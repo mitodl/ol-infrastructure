@@ -70,4 +70,6 @@ dagster_db = rds.Instance(
     character_set_name='utf8',
     copy_tags_to_snapshot=True,
     deletion_protection=True,
+    instance_class
 )
+
