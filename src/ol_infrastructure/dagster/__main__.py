@@ -25,15 +25,15 @@ dagster_policy = {
     'Version': '2012-10-17',
     'Statement': [
         {
-            "Effect": "Allow",
-            "Action": [
-                "s3:List*",
-                "s3:Get*",
-                "s3:Put*"
+            'Effect': 'Allow',
+            'Action': [
+                's3:List*',
+                's3:Get*',
+                's3:Put*'
             ],
-            "Resource": [
-                f"arn:aws:s3:::{dagster_bucket}",
-                f"arn:aws:s3:::{dagster_bucket}/*"
+            'Resource': [
+                f'arn:aws:s3:::{dagster_bucket}',
+                f'arn:aws:s3:::{dagster_bucket}/*'
             ]
         }
     ]
@@ -72,4 +72,3 @@ dagster_db = rds.Instance(
     deletion_protection=True,
     instance_class
 )
-
