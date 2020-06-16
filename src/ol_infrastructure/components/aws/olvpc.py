@@ -8,15 +8,23 @@ This includes:
 
     - Create an internet gateway
 
+    - Create an IPv6 egress gateway
+
     - Create a route table and associate the created subnets with it
 
     - Create a routing table to include the relevant peers and their networks
 """
-from ipaddress import IPv4Network
+from ipaddress import IPv4Network, IPv6Network
 from itertools import cycle
 from typing import Dict, List, Optional, Text
 
-from pulumi import ComponentResource, ResourceOptions, ResourceTransformationArgs, ResourceTransformationResult
+from pulumi import (
+    ComponentResource,
+    Output,
+    ResourceOptions,
+    ResourceTransformationArgs,
+    ResourceTransformationResult
+)
 from pulumi_aws import ec2
 from pydantic import PositiveInt, validator
 
@@ -25,7 +33,8 @@ from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit
 
 MIN_SUBNETS = PositiveInt(3)
 MAX_NET_PREFIX = 21  # A CIDR block of prefix length 21 allows for up to 8 /24 subnet blocks
-SUBNET_PREFIX = 24  # A CIDR block of prefix length 24 allows for up to 255 individual IP addresses
+SUBNET_PREFIX_V4 = 24  # A CIDR block of prefix length 24 allows for up to 255 individual IP addresses
+SUBNET_PREFIX_V6 = 64
 
 class OLVPCConfig(AWSBase):
     """Schema definition for VPC configuration values."""
@@ -89,7 +98,7 @@ class OLVPC(ComponentResource):
     A component resource that encapsulates all of the standard practices of how the Open Learning Platform Engineering
     team constructs and organizes VPC environments in AWS.
     """
-    def __init__(self, vpc_config: OLVPCConfig, opts: Optional[Dict] = None):  # noqa: WPS210
+    def __init__(self, vpc_config: OLVPCConfig, opts: Optional[ResourceOptions] = None):  # noqa: WPS210
         """Build an AWS VPC with subnets, internet gateway, and routing table.
 
         :param vpc_config: Configuration object for customizing the created VPC and associated resources.
@@ -98,10 +107,17 @@ class OLVPC(ComponentResource):
         super().__init__('ol:infrastructure:VPC', vpc_config.vpc_name, None, opts)
         resource_options = ResourceOptions(parent=self)
         # try:
-        #     existing_vpc = ec2.get_vpc(tags={'Environment': vpc_config.tags['Environment']})
-        # except 
-        # if existing_vpc and not existing_vpc.tags.get('pulumi_managed'):
-        #     vpc_options = ResourceOptions.merge(resource_options, ResourceOptions(import_=existing_vpc.id))
+        #     existing_vpcs = ec2.get_vpcs(tags={'Name': vpc_config.tags.get('Name')})
+        # except:
+        #     existing_vpcs = []
+        # if existing_vpcs:
+        #     unique_vpcs = []
+        #     for vpc in existing_vpcs:
+        #         if vpc not in unique_vpcs:
+        #             unique_vpcs.append(vpc)
+        #     if len(unique_vpcs) == 1:
+        #         vpc_options = ResourceOptions.merge(
+        #             resource_options, ResourceOptions(import_=unique_vpcs[0].id))
         # else:
         vpc_options = resource_options
 
@@ -118,7 +134,14 @@ class OLVPC(ComponentResource):
             f'{vpc_config.vpc_name}-internet-gateway',
             vpc_id=olvpc.id,
             tags=vpc_config.tags,
-            opts=ResourceOptions(parent=self))
+            opts=resource_options)
+
+        egress_gateway = ec2.EgressOnlyInternetGateway(
+            f'{vpc_config.vpc_name}-egress-internet-gateway',
+            opts=resource_options,
+            vpc_id=olvpc.id,
+            tags=vpc_config.tags
+        )
 
         route_table = ec2.RouteTable(
             f'{vpc_config.vpc_name}-route-table',
@@ -128,6 +151,10 @@ class OLVPC(ComponentResource):
                 {
                     'cidr_block': '0.0.0.0/0',
                     'gateway_id': gateway.id
+                },
+                {
+                    "ipv6CidrBlock": "::/0",
+                    "egressOnlyGatewayId": egress_gateway.id
                 }
             ],
             opts=ResourceOptions(parent=self)
@@ -135,15 +162,19 @@ class OLVPC(ComponentResource):
 
         olvpc_subnets: List[ec2.Subnet] = []
         zones: List[Text] = availability_zones(vpc_config.region)
+        v6net = olvpc.ipv6_cidr_block.apply(
+            lambda cidr: [str(net) for net in IPv6Network(cidr).subnets(new_prefix=SUBNET_PREFIX_V6)])
         subnet_iterator = zip(
             range(vpc_config.num_subnets),
             cycle(zones),
-            vpc_config.cidr_block.subnets(new_prefix=SUBNET_PREFIX))
-        for index, zone, subnet in subnet_iterator:
+            vpc_config.cidr_block.subnets(new_prefix=SUBNET_PREFIX_V4),
+            v6net)
+        for index, zone, subnet_v4, subnet_v6 in subnet_iterator:
             net_name = f'{vpc_config.vpc_name}-subnet-{index + 1}'
             ol_subnet = ec2.Subnet(
                 net_name,
-                cidr_block=str(subnet),
+                cidr_block=str(subnet_v4),
+                ipv6_cidr_block=subnet_v6,
                 availability_zone=zone,
                 vpc_id=olvpc.id,
                 map_public_ip_on_launch=vpc_config.default_public_ip,
@@ -161,7 +192,6 @@ class OLVPC(ComponentResource):
             f'{vpc_config.vpc_name}-s3',
             service_name='com.amazonaws.us-east-1.s3',
             vpc_id=olvpc.id,
-            subnet_ids=[net.id for net in olvpc_subnets],
             tags=vpc_config.tags,
             opts=ResourceOptions(parent=self))
 

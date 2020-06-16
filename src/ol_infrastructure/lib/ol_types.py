@@ -10,19 +10,26 @@ REQUIRED_TAGS = {'OU', 'Environment'}
 
 @unique
 class BusinessUnit(str, Enum):  # noqa: WPS600
+    '''
+    Canonical source of truth for defining valid OU tags to be used for cost allocation purposes.
+    '''
     bootcamps = 'bootcamps'
+    data = 'data'
     micromasters = 'micromasters'
-    xpro = 'mitxpro'
-    ovs = 'odl-video'
+    mit_open = 'mit-open'
+    mitx = 'mitx'
     ocw = 'open-courseware'
     operations = 'operations'
+    ovs = 'odl-video'
     residential = 'residential'
     starteam = 'starteam'
-    mit_open = 'mit-open'
-    data = 'data'
+    xpro = 'mitxpro'
 
 
 class AWSBase(BaseModel):
+    '''
+    Base class for deriving configuration objects to pass to AWS component resources.
+    '''
     tags: dict
     region: Text = 'us-east-1'
 
