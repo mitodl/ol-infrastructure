@@ -1,3 +1,10 @@
+# Getting Started
+This is a Pulumi project, so the first step is to install the Pulumi CLI along with the relevant language protocol. Instructions [here](https://www.pulumi.com/docs/get-started/install/).
+
+To install and manage the relevant dependencies this project uses [Poetry](https://python-poetry.org/). After installing the Poetry CLI simply run `poetry install`.
+
+We use the S3 state backend for Pulumi, so after installing the Pulumi CLI run `pulumi login s3://mitol-pulumi-state`.
+
 # Structure
 
 This is a monorepo of the Pulumi code that we use to manage the infrastructure that powers MIT Open Learning
@@ -22,3 +29,5 @@ own `Project`, meaning that it will have a `Pulumi.yaml` definition of that proj
 Stack names should be a dot-separated namespaced representation of the project path, suffixed with an environment specifier in the form of QA or Production. The capitalization is important as it will be used directly to interpolate into tag objects. It is easier to start with QA and Production and then call `.lower()` than it is to build a dictionary mapping the lowercase versions to their properly capitalized representation.
 
 The dotted namespace allows for peaceful coexistence of multiple projects within a single state backend, as well as allowing for use of [stack references](https://www.pulumi.com/docs/tutorials/aws/aws-py-stackreference/) between projects.
+
+The infrastructure components should be properly namespaced to match the stack names. For example, the project for managing VPC networking in AWS is located at `infrastructure/aws/network/` and the corresponding stacks are defined as `aws.network.QA` and `aws.network.Production`.
