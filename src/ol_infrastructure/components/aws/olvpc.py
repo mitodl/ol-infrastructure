@@ -1,18 +1,15 @@
+# coding: utf-8
 """This module defines a Pulumi component resource for encapsulating our best practices for building an AWS VPC.
 
 This includes:
 
-    - Create the named VPC with appropriate tags
-
-    - Create a minimum of 3 subnets across multiple availability zones
-
-    - Create an internet gateway
-
-    - Create an IPv6 egress gateway
-
-    - Create a route table and associate the created subnets with it
-
-    - Create a routing table to include the relevant peers and their networks
+- Create the named VPC with appropriate tags
+- Create a minimum of 3 subnets across multiple availability zones
+- Create an internet gateway
+- Create an IPv6 egress gateway
+- Create a route table and associate the created subnets with it
+- Create a routing table to include the relevant peers and their networks
+- Create an RDS subnet group
 """
 from ipaddress import IPv4Network, IPv6Network
 from itertools import cycle
@@ -25,7 +22,7 @@ from pulumi import (
     ResourceTransformationArgs,
     ResourceTransformationResult
 )
-from pulumi_aws import ec2
+from pulumi_aws import ec2, rds
 from pydantic import PositiveInt, validator
 
 from ol_infrastructure.lib.aws.ec2_helper import availability_zones
@@ -38,7 +35,6 @@ SUBNET_PREFIX_V6 = 64
 
 class OLVPCConfig(AWSBase):
     """Schema definition for VPC configuration values."""
-
     vpc_name: Text
     cidr_block: IPv4Network
     num_subnets: PositiveInt = MIN_SUBNETS
@@ -104,7 +100,7 @@ class OLVPC(ComponentResource):
         :param vpc_config: Configuration object for customizing the created VPC and associated resources.
         :type vpc_config: OLVPCConfig
         """
-        super().__init__('ol:infrastructure:VPC', vpc_config.vpc_name, None, opts)
+        super().__init__('ol:infrastructure:aws:VPC', vpc_config.vpc_name, None, opts)
         resource_options = ResourceOptions(parent=self)
         # try:
         #     existing_vpcs = ec2.get_vpcs(tags={'Name': vpc_config.tags.get('Name')})
@@ -188,6 +184,14 @@ class OLVPC(ComponentResource):
                 opts=ResourceOptions(parent=self))
             olvpc_subnets.append(ol_subnet)
 
+        db_subnet_group = rds.SubnetGroup(
+            f'{vpc_config.vpc_name}-db-subnet-group',
+            opts=resource_options,
+            description=f'RDS subnet group for {vpc_config.vpc_name}',
+            name=f'{vpc_config.vpc_name}-db-subnet-group',
+            subnet_ids=[net.id for net in olvpc_subnets],
+            tags=vpc_config.tags)
+
         ec2.VpcEndpoint(
             f'{vpc_config.vpc_name}-s3',
             service_name='com.amazonaws.us-east-1.s3',
@@ -198,5 +202,6 @@ class OLVPC(ComponentResource):
         self.register_outputs({
             'olvpc': olvpc,
             'subnets': olvpc_subnets,
-            'route_table': route_table
+            'route_table': route_table,
+            'rds_subnet_group': db_subnet_group
         })

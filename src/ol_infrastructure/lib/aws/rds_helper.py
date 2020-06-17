@@ -2,12 +2,14 @@
 
 from collections import defaultdict
 from typing import Dict, List, Text
+from functools import lru_cache
 
 import boto3
 
 rds_client = boto3.client('rds')
 
 
+@lru_cache
 def db_engines() -> Dict[Text, List[Text]]:
     """Generate a list of database engines and their currently available
     versions on RDS.
@@ -23,6 +25,7 @@ def db_engines() -> Dict[Text, List[Text]]:
     return dict(engines_versions)
 
 
+@lru_cache
 def parameter_group_family(engine: Text, engine_version: Text) -> Text:
     """Return the valid parameter group family for the specified DB engine and
     version.

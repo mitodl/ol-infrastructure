@@ -1,10 +1,12 @@
 from typing import List, Text
+from functools import lru_cache
 
 import boto3
 
 ec2_client = boto3.client('ec2')
 
 
+@lru_cache
 def aws_regions() -> List[Text]:
     """Generate the list of regions available in AWS.
 
@@ -15,6 +17,7 @@ def aws_regions() -> List[Text]:
     return [region['RegionName'] for region in ec2_client.describe_regions()['Regions']]
 
 
+@lru_cache
 def availability_zones(region: Text) -> List[Text]:
     """Generate a list of availability zones for a given AWS region.
 

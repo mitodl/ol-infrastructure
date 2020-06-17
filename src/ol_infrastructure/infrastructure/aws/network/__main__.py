@@ -1,7 +1,8 @@
 from pulumi import get_stack, config
 from ol_infrastructure.components.aws.olvpc import OLVPC, OLVPCConfig
 
-stack_name = get_stack()
+stack = get_stack()
+stack_name = stack.split('.')[-1]
 env_suffix = stack_name.lower()
 data_vpc_config = OLVPCConfig(
     vpc_name=f'ol-data-{env_suffix}',

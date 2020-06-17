@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
-from ol_infrastructure.components.aws.olvpc import OLVPCConfig
 
+from ol_infrastructure.components.aws.olvpc import OLVPCConfig
 
 VALID_CONFIG = dict(
     tags={'OU': 'operations', 'Environment': 'test'},
