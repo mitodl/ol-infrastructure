@@ -1,7 +1,9 @@
-import pulumi
+from pulumi import get_stack
+from pulumi.config import get_config
 import boto3
 from pulumi_aws import rds, s3, ec2, iam
 from pulumi_vault import database
+from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 
 # Create bucket for Dagster state
 # Create RDS Postgres DB for Dagster persistence
@@ -59,16 +61,7 @@ iam.InstanceProfile('dagster_instance_profile', role=dagster_role)
 postgres_parameter_group = rds.ParameterGroup()
 
 
-dagster_db = rds.Instance(
-    'dagster-storage',
-    engine='postgres',
-    engine_version='12.2',
-    allocated_storage=50,
-    max_allocated_storage=250,
-    auto_minor_version_upgrade=True,
-    backup_retention_period=30,
-    character_set_name='utf8',
-    copy_tags_to_snapshot=True,
-    deletion_protection=True,
-    instance_class
+dagster_db_config = OLPostgresDBConfig(
+    multi_az=get_config('')
 )
+dagster_db = OLAmazonDB
