@@ -36,6 +36,12 @@ class StorageType(str, Enum):
 
 class OLReplicaDBConfig(BaseModel):
     instance_size: Text = 'db.t3.small'
+    storage_type: StorageType = StorageType.ssd
+    public_access: bool = False
+    security_groups: Optional[List[rds.SecurityGroup]] = None
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class OLDBConfig(AWSBase):
@@ -44,6 +50,7 @@ class OLDBConfig(AWSBase):
     instance_name: Text  # The name of the RDS instance
     password: SecretStr
     subnet_group_name: Text
+    security_groups: List[rds.SecurityGroup]
     backup_days: conint(ge=0, le=35, strict=True) = 30
     db_name: Optional[Text] = None  # The name of the database schema to create
     instance_size: Text = 'db.m5.large'
@@ -57,6 +64,9 @@ class OLDBConfig(AWSBase):
     storage_type: StorageType = StorageType.ssd
     username: Text = 'oldevops'
     read_replica: Optional[OLReplicaDBConfig] = None
+
+    class Config:
+        arbitrary_types_allowed = True
 
     @validator('engine')
     def is_valid_engine(cls: 'OLDBConfig', engine: Text) -> Text:
@@ -134,7 +144,6 @@ class OLAmazonDB(pulumi.ComponentResource):
             final_snapshot_identifier=f'{db_config.instance_name}-{db_config.engine}-final-snapshot',
             identifier=db_config.instance_name,
             instance_class=db_config.instance_size,
-            kms_key_id=db_config.kms_key_id,
             max_allocated_storage=db_config.max_storage,
             multi_az=db_config.multi_az,
             name=db_config.db_name,
@@ -148,10 +157,28 @@ class OLAmazonDB(pulumi.ComponentResource):
             storage_type=str(db_config.storage_type),
             tags=db_config.tags,
             username=db_config.username,
-            vpc_security_group_ids=db_config.security_groups,
+            vpc_security_group_ids=[group.id for group in db_config.security_groups],
         )
 
-        pulumi.register_outputs({
+        component_outputs = {
             'parameter_group': parameter_group,
             'rds_instance': db_instance
-        })
+        }
+
+        if db_config.read_replica:
+            db_replica = rds.Instance(
+                f'{db_config.instance_name}-{db_config.engine}-replica',
+                identifier=f'{db_config.instance_name}-replica',
+                instance_class=db_config.read_replica.instance_size,
+                kms_key_id=db_instance.kms_key_id,
+                opts=resource_options,
+                publicly_accessible=db_config.read_replica.public_access,
+                replicate_source_db=db_instance.id,
+                storage_type=db_config.read_replica.storage_type,
+                tags=db_config.tags,
+                vpc_security_group_ids=(
+                    db_config.read_replica.security_groups or db_config.security_groups)
+            )
+            component_outputs['rds_replica'] = db_replica
+
+        self.register_outputs(component_outputs)

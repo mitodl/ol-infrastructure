@@ -1,4 +1,4 @@
-from pulumi import get_stack, config
+from pulumi import get_stack, config, export
 from ol_infrastructure.components.aws.olvpc import OLVPC, OLVPCConfig
 
 stack = get_stack()
@@ -14,3 +14,5 @@ data_vpc_config = OLVPCConfig(
         'business_unit': 'data',
         'Name': f'{stack_name} Data Services'})
 data_vpc = OLVPC(data_vpc_config)
+
+export('data_vpc', data_vpc)
