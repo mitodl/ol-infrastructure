@@ -121,6 +121,18 @@ class OLAmazonDB(pulumi.ComponentResource):
     """Component to create an RDS instance with sane defaults and manage associated resources."""
 
     def __init__(self, db_config: OLDBConfig, opts: pulumi.ResourceOptions = None):
+        """Create an RDS instance, parameter group, and optionally read replica.
+
+        :param db_config: Configuration object for customizing the deployed database instance.
+        :type db_config: OLDBConfig
+
+        :param opts: Custom pulumi options to pass to child resources.
+        :type opts: pulumi.ResourceOptions
+
+        :returns: The constructed component resource object.
+
+        :rtype: OLAMazonDB
+        """
         super().__init__('ol:infrastructure:aws:database:OLAmazonDB', db_config.instance_name, None, opts)
 
         resource_options = pulumi.ResourceOptions(parent=self)

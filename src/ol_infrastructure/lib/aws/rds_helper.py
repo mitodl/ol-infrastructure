@@ -11,8 +11,7 @@ rds_client = boto3.client('rds')
 
 @lru_cache
 def db_engines() -> Dict[Text, List[Text]]:
-    """Generate a list of database engines and their currently available
-    versions on RDS.
+    """Generate a list of database engines and their currently available versions on RDS.
 
     :returns: Dictionary of engine names and the list of available versions
     :rtype: Dict[Text, List[Text]]
@@ -27,8 +26,7 @@ def db_engines() -> Dict[Text, List[Text]]:
 
 @lru_cache
 def parameter_group_family(engine: Text, engine_version: Text) -> Text:
-    """Return the valid parameter group family for the specified DB engine and
-    version.
+    """Return the valid parameter group family for the specified DB engine and version.
 
     :param engine: Name of the RDS database engine (e.g. postgres, mysql, etc.)
     :type engine: Text
