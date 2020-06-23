@@ -117,7 +117,7 @@ class OLVPC(ComponentResource):
         # else:
         vpc_options = resource_options
 
-        olvpc = ec2.Vpc(
+        self.olvpc = ec2.Vpc(
             vpc_config.vpc_name,
             cidr_block=str(vpc_config.cidr_block),
             enable_dns_support=True,
@@ -126,39 +126,39 @@ class OLVPC(ComponentResource):
             tags=vpc_config.tags,
             opts=vpc_options)
 
-        gateway = ec2.InternetGateway(
+        self.gateway = ec2.InternetGateway(
             f'{vpc_config.vpc_name}-internet-gateway',
-            vpc_id=olvpc.id,
+            vpc_id=self.olvpc.id,
             tags=vpc_config.tags,
             opts=resource_options)
 
-        egress_gateway = ec2.EgressOnlyInternetGateway(
+        self.egress_gateway = ec2.EgressOnlyInternetGateway(
             f'{vpc_config.vpc_name}-egress-internet-gateway',
             opts=resource_options,
-            vpc_id=olvpc.id,
+            vpc_id=self.olvpc.id,
             tags=vpc_config.tags
         )
 
-        route_table = ec2.RouteTable(
+        self.route_table = ec2.RouteTable(
             f'{vpc_config.vpc_name}-route-table',
             tags=vpc_config.tags,
-            vpc_id=olvpc.id,
+            vpc_id=self.olvpc.id,
             routes=[
                 {
                     'cidr_block': '0.0.0.0/0',
-                    'gateway_id': gateway.id
+                    'gateway_id': self.gateway.id
                 },
                 {
                     "ipv6CidrBlock": "::/0",
-                    "egressOnlyGatewayId": egress_gateway.id
+                    "egressOnlyGatewayId": self.egress_gateway.id
                 }
             ],
             opts=ResourceOptions(parent=self)
         )
 
-        olvpc_subnets: List[ec2.Subnet] = []
+        self.olvpc_subnets: List[ec2.Subnet] = []
         zones: List[Text] = availability_zones(vpc_config.region)
-        v6net = olvpc.ipv6_cidr_block.apply(
+        v6net = self.olvpc.ipv6_cidr_block.apply(
             lambda cidr: [str(net) for net in IPv6Network(cidr).subnets(new_prefix=SUBNET_PREFIX_V6)])
         subnet_iterator = zip(
             range(vpc_config.num_subnets),
@@ -172,7 +172,7 @@ class OLVPC(ComponentResource):
                 cidr_block=str(subnet_v4),
                 ipv6_cidr_block=subnet_v6,
                 availability_zone=zone,
-                vpc_id=olvpc.id,
+                vpc_id=self.olvpc.id,
                 map_public_ip_on_launch=vpc_config.default_public_ip,
                 tags=vpc_config.tags,
                 assign_ipv6_address_on_creation=vpc_config.enable_ipv6,
@@ -180,28 +180,28 @@ class OLVPC(ComponentResource):
             ec2.RouteTableAssociation(
                 f'{net_name}-route-table-association',
                 subnet_id=ol_subnet.id,
-                route_table_id=route_table.id,
-                opts=ResourceOptions(parent=self))
-            olvpc_subnets.append(ol_subnet)
+                route_table_id=self.route_table.id,
+                opts=resource_options)
+            self.olvpc_subnets.append(ol_subnet)
 
-        db_subnet_group = rds.SubnetGroup(
+        self.db_subnet_group = rds.SubnetGroup(
             f'{vpc_config.vpc_name}-db-subnet-group',
             opts=resource_options,
             description=f'RDS subnet group for {vpc_config.vpc_name}',
             name=f'{vpc_config.vpc_name}-db-subnet-group',
-            subnet_ids=[net.id for net in olvpc_subnets],
+            subnet_ids=[net.id for net in self.olvpc_subnets],
             tags=vpc_config.tags)
 
         ec2.VpcEndpoint(
             f'{vpc_config.vpc_name}-s3',
             service_name='com.amazonaws.us-east-1.s3',
-            vpc_id=olvpc.id,
+            vpc_id=self.olvpc.id,
             tags=vpc_config.tags,
             opts=ResourceOptions(parent=self))
 
         self.register_outputs({
-            'olvpc': olvpc,
-            'subnets': olvpc_subnets,
-            'route_table': route_table,
-            'rds_subnet_group': db_subnet_group
+            'olvpc': self.olvpc,
+            'subnets': self.olvpc_subnets,
+            'route_table': self.route_table,
+            'rds_subnet_group': self.db_subnet_group
         })

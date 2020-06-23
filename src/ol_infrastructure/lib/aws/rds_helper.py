@@ -1,8 +1,8 @@
 # coding: utf-8
 
 from collections import defaultdict
-from typing import Dict, List, Text
 from functools import lru_cache
+from typing import Dict, List, Text
 
 import boto3
 
@@ -41,4 +41,4 @@ def parameter_group_family(engine: Text, engine_version: Text) -> Text:
     :rtype: Text
     """
     engine_details = rds_client.describe_db_engine_versions(Engine=engine, EngineVersion=engine_version)
-    return engine_details['DBParameterGroupFamily']
+    return engine_details['DBEngineVersions'][0]['DBParameterGroupFamily']

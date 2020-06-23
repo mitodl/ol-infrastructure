@@ -15,4 +15,6 @@ data_vpc_config = OLVPCConfig(
         'Name': f'{stack_name} Data Services'})
 data_vpc = OLVPC(data_vpc_config)
 
-export('data_vpc', data_vpc)
+export('data_vpc_id', data_vpc.olvpc.id)
+export('data_vpc_cidr', data_vpc.olvpc.cidr_block)
+export('data_vpc_rds_subnet', data_vpc.db_subnet_group.name)

@@ -22,34 +22,35 @@ from ol_infrastructure.lib.aws.rds_helper import (
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 
-# manage backup policy
-# generate or retrieve password in config
-# create DB security group
-# storage encrypted
 
+class StorageType(str, Enum):  # noqa: WPS600
+    """Container for constraining available selection of storage types."""
 
-class StorageType(str, Enum):
     magnetic = 'standard'
     ssd = 'gp2'
     performance = 'io1'
 
 
 class OLReplicaDBConfig(BaseModel):
+    """Configuration object for defining configuration needed to create a read replica."""
+
     instance_size: Text = 'db.t3.small'
     storage_type: StorageType = StorageType.ssd
     public_access: bool = False
     security_groups: Optional[List[rds.SecurityGroup]] = None
 
-    class Config:
+    class Config:  # noqa: WPS431
         arbitrary_types_allowed = True
 
 
 class OLDBConfig(AWSBase):
+    """Configuration object for defining the interface to create an RDS instance with sane defaults."""
+
     engine: Text
     engine_version: Text
     instance_name: Text  # The name of the RDS instance
     password: SecretStr
-    subnet_group_name: Text
+    subnet_group_name: Union[Text, pulumi.Output[str]]
     security_groups: List[rds.SecurityGroup]
     backup_days: conint(ge=0, le=35, strict=True) = 30
     db_name: Optional[Text] = None  # The name of the database schema to create
@@ -59,13 +60,12 @@ class OLDBConfig(AWSBase):
     multi_az: bool = True
     prevent_delete: bool = True
     public_access: bool = False
-    read_replica: Optional[Dict] = None
     storage: PositiveInt = PositiveInt(50)
     storage_type: StorageType = StorageType.ssd
     username: Text = 'oldevops'
     read_replica: Optional[OLReplicaDBConfig] = None
 
-    class Config:
+    class Config:  # noqa: WPS431, WPS306
         arbitrary_types_allowed = True
 
     @validator('engine')
@@ -86,6 +86,8 @@ class OLDBConfig(AWSBase):
 
 
 class OLPostgresDBConfig(OLDBConfig):
+    """Configuration container to specify settings specific to Postgres."""
+
     engine: Text = 'postgres'
     engine_version: Text = '12.3'
     port: PositiveInt = PositiveInt(5432)
@@ -99,6 +101,8 @@ class OLPostgresDBConfig(OLDBConfig):
 
 
 class OLMariaDBConfig(OLDBConfig):
+    """Configuration container to specify settings specific to MariaDB."""
+
     engine: Text = 'mariadb'
     engine_version: Text = '10.4.8'
     port: PositiveInt = PositiveInt(3306)
@@ -114,9 +118,10 @@ class OLMariaDBConfig(OLDBConfig):
 
 
 class OLAmazonDB(pulumi.ComponentResource):
+    """Component to create an RDS instance with sane defaults and manage associated resources."""
 
     def __init__(self, db_config: OLDBConfig, opts: pulumi.ResourceOptions = None):
-        super().__init__('ol:infrastructure:aws:rds:PostgresDB', db_config.instance_name, None, opts)
+        super().__init__('ol:infrastructure:aws:database:OLAmazonDB', db_config.instance_name, None, opts)
 
         resource_options = pulumi.ResourceOptions(parent=self)
 
@@ -149,7 +154,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             name=db_config.db_name,
             opts=resource_options,
             parameter_group_name=parameter_group.name,
-            password=db_config.password,
+            password=db_config.password.get_secret_value(),
             port=db_config.port,
             publicly_accessible=db_config.is_public,
             skip_final_snapshot=False,

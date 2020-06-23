@@ -25,7 +25,9 @@ stack_name = stack.split('.')[-1]
 namespace = stack.rsplit('.', 1)[0]
 env_suffix = stack_name.lower()
 network_stack = StackReference(f'aws.network.{stack_name}')
-data_vpc = network_stack.get_output('data_vpc')
+data_vpc_id = network_stack.get_output('data_vpc_id')
+data_vpc_cidr = network_stack.get_output('data_vpc_cidr')
+data_vpc_rds_subnet = network_stack.get_output('data_vpc_rds_subnet')
 aws_config = AWSBase(
     tags={
         'OU': 'data',
@@ -93,17 +95,18 @@ dagster_profile = iam.InstanceProfile(
 dagster_db_security_group = rds.SecurityGroup(
     f'dagster_db_access_{env_suffix}',
     name=f'ol-etl-db-access-{env_suffix}',
-    ingress={
-        'cidr': data_vpc.olvpc.cidr_block
-    },
+    ingress=[
+        {'cidr': data_vpc_cidr}
+    ],
     tags=aws_config.tags
 )
 
 dagster_db_config = OLPostgresDBConfig(
     instance_name=f'ol-etl-db-{env_suffix}',
     password=get_config('dagster:db_password'),
-    subnet_group_name=data_vpc.rds_subnet_group.name,
+    subnet_group_name=data_vpc_rds_subnet,
     security_groups=[dagster_db_security_group],
-    **defaults['rds']
+    tags=aws_config.tags,
+    **defaults(stack)['rds']
 )
 dagster_db = OLAmazonDB(dagster_db_config)
