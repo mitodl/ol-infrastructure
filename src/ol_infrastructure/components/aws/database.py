@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Text, Union
 
 import pulumi
 from pulumi_aws import rds
+from pulumi_aws.ec2 import SecurityGroup
 from pydantic import BaseModel, PositiveInt, SecretStr, conint, validator
 
 from ol_infrastructure.lib.aws.rds_helper import (
@@ -37,9 +38,9 @@ class OLReplicaDBConfig(BaseModel):
     instance_size: Text = 'db.t3.small'
     storage_type: StorageType = StorageType.ssd
     public_access: bool = False
-    security_groups: Optional[List[rds.SecurityGroup]] = None
+    security_groups: Optional[List[SecurityGroup]] = None
 
-    class Config:  # noqa: WPS431
+    class Config:  # noqa: WPS431, D106
         arbitrary_types_allowed = True
 
 
@@ -51,7 +52,7 @@ class OLDBConfig(AWSBase):
     instance_name: Text  # The name of the RDS instance
     password: SecretStr
     subnet_group_name: Union[Text, pulumi.Output[str]]
-    security_groups: List[rds.SecurityGroup]
+    security_groups: List[SecurityGroup]
     backup_days: conint(ge=0, le=35, strict=True) = 30
     db_name: Optional[Text] = None  # The name of the database schema to create
     instance_size: Text = 'db.m5.large'
@@ -93,8 +94,6 @@ class OLPostgresDBConfig(OLDBConfig):
     port: PositiveInt = PositiveInt(5432)
     parameter_overrides: List[Dict[Text, Union[Text, bool, int, float]]] = [
         {'name': 'client_encoding', 'value': 'UTF-8'},
-        {'name': 'server_encoding', 'value': 'UTF-8'},
-        {'name': 'log_timezone', 'value': 'UTC'},
         {'name': 'timezone', 'value': 'UTC'},
         {'name': 'rds.force_ssl', 'value': 1}
     ]
@@ -171,10 +170,10 @@ class OLAmazonDB(pulumi.ComponentResource):
             publicly_accessible=db_config.is_public,
             skip_final_snapshot=False,
             storage_encrypted=True,
-            storage_type=str(db_config.storage_type),
+            storage_type=db_config.storage_type.value,
             tags=db_config.tags,
             username=db_config.username,
-            vpc_security_group_ids=[group.id for group in db_config.security_groups],
+            vpc_security_group_ids=[group.id for group in db_config.security_groups]
         )
 
         component_outputs = {
@@ -191,10 +190,10 @@ class OLAmazonDB(pulumi.ComponentResource):
                 opts=resource_options,
                 publicly_accessible=db_config.read_replica.public_access,
                 replicate_source_db=db_instance.id,
-                storage_type=db_config.read_replica.storage_type,
+                storage_type=db_config.read_replica.storage_type.value,
                 tags=db_config.tags,
-                vpc_security_group_ids=(
-                    db_config.read_replica.security_groups or db_config.security_groups)
+                vpc_security_group_ids=[group.id for group in
+                                        db_config.read_replica.security_groups or db_config.security_groups]
             )
             component_outputs['rds_replica'] = db_replica
 

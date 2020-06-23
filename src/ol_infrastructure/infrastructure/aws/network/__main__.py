@@ -17,4 +17,5 @@ data_vpc = OLVPC(data_vpc_config)
 
 export('data_vpc_id', data_vpc.olvpc.id)
 export('data_vpc_cidr', data_vpc.olvpc.cidr_block)
+export('data_vpc_cidr_v6', data_vpc.olvpc.ipv6_cidr_block)
 export('data_vpc_rds_subnet', data_vpc.db_subnet_group.name)

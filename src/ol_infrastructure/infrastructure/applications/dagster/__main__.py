@@ -27,6 +27,7 @@ env_suffix = stack_name.lower()
 network_stack = StackReference(f'aws.network.{stack_name}')
 data_vpc_id = network_stack.get_output('data_vpc_id')
 data_vpc_cidr = network_stack.get_output('data_vpc_cidr')
+data_vpc_cidr_v6 = network_stack.get_output('data_vpc_cidr_v6')
 data_vpc_rds_subnet = network_stack.get_output('data_vpc_rds_subnet')
 aws_config = AWSBase(
     tags={
@@ -71,34 +72,55 @@ dagster_runtime_bucket = s3.Bucket(
 
 # Create instance profile for granting access to S3 buckets
 dagster_iam_policy = iam.Policy(
-    f'dagster_policy_{env_suffix}',
-    path=f'/ol-data/etl-policy-{env_suffix}',
+    f'dagster-policy-{env_suffix}',
+    path=f'/ol-data/etl-policy-{env_suffix}/',
     policy=dagster_bucket_policy,
     description='Policy for granting acces for batch data workflows to AWS resources'
 )
 
 dagster_role = iam.Role(
-    'etl_instance_role',
-    assume_role_policy=dagster_iam_policy.policy,
-    name=f'etl_instance_role-{env_suffix}',
-    path='/ol-data/etl-role',
+    'etl-instance-role',
+    assume_role_policy={
+        'Version': '2012-10-17',
+        'Statement': {
+            'Effect': 'Allow',
+            'Action': 'sts:AssumeRole',
+            'Principal': {'Service': 'ec2.amazonaws.com'}
+        }
+    },
+    name=f'etl-instance-role-{env_suffix}',
+    path='/ol-data/etl-role/',
     tags=aws_config.tags
+)
+
+iam.RolePolicyAttachment(
+    f'dagster-role-policy-{env_suffix}',
+    policy_arn=dagster_iam_policy.arn,
+    role=dagster_role.name
 )
 
 dagster_profile = iam.InstanceProfile(
-    f'dagster_instance_profile_{env_suffix}',
+    f'dagster-instance-profile-{env_suffix}',
     role=dagster_role.name,
     name=f'etl-instance-profile-{env_suffix}',
-    path='/ol-data/etl-profile'
+    path='/ol-data/etl-profile/'
 )
 
-dagster_db_security_group = rds.SecurityGroup(
-    f'dagster_db_access_{env_suffix}',
+dagster_db_security_group = ec2.SecurityGroup(
+    f'dagster-db-access-{env_suffix}',
     name=f'ol-etl-db-access-{env_suffix}',
+    description='Access from the data VPC to the Dagster database',
     ingress=[
-        {'cidr': data_vpc_cidr}
+        {
+            'cidr_blocks': [data_vpc_cidr],
+            'ipv6_cidr_blocks': [data_vpc_cidr_v6],
+            'protocol': 'tcp',
+            'from_port': 5432,
+            'to_port': 5432
+        }
     ],
-    tags=aws_config.tags
+    tags=aws_config.tags,
+    vpc_id=data_vpc_id
 )
 
 dagster_db_config = OLPostgresDBConfig(
