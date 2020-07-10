@@ -7,19 +7,18 @@ from ol_infrastructure.lib.ol_types import AWSBase
 aws_config = AWSBase(tags={'OU': 'mitxpro', 'Environment': 'operations'})
 
 s3.Bucket(
-    'xpro-legacy-certificates',
+    'xpro-legacy-certificates-bucket',
     bucket='certificates.mitxpro.mit.edu',
-    acl='public',
+    acl='public-read',
     tags=aws_config.tags,
     versioning={'enabled': True},
     cors_rules=[
         {
-            'allowedMethods': ['GET', 'HEAD', 'OPTIONS'],
+            'allowedMethods': ['GET', 'HEAD'],
             'allowedOrigins': ['*']
         }
     ],
     website={
         'indexDocument': 'index.html'
     },
-    region=aws_config.region
 )
