@@ -1,0 +1,118 @@
+"""Module for creating and managing static websites hosted in S3 and delivered through Cloudfront."""
+from enum import Enum
+from typing import List, Text, Optional
+
+from pydantic import validator
+from pulumi import ComponentResource, ResourceOptions
+from pulumi_aws import acm, cloudfront, s3
+
+from ol_infrastructure.lib.ol_types import AWSBase
+
+
+class CloudfrontPriceClass(str, Enum):  # noqa: WPS600
+    """Valid price classes for CloudFront to control tradeoffs of price vs. latency for global visitors."""
+
+    # For more details on price class refer to below link and search for PriceClass
+    # https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_DistributionConfig.html
+    # NB: POP == Points Of Presence which is where CDN edge servers are located
+    us_eu = 'PriceClass_100'  # POPs in US, Canada, Europe, and Israel
+    exclude_au_sa = 'PriceClass_200'  # POPs in all supported geos except South America and Australia
+    all_geos = 'PriceClass_All'  # POPs in all supoprted geos
+
+
+class S3ServerlessSiteConfig(AWSBase):
+    """Configuration object for customizing a static site hosted with S3 and Cloudfront."""
+
+    site_name: Text
+    domains: List[Text]
+    bucket_name: Text
+    site_index: Text = 'index.html'
+    cloudfront_price_class: CloudfrontPriceClass = CloudfrontPriceClass.us_eu
+
+
+class S3ServerlessSite(ComponentResource):
+    """A Pulumi component for constructing the resources to host a static website using S3 and Cloudfront."""
+
+    def __init__(self, site_config: S3ServerlessSiteConfig, opts: Optional[ResourceOptions] = None):
+        """Create an S3 bucket, ACM certificate, and Cloudfront distribution for hosting a static site.
+
+        :param site_config: Configuration object for customizing the component
+        :type site_config: S3ServerlessSiteConfig
+
+        :param opts: Pulumi resource options
+        :type opts: Optional[ResourceOptions]
+
+        :returns: A component resource comprised of the individual AWS resource elements.
+
+        :rtype: S3ServerlessSite
+        """
+        super().__init__('ol:infrastructure:aws:S3ServerlessSite', site_config.site_name, None, opts)
+        self.site_bucket = s3.Bucket(
+            f'{site_config.site_name}-bucket',
+            bucket=site_config.bucket_name,
+            acl='public-read',
+            tags=site_config.tags,
+            versioning={'enabled': True},
+            cors_rules=[
+                {
+                    'allowedMethods': ['GET', 'HEAD'],
+                    'allowedOrigins': ['*']
+                }
+            ],
+            website={
+                'indexDocument': site_config.site_index
+            },
+        )
+
+        self.site_tls = acm.Certificate(
+            f'{site_config.site_name}-tls',
+            domain_name=site_config.domains[0],
+            tags=site_config.tags,
+            validation_method='DNS',
+            subject_alternative_names=site_config.domains[1:]
+        )
+
+        s3_origin_id = f'{site_config.site_name}-s3-origin'
+
+        self.cloudfront_distribution = cloudfront.Distribution(
+            f'{site_config.site_name}-cloudfront-distribution',
+            aliases=site_config.domains,
+            comment=f'Cloudfront distribution for {site_config.site_name}',
+            default_cache_behavior={
+                'allowedMethods': [
+                    'GET',
+                    'HEAD',
+                    'OPTIONS',
+                ],
+                'cachedMethods': [
+                    'GET',
+                    'HEAD',
+                ],
+                'defaultTtl': 604800,
+                'forwardedValues': {
+                    'cookies': {
+                        'forward': 'none',
+                    },
+                    'queryString': False,
+                },
+                'maxTtl': 604800,
+                'minTtl': 0,
+                'targetOriginId': s3_origin_id,
+                'viewerProtocolPolicy': 'allow-all',
+            },
+            default_root_object='index.html',
+            enabled=True,
+            is_ipv6_enabled=True,
+            origins=[{
+                'domain_name': self.site_bucket.bucket_regional_domain_name,
+                'originId': s3_origin_id,
+            }],
+            price_class=str(site_config.cloudfront_price_class),
+            restrictions={'geoRestriction': {'restrictionType': 'none'}},
+            tags=site_config.tags,
+            viewer_certificate={
+                'acmCertificateArn': self.site_tls.arn,
+            }
+        )
+
+        self.register_outputs({})
