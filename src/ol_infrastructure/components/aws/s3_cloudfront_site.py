@@ -107,11 +107,12 @@ class S3ServerlessSite(ComponentResource):
                 'domain_name': self.site_bucket.bucket_regional_domain_name,
                 'originId': s3_origin_id,
             }],
-            price_class=str(site_config.cloudfront_price_class),
+            price_class=site_config.cloudfront_price_class.value,
             restrictions={'geoRestriction': {'restrictionType': 'none'}},
             tags=site_config.tags,
             viewer_certificate={
                 'acmCertificateArn': self.site_tls.arn,
+                'sslSupportMethod': 'sni-only'
             }
         )
 
