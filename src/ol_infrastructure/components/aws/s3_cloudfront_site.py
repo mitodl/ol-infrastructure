@@ -67,7 +67,7 @@ class S3ServerlessSite(ComponentResource):
         self.site_tls = acm.Certificate(
             f'{site_config.site_name}-tls',
             domain_name=site_config.domains[0],
-            tags=site_config.tags,
+            tags=site_config.merged_tags({'Name': f'{site_config.site_name}-certificate'}),
             validation_method='DNS',
             subject_alternative_names=site_config.domains[1:]
         )
@@ -109,7 +109,7 @@ class S3ServerlessSite(ComponentResource):
             }],
             price_class=site_config.cloudfront_price_class.value,
             restrictions={'geoRestriction': {'restrictionType': 'none'}},
-            tags=site_config.tags,
+            tags=site_config.merged_tags({'Name': f'{site_config.site_name}-cloudfront'}),
             viewer_certificate={
                 'acmCertificateArn': self.site_tls.arn,
                 'sslSupportMethod': 'sni-only'
