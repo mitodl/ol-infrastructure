@@ -1,6 +1,6 @@
 from pulumi import StackReference, get_stack
 from pulumi.config import get_config
-from pulumi_aws import ec2, iam, rds, s3
+from pulumi_aws import ec2, iam, s3
 
 from ol_infrastructure.components.aws.database import (
     OLAmazonDB,
