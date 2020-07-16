@@ -1,0 +1,2 @@
+config:
+  ol-infrastructure:src/ol_infrastructure/infrastructure/aws/dns: ""
