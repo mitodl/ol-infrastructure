@@ -3,6 +3,8 @@ from pulumi import export, StackReference
 from pulumi_aws import route53
 from ol_infrastructure.components.aws.s3_cloudfront_site import S3ServerlessSiteConfig, S3ServerlessSite
 
+fifteen_minutes = 60 * 15
+
 dns_stack = StackReference('infrastructure.aws.dns')
 mitxpro_zone_id = dns_stack.get_output('mitxpro_zone_id')
 xpro_legacy_certs_site_config = S3ServerlessSiteConfig(
@@ -16,7 +18,8 @@ xpro_legacy_certs_domain = route53.Record(
     'xpro-legacy-certificates-domain',
     name=xpro_legacy_certs_site_config.domains[0],
     type='CNAME',
-    records=xpro_legacy_certs_site.cloudfront_distribution.domain_name,
+    ttl=fifteen_minutes,
+    records=[xpro_legacy_certs_site.cloudfront_distribution.domain_name],
     zone_id=mitxpro_zone_id
 )
 
