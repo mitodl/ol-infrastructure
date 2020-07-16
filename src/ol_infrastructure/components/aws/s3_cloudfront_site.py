@@ -51,6 +51,18 @@ class S3ServerlessSite(ComponentResource):
             f'{site_config.site_name}-bucket',
             bucket=site_config.bucket_name,
             acl='public-read',
+            policy={
+                'Version':'2012-10-17',
+                'Statement':[
+                    {
+                        'Sid':'PublicRead',
+                        'Effect':'Allow',
+                        'Principal': '*',
+                        'Action':['s3:GetObject'],
+                        'Resource':[f'arn:aws:s3:::{site_config.bucket_name}/*']
+                    }
+                ]
+            },
             tags=site_config.tags,
             versioning={'enabled': True},
             cors_rules=[
