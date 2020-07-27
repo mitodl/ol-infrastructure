@@ -47,6 +47,9 @@ class S3ServerlessSite(ComponentResource):
         :rtype: S3ServerlessSite
         """
         super().__init__('ol:infrastructure:aws:S3ServerlessSite', site_config.site_name, None, opts)
+
+        resource_opts = ResourceOptions(parent=self).merge(opts)
+
         self.site_bucket = s3.Bucket(
             f'{site_config.site_name}-bucket',
             bucket=site_config.bucket_name,
@@ -74,6 +77,7 @@ class S3ServerlessSite(ComponentResource):
             website={
                 'indexDocument': site_config.site_index
             },
+            opts=resource_opts
         )
 
         self.site_tls = acm.Certificate(
@@ -81,7 +85,8 @@ class S3ServerlessSite(ComponentResource):
             domain_name=site_config.domains[0],
             tags=site_config.merged_tags({'Name': f'{site_config.site_name}-certificate'}),
             validation_method='DNS',
-            subject_alternative_names=site_config.domains[1:]
+            subject_alternative_names=site_config.domains[1:],
+            opts=resource_opts
         )
 
         s3_origin_id = f'{site_config.site_name}-s3-origin'
@@ -125,7 +130,8 @@ class S3ServerlessSite(ComponentResource):
             viewer_certificate={
                 'acmCertificateArn': self.site_tls.arn,
                 'sslSupportMethod': 'sni-only'
-            }
+            },
+            opts=resource_opts
         )
 
         self.register_outputs({})

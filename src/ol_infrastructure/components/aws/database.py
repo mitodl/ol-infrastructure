@@ -23,6 +23,8 @@ from ol_infrastructure.lib.aws.rds_helper import (
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 
+MAX_BACKUP_DAYS = 35
+
 
 class StorageType(str, Enum):  # noqa: WPS600
     """Container for constraining available selection of storage types."""
@@ -53,7 +55,7 @@ class OLDBConfig(AWSBase):
     password: SecretStr
     subnet_group_name: Union[Text, pulumi.Output[str]]
     security_groups: List[SecurityGroup]
-    backup_days: conint(ge=0, le=35, strict=True) = 30
+    backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30
     db_name: Optional[Text] = None  # The name of the database schema to create
     instance_size: Text = 'db.m5.large'
     is_public: bool = False
