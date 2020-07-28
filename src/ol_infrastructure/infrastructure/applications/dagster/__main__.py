@@ -63,9 +63,9 @@ dagster_runtime_bucket = s3.Bucket(
     tags=aws_config.tags,
     versioning={'enabled': True},
     server_side_encryption_configuration={
-        "rule": {
-            "applyServerSideEncryptionByDefault": {
-                "sseAlgorithm": "aws:kms",
+        'rule': {
+            'applyServerSideEncryptionByDefault': {
+                'sseAlgorithm': 'aws:kms',
             },
         },
     })
@@ -129,6 +129,7 @@ dagster_db_config = OLPostgresDBConfig(
     subnet_group_name=data_vpc_rds_subnet,
     security_groups=[dagster_db_security_group],
     tags=aws_config.tags,
-    **defaults(stack)['rds']
+    db_name='dagster',
+    **defaults(stack)['rds'],
 )
 dagster_db = OLAmazonDB(dagster_db_config)
