@@ -55,14 +55,14 @@ class S3ServerlessSite(ComponentResource):
             bucket=site_config.bucket_name,
             acl='public-read',
             policy={
-                'Version':'2012-10-17',
-                'Statement':[
+                'Version': '2012-10-17',
+                'Statement': [
                     {
-                        'Sid':'PublicRead',
-                        'Effect':'Allow',
+                        'Sid': 'PublicRead',
+                        'Effect': 'Allow',
                         'Principal': '*',
-                        'Action':['s3:GetObject'],
-                        'Resource':[f'arn:aws:s3:::{site_config.bucket_name}/*']
+                        'Action': ['s3:GetObject'],
+                        'Resource': [f'arn:aws:s3:::{site_config.bucket_name}/*']
                     }
                 ]
             },
