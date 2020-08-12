@@ -1,3 +1,5 @@
+"""Helper functions for working with EC2 resources."""
+
 from functools import lru_cache
 from ipaddress import IPv4Network
 from types import FunctionType
@@ -7,7 +9,8 @@ import boto3
 import pulumi
 
 ec2_client = boto3.client('ec2')
-AWSFilterType = List[Dict[Text, Union[Text, List[Text]]]]
+AWSFilterType = List[Dict[Text, Union[Text, List[Text]]]]  # noqa: WPS221
+
 
 @lru_cache
 def aws_regions() -> List[Text]:
@@ -21,7 +24,7 @@ def aws_regions() -> List[Text]:
 
 
 @lru_cache
-def availability_zones(region: Text) -> Tuple[Text]:
+def availability_zones(region: Text) -> List[Text]:
     """Generate a list of availability zones for a given AWS region.
 
     :param region: The region to be queried
@@ -34,7 +37,7 @@ def availability_zones(region: Text) -> Tuple[Text]:
     zones = ec2_client.describe_availability_zones(
         Filters=[{'Name': 'region-name', 'Values': [region]}]
     )['AvailabilityZones']
-    return (zone['ZoneName'] for zone in zones)
+    return [zone['ZoneName'] for zone in zones]
 
 
 def _conditional_import(  # noqa: WPS210
@@ -47,11 +50,11 @@ def _conditional_import(  # noqa: WPS210
     """Shared logic for determining whether to import an existing AWS resource into Pulumi.
 
     :param discover_func: A function object to be used for looking up AWS resources.  e.g. ec2_client.describe_vpcs
-    :type discover_func: function
+    :type discover_func: FunctionType
 
     :param filters: A set of filters to be applied to the discovery function to narrow down the candidate resources to
         be imported.
-    :type filters: List[Dict[Text, Union[Text, List[Text]]]]
+    :type filters: AWSFilterType
 
     :param attributes_key: The dictionary attribute used to access the resource information returned by the discovery
         function.  e.g. Vpcs
@@ -64,6 +67,9 @@ def _conditional_import(  # noqa: WPS210
     :param change_attributes_ignored: A list of attributes that should be ignored when comparing the imported state with
         the specified state in the Pulumi code.  e.g. ['tags']
     :type change_attributes_ignored: Text
+
+    :raises ValueError: If more than one resource of the given type is returned then a ValueError is raised as this is
+        intended to only operate on a single resource.
 
     :returns: A Pulumi ResourceOptions object that allows for importing unmanaged resources and the ID of the imported
               resource or an empty string if the resource doesn't exist.
@@ -91,7 +97,7 @@ def _conditional_import(  # noqa: WPS210
 
 
 def vpc_opts(vpc_cidr: IPv4Network) -> Tuple[pulumi.ResourceOptions, Text]:
-    """Look up and conditionally import an existing VPC
+    """Look up and conditionally import an existing VPC.
 
     :param vpc_cidr: The IPv4 CIDR block of the target VPC to be imported if it exists.  This ensures that there is no
         accidental overlap of IPv4 ranges.
@@ -109,7 +115,7 @@ def vpc_opts(vpc_cidr: IPv4Network) -> Tuple[pulumi.ResourceOptions, Text]:
     )
 
 
-def internet_gateway_opts(attached_vpc_id: Text) -> pulumi.ResourceOptions:
+def internet_gateway_opts(attached_vpc_id: Text) -> Tuple[pulumi.ResourceOptions, Text]:
     """Look up existing internet gateways to conditionally import when building a VPC.
 
     :param attached_vpc_id: The ID of the VPC where the target gateway will be attached

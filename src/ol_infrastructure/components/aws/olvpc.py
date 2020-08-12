@@ -108,7 +108,7 @@ class OLVPC(ComponentResource):
         """
         super().__init__('ol:infrastructure:aws:VPC', vpc_config.vpc_name, None, opts)
         resource_options = ResourceOptions(parent=self).merge(opts)
-
+        self.vpc_config = vpc_config
         vpc_resource_opts, imported_vpc_id = vpc_opts(vpc_config.cidr_block)
         self.olvpc = ec2.Vpc(
             vpc_config.vpc_name,
@@ -207,3 +207,57 @@ class OLVPC(ComponentResource):
             'route_table': self.route_table,
             'rds_subnet_group': self.db_subnet_group
         })
+
+
+class OLVPCPeeringConnection(ComponentResource):
+    """A Pulumi component for creating a VPC peering connection and populating bidirectional routes."""
+
+    def __init__(
+            self,
+            vpc_peer_name: Text,
+            source_vpc: OLVPC,
+            destination_vpc: OLVPC,
+            opts: Optional[ResourceOptions] = None
+    ):
+        """Create a peering connection and assocuated routes between two managed VPCs.
+
+        :param vpc_peer_name: The name of the peering connection
+        :type vpc_peer_name: Text
+
+        :param source_vpc: The source VPC object to be used as one end of the peering connection.
+        :type source_vpc: ec2.Vpc
+
+        :param destination_vpc: The destination VPC object to be used as the other end of the peering connection
+        :type destination_vpc: ec2.Vpc
+
+        :param opts: Resource option definitions to propagate to the child resources
+        :type opts: ResourceOptions
+        """
+        super().__init__('ol:infrastructure:aws:VPCPeeringConnection', vpc_peer_name, None, opts)
+        resource_options = ResourceOptions(parent=self).merge(opts)
+        self.peering_connection = ec2.VpcPeeringConnection(
+            f'{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-vpc-peer',
+            auto_accept=True,
+            vpc_id=source_vpc.olvpc.id,
+            peer_vpc_id=destination_vpc.olvpc.id,
+            tags=source_vpc.vpc_config.merged_tags(
+                {'Name': f'{source_vpc.vpc_config.vpc_name} to {destination_vpc.vpc_config.vpc_name} peer'}),
+            opts=resource_options
+        )
+        self.source_to_dest_route = ec2.Route(
+            f'{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-route',
+            route_table_id=source_vpc.route_table.id,
+            destination_cidr_block=destination_vpc.olvpc.cidr_block,
+            destination_ipv6_cidr_block=destination_vpc.olvpc.ipv6_cidr_block,
+            vpc_peering_connection_id=self.peering_connection.id,
+            opts=resource_options
+        )
+        self.dest_to_source_route = ec2.Route(
+            f'{destination_vpc.vpc_config.vpc_name}-to-{source_vpc.vpc_config.vpc_name}-route',
+            route_table_id=destination_vpc.route_table.id,
+            destination_cidr_block=source_vpc.olvpc.cidr_block,
+            destination_ipv6_cidr_block=source_vpc.olvpc.ipv6_cidr_block,
+            vpc_peering_connection_id=self.peering_connection.id,
+            opts=resource_options
+        )
+        self.register_outputs({})
