@@ -21,6 +21,7 @@ pulumi-aws = "^2.0.0"
 pulumi-vault = "^2.1.1"
 boto3 = "^1.13.17"
 pydantic = "^1.5.1"
+salt-pepper = "^0.7.6"
 
 [tool.poetry.dev-dependencies]
 wemake-python-styleguide = "^0.14.0"
