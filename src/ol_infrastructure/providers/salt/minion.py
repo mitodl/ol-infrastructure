@@ -12,7 +12,7 @@ from pulumi.dynamic import CreateResult, ReadResult, Resource, ResourceProvider
 from pydantic import BaseModel, SecretStr
 
 
-class OLSaltStackInputs(BaseModel):
+class OLSaltStackInputs:
     minion_id: Input[Text]
     salt_api_url: Input[Text]
     salt_user: Input[Text]
@@ -23,6 +23,9 @@ class OLSaltStackInputs(BaseModel):
 class _OLSaltStackProviderInputs(BaseModel):
     minion_id: Text
     salt_client: Pepper
+
+    class Config:  # noqa: WPS431, D106
+        arbitrary_types_allowed = True
 
 
 class OLSaltStackProvider(ResourceProvider):
@@ -37,7 +40,10 @@ class OLSaltStackProvider(ResourceProvider):
 
         :rtype: CreateResult
         """
-        keypair = inputs.salt_client.wheel('key.gen_accept', inputs.minion_id)
+        keypair = inputs.salt_client.wheel(
+            'key.gen_accept',
+            id_=inputs.minion_id
+        )['return'][0]['data']['return']
         output = {
             'minion_id': inputs.minion_id,
             'minion_public_key': keypair['pub'],
@@ -58,7 +64,10 @@ class OLSaltStackProvider(ResourceProvider):
 
         :rtype: ReadResult
         """
-        keyinfo = properties.salt_client.wheel('key.key_str', [id_])
+        keyinfo = properties.salt_client.wheel(
+            'key.print',
+            match=[id_]
+        )['return'][0]['data']['return']
         output = {
             'minion_id': id_,
             'minion_public_key': keyinfo['minions'][id_]
@@ -74,7 +83,7 @@ class OLSaltStackProvider(ResourceProvider):
         :param properties: The minion ID and salt API client
         :type properties: _OLSaltStackProviderInputs
         """
-        properties.salt_client.wheel('key.delete', id_)
+        properties.salt_client.wheel('key.delete', match=[id_])
 
 
 class OLSaltStack(Resource):
