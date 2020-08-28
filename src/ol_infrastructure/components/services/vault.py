@@ -8,7 +8,7 @@ This includes:
 - Define the base set of roles according to our established best practices
 """
 from enum import Enum
-from typing import Text
+from typing import Dict, Text, Union
 
 from pulumi import ComponentResource, ResourceOptions
 from pulumi_vault import Mount, database
@@ -22,15 +22,17 @@ from ol_infrastructure.lib.vault import (
 DEFAULT_PORT_POSTGRES = 5432
 DEFAULT_PORT_MYSQL = 3306
 DEFAULT_POT_MONGODB = 27017
-SIX_MONTHS = 60 * 60 * 24 * 30 * 6
+SIX_MONTHS = 60 * 60 * 24 * 30 * 6  # noqa: WPS432
 
-class DBEngines(str, Enum):
+
+class DBEngines(str, Enum):  # noqa: WPS600
     """Constraints for valid engine types that are supported by this component."""
     postgres = 'postgresql'
     mariadb = 'mysql'
     mysql = 'mysql'
     mysql_rds = 'mysql_rds'
     mongodb = 'mongodb'
+
 
 class OLVaultDatabaseConfig(BaseModel):
     db_name: Text
@@ -44,25 +46,29 @@ class OLVaultDatabaseConfig(BaseModel):
 
 
 class OLVaultPostgresDatabaseConfig(OLVaultDatabaseConfig):
-    db_port: Int = DEFAULT_PORT_POSTGRES
+    db_port: int = DEFAULT_PORT_POSTGRES
     db_connection: Text = 'postgresql://{{db_user}}:{{db_pass}}@{{db_host}}:{{db_port}}/{{db_name}}'
     db_type: Text = DBEngines.postgres.value
-    role_statements: Dict[Text, Text] = postgresql_sql_statements
+    role_statements: Dict[Text, Dict[Text, Text]] = postgres_sql_statements
 
 
 class OLVaultMysqlDatabaseConfig(OLVaultDatabaseConfig):
-    db_port: Int = DEFAULT_PORT_MYSQL
+    db_port: int = DEFAULT_PORT_MYSQL
     db_connection: Text = '{{db_user}}:{{db_pass}}@tcp({{db_host}}:{{db_port}})/'
     db_type: Text = DBEngines.mysql_rds.value
-    role_statements: Dict[Text, Text] = mysql_sql_statements
+    role_statements: Dict[Text, Dict[Text, Text]] = mysql_sql_statements
 
 
 class OLVaultDatabaseBackend(ComponentResource):
 
-    def __init__(self, db_config: OLVaultDatabaseConfig, opts: ResourceOptions = None):
+    def __init__(
+            self,
+            db_config: Union[OLVaultMysqlDatabaseConfig, OLVaultPostgresDatabaseConfig],
+            opts: ResourceOptions = None
+    ):
         super().__init__('ol:services:VaultDatabaseBackend', db_config.db_name, None, opts)
 
-        resource_opts = ResourceOptions(parent=self).merge(opts)
+        resource_opts = ResourceOptions.merge(ResourceOptions(parent=self), opts)  # type: ignore
 
         self.db_mount = Mount(
             f'{db_config.db_name}-mount-point',
@@ -79,8 +85,8 @@ class OLVaultDatabaseBackend(ComponentResource):
             verify_connection=db_config.verify_connection,
             name=db_config.db_name,
             data={
-                'db_user': db_config.db_username,
-                'db_pass': db_config.db_password,
+                'db_user': db_config.db_admin_username,
+                'db_pass': db_config.db_admin_password,
                 'db_host': db_config.db_host,
                 'db_port': db_config.db_port,
                 'db_name': db_config.db_name

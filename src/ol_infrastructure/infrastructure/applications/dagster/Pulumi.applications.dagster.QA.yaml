@@ -4,3 +4,11 @@ config:
   aws:region: us-east-1
   dagster:db_password:
     secure: v1:y15TVAw5jqVNTrXB:zN/lS+0N6NeqUxTGAwY64IV5LFyXHzDRZloAZwwgQA==
+  dagster:instance_type: t3a.medium
+  saltstack:api_password:
+    secure: v1:jcxzqwIOoxQ2261K:PsHmBDKsQetmclqZPtQmAD43OgsnLlDu9NAVVVP9iNtNzPmFNb1fj7QeBANm1uxyhY1cMN7spWYR2w==
+  saltstack:api_url: https://salt-qa.odl.mit.edu
+  saltstack:api_user: pulumi
+  saltstack:key_name: salt-qa
+  vault:address: active.vault.service.consul
+  vault:skip_tls_verify: "true"

@@ -1,8 +1,7 @@
 """Module for creating and managing static websites hosted in S3 and delivered through Cloudfront."""
 from enum import Enum
-from typing import List, Text, Optional
+from typing import List, Optional, Text
 
-from pydantic import validator
 from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import acm, cloudfront, s3
 
@@ -48,7 +47,7 @@ class S3ServerlessSite(ComponentResource):
         """
         super().__init__('ol:infrastructure:aws:S3ServerlessSite', site_config.site_name, None, opts)
 
-        resource_opts = ResourceOptions(parent=self).merge(opts)
+        resource_opts = ResourceOptions(parent=self).merge(opts)  # type: ignore
 
         self.site_bucket = s3.Bucket(
             f'{site_config.site_name}-bucket',

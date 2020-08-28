@@ -13,6 +13,7 @@ from enum import Enum
 from typing import Dict, List, Optional, Text, Union
 
 import pulumi
+
 from pulumi_aws import rds
 from pulumi_aws.ec2 import SecurityGroup
 from pydantic import BaseModel, PositiveInt, SecretStr, conint, validator
@@ -42,7 +43,7 @@ class OLReplicaDBConfig(BaseModel):
     public_access: bool = False
     security_groups: Optional[List[SecurityGroup]] = None
 
-    class Config:  # noqa: WPS431, D106
+    class Config:  # noqa: WPS431, D106, WPS306
         arbitrary_types_allowed = True
 
 
@@ -55,7 +56,7 @@ class OLDBConfig(AWSBase):
     password: SecretStr
     subnet_group_name: Union[Text, pulumi.Output[str]]
     security_groups: List[SecurityGroup]
-    backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30
+    backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore
     db_name: Optional[Text] = None  # The name of the database schema to create
     instance_size: Text = 'db.m5.large'
     is_public: bool = False
@@ -63,24 +64,23 @@ class OLDBConfig(AWSBase):
     multi_az: bool = True
     prevent_delete: bool = True
     public_access: bool = False
-    storage: PositiveInt = PositiveInt(50)
+    storage: PositiveInt = PositiveInt(50)  # noqa: WPS432
     storage_type: StorageType = StorageType.ssd
     username: Text = 'oldevops'
     read_replica: Optional[OLReplicaDBConfig] = None
 
-    class Config:  # noqa: WPS431, WPS306
+    class Config:  # noqa: WPS431, WPS306, D106
         arbitrary_types_allowed = True
 
     @validator('engine')
-    def is_valid_engine(cls: 'OLDBConfig', engine: Text) -> Text:
+    def is_valid_engine(cls: 'OLDBConfig', engine: Text) -> Text:  # noqa: N805, D102
         valid_engines = db_engines()
         if engine not in valid_engines:
             raise ValueError('The specified DB engine is not a valid option in AWS.')
         return engine
 
     @validator('engine_version')
-    def is_valid_version(cls: 'OLDBConfig', engine_version: Text, values: Dict) -> Text:
-        print(values)
+    def is_valid_version(cls: 'OLDBConfig', engine_version: Text, values: Dict) -> Text:  # noqa: N805, WPS110, D102
         engine = values.get('engine')
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
@@ -93,8 +93,8 @@ class OLPostgresDBConfig(OLDBConfig):
 
     engine: Text = 'postgres'
     engine_version: Text = '12.3'
-    port: PositiveInt = PositiveInt(5432)
-    parameter_overrides: List[Dict[Text, Union[Text, bool, int, float]]] = [
+    port: PositiveInt = PositiveInt(5432)  # noqa: WPS432
+    parameter_overrides: List[Dict[Text, Union[Text, bool, int, float]]] = [  # noqa: WPS234
         {'name': 'client_encoding', 'value': 'UTF-8'},
         {'name': 'timezone', 'value': 'UTC'},
         {'name': 'rds.force_ssl', 'value': 1}
@@ -106,8 +106,8 @@ class OLMariaDBConfig(OLDBConfig):
 
     engine: Text = 'mariadb'
     engine_version: Text = '10.4.8'
-    port: PositiveInt = PositiveInt(3306)
-    parameter_overrides: List[Dict[Text, Union[Text, bool, int, float]]] = [
+    port: PositiveInt = PositiveInt(3306)  # noqa: WPS432
+    parameter_overrides: List[Dict[Text, Union[Text, bool, int, float]]] = [  # noqa: WPS234
         {'name': 'character_set_client', 'value': 'utf8mb4'},
         {'name': 'character_set_connection', 'value': 'utf8mb4'},
         {'name': 'character_set_database', 'value': 'utf8mb4'},
@@ -136,9 +136,9 @@ class OLAmazonDB(pulumi.ComponentResource):
         """
         super().__init__('ol:infrastructure:aws:database:OLAmazonDB', db_config.instance_name, None, opts)
 
-        resource_options = pulumi.ResourceOptions(parent=self)
+        resource_options = pulumi.ResourceOptions.merge(pulumi.ResourceOptions(parent=self), opts)  # type: ignore
 
-        parameter_group = rds.ParameterGroup(
+        self.parameter_group = rds.ParameterGroup(
             f'{db_config.instance_name}-{db_config.engine}-parameter-group',
             family=parameter_group_family(
                 db_config.engine,
@@ -149,7 +149,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             parameters=db_config.parameter_overrides
         )
 
-        db_instance = rds.Instance(
+        self.db_instance = rds.Instance(
             f'{db_config.instance_name}-{db_config.engine}-instance',
             allocated_storage=db_config.storage,
             auto_minor_version_upgrade=True,
@@ -166,7 +166,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             multi_az=db_config.multi_az,
             name=db_config.db_name,
             opts=resource_options,
-            parameter_group_name=parameter_group.name,
+            parameter_group_name=self.parameter_group.name,
             password=db_config.password.get_secret_value(),
             port=db_config.port,
             publicly_accessible=db_config.is_public,
@@ -179,24 +179,24 @@ class OLAmazonDB(pulumi.ComponentResource):
         )
 
         component_outputs = {
-            'parameter_group': parameter_group,
-            'rds_instance': db_instance
+            'parameter_group': self.parameter_group,
+            'rds_instance': self.db_instance
         }
 
         if db_config.read_replica:
-            db_replica = rds.Instance(
+            self.db_replica = rds.Instance(
                 f'{db_config.instance_name}-{db_config.engine}-replica',
                 identifier=f'{db_config.instance_name}-replica',
                 instance_class=db_config.read_replica.instance_size,
-                kms_key_id=db_instance.kms_key_id,
+                kms_key_id=self.db_instance.kms_key_id,
                 opts=resource_options,
                 publicly_accessible=db_config.read_replica.public_access,
-                replicate_source_db=db_instance.id,
+                replicate_source_db=self.db_instance.id,
                 storage_type=db_config.read_replica.storage_type.value,
                 tags=db_config.tags,
                 vpc_security_group_ids=[group.id for group in
                                         db_config.read_replica.security_groups or db_config.security_groups]
             )
-            component_outputs['rds_replica'] = db_replica
+            component_outputs['rds_replica'] = self.db_replica
 
         self.register_outputs(component_outputs)
