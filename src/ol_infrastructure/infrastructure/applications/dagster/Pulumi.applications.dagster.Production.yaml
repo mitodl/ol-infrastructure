@@ -7,6 +7,6 @@ config:
     secure: v1:CmsJwtIantGcm5j1:DL2TQs80PEYe2iZIvWKFA/oSy3Lh3uSdzVcYPDR28EmvCYsNGzUxrLpb2k0oZ5NTOu2pniwF
   saltstack:api_url: https://salt-production.odl.mit.edu
   saltstack:api_user: pulumi
-  saltstack:key_name: salt-qa
-  vault:address: active.vault.service.consul
-  vault:skip_tls_verify: "true"
+  saltstack:key_name: salt-production
+  vault:address: https://active.vault.service.consul:8200
+  vault:skip_tls_verify: true

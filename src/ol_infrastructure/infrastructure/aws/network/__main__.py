@@ -5,7 +5,7 @@ from typing import Dict
 
 from pulumi import export, get_stack
 from pulumi.config import get_config
-from security_groups import public_web
+from security_groups import default_group, public_web, salt_minion
 
 from ol_infrastructure.components.aws.olvpc import (
     OLVPC,
@@ -38,19 +38,6 @@ data_vpc_config = OLVPCConfig(
         'Name': f'{stack_name} Data Services'})
 data_vpc = OLVPC(data_vpc_config)
 
-data_vpc_exports = vpc_exports(data_vpc)
-data_vpc_exports.update(
-    {
-        'security_groups': {
-            'web': public_web(data_vpc_config.vpc_name, data_vpc.olvpc)(
-                tags=data_vpc_config.merged_tags({'Name': f'ol-data-{env_suffix}-public-web'}),
-                name=f'ol-data-{env_suffix}-public-web'
-            ).id
-        }
-    }
-)
-export('data_vpc', data_vpc_exports)
-
 operations_vpc_config = OLVPCConfig(
     vpc_name=get_config('operations_vpc:name'),
     cidr_block=get_config('operations_vpc:cidr_block'),
@@ -64,6 +51,30 @@ operations_vpc_config = OLVPCConfig(
 )
 operations_vpc = OLVPC(operations_vpc_config)
 
+data_vpc_exports = vpc_exports(data_vpc)
+data_vpc_exports.update(
+    {
+        'security_groups': {
+            'default': default_group(data_vpc.olvpc).id,
+            'web': public_web(
+                data_vpc_config.vpc_name,
+                data_vpc.olvpc
+            )(
+                tags=data_vpc_config.merged_tags({'Name': f'ol-data-{env_suffix}-public-web'}),
+                name=f'ol-data-{env_suffix}-public-web'
+            ).id,
+            'salt_minion': salt_minion(
+                data_vpc_config.vpc_name,
+                data_vpc.olvpc,
+                operations_vpc.olvpc
+            )(
+                tags=data_vpc_config.merged_tags({'Name': f'ol-data-{env_suffix}-salt-minion'}),
+                name=f'ol-data-{env_suffix}-salt-minion'
+            ).id
+        }
+    }
+)
+export('data_vpc', data_vpc_exports)
 operations_vpc_exports = vpc_exports(operations_vpc)
 export('operations_vpc', operations_vpc_exports)
 

@@ -5,12 +5,11 @@ Registers a minion ID with a SaltStack master and generates a keypair.  The keyp
 to an instance via user data to take advantage of cloud-init.
 """
 from dataclasses import dataclass
-from typing import Optional, Text
+from typing import Dict, Optional, Text
 
 from pepper import Pepper
 from pulumi import Input, Output, ResourceOptions
 from pulumi.dynamic import CreateResult, ReadResult, Resource, ResourceProvider
-from pydantic import BaseModel, SecretStr
 
 
 @dataclass
@@ -18,24 +17,13 @@ class OLSaltStackInputs:
     minion_id: Input[Text]
     salt_api_url: Input[Text]
     salt_user: Input[Text]
-    salt_password: Input[SecretStr]
+    salt_password: Input[Text]
     salt_auth_method: Input[Text] = 'pam'
-
-
-class _OLSaltStackProviderInputs(BaseModel):
-    minion_id: Text
-    salt_api_url: Text
-    salt_user: Text
-    salt_password: SecretStr
-    salt_auth_method: Text = 'pam'
-
-    class Config:  # noqa: WPS431, D106
-        arbitrary_types_allowed = True
 
 
 class OLSaltStackProvider(ResourceProvider):
 
-    def create(self, inputs: _OLSaltStackProviderInputs) -> CreateResult:
+    def create(self, inputs: Dict[Text, Text]) -> CreateResult:
         """Register a salt minion and generate a keypair to be returned via Outputs.
 
         :param inputs: A salt client and minion ID to interact with the Salt API
@@ -46,23 +34,25 @@ class OLSaltStackProvider(ResourceProvider):
         :rtype: CreateResult
         """
         salt_client = self._salt_client(
-            inputs.salt_api_url,
-            inputs.salt_user,
-            inputs.salt_password.get_secret_value(),
-            inputs.salt_auth_method
+            inputs['salt_api_url'],
+            inputs['salt_user'],
+            inputs['salt_password'],
+            inputs['salt_auth_method']
         )
         keypair = salt_client.wheel(
             'key.gen_accept',
-            id_=inputs.minion_id
+            id_=inputs['minion_id']
         )['return'][0]['data']['return']
-        output = {
-            'minion_id': inputs.minion_id,
-            'minion_public_key': keypair['pub'],
-            'minion_private_key': keypair['priv']
-        }
-        return CreateResult(id_=inputs.minion_id, outs=output)
+        output = inputs.copy()
+        output.update(
+            {
+                'minion_public_key': keypair['pub'],
+                'minion_private_key': keypair['priv']
+            }
+        )
+        return CreateResult(id_=inputs['minion_id'], outs=output)
 
-    def read(self, id_: Text, properties: _OLSaltStackProviderInputs) -> ReadResult:
+    def read(self, id_: Text, properties: Dict[Text, Text]) -> ReadResult:
         """Retrieve the ID and public key of the target minion from the Salt API.
 
         :param id_: The minion ID
@@ -76,22 +66,24 @@ class OLSaltStackProvider(ResourceProvider):
         :rtype: ReadResult
         """
         salt_client = self._salt_client(
-            properties.salt_api_url,
-            properties.salt_user,
-            properties.salt_password.get_secret_value(),
-            properties.salt_auth_method
+            properties['salt_api_url'],
+            properties['salt_user'],
+            properties['salt_password'],
+            properties['salt_auth_method']
         )
         keyinfo = salt_client.wheel(
             'key.print',
             match=[id_]
         )['return'][0]['data']['return']
-        output = {
-            'minion_id': id_,
-            'minion_public_key': keyinfo.get('minions', {}).get(id_)
-        }
+        output = properties.copy()
+        output.update(
+            {
+                'minion_public_key': keyinfo.get('minions', {}).get(id_)
+            }
+        )
         return ReadResult(id_=id_, outs=output)
 
-    def delete(self, id_: Text, properties: _OLSaltStackProviderInputs):
+    def delete(self, id_: Text, properties: Dict[Text, Text]):
         """Delete the salt minion key from the master.
 
         :param id_: The ID of the target minion
@@ -101,10 +93,10 @@ class OLSaltStackProvider(ResourceProvider):
         :type properties: _OLSaltStackProviderInputs
         """
         salt_client = self._salt_client(
-            properties.salt_api_url,
-            properties.salt_user,
-            properties.salt_password.get_secret_value(),
-            properties.salt_auth_method
+            properties['salt_api_url'],
+            properties['salt_user'],
+            properties['salt_password'],
+            properties['salt_auth_method']
         )
         salt_client.wheel('key.delete', match=[id_])
 
@@ -138,8 +130,8 @@ class OLSaltStack(Resource):
             name,
             {
                 'minion_id': properties.minion_id,
-                'public_key': None,
-                'private_key': None,
+                'minion_public_key': None,
+                'minion_private_key': None,
                 'salt_api_url': properties.salt_api_url,
                 'salt_user': properties.salt_user,
                 'salt_password': properties.salt_password,

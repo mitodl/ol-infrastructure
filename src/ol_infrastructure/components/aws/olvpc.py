@@ -214,7 +214,7 @@ class OLVPCPeeringConnection(ComponentResource):
             destination_vpc: OLVPC,
             opts: Optional[ResourceOptions] = None
     ):
-        """Create a peering connection and assocuated routes between two managed VPCs.
+        """Create a peering connection and associated routes between two managed VPCs.
 
         :param vpc_peer_name: The name of the peering connection
         :type vpc_peer_name: Text

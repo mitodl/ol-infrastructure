@@ -43,7 +43,7 @@ class OLReplicaDBConfig(BaseModel):
     public_access: bool = False
     security_groups: Optional[List[SecurityGroup]] = None
 
-    class Config:  # noqa: WPS431, D106, WPS306
+    class Config:  # noqa: WPS431, D106
         arbitrary_types_allowed = True
 
 
@@ -54,6 +54,8 @@ class OLDBConfig(AWSBase):
     engine_version: Text
     instance_name: Text  # The name of the RDS instance
     password: SecretStr
+    parameter_overrides: List[Dict[Text, Union[Text, bool, int, float]]]  # noqa: WPS234
+    port: PositiveInt
     subnet_group_name: Union[Text, pulumi.Output[str]]
     security_groups: List[SecurityGroup]
     backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore
@@ -136,7 +138,7 @@ class OLAmazonDB(pulumi.ComponentResource):
         """
         super().__init__('ol:infrastructure:aws:database:OLAmazonDB', db_config.instance_name, None, opts)
 
-        resource_options = pulumi.ResourceOptions.merge(pulumi.ResourceOptions(parent=self), opts)  # type: ignore
+        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore
 
         self.parameter_group = rds.ParameterGroup(
             f'{db_config.instance_name}-{db_config.engine}-parameter-group',
@@ -173,7 +175,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             skip_final_snapshot=False,
             storage_encrypted=True,
             storage_type=db_config.storage_type.value,
-            tags=db_config.tags,
+            # tags=db_config.tags,
             username=db_config.username,
             vpc_security_group_ids=[group.id for group in db_config.security_groups]
         )

@@ -10,5 +10,4 @@ config:
   saltstack:api_url: https://salt-qa.odl.mit.edu
   saltstack:api_user: pulumi
   saltstack:key_name: salt-qa
-  vault:address: active.vault.service.consul
   vault:skip_tls_verify: "true"
