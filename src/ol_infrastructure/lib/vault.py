@@ -10,7 +10,7 @@ postgres_sql_statements = {
     },
     'admin': {
         'create': """CREATE USER "{{{{name}}}}" WITH PASSWORD '{{{{password}}}}' VALID UNTIL '{{{{expiration}}}}'
-          IN ROLE "rds_superuser" INHERIT;
+          IN ROLE "rds_superuser" INHERIT CREATEROLE CREATEDB;
           GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{{{{name}}}}" WITH GRANT OPTION;
           GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{{{{name}}}}" WITH GRANT OPTION;""",
         'revoke': """GRANT "{{{{name}}}}" TO {role_name} WITH ADMIN OPTION;
@@ -24,19 +24,21 @@ postgres_sql_statements = {
     'app': {
         'create': """CREATE USER "{{{{name}}}}" WITH PASSWORD '{{{{password}}}}' VALID UNTIL '{{{{expiration}}}}'
           IN ROLE "{role_name}" INHERIT;
-          GRANT "{{{{name}}}}" TO "{role_name}" WITH ADMIN OPTION;
           GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{{{{name}}}}" WITH GRANT OPTION;
           GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{{{{name}}}}" WITH GRANT OPTION;
           GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{role_name}" WITH GRANT OPTION;
           GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{role_name}" WITH GRANT OPTION;
+          SET ROLE "{{{{name}}}}";
           ALTER DEFAULT PRIVILEGES FOR USER "{{{{name}}}}" IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES
           TO "{{{{name}}}}" WITH GRANT OPTION;
           ALTER DEFAULT PRIVILEGES FOR USER "{{{{name}}}}" IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES
           TO "{{{{name}}}}" WITH GRANT OPTION;
+          SET ROLE "{role_name}";
           ALTER DEFAULT PRIVILEGES FOR ROLE "{role_name}" IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES
           TO "{role_name}" WITH GRANT OPTION;
           ALTER DEFAULT PRIVILEGES FOR ROLE "{role_name}" IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES
-          TO "{role_name}" WITH GRANT OPTION;""",
+          TO "{role_name}" WITH GRANT OPTION;
+          RESET ROLE;""",
         'revoke': """GRANT "{{{{name}}}}" TO {role_name} WITH ADMIN OPTION;
           REASSIGN OWNED BY "{{{{name}}}}" TO "{role_name}";
           DROP OWNED BY "{{{{name}}}}";
@@ -47,13 +49,14 @@ postgres_sql_statements = {
           DROP USER "{{{{name}}}}";"""},
     'readonly': {
         'create': """CREATE USER "{{{{name}}}}" WITH PASSWORD '{{{{password}}}}' VALID UNTIL '{{{{expiration}}}}';
-          GRANT "{{{{name}}}}" TO {role_name} WITH ADMIN OPTION;
           GRANT SELECT ON ALL TABLES IN SCHEMA public TO "{{{{name}}}}";
           GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO "{{{{name}}}}";
+          SET ROLE "{{{{name}}}}";
           ALTER DEFAULT PRIVILEGES FOR USER "{{{{name}}}}" IN SCHEMA public GRANT SELECT ON TABLES TO "{{{{name}}}}"
           WITH GRANT OPTION;
           ALTER DEFAULT PRIVILEGES FOR USER "{{{{name}}}}" IN SCHEMA public GRANT SELECT ON SEQUENCES TO "{{{{name}}}}"
-          WITH GRANT OPTION;""",
+          WITH GRANT OPTION;
+          RESET ROLE;""",
         'revoke': """GRANT "{{{{name}}}}" TO {role_name} WITH ADMIN OPTION;
           REASSIGN OWNED BY "{{{{name}}}}" TO "{role_name}";
           DROP OWNED BY "{{{{name}}}}";

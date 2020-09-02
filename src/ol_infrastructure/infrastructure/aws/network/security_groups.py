@@ -12,6 +12,18 @@ def default_group(vpc: ec2.Vpc) -> ec2.AwaitableGetSecurityGroupResult:
 
 
 def public_web(vpc_name: Text, vpc: ec2.Vpc) -> partial:
+    """Create a security group that exposes a webserver to the public internet.
+
+    :param vpc_name: The name of the VPC where the security group is being created.
+    :type vpc_name: Text
+
+    :param vpc: The VPC instance that the security group is being created in.
+    :type vpc: ec2.Vpc
+
+    :returns: A partial SecurityGroup object that can be finalized in the importing module
+
+    :rtype: partial
+    """
     return partial(
         ec2.SecurityGroup,
         f'{vpc_name}-web-server',
@@ -49,7 +61,7 @@ def salt_minion(vpc_name: Text, vpc: ec2.Vpc, ops_vpc: ec2.Vpc) -> partial:
     :param ops_vpc: The VPC instance that the target Salt master is located in.
     :type ops_vpc: ec2.Vpc
 
-    :returns: A partial SecurityGroup object that can be finalized in the imported module
+    :returns: A partial SecurityGroup object that can be finalized in the importing module
 
     :rtype: partial
     """
