@@ -6,7 +6,7 @@
 postgres_sql_statements = {
     'approle': {
         'create': 'CREATE ROLE {role_name};',
-        'revoke': 'DROP ROLE {role_name}'
+        'revoke': 'DROP ROLE {role_name};'
     },
     'admin': {
         'create': """CREATE USER "{{{{name}}}}" WITH PASSWORD '{{{{password}}}}' VALID UNTIL '{{{{expiration}}}}'

@@ -11,7 +11,7 @@ import yaml
 
 from pulumi import StackReference, export, get_stack
 from pulumi.config import get_config
-from pulumi_aws import ec2, get_ami, get_caller_identity, iam, s3
+from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53, s3
 
 from ol_infrastructure.components.aws.database import (
     OLAmazonDB,
@@ -33,6 +33,8 @@ stack_name = stack.split('.')[-1]
 namespace = stack.rsplit('.', 1)[0]
 env_suffix = stack_name.lower()
 network_stack = StackReference(f'infrastructure.aws.network.{stack_name}')
+dns_stack = StackReference('infrastructure.aws.dns')
+mitodl_zone_id = dns_stack.get_output('odl_zone_id')
 data_vpc = network_stack.get_output('data_vpc')
 operations_vpc = network_stack.get_output('operations_vpc')
 dagster_environment = f'data-{env_suffix}'
@@ -80,6 +82,7 @@ dagster_runtime_bucket = s3.Bucket(
 # Create instance profile for granting access to S3 buckets
 dagster_iam_policy = iam.Policy(
     f'dagster-policy-{env_suffix}',
+    name=f'dagster-policy-{env_suffix}',
     path=f'/ol-data/etl-policy-{env_suffix}/',
     policy=dagster_bucket_policy,
     description='Policy for granting acces for batch data workflows to AWS resources'
@@ -214,6 +217,24 @@ dagster_instance = ec2.Instance(
         data_vpc['security_groups']['web'],
         data_vpc['security_groups']['salt_minion'],
     ]
+)
+
+fifteen_minutes = 60 * 15
+dagster_domain = route53.Record(
+    f'dagster-{env_suffix}-service-domain',
+    name=get_config('dagster:domain'),
+    type='A',
+    ttl=fifteen_minutes,
+    records=[dagster_instance.public_ip],
+    zone_id=mitodl_zone_id
+)
+dagster_domain_v6 = route53.Record(
+    f'dagster-{env_suffix}-service-domain-v6',
+    name=get_config('dagster:domain'),
+    type='AAAA',
+    ttl=fifteen_minutes,
+    records=dagster_instance.ipv6_addresses,
+    zone_id=mitodl_zone_id
 )
 
 export('dagster_app', {

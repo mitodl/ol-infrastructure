@@ -175,7 +175,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             skip_final_snapshot=False,
             storage_encrypted=True,
             storage_type=db_config.storage_type.value,
-            # tags=db_config.tags,
+            tags=db_config.tags,
             username=db_config.username,
             vpc_security_group_ids=[group.id for group in db_config.security_groups]
         )
