@@ -13,15 +13,9 @@ This includes:
 """
 from ipaddress import IPv4Network, IPv6Network
 from itertools import cycle
-from typing import Dict, List, Optional, Text
+from typing import List, Optional, Text
 
-from pulumi import (
-    ComponentResource,
-    Output,
-    ResourceOptions,
-    ResourceTransformationArgs,
-    ResourceTransformationResult
-)
+from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import ec2, rds
 from pydantic import PositiveInt, validator
 
@@ -32,12 +26,13 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     subnet_opts,
     vpc_opts
 )
-from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit
+from ol_infrastructure.lib.ol_types import AWSBase
 
 MIN_SUBNETS = PositiveInt(3)
 MAX_NET_PREFIX = 21  # A CIDR block of prefix length 21 allows for up to 8 /24 subnet blocks
 SUBNET_PREFIX_V4 = 24  # A CIDR block of prefix length 24 allows for up to 255 individual IP addresses
 SUBNET_PREFIX_V6 = 64
+
 
 class OLVPCConfig(AWSBase):
     """Schema definition for VPC configuration values."""
@@ -107,7 +102,7 @@ class OLVPC(ComponentResource):
         :type vpc_config: OLVPCConfig
         """
         super().__init__('ol:infrastructure:aws:VPC', vpc_config.vpc_name, None, opts)
-        resource_options = ResourceOptions(parent=self).merge(opts)
+        resource_options = ResourceOptions.merge(ResourceOptions(parent=self), opts)  # type: ignore
         self.vpc_config = vpc_config
         vpc_resource_opts, imported_vpc_id = vpc_opts(vpc_config.cidr_block)
         self.olvpc = ec2.Vpc(
@@ -117,7 +112,7 @@ class OLVPC(ComponentResource):
             enable_dns_hostnames=True,
             assign_generated_ipv6_cidr_block=vpc_config.enable_ipv6,
             tags=vpc_config.tags,
-            opts=resource_options.merge(vpc_resource_opts)
+            opts=ResourceOptions.merge(resource_options, vpc_resource_opts)
         )
 
         internet_gateway_resource_opts, imported_gateway_id = internet_gateway_opts(imported_vpc_id)
@@ -125,7 +120,7 @@ class OLVPC(ComponentResource):
             f'{vpc_config.vpc_name}-internet-gateway',
             vpc_id=self.olvpc.id,
             tags=vpc_config.tags,
-            opts=resource_options.merge(internet_gateway_resource_opts)
+            opts=ResourceOptions.merge(resource_options, internet_gateway_resource_opts)
         )
 
         self.egress_gateway = ec2.EgressOnlyInternetGateway(
@@ -150,7 +145,7 @@ class OLVPC(ComponentResource):
                     'egressOnlyGatewayId': self.egress_gateway.id
                 }
             ],
-            opts=resource_options.merge(route_table_resource_opts)
+            opts=ResourceOptions.merge(resource_options, route_table_resource_opts)
         )
 
         self.olvpc_subnets: List[ec2.Subnet] = []
@@ -177,7 +172,7 @@ class OLVPC(ComponentResource):
                 map_public_ip_on_launch=vpc_config.default_public_ip,
                 tags=vpc_config.tags,
                 assign_ipv6_address_on_creation=vpc_config.enable_ipv6,
-                opts=resource_options.merge(subnet_resource_opts)
+                opts=ResourceOptions.merge(resource_options, subnet_resource_opts)
             )
             ec2.RouteTableAssociation(
                 f'{net_name}-route-table-association',
@@ -219,7 +214,7 @@ class OLVPCPeeringConnection(ComponentResource):
             destination_vpc: OLVPC,
             opts: Optional[ResourceOptions] = None
     ):
-        """Create a peering connection and assocuated routes between two managed VPCs.
+        """Create a peering connection and associated routes between two managed VPCs.
 
         :param vpc_peer_name: The name of the peering connection
         :type vpc_peer_name: Text
@@ -234,7 +229,7 @@ class OLVPCPeeringConnection(ComponentResource):
         :type opts: ResourceOptions
         """
         super().__init__('ol:infrastructure:aws:VPCPeeringConnection', vpc_peer_name, None, opts)
-        resource_options = ResourceOptions(parent=self).merge(opts)
+        resource_options = ResourceOptions.merge(ResourceOptions(parent=self), opts)  # type: ignore
         self.peering_connection = ec2.VpcPeeringConnection(
             f'{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-vpc-peer',
             auto_accept=True,
@@ -248,7 +243,6 @@ class OLVPCPeeringConnection(ComponentResource):
             f'{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-route',
             route_table_id=source_vpc.route_table.id,
             destination_cidr_block=destination_vpc.olvpc.cidr_block,
-            destination_ipv6_cidr_block=destination_vpc.olvpc.ipv6_cidr_block,
             vpc_peering_connection_id=self.peering_connection.id,
             opts=resource_options
         )
@@ -256,7 +250,6 @@ class OLVPCPeeringConnection(ComponentResource):
             f'{destination_vpc.vpc_config.vpc_name}-to-{source_vpc.vpc_config.vpc_name}-route',
             route_table_id=destination_vpc.route_table.id,
             destination_cidr_block=source_vpc.olvpc.cidr_block,
-            destination_ipv6_cidr_block=source_vpc.olvpc.ipv6_cidr_block,
             vpc_peering_connection_id=self.peering_connection.id,
             opts=resource_options
         )

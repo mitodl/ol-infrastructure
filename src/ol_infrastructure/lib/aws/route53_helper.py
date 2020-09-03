@@ -1,6 +1,7 @@
+from typing import Text
+
 import boto3
 import pulumi
-from typing import Text, Tuple
 
 route53_client = boto3.client('route53')
 
@@ -21,5 +22,7 @@ def zone_opts(domain: Text) -> pulumi.ResourceOptions:
     if 'pulumi_managed' in {tag['Key'] for tag in tags['ResourceTagSet']['Tags']}:  # noqa: C412
         opts = pulumi.ResourceOptions()
     else:
-        opts = pulumi.ResourceOptions(import_=zone_id)
+        opts = pulumi.ResourceOptions(
+            import_=zone_id,
+            ignore_changes=['tags', 'comment'])
     return opts

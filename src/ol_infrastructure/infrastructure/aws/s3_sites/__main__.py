@@ -1,8 +1,12 @@
 """Module for creating and managing S3 buckets that are not used by any applications."""
-from pulumi import export, StackReference, ResourceOptions, get_stack
+from pulumi import StackReference, export, get_stack
 from pulumi.config import get_config
 from pulumi_aws import route53
-from ol_infrastructure.components.aws.s3_cloudfront_site import S3ServerlessSiteConfig, S3ServerlessSite
+
+from ol_infrastructure.components.aws.s3_cloudfront_site import (
+    S3ServerlessSite,
+    S3ServerlessSiteConfig
+)
 
 fifteen_minutes = 60 * 15
 dns_stack = StackReference('infrastructure.aws.dns')

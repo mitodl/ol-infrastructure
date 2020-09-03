@@ -1,4 +1,4 @@
-from typing import Text, Dict, Any
+from typing import Any, Dict, Text
 
 production_defaults = {
     'rds': {

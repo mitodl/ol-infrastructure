@@ -5,16 +5,15 @@ from pydantic import BaseModel, validator
 
 from ol_infrastructure.lib.aws.ec2_helper import aws_regions
 
-REQUIRED_TAGS = {'OU', 'Environment'}
+REQUIRED_TAGS = {'OU', 'Environment'}  # noqa: WPS407
 
 
 @unique
 class BusinessUnit(str, Enum):  # noqa: WPS600
-    '''
-    Canonical source of truth for defining valid OU tags to be used for cost allocation purposes.
-    '''
+    """Canonical source of truth for defining valid OU tags to be used for cost allocation purposes."""
+
     bootcamps = 'bootcamps'
-    data = 'data'
+    data = 'data'  # noqa: WPS110
     micromasters = 'micromasters'
     mit_open = 'mit-open'
     mitx = 'mitx'
@@ -27,9 +26,8 @@ class BusinessUnit(str, Enum):  # noqa: WPS600
 
 
 class AWSBase(BaseModel):
-    '''
-    Base class for deriving configuration objects to pass to AWS component resources.
-    '''
+    """Base class for deriving configuration objects to pass to AWS component resources."""
+
     tags: dict
     region: Text = 'us-east-1'
 

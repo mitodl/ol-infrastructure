@@ -1,7 +1,8 @@
-from pulumi import export, ResourceOptions
+from pulumi import export
 from pulumi_aws import route53
-from ol_infrastructure.lib.ol_types import AWSBase
+
 from ol_infrastructure.lib.aws.route53_helper import zone_opts
+from ol_infrastructure.lib.ol_types import AWSBase
 
 mitxpro_legacy_dns_name = 'mitxpro.mit.edu'
 mitxpro_legacy_opts = zone_opts(mitxpro_legacy_dns_name)
