@@ -1,5 +1,5 @@
 """Helper functions for working with EC2 resources."""
-
+from enum import Enum, unique
 from functools import lru_cache
 from ipaddress import IPv4Network
 from types import FunctionType
@@ -8,8 +8,38 @@ from typing import Dict, List, Optional, Text, Tuple, Union
 import boto3
 import pulumi
 
+from pulumi_aws import get_ami
+
 ec2_client = boto3.client('ec2')
 AWSFilterType = List[Dict[Text, Union[Text, List[Text]]]]  # noqa: WPS221
+
+debian_10_ami = get_ami(
+    filters=[
+        {
+            'name': 'virtualization-type',
+            'values': ['hvm']
+        }, {
+            'name': 'root-device-type',
+            'values': ['ebs']
+        }, {
+            'name': 'name',
+            'values': ['debian-10-amd64*']
+        }
+    ],
+    most_recent=True,
+    owners=['136693071363']
+)
+
+
+@unique
+class InstanceTypes(str, Enum):
+    small = 't3a.small'
+    medium = 't3a.medium'
+    large = 't3a.large'
+    general_purpose_large = 'm5a.large'
+    general_purpose_xlarge = 'm5a.xlarge'
+    high_mem_regular = 'r5a.large'
+    high_mem_xlarge = 'r5a.xlarge'
 
 
 @lru_cache
@@ -83,6 +113,7 @@ def _conditional_import(  # noqa: WPS210
         change_attributes_ignored = ['tags']
     if resources:
         if len(resources) > 1:
+            pulumi.log.info(f'More than one resource returned with filter {filters}. Found {resources}')
             raise ValueError('Too many resources returned. A more precise filter is needed.')
         resource = resources[0]
         tags = resource['Tags']

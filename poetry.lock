@@ -88,10 +88,10 @@ description = "The AWS SDK for Python"
 name = "boto3"
 optional = false
 python-versions = "*"
-version = "1.14.52"
+version = "1.14.55"
 
 [package.dependencies]
-botocore = ">=1.17.52,<1.18.0"
+botocore = ">=1.17.55,<1.18.0"
 jmespath = ">=0.7.1,<1.0.0"
 s3transfer = ">=0.3.0,<0.4.0"
 
@@ -101,7 +101,7 @@ description = "Low-level, data-driven core of boto 3."
 name = "botocore"
 optional = false
 python-versions = "*"
-version = "1.17.52"
+version = "1.17.55"
 
 [package.dependencies]
 docutils = ">=0.10,<0.16"
@@ -393,7 +393,7 @@ description = "Python Git Library"
 name = "gitpython"
 optional = false
 python-versions = ">=3.4"
-version = "3.1.7"
+version = "3.1.8"
 
 [package.dependencies]
 gitdb = ">=4.0.1,<5"
@@ -579,8 +579,8 @@ category = "dev"
 description = "Python Build Reasonableness"
 name = "pbr"
 optional = false
-python-versions = "*"
-version = "5.4.5"
+python-versions = ">=2.6"
+version = "5.5.0"
 
 [[package]]
 category = "dev"
@@ -1021,12 +1021,12 @@ bandit = [
     {file = "bandit-1.6.2.tar.gz", hash = "sha256:41e75315853507aa145d62a78a2a6c5e3240fe14ee7c601459d0df9418196065"},
 ]
 boto3 = [
-    {file = "boto3-1.14.52-py2.py3-none-any.whl", hash = "sha256:3f34e2c55bb7764b1718a900a9237f2d2641d3118b70a3b3ffbbb99d549d184d"},
-    {file = "boto3-1.14.52.tar.gz", hash = "sha256:25e64288727b2d0cd559076523ca25dd8a2be646479fdcf70ed82545a52efc90"},
+    {file = "boto3-1.14.55-py2.py3-none-any.whl", hash = "sha256:3ddc9c3b272d2351b69667974a1897538408b24b5427c87123a6f51933164d6d"},
+    {file = "boto3-1.14.55.tar.gz", hash = "sha256:bb3dfd837238a134094d430a0214f68597cb6fb4fcecf2f54690917c3dbcbb05"},
 ]
 botocore = [
-    {file = "botocore-1.17.52-py2.py3-none-any.whl", hash = "sha256:d5c87558cc0f580b41ca432ff17b76ab28cf4ff36672ebfeca3fdeb94758e74a"},
-    {file = "botocore-1.17.52.tar.gz", hash = "sha256:768122a4c6e80c454d61741f19b2691d9366d257f3ac56a740d31b72eaccf4d6"},
+    {file = "botocore-1.17.55-py2.py3-none-any.whl", hash = "sha256:0c68c2f961d06980849078ba702645441fbc060de1fc9884e514838e90fd2a76"},
+    {file = "botocore-1.17.55.tar.gz", hash = "sha256:68458e5453af8ac97ecd5768d6193358889b578cefb33a1a22c7265380ae407f"},
 ]
 cfgv = [
     {file = "cfgv-3.2.0-py2.py3-none-any.whl", hash = "sha256:32e43d604bbe7896fe7c248a9c2276447dbef840feb28fe20494f62af110211d"},
@@ -1123,8 +1123,8 @@ gitdb = [
     {file = "gitdb-4.0.5.tar.gz", hash = "sha256:c9e1f2d0db7ddb9a704c2a0217be31214e91a4fe1dea1efad19ae42ba0c285c9"},
 ]
 gitpython = [
-    {file = "GitPython-3.1.7-py3-none-any.whl", hash = "sha256:fa3b92da728a457dd75d62bb5f3eb2816d99a7fe6c67398e260637a40e3fafb5"},
-    {file = "GitPython-3.1.7.tar.gz", hash = "sha256:2db287d71a284e22e5c2846042d0602465c7434d910406990d5b74df4afb0858"},
+    {file = "GitPython-3.1.8-py3-none-any.whl", hash = "sha256:1858f4fd089abe92ae465f01d5aaaf55e937eca565fb2c1fce35a51b5f85c910"},
+    {file = "GitPython-3.1.8.tar.gz", hash = "sha256:080bf8e2cf1a2b907634761c2eaefbe83b69930c94c66ad11b65a8252959f912"},
 ]
 graphviz = [
     {file = "graphviz-0.13.2-py2.py3-none-any.whl", hash = "sha256:241fb099e32b8e8c2acca747211c8237e40c0b89f24b1622860075d59f4c4b25"},
@@ -1272,8 +1272,8 @@ parver = [
     {file = "parver-0.3.0.tar.gz", hash = "sha256:b57d94e6f389f9db399bfc3ee4c4066f4cfb374ffef5727d5ae6a9c04eb8d228"},
 ]
 pbr = [
-    {file = "pbr-5.4.5-py2.py3-none-any.whl", hash = "sha256:579170e23f8e0c2f24b0de612f71f648eccb79fb1322c814ae6b3c07b5ba23e8"},
-    {file = "pbr-5.4.5.tar.gz", hash = "sha256:07f558fece33b05caf857474a366dfcc00562bca13dd8b47b2b3e22d9f9bf55c"},
+    {file = "pbr-5.5.0-py2.py3-none-any.whl", hash = "sha256:5adc0f9fc64319d8df5ca1e4e06eea674c26b80e6f00c530b18ce6a6592ead15"},
+    {file = "pbr-5.5.0.tar.gz", hash = "sha256:14bfd98f51c78a3dd22a1ef45cf194ad79eee4a19e8e1a0d5c7f8e81ffe182ea"},
 ]
 pep8-naming = [
     {file = "pep8-naming-0.9.1.tar.gz", hash = "sha256:a33d38177056321a167decd6ba70b890856ba5025f0a8eca6a3eda607da93caf"},

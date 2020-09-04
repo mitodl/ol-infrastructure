@@ -5,3 +5,4 @@ config:
   data_vpc:cidr_block: 10.2.0.0/16
   operations_vpc:cidr_block: 10.1.0.0/16
   operations_vpc:name: operations-qa
+  residential_vpc:cidr_block: 10.5.0.0/16

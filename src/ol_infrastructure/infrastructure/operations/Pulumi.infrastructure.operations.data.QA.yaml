@@ -1,0 +1,5 @@
+secretsprovider: awskms://alias/PulumiSecrets
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQE+VCGpUf4lyqLTtlcYivIvAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMwzkrzIycVwwrMJOoAgEQgDutyNt8lMJXQMSAvEwofyqY+NjmUmYpAEjV+SMka+ikif7vJ6HNcaqaO6gw9LO/WrtsoIUTh8I36uBNAA==
+config:
+  environment:business_unit: data
+  environment:vpc_reference: data_vpc
