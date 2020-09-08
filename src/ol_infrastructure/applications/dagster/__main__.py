@@ -9,7 +9,7 @@
 """
 import yaml
 
-from pulumi import StackReference, export, get_stack
+from pulumi import Output, ResourceOptions, StackReference, export, get_stack
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53, s3
 
@@ -162,27 +162,33 @@ salt_minion = OLSaltStack(
     )
 )
 
-cloud_init_userdata = {
-    'salt_minion': {
-        'pkg_name': 'salt-minion',
-        'service_name': 'salt-minion',
-        'config_dir': '/etc/salt',
-        'conf': {
-            'id': dagster_minion_id,
-            'master': f'salt-{env_suffix}.private.odl.mit.edu',
-            'startup_states': 'highstate'
+cloud_init_userdata = Output.all(
+    salt_minion.minion_public_key,
+    salt_minion.minion_private_key
+).apply(
+    lambda keys: '#cloud-config\n' + yaml.dump(
+        {
+            'salt_minion': {
+                'pkg_name': 'salt-minion',
+                'service_name': 'salt-minion',
+                'config_dir': '/etc/salt',
+                'conf': {
+                    'id': dagster_minion_id,
+                    'master': f'salt-{env_suffix}.private.odl.mit.edu',
+                    'startup_states': 'highstate'
+                },
+                'grains': {
+                    'roles': ['dagster'],
+                    'context': 'pulumi',
+                    'environment': dagster_environment
+                },
+                'public_key': keys[0],
+                'private_key': keys[1]
+            }
         },
-        'grains': {
-            'roles': ['dagster'],
-            'context': 'pulumi',
-            'environment': dagster_environment
-        }
-    }
-}
-salt_minion.minion_public_key.apply(
-    lambda pub: cloud_init_userdata['salt_minion'].update({'public_key': pub}))
-salt_minion.minion_private_key.apply(
-    lambda priv: cloud_init_userdata['salt_minion'].update({'private_key': priv}))
+        sort_keys=True
+    )
+)
 
 dagster_image = get_ami(
     filters=[
@@ -201,7 +207,7 @@ instance_tags = aws_config.merged_tags({'Name': dagster_minion_id})
 dagster_instance = ec2.Instance(
     f'dagster-instance-{dagster_environment}',
     ami=dagster_image.id,
-    user_data=f'#cloud-config\n{yaml.dump(cloud_init_userdata, sort_keys=True)}',
+    user_data=cloud_init_userdata,
     instance_type=get_config('dagster:instance_type'),
     iam_instance_profile=dagster_profile.id,
     tags=instance_tags,
@@ -216,7 +222,8 @@ dagster_instance = ec2.Instance(
         data_vpc['security_groups']['default'],
         data_vpc['security_groups']['web'],
         data_vpc['security_groups']['salt_minion'],
-    ]
+    ],
+    opts=ResourceOptions(depends_on=[salt_minion])
 )
 
 fifteen_minutes = 60 * 15

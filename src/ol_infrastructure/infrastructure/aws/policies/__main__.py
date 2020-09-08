@@ -1,3 +1,5 @@
+import json
+
 from pulumi import export
 from pulumi_aws import iam
 
@@ -6,7 +8,8 @@ describe_instance_policy_document = {
     'Statement': [
         {
             'Effect': 'Allow',
-            'Action': 'ec2:DescribeIntances'
+            'Action': 'ec2:DescribeIntances',
+            'Resource': '*'
         }
     ]
 }
@@ -15,7 +18,7 @@ describe_instance_policy = iam.Policy(
     'describe-ec2-instances-policy',
     name='describe-ec2-instances-policy',
     path='/ol-operations/describe-ec2-instances-policy/',
-    policy=describe_instance_policy_document,
+    policy=json.dumps(describe_instance_policy_document),
     description='Policy permitting EC2 describe instances capabilities for use with cloud auto-join systems.'
 )
 

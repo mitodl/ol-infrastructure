@@ -1,21 +1,17 @@
 import consul
 
-from pulumi import Config, StackReference, get_stack
+from pulumi import Config, export
 from pulumi_aws import ec2
 
+from ol_infrastructure.infrastructure import operations as ops
+
 env_config = Config('environment')
-stack = get_stack()
-stack_name = stack.split('.')[-1]
-namespace = stack.rsplit('.', 1)[0]
-env_suffix = stack_name.lower()
-env_prefix = namespace.rsplit('.', 1)[-1]
-network_stack = StackReference(f'infrastructure.aws.network.{stack_name}')
-security_stack = StackReference('infrastructure.aws.security')
-environment_name = f'{env_prefix}-{env_suffix}'
+environment_name = f'{ops.env_prefix}-{ops.env_suffix}'
 business_unit = env_config.get('business_unit') or 'operations'
-destination_vpc = network_stack.require_output(env_config.require('vpc_reference'))
+destination_vpc = ops.network_stack.require_output(env_config.require('vpc_reference'))
 
 ec2.SecurityGroupRule(
+    'consul-server-cross-dc-access-{ops.namespace}',
     type='ingress',
     cidr_blocks=[destination_vpc['cidr']],
     protocol='tcp',
@@ -24,3 +20,9 @@ ec2.SecurityGroupRule(
     description='WAN cross-datacenter communication',
     security_group_id=consul.consul_server_security_group.id
 )
+
+export('security_groups', {
+    'consul_server': consul.consul_server_security_group.id,
+    'consul_agent': consul.consul_agent_security_group.id
+})
+export('consul', consul.consul_export)
