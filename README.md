@@ -21,8 +21,8 @@ that uses the [diagrams](https://diagrams.mingrammer.com/) package to illustrate
 # Nomenclature
 
 Pulumi organizes code into `Projects` which represent a deployable unit. Within a project they have a concept of
-`Stacks` which are often used as a mapping for different environments. Each module underneath `infrastructure/` is its
-own `Project`, meaning that it will have a `Pulumi.yaml` definition of that project.
+`Stacks` which are often used as a mapping for different environments. Each module underneath `infrastructure/` and
+`applications/` is its own `Project`, meaning that it will have a `Pulumi.yaml` definition of that project. Each `stack` has its own yaml file in which the configuration for that stack is defined.
 
 # Conventions
 
@@ -31,3 +31,19 @@ Stack names should be a dot-separated namespaced representation of the project p
 The dotted namespace allows for peaceful coexistence of multiple projects within a single state backend, as well as allowing for use of [stack references](https://www.pulumi.com/docs/tutorials/aws/aws-py-stackreference/) between projects.
 
 The infrastructure components should be properly namespaced to match the stack names. For example, the project for managing VPC networking in AWS is located at `infrastructure/aws/network/` and the corresponding stacks are defined as `aws.network.QA` and `aws.network.Production`.
+
+
+# Executing
+
+In order to run a deployment, you need to specify the project and the stack that you would like to deploy. From the root of the repository, you can run `pulumi -C src/ol_infrastructure/path/to/module/ up`. If you haven't already selected the stack, it will ask you to interactively select the stack which you are deploying.
+
+Some resources will accept environment variables as configuration parameters. This reduces the boilerplate for per-stack configurations. Resources that we rely on which will accept environment variables are:
+
+Vault:
+  VAULT_ADDR: The full URL (excluding https://) where the Vault server is located
+  VAULT_TOKEN: The token to be used for authenticating to Vault
+
+SaltStack:
+  SALTSTACK_API_URL: The full URL for communicating with the Salt API (e.g. https://salt-qa.odl.mit.edu)
+  SALTSTACK_API_USER: The username for authenticating to the Salt API (default is `pulumi`)
+  SALTSTACK_API_PASSWORD: The password for the Salt API user
