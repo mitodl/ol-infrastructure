@@ -7,9 +7,7 @@
 - Register a minion ID and key pair with the appropriate SaltStack master instance
 - Provision an EC2 instance from a pre-built AMI with the pipeline code for Dagster
 """
-import yaml
-
-from pulumi import Output, ResourceOptions, StackReference, export, get_stack
+from pulumi import ResourceOptions, StackReference, export, get_stack
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53, s3
 
@@ -21,11 +19,12 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig
 )
+from ol_infrastructure.lib.aws.ec2_helper import build_userdata
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.providers.salt.minion import (
-    OLSaltStack,
-    OLSaltStackInputs
+    OLSaltStackMinion,
+    OLSaltStackMinionInputs
 )
 
 stack = get_stack()
@@ -152,9 +151,9 @@ dagster_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
 dagster_db_vault_backend = OLVaultDatabaseBackend(dagster_db_vault_backend_config)
 
 dagster_minion_id = f'dagster-{dagster_environment}-0'
-salt_minion = OLSaltStack(
+salt_minion = OLSaltStackMinion(
     f'saltstack-minion-{dagster_minion_id}',
-    OLSaltStackInputs(
+    OLSaltStackMinionInputs(
         minion_id=dagster_minion_id,
         salt_api_url=get_config('saltstack:api_url'),
         salt_user=get_config('saltstack:api_user'),
@@ -162,33 +161,12 @@ salt_minion = OLSaltStack(
     )
 )
 
-cloud_init_userdata = Output.all(
-    salt_minion.minion_public_key,
-    salt_minion.minion_private_key
-).apply(
-    lambda keys: '#cloud-config\n' + yaml.dump(
-        {
-            'salt_minion': {
-                'pkg_name': 'salt-minion',
-                'service_name': 'salt-minion',
-                'config_dir': '/etc/salt',
-                'conf': {
-                    'id': dagster_minion_id,
-                    'master': f'salt-{env_suffix}.private.odl.mit.edu',
-                    'startup_states': 'highstate'
-                },
-                'grains': {
-                    'roles': ['dagster'],
-                    'context': 'pulumi',
-                    'environment': dagster_environment
-                },
-                'public_key': keys[0],
-                'private_key': keys[1]
-            }
-        },
-        sort_keys=True
-    )
-)
+cloud_init_userdata = build_userdata(
+    instance_name=dagster_minion_id,
+    minion_keys=salt_minion,
+    minion_roles=['dagster'],
+    minion_environment=dagster_environment,
+    salt_host=f'salt-{env_suffix}.private.odl.mit.edu')
 
 dagster_image = get_ami(
     filters=[

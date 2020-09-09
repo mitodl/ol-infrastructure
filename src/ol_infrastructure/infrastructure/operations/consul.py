@@ -2,17 +2,19 @@ import json
 
 from itertools import chain
 
-import yaml
-
-from pulumi import Config, Output, ResourceOptions
+from pulumi import Config, ResourceOptions
 from pulumi_aws import ec2, iam
 
 from ol_infrastructure.infrastructure import operations as ops
-from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, debian_10_ami
+from ol_infrastructure.lib.aws.ec2_helper import (
+    InstanceTypes,
+    build_userdata,
+    debian_10_ami
+)
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.providers.salt.minion import (
-    OLSaltStack,
-    OLSaltStackInputs
+    OLSaltStackMinion,
+    OLSaltStackMinionInputs
 )
 
 env_config = Config('environment')
@@ -164,40 +166,19 @@ subnets = destination_vpc['subnet_ids']
 subnet_id = subnets.apply(chain)
 for count, subnet_id in zip(range(consul_config.get_int('instance_count') or 3), subnets):  # type: ignore
     instance_name = f'consul-{environment_name}-{count}'
-    salt_minion = OLSaltStack(
+    salt_minion = OLSaltStackMinion(
         f'saltstack-minion-{instance_name}',
-        OLSaltStackInputs(
+        OLSaltStackMinionInputs(
             minion_id=instance_name
         )
     )
 
-    cloud_init_userdata = Output.all(
-        salt_minion.minion_public_key,
-        salt_minion.minion_private_key
-    ).apply(
-        lambda keys: '#cloud-config\n' + yaml.dump(
-            {
-                'salt_minion': {
-                    'pkg_name': 'salt-minion',
-                    'service_name': 'salt-minion',
-                    'config_dir': '/etc/salt',
-                    'conf': {
-                        'id': instance_name,
-                        'master': f'salt-{ops.env_suffix}.private.odl.mit.edu',
-                        'startup_states': 'highstate'
-                    },
-                    'grains': {
-                        'roles': ['consul_server', 'service_discovery'],
-                        'context': 'pulumi',
-                        'environment': environment_name
-                    },
-                    'public_key': keys[0],
-                    'private_key': keys[1]
-                }
-            },
-            sort_keys=True
-        )
-    )
+    cloud_init_userdata = build_userdata(
+        instance_name=instance_name,
+        minion_keys=salt_minion,
+        minion_roles=['consul_server', 'service_discovery'],
+        minion_environment=environment_name,
+        salt_host=f'salt-{ops.env_suffix}.private.odl.mit.edu')
 
     instance_tags = aws_config.merged_tags({'Name': instance_name})
     consul_instance = ec2.Instance(

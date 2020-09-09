@@ -33,7 +33,7 @@ from pulumi.dynamic import CreateResult, ReadResult, Resource, ResourceProvider
 
 
 @dataclass
-class OLSaltStackInputs:
+class OLSaltStackMinionInputs:
     minion_id: Input[Text]
     salt_api_url: Optional[Input[Text]] = None
     salt_user: Optional[Input[Text]] = None
@@ -57,7 +57,7 @@ class OLSaltStackInputs:
                                      f'environment variable {lookups[1]}')
 
 
-class OLSaltStackProvider(ResourceProvider):
+class OLSaltStackMinionProvider(ResourceProvider):
 
     def create(self, inputs: Dict[Text, Text]) -> CreateResult:
         """Register a salt minion and generate a keypair to be returned via Outputs.
@@ -152,17 +152,17 @@ class OLSaltStackProvider(ResourceProvider):
         return salt_client
 
 
-class OLSaltStack(Resource):
+class OLSaltStackMinion(Resource):
     minion_id: Output[Text]
     minion_public_key: Output[Optional[Text]]
     minion_private_key: Output[Optional[Text]]
 
-    def __init__(self, name: Text, properties: OLSaltStackInputs, opts: ResourceOptions = None):
+    def __init__(self, name: Text, properties: OLSaltStackMinionInputs, opts: ResourceOptions = None):
         resource_options = ResourceOptions.merge(
             ResourceOptions(additional_secret_outputs=['minion_private_key']),
             opts)  # type: ignore
         super().__init__(
-            OLSaltStackProvider(),
+            OLSaltStackMinionProvider(),
             name,
             {
                 'minion_id': properties.minion_id,

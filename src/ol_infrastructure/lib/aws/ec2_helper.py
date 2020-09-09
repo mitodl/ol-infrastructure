@@ -3,12 +3,15 @@ from enum import Enum, unique
 from functools import lru_cache
 from ipaddress import IPv4Network
 from types import FunctionType
-from typing import Dict, List, Optional, Text, Tuple, Union
+from typing import Any, Dict, List, Optional, Text, Tuple, Union
 
 import boto3
 import pulumi
+import yaml
 
 from pulumi_aws import get_ami
+
+from ol_infrastructure.providers.salt.minion import OLSaltStackMinion
 
 ec2_client = boto3.client('ec2')
 AWSFilterType = List[Dict[Text, Union[Text, List[Text]]]]  # noqa: WPS221
@@ -204,3 +207,45 @@ def route_table_opts(internet_gateway_id: Text) -> Tuple[pulumi.ResourceOptions,
         'RouteTableId',
         ['tags', 'routes']
     )
+
+
+def build_userdata(  # noqa: WPS211
+        instance_name: Text,
+        minion_keys: OLSaltStackMinion,
+        minion_roles: List[Text],
+        minion_environment: Text,
+        salt_host: Text,
+        additional_cloud_config: Optional[Dict[Text, Any]] = None,
+        additional_salt_config: Optional[Dict[Text, Text]] = None
+) -> pulumi.Output[Text]:
+    def _build_cloud_config_string(keys) -> Text:  # noqa: WPS430
+        cloud_config = additional_cloud_config or {}
+        salt_config = {
+            'salt_minion': {
+                'pkg_name': 'salt-minion',
+                'service_name': 'salt-minion',
+                'config_dir': '/etc/salt',
+                'conf': {
+                    'id': instance_name,
+                    'master': salt_host,
+                    'startup_states': 'highstate'
+                },
+                'grains': {
+                    'roles': minion_roles,
+                    'context': 'pulumi',
+                    'environment': minion_environment
+                },
+                'public_key': keys[0],
+                'private_key': keys[1]
+            }
+        }
+        salt_config['salt_minion']['conf'].update(
+            additional_salt_config or {})
+        cloud_config.update(salt_config)
+        return '#cloud-config\n{yaml_data}'.format(
+            yaml_data=yaml.dump(cloud_config, sort_keys=True))
+
+    return pulumi.Output.all(
+        minion_keys.minion_public_key,
+        minion_keys.minion_private_key
+    ).apply(_build_cloud_config_string)
