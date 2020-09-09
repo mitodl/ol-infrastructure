@@ -180,7 +180,10 @@ for count, subnet_id in zip(range(consul_config.get_int('instance_count') or 3),
         minion_environment=environment_name,
         salt_host=f'salt-{ops.env_suffix}.private.odl.mit.edu')
 
-    instance_tags = aws_config.merged_tags({'Name': instance_name})
+    instance_tags = aws_config.merged_tags({
+        'Name': instance_name,
+        'consul_env': environment_name
+    })
     consul_instance = ec2.Instance(
         f'consul-instance-{environment_name}-{count}',
         ami=debian_10_ami.id,
