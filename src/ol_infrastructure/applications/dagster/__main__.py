@@ -211,7 +211,8 @@ dagster_domain = route53.Record(
     type='A',
     ttl=fifteen_minutes,
     records=[dagster_instance.public_ip],
-    zone_id=mitodl_zone_id
+    zone_id=mitodl_zone_id,
+    opts=ResourceOptions(depends_on=[dagster_instance])
 )
 dagster_domain_v6 = route53.Record(
     f'dagster-{env_suffix}-service-domain-v6',
@@ -219,7 +220,8 @@ dagster_domain_v6 = route53.Record(
     type='AAAA',
     ttl=fifteen_minutes,
     records=dagster_instance.ipv6_addresses,
-    zone_id=mitodl_zone_id
+    zone_id=mitodl_zone_id,
+    opts=ResourceOptions(depends_on=[dagster_instance])
 )
 
 export('dagster_app', {

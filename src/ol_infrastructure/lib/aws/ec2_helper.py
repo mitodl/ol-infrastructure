@@ -220,7 +220,15 @@ def build_userdata(  # noqa: WPS211
 ) -> pulumi.Output[Text]:
     def _build_cloud_config_string(keys) -> Text:  # noqa: WPS430
         cloud_config = additional_cloud_config or {}
+        # TODO (TMM 2020-09-10): Once the upstream PR is merged move to using the
+        # upstream bootstrap script. https://github.com/saltstack/salt-bootstrap/pull/1498
         salt_config = {
+            'bootcmd': [
+                'wget -O /tmp/salt_bootstrap.sh https://raw.githubusercontent.com/mitodl/salt-bootstrap/develop/bootstrap-salt.sh',  # noqa: E501
+                'chmod +x /tmp/salt_bootstrap.sh',
+                'sh /tmp/salt_bootstrap.sh -U -N -z'
+            ],
+            'package_update': True,
             'salt_minion': {
                 'pkg_name': 'salt-minion',
                 'service_name': 'salt-minion',
@@ -239,7 +247,7 @@ def build_userdata(  # noqa: WPS211
                 'private_key': keys[1]
             }
         }
-        salt_config['salt_minion']['conf'].update(
+        salt_config['salt_minion']['conf'].update(  # type: ignore
             additional_salt_config or {})
         cloud_config.update(salt_config)
         return '#cloud-config\n{yaml_data}'.format(
