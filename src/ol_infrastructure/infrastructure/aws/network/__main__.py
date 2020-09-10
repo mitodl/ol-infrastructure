@@ -6,12 +6,11 @@ environments were previously created with SaltStack. In that code we defaulted t
 some of the networks defined below specify 4 subnets, which results in a `x.x.0.0/24` network being created, while also
 importing the remaining 3 subnets. If only 3 subnets were specified then one of the existing networks would not be
 managed with Pulumi.
-
 """
-from typing import Dict
 
-from pulumi import export, get_stack
-from pulumi.config import get_config
+from typing import Any, Dict, Text
+
+from pulumi import Config, export, get_stack
 from security_groups import default_group, public_web, salt_minion
 
 from ol_infrastructure.components.aws.olvpc import (
@@ -21,7 +20,16 @@ from ol_infrastructure.components.aws.olvpc import (
 )
 
 
-def vpc_exports(vpc: OLVPC) -> Dict:
+def vpc_exports(vpc: OLVPC) -> Dict[Text, Any]:
+    """Create a consistent structure for VPC stack exports.
+
+    :param vpc: The VPC whose data you would like to export
+    :type vpc: OLVPC
+
+    :returns: A dictionary of data to be exported
+
+    :rtype: Dict[Text, Any]
+    """
     return {
         'id': vpc.olvpc.id,
         'cidr': vpc.olvpc.cidr_block,
@@ -34,9 +42,25 @@ def vpc_exports(vpc: OLVPC) -> Dict:
 stack = get_stack()
 stack_name = stack.split('.')[-1]
 env_suffix = stack_name.lower()
+
+apps_config = Config('apps_vpc')
+applications_vpc_config = OLVPCConfig(
+    vpc_name=f'applications-{env_suffix}',
+    cidr_block=apps_config.require('cidr_block'),
+    num_subnets=4,
+    tags={
+        'OU': 'operations',
+        'Environment': f'applications-{env_suffix}',
+        'business_unit': 'operations',
+        'Name': f'OL Applications {stack_name}'
+    }
+)
+applications_vpc = OLVPC(applications_vpc_config)
+
+data_config = Config('data_vpc')
 data_vpc_config = OLVPCConfig(
     vpc_name=f'ol-data-{env_suffix}',
-    cidr_block=get_config('data_vpc:cidr_block'),
+    cidr_block=data_config.require('cidr_block'),
     num_subnets=3,
     tags={
         'OU': 'data',
@@ -45,9 +69,38 @@ data_vpc_config = OLVPCConfig(
         'Name': f'{stack_name} Data Services'})
 data_vpc = OLVPC(data_vpc_config)
 
+ocw_config = Config('ocw_vpc')
+ocw_vpc_config = OLVPCConfig(
+    vpc_name=f'ocw-{env_suffix}',
+    cidr_block=ocw_config.require('cidr_block'),
+    num_subnets=3,
+    tags={
+        'OU': 'open-courseware',
+        'Environment': f'ocw-{env_suffix}',
+        'business_unit': 'open-courseware',
+        'Name': f'Open Courseware {stack_name}'
+    }
+)
+ocw_vpc = OLVPC(ocw_vpc_config)
+
+ops_config = Config('operations_vpc')
+operations_vpc_config = OLVPCConfig(
+    vpc_name=ops_config.require('name'),
+    cidr_block=ops_config.require('cidr_block'),
+    num_subnets=4,
+    tags={
+        'OU': 'operations',
+        'Environment': f'operations-{env_suffix}',
+        'business_unit': 'operations',
+        'Name': f'Operations {stack_name}'
+    }
+)
+operations_vpc = OLVPC(operations_vpc_config)
+
+mitx_config = Config('residential_vpc')
 residential_mitx_vpc_config = OLVPCConfig(
     vpc_name=f'mitx-{env_suffix}',
-    cidr_block=get_config('residential_vpc:cidr_block'),
+    cidr_block=mitx_config.require('cidr_block'),
     num_subnets=4,
     tags={
         'OU': 'residential',
@@ -58,18 +111,19 @@ residential_mitx_vpc_config = OLVPCConfig(
 )
 residential_mitx_vpc = OLVPC(residential_mitx_vpc_config)
 
-operations_vpc_config = OLVPCConfig(
-    vpc_name=get_config('operations_vpc:name'),
-    cidr_block=get_config('operations_vpc:cidr_block'),
+xpro_config = Config('xpro_vpc')
+xpro_vpc_config = OLVPCConfig(
+    vpc_name=f'mitxpro-{env_suffix}',
+    cidr_block=xpro_config.require('cidr_block'),
     num_subnets=4,
     tags={
-        'OU': 'operations',
-        'Environment': f'operations-{env_suffix}',
-        'business_unit': 'operations',
-        'Name': f'Operations {stack_name}'
+        'OU': 'mitxpro',
+        'Environment': f'mitxpro-{env_suffix}',
+        'business_unit': 'mitxpro',
+        'Name': f'xPro {stack_name}'
     }
 )
-operations_vpc = OLVPC(operations_vpc_config)
+xpro_vpc = OLVPC(xpro_vpc_config)
 
 data_vpc_exports = vpc_exports(data_vpc)
 data_vpc_exports.update(
@@ -121,6 +175,15 @@ residential_mitx_vpc_exports.update(
 )
 export('residential_mitx_vpc', residential_mitx_vpc_exports)
 
+xpro_vpc_exports = vpc_exports(xpro_vpc)
+export('xpro_vpc', xpro_vpc_exports)
+
+applications_vpc_exports = vpc_exports(applications_vpc)
+export('applications_vpc', applications_vpc_exports)
+
+ocw_vpc_exports = vpc_exports(ocw_vpc)
+export('ocw_vpc', ocw_vpc_exports)
+
 operations_vpc_exports = vpc_exports(operations_vpc)
 export('operations_vpc', operations_vpc_exports)
 
@@ -140,4 +203,40 @@ data_to_mitx_peer = OLVPCPeeringConnection(
     f'ol-data-{env_suffix}-to-residential-mitx-{env_suffix}-vpc-peer',
     data_vpc,
     residential_mitx_vpc
+)
+
+operations_to_xpro_peer = OLVPCPeeringConnection(
+    f'ol-operations-{env_suffix}-to-mitxpro-{env_suffix}-vpc-peer',
+    operations_vpc,
+    xpro_vpc
+)
+
+data_to_xpro_peer = OLVPCPeeringConnection(
+    f'ol-data-{env_suffix}-to-mitxpro-{env_suffix}-vpc-peer',
+    data_vpc,
+    xpro_vpc
+)
+
+operations_to_applications_peer = OLVPCPeeringConnection(
+    f'ol-operations-{env_suffix}-to-applications-{env_suffix}-vpc-peer',
+    operations_vpc,
+    applications_vpc
+)
+
+data_to_xpro_peer = OLVPCPeeringConnection(
+    f'ol-data-{env_suffix}-to-applications-{env_suffix}-vpc-peer',
+    data_vpc,
+    applications_vpc
+)
+
+operations_to_ocw_peer = OLVPCPeeringConnection(
+    f'ol-operations-{env_suffix}-to-ocw-{env_suffix}-vpc-peer',
+    operations_vpc,
+    ocw_vpc
+)
+
+data_to_ocw_peer = OLVPCPeeringConnection(
+    f'ol-data-{env_suffix}-to-ocw-{env_suffix}-vpc-peer',
+    data_vpc,
+    ocw_vpc
 )

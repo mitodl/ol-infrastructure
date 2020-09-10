@@ -209,6 +209,28 @@ def route_table_opts(internet_gateway_id: Text) -> Tuple[pulumi.ResourceOptions,
     )
 
 
+def vpc_peer_opts(source_vpc_cidr: Text, destination_vpc_cidr: Text) -> Tuple[pulumi.ResourceOptions, Text]:
+    """Look up an existing route table and conditionally import it.
+
+    :param internet_gateway_id: The ID of the internet gateway associated with the target route table.
+    :type internet_gateway_id: Text
+
+    :returns: A Pulumi ResourceOptions object that contains the necessary import settings.
+
+    :rtype: Tuple[pulumi.ResourceOptions, Text]
+    """
+    return _conditional_import(
+        ec2_client.describe_vpc_peering_connections,
+        [
+            {'Name': 'accepter-vpc-info.cidr-block', 'Values': [destination_vpc_cidr, source_vpc_cidr]},
+            {'Name': 'requester-vpc-info.cidr-block', 'Values': [source_vpc_cidr, destination_vpc_cidr]}
+        ],
+        'VpcPeeringConnections',
+        'VpcPeeringConnectionId',
+        ['tags', 'vpc_id', 'peer_vpc_id', 'id', 'auto_accept']
+    )
+
+
 def build_userdata(  # noqa: WPS211
         instance_name: Text,
         minion_keys: OLSaltStackMinion,

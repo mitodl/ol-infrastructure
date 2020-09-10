@@ -24,7 +24,8 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     internet_gateway_opts,
     route_table_opts,
     subnet_opts,
-    vpc_opts
+    vpc_opts,
+    vpc_peer_opts
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 
@@ -230,6 +231,8 @@ class OLVPCPeeringConnection(ComponentResource):
         """
         super().__init__('ol:infrastructure:aws:VPCPeeringConnection', vpc_peer_name, None, opts)
         resource_options = ResourceOptions.merge(ResourceOptions(parent=self), opts)  # type: ignore
+        vpc_peer_resource_opts, imported_vpc_peer_id = vpc_peer_opts(
+            str(source_vpc.vpc_config.cidr_block), str(destination_vpc.vpc_config.cidr_block))
         self.peering_connection = ec2.VpcPeeringConnection(
             f'{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-vpc-peer',
             auto_accept=True,
@@ -237,7 +240,7 @@ class OLVPCPeeringConnection(ComponentResource):
             peer_vpc_id=destination_vpc.olvpc.id,
             tags=source_vpc.vpc_config.merged_tags(
                 {'Name': f'{source_vpc.vpc_config.vpc_name} to {destination_vpc.vpc_config.vpc_name} peer'}),
-            opts=resource_options
+            opts=resource_options.merge(vpc_peer_resource_opts)  # type: ignore
         )
         self.source_to_dest_route = ec2.Route(
             f'{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-route',
