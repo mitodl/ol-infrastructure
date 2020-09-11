@@ -1,4 +1,13 @@
-"""Manage the creation of VPC infrastructure and the peering relationships between them."""
+"""Manage the creation of VPC infrastructure and the peering relationships between them.
+
+In addition to creating the VPCs, it will also import existing ones based on the defined CIDR block.  Some of these
+environments were previously created with SaltStack. In that code we defaulted to the first network being at
+`x.x.1.0/24`, whereas in the OLVPC component the first subnet defaults to being at `x.x.0.0/24`. Due to this disparity,
+some of the networks defined below specify 4 subnets, which results in a `x.x.0.0/24` network being created, while also
+importing the remaining 3 subnets. If only 3 subnets were specified then one of the existing networks would not be
+managed with Pulumi.
+
+"""
 from typing import Dict
 
 from pulumi import export, get_stack

@@ -40,10 +40,10 @@ In order to run a deployment, you need to specify the project and the stack that
 Some resources will accept environment variables as configuration parameters. This reduces the boilerplate for per-stack configurations. Resources that we rely on which will accept environment variables are:
 
 Vault:
-  VAULT_ADDR: The full URL (excluding https://) where the Vault server is located
-  VAULT_TOKEN: The token to be used for authenticating to Vault
+  - `VAULT_ADDR`: The full URL (excluding https://) where the Vault server is located
+  - `VAULT_TOKEN`: The token to be used for authenticating to Vault
 
 SaltStack:
-  SALTSTACK_API_URL: The full URL for communicating with the Salt API (e.g. https://salt-qa.odl.mit.edu)
-  SALTSTACK_API_USER: The username for authenticating to the Salt API (default is `pulumi`)
-  SALTSTACK_API_PASSWORD: The password for the Salt API user
+  - `SALTSTACK_API_URL`: The full URL for communicating with the Salt API (e.g. https://salt-qa.odl.mit.edu)
+  - `SALTSTACK_API_USER`: The username for authenticating to the Salt API (default is `pulumi`)
+  - `SALTSTACK_API_PASSWORD`: The password for the Salt API user
