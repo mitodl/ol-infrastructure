@@ -7,9 +7,7 @@
 - Register a minion ID and key pair with the appropriate SaltStack master instance
 - Provision an EC2 instance from a pre-built AMI with the pipeline code for Dagster
 """
-import yaml
-
-from pulumi import StackReference, export, get_stack
+from pulumi import ResourceOptions, StackReference, export, get_stack
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53, s3
 
@@ -21,11 +19,12 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig
 )
+from ol_infrastructure.lib.aws.ec2_helper import build_userdata
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.providers.salt.minion import (
-    OLSaltStack,
-    OLSaltStackInputs
+    OLSaltStackMinion,
+    OLSaltStackMinionInputs
 )
 
 stack = get_stack()
@@ -34,9 +33,9 @@ namespace = stack.rsplit('.', 1)[0]
 env_suffix = stack_name.lower()
 network_stack = StackReference(f'infrastructure.aws.network.{stack_name}')
 dns_stack = StackReference('infrastructure.aws.dns')
-mitodl_zone_id = dns_stack.get_output('odl_zone_id')
-data_vpc = network_stack.get_output('data_vpc')
-operations_vpc = network_stack.get_output('operations_vpc')
+mitodl_zone_id = dns_stack.require_output('odl_zone_id')
+data_vpc = network_stack.require_output('data_vpc')
+operations_vpc = network_stack.require_output('operations_vpc')
 dagster_environment = f'data-{env_suffix}'
 aws_config = AWSBase(
     tags={
@@ -124,8 +123,8 @@ dagster_db_security_group = ec2.SecurityGroup(
         cidr_blocks=[data_vpc['cidr'], operations_vpc['cidr']],
         ipv6_cidr_blocks=[data_vpc['cidr_v6']],
         protocol='tcp',
-        from_port=5432,
-        to_port=5432
+        from_port=5432,  # noqa: WPS432
+        to_port=5432  # noqa: WPS432
     )],
     tags=aws_config.tags,
     vpc_id=data_vpc['id']
@@ -152,9 +151,9 @@ dagster_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
 dagster_db_vault_backend = OLVaultDatabaseBackend(dagster_db_vault_backend_config)
 
 dagster_minion_id = f'dagster-{dagster_environment}-0'
-salt_minion = OLSaltStack(
+salt_minion = OLSaltStackMinion(
     f'saltstack-minion-{dagster_minion_id}',
-    OLSaltStackInputs(
+    OLSaltStackMinionInputs(
         minion_id=dagster_minion_id,
         salt_api_url=get_config('saltstack:api_url'),
         salt_user=get_config('saltstack:api_user'),
@@ -162,27 +161,12 @@ salt_minion = OLSaltStack(
     )
 )
 
-cloud_init_userdata = {
-    'salt_minion': {
-        'pkg_name': 'salt-minion',
-        'service_name': 'salt-minion',
-        'config_dir': '/etc/salt',
-        'conf': {
-            'id': dagster_minion_id,
-            'master': f'salt-{env_suffix}.private.odl.mit.edu',
-            'startup_states': 'highstate'
-        },
-        'grains': {
-            'roles': ['dagster'],
-            'context': 'pulumi',
-            'environment': dagster_environment
-        }
-    }
-}
-salt_minion.minion_public_key.apply(
-    lambda pub: cloud_init_userdata['salt_minion'].update({'public_key': pub}))
-salt_minion.minion_private_key.apply(
-    lambda priv: cloud_init_userdata['salt_minion'].update({'private_key': priv}))
+cloud_init_userdata = build_userdata(
+    instance_name=dagster_minion_id,
+    minion_keys=salt_minion,
+    minion_roles=['dagster'],
+    minion_environment=dagster_environment,
+    salt_host=f'salt-{env_suffix}.private.odl.mit.edu')
 
 dagster_image = get_ami(
     filters=[
@@ -201,7 +185,7 @@ instance_tags = aws_config.merged_tags({'Name': dagster_minion_id})
 dagster_instance = ec2.Instance(
     f'dagster-instance-{dagster_environment}',
     ami=dagster_image.id,
-    user_data=f'#cloud-config\n{yaml.dump(cloud_init_userdata, sort_keys=True)}',
+    user_data=cloud_init_userdata,
     instance_type=get_config('dagster:instance_type'),
     iam_instance_profile=dagster_profile.id,
     tags=instance_tags,
@@ -216,7 +200,8 @@ dagster_instance = ec2.Instance(
         data_vpc['security_groups']['default'],
         data_vpc['security_groups']['web'],
         data_vpc['security_groups']['salt_minion'],
-    ]
+    ],
+    opts=ResourceOptions(depends_on=[salt_minion])
 )
 
 fifteen_minutes = 60 * 15
@@ -226,7 +211,8 @@ dagster_domain = route53.Record(
     type='A',
     ttl=fifteen_minutes,
     records=[dagster_instance.public_ip],
-    zone_id=mitodl_zone_id
+    zone_id=mitodl_zone_id,
+    opts=ResourceOptions(depends_on=[dagster_instance])
 )
 dagster_domain_v6 = route53.Record(
     f'dagster-{env_suffix}-service-domain-v6',
@@ -234,7 +220,8 @@ dagster_domain_v6 = route53.Record(
     type='AAAA',
     ttl=fifteen_minutes,
     records=dagster_instance.ipv6_addresses,
-    zone_id=mitodl_zone_id
+    zone_id=mitodl_zone_id,
+    opts=ResourceOptions(depends_on=[dagster_instance])
 )
 
 export('dagster_app', {

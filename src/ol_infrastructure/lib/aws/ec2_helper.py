@@ -1,15 +1,48 @@
 """Helper functions for working with EC2 resources."""
-
+from enum import Enum, unique
 from functools import lru_cache
 from ipaddress import IPv4Network
 from types import FunctionType
-from typing import Dict, List, Optional, Text, Tuple, Union
+from typing import Any, Dict, List, Optional, Text, Tuple, Union
 
 import boto3
 import pulumi
+import yaml
+
+from pulumi_aws import get_ami
+
+from ol_infrastructure.providers.salt.minion import OLSaltStackMinion
 
 ec2_client = boto3.client('ec2')
 AWSFilterType = List[Dict[Text, Union[Text, List[Text]]]]  # noqa: WPS221
+
+debian_10_ami = get_ami(
+    filters=[
+        {
+            'name': 'virtualization-type',
+            'values': ['hvm']
+        }, {
+            'name': 'root-device-type',
+            'values': ['ebs']
+        }, {
+            'name': 'name',
+            'values': ['debian-10-amd64*']
+        }
+    ],
+    most_recent=True,
+    owners=['136693071363']
+)
+
+
+@unique
+class InstanceTypes(str, Enum):
+    small = 't3a.small'
+    medium = 't3a.medium'
+    large = 't3a.large'
+    general_purpose_large = 'm5a.large'
+    general_purpose_xlarge = 'm5a.xlarge'
+    high_mem_regular = 'r5a.large'
+    high_mem_xlarge = 'r5a.xlarge'
 
 
 @lru_cache
@@ -83,6 +116,7 @@ def _conditional_import(  # noqa: WPS210
         change_attributes_ignored = ['tags']
     if resources:
         if len(resources) > 1:
+            pulumi.log.info(f'More than one resource returned with filter {filters}. Found {resources}')
             raise ValueError('Too many resources returned. A more precise filter is needed.')
         resource = resources[0]
         tags = resource['Tags']
@@ -173,3 +207,53 @@ def route_table_opts(internet_gateway_id: Text) -> Tuple[pulumi.ResourceOptions,
         'RouteTableId',
         ['tags', 'routes']
     )
+
+
+def build_userdata(  # noqa: WPS211
+        instance_name: Text,
+        minion_keys: OLSaltStackMinion,
+        minion_roles: List[Text],
+        minion_environment: Text,
+        salt_host: Text,
+        additional_cloud_config: Optional[Dict[Text, Any]] = None,
+        additional_salt_config: Optional[Dict[Text, Text]] = None
+) -> pulumi.Output[Text]:
+    def _build_cloud_config_string(keys) -> Text:  # noqa: WPS430
+        cloud_config = additional_cloud_config or {}
+        # TODO (TMM 2020-09-10): Once the upstream PR is merged move to using the
+        # upstream bootstrap script. https://github.com/saltstack/salt-bootstrap/pull/1498
+        salt_config = {
+            'bootcmd': [
+                'wget -O /tmp/salt_bootstrap.sh https://raw.githubusercontent.com/mitodl/salt-bootstrap/develop/bootstrap-salt.sh',  # noqa: E501
+                'chmod +x /tmp/salt_bootstrap.sh',
+                'sh /tmp/salt_bootstrap.sh -U -N -z'
+            ],
+            'package_update': True,
+            'salt_minion': {
+                'pkg_name': 'salt-minion',
+                'service_name': 'salt-minion',
+                'config_dir': '/etc/salt',
+                'conf': {
+                    'id': instance_name,
+                    'master': salt_host,
+                    'startup_states': 'highstate'
+                },
+                'grains': {
+                    'roles': minion_roles,
+                    'context': 'pulumi',
+                    'environment': minion_environment
+                },
+                'public_key': keys[0],
+                'private_key': keys[1]
+            }
+        }
+        salt_config['salt_minion']['conf'].update(  # type: ignore
+            additional_salt_config or {})
+        cloud_config.update(salt_config)
+        return '#cloud-config\n{yaml_data}'.format(
+            yaml_data=yaml.dump(cloud_config, sort_keys=True))
+
+    return pulumi.Output.all(
+        minion_keys.minion_public_key,
+        minion_keys.minion_private_key
+    ).apply(_build_cloud_config_string)

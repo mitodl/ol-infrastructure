@@ -3,25 +3,61 @@ Dynamic provider that uses the SaltStack API to provision a minion.
 
 Registers a minion ID with a SaltStack master and generates a keypair.  The keypair is returned so that it can be passed
 to an instance via user data to take advantage of cloud-init.
+
+To use you can pass the API configuration as a Pulumi stack config or using environment variables.
+
+API URL:
+  As pulumi config: saltstack:api_url
+  As environment variable: SALTSTACK_API_URL
+
+API User:
+  As pulumi config: saltstack:api_user
+  As environment variable: SALTSTACK_API_USER
+
+API Password:
+  As pulumi config: saltstack:api_password
+  As environment variable: SALTSTACK_API_PASSWORD
+
+API Authentication Method:
+  As pulumi config: saltstack:api_auth_method
+  As environment variable: SALTSTACK_API_AUTH_METHOD
 """
+import os
+
 from dataclasses import dataclass
 from typing import Dict, Optional, Text
 
 from pepper import Pepper
-from pulumi import Input, Output, ResourceOptions
+from pulumi import Config, Input, Output, ResourceOptions
 from pulumi.dynamic import CreateResult, ReadResult, Resource, ResourceProvider
 
 
 @dataclass
-class OLSaltStackInputs:
+class OLSaltStackMinionInputs:
     minion_id: Input[Text]
-    salt_api_url: Input[Text]
-    salt_user: Input[Text]
-    salt_password: Input[Text]
+    salt_api_url: Optional[Input[Text]] = None
+    salt_user: Optional[Input[Text]] = None
+    salt_password: Optional[Input[Text]] = None
     salt_auth_method: Input[Text] = 'pam'
 
+    def __post_init__(self):
+        salt_config = Config('saltstack')
+        env_map = {
+            'salt_api_url': ['api_url', 'SALTSTACK_API_URL'],
+            'salt_user': ['api_user', 'SALTSTACK_API_USER'],
+            'salt_password': ['api_password', 'SALTSTACK_API_PASSWORD'],
+            'salt_auth_method': ['api_auth_method', 'SALTSTACK_API_AUTH_METHOD']
+        }
+        for attr, lookups in env_map.items():
+            if getattr(self, attr) is None:
+                setattr(self, attr, salt_config.get(lookups[0]) or os.environ.get(lookups[1]))  # noqa: WPS221
+                if not getattr(self, attr):
+                    raise ValueError('The SaltStack minion provider is missing a required parameter. '
+                                     f'Please set the Pulumi config saltstack:{lookups[0]} or set the '
+                                     f'environment variable {lookups[1]}')
 
-class OLSaltStackProvider(ResourceProvider):
+
+class OLSaltStackMinionProvider(ResourceProvider):
 
     def create(self, inputs: Dict[Text, Text]) -> CreateResult:
         """Register a salt minion and generate a keypair to be returned via Outputs.
@@ -116,17 +152,17 @@ class OLSaltStackProvider(ResourceProvider):
         return salt_client
 
 
-class OLSaltStack(Resource):
+class OLSaltStackMinion(Resource):
     minion_id: Output[Text]
     minion_public_key: Output[Optional[Text]]
     minion_private_key: Output[Optional[Text]]
 
-    def __init__(self, name: Text, properties: OLSaltStackInputs, opts: ResourceOptions = None):
+    def __init__(self, name: Text, properties: OLSaltStackMinionInputs, opts: ResourceOptions = None):
         resource_options = ResourceOptions.merge(
             ResourceOptions(additional_secret_outputs=['minion_private_key']),
             opts)  # type: ignore
         super().__init__(
-            OLSaltStackProvider(),
+            OLSaltStackMinionProvider(),
             name,
             {
                 'minion_id': properties.minion_id,

@@ -5,3 +5,4 @@ config:
   data_vpc:cidr_block: 10.3.0.0/16
   operations_vpc:cidr_block: 10.0.0.0/16
   operations_vpc:name: operations
+  residential_vpc:cidr_block: 10.7.0.0/16
