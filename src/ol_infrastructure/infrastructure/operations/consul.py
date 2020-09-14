@@ -106,6 +106,14 @@ consul_server_security_group = ec2.SecurityGroup(
             from_port=8300,
             to_port=8301,
             description='LAN gossip protocol'
+        ),
+        ec2.SecurityGroupIngressArgs(
+            cidr_blocks=ops.peer_vpcs.apply(
+                lambda peer_vpcs: [peer['cidr'] for peer in peer_vpcs.values()]),
+            protocol='tcp',
+            from_port=8300,
+            to_port=8302,
+            description='WAN cross-datacenter communication'
         )
     ]
 )
@@ -136,10 +144,10 @@ consul_agent_security_group = ec2.SecurityGroup(
 
 ec2.SecurityGroupRule(
     f'consul-agent-{environment_name}-inter-agent-tcp-access-rule',
-    type="ingress",
+    type='ingress',
     from_port=8301,
     to_port=8301,
-    protocol="tcp",
+    protocol='tcp',
     description='LAN gossip protocol from agents',
     source_security_group_id=consul_agent_security_group.id,
     security_group_id=consul_agent_security_group.id,
@@ -148,10 +156,10 @@ ec2.SecurityGroupRule(
 
 ec2.SecurityGroupRule(
     f'consul-agent-{environment_name}-inter-agent-udp-access-rule',
-    type="ingress",
+    type='ingress',
     from_port=8301,
     to_port=8301,
-    protocol="udp",
+    protocol='udp',
     description='LAN gossip protocol from agents',
     source_security_group_id=consul_agent_security_group.id,
     security_group_id=consul_agent_security_group.id,
@@ -164,7 +172,7 @@ consul_instances = []
 consul_export = {}
 subnets = destination_vpc['subnet_ids']
 subnet_id = subnets.apply(chain)
-for count, subnet_id in zip(range(consul_config.get_int('instance_count') or 3), subnets):  # type: ignore
+for count, subnet in zip(range(consul_config.get_int('instance_count') or 3), subnets):  # type: ignore # noqa: WPS221
     instance_name = f'consul-{environment_name}-{count}'
     salt_minion = OLSaltStackMinion(
         f'saltstack-minion-{instance_name}',
@@ -192,7 +200,7 @@ for count, subnet_id in zip(range(consul_config.get_int('instance_count') or 3),
         iam_instance_profile=consul_instance_profile.id,
         tags=instance_tags,
         volume_tags=instance_tags,
-        subnet_id=subnet_id,
+        subnet_id=subnet,
         key_name=salt_config.require('key_name'),
         root_block_device=ec2.InstanceRootBlockDeviceArgs(
             volume_type='gp2',

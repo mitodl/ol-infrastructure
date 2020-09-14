@@ -8,7 +8,7 @@ importing the remaining 3 subnets. If only 3 subnets were specified then one of 
 managed with Pulumi.
 """
 
-from typing import Any, Dict, Text
+from typing import Any, Dict, List, Optional, Text
 
 from pulumi import Config, export, get_stack
 from security_groups import default_group, public_web, salt_minion
@@ -20,7 +20,7 @@ from ol_infrastructure.components.aws.olvpc import (
 )
 
 
-def vpc_exports(vpc: OLVPC) -> Dict[Text, Any]:
+def vpc_exports(vpc: OLVPC, peers: Optional[List[Text]] = None) -> Dict[Text, Any]:
     """Create a consistent structure for VPC stack exports.
 
     :param vpc: The VPC whose data you would like to export
@@ -31,11 +31,13 @@ def vpc_exports(vpc: OLVPC) -> Dict[Text, Any]:
     :rtype: Dict[Text, Any]
     """
     return {
-        'id': vpc.olvpc.id,
         'cidr': vpc.olvpc.cidr_block,
         'cidr_v6': vpc.olvpc.ipv6_cidr_block,
+        'id': vpc.olvpc.id,
+        'name': vpc.vpc_config.vpc_name,
+        'peers': peers or [],
         'rds_subnet': vpc.db_subnet_group.name,
-        'subnet_ids': [subnet.id for subnet in vpc.olvpc_subnets]
+        'subnet_ids': [subnet.id for subnet in vpc.olvpc_subnets],
     }
 
 
@@ -125,7 +127,16 @@ xpro_vpc_config = OLVPCConfig(
 )
 xpro_vpc = OLVPC(xpro_vpc_config)
 
-data_vpc_exports = vpc_exports(data_vpc)
+data_vpc_exports = vpc_exports(
+    data_vpc,
+    [
+        'applications_vpc',
+        'ocw_vpc',
+        'operations_vpc',
+        'residential_mitx_vpc',
+        'xpro_vpc',
+    ]
+)
 data_vpc_exports.update(
     {
         'security_groups': {
@@ -150,7 +161,7 @@ data_vpc_exports.update(
 )
 export('data_vpc', data_vpc_exports)
 
-residential_mitx_vpc_exports = vpc_exports(residential_mitx_vpc)
+residential_mitx_vpc_exports = vpc_exports(residential_mitx_vpc, ['data_vpc', 'operations_vpc'])
 residential_mitx_vpc_exports.update(
     {
         'security_groups': {
@@ -175,16 +186,25 @@ residential_mitx_vpc_exports.update(
 )
 export('residential_mitx_vpc', residential_mitx_vpc_exports)
 
-xpro_vpc_exports = vpc_exports(xpro_vpc)
+xpro_vpc_exports = vpc_exports(xpro_vpc, ['data_vpc', 'operations_vpc'])
 export('xpro_vpc', xpro_vpc_exports)
 
-applications_vpc_exports = vpc_exports(applications_vpc)
+applications_vpc_exports = vpc_exports(applications_vpc, ['data_vpc', 'operations_vpc'])
 export('applications_vpc', applications_vpc_exports)
 
-ocw_vpc_exports = vpc_exports(ocw_vpc)
+ocw_vpc_exports = vpc_exports(ocw_vpc, ['data_vpc', 'operations_vpc'])
 export('ocw_vpc', ocw_vpc_exports)
 
-operations_vpc_exports = vpc_exports(operations_vpc)
+operations_vpc_exports = vpc_exports(
+    operations_vpc,
+    [
+        'applications_vpc',
+        'data_vpc',
+        'ocw_vpc',
+        'residential_mitx_vpc',
+        'xpro_vpc',
+    ]
+)
 export('operations_vpc', operations_vpc_exports)
 
 operations_to_data_peer = OLVPCPeeringConnection(
