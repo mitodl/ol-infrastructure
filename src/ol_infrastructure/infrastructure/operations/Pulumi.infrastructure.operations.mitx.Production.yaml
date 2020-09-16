@@ -1,2 +1,12 @@
 secretsprovider: awskms://alias/PulumiSecrets
 encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQFhkPWipqgMnTO+dMJzZ9G7AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbDQOb28u3xLQqCoaAgEQgDuJDFlY7hrOPOjW+dpHq8LHIO1Nn+cFJ5dyLb25j4zkYPH/Szsj1+Y/55qvan9XaUyB5I+2ZNaVkv8fYA==
+config:
+  aws:region: us-east-1
+  environment:business_unit: residential
+  environment:services:
+    - consul
+    - mongodb
+    - rabbitmq
+    - elasticsearch
+  environment:vpc_reference: residential_mitx_vpc
+  saltstack:key_name: salt-production
