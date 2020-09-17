@@ -130,7 +130,7 @@ def _conditional_import(  # noqa: WPS210
     return opts, resource_id
 
 
-def vpc_opts(vpc_cidr: IPv4Network) -> Tuple[pulumi.ResourceOptions, Text]:
+def vpc_opts(vpc_cidr: IPv4Network, vpc_tags: Dict[Text, Text]) -> Tuple[pulumi.ResourceOptions, Text]:
     """Look up and conditionally import an existing VPC.
 
     :param vpc_cidr: The IPv4 CIDR block of the target VPC to be imported if it exists.  This ensures that there is no
@@ -143,7 +143,10 @@ def vpc_opts(vpc_cidr: IPv4Network) -> Tuple[pulumi.ResourceOptions, Text]:
     """
     return _conditional_import(
         ec2_client.describe_vpcs,
-        [{'Name': 'cidr', 'Values': [str(vpc_cidr)]}],
+        [
+            {'Name': 'cidr', 'Values': [str(vpc_cidr)]},
+            {'Name': 'tag:Name', 'Values': [vpc_tags['Name']]}
+        ],
         'Vpcs',
         'VpcId'
     )
@@ -168,7 +171,7 @@ def internet_gateway_opts(attached_vpc_id: Text) -> Tuple[pulumi.ResourceOptions
     )
 
 
-def subnet_opts(cidr_block: IPv4Network) -> Tuple[pulumi.ResourceOptions, Text]:
+def subnet_opts(cidr_block: IPv4Network, vpc_id: Text) -> Tuple[pulumi.ResourceOptions, Text]:
     """Look up existing EC2 subnets to conditionally import.
 
     :param cidr_block: The CIDR block assigned to the subnet being defined.
@@ -180,7 +183,10 @@ def subnet_opts(cidr_block: IPv4Network) -> Tuple[pulumi.ResourceOptions, Text]:
     """
     return _conditional_import(
         ec2_client.describe_subnets,
-        [{'Name': 'cidr', 'Values': [str(cidr_block)]}],
+        [
+            {'Name': 'cidr', 'Values': [str(cidr_block)]},
+            {'Name': 'vpc-id', 'Values': [vpc_id]}
+        ],
         'Subnets',
         'SubnetId',
         ['tags',

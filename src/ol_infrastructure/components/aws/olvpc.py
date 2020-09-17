@@ -105,7 +105,7 @@ class OLVPC(ComponentResource):
         super().__init__('ol:infrastructure:aws:VPC', vpc_config.vpc_name, None, opts)
         resource_options = ResourceOptions.merge(ResourceOptions(parent=self), opts)  # type: ignore
         self.vpc_config = vpc_config
-        vpc_resource_opts, imported_vpc_id = vpc_opts(vpc_config.cidr_block)
+        vpc_resource_opts, imported_vpc_id = vpc_opts(vpc_config.cidr_block, vpc_config.tags)
         self.olvpc = ec2.Vpc(
             vpc_config.vpc_name,
             cidr_block=str(vpc_config.cidr_block),
@@ -160,7 +160,7 @@ class OLVPC(ComponentResource):
             v6net)
         for index, zone, subnet_v4, subnet_v6 in subnet_iterator:
             net_name = f'{vpc_config.vpc_name}-subnet-{index + 1}'
-            subnet_resource_opts, imported_subnet_id = subnet_opts(subnet_v4)
+            subnet_resource_opts, imported_subnet_id = subnet_opts(subnet_v4, imported_vpc_id)
             if imported_subnet_id:
                 subnet = ec2.get_subnet(id=imported_subnet_id)
                 zone = subnet.availability_zone

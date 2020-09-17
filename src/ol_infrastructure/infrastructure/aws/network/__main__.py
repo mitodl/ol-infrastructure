@@ -71,20 +71,6 @@ data_vpc_config = OLVPCConfig(
         'Name': f'{stack_name} Data Services'})
 data_vpc = OLVPC(data_vpc_config)
 
-ocw_config = Config('ocw_vpc')
-ocw_vpc_config = OLVPCConfig(
-    vpc_name=f'ocw-{env_suffix}',
-    cidr_block=ocw_config.require('cidr_block'),
-    num_subnets=3,
-    tags={
-        'OU': 'open-courseware',
-        'Environment': f'ocw-{env_suffix}',
-        'business_unit': 'open-courseware',
-        'Name': f'Open Courseware {stack_name}'
-    }
-)
-ocw_vpc = OLVPC(ocw_vpc_config)
-
 ops_config = Config('operations_vpc')
 operations_vpc_config = OLVPCConfig(
     vpc_name=ops_config.require('name'),
@@ -131,7 +117,6 @@ data_vpc_exports = vpc_exports(
     data_vpc,
     [
         'applications_vpc',
-        'ocw_vpc',
         'operations_vpc',
         'residential_mitx_vpc',
         'xpro_vpc',
@@ -140,7 +125,7 @@ data_vpc_exports = vpc_exports(
 data_vpc_exports.update(
     {
         'security_groups': {
-            'default': default_group(data_vpc.olvpc).id,
+            'default': data_vpc.olvpc.id.apply(default_group).id,
             'web': public_web(
                 data_vpc_config.vpc_name,
                 data_vpc.olvpc
@@ -165,7 +150,7 @@ residential_mitx_vpc_exports = vpc_exports(residential_mitx_vpc, ['data_vpc', 'o
 residential_mitx_vpc_exports.update(
     {
         'security_groups': {
-            'default': default_group(residential_mitx_vpc.olvpc).id,
+            'default': residential_mitx_vpc.olvpc.id.apply(default_group).id,
             'web': public_web(
                 residential_mitx_vpc_config.vpc_name,
                 residential_mitx_vpc.olvpc
@@ -192,15 +177,11 @@ export('xpro_vpc', xpro_vpc_exports)
 applications_vpc_exports = vpc_exports(applications_vpc, ['data_vpc', 'operations_vpc'])
 export('applications_vpc', applications_vpc_exports)
 
-ocw_vpc_exports = vpc_exports(ocw_vpc, ['data_vpc', 'operations_vpc'])
-export('ocw_vpc', ocw_vpc_exports)
-
 operations_vpc_exports = vpc_exports(
     operations_vpc,
     [
         'applications_vpc',
         'data_vpc',
-        'ocw_vpc',
         'residential_mitx_vpc',
         'xpro_vpc',
     ]
@@ -247,16 +228,4 @@ data_to_xpro_peer = OLVPCPeeringConnection(
     f'ol-data-{env_suffix}-to-applications-{env_suffix}-vpc-peer',
     data_vpc,
     applications_vpc
-)
-
-operations_to_ocw_peer = OLVPCPeeringConnection(
-    f'ol-operations-{env_suffix}-to-ocw-{env_suffix}-vpc-peer',
-    operations_vpc,
-    ocw_vpc
-)
-
-data_to_ocw_peer = OLVPCPeeringConnection(
-    f'ol-data-{env_suffix}-to-ocw-{env_suffix}-vpc-peer',
-    data_vpc,
-    ocw_vpc
 )

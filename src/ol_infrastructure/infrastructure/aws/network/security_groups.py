@@ -4,10 +4,19 @@ from typing import Text
 from pulumi_aws import ec2
 
 
-def default_group(vpc: ec2.Vpc) -> ec2.AwaitableGetSecurityGroupResult:
+def default_group(vpc_id: Text) -> ec2.AwaitableGetSecurityGroupResult:
     return ec2.get_security_group(
-        vpc_id=vpc.id,  # type: ignore
-        name='default'
+        vpc_id=vpc_id,
+        filters=[
+            ec2.GetSecurityGroupFilterArgs(
+                name='group-name',
+                values=['default']
+            ),
+            ec2.GetSecurityGroupFilterArgs(
+                name='vpc-id',
+                values=[vpc_id]
+            )
+        ]
     )
 
 
