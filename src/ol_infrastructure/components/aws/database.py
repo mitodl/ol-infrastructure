@@ -99,7 +99,8 @@ class OLPostgresDBConfig(OLDBConfig):
     parameter_overrides: List[Dict[Text, Union[Text, bool, int, float]]] = [  # noqa: WPS234
         {'name': 'client_encoding', 'value': 'UTF-8'},
         {'name': 'timezone', 'value': 'UTC'},
-        {'name': 'rds.force_ssl', 'value': 1}
+        {'name': 'rds.force_ssl', 'value': 1},
+        {'name': 'autovacuum', 'value': 1},
     ]
 
 
