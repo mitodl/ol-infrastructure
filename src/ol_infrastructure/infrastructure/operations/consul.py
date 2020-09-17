@@ -29,7 +29,7 @@ aws_config = AWSBase(tags={
 destination_vpc = ops.network_stack.require_output(env_config.require('vpc_reference'))
 
 consul_instance_role = iam.Role(
-    'consul-instance-role-{environment_name}',
+    f'consul-instance-role-{environment_name}',
     assume_role_policy=json.dumps(
         {
             'Version': '2012-10-17',
