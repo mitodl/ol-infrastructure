@@ -44,7 +44,7 @@ aws_config = AWSBase(
     },
 )
 
-dagster_bucket_name = f'dagster-{env_suffix}'
+dagster_bucket_name = f'dagster-{dagster_environment}'
 
 dagster_bucket_policy = {
     'Version': '2012-10-17',
