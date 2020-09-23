@@ -54,11 +54,25 @@ dagster_bucket_policy = {
             'Action': [
                 's3:List*',
                 's3:Get*',
-                's3:Put*'
+                's3:Put*',
+                's3:Delete*'
             ],
             'Resource': [
                 f'arn:aws:s3:::{dagster_bucket_name}',
                 f'arn:aws:s3:::{dagster_bucket_name}/*'
+            ]
+        },
+        {
+            'Effect': 'Allow',
+            'Action': [
+                's3:List*',
+                's3:Get*',
+                's3:Put*',
+                's3:Delete*'
+            ],
+            'Resource': [
+                'arn:aws:s3:::mitx-etl*',
+                'arn:aws:s3:::mitx-etl*/*'
             ]
         }
     ]
