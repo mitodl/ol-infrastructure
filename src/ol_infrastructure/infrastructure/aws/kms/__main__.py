@@ -1,10 +1,10 @@
 """State to create symmetric AWS KMS Customer Master Keys (CMK) for use
-with EC2 volume encryption. 
+with EC2 volume encryption.
 """
 import json
-from pulumi import get_stack
-from pulumi_aws import get_caller_identity, kms
 
+from pulumi import export, get_stack
+from pulumi_aws import get_caller_identity, kms
 
 owner = str(get_caller_identity().account_id)
 stack = get_stack()
@@ -33,7 +33,7 @@ kms_ec2_ebs_encryption_policy = {
             'Resource': '*',
             'Condition': {
                 'StringEquals': {
-                    'kms:ViaService': 'ec2.us-east-1.amazonaws.com',
+                    'kms:ViaService': 'ec2.amazonaws.com',
                     'kms:CallerAccount': f'{owner}'
                 }
             }
@@ -43,27 +43,27 @@ kms_ec2_ebs_encryption_policy = {
             'Effect': 'Allow',
             'Principal': {
                 'AWS': [
-                  f'arn:aws:iam::{owner}:root',
-                  f'arn:aws:iam::{owner}:user/mbreedlove',
-                  f'arn:aws:iam::{owner}:user/shaidar',
-                  f'arn:aws:iam::{owner}:user/tmacey',
+                    f'arn:aws:iam::{owner}:root',
+                    f'arn:aws:iam::{owner}:user/mbreedlove',
+                    f'arn:aws:iam::{owner}:user/shaidar',
+                    f'arn:aws:iam::{owner}:user/tmacey',
                 ]
             },
             'Action': [
-                 'kms:Create*',
-	             'kms:Describe*',
-	             'kms:Enable*',
-	             'kms:List*',
-	             'kms:Put*',
-	             'kms:Update*',
-	             'kms:Revoke*',
-	             'kms:Disable*',
-	             'kms:Get*',
-	             'kms:Delete*',
-	             'kms:TagResource',
-	             'kms:UnTagResource',
-	             'kms:ScheduleKeyDeletion',
-	             'kms:CancelKeyDeletion'
+                'kms:Create*',
+                'kms:Describe*',
+                'kms:Enable*',
+                'kms:List*',
+                'kms:Put*',
+                'kms:Update*',
+                'kms:Revoke*',
+                'kms:Disable*',
+                'kms:Get*',
+                'kms:Delete*',
+                'kms:TagResource',
+                'kms:UnTagResource',
+                'kms:ScheduleKeyDeletion',
+                'kms:CancelKeyDeletion'
             ],
             'Resource': '*'
         }
@@ -71,14 +71,15 @@ kms_ec2_ebs_encryption_policy = {
 }
 
 key = kms.Key(kms_ec2_environment,
-	customer_master_key_spec='SYMMETRIC_DEFAULT',
-	description=f"Key to encrypt/decrypt {env_suffix} EBS volumes",
-	enable_key_rotation=True,
-	is_enabled=True,
-	key_usage='ENCRYPT_DECRYPT',
-	policy=json.dumps(kms_ec2_ebs_encryption_policy),
-	tags={
-	    'OU': 'operations',
-	    'Environment': f'operations-{env_suffix}'
-	},
-)
+              customer_master_key_spec='SYMMETRIC_DEFAULT',
+              description=f"Key to encrypt/decrypt {env_suffix} EBS volumes",
+              enable_key_rotation=True,
+              is_enabled=True,
+              key_usage='ENCRYPT_DECRYPT',
+              policy=json.dumps(kms_ec2_ebs_encryption_policy),
+              tags={'OU': 'operations',
+                    'Environment': f'operations-{env_suffix}'
+                    },
+              )
+
+export('kms_ec2_ebs_key', key.id)
