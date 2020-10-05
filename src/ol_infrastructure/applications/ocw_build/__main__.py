@@ -16,9 +16,9 @@ TODO: consul cloud autojoin functionality
 
 from pulumi import ResourceOptions, StackReference, export, get_stack
 from pulumi.config import get_config
-from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53, s3
+from pulumi_aws import ec2, iam, route53, s3
 
-from ol_infrastructure.lib.aws.ec2_helper import build_userdata
+from ol_infrastructure.lib.aws.ec2_helper import build_userdata, debian_10_ami
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.providers.salt.minion import (
     OLSaltStackMinion,
@@ -154,24 +154,10 @@ cloud_init_userdata = build_userdata(
     salt_host=f'salt-{env_suffix}.private.odl.mit.edu'
 )
 
-iam_image = get_ami(
-    filters=[
-        {
-            'name': 'tag:Name',
-            'values': ['ocw-build'],
-        },
-        {
-            'name': 'virtualization-type',
-            'values': ['hvm'],
-        },
-    ],
-    most_recent=True,
-    owners=[str(get_caller_identity().account_id)]
-)
 instance_tags = aws_config.merged_tags({'Name': ocw_build_minion_id})
 ec2_instance = ec2.Instance(
     f'ocw-build-instance-{ocw_next_build_environment}',
-    ami=iam_image.id,
+    ami=debian_10_ami.id,
     user_data=cloud_init_userdata,
     instance_type=get_config('ocw_build:instance_type'),
     iam_instance_profile=ocw_build_instance_profile.id,
