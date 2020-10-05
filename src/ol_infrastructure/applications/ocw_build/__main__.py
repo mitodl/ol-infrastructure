@@ -199,7 +199,7 @@ route53_domain_v6 = route53.Record(
     opts=ResourceOptions(depends_on=[ec2_instance])
 )
 
-export('dagster_app', {
+export('ocw_build_app', {
     'ec2_private_address': ec2_instance.private_ip,
     'ec2_public_address': ec2_instance.public_ip,
     'ec2_address_v6': ec2_instance.ipv6_addresses
