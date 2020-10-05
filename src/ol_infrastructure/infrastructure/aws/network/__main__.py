@@ -174,7 +174,34 @@ export('residential_mitx_vpc', residential_mitx_vpc_exports)
 xpro_vpc_exports = vpc_exports(xpro_vpc, ['data_vpc', 'operations_vpc'])
 export('xpro_vpc', xpro_vpc_exports)
 
-applications_vpc_exports = vpc_exports(applications_vpc, ['data_vpc', 'operations_vpc'])
+applications_vpc_exports = vpc_exports(applications_vpc,
+                                       ['data_vpc', 'operations_vpc'])
+applications_vpc_exports.update(
+    {
+        'security_groups': {
+            'default': applications_vpc.olvpc.id.apply(default_group).id,
+            'web': public_web(
+                applications_vpc_config.vpc_name,
+                applications_vpc.olvpc
+            )(
+                tags=applications_vpc_config.merged_tags({
+                    'Name': f'applications-{env_suffix}-public-web'
+                }),
+                name=f'applications-{env_suffix}-public-web'
+            ).id,
+            'salt_minion': salt_minion(
+                applications_vpc_config.vpc_name,
+                applications_vpc.olvpc,
+                operations_vpc.olvpc
+            )(
+                tags=applications_vpc_config.merged_tags({
+                    'Name': f'applications-{env_suffix}-salt-minion'
+                }),
+                name=f'applications-{env_suffix}-salt-minion'
+            ).id
+        }
+    }
+)
 export('applications_vpc', applications_vpc_exports)
 
 operations_vpc_exports = vpc_exports(
