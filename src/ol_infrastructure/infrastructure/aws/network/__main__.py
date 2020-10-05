@@ -26,6 +26,9 @@ def vpc_exports(vpc: OLVPC, peers: Optional[List[Text]] = None) -> Dict[Text, An
     :param vpc: The VPC whose data you would like to export
     :type vpc: OLVPC
 
+    :param peers: A list of the VPC peers that connect to this network.
+    :type peers: Optional[List[Text]]
+
     :returns: A dictionary of data to be exported
 
     :rtype: Dict[Text, Any]
@@ -174,8 +177,7 @@ export('residential_mitx_vpc', residential_mitx_vpc_exports)
 xpro_vpc_exports = vpc_exports(xpro_vpc, ['data_vpc', 'operations_vpc'])
 export('xpro_vpc', xpro_vpc_exports)
 
-applications_vpc_exports = vpc_exports(applications_vpc,
-                                       ['data_vpc', 'operations_vpc'])
+applications_vpc_exports = vpc_exports(applications_vpc, ['data_vpc', 'operations_vpc'])
 applications_vpc_exports.update(
     {
         'security_groups': {
