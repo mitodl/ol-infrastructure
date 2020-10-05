@@ -194,7 +194,7 @@ route53_domain_v6 = route53.Record(
     name=get_config('ocw_build:domain'),
     type='AAAA',
     ttl=fifteen_minutes,
-    records=[ec2_instance.ipv6_addresses],
+    records=ec2_instance.ipv6_addresses,
     zone_id=mitodl_zone_id,
     opts=ResourceOptions(depends_on=[ec2_instance])
 )
