@@ -8,7 +8,7 @@ describe_instance_policy_document = {
     'Statement': [
         {
             'Effect': 'Allow',
-            'Action': 'ec2:DescribeIntances',
+            'Action': 'ec2:DescribeInstances',
             'Resource': '*'
         }
     ]

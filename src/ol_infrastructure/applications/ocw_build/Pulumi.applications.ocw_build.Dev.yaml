@@ -6,6 +6,6 @@ config:
   aws:region: us-east-1
   # Nice to make this smaller some day, but we need the bigger instance because
   # of hugo-course-publisher's memory usage:
-  ocw_build:intance_type: m5.xlarge
+  ocw_build:instance_type: m5.xlarge
   saltstack:api_url: https://salt-production.odl.mit.edu
   saltstack:api_user: pulumi
