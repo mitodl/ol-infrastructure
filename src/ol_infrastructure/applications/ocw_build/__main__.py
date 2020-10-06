@@ -27,6 +27,14 @@ from ol_infrastructure.providers.salt.minion import (
 
 # Setup
 
+# Lookup dict for environment name only as needed for minion grain, for
+# matching up with legacy infrastructure.
+env_nomenclature = {
+    'dev': 'applications-dev',
+    'qa': 'rc-apps',
+    'production': 'production-apps'
+}
+
 stack = get_stack()
 stack_name = stack.split('.')[-1]
 namespace = stack.rsplit('.', 1)[0]
@@ -45,7 +53,7 @@ aws_config = AWSBase(
 
 # Website bucket and related IAM stuff
 
-website_bucket_name = f'ocw-website-{env_suffix}'
+website_bucket_name = f'ocw-website-{ocw_next_build_environment}'
 website_bucket = s3.Bucket(
     website_bucket_name,
     bucket=website_bucket_name,
@@ -141,7 +149,7 @@ cloud_init_userdata = build_userdata(
     instance_name=ocw_build_minion_id,
     minion_keys=salt_minion,
     minion_roles=['ocw-build'],
-    minion_environment=ocw_next_build_environment,
+    minion_environment=env_nomenclature[env_suffix],
     salt_host=f'salt-{env_suffix}.private.odl.mit.edu'
 )
 
