@@ -28,7 +28,7 @@ from ol_infrastructure.providers.salt.minion import (
 # Setup
 
 env_nomenclature = {
-    'dev': 'dev-apps',  # valid?
+    'dev': 'applications-dev',
     'qa': 'rc-apps',
     'production': 'production-apps'
 }
