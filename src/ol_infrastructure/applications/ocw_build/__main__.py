@@ -99,7 +99,7 @@ ocw_next_instance_policy_data = {
 iam_instance_policy = iam.Policy(
     f'ocw-build-instance-policy-{env_suffix}',
     name=f'ocw-build-instance-policy-{env_suffix}',
-    path=f'/ol-applications/ocw-build-policy-{env_suffix}',
+    path=f'/ol-applications/ocw-build-policy-{env_suffix}/',
     policy=ocw_next_instance_policy_data,
     description='Grants access to S3 buckets from the OCW Build server'
 )
@@ -117,7 +117,7 @@ iam_role = iam.Role(
         }
     ),
     name=f'ocw-build-instance-role-{env_suffix}',
-    path='/ol-applications/ocw-build-role'
+    path='/ol-applications/ocw-build-role/'
 )
 
 iam.RolePolicyAttachment(
