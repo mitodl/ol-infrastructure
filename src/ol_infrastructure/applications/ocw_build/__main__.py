@@ -45,7 +45,7 @@ aws_config = AWSBase(
 
 # Website bucket and related IAM stuff
 
-website_bucket_name = f'ocw-website-{env_suffix}'
+website_bucket_name = f'ocw-website-{ocw_next_build_environment}'
 website_bucket = s3.Bucket(
     website_bucket_name,
     bucket=website_bucket_name,
