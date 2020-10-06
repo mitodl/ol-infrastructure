@@ -27,6 +27,8 @@ from ol_infrastructure.providers.salt.minion import (
 
 # Setup
 
+# Lookup dict for environment name only as needed for minion grain, for
+# matching up with legacy infrastructure.
 env_nomenclature = {
     'dev': 'applications-dev',
     'qa': 'rc-apps',
@@ -41,7 +43,7 @@ network_stack = StackReference(f'infrastructure.aws.network.{stack_name}')
 dns_stack = StackReference('infrastructure.aws.dns')
 mitodl_zone_id = dns_stack.require_output('odl_zone_id')
 apps_vpc = network_stack.require_output('applications_vpc')
-ocw_next_build_environment = env_nomenclature[env_suffix]
+ocw_next_build_environment = f'applications-{env_suffix}'
 aws_config = AWSBase(
     tags={
         'OU': 'open-courseware',
@@ -147,7 +149,7 @@ cloud_init_userdata = build_userdata(
     instance_name=ocw_build_minion_id,
     minion_keys=salt_minion,
     minion_roles=['ocw-build'],
-    minion_environment=ocw_next_build_environment,
+    minion_environment=env_nomenclature[env_suffix],
     salt_host=f'salt-{env_suffix}.private.odl.mit.edu'
 )
 
