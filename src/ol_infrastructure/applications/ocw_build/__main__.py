@@ -27,6 +27,12 @@ from ol_infrastructure.providers.salt.minion import (
 
 # Setup
 
+env_nomenclature = {
+    'dev': 'dev-apps',  # valid?
+    'qa': 'rc-apps',
+    'production': 'production-apps'
+}
+
 stack = get_stack()
 stack_name = stack.split('.')[-1]
 namespace = stack.rsplit('.', 1)[0]
@@ -35,7 +41,7 @@ network_stack = StackReference(f'infrastructure.aws.network.{stack_name}')
 dns_stack = StackReference('infrastructure.aws.dns')
 mitodl_zone_id = dns_stack.require_output('odl_zone_id')
 apps_vpc = network_stack.require_output('applications_vpc')
-ocw_next_build_environment = f'applications-{env_suffix}'
+ocw_next_build_environment = env_nomenclature[env_suffix]
 aws_config = AWSBase(
     tags={
         'OU': 'open-courseware',
