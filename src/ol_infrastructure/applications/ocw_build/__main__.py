@@ -59,6 +59,7 @@ ocw_next_instance_policy_data = {
     'Version': '2012-10-17',
     'Statement': [
         {
+            'Sid': 'Statement1',
             'Effect': 'Allow',
             'Action': [
                 's3:List*',
@@ -66,22 +67,12 @@ ocw_next_instance_policy_data = {
             ],
             'Resource': [
                 # This bucket is not managed here, but we need access:
-                'arn:aws:s3:::open-learning-course-data-*'
+                'arn:aws:s3:::open-learning-course-data-*',
+                'arn:aws:s3:::open-learning-course-data-*/*'
             ]
         },
         {
-            'Effect': 'Allow',
-            'Action': [
-                's3:GetAccessPoint',
-                's3:GetAccountPublicAccessBlock',
-                's3:ListAllMyBuckets',
-                's3:ListAccessPoints',
-                's3:ListJobs',
-                's3:HeadBucket'
-            ],
-            'Resource': '*'
-        },
-        {
+            'Sid': 'Statement3',
             'Effect': 'Allow',
             'Action': [
                 's3:List*',
@@ -90,8 +81,8 @@ ocw_next_instance_policy_data = {
                 's3:Delete*'
             ],
             'Resource': [
-                f'arn:aws:s3::{website_bucket_name}',
-                f'arn:aws:s3::{website_bucket_name}/*'
+                f'arn:aws:s3:::{website_bucket_name}',
+                f'arn:aws:s3:::{website_bucket_name}/*'
             ]
         }
     ]
