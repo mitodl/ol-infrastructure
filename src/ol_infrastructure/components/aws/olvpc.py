@@ -171,7 +171,7 @@ class OLVPC(ComponentResource):
                 availability_zone=zone,
                 vpc_id=self.olvpc.id,
                 map_public_ip_on_launch=vpc_config.default_public_ip,
-                tags=vpc_config.tags,
+                tags=vpc_config.merged_tags({'Name': net_name}),
                 assign_ipv6_address_on_creation=vpc_config.enable_ipv6,
                 opts=ResourceOptions.merge(resource_options, subnet_resource_opts)
             )

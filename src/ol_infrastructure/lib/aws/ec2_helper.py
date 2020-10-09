@@ -127,6 +127,13 @@ def _conditional_import(  # noqa: WPS210
         opts = pulumi.ResourceOptions(
             import_=resource_id,
             ignore_changes=change_attributes_ignored)
+        if not pulumi.runtime.is_dry_run():
+            ec2_client.create_tags(
+                Resources=[resource_id],
+                Tags=[
+                    {'Key': 'pulumi_managed', 'Value': 'true'}
+                ]
+            )
     return opts, resource_id
 
 
@@ -254,7 +261,7 @@ def build_userdata(  # noqa: WPS211
             'bootcmd': [
                 'wget -O /tmp/salt_bootstrap.sh https://raw.githubusercontent.com/mitodl/salt-bootstrap/develop/bootstrap-salt.sh',  # noqa: E501
                 'chmod +x /tmp/salt_bootstrap.sh',
-                'sh /tmp/salt_bootstrap.sh -U -N -z'
+                'sh /tmp/salt_bootstrap.sh -N -z'
             ],
             'package_update': True,
             'salt_minion': {
