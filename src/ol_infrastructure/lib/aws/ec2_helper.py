@@ -57,7 +57,7 @@ def aws_regions() -> List[Text]:
 
 
 @lru_cache
-def availability_zones(region: Text) -> List[Text]:
+def availability_zones(region: Text = 'us-east-1') -> List[Text]:
     """Generate a list of availability zones for a given AWS region.
 
     :param region: The region to be queried

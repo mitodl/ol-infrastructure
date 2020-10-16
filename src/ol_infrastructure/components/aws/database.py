@@ -86,7 +86,7 @@ class OLDBConfig(AWSBase):
         engine = values.get('engine')
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
-            raise ValueError(f'The specified version of the {engine} engine is nut supported in AWS.')
+            raise ValueError(f'The specified version of the {engine} engine is not supported in AWS.')
         return engine_version
 
 

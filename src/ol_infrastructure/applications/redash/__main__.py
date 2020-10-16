@@ -3,15 +3,30 @@
 - Create an RDS PostgreSQL instance for storing Redash's configuration data and intermediate query results
 - Mount a Vault database backend and provision role definitions for the Redash RDS database
 - Create an IAM role for Redash instances to allow access to S3 and other AWS resources
+- Create a Redis cluster in Elasticache
 - Register a minion ID and key pair with the appropriate SaltStack master instance
-- Provision an EC2 instance from a pre-built AMI with the configuration and code for Redash
+- Provision a set of EC2 instances from a pre-built AMI with the configuration and code for Redash
+- Provision an AWS load balancer and connect the deployed EC2 instances
+- Create a DNS record for the deployed load balancer
 """
+import json
+
 from itertools import chain
 
 from pulumi import Config, ResourceOptions, StackReference, export, get_stack
 from pulumi.config import get_config
-from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53
+from pulumi_aws import (
+    ec2,
+    get_ami,
+    get_caller_identity,
+    iam,
+    route53
+)
 
+from ol_infrastructure.components.aws.cache import (
+    OLAmazonCache,
+    OLAmazonRedisConfig
+)
 from ol_infrastructure.components.aws.database import (
     OLAmazonDB,
     OLPostgresDBConfig
@@ -55,21 +70,23 @@ aws_config = AWSBase(
 
 redash_instance_role = iam.Role(
     'redash-instance-role',
-    assume_role_policy={
-        'Version': '2012-10-17',
-        'Statement': {
-            'Effect': 'Allow',
-            'Action': 'sts:AssumeRole',
-            'Principal': {'Service': 'ec2.amazonaws.com'}
+    assume_role_policy=json.dumps(
+        {
+            'Version': '2012-10-17',
+            'Statement': {
+                'Effect': 'Allow',
+                'Action': 'sts:AssumeRole',
+                'Principal': {'Service': 'ec2.amazonaws.com'}
+            }
         }
-    },
+    ),
     name=f'redash-instance-role-{env_suffix}',
     path='/ol-data/redash-role/',
     tags=aws_config.tags
 )
 
 iam.RolePolicyAttachment(
-    f'consul-role-policy-{redash_environment}',
+    f'redash-role-policy-{redash_environment}',
     policy_arn=policy_stack.require_output('iam_policies')['describe_instances'],
     role=redash_instance_role.name
 )
@@ -77,8 +94,8 @@ iam.RolePolicyAttachment(
 redash_instance_profile = iam.InstanceProfile(
     f'redash-instance-profile-{env_suffix}',
     role=redash_instance_role.name,
-    name=f'etl-instance-profile-{env_suffix}',
-    path='/ol-data/etl-profile/'
+    name=f'redash-instance-profile-{env_suffix}',
+    path='/ol-data/redash-profile/'
 )
 
 redash_db_security_group = ec2.SecurityGroup(
@@ -115,6 +132,23 @@ redash_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_host=redash_db.db_instance.address,
 )
 redash_db_vault_backend = OLVaultDatabaseBackend(redash_db_vault_backend_config)
+
+redis_config = Config('redis')
+redash_redis_config = OLAmazonRedisConfig(
+    encrypt_transit=True,
+    auth_token=redis_config.require_secret('auth_token'),
+    engine_version='6.x',
+    node_group_count=3,
+    replica_count=3,
+    auto_upgrade=True,
+    cluster_description='Redis cluster for Redash tasks and caching',
+    cluster_name=f'redash-redis-{redash_environment}',
+    instance_type=redis_config.require('instance_type'),
+    num_instances=3,
+    security_groups=[],  # TODO: Create Redis security group and hook it to Redash security group. (TMM 2020-10-16)
+    subnet_group=data_vpc['elasticache_subnet'],  # the name of the subnet group created in the OLVPC component resource
+)
+redash_redis_cluster = OLAmazonCache(redash_redis_config)
 
 instance_type_name = redash_config.get('instance_type') or InstanceTypes.medium.name
 instance_type = InstanceTypes[instance_type_name].value

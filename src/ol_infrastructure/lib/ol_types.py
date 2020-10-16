@@ -29,7 +29,7 @@ class BusinessUnit(str, Enum):  # noqa: WPS600
 class AWSBase(BaseModel):
     """Base class for deriving configuration objects to pass to AWS component resources."""
 
-    tags: dict
+    tags: Dict
     region: Text = 'us-east-1'
 
     def __init__(self, **kwargs):
