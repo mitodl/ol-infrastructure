@@ -1,3 +1,14 @@
+"""
+Deploy the Digital Credentials Sign and Verify service to Fargate as a Docker container.
+
+This module sets up the services necessary to deploy a set of Docker containers to run the sign and verify service
+needed for the Digital Credentials project.
+
+- Create a secret in AWS secrets manager
+- Create an IAM role and profile for the Fargate task
+- Create a cluster, task definition, and service on Amazon Fargate/ECS
+- Register the service with Route 53 DNS
+"""
 import json
 
 from pulumi import Config, StackReference, get_stack
@@ -10,11 +21,13 @@ stack_name = stack.split('.')[-1]
 namespace = stack.rsplit('.', 1)[0]
 env_suffix = stack_name.lower()
 network_stack = StackReference(f'infrastructure.aws.network.{stack_name}')
-apps_vpc = network_stack.require_output('aplications_vpc')
+dns_stack = StackReference('infrastructure.aws.dns')
+mitodl_zone_id = dns_stack.require_output('odl_zone_id')
+apps_vpc = network_stack.require_output('applications_vpc')
 aws_config = AWSBase(
     tags={
         'OU': 'digital-credentials',
-        'Environment': 'applications-{env_suffix}'
+        'Environment': f'applications-{env_suffix}'
     }
 )
 
@@ -37,16 +50,14 @@ sign_and_verify_task_execution_role = iam.Role(
     'digital-credentials-sign-and-verify-task-execution-role',
     name=f'digital-credentials-sign-and-verify-execution-role-{env_suffix}',
     path=f'/digital-credentials/sign-and-verify-execution-{env_suffix}/',
-    assume_role_policy=json.dumps(
-        {
-            'Version': '2012-10-17',
-            'Statement': {
-                'Effect': 'Allow',
-                'Action': 'sts:AssumeRole',
-                'Principal': {'Service': 'ecs-tasks.amazonaws.com'}
-            }
+    assume_role_policy={
+        'Version': '2012-10-17',
+        'Statement': {
+            'Effect': 'Allow',
+            'Action': 'sts:AssumeRole',
+            'Principal': {'Service': 'ecs-tasks.amazonaws.com'}
         }
-    ),
+    },
     tags=aws_config.tags,
 )
 
@@ -55,8 +66,8 @@ sign_and_verify_execution_policy = iam.Policy(
     description='ECS Fargate task execution policy for sign and verify service to grant access for retrieving the '
     'Unlocked DID value from AWS Secrets Manager',
     name=f'ecs-fargate-sign-and-verify-task-execution-policy-{env_suffix}',
-    path='/digital-credentials/sign-and-verify-execution-{env_suffix}/',
-    policy=json.dumps(
+    path=f'/digital-credentials/sign-and-verify-execution-{env_suffix}/',
+    policy=unlocked_did_secret.arn.apply(lambda arn: json.dumps(
         {
             'Version': '2012-10-17',
             'Statement': {
@@ -66,11 +77,11 @@ sign_and_verify_execution_policy = iam.Policy(
                     'kms:Decrypt'
                 ],
                 'Resource': [
-                    unlocked_did_secret.arn
+                    arn
                 ]
             }
         }
-    )
+    ))
 )
 
 iam.RolePolicyAttachment(
@@ -82,21 +93,20 @@ iam.RolePolicyAttachment(
 sign_and_verify_cluster = ecs.Cluster(
     f'ecs-cluster-sign-and-verify-{env_suffix}',
     capacity_providers=['FARGATE'],
-    name='sign-and-verify-{env_suffix}',
-    tags=aws_config.merged_tags({'Name': 'sign-and-verify-{env_suffix}'}),
+    name=f'sign-and-verify-{env_suffix}',
+    tags=aws_config.merged_tags({'Name': f'sign-and-verify-{env_suffix}'}),
 )
 
 sign_and_verify_task = ecs.TaskDefinition(
     f'sign-and-verify-task-{env_suffix}',
-    cpu='0.25',
-    memory='500',
+    cpu='256',
+    memory='512',
     network_mode='awsvpc',
-    pid_mode='task',
-    requires_compatibilities='FARGATE',
-    tags=aws_config.tags,
+    requires_compatibilities=['FARGATE'],
+    tags=aws_config.merged_tags({'Name': f'sign-and-verify-{env_suffix}'}),
     execution_role_arn=sign_and_verify_task_execution_role.arn,
     family=f'sign-and-verify-task-{env_suffix}',
-    container_definitions=json.dumps(
+    container_definitions=unlocked_did_secret.arn.apply(lambda arn: json.dumps(
         [
             {
                 'name': 'sign-and-verify',
@@ -105,16 +115,11 @@ sign_and_verify_task = ecs.TaskDefinition(
                     {'name': 'PORT', 'value': '5000'}
                 ],
                 'secrets': [
-                    {'name': 'UNLOCKED_DID', 'valueFrom': unlocked_did_secret.arn}
+                    {'name': 'UNLOCKED_DID', 'valueFrom': arn}
                 ]
-            },
-            {
-                'name': 'caddy',
-                'image': 'mitodl/'
             }
         ]
-    ),
-    ipc_mode='task',
+    )),
 )
 
 sign_and_verify_service = ecs.Service(
@@ -125,7 +130,7 @@ sign_and_verify_service = ecs.Service(
     name=f'sign-and-verify-service-{env_suffix}',
     network_configuration=ecs.ServiceNetworkConfigurationArgs(
         subnets=apps_vpc['subnet_ids'],
-        security_groups=apps_vpc['security_groups']['web'],
+        security_groups=[apps_vpc['security_groups']['web']],
         assign_public_ip=True
     ),
     propagate_tags='SERVICE',
@@ -136,3 +141,23 @@ sign_and_verify_service = ecs.Service(
         type='ECS'
     )
 )
+
+# five_minutes = 60 * 5
+# dagster_domain = route53.Record(
+#     f'sign-and-verify-{env_suffix}-dns-record',
+#     name=sign_and_verify_config.require('domain'),
+#     type='A',
+#     ttl=five_minutes,
+#     records=[sign_and_verify_service.network_configuration.],
+#     zone_id=mitodl_zone_id,
+#     opts=ResourceOptions(depends_on=[dagster_instance])
+# )
+# dagster_domain_v6 = route53.Record(
+#     f'sign-and-verify-{env_suffix}-dns-record-v6',
+#     name=sign_and_verify_config.require('domain'),
+#     type='AAAA',
+#     ttl=five_minutes,
+#     records=dagster_instance.ipv6_addresses,
+#     zone_id=mitodl_zone_id,
+#     opts=ResourceOptions(depends_on=[dagster_instance])
+# )
