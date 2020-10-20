@@ -7,6 +7,8 @@
 - Register a minion ID and key pair with the appropriate SaltStack master instance
 - Provision an EC2 instance from a pre-built AMI with the pipeline code for Dagster
 """
+import json
+
 from pulumi import ResourceOptions, StackReference, export, get_stack
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53, s3
@@ -97,20 +99,22 @@ dagster_iam_policy = iam.Policy(
     f'dagster-policy-{env_suffix}',
     name=f'dagster-policy-{env_suffix}',
     path=f'/ol-data/etl-policy-{env_suffix}/',
-    policy=dagster_bucket_policy,
+    policy=json.dumps(dagster_bucket_policy),
     description='Policy for granting acces for batch data workflows to AWS resources'
 )
 
 dagster_role = iam.Role(
     'etl-instance-role',
-    assume_role_policy={
-        'Version': '2012-10-17',
-        'Statement': {
-            'Effect': 'Allow',
-            'Action': 'sts:AssumeRole',
-            'Principal': {'Service': 'ec2.amazonaws.com'}
+    assume_role_policy=json.dumps(
+        {
+            'Version': '2012-10-17',
+            'Statement': {
+                'Effect': 'Allow',
+                'Action': 'sts:AssumeRole',
+                'Principal': {'Service': 'ec2.amazonaws.com'}
+            }
         }
-    },
+    ),
     name=f'etl-instance-role-{env_suffix}',
     path='/ol-data/etl-role/',
     tags=aws_config.tags
