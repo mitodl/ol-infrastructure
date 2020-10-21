@@ -1,5 +1,5 @@
-"""
-Deploy the Digital Credentials Sign and Verify service to Fargate as a Docker container.
+"""Deploy the Digital Credentials Sign and Verify service to Fargate as a
+Docker container.
 
 This module sets up the services necessary to deploy a set of Docker containers to run the sign and verify service
 needed for the Digital Credentials project.
@@ -121,7 +121,15 @@ sign_and_verify_task = ecs.TaskDefinition(
                 ],
                 'portMappings': [
                     {'containerPort': CONTAINER_PORT, 'protocol': 'tcp'}
-                ]
+                ],
+                'logConfiguration': {
+                    'logDriver': 'awslogs',
+                    'options': {
+                        'awslogs-group': f'digital-credentials-sign-and-verify-{env_suffix}',
+                        'awslogs-region': 'us-east-1',
+                        'awslogs-stream-prefix': f'sign-and-verify-{env_suffix}'
+                    }
+                },
             }
         ]
     )),
@@ -145,6 +153,13 @@ sign_and_verify_target_group = lb.TargetGroup(
     target_type='ip',
     port=CONTAINER_PORT,
     protocol='HTTP',
+    health_check=lb.TargetGroupHealthCheckArgs(
+        healthy_threshold=2,
+        interval=10,
+        path='/status',
+        port=CONTAINER_PORT,
+        protocol='HTTP',
+    ),
     name=f'sign-and-verify-alb-group-{env_suffix}',
     tags=aws_config.tags,
 )
@@ -168,7 +183,9 @@ sign_and_verify_alb_listener = lb.Listener(
 sign_and_verify_service = ecs.Service(
     f'sign-and-verify-service-{env_suffix}',
     cluster=sign_and_verify_cluster.arn,
-    desired_count=1,
+    desired_count=2,
+    health_check_grace_period_seconds=30,
+    platform_version='LATEST',
     launch_type='FARGATE',
     name=f'sign-and-verify-service-{env_suffix}',
     network_configuration=ecs.ServiceNetworkConfigurationArgs(
