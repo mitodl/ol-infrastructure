@@ -12,7 +12,7 @@ needed for the Digital Credentials project.
 import json
 
 from pulumi import Config, StackReference, get_stack
-from pulumi_aws import ecs, iam, secretsmanager
+from pulumi_aws import acm, ecs, iam, lb, route53, secretsmanager
 
 from ol_infrastructure.lib.ol_types import AWSBase
 
@@ -31,12 +31,14 @@ aws_config = AWSBase(
     }
 )
 
+CONTAINER_PORT = 80
+
 sign_and_verify_config = Config('sign_and_verify')
 unlocked_did_secret = secretsmanager.Secret(
     f'sign-and-verify-unlocked-did-{env_suffix}',
     description='Base64 encoded JSON object of the Unlocked DID that specifies the signing keys '
     'for the digital credentials sign and verify service.',
-    name=f'sign-and-verify-unlocked-did-{env_suffix}',
+    name_prefix=f'sign-and-verify-unlocked-did-{env_suffix}',
     tags=aws_config.tags
 )
 
@@ -112,14 +114,55 @@ sign_and_verify_task = ecs.TaskDefinition(
                 'name': 'sign-and-verify',
                 'image': f'mitodl/sign-and-verify:{sign_and_verify_config.require("docker_label")}',
                 'environment': [
-                    {'name': 'PORT', 'value': '5000'}
+                    {'name': 'PORT', 'value': f'{CONTAINER_PORT}'}
                 ],
                 'secrets': [
                     {'name': 'UNLOCKED_DID', 'valueFrom': arn}
+                ],
+                'portMappings': [
+                    {'containerPort': CONTAINER_PORT, 'protocol': 'tcp'}
                 ]
             }
         ]
     )),
+)
+
+
+sign_and_verify_load_balancer = lb.LoadBalancer(
+    f'sign-and-verify-load-balancer-{env_suffix}',
+    name=f'sign-and-verify-load-balancer-{env_suffix}',
+    ip_address_type='dualstack',
+    load_balancer_type='application',
+    enable_http2=True,
+    subnets=apps_vpc['subnet_ids'],
+    security_groups=[apps_vpc['security_groups']['web']],
+    tags=aws_config.merged_tags({'Name': f'sign-and-verify-load-balancer-{env_suffix}'})
+)
+
+sign_and_verify_target_group = lb.TargetGroup(
+    f'sign-and-verify-alb-target-group-{env_suffix}',
+    vpc_id=apps_vpc['id'],
+    target_type='ip',
+    port=CONTAINER_PORT,
+    protocol='HTTP',
+    name=f'sign-and-verify-alb-group-{env_suffix}',
+    tags=aws_config.tags,
+)
+
+sign_and_verify_acm_cert = acm.get_certificate(domain='*.odl.mit.edu', most_recent=True, statuses=['ISSUED'])
+
+sign_and_verify_alb_listener = lb.Listener(
+    f'sign-and-verify-alb-listener-{env_suffix}',
+    certificate_arn=sign_and_verify_acm_cert.arn,
+    load_balancer_arn=sign_and_verify_load_balancer.arn,
+    port=443,
+    protocol='HTTPS',
+    default_actions=[
+        lb.ListenerDefaultActionArgs(
+            type='forward',
+            target_group_arn=sign_and_verify_target_group.arn,
+        )
+    ]
 )
 
 sign_and_verify_service = ecs.Service(
@@ -130,7 +173,7 @@ sign_and_verify_service = ecs.Service(
     name=f'sign-and-verify-service-{env_suffix}',
     network_configuration=ecs.ServiceNetworkConfigurationArgs(
         subnets=apps_vpc['subnet_ids'],
-        security_groups=[apps_vpc['security_groups']['web']],
+        security_groups=[apps_vpc['security_groups']['web'], apps_vpc['security_groups']['default']],
         assign_public_ip=True
     ),
     propagate_tags='SERVICE',
@@ -139,25 +182,22 @@ sign_and_verify_service = ecs.Service(
     force_new_deployment=True,
     deployment_controller=ecs.ServiceDeploymentControllerArgs(
         type='ECS'
-    )
+    ),
+    load_balancers=[
+        ecs.ServiceLoadBalancerArgs(
+            container_port=CONTAINER_PORT,
+            container_name='sign-and-verify',
+            target_group_arn=sign_and_verify_target_group.arn
+        )
+    ]
 )
 
-# five_minutes = 60 * 5
-# dagster_domain = route53.Record(
-#     f'sign-and-verify-{env_suffix}-dns-record',
-#     name=sign_and_verify_config.require('domain'),
-#     type='A',
-#     ttl=five_minutes,
-#     records=[sign_and_verify_service.network_configuration.],
-#     zone_id=mitodl_zone_id,
-#     opts=ResourceOptions(depends_on=[dagster_instance])
-# )
-# dagster_domain_v6 = route53.Record(
-#     f'sign-and-verify-{env_suffix}-dns-record-v6',
-#     name=sign_and_verify_config.require('domain'),
-#     type='AAAA',
-#     ttl=five_minutes,
-#     records=dagster_instance.ipv6_addresses,
-#     zone_id=mitodl_zone_id,
-#     opts=ResourceOptions(depends_on=[dagster_instance])
-# )
+five_minutes = 60 * 5
+sign_and_verify_domain = route53.Record(
+    f'sign-and-verify-{env_suffix}-dns-record',
+    name=sign_and_verify_config.require('domain'),
+    type='CNAME',
+    ttl=five_minutes,
+    records=[sign_and_verify_load_balancer.dns_name],
+    zone_id=mitodl_zone_id
+)
