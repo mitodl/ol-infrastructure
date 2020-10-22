@@ -14,6 +14,7 @@ class BusinessUnit(str, Enum):  # noqa: WPS600
 
     bootcamps = 'bootcamps'
     data = 'data'  # noqa: WPS110
+    digital_credentials = 'digital-credentials'
     micromasters = 'micromasters'
     mit_open = 'mit-open'
     mitx = 'mitx'

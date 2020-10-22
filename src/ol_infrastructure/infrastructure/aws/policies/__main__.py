@@ -22,6 +22,32 @@ describe_instance_policy = iam.Policy(
     description='Policy permitting EC2 describe instances capabilities for use with cloud auto-join systems.'
 )
 
+create_cloudwatch_logs_policy = iam.Policy(
+    'create-cloudwatch-log-group-policy',
+    name='allow-cloudwatch-log-access',
+    path='/ol-operations/global-policies/',
+    policy=json.dumps(
+        {
+            'Version': '2012-10-17',
+            'Statement': [
+                {
+                    'Effect': 'Allow',
+                    'Action': [
+                        'logs:CreateLogGroup',
+                        'logs:CreateLogStream',
+                        'logs:PutLogEvents',
+                        'logs:DescribeLogStreams'
+                    ],
+                    'Resource': [
+                        'arn:aws:logs:*:*:*'
+                    ]
+                }
+            ]
+        }
+    )
+)
+
 export('iam_policies', {
-    'describe_instances': describe_instance_policy.arn
+    'describe_instances': describe_instance_policy.arn,
+    'cloudwatch_logging': create_cloudwatch_logs_policy.arn
 })
