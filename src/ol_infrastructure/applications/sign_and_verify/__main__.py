@@ -22,6 +22,7 @@ namespace = stack.rsplit('.', 1)[0]
 env_suffix = stack_name.lower()
 network_stack = StackReference(f'infrastructure.aws.network.{stack_name}')
 dns_stack = StackReference('infrastructure.aws.dns')
+iam_policies = StackReference('infrastructure.aws.policies').require_output('iam_policies')
 mitodl_zone_id = dns_stack.require_output('odl_zone_id')
 apps_vpc = network_stack.require_output('applications_vpc')
 aws_config = AWSBase(
@@ -42,7 +43,7 @@ sign_and_verify_load_balancer = lb.LoadBalancer(
     load_balancer_type='application',
     enable_http2=True,
     subnets=apps_vpc['subnet_ids'],
-    security_groups=[apps_vpc['security_groups']['web']],
+    security_groups=[apps_vpc['security_groups']['web'], apps_vpc['security_groups']['default']],
     tags=aws_config.merged_tags({'Name': f'sign-and-verify-load-balancer-{env_suffix}'})
 )
 
@@ -96,7 +97,8 @@ unlocked_did_secret_value = secretsmanager.SecretVersion(
     secret_string=sign_and_verify_config.require_secret('unlocked_did'),  # Base64 encoded JSON object of unlocked DID
 )
 
-# Create the task execution role to grant access to retrieve the Unlocked DID secret
+# Create the task execution role to grant access to retrieve the Unlocked DID secret and send logs to Cloudwatch
+
 sign_and_verify_task_execution_role = iam.Role(
     'digital-credentials-sign-and-verify-task-execution-role',
     name=f'digital-credentials-sign-and-verify-execution-role-{env_suffix}',
@@ -143,6 +145,12 @@ iam.RolePolicyAttachment(
     role=sign_and_verify_task_execution_role.name
 )
 
+iam.RolePolicyAttachment(
+    'sign-and-verify-task-execution-create-log-group-permissions',
+    policy_arn=iam_policies['cloudwatch_logging'],
+    role=sign_and_verify_task_execution_role.name
+)
+
 # Create an ECS/Fargate cluster,define the task including container details, and register that with a service
 sign_and_verify_cluster = ecs.Cluster(
     f'ecs-cluster-sign-and-verify-{env_suffix}',
@@ -179,7 +187,9 @@ sign_and_verify_task = ecs.TaskDefinition(
                     'options': {
                         'awslogs-group': f'digital-credentials-sign-and-verify-{env_suffix}',
                         'awslogs-region': 'us-east-1',
-                        'awslogs-stream-prefix': f'sign-and-verify-{env_suffix}'
+                        'awslogs-stream-prefix': f'sign-and-verify-{env_suffix}',
+                        'awslogs-create-group': 'true',
+                        'awslogs-datetime-format': '%Y-%m-%dT%H:%M:%S%z'
                     }
                 },
             }
