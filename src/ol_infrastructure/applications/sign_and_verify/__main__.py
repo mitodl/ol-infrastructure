@@ -33,6 +33,54 @@ aws_config = AWSBase(
 
 CONTAINER_PORT = 80
 
+# Create an application load balancer to route traffic to the Fargate service
+
+sign_and_verify_load_balancer = lb.LoadBalancer(
+    f'sign-and-verify-load-balancer-{env_suffix}',
+    name=f'sign-and-verify-load-balancer-{env_suffix}',
+    ip_address_type='dualstack',
+    load_balancer_type='application',
+    enable_http2=True,
+    subnets=apps_vpc['subnet_ids'],
+    security_groups=[apps_vpc['security_groups']['web']],
+    tags=aws_config.merged_tags({'Name': f'sign-and-verify-load-balancer-{env_suffix}'})
+)
+
+sign_and_verify_target_group = lb.TargetGroup(
+    f'sign-and-verify-alb-target-group-{env_suffix}',
+    vpc_id=apps_vpc['id'],
+    target_type='ip',
+    port=CONTAINER_PORT,
+    protocol='HTTP',
+    health_check=lb.TargetGroupHealthCheckArgs(
+        healthy_threshold=2,
+        interval=10,
+        path='/status',
+        port=f'{CONTAINER_PORT}',
+        protocol='HTTP',
+    ),
+    name=f'sign-and-verify-alb-group-{env_suffix}',
+    tags=aws_config.tags,
+)
+
+sign_and_verify_acm_cert = acm.get_certificate(domain='*.odl.mit.edu', most_recent=True, statuses=['ISSUED'])
+
+sign_and_verify_alb_listener = lb.Listener(
+    f'sign-and-verify-alb-listener-{env_suffix}',
+    certificate_arn=sign_and_verify_acm_cert.arn,
+    load_balancer_arn=sign_and_verify_load_balancer.arn,
+    port=443,
+    protocol='HTTPS',
+    default_actions=[
+        lb.ListenerDefaultActionArgs(
+            type='forward',
+            target_group_arn=sign_and_verify_target_group.arn,
+        )
+    ]
+)
+
+# Store the Unlocked DID in AWS secrets manager because it contains private key information
+
 sign_and_verify_config = Config('sign_and_verify')
 unlocked_did_secret = secretsmanager.Secret(
     f'sign-and-verify-unlocked-did-{env_suffix}',
@@ -48,18 +96,21 @@ unlocked_did_secret_value = secretsmanager.SecretVersion(
     secret_string=sign_and_verify_config.require_secret('unlocked_did'),  # Base64 encoded JSON object of unlocked DID
 )
 
+# Create the task execution role to grant access to retrieve the Unlocked DID secret
 sign_and_verify_task_execution_role = iam.Role(
     'digital-credentials-sign-and-verify-task-execution-role',
     name=f'digital-credentials-sign-and-verify-execution-role-{env_suffix}',
     path=f'/digital-credentials/sign-and-verify-execution-{env_suffix}/',
-    assume_role_policy={
-        'Version': '2012-10-17',
-        'Statement': {
-            'Effect': 'Allow',
-            'Action': 'sts:AssumeRole',
-            'Principal': {'Service': 'ecs-tasks.amazonaws.com'}
+    assume_role_policy=json.dumps(
+        {
+            'Version': '2012-10-17',
+            'Statement': {
+                'Effect': 'Allow',
+                'Action': 'sts:AssumeRole',
+                'Principal': {'Service': 'ecs-tasks.amazonaws.com'}
+            }
         }
-    },
+    ),
     tags=aws_config.tags,
 )
 
@@ -92,6 +143,7 @@ iam.RolePolicyAttachment(
     role=sign_and_verify_task_execution_role.name
 )
 
+# Create an ECS/Fargate cluster,define the task including container details, and register that with a service
 sign_and_verify_cluster = ecs.Cluster(
     f'ecs-cluster-sign-and-verify-{env_suffix}',
     capacity_providers=['FARGATE'],
@@ -135,51 +187,6 @@ sign_and_verify_task = ecs.TaskDefinition(
     )),
 )
 
-
-sign_and_verify_load_balancer = lb.LoadBalancer(
-    f'sign-and-verify-load-balancer-{env_suffix}',
-    name=f'sign-and-verify-load-balancer-{env_suffix}',
-    ip_address_type='dualstack',
-    load_balancer_type='application',
-    enable_http2=True,
-    subnets=apps_vpc['subnet_ids'],
-    security_groups=[apps_vpc['security_groups']['web']],
-    tags=aws_config.merged_tags({'Name': f'sign-and-verify-load-balancer-{env_suffix}'})
-)
-
-sign_and_verify_target_group = lb.TargetGroup(
-    f'sign-and-verify-alb-target-group-{env_suffix}',
-    vpc_id=apps_vpc['id'],
-    target_type='ip',
-    port=CONTAINER_PORT,
-    protocol='HTTP',
-    health_check=lb.TargetGroupHealthCheckArgs(
-        healthy_threshold=2,
-        interval=10,
-        path='/status',
-        port=CONTAINER_PORT,
-        protocol='HTTP',
-    ),
-    name=f'sign-and-verify-alb-group-{env_suffix}',
-    tags=aws_config.tags,
-)
-
-sign_and_verify_acm_cert = acm.get_certificate(domain='*.odl.mit.edu', most_recent=True, statuses=['ISSUED'])
-
-sign_and_verify_alb_listener = lb.Listener(
-    f'sign-and-verify-alb-listener-{env_suffix}',
-    certificate_arn=sign_and_verify_acm_cert.arn,
-    load_balancer_arn=sign_and_verify_load_balancer.arn,
-    port=443,
-    protocol='HTTPS',
-    default_actions=[
-        lb.ListenerDefaultActionArgs(
-            type='forward',
-            target_group_arn=sign_and_verify_target_group.arn,
-        )
-    ]
-)
-
 sign_and_verify_service = ecs.Service(
     f'sign-and-verify-service-{env_suffix}',
     cluster=sign_and_verify_cluster.arn,
@@ -209,6 +216,7 @@ sign_and_verify_service = ecs.Service(
     ]
 )
 
+# Create a DNS record to point to the ALB for routing inbound traffic.
 five_minutes = 60 * 5
 sign_and_verify_domain = route53.Record(
     f'sign-and-verify-{env_suffix}-dns-record',
