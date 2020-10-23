@@ -14,14 +14,7 @@ import json
 from itertools import chain
 
 from pulumi import Config, ResourceOptions, StackReference, export, get_stack
-from pulumi.config import get_config
-from pulumi_aws import (
-    ec2,
-    get_ami,
-    get_caller_identity,
-    iam,
-    route53
-)
+from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53
 
 from ol_infrastructure.components.aws.cache import (
     OLAmazonCache,
@@ -44,8 +37,6 @@ from ol_infrastructure.providers.salt.minion import (
 )
 
 # TODO:
-# - provision Redis cluster
-# - create autoscaling group for worker nodes
 # - create load balancer for web nodes
 
 redash_config = Config('redash')
@@ -68,8 +59,9 @@ aws_config = AWSBase(
     },
 )
 
+# Configure IAM and security settings for Redash instances
 redash_instance_role = iam.Role(
-    'redash-instance-role',
+    f'redash-instance-role-{env_suffix}',
     assume_role_policy=json.dumps(
         {
             'Version': '2012-10-17',
@@ -80,7 +72,6 @@ redash_instance_role = iam.Role(
             }
         }
     ),
-    name=f'redash-instance-role-{env_suffix}',
     path='/ol-data/redash-role/',
     tags=aws_config.tags
 )
@@ -94,28 +85,51 @@ iam.RolePolicyAttachment(
 redash_instance_profile = iam.InstanceProfile(
     f'redash-instance-profile-{env_suffix}',
     role=redash_instance_role.name,
-    name=f'redash-instance-profile-{env_suffix}',
     path='/ol-data/redash-profile/'
 )
 
+redash_instance_security_group = ec2.SecurityGroup(
+    f'redash-instance-{env_suffix}',
+    description='Security group to assign to Redash application to control inter-service access',
+    tags=aws_config.merged_tags({'Name': f'redash-instance-{redash_environment}'}),
+    vpc_id=data_vpc['id'],
+)
+
+# Set up Postgres instance for Redash in RDS
 redash_db_security_group = ec2.SecurityGroup(
-    f'redash-db-access-{env_suffix}',
-    name=f'ol-redash-db-access-{env_suffix}',
+    f'redash-db-access-{redash_environment}',
     description='Access from the data VPC to the Redash database',
-    ingress=[ec2.SecurityGroupIngressArgs(
-        cidr_blocks=[data_vpc['cidr'], operations_vpc['cidr']],
-        ipv6_cidr_blocks=[data_vpc['cidr_v6']],
-        protocol='tcp',
-        from_port=5432,  # noqa: WPS432
-        to_port=5432  # noqa: WPS432
-    )],
-    tags=aws_config.tags,
+    ingress=[
+        ec2.SecurityGroupIngressArgs(
+            protocol='tcp',
+            from_port=5432,  # noqa: WPS432
+            to_port=5432,  # noqa: WPS432
+            security_groups=[redash_instance_security_group.id],
+            description='PostgreSQL access from Redash instances'
+        ),
+        ec2.SecurityGroupIngressArgs(
+            protocol='tcp',
+            from_port=5432,
+            to_port=5432,
+            cidr_blocks=[operations_vpc['cidr']]
+        )
+    ],
+    egress=[
+        ec2.SecurityGroupEgressArgs(
+            from_port=0,
+            to_port=0,
+            protocol="-1",
+            cidr_blocks=["0.0.0.0/0"],
+            ipv6_cidr_blocks=['::/0']
+        )
+    ],
+    tags=aws_config.merged_tags({'Name': f'redash-db-access-{redash_environment}'}),
     vpc_id=data_vpc['id']
 )
 
 redash_db_config = OLPostgresDBConfig(
-    instance_name=f'redash-db-{env_suffix}',
-    password=redash_config.require_secret('db_password'),
+    instance_name=f'redash-db-{redash_environment}',
+    password=redash_config.require('db_password'),
     subnet_group_name=data_vpc['rds_subnet'],
     security_groups=[redash_db_security_group],
     tags=aws_config.tags,
@@ -128,28 +142,49 @@ redash_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=redash_db_config.db_name,
     mount_point=f'{redash_db_config.engine}-redash-{redash_environment}',
     db_admin_username=redash_db_config.username,
-    db_admin_password=redash_config.require_secret('db_password'),
+    db_admin_password=redash_config.require('db_password'),
     db_host=redash_db.db_instance.address,
 )
 redash_db_vault_backend = OLVaultDatabaseBackend(redash_db_vault_backend_config)
 
+# Set up Redis instance for Redash in Elasticache
 redis_config = Config('redis')
 redash_redis_config = OLAmazonRedisConfig(
     encrypt_transit=True,
-    auth_token=redis_config.require_secret('auth_token'),
+    auth_token=redis_config.require('auth_token'),
     engine_version='6.x',
-    node_group_count=3,
-    replica_count=3,
+    num_instances=3,
+    shard_count=1,
     auto_upgrade=True,
     cluster_description='Redis cluster for Redash tasks and caching',
     cluster_name=f'redash-redis-{redash_environment}',
-    instance_type=redis_config.require('instance_type'),
-    num_instances=3,
-    security_groups=[],  # TODO: Create Redis security group and hook it to Redash security group. (TMM 2020-10-16)
+    security_groups=['dummy-group'],
     subnet_group=data_vpc['elasticache_subnet'],  # the name of the subnet group created in the OLVPC component resource
+    tags=aws_config.tags,
+    **defaults(stack)['redis']
 )
+
+redis_cluster_security_group = ec2.SecurityGroup(
+    f'redash-redis-cluster-{redash_environment}',
+    name=f'redash-redis-{redash_environment}',
+    description='Grant access to Redis from Redash',
+    ingress=[
+        ec2.SecurityGroupIngressArgs(
+            from_port=redash_redis_config.port,
+            to_port=redash_redis_config.port,
+            protocol='tcp',
+            security_groups=redash_instance_security_group.id.apply(lambda sec_group: [sec_group]),
+            description='Redis protocol communication'
+        )
+    ],
+    tags=aws_config.merged_tags({'Name': f'redash-redis-{redash_environment}'}),
+    vpc_id=data_vpc['id'],
+)
+
+redash_redis_config.security_groups = [redis_cluster_security_group.id]
 redash_redis_cluster = OLAmazonCache(redash_redis_config)
 
+# Deploy Redash instances on EC2
 instance_type_name = redash_config.get('instance_type') or InstanceTypes.medium.name
 instance_type = InstanceTypes[instance_type_name].value
 redash_instances = []
@@ -206,6 +241,7 @@ for count, subnet in zip(range(redash_config.get_int('instance_count') or 3), su
             data_vpc['security_groups']['default'],
             data_vpc['security_groups']['salt_minion'],
             data_vpc['security_groups']['web'],
+            redash_instance_security_group.id
         ],
         opts=ResourceOptions(depends_on=[salt_minion])
     )
@@ -220,7 +256,7 @@ for count, subnet in zip(range(redash_config.get_int('instance_count') or 3), su
 fifteen_minutes = 60 * 15
 redash_domain = route53.Record(
     f'redash-{env_suffix}-service-domain',
-    name=get_config('redash:domain'),
+    name=redash_config.require('domain'),
     type='A',
     ttl=fifteen_minutes,
     records=[instance['public_ip'] for instance in redash_export.values()],
@@ -229,7 +265,7 @@ redash_domain = route53.Record(
 )
 redash_domain_v6 = route53.Record(
     f'redash-{env_suffix}-service-domain-v6',
-    name=get_config('redash:domain'),
+    name=redash_config.require('domain'),
     type='AAAA',
     ttl=fifteen_minutes,
     records=[instance['ipv6_address'][0] for instance in redash_export.values()],
@@ -239,5 +275,6 @@ redash_domain_v6 = route53.Record(
 
 export('redash_app', {
     'rds_host': redash_db.db_instance.address,
+    'redis_cluster': redash_redis_cluster.cache_cluster.primary_endpoint_address,
     'instances': redash_export
 })

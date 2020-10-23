@@ -6,7 +6,7 @@ This includes:
 """
 import re
 
-from typing import Any, Dict, List, Optional, Text
+from typing import Any, Dict, List, Optional, Text, Union, cast
 
 import pulumi
 
@@ -21,6 +21,12 @@ from ol_infrastructure.lib.ol_types import AWSBase
 
 
 class OLAmazonCacheConfig(AWSBase):
+    encrypt_transit: Optional[bool] = None
+    encrypted: Optional[bool] = None
+    auth_token: Optional[Text] = None
+    shard_count: Optional[int] = None
+    kms_key_id: Optional[Text] = None
+    snapshot_retention_days: Optional[int] = None
     auto_upgrade: bool = True  # Automatically perform ugprades of minor versions
     apply_immediately: bool = False
     cluster_description: Text
@@ -32,7 +38,10 @@ class OLAmazonCacheConfig(AWSBase):
     parameter_overrides: Optional[Dict[Text, Any]] = None
     port: int
     security_groups: List[Text]
-    subnet_group: Text  # the name of the subnet group created in the OLVPC component resource
+    subnet_group: Union[Text, pulumi.Output[str]]  # the name of the subnet group created in the OLVPC component
+
+    class Config:  # noqa: WPS431, WPS306, D106
+        arbitrary_types_allowed = True
 
     @validator('engine')
     def is_valid_engine(cls: 'OLAmazonCacheConfig', engine: Text) -> Text:  # noqa: N805, D102
@@ -62,9 +71,9 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
     engine: Text = 'redis'
     engine_version: Text = '6.x'
     kms_key_id: Optional[Text] = None
-    node_group_count: PositiveInt = PositiveInt(2)
+    num_instances: conint(ge=1, le=5) = 1  # type: ignore
+    shard_count: PositiveInt = PositiveInt(1)
     port: PositiveInt = PositiveInt(6379)
-    replica_count: PositiveInt = PositiveInt(3)
     snapshot_retention_days: PositiveInt = PositiveInt(5)
 
     @validator('auth_token')
@@ -113,23 +122,33 @@ class OLAmazonCache(pulumi.ComponentResource):
 
     def __init__(
             self,
-            cache_config: OLAmazonCacheConfig,
+            cache_config: Union[OLAmazonRedisConfig, OLAmazonMemcachedConfig],
             opts: pulumi.ResourceOptions = None
     ):
-        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore
         super().__init__(
             'ol:infrastructure:aws:elasticache:OLAmazonCache',
             cache_config.cluster_name,
             None,
-            resource_options
+            opts
         )
+        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore
 
-        clustered_redis = cache_config.engine == 'redis' and cache_config.cluster_mode_enabled
+        clustered_redis = cache_config.engine == 'redis' and getattr(cache_config, 'cluster_mode_enabled')
 
         cache_parameters = [elasticache.ParameterGroupParameterArgs(name=name, value=setting)
                             for name, setting in (cache_config.parameter_overrides or {}).items()]
         if clustered_redis:
-            cache_parameters.append(elasticache.ParameterGroupParameterArgs(name='cluster-enabled', value=True))
+            cache_parameters.append(
+                elasticache.ParameterGroupParameterArgs(
+                    name='cluster-enabled', value='yes'
+                )
+            )
+            if cache_config.engine_version.startswith('6'):
+                cache_options = resource_options.merge(
+                    pulumi.ResourceOptions(ignore_changes=['engine_version'])
+                )  # type: ignore
+            else:
+                cache_options = resource_options
 
         self.parameter_group = elasticache.ParameterGroup(
             f'{cache_config.cluster_name}-{cache_config.engine}-{cache_config.engine_version}-parameter-group',
@@ -140,6 +159,7 @@ class OLAmazonCache(pulumi.ComponentResource):
         )
 
         if clustered_redis:
+            cast(OLAmazonRedisConfig, cache_config)
             self.cache_cluster = elasticache.ReplicationGroup(
                 f'{cache_config.cluster_name}-{cache_config.engine}-elasticache-cluster',
                 apply_immediately=cache_config.apply_immediately,
@@ -148,18 +168,17 @@ class OLAmazonCache(pulumi.ComponentResource):
                 auto_minor_version_upgrade=cache_config.auto_upgrade,
                 automatic_failover_enabled=True,
                 cluster_mode=elasticache.ReplicationGroupClusterModeArgs(
-                    num_node_groups=cache_config.node_group_count,
-                    replicas_per_node_group=cache_config.replica_count
+                    num_node_groups=cache_config.shard_count,
+                    replicas_per_node_group=cache_config.num_instances
                 ),
                 engine='redis',
                 engine_version=cache_config.engine_version,
                 kms_key_id=cache_config.kms_key_id,
-                name=cache_config.cluster_name,
                 node_type=cache_config.instance_type,
-                number_cache_clusters=cache_config.num_instances,
-                opts=resource_options,
+                opts=cache_options,
                 parameter_group_name=self.parameter_group.name,
                 port=cache_config.port,
+                replication_group_id=cache_config.cluster_name,
                 replication_group_description=cache_config.cluster_description,
                 security_group_ids=cache_config.security_groups,
                 snapshot_retention_limit=cache_config.snapshot_retention_days,
@@ -168,10 +187,10 @@ class OLAmazonCache(pulumi.ComponentResource):
                 transit_encryption_enabled=cache_config.encrypt_transit,
             )
         else:
+            cast(OLAmazonMemcachedConfig, cache_config)
             self.cache_cluster = elasticache.Cluster(
                 f'{cache_config.cluster_name}-{cache_config.engine}-elasticache-cluster',
                 engine=cache_config.engine,
-                name=cache_config.cluster_name,
                 cluster_id=cache_config.cluster_name,
                 opts=resource_options,
                 engine_version=cache_config.engine_version,
