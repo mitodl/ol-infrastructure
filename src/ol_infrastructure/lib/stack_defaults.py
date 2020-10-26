@@ -12,9 +12,10 @@ production_defaults = {
 
 qa_defaults = {
     'rds': {
-        'multi_az': False,
         'instance_size': 'db.t3.medium',
-        'prevent_delete': False
+        'multi_az': False,
+        'prevent_delete': False,
+        'take_final_snapshot': False,
     },
     'redis': {
         'instance_type': 'cache.t3.small'
