@@ -16,7 +16,7 @@ from itertools import cycle
 from typing import List, Optional, Text
 
 from pulumi import ComponentResource, ResourceOptions
-from pulumi_aws import ec2, rds
+from pulumi_aws import ec2, elasticache, rds
 from pydantic import PositiveInt, validator
 
 from ol_infrastructure.lib.aws.ec2_helper import (
@@ -37,6 +37,7 @@ SUBNET_PREFIX_V6 = 64
 
 class OLVPCConfig(AWSBase):
     """Schema definition for VPC configuration values."""
+
     vpc_name: Text
     cidr_block: IPv4Network
     num_subnets: PositiveInt = MIN_SUBNETS
@@ -96,11 +97,16 @@ class OLVPC(ComponentResource):
     A component resource that encapsulates all of the standard practices of how the Open Learning Platform Engineering
     team constructs and organizes VPC environments in AWS.
     """
+
     def __init__(self, vpc_config: OLVPCConfig, opts: Optional[ResourceOptions] = None):  # noqa: WPS210
         """Build an AWS VPC with subnets, internet gateway, and routing table.
 
         :param vpc_config: Configuration object for customizing the created VPC and associated resources.
         :type vpc_config: OLVPCConfig
+
+        :param opts: Optional resource options to be merged into the defaults.  Useful for handling things like AWS
+            provider overrides.
+        :type opts: Optional[ResourceOptions]
         """
         super().__init__('ol:infrastructure:aws:VPC', vpc_config.vpc_name, None, opts)
         resource_options = ResourceOptions.merge(ResourceOptions(parent=self), opts)  # type: ignore
@@ -163,7 +169,7 @@ class OLVPC(ComponentResource):
             subnet_resource_opts, imported_subnet_id = subnet_opts(subnet_v4, imported_vpc_id)
             if imported_subnet_id:
                 subnet = ec2.get_subnet(id=imported_subnet_id)
-                zone = subnet.availability_zone
+                zone = subnet.availability_zone  # noqa: WPS440
             ol_subnet = ec2.Subnet(
                 net_name,
                 cidr_block=str(subnet_v4),
@@ -190,7 +196,15 @@ class OLVPC(ComponentResource):
             subnet_ids=[net.id for net in self.olvpc_subnets],
             tags=vpc_config.tags)
 
-        ec2.VpcEndpoint(
+        self.cache_subnet_group = elasticache.SubnetGroup(
+            f'{vpc_config.vpc_name}-cache-subnet-group',
+            opts=resource_options,
+            description=f'Elasticache subnet group for {vpc_config.vpc_name}',
+            name=f'{vpc_config.vpc_name}-cache-subnet-group',
+            subnet_ids=[net.id for net in self.olvpc_subnets],
+        )
+
+        self.s3_endpoint = ec2.VpcEndpoint(
             f'{vpc_config.vpc_name}-s3',
             service_name='com.amazonaws.us-east-1.s3',
             vpc_id=self.olvpc.id,
@@ -221,13 +235,13 @@ class OLVPCPeeringConnection(ComponentResource):
         :type vpc_peer_name: Text
 
         :param source_vpc: The source VPC object to be used as one end of the peering connection.
-        :type source_vpc: ec2.Vpc
+        :type source_vpc: OLVPC
 
         :param destination_vpc: The destination VPC object to be used as the other end of the peering connection
-        :type destination_vpc: ec2.Vpc
+        :type destination_vpc: OLVPC
 
         :param opts: Resource option definitions to propagate to the child resources
-        :type opts: ResourceOptions
+        :type opts: Optional[ResourceOptions]
         """
         super().__init__('ol:infrastructure:aws:VPCPeeringConnection', vpc_peer_name, None, opts)
         resource_options = ResourceOptions.merge(ResourceOptions(parent=self), opts)  # type: ignore

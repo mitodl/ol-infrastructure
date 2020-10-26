@@ -2,13 +2,23 @@ from typing import Any, Dict, Text
 
 production_defaults = {
     'rds': {
-        'multi_az': True
+        'multi_az': True,
+        'instance_size': 'db.m6g.large'
+    },
+    'redis': {
+        'instance_type': 'cache.m6g.large'
     }
 }
 
 qa_defaults = {
     'rds': {
-        'multi_az': False
+        'instance_size': 'db.t3.medium',
+        'multi_az': False,
+        'prevent_delete': False,
+        'take_final_snapshot': False,
+    },
+    'redis': {
+        'instance_type': 'cache.t3.small'
     }
 }
 

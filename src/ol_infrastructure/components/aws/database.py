@@ -66,6 +66,7 @@ class OLDBConfig(AWSBase):
     multi_az: bool = True
     prevent_delete: bool = True
     public_access: bool = False
+    take_final_snapshot: bool = True
     storage: PositiveInt = PositiveInt(50)  # noqa: WPS432
     storage_type: StorageType = StorageType.ssd
     username: Text = 'oldevops'
@@ -86,7 +87,7 @@ class OLDBConfig(AWSBase):
         engine = values.get('engine')
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
-            raise ValueError(f'The specified version of the {engine} engine is nut supported in AWS.')
+            raise ValueError(f'The specified version of the {engine} engine is not supported in AWS.')
         return engine_version
 
 
@@ -173,7 +174,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             password=db_config.password.get_secret_value(),
             port=db_config.port,
             publicly_accessible=db_config.is_public,
-            skip_final_snapshot=False,
+            skip_final_snapshot=not db_config.take_final_snapshot,
             storage_encrypted=True,
             storage_type=db_config.storage_type.value,
             tags=db_config.tags,
