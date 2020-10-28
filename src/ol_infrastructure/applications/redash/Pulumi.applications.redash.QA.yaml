@@ -1,0 +1,12 @@
+secretsprovider: awskms://alias/PulumiSecrets
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQE8z1PhzNU1kWZdFZmuwQe6AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMxjn9UyNNJqAuCHYRAgEQgDvehbUcffDQ5ccyaoDt37/sQOMinQ2Km1Zh5XTk0Q02j8C77+LICBIhCWux6VQh5HYUKexwx9pP93xMrw==
+config:
+  aws:region: us-east-1
+  redash:db_password:
+    secure: v1:XjB67mn+1IUZ83WE:MXyTmXh2Rx6gQYcuTCRFpKU71It19U8IdhddLLcpuae3TkwNRkk39hf+2yHDqfWMjZ3wPWZ6iF6MgB5fLjvsZ3hu6cuFNdFVNKDCXoUxkGS5t6uqtEAdUfVR
+  redash:domain: bi-qa.odl.mit.edu
+  redash:instance_type: medium
+  redis:auth_token:
+    secure: v1:MPNDpRt4pNoYNSst:hSvoKRsqM/RvZOBfrnTTVojqfVxV8ybiUaT3ekbHwqIjDkepCMcUkz5/ym+H/X4wHoOm1/RjOvT0eUu7ZNbdCG3ojFOimTvj+ctZpuV6SyLpW488BH1OQ6qkDA==
+  saltstack:key_name: salt-qa
+  vault:skip_tls_verify: "true"
