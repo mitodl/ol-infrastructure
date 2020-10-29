@@ -13,12 +13,12 @@ push web content to the OCW site's S3 buckets.
 
 TODO: consul cloud autojoin functionality
 '''
-
 from pulumi import ResourceOptions, StackReference, export, get_stack
 from pulumi.config import get_config
 from pulumi_aws import ec2, iam, route53, s3
 
 from ol_infrastructure.lib.aws.ec2_helper import build_userdata, debian_10_ami
+from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.providers.salt.minion import (
     OLSaltStackMinion,
@@ -63,7 +63,7 @@ website_bucket = s3.Bucket(
 )
 
 # Instance profile that includes access to that bucket, plus others
-ocw_next_instance_policy_data = {
+ocw_next_instance_policy = {
     'Version': '2012-10-17',
     'Statement': [
         {
@@ -95,17 +95,18 @@ ocw_next_instance_policy_data = {
         }
     ]
 }
+
 iam_instance_policy = iam.Policy(
     f'ocw-build-instance-policy-{env_suffix}',
     name=f'ocw-build-instance-policy-{env_suffix}',
     path=f'/ol-applications/ocw-build-policy-{env_suffix}/',
-    policy=ocw_next_instance_policy_data,
+    policy=lint_iam_policy(ocw_next_instance_policy, stringify=True),
     description='Grants access to S3 buckets from the OCW Build server'
 )
 
 iam_role = iam.Role(
     f'ocw-build-instance-role-{env_suffix}',
-    assume_role_policy=(
+    assume_role_policy=lint_iam_policy(
         {
             'Version': '2012-10-17',
             'Statement': {
@@ -113,7 +114,8 @@ iam_role = iam.Role(
                 'Action': 'sts:AssumeRole',
                 'Principal': {'Service': 'ec2.amazonaws.com'}
             }
-        }
+        },
+        stringify=True
     ),
     name=f'ocw-build-instance-role-{env_suffix}',
     path='/ol-applications/ocw-build-role/'

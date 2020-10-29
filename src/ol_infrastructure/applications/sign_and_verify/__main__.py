@@ -14,6 +14,7 @@ import json
 from pulumi import Config, StackReference, get_stack
 from pulumi_aws import acm, ecs, iam, lb, route53, secretsmanager
 
+from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 
 stack = get_stack()
@@ -122,20 +123,30 @@ sign_and_verify_execution_policy = iam.Policy(
     'Unlocked DID value from AWS Secrets Manager',
     name=f'ecs-fargate-sign-and-verify-task-execution-policy-{env_suffix}',
     path=f'/digital-credentials/sign-and-verify-execution-{env_suffix}/',
-    policy=unlocked_did_secret.arn.apply(lambda arn: json.dumps(
+    policy=unlocked_did_secret.arn.apply(lambda arn: lint_iam_policy(
         {
             'Version': '2012-10-17',
-            'Statement': {
-                'Effect': 'Allow',
-                'Action': [
-                    'secretsmanager:GetSecretValue',
-                    'kms:Decrypt'
-                ],
-                'Resource': [
-                    arn
-                ]
-            }
-        }
+            'Statement': [
+                {
+                    'Effect': 'Allow',
+                    'Action': [
+                        'secretsmanager:GetSecretValue',
+                    ],
+                    'Resource': [
+                        arn
+                    ]
+                },
+                {
+                    'Effect': 'Allow',
+                    'Action': [
+                        'kms:Decrypt'
+                    ],
+                    'Resource': [
+                        'arn:*:kms:*:*:key/secretsmanager'
+                    ]
+                },
+            ]
+        }, stringify=True
     ))
 )
 
