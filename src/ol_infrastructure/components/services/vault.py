@@ -7,13 +7,16 @@ This includes:
 - Control the lease TTL settings
 - Define the base set of roles according to our established best practices
 """
+import json
+
 from enum import Enum
-from typing import Dict, Text, Union
+from typing import Dict, List, Text, Union
 
 from pulumi import ComponentResource, Output, ResourceOptions
-from pulumi_vault import Mount, database
+from pulumi_vault import AuthBackend, Mount, Policy, approle, aws, database
 from pydantic import BaseModel
 
+from ol_infrastructure.lib.ol_types import Apps
 from ol_infrastructure.lib.vault import (
     mysql_sql_statements,
     postgres_sql_statements
@@ -133,4 +136,82 @@ class OLVaultDatabaseBackend(ComponentResource):
                 max_ttl=db_config.max_ttl,
                 default_ttl=db_config.default_ttl
             )
+        self.register_outputs({})
+
+class OLVaultAWSSecretsEngineConfig(BaseModel):
+    app_name: Text
+    access_key: Text
+    default_lease_ttl_seconds: int = SIX_MONTHS
+    max_lease_ttl_seconds: int = SIX_MONTHS
+    description: Text
+    secret_key: Text
+    path: Text
+    policy_documents: Dict
+    credential_type: str = 'iam_user'
+
+
+class OLVaultAWSSecretsEngine(ComponentResource):
+
+    def __init__(
+            self,
+            engine_config: OLVaultAWSSecretsEngineConfig,
+            opts: ResourceOptions = None
+    ):
+        super().__init__('ol:services:VaultAWSSecretsEngine', engine_config.app_name, None, opts)
+
+        self.aws_secrets_engine = aws.SecretBackend(
+            # TODO verify app_name exists based on Apps class in ol_types
+            f'aws-{engine_config.app_name}',
+            access_key=engine_config.access_key,
+            secret_key=engine_config.secret_key,
+            path=f'aws-{engine_config.app_name}'
+        )
+
+        for role_name, policy in engine_config.policy_documents.items():
+            aws.SecretBackendRole(
+                role_name,
+                backend=f'aws-{engine_config.app_name}',
+                credential_type='iam_user',
+                name=role_name,
+                policy_document=json.dumps(policy),
+                opts=ResourceOptions(depends_on=[self.aws_secrets_engine])
+            )
+
+        self.register_outputs({})
+
+
+class OLVaultAppRoleAuthBackendConfig(BaseModel):
+    name: Text
+    type: str = 'approle'
+    description: Text
+    backend: Text
+    role_name: Text
+    token_policies: List
+
+
+class OLVaultAppRoleAuthBackend(ComponentResource):
+
+    def __init__(
+            self,
+            approle_config: OLVaultAppRoleAuthBackendConfig,
+            opts: ResourceOptions = None
+    ):
+        super().__init__('ol:services:VaultAppRoleAuthBackend', approle_config.name, None, opts)
+
+        self.approle_backend = AuthBackend(
+            approle_config.name,
+            description=approle_config.description,
+            path=approle_config,
+            type=approle_config.type)
+
+        for policy in approle_config.token_policies:
+            self.approle_policy = Policy(f'{approle_config.name}', policy=policy)
+
+        self.approle_backend_role = approle.AuthBackendRole(
+            approle_config.name,
+            backend=self.approle_backend.path,
+            role_name=approle_config.role_name,
+            token_policies=approle_config.token_policies,
+            opts=ResourceOptions(depends_on=[self.approle_backend, self.approle_policy]))
+
         self.register_outputs({})
