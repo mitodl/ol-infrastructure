@@ -22,6 +22,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig
 )
 from ol_infrastructure.lib.aws.ec2_helper import build_userdata
+from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.providers.salt.minion import (
@@ -99,7 +100,7 @@ dagster_iam_policy = iam.Policy(
     f'dagster-policy-{env_suffix}',
     name=f'dagster-policy-{env_suffix}',
     path=f'/ol-data/etl-policy-{env_suffix}/',
-    policy=json.dumps(dagster_bucket_policy),
+    policy=lint_iam_policy(dagster_bucket_policy, stringify=True),
     description='Policy for granting acces for batch data workflows to AWS resources'
 )
 
