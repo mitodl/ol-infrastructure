@@ -1,13 +1,11 @@
 import json
-
 from typing import Any, Dict, Text, Union
 
 from parliament import analyze_policy_string
 
 
 def lint_iam_policy(
-        policy_document: Union[Text, Dict[Text, Any]],
-        stringify: bool = False
+    policy_document: Union[Text, Dict[Text, Any]], stringify: bool = False
 ) -> Union[Text, Dict[Text, Any]]:
     """Lint the contents of an IAM policy and abort execution if issues are found.
 
@@ -26,5 +24,7 @@ def lint_iam_policy(
         stringified_document = json.dumps(policy_document)
     findings = analyze_policy_string(stringified_document or policy_document).findings
     if findings:
-        raise Exception('Potential issues found with IAM policy document', findings)
-    return stringified_document if stringify and stringified_document else policy_document
+        raise Exception("Potential issues found with IAM policy document", findings)
+    return (
+        stringified_document if stringify and stringified_document else policy_document
+    )
