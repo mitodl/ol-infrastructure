@@ -1,12 +1,10 @@
-# coding: utf-8
-
 from collections import defaultdict
 from functools import lru_cache
 from typing import Dict, List, Text
 
 import boto3
 
-rds_client = boto3.client('rds')
+rds_client = boto3.client("rds")
 
 
 @lru_cache
@@ -16,11 +14,11 @@ def db_engines() -> Dict[Text, List[Text]]:
     :returns: Dictionary of engine names and the list of available versions
     :rtype: Dict[Text, List[Text]]
     """
-    all_engines_paginator = rds_client.get_paginator('describe_db_engine_versions')
+    all_engines_paginator = rds_client.get_paginator("describe_db_engine_versions")
     engines_versions = defaultdict(list)
     for engines_page in all_engines_paginator.paginate():  # noqa: WPS122
-        for engine in engines_page['DBEngineVersions']:
-            engines_versions[engine['Engine']].append(engine['EngineVersion'])
+        for engine in engines_page["DBEngineVersions"]:
+            engines_versions[engine["Engine"]].append(engine["EngineVersion"])
     return dict(engines_versions)
 
 
@@ -38,5 +36,7 @@ def parameter_group_family(engine: Text, engine_version: Text) -> Text:
 
     :rtype: Text
     """
-    engine_details = rds_client.describe_db_engine_versions(Engine=engine, EngineVersion=engine_version)
-    return engine_details['DBEngineVersions'][0]['DBParameterGroupFamily']
+    engine_details = rds_client.describe_db_engine_versions(
+        Engine=engine, EngineVersion=engine_version
+    )
+    return engine_details["DBEngineVersions"][0]["DBParameterGroupFamily"]

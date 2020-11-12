@@ -1,12 +1,10 @@
-# coding: utf-8
-
 from collections import defaultdict
 from functools import lru_cache
 from typing import Dict, List, Text
 
 import boto3
 
-cache_client = boto3.client('elasticache')
+cache_client = boto3.client("elasticache")
 
 
 @lru_cache
@@ -17,11 +15,11 @@ def cache_engines() -> Dict[Text, List[Text]]:
 
     :rtype: Dict[Text, List[Text]]
     """
-    all_engines_paginator = cache_client.get_paginator('describe_cache_engine_versions')
+    all_engines_paginator = cache_client.get_paginator("describe_cache_engine_versions")
     engines_versions = defaultdict(list)
     for engines_page in all_engines_paginator.paginate():  # noqa: WPS122
-        for engine in engines_page['CacheEngineVersions']:
-            engines_versions[engine['Engine']].append(engine['EngineVersion'])
+        for engine in engines_page["CacheEngineVersions"]:
+            engines_versions[engine["Engine"]].append(engine["EngineVersion"])
     return dict(engines_versions)
 
 
@@ -39,5 +37,7 @@ def parameter_group_family(engine: Text, engine_version: Text) -> Text:
 
     :rtype: Text
     """
-    engine_details = cache_client.describe_cache_engine_versions(Engine=engine, EngineVersion=engine_version)
-    return engine_details['CacheEngineVersions'][0]['CacheParameterGroupFamily']
+    engine_details = cache_client.describe_cache_engine_versions(
+        Engine=engine, EngineVersion=engine_version
+    )
+    return engine_details["CacheEngineVersions"][0]["CacheParameterGroupFamily"]

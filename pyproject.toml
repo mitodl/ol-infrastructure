@@ -34,6 +34,13 @@ isort = "*"
 diagrams = "*"
 pyformat = "*"
 invoke = "*"
+black = "^20.8b1"
+
+[tool.black]
+target-version = ["py38"]
+
+[tool.isort]
+profile = "black"
 
 [build-system]
 requires = ["poetry_core>=1.0.0"]
