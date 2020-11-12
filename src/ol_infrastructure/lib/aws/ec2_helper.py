@@ -253,6 +253,40 @@ def build_userdata(  # noqa: WPS211
         additional_cloud_config: Optional[Dict[Text, Any]] = None,
         additional_salt_config: Optional[Dict[Text, Text]] = None
 ) -> pulumi.Output[Text]:
+    """Construct a user data dictionary for use with EC2 instances
+
+    :param instance_name: The value for the `Name` tag
+    :type instance_name: Text
+
+    :param minion_keys: The minion keys generated from the SaltStack minion dynamic
+        provider
+    :type minion_keys: OLSaltStackMinion
+
+    :param minion_roles: The list of values to assign to the `roles` grain on the minion
+    :type minion_roles: List[Text]
+
+    :param minion_environment: The value to set for the `environment` grain on the
+        minion
+    :type minion_environment: Text
+
+    :param salt_host: The resolvable address of the host for the Salt master that the
+        instance will be communicating with.
+    :type salt_host: Text
+
+    :param additional_cloud_config: Additional settings to pass through to cloud-init.
+        It will be merged in with the YAML document that sets the Saltstack
+        configuration.
+    :type additional_cloud_config: Optional[Dict[Text, Any]]
+
+    :param additional_salt_config: Additional settings to set in the salt_minion module
+        of cloud-init
+    :type additional_salt_config: Optional[Dict[Text, Text]]
+
+    :returns: A YAML rendering of the cloud-init userdata wrapped in a Pulumi output to
+              create a dependency link.
+
+    :rtype: pulumi.Output[Text]
+    """
     def _build_cloud_config_string(keys) -> Text:  # noqa: WPS430
         cloud_config = additional_cloud_config or {}
         # TODO (TMM 2020-09-10): Once the upstream PR is merged move to using the
