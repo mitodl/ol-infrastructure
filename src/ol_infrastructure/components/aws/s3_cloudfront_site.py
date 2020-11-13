@@ -14,9 +14,9 @@ class CloudfrontPriceClass(str, Enum):  # noqa: WPS600
     # For more details on price class refer to below link and search for PriceClass
     # https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_DistributionConfig.html
     # NB: POP == Points Of Presence which is where CDN edge servers are located
-    us_eu = 'PriceClass_100'  # POPs in US, Canada, Europe, and Israel
-    exclude_au_sa = 'PriceClass_200'  # POPs in all supported geos except South America and Australia
-    all_geos = 'PriceClass_All'  # POPs in all supoprted geos
+    us_eu = "PriceClass_100"  # POPs in US, Canada, Europe, and Israel
+    exclude_au_sa = "PriceClass_200"  # POPs in all supported geos except South America and Australia
+    all_geos = "PriceClass_All"  # POPs in all supoprted geos
 
 
 class S3ServerlessSiteConfig(AWSBase):
@@ -25,14 +25,18 @@ class S3ServerlessSiteConfig(AWSBase):
     site_name: Text
     domains: List[Text]
     bucket_name: Text
-    site_index: Text = 'index.html'
+    site_index: Text = "index.html"
     cloudfront_price_class: CloudfrontPriceClass = CloudfrontPriceClass.us_eu
 
 
 class S3ServerlessSite(ComponentResource):
     """A Pulumi component for constructing the resources to host a static website using S3 and Cloudfront."""
 
-    def __init__(self, site_config: S3ServerlessSiteConfig, opts: Optional[ResourceOptions] = None):
+    def __init__(
+        self,
+        site_config: S3ServerlessSiteConfig,
+        opts: Optional[ResourceOptions] = None,
+    ):
         """Create an S3 bucket, ACM certificate, and Cloudfront distribution for hosting a static site.
 
         :param site_config: Configuration object for customizing the component
@@ -41,96 +45,95 @@ class S3ServerlessSite(ComponentResource):
         :param opts: Pulumi resource options
         :type opts: Optional[ResourceOptions]
 
-        :returns: A component resource comprised of the individual AWS resource elements.
-
         :rtype: S3ServerlessSite
         """
-        super().__init__('ol:infrastructure:aws:S3ServerlessSite', site_config.site_name, None, opts)
+        super().__init__(
+            "ol:infrastructure:aws:S3ServerlessSite", site_config.site_name, None, opts
+        )
 
         resource_opts = ResourceOptions(parent=self).merge(opts)  # type: ignore
 
         self.site_bucket = s3.Bucket(
-            f'{site_config.site_name}-bucket',
+            f"{site_config.site_name}-bucket",
             bucket=site_config.bucket_name,
-            acl='public-read',
+            acl="public-read",
             policy={
-                'Version': '2012-10-17',
-                'Statement': [
+                "Version": "2012-10-17",
+                "Statement": [
                     {
-                        'Sid': 'PublicRead',
-                        'Effect': 'Allow',
-                        'Principal': '*',
-                        'Action': ['s3:GetObject'],
-                        'Resource': [f'arn:aws:s3:::{site_config.bucket_name}/*']
+                        "Sid": "PublicRead",
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": ["s3:GetObject"],
+                        "Resource": [f"arn:aws:s3:::{site_config.bucket_name}/*"],
                     }
-                ]
+                ],
             },
             tags=site_config.tags,
-            versioning={'enabled': True},
-            cors_rules=[
-                {
-                    'allowedMethods': ['GET', 'HEAD'],
-                    'allowedOrigins': ['*']
-                }
-            ],
-            website={
-                'indexDocument': site_config.site_index
-            },
-            opts=resource_opts
+            versioning={"enabled": True},
+            cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
+            website={"indexDocument": site_config.site_index},
+            opts=resource_opts,
         )
 
         self.site_tls = acm.Certificate(
-            f'{site_config.site_name}-tls',
+            f"{site_config.site_name}-tls",
             domain_name=site_config.domains[0],
-            tags=site_config.merged_tags({'Name': f'{site_config.site_name}-certificate'}),
-            validation_method='DNS',
+            tags=site_config.merged_tags(
+                {"Name": f"{site_config.site_name}-certificate"}
+            ),
+            validation_method="DNS",
             subject_alternative_names=site_config.domains[1:],
-            opts=resource_opts
+            opts=resource_opts,
         )
 
-        s3_origin_id = f'{site_config.site_name}-s3-origin'
+        s3_origin_id = f"{site_config.site_name}-s3-origin"
 
         self.cloudfront_distribution = cloudfront.Distribution(
-            f'{site_config.site_name}-cloudfront-distribution',
+            f"{site_config.site_name}-cloudfront-distribution",
             aliases=site_config.domains,
-            comment=f'Cloudfront distribution for {site_config.site_name}',
+            comment=f"Cloudfront distribution for {site_config.site_name}",
             default_cache_behavior={
-                'allowedMethods': [
-                    'GET',
-                    'HEAD',
-                    'OPTIONS',
+                "allowedMethods": [
+                    "GET",
+                    "HEAD",
+                    "OPTIONS",
                 ],
-                'cachedMethods': [
-                    'GET',
-                    'HEAD',
+                "cachedMethods": [
+                    "GET",
+                    "HEAD",
                 ],
-                'defaultTtl': 604800,
-                'forwardedValues': {
-                    'cookies': {
-                        'forward': 'none',
+                "defaultTtl": 604800,
+                "forwardedValues": {
+                    "cookies": {
+                        "forward": "none",
                     },
-                    'queryString': False,
+                    "queryString": False,
                 },
-                'maxTtl': 604800,
-                'minTtl': 0,
-                'targetOriginId': s3_origin_id,
-                'viewerProtocolPolicy': 'allow-all',
+                "maxTtl": 604800,
+                "minTtl": 0,
+                "targetOriginId": s3_origin_id,
+                "viewerProtocolPolicy": "allow-all",
             },
-            default_root_object='index.html',
+            default_root_object="index.html",
             enabled=True,
             is_ipv6_enabled=True,
-            origins=[{
-                'domain_name': self.site_bucket.bucket_regional_domain_name,
-                'originId': s3_origin_id,
-            }],
+            origins=[
+                {
+                    "domain_name": self.site_bucket.bucket_regional_domain_name,
+                    "originId": s3_origin_id,
+                }
+            ],
             price_class=site_config.cloudfront_price_class.value,
-            restrictions={'geoRestriction': {'restrictionType': 'none'}},
-            tags=site_config.merged_tags({'Name': f'{site_config.site_name}-cloudfront'}),
+            restrictions={"geoRestriction": {"restrictionType": "none"}},
+            tags=site_config.merged_tags(
+                {"Name": f"{site_config.site_name}-cloudfront"}
+            ),
             viewer_certificate={
-                'acmCertificateArn': self.site_tls.arn,
-                'sslSupportMethod': 'sni-only'
+                "acmCertificateArn": self.site_tls.arn,
+                "sslSupportMethod": "sni-only",
             },
-            opts=resource_opts
+            opts=resource_opts,
         )
 
         self.register_outputs({})
