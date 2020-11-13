@@ -5,8 +5,6 @@ config:
   environment:business_unit: operations
   environment:services:
     - consul
-    - cassandra
-    - rabbitmq
     - elasticsearch
   environment:vpc_reference: applications_vpc
   saltstack:key_name: salt-production
