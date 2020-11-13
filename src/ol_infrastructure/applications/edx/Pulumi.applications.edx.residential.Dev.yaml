@@ -3,9 +3,5 @@ encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQFy/od1HcTldXLmDc
 config:
   aws:region: us-east-1
   environment:business_unit: residential
-  environment:services:
-    - consul
-    - rabbitmq
-    - elasticsearch
   environment:vpc_reference: residential_mitx_vpc
   saltstack:key_name: salt-qa

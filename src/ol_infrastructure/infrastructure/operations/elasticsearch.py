@@ -30,8 +30,8 @@ aws_config = AWSBase(tags={
 destination_vpc = ops.network_stack.require_output(env_config.require('vpc_reference'))
 
 elasticsearch_backup_bucket = s3.Bucket(
-    f'ol-{business_unit}-elasticsearch-backup',
-    bucket=f'ol-{business_unit}-elasticsearch-backup',
+    f'ol-{environment_name}-elasticsearch-backup',
+    bucket=f'ol-{environment_name}-elasticsearch-backup',
     acl='private',
     tags=aws_config.tags,
     versioning={'enabled': True},
