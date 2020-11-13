@@ -46,35 +46,6 @@ edxapp_security_group = ec2.SecurityGroup(
     ]
 )
 
-edx_worker_security_group = ec2.SecurityGroup(
-    f'edx-worker-{environment_name}-security-group',
-    name=f'edx-worker-{environment_name}',
-    description='Access control to edx-worker',
-    tags=aws_config.tags,
-    vpc_id=destination_vpc['id'],
-    ingress=[
-        ec2.SecurityGroupIngressArgs(
-            self=True,
-            protocol='tcp',
-            from_port=18040,
-            to_port=18040,
-            description='Xqueue access'
-        )
-    ]
-)
-
-ec2.SecurityGroupRule(
-    f'edxapp-{environment_name}-to-edx-worker-tcp-access-rule',
-    type='ingress',
-    from_port=18040,
-    to_port=18040,
-    protocol='tcp',
-    description='Access from edxapp to edx-worker',
-    source_security_group_id=edxapp_security_group.id,
-    security_group_id=edxapp_security_group.id,
-    opts=ResourceOptions(parent=edxapp_security_group)
-)
-
 ec2.SecurityGroupRule(
     f'edxapp-{environment_name}-to-elasticsearch-tcp-access-rule',
     type='ingress',
@@ -82,19 +53,7 @@ ec2.SecurityGroupRule(
     to_port=9200,
     protocol='tcp',
     description='Access from edxapp to elasticsearch cluster',
-    source_security_group_id=ops.elasticsearch.elasticsearch_security_group.id,
-    security_group_id=ops.elasticsearch.elasticsearch_security_group.id,
-    opts=ResourceOptions(parent=ops.elasticsearch.elasticsearch_security_group)
-)
-
-ec2.SecurityGroupRule(
-    f'edx-worker-{environment_name}-to-elasticsearch-tcp-access-rule',
-    type='ingress',
-    from_port=9200,
-    to_port=9200,
-    protocol='tcp',
-    description='Access from edx-worker to elasticsearch cluster',
-    source_security_group_id=ops.elasticsearch.elasticsearch_security_group.id,
+    source_security_group_id=edxapp_security_group.id,
     security_group_id=ops.elasticsearch.elasticsearch_security_group.id,
     opts=ResourceOptions(parent=ops.elasticsearch.elasticsearch_security_group)
 )
