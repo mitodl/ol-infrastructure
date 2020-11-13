@@ -163,10 +163,15 @@ ec2.SecurityGroupRule(
     opts=ResourceOptions(parent=consul_agent_security_group),
 )
 
+security_groups = {
+    "consul_server": consul_server_security_group.id,
+    "consul_agent": consul_agent_security_group.id,
+}
+
 instance_type_name = consul_config.get("instance_type") or InstanceTypes.medium.name
 instance_type = InstanceTypes[instance_type_name].value
 consul_instances = []
-consul_export = {}
+export_data = {}
 subnets = destination_vpc["subnet_ids"]
 subnet_id = subnets.apply(chain)
 for count, subnet in zip(range(consul_config.get_int("instance_count") or 3), subnets):  # type: ignore # noqa: WPS221
@@ -209,7 +214,7 @@ for count, subnet in zip(range(consul_config.get_int("instance_count") or 3), su
     )
     consul_instances.append(consul_instance)
 
-    consul_export[instance_name] = {
+    export_data[instance_name] = {
         "public_ip": consul_instance.public_ip,
         "private_ip": consul_instance.private_ip,
         "ipv6_address": consul_instance.ipv6_addresses,
