@@ -3,7 +3,7 @@ import json
 from itertools import chain
 
 from pulumi import Config, ResourceOptions, export
-from pulumi_aws import ec2, iam
+from pulumi_aws import ec2, iam, s3
 
 from ol_infrastructure.infrastructure import operations as ops
 from ol_infrastructure.lib.aws.ec2_helper import (
@@ -29,47 +29,48 @@ aws_config = AWSBase(tags={
 })
 destination_vpc = ops.network_stack.require_output(env_config.require('vpc_reference'))
 
+elasticsearch_backup_bucket = s3.Bucket(
+    f'ol-{business_unit}-elasticsearch-backup',
+    bucket=f'ol-{business_unit}-elasticsearch-backup',
+    acl='private',
+    tags=aws_config.tags,
+    versioning={'enabled': True},
+    server_side_encryption_configuration={
+        'rule': {
+            'applyServerSideEncryptionByDefault': {
+                'sseAlgorithm': 'aws:kms',
+            },
+        },
+    })
+
 elasticsearch_instance_policy = {
-    "Version": "2012-10-17",
-    "Statement": [
+    'Version': '2012-10-17',
+    'Statement': [
         {
-            "Action": [
-                "ec2:DescribeInstances",
-                "ec2:DescribeAvailabilityZones",
-                "ec2:DescribeRegions",
-                "ec2:DescribeSecurityGroups",
-                "ec2:DescribeTags"
+            'Action': [
+                'ec2:DescribeInstances',
+                'ec2:DescribeAvailabilityZones',
+                'ec2:DescribeRegions',
+                'ec2:DescribeSecurityGroups',
+                'ec2:DescribeTags'
             ],
-            "Effect": "Allow",
-            "Resource": [
-                "*"
+            'Effect': 'Allow',
+            'Resource': [
+                '*'
             ]
         },
         {
-            "Action": [
-                "s3:ListBucket",
-                "s3:GetBucketLocation",
-                "s3:ListBucketMultipartUploads",
-                "s3:ListBucketVersions"
+            'Action': [
+                's3:AbortMultipartUpload',
+                's3:List*',
+                's3:Get*',
+                's3:Put*',
+                's3:Delete*'
             ],
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:s3:::mitx-elasticsearch-backups",
-                "arn:aws:s3:::mitx-elasticsearch-backups-operations-es7"
-            ]
-        },
-        {
-            "Action": [
-                "s3:GetObject",
-                "s3:PutObject",
-                "s3:DeleteObject",
-                "s3:AbortMultipartUpload",
-                "s3:ListMultipartUploadParts"
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:s3:::mitx-elasticsearch-backups/*",
-                "arn:aws:s3:::mitx-elasticsearch-backups-operations-es7/*"
+            'Effect': 'Allow',
+            'Resource': [
+                f'arn:aws:s3:::{elasticsearch_backup_bucket.name}',
+                f'arn:aws:s3:::{elasticsearch_backup_bucket.name}/*'
             ]
         }
     ],
@@ -80,7 +81,7 @@ elasticsearch_iam_policy = iam.Policy(
     name=f'elasticsearch-policy-{environment_name}',
     path=f'/ol-applications/elasticsearch-{environment_name}/',
     policy=lint_iam_policy(elasticsearch_instance_policy, stringify=True),
-    description='Policy for granting access to backup S3 buckets'
+    description='Policy to access resources needed by elasticsearch instances'
 )
 
 elasticsearch_instance_role = iam.Role(
@@ -102,7 +103,7 @@ elasticsearch_instance_role = iam.Role(
 
 iam.RolePolicyAttachment(
     f'elasticsearch-role-policy-{environment_name}',
-    policy_arn=ops.policy_stack.require_output('iam_policies')['describe_instances'],
+    policy_arn=elasticsearch_instance_role.arn,
     role=elasticsearch_instance_role.name
 )
 
@@ -148,9 +149,29 @@ for count, subnet in zip(range(elasticsearch_config.get_int('instance_count') or
     cloud_init_userdata = build_userdata(
         instance_name=instance_name,
         minion_keys=salt_minion,
-        minion_roles=['elasticsearch', 'service_discovery'],
+        minion_roles=['elasticsearch'],
         minion_environment=environment_name,
-        salt_host=f'salt-{ops.env_suffix}.private.odl.mit.edu')
+        salt_host=f'salt-{ops.env_suffix}.private.odl.mit.edu',
+        additional_cloud_config={
+            'device_aliases': {
+                'ephemeral0': '/dev/nvme1n1'
+            },
+            'disk_setup': {
+                'ephmeral0': {
+                    'table_type': 'gpt',
+                    'layout': True,
+                    'overwrite': False
+                }
+            },
+            'fs_setup': [{
+                'device': 'ephemeral0',
+                'partition': 'none',
+                'label': 'None',
+                'filesystem': 'ext4'
+            }
+            ],
+            'mount': ['ephemeral0', '/var/lib/elasticsearch', 'ext4']
+        })
 
     instance_tags = aws_config.merged_tags({
         'Name': instance_name,
@@ -172,7 +193,7 @@ for count, subnet in zip(range(elasticsearch_config.get_int('instance_count') or
             encrypted=True,
         ),
         ebs_block_devices=ec2.InstanceEbsBlockDeviceArgs(
-            device_name='/dev/xvdb',
+            device_name='/dev/nvme1n1',
             volume_type='gp2',
             volume_size=100,
             encrypted=True,
@@ -192,6 +213,6 @@ for count, subnet in zip(range(elasticsearch_config.get_int('instance_count') or
     }
 
 export('elasticsearch', {
-    'elasticsearch_security_group': elasticsearch_security_group,
+    'elasticsearch_security_group': elasticsearch_security_group.id,
     'instances': elasticsearch_export
 })
