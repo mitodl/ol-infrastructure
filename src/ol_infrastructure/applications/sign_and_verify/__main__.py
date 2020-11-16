@@ -1,5 +1,4 @@
-"""Deploy the Digital Credentials Sign and Verify service to Fargate as a
-Docker container.
+"""Deploy the Digital Credentials Sign and Verify service to Fargate as a Docker container.
 
 This module sets up the services necessary to deploy a set of Docker containers to run the sign and verify service
 needed for the Digital Credentials project.
@@ -9,9 +8,10 @@ needed for the Digital Credentials project.
 - Create a cluster, task definition, and service on Amazon Fargate/ECS
 - Register the service with Route 53 DNS
 """
+
 import json
 
-from pulumi import Config, StackReference, get_stack
+from pulumi import Config, Output, StackReference, get_stack
 from pulumi_aws import acm, ecs, iam, lb, route53, secretsmanager
 
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
@@ -106,6 +106,18 @@ unlocked_did_secret_value = secretsmanager.SecretVersion(
     ),  # Base64 encoded JSON object of unlocked DID
 )
 
+hmac_secret = secretsmanager.Secret(
+    f"sign-and-verify-hmac-{env_suffix}",
+    description="Shared secret for validating HMAC",
+    name_prefix=f"sign-and-verify-hmac-secret-{env_suffix}",
+    tags=aws_config.tags,
+)
+
+hmac_secret_value = secretsmanager.SecretVersion(
+    f"sign-and-verify-hmac-{env_suffix}",
+    secret_id=unlocked_did_secret.id,
+    secret_string=sign_and_verify_config.require_secret("hmac_secret"),
+)
 # Create the task execution role to grant access to retrieve the Unlocked DID secret and send logs to Cloudwatch
 
 sign_and_verify_task_execution_role = iam.Role(
@@ -184,14 +196,20 @@ sign_and_verify_task = ecs.TaskDefinition(
     tags=aws_config.merged_tags({"Name": f"sign-and-verify-{env_suffix}"}),
     execution_role_arn=sign_and_verify_task_execution_role.arn,
     family=f"sign-and-verify-task-{env_suffix}",
-    container_definitions=unlocked_did_secret.arn.apply(
-        lambda arn: json.dumps(
+    container_definitions=Output.all(unlocked_did_secret.arn, hmac_secret.arn).apply(
+        lambda arns: json.dumps(
             [
                 {
                     "name": "sign-and-verify",
                     "image": f'mitodl/sign-and-verify:{sign_and_verify_config.require("docker_label")}',
-                    "environment": [{"name": "PORT", "value": f"{CONTAINER_PORT}"}],
-                    "secrets": [{"name": "UNLOCKED_DID", "valueFrom": arn}],
+                    "environment": [
+                        {"name": "PORT", "value": f"{CONTAINER_PORT}"},
+                        {"name": "DIGEST_CHECK", "value": "true"},
+                    ],
+                    "secrets": [
+                        {"name": "UNLOCKED_DID", "valueFrom": arns[0]},
+                        {"name": "HMAC_SECRET", "valueFrom": arns[1]},
+                    ],
                     "portMappings": [
                         {"containerPort": CONTAINER_PORT, "protocol": "tcp"}
                     ],
@@ -202,7 +220,7 @@ sign_and_verify_task = ecs.TaskDefinition(
                             "awslogs-region": "us-east-1",
                             "awslogs-stream-prefix": f"sign-and-verify-{env_suffix}",
                             "awslogs-create-group": "true",
-                            "awslogs-datetime-format": "%Y-%m-%dT%H:%M:%S%z",
+                            "awslogs-datetime-format": "%Y-%m-%dT%H:%M:%S%z",  # noqa: WPS323
                         },
                     },
                 }
