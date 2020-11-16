@@ -115,7 +115,7 @@ hmac_secret = secretsmanager.Secret(
 
 hmac_secret_value = secretsmanager.SecretVersion(
     f"sign-and-verify-hmac-{env_suffix}",
-    secret_id=unlocked_did_secret.id,
+    secret_id=hmac_secret.id,
     secret_string=sign_and_verify_config.require_secret("hmac_secret"),
 )
 # Create the task execution role to grant access to retrieve the Unlocked DID secret and send logs to Cloudwatch
