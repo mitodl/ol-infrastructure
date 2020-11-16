@@ -143,8 +143,8 @@ sign_and_verify_execution_policy = iam.Policy(
     "Unlocked DID value from AWS Secrets Manager",
     name=f"ecs-fargate-sign-and-verify-task-execution-policy-{env_suffix}",
     path=f"/digital-credentials/sign-and-verify-execution-{env_suffix}/",
-    policy=unlocked_did_secret.arn.apply(
-        lambda arn: lint_iam_policy(
+    policy=Output.all(unlocked_did_secret.arn, hmac_secret.arn).apply(
+        lambda arns: lint_iam_policy(
             {
                 "Version": "2012-10-17",
                 "Statement": [
@@ -153,7 +153,7 @@ sign_and_verify_execution_policy = iam.Policy(
                         "Action": [
                             "secretsmanager:GetSecretValue",
                         ],
-                        "Resource": [arn],
+                        "Resource": arns,
                     },
                     {
                         "Effect": "Allow",
