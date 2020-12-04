@@ -147,7 +147,7 @@ class OLVaultAWSSecretsEngineConfig(BaseModel):
     description: Text
     secret_key: Text
     path: Text
-    policy_documents: Dict
+    policy_documents: Dict[Text, Text]
     credential_type: str = 'iam_user'
 
 
