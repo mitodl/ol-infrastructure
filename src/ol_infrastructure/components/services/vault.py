@@ -17,10 +17,7 @@ from pulumi_vault import AuthBackend, Mount, Policy, approle, aws, database
 from pydantic import BaseModel
 
 from ol_infrastructure.lib.ol_types import Apps
-from ol_infrastructure.lib.vault import (
-    mysql_sql_statements,
-    postgres_sql_statements
-)
+from ol_infrastructure.lib.vault import mysql_sql_statements, postgres_sql_statements
 
 DEFAULT_PORT_POSTGRES = 5432
 DEFAULT_PORT_MYSQL = 3306
