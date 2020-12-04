@@ -10,7 +10,7 @@ This includes:
 import json
 
 from enum import Enum
-from typing import Dict, List, Text, Union
+from typing import Dict, Text, Union
 
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_vault import AuthBackend, Mount, Policy, approle, aws, database
@@ -138,6 +138,7 @@ class OLVaultDatabaseBackend(ComponentResource):
             )
         self.register_outputs({})
 
+
 class OLVaultAWSSecretsEngineConfig(BaseModel):
     app_name: Text
     access_key: Text
@@ -186,10 +187,15 @@ class OLVaultAppRoleAuthBackendConfig(BaseModel):
     description: Text
     backend: Text
     role_name: Text
-    token_policies: List
+    token_policies: Dict[str, str]
 
 
 class OLVaultAppRoleAuthBackend(ComponentResource):
+    """
+    Due to the following open issue https://github.com/pulumi/pulumi-vault/issues/10
+    we can't pass json as policy and thus had to do some workarounds below. Those can
+    changed once that issue is resolved.
+    """
 
     def __init__(
             self,
@@ -201,17 +207,19 @@ class OLVaultAppRoleAuthBackend(ComponentResource):
         self.approle_backend = AuthBackend(
             approle_config.name,
             description=approle_config.description,
-            path=approle_config,
+            path=approle_config.name,
             type=approle_config.type)
 
-        for policy in approle_config.token_policies:
-            self.approle_policy = Policy(f'{approle_config.name}', policy=policy)
+        token_policy_names = []
+        for policy_key, policy_value in approle_config.token_policies.items():
+            vault_policy = Policy(policy_key, policy=policy_value)
+            token_policy_names.append(vault_policy.name)
 
         self.approle_backend_role = approle.AuthBackendRole(
             approle_config.name,
             backend=self.approle_backend.path,
             role_name=approle_config.role_name,
-            token_policies=approle_config.token_policies,
-            opts=ResourceOptions(depends_on=[self.approle_backend, self.approle_policy]))
+            token_policies=token_policy_names,
+            opts=ResourceOptions(depends_on=[self.approle_backend, vault_policy]))
 
         self.register_outputs({})
