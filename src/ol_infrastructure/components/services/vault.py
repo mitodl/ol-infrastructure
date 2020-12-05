@@ -14,10 +14,13 @@ from typing import Dict, Text, Union
 
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_vault import AuthBackend, Mount, Policy, approle, aws, database
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 from ol_infrastructure.lib.ol_types import Apps
-from ol_infrastructure.lib.vault import mysql_sql_statements, postgres_sql_statements
+from ol_infrastructure.lib.vault import (
+    mysql_sql_statements,
+    postgres_sql_statements
+)
 
 DEFAULT_PORT_POSTGRES = 5432
 DEFAULT_PORT_MYSQL = 3306
@@ -138,14 +141,20 @@ class OLVaultDatabaseBackend(ComponentResource):
 
 class OLVaultAWSSecretsEngineConfig(BaseModel):
     app_name: Text
-    access_key: Text
+    aws_access_key: Text
     default_lease_ttl_seconds: int = SIX_MONTHS
     max_lease_ttl_seconds: int = SIX_MONTHS
     description: Text
-    secret_key: Text
+    aws_secret_key: Text
     path: Text
     policy_documents: Dict[Text, Text]
-    credential_type: str = 'iam_user'
+    credential_type: Text = 'iam_user'
+
+    @validator('path')
+    def is_valid_path(cls: 'OLVaultAWSSecretsEngineConfig', path: Text) -> Text:
+        if path.startswith('/') or path.endswith('/'):
+            raise ValueError(f'The specified path value {path} can not start or end with a slash')
+        return path
 
 
 class OLVaultAWSSecretsEngine(ComponentResource):
@@ -160,16 +169,16 @@ class OLVaultAWSSecretsEngine(ComponentResource):
         self.aws_secrets_engine = aws.SecretBackend(
             # TODO verify app_name exists based on Apps class in ol_types
             f'aws-{engine_config.app_name}',
-            access_key=engine_config.access_key,
-            secret_key=engine_config.secret_key,
+            access_key=engine_config.aws_access_key,
+            secret_key=engine_config.aws_secret_key,
             path=f'aws-{engine_config.app_name}'
         )
 
         for role_name, policy in engine_config.policy_documents.items():
             aws.SecretBackendRole(
                 role_name,
-                backend=f'aws-{engine_config.app_name}',
-                credential_type='iam_user',
+                backend=self.aws_secrets_engine.name,
+                credential_type=engine_config.credential_type,
                 name=role_name,
                 policy_document=json.dumps(policy),
                 opts=ResourceOptions(depends_on=[self.aws_secrets_engine])
@@ -179,10 +188,9 @@ class OLVaultAWSSecretsEngine(ComponentResource):
 
 
 class OLVaultAppRoleAuthBackendConfig(BaseModel):
-    name: Text
-    type: str = 'approle'
+    authbackend_name: Text
+    backend_type: str = 'approle'
     description: Text
-    backend: Text
     role_name: Text
     token_policies: Dict[str, str]
 
@@ -199,13 +207,13 @@ class OLVaultAppRoleAuthBackend(ComponentResource):
             approle_config: OLVaultAppRoleAuthBackendConfig,
             opts: ResourceOptions = None
     ):
-        super().__init__('ol:services:VaultAppRoleAuthBackend', approle_config.name, None, opts)
+        super().__init__('ol:services:VaultAppRoleAuthBackend', approle_config.authbackend_name, None, opts)
 
         self.approle_backend = AuthBackend(
-            approle_config.name,
+            approle_config.authbackend_name,
             description=approle_config.description,
-            path=approle_config.name,
-            type=approle_config.type)
+            path=approle_config.authbackend_name,
+            type=approle_config.backend_type)
 
         token_policy_names = []
         for policy_key, policy_value in approle_config.token_policies.items():
@@ -213,10 +221,10 @@ class OLVaultAppRoleAuthBackend(ComponentResource):
             token_policy_names.append(vault_policy.name)
 
         self.approle_backend_role = approle.AuthBackendRole(
-            approle_config.name,
+            approle_config.authbackend_name,
             backend=self.approle_backend.path,
             role_name=approle_config.role_name,
             token_policies=token_policy_names,
-            opts=ResourceOptions(depends_on=[self.approle_backend, vault_policy]))
+        )
 
         self.register_outputs({})
