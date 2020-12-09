@@ -166,12 +166,15 @@ class OLVaultAWSSecretsEngine(ComponentResource):
     ):
         super().__init__('ol:services:VaultAWSSecretsEngine', engine_config.app_name, None, opts)
 
+        resource_options = ResourceOptions(parent=self).merge(opts)  # type: ignore
+
         self.aws_secrets_engine = aws.SecretBackend(
             # TODO verify app_name exists based on Apps class in ol_types
             f'aws-{engine_config.app_name}',
             access_key=engine_config.aws_access_key,
             secret_key=engine_config.aws_secret_key,
-            path=f'aws-{engine_config.app_name}'
+            path=f'aws-{engine_config.app_name}',
+            opts=resource_options,
         )
 
         for role_name, policy in engine_config.policy_documents.items():
@@ -209,11 +212,15 @@ class OLVaultAppRoleAuthBackend(ComponentResource):
     ):
         super().__init__('ol:services:VaultAppRoleAuthBackend', approle_config.authbackend_name, None, opts)
 
+        resource_options = ResourceOptions(parent=self).merge(opts)  # type: ignore
+
         self.approle_backend = AuthBackend(
             approle_config.authbackend_name,
             description=approle_config.description,
             path=approle_config.authbackend_name,
-            type=approle_config.backend_type)
+            type=approle_config.backend_type,
+            opts=resource_options,
+        )
 
         token_policy_names = []
         for policy_key, policy_value in approle_config.token_policies.items():
@@ -225,6 +232,7 @@ class OLVaultAppRoleAuthBackend(ComponentResource):
             backend=self.approle_backend.path,
             role_name=approle_config.role_name,
             token_policies=token_policy_names,
+            opts=resource_options,
         )
 
         self.register_outputs({})
