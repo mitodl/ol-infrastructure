@@ -74,7 +74,7 @@ class OLVaultDatabaseBackend(ComponentResource):
             db_config: Union[OLVaultMysqlDatabaseConfig, OLVaultPostgresDatabaseConfig],
             opts: ResourceOptions = None
     ):
-        super().__init__('ol:services:VaultDatabaseBackend', db_config.db_name, None, opts)
+        super().__init__('ol:services:Vault:DatabaseBackend', db_config.db_name, None, opts)
 
         resource_opts = ResourceOptions.merge(ResourceOptions(parent=self), opts)  # type: ignore
 
@@ -146,15 +146,15 @@ class OLVaultAWSSecretsEngineConfig(BaseModel):
     max_lease_ttl_seconds: int = SIX_MONTHS
     description: Text
     aws_secret_key: Text
-    path: Text
+    vault_backend_path: Text
     policy_documents: Dict[Text, Text]
     credential_type: Text = 'iam_user'
 
-    @validator('path')
-    def is_valid_path(cls: 'OLVaultAWSSecretsEngineConfig', path: Text) -> Text:
-        if path.startswith('/') or path.endswith('/'):
-            raise ValueError(f'The specified path value {path} can not start or end with a slash')
-        return path
+    @validator('vault_backend_path')
+    def is_valid_path(cls: 'OLVaultAWSSecretsEngineConfig', vault_backend_path: Text) -> Text:
+        if vault_backend_path.startswith('/') or vault_backend_path.endswith('/'):
+            raise ValueError(f'The specified path value {vault_backend_path} can not start or end with a slash')
+        return vault_backend_path
 
 
 class OLVaultAWSSecretsEngine(ComponentResource):
@@ -164,7 +164,7 @@ class OLVaultAWSSecretsEngine(ComponentResource):
             engine_config: OLVaultAWSSecretsEngineConfig,
             opts: ResourceOptions = None
     ):
-        super().__init__('ol:services:VaultAWSSecretsEngine', engine_config.app_name, None, opts)
+        super().__init__('ol:services:Vault:AWSSecretsEngine', engine_config.app_name, None, opts)
 
         resource_options = ResourceOptions(parent=self).merge(opts)  # type: ignore
 
@@ -173,7 +173,7 @@ class OLVaultAWSSecretsEngine(ComponentResource):
             f'aws-{engine_config.app_name}',
             access_key=engine_config.aws_access_key,
             secret_key=engine_config.aws_secret_key,
-            path=f'aws-{engine_config.app_name}',
+            path=f'aws-{engine_config.vault_backend_path}',
             opts=resource_options,
         )
 
@@ -210,7 +210,7 @@ class OLVaultAppRoleAuthBackend(ComponentResource):
             approle_config: OLVaultAppRoleAuthBackendConfig,
             opts: ResourceOptions = None
     ):
-        super().__init__('ol:services:VaultAppRoleAuthBackend', approle_config.authbackend_name, None, opts)
+        super().__init__('ol:services:Vault:AppRoleAuthBackend', approle_config.authbackend_name, None, opts)
 
         resource_options = ResourceOptions(parent=self).merge(opts)  # type: ignore
 
