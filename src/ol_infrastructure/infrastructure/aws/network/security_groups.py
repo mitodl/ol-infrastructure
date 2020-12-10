@@ -8,15 +8,9 @@ def default_group(vpc_id: Text) -> ec2.AwaitableGetSecurityGroupResult:
     return ec2.get_security_group(
         vpc_id=vpc_id,
         filters=[
-            ec2.GetSecurityGroupFilterArgs(
-                name='group-name',
-                values=['default']
-            ),
-            ec2.GetSecurityGroupFilterArgs(
-                name='vpc-id',
-                values=[vpc_id]
-            )
-        ]
+            ec2.GetSecurityGroupFilterArgs(name="group-name", values=["default"]),
+            ec2.GetSecurityGroupFilterArgs(name="vpc-id", values=[vpc_id]),
+        ],
     )
 
 
@@ -35,26 +29,27 @@ def public_web(vpc_name: Text, vpc: ec2.Vpc) -> partial:
     """
     return partial(
         ec2.SecurityGroup,
-        f'{vpc_name}-web-server',
-        description='HTTP/HTTPS access from the public internet',
+        f"{vpc_name}-web-server",
+        description="HTTP/HTTPS access from the public internet",
         vpc_id=vpc.id,
         ingress=[
             {
-                'from_port': 80,
-                'to_port': 80,
-                'protocol': 'tcp',
-                'cidr_blocks': ['0.0.0.0/0'],
-                'ipv6_cidr_blocks': ['::/0'],
-                'description': 'HTTP access from the public internet'
-            }, {
-                'from_port': 443,
-                'to_port': 443,
-                'protocol': 'tcp',
-                'cidr_blocks': ['0.0.0.0/0'],
-                'ipv6_cidr_blocks': ['::/0'],
-                'description': 'HTTPS access from the public internet'
-            }
-        ]
+                "from_port": 80,
+                "to_port": 80,
+                "protocol": "tcp",
+                "cidr_blocks": ["0.0.0.0/0"],
+                "ipv6_cidr_blocks": ["::/0"],
+                "description": "HTTP access from the public internet",
+            },
+            {
+                "from_port": 443,
+                "to_port": 443,
+                "protocol": "tcp",
+                "cidr_blocks": ["0.0.0.0/0"],
+                "ipv6_cidr_blocks": ["::/0"],
+                "description": "HTTPS access from the public internet",
+            },
+        ],
     )
 
 
@@ -76,22 +71,23 @@ def salt_minion(vpc_name: Text, vpc: ec2.Vpc, ops_vpc: ec2.Vpc) -> partial:
     """
     return partial(
         ec2.SecurityGroup,
-        f'{vpc_name}-salt-minion',
-        description='Access to minions from the salt master',
+        f"{vpc_name}-salt-minion",
+        description="Access to minions from the salt master",
         vpc_id=vpc.id,
         ingress=[
             {
-                'from_port': 22,
-                'to_port': 22,
-                'protocol': 'tcp',
-                'cidr_blocks': [ops_vpc.cidr_block],
-                'description': 'SSH access from the salt master'
-            }, {
-                'from_port': 19999,
-                'to_port': 19999,
-                'protocol': 'tcp',
-                'cidr_blocks': [ops_vpc.cidr_block],
-                'description': 'Access to the Netdata HTTP interface from the salt master'
-            }
-        ]
+                "from_port": 22,
+                "to_port": 22,
+                "protocol": "tcp",
+                "cidr_blocks": [ops_vpc.cidr_block],
+                "description": "SSH access from the salt master",
+            },
+            {
+                "from_port": 19999,
+                "to_port": 19999,
+                "protocol": "tcp",
+                "cidr_blocks": [ops_vpc.cidr_block],
+                "description": "Access to the Netdata HTTP interface from the salt master",
+            },
+        ],
     )

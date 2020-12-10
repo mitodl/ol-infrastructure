@@ -3,7 +3,7 @@ from typing import Text
 import boto3
 import pulumi
 
-route53_client = boto3.client('route53')
+route53_client = boto3.client("route53")
 
 
 def zone_opts(domain: Text) -> pulumi.ResourceOptions:
@@ -16,13 +16,19 @@ def zone_opts(domain: Text) -> pulumi.ResourceOptions:
 
     :rtype: pulumi.ResourceOptions
     """
-    zone = route53_client.list_hosted_zones_by_name(DNSName=domain)['HostedZones'][0]
-    zone_id = zone['Id'].split('/')[-1]  # 'Id' attribute is of the form /hostedzone/<ZONE_ID>
-    tags = route53_client.list_tags_for_resource(ResourceType='hostedzone', ResourceId=zone_id)
-    if 'pulumi_managed' in {tag['Key'] for tag in tags['ResourceTagSet']['Tags']}:  # noqa: C412
+    zone = route53_client.list_hosted_zones_by_name(DNSName=domain)["HostedZones"][0]
+    zone_id = zone["Id"].split("/")[
+        -1
+    ]  # 'Id' attribute is of the form /hostedzone/<ZONE_ID>
+    tags = route53_client.list_tags_for_resource(
+        ResourceType="hostedzone", ResourceId=zone_id
+    )
+    if "pulumi_managed" in {  # noqa: C412, WPS337
+        tag["Key"] for tag in tags["ResourceTagSet"]["Tags"]
+    }:
         opts = pulumi.ResourceOptions()
     else:
         opts = pulumi.ResourceOptions(
-            import_=zone_id,
-            ignore_changes=['tags', 'comment'])
+            import_=zone_id, ignore_changes=["tags", "comment"]
+        )
     return opts
