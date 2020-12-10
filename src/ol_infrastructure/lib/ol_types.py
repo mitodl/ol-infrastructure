@@ -25,6 +25,21 @@ class BusinessUnit(str, Enum):  # noqa: WPS600
     starteam = "starteam"
     xpro = "mitxpro"
 
+@unique
+class Apps(str, Enum):  # noqa: WPS600
+    """Canonical source of truth for defining apps."""
+
+    bootcamps = 'bootcamps'
+    micromasters = 'micromasters'
+    ocw_build = 'ocw-build'
+    redash = 'redash'
+    dagster = 'dagster'
+    mitxpro_edx = 'xpro-edx'
+    mitx_edx = 'mitx-edx'
+    odl_video_service = 'ovs'
+    mit_open = 'open'
+    starcellbio = 'starcellbio'
+
 
 class AWSBase(BaseModel):
     """Base class for deriving configuration objects to pass to AWS component resources."""
