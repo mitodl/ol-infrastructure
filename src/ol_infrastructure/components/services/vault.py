@@ -184,7 +184,7 @@ class OLVaultAWSSecretsEngine(ComponentResource):
                 credential_type=engine_config.credential_type,
                 name=role_name,
                 policy_document=json.dumps(policy),
-                opts=ResourceOptions(depends_on=[self.aws_secrets_engine])
+                opts=resource_options,
             )
 
         self.register_outputs({})
