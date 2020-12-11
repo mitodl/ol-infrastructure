@@ -1,0 +1,7 @@
+secretsprovider: awskms://alias/PulumiSecrets
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQFQ0zE2j+YiYEzhOkcJ6OsbAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMXPLBK9sDxHhChYzYAgEQgDsLBoxwE0LVc3Ljh4NScmA3t69PRJH4ScvWAI9/LSrBSaCwy58hdSQ1Tv3QtNSwVzqT82bfwBkTYCh6VQ==
+config:
+  aws:region: us-east-1
+  environment:business_unit: residential
+  environment:vpc_reference: residential_mitx_vpc
+  saltstack:key_name: salt-qa
