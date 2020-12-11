@@ -1,7 +1,7 @@
 import json
 from itertools import chain
 
-from pulumi import Config, ResourceOptions, export
+from pulumi import Config, ResourceOptions
 from pulumi_aws import ec2, iam, s3
 
 from ol_infrastructure.infrastructure import operations as ops
@@ -126,12 +126,14 @@ elasticsearch_security_group = ec2.SecurityGroup(
     ],
 )
 
+security_groups = {"elasticsearch_server": elasticsearch_security_group}
+
 instance_type_name = (
     elasticsearch_config.get("instance_type") or InstanceTypes.medium.name
 )
 instance_type = InstanceTypes[instance_type_name].value
 elasticsearch_instances = []
-elasticsearch_export = {}
+export_data = {}
 subnets = destination_vpc["subnet_ids"]
 subnet_id = subnets.apply(chain)
 for count, subnet in zip(range(elasticsearch_config.get_int("instance_count") or 3), subnets):  # type: ignore # noqa: WPS221
@@ -196,16 +198,8 @@ for count, subnet in zip(range(elasticsearch_config.get_int("instance_count") or
     )
     elasticsearch_instances.append(elasticsearch_instance)
 
-    elasticsearch_export[instance_name] = {
+    export_data[instance_name] = {
         "public_ip": elasticsearch_instance.public_ip,
         "private_ip": elasticsearch_instance.private_ip,
         "ipv6_address": elasticsearch_instance.ipv6_addresses,
     }
-
-export(
-    "elasticsearch",
-    {
-        "elasticsearch_security_group": elasticsearch_security_group.id,
-        "instances": elasticsearch_export,
-    },
-)
