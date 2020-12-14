@@ -288,7 +288,7 @@ class OLVaultPKIIntermediateCABackend(ComponentResource):
 
     Offline CA --- pki-intermediate-ca --- sign -----> pki-intermediate-mitx-qa
                                                        pki-intermediate-mitxpro-qa
-                                                       ....
+                                                       pki-intermeidate-...
     """
 
     def __init__(
@@ -297,7 +297,7 @@ class OLVaultPKIIntermediateCABackend(ComponentResource):
         opts: ResourceOptions = None,
     ):
         super().__init__(
-            "ol:services:Vault:PKIIntermediateCABackend",
+            "ol:services:Vault:PKI:IntermediateCABackend",
             "pki-intermediate-ca",
             None,
             opts,
@@ -366,7 +366,7 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
         opts: ResourceOptions = None,
     ):
         super().__init__(
-            "ol:services:Vault:PKIIntermediateEnvBackendConfig",
+            "ol:services:Vault:PKI:IntermediateEnvBackendConfig",
             backend_config.environment_name,
             None,
             opts,
@@ -441,6 +441,16 @@ class OLVaultPKIIntermediateRoleConfig(BaseModel):
     allowed_domains: List[Text]
     cert_type: Text  # Should be client or server
 
+    @validator("cert_type")
+    def is_valid_cert_type(
+        cls: "OLVaultPKIIntermediateRoleConfig", cert_type: Text  # noqa: N805
+    ) -> Text:
+        if cert_type not in {"server", "client"}:
+            raise ValueError(
+                f"The specified certificate type {cert_type} has to be either client or server"
+            )
+        return cert_type
+
 
 class OLVaultPKIIntermediateRole(ComponentResource):
     def __init__(
@@ -449,7 +459,7 @@ class OLVaultPKIIntermediateRole(ComponentResource):
         opts: ResourceOptions = None,
     ):
         super().__init__(
-            "ol:services:Vault:PKIIntermediateRoleConfig",
+            "ol:services:Vault:PKI:IntermediateRoleConfig",
             role_config.role_name,
             None,
             opts,
@@ -457,48 +467,32 @@ class OLVaultPKIIntermediateRole(ComponentResource):
 
         resource_options = ResourceOptions(parent=self).merge(opts)  # type: ignore
 
-        if role_config.cert_type == "client":
-            self.pki_mitxpro_qa_fluentd_client_role = pkisecret.SecretBackendRole(
-                role_config.role_name,
-                name=role_config.role_name,  # forcing role name so that pulumi doesn't add suffix
-                backend=role_config.pki_intermediate_backend,
-                client_flag=True,
-                allowed_domains=role_config.allowed_domains,
-                allow_glob_domains=True,
-                key_type=role_config.key_type,
-                key_bits=role_config.key_bits,
-                ttl=role_config.default_ttl,
-                max_ttl=role_config.max_ttl,
-                key_usages=role_config.key_usages,
-                generate_lease=True,
-                countries=[CERTIFICATE_CONFIG["country"]],
-                provinces=[CERTIFICATE_CONFIG["state"]],
-                localities=[CERTIFICATE_CONFIG["city"]],
-                organizations=[CERTIFICATE_CONFIG["organization"]],
-                organization_unit=[CERTIFICATE_CONFIG["organizational_unit"]],
-                postal_codes=[CERTIFICATE_CONFIG["zip_code"]],
-                opts=resource_options,
-            )
-        else:
-            self.pki_mitxpro_qa_fluentd_client_role = pkisecret.SecretBackendRole(
-                role_config.role_name,
-                name=role_config.role_name,  # forcing role name so that pulumi doesn't add suffix
-                backend=role_config.pki_intermediate_backend,
-                server_flag=True,
-                allowed_domains=role_config.allowed_domains,
-                allow_glob_domains=True,
-                key_type=role_config.key_type,
-                key_bits=role_config.key_bits,
-                ttl=role_config.default_ttl,
-                max_ttl=role_config.max_ttl,
-                key_usages=role_config.key_usages,
-                generate_lease=True,
-                countries=[CERTIFICATE_CONFIG["country"]],
-                provinces=[CERTIFICATE_CONFIG["state"]],
-                localities=[CERTIFICATE_CONFIG["city"]],
-                organizations=[CERTIFICATE_CONFIG["organization"]],
-                organization_unit=[CERTIFICATE_CONFIG["organizational_unit"]],
-                postal_codes=[CERTIFICATE_CONFIG["zip_code"]],
-            )
+        # Default is True for both flags
+        flag_type = {
+            "client": {"client_flag": True, "server_flag": False},
+            "server": {"server_flag": True, "client_flag": False},
+        }
+
+        self.pki_intermediate_env_client_role = pkisecret.SecretBackendRole(
+            role_config.role_name,
+            name=role_config.role_name,  # forcing role name so that pulumi doesn't add suffix
+            backend=role_config.pki_intermediate_backend,
+            allowed_domains=role_config.allowed_domains,
+            allow_glob_domains=True,
+            key_type=role_config.key_type,
+            key_bits=role_config.key_bits,
+            ttl=role_config.default_ttl,
+            max_ttl=role_config.max_ttl,
+            key_usages=role_config.key_usages,
+            generate_lease=True,
+            countries=[CERTIFICATE_CONFIG["country"]],
+            provinces=[CERTIFICATE_CONFIG["state"]],
+            localities=[CERTIFICATE_CONFIG["city"]],
+            organizations=[CERTIFICATE_CONFIG["organization"]],
+            organization_unit=[CERTIFICATE_CONFIG["organizational_unit"]],
+            postal_codes=[CERTIFICATE_CONFIG["zip_code"]],
+            opts=resource_options,
+            **flag_type[role_config.cert_type],
+        )
 
         self.register_outputs({})
