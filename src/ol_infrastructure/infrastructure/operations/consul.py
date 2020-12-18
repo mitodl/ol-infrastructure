@@ -127,6 +127,7 @@ consul_agent_security_group = ec2.SecurityGroup(
             protocol="tcp",
             from_port=8301,
             to_port=8301,
+            self=True,
             description="LAN gossip protocol from servers",
         ),
         ec2.SecurityGroupIngressArgs(
@@ -134,33 +135,10 @@ consul_agent_security_group = ec2.SecurityGroup(
             protocol="udp",
             from_port=8301,
             to_port=8301,
+            self=True,
             description="LAN gossip protocol from servers",
         ),
     ],
-)
-
-ec2.SecurityGroupRule(
-    f"consul-agent-{environment_name}-inter-agent-tcp-access-rule",
-    type="ingress",
-    from_port=8301,
-    to_port=8301,
-    protocol="tcp",
-    description="LAN gossip protocol from agents",
-    source_security_group_id=consul_agent_security_group.id,
-    security_group_id=consul_agent_security_group.id,
-    opts=ResourceOptions(parent=consul_agent_security_group),
-)
-
-ec2.SecurityGroupRule(
-    f"consul-agent-{environment_name}-inter-agent-udp-access-rule",
-    type="ingress",
-    from_port=8301,
-    to_port=8301,
-    protocol="udp",
-    description="LAN gossip protocol from agents",
-    source_security_group_id=consul_agent_security_group.id,
-    security_group_id=consul_agent_security_group.id,
-    opts=ResourceOptions(parent=consul_agent_security_group),
 )
 
 security_groups = {
