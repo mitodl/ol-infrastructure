@@ -1,0 +1,13 @@
+secretsprovider: awskms://alias/PulumiSecrets
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEfv9Q1cyfdz2aqY/peW/dgAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMBSvJow6mYib+SaqBAgEQgDv9MYz/5UCsreTwGJy2eJSIfRDc13pK/DU2IzzHKCGpC32o/J2+VFfvgJnOowzRCLvqGhLWcDoIo0faBQ== #pragma: allowlist secret
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-mitxpro-production.odl.mit.edu
+  consul:httpAuth:
+    secure: v1:NiN8iManSKIvT0Y5:anAdRnHBV+lG2wkheycMw1C994jRSSUZRDm59nRimB4V48ArcQlpS5lQoWgOIIjI3dQQxvTMkA==
+  consul:scheme: https
+  mitxpro_edxapp:db_password:
+    secure: v1:L1sC8LHcof9q4IwX:fSIljveQNuFAq3Cj/WoT7QAPOr5v50MCA7I6oRpfMrtUCy/TbCegUKIx84y1IcHw
+  mitxpro_edxapp:db_purpose: xpro_production
+  vault:address: active.vault.service.consul
+  vault:skip_tls_verify: "true"
