@@ -5,6 +5,6 @@ config:
   environment:business_unit: mitxpro
   environment:services:
     - consul
-    - elasticsearch
+    # - elasticsearch
   environment:vpc_reference: xpro_vpc
   saltstack:key_name: salt-qa
