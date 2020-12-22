@@ -73,7 +73,10 @@ postgres_sql_statements = {
 mysql_sql_statements = {
     "admin": {
         "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
-        "GRANT ALL ON `%`.* TO '{{{{name}}}}'@'%';",
+        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER, "
+        "CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, CREATE VIEW, SHOW VIEW, "
+        "CREATE ROUTINE, ALTER ROUTINE, EVENT, TRIGGER ON `%`.* TO '{{{{name}}}}' "
+        "WITH GRANT OPTION; GRANT RELOAD, LOCK TABLES ON *.* to '{{{{name}}}}';",
         "revoke": "DROP USER '{{{{name}}}}';",
     },
     "app": {
