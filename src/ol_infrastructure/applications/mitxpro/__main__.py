@@ -136,7 +136,6 @@ edx_role_statments = mysql_sql_statements.update(
             "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
             "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
             "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh_{mitxpro_config.require('db_purpose')}.* TO '{{{{name}}}}'@'%';",
-            "revoke": "DROP USER '{{{{name}}}}';",
         },
         f"edxapp-{hyphenated_db_purpose}": {
             "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
