@@ -10,10 +10,6 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     build_userdata,
     debian_10_ami,
 )
-from ol_infrastructure.lib.aws.iam_helper import (
-    lint_iam_policy,
-    route53_policy_template,
-)
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.providers.salt.minion import (
     OLSaltStackMinion,
@@ -50,21 +46,6 @@ consul_instance_role = iam.Role(
 iam.RolePolicyAttachment(
     f"consul-describe-instance-role-policy-{environment_name}",
     policy_arn=ops.policy_stack.require_output("iam_policies")["describe_instances"],
-    role=consul_instance_role.name,
-)
-
-route53_permissions_policy = iam.Policy(
-    "consul-caddy-route53-challenge-permissions",
-    name="consul-caddy-route53-challenge-policy",
-    path="/ol-operations/consul/route53/",
-    policy=mitodl_zone_id.apply(
-        lambda zone_id: lint_iam_policy(route53_policy_template(zone_id))
-    ),
-)
-
-iam.RolePolicyAttachment(
-    f"consul-route53-role-policy-{environment_name}",
-    policy_arn=route53_permissions_policy.arn,
     role=consul_instance_role.name,
 )
 

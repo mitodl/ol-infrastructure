@@ -116,6 +116,7 @@ mitxpro_edxapp_db_security_group = ec2.SecurityGroup(
 )
 
 mitxpro_edxapp_db_config = OLMariaDBConfig(
+    engine_version='10.4.13',
     instance_name=f"ol-mitxpro-edxapp-db-{env_suffix}",
     password=mitxpro_config.require("db_password"),
     subnet_group_name=xpro_vpc["rds_subnet"],

@@ -110,7 +110,7 @@ class OLMariaDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to MariaDB."""
 
     engine: Text = "mariadb"
-    engine_version: Text = "10.4.8"
+    engine_version: Text = "10.4.13"
     port: PositiveInt = PositiveInt(3306)  # noqa: WPS432
     parameter_overrides: List[
         Dict[Text, Union[Text, bool, int, float]]
