@@ -9,6 +9,7 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.stack_defaults import defaults
+from ol_infrastructure.lib.vault import mysql_sql_statements
 
 stack = get_stack()
 stack_name = stack.split(".")[-1]
@@ -94,11 +95,8 @@ mitxpro_edxapp_db_security_group = ec2.SecurityGroup(
     description="Access from the mitxpro and operations VPC to the mitxpro edxapp database",
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            security_groups=[
-                mitxpro_edxapp_security_group.id,
-                mitxpro_edx_worker_security_group.id,
-                operations_stack.require_output("security_groups")["consul_server"],
-            ],
+            cidr_blocks=[xpro_vpc["cidr"]],
+            ipv6_cidr_blocks=[xpro_vpc["cidr_v6"]],
             protocol="tcp",
             from_port=3306,
             to_port=3306,
@@ -117,7 +115,7 @@ mitxpro_edxapp_db_security_group = ec2.SecurityGroup(
 
 mitxpro_edxapp_db_config = OLMariaDBConfig(
     instance_name=f"ol-mitxpro-edxapp-db-{env_suffix}",
-    password=mitxpro_config.require_secret("db_password"),
+    password=mitxpro_config.require("db_password"),
     subnet_group_name=xpro_vpc["rds_subnet"],
     security_groups=[mitxpro_edxapp_db_security_group],
     tags=aws_config.merged_tags({"Name": f"mitxpro-edxapp-{env_suffix}-db"}),
@@ -128,12 +126,38 @@ mitxpro_edxapp_db_config = OLMariaDBConfig(
 )
 mitxpro_edxapp_db = OLAmazonDB(mitxpro_edxapp_db_config)
 
+hyphenated_db_purpose = (mitxpro_config.require("db_purpose")).replace("_", "-")
+
+edx_role_statments = mysql_sql_statements.update(
+    {
+        f"edxapp-{hyphenated_db_purpose}": {
+            "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
+            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
+            "CREATE TEMPORARY TABLES, LOCK TABLES ON {{{{ app }}}}.* TO '{{{{name}}}}'@'%';",
+            "revoke": "DROP USER '{{{{name}}}}';",
+        },
+        f"edxapp-{hyphenated_db_purpose}": {
+            "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
+            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
+            "CREATE TEMPORARY TABLES, LOCK TABLES ON {{{{ app }}}}.* TO '{{{{name}}}}'@'%';",
+            "revoke": "DROP USER '{{{{name}}}}';",
+        },
+        f"xqueue-{hyphenated_db_purpose}": {
+            "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
+            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
+            "CREATE TEMPORARY TABLES, LOCK TABLES ON {{{{ app }}}}.* TO '{{{{name}}}}'@'%';",
+            "revoke": "DROP USER '{{{{name}}}}';",
+        },
+    }
+)
+
 mitxpro_edxapp_db_vault_backend_config = OLVaultMysqlDatabaseConfig(
     db_name=mitxpro_edxapp_db_config.db_name,
     mount_point=f"{mitxpro_edxapp_db_config.engine}-mitxpro-edxapp-{mitxpro_environment}",
     db_admin_username=mitxpro_edxapp_db_config.username,
-    db_admin_password=mitxpro_config.require_secret("db_password"),
+    db_admin_password=mitxpro_config.require("db_password"),
     db_host=mitxpro_edxapp_db.db_instance.address,
+    role_statements=mysql_sql_statements,
 )
 mitxpro_edxapp_db_vault_backend = OLVaultDatabaseBackend(
     mitxpro_edxapp_db_vault_backend_config
