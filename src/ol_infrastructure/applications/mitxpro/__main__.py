@@ -134,19 +134,29 @@ edx_role_statments = mysql_sql_statements.update(
     {
         f"edxapp-csmh-{hyphenated_db_purpose}": {
             "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
-            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
-            "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh_{mitxpro_config.require('db_purpose')}.* TO '{{{{name}}}}'@'%';",
+            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
+            f"CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh_{mitxpro_config.require('db_purpose')}.* "
+            "TO '{{{{name}}}}'@'%';"
+            f"GRANT REFERENCES ON edxapp_csmh_{mitxpro_config.require('db_purpose')}.* "
+            "TO '{{{{name}}}}'@'%';",
+            "revoke": "DROP USER '{{{{name}}}}';",
         },
         f"edxapp-{hyphenated_db_purpose}": {
             "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
-            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
-            "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_{mitxpro_config.require('db_purpose')}.* TO '{{{{name}}}}'@'%';",
+            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
+            f"CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_{mitxpro_config.require('db_purpose')}.* "
+            "TO '{{{{name}}}}'@'%';"
+            f"GRANT REFERENCES ON edxapp_{mitxpro_config.require('db_purpose')}.* "
+            "TO '{{{{name}}}}'@'%';",
             "revoke": "DROP USER '{{{{name}}}}';",
         },
         f"xqueue-{hyphenated_db_purpose}": {
             "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
-            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
-            "CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue_{mitxpro_config.require('db_purpose')}.* TO '{{{{name}}}}'@'%';",
+            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
+            f"CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue_{mitxpro_config.require('db_purpose')}.* "
+            "TO '{{{{name}}}}'@'%';"
+            f"GRANT REFERENCES ON xqueue_{mitxpro_config.require('db_purpose')}.* "
+            "TO '{{{{name}}}}'@'%';",
             "revoke": "DROP USER '{{{{name}}}}';",
         },
     }
@@ -156,7 +166,7 @@ mitxpro_edxapp_db_vault_backend_config = OLVaultMysqlDatabaseConfig(
     db_name=mitxpro_edxapp_db_config.db_name,
     mount_point=f"{mitxpro_edxapp_db_config.engine}-mitxpro-edxapp-{mitxpro_environment}",
     db_admin_username=mitxpro_edxapp_db_config.username,
-    db_admin_password=mitxpro_config.require("db_password"),
+    db_admin_password=mitxpro_edxapp_db_config.password.get_secret_value(),
     db_host=mitxpro_edxapp_db.db_instance.address,
     role_statements=mysql_sql_statements,
 )
@@ -165,13 +175,16 @@ mitxpro_edxapp_db_vault_backend = OLVaultDatabaseBackend(
 )
 
 mitxpro_edxapp_db_consul_node = Node(
-    "mysql", name="mysql", address=mitxpro_edxapp_db.db_instance.address
+    "edxapp-mysql",
+    name="edxapp-mysql",
+    address=mitxpro_edxapp_db.db_instance.address,
+    datacenter=mitxpro_environment,
 )
 
 mitxpro_edxapp_db_consul_service = Service(
-    "mysql",
-    node="mysql",
-    name="mysql",
+    "edxapp-mysql",
+    node=mitxpro_edxapp_db_consul_node.name,
+    name="edxapp-mysql",
     port=3306,
     meta={
         "external-node": True,

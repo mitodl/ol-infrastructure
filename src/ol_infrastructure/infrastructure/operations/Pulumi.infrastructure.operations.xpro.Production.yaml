@@ -8,3 +8,4 @@ config:
     # - elasticsearch
   environment:vpc_reference: xpro_vpc
   saltstack:key_name: salt-production
+  saltstack:environment_name: mitxpro-production

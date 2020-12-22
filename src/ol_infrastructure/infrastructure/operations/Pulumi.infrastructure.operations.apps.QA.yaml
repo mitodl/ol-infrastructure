@@ -8,3 +8,4 @@ config:
     # - elasticsearch
   environment:vpc_reference: applications_vpc
   saltstack:key_name: salt-qa
+  saltstack:environment_name: rc-apps

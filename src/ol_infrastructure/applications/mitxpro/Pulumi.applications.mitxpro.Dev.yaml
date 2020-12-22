@@ -3,7 +3,7 @@ encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQH1p5cNCNGNxsg8SU
 config:
   aws:region: us-east-1
   consul:address: https://consul-mitxpro-qa.odl.mit.edu
-  consul:httpAuth:
+  consul:http_auth:
     secure: v1:OhuBxw6C/oJd3b6W:sfBXy+WtqpFD3x2ORyN3v+6ckliOM1JQCOIMUK/iyPQ0tbeHnMmMnPHPyaEDffGOrsXa8WlCBw==
   consul:scheme: https
   mitxpro_edxapp:db_password:

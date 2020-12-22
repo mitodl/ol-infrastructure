@@ -1,14 +1,18 @@
 import json
 from itertools import chain
 
-from pulumi import Config, ResourceOptions
-from pulumi_aws import ec2, iam
+from pulumi import Config, ResourceOptions, StackReference
+from pulumi_aws import ec2, iam, route53
 
 from ol_infrastructure.infrastructure import operations as ops
 from ol_infrastructure.lib.aws.ec2_helper import (
     InstanceTypes,
     build_userdata,
     debian_10_ami,
+)
+from ol_infrastructure.lib.aws.iam_helper import (
+    lint_iam_policy,
+    route53_policy_template,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.providers.salt.minion import (
@@ -23,6 +27,8 @@ environment_name = f"{ops.env_prefix}-{ops.env_suffix}"
 business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
 destination_vpc = ops.network_stack.require_output(env_config.require("vpc_reference"))
+dns_stack = StackReference("infrastructure.aws.dns")
+mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
 consul_instance_role = iam.Role(
     f"consul-instance-role-{environment_name}",
@@ -37,13 +43,28 @@ consul_instance_role = iam.Role(
         }
     ),
     name=f"consul-instance-role-{environment_name}",
-    path="/ol-operations/consul-role/",
+    path="/ol-operations/consul/role/",
     tags=aws_config.tags,
 )
 
 iam.RolePolicyAttachment(
-    f"consul-role-policy-{environment_name}",
+    f"consul-describe-instance-role-policy-{environment_name}",
     policy_arn=ops.policy_stack.require_output("iam_policies")["describe_instances"],
+    role=consul_instance_role.name,
+)
+
+route53_permissions_policy = iam.Policy(
+    "consul-caddy-route53-challenge-permissions",
+    name="consul-caddy-route53-challenge-policy",
+    path="/ol-operations/consul/route53/",
+    policy=mitodl_zone_id.apply(
+        lambda zone_id: lint_iam_policy(route53_policy_template(zone_id))
+    ),
+)
+
+iam.RolePolicyAttachment(
+    f"consul-route53-role-policy-{environment_name}",
+    policy_arn=route53_permissions_policy.arn,
     role=consul_instance_role.name,
 )
 
@@ -51,7 +72,7 @@ consul_instance_profile = iam.InstanceProfile(
     f"consul-instance-profile-{environment_name}",
     role=consul_instance_role.name,
     name=f"consul-instance-profile-{environment_name}",
-    path="/ol-operations/consul-profile/",
+    path="/ol-operations/consul/profile/",
 )
 
 consul_server_security_group = ec2.SecurityGroup(
@@ -152,6 +173,7 @@ consul_instances = []
 export_data = {}
 subnets = destination_vpc["subnet_ids"]
 subnet_id = subnets.apply(chain)
+salt_environment = Config("saltstack").get("environment_name") or environment_name
 for count, subnet in zip(range(consul_config.get_int("instance_count") or 3), subnets):  # type: ignore # noqa: WPS221
     instance_name = f"consul-{environment_name}-{count}"
     salt_minion = OLSaltStackMinion(
@@ -163,7 +185,7 @@ for count, subnet in zip(range(consul_config.get_int("instance_count") or 3), su
         instance_name=instance_name,
         minion_keys=salt_minion,
         minion_roles=["consul_server", "service_discovery"],
-        minion_environment=environment_name,
+        minion_environment=salt_environment,
         salt_host=f"salt-{ops.env_suffix}.private.odl.mit.edu",
     )
 
@@ -186,6 +208,7 @@ for count, subnet in zip(range(consul_config.get_int("instance_count") or 3), su
         vpc_security_group_ids=[
             destination_vpc["security_groups"]["default"],
             destination_vpc["security_groups"]["salt_minion"],
+            destination_vpc["security_groups"]["web"],
             consul_server_security_group.id,
         ],
         opts=ResourceOptions(depends_on=[salt_minion]),
@@ -197,3 +220,14 @@ for count, subnet in zip(range(consul_config.get_int("instance_count") or 3), su
         "private_ip": consul_instance.private_ip,
         "ipv6_address": consul_instance.ipv6_addresses,
     }
+
+fifteen_minutes = 60 * 15
+consul_domain = route53.Record(
+    f"consul-{environment_name}-dns-record",
+    name=f"consul-{salt_environment}.odl.mit.edu",
+    type="A",
+    ttl=fifteen_minutes,
+    records=[consul_server.public_ip for consul_server in consul_instances],
+    zone_id=mitodl_zone_id,
+    opts=ResourceOptions(depends_on=consul_instances),
+)

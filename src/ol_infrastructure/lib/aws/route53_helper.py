@@ -31,4 +31,10 @@ def zone_opts(domain: Text) -> pulumi.ResourceOptions:
         opts = pulumi.ResourceOptions(
             import_=zone_id, ignore_changes=["tags", "comment"]
         )
+        if not pulumi.runtime.is_dry_run():
+            route53_client.change_tags_for_resource(
+                ResourceType="hostedzone",
+                ResourceId=zone_id,
+                AddTags=[{"Key": "pulumi_managed", "Value": "true"}],
+            )
     return opts
