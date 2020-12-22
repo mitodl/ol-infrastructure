@@ -183,6 +183,29 @@ residential_mitx_vpc_exports.update(
 export("residential_mitx_vpc", residential_mitx_vpc_exports)
 
 xpro_vpc_exports = vpc_exports(xpro_vpc, ["data_vpc", "operations_vpc"])
+xpro_vpc_exports.update(
+    {
+        "security_groups": {
+            "default": xpro_vpc.olvpc.id.apply(default_group).id,
+            "web": public_web(xpro_vpc_config.vpc_name, xpro_vpc.olvpc)(
+                tags=xpro_vpc_config.merged_tags(
+                    {"Name": f"mitxpro-{env_suffix}-public-web"}
+                ),
+                name=f"mitxpro-{env_suffix}-public-web",
+            ).id,
+            "salt_minion": salt_minion(
+                xpro_vpc_config.vpc_name,
+                xpro_vpc.olvpc,
+                operations_vpc.olvpc,
+            )(
+                tags=xpro_vpc_config.merged_tags(
+                    {"Name": f"mitxpro-{env_suffix}-salt-minion"}
+                ),
+                name=f"mitxpro-{env_suffix}-salt-minion",
+            ).id,
+        }
+    }
+)
 export("xpro_vpc", xpro_vpc_exports)
 
 applications_vpc_exports = vpc_exports(applications_vpc, ["data_vpc", "operations_vpc"])
@@ -219,6 +242,19 @@ operations_vpc_exports = vpc_exports(
         "residential_mitx_vpc",
         "xpro_vpc",
     ],
+)
+operations_vpc_exports.update(
+    {
+        "security_groups": {
+            "default": operations_vpc.olvpc.id.apply(default_group).id,
+            "web": public_web(operations_vpc_config.vpc_name, operations_vpc.olvpc)(
+                tags=operations_vpc_config.merged_tags(
+                    {"Name": f"applications-{env_suffix}-public-web"}
+                ),
+                name=f"applications-{env_suffix}-public-web",
+            ).id,
+        }
+    }
 )
 export("operations_vpc", operations_vpc_exports)
 
