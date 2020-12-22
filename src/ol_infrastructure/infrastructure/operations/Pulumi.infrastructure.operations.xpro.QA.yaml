@@ -4,7 +4,6 @@ config:
   aws:region: us-east-1
   environment:business_unit: mitxpro
   environment:services:
-    - consul
-    # - elasticsearch
+  - consul
   environment:vpc_reference: xpro_vpc
   saltstack:key_name: salt-qa

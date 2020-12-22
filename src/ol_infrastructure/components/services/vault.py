@@ -8,7 +8,6 @@ This includes:
 - Define the base set of roles according to our established best practices
 """
 import json
-
 from enum import Enum
 from typing import Dict, Text, Union
 
@@ -16,11 +15,7 @@ from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_vault import AuthBackend, Mount, Policy, approle, aws, database
 from pydantic import BaseModel, validator
 
-from ol_infrastructure.lib.ol_types import Apps
-from ol_infrastructure.lib.vault import (
-    mysql_sql_statements,
-    postgres_sql_statements
-)
+from ol_infrastructure.lib.vault import mysql_sql_statements, postgres_sql_statements
 
 DEFAULT_PORT_POSTGRES = 5432
 DEFAULT_PORT_MYSQL = 3306
@@ -39,6 +34,8 @@ class DBEngines(str, Enum):  # noqa: WPS600
 
 
 class OLVaultDatabaseConfig(BaseModel):
+    """Configuration object for Vault database backend resource."""
+
     db_name: Text
     mount_point: Text
     db_admin_username: Text
@@ -53,6 +50,8 @@ class OLVaultDatabaseConfig(BaseModel):
 
 
 class OLVaultPostgresDatabaseConfig(OLVaultDatabaseConfig):
+    """Configuration object for Postgres database to register with Vault."""
+
     db_port: int = DEFAULT_PORT_POSTGRES
     # The db_connection strings are passed through the `.format` method so the variables that need to remain in the
     # template to be passed to Vault are wrapped in 4 pairs of braces. TMM 2020-09-01
@@ -64,6 +63,8 @@ class OLVaultPostgresDatabaseConfig(OLVaultDatabaseConfig):
 
 
 class OLVaultMysqlDatabaseConfig(OLVaultDatabaseConfig):
+    """Configuration object for MySQL/MariaDB database to register with Vault."""
+
     db_port: int = DEFAULT_PORT_MYSQL
     db_connection: Text = "{{{{username}}}}:{{{{password}}}}@tcp({db_host}:{db_port})/"
     db_type: Text = DBEngines.mysql_rds.value
@@ -71,12 +72,16 @@ class OLVaultMysqlDatabaseConfig(OLVaultDatabaseConfig):
 
 
 class OLVaultDatabaseBackend(ComponentResource):
+    """Resource for encapsulating the steps needed to connect Vault to a database."""
+
     def __init__(
         self,
         db_config: Union[OLVaultMysqlDatabaseConfig, OLVaultPostgresDatabaseConfig],
         opts: ResourceOptions = None,
     ):
-        super().__init__('ol:services:Vault:DatabaseBackend', db_config.db_name, None, opts)
+        super().__init__(
+            "ol:services:Vault:DatabaseBackend", db_config.db_name, None, opts
+        )
 
         resource_opts = ResourceOptions.merge(ResourceOptions(parent=self), opts)  # type: ignore
 
@@ -150,32 +155,35 @@ class OLVaultAWSSecretsEngineConfig(BaseModel):
     aws_secret_key: Text
     vault_backend_path: Text
     policy_documents: Dict[Text, Text]
-    credential_type: Text = 'iam_user'
+    credential_type: Text = "iam_user"
 
-    @validator('vault_backend_path')
-    def is_valid_path(cls: 'OLVaultAWSSecretsEngineConfig', vault_backend_path: Text) -> Text:
-        if vault_backend_path.startswith('/') or vault_backend_path.endswith('/'):
-            raise ValueError(f'The specified path value {vault_backend_path} can not start or end with a slash')
+    @validator("vault_backend_path")
+    def is_valid_path(
+        cls: "OLVaultAWSSecretsEngineConfig", vault_backend_path: Text  # noqa: N805
+    ) -> Text:
+        if vault_backend_path.startswith("/") or vault_backend_path.endswith("/"):
+            raise ValueError(
+                f"The specified path value {vault_backend_path} can not start or end with a slash"
+            )
         return vault_backend_path
 
 
 class OLVaultAWSSecretsEngine(ComponentResource):
-
     def __init__(
-            self,
-            engine_config: OLVaultAWSSecretsEngineConfig,
-            opts: ResourceOptions = None
+        self, engine_config: OLVaultAWSSecretsEngineConfig, opts: ResourceOptions = None
     ):
-        super().__init__('ol:services:Vault:AWSSecretsEngine', engine_config.app_name, None, opts)
+        super().__init__(
+            "ol:services:Vault:AWSSecretsEngine", engine_config.app_name, None, opts
+        )
 
         resource_options = ResourceOptions(parent=self).merge(opts)  # type: ignore
 
         self.aws_secrets_engine = aws.SecretBackend(
             # TODO verify app_name exists based on Apps class in ol_types
-            f'aws-{engine_config.app_name}',
+            f"aws-{engine_config.app_name}",
             access_key=engine_config.aws_access_key,
             secret_key=engine_config.aws_secret_key,
-            path=f'aws-{engine_config.vault_backend_path}',
+            path=f"aws-{engine_config.vault_backend_path}",
             opts=resource_options,
         )
 
@@ -194,25 +202,29 @@ class OLVaultAWSSecretsEngine(ComponentResource):
 
 class OLVaultAppRoleAuthBackendConfig(BaseModel):
     authbackend_name: Text
-    backend_type: str = 'approle'
+    backend_type: str = "approle"
     description: Text
     role_name: Text
     token_policies: Dict[str, str]
 
 
 class OLVaultAppRoleAuthBackend(ComponentResource):
-    """
-    Due to the following open issue https://github.com/pulumi/pulumi-vault/issues/10
-    we can't pass json as policy and thus had to do some workarounds below. Those can
-    changed once that issue is resolved.
-    """
+    """Register an App Role with Vault as an authentication option."""
 
+    # Due to the following open issue https://github.com/pulumi/pulumi-vault/issues/10
+    # we can't pass json as policy and thus had to do some workarounds below. Those can
+    # changed once that issue is resolved.
     def __init__(
-            self,
-            approle_config: OLVaultAppRoleAuthBackendConfig,
-            opts: ResourceOptions = None
+        self,
+        approle_config: OLVaultAppRoleAuthBackendConfig,
+        opts: ResourceOptions = None,
     ):
-        super().__init__('ol:services:Vault:AppRoleAuthBackend', approle_config.authbackend_name, None, opts)
+        super().__init__(
+            "ol:services:Vault:AppRoleAuthBackend",
+            approle_config.authbackend_name,
+            None,
+            opts,
+        )
 
         resource_options = ResourceOptions(parent=self).merge(opts)  # type: ignore
 
