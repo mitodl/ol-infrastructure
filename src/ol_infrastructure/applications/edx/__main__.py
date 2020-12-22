@@ -4,56 +4,53 @@ from pulumi_aws import ec2
 from ol_infrastructure.infrastructure import operations as ops
 from ol_infrastructure.lib.ol_types import AWSBase
 
-env_config = Config('environment')
-consul_config = Config('consul')
-salt_config = Config('saltstack')
-environment_name = f'{ops.env_prefix}-{ops.env_suffix}'
-business_unit = env_config.get('business_unit') or 'operations'
-aws_config = AWSBase(tags={
-    'OU': business_unit,
-    'Environment': environment_name
-})
-destination_vpc = ops.network_stack.require_output(env_config.require('vpc_reference'))
+env_config = Config("environment")
+consul_config = Config("consul")
+salt_config = Config("saltstack")
+environment_name = f"{ops.env_prefix}-{ops.env_suffix}"
+business_unit = env_config.get("business_unit") or "operations"
+aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
+destination_vpc = ops.network_stack.require_output(env_config.require("vpc_reference"))
 
 edxapp_security_group = ec2.SecurityGroup(
-    f'edxapp-{environment_name}-security-group',
-    name=f'edxapp-{environment_name}',
-    description='Access control to edxapp',
+    f"edxapp-{environment_name}-security-group",
+    name=f"edxapp-{environment_name}",
+    description="Access control to edxapp",
     tags=aws_config.tags,
-    vpc_id=destination_vpc['id'],
+    vpc_id=destination_vpc["id"],
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=['0.0.0.0/0'],
-            protocol='tcp',
+            cidr_blocks=["0.0.0.0/0"],
+            protocol="tcp",
             from_port=80,
             to_port=80,
-            description='HTTP access'
+            description="HTTP access",
         ),
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=['0.0.0.0/0'],
-            protocol='tcp',
+            cidr_blocks=["0.0.0.0/0"],
+            protocol="tcp",
             from_port=443,
             to_port=443,
-            description='HTTPS access'
+            description="HTTPS access",
         ),
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=[destination_vpc['cidr']],
-            protocol='tcp',
+            cidr_blocks=[destination_vpc["cidr"]],
+            protocol="tcp",
             from_port=18040,
             to_port=18040,
-            description='Xqueue access'
-        )
-    ]
+            description="Xqueue access",
+        ),
+    ],
 )
 
 ec2.SecurityGroupRule(
-    f'edxapp-{environment_name}-to-elasticsearch-tcp-access-rule',
-    type='ingress',
+    f"edxapp-{environment_name}-to-elasticsearch-tcp-access-rule",
+    type="ingress",
     from_port=9200,
     to_port=9200,
-    protocol='tcp',
-    description='Access from edxapp to elasticsearch cluster',
+    protocol="tcp",
+    description="Access from edxapp to elasticsearch cluster",
     source_security_group_id=edxapp_security_group.id,
     security_group_id=ops.elasticsearch.elasticsearch_security_group.id,
-    opts=ResourceOptions(parent=ops.elasticsearch.elasticsearch_security_group)
+    opts=ResourceOptions(parent=ops.elasticsearch.elasticsearch_security_group),
 )

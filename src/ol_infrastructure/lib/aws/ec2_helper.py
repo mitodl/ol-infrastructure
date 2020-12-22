@@ -15,7 +15,7 @@ from ol_infrastructure.providers.salt.minion import OLSaltStackMinion
 ec2_client = boto3.client("ec2")
 AWSFilterType = List[Dict[Text, Union[Text, List[Text]]]]  # noqa: WPS221
 
-debian_10_ami = get_ami(
+debian_10_ami = get_ami(  # noqa: WPS114
     filters=[
         {"name": "virtualization-type", "values": ["hvm"]},
         {"name": "root-device-type", "values": ["ebs"]},
@@ -27,7 +27,7 @@ debian_10_ami = get_ami(
 
 
 @unique
-class InstanceTypes(str, Enum):
+class InstanceTypes(str, Enum):  # noqa: WPS600
     small = "t3a.small"
     medium = "t3a.medium"
     large = "t3a.large"
@@ -136,11 +136,17 @@ def vpc_opts(
 ) -> Tuple[pulumi.ResourceOptions, Text]:
     """Look up and conditionally import an existing VPC.
 
-    :param vpc_cidr: The IPv4 CIDR block of the target VPC to be imported if it exists.  This ensures that there is no
-        accidental overlap of IPv4 ranges.
+    :param vpc_cidr: The IPv4 CIDR block of the target VPC to be imported if it exists.
+        This ensures that there is no accidental overlap of IPv4 ranges.
+    :type vpc_cidr: IPv4Network
 
-    :returns: A Pulumi ResourceOptions object that allows for importing unmanaged VPCs and the ID of the imported VPC or
-              and empty string if the VPC doesn't exist.
+    :param vpc_tags: The tags to filter the VPC lookup by to resolve cases where the
+        CIDR block might overlap with an existing VPC.
+    :type vpc_tags: Dict[Text, Text]
+
+    :returns: A Pulumi ResourceOptions object that allows for importing unmanaged VPCs
+              and the ID of the imported VPC or and empty string if the VPC doesn't
+              exist.
 
     :rtype: Tuple[pulumi.ResourceOptions, Text]
     """
@@ -181,6 +187,9 @@ def subnet_opts(
 
     :param cidr_block: The CIDR block assigned to the subnet being defined.
     :type cidr_block: IPv4Network
+
+    :param vpc_id: The ID of the VPC to look for subnets in.
+    :type vpc_id: Text
 
     :returns: A Pulumi ResourceOptions object and the ID of the subnet to be conditionally imported.
 
@@ -227,10 +236,16 @@ def vpc_peer_opts(
 ) -> Tuple[pulumi.ResourceOptions, Text]:
     """Look up an existing route table and conditionally import it.
 
-    :param internet_gateway_id: The ID of the internet gateway associated with the target route table.
-    :type internet_gateway_id: Text
+    :param source_vpc_cidr: The CIDR block of the VPC that is initiating the peer
+        request.
+    :type source_vpc_cidr: Text
 
-    :returns: A Pulumi ResourceOptions object that contains the necessary import settings.
+    :param destination_vpc_cidr: The CIDR block of the VPC that is accepting the peer
+        request.
+    :param destination_vpc_cidr: Text
+
+    :returns: A Pulumi ResourceOptions object that contains the necessary import
+              settings.
 
     :rtype: Tuple[pulumi.ResourceOptions, Text]
     """
@@ -261,7 +276,7 @@ def build_userdata(  # noqa: WPS211
     additional_cloud_config: Optional[Dict[Text, Any]] = None,
     additional_salt_config: Optional[Dict[Text, Text]] = None,
 ) -> pulumi.Output[Text]:
-    """Construct a user data dictionary for use with EC2 instances
+    """Construct a user data dictionary for use with EC2 instances.
 
     :param instance_name: The value for the `Name` tag
     :type instance_name: Text
@@ -295,6 +310,7 @@ def build_userdata(  # noqa: WPS211
 
     :rtype: pulumi.Output[Text]
     """
+
     def _build_cloud_config_string(keys) -> Text:  # noqa: WPS430
         cloud_config = additional_cloud_config or {}
         # TODO (TMM 2020-09-10): Once the upstream PR is merged move to using the
