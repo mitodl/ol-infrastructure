@@ -15,11 +15,7 @@ from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_vault import AuthBackend, Mount, Policy, approle, aws, database, pkisecret
 from pydantic import BaseModel, validator
 
-from ol_infrastructure.lib.ol_types import Apps
-from ol_infrastructure.lib.vault import (
-    mysql_sql_statements,
-    postgres_sql_statements
-)
+from ol_infrastructure.lib.vault import mysql_sql_statements, postgres_sql_statements
 
 DEFAULT_PORT_POSTGRES = 5432
 DEFAULT_PORT_MYSQL = 3306
@@ -28,7 +24,7 @@ SIX_MONTHS = 60 * 60 * 24 * 30 * 6  # noqa: WPS432
 TWELVE_MONTHS = 60 * 60 * 24 * 30 * 12  # noqa: WPS432
 VAULT_API_URL = "https://active.vault.service.consul/v1"
 
-CERTIFICATE_CONFIG = {
+CERTIFICATE_CONFIG = {  # noqa: WPS407
     "country": "US",
     "state": "Massachusetts",
     "city": "Cambridge",
@@ -225,8 +221,6 @@ class OLVaultAppRoleAuthBackendConfig(BaseModel):
 
 class OLVaultAppRoleAuthBackend(ComponentResource):
     """Register an App Role with Vault as an authentication option."""
-    Create AppRole Auth Backend to use by apps for vault creds.
-
 
     # Due to the following open issue https://github.com/pulumi/pulumi-vault/issues/10
     # we can't pass json as policy and thus had to do some workarounds below. Those can
