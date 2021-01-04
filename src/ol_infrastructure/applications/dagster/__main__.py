@@ -12,6 +12,7 @@ import json
 from pulumi import ResourceOptions, StackReference, export, get_stack
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53, s3
+from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -175,6 +176,34 @@ dagster_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_host=dagster_db.db_instance.address,
 )
 dagster_db_vault_backend = OLVaultDatabaseBackend(dagster_db_vault_backend_config)
+
+dagster_db_consul_node = Node(
+    "dagster-instance-db-node",
+    name="dagster-postgres-db",
+    address=dagster_db.db_instance.address,
+    datacenter=dagster_environment,
+)
+
+dagster_db_consul_service = Service(
+    "dagster-instance-db-service",
+    node=dagster_db_consul_node.name,
+    name="dagster-db",
+    port=dagster_db_config.port,
+    meta={
+        "external-node": True,
+        "external-probe": True,
+    },
+    checks=[
+        ServiceCheckArgs(
+            check_id="dagster-instance-db",
+            interval="10s",
+            name="dagster-instance-id",
+            timeout="60s",
+            status="passing",
+            tcp=f"{dagster_db.db_instance.address}:{dagster_db_config.port}",
+        )
+    ],
+)
 
 dagster_minion_id = f"dagster-{dagster_environment}-0"
 salt_minion = OLSaltStackMinion(

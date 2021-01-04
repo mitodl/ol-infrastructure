@@ -2,6 +2,10 @@ secretsprovider: awskms://alias/PulumiSecrets
 encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEGccCx6w+aU1z9VNPzXzwIAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkTCVUUXv23ZgiFtbAgEQgDusl6M2Rs0caUtV7jakSKAqsXTqm8f7M0UuEu0hjZ5KdbCp8HUDBShST/yKEpt0ExGXlODrlmL3gGN6fg==
 config:
   aws:region: us-east-1
+  consul:address: https://consul-data-qa.odl.mit.edu
+  consul:http_auth:
+    secure: v1:PEzTCMfXyX1OP5Li:o/tPn/JE7hsf+AD+ji6rJEpfa+T/VoZAyhDXisviKzqTUF9pMo1P+FdVTDKEg2uacuy3WtTn0g==
+  consul:scheme: https
   dagster:db_password:
     secure: v1:XI74KBKUpbjHPTtE:3ZRZk+kvQ9w92TJPRRC4qw6kdK3etaumBDAgnySVagHjzYgRPfr8MhSeag==
   dagster:domain: pipelines-qa.odl.mit.edu
