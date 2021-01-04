@@ -48,7 +48,17 @@ dagster_bucket_policy = {
     "Statement": [
         {
             "Effect": "Allow",
-            "Action": ["s3:List*", "s3:Get*", "s3:Put*", "s3:Delete*"],
+            "Action": "s3:ListAllMyBuckets",
+            "Resource": "*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket*",
+                "s3:GetObject*",
+                "s3:PutObject*",
+                "s3:DeleteObject*",
+            ],
             "Resource": [
                 f"arn:aws:s3:::{dagster_bucket_name}",
                 f"arn:aws:s3:::{dagster_bucket_name}/*",
@@ -56,7 +66,12 @@ dagster_bucket_policy = {
         },
         {
             "Effect": "Allow",
-            "Action": ["s3:List*", "s3:Get*", "s3:Put*", "s3:Delete*"],
+            "Action": [
+                "s3:ListBucket*",
+                "s3:GetObject*",
+                "s3:PutObject*",
+                "s3:DeleteObject*",
+            ],
             "Resource": ["arn:aws:s3:::mitx-etl*", "arn:aws:s3:::mitx-etl*/*"],
         },
     ],
@@ -114,6 +129,14 @@ dagster_profile = iam.InstanceProfile(
     role=dagster_role.name,
     name=f"etl-instance-profile-{env_suffix}",
     path="/ol-data/etl-profile/",
+)
+
+dagster_instance_security_group = ec2.SecurityGroup(
+    f"dagster-instance-security-group-{env_suffix}",
+    name=f"dagster-instance-{dagster_environment}",
+    description="Access control to and from the Dagster instance",
+    tags=aws_config.tags,
+    vpc_id=data_vpc["id"],
 )
 
 dagster_db_security_group = ec2.SecurityGroup(
@@ -204,6 +227,7 @@ dagster_instance = ec2.Instance(
         data_vpc["security_groups"]["default"],
         data_vpc["security_groups"]["web"],
         data_vpc["security_groups"]["salt_minion"],
+        dagster_instance_security_group.id,
     ],
     opts=ResourceOptions(depends_on=[salt_minion]),
 )
@@ -235,5 +259,6 @@ export(
         "ec2_private_address": dagster_instance.private_ip,
         "ec2_public_address": dagster_instance.public_ip,
         "ec2_address_v6": dagster_instance.ipv6_addresses,
+        "security_group": dagster_instance_security_group.id,
     },
 )
