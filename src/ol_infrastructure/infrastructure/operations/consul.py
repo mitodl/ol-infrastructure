@@ -38,7 +38,6 @@ consul_instance_role = iam.Role(
             },
         }
     ),
-    name=f"consul-instance-role-{environment_name}",
     path="/ol-operations/consul/role/",
     tags=aws_config.tags,
 )
@@ -52,7 +51,6 @@ iam.RolePolicyAttachment(
 consul_instance_profile = iam.InstanceProfile(
     f"consul-instance-profile-{environment_name}",
     role=consul_instance_role.name,
-    name=f"consul-instance-profile-{environment_name}",
     path="/ol-operations/consul/profile/",
 )
 

@@ -12,6 +12,7 @@ import json
 from pulumi import ResourceOptions, StackReference, export, get_stack
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53, s3
+from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -48,7 +49,17 @@ dagster_bucket_policy = {
     "Statement": [
         {
             "Effect": "Allow",
-            "Action": ["s3:List*", "s3:Get*", "s3:Put*", "s3:Delete*"],
+            "Action": "s3:ListAllMyBuckets",
+            "Resource": "*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket*",
+                "s3:GetObject*",
+                "s3:PutObject*",
+                "s3:DeleteObject*",
+            ],
             "Resource": [
                 f"arn:aws:s3:::{dagster_bucket_name}",
                 f"arn:aws:s3:::{dagster_bucket_name}/*",
@@ -56,7 +67,12 @@ dagster_bucket_policy = {
         },
         {
             "Effect": "Allow",
-            "Action": ["s3:List*", "s3:Get*", "s3:Put*", "s3:Delete*"],
+            "Action": [
+                "s3:ListBucket*",
+                "s3:GetObject*",
+                "s3:PutObject*",
+                "s3:DeleteObject*",
+            ],
             "Resource": ["arn:aws:s3:::mitx-etl*", "arn:aws:s3:::mitx-etl*/*"],
         },
     ],
@@ -116,6 +132,14 @@ dagster_profile = iam.InstanceProfile(
     path="/ol-data/etl-profile/",
 )
 
+dagster_instance_security_group = ec2.SecurityGroup(
+    f"dagster-instance-security-group-{env_suffix}",
+    name=f"dagster-instance-{dagster_environment}",
+    description="Access control to and from the Dagster instance",
+    tags=aws_config.tags,
+    vpc_id=data_vpc["id"],
+)
+
 dagster_db_security_group = ec2.SecurityGroup(
     f"dagster-db-access-{env_suffix}",
     name=f"ol-etl-db-access-{env_suffix}",
@@ -152,6 +176,34 @@ dagster_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_host=dagster_db.db_instance.address,
 )
 dagster_db_vault_backend = OLVaultDatabaseBackend(dagster_db_vault_backend_config)
+
+dagster_db_consul_node = Node(
+    "dagster-instance-db-node",
+    name="dagster-postgres-db",
+    address=dagster_db.db_instance.address,
+    datacenter=dagster_environment,
+)
+
+dagster_db_consul_service = Service(
+    "dagster-instance-db-service",
+    node=dagster_db_consul_node.name,
+    name="dagster-db",
+    port=dagster_db_config.port,
+    meta={
+        "external-node": True,
+        "external-probe": True,
+    },
+    checks=[
+        ServiceCheckArgs(
+            check_id="dagster-instance-db",
+            interval="10s",
+            name="dagster-instance-id",
+            timeout="60s",
+            status="passing",
+            tcp=f"{dagster_db.db_instance.address}:{dagster_db_config.port}",
+        )
+    ],
+)
 
 dagster_minion_id = f"dagster-{dagster_environment}-0"
 salt_minion = OLSaltStackMinion(
@@ -204,6 +256,7 @@ dagster_instance = ec2.Instance(
         data_vpc["security_groups"]["default"],
         data_vpc["security_groups"]["web"],
         data_vpc["security_groups"]["salt_minion"],
+        dagster_instance_security_group.id,
     ],
     opts=ResourceOptions(depends_on=[salt_minion]),
 )
@@ -235,5 +288,6 @@ export(
         "ec2_private_address": dagster_instance.private_ip,
         "ec2_public_address": dagster_instance.public_ip,
         "ec2_address_v6": dagster_instance.ipv6_addresses,
+        "security_group": dagster_instance_security_group.id,
     },
 )

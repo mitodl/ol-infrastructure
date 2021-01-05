@@ -18,6 +18,7 @@ env_suffix = stack_name.lower()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_name}")
 operations_stack = StackReference(f"infrastructure.operations.xpro.{stack_name}")
 dns_stack = StackReference("infrastructure.aws.dns")
+dagster_app = StackReference(f"applications.dagster.{stack_name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 xpro_vpc = network_stack.require_output("xpro_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
@@ -30,6 +31,7 @@ aws_config = AWSBase(
         "application": Apps.mitxpro_edx.value,
     },
 )
+xpro_db_purpose = mitxpro_config.require("db_purpose")
 
 mitxpro_edxapp_security_group = ec2.SecurityGroup(
     f"mitxpro-edxapp-access-{env_suffix}",
@@ -98,6 +100,7 @@ mitxpro_edxapp_db_security_group = ec2.SecurityGroup(
             security_groups=[
                 mitxpro_edxapp_security_group.id,
                 mitxpro_edx_worker_security_group.id,
+                dagster_app.require_output("dagster_app")["security_group"],
             ],
             protocol="tcp",
             from_port=3306,
@@ -116,47 +119,45 @@ mitxpro_edxapp_db_security_group = ec2.SecurityGroup(
 )
 
 mitxpro_edxapp_db_config = OLMariaDBConfig(
-    engine_version='10.4.13',
+    engine_version="10.4.13",
     instance_name=f"ol-mitxpro-edxapp-db-{env_suffix}",
     password=mitxpro_config.require("db_password"),
     subnet_group_name=xpro_vpc["rds_subnet"],
     security_groups=[mitxpro_edxapp_db_security_group],
     tags=aws_config.merged_tags({"Name": f"mitxpro-edxapp-{env_suffix}-db"}),
-    db_name="edxapp_{db_purpose}".format(
-        db_purpose=mitxpro_config.require("db_purpose")
-    ),
+    db_name="edxapp_{db_purpose}".format(db_purpose=xpro_db_purpose),
     **defaults(stack)["rds"],
 )
 mitxpro_edxapp_db = OLAmazonDB(mitxpro_edxapp_db_config)
 
-hyphenated_db_purpose = (mitxpro_config.require("db_purpose")).replace("_", "-")
+hyphenated_db_purpose = xpro_db_purpose.replace("_", "-")
 
 edx_role_statments = mysql_sql_statements.update(
     {
         f"edxapp-csmh-{hyphenated_db_purpose}": {
             "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
             "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
-            f"CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh_{mitxpro_config.require('db_purpose')}.* "
+            f"CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh_{xpro_db_purpose}.* "
             "TO '{{{{name}}}}'@'%';"
-            f"GRANT REFERENCES ON edxapp_csmh_{mitxpro_config.require('db_purpose')}.* "
+            f"GRANT REFERENCES ON edxapp_csmh_{xpro_db_purpose}.* "
             "TO '{{{{name}}}}'@'%';",
             "revoke": "DROP USER '{{{{name}}}}';",
         },
         f"edxapp-{hyphenated_db_purpose}": {
             "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
             "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
-            f"CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_{mitxpro_config.require('db_purpose')}.* "
+            f"CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_{xpro_db_purpose}.* "
             "TO '{{{{name}}}}'@'%';"
-            f"GRANT REFERENCES ON edxapp_{mitxpro_config.require('db_purpose')}.* "
+            f"GRANT REFERENCES ON edxapp_{xpro_db_purpose}.* "
             "TO '{{{{name}}}}'@'%';",
             "revoke": "DROP USER '{{{{name}}}}';",
         },
         f"xqueue-{hyphenated_db_purpose}": {
             "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
             "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
-            f"CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue_{mitxpro_config.require('db_purpose')}.* "
+            f"CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue_{xpro_db_purpose}.* "
             "TO '{{{{name}}}}'@'%';"
-            f"GRANT REFERENCES ON xqueue_{mitxpro_config.require('db_purpose')}.* "
+            f"GRANT REFERENCES ON xqueue_{xpro_db_purpose}.* "
             "TO '{{{{name}}}}'@'%';",
             "revoke": "DROP USER '{{{{name}}}}';",
         },
