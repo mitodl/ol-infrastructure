@@ -3,6 +3,9 @@
 
 # These strings are passed through the `.format` method so the variables that need to remain in the template
 # to be passed to Vault are wrapped in 4 pairs of braces. TMM 2020-09-01
+
+from enum import Enum
+
 postgres_sql_statements = {
     "approle": {
         "create": "CREATE ROLE {role_name};",
@@ -91,3 +94,7 @@ mysql_sql_statements = {
         "revoke": "DROP USER '{{{{name}}}}';",
     },
 }
+
+class VaultPKIKeyTypeBits(int, Enum):
+    rsa = 4096
+    ec = 256
