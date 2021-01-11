@@ -15,7 +15,7 @@ from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_vault import AuthBackend, Mount, Policy, approle, aws, database, pkisecret
 from pydantic import BaseModel, validator
 
-from ol_infrastructure.lib.vault import mysql_sql_statements, postgres_sql_statements
+from ol_infrastructure.lib.vault import mysql_sql_statements, postgres_sql_statements, VaultPKIKeyTypeBits
 
 DEFAULT_PORT_POSTGRES = 5432
 DEFAULT_PORT_MYSQL = 3306
@@ -427,8 +427,8 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
 class OLVaultPKIIntermediateRoleConfig(BaseModel):
     pki_intermediate_backend: Text
     role_name: Text
-    key_type: Text = "rsa"
-    key_bits: int = 4096
+    key_type: Text = VaultPKIKeyTypeBits.rsa.name
+    key_bits: int = VaultPKIKeyTypeBits.rsa
     max_ttl: int = SIX_MONTHS
     default_ttl: int = SIX_MONTHS
     key_usages: List[Text] = ["DigitalSignature", "KeyAgreement", "KeyEncipherment"]
