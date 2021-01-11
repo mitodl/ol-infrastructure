@@ -427,8 +427,7 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
 class OLVaultPKIIntermediateRoleConfig(BaseModel):
     pki_intermediate_backend: Text
     role_name: Text
-    key_type: Text = VaultPKIKeyTypeBits.rsa.name
-    key_bits: int = VaultPKIKeyTypeBits.rsa
+    key_config: VaultPKIKeyTypeBits
     max_ttl: int = SIX_MONTHS
     default_ttl: int = SIX_MONTHS
     key_usages: List[Text] = ["DigitalSignature", "KeyAgreement", "KeyEncipherment"]
@@ -473,8 +472,8 @@ class OLVaultPKIIntermediateRole(ComponentResource):
             backend=role_config.pki_intermediate_backend,
             allowed_domains=role_config.allowed_domains,
             allow_glob_domains=True,
-            key_type=role_config.key_type,
-            key_bits=role_config.key_bits,
+            key_type=VaultPKIKeyTypeBits.rsa.name,
+            key_bits=VaultPKIKeyTypeBits.rsa,
             ttl=role_config.default_ttl,
             max_ttl=role_config.max_ttl,
             key_usages=role_config.key_usages,
