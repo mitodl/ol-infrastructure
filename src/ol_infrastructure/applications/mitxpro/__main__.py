@@ -1,4 +1,4 @@
-from pulumi import Config, StackReference, export, get_stack
+from pulumi import Config, StackReference, export
 from pulumi_aws import ec2
 from pulumi_consul import Node, Service
 
@@ -8,21 +8,19 @@ from ol_infrastructure.components.services.vault import (
     OLVaultMysqlDatabaseConfig,
 )
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import mysql_sql_statements
 
-stack = get_stack()
-stack_name = stack.split(".")[-1]
-namespace = stack.rsplit(".", 1)[0]
-env_suffix = stack_name.lower()
-network_stack = StackReference(f"infrastructure.aws.network.{stack_name}")
-operations_stack = StackReference(f"infrastructure.operations.xpro.{stack_name}")
+stack_info = parse_stack()
+network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+operations_stack = StackReference(f"infrastructure.operations.xpro.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
-dagster_app = StackReference(f"applications.dagster.{stack_name}")
+dagster_app = StackReference(f"applications.dagster.{stack_info.name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 xpro_vpc = network_stack.require_output("xpro_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
-mitxpro_environment = f"mitxpro-{env_suffix}"
+mitxpro_environment = f"mitxpro-{stack_info.env_suffix}"
 mitxpro_config = Config("mitxpro_edxapp")
 aws_config = AWSBase(
     tags={
@@ -34,8 +32,8 @@ aws_config = AWSBase(
 xpro_db_purpose = mitxpro_config.require("db_purpose")
 
 mitxpro_edxapp_security_group = ec2.SecurityGroup(
-    f"mitxpro-edxapp-access-{env_suffix}",
-    name=f"mitxpro-edxapp-access-{env_suffix}",
+    f"mitxpro-edxapp-access-{stack_info.env_suffix}",
+    name=f"mitxpro-edxapp-access-{stack_info.env_suffix}",
     description="Access control to mitxpro_edxapp",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -84,16 +82,16 @@ mitxpro_edxapp_security_group = ec2.SecurityGroup(
 )
 
 mitxpro_edx_worker_security_group = ec2.SecurityGroup(
-    f"mitxpro-edx-worker-access-{env_suffix}",
-    name=f"mitxpro-edx-worker-access-{env_suffix}",
+    f"mitxpro-edx-worker-access-{stack_info.env_suffix}",
+    name=f"mitxpro-edx-worker-access-{stack_info.env_suffix}",
     description="Access control to mitxpro_edx_worker",
     tags=aws_config.tags,
     vpc_id=xpro_vpc["id"],
 )
 
 mitxpro_edxapp_db_security_group = ec2.SecurityGroup(
-    f"mitxpro-edxapp-db-access-{env_suffix}",
-    name=f"mitxpro-edxapp-db-access-{env_suffix}",
+    f"mitxpro-edxapp-db-access-{stack_info.env_suffix}",
+    name=f"mitxpro-edxapp-db-access-{stack_info.env_suffix}",
     description="Access from the mitxpro and operations VPC to the mitxpro edxapp database",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -120,13 +118,13 @@ mitxpro_edxapp_db_security_group = ec2.SecurityGroup(
 
 mitxpro_edxapp_db_config = OLMariaDBConfig(
     engine_version="10.4.13",
-    instance_name=f"ol-mitxpro-edxapp-db-{env_suffix}",
+    instance_name=f"ol-mitxpro-edxapp-db-{stack_info.env_suffix}",
     password=mitxpro_config.require("db_password"),
     subnet_group_name=xpro_vpc["rds_subnet"],
     security_groups=[mitxpro_edxapp_db_security_group],
-    tags=aws_config.merged_tags({"Name": f"mitxpro-edxapp-{env_suffix}-db"}),
+    tags=aws_config.merged_tags({"Name": f"mitxpro-edxapp-{stack_info.env_suffix}-db"}),
     db_name="edxapp_{db_purpose}".format(db_purpose=xpro_db_purpose),
-    **defaults(stack)["rds"],
+    **defaults(stack_info)["rds"],
 )
 mitxpro_edxapp_db = OLAmazonDB(mitxpro_edxapp_db_config)
 

@@ -12,7 +12,7 @@
 import json
 from itertools import chain
 
-from pulumi import Config, ResourceOptions, StackReference, export, get_stack
+from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53
 
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
@@ -23,6 +23,7 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, build_userdata
 from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.providers.salt.minion import (
     OLSaltStackMinion,
@@ -34,24 +35,21 @@ from ol_infrastructure.providers.salt.minion import (
 
 redash_config = Config("redash")
 salt_config = Config("saltstack")
-stack = get_stack()
-stack_name = stack.split(".")[-1]
-namespace = stack.rsplit(".", 1)[0]
-env_suffix = stack_name.lower()
-network_stack = StackReference(f"infrastructure.aws.network.{stack_name}")
+stack_info = parse_stack()
+network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
 policy_stack = StackReference("infrastructure.aws.policies")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
-redash_environment = f"data-{env_suffix}"
+redash_environment = f"data-{stack_info.env_suffix}"
 aws_config = AWSBase(
     tags={"OU": "data", "Environment": redash_environment},
 )
 
 # Configure IAM and security settings for Redash instances
 redash_instance_role = iam.Role(
-    f"redash-instance-role-{env_suffix}",
+    f"redash-instance-role-{stack_info.env_suffix}",
     assume_role_policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -73,13 +71,13 @@ iam.RolePolicyAttachment(
 )
 
 redash_instance_profile = iam.InstanceProfile(
-    f"redash-instance-profile-{env_suffix}",
+    f"redash-instance-profile-{stack_info.env_suffix}",
     role=redash_instance_role.name,
     path="/ol-data/redash-profile/",
 )
 
 redash_instance_security_group = ec2.SecurityGroup(
-    f"redash-instance-{env_suffix}",
+    f"redash-instance-{stack_info.env_suffix}",
     description="Security group to assign to Redash application to control inter-service access",
     tags=aws_config.merged_tags({"Name": f"redash-instance-{redash_environment}"}),
     vpc_id=data_vpc["id"],
@@ -124,7 +122,7 @@ redash_db_config = OLPostgresDBConfig(
     security_groups=[redash_db_security_group],
     tags=aws_config.tags,
     db_name="redash",
-    **defaults(stack)["rds"],
+    **defaults(stack_info)["rds"],
 )
 redash_db = OLAmazonDB(redash_db_config)
 
@@ -153,7 +151,7 @@ redash_redis_config = OLAmazonRedisConfig(
         "elasticache_subnet"
     ],  # the name of the subnet group created in the OLVPC component resource
     tags=aws_config.tags,
-    **defaults(stack)["redis"],
+    **defaults(stack_info)["redis"],
 )
 
 redis_cluster_security_group = ec2.SecurityGroup(
@@ -211,7 +209,7 @@ for count, subnet in zip(range(redash_config.get_int("instance_count") or 3), su
         minion_keys=salt_minion,
         minion_roles=["redash"],
         minion_environment=redash_environment,
-        salt_host=f"salt-{env_suffix}.private.odl.mit.edu",
+        salt_host=f"salt-{stack_info.env_suffix}.private.odl.mit.edu",
     )
 
     instance_tags = aws_config.merged_tags(
@@ -250,7 +248,7 @@ for count, subnet in zip(range(redash_config.get_int("instance_count") or 3), su
 
 fifteen_minutes = 60 * 15
 redash_domain = route53.Record(
-    f"redash-{env_suffix}-service-domain",
+    f"redash-{stack_info.env_suffix}-service-domain",
     name=redash_config.require("domain"),
     type="A",
     ttl=fifteen_minutes,
@@ -259,7 +257,7 @@ redash_domain = route53.Record(
     opts=ResourceOptions(depends_on=[redash_instance]),
 )
 redash_domain_v6 = route53.Record(
-    f"redash-{env_suffix}-service-domain-v6",
+    f"redash-{stack_info.env_suffix}-service-domain-v6",
     name=redash_config.require("domain"),
     type="AAAA",
     ttl=fifteen_minutes,

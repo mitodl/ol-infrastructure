@@ -14,13 +14,14 @@ content to the OCW site's S3 buckets.
 
 TODO: consul cloud autojoin functionality
 """
-from pulumi import ResourceOptions, StackReference, export, get_stack
+from pulumi import ResourceOptions, StackReference, export
 from pulumi.config import get_config
 from pulumi_aws import ec2, iam, route53, s3
 
 from ol_infrastructure.lib.aws.ec2_helper import build_userdata, debian_10_ami
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.providers.salt.minion import (
     OLSaltStackMinion,
     OLSaltStackMinionInputs,
@@ -36,15 +37,12 @@ env_nomenclature = {
     "production": "production-apps",
 }
 
-stack = get_stack()
-stack_name = stack.split(".")[-1]
-namespace = stack.rsplit(".", 1)[0]
-env_suffix = stack_name.lower()
-network_stack = StackReference(f"infrastructure.aws.network.{stack_name}")
+stack_info = parse_stack()
+network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 apps_vpc = network_stack.require_output("applications_vpc")
-ocw_next_build_environment = f"applications-{env_suffix}"
+ocw_next_build_environment = f"applications-{stack_info.env_suffix}"
 aws_config = AWSBase(
     tags={"OU": "open-courseware", "Environment": ocw_next_build_environment},
 )
@@ -87,15 +85,15 @@ ocw_next_instance_policy = {
 }
 
 iam_instance_policy = iam.Policy(
-    f"ocw-build-instance-policy-{env_suffix}",
-    name=f"ocw-build-instance-policy-{env_suffix}",
-    path=f"/ol-applications/ocw-build-policy-{env_suffix}/",
+    f"ocw-build-instance-policy-{stack_info.env_suffix}",
+    name=f"ocw-build-instance-policy-{stack_info.env_suffix}",
+    path=f"/ol-applications/ocw-build-policy-{stack_info.env_suffix}/",
     policy=lint_iam_policy(ocw_next_instance_policy, stringify=True),
     description="Grants access to S3 buckets from the OCW Build server",
 )
 
 iam_role = iam.Role(
-    f"ocw-build-instance-role-{env_suffix}",
+    f"ocw-build-instance-role-{stack_info.env_suffix}",
     assume_role_policy=lint_iam_policy(
         {
             "Version": "2012-10-17",
@@ -107,20 +105,20 @@ iam_role = iam.Role(
         },
         stringify=True,
     ),
-    name=f"ocw-build-instance-role-{env_suffix}",
+    name=f"ocw-build-instance-role-{stack_info.env_suffix}",
     path="/ol-applications/ocw-build-role/",
 )
 
 iam.RolePolicyAttachment(
-    f"ocw-build-role-policy-{env_suffix}",
+    f"ocw-build-role-policy-{stack_info.env_suffix}",
     policy_arn=iam_instance_policy.arn,
     role=iam_role.name,
 )
 
 ocw_build_instance_profile = iam.InstanceProfile(
-    f"ocw-build-instance-profile-{env_suffix}",
+    f"ocw-build-instance-profile-{stack_info.env_suffix}",
     role=iam_role.name,
-    name=f"ocw-build-instance-profile-{env_suffix}",
+    name=f"ocw-build-instance-profile-{stack_info.env_suffix}",
     path="/ol-applications/ocw-build-instance-profile/",
 )
 
@@ -141,8 +139,8 @@ cloud_init_userdata = build_userdata(
     instance_name=ocw_build_minion_id,
     minion_keys=salt_minion,
     minion_roles=["ocw-build"],
-    minion_environment=env_nomenclature[env_suffix],
-    salt_host=f"salt-{env_suffix}.private.odl.mit.edu",
+    minion_environment=env_nomenclature[stack_info.env_suffix],
+    salt_host=f"salt-{stack_info.env_suffix}.private.odl.mit.edu",
 )
 
 instance_tags = aws_config.merged_tags({"Name": ocw_build_minion_id})
@@ -171,7 +169,7 @@ ec2_instance = ec2.Instance(
 
 fifteen_minutes = 60 * 15
 route53_domain = route53.Record(
-    f"ocw-build-{env_suffix}-service-domain",
+    f"ocw-build-{stack_info.env_suffix}-service-domain",
     name=get_config("ocw_build:domain"),
     type="A",
     ttl=fifteen_minutes,
@@ -180,7 +178,7 @@ route53_domain = route53.Record(
     opts=ResourceOptions(depends_on=[ec2_instance]),
 )
 route53_domain_v6 = route53.Record(
-    f"ocw-build-{env_suffix}-service-domain-v6",
+    f"ocw-build-{stack_info.env_suffix}-service-domain-v6",
     name=get_config("ocw_build:domain"),
     type="AAAA",
     ttl=fifteen_minutes,

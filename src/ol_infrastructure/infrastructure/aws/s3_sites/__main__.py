@@ -1,5 +1,5 @@
 """Module for creating and managing S3 buckets that are not used by any applications."""
-from pulumi import StackReference, export, get_stack
+from pulumi import StackReference, export
 from pulumi.config import get_config
 from pulumi_aws import route53
 
@@ -7,14 +7,13 @@ from ol_infrastructure.components.aws.s3_cloudfront_site import (
     S3ServerlessSite,
     S3ServerlessSiteConfig,
 )
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 fifteen_minutes = 60 * 15
 dns_stack = StackReference("infrastructure.aws.dns")
-stack = get_stack()
-stack_name = stack.split(".")[-1]
-env_suffix = stack_name.lower()
+stack_info = parse_stack()
 
-if "production" in stack.lower():
+if stack_info.env_suffix == "production":
     # Static site for hosting legacy course and program certificates from MIT xPro
     mitxpro_zone_id = dns_stack.get_output("mitxpro_legacy_zone_id")
     xpro_legacy_certs_site_config = S3ServerlessSiteConfig(
@@ -42,10 +41,10 @@ if "production" in stack.lower():
 # Static site for hosting beta releases of OCW content built with Hugo course publisher
 mitodl_zone_id = dns_stack.get_output("odl_zone_id")
 ocw_beta_site_config = S3ServerlessSiteConfig(
-    site_name=f"ocw-beta-{env_suffix}-course-site",
+    site_name=f"ocw-beta-{stack_info.env_suffix}-course-site",
     domains=[get_config("ocw_beta_site:domain")],
-    bucket_name=f"ocw-beta-{env_suffix}-course-site",
-    tags={"OU": "open-courseware", "Environment": f"ocw-{env_suffix}"},
+    bucket_name=f"ocw-beta-{stack_info.env_suffix}-course-site",
+    tags={"OU": "open-courseware", "Environment": f"ocw-{stack_info.env_suffix}"},
 )
 ocw_beta_site = S3ServerlessSite(ocw_beta_site_config)
 ocw_beta_domain = route53.Record(
