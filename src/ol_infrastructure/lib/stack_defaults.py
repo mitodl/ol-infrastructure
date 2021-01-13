@@ -13,6 +13,18 @@ qa_defaults = {
         "multi_az": False,
         "prevent_delete": False,
         "take_final_snapshot": False,
+        "backup_days": 7,
+    },
+    "redis": {"instance_type": "cache.t3.small"},
+}
+
+ci_defaults = {
+    "rds": {
+        "instance_size": "db.t3.medium",
+        "multi_az": False,
+        "prevent_delete": False,
+        "take_final_snapshot": False,
+        "backup_days": 1,
     },
     "redis": {"instance_type": "cache.t3.small"},
 }
