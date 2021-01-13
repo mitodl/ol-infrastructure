@@ -9,7 +9,7 @@
 """
 import json
 
-from pulumi import ResourceOptions, StackReference, export, get_stack
+from pulumi import ResourceOptions, StackReference, export
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53, s3
 from pulumi_consul import Node, Service, ServiceCheckArgs
@@ -22,22 +22,20 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib.aws.ec2_helper import build_userdata
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.providers.salt.minion import (
     OLSaltStackMinion,
     OLSaltStackMinionInputs,
 )
 
-stack = get_stack()
-stack_name = stack.split(".")[-1]
-namespace = stack.rsplit(".", 1)[0]
-env_suffix = stack_name.lower()
-network_stack = StackReference(f"infrastructure.aws.network.{stack_name}")
+stack_info = parse_stack()
+network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
-dagster_environment = f"data-{env_suffix}"
+dagster_environment = f"data-{stack_info.env_suffix}"
 aws_config = AWSBase(
     tags={"OU": "data", "Environment": dagster_environment},
 )
@@ -95,9 +93,9 @@ dagster_runtime_bucket = s3.Bucket(
 
 # Create instance profile for granting access to S3 buckets
 dagster_iam_policy = iam.Policy(
-    f"dagster-policy-{env_suffix}",
-    name=f"dagster-policy-{env_suffix}",
-    path=f"/ol-data/etl-policy-{env_suffix}/",
+    f"dagster-policy-{stack_info.env_suffix}",
+    name=f"dagster-policy-{stack_info.env_suffix}",
+    path=f"/ol-data/etl-policy-{stack_info.env_suffix}/",
     policy=lint_iam_policy(dagster_bucket_policy, stringify=True),
     description="Policy for granting acces for batch data workflows to AWS resources",
 )
@@ -114,26 +112,26 @@ dagster_role = iam.Role(
             },
         }
     ),
-    name=f"etl-instance-role-{env_suffix}",
+    name=f"etl-instance-role-{stack_info.env_suffix}",
     path="/ol-data/etl-role/",
     tags=aws_config.tags,
 )
 
 iam.RolePolicyAttachment(
-    f"dagster-role-policy-{env_suffix}",
+    f"dagster-role-policy-{stack_info.env_suffix}",
     policy_arn=dagster_iam_policy.arn,
     role=dagster_role.name,
 )
 
 dagster_profile = iam.InstanceProfile(
-    f"dagster-instance-profile-{env_suffix}",
+    f"dagster-instance-profile-{stack_info.env_suffix}",
     role=dagster_role.name,
-    name=f"etl-instance-profile-{env_suffix}",
+    name=f"etl-instance-profile-{stack_info.env_suffix}",
     path="/ol-data/etl-profile/",
 )
 
 dagster_instance_security_group = ec2.SecurityGroup(
-    f"dagster-instance-security-group-{env_suffix}",
+    f"dagster-instance-security-group-{stack_info.env_suffix}",
     name=f"dagster-instance-{dagster_environment}",
     description="Access control to and from the Dagster instance",
     tags=aws_config.tags,
@@ -141,8 +139,8 @@ dagster_instance_security_group = ec2.SecurityGroup(
 )
 
 dagster_db_security_group = ec2.SecurityGroup(
-    f"dagster-db-access-{env_suffix}",
-    name=f"ol-etl-db-access-{env_suffix}",
+    f"dagster-db-access-{stack_info.env_suffix}",
+    name=f"ol-etl-db-access-{stack_info.env_suffix}",
     description="Access from the data VPC to the Dagster database",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -158,13 +156,13 @@ dagster_db_security_group = ec2.SecurityGroup(
 )
 
 dagster_db_config = OLPostgresDBConfig(
-    instance_name=f"ol-etl-db-{env_suffix}",
+    instance_name=f"ol-etl-db-{stack_info.env_suffix}",
     password=get_config("dagster:db_password"),
     subnet_group_name=data_vpc["rds_subnet"],
     security_groups=[dagster_db_security_group],
     tags=aws_config.tags,
     db_name="dagster",
-    **defaults(stack)["rds"],
+    **defaults(stack_info)["rds"],
 )
 dagster_db = OLAmazonDB(dagster_db_config)
 
@@ -221,7 +219,7 @@ cloud_init_userdata = build_userdata(
     minion_keys=salt_minion,
     minion_roles=["dagster"],
     minion_environment=dagster_environment,
-    salt_host=f"salt-{env_suffix}.private.odl.mit.edu",
+    salt_host=f"salt-{stack_info.env_suffix}.private.odl.mit.edu",
 )
 
 dagster_image = get_ami(
@@ -263,7 +261,7 @@ dagster_instance = ec2.Instance(
 
 fifteen_minutes = 60 * 15
 dagster_domain = route53.Record(
-    f"dagster-{env_suffix}-service-domain",
+    f"dagster-{stack_info.env_suffix}-service-domain",
     name=get_config("dagster:domain"),
     type="A",
     ttl=fifteen_minutes,
@@ -272,7 +270,7 @@ dagster_domain = route53.Record(
     opts=ResourceOptions(depends_on=[dagster_instance]),
 )
 dagster_domain_v6 = route53.Record(
-    f"dagster-{env_suffix}-service-domain-v6",
+    f"dagster-{stack_info.env_suffix}-service-domain-v6",
     name=get_config("dagster:domain"),
     type="AAAA",
     ttl=fifteen_minutes,

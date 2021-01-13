@@ -3,18 +3,17 @@
 """
 import json
 
-from pulumi import export, get_stack
+from pulumi import export
 from pulumi_aws import get_caller_identity, kms
 
 from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 owner = str(get_caller_identity().account_id)
-stack = get_stack()
-stack_name = stack.split(".")[-1]
-env_suffix = stack_name.lower()
-kms_ec2_environment = f"ec2-ebs-{env_suffix}"
+stack_info = parse_stack()
+kms_ec2_environment = f"ec2-ebs-{stack_info.env_suffix}"
 aws_config = AWSBase(
-    tags={"OU": "operations", "Environment": f"operations-{env_suffix}"}
+    tags={"OU": "operations", "Environment": f"operations-{stack_info.env_suffix}"}
 )
 
 kms_ec2_ebs_encryption_policy = {
@@ -76,7 +75,7 @@ kms_ec2_ebs_encryption_policy = {
 key = kms.Key(
     kms_ec2_environment,
     customer_master_key_spec="SYMMETRIC_DEFAULT",
-    description=f"Key to encrypt/decrypt {env_suffix} EBS volumes",
+    description=f"Key to encrypt/decrypt {stack_info.env_suffix} EBS volumes",
     enable_key_rotation=True,
     is_enabled=True,
     key_usage="ENCRYPT_DECRYPT",
