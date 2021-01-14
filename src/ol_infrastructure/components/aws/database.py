@@ -56,7 +56,6 @@ class OLDBConfig(AWSBase):
     backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore
     db_name: Optional[Text] = None  # The name of the database schema to create
     instance_size: Text = "db.m5.large"
-    is_public: bool = False
     max_storage: Optional[PositiveInt] = None  # Set to allow for storage autoscaling
     multi_az: bool = True
     prevent_delete: bool = True
@@ -79,8 +78,8 @@ class OLDBConfig(AWSBase):
 
     @validator("engine_version")
     def is_valid_version(
-        cls: "OLDBConfig", engine_version: Text, values: Dict
-    ) -> Text:  # noqa: N805, WPS110, D102
+        cls: "OLDBConfig", engine_version: Text, values: Dict  # noqa: N805, WPS110
+    ) -> Text:
         engine = values.get("engine")
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
@@ -131,15 +130,12 @@ class OLAmazonDB(pulumi.ComponentResource):
     def __init__(self, db_config: OLDBConfig, opts: pulumi.ResourceOptions = None):
         """Create an RDS instance, parameter group, and optionally read replica.
 
-        :param db_config: Configuration object for customizing the deployed database instance.
+        :param db_config: Configuration object for customizing the deployed database
+            instance.
         :type db_config: OLDBConfig
 
         :param opts: Custom pulumi options to pass to child resources.
         :type opts: pulumi.ResourceOptions
-
-        :returns: The constructed component resource object.
-
-        :rtype: OLAMazonDB
         """
         super().__init__(
             "ol:infrastructure:aws:database:OLAmazonDB",
@@ -179,7 +175,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             parameter_group_name=self.parameter_group.name,
             password=db_config.password.get_secret_value(),
             port=db_config.port,
-            publicly_accessible=db_config.is_public,
+            publicly_accessible=db_config.public_access,
             skip_final_snapshot=not db_config.take_final_snapshot,
             storage_encrypted=True,
             storage_type=db_config.storage_type.value,
