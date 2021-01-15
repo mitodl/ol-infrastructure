@@ -5,14 +5,14 @@
 - Create an IAM policy to grant access to S3 and other resources
 """
 from pulumi import Config, StackReference, export
-from pulumi_aws import ec2
+from pulumi_aws import ec2, iam, s3
 
-from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
@@ -27,6 +27,47 @@ aws_config = AWSBase(
         "OU": "open-courseware",
         "Environment": f"applications_{stack_info.env_suffix}",
     }
+)
+
+# Create S3 buckets
+
+# Bucket used to store output from ocw-to-hugo which is markdown files rendered from
+# legacy OCW Plone content.
+ocw_to_hugo_bucket_name = "ocw-to-hugo-output-{stack_info.env_suffix}"
+ocw_studio_legacy_markdown_bucket = s3.Bucket(
+    f"ocw-to-hugo-output-{stack_info.env_suffix}",
+    bucket=ocw_to_hugo_bucket_name,
+)
+
+ocw_studio_iam_policy = iam.Policy(
+    f"ocw-studio-{stack_info.env_suffix}-policy",
+    description=f"AWS access controls for the OCW Studio application in the {stack_info.name} environment",
+    path=f"ol-applications/ocw-studio/{stack_info.env_suffix}/",
+    name_prefix="aws-permissions",
+    policy=lint_iam_policy(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": "s3:ListAllMyBuckets",
+                    "Resource": "*",
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:ListBucket*",
+                        "s3:GetObject*",
+                    ],
+                    "Resource": [
+                        f"arn:aws:s3:::{ocw_to_hugo_bucket_name}",
+                        f"arn:aws:s3:::{ocw_to_hugo_bucket_name}/*",
+                    ],
+                },
+            ],
+        },
+        stringify=True,
+    ),
 )
 
 # Create RDS instance
