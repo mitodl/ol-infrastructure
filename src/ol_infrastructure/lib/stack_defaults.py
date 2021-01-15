@@ -30,8 +30,11 @@ ci_defaults = {
 }
 
 
+env_dict = {"ci": ci_defaults, "qa": qa_defaults, "production": production_defaults}
+
+
 def defaults(stack_info: StackInfo) -> Dict[Text, Any]:
-    """Provides a single location to dispatch infrastructure defaults based on env.
+    """Provide a single location to dispatch infrastructure defaults based on env.
 
     :param stack_info: The stack_info object that has been parsed from the Pulumi stack.
     :type stack_info: StackInfo
@@ -40,6 +43,4 @@ def defaults(stack_info: StackInfo) -> Dict[Text, Any]:
 
     :rtype: Dict[Text, Any]
     """
-    if stack_info.env_suffix == "qa":
-        return qa_defaults
-    return production_defaults
+    return env_dict[stack_info.env_suffix]

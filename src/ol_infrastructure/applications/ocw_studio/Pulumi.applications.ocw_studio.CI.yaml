@@ -3,4 +3,4 @@ encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEmOuKx7TjiG3Wvrd
 config:
   aws:region: us-east-1
   ocw_studio:db_password:
-    secure: v1:mNTUydzJCdznPY+x:TGVBv+goowz2+Ghedc5vMIm2WTmI2KfJwcLp1n/9dj00DNeMANQk4fJ/nKJLCslCc+WQFOMirx+lv36ytaIGmvOy54O2KbdxyXSZ5mVBVrX+OMwUb9okvVJDoP8xkhCzbOvTHA==
+    secure: v1:PMhnJY0c/38fxcK/:HwHpoUXfP5YTzXq/3cyZUj4eRjCmNkdScLTGca863qCG/U1Py2BHwJXHiM8KPXx9NJufyVDzNtf79Ss7UTEcKOmM+M+8NXFE6I8UCapuui3yi52KFOWk7o6X
