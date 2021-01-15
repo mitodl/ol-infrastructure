@@ -33,7 +33,7 @@ aws_config = AWSBase(
 
 # Bucket used to store output from ocw-to-hugo which is markdown files rendered from
 # legacy OCW Plone content.
-ocw_to_hugo_bucket_name = "ocw-to-hugo-output-{stack_info.env_suffix}"
+ocw_to_hugo_bucket_name = f"ocw-to-hugo-output-{stack_info.env_suffix}"
 ocw_studio_legacy_markdown_bucket = s3.Bucket(
     f"ocw-to-hugo-output-{stack_info.env_suffix}",
     bucket=ocw_to_hugo_bucket_name,
@@ -42,8 +42,8 @@ ocw_studio_legacy_markdown_bucket = s3.Bucket(
 ocw_studio_iam_policy = iam.Policy(
     f"ocw-studio-{stack_info.env_suffix}-policy",
     description=f"AWS access controls for the OCW Studio application in the {stack_info.name} environment",
-    path=f"ol-applications/ocw-studio/{stack_info.env_suffix}/",
-    name_prefix="aws-permissions",
+    path=f"/ol-applications/ocw-studio/{stack_info.env_suffix}/",
+    name_prefix="aws-permissions-",
     policy=lint_iam_policy(
         {
             "Version": "2012-10-17",
