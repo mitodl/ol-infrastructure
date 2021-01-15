@@ -45,8 +45,8 @@ class OLAmazonCacheConfig(AWSBase):
 
     @validator("engine")
     def is_valid_engine(
-        cls: "OLAmazonCacheConfig", engine: Text
-    ) -> Text:  # noqa: N805, D102
+        cls: "OLAmazonCacheConfig", engine: Text  # noqa: N805
+    ) -> Text:  # noqa: D102
         valid_engines = cache_engines()
         if engine not in valid_engines:
             raise ValueError("The specified cache engine is not a valid option in AWS.")
@@ -91,7 +91,7 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
         if values["encrypt_transit"] and auth_token is None:
             raise ValueError("Cannot encrypt transit with no auth token configured")
         token_valid = 16 <= len(auth_token or "") <= 128 and bool(
-            re.search("[^'\"/@\\W]+", auth_token or "")
+            re.search(r"[^'\"/@\\W]+", auth_token or "")
         )  # noqa: WPS221, W605, E501
         if not token_valid:
             raise ValueError(
@@ -102,8 +102,8 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
 
     @validator("cluster_name")
     def is_valid_cluster_name(
-        cls: "OLAmazonRedisConfig", cluster_name: Text
-    ) -> Text:  # noqa: N805
+        cls: "OLAmazonRedisConfig", cluster_name: Text  # noqa: N805
+    ) -> Text:
         is_valid: bool = True
         is_valid = 1 < len(cluster_name) < 41
         is_valid = not bool(re.search("[^a-zA-Z-9-]", cluster_name))
@@ -122,8 +122,8 @@ class OLAmazonMemcachedConfig(OLAmazonCacheConfig):
 
     @validator("cluster_name")
     def is_valid_cluster_name(
-        cls: "OLAmazonMemcachedConfig", cluster_name: Text
-    ) -> Text:  # noqa: N805
+        cls: "OLAmazonMemcachedConfig", cluster_name: Text  # noqa: N805
+    ) -> Text:
         is_valid: bool = True
         is_valid = 1 < len(cluster_name) < 51
         is_valid = not bool(re.search("[^a-zA-Z-9-]", cluster_name))
@@ -148,7 +148,7 @@ class OLAmazonCache(pulumi.ComponentResource):
         )
         resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore
 
-        clustered_redis = cache_config.engine == "redis" and getattr(
+        clustered_redis = cache_config.engine == "redis" and getattr(  # noqa: B009
             cache_config, "cluster_mode_enabled"
         )
 
@@ -207,6 +207,7 @@ class OLAmazonCache(pulumi.ComponentResource):
                 tags=cache_config.tags,
                 transit_encryption_enabled=cache_config.encrypt_transit,
             )
+            self.address = self.cache_cluster.configuration_endpoint_address
         else:
             cast(OLAmazonMemcachedConfig, cache_config)
             self.cache_cluster = elasticache.Cluster(
@@ -225,6 +226,7 @@ class OLAmazonCache(pulumi.ComponentResource):
                 subnet_group_name=cache_config.subnet_group,
                 tags=cache_config.tags,
             )
+            self.address = self.cache_cluster.member_clusters
 
         self.register_outputs(
             {
