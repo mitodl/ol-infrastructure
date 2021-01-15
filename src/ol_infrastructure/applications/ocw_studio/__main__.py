@@ -37,6 +37,7 @@ ocw_to_hugo_bucket_name = f"ocw-to-hugo-output-{stack_info.env_suffix}"
 ocw_studio_legacy_markdown_bucket = s3.Bucket(
     f"ocw-to-hugo-output-{stack_info.env_suffix}",
     bucket=ocw_to_hugo_bucket_name,
+    tags=aws_config.tags,
 )
 
 ocw_studio_iam_policy = iam.Policy(
