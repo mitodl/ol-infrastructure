@@ -42,7 +42,7 @@ aws_config = AWSBase(
 
 dagster_bucket_name = f"dagster-{dagster_environment}"
 
-dagster_bucket_policy = {
+dagster_iam_policy_document = {
     "Version": "2012-10-17",
     "Statement": [
         {
@@ -73,6 +73,19 @@ dagster_bucket_policy = {
             ],
             "Resource": ["arn:aws:s3:::mitx-etl*", "arn:aws:s3:::mitx-etl*/*"],
         },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket*",
+                "s3:GetObject*",
+                "s3:PutObject*",
+                "s3:DeleteObject*",
+            ],
+            "Resource": [
+                "arn:aws:s3:::mitodl-data-lake*",
+                "arn:aws:s3:::mitodl-data-lake*/*",
+            ],
+        },
     ],
 }
 
@@ -96,7 +109,7 @@ dagster_iam_policy = iam.Policy(
     f"dagster-policy-{stack_info.env_suffix}",
     name=f"dagster-policy-{stack_info.env_suffix}",
     path=f"/ol-data/etl-policy-{stack_info.env_suffix}/",
-    policy=lint_iam_policy(dagster_bucket_policy, stringify=True),
+    policy=lint_iam_policy(dagster_iam_policy_document, stringify=True),
     description="Policy for granting acces for batch data workflows to AWS resources",
 )
 
