@@ -1,0 +1,12 @@
+[Unit]
+Description=Concourse service for managing continuous deployment pipelines
+After=network.target
+
+[Service]
+
+EnvironmentFile=/opt/concourse/env
+
+{% if worker %}
+KillSignal=SIGUSR2
+{% endif %}
+
