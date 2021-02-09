@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "ol-configuration-management"
+version = "0.1.0"
+description = ""
+authors = ["MIT Open Learning Engineering <oldevops@mit.edu>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+pyinfra = "^1.2.1"
+pydantic = "^1.7.3"
+httpx = "^0.16.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6"
+wemake-python-styleguide = "*"
+black = "*"
+testinfra = "^6.0.0"
+copier = "^5.1.0"
+pre-commit = "^2.10.0"
+mypy = "^0.800"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
