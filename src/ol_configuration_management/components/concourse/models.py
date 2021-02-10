@@ -1,9 +1,11 @@
 from enum import Enum
 from ipaddress import IPv4Address, IPv6Address
 from pathlib import Path
-from typing import Optional, Text
+from typing import Dict, Optional, Text
 
 from pydantic import BaseSettings, Field, SecretStr, validator
+
+from ol_configuration_management.lib.model_helpers import OLBaseSettings
 
 
 class IframeOptions(str, Enum):
@@ -11,17 +13,29 @@ class IframeOptions(str, Enum):
     same_origin = "sameorigin"
 
 
-class ConcourseBaseConfig(BaseSettings):
+class ConcourseBaseConfig(OLBaseSettings):
     version: Text = "6.7.4"
     deploy_directory: Path = Path("/opt/concourse/")
 
+    def concourse_env(self) -> Dict[Text, Text]:
+        """Create a mapping of concourse environment variables to the concrete values.
+
+        :returns: A dictionary of concourse env vars and their values
+
+        :rtype: Dict[Text, Text]
+        """
+        concourse_env_dict = {}
+        for attr in self.fields:
+            if env_name := attr.field_info.extra.get("concourse_env_var"):
+                concourse_env_dict[env_name] = self.dict()[attr.name]
+        return concourse_env_dict
+
     class Config:  # noqa: WPS431
         env_prefix = "concourse_"
-        case_sensitive = False
 
 
 class ConcourseWebConfig(ConcourseBaseConfig):
-    admin_user: Text = Field("oldevops", concourse_env_var="CONCOURSE_ADD_LOCAL_USER")
+    admin_user: Text = "oldevops"
     admin_password: SecretStr
     postgres_host: Text = Field(
         "concourse-postgres.service.consul", concourse_env_var="CONCOURSE_POSTGRES_HOST"
@@ -107,9 +121,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     )
 
     # 32 bit random string
-    encryption_key: SecretStr = Field(
-        ..., concourse_env_var="CONCOURSE_ENCRYPTION_KEY"
-    )
+    encryption_key: SecretStr = Field(..., concourse_env_var="CONCOURSE_ENCRYPTION_KEY")
 
     vault_url: Optional[Text] = Field(
         "https://active.vault.service.consul:8200",
@@ -122,15 +134,31 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         ..., concourse_env_var="CONCOURSE_VAULT_AUTH_PARAM"
     )
 
-    
-
-
     class Config:  # noqa: WPS431
         env_prefix = "concourse_web_"
         arbitrary_types_allowed = True
-        case_sensitive = False
 
     @property
     def local_user(self):
         password_value = self.admin_password.get_secret_value()
         return f"{self.admin_user}:{password_value}"
+
+
+class ConcourseWorkerConfig(ConcourseBaseConfig):
+    work_dir: Path = Field(
+        Path("/var/concourse/worker/"), concourse_env_var="CONCOURSE_WORK_DIR"
+    )
+    tsa_host: Text = Field(
+        "web.concourse.service.consul:2222", concourse_env_var="CONCOURSE_TSA_HOST"
+    )
+    tsa_public_key: Path = Field(
+        Path("/var/concourse/tsa_host_key.pub"),
+        concourse_env_var="CONCOURSE_TSA_PUBLIC_KEY",
+    )
+    worker_private_key: Path = Field(
+        Path("/var/concourse/worker_private_key.pem"),
+        concourse_env_var="CONCOURSE_TSA_WORKER_PRIVATE_KEY",
+    )
+
+    class Config:  # noqa: WPS431
+        env_prefix = "concourse_worker_"

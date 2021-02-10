@@ -1,0 +1,4 @@
+CONCOURSE_ADD_LOCAL_USER={% web_config.local_user %}
+{% for env_var, env_value in web_config.concourse_env().items() %}
+{{ env_var }}={{ env_value }}
+{% endfor %}
