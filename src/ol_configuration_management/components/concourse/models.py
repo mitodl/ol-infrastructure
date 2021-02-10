@@ -1,14 +1,14 @@
 from enum import Enum
-from ipaddress import IPv4Address, IPv6Address
+from ipaddress import IPv4Address
 from pathlib import Path
 from typing import Dict, Optional, Text
 
-from pydantic import BaseSettings, Field, SecretStr, validator
+from pydantic import Field, SecretStr
 
 from ol_configuration_management.lib.model_helpers import OLBaseSettings
 
 
-class IframeOptions(str, Enum):
+class IframeOptions(str, Enum):  # noqa: WPS600
     deny = "deny"
     same_origin = "sameorigin"
 
@@ -34,7 +34,7 @@ class ConcourseBaseConfig(OLBaseSettings):
         env_prefix = "concourse_"
 
 
-class ConcourseWebConfig(ConcourseBaseConfig):
+class ConcourseWebConfig(OLBaseSettings):
     admin_user: Text = "oldevops"
     admin_password: SecretStr
     postgres_host: Text = Field(
@@ -65,43 +65,47 @@ class ConcourseWebConfig(ConcourseBaseConfig):
 
     # Enable auditing for all api requests connected to builds.
     audit_builds: bool = Field(
-        True, concourse_env_var="CONCOURSE_ENABLE_BUILD_AUDITING"
+        default=True, concourse_env_var="CONCOURSE_ENABLE_BUILD_AUDITING"
     )
 
     # Enable auditing for all api requests connected to containers.
     audit_containers: bool = Field(
-        True, concourse_env_var="CONCOURSE_ENABLE_CONTAINER_AUDITING"
+        default=True, concourse_env_var="CONCOURSE_ENABLE_CONTAINER_AUDITING"
     )
 
     # Enable auditing for all api requests connected to jobs.
-    audit_jobs: bool = Field(True, concourse_env_var="CONCOURSE_ENABLE_JOB_AUDITING")
+    audit_jobs: bool = Field(
+        default=True, concourse_env_var="CONCOURSE_ENABLE_JOB_AUDITING"
+    )
 
     # Enable auditing for all api requests connected to pipelines.
     audit_pipelines: bool = Field(
-        True, concourse_env_var="CONCOURSE_ENABLE_PIPELINE_AUDITING"
+        default=True, concourse_env_var="CONCOURSE_ENABLE_PIPELINE_AUDITING"
     )
 
     # Enable auditing for all api requests connected to resources.
     audit_resources: bool = Field(
-        True, concourse_env_var="CONCOURSE_ENABLE_RESOURCE_AUDITING"
+        default=True, concourse_env_var="CONCOURSE_ENABLE_RESOURCE_AUDITING"
     )
 
     # Enable auditing for all api requests connected to system transactions.
     audit_system: bool = Field(
-        True, concourse_env_var="CONCOURSE_ENABLE_SYSTEM_AUDITING"
+        default=True, concourse_env_var="CONCOURSE_ENABLE_SYSTEM_AUDITING"
     )
 
     # Enable auditing for all api requests connected to teams.
-    audit_teams: bool = Field(True, concourse_env_var="CONCOURSE_ENABLE_TEAM_AUDITING")
+    audit_teams: bool = Field(
+        default=True, concourse_env_var="CONCOURSE_ENABLE_TEAM_AUDITING"
+    )
 
     # Enable auditing for all api requests connected to workers.
     audit_workers: bool = Field(
-        True, concourse_env_var="CONCOURSE_ENABLE_WORKER_AUDITING"
+        default=True, concourse_env_var="CONCOURSE_ENABLE_WORKER_AUDITING"
     )
 
     # Enable auditing for all api requests connected to volumes.
     audit_volumes: bool = Field(
-        True, concourse_env_var="CONCOURSE_ENABLE_VOLUME_AUDITING"
+        default=True, concourse_env_var="CONCOURSE_ENABLE_VOLUME_AUDITING"
     )
 
     github_client_id: Optional[Text] = Field(
@@ -144,7 +148,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         return f"{self.admin_user}:{password_value}"
 
 
-class ConcourseWorkerConfig(ConcourseBaseConfig):
+class ConcourseWorkerConfig(OLBaseSettings):
     work_dir: Path = Field(
         Path("/var/concourse/worker/"), concourse_env_var="CONCOURSE_WORK_DIR"
     )
