@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 
-EnvironmentFile=/opt/concourse/env
+EnvironmentFile={% concourse_config.env_file_path %}
 
 {% if worker %}
 KillSignal=SIGUSR2
