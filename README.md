@@ -28,3 +28,11 @@ Each model defined for a given component will inherit from
 the Pydantic `BaseSettings` class and sets the `case_sensitive` model setting to
 `False`. This allows us to easily use environment variables to override attributes of a
 model at build time.
+
+## Directory Locations
+When faced with a decision of where to locate any given files or directories we default
+to following the [Filesystem Hierarchy
+Standard](https://en.wikipedia.org/wiki/Filesystem_Hierarchy_Standard). This typically
+means that applications or services which are deployed by downloading an archive or
+cloning a software repository should go under `/opt`, configuration files under `/etc/`,
+and data files under `/var/lib`.
