@@ -1,8 +1,8 @@
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional, Text
+from typing import Dict, List, Optional, Text
 
-from pydantic import Field, SecretStr
+from pydantic import Field, PositiveInt, SecretStr
 
 from ol_configuration_management.lib.model_helpers import OLBaseSettings
 
@@ -31,11 +31,9 @@ class ConcourseBaseConfig(OLBaseSettings):
         for attr in self.fields.values():
             if env_name := attr.field_info.extra.get("concourse_env_var"):
                 attr_val = self.dict()[attr.name]
-                try:
-                    attr_val = attr_val.get_secret_value()
-                except AttributeError:
-                    pass  # noqa: WPS420
-                concourse_env_dict[env_name] = attr_val
+                if attr_val is not None:
+                    val_transform = attr.field_info.extra.get("env_transform") or str
+                    concourse_env_dict[env_name] = val_transform(attr_val)
         return concourse_env_dict
 
     class Config:  # noqa: WPS431
@@ -43,6 +41,7 @@ class ConcourseBaseConfig(OLBaseSettings):
 
 
 class ConcourseWebConfig(ConcourseBaseConfig):
+    _node_type: Text = "web"
     admin_password: SecretStr
     admin_user: Text = "oldevops"
     audit_builds: bool = (
@@ -92,16 +91,28 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         Path("/etc/concourse/authorized_keys"),
         concourse_env_var="CONCOURSE_TSA_AUTHORIZED_KEYS",
     )
-    cluster_name: Text = Field("", concourse_env_var="CONCOURSE_CLUSTER_NAME")
+    cluster_name: Optional[Text] = Field(
+        None, concourse_env_var="CONCOURSE_CLUSTER_NAME"
+    )
     database_name: Text = Field(
         "concourse", concourse_env_var="CONCOURSE_POSTGRES_DATABASE"
     )
     database_password: SecretStr = Field(
-        ..., concourse_env_var="CONCOURSE_POSTGRES_PASSWORD"
+        ...,
+        concourse_env_var="CONCOURSE_POSTGRES_PASSWORD",
+        env_transform=lambda _: _.get_secret_value(),
     )
     database_user: Text = Field("oldevops", concourse_env_var="CONCOURSE_POSTGRES_USER")
+    db_max_conns_api: PositiveInt = Field(
+        PositiveInt(10), concourse_env_var="CONCOURSE_API_MAX_CONNS"
+    )
+    db_max_conns_backend: PositiveInt = Field(
+        PositiveInt(50), concourse_env_var="CONCOURSE_BACKEND_MAX_CONNS"
+    )
     encryption_key: SecretStr = Field(
-        ..., concourse_env_var="CONCOURSE_ENCRYPTION_KEY"
+        ...,
+        concourse_env_var="CONCOURSE_ENCRYPTION_KEY",
+        env_transform=lambda _: _.get_secret_value(),
     )  # 32 bit random string
     github_client_id: Optional[Text] = Field(
         None, concourse_env_var="CONCOURSE_GITHUB_CLIENT_ID"
@@ -146,6 +157,9 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     vault_auth_param: Optional[Text] = Field(
         None, concourse_env_var="CONCOURSE_VAULT_AUTH_PARAM"
     )
+    vault_ca_cert: Optional[Path] = Field(
+        None, concourse_env_var="CONCOURSE_VAULT_CA_CERT"
+    )
     vault_url: Optional[Text] = Field(
         "https://active.vault.service.consul:8200",
         concourse_env_var="CONCOURSE_VAULT_URL",
@@ -167,8 +181,11 @@ class ConcourseWebConfig(ConcourseBaseConfig):
 
 
 class ConcourseWorkerConfig(ConcourseBaseConfig):
-    work_dir: Path = Field(
-        Path("/var/concourse/worker/"), concourse_env_var="CONCOURSE_WORK_DIR"
+    _node_type: Text = "worker"
+    tags: Optional[List[Text]] = Field(
+        None,
+        concourse_env_var="CONCOURSE_TAG",
+        env_transform=lambda _: ",".join(_),
     )
     tsa_host: Text = Field(
         "web.concourse.service.consul:2222", concourse_env_var="CONCOURSE_TSA_HOST"
@@ -176,6 +193,9 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     tsa_public_key: Path = Field(
         Path("/var/concourse/tsa_host_key.pub"),
         concourse_env_var="CONCOURSE_TSA_PUBLIC_KEY",
+    )
+    work_dir: Path = Field(
+        Path("/var/concourse/worker/"), concourse_env_var="CONCOURSE_WORK_DIR"
     )
     worker_private_key: Path = Field(
         Path("/var/concourse/worker_private_key.pem"),

@@ -3,9 +3,11 @@ Description=Concourse service for managing continuous deployment pipelines
 After=network.target
 
 [Service]
-
-EnvironmentFile={% concourse_config.env_file_path %}
-
-{% if worker %}
+Exec={{ concourse_config.deploy_directory }}
+EnvironmentFile={{ concourse_config.env_file_path }}
+{% if concourse_config._node_type == "web" %}
+ExecReload=
+{% endif %}
+{% if concourse_config._node_type == "worker" %}
 KillSignal=SIGUSR2
 {% endif %}
