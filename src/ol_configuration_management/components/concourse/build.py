@@ -61,7 +61,7 @@ def install_concourse(
         name="Extract the Concourse release archive.",
         commands=[
             f"tar -xvzf {concourse_archive_path}",
-            f"mv concourse {concourse_config.deploy_directory}",
+            f"mv concourse/* {concourse_config.deploy_directory}",
         ],
         state=state,
         host=host,
@@ -106,14 +106,15 @@ def configure_concourse(
         host=host,
         sudo=sudo,
     )
-    systemd.service(
-        name="Restart the Concourse service when the configuration changes",
-        service="concourse",
-        restarted=concourse_env_file.changed,
-        state=state,
-        host=host,
-        sudo=sudo,
-    )
+    if host.fact.has_systemd:
+        systemd.service(
+            name="Restart the Concourse service when the configuration changes",
+            service="concourse",
+            restarted=concourse_env_file.changed,
+            state=state,
+            host=host,
+            sudo=sudo,
+        )
     # if concourse_config._node_type == "web"
     # Create authorized_keys file
     # Write tsa_host_key and session_signing_key

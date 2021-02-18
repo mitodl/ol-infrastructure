@@ -2,7 +2,7 @@ from pyinfra.api import FactBase
 
 
 class HasSystemd(FactBase):
-    command = "/bin/which systemd"
+    command = "/bin/which systemd || echo 'false'"
 
     def process(self, output):
-        return bool(output)
+        return "false" not in ",".join(output)
