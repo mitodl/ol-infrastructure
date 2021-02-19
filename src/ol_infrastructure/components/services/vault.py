@@ -12,10 +12,14 @@ from enum import Enum
 from typing import Dict, List, Text, Union
 
 from pulumi import ComponentResource, Output, ResourceOptions
-from pulumi_vault import AuthBackend, Mount, Policy, approle, aws, database, pkisecret
+from pulumi_vault import Mount, aws, database, pkisecret
 from pydantic import BaseModel, validator
 
-from ol_infrastructure.lib.vault import mysql_sql_statements, postgres_sql_statements, VaultPKIKeyTypeBits
+from ol_infrastructure.lib.vault import (
+    VaultPKIKeyTypeBits,
+    mysql_sql_statements,
+    postgres_sql_statements,
+)
 
 DEFAULT_PORT_POSTGRES = 5432
 DEFAULT_PORT_MYSQL = 3306
@@ -207,58 +211,6 @@ class OLVaultAWSSecretsEngine(ComponentResource):
                 policy_document=json.dumps(policy),
                 opts=resource_options,
             )
-
-        self.register_outputs({})
-
-
-class OLVaultAppRoleAuthBackendConfig(BaseModel):
-    authbackend_name: Text
-    backend_type: str = "approle"
-    description: Text
-    role_name: Text
-    token_policies: Dict[str, str]
-
-
-class OLVaultAppRoleAuthBackend(ComponentResource):
-    """Register an App Role with Vault as an authentication option."""
-
-    # Due to the following open issue https://github.com/pulumi/pulumi-vault/issues/10
-    # we can't pass json as policy and thus had to do some workarounds below. Those can
-    # changed once that issue is resolved.
-    def __init__(
-        self,
-        approle_config: OLVaultAppRoleAuthBackendConfig,
-        opts: ResourceOptions = None,
-    ):
-        super().__init__(
-            "ol:services:Vault:AppRoleAuthBackend",
-            approle_config.authbackend_name,
-            None,
-            opts,
-        )
-
-        resource_options = ResourceOptions(parent=self).merge(opts)  # type: ignore
-
-        self.approle_backend = AuthBackend(
-            approle_config.authbackend_name,
-            description=approle_config.description,
-            path=approle_config.authbackend_name,
-            type=approle_config.backend_type,
-            opts=resource_options,
-        )
-
-        token_policy_names = []
-        for policy_key, policy_value in approle_config.token_policies.items():
-            vault_policy = Policy(policy_key, policy=policy_value)
-            token_policy_names.append(vault_policy.name)
-
-        self.approle_backend_role = approle.AuthBackendRole(
-            approle_config.authbackend_name,
-            backend=self.approle_backend.path,
-            role_name=approle_config.role_name,
-            token_policies=token_policy_names,
-            opts=resource_options,
-        )
 
         self.register_outputs({})
 
