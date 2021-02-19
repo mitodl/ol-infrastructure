@@ -9,5 +9,5 @@ path "secret-operations/global/*" {
 }
 
 path "postgresql-bootcamps/creds/app" {
-  capabilities = ["write"]
+  capabilities = ["read"]
 }

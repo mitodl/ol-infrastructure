@@ -37,8 +37,8 @@ for hcl_file in policy_folder:
     )
     constituent_approle_export.update(
         {
-            f"constituent_approle-{stack_info.env_suffix}": constituent_approle.id,
+            f"{constituent_name}-{stack_info.env_suffix}": constituent_approle.id,
         }
     )
 
-export("constituent_approle_export", constituent_approle_export)
+export("constituent_approles", constituent_approle_export)
