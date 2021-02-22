@@ -1,13 +1,20 @@
 [Unit]
 Description=Concourse service for managing continuous deployment pipelines
 After=network.target
+Documentation=https://concourse-ci.org/
 
 [Service]
-Exec={{ concourse_config.deploy_directory }}
-EnvironmentFile={{ concourse_config.env_file_path }}
+User={{ concourse_config.user }}
+Group={{ concourse_config.user }}
+ExecStart={{ concourse_config.deploy_directory }}/bin/concourse {{ concourse_config._node_type }}
+Restart=on-failure
+EnvironmentFile=-{{ concourse_config.env_file_path }}
 {% if concourse_config._node_type == "web" %}
-ExecReload=
+ExecReload=/bin/kill -HUP $MAINPID
 {% endif %}
 {% if concourse_config._node_type == "worker" %}
 KillSignal=SIGUSR2
 {% endif %}
+
+[Install]
+WantedBy=multi-user.target

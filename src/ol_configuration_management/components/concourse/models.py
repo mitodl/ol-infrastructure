@@ -1,8 +1,10 @@
+import secrets
 from enum import Enum
+from functools import partial
 from pathlib import Path
 from typing import Dict, List, Optional, Text
 
-from pydantic import Field, PositiveInt, SecretStr
+from pydantic import Field, PositiveInt, SecretStr, validator
 
 from ol_configuration_management.lib.model_helpers import OLBaseSettings
 
@@ -18,7 +20,7 @@ class ConcourseBaseConfig(OLBaseSettings):
     deploy_directory: Path = Path("/opt/concourse/")
     data_directory: Path = Path("/var/lib/concourse")
     config_directory: Path = Path("/etc/concourse")
-    env_file_path: Path = Path("/etc/defaults/concourse_env")
+    env_file_path: Path = Path("/etc/default/concourse")
 
     def concourse_env(self) -> Dict[Text, Text]:
         """Create a mapping of concourse environment variables to the concrete values.
@@ -87,6 +89,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
             default=True, concourse_env_var="CONCOURSE_ENABLE_WORKER_AUDITING"
         )
     )
+    authorized_worker_keys: Optional[List[Text]] = None
     authorized_keys_file: Path = Field(
         Path("/etc/concourse/authorized_keys"),
         concourse_env_var="CONCOURSE_TSA_AUTHORIZED_KEYS",
@@ -110,7 +113,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         PositiveInt(50), concourse_env_var="CONCOURSE_BACKEND_MAX_CONNS"
     )
     encryption_key: SecretStr = Field(
-        ...,
+        default_factory=partial(secrets.token_hex, 16),
         concourse_env_var="CONCOURSE_ENCRYPTION_KEY",
         env_transform=lambda _: _.get_secret_value(),
     )  # 32 bit random string
@@ -143,11 +146,13 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     public_domain: Optional[Text] = Field(
         None, concourse_env_var="CONCOURSE_EXTERNAL_URL"
     )
-    session_signing_key: Path = Field(
+    session_signing_key: Optional[Text] = None
+    session_signing_key_path: Path = Field(
         Path("/etc/concourse/session_signing_key"),
         concourse_env_var="CONCOURSE_SESSION_SIGNING_KEY",
     )
-    tsa_host_key: Path = Field(
+    tsa_host_key: Optional[Text] = None
+    tsa_host_key_path: Path = Field(
         Path("/etc/concourse/tsa_host_key"),
         concourse_env_var="CONCOURSE_TSA_HOST_KEY",
     )
@@ -168,6 +173,14 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     class Config:  # noqa: WPS431
         env_prefix = "concourse_web_"
         arbitrary_types_allowed = True
+
+    @validator("encryption_key")
+    def validate_encryption_key_length(cls, encryption_key):  # noqa: N805
+        if len(encryption_key) != 32:
+            raise ValueError(
+                "Encryption key is not the correct length. It needs to be a 32 byte random string."
+            )
+        return encryption_key
 
     @property
     def local_user(self):
@@ -197,7 +210,8 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     work_dir: Path = Field(
         Path("/var/concourse/worker/"), concourse_env_var="CONCOURSE_WORK_DIR"
     )
-    worker_private_key: Path = Field(
+    worker_private_key: Optional[Text] = None
+    worker_private_key_path: Path = Field(
         Path("/var/concourse/worker_private_key.pem"),
         concourse_env_var="CONCOURSE_TSA_WORKER_PRIVATE_KEY",
     )

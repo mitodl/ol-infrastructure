@@ -3,7 +3,7 @@ from pyinfra.operations import apt
 
 
 @deploy("Install baseline requirements")
-def install_baseline_packages(state=None, host=None):
+def install_baseline_packages(state=None, host=None, sudo=True):
     apt.packages(
         name="Install baseline packages for Debian based hosts",
         packages=[
@@ -12,4 +12,5 @@ def install_baseline_packages(state=None, host=None):
         update=True,
         state=state,
         host=host,
+        sudo=sudo,
     )
