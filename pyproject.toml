@@ -5,8 +5,8 @@ description = ""
 authors = ["MIT Open Learning Engineering <oldevops@mit.edu>"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
-pyinfra = "^1.2.1"
+python = "^3.7"
+pyinfra = { git = "https://github.com/Fizzadar/pyinfra" }
 pydantic = "^1.7.3"
 httpx = "^0.16.1"
 

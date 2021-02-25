@@ -99,9 +99,9 @@ def install_concourse(
 @deploy("Manage Web Node Keys")
 def _manage_web_node_keys(
     concourse_config: ConcourseWebConfig,
-    sudo=True,
     state=None,
     host=None,
+    sudo=True,
 ):
     # Create authorized_keys file
     files.template(
@@ -210,9 +210,9 @@ def configure_concourse(
         sudo=sudo,
     )
     if concourse_config._node_type == "web":  # noqa: WPS437
-        _manage_web_node_keys(concourse_config, sudo, state, host)
+        _manage_web_node_keys(concourse_config, state=state, host=host)
     elif concourse_config._node_type == "worker":  # noqa: WPS437
-        _manage_worker_node_keys(concourse_config, sudo, state, host)
+        _manage_worker_node_keys(concourse_config, state=state, host=host)
     return concourse_env_file.changed
 
 
