@@ -1,0 +1,24 @@
+from pyinfra.api import deploy
+from pyinfra.operations import server, files
+from pathlib import Path
+from ol_configuration_management.components.[[ _copier_answers.component_name ]].models import [[ _copier_answers.component_name|capitalize ]]Config
+
+
+@deploy("Install [[ _copier_answers.component_name ]]")
+def install_[[ _copier_answers.component_name ]](state=None, host=None):
+    server.shell(
+        name="Sample operation",
+        commands=[
+            "echo 'foobar'"
+        ]
+    )
+
+
+@deploy("Configure [[_copier_answers.component_name ]]")
+def configure_[[_copier_answers.component_name ]]([[_copier_answers.component_name ]]_config: [[_copier_answers.component_name|capitalize ]]Config, state=None, host=None):
+    files.template(
+        name="Write a configuration file",
+        src=Path(__file__).parent.joinpath("templates/conf.ini.j2"),
+        dest="/etc/[[_copier_answers.component_name ]]/[[_copier_answers.component_name ]].conf",
+        settings=[[_copier_answers.component_name ]]_config
+    )
