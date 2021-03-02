@@ -100,6 +100,7 @@ ocw_studio_iam_policy = iam.Policy(
 
 ocw_studio_vault_backend_role = aws.SecretBackendRole(
     f"ocw-studio-app-{stack_info.env_suffix}",
+    name=f"ocw-studio-app-{stack_info.env_suffix}",
     backend="aws-mitx",
     credential_type="iam_user",
     policy_arns=[ocw_studio_iam_policy.arn],
