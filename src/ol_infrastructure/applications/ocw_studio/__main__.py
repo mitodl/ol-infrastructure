@@ -27,6 +27,7 @@ aws_config = AWSBase(
     tags={
         "OU": "open-courseware",
         "Environment": f"applications_{stack_info.env_suffix}",
+        "Application": "ocw_studio",
     }
 )
 
