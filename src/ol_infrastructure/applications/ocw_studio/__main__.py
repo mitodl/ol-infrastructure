@@ -47,7 +47,7 @@ ocw_storage_bucket_name = f"ol-ocw-studio-app-{stack_info.env_suffix}"
 ocw_storage_bucket = s3.Bucket(
     f"ol-ocw-studio-app-{stack_info.env_suffix}",
     bucket=ocw_storage_bucket_name,
-    versioning=aws.s3.BucketVersioningArgs(
+    versioning=s3.BucketVersioningArgs(
         enabled=True,
     ),
     tags=aws_config.tags,
