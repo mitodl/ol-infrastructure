@@ -6,6 +6,7 @@
 """
 from pulumi import Config, StackReference, export
 from pulumi_aws import ec2, iam, s3
+from pulumi_vault import aws
 
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -26,6 +27,7 @@ aws_config = AWSBase(
     tags={
         "OU": "open-courseware",
         "Environment": f"applications_{stack_info.env_suffix}",
+        "Application": "ocw_studio",
     }
 )
 
@@ -39,6 +41,18 @@ ocw_studio_legacy_markdown_bucket = s3.Bucket(
     bucket=ocw_to_hugo_bucket_name,
     tags=aws_config.tags,
 )
+
+# Bucket used to store file uploads from ocw-studio app.
+ocw_storage_bucket_name = f"ol-ocw-studio-app-{stack_info.env_suffix}"
+ocw_storage_bucket = s3.Bucket(
+    f"ol-ocw-studio-app-{stack_info.env_suffix}",
+    bucket=ocw_storage_bucket_name,
+    versioning=aws.s3.BucketVersioningArgs(
+        enabled=True,
+    ),
+    tags=aws_config.tags,
+)
+
 
 ocw_studio_iam_policy = iam.Policy(
     f"ocw-studio-{stack_info.env_suffix}-policy",
@@ -65,10 +79,30 @@ ocw_studio_iam_policy = iam.Policy(
                         f"arn:aws:s3:::{ocw_to_hugo_bucket_name}/*",
                     ],
                 },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:ListBucket*",
+                        "s3:PutObject",
+                        "s3:GetObject*",
+                        "s3:DeleteObject*",
+                    ],
+                    "Resource": [
+                        f"arn:aws:s3:::{ocw_storage_bucket_name}",
+                        f"arn:aws:s3:::{ocw_storage_bucket_name}/*",
+                    ],
+                },
             ],
         },
         stringify=True,
     ),
+)
+
+ocw_studio_vault_backend_role = aws.SecretBackendRole(
+    f"ocw-studio-app-{stack_info.env_suffix}",
+    backend="aws-mitx",
+    credential_type="iam_user",
+    policy_arns=[ocw_studio_iam_policy.arn],
 )
 
 # Create RDS instance
