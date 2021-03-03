@@ -1,39 +1,66 @@
 import json
-from typing import Any, Dict, Text, Union
+from typing import Any, Dict, Union
 
 from parliament import analyze_policy_string
 
+IAM_POLICY_VERSION = "2012-10-17"
+
 
 def lint_iam_policy(
-    policy_document: Union[Text, Dict[Text, Any]], stringify: bool = False
-) -> Union[Text, Dict[Text, Any]]:
+    policy_document: Union[str, Dict[str, Any]],
+    stringify: bool = False,
+    parliament_config: Dict = None,
+) -> Union[str, Dict[str, Any]]:
     """Lint the contents of an IAM policy and abort execution if issues are found.
 
-    :param policy_document: An IAM policy document represented as a JSON encoded string or a dictionary
+    :param policy_document: An IAM policy document represented as a JSON encoded string
+        or a dictionary
     :type policy_document: Union[Text, Dict[Text, Any]]
 
-    :param stringify: If set to true then the dictionary of the policy document will be returned as a JSON string.
+    :param stringify: If set to true then the dictionary of the policy document will be
+        returned as a JSON string.
     :type stringify: bool
 
-    :raises Exception: If there are linting violations detected then a bare exception is raised with the findings.
+    :param parliament_config: A configuration object to customize the strictness and
+        error checking of the Parliament library.
+    :type parliament_config: Dict
+
+    :raises Exception: If there are linting violations detected then a bare exception is
+        raised with the findings.
 
     :returns: The contents of the policy document that is passed to the function.
 
     :rtype: Union[Text, Dict[Text, Any]]
     """
     stringified_document = None
-    if not isinstance(policy_document, Text):
+    if not isinstance(policy_document, str):
         stringified_document = json.dumps(policy_document)
-    findings = analyze_policy_string(stringified_document or policy_document).findings
+    findings = analyze_policy_string(
+        stringified_document or policy_document,
+        include_community_auditors=True,
+        config=parliament_config,
+    ).findings
     if findings:
-        raise Exception("Potential issues found with IAM policy document", findings)
+        raise Exception(  # noqa: WPS454
+            "Potential issues found with IAM policy document", findings
+        )
     return (
         stringified_document if stringify and stringified_document else policy_document
     )
 
 
-def route53_policy_template(zone_id: Text) -> Dict[Text, Any]:
-    """Policy definition to allow Caddy to use Route 53 to resolve DNS challenges."""
+def route53_policy_template(zone_id: str) -> Dict[str, Any]:
+    """Policy definition to allow Caddy to use Route 53 to resolve DNS challenges.
+
+    This provides the permissions necessary to modify Route53 records, for example in a
+    Caddy configuration that is using the DNS authorization method for Let's Encrypt.
+
+    :param zone_id: The ID of the DNS zone that the policy is being generated for.
+    :type zone_id: str
+
+    :returns: A dictionary object representing a policy document to allow access to
+              modify records in a Route53 zone.
+    """
     return {
         "Version": "2012-10-17",
         "Statement": [

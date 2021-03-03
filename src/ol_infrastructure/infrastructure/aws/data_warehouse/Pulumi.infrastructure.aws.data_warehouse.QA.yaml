@@ -1,0 +1,4 @@
+secretsprovider: awskms://alias/PulumiSecrets
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQHJIeIGtFZd1Eb8TBgStqbcAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMxrfSAn/LOysTcxIiAgEQgDu5tjKVx+PqjBgo/SnRzvuRWnW9F7U+tZISmPOp4skA1OKG3BHqVet9eawN3T6I6Pjouz//IHrfSfxdsg==
+config:
+  aws:region: us-east-1
