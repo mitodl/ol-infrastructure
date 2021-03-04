@@ -150,6 +150,7 @@ mit_open_iam_policy = iam.Policy(
 mit_open_vault_iam_role = aws.SecretBackendRole(
     f"mit-open-iam-permissions-vault-policy-{stack_info.env_suffix}",
     name=f"mit-open-application-{app_env_suffix}",
+    # TODO: Make this configurable to support multiple AWS backends. TMM 2021-03-04
     backend="aws-mitx",
     credential_type="iam_user",
     policy_arns=[mit_open_iam_policy.arn],
