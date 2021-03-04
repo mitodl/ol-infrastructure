@@ -15,6 +15,7 @@ aws_config = AWSBase(
         "Application": "data-warehouse",
     },
 )
+s3_kms_key = kms_stack.require_output("kms_s3_data_analytics_key")
 
 results_bucket = s3.Bucket(
     f"ol_warehouse_results_bucket_{stack_info.env_suffix}",
@@ -23,7 +24,7 @@ results_bucket = s3.Bucket(
         rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
             apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
                 sse_algorithm="aws:kms",
-                kms_master_key_id=kms_stack.require_output("kms_s3_data_analytics_key"),
+                kms_master_key_id=s3_kms_key["id"],
             ),
             bucket_key_enabled=True,
         )
@@ -46,7 +47,7 @@ athena_warehouse_workgroup = athena.Workgroup(
         result_configuration=athena.WorkgroupConfigurationResultConfigurationArgs(
             encryption_configuration=athena.WorkgroupConfigurationResultConfigurationEncryptionConfigurationArgs(
                 encryption_option="SSE_KMS",
-                kms_key_arn=kms_stack.require_output("kms_s3_data_analytics_key"),
+                kms_key_arn=s3_kms_key["arn"],
             ),
             output_location=results_bucket.bucket.apply(
                 lambda bucket_name: f"s3://{bucket_name}/output/"
@@ -67,9 +68,7 @@ for unit in BusinessUnit:
                 s3.BucketServerSideEncryptionConfigurationRuleArgs(
                     s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
                         sse_algorithm="aws:kms",
-                        kms_master_key_id=kms_stack.require_output(
-                            "kms_s3_data_analytics_key"
-                        ),
+                        kms_master_key_id=s3_kms_key["id"],
                     ),
                     bucket_key_enabled=True,
                 )
@@ -85,7 +84,7 @@ for unit in BusinessUnit:
             name="ol_warehouse_{unit.name}_{stack_info.env_suffix}",
             encryption_configuration=athena.DatabaseEncryptionConfigurationArgs(
                 encryption_option="SSE_KMS",
-                kms_key=kms_stack.require_output("kms_s3_data_analytics_key"),
+                kms_key=s3_kms_key["id"],
             ),
         )
     )

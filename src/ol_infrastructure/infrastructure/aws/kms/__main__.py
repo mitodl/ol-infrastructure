@@ -114,8 +114,13 @@ ebs_key = kms.Key(
     policy=json.dumps(kms_ec2_ebs_encryption_policy),
     tags=aws_config.merged_tags({"Name": kms_ec2_environment}),
 )
-
-export("kms_ec2_ebs_key", ebs_key.id)
+ebs_key_alias = kms.Alias(
+    f"{kms_ec2_environment}-alias", name=kms_ec2_environment, target_key_id=ebs_key.id
+)
+export(
+    "kms_ec2_ebs_key",
+    {"id": ebs_key.id, "arn": ebs_key.arn, "alias": ebs_key_alias.name},
+)
 
 # KMS key used for encrypting data in S3 used for data analytics/warehousing
 s3_data_key = kms.Key(
@@ -137,5 +142,13 @@ s3_data_key = kms.Key(
     ).tags,
     policy=json.dumps(kms_s3_data_encryption_policy),
 )
+s3_data_key_alias = kms.Alias(
+    f"s3-data-analytics-{stack_info.env_suffix}-alias",
+    name=f"s3-analytical-data-{stack_info.env_suffix}",
+    target_key_id=s3_data_key.id,
+)
 
-export("kms_s3_data_analytics_key", s3_data_key.id)
+export(
+    "kms_s3_data_analytics_key",
+    {"id": s3_data_key.id, "arn": s3_data_key.arn, "alias": s3_data_key_alias.name},
+)
