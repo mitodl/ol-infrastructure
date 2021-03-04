@@ -29,6 +29,11 @@ results_bucket = s3.Bucket(
         )
     ),
     tags=aws_config.tags,
+    lifecycle_rules=s3.BucketLifecycleRuleArgs(
+        enabled=True,
+        expiration=s3.BucketLifecycleRuleExpirationArgs(days=30),
+        id="expire_old_query_results",
+    ),
 )
 
 athena_warehouse_workgroup = athena.Workgroup(
@@ -56,8 +61,8 @@ warehouse_dbs = []
 for unit in BusinessUnit:
     warehouse_buckets.append(
         s3.Bucket(
-            f"ol_warehouse_s3_bucket_{unit.name}",
-            bucket=f"ol-warehouse-{unit.value}-{stack_info.env_suffix}",
+            f"ol_data_lake_s3_bucket_{unit.name}",
+            bucket=f"ol-data-lake-{unit.value}-{stack_info.env_suffix}",
             server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
                 s3.BucketServerSideEncryptionConfigurationRuleArgs(
                     s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
@@ -77,7 +82,7 @@ for unit in BusinessUnit:
     warehouse_dbs.append(
         athena.Database(
             f"ol_warehouse_database_{unit.name}_{stack_info.env_suffix}",
-            name="ol_warehouse_{unit.name}",
+            name="ol_warehouse_{unit.name}_{stack_info.env_suffix}",
             encryption_configuration=athena.DatabaseEncryptionConfigurationArgs(
                 encryption_option="SSE_KMS",
                 kms_key=kms_stack.require_output("kms_s3_data_analytics_key"),

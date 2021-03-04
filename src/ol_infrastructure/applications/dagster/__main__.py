@@ -8,10 +8,11 @@
 - Provision an EC2 instance from a pre-built AMI with the pipeline code for Dagster
 """
 import json
+from typing import Dict, List, Union
 
 from pulumi import ResourceOptions, StackReference, export
 from pulumi.config import get_config
-from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53, s3
+from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -30,8 +31,11 @@ from ol_infrastructure.providers.salt.minion import (
 )
 
 stack_info = parse_stack()
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+data_warehouse_stack = StackReference(
+    f"infrastructure.aws.data_warehouse.{stack_info.name}"
+)
 dns_stack = StackReference("infrastructure.aws.dns")
+network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
@@ -42,51 +46,155 @@ aws_config = AWSBase(
 
 dagster_bucket_name = f"dagster-{dagster_environment}"
 
+data_lake_bucket_resources = []
+athena_warehouse_outputs = data_warehouse_stack.require_output("athena_data_warehouse")
+athena_warehouse_workgroup = athena_warehouse_outputs["workgroup"]
+data_lake_buckets = []
+data_lake_buckets.append(athena_warehouse_outputs["source_buckets"])
+data_lake_buckets.append(athena_warehouse_outputs["results_bucket"])
+for bucket in data_lake_buckets:
+    data_lake_bucket_resources.extend(
+        [
+            f"arn:aws:s3:::{bucket}",
+            f"arn:aws:s3:::{bucket}/*",
+        ]
+    )
+
+s3_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
+    {
+        "Effect": "Allow",
+        "Action": "s3:ListAllMyBuckets",
+        "Resource": "*",
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "s3:ListBucket*",
+            "s3:GetObject*",
+            "s3:PutObject",
+            "s3:DeleteObject*",
+        ],
+        "Resource": [
+            f"arn:aws:s3:::{dagster_bucket_name}",
+            f"arn:aws:s3:::{dagster_bucket_name}/*",
+        ],
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "s3:ListBucket*",
+            "s3:GetObject*",
+            "s3:PutObject",
+            "s3:DeleteObject*",
+        ],
+        "Resource": ["arn:aws:s3:::mitx-etl*", "arn:aws:s3:::mitx-etl*/*"],
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "s3:ListBucket*",
+            "s3:GetObject*",
+            "s3:PutObject",
+            "s3:DeleteObject*",
+        ],
+        "Resource": data_lake_bucket_resources,
+    },
+]
+
+athena_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
+    {
+        "Effect": "Allow",
+        "Action": [
+            "athena:ListDataCatalogs",
+            "athena:ListWorkGroups",
+        ],
+        "Resource": ["*"],
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "athena:ListTagsForResource",
+            "athena:TagResource",
+            "athena:UntagResource",
+        ],
+        "Resource": [
+            f"arn:*:athena:*:*:workgroup/{athena_warehouse_workgroup}",
+            "arn:*:athena:*:*:datacatalog/*",
+        ],
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "athena:BatchGetNamedQuery",
+            "athena:BatchGetQueryExecution",
+            "athena:CreateNamedQuery",
+            "athena:DeleteNamedQuery",
+            "athena:GetNamedQuery",
+            "athena:GetQueryExecution",
+            "athena:GetQueryResults",
+            "athena:GetQueryResultsStream",
+            "athena:GetWorkGroup",
+            "athena:ListNamedQueries",
+            "athena:ListQueryExecutions",
+            "athena:StartQueryExecution",
+            "athena:StopQueryExecution",
+            "athena:UpdateWorkGroup",
+        ],
+        "Resource": [f"arn:*:athena:*:*:workgroup/{athena_warehouse_workgroup}"],
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "athena:CreateDataCatalog",
+            "athena:DeleteDataCatalog",
+            "athena:GetDataCatalog",
+            "athena:GetDatabase",
+            "athena:GetTableMetadata",
+            "athena:ListDatabases",
+            "athena:ListTableMetadata",
+            "athena:UpdateDataCatalog",
+        ],
+        "Resource": ["arn:*:athena:*:*:datacatalog/*"],
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "glue:GetDatabases",
+            "glue:TagResource",
+            "glue:UnTagResource",
+        ],
+        "Resource": ["*"],
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "glue:BatchCreatePartition",
+            "glue:BatchDeletePartition",
+            "glue:BatchDeleteTable",
+            "glue:BatchGetPartition",
+            "glue:CreatePartition",
+            "glue:CreateTable",
+            "glue:DeletePartition",
+            "glue:DeleteTable",
+            "glue:GetDatabase",
+            "glue:GetPartition",
+            "glue:GetPartitions",
+            "glue:GetTable",
+            "glue:GetTables",
+            "glue:UpdateDatabase",
+            "glue:UpdatePartition",
+            "glue:UpdateTable",
+        ],
+        "Resource": [
+            "arn:aws:glue:::database/{db}"
+            for db in athena_warehouse_outputs["databases"]
+        ],
+    },
+]
+
 dagster_iam_policy_document = {
     "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": "s3:ListAllMyBuckets",
-            "Resource": "*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:ListBucket*",
-                "s3:GetObject*",
-                "s3:PutObject*",
-                "s3:DeleteObject*",
-            ],
-            "Resource": [
-                f"arn:aws:s3:::{dagster_bucket_name}",
-                f"arn:aws:s3:::{dagster_bucket_name}/*",
-            ],
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:ListBucket*",
-                "s3:GetObject*",
-                "s3:PutObject*",
-                "s3:DeleteObject*",
-            ],
-            "Resource": ["arn:aws:s3:::mitx-etl*", "arn:aws:s3:::mitx-etl*/*"],
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:ListBucket*",
-                "s3:GetObject*",
-                "s3:PutObject*",
-                "s3:DeleteObject*",
-            ],
-            "Resource": [
-                "arn:aws:s3:::mitodl-data-lake*",
-                "arn:aws:s3:::mitodl-data-lake*/*",
-            ],
-        },
-    ],
+    "Statement": s3_permissions + athena_permissions,
 }
 
 dagster_runtime_bucket = s3.Bucket(
@@ -211,7 +319,7 @@ dagster_db_consul_service = Service(
             name="dagster-instance-id",
             timeout="60s",
             status="passing",
-            tcp=f"{dagster_db.db_instance.address}:{dagster_db_config.port}",
+            tcp=f"{dagster_db.db_instance.address}:{dagster_db_config.port}",  # noqa: WPS237
         )
     ],
 )
@@ -235,7 +343,7 @@ cloud_init_userdata = build_userdata(
     salt_host=f"salt-{stack_info.env_suffix}.private.odl.mit.edu",
 )
 
-dagster_image = get_ami(
+dagster_image = ec2.get_ami(
     filters=[
         {
             "name": "tag:Name",
