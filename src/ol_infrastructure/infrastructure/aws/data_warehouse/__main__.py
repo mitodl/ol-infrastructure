@@ -1,5 +1,5 @@
 from pulumi import Config, StackReference, export
-from pulumi_aws import athena, s3
+from pulumi_aws import athena, glue, s3
 
 from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -20,6 +20,7 @@ s3_kms_key = kms_stack.require_output("kms_s3_data_analytics_key")
 results_bucket = s3.Bucket(
     f"ol_warehouse_results_bucket_{stack_info.env_suffix}",
     bucket=f"ol-warehouse-results-{stack_info.env_suffix}",
+    acl="private",
     server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
         rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
             apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
@@ -37,6 +38,12 @@ results_bucket = s3.Bucket(
             id="expire_old_query_results",
         )
     ],
+)
+s3.BucketPublicAccessBlock(
+    f"ol_warehouse_results_bucket_{stack_info.env_suffix}_block_public_access",
+    bucket=results_bucket.bucket,
+    block_public_acls=True,
+    block_public_policy=True,
 )
 
 athena_warehouse_workgroup = athena.Workgroup(
@@ -62,33 +69,38 @@ athena_warehouse_workgroup = athena.Workgroup(
 warehouse_buckets = []
 warehouse_dbs = []
 for unit in BusinessUnit:
-    warehouse_buckets.append(
-        s3.Bucket(
-            f"ol_data_lake_s3_bucket_{unit.name}",
-            bucket=f"ol-data-lake-{unit.value}-{stack_info.env_suffix}",
-            server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
-                rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-                    apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
-                        sse_algorithm="aws:kms",
-                        kms_master_key_id=s3_kms_key["id"],
-                    ),
-                    bucket_key_enabled=True,
-                )
-            ),
-            versioning=s3.BucketVersioningArgs(enabled=True),
-            tags=aws_config.merged_tags({"OU": unit.value}),
-        )
+    lake_storage_bucket = s3.Bucket(
+        f"ol_data_lake_s3_bucket_{unit.name}_{stack_info.env_suffix}",
+        bucket=f"ol-data-lake-{unit.value}-{stack_info.env_suffix}",
+        acl="private",
+        server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
+            rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
+                apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
+                    sse_algorithm="aws:kms",
+                    kms_master_key_id=s3_kms_key["id"],
+                ),
+                bucket_key_enabled=True,
+            )
+        ),
+        versioning=s3.BucketVersioningArgs(enabled=True),
+        tags=aws_config.merged_tags({"OU": unit.value}),
+    )
+    warehouse_buckets.append(lake_storage_bucket)
+    s3.BucketPublicAccessBlock(
+        f"ol_data_lake_s3_bucket_{unit.name}_{stack_info.env_suffix}_block_public_access",
+        bucket=lake_storage_bucket.bucket,
+        block_public_acls=True,
+        block_public_policy=True,
     )
 
     warehouse_dbs.append(
-        athena.Database(
+        glue.CatalogDatabase(
             f"ol_warehouse_database_{unit.name}_{stack_info.env_suffix}",
             name=f"ol_warehouse_{unit.name}_{stack_info.env_suffix}",
-            encryption_configuration=athena.DatabaseEncryptionConfigurationArgs(
-                encryption_option="SSE_KMS",
-                kms_key=s3_kms_key["id"],
+            description=f"Data mart for information owned by or sourced from {unit} in the {stack_info.env_suffix} environment.",
+            location_uri=lake_storage_bucket.bucket.apply(
+                lambda bucket: f"s3://{bucket}"
             ),
-            bucket=results_bucket.bucket,
         )
     )
 

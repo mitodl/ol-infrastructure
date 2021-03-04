@@ -82,7 +82,6 @@ kms_s3_data_encryption_policy = {
     "Statement": [
         kms_key_access_statement,
         {
-            "Sid": "Allow access through S3 for authorized principles to perform encrypt/decrypt operations",
             "Effect": "Allow",
             "Principal": {"AWS": "*"},
             "Action": [
@@ -96,7 +95,7 @@ kms_s3_data_encryption_policy = {
             "Resource": "*",
             "Condition": {
                 "StringEquals": {
-                    "kms:ViaService": "s3.amazonaws.com",
+                    "kms:ViaService": "s3.us-east-1.amazonaws.com",
                     "kms:CallerAccount": f"{owner}",
                 }
             },
