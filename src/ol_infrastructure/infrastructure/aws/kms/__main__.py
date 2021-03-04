@@ -115,7 +115,9 @@ ebs_key = kms.Key(
     tags=aws_config.merged_tags({"Name": kms_ec2_environment}),
 )
 ebs_key_alias = kms.Alias(
-    f"{kms_ec2_environment}-alias", name=kms_ec2_environment, target_key_id=ebs_key.id
+    f"{kms_ec2_environment}-alias",
+    name=f"alias/{kms_ec2_environment}",
+    target_key_id=ebs_key.id,
 )
 export(
     "kms_ec2_ebs_key",
@@ -144,7 +146,7 @@ s3_data_key = kms.Key(
 )
 s3_data_key_alias = kms.Alias(
     f"s3-data-analytics-{stack_info.env_suffix}-alias",
-    name=f"s3-analytical-data-{stack_info.env_suffix}",
+    name=f"alias/s3-analytical-data-{stack_info.env_suffix}",
     target_key_id=s3_data_key.id,
 )
 
