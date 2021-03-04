@@ -30,11 +30,13 @@ results_bucket = s3.Bucket(
         )
     ),
     tags=aws_config.tags,
-    lifecycle_rules=s3.BucketLifecycleRuleArgs(
-        enabled=True,
-        expiration=s3.BucketLifecycleRuleExpirationArgs(days=30),
-        id="expire_old_query_results",
-    ),
+    lifecycle_rules=[
+        s3.BucketLifecycleRuleArgs(
+            enabled=True,
+            expiration=s3.BucketLifecycleRuleExpirationArgs(days=30),
+            id="expire_old_query_results",
+        )
+    ],
 )
 
 athena_warehouse_workgroup = athena.Workgroup(
@@ -43,7 +45,7 @@ athena_warehouse_workgroup = athena.Workgroup(
     description="Data warehousing for MIT Open Learning in the {stack_info.name} environment",
     state="ENABLED",
     tags=aws_config.merged_tags({"Name": f"ol-warehouse-{stack_info.env_suffix}"}),
-    config=athena.WorkgroupConfigurationArgs(
+    configuration=athena.WorkgroupConfigurationArgs(
         result_configuration=athena.WorkgroupConfigurationResultConfigurationArgs(
             encryption_configuration=athena.WorkgroupConfigurationResultConfigurationEncryptionConfigurationArgs(
                 encryption_option="SSE_KMS",
@@ -52,8 +54,8 @@ athena_warehouse_workgroup = athena.Workgroup(
             output_location=results_bucket.bucket.apply(
                 lambda bucket_name: f"s3://{bucket_name}/output/"
             ),
-            enforce_workgroup_configuration=True,
         ),
+        enforce_workgroup_configuration=True,
     ),
 )
 
@@ -65,8 +67,8 @@ for unit in BusinessUnit:
             f"ol_data_lake_s3_bucket_{unit.name}",
             bucket=f"ol-data-lake-{unit.value}-{stack_info.env_suffix}",
             server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
-                s3.BucketServerSideEncryptionConfigurationRuleArgs(
-                    s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
+                rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
+                    apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
                         sse_algorithm="aws:kms",
                         kms_master_key_id=s3_kms_key["id"],
                     ),
@@ -81,11 +83,12 @@ for unit in BusinessUnit:
     warehouse_dbs.append(
         athena.Database(
             f"ol_warehouse_database_{unit.name}_{stack_info.env_suffix}",
-            name="ol_warehouse_{unit.name}_{stack_info.env_suffix}",
+            name=f"ol_warehouse_{unit.name}_{stack_info.env_suffix}",
             encryption_configuration=athena.DatabaseEncryptionConfigurationArgs(
                 encryption_option="SSE_KMS",
                 kms_key=s3_kms_key["id"],
             ),
+            bucket=results_bucket.bucket,
         )
     )
 
