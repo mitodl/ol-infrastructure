@@ -15,9 +15,7 @@ from ol_configuration_management.facts import has_systemd  # noqa: F401
 
 
 @deploy("Install Concourse")
-def install_concourse(
-    concourse_config: ConcourseBaseConfig, sudo=True, state=None, host=None
-):
+def install_concourse(concourse_config: ConcourseBaseConfig, state=None, host=None):
     # Create a Concourse system user
     server.user(
         name="Create the Concourse system user",
@@ -29,7 +27,6 @@ def install_concourse(
         system=True,
         state=state,
         host=host,
-        sudo=sudo,
     )
     installation_directory = (
         f"{concourse_config.deploy_directory}-{concourse_config.version}"
@@ -48,7 +45,6 @@ def install_concourse(
             sha1sum=httpx.get(concourse_archive_hash).read().decode("utf8").split()[0],
             state=state,
             host=host,
-            sudo=sudo,
         )
         # Unpack Concourse to /opt/concourse
         server.shell(
@@ -59,7 +55,6 @@ def install_concourse(
             ],
             state=state,
             host=host,
-            sudo=sudo,
         )
         # Verify ownership of Concourse directory
         files.directory(
@@ -68,7 +63,6 @@ def install_concourse(
             user=concourse_config.user,
             state=state,
             host=host,
-            sudo=sudo,
         )
     # Link Concourse installation to target directory
     active_installation_path = files.link(
@@ -80,7 +74,6 @@ def install_concourse(
         present=True,
         state=state,
         host=host,
-        sudo=sudo,
     )
     # create configuration directory
     files.directory(
@@ -91,7 +84,6 @@ def install_concourse(
         recursive=True,
         state=state,
         host=host,
-        sudo=sudo,
     )
     return active_installation_path.changed
 
