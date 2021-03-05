@@ -1,13 +1,15 @@
-"""State to create symmetric AWS KMS Customer Master Keys (CMK) for use with EC2 volume encryption.
-
-"""
+"""State to create symmetric AWS KMS Customer Master Keys (CMK)."""
 import json
 
 from pulumi import export
 from pulumi_aws import get_caller_identity, kms
 
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+
+DEFAULT_KEY_SPEC = "SYMMETRIC_DEFAULT"
+ENCRYPT_KEY_USAGE = "ENCRYPT_DECRYPT"
 
 owner = str(get_caller_identity().account_id)
 stack_info = parse_stack()
@@ -16,12 +18,43 @@ aws_config = AWSBase(
     tags={"OU": "operations", "Environment": f"operations-{stack_info.env_suffix}"}
 )
 
+
+kms_key_access_statement = {
+    # Allow direct access to key metadata to the account
+    "Effect": "Allow",
+    "Principal": {
+        "AWS": [
+            f"arn:aws:iam::{owner}:root",
+            f"arn:aws:iam::{owner}:user/mbreedlove",
+            f"arn:aws:iam::{owner}:user/shaidar",
+            f"arn:aws:iam::{owner}:user/tmacey",
+        ]
+    },
+    "Action": [
+        "kms:Create*",
+        "kms:Describe*",
+        "kms:Enable*",
+        "kms:List*",
+        "kms:Put*",
+        "kms:Update*",
+        "kms:Revoke*",
+        "kms:Disable*",
+        "kms:Get*",
+        "kms:Delete*",
+        "kms:TagResource",
+        "kms:UnTagResource",
+        "kms:ScheduleKeyDeletion",
+        "kms:CancelKeyDeletion",
+    ],
+    "Resource": "*",
+}
+
 kms_ec2_ebs_encryption_policy = {
-    "Version": "2012-10-17",
+    "Version": IAM_POLICY_VERSION,
     "Id": "auto-ebs-2",
     "Statement": [
         {
-            "Sid": "Allow access through EBS for all principals in the account that are authorized to use EBS",
+            # Allow access through EBS for all principals in the account that are authorized to use EBS
             "Effect": "Allow",
             "Principal": {"AWS": "*"},
             "Action": [
@@ -40,47 +73,83 @@ kms_ec2_ebs_encryption_policy = {
                 }
             },
         },
+        kms_key_access_statement,
+    ],
+}
+
+kms_s3_data_encryption_policy = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        kms_key_access_statement,
         {
-            "Sid": "Allow direct access to key metadata to the account",
             "Effect": "Allow",
-            "Principal": {
-                "AWS": [
-                    f"arn:aws:iam::{owner}:root",
-                    f"arn:aws:iam::{owner}:user/mbreedlove",
-                    f"arn:aws:iam::{owner}:user/shaidar",
-                    f"arn:aws:iam::{owner}:user/tmacey",
-                ]
-            },
+            "Principal": {"AWS": "*"},
             "Action": [
-                "kms:Create*",
-                "kms:Describe*",
-                "kms:Enable*",
-                "kms:List*",
-                "kms:Put*",
-                "kms:Update*",
-                "kms:Revoke*",
-                "kms:Disable*",
-                "kms:Get*",
-                "kms:Delete*",
-                "kms:TagResource",
-                "kms:UnTagResource",
-                "kms:ScheduleKeyDeletion",
-                "kms:CancelKeyDeletion",
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:CreateGrant",
+                "kms:DescribeKey",
             ],
             "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "kms:ViaService": "s3.us-east-1.amazonaws.com",
+                    "kms:CallerAccount": f"{owner}",
+                }
+            },
         },
     ],
 }
 
-key = kms.Key(
+ebs_key = kms.Key(
     kms_ec2_environment,
-    customer_master_key_spec="SYMMETRIC_DEFAULT",
+    customer_master_key_spec=DEFAULT_KEY_SPEC,
     description=f"Key to encrypt/decrypt {stack_info.env_suffix} EBS volumes",
     enable_key_rotation=True,
     is_enabled=True,
-    key_usage="ENCRYPT_DECRYPT",
+    key_usage=ENCRYPT_KEY_USAGE,
     policy=json.dumps(kms_ec2_ebs_encryption_policy),
     tags=aws_config.merged_tags({"Name": kms_ec2_environment}),
 )
+ebs_key_alias = kms.Alias(
+    f"{kms_ec2_environment}-alias",
+    name=f"alias/{kms_ec2_environment}",
+    target_key_id=ebs_key.id,
+)
+export(
+    "kms_ec2_ebs_key",
+    {"id": ebs_key.id, "arn": ebs_key.arn, "alias": ebs_key_alias.name},
+)
 
-export("kms_ec2_ebs_key", key.id)
+# KMS key used for encrypting data in S3 used for data analytics/warehousing
+s3_data_key = kms.Key(
+    f"s3-data-analytics-{stack_info.env_suffix}",
+    customer_master_key_spec=DEFAULT_KEY_SPEC,
+    description=(
+        "Key for encrypting data in S3 buckets used for "
+        f"analytical/warehousing purposes in {stack_info.env_suffix} environments"
+    ),
+    enable_key_rotation=True,
+    is_enabled=True,
+    key_usage=ENCRYPT_KEY_USAGE,
+    tags=AWSBase(
+        tags={
+            "OU": "data",
+            "Environment": f"data-{stack_info.env_suffix}",
+            "Owner": "platform-engineering",
+        }
+    ).tags,
+    policy=json.dumps(kms_s3_data_encryption_policy),
+)
+s3_data_key_alias = kms.Alias(
+    f"s3-data-analytics-{stack_info.env_suffix}-alias",
+    name=f"alias/s3-analytical-data-{stack_info.env_suffix}",
+    target_key_id=s3_data_key.id,
+)
+
+export(
+    "kms_s3_data_analytics_key",
+    {"id": s3_data_key.id, "arn": s3_data_key.arn, "alias": s3_data_key_alias.name},
+)

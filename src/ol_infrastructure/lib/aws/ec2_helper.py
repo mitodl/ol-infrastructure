@@ -3,19 +3,19 @@ from enum import Enum, unique
 from functools import lru_cache
 from ipaddress import IPv4Network
 from types import FunctionType
-from typing import Any, Dict, List, Optional, Text, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import boto3
 import pulumi
 import yaml
-from pulumi_aws import get_ami
+from pulumi_aws import ec2
 
 from ol_infrastructure.providers.salt.minion import OLSaltStackMinion
 
 ec2_client = boto3.client("ec2")
-AWSFilterType = List[Dict[Text, Union[Text, List[Text]]]]  # noqa: WPS221
+AWSFilterType = List[Dict[str, Union[str, List[str]]]]  # noqa: WPS221
 
-debian_10_ami = get_ami(  # noqa: WPS114
+debian_10_ami = ec2.get_ami(  # noqa: WPS114
     filters=[
         {"name": "virtualization-type", "values": ["hvm"]},
         {"name": "root-device-type", "values": ["ebs"]},
@@ -38,26 +38,26 @@ class InstanceTypes(str, Enum):  # noqa: WPS600
 
 
 @lru_cache
-def aws_regions() -> List[Text]:
+def aws_regions() -> List[str]:
     """Generate the list of regions available in AWS.
 
     :returns: List of AWS regions
 
-    :rtype: List[Text]
+    :rtype: List[str]
     """
     return [region["RegionName"] for region in ec2_client.describe_regions()["Regions"]]
 
 
 @lru_cache
-def availability_zones(region: Text = "us-east-1") -> List[Text]:
+def availability_zones(region: str = "us-east-1") -> List[str]:
     """Generate a list of availability zones for a given AWS region.
 
     :param region: The region to be queried
-    :type region: Text
+    :type region: str
 
     :returns: The list of availability zone names for the region
 
-    :rtype: List[Text]
+    :rtype: List[str]
     """
     zones = ec2_client.describe_availability_zones(
         Filters=[{"Name": "region-name", "Values": [region]}]
@@ -68,10 +68,10 @@ def availability_zones(region: Text = "us-east-1") -> List[Text]:
 def _conditional_import(  # noqa: WPS210
     discover_func: FunctionType,
     filters: AWSFilterType,
-    attributes_key: Text,
-    attribute_id_key: Text,
-    change_attributes_ignored: Optional[List[Text]] = None,
-) -> Tuple[pulumi.ResourceOptions, Text]:
+    attributes_key: str,
+    attribute_id_key: str,
+    change_attributes_ignored: Optional[List[str]] = None,
+) -> Tuple[pulumi.ResourceOptions, str]:
     """Shared logic for determining whether to import an existing AWS resource into Pulumi.
 
     :param discover_func: A function object to be used for looking up AWS resources.  e.g. ec2_client.describe_vpcs
@@ -83,15 +83,15 @@ def _conditional_import(  # noqa: WPS210
 
     :param attributes_key: The dictionary attribute used to access the resource information returned by the discovery
         function.  e.g. Vpcs
-    :type attributes_key: Text
+    :type attributes_key: str
 
     :param attribute_id_key: The dictionary attribute where the resource ID is located in the data structure returned by
         the discovery function.  e.g. VpcId
-    :type attribute_id_key: Text
+    :type attribute_id_key: str
 
     :param change_attributes_ignored: A list of attributes that should be ignored when comparing the imported state with
         the specified state in the Pulumi code.  e.g. ['tags']
-    :type change_attributes_ignored: Text
+    :type change_attributes_ignored: str
 
     :raises ValueError: If more than one resource of the given type is returned then a ValueError is raised as this is
         intended to only operate on a single resource.
@@ -99,7 +99,7 @@ def _conditional_import(  # noqa: WPS210
     :returns: A Pulumi ResourceOptions object that allows for importing unmanaged resources and the ID of the imported
               resource or an empty string if the resource doesn't exist.
 
-    :rtype: Tuple[pulumi.ResourceOptions, Text]
+    :rtype: Tuple[pulumi.ResourceOptions, str]
     """
     resources = discover_func(Filters=filters)[attributes_key]
     tags = []
@@ -132,8 +132,8 @@ def _conditional_import(  # noqa: WPS210
 
 
 def vpc_opts(
-    vpc_cidr: IPv4Network, vpc_tags: Dict[Text, Text]
-) -> Tuple[pulumi.ResourceOptions, Text]:
+    vpc_cidr: IPv4Network, vpc_tags: Dict[str, str]
+) -> Tuple[pulumi.ResourceOptions, str]:
     """Look up and conditionally import an existing VPC.
 
     :param vpc_cidr: The IPv4 CIDR block of the target VPC to be imported if it exists.
@@ -142,13 +142,13 @@ def vpc_opts(
 
     :param vpc_tags: The tags to filter the VPC lookup by to resolve cases where the
         CIDR block might overlap with an existing VPC.
-    :type vpc_tags: Dict[Text, Text]
+    :type vpc_tags: Dict[str, str]
 
     :returns: A Pulumi ResourceOptions object that allows for importing unmanaged VPCs
               and the ID of the imported VPC or and empty string if the VPC doesn't
               exist.
 
-    :rtype: Tuple[pulumi.ResourceOptions, Text]
+    :rtype: Tuple[pulumi.ResourceOptions, str]
     """
     return _conditional_import(
         ec2_client.describe_vpcs,
@@ -161,16 +161,16 @@ def vpc_opts(
     )
 
 
-def internet_gateway_opts(attached_vpc_id: Text) -> Tuple[pulumi.ResourceOptions, Text]:
+def internet_gateway_opts(attached_vpc_id: str) -> Tuple[pulumi.ResourceOptions, str]:
     """Look up existing internet gateways to conditionally import when building a VPC.
 
     :param attached_vpc_id: The ID of the VPC where the target gateway will be attached
-    :type attached_vpc_id: Text
+    :type attached_vpc_id: str
 
     :returns: A Pulumi ResourceOptions object that includes the appropriate import parameters and the ID of the imported
               gateway or an empty string if no gateway exists.
 
-    :rtype: Tuple[pulumi.ResourceOptions, Text]
+    :rtype: Tuple[pulumi.ResourceOptions, str]
     """
     return _conditional_import(
         ec2_client.describe_internet_gateways,
@@ -181,19 +181,19 @@ def internet_gateway_opts(attached_vpc_id: Text) -> Tuple[pulumi.ResourceOptions
 
 
 def subnet_opts(
-    cidr_block: IPv4Network, vpc_id: Text
-) -> Tuple[pulumi.ResourceOptions, Text]:
+    cidr_block: IPv4Network, vpc_id: str
+) -> Tuple[pulumi.ResourceOptions, str]:
     """Look up existing EC2 subnets to conditionally import.
 
     :param cidr_block: The CIDR block assigned to the subnet being defined.
     :type cidr_block: IPv4Network
 
     :param vpc_id: The ID of the VPC to look for subnets in.
-    :type vpc_id: Text
+    :type vpc_id: str
 
     :returns: A Pulumi ResourceOptions object and the ID of the subnet to be conditionally imported.
 
-    :rtype: Tuple[pulumi.ResourceOptions, Text]
+    :rtype: Tuple[pulumi.ResourceOptions, str]
     """
     return _conditional_import(
         ec2_client.describe_subnets,
@@ -212,15 +212,15 @@ def subnet_opts(
     )
 
 
-def route_table_opts(internet_gateway_id: Text) -> Tuple[pulumi.ResourceOptions, Text]:
+def route_table_opts(internet_gateway_id: str) -> Tuple[pulumi.ResourceOptions, str]:
     """Look up an existing route table and conditionally import it.
 
     :param internet_gateway_id: The ID of the internet gateway associated with the target route table.
-    :type internet_gateway_id: Text
+    :type internet_gateway_id: str
 
     :returns: A Pulumi ResourceOptions object that contains the necessary import settings.
 
-    :rtype: Tuple[pulumi.ResourceOptions, Text]
+    :rtype: Tuple[pulumi.ResourceOptions, str]
     """
     return _conditional_import(
         ec2_client.describe_route_tables,
@@ -232,22 +232,22 @@ def route_table_opts(internet_gateway_id: Text) -> Tuple[pulumi.ResourceOptions,
 
 
 def vpc_peer_opts(
-    source_vpc_cidr: Text, destination_vpc_cidr: Text
-) -> Tuple[pulumi.ResourceOptions, Text]:
+    source_vpc_cidr: str, destination_vpc_cidr: str
+) -> Tuple[pulumi.ResourceOptions, str]:
     """Look up an existing route table and conditionally import it.
 
     :param source_vpc_cidr: The CIDR block of the VPC that is initiating the peer
         request.
-    :type source_vpc_cidr: Text
+    :type source_vpc_cidr: str
 
     :param destination_vpc_cidr: The CIDR block of the VPC that is accepting the peer
         request.
-    :param destination_vpc_cidr: Text
+    :param destination_vpc_cidr: str
 
     :returns: A Pulumi ResourceOptions object that contains the necessary import
               settings.
 
-    :rtype: Tuple[pulumi.ResourceOptions, Text]
+    :rtype: Tuple[pulumi.ResourceOptions, str]
     """
     return _conditional_import(
         ec2_client.describe_vpc_peering_connections,
@@ -268,50 +268,50 @@ def vpc_peer_opts(
 
 
 def build_userdata(  # noqa: WPS211
-    instance_name: Text,
+    instance_name: str,
     minion_keys: OLSaltStackMinion,
-    minion_roles: List[Text],
-    minion_environment: Text,
-    salt_host: Text,
-    additional_cloud_config: Optional[Dict[Text, Any]] = None,
-    additional_salt_config: Optional[Dict[Text, Text]] = None,
-) -> pulumi.Output[Text]:
+    minion_roles: List[str],
+    minion_environment: str,
+    salt_host: str,
+    additional_cloud_config: Optional[Dict[str, Any]] = None,
+    additional_salt_config: Optional[Dict[str, str]] = None,
+) -> pulumi.Output[str]:
     """Construct a user data dictionary for use with EC2 instances.
 
     :param instance_name: The value for the `Name` tag
-    :type instance_name: Text
+    :type instance_name: str
 
     :param minion_keys: The minion keys generated from the SaltStack minion dynamic
         provider
     :type minion_keys: OLSaltStackMinion
 
     :param minion_roles: The list of values to assign to the `roles` grain on the minion
-    :type minion_roles: List[Text]
+    :type minion_roles: List[str]
 
     :param minion_environment: The value to set for the `environment` grain on the
         minion
-    :type minion_environment: Text
+    :type minion_environment: str
 
     :param salt_host: The resolvable address of the host for the Salt master that the
         instance will be communicating with.
-    :type salt_host: Text
+    :type salt_host: str
 
     :param additional_cloud_config: Additional settings to pass through to cloud-init.
         It will be merged in with the YAML document that sets the Saltstack
         configuration.
-    :type additional_cloud_config: Optional[Dict[Text, Any]]
+    :type additional_cloud_config: Optional[Dict[str, Any]]
 
     :param additional_salt_config: Additional settings to set in the salt_minion module
         of cloud-init
-    :type additional_salt_config: Optional[Dict[Text, Text]]
+    :type additional_salt_config: Optional[Dict[str, str]]
 
     :returns: A YAML rendering of the cloud-init userdata wrapped in a Pulumi output to
               create a dependency link.
 
-    :rtype: pulumi.Output[Text]
+    :rtype: pulumi.Output[str]
     """
 
-    def _build_cloud_config_string(keys) -> Text:  # noqa: WPS430
+    def _build_cloud_config_string(keys) -> str:  # noqa: WPS430
         cloud_config = additional_cloud_config or {}
         # TODO (TMM 2020-09-10): Once the upstream PR is merged move to using the
         # upstream bootstrap script. https://github.com/saltstack/salt-bootstrap/pull/1498

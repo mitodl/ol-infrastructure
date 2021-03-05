@@ -1,11 +1,12 @@
 from enum import Enum, unique
-from typing import Dict, Text
+from typing import Dict
 
 from pydantic import BaseModel, validator
 
 from ol_infrastructure.lib.aws.ec2_helper import aws_regions
 
 REQUIRED_TAGS = {"OU", "Environment"}  # noqa: WPS407
+RECOMMENDED_TAGS = {"Application", "Owner"}  # noqa: WPS407
 
 
 @unique
@@ -45,18 +46,18 @@ class Apps(str, Enum):  # noqa: WPS600
 class AWSBase(BaseModel):
     """Base class for deriving configuration objects to pass to AWS component resources."""
 
-    tags: Dict
-    region: Text = "us-east-1"
+    tags: Dict[str, str]
+    region: str = "us-east-1"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.tags.update({"pulumi_managed": "true"})
 
     @validator("tags")
-    def enforce_tags(cls, tags: Dict[Text, Text]) -> Dict[Text, Text]:  # noqa: N805
+    def enforce_tags(cls, tags: Dict[str, str]) -> Dict[str, str]:  # noqa: N805
         if not REQUIRED_TAGS.issubset(tags.keys()):
             raise ValueError(
-                f"Not all required tags have been specified. Missing tags: {REQUIRED_TAGS.difference(tags.keys())}"
+                f"Not all required tags have been specified. Missing tags: {REQUIRED_TAGS.difference(tags.keys())}"  # noqa: WPS237
             )
         try:
             BusinessUnit(tags["OU"])
@@ -65,12 +66,12 @@ class AWSBase(BaseModel):
         return tags
 
     @validator("region")
-    def check_region(cls, region: Text) -> Text:  # noqa: N805
+    def check_region(cls, region: str) -> str:  # noqa: N805
         if region not in aws_regions():
             raise ValueError("The specified region does not exist")
         return region
 
-    def merged_tags(self, new_tags: Dict[Text, Text]) -> Dict[Text, Text]:
+    def merged_tags(self, new_tags: Dict[str, str]) -> Dict[str, str]:
         """Return a dictionary of tags that merges those defined on the class with those passed in.
 
         This generates a new dictionary of tags in order to allow for a broadly applicable set of tagsto then be updated
