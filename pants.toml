@@ -1,0 +1,19 @@
+[GLOBAL]
+pants_version = "2.3.0rc0"
+backend_packages = [
+  'pants.backend.python',
+  'pants.backend.python.lint.isort',
+  'pants.backend.python.lint.black',
+  'pants.backend.python.lint.flake8',
+  'pants.backend.python.typecheck.mypy'
+]
+
+[source]
+root_patterns = ['src/']
+
+[python-setup]
+interpreter_constraints = ['>=3.7']
+requirement_constraints = './requirements.txt'
+
+[flake8]
+config = 'setup.cfg'

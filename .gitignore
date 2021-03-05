@@ -1,0 +1,6 @@
+__pycache__/*
+**/*.pyc
+.mypy_cache/
+/.pants.d/
+.pids/
+.vagrant/
