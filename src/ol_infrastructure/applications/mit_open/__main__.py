@@ -1,4 +1,4 @@
-from pulumi import Config, StackReference, export
+from pulumi import Config, export
 from pulumi.output import Output
 from pulumi_aws import iam, s3
 from pulumi_vault import aws
@@ -9,9 +9,6 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 mit_open_config = Config("mit_open")
 stack_info = parse_stack()
-data_warehouse_stack = StackReference(
-    f"infrastructure.aws.data_warehouse.{stack_info.name}"
-)
 aws_config = AWSBase(
     tags={
         "OU": "mit-open",
@@ -22,8 +19,6 @@ aws_config = AWSBase(
 app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
     stack_info.env_suffix
 ]
-athena_warehouse_outputs = data_warehouse_stack.require_output("athena_data_warehouse")
-athena_warehouse_workgroup = athena_warehouse_outputs["workgroup"]
 
 app_storage_bucket_name = f"mit-open-app-storage-{app_env_suffix}"
 application_storage_bucket = s3.Bucket(
@@ -104,7 +99,9 @@ athena_warehouse_access_statements = [
             "athena:StartQueryExecution",
             "athena:StopQueryExecution",
         ],
-        "Resource": [f"arn:*:athena:*:*:workgroup/{athena_warehouse_workgroup}"],
+        "Resource": [
+            f"arn:*:athena:*:*:workgroup/ol-warehouse-{stack_info.env_suffix}"
+        ],
     },
     {
         "Effect": "Allow",
