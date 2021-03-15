@@ -15,7 +15,7 @@ pytest = "^6"
 wemake-python-styleguide = "*"
 black = "*"
 copier = "^5.1.0"
-pre-commit = "^2.10.0"
+pre-commit = "^2.11.1"
 mypy = "*"
 pytest-testinfra = "^6.1.0"
 
