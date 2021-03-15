@@ -90,7 +90,12 @@ dagster_s3_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS2
     },
     {
         "Effect": "Allow",
-        "Action": ["s3:ListBucket", "s3:GetObject"],
+        "Action": [
+            "s3:GetBucketLocation",
+            "s3:GetObject",
+            "s3:ListBucket",
+            "s3:PutObject",
+        ],
         "Resource": [
             f"arn:aws:s3:::ol-warehouse-results-{stack_info.env_suffix}",
             f"arn:aws:s3:::ol-warehouse-results-{stack_info.env_suffix}/*",
