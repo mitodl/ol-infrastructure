@@ -99,6 +99,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     cluster_name: Optional[str] = Field(
         None, concourse_env_var="CONCOURSE_CLUSTER_NAME"
     )
+    container_runtime: str = Field("containerd", concourse_env_var="CONCOURSE_RUNTIME")
     database_name: str = Field(
         "concourse", concourse_env_var="CONCOURSE_POSTGRES_DATABASE"
     )
