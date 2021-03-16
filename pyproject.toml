@@ -7,7 +7,7 @@ authors = ["MIT Open Learning Engineering <oldevops@mit.edu>"]
 [tool.poetry.dependencies]
 python = "^3.7"
 pyinfra = { git = "https://github.com/Fizzadar/pyinfra" }
-pydantic = "^1.7.3"
+pydantic = "^1.8.1"
 httpx = "^0.16.1"
 
 [tool.poetry.dev-dependencies]
