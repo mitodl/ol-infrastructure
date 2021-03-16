@@ -202,7 +202,7 @@ sign_and_verify_task = ecs.TaskDefinition(
             [
                 {
                     "name": "sign-and-verify",
-                    "image": f'mitodl/sign-and-verify:{sign_and_verify_config.require("docker_label")}',
+                    "image": f'mitodl/sign-and-verify:{sign_and_verify_config.require("docker_label")}',  # noqa: WPS237
                     "environment": [
                         {"name": "PORT", "value": f"{CONTAINER_PORT}"},
                         {"name": "DIGEST_CHECK", "value": "true"},
@@ -221,7 +221,6 @@ sign_and_verify_task = ecs.TaskDefinition(
                             "awslogs-region": "us-east-1",
                             "awslogs-stream-prefix": f"sign-and-verify-{stack_info.env_suffix}",
                             "awslogs-create-group": "true",
-                            "awslogs-datetime-format": "%Y-%m-%dT%H:%M:%S%z",  # noqa: WPS323
                         },
                     },
                 }
