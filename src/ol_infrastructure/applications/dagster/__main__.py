@@ -39,28 +39,14 @@ network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
+athena_warehouse = data_warehouse_stack.require_output("athena_data_warehouse")
 dagster_environment = f"data-{stack_info.env_suffix}"
 aws_config = AWSBase(
     tags={"OU": "data", "Environment": dagster_environment},
 )
 
 dagster_bucket_name = f"dagster-{dagster_environment}"
-
-data_lake_bucket_resources = []
-athena_warehouse_outputs = data_warehouse_stack.require_output("athena_data_warehouse")
-athena_warehouse_workgroup = athena_warehouse_outputs["workgroup"]
-data_lake_buckets = []
-data_lake_buckets.append(athena_warehouse_outputs["source_buckets"])
-data_lake_buckets.append(athena_warehouse_outputs["results_bucket"])
-for bucket in data_lake_buckets:
-    data_lake_bucket_resources.extend(
-        [
-            f"arn:aws:s3:::{bucket}",
-            f"arn:aws:s3:::{bucket}/*",
-        ]
-    )
-
-s3_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
+dagster_s3_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
     {
         "Effect": "Allow",
         "Action": "s3:ListAllMyBuckets",
@@ -70,7 +56,7 @@ s3_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
         "Effect": "Allow",
         "Action": [
             "s3:ListBucket*",
-            "s3:GetObject*",
+            "s3:GetObject",
             "s3:PutObject",
             "s3:DeleteObject*",
         ],
@@ -83,7 +69,7 @@ s3_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
         "Effect": "Allow",
         "Action": [
             "s3:ListBucket*",
-            "s3:GetObject*",
+            "s3:GetObject",
             "s3:PutObject",
             "s3:DeleteObject*",
         ],
@@ -93,11 +79,27 @@ s3_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
         "Effect": "Allow",
         "Action": [
             "s3:ListBucket*",
-            "s3:GetObject*",
+            "s3:GetObject",
             "s3:PutObject",
             "s3:DeleteObject*",
         ],
-        "Resource": data_lake_bucket_resources,
+        "Resource": [
+            f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}",
+            f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}/*",
+        ],
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "s3:GetBucketLocation",
+            "s3:GetObject",
+            "s3:ListBucket",
+            "s3:PutObject",
+        ],
+        "Resource": [
+            f"arn:aws:s3:::ol-warehouse-results-{stack_info.env_suffix}",
+            f"arn:aws:s3:::ol-warehouse-results-{stack_info.env_suffix}/*",
+        ],
     },
 ]
 
@@ -118,7 +120,7 @@ athena_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
             "athena:UntagResource",
         ],
         "Resource": [
-            f"arn:*:athena:*:*:workgroup/{athena_warehouse_workgroup}",
+            f"arn:*:athena:*:*:workgroup/*{stack_info.env_suffix}",
             "arn:*:athena:*:*:datacatalog/*",
         ],
     },
@@ -140,7 +142,7 @@ athena_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
             "athena:StopQueryExecution",
             "athena:UpdateWorkGroup",
         ],
-        "Resource": [f"arn:*:athena:*:*:workgroup/{athena_warehouse_workgroup}"],
+        "Resource": [f"arn:*:athena:*:*:workgroup/*{stack_info.env_suffix}"],
     },
     {
         "Effect": "Allow",
@@ -159,7 +161,6 @@ athena_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
     {
         "Effect": "Allow",
         "Action": [
-            "glue:GetDatabases",
             "glue:TagResource",
             "glue:UnTagResource",
         ],
@@ -172,11 +173,12 @@ athena_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
             "glue:BatchDeletePartition",
             "glue:BatchDeleteTable",
             "glue:BatchGetPartition",
-            "glue:CreatePartition",
             "glue:CreateTable",
+            "glue:CreatePartition",
             "glue:DeletePartition",
             "glue:DeleteTable",
             "glue:GetDatabase",
+            "glue:GetDatabases",
             "glue:GetPartition",
             "glue:GetPartitions",
             "glue:GetTable",
@@ -186,15 +188,16 @@ athena_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
             "glue:UpdateTable",
         ],
         "Resource": [
-            "arn:aws:glue:::database/{db}"
-            for db in athena_warehouse_outputs["databases"]
+            "arn:aws:glue:*:*:catalog",
+            f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}",
+            f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}/*",
         ],
     },
 ]
 
-dagster_iam_policy_document = {
+dagster_iam_permissions = {
     "Version": "2012-10-17",
-    "Statement": s3_permissions + athena_permissions,
+    "Statement": dagster_s3_permissions + athena_permissions,
 }
 
 dagster_runtime_bucket = s3.Bucket(
@@ -217,7 +220,7 @@ dagster_iam_policy = iam.Policy(
     f"dagster-policy-{stack_info.env_suffix}",
     name=f"dagster-policy-{stack_info.env_suffix}",
     path=f"/ol-data/etl-policy-{stack_info.env_suffix}/",
-    policy=lint_iam_policy(dagster_iam_policy_document, stringify=True),
+    policy=lint_iam_policy(dagster_iam_permissions, stringify=True),
     description="Policy for granting acces for batch data workflows to AWS resources",
 )
 

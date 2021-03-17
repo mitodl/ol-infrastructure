@@ -113,6 +113,20 @@ athena_warehouse_access_statements = [
     {
         "Effect": "Allow",
         "Action": [
+            "s3:ListBucket",
+            "S3:GetObject",
+        ],
+        "Resource": [
+            f"arn:aws:s3:::ol-data-lake-mitx-{stack_info.env_suffix}",
+            f"arn:aws:s3:::ol-data-lake-mitx-{stack_info.env_suffix}/*",
+            f"arn:aws:s3:::ol-data-lake-mit-open-{stack_info.env_suffix}",
+            f"arn:aws:s3:::ol-data-lake-mit-open-{stack_info.env_suffix}/*",
+            f"arn:aws:s3:::ol-warehouse-results-{stack_info.env_suffix}",
+        ],
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
             "athena:BatchGetNamedQuery",
             "athena:BatchGetQueryExecution",
             "athena:GetNamedQuery",
@@ -153,7 +167,8 @@ athena_warehouse_access_statements = [
         ],
         "Resource": [
             "arn:aws:glue:*:*:catalog",
-            f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}",
+            f"arn:aws:glue:*:*:database/ol_warehouse_mitx_{stack_info.env_suffix}",
+            f"arn:aws:glue:*:*:database/ol_warehouse_mit_open_{stack_info.env_suffix}",
             f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}/*",
         ],
     },
