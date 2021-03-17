@@ -43,12 +43,19 @@ course_data_bucket = s3.Bucket(
     tags=aws_config.tags,
 )
 
+parliament_config = {
+    "PERMISSIONS_MANAGEMENT_ACTIONS": {
+        "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
+    }
+}
+
 s3_bucket_permissions = [
     {
         "Action": [
             "s3:GetObject*",
             "s3:ListBucket*",
             "s3:PutObject",
+            "s3:PutObjectAcl",
             "S3:DeleteObject",
         ],
         "Effect": "Allow",
@@ -167,7 +174,9 @@ mit_open_iam_policy = iam.Policy(
     f"mit_open_iam_permissions_{stack_info.env_suffix}",
     name=f"mit-open-application-permissions-{stack_info.env_suffix}",
     path=f"/ol-applications/mit-open/{stack_info.env_suffix}/",
-    policy=lint_iam_policy(open_policy_document, stringify=True),
+    policy=lint_iam_policy(
+        open_policy_document, stringify=True, parliament_config=parliament_config
+    ),
 )
 
 mit_open_vault_iam_role = aws.SecretBackendRole(
