@@ -903,7 +903,7 @@ testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "requests", "xm
 
 [[package]]
 name = "pytest-testinfra"
-version = "6.1.0"
+version = "6.2.0"
 description = "Test infrastructures"
 category = "dev"
 optional = false
@@ -1232,7 +1232,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "db83b63387f952a14d13d1b013828bc336cec4640ee69bc6f2d94fa6d03822c8"
+content-hash = "1b8670d5a4cc7f1c69c3b87decfc18258cb3587004c75389345438d82ebd06be"
 
 [metadata.files]
 appdirs = [
@@ -1751,8 +1751,8 @@ pytest = [
     {file = "pytest-6.2.2.tar.gz", hash = "sha256:9d1edf9e7d0b84d72ea3dbcdfd22b35fb543a5e8f2a60092dd578936bf63d7f9"},
 ]
 pytest-testinfra = [
-    {file = "pytest-testinfra-6.1.0.tar.gz", hash = "sha256:82d9f20e5c334202a67adf74a0db8492629364e8a955f402eaf69afa9b91d0a8"},
-    {file = "pytest_testinfra-6.1.0-py3-none-any.whl", hash = "sha256:c0ab1a9b7a9550c1cade72e905956ca44400757c347ca11ba9399d6ac8a8cf7f"},
+    {file = "pytest-testinfra-6.2.0.tar.gz", hash = "sha256:fbaec729a39c90917895381bee903461be1aa8dcd2f5fff6bc5600c9fe12c795"},
+    {file = "pytest_testinfra-6.2.0-py3-none-any.whl", hash = "sha256:f24f41c6453e0e70f361672cabc8358b4ade1f72a1d52870e621f12bf74015e1"},
 ]
 python-dateutil = [
     {file = "python-dateutil-2.8.1.tar.gz", hash = "sha256:73ebfe9dbf22e832286dafa60473e4cd239f8592f699aa5adaf10050e6e1823c"},
