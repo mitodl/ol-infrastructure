@@ -1,0 +1,20 @@
+[Unit]
+Description="HashiCorp Consul - A service mesh solution"
+Documentation=https://www.consul.io/
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+Type=notify
+EnvironmentFile=-/etc/default/consul
+Restart=on-failure
+LimitNOFILE=65536
+ExecStart=/usr/local/bin/consul agent $OPTIONS -config-dir={{ consul.config_directory }} -data-dir={{ consul.data_directory }}
+ExecReload=/bin/kill --signal HUP $MAINPID
+KillSignal=SIGTERM
+KillMode=process
+User={{ consul.user }}
+Group={{ consul.group }}
+
+[Install]
+WantedBy=multi-user.target

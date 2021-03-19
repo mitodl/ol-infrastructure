@@ -1,4 +1,5 @@
-from typing import List
+from pathlib import Path
+from typing import Optional, Sequence, Tuple
 
 from pydantic import BaseModel
 
@@ -8,30 +9,17 @@ from ol_configuration_management.lib.model_helpers import OLBaseSettings
 class HashicorpProduct(BaseModel):
     name: str
     version: str
+    install_directory: Optional[Path] = None
 
 
 class HashicorpConfig(OLBaseSettings):
-    products: List[HashicorpProduct]
-
     class Config:  # noqa: WPS431
-        env_prefix = "hashicorp_"
+        extra = "allow"
+
+    def render_config_files(self) -> Sequence[Tuple[Path, str]]:
+        raise NotImplementedError("This method has not been implemented")
 
 
-class ConsulConfig(OLBaseSettings):
+class FlexibleBaseModel(BaseModel):
     class Config:  # noqa: WPS431
-        env_prefix = "consul_"
-
-
-class ConsulTemplateConfig(OLBaseSettings):
-    class Config:  # noqa: WPS431
-        env_prefix = "consul_template"
-
-
-class NomadConfig(OLBaseSettings):
-    class Config:  # noqa: WPS431
-        env_prefix = "nomad_"
-
-
-class VaultConfig(OLBaseSettings):
-    class Config:  # noqa: WPS431
-        env_prefix = "vault_"
+        extra = "allow"

@@ -98,7 +98,7 @@ def _manage_web_node_keys(
     # Create authorized_keys file
     files.template(
         name="Create authorized_keys file to permit worker connections",
-        src=Path(__file__).parent.joinpath("templates/authorized_keys.j2"),
+        src=Path(__file__).parent.joinpath("templates", "authorized_keys.j2"),
         dest=concourse_config.authorized_keys_file,
         user=concourse_config.user,
         authorized_keys=concourse_config.authorized_worker_keys or [],

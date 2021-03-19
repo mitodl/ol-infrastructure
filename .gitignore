@@ -4,3 +4,4 @@ __pycache__/*
 /.pants.d/
 .pids/
 .vagrant/
+dist/
