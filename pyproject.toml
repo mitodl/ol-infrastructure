@@ -16,7 +16,7 @@ repository = "https://github.com/mitodl/ol-infrastructure"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pulumi = "^2.0.0"
+pulumi = "^2.23.1"
 pulumi-aws = "^3.34.1"
 pulumi_consul = "^2.9.0"
 pulumi-vault = "^3.5.0"
