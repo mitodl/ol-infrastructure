@@ -24,7 +24,7 @@ boto3 = "^1.17.33"
 pydantic = "^1.5.1"
 salt-pepper = "^0.7.6"
 pyyaml = "^5.3.1"
-parliament = "^1.2.1"
+parliament = "^1.4.0"
 
 [tool.poetry.dev-dependencies]
 wemake-python-styleguide = "^0.15"

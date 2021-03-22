@@ -622,7 +622,7 @@ pyparsing = ">=2.0.2"
 
 [[package]]
 name = "parliament"
-version = "1.3.1"
+version = "1.4.0"
 description = "parliament audits your AWS IAM policies"
 category = "main"
 optional = false
@@ -1148,7 +1148,7 @@ typing_extensions = ">=3.6,<4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "f92397163e97ef52510c6e6bcd87a9ff7ef18a644f97d4d888cd75c4d4227ac5"
+content-hash = "1e32687afe062177a0a6cd4c5d2066bfa16ba96a128b1179816c880488aba5f0"
 
 [metadata.files]
 appdirs = [
@@ -1480,8 +1480,8 @@ packaging = [
     {file = "packaging-20.9.tar.gz", hash = "sha256:5b327ac1320dc863dca72f4514ecc086f31186744b84a230374cc1fd776feae5"},
 ]
 parliament = [
-    {file = "parliament-1.3.1-py3-none-any.whl", hash = "sha256:07574d6302bf2e22f8b9a29c75ebe688a5b9c3a82292f9a75f9c690ce7e6cc35"},
-    {file = "parliament-1.3.1.tar.gz", hash = "sha256:2359299fb09a495faee2622c03c6d3765660656fbc0a4f197c309dbd7a6e2ba6"},
+    {file = "parliament-1.4.0-py3-none-any.whl", hash = "sha256:cbfb09b525d7278fde1a77cfc3740d56becadbf893c9825377802bfce365abe3"},
+    {file = "parliament-1.4.0.tar.gz", hash = "sha256:cf40d5f5732bcf831fdb1a13f71c3cf4f3bdb8c8d9685592ecdd6d84675b947e"},
 ]
 parver = [
     {file = "parver-0.3.1-py2.py3-none-any.whl", hash = "sha256:41a548c51b006a2f2522b54293cbfd2514bffa10774ece8430c9964a20cbd8b4"},
