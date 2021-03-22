@@ -17,7 +17,7 @@ black = "*"
 copier = "^5.1.0"
 pre-commit = "^2.11.1"
 mypy = "*"
-pytest-testinfra = "^6.1.0"
+pytest-testinfra = "^6.2.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
