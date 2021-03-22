@@ -6,12 +6,12 @@ import httpx
 from pyinfra.api import deploy
 from pyinfra.operations import files, server, systemd
 
-from ol_configuration_management.components.concourse.models import (
+from bilder.components.concourse.models import (
     ConcourseBaseConfig,
     ConcourseWebConfig,
     ConcourseWorkerConfig,
 )
-from ol_configuration_management.facts import has_systemd  # noqa: F401
+from bilder.facts import has_systemd  # noqa: F401
 
 
 @deploy("Install Concourse")

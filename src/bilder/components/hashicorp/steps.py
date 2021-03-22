@@ -5,12 +5,9 @@ import httpx
 from pyinfra.api import deploy
 from pyinfra.operations import apt, files, server
 
-from ol_configuration_management.components.hashicorp.models import (
-    HashicorpConfig,
-    HashicorpProduct,
-)
-from ol_configuration_management.facts import system  # noqa: F401
-from ol_configuration_management.lib.linux_helpers import linux_family
+from bilder.components.hashicorp.models import HashicorpConfig, HashicorpProduct
+from bilder.facts import system  # noqa: F401
+from bilder.lib.linux_helpers import linux_family
 
 
 @deploy("Install Hashicorp Products")  # noqa: WPS210

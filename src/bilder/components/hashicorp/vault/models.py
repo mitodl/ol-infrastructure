@@ -2,10 +2,7 @@ import abc
 from pathlib import Path
 from typing import Any, Optional
 
-from ol_configuration_management.components.hashicorp.models import (
-    FlexibleBaseModel,
-    HashicorpConfig,
-)
+from bilder.components.hashicorp.models import FlexibleBaseModel, HashicorpConfig
 
 
 class VaultSealConfig(FlexibleBaseModel, abc.ABC):

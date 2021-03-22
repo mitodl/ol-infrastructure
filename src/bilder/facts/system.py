@@ -1,6 +1,6 @@
 from pyinfra.api import FactBase
 
-from ol_configuration_management.lib.linux_helpers import normalize_cpu_arch
+from bilder.lib.linux_helpers import normalize_cpu_arch
 
 
 class DebianCpuArch(FactBase):

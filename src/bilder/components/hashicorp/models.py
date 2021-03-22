@@ -3,7 +3,7 @@ from typing import Optional, Sequence, Tuple
 
 from pydantic import BaseModel
 
-from ol_configuration_management.lib.model_helpers import OLBaseSettings
+from bilder.lib.model_helpers import OLBaseSettings
 
 
 class HashicorpProduct(BaseModel):

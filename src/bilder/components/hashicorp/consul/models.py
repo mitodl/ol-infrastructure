@@ -4,10 +4,7 @@ from typing import Dict, List, Optional
 from pydantic.fields import Field
 from pydantic.types import SecretStr
 
-from ol_configuration_management.components.hashicorp.models import (
-    FlexibleBaseModel,
-    HashicorpConfig,
-)
+from bilder.components.hashicorp.models import FlexibleBaseModel, HashicorpConfig
 
 
 class EnvConsulConfig(HashicorpConfig):

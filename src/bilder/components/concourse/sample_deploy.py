@@ -1,19 +1,17 @@
 from pyinfra import host
 
-from ol_configuration_management.components.baseline.setup import (
-    install_baseline_packages,
-)
-from ol_configuration_management.components.concourse.build import (
-    configure_concourse,
-    install_concourse,
-    register_concourse_service,
-)
-from ol_configuration_management.components.concourse.models import (
+from bilder.components.baseline.setup import install_baseline_packages
+from bilder.components.concourse.models import (
     ConcourseBaseConfig,
     ConcourseWebConfig,
     ConcourseWorkerConfig,
 )
-from ol_configuration_management.facts import has_systemd  # noqa: F401
+from bilder.components.concourse.steps import (
+    configure_concourse,
+    install_concourse,
+    register_concourse_service,
+)
+from bilder.facts import has_systemd  # noqa: F401
 
 concourse_config = ConcourseBaseConfig()
 web_config = ConcourseWebConfig()

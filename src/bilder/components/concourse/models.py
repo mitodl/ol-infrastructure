@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 
 from pydantic import Field, PositiveInt, SecretStr, validator
 
-from ol_configuration_management.lib.model_helpers import OLBaseSettings
+from bilder.lib.model_helpers import OLBaseSettings
 
 
 class IframeOptions(str, Enum):  # noqa: WPS600
