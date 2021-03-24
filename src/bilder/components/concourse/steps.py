@@ -211,7 +211,6 @@ def configure_concourse(
 @deploy("Register and enable Concourse service")
 def register_concourse_service(
     concourse_config: Union[ConcourseWebConfig, ConcourseWorkerConfig],
-    sudo=True,
     state=None,
     host=None,
     restart=False,
@@ -224,7 +223,6 @@ def register_concourse_service(
         concourse_config=concourse_config,
         state=state,
         host=host,
-        sudo=sudo,
     )
     # Enable Systemd service and ensure it is running
     systemd.service(
@@ -236,5 +234,4 @@ def register_concourse_service(
         daemon_reload=systemd_unit.changed,
         state=state,
         host=host,
-        sudo=sudo,
     )

@@ -1,0 +1,16 @@
+[Unit]
+Description=consul agent
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+EnvironmentFile=-/etc/sysconfig/consul-template
+Restart=on-failure
+ExecStart=/usr/local/bin/consul-template -config={{ context.configuration_directory }}
+ExecReload=/bin/kill -HUP $MAINPID
+KillSignal=SIGTERM
+User={{ consul.user }}
+Group={{ consul.group }}
+
+[Install]
+WantedBy=multi-user.target

@@ -3,7 +3,7 @@ from typing import List
 
 import httpx
 from pyinfra.api import deploy
-from pyinfra.operations import apt, files, server
+from pyinfra.operations import apt, files, server, systemd
 
 from bilder.components.hashicorp.models import HashicorpConfig, HashicorpProduct
 from bilder.facts import system  # noqa: F401
@@ -75,6 +75,30 @@ def install_hashicorp_products(
             user=product.name,
             group=product.name,
             mode="755",
+            state=state,
+            host=host,
+        )
+
+
+@deploy("Register Hashicorp Service")
+def register_service(hashicorp_products: List[HashicorpProduct], state=None, host=None):
+    for product in hashicorp_products:
+        systemd_unit = files.template(
+            f"Create service definition for {product.name}",
+            dest="/usr/lib/systemd/system/{product.name}.service",
+            src=Path(__file__).parent.joinpath(
+                "templates", f"{product.name}.service.j2"
+            ),
+            context=product.systemd_template_context,
+            state=state,
+            host=host,
+        )
+        systemd.service(
+            name=f"Register service for {product.name}",
+            service=product.name,
+            running=True,
+            enabled=True,
+            daemon_reload=systemd_unit.changed,
             state=state,
             host=host,
         )

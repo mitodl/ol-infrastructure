@@ -9,12 +9,12 @@ Type=notify
 EnvironmentFile=-/etc/default/consul
 Restart=on-failure
 LimitNOFILE=65536
-ExecStart=/usr/local/bin/consul agent $OPTIONS -config-dir={{ consul.config_directory }} -data-dir={{ consul.data_directory }}
+ExecStart=/usr/local/bin/consul agent $OPTIONS -config-dir={{ context.configuration_directory }} -data-dir={{ context.data_directory }}
 ExecReload=/bin/kill --signal HUP $MAINPID
 KillSignal=SIGTERM
 KillMode=process
-User={{ consul.user }}
-Group={{ consul.group }}
+User=consul
+Group=consul
 
 [Install]
 WantedBy=multi-user.target
