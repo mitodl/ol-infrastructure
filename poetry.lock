@@ -767,7 +767,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-consul"
-version = "2.9.0"
+version = "2.9.1"
 description = "A Pulumi package for creating and managing consul resources."
 category = "main"
 optional = false
@@ -1148,7 +1148,7 @@ typing_extensions = ">=3.6,<4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "5287e6ce3596b58b5bbc3de4c041ee5dbd8a71badfbeeca36eac28cced1c5441"
+content-hash = "8e8e2572050e7b9b3c3ec196d3107fbaf08af55f339deef5715ef707582ca0fb"
 
 [metadata.files]
 appdirs = [
@@ -1540,7 +1540,7 @@ pulumi-aws = [
     {file = "pulumi_aws-3.34.2.tar.gz", hash = "sha256:7486db9779517e7b07f62dec061c474056150d8c47e2a8aa544ff693928b64e3"},
 ]
 pulumi-consul = [
-    {file = "pulumi_consul-2.9.0.tar.gz", hash = "sha256:e7b93807c52c13e2efcb01203e4de71c484012cb30d361195e2460810439c54d"},
+    {file = "pulumi_consul-2.9.1.tar.gz", hash = "sha256:8faff15a24a4e350bcc22047b1b720d0672d54fdea789db5c4a82c19dc5e56dc"},
 ]
 pulumi-vault = [
     {file = "pulumi_vault-3.5.0.tar.gz", hash = "sha256:4547d02bdf68d91d7ad1ba0d7cd99a5c18114295a46a989297e840d016444ae5"},
