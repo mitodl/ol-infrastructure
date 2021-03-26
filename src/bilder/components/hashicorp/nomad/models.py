@@ -28,7 +28,7 @@ class NomadJob(OLBaseSettings):
 
 
 class Nomad(HashicorpProduct):
-    name: str = "nomad"
+    _name: str = "nomad"
     version: str = "1.0.4"
     configuration: Dict[Path, NomadConfig] = {
         Path("/etc/nomad.d/00-default.json"): NomadConfig(client=NomadClientConfig())

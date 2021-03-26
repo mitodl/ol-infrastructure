@@ -18,7 +18,7 @@ class FlexibleBaseModel(BaseModel):
 
 
 class HashicorpProduct(BaseModel, abc.ABC):
-    name: str
+    _name: str
     version: str
     install_directory: Optional[Path] = None
     configuration: Dict[Path, HashicorpConfig]
@@ -32,3 +32,7 @@ class HashicorpProduct(BaseModel, abc.ABC):
     @abc.abstractmethod
     def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
         raise NotImplementedError("This method has not been implemented")
+
+    @property
+    def name(self):
+        return self._name

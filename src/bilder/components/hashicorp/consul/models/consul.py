@@ -85,7 +85,7 @@ class ConsulConfig(HashicorpConfig):
 
 
 class Consul(HashicorpProduct):
-    name: str = "consul"
+    _name: str = "consul"
     version: str = "1.9.4"
     configuration: Dict[Path, ConsulConfig] = {
         Path("/etc/consul.d/00-default.json"): ConsulConfig()

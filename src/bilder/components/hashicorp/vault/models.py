@@ -154,7 +154,7 @@ class VaultServerConfig(HashicorpConfig):
 
 
 class Vault(HashicorpProduct):
-    name: str = "vault"
+    _name: str = "vault"
     version: str = "1.6.3"
     configuration: HashicorpConfig = VaultAgentConfig()
     configuration_file: Path = Path("/etc/vault/vault.json")

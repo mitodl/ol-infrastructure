@@ -12,7 +12,7 @@ class ConsulTemplateConfig(HashicorpConfig):
 
 
 class ConsulTemplate(HashicorpProduct):
-    name: str = "consul-template"
+    _name: str = "consul-template"
     version: str = "0.25.2"
     configuration: Dict[Path, ConsulTemplateConfig] = {
         Path("/etc/consul-template.d/00-default.json"): ConsulTemplateConfig()
