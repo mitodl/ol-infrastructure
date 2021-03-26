@@ -1,13 +1,14 @@
 from bilder.components.baseline.setup import install_baseline_packages
-from bilder.components.hashicorp.install import install_hashicorp_products
-from bilder.components.hashicorp.models import HashicorpConfig
+from bilder.components.hashicorp import steps as hashicorp_steps
+from bilder.components.hashicorp.consul.models.consul import Consul
+from bilder.components.hashicorp.consul.models.consul_template import ConsulTemplate
+from bilder.components.hashicorp.nomad.models import Nomad
+from bilder.components.hashicorp.vault.models import Vault
 
-hashicorp_config = HashicorpConfig(
-    products=[
-        {"name": "consul", "version": "1.9.3"},
-        {"name": "consul-template", "version": "0.25.2"},
-    ]
-)
+products = [Consul(systemd_execution_type="exec"), ConsulTemplate(), Vault(), Nomad()]
 
 install_baseline_packages()
-install_hashicorp_products(hashicorp_config)
+hashicorp_steps.install_hashicorp_products(products)
+hashicorp_steps.register_services(products)
+for product in products:
+    hashicorp_steps.configure_hashicorp_product(product)

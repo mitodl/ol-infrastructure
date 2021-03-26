@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from pydantic.fields import Field
 
@@ -58,6 +58,7 @@ class ConsulConfig(HashicorpConfig):
     addresses: Optional[ConsulAddresses]
     bootstrap_expect: Optional[int] = 3
     client_addr: Optional[str]
+    data_dir: Optional[Path] = Path("/var/lib/consul/")
     datacenter: Optional[str]
     disable_host_node_id: Optional[bool] = True
     dns_config: Optional[ConsulDNSConfig]
@@ -86,9 +87,25 @@ class ConsulConfig(HashicorpConfig):
 class Consul(HashicorpProduct):
     name: str = "consul"
     version: str = "1.9.4"
+    configuration: Dict[Path, ConsulConfig] = {
+        Path("/etc/consul.d/00-default.json"): ConsulConfig()
+    }
     configuration_directory: Path = Path("/etc/consul.d/")
-    data_directory: Path = Path("/var/lib/consul/")
+    systemd_execution_type: str = "notify"
 
     @property
     def systemd_template_context(self):
         return self
+
+    def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
+        for fpath, config in self.configuration.items():  # noqa: WPS526
+            yield fpath, config.json(exclude_none=True)
+
+    @property
+    def data_directory(self) -> Path:
+        data_dir = list(
+            filter(
+                None, map(lambda config: config.data_dir, self.configuration.values())
+            )
+        )[0]
+        return data_dir or Path("/var/lib/consul/")

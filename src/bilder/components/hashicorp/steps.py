@@ -1,3 +1,4 @@
+import tempfile
 from pathlib import Path
 from typing import List
 
@@ -5,8 +6,8 @@ import httpx
 from pyinfra.api import deploy
 from pyinfra.operations import apt, files, server, systemd
 
-from bilder.components.hashicorp.models import HashicorpConfig, HashicorpProduct
-from bilder.facts import system  # noqa: F401
+from bilder.components.hashicorp.models import HashicorpProduct
+from bilder.facts import has_systemd, system  # noqa: F401
 from bilder.lib.linux_helpers import linux_family
 
 
@@ -64,7 +65,7 @@ def install_hashicorp_products(
         )
         server.shell(
             name=f"Unzip {product.name}",
-            commands=[f"unzip {download_destination} -d {target_directory}"],
+            commands=[f"unzip -o {download_destination} -d {target_directory}"],
             state=state,
             host=host,
         )
@@ -78,14 +79,37 @@ def install_hashicorp_products(
             state=state,
             host=host,
         )
+        files.directory(
+            name=f"Ensure configuration directory for {product.name}",
+            path=product.configuration_directory or product.configuration_file.parent,
+            present=True,
+            user=product.name,
+            group=product.name,
+            recursive=True,
+            state=state,
+            host=host,
+        )
+        if hasattr(product, "data_directory"):  # noqa: WPS421
+            files.directory(
+                name=f"Create data directory for {product.name}",
+                path=product.data_directory,
+                present=True,
+                user=product.name,
+                group=product.name,
+                recursive=True,
+                state=state,
+                host=host,
+            )
 
 
 @deploy("Register Hashicorp Service")
-def register_service(hashicorp_products: List[HashicorpProduct], state=None, host=None):
+def register_services(
+    hashicorp_products: List[HashicorpProduct], state=None, host=None
+):
     for product in hashicorp_products:
         systemd_unit = files.template(
-            f"Create service definition for {product.name}",
-            dest="/usr/lib/systemd/system/{product.name}.service",
+            name=f"Create service definition for {product.name}",
+            dest=f"/usr/lib/systemd/system/{product.name}.service",
             src=Path(__file__).parent.joinpath(
                 "templates", f"{product.name}.service.j2"
             ),
@@ -105,7 +129,28 @@ def register_service(hashicorp_products: List[HashicorpProduct], state=None, hos
 
 
 @deploy("Configure Hashicorp Products")
-def configure_hashicorp_products(
-    product_config: HashicorpConfig, state=None, host=None
-):
-    pass  # noqa: WPS420
+def configure_hashicorp_product(product: HashicorpProduct, state=None, host=None):
+    put_results = []
+    for fpath, file_contents in product.render_configuration_files():
+        temp_src = tempfile.NamedTemporaryFile(delete=False)
+        temp_src.write(file_contents.encode("utf8"))
+        put_results.append(
+            files.put(
+                name=f"Create configuration file {fpath} for {product.name}",
+                src=temp_src.name,
+                create_remote_dir=True,
+                user=product.name,
+                group=product.name,
+                dest=fpath,
+                state=state,
+                host=host,
+            )
+        )
+    if host.fact.has_systemd:
+        systemd.service(
+            name=f"Reload service for {product.name}",
+            service=product.name,
+            reloaded=any(upload_result.changed for upload_result in put_results),
+            host=host,
+            state=state,
+        )

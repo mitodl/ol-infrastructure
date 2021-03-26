@@ -1,6 +1,6 @@
 import abc
 from pathlib import Path
-from typing import Dict, Optional, Sequence, Tuple
+from typing import Dict, Iterable, Optional, Tuple
 
 from pydantic import BaseModel
 
@@ -30,5 +30,5 @@ class HashicorpProduct(BaseModel, abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def render_config_file(self) -> Sequence[Tuple[Path, str]]:
+    def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
         raise NotImplementedError("This method has not been implemented")

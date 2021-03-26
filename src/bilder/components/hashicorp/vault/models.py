@@ -1,6 +1,6 @@
 import abc
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Iterable, List, Optional, Tuple, Union
 
 from bilder.components.hashicorp.models import (
     FlexibleBaseModel,
@@ -129,25 +129,25 @@ class VaultAgentConfig(HashicorpConfig):
 
 
 class VaultServerConfig(HashicorpConfig):
-    storage: VaultStorageBackend
+    api_addr: Optional[str]
+    cache_size: Optional[str]
+    cluster_addr: Optional[str]
+    cluster_name: Optional[str]
+    default_lease_ttl: Optional[str]
+    default_max_request_duration: Optional[str]
+    disable_cache: bool = False
+    disable_clustering: bool = False
+    disable_mlock: bool = False
     ha_storage: Optional[VaultStorageBackend]
     listener: Optional[List[VaultListener]]
-    seal: Optional[VaultSealConfig]
-    cluster_name: Optional[str]
-    cache_size: Optional[str]
-    disable_cache: bool = False
-    disable_mlock: bool = False
-    api_addr: Optional[str]
-    cluster_addr: Optional[str]
-    disable_clustering: bool = False
-    plugin_directory: Optional[Path]
-    telemetry: Optional[VaultTelemetryConfig]
-    max_lease_ttl: Optional[str]
-    default_lease_ttl: Optional[str]
-    ui: Optional[bool] = False
     log_format: str = "json"
     log_level: str = "Warn"
-    default_max_request_duration: Optional[str]
+    max_lease_ttl: Optional[str]
+    plugin_directory: Optional[Path]
+    seal: Optional[VaultSealConfig]
+    storage: VaultStorageBackend
+    telemetry: Optional[VaultTelemetryConfig]
+    ui: Optional[bool] = False
 
     class Config:  # noqa: WPS431
         env_prefix = "vault_"
@@ -156,13 +156,16 @@ class VaultServerConfig(HashicorpConfig):
 class Vault(HashicorpProduct):
     name: str = "vault"
     version: str = "1.6.3"
-    configuration: HashicorpConfig
+    configuration: HashicorpConfig = VaultAgentConfig()
     configuration_file: Path = Path("/etc/vault/vault.json")
 
     @property
     def systemd_template_context(self):
         mode_map = {VaultAgentConfig: "agent", VaultServerConfig: "server"}
         return {
-            "mode": mode_map(type(self.configuration)),
+            "mode": mode_map[type(self.configuration)],
             "configuration_file": self.configuration_file,
         }
+
+    def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
+        return [(self.configuration_file, self.configuration.json(exclude_none=True))]

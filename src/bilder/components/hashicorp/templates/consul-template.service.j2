@@ -9,8 +9,8 @@ Restart=on-failure
 ExecStart=/usr/local/bin/consul-template -config={{ context.configuration_directory }}
 ExecReload=/bin/kill -HUP $MAINPID
 KillSignal=SIGTERM
-User={{ consul.user }}
-Group={{ consul.group }}
+User=consul-template
+Group=consul-template
 
 [Install]
 WantedBy=multi-user.target

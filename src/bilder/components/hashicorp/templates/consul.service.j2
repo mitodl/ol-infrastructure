@@ -5,7 +5,7 @@ Requires=network-online.target
 After=network-online.target
 
 [Service]
-Type=notify
+Type={{ context.systemd_execution_type }}
 EnvironmentFile=-/etc/default/consul
 Restart=on-failure
 LimitNOFILE=65536
