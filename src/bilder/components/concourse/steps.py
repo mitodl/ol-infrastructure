@@ -6,12 +6,12 @@ import httpx
 from pyinfra.api import deploy
 from pyinfra.operations import files, server, systemd
 
-from ol_configuration_management.components.concourse.models import (
+from bilder.components.concourse.models import (
     ConcourseBaseConfig,
     ConcourseWebConfig,
     ConcourseWorkerConfig,
 )
-from ol_configuration_management.facts import has_systemd  # noqa: F401
+from bilder.facts import has_systemd  # noqa: F401
 
 
 @deploy("Install Concourse")
@@ -98,7 +98,7 @@ def _manage_web_node_keys(
     # Create authorized_keys file
     files.template(
         name="Create authorized_keys file to permit worker connections",
-        src=Path(__file__).parent.joinpath("templates/authorized_keys.j2"),
+        src=Path(__file__).parent.joinpath("templates", "authorized_keys.j2"),
         dest=concourse_config.authorized_keys_file,
         user=concourse_config.user,
         authorized_keys=concourse_config.authorized_worker_keys or [],
@@ -211,7 +211,6 @@ def configure_concourse(
 @deploy("Register and enable Concourse service")
 def register_concourse_service(
     concourse_config: Union[ConcourseWebConfig, ConcourseWorkerConfig],
-    sudo=True,
     state=None,
     host=None,
     restart=False,
@@ -224,7 +223,6 @@ def register_concourse_service(
         concourse_config=concourse_config,
         state=state,
         host=host,
-        sudo=sudo,
     )
     # Enable Systemd service and ensure it is running
     systemd.service(
@@ -236,5 +234,4 @@ def register_concourse_service(
         daemon_reload=systemd_unit.changed,
         state=state,
         host=host,
-        sudo=sudo,
     )

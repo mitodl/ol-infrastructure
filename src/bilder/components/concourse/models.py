@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 
 from pydantic import Field, PositiveInt, SecretStr, validator
 
-from ol_configuration_management.lib.model_helpers import OLBaseSettings
+from bilder.lib.model_helpers import OLBaseSettings
 
 
 class IframeOptions(str, Enum):  # noqa: WPS600
@@ -30,7 +30,7 @@ class ConcourseBaseConfig(OLBaseSettings):
         :rtype: Dict[Text, Text]
         """
         concourse_env_dict = {}
-        for attr in self.fields.values():
+        for attr in self.__fields__.values():
             if attr.field_info.extra.get("concourse_env_var"):
                 attr_val = self.dict()[attr.name]
                 if attr_val is not None:
