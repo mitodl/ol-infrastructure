@@ -25,9 +25,10 @@ business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
 destination_vpc = ops.network_stack.require_output(env_config.require("vpc_reference"))
 
+elasticsearch_backup_bucket_name = f"ol-{environment_name}-elasticsearch-backup"
 elasticsearch_backup_bucket = s3.Bucket(
     f"ol-{environment_name}-elasticsearch-backup",
-    bucket=f"ol-{environment_name}-elasticsearch-backup",
+    bucket=elasticsearch_backup_bucket_name,
     acl="private",
     tags=aws_config.tags,
     versioning={"enabled": True},
@@ -57,15 +58,15 @@ elasticsearch_instance_policy = {
         {
             "Action": [
                 "s3:AbortMultipartUpload",
-                "s3:List*",
-                "s3:Get*",
-                "s3:Put*",
-                "s3:Delete*",
+                "s3:ListBucket",
+                "s3:GetObject*",
+                "s3:PutObject",
+                "s3:DeleteObject",
             ],
             "Effect": "Allow",
             "Resource": [
-                f"arn:aws:s3:::{elasticsearch_backup_bucket.name}",
-                f"arn:aws:s3:::{elasticsearch_backup_bucket.name}/*",
+                f"arn:aws:s3:::{elasticsearch_backup_bucket_name}",
+                f"arn:aws:s3:::{elasticsearch_backup_bucket_name}/*",
             ],
         },
     ],
@@ -92,13 +93,13 @@ elasticsearch_instance_role = iam.Role(
         }
     ),
     name=f"elasticsearch-instance-role-{environment_name}",
-    path=f"/ol-operations/elasticsearch-{environment_name}",
+    path=f"/ol-operations/elasticsearch-{environment_name}/",
     tags=aws_config.tags,
 )
 
 iam.RolePolicyAttachment(
     f"elasticsearch-role-policy-{environment_name}",
-    policy_arn=elasticsearch_instance_role.arn,
+    policy_arn=elasticsearch_iam_policy.arn,
     role=elasticsearch_instance_role.name,
 )
 
@@ -126,7 +127,7 @@ elasticsearch_security_group = ec2.SecurityGroup(
     ],
 )
 
-security_groups = {"elasticsearch_server": elasticsearch_security_group}
+security_groups = {"elasticsearch_server": elasticsearch_security_group.id}
 
 instance_type_name = (
     elasticsearch_config.get("instance_type") or InstanceTypes.medium.name
@@ -184,12 +185,14 @@ for count, subnet in zip(range(elasticsearch_config.get_int("instance_count") or
             volume_size=20,
             encrypted=True,
         ),
-        ebs_block_devices=ec2.InstanceEbsBlockDeviceArgs(
-            device_name="/dev/nvme1n1",
-            volume_type="gp2",
-            volume_size=100,
-            encrypted=True,
-        ),
+        ebs_block_devices=[
+            ec2.InstanceEbsBlockDeviceArgs(
+                device_name="/dev/sdb",
+                volume_type="gp2",
+                volume_size=100,
+                encrypted=True,
+            )
+        ],
         vpc_security_group_ids=[
             destination_vpc["security_groups"]["salt_minion"],
             elasticsearch_security_group.id,
