@@ -1,0 +1,11 @@
+secretsprovider: awskms://alias/PulumiSecrets
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQFORL7zva+dnC+r+kWUU+2eAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMGot4YkjSDFiawpNZAgEQgDuvFGef55ZbW2tn6gw5qtsh/TMO+m988qN9Ebqc+vytpADUcVhK/cu+X5pOoJ+fH1ki5uGR36e9vd8GFg==
+config:
+  aws:region: us-east-1
+  environment:business_unit: mitxpro
+  environment:services:
+    - consul
+    # - elasticsearch
+  environment:vpc_reference: xpro_vpc
+  saltstack:key_name: salt-production
+  saltstack:environment_name: mitxpro-production
