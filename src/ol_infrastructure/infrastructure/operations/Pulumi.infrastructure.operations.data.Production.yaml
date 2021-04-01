@@ -2,6 +2,7 @@ secretsprovider: awskms://alias/PulumiSecrets
 encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQGiSij8PQ2GPogmbVLVeWwGAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMxWTEjFlyJKvsPsGWAgEQgDtdxA/jvJOR/XMVfLrrTZyQcqOvqcKitR0avmXw4q7Q9Xc1cMCH791Jhlw2VuSFfOfTJAcqCjYN9elYGw==
 config:
   aws:region: us-east-1
+  elasticsearch:instance_type: general_purpose_large
   environment:business_unit: data
   environment:services:
   - consul

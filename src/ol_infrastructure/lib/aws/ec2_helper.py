@@ -25,6 +25,16 @@ debian_10_ami = ec2.get_ami(  # noqa: WPS114
     owners=["136693071363"],
 )
 
+default_egress_args = [
+    ec2.SecurityGroupEgressArgs(
+        protocol="-1",
+        from_port=0,
+        to_port=0,
+        cidr_blocks=["0.0.0.0/0"],
+        ipv6_cidr_blocks=["::/0"],
+    )
+]
+
 
 @unique
 class InstanceTypes(str, Enum):  # noqa: WPS600

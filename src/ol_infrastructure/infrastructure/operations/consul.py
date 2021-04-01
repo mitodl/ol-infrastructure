@@ -9,6 +9,7 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     InstanceTypes,
     build_userdata,
     debian_10_ami,
+    default_egress_args,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.providers.salt.minion import (
@@ -113,6 +114,7 @@ consul_server_security_group = ec2.SecurityGroup(
             description="WAN cross-datacenter communication",
         ),
     ],
+    egress=default_egress_args,
 )
 
 consul_agent_security_group = ec2.SecurityGroup(

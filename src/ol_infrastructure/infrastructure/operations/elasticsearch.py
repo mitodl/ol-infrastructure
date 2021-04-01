@@ -9,6 +9,7 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     InstanceTypes,
     build_userdata,
     debian_10_ami,
+    default_egress_args,
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -125,6 +126,7 @@ elasticsearch_security_group = ec2.SecurityGroup(
             description="Elasticsearch cluster instances access",
         )
     ],
+    egress=default_egress_args,
 )
 
 security_groups = {"elasticsearch_server": elasticsearch_security_group.id}
@@ -137,6 +139,7 @@ elasticsearch_instances = []
 export_data = {}
 subnets = destination_vpc["subnet_ids"]
 subnet_id = subnets.apply(chain)
+salt_environment = Config("saltstack").get("environment_name") or environment_name
 for count, subnet in zip(range(elasticsearch_config.get_int("instance_count") or 3), subnets):  # type: ignore # noqa: WPS221
     instance_name = f"elasticsearch-{environment_name}-{count}"
     salt_minion = OLSaltStackMinion(
@@ -148,7 +151,7 @@ for count, subnet in zip(range(elasticsearch_config.get_int("instance_count") or
         instance_name=instance_name,
         minion_keys=salt_minion,
         minion_roles=["elasticsearch"],
-        minion_environment=environment_name,
+        minion_environment=salt_environment,
         salt_host=f"salt-{ops.env_suffix}.private.odl.mit.edu",
         additional_cloud_config={
             "device_aliases": {"ephemeral0": "/dev/nvme1n1"},
@@ -168,8 +171,23 @@ for count, subnet in zip(range(elasticsearch_config.get_int("instance_count") or
     )
 
     instance_tags = aws_config.merged_tags(
-        {"Name": instance_name, "elasticsearch_env": environment_name}
+        {
+            "Name": instance_name,
+            "elasticsearch_env": environment_name,
+            "escluster": salt_environment,
+        }
     )
+    if elasticsearch_config.get_bool("public_web"):
+        es_security_groups = [
+            destination_vpc["security_groups"]["salt_minion"],
+            destination_vpc["security_groups"]["web"],
+            elasticsearch_security_group.id,
+        ]
+    else:
+        es_security_groups = [
+            destination_vpc["security_groups"]["salt_minion"],
+            elasticsearch_security_group.id,
+        ]
     elasticsearch_instance = ec2.Instance(
         f"elasticsearch-instance-{environment_name}-{count}",
         ami=debian_10_ami.id,
@@ -193,10 +211,7 @@ for count, subnet in zip(range(elasticsearch_config.get_int("instance_count") or
                 encrypted=True,
             )
         ],
-        vpc_security_group_ids=[
-            destination_vpc["security_groups"]["salt_minion"],
-            elasticsearch_security_group.id,
-        ],
+        vpc_security_group_ids=es_security_groups,
         opts=ResourceOptions(depends_on=[salt_minion]),
     )
     elasticsearch_instances.append(elasticsearch_instance)
