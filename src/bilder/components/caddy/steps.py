@@ -68,6 +68,15 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
             state=state,
             host=host,
         )
+    if caddy_config.log_file:
+        files.directory(
+            name="Crate Caddy log directory",
+            path=caddy_config.log_file.parent,
+            user="caddy",
+            present=True,
+            state=state,
+            host=host,
+        )
     return caddy_install.changed
 
 
