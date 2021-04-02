@@ -1,7 +1,0 @@
-name: ol-infrastructure-operations
-runtime: python
-description: >
-  Pulumi project for managing the operational services needed within a given environment.  This includes elements such
-  as Consul, Vault, RabbitMQ, MongoDB, Elasticsearch, etc.
-backend:
-  url: s3://mitol-pulumi-state/

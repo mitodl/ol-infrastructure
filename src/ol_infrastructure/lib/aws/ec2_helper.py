@@ -17,6 +17,7 @@ AWSFilterType = List[Dict[str, Union[str, List[str]]]]  # noqa: WPS221
 
 debian_10_ami = ec2.get_ami(  # noqa: WPS114
     filters=[
+        {"name": "image-id", "values": ["ami-0e0161137b4b30900"]},
         {"name": "virtualization-type", "values": ["hvm"]},
         {"name": "root-device-type", "values": ["ebs"]},
         {"name": "name", "values": ["debian-10-amd64*"]},
