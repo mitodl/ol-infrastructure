@@ -8,7 +8,7 @@ importing the remaining 3 subnets. If only 3 subnets were specified then one of 
 managed with Pulumi.
 """
 
-from typing import Any, Dict, List, Optional, Text
+from typing import Any, Dict, List, Optional
 
 from pulumi import Config, export
 from security_groups import default_group, public_web, salt_minion
@@ -21,7 +21,7 @@ from ol_infrastructure.components.aws.olvpc import (
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
-def vpc_exports(vpc: OLVPC, peers: Optional[List[Text]] = None) -> Dict[Text, Any]:
+def vpc_exports(vpc: OLVPC, peers: Optional[List[str]] = None) -> Dict[str, Any]:
     """Create a consistent structure for VPC stack exports.
 
     :param vpc: The VPC whose data you would like to export

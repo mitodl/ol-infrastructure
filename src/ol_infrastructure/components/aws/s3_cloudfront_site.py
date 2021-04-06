@@ -1,6 +1,6 @@
 """Module for creating and managing static websites hosted in S3 and delivered through Cloudfront."""
 from enum import Enum
-from typing import List, Optional, Text
+from typing import List, Optional
 
 from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import acm, cloudfront, s3
@@ -22,10 +22,10 @@ class CloudfrontPriceClass(str, Enum):  # noqa: WPS600
 class S3ServerlessSiteConfig(AWSBase):
     """Configuration object for customizing a static site hosted with S3 and Cloudfront."""
 
-    site_name: Text
-    domains: List[Text]
-    bucket_name: Text
-    site_index: Text = "index.html"
+    site_name: str
+    domains: List[str]
+    bucket_name: str
+    site_index: str = "index.html"
     cloudfront_price_class: CloudfrontPriceClass = CloudfrontPriceClass.us_eu
 
 

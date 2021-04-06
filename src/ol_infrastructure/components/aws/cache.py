@@ -5,7 +5,7 @@ This includes:
 - Create a clustered deployment of Redis or Memcached
 """
 import re
-from typing import Any, Dict, List, Optional, Text, Union, cast
+from typing import Any, Dict, List, Optional, Union, cast
 
 import pulumi
 from pulumi_aws import elasticache
@@ -21,23 +21,23 @@ from ol_infrastructure.lib.ol_types import AWSBase
 class OLAmazonCacheConfig(AWSBase):
     encrypt_transit: Optional[bool] = None
     encrypted: Optional[bool] = None
-    auth_token: Optional[Text] = None
+    auth_token: Optional[str] = None
     shard_count: Optional[int] = None
-    kms_key_id: Optional[Text] = None
+    kms_key_id: Optional[str] = None
     snapshot_retention_days: Optional[int] = None
     auto_upgrade: bool = True  # Automatically perform ugprades of minor versions
     apply_immediately: bool = False
-    cluster_description: Text
-    cluster_name: Text
-    engine: Text
-    engine_version: Text
-    instance_type: Text
+    cluster_description: str
+    cluster_name: str
+    engine: str
+    engine_version: str
+    instance_type: str
     num_instances: PositiveInt = PositiveInt(3)
-    parameter_overrides: Optional[Dict[Text, Any]] = None
+    parameter_overrides: Optional[Dict[str, Any]] = None
     port: int
-    security_groups: List[Text]
+    security_groups: List[str]
     subnet_group: Union[
-        Text, pulumi.Output[str]
+        str, pulumi.Output[str]
     ]  # the name of the subnet group created in the OLVPC component
 
     class Config:  # noqa: WPS431, WPS306, D106
@@ -45,8 +45,8 @@ class OLAmazonCacheConfig(AWSBase):
 
     @validator("engine")
     def is_valid_engine(
-        cls: "OLAmazonCacheConfig", engine: Text  # noqa: N805
-    ) -> Text:  # noqa: D102
+        cls: "OLAmazonCacheConfig", engine: str  # noqa: N805
+    ) -> str:  # noqa: D102
         valid_engines = cache_engines()
         if engine not in valid_engines:
             raise ValueError("The specified cache engine is not a valid option in AWS.")
@@ -55,9 +55,9 @@ class OLAmazonCacheConfig(AWSBase):
     @validator("engine_version")
     def is_valid_version(  # noqa: D102
         cls: "OLAmazonCacheConfig",  # noqa: N805
-        engine_version: Text,
+        engine_version: str,
         values: Dict,  # noqa: WPS110
-    ) -> Text:
+    ) -> str:
         engine = values.get("engine")
         engines_map = cache_engines()
         if engine_version not in engines_map.get(engine, []):
@@ -70,11 +70,11 @@ class OLAmazonCacheConfig(AWSBase):
 class OLAmazonRedisConfig(OLAmazonCacheConfig):
     cluster_mode_enabled: bool = True
     encrypt_transit: bool = True
-    auth_token: Optional[Text] = None
+    auth_token: Optional[str] = None
     encrypted: bool = True
-    engine: Text = "redis"
-    engine_version: Text = "6.x"
-    kms_key_id: Optional[Text] = None
+    engine: str = "redis"
+    engine_version: str = "6.x"
+    kms_key_id: Optional[str] = None
     num_instances: conint(ge=1, le=5) = 1  # type: ignore
     shard_count: PositiveInt = PositiveInt(1)
     port: PositiveInt = PositiveInt(6379)
@@ -83,9 +83,9 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
     @validator("auth_token")
     def is_auth_token_valid(
         cls: "OLAmazonRedisConfig",  # noqa: N805
-        auth_token: Optional[Text],
+        auth_token: Optional[str],
         values: Dict,  # noqa: WPS110
-    ) -> Optional[Text]:
+    ) -> Optional[str]:
         if not values["encrypt_transit"]:
             return auth_token
         if values["encrypt_transit"] and auth_token is None:
@@ -102,8 +102,8 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
 
     @validator("cluster_name")
     def is_valid_cluster_name(
-        cls: "OLAmazonRedisConfig", cluster_name: Text  # noqa: N805
-    ) -> Text:
+        cls: "OLAmazonRedisConfig", cluster_name: str  # noqa: N805
+    ) -> str:
         is_valid: bool = True
         is_valid = 1 < len(cluster_name) < 41
         is_valid = not bool(re.search("[^a-zA-Z-9-]", cluster_name))
@@ -115,15 +115,15 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
 
 
 class OLAmazonMemcachedConfig(OLAmazonCacheConfig):
-    engine: Text = "memcached"
-    engine_version: Text = "1.5.16"
+    engine: str = "memcached"
+    engine_version: str = "1.5.16"
     port: PositiveInt = PositiveInt(11211)
     num_instances: conint(ge=1, le=20) = 3  # type: ignore
 
     @validator("cluster_name")
     def is_valid_cluster_name(
-        cls: "OLAmazonMemcachedConfig", cluster_name: Text  # noqa: N805
-    ) -> Text:
+        cls: "OLAmazonMemcachedConfig", cluster_name: str  # noqa: N805
+    ) -> str:
         is_valid: bool = True
         is_valid = 1 < len(cluster_name) < 51
         is_valid = not bool(re.search("[^a-zA-Z-9-]", cluster_name))
