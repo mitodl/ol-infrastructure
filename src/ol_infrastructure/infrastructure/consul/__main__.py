@@ -1,28 +1,36 @@
 import json
 from itertools import chain
 
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, iam, route53
 
-from ol_infrastructure.infrastructure import operations as ops
 from ol_infrastructure.lib.aws.ec2_helper import (
     InstanceTypes,
     build_userdata,
     debian_10_ami,
+    default_egress_args,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.providers.salt.minion import (
     OLSaltStackMinion,
     OLSaltStackMinionInputs,
 )
 
+stack_info = parse_stack()
 env_config = Config("environment")
 consul_config = Config("consul")
 salt_config = Config("saltstack")
-environment_name = f"{ops.env_prefix}-{ops.env_suffix}"
+environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 business_unit = env_config.get("business_unit") or "operations"
+network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+policy_stack = StackReference("infrastructure.aws.policies")
+destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))
+peer_vpcs = destination_vpc["peers"].apply(
+    lambda peers: {peer: network_stack.require_output(peer) for peer in peers}
+)
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
-destination_vpc = ops.network_stack.require_output(env_config.require("vpc_reference"))
+destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))
 dns_stack = StackReference("infrastructure.aws.dns")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
@@ -44,7 +52,7 @@ consul_instance_role = iam.Role(
 
 iam.RolePolicyAttachment(
     f"consul-describe-instance-role-policy-{environment_name}",
-    policy_arn=ops.policy_stack.require_output("iam_policies")["describe_instances"],
+    policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
     role=consul_instance_role.name,
 )
 
@@ -104,7 +112,7 @@ consul_server_security_group = ec2.SecurityGroup(
             description="LAN gossip protocol",
         ),
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=ops.peer_vpcs.apply(
+            cidr_blocks=peer_vpcs.apply(
                 lambda peer_vpcs: [peer["cidr"] for peer in peer_vpcs.values()]
             ),
             protocol="tcp",
@@ -113,6 +121,7 @@ consul_server_security_group = ec2.SecurityGroup(
             description="WAN cross-datacenter communication",
         ),
     ],
+    egress=default_egress_args,
 )
 
 consul_agent_security_group = ec2.SecurityGroup(
@@ -165,7 +174,7 @@ for count, subnet in zip(range(consul_config.get_int("instance_count") or 3), su
         minion_keys=salt_minion,
         minion_roles=["consul_server", "service_discovery"],
         minion_environment=salt_environment,
-        salt_host=f"salt-{ops.env_suffix}.private.odl.mit.edu",
+        salt_host=f"salt-{stack_info.env_suffix}.private.odl.mit.edu",
     )
 
     instance_tags = aws_config.merged_tags(
@@ -210,3 +219,12 @@ consul_domain = route53.Record(
     zone_id=mitodl_zone_id,
     opts=ResourceOptions(depends_on=consul_instances),
 )
+
+export(
+    "security_groups",
+    {
+        "consul_server": consul_server_security_group.id,
+        "consul_agent": consul_agent_security_group.id,
+    },
+)
+export("instances", export_data)

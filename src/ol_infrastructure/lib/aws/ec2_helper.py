@@ -17,6 +17,7 @@ AWSFilterType = List[Dict[str, Union[str, List[str]]]]  # noqa: WPS221
 
 debian_10_ami = ec2.get_ami(  # noqa: WPS114
     filters=[
+        {"name": "image-id", "values": ["ami-0e0161137b4b30900"]},
         {"name": "virtualization-type", "values": ["hvm"]},
         {"name": "root-device-type", "values": ["ebs"]},
         {"name": "name", "values": ["debian-10-amd64*"]},
@@ -24,6 +25,16 @@ debian_10_ami = ec2.get_ami(  # noqa: WPS114
     most_recent=True,
     owners=["136693071363"],
 )
+
+default_egress_args = [
+    ec2.SecurityGroupEgressArgs(
+        protocol="-1",
+        from_port=0,
+        to_port=0,
+        cidr_blocks=["0.0.0.0/0"],
+        ipv6_cidr_blocks=["::/0"],
+    )
+]
 
 
 @unique
