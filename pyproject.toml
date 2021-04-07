@@ -28,7 +28,7 @@ parliament = "^1.4.0"
 
 [tool.poetry.dev-dependencies]
 wemake-python-styleguide = "^0.15"
-pre-commit = "^2.11.1"
+pre-commit = "^2.12.0"
 pytest = "^6.0.0"
 mypy = "<1.0"
 isort = "*"
