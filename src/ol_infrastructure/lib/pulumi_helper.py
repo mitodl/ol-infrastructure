@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Text
 
 from pulumi import get_stack
 
@@ -8,10 +7,10 @@ from pulumi import get_stack
 class StackInfo:
     """Container class for enapsulating standard information about a stack."""
 
-    name: Text
-    namespace: Text
-    env_suffix: Text
-    env_prefix: Text
+    name: str
+    namespace: str
+    env_suffix: str
+    env_prefix: str
 
 
 def parse_stack() -> StackInfo:

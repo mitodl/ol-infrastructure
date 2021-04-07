@@ -24,7 +24,7 @@ API Authentication Method:
 """
 import os
 from dataclasses import dataclass
-from typing import Dict, Optional, Text
+from typing import Dict, Optional
 
 from pepper import Pepper
 from pulumi import Config, Input, Output, ResourceOptions
@@ -33,11 +33,11 @@ from pulumi.dynamic import CreateResult, ReadResult, Resource, ResourceProvider
 
 @dataclass
 class OLSaltStackMinionInputs:
-    minion_id: Input[Text]
-    salt_api_url: Optional[Input[Text]] = None
-    salt_user: Optional[Input[Text]] = None
-    salt_password: Optional[Input[Text]] = None
-    salt_auth_method: Input[Text] = "pam"
+    minion_id: Input[str]
+    salt_api_url: Optional[Input[str]] = None
+    salt_user: Optional[Input[str]] = None
+    salt_password: Optional[Input[str]] = None
+    salt_auth_method: Input[str] = "pam"
 
     def __post_init__(self) -> None:
         salt_config = Config("saltstack")
@@ -63,7 +63,7 @@ class OLSaltStackMinionInputs:
 
 
 class OLSaltStackMinionProvider(ResourceProvider):
-    def create(self, inputs: Dict[Text, Text]) -> CreateResult:
+    def create(self, inputs: Dict[str, str]) -> CreateResult:
         """Register a salt minion and generate a keypair to be returned via Outputs.
 
         :param inputs: A salt client and minion ID to interact with the Salt API
@@ -88,11 +88,11 @@ class OLSaltStackMinionProvider(ResourceProvider):
         )
         return CreateResult(id_=inputs["minion_id"], outs=output)
 
-    def read(self, id_: Text, properties: Dict[Text, Text]) -> ReadResult:
+    def read(self, id_: str, properties: Dict[str, str]) -> ReadResult:
         """Retrieve the ID and public key of the target minion from the Salt API.
 
         :param id_: The minion ID
-        :type id_: Text
+        :type id_: str
 
         :param properties: The salt client and minion ID
         :type properties: _OLSaltStackProviderInputs
@@ -114,11 +114,11 @@ class OLSaltStackMinionProvider(ResourceProvider):
         output.update({"minion_public_key": keyinfo.get("minions", {}).get(id_)})
         return ReadResult(id_=id_, outs=output)
 
-    def delete(self, id_: Text, properties: Dict[Text, Text]):
+    def delete(self, id_: str, properties: Dict[str, str]):
         """Delete the salt minion key from the master.
 
         :param id_: The ID of the target minion
-        :type id_: Text
+        :type id_: str
 
         :param properties: The minion ID and salt API client
         :type properties: _OLSaltStackProviderInputs
@@ -132,7 +132,7 @@ class OLSaltStackMinionProvider(ResourceProvider):
         salt_client.wheel("key.delete", match=[id_])
 
     def _salt_client(
-        self, api_url: Text, api_user: Text, api_password: Text, api_auth: Text = "pam"
+        self, api_url: str, api_user: str, api_password: str, api_auth: str = "pam"
     ) -> Pepper:
         salt_client = Pepper(api_url)
         salt_client.login(username=api_user, password=api_password, eauth=api_auth)
@@ -140,13 +140,13 @@ class OLSaltStackMinionProvider(ResourceProvider):
 
 
 class OLSaltStackMinion(Resource):
-    minion_id: Output[Text]
-    minion_public_key: Output[Optional[Text]]
-    minion_private_key: Output[Optional[Text]]
+    minion_id: Output[str]
+    minion_public_key: Output[Optional[str]]
+    minion_private_key: Output[Optional[str]]
 
     def __init__(
         self,
-        name: Text,
+        name: str,
         properties: OLSaltStackMinionInputs,
         opts: ResourceOptions = None,
     ):

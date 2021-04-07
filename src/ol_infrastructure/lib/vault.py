@@ -95,6 +95,7 @@ mysql_sql_statements = {
     },
 }
 
+
 class VaultPKIKeyTypeBits(int, Enum):
     rsa = 4096
     ec = 256

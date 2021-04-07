@@ -1,12 +1,10 @@
-from typing import Text
-
 import boto3
 import pulumi
 
 route53_client = boto3.client("route53")
 
 
-def zone_opts(domain: Text) -> pulumi.ResourceOptions:
+def zone_opts(domain: str) -> pulumi.ResourceOptions:
     """Look up and conditionally import an existing hosted zone.
 
     :param domain: The domain name to be looked up and optionally imported.  e.g. odl.mit.edu

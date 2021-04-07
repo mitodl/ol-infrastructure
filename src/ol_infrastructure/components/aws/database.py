@@ -9,7 +9,7 @@ This includes:
 - Create DB instance
 """
 from enum import Enum
-from typing import Dict, List, Optional, Text, Union
+from typing import Dict, List, Optional, Union
 
 import pulumi
 from pulumi_aws import rds
@@ -33,7 +33,7 @@ class StorageType(str, Enum):  # noqa: WPS600
 class OLReplicaDBConfig(BaseModel):
     """Configuration object for defining configuration needed to create a read replica."""
 
-    instance_size: Text = "db.t3.small"
+    instance_size: str = "db.t3.small"
     storage_type: StorageType = StorageType.ssd
     public_access: bool = False
     security_groups: Optional[List[SecurityGroup]] = None
@@ -45,17 +45,17 @@ class OLReplicaDBConfig(BaseModel):
 class OLDBConfig(AWSBase):
     """Configuration object for defining the interface to create an RDS instance with sane defaults."""
 
-    engine: Text
-    engine_version: Text
-    instance_name: Text  # The name of the RDS instance
+    engine: str
+    engine_version: str
+    instance_name: str  # The name of the RDS instance
     password: SecretStr
-    parameter_overrides: List[Dict[Text, Union[Text, bool, int, float]]]  # noqa: WPS234
+    parameter_overrides: List[Dict[str, Union[str, bool, int, float]]]  # noqa: WPS234
     port: PositiveInt
-    subnet_group_name: Union[Text, pulumi.Output[str]]
+    subnet_group_name: Union[str, pulumi.Output[str]]
     security_groups: List[SecurityGroup]
     backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore
-    db_name: Optional[Text] = None  # The name of the database schema to create
-    instance_size: Text = "db.m5.large"
+    db_name: Optional[str] = None  # The name of the database schema to create
+    instance_size: str = "db.m5.large"
     max_storage: Optional[PositiveInt] = None  # Set to allow for storage autoscaling
     multi_az: bool = True
     prevent_delete: bool = True
@@ -63,14 +63,14 @@ class OLDBConfig(AWSBase):
     take_final_snapshot: bool = True
     storage: PositiveInt = PositiveInt(50)  # noqa: WPS432
     storage_type: StorageType = StorageType.ssd
-    username: Text = "oldevops"
+    username: str = "oldevops"
     read_replica: Optional[OLReplicaDBConfig] = None
 
     class Config:  # noqa: WPS431, WPS306, D106
         arbitrary_types_allowed = True
 
     @validator("engine")
-    def is_valid_engine(cls: "OLDBConfig", engine: Text) -> Text:  # noqa: N805, D102
+    def is_valid_engine(cls: "OLDBConfig", engine: str) -> str:  # noqa: N805, D102
         valid_engines = db_engines()
         if engine not in valid_engines:
             raise ValueError("The specified DB engine is not a valid option in AWS.")
@@ -78,8 +78,8 @@ class OLDBConfig(AWSBase):
 
     @validator("engine_version")
     def is_valid_version(
-        cls: "OLDBConfig", engine_version: Text, values: Dict  # noqa: N805, WPS110
-    ) -> Text:
+        cls: "OLDBConfig", engine_version: str, values: Dict  # noqa: N805, WPS110
+    ) -> str:
         engine = values.get("engine")
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
@@ -92,11 +92,11 @@ class OLDBConfig(AWSBase):
 class OLPostgresDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to Postgres."""
 
-    engine: Text = "postgres"
-    engine_version: Text = "12.3"
+    engine: str = "postgres"
+    engine_version: str = "12.3"
     port: PositiveInt = PositiveInt(5432)  # noqa: WPS432
     parameter_overrides: List[
-        Dict[Text, Union[Text, bool, int, float]]
+        Dict[str, Union[str, bool, int, float]]
     ] = [  # noqa: WPS234
         {"name": "client_encoding", "value": "UTF-8"},
         {"name": "timezone", "value": "UTC"},
@@ -108,11 +108,11 @@ class OLPostgresDBConfig(OLDBConfig):
 class OLMariaDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to MariaDB."""
 
-    engine: Text = "mariadb"
-    engine_version: Text = "10.4.13"
+    engine: str = "mariadb"
+    engine_version: str = "10.4.13"
     port: PositiveInt = PositiveInt(3306)  # noqa: WPS432
     parameter_overrides: List[
-        Dict[Text, Union[Text, bool, int, float]]
+        Dict[str, Union[str, bool, int, float]]
     ] = [  # noqa: WPS234
         {"name": "character_set_client", "value": "utf8mb4"},
         {"name": "character_set_connection", "value": "utf8mb4"},
