@@ -1,7 +1,7 @@
 locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
   business_unit = "operations"
-  app_name = "concourse"
+  app_name = "caddy"
 }
 
 variable "build_environment" {
@@ -9,13 +9,8 @@ variable "build_environment" {
   default = "operations-qa"
 }
 
-# Available options are "web" or "worker". Used to determine which type of node to build an image for.
-variable "node_type" {
-  type = string
-}
-
 source "amazon-ebs" "caddy" {
-  ami_description         = "Deployment image for Caddy ${var.node_type} server generated at ${local.timestamp}"
+  ami_description         = "Deployment image for Caddy server generated at ${local.timestamp}"
   ami_name                = "caddy"
   ami_virtualization_type = "hvm"
   force_deregister        = true
@@ -23,12 +18,12 @@ source "amazon-ebs" "caddy" {
   run_volume_tags = {
     OU      = "${local.business_unit}"
     app     = "${local.app_name}"
-    purpose = "caddy-${var.node_type}"
+    purpose = "caddy"
   }
   snapshot_tags = {
     OU      = "${local.business_unit}"
     app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.node_type}"
+    purpose = "${local.app_name}"
   }
   # Base all builds off of the most recent Debian 10 image built by the Debian organization.
   source_ami_filter {
@@ -48,10 +43,10 @@ source "amazon-ebs" "caddy" {
     random = true
   }
   tags = {
-    Name    = "${local.app_name}-${var.node_type}"
+    Name    = "${local.app_name}"
     OU      = "${local.business_unit}"
     app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.node_type}"
+    purpose = "${local.app_name}"
   }
 }
 

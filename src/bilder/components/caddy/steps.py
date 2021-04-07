@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pyinfra.api import deploy
 from pyinfra.operations import apt, files, server, systemd
 
@@ -21,7 +23,7 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
             dest="/usr/local/bin/caddy",
             src=caddy_config.custom_download_url(),
             mode=755,
-            sttate=state,
+            state=state,
             host=host,
         )
         files.directory(
@@ -41,6 +43,13 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
             group=caddy_user,
             present=True,
             recursive=True,
+            state=state,
+            host=host,
+        )
+        files.template(
+            name="Create SystemD service definition for Caddy",
+            dest="/usr/lib/systemd/system/caddy.service",
+            src=Path(__file__).parent.joinpath("templates/caddy.service.j2"),
             state=state,
             host=host,
         )
@@ -103,7 +112,9 @@ def configure_caddy(caddy_config: CaddyConfig, state=None, host=None):
 
 
 @deploy("Manage Caddy Service")
-def caddy_service(state=None, host=None, do_restart=False, do_reload=False):
+def caddy_service(
+    caddy_config: CaddyConfig, state=None, host=None, do_restart=False, do_reload=False
+):
     systemd.service(
         name="Enable Caddy service",
         service="caddy",
@@ -111,6 +122,7 @@ def caddy_service(state=None, host=None, do_restart=False, do_reload=False):
         enabled=True,
         restarted=do_restart,
         reloaded=do_reload,
+        daemon_reload=caddy_config.plugins is not None,
         state=state,
         host=host,
     )
