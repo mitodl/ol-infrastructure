@@ -96,7 +96,7 @@ def configure_caddy(caddy_config: CaddyConfig, state=None, host=None):
             name="Create Caddyfile",
             src=caddy_config.caddyfile,
             dest="/etc/caddy/Caddyfile",
-            config=caddy_config,
+            context=caddy_config.template_context,
             state=state,
             host=host,
         )

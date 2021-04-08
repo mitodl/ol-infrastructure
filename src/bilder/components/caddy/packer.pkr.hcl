@@ -10,15 +10,15 @@ variable "build_environment" {
 }
 
 source "amazon-ebs" "caddy" {
-  ami_description         = "Deployment image for Caddy server generated at ${local.timestamp}"
-  ami_name                = "caddy"
+  ami_description         = "Deployment image for ${Local.App_Name} server generated at ${local.timestamp}"
+  ami_name                = "${local.app_name}"
   ami_virtualization_type = "hvm"
   force_deregister        = true
   instance_type           = "t3a.medium"
   run_volume_tags = {
     OU      = "${local.business_unit}"
     app     = "${local.app_name}"
-    purpose = "caddy"
+    purpose = "${local.app_name}"
   }
   snapshot_tags = {
     OU      = "${local.business_unit}"
@@ -71,19 +71,19 @@ build {
     ]
   }
   provisioner "shell-local" {
-    except = ["docker.concourse"]
+    except = ["docker.${local.app_name}"]
     inline = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session.pem ${build.Host} ${path.root}/sample_deploy.py"]
   }
   provisioner "shell-local" {
-    except = ["docker.concourse"]
+    except = ["docker.${local.app_name}"]
     inline = ["py.test --ssh-identity-file=/tmp/packer-session.pem --hosts='ssh://${build.User}@${build.Host}:${build.Port}' ${path.root}/test_caddy_build.py"]
   }
   provisioner "shell-local" {
-    only = ["docker.concourse"]
+    only = ["docker.${local.app_name}"]
     inline = ["pyinfra @docker/${build.ID} ${path.root}/sample_deploy.py"]
   }
   provisioner "shell-local" {
-    only = ["docker.concourse"]
-    inline = ["py.test --hosts=docker://${build.ID} ${path.root}/test_caddy_build.py"]
+    only = ["docker.${local.app_name}"]
+    inline = ["py.test --hosts=docker://${build.ID} ${path.root}/test_sample_deploy.py"]
   }
 }

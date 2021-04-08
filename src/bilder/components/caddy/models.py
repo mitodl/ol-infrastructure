@@ -26,6 +26,7 @@ class CaddyConfig(OLBaseSettings):
     log_file: Optional[Path] = Path("/var/log/caddy/caddy.log")
     plugins: Optional[List[CaddyPlugin]]
     template_context: Optional[Dict[str, Any]]
+    upstream_address: Optional[str]
 
     class Config:  # noqa: WPS431
         env_prefix = "caddy_"
