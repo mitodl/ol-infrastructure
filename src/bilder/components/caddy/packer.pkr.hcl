@@ -1,7 +1,7 @@
 locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
   business_unit = "operations"
-  app_name = "[[_copier_answers.component_name ]]"
+  app_name = "caddy"
 }
 
 variable "build_environment" {
@@ -9,16 +9,16 @@ variable "build_environment" {
   default = "operations-qa"
 }
 
-source "amazon-ebs" "[[_copier_answers.component_name ]]" {
-  ami_description         = "Deployment image for [[_copier_answers.component_name|capitalize ]] server generated at ${local.timestamp}"
-  ami_name                = "[[_copier_answers.component_name ]]"
+source "amazon-ebs" "caddy" {
+  ami_description         = "Deployment image for ${Local.App_Name} server generated at ${local.timestamp}"
+  ami_name                = "${local.app_name}"
   ami_virtualization_type = "hvm"
   force_deregister        = true
   instance_type           = "t3a.medium"
   run_volume_tags = {
     OU      = "${local.business_unit}"
     app     = "${local.app_name}"
-    purpose = "[[_copier_answers.component_name ]]"
+    purpose = "${local.app_name}"
   }
   snapshot_tags = {
     OU      = "${local.business_unit}"
@@ -50,15 +50,15 @@ source "amazon-ebs" "[[_copier_answers.component_name ]]" {
   }
 }
 
-source "docker" "[[_copier_answers.component_name ]]" {
+source "docker" "caddy" {
   image = "debian:buster"
   commit = true
 }
 
 build {
   sources = [
-    "source.amazon-ebs.[[_copier_answers.component_name ]]",
-    "source.docker.[[_copier_answers.component_name ]]",
+    "source.amazon-ebs.caddy",
+    "source.docker.caddy",
   ]
 
   provisioner "shell-local" {
@@ -71,19 +71,19 @@ build {
     ]
   }
   provisioner "shell-local" {
-    except = ["docker.[[_copier_answers.component_name ]]"]
+    except = ["docker.${local.app_name}"]
     inline = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session.pem ${build.Host} ${path.root}/sample_deploy.py"]
   }
   provisioner "shell-local" {
-    except = ["docker.[[_copier_answers.component_name ]]"]
-    inline = ["py.test --ssh-identity-file=/tmp/packer-session.pem --hosts='ssh://${build.User}@${build.Host}:${build.Port}' ${path.root}/test_[[_copier_answers.component_name ]]_build.py"]
+    except = ["docker.${local.app_name}"]
+    inline = ["py.test --ssh-identity-file=/tmp/packer-session.pem --hosts='ssh://${build.User}@${build.Host}:${build.Port}' ${path.root}/test_caddy_build.py"]
   }
   provisioner "shell-local" {
-    only = ["docker.[[_copier_answers.component_name ]]"]
+    only = ["docker.${local.app_name}"]
     inline = ["pyinfra @docker/${build.ID} ${path.root}/sample_deploy.py"]
   }
   provisioner "shell-local" {
-    only = ["docker.[[_copier_answers.component_name ]]"]
-    inline = ["py.test --hosts=docker://${build.ID} ${path.root}/test_[[_copier_answers.component_name ]]_build.py"]
+    only = ["docker.${local.app_name}"]
+    inline = ["py.test --hosts=docker://${build.ID} ${path.root}/test_sample_deploy.py"]
   }
 }

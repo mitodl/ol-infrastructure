@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "ol-configuration-management"
+name = "bilder"
 version = "0.1.0"
-description = ""
+description = "Configuration management logic and Packer templates for building images to run services in a production environment."
 authors = ["MIT Open Learning Engineering <oldevops@mit.edu>"]
 
 [tool.poetry.dependencies]
