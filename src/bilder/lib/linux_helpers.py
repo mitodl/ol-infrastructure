@@ -1,3 +1,9 @@
+RED_HAT = "RedHat"
+DEBIAN = "Debian"
+
+DEFAULT_DIRECTORY_MODE = 755
+
+
 def normalize_cpu_arch(arch_specifier: str) -> str:
     """Normalize the string used for the CPU kernel architecture.
 
@@ -25,14 +31,15 @@ def linux_family(distribution_name: str) -> str:
         Fedora, etc.)
     :type distribution_name: str
 
-    :returns: The family that the linux distribution belongs to (e.g. Debian, RedHat, etc.)
+    :returns: The family that the linux distribution belongs to (e.g. Debian, RedHat,
+              etc.)
 
     :rtype: str
     """
     return {
-        "Ubuntu": "Debian",
-        "Debian": "Debian",
-        "RedHat": "RedHat",
-        "Fedora": "RedHat",
-        "CentOS": "RedHat",
+        "Ubuntu": DEBIAN,
+        DEBIAN: DEBIAN,
+        RED_HAT: RED_HAT,
+        "Fedora": RED_HAT,
+        "CentOS": RED_HAT,
     }[distribution_name]

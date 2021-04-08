@@ -33,8 +33,8 @@ def install_concourse(concourse_config: ConcourseBaseConfig, state=None, host=No
     )
     if not host.fact.directory(installation_directory):
         # Download latest Concourse release from GitHub
-        concourse_archive = f"https://github.com/concourse/concourse/releases/download/v{concourse_config.version}/concourse-{concourse_config.version}-linux-amd64.tgz"
-        concourse_archive_hash = f"https://github.com/concourse/concourse/releases/download/v{concourse_config.version}/concourse-{concourse_config.version}-linux-amd64.tgz.sha1"
+        concourse_archive = f"https://github.com/concourse/concourse/releases/download/v{concourse_config.version}/concourse-{concourse_config.version}-linux-amd64.tgz"  # noqa: E501
+        concourse_archive_hash = f"https://github.com/concourse/concourse/releases/download/v{concourse_config.version}/concourse-{concourse_config.version}-linux-amd64.tgz.sha1"  # noqa: E501
         concourse_archive_path = (
             f"/tmp/concourse-{concourse_config.version}.tgz"  # noqa: S108
         )
@@ -124,7 +124,7 @@ def _manage_web_node_keys(
         server.shell(
             name="Generate a tsa host key",
             commands=[
-                f"{concourse_config.deploy_directory}/bin/concourse generate-key -t ssh -f {concourse_config.tsa_host_key_path}"
+                f"{concourse_config.deploy_directory}/bin/concourse generate-key -t ssh -f {concourse_config.tsa_host_key_path}"  # noqa: E501
             ],
             state=state,
             host=host,
@@ -147,7 +147,7 @@ def _manage_web_node_keys(
         server.shell(
             name="Generate a session signing key",
             commands=[
-                f"{concourse_config.deploy_directory}/bin/concourse generate-key -t rsa -f {concourse_config.session_signing_key_path}"
+                f"{concourse_config.deploy_directory}/bin/concourse generate-key -t rsa -f {concourse_config.session_signing_key_path}"  # noqa: E501
             ],
             state=state,
             host=host,
@@ -176,7 +176,7 @@ def _manage_worker_node_keys(
         server.shell(
             name="Generate a worker private key",
             commands=[
-                f"{concourse_config.deploy_directory}/bin/concourse generate-key -t ssh -f {concourse_config.worker_private_key_path}"
+                f"{concourse_config.deploy_directory}/bin/concourse generate-key -t ssh -f {concourse_config.worker_private_key_path}"  # noqa: E501
             ],
             state=state,
             host=host,

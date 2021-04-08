@@ -31,19 +31,18 @@ def install_hashicorp_products(
             state=state,
             host=host,
         )
-        # TODO: Remove the call to `.split` after
-        # https://github.com/Fizzadar/pyinfra/pull/545 gets merged and released.
-        # TMM 2021-03-05
-        if linux_family(host.fact.linux_name.split()[0]).lower == "debian":
+        if linux_family(host.fact.linux_name).lower == "debian":
             cpu_arch = host.fact.debian_cpu_arch
-        elif linux_family(host.fact.linux_name.split()[0]).lower == "redhat":
+        elif linux_family(host.fact.linux_name).lower == "redhat":
             cpu_arch = host.fact.redhat_cpu_arch
         else:
             cpu_arch = "amd64"
         file_download = f"{product.name}_{product.version}_linux_{cpu_arch}.zip"
         file_hashes = (
             httpx.get(
-                f"https://releases.hashicorp.com/{product.name}/{product.version}/{product.name}_{product.version}_SHA256SUMS"  # noqa: WPS221
+                "https://releases.hashicorp.com/{product_name}/{product_version}/{product_name}_{product_version}_SHA256SUMS".format(  # noqa: E501
+                    product_name=product.name, product_version=product.version
+                )
             )
             .read()
             .decode("utf8")
@@ -57,7 +56,7 @@ def install_hashicorp_products(
         target_directory = product.install_directory or "/usr/local/bin/"
         download_binary = files.download(
             name=f"Download {product.name} archive",
-            src=f"https://releases.hashicorp.com/{product.name}/{product.version}/{file_download}",  # noqa: WPS221
+            src=f"https://releases.hashicorp.com/{product.name}/{product.version}/{file_download}",  # noqa: WPS221,E501
             dest=download_destination,
             sha256sum=file_hash_map[file_download],
             state=state,
