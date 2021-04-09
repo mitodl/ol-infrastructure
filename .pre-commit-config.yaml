@@ -22,10 +22,12 @@ repos:
   hooks:
     - id: autoflake
       args:
+        - "--check"
         - "--in-place"
         - "--ignore-init-module-imports"
         - "--expand-star-imports"
         - "--remove-unused-variables"
+        - "--remove-all-unused-imports"
 - repo: https://github.com/Yelp/detect-secrets
   rev: v1.0.3
   hooks:

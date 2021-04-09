@@ -215,7 +215,7 @@ for count, subnet in zip(range(elasticsearch_config.get_int("instance_count") or
             ec2.InstanceEbsBlockDeviceArgs(
                 device_name="/dev/sdb",
                 volume_type="gp2",
-                volume_size=100,
+                volume_size=elasticsearch_config.get_int("disk_size") or 100,
                 encrypted=True,
             )
         ],
