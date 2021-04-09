@@ -6,7 +6,10 @@ from typing import Dict, List, Optional
 
 from pydantic import Field, PositiveInt, SecretStr, validator
 
+from bilder.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bilder.lib.model_helpers import OLBaseSettings
+
+CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH = 32
 
 
 class IframeOptions(str, Enum):  # noqa: WPS600
@@ -113,10 +116,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         PositiveInt(10), concourse_env_var="CONCOURSE_API_MAX_CONNS"
     )
     db_max_conns_backend: PositiveInt = Field(
-        PositiveInt(50), concourse_env_var="CONCOURSE_BACKEND_MAX_CONNS"
+        PositiveInt(50), concourse_env_var="CONCOURSE_BACKEND_MAX_CONNS"  # noqa: WPS432
     )
     encryption_key: SecretStr = Field(
-        default_factory=partial(secrets.token_hex, 16),
+        default_factory=partial(
+            secrets.token_hex, CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH / 2
+        ),
         concourse_env_var="CONCOURSE_ENCRYPTION_KEY",
         env_transform=lambda _: _.get_secret_value(),
     )  # 32 bit random string
@@ -145,7 +150,9 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     postgres_host: str = Field(
         "concourse-postgres.service.consul", concourse_env_var="CONCOURSE_POSTGRES_HOST"
     )
-    postgres_port: int = Field(5432, concourse_env_var="CONCOURSE_POSTGRES_PORT")
+    postgres_port: int = Field(
+        DEFAULT_POSTGRES_PORT, concourse_env_var="CONCOURSE_POSTGRES_PORT"
+    )
     public_domain: Optional[str] = Field(
         None, concourse_env_var="CONCOURSE_EXTERNAL_URL"
     )
@@ -179,9 +186,10 @@ class ConcourseWebConfig(ConcourseBaseConfig):
 
     @validator("encryption_key")
     def validate_encryption_key_length(cls, encryption_key):  # noqa: N805
-        if len(encryption_key) != 32:
+        if len(encryption_key) != CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH:
             raise ValueError(
-                "Encryption key is not the correct length. It needs to be a 32 byte random string."
+                "Encryption key is not the correct length. "
+                "It needs to be a 32 byte random string."
             )
         return encryption_key
 

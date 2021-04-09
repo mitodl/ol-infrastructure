@@ -4,6 +4,7 @@ from pyinfra.api import deploy
 from pyinfra.operations import apt, files, server, systemd
 
 from bilder.components.caddy.models import CaddyConfig
+from bilder.lib.linux_helpers import DEFAULT_DIRECTORY_MODE
 
 
 @deploy("Install Caddy")
@@ -12,7 +13,7 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
         caddy_user = "caddy"
         server.user(
             name="Create system user for Caddy",
-            user="caddy",
+            user=caddy_user,
             system=True,
             ensure_home=False,
             state=state,
@@ -22,7 +23,7 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
             name="Download custom build of Caddy",
             dest="/usr/local/bin/caddy",
             src=caddy_config.custom_download_url(),
-            mode=755,
+            mode=DEFAULT_DIRECTORY_MODE,
             state=state,
             host=host,
         )
@@ -62,9 +63,9 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
         )
         apt.repo(
             name="Set up Caddy APT repository",
-            src="deb https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main",
+            src="deb https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main",  # noqa: E501
             present=True,
-            filename="caddy",
+            filename="caddy.list",
             state=state,
             host=host,
         )
@@ -81,7 +82,7 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
         files.directory(
             name="Crate Caddy log directory",
             path=caddy_config.log_file.parent,
-            user="caddy",
+            user=caddy_user,
             present=True,
             state=state,
             host=host,
