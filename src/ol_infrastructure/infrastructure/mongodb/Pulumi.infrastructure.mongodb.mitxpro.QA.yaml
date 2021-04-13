@@ -1,0 +1,8 @@
+secretsprovider: awskms://alias/PulumiSecrets
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEu7beEzqLpChx5wk9wJpB7AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMqrYirXPsIRbMicMKAgEQgDsX2PIk95/I9rIh25m03ITmTfxDOfpd7pHlJDnsCOCMqsO2iCMi/NPqxNCQIhh8b//yB1+drZRSyLj1Cg==  # pragma: allowlist secret
+config:
+  aws:region: us-east-1
+  environment:business_unit: mitxpro
+  environment:vpc_reference: mitxpro_vpc
+  saltstack:environment_name: mitxpro-qa
+  saltstack:key_name: salt-qa
