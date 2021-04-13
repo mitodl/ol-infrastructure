@@ -1,0 +1,7 @@
+creation_rules:
+  - path_regex: (ci.env$|.*\.ci\.ya?ml)
+    kms: ''
+  - path_regex: (qa.env$|.*\.qa\.ya?ml|rc.env$|.*\.rc\.ya?ml)
+    kms: ''
+  - path_regex: (production.env$|.*\.production\.ya?ml)
+    kms: ''

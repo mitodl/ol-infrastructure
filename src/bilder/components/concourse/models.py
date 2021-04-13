@@ -19,7 +19,7 @@ class IframeOptions(str, Enum):  # noqa: WPS600
 
 class ConcourseBaseConfig(OLBaseSettings):
     user: str = "concourse"
-    version: str = "6.7.4"
+    version: str = "7.1.0"
     deploy_directory: Path = Path("/opt/concourse/")
     data_directory: Path = Path("/var/lib/concourse")
     config_directory: Path = Path("/etc/concourse")
@@ -50,7 +50,7 @@ class ConcourseBaseConfig(OLBaseSettings):
 class ConcourseWebConfig(ConcourseBaseConfig):
     _node_type: str = "web"
     admin_password: SecretStr
-    admin_user: str = "oldevops"
+    admin_user: str = "admin"
     audit_builds: bool = (
         Field(  # Enable auditing for all api requests connected to builds.
             default=True, concourse_env_var="CONCOURSE_ENABLE_BUILD_AUDITING"
@@ -132,7 +132,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         None, concourse_env_var="CONCOURSE_GITHUB_CLIENT_SECRET"
     )
     github_main_team_concourse_team: Optional[str] = Field(
-        "mitodl:olengineering", concourse_env_var="CONCOURSE_MAIN_TEAM_GITHUB_TEAM"
+        "mitodl:odl-engineering", concourse_env_var="CONCOURSE_MAIN_TEAM_GITHUB_TEAM"
     )
     github_main_team_org: Optional[str] = Field(
         "mitodl", concourse_env_var="CONCOURSE_MAIN_TEAM_GITHUB_ORG"
