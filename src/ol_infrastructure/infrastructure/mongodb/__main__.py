@@ -120,9 +120,24 @@ for instance_num, subnet in nums_subnets:
         minion_environment=salt_environment,
         salt_host=f"salt-{stack_info.env_suffix}.private.odl.mit.edu",
         additional_cloud_config={
-            # TODO: fill in.
-            # The cloud config in Pulumi.infrastructure.elasticsearch.__main__
-            # does not mount the volume.
+            "fs_setup": [
+                {
+                    "device": "/dev/nvme0n1",
+                    "filesystem": "ext4",
+                    "label": "var_lib_mongodb",
+                    "partition": "None",
+                }
+            ],
+            "mounts": [
+                [
+                    "LABEL=var_lib_mongodb",
+                    "/var/lib/mongodb",
+                    "auto",
+                    "defaults",
+                    "0",
+                    "0",
+                ]
+            ],
         },
     )
 
