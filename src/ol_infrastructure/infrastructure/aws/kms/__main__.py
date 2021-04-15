@@ -103,6 +103,31 @@ kms_s3_data_encryption_policy = {
     ],
 }
 
+kms_sops_encryption_policy = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        kms_key_access_statement,
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": [
+                    "arn:aws:iam::610119931565:user/tmacey",
+                    "arn:aws:iam::610119931565:user/shaidar",
+                    "arn:aws:iam::610119931565:user/mbreedlove",
+                ]
+            },
+            "Action": [
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:DescribeKey",
+            ],
+            "Resource": "*",
+        },
+    ],
+}
+
 ebs_key = kms.Key(
     kms_ec2_environment,
     customer_master_key_spec=DEFAULT_KEY_SPEC,
@@ -152,4 +177,35 @@ s3_data_key_alias = kms.Alias(
 export(
     "kms_s3_data_analytics_key",
     {"id": s3_data_key.id, "arn": s3_data_key.arn, "alias": s3_data_key_alias.name},
+)
+
+# KMS key used for encrypting secrets managed with SOPS
+sops_key = kms.Key(
+    f"sops-infrastructure-secret-management-key-{stack_info.env_suffix}",
+    customer_master_key_spec=DEFAULT_KEY_SPEC,
+    description=(
+        "Key for encrypting secrets used in building and deploying infrastructure "
+        f"in {stack_info.env_suffix} environments."
+    ),
+    enable_key_rotation=True,
+    is_enabled=True,
+    key_usage=ENCRYPT_KEY_USAGE,
+    tags=AWSBase(
+        tags={
+            "OU": "operations",
+            "Environment": f"operations-{stack_info.env_suffix}",
+            "Owner": "platform-engineering",
+        }
+    ).tags,
+    policy=json.dumps(kms_sops_encryption_policy),
+)
+sops_key_alias = kms.Alias(
+    f"sops-infrastructure-secret-management-key-{stack_info.env_suffix}-alias",
+    name=f"alias/sops-infrastructure-secrets-{stack_info.env_suffix}",
+    target_key_id=sops_key.id,
+)
+
+export(
+    "sops_infrastructure_secrets_key",
+    {"id": sops_key.id, "arn": sops_key.arn, "alias": sops_key_alias.name},
 )
