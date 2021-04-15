@@ -181,7 +181,7 @@ for instance_num, subnet in zip(instance_nums, subnets):
                 [
                     "LABEL=var_lib_elastics",
                     "/var/lib/elasticsearch",
-                    "auto",
+                    "ext4",
                     "defaults",
                     "0",
                     "0",
