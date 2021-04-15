@@ -28,7 +28,8 @@ business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 consul_stack = StackReference(
-    f"infrastructure.consul.{stack_info.namespace.rsplit('.', 1)[1]}.{stack_info.name}"  # noqa: WPS237, WPS221
+    f"infrastructure.consul.{stack_info.namespace.rsplit('.', 1)[1]}."  # noqa: WPS237
+    "{stack_info.name}"
 )
 destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))
 elasticsearch_backup_bucket_name = f"ol-{environment_name}-elasticsearch-backup"
@@ -125,16 +126,16 @@ elasticsearch_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
-            from_port=9200,
-            to_port=9200,
+            from_port=9200,  # noqa: WPS432
+            to_port=9200,  # noqa: WPS432
             cidr_blocks=[destination_vpc["cidr"]],
             description="Access to Elasticsearch cluster from VPC",
         ),
         ec2.SecurityGroupIngressArgs(
             self=True,
             protocol="tcp",
-            from_port=9300,
-            to_port=9400,
+            from_port=9300,  # noqa: WPS432
+            to_port=9400,  # noqa: WPS432
             description="Elasticsearch cluster instances access",
         ),
     ],
@@ -152,8 +153,10 @@ export_data = {}
 subnets = destination_vpc["subnet_ids"]
 subnet_id = subnets.apply(chain)
 salt_environment = Config("saltstack").get("environment_name") or environment_name
-for count, subnet in zip(range(elasticsearch_config.get_int("instance_count") or 3), subnets):  # type: ignore # noqa: WPS221
-    instance_name = f"elasticsearch-{environment_name}-{count}"
+instance_nums = range(elasticsearch_config.get_int("instance_count") or 3)
+
+for instance_num, subnet in zip(instance_nums, subnets):
+    instance_name = f"elasticsearch-{environment_name}-{instance_num}"
     salt_minion = OLSaltStackMinion(
         f"saltstack-minion-{instance_name}",
         OLSaltStackMinionInputs(minion_id=instance_name),
@@ -166,19 +169,24 @@ for count, subnet in zip(range(elasticsearch_config.get_int("instance_count") or
         minion_environment=salt_environment,
         salt_host=f"salt-{stack_info.env_suffix}.private.odl.mit.edu",
         additional_cloud_config={
-            "device_aliases": {"ephemeral0": "/dev/nvme1n1"},
-            "disk_setup": {
-                "ephmeral0": {"table_type": "gpt", "layout": True, "overwrite": False}
-            },
             "fs_setup": [
                 {
-                    "device": "ephemeral0",
-                    "partition": "none",
-                    "label": "None",
+                    "device": "/dev/nvme0n1",
                     "filesystem": "ext4",
+                    "label": "var_lib_elasticsearch",
+                    "partition": "None",
                 }
             ],
-            "mount": ["ephemeral0", "/var/lib/elasticsearch", "ext4"],
+            "mounts": [
+                [
+                    "LABEL=var_lib_elasticsearch",
+                    "/var/lib/elasticsearch",
+                    "auto",
+                    "defaults",
+                    "0",
+                    "0",
+                ]
+            ],
         },
     )
 
@@ -197,7 +205,7 @@ for count, subnet in zip(range(elasticsearch_config.get_int("instance_count") or
     if elasticsearch_config.get_bool("public_web"):
         es_security_groups.append(destination_vpc["security_groups"]["web"])
     elasticsearch_instance = ec2.Instance(
-        f"elasticsearch-instance-{environment_name}-{count}",
+        f"elasticsearch-instance-{environment_name}-{instance_num}",
         ami=debian_10_ami.id,
         user_data=cloud_init_userdata,
         instance_type=instance_type,
@@ -208,7 +216,7 @@ for count, subnet in zip(range(elasticsearch_config.get_int("instance_count") or
         key_name=salt_config.require("key_name"),
         root_block_device=ec2.InstanceRootBlockDeviceArgs(
             volume_type="gp2",
-            volume_size=20,
+            volume_size=20,  # noqa: WPS432
             encrypted=True,
         ),
         ebs_block_devices=[
