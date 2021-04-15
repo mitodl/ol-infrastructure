@@ -173,13 +173,13 @@ for instance_num, subnet in zip(instance_nums, subnets):
                 {
                     "device": "/dev/nvme0n1",
                     "filesystem": "ext4",
-                    "label": "var_lib_elasticsearch",
+                    "label": "var_lib_elastics",
                     "partition": "None",
                 }
             ],
             "mounts": [
                 [
-                    "LABEL=var_lib_elasticsearch",
+                    "LABEL=var_lib_elastics",
                     "/var/lib/elasticsearch",
                     "auto",
                     "defaults",
