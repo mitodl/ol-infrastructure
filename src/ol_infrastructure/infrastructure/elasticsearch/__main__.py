@@ -28,8 +28,9 @@ business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 consul_stack = StackReference(
-    f"infrastructure.consul.{stack_info.namespace.rsplit('.', 1)[1]}."  # noqa: WPS237
-    "{stack_info.name}"
+    "infrastructure.consul."  # noqa: WPS237, WPS221
+    f"{stack_info.namespace.rsplit('.', 1)[1]}."  # noqa: WPS237, WPS221
+    f"{stack_info.name}"
 )
 destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))
 elasticsearch_backup_bucket_name = f"ol-{environment_name}-elasticsearch-backup"
