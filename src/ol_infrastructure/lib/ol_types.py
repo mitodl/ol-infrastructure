@@ -11,7 +11,11 @@ RECOMMENDED_TAGS = {"Application", "Owner"}  # noqa: WPS407
 
 @unique
 class BusinessUnit(str, Enum):  # noqa: WPS600
-    """Canonical source of truth for defining valid OU tags to be used for cost allocation purposes."""
+    """Canonical source of truth for defining valid OU tags.
+
+    We rely on tagging AWS resources with a valid OU to allow for cost allocation to
+    different business units.
+    """
 
     bootcamps = "bootcamps"
     data = "data"  # noqa: WPS110
@@ -19,6 +23,7 @@ class BusinessUnit(str, Enum):  # noqa: WPS600
     micromasters = "micromasters"
     mit_open = "mit-open"
     mitx = "mitx"
+    mitx_online = "mitx-online"
     ocw = "open-courseware"
     operations = "operations"
     ovs = "odl-video"
@@ -44,7 +49,7 @@ class Apps(str, Enum):  # noqa: WPS600
 
 
 class AWSBase(BaseModel):
-    """Base class for deriving configuration objects to pass to AWS component resources."""
+    """Base class for configuration objects to pass to AWS component resources."""
 
     tags: Dict[str, str]
     region: str = "us-east-1"
@@ -57,7 +62,9 @@ class AWSBase(BaseModel):
     def enforce_tags(cls, tags: Dict[str, str]) -> Dict[str, str]:  # noqa: N805
         if not REQUIRED_TAGS.issubset(tags.keys()):
             raise ValueError(
-                f"Not all required tags have been specified. Missing tags: {REQUIRED_TAGS.difference(tags.keys())}"  # noqa: WPS237
+                "Not all required tags have been specified. Missing tags: {}".format(
+                    REQUIRED_TAGS.difference(tags.keys())
+                )
             )
         try:
             BusinessUnit(tags["OU"])
@@ -72,15 +79,17 @@ class AWSBase(BaseModel):
         return region
 
     def merged_tags(self, new_tags: Dict[str, str]) -> Dict[str, str]:
-        """Return a dictionary of tags that merges those defined on the class with those passed in.
+        """Return a dictionary of existing tags with the ones passed in.
 
-        This generates a new dictionary of tags in order to allow for a broadly applicable set of tagsto then be updated
-        with specific tags to be set on child resources in a ComponentResource class.
+        This generates a new dictionary of tags in order to allow for a broadly
+        applicable set of tagsto then be updated with specific tags to be set on child
+        resources in a ComponentResource class.
 
         :param new_tags: Dictionary of specific tags to be set on a child resource.
         :type new_tags: Dict[Text, Text]
 
-        :returns: Merged dictionary of base tags and specific tags to be set on a child resource.
+        :returns: Merged dictionary of base tags and specific tags to be set on a child
+                  resource.
 
         :rtype: Dict[Text, Text]
         """
