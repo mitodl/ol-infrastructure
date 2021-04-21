@@ -17,17 +17,17 @@ kms_ec2_environment = f"ec2-ebs-{stack_info.env_suffix}"
 aws_config = AWSBase(
     tags={"OU": "operations", "Environment": f"operations-{stack_info.env_suffix}"}
 )
-
+ANY_RESOURCE = "*"
 
 kms_key_access_statement = {
     # Allow direct access to key metadata to the account
     "Effect": "Allow",
     "Principal": {
         "AWS": [
-            f"arn:aws:iam::{owner}:root",
-            f"arn:aws:iam::{owner}:user/mbreedlove",
-            f"arn:aws:iam::{owner}:user/shaidar",
-            f"arn:aws:iam::{owner}:user/tmacey",
+            "arn:aws:iam::{}:root".format(owner),
+            "arn:aws:iam::{}:user/mbreedlove".format(owner),
+            "arn:aws:iam::{}:user/shaidar".format(owner),
+            "arn:aws:iam::{}:user/tmacey".format(owner),
         ]
     },
     "Action": [
@@ -46,7 +46,7 @@ kms_key_access_statement = {
         "kms:ScheduleKeyDeletion",
         "kms:CancelKeyDeletion",
     ],
-    "Resource": "*",
+    "Resource": ANY_RESOURCE,
 }
 
 kms_ec2_ebs_encryption_policy = {
@@ -54,9 +54,10 @@ kms_ec2_ebs_encryption_policy = {
     "Id": "auto-ebs-2",
     "Statement": [
         {
-            # Allow access through EBS for all principals in the account that are authorized to use EBS
+            # Allow access through EBS for all principals in the account that are
+            # authorized to use EBS
             "Effect": "Allow",
-            "Principal": {"AWS": "*"},
+            "Principal": {"AWS": ANY_RESOURCE},
             "Action": [
                 "kms:Encrypt",
                 "kms:Decrypt",
@@ -65,7 +66,7 @@ kms_ec2_ebs_encryption_policy = {
                 "kms:CreateGrant",
                 "kms:DescribeKey",
             ],
-            "Resource": "*",
+            "Resource": ANY_RESOURCE,
             "Condition": {
                 "StringEquals": {
                     "kms:ViaService": "ec2.amazonaws.com",
@@ -83,7 +84,7 @@ kms_s3_data_encryption_policy = {
         kms_key_access_statement,
         {
             "Effect": "Allow",
-            "Principal": {"AWS": "*"},
+            "Principal": {"AWS": ANY_RESOURCE},
             "Action": [
                 "kms:Encrypt",
                 "kms:Decrypt",
@@ -92,7 +93,7 @@ kms_s3_data_encryption_policy = {
                 "kms:CreateGrant",
                 "kms:DescribeKey",
             ],
-            "Resource": "*",
+            "Resource": ANY_RESOURCE,
             "Condition": {
                 "StringEquals": {
                     "kms:ViaService": "s3.us-east-1.amazonaws.com",
@@ -103,7 +104,7 @@ kms_s3_data_encryption_policy = {
     ],
 }
 
-kms_sops_encryption_policy = {
+kms_infrastructure_as_code_encryption_policy = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
         kms_key_access_statement,
@@ -111,9 +112,9 @@ kms_sops_encryption_policy = {
             "Effect": "Allow",
             "Principal": {
                 "AWS": [
-                    "arn:aws:iam::610119931565:user/tmacey",
-                    "arn:aws:iam::610119931565:user/shaidar",
-                    "arn:aws:iam::610119931565:user/mbreedlove",
+                    "arn:aws:iam::{}:user/tmacey".format(owner),
+                    "arn:aws:iam::{}:user/shaidar".format(owner),
+                    "arn:aws:iam::{}:user/mbreedlove".format(owner),
                 ]
             },
             "Action": [
@@ -123,7 +124,7 @@ kms_sops_encryption_policy = {
                 "kms:GenerateDataKey*",
                 "kms:DescribeKey",
             ],
-            "Resource": "*",
+            "Resource": ANY_RESOURCE,
         },
     ],
 }
@@ -180,8 +181,8 @@ export(
 )
 
 # KMS key used for encrypting secrets managed with SOPS
-sops_key = kms.Key(
-    f"sops-infrastructure-secret-management-key-{stack_info.env_suffix}",
+infrastructure_as_code_key = kms.Key(
+    f"infrastructure-secret-management-key-{stack_info.env_suffix}",
     customer_master_key_spec=DEFAULT_KEY_SPEC,
     description=(
         "Key for encrypting secrets used in building and deploying infrastructure "
@@ -197,15 +198,19 @@ sops_key = kms.Key(
             "Owner": "platform-engineering",
         }
     ).tags,
-    policy=json.dumps(kms_sops_encryption_policy),
+    policy=json.dumps(kms_infrastructure_as_code_encryption_policy),
 )
-sops_key_alias = kms.Alias(
-    f"sops-infrastructure-secret-management-key-{stack_info.env_suffix}-alias",
-    name=f"alias/sops-infrastructure-secrets-{stack_info.env_suffix}",
-    target_key_id=sops_key.id,
+infrastructure_as_code_key_alias = kms.Alias(
+    f"infrastructure-secret-management-key-{stack_info.env_suffix}-alias",
+    name=f"alias/infrastructure-secrets-{stack_info.env_suffix}",
+    target_key_id=infrastructure_as_code_key.id,
 )
 
 export(
     "sops_infrastructure_secrets_key",
-    {"id": sops_key.id, "arn": sops_key.arn, "alias": sops_key_alias.name},
+    {
+        "id": infrastructure_as_code_key.id,
+        "arn": infrastructure_as_code_key.arn,
+        "alias": infrastructure_as_code_key_alias.name,
+    },
 )
