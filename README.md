@@ -79,6 +79,6 @@ backend:
 
 Create the directory path according to the conventions detailed above and then create these files. Once that is done you
 will need to create the stack definitions (again according to the above conventions). To do this, `cd` to the target
-directory and run the command `pulumi stack init --secrets-provider=awskms://alias/PulumiSecrets <your.dotted.stack.name.QA>`
+directory and run the command `pulumi stack init --secrets-provider=awskms://alias/infrastructure-secrets-qa <your.dotted.stack.name.QA>`
 
 Now you're ready to start writing the code that will define the target deployment.
