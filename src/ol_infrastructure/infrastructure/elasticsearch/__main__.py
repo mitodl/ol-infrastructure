@@ -8,6 +8,7 @@ from pulumi_aws import ec2, iam, s3
 from ol_infrastructure.lib.aws.ec2_helper import (
     InstanceTypes,
     build_userdata,
+    debian_10_ami,
     default_egress_args,
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
@@ -22,7 +23,6 @@ stack_info = parse_stack()
 env_config = Config("environment")
 elasticsearch_config = Config("elasticsearch")
 salt_config = Config("saltstack")
-aws_api_config = Config("aws_api")
 environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
@@ -145,17 +145,6 @@ elasticsearch_security_group = ec2.SecurityGroup(
 
 security_groups = {"elasticsearch_server": elasticsearch_security_group.id}
 
-debian_10_ami = ec2.get_ami(  # noqa: WPS114
-    filters=[
-        {"name": "image-id", "values": [aws_api_config.get("ami_id")]},
-        {"name": "virtualization-type", "values": ["hvm"]},
-        {"name": "root-device-type", "values": ["ebs"]},
-        {"name": "name", "values": ["debian-10-amd64*"]},
-    ],
-    most_recent=True,
-    owners=["136693071363"],
-)
-
 instance_type_name = (
     elasticsearch_config.get("instance_type") or InstanceTypes.medium.name
 )
@@ -218,7 +207,7 @@ for instance_num, subnet in zip(instance_nums, subnets):
         es_security_groups.append(destination_vpc["security_groups"]["web"])
     elasticsearch_instance = ec2.Instance(
         f"elasticsearch-instance-{environment_name}-{instance_num}",
-        ami=debian_10_ami.id,
+        ami=elasticsearch_config.get("ami_id") or debian_10_ami.id,
         user_data=cloud_init_userdata,
         instance_type=instance_type,
         iam_instance_profile=elasticsearch_instance_profile.id,
