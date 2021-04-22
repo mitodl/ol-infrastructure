@@ -75,16 +75,6 @@ def install_concourse(concourse_config: ConcourseBaseConfig, state=None, host=No
         state=state,
         host=host,
     )
-    # create configuration directory
-    files.directory(
-        name="Create Concourse configuration directory",
-        path=concourse_config.config_directory,
-        user=concourse_config.user,
-        present=True,
-        recursive=True,
-        state=state,
-        host=host,
-    )
     return active_installation_path.changed
 
 
@@ -108,11 +98,11 @@ def _manage_web_node_keys(
     )
     # Write tsa_host_key and session_signing_key
     if concourse_config.tsa_host_key:
-        host_key_file = tempfile.NamedTemporaryFile()
-        host_key_file.write(concourse_config.tsa_host_key)
+        host_key_file = tempfile.NamedTemporaryFile(delete=False)
+        host_key_file.write(concourse_config.tsa_host_key.encode("utf8"))
         files.put(
             name="Write tsa_host_key file",
-            dest=concourse_config.tsa_host_key,
+            dest=concourse_config.tsa_host_key_path,
             user=concourse_config.user,
             mode="600",
             src=host_key_file.name,
@@ -131,11 +121,13 @@ def _manage_web_node_keys(
             sudo=sudo,
         )
     if concourse_config.session_signing_key:
-        session_signing_key_file = tempfile.NamedTemporaryFile()
-        session_signing_key_file.write(concourse_config.session_signing_key)
+        session_signing_key_file = tempfile.NamedTemporaryFile(delete=False)
+        session_signing_key_file.write(
+            concourse_config.session_signing_key.encode("utf8")
+        )
         files.put(
             name="Write session_signing_host_key file",
-            dest=concourse_config.session_signing_key,
+            dest=concourse_config.session_signing_key_path,
             user=concourse_config.user,
             mode="600",
             src=session_signing_key_file.name,
@@ -159,9 +151,22 @@ def _manage_web_node_keys(
 def _manage_worker_node_keys(
     concourse_config: ConcourseWorkerConfig, sudo=True, host=None, state=None
 ):
+    if concourse_config.tsa_public_key:
+        tsa_key_file = tempfile.NamedTemporaryFile(delete=False)
+        tsa_key_file.write(concourse_config.tsa_public_key.encode("utf8"))
+        files.put(
+            name="Write TSA public key file",
+            dest=concourse_config.tsa_public_key_path,
+            src=tsa_key_file.name,
+            user=concourse_config.user,
+            mode="600",
+            state=state,
+            host=host,
+            sudo=sudo,
+        )
     if concourse_config.worker_private_key:
-        worker_key_file = tempfile.NamedTemporaryFile()
-        worker_key_file.write(concourse_config.worker_private_key)
+        worker_key_file = tempfile.NamedTemporaryFile(delete=False)
+        worker_key_file.write(concourse_config.worker_private_key.encode("utf8"))
         files.put(
             name="Write worker private key file",
             dest=concourse_config.worker_private_key_path,

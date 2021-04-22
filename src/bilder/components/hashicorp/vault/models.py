@@ -29,6 +29,21 @@ class VaultAutoAuthAppRole(VaultAutoAuthMethodConfig):
     secret_id_response_wrapping_path: Optional[Path]
 
 
+class VaultAutoAuthAWS(VaultAutoAuthMethodConfig):
+    # The type of authentication; must be ec2 or iam.
+    type: str = "iam"
+    # The role to authenticate against on Vault.
+    role: str
+    # In seconds, how frequently the Vault agent should check for new credentials if
+    # using the iam type.
+    credential_poll_interval: Optional[int]
+    access_key: Optional[str]
+    secret_key: Optional[str]
+    region: str = "us-east-1"
+    session_token: Optional[str]
+    header_value: Optional[str]
+
+
 class VaultAutoAuthMethod(FlexibleBaseModel):
     type: str
     mount_path: Optional[Path]
@@ -102,6 +117,7 @@ class VaultConnectionConfig(FlexibleBaseModel):
 
 class VaultTemplate(FlexibleBaseModel):
     source: Optional[Path]
+    contents: Optional[str]  # noqa: WPS110
     destination: Path
     create_dest_dirs: bool = True
     command: Optional[str]
@@ -168,4 +184,9 @@ class Vault(HashicorpProduct):
         }
 
     def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
-        return [(self.configuration_file, self.configuration.json(exclude_none=True))]
+        return [
+            (
+                self.configuration_file,
+                self.configuration.json(exclude_none=True, indent=2),
+            )
+        ]

@@ -22,7 +22,6 @@ class ConcourseBaseConfig(OLBaseSettings):
     version: str = "7.1.0"
     deploy_directory: Path = Path("/opt/concourse/")
     data_directory: Path = Path("/var/lib/concourse")
-    config_directory: Path = Path("/etc/concourse")
     env_file_path: Path = Path("/etc/default/concourse")
 
     def concourse_env(self) -> Dict[str, str]:
@@ -214,7 +213,8 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     tsa_host: str = Field(
         "web.concourse.service.consul:2222", concourse_env_var="CONCOURSE_TSA_HOST"
     )
-    tsa_public_key: Path = Field(
+    tsa_public_key: Optional[str]
+    tsa_public_key_path: Path = Field(
         Path("/var/concourse/tsa_host_key.pub"),
         concourse_env_var="CONCOURSE_TSA_PUBLIC_KEY",
     )
