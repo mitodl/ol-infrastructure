@@ -105,6 +105,20 @@ residential_mitx_vpc_config = OLVPCConfig(
 )
 residential_mitx_vpc = OLVPC(residential_mitx_vpc_config)
 
+mitx_online_config = Config("mitx_online_vpc")
+mitx_online_vpc_config = OLVPCConfig(
+    vpc_name=f"mitx-online-{stack_info.env_suffix}",
+    cidr_block=mitx_config.require("cidr_block"),
+    num_subnets=5,
+    tags={
+        "OU": "mitx-online",
+        "Environment": f"mitx-online-{stack_info.env_suffix}",
+        "business_unit": "mitx-online",
+        "Name": f"MITx Online {stack_info.name}",
+    },
+)
+mitx_online_vpc = OLVPC(mitx_online_vpc_config)
+
 xpro_config = Config("xpro_vpc")
 xpro_vpc_config = OLVPCConfig(
     vpc_name=f"mitxpro-{stack_info.env_suffix}",
@@ -123,6 +137,7 @@ data_vpc_exports = vpc_exports(
     data_vpc,
     [
         "applications_vpc",
+        "mitx_online_vpc",
         "operations_vpc",
         "residential_mitx_vpc",
         "xpro_vpc",
@@ -181,6 +196,32 @@ residential_mitx_vpc_exports.update(
 )
 export("residential_mitx_vpc", residential_mitx_vpc_exports)
 
+mitx_online_vpc_exports = vpc_exports(mitx_online_vpc, ["data_vpc", "operations_vpc"])
+mitx_online_vpc_exports.update(
+    {
+        "security_groups": {
+            "default": mitx_online_vpc.olvpc.id.apply(default_group).id,
+            "web": public_web(mitx_online_vpc_config.vpc_name, mitx_online_vpc.olvpc)(
+                tags=mitx_online_vpc_config.merged_tags(
+                    {"Name": f"mitx-online-{stack_info.env_suffix}-public-web"}
+                ),
+                name=f"mitx-online-{stack_info.env_suffix}-public-web",
+            ).id,
+            "salt_minion": salt_minion(
+                mitx_online_vpc_config.vpc_name,
+                mitx_online_vpc.olvpc,
+                operations_vpc.olvpc,
+            )(
+                tags=mitx_online_vpc_config.merged_tags(
+                    {"Name": f"mitx-online-{stack_info.env_suffix}-salt-minion"}
+                ),
+                name=f"mitx-online-{stack_info.env_suffix}-salt-minion",
+            ).id,
+        }
+    }
+)
+export("mitx_online_vpc", mitx_online_vpc_exports)
+
 xpro_vpc_exports = vpc_exports(xpro_vpc, ["data_vpc", "operations_vpc"])
 xpro_vpc_exports.update(
     {
@@ -238,6 +279,7 @@ operations_vpc_exports = vpc_exports(
     [
         "applications_vpc",
         "data_vpc",
+        "mitx_online_vpc",
         "residential_mitx_vpc",
         "xpro_vpc",
     ],
