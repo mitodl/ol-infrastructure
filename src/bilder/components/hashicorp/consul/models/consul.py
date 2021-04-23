@@ -1,3 +1,4 @@
+import abc
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
@@ -31,17 +32,25 @@ class ConsulDNSConfig(FlexibleBaseModel):
     service_ttl: Dict[str, str] = {"*": "30s"}
 
 
-class ConsulServiceCheck(FlexibleBaseModel):
-    tcp: Optional[int]
-    udp: Optional[int]
-    interval: str
+class ConsulServiceCheck(abc.ABC):
+    id: str
+
+
+class ConsulServiceTCPCheck(ConsulServiceCheck):
+    name: Optional[str]
+    tcp: str
+    interval: Optional[str]
+    timeout: Optional[str]
 
 
 class ConsulService(FlexibleBaseModel):
+    id: Optional[str]
+    tags: Optional[List[str]]
+    meta: Optional[Dict[str, str]]
     name: str
-    port: int
-    address: str
-    check: ConsulServiceCheck
+    port: Optional[int]
+    address: Optional[str]
+    check: Optional[ConsulServiceCheck]
 
 
 class ConsulTelemetry(FlexibleBaseModel):

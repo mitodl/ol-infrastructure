@@ -19,7 +19,12 @@ from bilder.components.concourse.steps import (
     install_concourse,
     register_concourse_service,
 )
-from bilder.components.hashicorp.consul.models.consul import Consul, ConsulConfig
+from bilder.components.hashicorp.consul.models.consul import (
+    Consul,
+    ConsulConfig,
+    ConsulService,
+    ConsulServiceTCPCheck,
+)
 from bilder.components.hashicorp.steps import (
     configure_hashicorp_product,
     install_hashicorp_products,
@@ -63,13 +68,6 @@ concourse_config_map = {
     "worker": partial(ConcourseWorkerConfig),
 }
 concourse_config = concourse_config_map[node_type]()
-if concourse_config._node_type == "web":  # noqa: WPS437
-    # Setting this attribute after instantiating the object to bypass validation
-    concourse_config.encryption_key = SecretStr(
-        "{{ with secret 'secret-concourse/web' }}"
-        "{{ .Data.data.encryption_key }}"
-        "{{ end }}"
-    )
 vault_template_map = {
     "web": [
         partial(
@@ -111,8 +109,43 @@ vault_template_map = {
 
 # Install Concourse
 install_baseline_packages()
-install_changed = install_concourse(concourse_base_config)
-config_changed = configure_concourse(concourse_config)
+concourse_install_changed = install_concourse(concourse_base_config)
+concourse_config_changed = configure_concourse(concourse_config)
+
+consul_configuration = {Path("00-default.json"): ConsulConfig()}
+
+if concourse_config._node_type == "web":  # noqa: WPS437
+    # Setting this attribute after instantiating the object to bypass validation
+    concourse_config.encryption_key = SecretStr(
+        "{{ with secret 'secret-concourse/web' }}"
+        "{{ .Data.data.encryption_key }}"
+        "{{ end }}"
+    )
+    consul_configuration[Path("01-concourse.json")] = ConsulConfig(
+        services=[
+            ConsulService(
+                name="concourse",
+                port=2222,
+                tags=["web"],
+                check=ConsulServiceTCPCheck(tcp="localhost:2222"),
+            )
+        ]
+    )
+
+    # Install Caddy
+    caddy_config = CaddyConfig(
+        caddyfile=Path(__file__)
+        .parent.resolve()
+        .joinpath("templates", "concourse_caddyfile.j2"),
+        plugins=[
+            CaddyPlugin(repository="github.com/caddy-dns/route53", version="v1.1.1")
+        ],
+    )
+    caddy_config.template_context = caddy_config.dict()
+    install_caddy(caddy_config)
+    caddy_config_changed = configure_caddy(caddy_config)
+    if host.fact.has_systemd:
+        caddy_service(do_reload=caddy_config_changed)
 
 # Install Consul and Vault Agent
 hashicorp_products = [
@@ -141,27 +174,15 @@ hashicorp_products = [
             ],
         )
     ),
-    Consul(version="1.9.5", configuration={Path("00-default.json"): ConsulConfig()}),
+    Consul(version="1.9.5", configuration=consul_configuration),
 ]
 install_hashicorp_products(hashicorp_products)
-
-# Install Caddy
-caddy_config = CaddyConfig(
-    caddyfile=Path(__file__)
-    .parent.resolve()
-    .joinpath("templates", "concourse_caddyfile.j2"),
-    plugins=[CaddyPlugin(repository="github.com/caddy-dns/route53", version="v1.1.1")],
-)
-caddy_config.template_context = caddy_config.dict()
-install_caddy(caddy_config)
-caddy_config_changed = configure_caddy(caddy_config)
 
 # Manage services
 if host.fact.has_systemd:
     register_concourse_service(
-        concourse_config, restart=install_changed or config_changed
+        concourse_config, restart=concourse_install_changed or concourse_config_changed
     )
-    caddy_service(do_reload=caddy_config_changed)
     register_services(hashicorp_products)
 
 for product in hashicorp_products:
