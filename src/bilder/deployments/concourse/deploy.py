@@ -116,7 +116,6 @@ config_changed = configure_concourse(concourse_config)
 
 # Install Consul and Vault Agent
 hashicorp_products = [
-    Consul(configuration={Path("/etc/consul.d/00-default.json"): ConsulConfig()}),
     Vault(
         configuration=VaultAgentConfig(
             auto_auth=VaultAutoAuthConfig(
@@ -134,7 +133,7 @@ hashicorp_products = [
                 VaultTemplate(
                     contents=get_template(
                         "{% for env_var, env_value in concourse_env.items() -%}\n"
-                        "{{ env_var }}={{ env_value }}\n {% endfor -%}",
+                        "{{ env_var }}={{ env_value }}\n{% endfor -%}",
                         is_string=True,
                     ).render(concourse_env=concourse_config.concourse_env()),
                     destination=concourse_base_config.env_file_path,
@@ -142,6 +141,7 @@ hashicorp_products = [
             ],
         )
     ),
+    Consul(version="1.9.5", configuration={Path("00-default.json"): ConsulConfig()}),
 ]
 install_hashicorp_products(hashicorp_products)
 
