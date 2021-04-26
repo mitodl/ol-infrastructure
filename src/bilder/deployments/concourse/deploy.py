@@ -79,7 +79,7 @@ vault_template_map = {
             VaultTemplate,
             contents=(
                 "{{ with secret 'secret-concourse/tsa_key' }}"
-                "{{ .Data.private_key }}{{ end }}"
+                "{{ .Data.data.private_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("tsa_host_key_path"),
         ),
@@ -91,13 +91,21 @@ vault_template_map = {
             ),
             destination=concourse_config.dict().get("session_signing_key_path"),
         ),
+        partial(
+            VaultTemplate,
+            contents=(
+                "{{ with secret 'secret-concourse/generic_worker_key' }}"
+                "{{ .Data.data.public_key }}{{ end }}"
+            ),
+            destination=concourse_config.dict().get("authorized_keys_file"),
+        ),
     ],
     CONCOURSE_WORKER_NODE_TYPE: [
         partial(
             VaultTemplate,
             contents=(
                 "{{ with secret 'secret-concourse/generic_worker_key' }}"
-                "{{ .Data.private_key }}{{ end }}"
+                "{{ .Data.data.private_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("worker_private_key_path"),
         ),
@@ -105,7 +113,7 @@ vault_template_map = {
             VaultTemplate,
             contents=(
                 "{{ with secret 'secret-concourse/tsa_key' }}"
-                "{{ .Data.public_key }}{{ end }}"
+                "{{ .Data.data.public_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("tsa_public_key_path"),
         ),
