@@ -1,7 +1,6 @@
 import json
-from itertools import chain
 
-from pulumi import Config, ResourceOptions
+from pulumi import Config, ResourceOptions, export
 from pulumi.stack_reference import StackReference
 from pulumi_aws import ec2, iam
 
@@ -11,7 +10,6 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     debian_10_ami,
     default_egress_args,
 )
-from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.providers.salt.minion import (
@@ -27,6 +25,7 @@ environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+policy_stack = StackReference("infrastructure.aws.policies")
 operations_vpc = network_stack.require_output("operations_vpc")
 consul_stack = StackReference(
     "infrastructure.consul."  # noqa: WPS237, WPS221
@@ -34,31 +33,6 @@ consul_stack = StackReference(
     f"{stack_info.name}"
 )
 destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))
-
-mongodb_instance_policy = {
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Action": [
-                "ec2:DescribeInstances",
-                "ec2:DescribeAvailabilityZones",
-                "ec2:DescribeRegions",
-                "ec2:DescribeSecurityGroups",
-                "ec2:DescribeTags",
-            ],
-            "Effect": "Allow",
-            "Resource": ["*"],
-        },
-    ],
-}
-
-mongodb_iam_policy = iam.Policy(
-    f"mongodb-policy-{environment_name}",
-    name=f"mongodb-policy-{environment_name}",
-    path=f"/ol-applications/mongodb-{environment_name}/",
-    policy=lint_iam_policy(mongodb_instance_policy, stringify=True),
-    description="Policy to access resources needed by mongodb instances",
-)
 
 mongodb_instance_role = iam.Role(
     "mongodb-instance-role",
@@ -73,13 +47,13 @@ mongodb_instance_role = iam.Role(
         }
     ),
     name=f"mongodb-instance-role-{environment_name}",
-    path=f"/ol-operations/mongodb-{environment_name}/",
+    path=f"/ol-infrastructure/mongodb-{environment_name}/",
     tags=aws_config.tags,
 )
 
 iam.RolePolicyAttachment(
     f"mongodb-role-policy-{environment_name}",
-    policy_arn=mongodb_iam_policy.arn,
+    policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
     role=mongodb_instance_role.name,
 )
 
@@ -87,7 +61,7 @@ mongodb_instance_profile = iam.InstanceProfile(
     f"mongodb-instance-profile-{environment_name}",
     role=mongodb_instance_role.name,
     name=f"mongodb-instance-profile-{environment_name}",
-    path="/ol-operations/mongodb-profile/",
+    path="/ol-infrastructure/mongodb-profile/",
 )
 
 mongodb_security_group = ec2.SecurityGroup(
@@ -123,7 +97,6 @@ instance_type = InstanceTypes[instance_type_name].value
 mongodb_instances = []
 export_data = {}
 subnets = destination_vpc["subnet_ids"]
-subnet_id = subnets.apply(chain)
 salt_environment = Config("saltstack").get("environment_name") or environment_name
 instance_nums = range(mongodb_config.get_int("instance_count") or 3)
 
@@ -166,7 +139,6 @@ for instance_num, subnet in zip(instance_nums, subnets):
         {
             "Name": instance_name,
             "mongodb_env": environment_name,
-            "escluster": salt_environment,
         }
     )
     mongodb_security_groups = [
@@ -207,3 +179,5 @@ for instance_num, subnet in zip(instance_nums, subnets):
         "private_ip": mongodb_instance.private_ip,
         "ipv6_address": mongodb_instance.ipv6_addresses,
     }
+
+export("instances", export_data)
