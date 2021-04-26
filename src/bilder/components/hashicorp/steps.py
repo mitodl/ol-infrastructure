@@ -131,8 +131,8 @@ def register_services(
 def configure_hashicorp_product(product: HashicorpProduct, state=None, host=None):
     put_results = []
     for fpath, file_contents in product.render_configuration_files():
-        temp_src = tempfile.NamedTemporaryFile(delete=False)
-        temp_src.write(file_contents.encode("utf8"))
+        temp_src = tempfile.NamedTemporaryFile(delete=False, mode="w")
+        temp_src.write(file_contents)
         put_results.append(
             files.put(
                 name=f"Create configuration file {fpath} for {product.name}",
@@ -145,6 +145,7 @@ def configure_hashicorp_product(product: HashicorpProduct, state=None, host=None
                 host=host,
             )
         )
+        temp_src.close()
     if host.fact.has_systemd:
         systemd.service(
             name=f"Reload service for {product.name}",

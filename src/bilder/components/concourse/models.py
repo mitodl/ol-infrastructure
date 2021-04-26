@@ -19,10 +19,9 @@ class IframeOptions(str, Enum):  # noqa: WPS600
 
 class ConcourseBaseConfig(OLBaseSettings):
     user: str = "concourse"
-    version: str = "6.7.4"
+    version: str = "7.1.0"
     deploy_directory: Path = Path("/opt/concourse/")
     data_directory: Path = Path("/var/lib/concourse")
-    config_directory: Path = Path("/etc/concourse")
     env_file_path: Path = Path("/etc/default/concourse")
 
     def concourse_env(self) -> Dict[str, str]:
@@ -50,7 +49,7 @@ class ConcourseBaseConfig(OLBaseSettings):
 class ConcourseWebConfig(ConcourseBaseConfig):
     _node_type: str = "web"
     admin_password: SecretStr
-    admin_user: str = "oldevops"
+    admin_user: str = "admin"
     audit_builds: bool = (
         Field(  # Enable auditing for all api requests connected to builds.
             default=True, concourse_env_var="CONCOURSE_ENABLE_BUILD_AUDITING"
@@ -132,7 +131,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         None, concourse_env_var="CONCOURSE_GITHUB_CLIENT_SECRET"
     )
     github_main_team_concourse_team: Optional[str] = Field(
-        "mitodl:olengineering", concourse_env_var="CONCOURSE_MAIN_TEAM_GITHUB_TEAM"
+        "mitodl:odl-engineering", concourse_env_var="CONCOURSE_MAIN_TEAM_GITHUB_TEAM"
     )
     github_main_team_org: Optional[str] = Field(
         "mitodl", concourse_env_var="CONCOURSE_MAIN_TEAM_GITHUB_ORG"
@@ -214,7 +213,8 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     tsa_host: str = Field(
         "web.concourse.service.consul:2222", concourse_env_var="CONCOURSE_TSA_HOST"
     )
-    tsa_public_key: Path = Field(
+    tsa_public_key: Optional[str]
+    tsa_public_key_path: Path = Field(
         Path("/var/concourse/tsa_host_key.pub"),
         concourse_env_var="CONCOURSE_TSA_PUBLIC_KEY",
     )

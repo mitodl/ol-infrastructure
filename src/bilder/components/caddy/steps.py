@@ -19,7 +19,7 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
             state=state,
             host=host,
         )
-        files.download(
+        caddy_install = files.download(
             name="Download custom build of Caddy",
             dest="/usr/local/bin/caddy",
             src=caddy_config.custom_download_url(),
