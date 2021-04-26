@@ -45,12 +45,17 @@ from bilder.components.hashicorp.vault.models import (
 from bilder.facts import has_systemd  # noqa: F401
 from bilder.lib.magic_numbers import VAULT_HTTP_PORT
 
+VERSIONS = {  # noqa: WPS407
+    "caddy_route53": "v1.1.1",
+    "concourse": "7.2.0",
+    "consul": "1.9.5",
+}
 CONCOURSE_WEB_HOST_COMMUNICATION_PORT = 2222
 CONCOURSE_WEB_NODE_TYPE = "web"
 CONCOURSE_WORKER_NODE_TYPE = "worker"
 node_type = host.data.node_type or os.environ.get("NODE_TYPE", CONCOURSE_WEB_NODE_TYPE)
 # Set up configuration objects
-concourse_base_config = ConcourseBaseConfig(version="7.1.0")
+concourse_base_config = ConcourseBaseConfig(version=VERSIONS["concourse"])
 concourse_config_map = {
     CONCOURSE_WEB_NODE_TYPE: partial(  # noqa: S106
         ConcourseWebConfig,
@@ -154,7 +159,10 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
         .parent.resolve()
         .joinpath("templates", "concourse_caddyfile.j2"),
         plugins=[
-            CaddyPlugin(repository="github.com/caddy-dns/route53", version="v1.1.1")
+            CaddyPlugin(
+                repository="github.com/caddy-dns/route53",
+                version=VERSIONS["caddy_route53"],
+            )
         ],
     )
     caddy_config.template_context = caddy_config.dict()
@@ -194,7 +202,7 @@ hashicorp_products = [
             ],
         )
     ),
-    Consul(version="1.9.5", configuration=consul_configuration),
+    Consul(version=VERSIONS["consul"], configuration=consul_configuration),
 ]
 install_hashicorp_products(hashicorp_products)
 
