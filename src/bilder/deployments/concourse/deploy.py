@@ -25,6 +25,7 @@ from bilder.components.hashicorp.consul.models.consul import (
     ConsulService,
     ConsulServiceTCPCheck,
 )
+from bilder.components.hashicorp.consul.steps import proxy_consul_dns
 from bilder.components.hashicorp.steps import (
     configure_hashicorp_product,
     install_hashicorp_products,
@@ -38,15 +39,19 @@ from bilder.components.hashicorp.vault.models import (
     VaultAutoAuthFileSink,
     VaultAutoAuthMethod,
     VaultAutoAuthSink,
+    VaultConnectionConfig,
     VaultTemplate,
 )
 from bilder.facts import has_systemd  # noqa: F401
 
-node_type = host.data.node_type or os.environ.get("NODE_TYPE", "web")
+CONCOURSE_WEB_HOST_COMMUNICATION_PORT = 2222
+CONCOURSE_WEB_NODE_TYPE = "web"
+CONCOURSE_WORKER_NODE_TYPE = "worker"
+node_type = host.data.node_type or os.environ.get("NODE_TYPE", CONCOURSE_WEB_NODE_TYPE)
 # Set up configuration objects
 concourse_base_config = ConcourseBaseConfig(version="7.1.0")
 concourse_config_map = {
-    "web": partial(  # noqa: S106
+    CONCOURSE_WEB_NODE_TYPE: partial(  # noqa: S106
         ConcourseWebConfig,
         admin_user="oldevops",
         admin_password=(
@@ -65,11 +70,11 @@ concourse_config_map = {
             "{{ end }}"
         ),
     ),
-    "worker": partial(ConcourseWorkerConfig),
+    CONCOURSE_WORKER_NODE_TYPE: partial(ConcourseWorkerConfig),
 }
 concourse_config = concourse_config_map[node_type]()
 vault_template_map = {
-    "web": [
+    CONCOURSE_WEB_NODE_TYPE: [
         partial(
             VaultTemplate,
             contents=(
@@ -87,7 +92,7 @@ vault_template_map = {
             destination=concourse_config.dict().get("session_signing_key_path"),
         ),
     ],
-    "worker": [
+    CONCOURSE_WORKER_NODE_TYPE: [
         partial(
             VaultTemplate,
             contents=(
@@ -114,7 +119,7 @@ concourse_config_changed = configure_concourse(concourse_config)
 
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
 
-if concourse_config._node_type == "web":  # noqa: WPS437
+if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
     # Setting this attribute after instantiating the object to bypass validation
     concourse_config.encryption_key = SecretStr(
         "{{ with secret 'secret-concourse/web' }}"
@@ -125,8 +130,8 @@ if concourse_config._node_type == "web":  # noqa: WPS437
         services=[
             ConsulService(
                 name="concourse",
-                port=2222,
-                tags=["web"],
+                port=CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
+                tags=[CONCOURSE_WEB_NODE_TYPE],
                 check=ConsulServiceTCPCheck(tcp="localhost:2222"),
             )
         ]
@@ -151,6 +156,10 @@ if concourse_config._node_type == "web":  # noqa: WPS437
 hashicorp_products = [
     Vault(
         configuration=VaultAgentConfig(
+            vault=VaultConnectionConfig(
+                address="https://active.vault.service.consul:8200",
+                tls_skip_verify=True,
+            ),
             auto_auth=VaultAutoAuthConfig(
                 method=VaultAutoAuthMethod(
                     type="aws",
@@ -184,6 +193,7 @@ if host.fact.has_systemd:
         concourse_config, restart=concourse_install_changed or concourse_config_changed
     )
     register_services(hashicorp_products)
+    proxy_consul_dns()
 
 for product in hashicorp_products:
     configure_hashicorp_product(product)
