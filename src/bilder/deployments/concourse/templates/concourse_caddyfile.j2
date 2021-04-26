@@ -1,0 +1,16 @@
+{
+    email odl-devops@mit.edu
+}
+
+{$DOMAIN:cicd.odl.mit.edu} {
+    log {
+        format json
+        output file {{ context.log_file }}
+    }
+
+    tls {
+      dns route53
+    }
+
+    reverse_proxy {{ context.upstream_address }}
+}
