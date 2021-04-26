@@ -43,6 +43,7 @@ from bilder.components.hashicorp.vault.models import (
     VaultTemplate,
 )
 from bilder.facts import has_systemd  # noqa: F401
+from bilder.lib.magic_numbers import VAULT_HTTP_PORT
 
 CONCOURSE_WEB_HOST_COMMUNICATION_PORT = 2222
 CONCOURSE_WEB_NODE_TYPE = "web"
@@ -167,7 +168,7 @@ hashicorp_products = [
     Vault(
         configuration=VaultAgentConfig(
             vault=VaultConnectionConfig(
-                address="https://active.vault.service.consul:8200",
+                address=f"https://active.vault.service.consul:{VAULT_HTTP_PORT}",
                 tls_skip_verify=True,
             ),
             auto_auth=VaultAutoAuthConfig(
