@@ -140,7 +140,9 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
                 name="concourse",
                 port=CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
                 tags=[CONCOURSE_WEB_NODE_TYPE],
-                check=ConsulServiceTCPCheck(tcp="localhost:2222"),
+                check=ConsulServiceTCPCheck(
+                    tcp=f"localhost:{CONCOURSE_WEB_HOST_COMMUNICATION_PORT}"
+                ),
             )
         ]
     )
