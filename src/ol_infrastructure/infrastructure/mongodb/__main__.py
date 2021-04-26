@@ -179,5 +179,11 @@ for instance_num, subnet in zip(instance_nums, subnets):
         "private_ip": mongodb_instance.private_ip,
         "ipv6_address": mongodb_instance.ipv6_addresses,
     }
+export(
+    "security_groups",
+    {
+        "mongodb_server": mongodb_security_group.id,
+    },
+)
 
 export("instances", export_data)
