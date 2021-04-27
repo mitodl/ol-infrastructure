@@ -32,12 +32,13 @@ class ConsulDNSConfig(FlexibleBaseModel):
     service_ttl: Dict[str, str] = {"*": "30s"}
 
 
-class ConsulServiceCheck(abc.ABC):
-    id: str
+class ConsulServiceCheck(FlexibleBaseModel, abc.ABC):
+    id: Optional[str]
 
 
 class ConsulServiceTCPCheck(ConsulServiceCheck):
-    name: Optional[str]
+    id: Optional[str]
+    name: str
     tcp: str
     interval: Optional[str]
     timeout: Optional[str]

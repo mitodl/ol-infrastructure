@@ -147,7 +147,8 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
                 port=CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
                 tags=[CONCOURSE_WEB_NODE_TYPE],
                 check=ConsulServiceTCPCheck(
-                    tcp=f"localhost:{CONCOURSE_WEB_HOST_COMMUNICATION_PORT}"
+                    name="concourse-web-job-queue",
+                    tcp=f"localhost:{CONCOURSE_WEB_HOST_COMMUNICATION_PORT}",
                 ),
             )
         ]
@@ -169,7 +170,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
     install_caddy(caddy_config)
     caddy_config_changed = configure_caddy(caddy_config)
     if host.fact.has_systemd:
-        caddy_service(do_reload=caddy_config_changed)
+        caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
 
 # Install Consul and Vault Agent
 hashicorp_products = [
@@ -205,14 +206,13 @@ hashicorp_products = [
     Consul(version=VERSIONS["consul"], configuration=consul_configuration),
 ]
 install_hashicorp_products(hashicorp_products)
+for product in hashicorp_products:
+    configure_hashicorp_product(product)
 
 # Manage services
 if host.fact.has_systemd:
     register_concourse_service(
         concourse_config, restart=concourse_install_changed or concourse_config_changed
     )
-    register_services(hashicorp_products)
+    register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
-
-for product in hashicorp_products:
-    configure_hashicorp_product(product)

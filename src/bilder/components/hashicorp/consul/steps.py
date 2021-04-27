@@ -21,7 +21,7 @@ def proxy_consul_dns(state=None, host=None):
     systemd.service(
         name="Enable systemd-resolved",
         service="systemd-resolved",
-        enable=True,
+        enabled=True,
         running=True,
         state=state,
         host=host,
@@ -37,7 +37,7 @@ def proxy_consul_dns(state=None, host=None):
             jump="REDIRECT",
             destination="localhost",
             destination_port=DEFAULT_DNS_PORT,
-            to_ports=CONSUL_DNS_PORT,
+            to_ports=str(CONSUL_DNS_PORT),
             state=state,
             host=host,
         )

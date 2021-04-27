@@ -103,7 +103,10 @@ def install_hashicorp_products(
 
 @deploy("Register Hashicorp Service")
 def register_services(
-    hashicorp_products: List[HashicorpProduct], state=None, host=None
+    hashicorp_products: List[HashicorpProduct],
+    start_services_immediately=True,
+    state=None,
+    host=None,
 ):
     for product in hashicorp_products:
         systemd_unit = files.template(
@@ -119,7 +122,7 @@ def register_services(
         systemd.service(
             name=f"Register service for {product.name}",
             service=product.name,
-            running=True,
+            running=start_services_immediately,
             enabled=True,
             daemon_reload=systemd_unit.changed,
             state=state,
@@ -146,11 +149,3 @@ def configure_hashicorp_product(product: HashicorpProduct, state=None, host=None
             )
         )
         temp_src.close()
-    if host.fact.has_systemd:
-        systemd.service(
-            name=f"Reload service for {product.name}",
-            service=product.name,
-            reloaded=any(upload_result.changed for upload_result in put_results),
-            host=host,
-            state=state,
-        )

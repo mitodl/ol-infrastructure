@@ -119,7 +119,9 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     )
     encryption_key: SecretStr = Field(
         default_factory=partial(
-            secrets.token_hex, CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH / 2
+            # Using floor division to produce an int instead of float
+            secrets.token_hex,
+            CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH // 2,
         ),
         concourse_env_var="CONCOURSE_ENCRYPTION_KEY",
         env_transform=lambda _: _.get_secret_value(),
