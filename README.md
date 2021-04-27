@@ -1,6 +1,8 @@
 # Overview
 This repository is a monorepo for managing the configuration and deployment of services managed by MIT Open Learning engineering. It uses a combination of Pulumi and PyInfra to build a pure-python deployment stack to enable more developer-friendly access to creating and modifying the systems that power the applications that we build and serve.
 
+All infrastructure provisioning performed via Pulumi is located under `src/ol-infrastructure/` and all configuration management written in PyInfra lives under `src/bilder`.
+
 # Infrastructure Management
 
 ## Getting Started
@@ -16,10 +18,10 @@ We use the S3 state backend for Pulumi, so after installing the Pulumi CLI run `
 
 This is a monorepo of the Pulumi code that we use to manage the infrastructure that powers MIT Open Learning
 
-Component resources are located under `components/` with a descriptive name that makes it evident what the intent of the
+Component resources are located under `src/ol-infrastructure/components/` with a descriptive name that makes it evident what the intent of the
 component is.
 
-Concrete implementations of infrastructure are located under `infrastructure/` with a descriptive name that makes it
+Concrete implementations of infrastructure are located under `src/ol-infrastructure/infrastructure/` with a descriptive name that makes it
 evident what is contained in that project.
 
 Each component or concrete infrastructure that is more complex than a single resource will include a `diagram.py` file
@@ -28,8 +30,8 @@ that uses the [diagrams](https://diagrams.mingrammer.com/) package to illustrate
 ## Nomenclature
 
 Pulumi organizes code into `Projects` which represent a deployable unit. Within a project they have a concept of
-`Stacks` which are often used as a mapping for different environments. Each module underneath `infrastructure/` and
-`applications/` is its own `Project`, meaning that it will have a `Pulumi.yaml` definition of that project. Each `stack`
+`Stacks` which are often used as a mapping for different environments. Each module underneath `src/ol-infrastructure/infrastructure/` and
+`src/ol-infrastructure/applications/` is its own `Project`, meaning that it will have a `Pulumi.yaml` definition of that project. Each `stack`
 has its own yaml file in which the configuration for that stack is defined.
 
 ## Conventions
@@ -44,7 +46,7 @@ allowing for use of [stack references](https://www.pulumi.com/docs/tutorials/aws
 projects.
 
 The infrastructure components should be properly namespaced to match the stack names. For example, the project for
-managing VPC networking in AWS is located at `infrastructure/aws/network/` and the corresponding stacks are defined as
+managing VPC networking in AWS is located at `src/ol-infrastructure/infrastructure/aws/network/` and the corresponding stacks are defined as
 `aws.network.QA` and `aws.network.Production`.
 
 
@@ -100,7 +102,7 @@ Any given service is unlikely to be composed of a single service, instead requir
 variety of components to be used together. In order to make the composition of a running
 system easier to reason about, we decompose the responsibilities for any given piece of
 technology into a self-contained component. These components live under the
-`src/components/` directory. Each component provide at minimum the logic needed to
+`src/bilder/components/` directory. Each component provide at minimum the logic needed to
 install and configure the associated service. In addition, each component should also
 provide the logic needed to upgrade an instance of the service, the SystemD unit files
 needed to register the service, and any logic required to perform maintenance on the
