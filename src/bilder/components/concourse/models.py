@@ -20,6 +20,7 @@ class IframeOptions(str, Enum):  # noqa: WPS600
 class ConcourseBaseConfig(OLBaseSettings):
     user: str = "concourse"
     version: str = "7.1.0"
+    configuration_directory: Path = Path("/etc/concourse")
     deploy_directory: Path = Path("/opt/concourse/")
     data_directory: Path = Path("/var/lib/concourse")
     env_file_path: Path = Path("/etc/default/concourse")
@@ -217,7 +218,7 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     )
     tsa_public_key: Optional[str]
     tsa_public_key_path: Path = Field(
-        Path("/var/concourse/tsa_host_key.pub"),
+        Path("/etc/concourse/tsa_host_key.pub"),
         concourse_env_var="CONCOURSE_TSA_PUBLIC_KEY",
     )
     work_dir: Path = Field(
@@ -225,7 +226,7 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     )
     worker_private_key: Optional[str] = None
     worker_private_key_path: Path = Field(
-        Path("/var/concourse/worker_private_key.pem"),
+        Path("/etc/concourse/worker_private_key.pem"),
         concourse_env_var="CONCOURSE_TSA_WORKER_PRIVATE_KEY",
     )
 

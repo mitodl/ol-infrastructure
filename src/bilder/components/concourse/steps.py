@@ -206,9 +206,27 @@ def configure_concourse(
         host=host,
         sudo=sudo,
     )
+    files.directory(
+        name="Create Concourse configuration directory",
+        path=concourse_config.configuration_directory,
+        user=concourse_config.user,
+        recursive=True,
+        present=True,
+        state=state,
+        host=host,
+    )
     if concourse_config._node_type == "web":  # noqa: WPS437
         _manage_web_node_keys(concourse_config, state=state, host=host)
     elif concourse_config._node_type == "worker":  # noqa: WPS437
+        files.directory(
+            name="Create Concourse worker state directory",
+            path=concourse_config.work_dir,
+            present=True,
+            user=concourse_config.user,
+            recursive=True,
+            state=state,
+            host=host,
+        )
         _manage_worker_node_keys(concourse_config, state=state, host=host)
     return concourse_env_file.changed
 
