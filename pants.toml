@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.3.0rc0"
+pants_version = "2.4.0"
 backend_packages = [
   'pants.backend.python',
   'pants.backend.python.lint.isort',
@@ -12,7 +12,7 @@ backend_packages = [
 root_patterns = ['src/']
 
 [python-setup]
-interpreter_constraints = ['>=3.7']
+interpreter_constraints = ['>=3.8']
 requirement_constraints = './requirements.txt'
 
 [flake8]
