@@ -286,6 +286,7 @@ def build_userdata(  # noqa: WPS211
     salt_host: str,
     additional_cloud_config: Optional[Dict[str, Any]] = None,
     additional_salt_config: Optional[Dict[str, str]] = None,
+    additional_salt_grains: Optional[Dict[str, str]] = None,
 ) -> pulumi.Output[str]:
     """Construct a user data dictionary for use with EC2 instances.
 
@@ -315,6 +316,9 @@ def build_userdata(  # noqa: WPS211
     :param additional_salt_config: Additional settings to set in the salt_minion module
         of cloud-init
     :type additional_salt_config: Optional[Dict[str, str]]
+
+    :param additional_salt_grains: Additional settings to set in the salt grains
+    :type additional_salt_grains: Optional[Dict[str, str]]
 
     :returns: A YAML rendering of the cloud-init userdata wrapped in a Pulumi output to
               create a dependency link.
@@ -353,6 +357,9 @@ def build_userdata(  # noqa: WPS211
         }
         salt_config["salt_minion"]["conf"].update(  # type: ignore
             additional_salt_config or {}
+        )
+        salt_config["salt_minion"]["grains"].update(  # type: ignore
+            additional_salt_grains or {}
         )
         cloud_config.update(salt_config)
         return "#cloud-config\n{yaml_data}".format(

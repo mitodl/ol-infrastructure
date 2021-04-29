@@ -113,7 +113,7 @@ for instance_num, subnet in zip(instance_nums, subnets):
         minion_roles=["mongodb"],
         minion_environment=salt_environment,
         salt_host=f"salt-{stack_info.env_suffix}.private.odl.mit.edu",
-        additional_salt_config={"business_unit": business_unit},
+        additional_salt_grains={"business_unit": business_unit},
         additional_cloud_config={
             "fs_setup": [
                 {
