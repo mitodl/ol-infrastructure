@@ -72,6 +72,14 @@ mitxpro_edxapp_security_group = ec2.SecurityGroup(
             cidr_blocks=[xpro_vpc["cidr"]],
             ipv6_cidr_blocks=[xpro_vpc["cidr_v6"]],
             protocol="tcp",
+            from_port=4567,
+            to_port=4567,
+            description="Forum access",
+        ),
+        ec2.SecurityGroupIngressArgs(
+            cidr_blocks=[xpro_vpc["cidr"]],
+            ipv6_cidr_blocks=[xpro_vpc["cidr_v6"]],
+            protocol="tcp",
             from_port=18040,
             to_port=18040,
             description="Xqueue access",
@@ -123,7 +131,7 @@ mitxpro_edxapp_db_config = OLMariaDBConfig(
     subnet_group_name=xpro_vpc["rds_subnet"],
     security_groups=[mitxpro_edxapp_db_security_group],
     tags=aws_config.merged_tags({"Name": f"mitxpro-edxapp-{stack_info.env_suffix}-db"}),
-    db_name="edxapp_{db_purpose}".format(db_purpose=xpro_db_purpose),
+    db_name=f"edxapp_{xpro_db_purpose}",
     **defaults(stack_info)["rds"],
 )
 mitxpro_edxapp_db = OLAmazonDB(mitxpro_edxapp_db_config)
