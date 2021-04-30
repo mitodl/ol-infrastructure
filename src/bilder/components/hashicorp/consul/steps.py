@@ -3,7 +3,7 @@ import tempfile
 from pyinfra.api import deploy
 from pyinfra.operations import files, iptables, systemd
 
-from bilder.lib.magic_numbers import CONSUL_DNS_PORT, DEFAULT_DNS_PORT
+from bridge.lib.magic_numbers import CONSUL_DNS_PORT, DEFAULT_DNS_PORT
 
 
 @deploy("Set up DNS proxy")

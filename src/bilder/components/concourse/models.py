@@ -6,8 +6,8 @@ from typing import Dict, List, Optional
 
 from pydantic import Field, PositiveInt, SecretStr, validator
 
-from bilder.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bilder.lib.model_helpers import OLBaseSettings
+from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 
 CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH = 32
 

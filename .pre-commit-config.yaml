@@ -22,7 +22,6 @@ repos:
   hooks:
     - id: autoflake
       args:
-        - "--check"
         - "--in-place"
         - "--ignore-init-module-imports"
         - "--expand-star-imports"
@@ -32,7 +31,10 @@ repos:
   rev: v1.1.0
   hooks:
     - id: detect-secrets
-      exclude: poetry.lock
+      args:
+        - "--exclude-lines (^encryptedkey:|secure:|^secretsprovider:)"
+        - "--exclude-files secrets/"
+        - "--exclude-files poetry.lock"
 - repo: https://github.com/timothycrosley/isort
   rev: 5.8.0
   hooks:

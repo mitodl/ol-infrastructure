@@ -43,14 +43,16 @@ from bilder.components.hashicorp.vault.models import (
     VaultTemplate,
 )
 from bilder.facts import has_systemd  # noqa: F401
-from bilder.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.magic_numbers import (
+    CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
+    VAULT_HTTP_PORT,
+)
 
 VERSIONS = {  # noqa: WPS407
     "caddy_route53": "v1.1.1",
     "concourse": "7.2.0",
     "consul": "1.9.5",
 }
-CONCOURSE_WEB_HOST_COMMUNICATION_PORT = 2222
 CONCOURSE_WEB_NODE_TYPE = "web"
 CONCOURSE_WORKER_NODE_TYPE = "worker"
 node_type = host.data.node_type or os.environ.get("NODE_TYPE", CONCOURSE_WEB_NODE_TYPE)
@@ -84,8 +86,8 @@ vault_template_map = {
         partial(
             VaultTemplate,
             contents=(
-                "{{ with secret 'secret-concourse/tsa_key' }}"
-                "{{ .Data.data.private_key }}{{ end }}"
+                "{{ with secret 'secret-concourse/web' }}"
+                "{{ .Data.data.tsa_private_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("tsa_host_key_path"),
         ),
@@ -100,8 +102,8 @@ vault_template_map = {
         partial(
             VaultTemplate,
             contents=(
-                "{{ with secret 'secret-concourse/generic_worker_key' }}"
-                "{{ .Data.data.public_key }}{{ end }}"
+                "{{ with secret 'secret-concourse/web' }}"
+                "{{ .Data.data.worker_public_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("authorized_keys_file"),
         ),
@@ -110,16 +112,16 @@ vault_template_map = {
         partial(
             VaultTemplate,
             contents=(
-                "{{ with secret 'secret-concourse/generic_worker_key' }}"
-                "{{ .Data.data.private_key }}{{ end }}"
+                "{{ with secret 'secret-concourse/worker' }}"
+                "{{ .Data.data.worker_private_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("worker_private_key_path"),
         ),
         partial(
             VaultTemplate,
             contents=(
-                "{{ with secret 'secret-concourse/tsa_key' }}"
-                "{{ .Data.data.public_key }}{{ end }}"
+                "{{ with secret 'secret-concourse/worker' }}"
+                "{{ .Data.data.tsa_public_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("tsa_public_key_path"),
         ),
