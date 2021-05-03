@@ -1,5 +1,5 @@
 name: ol-infrastructure-ocw_site-application
 runtime: python
-description: OCW next-generation site contents stored in S3 buckets and hosted on the CDN
+description: OCW site contents stored in S3 buckets and hosted on the CDN
 backend:
   url: s3://mitol-pulumi-state/
