@@ -1,4 +1,4 @@
-name: ol-infrastructure-ocw_site-application
+name: ol-infrastructure-ocw-site-application
 runtime: python
 description: OCW site contents stored in S3 buckets and hosted on the CDN
 backend:
