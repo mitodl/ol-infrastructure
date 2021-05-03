@@ -1,6 +1,5 @@
 from pulumi import Config, export
 from pulumi_aws import iam, s3
-from pulumi_vault import aws
 
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -68,13 +67,10 @@ s3_bucket_iam_policy = iam.Policy(
     ),
 )
 
-role_name = f"ocw-site-{stack_info.env_suffix}"
-ocw_site_vault_backend_role = aws.SecretBackendRole(
-    role_name,
-    name=role_name,
-    backend="aws-mitx",
-    credential_type="iam_user",
-    policy_arns=[s3_bucket_iam_policy.arn],
+export(
+    "ocw_site_buckets",
+    {
+        "buckets": [draft_bucket_name, live_bucket_name],
+        "policy": s3_bucket_iam_policy.name,
+    },
 )
-
-export("ocw_site_buckets", {"buckets": [draft_bucket_name, live_bucket_name]})
