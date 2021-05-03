@@ -9,12 +9,14 @@ import json
 from pathlib import Path
 
 import pulumi_vault as vault
+import yaml
 from pulumi import Config, StackReference
-from pulumi_aws import ec2, iam
+from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
     CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
+    DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -22,7 +24,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
+from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -38,6 +40,26 @@ mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 operations_vpc = network_stack.require_output("operations_vpc")
 aws_config = AWSBase(
     tags={"OU": "operations", "Environment": "operations-{stack_info.env_suffix}"}
+)
+aws_account = get_caller_identity()
+concourse_web_ami = ec2.get_ami(
+    filters=[
+        ec2.GetAmiFilterArgs(name="name", values=["concourse-web"]),
+        ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
+        ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
+    ],
+    most_recent=True,
+    owners=[aws_account.account_id],
+)
+
+concourse_worker_ami = ec2.get_ami(
+    filters=[
+        ec2.GetAmiFilterArgs(name="name", values=["concourse-worker"]),
+        ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
+        ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
+    ],
+    most_recent=True,
+    owners=[aws_account.account_id],
 )
 
 ###################################
@@ -104,12 +126,33 @@ vault.generic.Secret(
 )
 
 # Vault policy definition
-vault.Policy(
+concourse_vault_policy = vault.Policy(
     "concourse-vault-policy",
     name="concourse",
-    policy=Path(__file__).parent.joinpath("concourse_policy.hcl"),
+    policy=Path(__file__).parent.joinpath("concourse_policy.hcl").read_text(),
 )
 # Register Concourse AMI for Vault AWS auth
+vault.aws.AuthBackendRole(
+    "concourse-web-ami-ec2-vault-auth",
+    backend="aws",
+    auth_type="ec2",
+    role="concourse-web",
+    bound_ami_ids=[concourse_web_ami.id],
+    bound_account_ids=[aws_account.account_id],
+    bound_vpc_ids=[operations_vpc["id"]],
+    token_policies=[concourse_vault_policy.name],
+)
+
+vault.aws.AuthBackendRole(
+    "concourse-worker-ami-ec2-vault-auth",
+    backend="aws",
+    auth_type="ec2",
+    role="concourse-worker",
+    bound_ami_ids=[concourse_worker_ami.id],
+    bound_account_ids=[aws_account.account_id],
+    bound_vpc_ids=[operations_vpc["id"]],
+    token_policies=[concourse_vault_policy.name],
+)
 
 ##################################
 #     Network Access Control     #
@@ -214,18 +257,190 @@ concourse_db_consul_service = Service(
 #     EC2 Deployment     #
 ##########################
 
-# Create Vault role definitions for web and worker EC2 auth backend
+# Create load balancer for Concourse web nodes
+web_lb = lb.LoadBalancer(
+    "concourse-web-load-balancer",
+    name=f"concourse-web-{stack_info.env_suffix}",
+    ip_address_type="dualstack",
+    load_balancer_type="application",
+    enable_http2=True,
+    subnets=operations_vpc["subnet_ids"],
+    security_groups=[
+        operations_vpc["security_groups"]["web"],
+    ],
+    tags=aws_config.merged_tags({"Name": f"concourse-web-{stack_info.env_suffix}"}),
+)
+
+web_lb_target_group = lb.TargetGroup(
+    "concourse-web-alb-target-group",
+    vpc_id=operations_vpc["id"],
+    target_type="ip",
+    port=DEFAULT_HTTPS_PORT,
+    protocol="HTTPS",
+    health_check=lb.TargetGroupHealthCheckArgs(
+        healthy_threshold=2,
+        interval=10,
+        path="/",
+        port=str(DEFAULT_HTTPS_PORT),
+        protocol="HTTPS",
+    ),
+    name=f"concourse-web-alb-group-{stack_info.env_suffix}",
+    tags=aws_config.tags,
+)
+concourse_web_acm_cert = acm.get_certificate(
+    domain="*.odl.mit.edu", most_recent=True, statuses=["ISSUED"]
+)
+concourse_web_alb_listener = lb.Listener(
+    "concourse-web-alb-listener",
+    certificate_arn=concourse_web_acm_cert.arn,
+    load_balancer_arn=web_lb.arn,
+    port=DEFAULT_HTTPS_PORT,
+    default_actions=[
+        lb.ListenerDefaultActionArgs(
+            type="forward",
+            target_group_arn=web_lb_target_group.arn,
+        )
+    ],
+)
 
 # Create auto scale group and launch configs for Concourse web and worker
+web_launch_config = ec2.LaunchTemplate(
+    "concourse-web-launch-template",
+    name_prefix=f"concourse-web-{stack_info.env_suffix}-",
+    description="Launch template for deploying Concourse web nodes",
+    iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
+        arn=concourse_instance_profile.arn,
+        name=concourse_instance_profile.name,
+    ),
+    image_id=concourse_web_ami.id,
+    vpc_security_group_ids=[
+        concourse_web_security_group.id,
+        operations_vpc["security_groups"]["web"],
+    ],
+    instance_type=InstanceTypes.medium,
+    key_name="salt-production",
+    tag_specifications=[
+        ec2.LaunchTemplateTagSpecificationArgs(
+            resource_type="instance",
+            tags=aws_config.tags,
+        ),
+        ec2.LaunchTemplateTagSpecificationArgs(
+            resource_type="volume",
+            tags=aws_config.tags,
+        ),
+    ],
+    tags=aws_config.tags,
+    user_data="#cloud-config\n{}".format(
+        yaml.dump(
+            {
+                "write_files": [
+                    {
+                        "path": "/etc/consul.d/02-autojoin.json",
+                        "contents": json.dumps(
+                            {
+                                "retry_join": [
+                                    "provider=aws tag_key=consul_env "
+                                    f"tag_value=operations-{stack_info.env_suffix}"
+                                ]
+                            }
+                        ),
+                    },
+                    {
+                        "path": "/etc/default/caddy",
+                        "contents": "DOMAIN={}".format(
+                            concourse_config.require("web_host_domain")
+                        ),
+                    },
+                ]
+            },
+            sort_keys=True,
+        )
+    ),
+)
+web_asg = autoscaling.Group(
+    "concourse-web-autoscaling-group",
+    desired_capacity=concourse_config.get_int("web_node_capacity") or 1,
+    min_size=1,
+    max_size=5,
+    health_check_type="ELB",
+    vpc_zone_identifiers=operations_vpc["subnet_ids"],
+    launch_template=autoscaling.GroupLaunchTemplateArgs(
+        id=web_launch_config.id, version="$Latest"
+    ),
+    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
+        strategy="Rolling",
+    ),
+    target_group_arns=[web_lb_target_group.arn],
+)
 
-# Create userdata for Consul configuration to join correct cluster
-# Create userdata for setting Caddy domain
-
-# Create load balancer for Concourse web nodes
+worker_launch_config = ec2.LaunchTemplate(
+    "concourse-worker-launch-template",
+    name_prefix=f"concourse-worker-{stack_info.env_suffix}-",
+    description="Launch template for deploying Concourse worker nodes",
+    iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
+        arn=concourse_instance_profile.arn,
+        name=concourse_instance_profile.name,
+    ),
+    image_id=concourse_worker_ami.id,
+    vpc_security_group_ids=[
+        concourse_worker_security_group.id,
+    ],
+    instance_type=InstanceTypes.large,
+    key_name="salt-production",
+    tag_specifications=[
+        ec2.LaunchTemplateTagSpecificationArgs(
+            resource_type="instance",
+            tags=aws_config.tags,
+        ),
+        ec2.LaunchTemplateTagSpecificationArgs(
+            resource_type="volume",
+            tags=aws_config.tags,
+        ),
+    ],
+    tags=aws_config.tags,
+    user_data="#cloud-config\n{}".format(
+        yaml.dump(
+            {
+                "write_files": [
+                    {
+                        "path": "/etc/consul.d/02-autojoin.json",
+                        "contents": json.dumps(
+                            {
+                                "retry_join": [
+                                    "provider=aws tag_key=consul_env "
+                                    f"tag_value=operations-{stack_info.env_suffix}"
+                                ]
+                            }
+                        ),
+                    },
+                ]
+            },
+            sort_keys=True,
+        )
+    ),
+)
+worker_asg = autoscaling.Group(
+    "concourse-worker-autoscaling-group",
+    desired_capacity=concourse_config.get_int("web_node_capacity") or 1,
+    min_size=1,
+    max_size=50,  # noqa: WPS432
+    health_check_type="EC2",
+    vpc_zone_identifiers=operations_vpc["subnet_ids"],
+    launch_template=autoscaling.GroupLaunchTemplateArgs(
+        id=worker_launch_config.id, version="$Latest"
+    ),
+    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
+        strategy="Rolling",
+    ),
+)
 
 # Create Route53 DNS records for Concourse web nodes
-
-
-# Create RDS postgres instance
-
-# Register Postgres instance in Vault
+five_minutes = 60 * 5
+route53.Record(
+    "concourse-web-dns-record",
+    name=concourse_config.require("web_host_domain"),
+    type="CNAME",
+    ttl=five_minutes,
+    records=[web_lb.dns_name],
+    zone_id=mitodl_zone_id,
+)
