@@ -44,7 +44,7 @@ s3_bucket_iam_policy = iam.Policy(
     f"ocw-site-{stack_info.env_suffix}-policy",
     description=policy_description,
     path=f"/ol-applications/ocw-site/{stack_info.env_suffix}/",
-    name_prefix="aws-permissions-",
+    name_prefix=f"ocw-site-content-read-only-{stack_info.env_suffix}",
     policy=lint_iam_policy(
         {
             "Version": "2012-10-17",
