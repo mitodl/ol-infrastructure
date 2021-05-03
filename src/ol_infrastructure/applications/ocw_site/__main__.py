@@ -11,7 +11,7 @@ stack_info = parse_stack()
 aws_config = AWSBase(
     tags={
         "OU": "open-courseware",
-        "environment": f"applications_{stack_info.env_suffix}",
+        "Environment": f"applications_{stack_info.env_suffix}",
     }
 )
 
