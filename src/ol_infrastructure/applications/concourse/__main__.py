@@ -5,6 +5,7 @@
 - Create an autoscaling group for Concourse web nodes
 - Create an autoscaling group for Concourse worker instances
 """
+import base64
 import json
 from pathlib import Path
 
@@ -35,11 +36,13 @@ stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
+consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
+consul_security_groups = consul_stack.require_output("security_groups")
 operations_vpc = network_stack.require_output("operations_vpc")
 aws_config = AWSBase(
-    tags={"OU": "operations", "Environment": "operations-{stack_info.env_suffix}"}
+    tags={"OU": "operations", "Environment": f"operations-{stack_info.env_suffix}"}
 )
 aws_account = get_caller_identity()
 concourse_web_ami = ec2.get_ami(
@@ -107,19 +110,18 @@ concourse_secrets_mount = vault.Mount(
     "concourse-app-secrets",
     description="Generic secrets storage for Concourse application deployment",
     path="secret-concourse",
-    type="generic",
-    options={"version": "2"},
+    type="kv-v2",
 )
 vault.generic.Secret(
     "concourse-web-secret-values",
-    path=concourse_secrets_mount.path.concat("/web"),
+    path=concourse_secrets_mount.path.apply(lambda mount_path: f"{mount_path}/web"),
     data_json=concourse_config.require_secret_object("web_vault_secrets").apply(
         json.dumps
     ),
 )
 vault.generic.Secret(
     "concourse-worker-secret-values",
-    path=concourse_secrets_mount.path.concat("/worker"),
+    path=concourse_secrets_mount.path.apply(lambda mount_path: f"{mount_path}/worker"),
     data_json=concourse_config.require_secret_object("worker_vault_secrets").apply(
         json.dumps
     ),
@@ -161,15 +163,24 @@ vault.aws.AuthBackendRole(
 # Create worker node security group
 concourse_worker_security_group = ec2.SecurityGroup(
     f"concourse-worker-security-group-{stack_info.env_suffix}",
-    name="concourse-web-operations-{stack_info.env_suffix}",
-    description="Access control for Concourse web servers",
+    name=f"concourse-worker-operations-{stack_info.env_suffix}",
+    description="Access control for Concourse worker servers",
+    ingress=[
+        ec2.SecurityGroupIngressArgs(
+            self=True,
+            from_port=22,
+            to_port=22,
+            protocol="tcp",
+        )
+    ],
     egress=default_egress_args,
+    vpc_id=operations_vpc["id"],
 )
 
 # Create web node security group
 concourse_web_security_group = ec2.SecurityGroup(
     f"concourse-web-security-group-{stack_info.env_suffix}",
-    name="concourse-web-operations-{stack_info.env_suffix}",
+    name=f"concourse-web-operations-{stack_info.env_suffix}",
     description="Access control for Concourse web servers",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -181,6 +192,7 @@ concourse_web_security_group = ec2.SecurityGroup(
         )
     ],
     egress=default_egress_args,
+    vpc_id=operations_vpc["id"],
 )
 
 # Create security group for Concourse Postgres database
@@ -191,11 +203,14 @@ concourse_db_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             security_groups=[concourse_web_security_group.id],
+            # TODO: Create Vault security group to act as source of allowed
+            # traffic. (TMM 2021-05-04)
+            cidr_blocks=[operations_vpc["cidr"]],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
             description="Access to Postgres from Concourse web nodes",
-        )
+        ),
     ],
     tags=aws_config.tags,
     vpc_id=operations_vpc["id"],
@@ -274,7 +289,7 @@ web_lb = lb.LoadBalancer(
 web_lb_target_group = lb.TargetGroup(
     "concourse-web-alb-target-group",
     vpc_id=operations_vpc["id"],
-    target_type="ip",
+    target_type="instance",
     port=DEFAULT_HTTPS_PORT,
     protocol="HTTPS",
     health_check=lb.TargetGroupHealthCheckArgs(
@@ -295,6 +310,7 @@ concourse_web_alb_listener = lb.Listener(
     certificate_arn=concourse_web_acm_cert.arn,
     load_balancer_arn=web_lb.arn,
     port=DEFAULT_HTTPS_PORT,
+    protocol="HTTPS",
     default_actions=[
         lb.ListenerDefaultActionArgs(
             type="forward",
@@ -310,52 +326,59 @@ web_launch_config = ec2.LaunchTemplate(
     description="Launch template for deploying Concourse web nodes",
     iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
         arn=concourse_instance_profile.arn,
-        name=concourse_instance_profile.name,
     ),
     image_id=concourse_web_ami.id,
     vpc_security_group_ids=[
         concourse_web_security_group.id,
         operations_vpc["security_groups"]["web"],
+        consul_security_groups["consul_agent"],
     ],
     instance_type=InstanceTypes.medium,
     key_name="salt-production",
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="instance",
-            tags=aws_config.tags,
+            tags=aws_config.merged_tags(
+                {"Name": f"concourse-web-{stack_info.env_suffix}"}
+            ),
         ),
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="volume",
-            tags=aws_config.tags,
+            tags=aws_config.merged_tags(
+                {"Name": f"concourse-web-{stack_info.env_suffix}"}
+            ),
         ),
     ],
     tags=aws_config.tags,
-    user_data="#cloud-config\n{}".format(
-        yaml.dump(
-            {
-                "write_files": [
-                    {
-                        "path": "/etc/consul.d/02-autojoin.json",
-                        "contents": json.dumps(
-                            {
-                                "retry_join": [
-                                    "provider=aws tag_key=consul_env "
-                                    f"tag_value=operations-{stack_info.env_suffix}"
-                                ]
-                            }
-                        ),
-                    },
-                    {
-                        "path": "/etc/default/caddy",
-                        "contents": "DOMAIN={}".format(
-                            concourse_config.require("web_host_domain")
-                        ),
-                    },
-                ]
-            },
-            sort_keys=True,
-        )
-    ),
+    user_data=base64.b64encode(
+        "#cloud-config\n{}".format(
+            yaml.dump(
+                {
+                    "write_files": [
+                        {
+                            "path": "/etc/consul.d/02-autojoin.json",
+                            "contents": json.dumps(
+                                {
+                                    "retry_join": [
+                                        "provider=aws tag_key=consul_env "
+                                        f"tag_value=operations-{stack_info.env_suffix}"
+                                    ]
+                                }
+                            ),
+                            "owner": "consul:consul",
+                        },
+                        {
+                            "path": "/etc/default/caddy",
+                            "contents": "DOMAIN={}".format(
+                                concourse_config.require("web_host_domain")
+                            ),
+                        },
+                    ]
+                },
+                sort_keys=True,
+            )
+        ).encode("utf8")
+    ).decode("utf8"),
 )
 web_asg = autoscaling.Group(
     "concourse-web-autoscaling-group",
@@ -379,45 +402,52 @@ worker_launch_config = ec2.LaunchTemplate(
     description="Launch template for deploying Concourse worker nodes",
     iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
         arn=concourse_instance_profile.arn,
-        name=concourse_instance_profile.name,
     ),
     image_id=concourse_worker_ami.id,
     vpc_security_group_ids=[
         concourse_worker_security_group.id,
+        consul_security_groups["consul_agent"],
     ],
     instance_type=InstanceTypes.large,
     key_name="salt-production",
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="instance",
-            tags=aws_config.tags,
+            tags=aws_config.merged_tags(
+                {"Name": f"concourse-worker-{stack_info.env_suffix}"}
+            ),
         ),
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="volume",
-            tags=aws_config.tags,
+            tags=aws_config.merged_tags(
+                {"Name": f"concourse-worker-{stack_info.env_suffix}"}
+            ),
         ),
     ],
     tags=aws_config.tags,
-    user_data="#cloud-config\n{}".format(
-        yaml.dump(
-            {
-                "write_files": [
-                    {
-                        "path": "/etc/consul.d/02-autojoin.json",
-                        "contents": json.dumps(
-                            {
-                                "retry_join": [
-                                    "provider=aws tag_key=consul_env "
-                                    f"tag_value=operations-{stack_info.env_suffix}"
-                                ]
-                            }
-                        ),
-                    },
-                ]
-            },
-            sort_keys=True,
-        )
-    ),
+    user_data=base64.b64encode(
+        "#cloud-config\n{}".format(
+            yaml.dump(
+                {
+                    "write_files": [
+                        {
+                            "path": "/etc/consul.d/02-autojoin.json",
+                            "contents": json.dumps(
+                                {
+                                    "retry_join": [
+                                        "provider=aws tag_key=consul_env "
+                                        f"tag_value=operations-{stack_info.env_suffix}"
+                                    ]
+                                }
+                            ),
+                            "owner": "consul:consul",
+                        },
+                    ]
+                },
+                sort_keys=True,
+            )
+        ).encode("utf8")
+    ).decode("utf8"),
 )
 worker_asg = autoscaling.Group(
     "concourse-worker-autoscaling-group",

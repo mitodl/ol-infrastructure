@@ -151,6 +151,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
                 check=ConsulServiceTCPCheck(
                     name="concourse-web-job-queue",
                     tcp=f"localhost:{CONCOURSE_WEB_HOST_COMMUNICATION_PORT}",
+                    interval="10s",
                 ),
             )
         ]
