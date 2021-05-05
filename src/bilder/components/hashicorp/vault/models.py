@@ -60,7 +60,7 @@ class VaultAutoAuthSink(FlexibleBaseModel):
     derive_key: bool = False
     aad: Optional[str]
     aad_env_var: Optional[str]
-    config: VaultAutoAuthSinkConfig
+    config: List[VaultAutoAuthSinkConfig]
 
 
 class VaultAgentCache(FlexibleBaseModel):
@@ -102,7 +102,7 @@ class ConsulStorageBackend(VaultStorageBackend):
 
 class VaultAutoAuthConfig(FlexibleBaseModel):
     method: VaultAutoAuthMethod
-    sinks: Optional[List[VaultAutoAuthSink]]
+    sink: Optional[List[VaultAutoAuthSink]]
 
 
 class VaultConnectionConfig(FlexibleBaseModel):

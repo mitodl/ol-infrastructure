@@ -40,6 +40,7 @@ from bilder.components.hashicorp.vault.models import (
     VaultAutoAuthMethod,
     VaultAutoAuthSink,
     VaultConnectionConfig,
+    VaultListener,
     VaultTemplate,
 )
 from bilder.facts import has_systemd  # noqa: F401
@@ -179,6 +180,9 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
 hashicorp_products = [
     Vault(
         configuration=VaultAgentConfig(
+            listener=[
+                VaultListener(type="tcp", address="127.0.0.1:8100", tls_disable=True)
+            ],
             vault=VaultConnectionConfig(
                 address=f"https://active.vault.service.consul:{VAULT_HTTP_PORT}",
                 tls_skip_verify=True,
@@ -191,7 +195,7 @@ hashicorp_products = [
                         role=f"concourse-{concourse_config._node_type}"  # noqa: WPS437
                     ),
                 ),
-                sinks=[VaultAutoAuthSink(type="file", config=VaultAutoAuthFileSink())],
+                sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
             ),
             template=[partial_func() for partial_func in vault_template_map[node_type]]
             + [

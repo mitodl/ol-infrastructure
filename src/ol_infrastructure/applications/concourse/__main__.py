@@ -137,8 +137,11 @@ concourse_vault_policy = vault.Policy(
 vault.aws.AuthBackendRole(
     "concourse-web-ami-ec2-vault-auth",
     backend="aws",
-    auth_type="ec2",
+    auth_type="iam",
     role="concourse-web",
+    inferred_entity_type="ec2_instance",
+    inferred_aws_region="us-east-1",
+    bound_iam_instance_profile_arns=[concourse_instance_profile.arn],
     bound_ami_ids=[concourse_web_ami.id],
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[operations_vpc["id"]],
@@ -148,7 +151,10 @@ vault.aws.AuthBackendRole(
 vault.aws.AuthBackendRole(
     "concourse-worker-ami-ec2-vault-auth",
     backend="aws",
-    auth_type="ec2",
+    auth_type="iam",
+    inferred_entity_type="ec2_instance",
+    inferred_aws_region="us-east-1",
+    bound_iam_instance_profile_arns=[concourse_instance_profile.arn],
     role="concourse-worker",
     bound_ami_ids=[concourse_worker_ami.id],
     bound_account_ids=[aws_account.account_id],
@@ -357,19 +363,20 @@ web_launch_config = ec2.LaunchTemplate(
                     "write_files": [
                         {
                             "path": "/etc/consul.d/02-autojoin.json",
-                            "contents": json.dumps(
+                            "content": json.dumps(
                                 {
                                     "retry_join": [
                                         "provider=aws tag_key=consul_env "
                                         f"tag_value=operations-{stack_info.env_suffix}"
-                                    ]
+                                    ],
+                                    "datacenter": f"operations-{stack_info.env_suffix}",
                                 }
                             ),
                             "owner": "consul:consul",
                         },
                         {
                             "path": "/etc/default/caddy",
-                            "contents": "DOMAIN={}".format(
+                            "content": "DOMAIN={}".format(
                                 concourse_config.require("web_host_domain")
                             ),
                         },
@@ -432,12 +439,13 @@ worker_launch_config = ec2.LaunchTemplate(
                     "write_files": [
                         {
                             "path": "/etc/consul.d/02-autojoin.json",
-                            "contents": json.dumps(
+                            "content": json.dumps(
                                 {
                                     "retry_join": [
                                         "provider=aws tag_key=consul_env "
                                         f"tag_value=operations-{stack_info.env_suffix}"
-                                    ]
+                                    ],
+                                    "datacenter": f"operations-{stack_info.env_suffix}",
                                 }
                             ),
                             "owner": "consul:consul",
