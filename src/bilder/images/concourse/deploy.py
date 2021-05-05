@@ -64,17 +64,17 @@ concourse_config_map = {
         ConcourseWebConfig,
         admin_user="oldevops",
         admin_password=(
-            "{{ with secret 'secret-concourse/web' }}"
+            '{{ with secret "secret-concourse/web" }}'
             "{{ .Data.data.admin_password }}"
             "{{ end }}"
         ),
         database_user=(
-            "{{ with secret 'postgres-concourse/creds/concourse' }}"
+            '{{ with secret "postgres-concourse/creds/app" }}'
             "{{ .Data.username }}"
             "{{ end }}"
         ),
         database_password=(
-            "{{ with secret 'postgres-concourse/creds/concourse' }}"
+            '{{ with secret "postgres-concourse/creds/app" }}'
             "{{ .Data.password }}"
             "{{ end }}"
         ),
@@ -87,7 +87,7 @@ vault_template_map = {
         partial(
             VaultTemplate,
             contents=(
-                "{{ with secret 'secret-concourse/web' }}"
+                '{{ with secret "secret-concourse/web" }}'
                 "{{ .Data.data.tsa_private_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("tsa_host_key_path"),
@@ -95,7 +95,7 @@ vault_template_map = {
         partial(
             VaultTemplate,
             contents=(
-                "{{ with secret 'secret-concourse/web' }}"
+                '{{ with secret "secret-concourse/web" }}'
                 "{{ .Data.data.session_signing_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("session_signing_key_path"),
@@ -103,7 +103,7 @@ vault_template_map = {
         partial(
             VaultTemplate,
             contents=(
-                "{{ with secret 'secret-concourse/web' }}"
+                '{{ with secret "secret-concourse/web" }}'
                 "{{ .Data.data.worker_public_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("authorized_keys_file"),
@@ -113,7 +113,7 @@ vault_template_map = {
         partial(
             VaultTemplate,
             contents=(
-                "{{ with secret 'secret-concourse/worker' }}"
+                '{{ with secret "secret-concourse/worker" }}'
                 "{{ .Data.data.worker_private_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("worker_private_key_path"),
@@ -121,7 +121,7 @@ vault_template_map = {
         partial(
             VaultTemplate,
             contents=(
-                "{{ with secret 'secret-concourse/worker' }}"
+                '{{ with secret "secret-concourse/worker" }}'
                 "{{ .Data.data.tsa_public_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("tsa_public_key_path"),
@@ -139,7 +139,7 @@ consul_configuration = {Path("00-default.json"): ConsulConfig()}
 if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
     # Setting this attribute after instantiating the object to bypass validation
     concourse_config.encryption_key = SecretStr(
-        "{{ with secret 'secret-concourse/web' }}"
+        '{{ with secret "secret-concourse/web" }}'
         "{{ .Data.data.encryption_key }}"
         "{{ end }}"
     )

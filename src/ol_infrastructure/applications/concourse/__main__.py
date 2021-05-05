@@ -114,16 +114,20 @@ concourse_secrets_mount = vault.Mount(
 )
 vault.generic.Secret(
     "concourse-web-secret-values",
-    path=concourse_secrets_mount.path.apply(lambda mount_path: f"{mount_path}/web"),
+    path=concourse_secrets_mount.path.apply(
+        lambda mount_path: f"{mount_path}/data/web"
+    ),
     data_json=concourse_config.require_secret_object("web_vault_secrets").apply(
-        json.dumps
+        lambda web_secrets: json.dumps({"data": web_secrets})
     ),
 )
 vault.generic.Secret(
     "concourse-worker-secret-values",
-    path=concourse_secrets_mount.path.apply(lambda mount_path: f"{mount_path}/worker"),
+    path=concourse_secrets_mount.path.apply(
+        lambda mount_path: f"{mount_path}/data/worker"
+    ),
     data_json=concourse_config.require_secret_object("worker_vault_secrets").apply(
-        json.dumps
+        lambda worker_secrets: json.dumps({"data": worker_secrets})
     ),
 )
 
