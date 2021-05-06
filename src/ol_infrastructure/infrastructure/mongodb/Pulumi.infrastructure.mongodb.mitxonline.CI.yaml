@@ -4,7 +4,7 @@ config:
   aws:region: us-east-1
   mongodb:instance_type: medium
   mongodb:disk_size: 500
-  environment:business_unit: mitx-online
+  environment:business_unit: mitxonline
   environment:vpc_reference: mitx_online_vpc
-  saltstack:environment_name: mitx-online-qa
+  saltstack:environment_name: mitxonline-qa
   saltstack:key_name: salt-qa
