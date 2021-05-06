@@ -304,7 +304,7 @@ web_lb_target_group = lb.TargetGroup(
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",
     ),
-    name=f"concourse-web-alb-group-{stack_info.env_suffix}",
+    name=f"concourse-web-{stack_info.env_suffix}"[:32],
     tags=aws_config.tags,
 )
 concourse_web_acm_cert = acm.get_certificate(
