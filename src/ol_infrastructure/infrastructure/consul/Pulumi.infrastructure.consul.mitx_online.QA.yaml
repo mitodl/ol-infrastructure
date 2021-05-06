@@ -4,4 +4,5 @@ config:
   aws:region: us-east-1
   environment:business_unit: mitx-online
   environment:vpc_reference: mitx_online_vpc
+  saltstack:environment_name: mitx-online-qa
   saltstack:key_name: salt-qa
