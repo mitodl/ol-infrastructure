@@ -23,7 +23,7 @@ class BusinessUnit(str, Enum):  # noqa: WPS600
     micromasters = "micromasters"
     mit_open = "mit-open"
     mitx = "mitx"
-    mitx_online = "mitx-online"
+    mitx_online = "mitxonline"
     ocw = "open-courseware"
     operations = "operations"
     ovs = "odl-video"

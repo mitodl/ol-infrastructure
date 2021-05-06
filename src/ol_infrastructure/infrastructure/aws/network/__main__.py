@@ -111,9 +111,9 @@ mitx_online_vpc_config = OLVPCConfig(
     cidr_block=mitx_config.require("cidr_block"),
     num_subnets=5,
     tags={
-        "OU": "mitx-online",
-        "Environment": f"mitx-online-{stack_info.env_suffix}",
-        "business_unit": "mitx-online",
+        "OU": "mitxonline",
+        "Environment": f"mitxonline-{stack_info.env_suffix}",
+        "business_unit": "mitxonline",
         "Name": f"MITx Online {stack_info.name}",
     },
 )
@@ -203,9 +203,9 @@ mitx_online_vpc_exports.update(
             "default": mitx_online_vpc.olvpc.id.apply(default_group).id,
             "web": public_web(mitx_online_vpc_config.vpc_name, mitx_online_vpc.olvpc)(
                 tags=mitx_online_vpc_config.merged_tags(
-                    {"Name": f"mitx-online-{stack_info.env_suffix}-public-web"}
+                    {"Name": f"mitxonline-{stack_info.env_suffix}-public-web"}
                 ),
-                name=f"mitx-online-{stack_info.env_suffix}-public-web",
+                name=f"mitxonline-{stack_info.env_suffix}-public-web",
             ).id,
             "salt_minion": salt_minion(
                 mitx_online_vpc_config.vpc_name,
@@ -213,9 +213,9 @@ mitx_online_vpc_exports.update(
                 operations_vpc.olvpc,
             )(
                 tags=mitx_online_vpc_config.merged_tags(
-                    {"Name": f"mitx-online-{stack_info.env_suffix}-salt-minion"}
+                    {"Name": f"mitxonline-{stack_info.env_suffix}-salt-minion"}
                 ),
-                name=f"mitx-online-{stack_info.env_suffix}-salt-minion",
+                name=f"mitxonline-{stack_info.env_suffix}-salt-minion",
             ).id,
         }
     }

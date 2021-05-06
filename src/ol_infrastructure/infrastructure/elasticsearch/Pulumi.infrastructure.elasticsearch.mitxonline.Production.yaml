@@ -4,7 +4,7 @@ config:
   aws:region: us-east-1
   elasticsearch:instance_type: general_purpose_large
   elasticsearch:disk_size: 100
-  environment:business_unit: mitx-online
+  environment:business_unit: mitxonline
   environment:vpc_reference: mitx_online_vpc
-  saltstack:environment_name: mitx-online-production
+  saltstack:environment_name: mitxonline-production
   saltstack:key_name: salt-production
