@@ -1,4 +1,8 @@
 {
+    storage file_system {
+        root {{ context.data_directory }}
+    }
+    default_sni {$DOMAIN:cicd.odl.mit.edu}
     email odl-devops@mit.edu
 }
 
@@ -12,5 +16,5 @@
       dns route53
     }
 
-    reverse_proxy {{ context.upstream_address }}
+    reverse_proxy http://127.0.0.1:8080
 }

@@ -43,6 +43,7 @@ from bilder.components.hashicorp.vault.models import (
     VaultListener,
     VaultTemplate,
 )
+from bilder.components.hashicorp.vault.steps import vault_template_permissions
 from bilder.facts import has_systemd  # noqa: F401
 from bridge.lib.magic_numbers import (
     CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
@@ -78,6 +79,11 @@ concourse_config_map = {
             "{{ .Data.password }}"
             "{{ end }}"
         ),
+        public_domain=(
+            '{{ with secret "secret-concourse/web" }}'
+            "{{ .Data.data.public_domain }}"
+            "{{ end }}"
+        ),
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(ConcourseWorkerConfig),
 }
@@ -88,7 +94,7 @@ vault_template_map = {
             VaultTemplate,
             contents=(
                 '{{ with secret "secret-concourse/web" }}'
-                "{{ .Data.data.tsa_private_key }}{{ end }}"
+                "{{ printf .Data.data.tsa_private_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("tsa_host_key_path"),
         ),
@@ -96,7 +102,7 @@ vault_template_map = {
             VaultTemplate,
             contents=(
                 '{{ with secret "secret-concourse/web" }}'
-                "{{ .Data.data.session_signing_key }}{{ end }}"
+                "{{ printf .Data.data.session_signing_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("session_signing_key_path"),
         ),
@@ -104,7 +110,7 @@ vault_template_map = {
             VaultTemplate,
             contents=(
                 '{{ with secret "secret-concourse/web" }}'
-                "{{ .Data.data.worker_public_key }}{{ end }}"
+                "{{ printf .Data.data.worker_public_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("authorized_keys_file"),
         ),
@@ -114,7 +120,7 @@ vault_template_map = {
             VaultTemplate,
             contents=(
                 '{{ with secret "secret-concourse/worker" }}'
-                "{{ .Data.data.worker_private_key }}{{ end }}"
+                "{{ printf .Data.data.worker_private_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("worker_private_key_path"),
         ),
@@ -122,7 +128,7 @@ vault_template_map = {
             VaultTemplate,
             contents=(
                 '{{ with secret "secret-concourse/worker" }}'
-                "{{ .Data.data.tsa_public_key }}{{ end }}"
+                "{{ printf .Data.data.tsa_public_key }}{{ end }}"
             ),
             destination=concourse_config.dict().get("tsa_public_key_path"),
         ),
@@ -177,42 +183,42 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
         caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
 
 # Install Consul and Vault Agent
-hashicorp_products = [
-    Vault(
-        configuration=VaultAgentConfig(
-            listener=[
-                VaultListener(type="tcp", address="127.0.0.1:8100", tls_disable=True)
-            ],
-            vault=VaultConnectionConfig(
-                address=f"https://active.vault.service.consul:{VAULT_HTTP_PORT}",
-                tls_skip_verify=True,
-            ),
-            auto_auth=VaultAutoAuthConfig(
-                method=VaultAutoAuthMethod(
-                    type="aws",
-                    mount_path="auth/aws",
-                    config=VaultAutoAuthAWS(
-                        role=f"concourse-{concourse_config._node_type}"  # noqa: WPS437
-                    ),
+vault = Vault(
+    configuration=VaultAgentConfig(
+        listener=[
+            VaultListener(type="tcp", address="127.0.0.1:8100", tls_disable=True)
+        ],
+        vault=VaultConnectionConfig(
+            address=f"https://active.vault.service.consul:{VAULT_HTTP_PORT}",
+            tls_skip_verify=True,
+        ),
+        auto_auth=VaultAutoAuthConfig(
+            method=VaultAutoAuthMethod(
+                type="aws",
+                mount_path="auth/aws",
+                config=VaultAutoAuthAWS(
+                    role=f"concourse-{concourse_config._node_type}"  # noqa: WPS437
                 ),
-                sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
             ),
-            template=[partial_func() for partial_func in vault_template_map[node_type]]
-            + [
-                VaultTemplate(
-                    contents=get_template(
-                        "{% for env_var, env_value in concourse_env.items() -%}\n"
-                        "{{ env_var }}={{ env_value }}\n{% endfor -%}",
-                        is_string=True,
-                    ).render(concourse_env=concourse_config.concourse_env()),
-                    destination=concourse_base_config.env_file_path,
-                ),
-            ],
-        )
-    ),
-    Consul(version=VERSIONS["consul"], configuration=consul_configuration),
-]
+            sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
+        ),
+        template=[partial_func() for partial_func in vault_template_map[node_type]]
+        + [
+            VaultTemplate(
+                contents=get_template(
+                    "{% for env_var, env_value in concourse_env.items() -%}\n"
+                    "{{ env_var }}={{ env_value }}\n{% endfor -%}",
+                    is_string=True,
+                ).render(concourse_env=concourse_config.concourse_env()),
+                destination=concourse_base_config.env_file_path,
+            ),
+        ],
+    )
+)
+consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
+hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
+vault_template_permissions(vault.configuration)
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 

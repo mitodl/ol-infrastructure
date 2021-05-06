@@ -9,7 +9,8 @@ StartLimitBurst=3
 [Service]
 User=vault
 Group=vault
-ProtectSystem=full
+# When set to "full" or "strict" this prevents the agent from rendering templates in /etc/
+ProtectSystem={% if context.mode == "agent" %}true{% else %}full{% endif %}
 ProtectHome=read-only
 PrivateTmp=yes
 PrivateDevices=yes

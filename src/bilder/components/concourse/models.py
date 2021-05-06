@@ -112,6 +112,9 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         env_transform=lambda _: _.get_secret_value(),
     )
     database_user: str = Field("oldevops", concourse_env_var="CONCOURSE_POSTGRES_USER")
+    database_sslmode: str = Field(
+        "require", concourse_env_var="CONCOURSE_POSTGRES_SSLMODE"
+    )
     db_max_conns_api: PositiveInt = Field(
         PositiveInt(10), concourse_env_var="CONCOURSE_API_MAX_CONNS"
     )
@@ -143,7 +146,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         "odlbot", concourse_env_var="CONCOURSE_MAIN_TEAM_GITHUB_USER"
     )
     iframe_options: IframeOptions = Field(
-        IframeOptions.deny.value, concourse_env_var="CONCOURSE_X_FRAME_OPTIONS"
+        IframeOptions.deny, concourse_env_var="CONCOURSE_X_FRAME_OPTIONS"
     )
     peer_address: str = Field(
         "web.concourse.service.consul",

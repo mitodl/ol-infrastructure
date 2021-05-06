@@ -45,6 +45,7 @@ aws_config = AWSBase(
     tags={"OU": "operations", "Environment": f"operations-{stack_info.env_suffix}"}
 )
 aws_account = get_caller_identity()
+ops_vpc_id = operations_vpc["id"]
 concourse_web_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["concourse-web"]),
@@ -99,6 +100,12 @@ iam.RolePolicyAttachment(
     role=concourse_instance_role.name,
 )
 
+iam.RolePolicyAttachment(
+    f"concourse-route53-role-policy-{stack_info.env_suffix}",
+    policy_arn=policy_stack.require_output("iam_policies")["route53_odl_zone_records"],
+    role=concourse_instance_role.name,
+)
+
 concourse_instance_profile = iam.InstanceProfile(
     f"concourse-instance-profile-{stack_info.env_suffix}",
     role=concourse_instance_role.name,
@@ -114,20 +121,16 @@ concourse_secrets_mount = vault.Mount(
 )
 vault.generic.Secret(
     "concourse-web-secret-values",
-    path=concourse_secrets_mount.path.apply(
-        lambda mount_path: f"{mount_path}/data/web"
-    ),
+    path=concourse_secrets_mount.path.apply(lambda mount_path: f"{mount_path}/web"),
     data_json=concourse_config.require_secret_object("web_vault_secrets").apply(
-        lambda web_secrets: json.dumps({"data": web_secrets})
+        json.dumps
     ),
 )
 vault.generic.Secret(
     "concourse-worker-secret-values",
-    path=concourse_secrets_mount.path.apply(
-        lambda mount_path: f"{mount_path}/data/worker"
-    ),
+    path=concourse_secrets_mount.path.apply(lambda mount_path: f"{mount_path}/worker"),
     data_json=concourse_config.require_secret_object("worker_vault_secrets").apply(
-        lambda worker_secrets: json.dumps({"data": worker_secrets})
+        json.dumps
     ),
 )
 
@@ -148,7 +151,7 @@ vault.aws.AuthBackendRole(
     bound_iam_instance_profile_arns=[concourse_instance_profile.arn],
     bound_ami_ids=[concourse_web_ami.id],
     bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[operations_vpc["id"]],
+    bound_vpc_ids=[ops_vpc_id],
     token_policies=[concourse_vault_policy.name],
 )
 
@@ -162,7 +165,7 @@ vault.aws.AuthBackendRole(
     role="concourse-worker",
     bound_ami_ids=[concourse_worker_ami.id],
     bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[operations_vpc["id"]],
+    bound_vpc_ids=[ops_vpc_id],
     token_policies=[concourse_vault_policy.name],
 )
 
@@ -175,16 +178,8 @@ concourse_worker_security_group = ec2.SecurityGroup(
     f"concourse-worker-security-group-{stack_info.env_suffix}",
     name=f"concourse-worker-operations-{stack_info.env_suffix}",
     description="Access control for Concourse worker servers",
-    ingress=[
-        ec2.SecurityGroupIngressArgs(
-            self=True,
-            from_port=22,
-            to_port=22,
-            protocol="tcp",
-        )
-    ],
     egress=default_egress_args,
-    vpc_id=operations_vpc["id"],
+    vpc_id=ops_vpc_id,
 )
 
 # Create web node security group
@@ -202,7 +197,7 @@ concourse_web_security_group = ec2.SecurityGroup(
         )
     ],
     egress=default_egress_args,
-    vpc_id=operations_vpc["id"],
+    vpc_id=ops_vpc_id,
 )
 
 # Create security group for Concourse Postgres database
@@ -223,7 +218,7 @@ concourse_db_security_group = ec2.SecurityGroup(
         ),
     ],
     tags=aws_config.tags,
-    vpc_id=operations_vpc["id"],
+    vpc_id=ops_vpc_id,
 )
 
 
@@ -243,7 +238,7 @@ concourse_db = OLAmazonDB(concourse_db_config)
 
 concourse_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=concourse_db_config.db_name,
-    mount_point=f"{concourse_db_config.engine}-concourse-{stack_info.env_suffix}",
+    mount_point=f"{concourse_db_config.engine}-concourse",
     db_admin_username=concourse_db_config.username,
     db_admin_password=concourse_config.require("db_password"),
     db_host=concourse_db.db_instance.address,
@@ -260,7 +255,7 @@ concourse_db_consul_node = Node(
 concourse_db_consul_service = Service(
     "concourse-instance-db-service",
     node=concourse_db_consul_node.name,
-    name="concourse-db",
+    name="concourse-postgres",
     port=concourse_db_config.port,
     meta={
         "external-node": True,
@@ -298,7 +293,7 @@ web_lb = lb.LoadBalancer(
 
 web_lb_target_group = lb.TargetGroup(
     "concourse-web-alb-target-group",
-    vpc_id=operations_vpc["id"],
+    vpc_id=ops_vpc_id,
     target_type="instance",
     port=DEFAULT_HTTPS_PORT,
     protocol="HTTPS",
