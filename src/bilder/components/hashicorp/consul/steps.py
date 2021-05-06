@@ -41,6 +41,7 @@ def proxy_consul_dns(state=None, host=None):
                 dest="/etc/systemd/resolved.conf.d/consul.conf",
                 src=resolved_conf.name,
                 create_remote_dir=True,
+            mode="0755",
                 state=state,
                 host=host,
             )

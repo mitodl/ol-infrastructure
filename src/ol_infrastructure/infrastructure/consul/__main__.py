@@ -2,11 +2,19 @@ import json
 from itertools import chain
 
 from pulumi import Config, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, iam, route53
+from pulumi_aws import autoscaling, ec2, get_caller_identity, iam, route53
 
+from bilder.lib.magic_numbers import (
+    CONSUL_DNS_PORT,
+    CONSUL_HTTP_PORT,
+    CONSUL_LAN_SERF_PORT,
+    CONSUL_RPC_PORT,
+    CONSUL_WAN_SERF_PORT,
+)
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
+    availability_zones,
     build_userdata,
     debian_10_ami,
     default_egress_args,
@@ -73,43 +81,43 @@ consul_server_security_group = ec2.SecurityGroup(
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=[destination_vpc["cidr"]],
             protocol="tcp",
-            from_port=8500,
-            to_port=8500,
+            from_port=CONSUL_HTTP_PORT,
+            to_port=CONSUL_HTTP_PORT,
             description="HTTP API access",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=[destination_vpc["cidr"]],
             protocol="udp",
-            from_port=8500,
-            to_port=8500,
+            from_port=CONSUL_HTTP_PORT,
+            to_port=CONSUL_HTTP_PORT,
             description="HTTP API access",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=[destination_vpc["cidr"]],
             protocol="tcp",
-            from_port=8600,
-            to_port=8600,
+            from_port=CONSUL_DNS_PORT,
+            to_port=CONSUL_DNS_PORT,
             description="DNS access",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=[destination_vpc["cidr"]],
             protocol="udp",
-            from_port=8600,
-            to_port=8600,
+            from_port=CONSUL_DNS_PORT,
+            to_port=CONSUL_DNS_PORT,
             description="DNS access",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=[destination_vpc["cidr"]],
             protocol="tcp",
-            from_port=8300,
-            to_port=8301,
+            from_port=CONSUL_RPC_PORT,
+            to_port=CONSUL_LAN_SERF_PORT,
             description="LAN gossip protocol",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=[destination_vpc["cidr"]],
             protocol="udp",
-            from_port=8300,
-            to_port=8301,
+            from_port=CONSUL_RPC_PORT,
+            to_port=CONSUL_LAN_SERF_PORT,
             description="LAN gossip protocol",
         ),
         ec2.SecurityGroupIngressArgs(
@@ -117,8 +125,8 @@ consul_server_security_group = ec2.SecurityGroup(
                 lambda peer_vpcs: [peer["cidr"] for peer in peer_vpcs.values()]
             ),
             protocol="tcp",
-            from_port=8300,
-            to_port=8302,
+            from_port=CONSUL_RPC_PORT,
+            to_port=CONSUL_WAN_SERF_PORT,
             description="WAN cross-datacenter communication",
         ),
     ],
@@ -135,16 +143,16 @@ consul_agent_security_group = ec2.SecurityGroup(
         ec2.SecurityGroupIngressArgs(
             security_groups=[consul_server_security_group.id],
             protocol="tcp",
-            from_port=8301,
-            to_port=8301,
+            from_port=CONSUL_LAN_SERF_PORT,
+            to_port=CONSUL_LAN_SERF_PORT,
             self=True,
             description="LAN gossip protocol from servers",
         ),
         ec2.SecurityGroupIngressArgs(
             security_groups=[consul_server_security_group.id],
             protocol="udp",
-            from_port=8301,
-            to_port=8301,
+            from_port=CONSUL_LAN_SERF_PORT,
+            to_port=CONSUL_LAN_SERF_PORT,
             self=True,
             description="LAN gossip protocol from servers",
         ),
@@ -156,6 +164,7 @@ security_groups = {
     "consul_agent": consul_agent_security_group.id,
 }
 
+# This section will need to be replaced with Launch Template config
 instance_type_name = consul_config.get("instance_type") or InstanceTypes.medium.name
 instance_type = InstanceTypes[instance_type_name].value
 consul_instances = []
@@ -219,6 +228,7 @@ for count, subnet in zip(instance_range, subnets):  # type:ignore
         "private_ip": consul_instance.private_ip,
         "ipv6_address": consul_instance.ipv6_addresses,
     }
+######
 
 fifteen_minutes = 60 * 15
 consul_domain = route53.Record(
@@ -231,6 +241,49 @@ consul_domain = route53.Record(
     opts=ResourceOptions(depends_on=consul_instances),
 )
 
+aws_account = get_caller_identity()
+consul_ami = ec2.get_ami(
+    filters=[
+        ec2.GetAmiFilterArgs(name="name", values=["consul"]),
+        ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
+        ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
+    ],
+    most_recent=True,
+    owners=[aws_account.account_id],
+)
+
+consul_launch_config = ec2.LaunchTemplate(
+    "consul-launch-template",
+    name_prefix=f"consul-{environment_name}-",
+    description="Launch template for deploying Consul cluster",
+    iam_instance_profile=consul_instance_profile.id,
+    image_id=consul_ami.id,
+    instance_type=InstanceTypes[instance_type_name].value,
+    key_name=salt_config.require("key_name"),
+    tags=instance_tags,
+    vpc_security_group_ids=[
+        destination_vpc["security_groups"]["default"],
+        destination_vpc["security_groups"]["salt_minion"],
+        destination_vpc["security_groups"]["web"],
+        consul_server_security_group.id,
+    ],
+)
+
+consul_asg = autoscaling.Group(
+    f"consul-{environment_name}-autoscaling-group",
+    availability_zones=availability_zones,
+    desired_capacity=3,
+    max_size=5,
+    min_size=3,
+    launch_template=autoscaling.GroupLaunchTemplateArgs(
+        id=consul_launch_config.id,
+        version="$Latest",
+    ),
+    instance_refresh=autoscaling.GroupInstanceRfereshArgs(
+        strategy="Rolling",
+    ),
+)
+
 export(
     "security_groups",
     {
@@ -239,3 +292,5 @@ export(
     },
 )
 export("instances", export_data)
+export("consul_launch_config", consul_launch_config.id)
+export("consul_asg", consul_asg.id)
