@@ -84,6 +84,16 @@ concourse_config_map = {
             "{{ .Data.data.public_domain }}"
             "{{ end }}"
         ),
+        github_client_id=(
+            '{{ with secret "secret-concourse/web" }}'
+            "{{ .Data.data.github_client_id }}"
+            "{{ end }}"
+        ),
+        github_client_secret=(
+            '{{ with secret "secret-concourse/web" }}'
+            "{{ .Data.data.github_client_secret }}"
+            "{{ end }}"
+        ),
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(ConcourseWorkerConfig),
 }
