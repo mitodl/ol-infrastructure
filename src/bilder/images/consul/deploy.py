@@ -30,7 +30,6 @@ consul_configuration = {
     Path("00-default.json"): ConsulConfig(
         acl=ConsulACL([ConsulACLToken(master="<value>")]),
         bootstrap_expect=3,
-        encrypt="",
         server=True,
         telemetry=ConsulTelemetry(),
     )
@@ -51,8 +50,6 @@ caddy_config = CaddyConfig(
 caddy_config.template_context = caddy_config.dict()
 install_caddy(caddy_config)
 caddy_config_changed = configure_caddy(caddy_config)
-if host.fact.has_systemd:
-    caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
 
 # Install Consul
 hashicorp_products = [
@@ -64,5 +61,6 @@ for product in hashicorp_products:
 
 # Manage services
 if host.fact.has_systemd:
+    caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
