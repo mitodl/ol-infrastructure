@@ -261,8 +261,17 @@ consul_launch_config = ec2.LaunchTemplate(
     instance_type=InstanceTypes[instance_type_name].value,
     key_name=salt_config.require("key_name"),
     tags=instance_tags,
+    tag_specifications=[
+        ec2.LaunchTemplateTagSpecificationArgs(
+            resource_type="instance",
+            tags=aws_config.merged_tags({"Name": f"consul-{stack_info.env_suffix}"}),
+        ),
+        ec2.LaunchTemplateTagSpecificationArgs(
+            resource_type="volume",
+            tags=aws_config.merged_tags({"Name": f"consul-{stack_info.env_suffix}"}),
+        ),
+    ],
     vpc_security_group_ids=[
-        destination_vpc["security_groups"]["default"],
         destination_vpc["security_groups"]["salt_minion"],
         destination_vpc["security_groups"]["web"],
         consul_server_security_group.id,
