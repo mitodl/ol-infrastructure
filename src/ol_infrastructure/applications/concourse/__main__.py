@@ -245,11 +245,15 @@ concourse_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
 )
 concourse_db_vault_backend = OLVaultDatabaseBackend(concourse_db_vault_backend_config)
 
+if stack_info.env_suffix == "production":
+    consul_datacenter = "operations"
+else:
+    consul_datacenter = "operations-qa"
 concourse_db_consul_node = Node(
     "concourse-instance-db-node",
     name="concourse-postgres-db",
     address=concourse_db.db_instance.address,
-    datacenter=f"operations-{stack_info.env_suffix}",
+    datacenter=consul_datacenter,
 )
 
 concourse_db_consul_service = Service(
@@ -368,7 +372,7 @@ web_launch_config = ec2.LaunchTemplate(
                                         "provider=aws tag_key=consul_env "
                                         f"tag_value=operations-{stack_info.env_suffix}"
                                     ],
-                                    "datacenter": f"operations-{stack_info.env_suffix}",
+                                    "datacenter": consul_datacenter,
                                 }
                             ),
                             "owner": "consul:consul",
@@ -444,7 +448,7 @@ worker_launch_config = ec2.LaunchTemplate(
                                         "provider=aws tag_key=consul_env "
                                         f"tag_value=operations-{stack_info.env_suffix}"
                                     ],
-                                    "datacenter": f"operations-{stack_info.env_suffix}",
+                                    "datacenter": consul_datacenter,
                                 }
                             ),
                             "owner": "consul:consul",

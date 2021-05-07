@@ -162,7 +162,17 @@ export_data = {}
 subnets = destination_vpc["subnet_ids"]
 subnet_id = subnets.apply(chain)
 salt_environment = Config("saltstack").get("environment_name") or environment_name
-for count, subnet in zip(range(consul_config.get_int("instance_count") or 3), subnets):  # type: ignore # noqa: WPS221
+instance_range = range(consul_config.get_int("instance_count") or 3)
+for count, subnet in zip(instance_range, subnets):  # type:ignore
+    subnet_object = ec2.get_subnet(id=subnet)
+    # This is only necessary for the operations environment because the 1i AZ is lacking
+    # support for newer instance types. We need to retire that subnet to avoid further
+    # hacks like this one.
+
+    # TODO: redeploy or otherwise migrate instances out of the 1e AZ and delete the
+    # associated subnet. (TMM 2021-05-07)
+    if subnet_object.availability_zone == "us-east-1e":
+        continue
     instance_name = f"consul-{environment_name}-{count}"
     salt_minion = OLSaltStackMinion(
         f"saltstack-minion-{instance_name}",
