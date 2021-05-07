@@ -211,6 +211,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
 
 class ConcourseWorkerConfig(ConcourseBaseConfig):
     _node_type: str = "worker"
+    user: str = "root"
     tags: Optional[List[str]] = Field(
         None,
         concourse_env_var="CONCOURSE_TAG",

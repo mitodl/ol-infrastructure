@@ -196,7 +196,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
 vault = Vault(
     configuration=VaultAgentConfig(
         listener=[
-            VaultListener(type="tcp", address="127.0.0.1:8100", tls_disable=True)
+            VaultListener(type="tcp", address="127.0.0.1:8200", tls_disable=True)
         ],
         vault=VaultConnectionConfig(
             address=f"https://active.vault.service.consul:{VAULT_HTTP_PORT}",

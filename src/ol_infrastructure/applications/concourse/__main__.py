@@ -168,6 +168,15 @@ vault.generic.Secret(
         json.dumps
     ),
 )
+vault.generic.Secret(
+    "concourse-dockerhub-credentials",
+    path=concourse_secrets_mount.path.apply(
+        lambda mount_path: f"{mount_path}/concourse/main/dockerhub"
+    ),
+    data_json=concourse_config.require_secret_object("dockerhub_credentials").apply(
+        json.dumps
+    ),
+)
 
 # Vault policy definition
 concourse_vault_policy = vault.Policy(
