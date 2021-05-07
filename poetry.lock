@@ -629,7 +629,6 @@ optional = false
 python-versions = "*"
 
 [[package]]
-
 name = "isort"
 version = "5.8.0"
 description = "A Python utility / library to sort Python imports."
@@ -906,7 +905,7 @@ six = ">=1.12.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "4.2.0"
+version = "4.3.0"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 category = "main"
 optional = false
@@ -1441,7 +1440,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "7a2a890cac7513806b8597a17fe95909c19f071b30c7b44d1af6112bd488dbbc"
+content-hash = "01d76c5fec5d6001f12b49adea0a4cbe06fc820fb73e45aa9d1e7b69652d0247"
 
 [metadata.files]
 appdirs = [
@@ -1824,7 +1823,6 @@ iniconfig = [
     {file = "iniconfig-1.1.1-py2.py3-none-any.whl", hash = "sha256:011e24c64b7f47f6ebd835bb12a743f2fbe9a26d4cecaa7f53bc4f35ee9da8b3"},
     {file = "iniconfig-1.1.1.tar.gz", hash = "sha256:bc3af051d7d14b2ee5ef9969666def0cd1a000e121eaea580d4a313df4b37f32"},
 ]
-
 isort = [
     {file = "isort-5.8.0-py3-none-any.whl", hash = "sha256:2bb1680aad211e3c9944dbce1d4ba09a989f04e238296c87fe2139faa26d655d"},
     {file = "isort-5.8.0.tar.gz", hash = "sha256:0a943902919f65c5684ac4e0154b1ad4fac6dcaa5d9f3426b732f1c8b5419be6"},
@@ -2005,7 +2003,7 @@ pulumi = [
     {file = "pulumi-3.2.1-py2.py3-none-any.whl", hash = "sha256:69a4b07a5d1fd523d8c859f6e87269fbedb04dee0c63967e5298558f9d4c97eb"},
 ]
 pulumi-aws = [
-    {file = "pulumi_aws-4.2.0.tar.gz", hash = "sha256:af96f2c20e2f82eae445a63b9fb23a477af257ed9f2e45708340be6e2fb9e94e"},
+    {file = "pulumi_aws-4.3.0.tar.gz", hash = "sha256:0f6aa807612b01e89a802e3e0e741e6c70b443668b09fd47ec9c4b5748973b68"},
 ]
 pulumi-consul = [
     {file = "pulumi_consul-3.0.0.tar.gz", hash = "sha256:d3037c0a36d383038b725e247b9aa3a26c58c4feeaf0863345d1a8ba6a2cc9d9"},
