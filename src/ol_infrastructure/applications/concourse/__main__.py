@@ -26,7 +26,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
@@ -71,11 +71,40 @@ concourse_worker_ami = ec2.get_ami(
 ###################################
 
 # AWS Permissions Document
-concourse_iam_permissions = {"Version": IAM_POLICY_VERSION, "Statement": {}}
-# KMS key access for decrypting secrets from SOPS and Pulumi
 # S3 bucket permissions for publishing OCW
 # S3 bucket permissions for uploading software artifacts
+concourse_iam_permissions = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "s3:ListAllMyBuckets",
+            "Resource": "*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:ListBucket*",
+            ],
+            "Resource": [
+                "arn:aws:s3:::ocw-content*",
+                "arn:aws:s3:::ocw-content*/*",
+                "arn:aws:s3:::ol-eng-artifacts" "arn:aws:s3:::ol-eng-artifacts/*",
+            ],
+        },
+    ],
+}
 
+concourse_iam_policy = iam.Policy(
+    "cicd-iam-permissions-policy",
+    path=f"/ol-infrastructure/iam/cicd-{stack_info.env_suffix}/",
+    policy=lint_iam_policy(concourse_iam_permissions, stringify=True),
+    name_prefix=f"cicd-policy-{stack_info.env_suffix}",
+    tags=aws_config.tags,
+)
 
 # IAM and instance profile
 concourse_instance_role = iam.Role(
@@ -103,6 +132,12 @@ iam.RolePolicyAttachment(
 iam.RolePolicyAttachment(
     f"concourse-route53-role-policy-{stack_info.env_suffix}",
     policy_arn=policy_stack.require_output("iam_policies")["route53_odl_zone_records"],
+    role=concourse_instance_role.name,
+)
+
+iam.RolePolicyAttachment(
+    "concourse-cicd-permissions-policy",
+    policy_arn=concourse_iam_policy.arn,
     role=concourse_instance_role.name,
 )
 
@@ -295,6 +330,7 @@ web_lb = lb.LoadBalancer(
     tags=aws_config.merged_tags({"Name": f"concourse-web-{stack_info.env_suffix}"}),
 )
 
+TARGET_GROUP_NAME_MAX_LENGTH = 32
 web_lb_target_group = lb.TargetGroup(
     "concourse-web-alb-target-group",
     vpc_id=ops_vpc_id,
@@ -308,7 +344,7 @@ web_lb_target_group = lb.TargetGroup(
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",
     ),
-    name=f"concourse-web-{stack_info.env_suffix}"[:32],
+    name=f"concourse-web-{stack_info.env_suffix}"[:TARGET_GROUP_NAME_MAX_LENGTH],
     tags=aws_config.tags,
 )
 concourse_web_acm_cert = acm.get_certificate(
