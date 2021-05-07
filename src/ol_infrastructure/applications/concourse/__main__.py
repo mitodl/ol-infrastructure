@@ -48,7 +48,7 @@ aws_account = get_caller_identity()
 ops_vpc_id = operations_vpc["id"]
 concourse_web_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["concourse-web"]),
+        ec2.GetAmiFilterArgs(name="name", values=["concourse-web-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
     ],
@@ -58,7 +58,7 @@ concourse_web_ami = ec2.get_ami(
 
 concourse_worker_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["concourse-worker"]),
+        ec2.GetAmiFilterArgs(name="name", values=["concourse-worker-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
     ],
@@ -446,7 +446,7 @@ web_asg = autoscaling.Group(
         id=web_launch_config.id, version="$Latest"
     ),
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
-        strategy="Rolling",
+        strategy="Rolling", triggers=["image_id", "user_data"]
     ),
     target_group_arns=[web_lb_target_group.arn],
 )
@@ -516,7 +516,7 @@ worker_asg = autoscaling.Group(
         id=worker_launch_config.id, version="$Latest"
     ),
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
-        strategy="Rolling",
+        strategy="Rolling", triggers=["image_id", "user_data"]
     ),
 )
 
