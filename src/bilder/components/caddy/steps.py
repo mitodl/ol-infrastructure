@@ -38,7 +38,7 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
             host=host,
         )
         files.directory(
-            name="Create Caddy configuration directory",
+            name="Create Caddy data directory",
             path=caddy_config.data_directory,
             user=caddy_user,
             group=caddy_user,

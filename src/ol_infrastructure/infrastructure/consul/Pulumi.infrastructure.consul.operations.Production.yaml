@@ -4,4 +4,5 @@ config:
   aws:region: us-east-1
   environment:business_unit: operations
   environment:vpc_reference: operations_vpc
+  saltstack:environment_name: operations
   saltstack:key_name: salt-production

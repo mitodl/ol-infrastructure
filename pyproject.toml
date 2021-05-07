@@ -6,7 +6,6 @@ authors = ["MIT Open Learning Engineering <oldevops@mit.edu>"]
 license = "BSD-3-Clause"
 readme = "README.md"
 classifiers = [
-    'Framework :: Pulumi',
     'Operating System :: Linux',
     'Programming Language :: Python',
     'Programming Language :: Python :: 3',
@@ -32,7 +31,6 @@ salt-pepper = "^0.7.6"
 black = "*"
 copier = "^5.1.0"
 diagrams = "*"
-invoke = "*"
 isort = "*"
 mypy = "<1.0"
 pre-commit = "^2.12.0"

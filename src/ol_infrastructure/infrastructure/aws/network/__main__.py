@@ -1,11 +1,13 @@
-"""Manage the creation of VPC infrastructure and the peering relationships between them.
+"""
+Manage the creation of VPC infrastructure and the peering relationships between them.
 
-In addition to creating the VPCs, it will also import existing ones based on the defined CIDR block.  Some of these
-environments were previously created with SaltStack. In that code we defaulted to the first network being at
-`x.x.1.0/24`, whereas in the OLVPC component the first subnet defaults to being at `x.x.0.0/24`. Due to this disparity,
-some of the networks defined below specify 4 subnets, which results in a `x.x.0.0/24` network being created, while also
-importing the remaining 3 subnets. If only 3 subnets were specified then one of the existing networks would not be
-managed with Pulumi.
+In addition to creating the VPCs, it will also import existing ones based on the defined
+CIDR block.  Some of these environments were previously created with SaltStack.  In that
+code we defaulted to the first network being at `x.x.1.0/24`, whereas in the OLVPC
+component the first subnet defaults to being at `x.x.0.0/24`.  Due to this disparity,
+some of the networks defined below specify 4 subnets, which results in a `x.x.0.0/24`
+network being created, while also importing the remaining 3 subnets.  If only 3 subnets
+were specified then one of the existing networks would not be managed with Pulumi.
 """
 
 from typing import Any, Dict, List, Optional
@@ -108,7 +110,7 @@ residential_mitx_vpc = OLVPC(residential_mitx_vpc_config)
 mitx_online_config = Config("mitx_online_vpc")
 mitx_online_vpc_config = OLVPCConfig(
     vpc_name=f"mitx-online-{stack_info.env_suffix}",
-    cidr_block=mitx_config.require("cidr_block"),
+    cidr_block=mitx_online_config.require("cidr_block"),
     num_subnets=5,
     tags={
         "OU": "mitxonline",
@@ -265,7 +267,11 @@ applications_vpc_exports.update(
                 operations_vpc.olvpc,
             )(
                 tags=applications_vpc_config.merged_tags(
-                    {"Name": f"applications-{stack_info.env_suffix}-salt-minion"}
+                    {
+                        "Name": "applications-{}-salt-minion".format(
+                            stack_info.env_suffix
+                        )
+                    }
                 ),
                 name=f"applications-{stack_info.env_suffix}-salt-minion",
             ).id,
@@ -290,9 +296,19 @@ operations_vpc_exports.update(
             "default": operations_vpc.olvpc.id.apply(default_group).id,
             "web": public_web(operations_vpc_config.vpc_name, operations_vpc.olvpc)(
                 tags=operations_vpc_config.merged_tags(
-                    {"Name": f"applications-{stack_info.env_suffix}-public-web"}
+                    {"Name": f"operations-{stack_info.env_suffix}-public-web"}
                 ),
-                name=f"applications-{stack_info.env_suffix}-public-web",
+                name=f"operations-{stack_info.env_suffix}-public-web",
+            ).id,
+            "salt_minion": salt_minion(
+                operations_vpc_config.vpc_name,
+                operations_vpc.olvpc,
+                operations_vpc.olvpc,
+            )(
+                tags=data_vpc_config.merged_tags(
+                    {"Name": f"operations-{stack_info.env_suffix}-salt-minion"}
+                ),
+                name=f"operations-{stack_info.env_suffix}-salt-minion",
             ).id,
         }
     }
@@ -300,43 +316,55 @@ operations_vpc_exports.update(
 export("operations_vpc", operations_vpc_exports)
 
 operations_to_data_peer = OLVPCPeeringConnection(
-    f"ol-operations-{stack_info.env_suffix}-to-ol-data-{stack_info.env_suffix}-vpc-peer",
+    "ol-operations-{0}-to-ol-data-{0}-vpc-peer".format(stack_info.env_suffix),
     operations_vpc,
     data_vpc,
 )
 
 operations_to_mitx_peer = OLVPCPeeringConnection(
-    f"ol-operations-{stack_info.env_suffix}-to-residential-mitx-{stack_info.env_suffix}-vpc-peer",
+    "ol-operations-{0}-to-residential-mitx-{0}-vpc-peer".format(stack_info.env_suffix),
     operations_vpc,
     residential_mitx_vpc,
 )
 
+operations_to_mitx_online_peer = OLVPCPeeringConnection(
+    "ol-operations-{0}-to-mitx-online-{0}-vpc-peer".format(stack_info.env_suffix),
+    operations_vpc,
+    mitx_online_vpc,
+)
+
 data_to_mitx_peer = OLVPCPeeringConnection(
-    f"ol-data-{stack_info.env_suffix}-to-residential-mitx-{stack_info.env_suffix}-vpc-peer",
+    "ol-data-{0}-to-residential-mitx-{0}-vpc-peer".format(stack_info.env_suffix),
     data_vpc,
     residential_mitx_vpc,
 )
 
+data_to_mitx_online_peer = OLVPCPeeringConnection(
+    "ol-data-{0}-to-mitx-online-{0}-vpc-peer".format(stack_info.env_suffix),
+    data_vpc,
+    mitx_online_vpc,
+)
+
 operations_to_xpro_peer = OLVPCPeeringConnection(
-    f"ol-operations-{stack_info.env_suffix}-to-mitxpro-{stack_info.env_suffix}-vpc-peer",
+    "ol-operations-{0}-to-mitxpro-{0}-vpc-peer".format(stack_info.env_suffix),
     operations_vpc,
     xpro_vpc,
 )
 
 data_to_xpro_peer = OLVPCPeeringConnection(
-    f"ol-data-{stack_info.env_suffix}-to-mitxpro-{stack_info.env_suffix}-vpc-peer",
+    "ol-data-{0}-to-mitxpro-{0}-vpc-peer".format(stack_info.env_suffix),
     data_vpc,
     xpro_vpc,
 )
 
 operations_to_applications_peer = OLVPCPeeringConnection(
-    f"ol-operations-{stack_info.env_suffix}-to-applications-{stack_info.env_suffix}-vpc-peer",
+    "ol-operations-{0}-to-applications-{0}-vpc-peer".format(stack_info.env_suffix),
     operations_vpc,
     applications_vpc,
 )
 
 data_to_xpro_peer = OLVPCPeeringConnection(
-    f"ol-data-{stack_info.env_suffix}-to-applications-{stack_info.env_suffix}-vpc-peer",
+    "ol-data-{0}-to-applications-{0}-vpc-peer".format(stack_info.env_suffix),
     data_vpc,
     applications_vpc,
 )

@@ -16,10 +16,8 @@ variable "node_type" {
 
 source "amazon-ebs" "concourse" {
   ami_description         = "Deployment image for Concourse ${var.node_type} server generated at ${local.timestamp}"
-  ami_name                = "concourse-${var.node_type}"
+  ami_name                = "concourse-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
-  force_deregister        = true
-  force_delete_snapshot   = true
   instance_type           = "t3a.medium"
   run_volume_tags = {
     OU      = "${local.business_unit}"
