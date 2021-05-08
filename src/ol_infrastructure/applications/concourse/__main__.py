@@ -445,9 +445,7 @@ web_asg = autoscaling.Group(
     launch_template=autoscaling.GroupLaunchTemplateArgs(
         id=web_launch_config.id, version="$Latest"
     ),
-    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
-        strategy="Rolling", triggers=["image_id", "user_data"]
-    ),
+    instance_refresh=autoscaling.GroupInstanceRefreshArgs(strategy="Rolling"),
     target_group_arns=[web_lb_target_group.arn],
 )
 
@@ -515,9 +513,7 @@ worker_asg = autoscaling.Group(
     launch_template=autoscaling.GroupLaunchTemplateArgs(
         id=worker_launch_config.id, version="$Latest"
     ),
-    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
-        strategy="Rolling", triggers=["image_id", "user_data"]
-    ),
+    instance_refresh=autoscaling.GroupInstanceRefreshArgs(strategy="Rolling"),
 )
 
 # Create Route53 DNS records for Concourse web nodes
