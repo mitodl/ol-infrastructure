@@ -65,6 +65,7 @@ concourse_worker_ami = ec2.get_ami(
     most_recent=True,
     owners=[aws_account.account_id],
 )
+concourse_web_tag = f"concourse-web-{stack_info.env_suffix}"
 
 ###################################
 #    Security & Access Control    #
@@ -328,7 +329,7 @@ concourse_db_consul_service = Service(
 # Create load balancer for Concourse web nodes
 web_lb = lb.LoadBalancer(
     "concourse-web-load-balancer",
-    name=f"concourse-web-{stack_info.env_suffix}",
+    name=concourse_web_tag,
     ip_address_type="dualstack",
     load_balancer_type="application",
     enable_http2=True,
@@ -336,7 +337,7 @@ web_lb = lb.LoadBalancer(
     security_groups=[
         operations_vpc["security_groups"]["web"],
     ],
-    tags=aws_config.merged_tags({"Name": f"concourse-web-{stack_info.env_suffix}"}),
+    tags=aws_config.merged_tags({"Name": concourse_web_tag}),
 )
 
 TARGET_GROUP_NAME_MAX_LENGTH = 32
@@ -353,7 +354,7 @@ web_lb_target_group = lb.TargetGroup(
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",
     ),
-    name=f"concourse-web-{stack_info.env_suffix}"[:TARGET_GROUP_NAME_MAX_LENGTH],
+    name=concourse_web_tag[:TARGET_GROUP_NAME_MAX_LENGTH],
     tags=aws_config.tags,
 )
 concourse_web_acm_cert = acm.get_certificate(
@@ -392,15 +393,11 @@ web_launch_config = ec2.LaunchTemplate(
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="instance",
-            tags=aws_config.merged_tags(
-                {"Name": f"concourse-web-{stack_info.env_suffix}"}
-            ),
+            tags=aws_config.merged_tags({"Name": concourse_web_tag}),
         ),
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="volume",
-            tags=aws_config.merged_tags(
-                {"Name": f"concourse-web-{stack_info.env_suffix}"}
-            ),
+            tags=aws_config.merged_tags({"Name": concourse_web_tag}),
         ),
     ],
     tags=aws_config.tags,
@@ -447,7 +444,14 @@ web_asg = autoscaling.Group(
     ),
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(strategy="Rolling"),
     target_group_arns=[web_lb_target_group.arn],
-    tags=aws_config.tags,
+    tags=[
+        autoscaling.GroupTagArgs(
+            key=key_name,
+            value=key_value,
+            propagate_at_launch=True,
+        )
+        for key_name, key_value in aws_config.tags.items()
+    ],
 )
 
 worker_launch_config = ec2.LaunchTemplate(
@@ -515,7 +519,14 @@ worker_asg = autoscaling.Group(
         id=worker_launch_config.id, version="$Latest"
     ),
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(strategy="Rolling"),
-    tags=aws_config.tags,
+    tags=[
+        autoscaling.GroupTagArgs(
+            key=key_name,
+            value=key_value,
+            propagate_at_launch=True,
+        )
+        for key_name, key_value in aws_config.tags.items()
+    ],
 )
 
 # Create Route53 DNS records for Concourse web nodes
