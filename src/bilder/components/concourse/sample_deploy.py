@@ -1,6 +1,6 @@
 from pyinfra import host
 
-from bilder.components.baseline.setup import install_baseline_packages
+from bilder.components.baseline.steps import install_baseline_packages
 from bilder.components.concourse.models import (
     ConcourseBaseConfig,
     ConcourseWebConfig,

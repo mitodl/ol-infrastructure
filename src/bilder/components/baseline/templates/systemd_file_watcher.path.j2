@@ -1,0 +1,8 @@
+[Path]
+Unit={{ service_name }}-restarter.service
+{% for path in watched_files -%}
+PathChanged={{ path }}
+{% endfor -%}
+
+[Install]
+WantedBy=multi-user.target

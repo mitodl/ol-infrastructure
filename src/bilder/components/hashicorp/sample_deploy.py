@@ -1,4 +1,4 @@
-from bilder.components.baseline.setup import install_baseline_packages
+from bilder.components.baseline.steps import install_baseline_packages
 from bilder.components.hashicorp import steps as hashicorp_steps
 from bilder.components.hashicorp.consul.models.consul import Consul
 from bilder.components.hashicorp.consul.models.consul_template import ConsulTemplate

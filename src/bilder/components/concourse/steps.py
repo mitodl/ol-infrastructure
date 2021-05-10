@@ -6,6 +6,7 @@ import httpx
 from pyinfra.api import deploy
 from pyinfra.operations import files, server, systemd
 
+from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.concourse.models import (
     ConcourseBaseConfig,
     ConcourseWebConfig,
@@ -247,7 +248,12 @@ def register_concourse_service(
         state=state,
         host=host,
     )
-    # Enable Systemd service and ensure it is running
+    service_configuration_watches(
+        service_name="concourse",
+        watched_files=list(concourse_config.configuration_paths()),
+        state=state,
+        host=host,
+    )
     systemd.service(
         name="Ensure Concourse service is enabled and running.",
         service="concourse",
