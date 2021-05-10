@@ -121,6 +121,9 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     db_max_conns_backend: PositiveInt = Field(
         PositiveInt(50), concourse_env_var="CONCOURSE_BACKEND_MAX_CONNS"  # noqa: WPS432
     )
+    enable_instanced_pipelines: bool = Field(
+        default=True, concourse_env_var="CONCOURSE_ENABLE_PIPELINE_INSTANCES"
+    )
     encryption_key: SecretStr = Field(
         default_factory=partial(
             # Using floor division to produce an int instead of float
