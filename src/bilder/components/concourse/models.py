@@ -2,7 +2,7 @@ import secrets
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Generator, List, Optional
 
 from pydantic import Field, PositiveInt, SecretStr, validator
 
@@ -24,6 +24,19 @@ class ConcourseBaseConfig(OLBaseSettings):
     deploy_directory: Path = Path("/opt/concourse/")
     data_directory: Path = Path("/var/lib/concourse")
     env_file_path: Path = Path("/etc/default/concourse")
+
+    def configuration_paths(self) -> Generator[Path, None, None]:
+        """List the paths of files that are read by the Concourse process.
+
+        :yields: A list of file paths that the Concourse process needs to read to
+                  operate.
+
+        :rtype: List[Path]
+        """
+        for field in self.__fields__.values():
+            field_value = self.dict()[field.name]
+            if field.type_ == Path and field_value:
+                yield field_value
 
     def concourse_env(self) -> Dict[str, str]:
         """Create a mapping of concourse environment variables to the concrete values.
