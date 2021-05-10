@@ -121,6 +121,8 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     db_max_conns_backend: PositiveInt = Field(
         PositiveInt(50), concourse_env_var="CONCOURSE_BACKEND_MAX_CONNS"  # noqa: WPS432
     )
+    # Feature flag to enable pipeline grouping
+    # https://concourse-ci.org/instanced-pipelines.html
     enable_instanced_pipelines: bool = Field(
         default=True, concourse_env_var="CONCOURSE_ENABLE_PIPELINE_INSTANCES"
     )
