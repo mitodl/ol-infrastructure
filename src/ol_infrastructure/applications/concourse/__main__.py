@@ -447,6 +447,7 @@ web_asg = autoscaling.Group(
     ),
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(strategy="Rolling"),
     target_group_arns=[web_lb_target_group.arn],
+    tags=aws_config.tags,
 )
 
 worker_launch_config = ec2.LaunchTemplate(
@@ -505,7 +506,7 @@ worker_launch_config = ec2.LaunchTemplate(
 )
 worker_asg = autoscaling.Group(
     "concourse-worker-autoscaling-group",
-    desired_capacity=concourse_config.get_int("web_node_capacity") or 1,
+    desired_capacity=concourse_config.get_int("worker_node_capacity") or 1,
     min_size=1,
     max_size=50,  # noqa: WPS432
     health_check_type="EC2",
@@ -514,6 +515,7 @@ worker_asg = autoscaling.Group(
         id=worker_launch_config.id, version="$Latest"
     ),
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(strategy="Rolling"),
+    tags=aws_config.tags,
 )
 
 # Create Route53 DNS records for Concourse web nodes
