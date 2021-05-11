@@ -1,8 +1,6 @@
 [Unit]
 Description=Restart {{ service_name }} when watched files change
 After=network.target
-StartLimitIntervalSec=10
-StartLimitBurst=5
 
 [Service]
 Type=oneshot
