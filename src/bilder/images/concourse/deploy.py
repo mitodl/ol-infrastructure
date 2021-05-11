@@ -6,8 +6,11 @@ from pydantic import SecretStr
 from pyinfra import host
 from pyinfra.api.util import get_template
 
-from bilder.components.baseline.steps import install_baseline_packages
-from bilder.components.caddy.models import CaddyConfig, CaddyPlugin
+from bilder.components.baseline.steps import (
+    install_baseline_packages,
+    service_configuration_watches,
+)
+from bilder.components.caddy.models import CaddyConfig
 from bilder.components.caddy.steps import caddy_service, configure_caddy, install_caddy
 from bilder.components.concourse.models import (
     ConcourseBaseConfig,
@@ -51,7 +54,6 @@ from bridge.lib.magic_numbers import (
 )
 
 VERSIONS = {  # noqa: WPS407
-    "caddy_route53": "v1.1.1",
     "concourse": "7.2.0",
     "consul": "1.9.5",
 }
@@ -124,6 +126,22 @@ vault_template_map = {
             ),
             destination=concourse_config.dict().get("authorized_keys_file"),
         ),
+        partial(
+            VaultTemplate,
+            contents=(
+                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+                "{{ printf .Data.value }}{{ end }}"
+            ),
+            destination=Path("/etc/caddy/odl_wildcard.cert"),
+        ),
+        partial(
+            VaultTemplate,
+            contents=(
+                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+                "{{ printf .Data.key }}{{ end }}"
+            ),
+            destination=Path("/etc/caddy/odl_wildcard.key"),
+        ),
     ],
     CONCOURSE_WORKER_NODE_TYPE: [
         partial(
@@ -179,17 +197,18 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
         caddyfile=Path(__file__)
         .parent.resolve()
         .joinpath("templates", "concourse_caddyfile.j2"),
-        plugins=[
-            CaddyPlugin(
-                repository="github.com/caddy-dns/route53",
-                version=VERSIONS["caddy_route53"],
-            )
-        ],
     )
     caddy_config.template_context = caddy_config.dict()
     install_caddy(caddy_config)
     caddy_config_changed = configure_caddy(caddy_config)
     if host.fact.has_systemd:
+        service_configuration_watches(
+            service_name="caddy",
+            watched_files=[
+                Path("/etc/caddy/odl_wildcard.cert"),
+                Path("/etc/caddy/odl_wildcard.key"),
+            ],
+        )
         caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
 
 # Install Consul and Vault Agent

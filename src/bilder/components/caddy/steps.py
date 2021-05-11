@@ -9,8 +9,8 @@ from bilder.lib.linux_helpers import DEFAULT_DIRECTORY_MODE
 
 @deploy("Install Caddy")
 def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
+    caddy_user = "caddy"
     if caddy_config.plugins:
-        caddy_user = "caddy"
         server.user(
             name="Create system user for Caddy",
             user=caddy_user,
@@ -55,6 +55,12 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
             host=host,
         )
     else:
+        apt.packages(
+            name="Install gnupg for adding Caddy repository",
+            packages=["gnupg"],
+            state=state,
+            host=host,
+        )
         apt.key(
             name="Add Caddy repository GPG key",
             src="https://dl.cloudsmith.io/public/caddy/stable/gpg.key",
