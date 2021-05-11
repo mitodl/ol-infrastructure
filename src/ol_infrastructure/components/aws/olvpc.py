@@ -1,4 +1,4 @@
-"""This module defines a Pulumi component resource for encapsulating our best practices for building an AWS VPC.
+"""This module defines a Pulumi component resource for building an AWS VPC.
 
 This includes:
 
@@ -9,6 +9,7 @@ This includes:
 - Create a route table and associate the created subnets with it
 - Create a routing table to include the relevant peers and their networks
 - Create an RDS subnet group
+
 """
 from ipaddress import IPv4Network, IPv6Network
 from itertools import cycle
@@ -92,8 +93,8 @@ class OLVPCConfig(AWSBase):
         """
         if num_nets < MIN_SUBNETS:
             raise ValueError(
-                "There should be at least 2 subnets defined for a VPC to allow for high availability "
-                "across availability zones"
+                "There should be at least 2 subnets defined for a VPC to allow for "
+                "high availability across availability zones"
             )
         return num_nets
 
@@ -119,7 +120,10 @@ class OLVPC(ComponentResource):  # noqa: WPS230
         :type opts: Optional[ResourceOptions]
         """
         super().__init__("ol:infrastructure:aws:VPC", vpc_config.vpc_name, None, opts)
-        resource_options = ResourceOptions.merge(ResourceOptions(parent=self), opts)  # type: ignore
+        resource_options = ResourceOptions.merge(  # type: ignore
+            ResourceOptions(parent=self),
+            opts,
+        )
         self.vpc_config = vpc_config
         vpc_resource_opts, imported_vpc_id = vpc_opts(
             vpc_config.cidr_block, vpc_config.tags
@@ -160,14 +164,20 @@ class OLVPC(ComponentResource):  # noqa: WPS230
             f"{vpc_config.vpc_name}-route-table",
             tags=vpc_config.tags,
             vpc_id=self.olvpc.id,
-            routes=[
-                {"cidr_block": "0.0.0.0/0", "gateway_id": self.gateway.id},
-                {
-                    "ipv6CidrBlock": "::/0",
-                    "egressOnlyGatewayId": self.egress_gateway.id,
-                },
-            ],
             opts=ResourceOptions.merge(resource_options, route_table_resource_opts),
+        )
+
+        ec2.Route(
+            f"{vpc_config.vpc_name}-default-external-network-route",
+            route_table_id=self.route_table.id,
+            destination_cidr_block="0.0.0.0/0",
+            gateway_id=self.gateway.id,
+        )
+        ec2.Route(
+            f"{vpc_config.vpc_name}-default-external-ipv6-network-route",
+            route_table_id=self.route_table.id,
+            destination_ipv6_cidr_block="::/0",
+            egress_only_gateway_id=self.egress_gateway.id,
         )
 
         self.olvpc_subnets: List[ec2.Subnet] = []
@@ -248,7 +258,10 @@ class OLVPC(ComponentResource):  # noqa: WPS230
 
 
 class OLVPCPeeringConnection(ComponentResource):
-    """A Pulumi component for creating a VPC peering connection and populating bidirectional routes."""
+    """
+    A Pulumi component for creating a VPC peering connection and populating
+    bidirectional routes.
+    """
 
     def __init__(
         self,
@@ -276,32 +289,35 @@ class OLVPCPeeringConnection(ComponentResource):
         super().__init__(
             "ol:infrastructure:aws:VPCPeeringConnection", vpc_peer_name, None, opts
         )
-        resource_options = ResourceOptions.merge(ResourceOptions(parent=self), opts)  # type: ignore
+        resource_options = ResourceOptions.merge(  # type: ignore
+            ResourceOptions(parent=self),
+            opts,
+        )
         vpc_peer_resource_opts, imported_vpc_peer_id = vpc_peer_opts(
             str(source_vpc.vpc_config.cidr_block),
             str(destination_vpc.vpc_config.cidr_block),
         )
         self.peering_connection = ec2.VpcPeeringConnection(
-            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-vpc-peer",  # noqa: WPS237
+            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-vpc-peer",  # noqa: WPS237, E501
             auto_accept=True,
             vpc_id=source_vpc.olvpc.id,
             peer_vpc_id=destination_vpc.olvpc.id,
             tags=source_vpc.vpc_config.merged_tags(
                 {
-                    "Name": f"{source_vpc.vpc_config.vpc_name} to {destination_vpc.vpc_config.vpc_name} peer"  # noqa: WPS237
+                    "Name": f"{source_vpc.vpc_config.vpc_name} to {destination_vpc.vpc_config.vpc_name} peer"  # noqa: WPS237, E501
                 }
             ),
             opts=resource_options.merge(vpc_peer_resource_opts),  # type: ignore
         )
         self.source_to_dest_route = ec2.Route(
-            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-route",  # noqa: WPS237
+            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-route",  # noqa: WPS237, E501
             route_table_id=source_vpc.route_table.id,
             destination_cidr_block=destination_vpc.olvpc.cidr_block,
             vpc_peering_connection_id=self.peering_connection.id,
             opts=resource_options,
         )
         self.dest_to_source_route = ec2.Route(
-            f"{destination_vpc.vpc_config.vpc_name}-to-{source_vpc.vpc_config.vpc_name}-route",  # noqa: WPS237
+            f"{destination_vpc.vpc_config.vpc_name}-to-{source_vpc.vpc_config.vpc_name}-route",  # noqa: WPS237, E501
             route_table_id=destination_vpc.route_table.id,
             destination_cidr_block=source_vpc.olvpc.cidr_block,
             vpc_peering_connection_id=self.peering_connection.id,

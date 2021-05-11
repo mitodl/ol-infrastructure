@@ -315,56 +315,48 @@ operations_vpc_exports.update(
 )
 export("operations_vpc", operations_vpc_exports)
 
-operations_to_data_peer = OLVPCPeeringConnection(
-    "ol-operations-{0}-to-ol-data-{0}-vpc-peer".format(stack_info.env_suffix),
-    operations_vpc,
-    data_vpc,
-)
-
-operations_to_mitx_peer = OLVPCPeeringConnection(
-    "ol-operations-{0}-to-residential-mitx-{0}-vpc-peer".format(stack_info.env_suffix),
-    operations_vpc,
-    residential_mitx_vpc,
-)
-
-operations_to_mitx_online_peer = OLVPCPeeringConnection(
-    "ol-operations-{0}-to-mitx-online-{0}-vpc-peer".format(stack_info.env_suffix),
-    operations_vpc,
-    mitx_online_vpc,
-)
-
-data_to_mitx_peer = OLVPCPeeringConnection(
-    "ol-data-{0}-to-residential-mitx-{0}-vpc-peer".format(stack_info.env_suffix),
-    data_vpc,
-    residential_mitx_vpc,
-)
-
 data_to_mitx_online_peer = OLVPCPeeringConnection(
     "ol-data-{0}-to-mitx-online-{0}-vpc-peer".format(stack_info.env_suffix),
     data_vpc,
     mitx_online_vpc,
 )
-
-operations_to_xpro_peer = OLVPCPeeringConnection(
-    "ol-operations-{0}-to-mitxpro-{0}-vpc-peer".format(stack_info.env_suffix),
-    operations_vpc,
-    xpro_vpc,
+data_to_mitx_peer = OLVPCPeeringConnection(
+    "ol-data-{0}-to-residential-mitx-{0}-vpc-peer".format(stack_info.env_suffix),
+    data_vpc,
+    residential_mitx_vpc,
 )
-
+data_to_applications_peer = OLVPCPeeringConnection(
+    "ol-data-{0}-to-applications-{0}-vpc-peer".format(stack_info.env_suffix),
+    data_vpc,
+    applications_vpc,
+)
 data_to_xpro_peer = OLVPCPeeringConnection(
     "ol-data-{0}-to-mitxpro-{0}-vpc-peer".format(stack_info.env_suffix),
     data_vpc,
     xpro_vpc,
 )
-
 operations_to_applications_peer = OLVPCPeeringConnection(
     "ol-operations-{0}-to-applications-{0}-vpc-peer".format(stack_info.env_suffix),
     operations_vpc,
     applications_vpc,
 )
-
-data_to_xpro_peer = OLVPCPeeringConnection(
-    "ol-data-{0}-to-applications-{0}-vpc-peer".format(stack_info.env_suffix),
+operations_to_data_peer = OLVPCPeeringConnection(
+    "ol-operations-{0}-to-ol-data-{0}-vpc-peer".format(stack_info.env_suffix),
+    operations_vpc,
     data_vpc,
-    applications_vpc,
+)
+operations_to_mitx_online_peer = OLVPCPeeringConnection(
+    "ol-operations-{0}-to-mitx-online-{0}-vpc-peer".format(stack_info.env_suffix),
+    operations_vpc,
+    mitx_online_vpc,
+)
+operations_to_mitx_peer = OLVPCPeeringConnection(
+    "ol-operations-{0}-to-residential-mitx-{0}-vpc-peer".format(stack_info.env_suffix),
+    operations_vpc,
+    residential_mitx_vpc,
+)
+operations_to_xpro_peer = OLVPCPeeringConnection(
+    "ol-operations-{0}-to-mitxpro-{0}-vpc-peer".format(stack_info.env_suffix),
+    operations_vpc,
+    xpro_vpc,
 )
