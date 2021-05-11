@@ -8,6 +8,7 @@ User={{ concourse_config.user }}
 Group={{ concourse_config.user }}
 ExecStart={{ concourse_config.deploy_directory }}/bin/concourse {{ concourse_config._node_type }}
 Restart=always
+RestartSec=2
 EnvironmentFile=-{{ concourse_config.env_file_path }}
 {% if concourse_config._node_type == "web" %}
 ExecReload=/bin/kill -HUP $MAINPID
