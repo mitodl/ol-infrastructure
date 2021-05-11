@@ -21,7 +21,11 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, build_userdata
+from ol_infrastructure.lib.aws.ec2_helper import (
+    DiskTypes,
+    InstanceTypes,
+    build_userdata,
+)
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
@@ -228,7 +232,7 @@ for count, subnet in zip(range(redash_config.get_int("instance_count") or 3), su
         subnet_id=subnet,
         key_name=salt_config.require("key_name"),
         root_block_device=ec2.InstanceRootBlockDeviceArgs(
-            volume_type="gp2", volume_size=20
+            volume_type=DiskTypes.ssd, volume_size=50
         ),
         vpc_security_group_ids=[
             data_vpc["security_groups"]["default"],

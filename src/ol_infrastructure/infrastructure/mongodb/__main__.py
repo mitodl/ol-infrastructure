@@ -5,6 +5,7 @@ from pulumi.stack_reference import StackReference
 from pulumi_aws import ec2, iam
 
 from ol_infrastructure.lib.aws.ec2_helper import (
+    DiskTypes,
     InstanceTypes,
     build_userdata,
     debian_10_ami,
@@ -158,14 +159,14 @@ for instance_num, subnet in zip(instance_nums, subnets):
         subnet_id=subnet,
         key_name=salt_config.require("key_name"),
         root_block_device=ec2.InstanceRootBlockDeviceArgs(
-            volume_type="gp2",
+            volume_type=DiskTypes.ssd,
             volume_size=20,  # noqa: WPS432
             encrypted=True,
         ),
         ebs_block_devices=[
             ec2.InstanceEbsBlockDeviceArgs(
                 device_name="/dev/sdb",
-                volume_type="gp2",
+                volume_type=DiskTypes.ssd,
                 volume_size=mongodb_config.get_int("disk_size") or 100,
                 encrypted=True,
             )

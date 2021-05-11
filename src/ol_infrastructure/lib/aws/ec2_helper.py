@@ -48,6 +48,12 @@ class InstanceTypes(str, Enum):  # noqa: WPS600
     high_mem_xlarge = "r5a.xlarge"
 
 
+@unique
+class DiskTypes(str, Enum):
+    ssd = "gp3"
+    provisioned_iops = "io2"
+
+
 @lru_cache
 def aws_regions() -> List[str]:
     """Generate the list of regions available in AWS.

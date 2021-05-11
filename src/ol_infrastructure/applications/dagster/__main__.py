@@ -20,7 +20,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.ec2_helper import build_userdata
+from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, build_userdata
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -372,7 +372,7 @@ dagster_instance = ec2.Instance(
     subnet_id=data_vpc["subnet_ids"][0],
     key_name=get_config("saltstack:key_name"),
     root_block_device=ec2.InstanceRootBlockDeviceArgs(
-        volume_type="gp2", volume_size=100
+        volume_type=DiskTypes.ssd, volume_size=100
     ),
     vpc_security_group_ids=[
         data_vpc["security_groups"]["default"],

@@ -5,6 +5,7 @@ from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, iam, route53
 
 from ol_infrastructure.lib.aws.ec2_helper import (
+    DiskTypes,
     InstanceTypes,
     build_userdata,
     debian_10_ami,
@@ -201,7 +202,7 @@ for count, subnet in zip(instance_range, subnets):  # type:ignore
         subnet_id=subnet,
         key_name=salt_config.require("key_name"),
         root_block_device=ec2.InstanceRootBlockDeviceArgs(
-            volume_type="gp2", volume_size=20
+            volume_type=DiskTypes.ssd, volume_size=20
         ),
         vpc_security_group_ids=[
             destination_vpc["security_groups"]["default"],
