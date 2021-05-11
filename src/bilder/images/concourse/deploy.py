@@ -97,7 +97,11 @@ concourse_config_map = {
             "{{ end }}"
         ),
     ),
-    CONCOURSE_WORKER_NODE_TYPE: partial(ConcourseWorkerConfig),
+    CONCOURSE_WORKER_NODE_TYPE: partial(
+        ConcourseWorkerConfig,
+        ephemeral=True,
+        container_runtime="containerd",
+    ),
 }
 concourse_config = concourse_config_map[node_type]()
 vault_template_map = {

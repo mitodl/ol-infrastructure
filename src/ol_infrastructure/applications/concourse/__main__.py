@@ -25,7 +25,11 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
+from ol_infrastructure.lib.aws.ec2_helper import (
+    DiskTypes,
+    InstanceTypes,
+    default_egress_args,
+)
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -375,6 +379,9 @@ concourse_web_alb_listener = lb.Listener(
 )
 
 # Create auto scale group and launch configs for Concourse web and worker
+web_instance_type = (
+    concourse_config.get("web_instance_type") or InstanceTypes.medium.name
+)
 web_launch_config = ec2.LaunchTemplate(
     "concourse-web-launch-template",
     name_prefix=f"concourse-web-{stack_info.env_suffix}-",
@@ -388,7 +395,7 @@ web_launch_config = ec2.LaunchTemplate(
         operations_vpc["security_groups"]["web"],
         consul_security_groups["consul_agent"],
     ],
-    instance_type=InstanceTypes.medium,
+    instance_type=InstanceTypes[web_instance_type].value,
     key_name="salt-production",
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
@@ -442,7 +449,12 @@ web_asg = autoscaling.Group(
     launch_template=autoscaling.GroupLaunchTemplateArgs(
         id=web_launch_config.id, version="$Latest"
     ),
-    instance_refresh=autoscaling.GroupInstanceRefreshArgs(strategy="Rolling"),
+    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
+        strategy="Rolling",
+        preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
+            min_healthy_percentage=50  # noqa: WPS432
+        ),
+    ),
     target_group_arns=[web_lb_target_group.arn],
     tags=[
         autoscaling.GroupTagArgs(
@@ -454,6 +466,9 @@ web_asg = autoscaling.Group(
     ],
 )
 
+worker_instance_type = (
+    concourse_config.get("worker_instance_type") or InstanceTypes.large.name
+)
 worker_launch_config = ec2.LaunchTemplate(
     "concourse-worker-launch-template",
     name_prefix=f"concourse-worker-{stack_info.env_suffix}-",
@@ -462,11 +477,21 @@ worker_launch_config = ec2.LaunchTemplate(
         arn=concourse_instance_profile.arn,
     ),
     image_id=concourse_worker_ami.id,
+    block_device_mappings=[
+        ec2.LaunchTemplateBlockDeviceMappingArgs(
+            device_name="/dev/xvda",
+            ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
+                volume_size=concourse_config.get_int("worker_disk_size")
+                or 25,  # noqa: WPS432
+                volume_type=DiskTypes.ssd,
+            ),
+        )
+    ],
     vpc_security_group_ids=[
         concourse_worker_security_group.id,
         consul_security_groups["consul_agent"],
     ],
-    instance_type=InstanceTypes.large,
+    instance_type=InstanceTypes[worker_instance_type].value,
     key_name="salt-production",
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
