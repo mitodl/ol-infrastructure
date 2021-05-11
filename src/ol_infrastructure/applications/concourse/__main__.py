@@ -350,7 +350,7 @@ web_lb_target_group = lb.TargetGroup(
     health_check=lb.TargetGroupHealthCheckArgs(
         healthy_threshold=2,
         interval=10,
-        path="/",
+        path="/api/v1/info",
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",
     ),
@@ -518,7 +518,12 @@ worker_asg = autoscaling.Group(
     launch_template=autoscaling.GroupLaunchTemplateArgs(
         id=worker_launch_config.id, version="$Latest"
     ),
-    instance_refresh=autoscaling.GroupInstanceRefreshArgs(strategy="Rolling"),
+    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
+        strategy="Rolling",
+        preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
+            min_healthy_percentage=50  # noqa: WPS432
+        ),
+    ),
     tags=[
         autoscaling.GroupTagArgs(
             key=key_name,
