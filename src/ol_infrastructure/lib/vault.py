@@ -42,7 +42,8 @@ postgres_sql_statements = {
           TO "{role_name}" WITH GRANT OPTION;
           ALTER DEFAULT PRIVILEGES FOR ROLE "{role_name}" IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES
           TO "{role_name}" WITH GRANT OPTION;
-          RESET ROLE;""",
+          RESET ROLE;
+          ALTER ROLE "{{{{name}}}}" SET ROLE "{role_name}";""",
         "revoke": """GRANT "{{{{name}}}}" TO {role_name} WITH ADMIN OPTION;
           REASSIGN OWNED BY "{{{{name}}}}" TO "{role_name}";
           DROP OWNED BY "{{{{name}}}}";
