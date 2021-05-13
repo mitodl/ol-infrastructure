@@ -96,10 +96,10 @@ concourse_config_map = {
             "{{ .Data.data.github_client_secret }}"
             "{{ end }}"
         ),
+        vault_url="http://localhost:8200",
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
-        ephemeral=True,
         container_runtime="containerd",
     ),
 }

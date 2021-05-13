@@ -15,11 +15,7 @@ from pulumi import Config, StackReference
 from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
-from bridge.lib.magic_numbers import (
-    CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
-    DEFAULT_HTTPS_PORT,
-    DEFAULT_POSTGRES_PORT,
-)
+from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, DEFAULT_POSTGRES_PORT
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -238,15 +234,27 @@ concourse_web_security_group = ec2.SecurityGroup(
     description="Access control for Concourse web servers",
     ingress=[
         ec2.SecurityGroupIngressArgs(
+            self=True,
             security_groups=[concourse_worker_security_group.id],
-            from_port=CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
-            to_port=CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
+            from_port=0,
+            to_port=65535,
             protocol="tcp",
             description="Allow Concourse workers to connect to Concourse web nodes",
         )
     ],
     egress=default_egress_args,
     vpc_id=ops_vpc_id,
+)
+
+ec2.SecurityGroupRule(
+    "concourse-worker-access-from-concourse-web",
+    security_group_id=concourse_worker_security_group.id,
+    source_security_group_id=concourse_web_security_group.id,
+    protocol="tcp",
+    from_port=0,
+    to_port=65535,
+    description="Allow all traffic from Concourse web nodes to workers",
+    type="ingress",
 )
 
 # Create security group for Concourse Postgres database
@@ -281,6 +289,7 @@ concourse_db_config = OLPostgresDBConfig(
     security_groups=[concourse_db_security_group],
     tags=aws_config.tags,
     db_name="concourse",
+    engine_version="12.5",
     **defaults(stack_info)["rds"],
 )
 concourse_db = OLAmazonDB(concourse_db_config)
