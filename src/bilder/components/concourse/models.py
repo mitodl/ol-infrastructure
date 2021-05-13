@@ -157,16 +157,6 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         concourse_env_var="CONCOURSE_BIND_PORT",
         description="Port on which to listen for HTTP traffic. (default: 8080)",
     )
-    bitbucket_cloud_client_id: Optional[str] = Field(
-        None,
-        concourse_env_var="CONCOURSE_BITBUCKET_CLOUD_CLIENT_ID",
-        description="(Required) Client id",
-    )
-    bitbucket_cloud_client_secret: Optional[str] = Field(
-        None,
-        concourse_env_var="CONCOURSE_BITBUCKET_CLOUD_CLIENT_SECRET",
-        description="(Required) Client secret",
-    )
     build_tracker_interval: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_BUILD_TRACKER_INTERVAL",
@@ -176,29 +166,6 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         None,
         concourse_env_var="CONCOURSE_CAPTURE_ERROR_METRICS",
         description="Enable capturing of error log metrics",
-    )
-    cf_api_url: Optional[str] = Field(
-        None,
-        concourse_env_var="CONCOURSE_CF_API_URL",
-        description="(Required) The base API URL of your CF deployment. It will use this information to discover information about the authentication provider.",
-    )
-    cf_ca_cert: Optional[str] = Field(
-        None, concourse_env_var="CONCOURSE_CF_CA_CERT", description="CA Certificate"
-    )
-    cf_client_id: Optional[str] = Field(
-        None,
-        concourse_env_var="CONCOURSE_CF_CLIENT_ID",
-        description="(Required) Client id",
-    )
-    cf_client_secret: Optional[str] = Field(
-        None,
-        concourse_env_var="CONCOURSE_CF_CLIENT_SECRET",
-        description="(Required) Client secret",
-    )
-    cf_skip_ssl_validation: Optional[bool] = Field(
-        None,
-        concourse_env_var="CONCOURSE_CF_SKIP_SSL_VALIDATION",
-        description="Skip SSL validation",
     )
     cli_artifacts_dir: Optional[str] = Field(
         None,
@@ -543,7 +510,9 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         description="Time limit on checking for new versions of resources. (default: 1h)",
     )
     iframe_options: IframeOptions = Field(
-        IframeOptions.deny, concourse_env_var="CONCOURSE_X_FRAME_OPTIONS"
+        IframeOptions.deny,
+        concourse_env_var="CONCOURSE_X_FRAME_OPTIONS",
+        env_transform=str,
     )
     influxdb_batch_duration: Optional[str] = Field(
         None,

@@ -36,6 +36,7 @@ from bilder.components.hashicorp.steps import (
 )
 from bilder.components.hashicorp.vault.models import (
     Vault,
+    VaultAgentCache,
     VaultAgentConfig,
     VaultAutoAuthAWS,
     VaultAutoAuthConfig,
@@ -97,10 +98,13 @@ concourse_config_map = {
             "{{ end }}"
         ),
         vault_url="http://localhost:8200",
+        vault_client_token="this-token-gets-overridden-by-the-vault-agent",
+        vault_path_prefix="/secret-concourse",
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
-        container_runtime="containerd",
+        container_runtime="guardian",
+        baggageclaim_driver="btrfs",
     ),
 }
 concourse_config = concourse_config_map[node_type]()
@@ -168,7 +172,7 @@ vault_template_map = {
 }
 
 # Install Concourse
-install_baseline_packages()
+install_baseline_packages(packages=["curl", "btrfs-progs"])
 concourse_install_changed = install_concourse(concourse_base_config)
 concourse_config_changed = configure_concourse(concourse_config)
 
@@ -189,7 +193,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
                 tags=[CONCOURSE_WEB_NODE_TYPE],
                 check=ConsulServiceTCPCheck(
                     name="concourse-web-job-queue",
-                    tcp=f"localhost:{CONCOURSE_WEB_HOST_COMMUNICATION_PORT}",
+                    tcp="localhost:8080",
                     interval="10s",
                 ),
             )
@@ -218,6 +222,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
 # Install Consul and Vault Agent
 vault = Vault(
     configuration=VaultAgentConfig(
+        cache=VaultAgentCache(use_auto_auth_token="force"),
         listener=[
             VaultListener(type="tcp", address="127.0.0.1:8200", tls_disable=True)
         ],
