@@ -15,7 +15,12 @@ from pulumi import Config, StackReference
 from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
-from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, DEFAULT_POSTGRES_PORT
+from bridge.lib.magic_numbers import (
+    CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
+    DEFAULT_HTTPS_PORT,
+    DEFAULT_POSTGRES_PORT,
+    MAXIMUM_PORT_NUMBER,
+)
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -172,7 +177,7 @@ vault.generic.Secret(
 vault.generic.Secret(
     "concourse-dockerhub-credentials",
     path=concourse_secrets_mount.path.apply(
-        lambda mount_path: f"{mount_path}/concourse/main/dockerhub"
+        lambda mount_path: f"{mount_path}/main/dockerhub"
     ),
     data_json=concourse_config.require_secret_object("dockerhub_credentials").apply(
         json.dumps
@@ -236,8 +241,8 @@ concourse_web_security_group = ec2.SecurityGroup(
         ec2.SecurityGroupIngressArgs(
             self=True,
             security_groups=[concourse_worker_security_group.id],
-            from_port=0,
-            to_port=65535,
+            from_port=CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
+            to_port=CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
             protocol="tcp",
             description="Allow Concourse workers to connect to Concourse web nodes",
         )
@@ -252,7 +257,7 @@ ec2.SecurityGroupRule(
     source_security_group_id=concourse_web_security_group.id,
     protocol="tcp",
     from_port=0,
-    to_port=65535,
+    to_port=MAXIMUM_PORT_NUMBER,
     description="Allow all traffic from Concourse web nodes to workers",
     type="ingress",
 )

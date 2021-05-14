@@ -97,7 +97,7 @@ concourse_config_map = {
             "{{ .Data.data.github_client_secret }}"
             "{{ end }}"
         ),
-        vault_url="http://localhost:8200",
+        vault_url=f"http://localhost:{VAULT_HTTP_PORT}",
         vault_client_token="this-token-gets-overridden-by-the-vault-agent",
         vault_path_prefix="/secret-concourse",
     ),
@@ -222,9 +222,11 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
 # Install Consul and Vault Agent
 vault = Vault(
     configuration=VaultAgentConfig(
-        cache=VaultAgentCache(use_auto_auth_token="force"),
+        cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
         listener=[
-            VaultListener(type="tcp", address="127.0.0.1:8200", tls_disable=True)
+            VaultListener(
+                type="tcp", address=f"127.0.0.1:{VAULT_HTTP_PORT}", tls_disable=True
+            )
         ],
         vault=VaultConnectionConfig(
             address=f"https://active.vault.service.consul:{VAULT_HTTP_PORT}",
