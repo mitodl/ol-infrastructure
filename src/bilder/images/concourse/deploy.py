@@ -36,6 +36,7 @@ from bilder.components.hashicorp.steps import (
 )
 from bilder.components.hashicorp.vault.models import (
     Vault,
+    VaultAgentCache,
     VaultAgentConfig,
     VaultAutoAuthAWS,
     VaultAutoAuthConfig,
@@ -96,11 +97,14 @@ concourse_config_map = {
             "{{ .Data.data.github_client_secret }}"
             "{{ end }}"
         ),
+        vault_url=f"http://localhost:{VAULT_HTTP_PORT}",
+        vault_client_token="this-token-gets-overridden-by-the-vault-agent",
+        vault_path_prefix="/secret-concourse",
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
-        ephemeral=True,
-        container_runtime="containerd",
+        container_runtime="guardian",
+        baggageclaim_driver="btrfs",
     ),
 }
 concourse_config = concourse_config_map[node_type]()
@@ -168,7 +172,7 @@ vault_template_map = {
 }
 
 # Install Concourse
-install_baseline_packages()
+install_baseline_packages(packages=["curl", "btrfs-progs"])
 concourse_install_changed = install_concourse(concourse_base_config)
 concourse_config_changed = configure_concourse(concourse_config)
 
@@ -189,7 +193,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
                 tags=[CONCOURSE_WEB_NODE_TYPE],
                 check=ConsulServiceTCPCheck(
                     name="concourse-web-job-queue",
-                    tcp=f"localhost:{CONCOURSE_WEB_HOST_COMMUNICATION_PORT}",
+                    tcp="localhost:8080",
                     interval="10s",
                 ),
             )
@@ -218,8 +222,11 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
 # Install Consul and Vault Agent
 vault = Vault(
     configuration=VaultAgentConfig(
+        cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
         listener=[
-            VaultListener(type="tcp", address="127.0.0.1:8200", tls_disable=True)
+            VaultListener(
+                type="tcp", address=f"127.0.0.1:{VAULT_HTTP_PORT}", tls_disable=True
+            )
         ],
         vault=VaultConnectionConfig(
             address=f"https://active.vault.service.consul:{VAULT_HTTP_PORT}",

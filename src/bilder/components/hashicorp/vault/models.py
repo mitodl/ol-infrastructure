@@ -64,7 +64,7 @@ class VaultAutoAuthSink(FlexibleBaseModel):
 
 
 class VaultAgentCache(FlexibleBaseModel):
-    use_auto_auth_token: bool = True
+    use_auto_auth_token: Union[str, bool] = True
 
 
 class VaultSealConfig(FlexibleBaseModel, abc.ABC):

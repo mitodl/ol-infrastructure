@@ -50,7 +50,7 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
         files.template(
             name="Create SystemD service definition for Caddy",
             dest="/usr/lib/systemd/system/caddy.service",
-            src=Path(__file__).parent.joinpath("templates/caddy.service.j2"),
+            src=Path(__file__).parent.joinpath("templates", "caddy.service.j2"),
             state=state,
             host=host,
         )
@@ -84,6 +84,13 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
             state=state,
             host=host,
         )
+    files.put(
+        name="Configure systemd to load environment variables from file",
+        dest="/etc/systemd/system/caddy.service",
+        src=Path(__file__).parent.joinpath("templates", "caddy.service.override"),
+        state=state,
+        host=host,
+    )
     if caddy_config.log_file:
         files.directory(
             name="Crate Caddy log directory",

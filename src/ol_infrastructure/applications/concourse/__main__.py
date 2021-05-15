@@ -19,6 +19,7 @@ from bridge.lib.magic_numbers import (
     CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
+    MAXIMUM_PORT_NUMBER,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -176,7 +177,7 @@ vault.generic.Secret(
 vault.generic.Secret(
     "concourse-dockerhub-credentials",
     path=concourse_secrets_mount.path.apply(
-        lambda mount_path: f"{mount_path}/concourse/main/dockerhub"
+        lambda mount_path: f"{mount_path}/main/dockerhub"
     ),
     data_json=concourse_config.require_secret_object("dockerhub_credentials").apply(
         json.dumps
@@ -238,6 +239,7 @@ concourse_web_security_group = ec2.SecurityGroup(
     description="Access control for Concourse web servers",
     ingress=[
         ec2.SecurityGroupIngressArgs(
+            self=True,
             security_groups=[concourse_worker_security_group.id],
             from_port=CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
             to_port=CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
@@ -247,6 +249,17 @@ concourse_web_security_group = ec2.SecurityGroup(
     ],
     egress=default_egress_args,
     vpc_id=ops_vpc_id,
+)
+
+ec2.SecurityGroupRule(
+    "concourse-worker-access-from-concourse-web",
+    security_group_id=concourse_worker_security_group.id,
+    source_security_group_id=concourse_web_security_group.id,
+    protocol="tcp",
+    from_port=0,
+    to_port=MAXIMUM_PORT_NUMBER,
+    description="Allow all traffic from Concourse web nodes to workers",
+    type="ingress",
 )
 
 # Create security group for Concourse Postgres database
@@ -281,6 +294,7 @@ concourse_db_config = OLPostgresDBConfig(
     security_groups=[concourse_db_security_group],
     tags=aws_config.tags,
     db_name="concourse",
+    engine_version="12.5",
     **defaults(stack_info)["rds"],
 )
 concourse_db = OLAmazonDB(concourse_db_config)
