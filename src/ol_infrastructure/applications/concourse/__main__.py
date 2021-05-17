@@ -16,7 +16,6 @@ from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, rout
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
-    CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
     MAXIMUM_PORT_NUMBER,
@@ -241,8 +240,8 @@ concourse_web_security_group = ec2.SecurityGroup(
         ec2.SecurityGroupIngressArgs(
             self=True,
             security_groups=[concourse_worker_security_group.id],
-            from_port=CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
-            to_port=CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
+            from_port=0,
+            to_port=MAXIMUM_PORT_NUMBER,
             protocol="tcp",
             description="Allow Concourse workers to connect to Concourse web nodes",
         )
