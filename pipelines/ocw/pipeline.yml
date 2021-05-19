@@ -73,7 +73,16 @@ jobs:
         params:
           source: ocw-www/dist/
           destination:
-            - dir: s3-remote:((ocw-site-bucket))
+            - dir: s3-remote:((ocw-draft-bucket))
+              command: sync
+              args:
+                - "--exclude"
+                - "/courses/**"
+      - put: ocw-site
+        params:
+          source: ocw-www/dist/
+          destination:
+            - dir: s3-remote:((ocw-live-bucket))
               command: sync
               args:
                 - "--exclude"
