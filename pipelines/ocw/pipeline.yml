@@ -74,5 +74,7 @@ jobs:
           source: ocw-www/dist/
           destination:
             - dir: s3-remote:((ocw-site-bucket))
+            - command: sync
             - args:
-              - "--dry-run"
+              - "--exclude"
+              - "courses"
