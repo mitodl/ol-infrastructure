@@ -77,4 +77,4 @@ jobs:
               command: sync
               args:
                 - "--exclude"
-                - "courses"
+                - "/courses/**"
