@@ -222,7 +222,7 @@ mitx_online_vpc_exports.update(
         }
     }
 )
-export("mitx_online_vpc", mitx_online_vpc_exports)
+export("mitxonline_vpc", mitx_online_vpc_exports)
 
 xpro_vpc_exports = vpc_exports(xpro_vpc, ["data_vpc", "operations_vpc"])
 xpro_vpc_exports.update(
