@@ -37,7 +37,9 @@ jobs:
     plan:
       - get: ol-infrastructure
       - get: ocw-www
+        trigger: true
       - get: ocw-hugo-themes
+        trigger: true
       - task: copy-go-mod-file
         config:
           platform: linux
