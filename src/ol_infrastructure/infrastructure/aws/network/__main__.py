@@ -13,6 +13,7 @@ were specified then one of the existing networks would not be managed with Pulum
 from typing import Any, Dict, List, Optional
 
 from pulumi import Config, export
+from pulumi_aws import ec2
 from security_groups import default_group, public_web, salt_minion
 
 from ol_infrastructure.components.aws.olvpc import (
@@ -92,6 +93,17 @@ operations_vpc_config = OLVPCConfig(
     },
 )
 operations_vpc = OLVPC(operations_vpc_config)
+if stack_info.env_suffix == "production":
+    # TODO: Delete this once we migrate the Micromasters RDS into the applications VPC
+    # (TMM 2021-05-19)
+    # This is necessary in order for Redash to be able to access the
+    # MicroMasters read replicat
+    ec2.Route(
+        "operations-to-micromasters-peer-route",
+        route_table_id=operations_vpc.route_table.id,
+        destination_cidr_block="10.10.0.0/16",
+        vpc_peering_connection_id="pcx-0d1b9264",
+    )
 
 mitx_config = Config("residential_vpc")
 residential_mitx_vpc_config = OLVPCConfig(
