@@ -12,6 +12,4 @@ npm run build:githash
 npm run build
 
 # Just for testing rclone!
-mkdir ../ocw-www/dist/courses
-date > ../ocw-www/dist/courses/testfile1
-date > ../ocw-www/dist/testfile2
+date > ../ocw-www/dist/testfile3
