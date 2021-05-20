@@ -1,12 +1,15 @@
-"""Deploy the Digital Credentials Sign and Verify service to Fargate as a Docker container.
+"""Deploy the Digital Credentials Sign and Verify service to AWS Fargate
 
-This module sets up the services necessary to deploy a set of Docker containers to run the sign and verify service
-needed for the Digital Credentials project.
+This module sets up the services necessary to deploy a set of Docker containers to run
+the sign and verify service needed for the Digital Credentials project.
 
-- Create a secret in AWS secrets manager
-- Create an IAM role and profile for the Fargate task
-- Create a cluster, task definition, and service on Amazon Fargate/ECS
-- Register the service with Route 53 DNS
+    - Create a secret in AWS secrets manager
+
+    - Create an IAM role and profile for the Fargate task
+
+    - Create a cluster, task definition, and service on Amazon Fargate/ECS
+
+    - Register the service with Route 53 DNS
 """
 
 import json

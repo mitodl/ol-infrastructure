@@ -58,7 +58,7 @@ class OLAmazonCacheConfig(AWSBase):
         engine_version: str,
         values: Dict,  # noqa: WPS110
     ) -> str:
-        engine = values.get("engine")
+        engine: str = values.get("engine")
         engines_map = cache_engines()
         if engine_version not in engines_map.get(engine, []):
             raise ValueError(

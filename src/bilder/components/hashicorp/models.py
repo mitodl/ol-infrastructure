@@ -24,6 +24,7 @@ class HashicorpProduct(BaseModel, abc.ABC):
     configuration: Dict[Path, HashicorpConfig]
     configuration_directory: Optional[Path]
     configuration_file: Optional[Path]
+    data_directory: Optional[Path]
 
     @abc.abstractproperty
     def systemd_template_context(self):

@@ -1,5 +1,6 @@
+---
 name: ol-infrastructure-elasticsearch
 runtime: python
 description: Manage deployment of Elasticsearch clusters
 backend:
-  url: s3://mitol-pulumi-state/
+    url: s3://mitol-pulumi-state/

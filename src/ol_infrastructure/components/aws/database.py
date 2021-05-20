@@ -80,7 +80,7 @@ class OLDBConfig(AWSBase):
     def is_valid_version(
         cls: "OLDBConfig", engine_version: str, values: Dict  # noqa: N805, WPS110
     ) -> str:
-        engine = values.get("engine")
+        engine: str = values.get("engine")
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
             raise ValueError(

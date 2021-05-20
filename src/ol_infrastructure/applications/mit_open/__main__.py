@@ -28,6 +28,7 @@ application_storage_bucket = s3.Bucket(
     tags=aws_config.tags,
 )
 
+FIVE_MINUTES = 300
 course_data_bucket = s3.Bucket(
     f"mit-open-learning-course-data-{stack_info.env_suffix}",
     bucket=f"open-learning-course-data-{app_env_suffix}",
@@ -37,7 +38,7 @@ course_data_bucket = s3.Bucket(
             allowed_methods=["GET"],
             allowed_headers=["*"],
             allowed_origins=["*"],
-            max_age_seconds=300,
+            max_age_seconds=FIVE_MINUTES,
         )
     ],
     tags=aws_config.tags,

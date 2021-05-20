@@ -1,11 +1,15 @@
 """The complete state necessary to deploy an instance of the Redash application.
 
-- Create an RDS PostgreSQL instance for storing Redash's configuration data and intermediate query results
-- Mount a Vault database backend and provision role definitions for the Redash RDS database
-- Create an IAM role for Redash instances to allow access to S3 and other AWS resources
+- Create an RDS PostgreSQL instance for storing Redash's configuration data and
+  intermediate query results
+- Mount a Vault database backend and provision role definitions for the Redash RDS
+  database
+- Create an IAM role for Redash instances to allow access to S3 and other AWS
+  resources
 - Create a Redis cluster in Elasticache
 - Register a minion ID and key pair with the appropriate SaltStack master instance
-- Provision a set of EC2 instances from a pre-built AMI with the configuration and code for Redash
+- Provision a set of EC2 instances from a pre-built AMI with the configuration
+  and code for Redash
 - Provision an AWS load balancer and connect the deployed EC2 instances
 - Create a DNS record for the deployed load balancer
 """
@@ -15,6 +19,7 @@ from itertools import chain
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53
 
+from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -82,7 +87,8 @@ redash_instance_profile = iam.InstanceProfile(
 
 redash_instance_security_group = ec2.SecurityGroup(
     f"redash-instance-{stack_info.env_suffix}",
-    description="Security group to assign to Redash application to control inter-service access",
+    description="Security group to assign to Redash application to control "
+    "inter-service access",
     tags=aws_config.merged_tags({"Name": f"redash-instance-{redash_environment}"}),
     vpc_id=data_vpc["id"],
 )
@@ -94,15 +100,15 @@ redash_db_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
-            from_port=5432,  # noqa: WPS432
-            to_port=5432,  # noqa: WPS432
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
             security_groups=[redash_instance_security_group.id],
             description="PostgreSQL access from Redash instances",
         ),
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
-            from_port=5432,
-            to_port=5432,
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
             cidr_blocks=[operations_vpc["cidr"]],
         ),
     ],

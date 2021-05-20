@@ -24,10 +24,10 @@ kms_key_access_statement = {
     "Effect": "Allow",
     "Principal": {
         "AWS": [
-            "arn:aws:iam::{}:root".format(owner),
-            "arn:aws:iam::{}:user/mbreedlove".format(owner),
-            "arn:aws:iam::{}:user/shaidar".format(owner),
-            "arn:aws:iam::{}:user/tmacey".format(owner),
+            f"arn:aws:iam::{owner}:root",
+            f"arn:aws:iam::{owner}:user/mbreedlove",
+            f"arn:aws:iam::{owner}:user/shaidar",
+            f"arn:aws:iam::{owner}:user/tmacey",
         ]
     },
     "Action": [
@@ -112,9 +112,9 @@ kms_infrastructure_as_code_encryption_policy = {
             "Effect": "Allow",
             "Principal": {
                 "AWS": [
-                    "arn:aws:iam::{}:user/tmacey".format(owner),
-                    "arn:aws:iam::{}:user/shaidar".format(owner),
-                    "arn:aws:iam::{}:user/mbreedlove".format(owner),
+                    f"arn:aws:iam::{owner}:user/tmacey",
+                    f"arn:aws:iam::{owner}:user/shaidar",
+                    f"arn:aws:iam::{owner}:user/mbreedlove",
                 ]
             },
             "Action": [

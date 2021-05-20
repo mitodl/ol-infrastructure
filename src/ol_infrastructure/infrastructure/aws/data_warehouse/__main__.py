@@ -23,7 +23,7 @@ results_bucket = s3.Bucket(
     acl="private",
     server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
         rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
                 sse_algorithm="aws:kms",
                 kms_master_key_id=s3_kms_key["id"],
             ),
@@ -49,12 +49,13 @@ s3.BucketPublicAccessBlock(
 athena_warehouse_workgroup = athena.Workgroup(
     f"ol_warehouse_athena_workgroup_{stack_info.env_suffix}",
     name=f"ol-warehouse-{stack_info.env_suffix}",
-    description="Data warehousing for MIT Open Learning in the {stack_info.name} environment",
+    description="Data warehousing for MIT Open Learning in the "
+    f"{stack_info.name} environment",
     state="ENABLED",
     tags=aws_config.merged_tags({"Name": f"ol-warehouse-{stack_info.env_suffix}"}),
     configuration=athena.WorkgroupConfigurationArgs(
         result_configuration=athena.WorkgroupConfigurationResultConfigurationArgs(
-            encryption_configuration=athena.WorkgroupConfigurationResultConfigurationEncryptionConfigurationArgs(
+            encryption_configuration=athena.WorkgroupConfigurationResultConfigurationEncryptionConfigurationArgs(  # noqa: E501
                 encryption_option="SSE_KMS",
                 kms_key_arn=s3_kms_key["arn"],
             ),
@@ -73,9 +74,9 @@ for unit in BusinessUnit:
         f"ol_data_lake_s3_bucket_{unit.name}_{stack_info.env_suffix}",
         bucket=f"ol-data-lake-{unit.value}-{stack_info.env_suffix}",
         acl="private",
-        server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
+        server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(  # noqa: E501
             rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-                apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
+                apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
                     sse_algorithm="aws:kms",
                     kms_master_key_id=s3_kms_key["id"],
                 ),

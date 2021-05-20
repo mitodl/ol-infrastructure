@@ -1,4 +1,5 @@
+---
 secretsprovider: awskms://alias/infrastructure-secrets-qa  # pragma: allowlist secret
 encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QHhXlvPfNhuE+oHmMQQseu9AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMPLfTZMrnTgwBA2kfAgEQgDupw9ff+ck3TY6C9Z9MJ3nBjVRZGqljmBh4OmWLRPsR6iBm59Z1RTIcgaxHjChEkMM0Y9+GGF6j3nM6Qw== # pragma: allowlist secret
 config:
-  aws:region: us-east-1
+    aws:region: us-east-1

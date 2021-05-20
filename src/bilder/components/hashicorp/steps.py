@@ -80,7 +80,10 @@ def install_hashicorp_products(
         )
         files.directory(
             name=f"Ensure configuration directory for {product.name}",
-            path=product.configuration_directory or product.configuration_file.parent,
+            path=(
+                product.configuration_directory
+                or product.configuration_file.parent  # type: ignore
+            ),
             present=True,
             user=product.name,
             group=product.name,

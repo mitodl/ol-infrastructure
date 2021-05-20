@@ -46,7 +46,7 @@ class VaultAutoAuthAWS(VaultAutoAuthMethodConfig):
 
 class VaultAutoAuthMethod(FlexibleBaseModel):
     type: str
-    mount_path: Optional[Path]
+    mount_path: Optional[str]
     namespace: Optional[str]
     wrap_ttl: Optional[Union[str, int]]
     config: VaultAutoAuthMethodConfig

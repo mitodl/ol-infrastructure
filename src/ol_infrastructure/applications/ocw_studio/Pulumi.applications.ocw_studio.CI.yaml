@@ -1,6 +1,7 @@
+---
 secretsprovider: awskms://alias/PulumiSecrets
 encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEmOuKx7TjiG3WvrduMXtibAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMsgzrV+TMGt9WcJXzAgEQgDtNRhDDddtK6dqcatu+JoRNY+vrvaHPwOxI/uUO7MWEM1WVMEmRYyE1V0LVXKNZs8bLOHrSI3QxYilLxA==
 config:
-  aws:region: us-east-1
-  ocw_studio:db_password:
-    secure: v1:PMhnJY0c/38fxcK/:HwHpoUXfP5YTzXq/3cyZUj4eRjCmNkdScLTGca863qCG/U1Py2BHwJXHiM8KPXx9NJufyVDzNtf79Ss7UTEcKOmM+M+8NXFE6I8UCapuui3yi52KFOWk7o6X
+    aws:region: us-east-1
+    ocw_studio:db_password:
+        secure: v1:PMhnJY0c/38fxcK/:HwHpoUXfP5YTzXq/3cyZUj4eRjCmNkdScLTGca863qCG/U1Py2BHwJXHiM8KPXx9NJufyVDzNtf79Ss7UTEcKOmM+M+8NXFE6I8UCapuui3yi52KFOWk7o6X
