@@ -32,7 +32,7 @@ resources:
               region = us-east-1
 
 jobs:
-    - name: build
+    - name: build-theme-assets
       serial: true
       plan:
           - get: ol-infrastructure
