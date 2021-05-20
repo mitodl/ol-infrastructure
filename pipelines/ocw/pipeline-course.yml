@@ -1,0 +1,96 @@
+---
+resource_types:
+  - name: rclone
+    type: docker-image
+    source:
+      repository: sothr/concourse-rclone-resource
+      tag: latest
+resources:
+  - name: ol-infrastructure
+    type: git
+    source:
+      uri: https://github.com/mitodl/ol-infrastructure.git
+      branch: ((ol-infrastructure-git-ref))
+  - name: ocw-www
+    type: git
+    source:
+      uri: https://github.com/mitodl/ocw-www.git
+      branch: ((ocw-www-git-ref))
+  - name: ocw-hugo-themes
+    type: git
+    source:
+      uri: https://github.com/mitodl/ocw-hugo-themes.git
+      branch: ((ocw-hugo-theme-git-ref))
+  - name: course-markdown
+    type: git
+    source:
+      uri: git@((git-domain)):((github-org))/((course-repo)).git
+      branch: main
+      private_key: ((git-private-key))
+  - name: ocw-site
+    type: rclone
+    source:
+      config: |
+        [s3-remote]
+        type = s3
+        provider = AWS
+        env_auth = true
+        region = us-east-1
+
+jobs:
+  - name: build-course
+    serial: true
+    plan:
+      - get: ol-infrastructure
+      - get: ocw-www
+        trigger: true
+      - get: ocw-hugo-themes
+        trigger: true
+      - get: course-markdown
+        trigger: true
+      - task: copy-go-mod-file
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source: {repository: busybox}
+          inputs:
+            - name: ol-infrastructure
+            - name: ocw-hugo-themes
+            - name: ocw-www
+            - name: course-markdown
+          outputs:
+            - name: ocw-www
+            - name: ocw-hugo-themes
+            - name: course-markdown
+          run:
+            path: ol-infrastructure/pipelines/ocw/scripts/modify-go-mod.sh
+      - task: build-course-task
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source: {repository: mitodl/ocw-course-publisher, tag: "latest"}
+          inputs:
+            - name: ol-infrastructure
+            - name: ocw-hugo-themes
+            - name: ocw-www
+            - name: course-markdown
+          outputs:
+            - name: ocw-www
+          params:
+            COURSE_BASE_URL: ((course-base-url))
+          run:
+            path: ol-infrastructure/pipelines/ocw/scripts/build-one-course.sh
+      - put: ocw-site
+        params:
+          source: ocw-www/dist/courses/((course-id))/
+          destination:
+            - dir: s3-remote:((ocw-draft-bucket))/courses/((course-id))
+              command: sync
+      - put: ocw-site
+        params:
+          source: ocw-www/dist/courses/((course-id))/
+          destination:
+            - dir: s3-remote:((ocw-live-bucket))/courses/((course-id))
+              command: sync
