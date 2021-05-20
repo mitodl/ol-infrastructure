@@ -1,0 +1,7 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjEYf3gV5ZTnviCJcHwGnUuLzld5EuYumgMrRde6bvXUgFX6tgmkn7GE+XzOn/yyBWiAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMC1y1VeTVSEM970yPAgEQgDvmhUTNKMDUFYzvNIhqWM/x9sCuXu1B4nxoOS9IBy8+UWgbC0JNOYpp3Vvzj9U9CuBFq5rpy4NR8qMpVg==
+config:
+    aws:region: us-east-1
+    mitxonline:db_password:
+        secure: v1:IwTPN3Do+RpBiRsW:JpALSjS8dT3rByCB+/6Q9XK56GWu+eS6s+aKeEXa943g7ZbV5tsZ2iHisoyDJs3ESn8zdirxZuym9caIehTGcyvqfctVMz8IKJIiD7Up1AkX70rG8U0N2LHR
