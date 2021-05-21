@@ -5,6 +5,8 @@ resources:
       source:
           uri: https://github.com/mitodl/ol-infrastructure.git
           branch: ((ol-infrastructure-git-ref))
+          paths:
+              - dockerfiles/ocw/node-hugo/Dockerfile
     - name: node-image
       type: docker-image
       check_every: 1h
@@ -28,6 +30,7 @@ jobs:
           - get: node-image
             trigger: true
           - get: ol-infrastructure
+            trigger: true
           - put: ocw-course-publisher-image
             params:
                 build: ol-infrastructure/dockerfiles/ocw/node-hugo
