@@ -1,4 +1,4 @@
-"""This module defines a Pulumi component resource for enforcing best practices for building AWS Elasticache clusters.
+"""This module defines a Pulumi component resource for building Elasticache clusters.
 
 This includes:
 - Create a parameter group for each deployed cluster
@@ -11,11 +11,15 @@ import pulumi
 from pulumi_aws import elasticache
 from pydantic import PositiveInt, conint, validator
 
+from bridge.lib.magic_numbers import DEFAULT_MEMCACHED_PORT, DEFAULT_REDIS_PORT
 from ol_infrastructure.lib.aws.elasticache_helper import (
     cache_engines,
     parameter_group_family,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
+
+PulumiString = Union[str, pulumi.Output[str]]
+MAX_MEMCACHED_CLUSTER_SIZE = 20
 
 
 class OLAmazonCacheConfig(AWSBase):
@@ -35,7 +39,7 @@ class OLAmazonCacheConfig(AWSBase):
     num_instances: PositiveInt = PositiveInt(3)
     parameter_overrides: Optional[Dict[str, Any]] = None
     port: int
-    security_groups: List[str]
+    security_groups: List[PulumiString]
     subnet_group: Union[
         str, pulumi.Output[str]
     ]  # the name of the subnet group created in the OLVPC component
@@ -70,14 +74,14 @@ class OLAmazonCacheConfig(AWSBase):
 class OLAmazonRedisConfig(OLAmazonCacheConfig):
     cluster_mode_enabled: bool = True
     encrypt_transit: bool = True
-    auth_token: Optional[str] = None
+    auth_token: Optional[PulumiString] = None
     encrypted: bool = True
     engine: str = "redis"
     engine_version: str = "6.x"
-    kms_key_id: Optional[str] = None
+    kms_key_id: Optional[PulumiString] = None
     num_instances: conint(ge=1, le=5) = 1  # type: ignore
     shard_count: PositiveInt = PositiveInt(1)
-    port: PositiveInt = PositiveInt(6379)
+    port: PositiveInt = PositiveInt(DEFAULT_REDIS_PORT)
     snapshot_retention_days: PositiveInt = PositiveInt(5)
 
     @validator("auth_token")
@@ -86,11 +90,15 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
         auth_token: Optional[str],
         values: Dict,  # noqa: WPS110
     ) -> Optional[str]:
+        min_token_length = 16
+        max_token_length = 128
         if not values["encrypt_transit"]:
             return auth_token
         if values["encrypt_transit"] and auth_token is None:
             raise ValueError("Cannot encrypt transit with no auth token configured")
-        token_valid = 16 <= len(auth_token or "") <= 128 and bool(
+        token_valid = min_token_length <= len(
+            auth_token or ""
+        ) <= max_token_length and bool(
             re.search(r"[^'\"/@\\W]+", auth_token or "")
         )  # noqa: WPS221, W605, E501
         if not token_valid:
@@ -104,12 +112,14 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
     def is_valid_cluster_name(
         cls: "OLAmazonRedisConfig", cluster_name: str  # noqa: N805
     ) -> str:
+        cluster_name_max_length = 41
         is_valid: bool = True
-        is_valid = 1 < len(cluster_name) < 41
+        is_valid = 1 < len(cluster_name) < cluster_name_max_length
         is_valid = not bool(re.search("[^a-zA-Z-9-]", cluster_name))
         if not is_valid:
             raise ValueError(
-                "The cluster name does not comply with the Elasticache naming constraints for Redis"
+                "The cluster name does not comply with the Elasticache naming "
+                "constraints for Redis"
             )
         return cluster_name
 
@@ -117,19 +127,21 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
 class OLAmazonMemcachedConfig(OLAmazonCacheConfig):
     engine: str = "memcached"
     engine_version: str = "1.5.16"
-    port: PositiveInt = PositiveInt(11211)
-    num_instances: conint(ge=1, le=20) = 3  # type: ignore
+    port: PositiveInt = PositiveInt(DEFAULT_MEMCACHED_PORT)
+    num_instances: conint(ge=1, le=MAX_MEMCACHED_CLUSTER_SIZE) = 3  # type: ignore
 
     @validator("cluster_name")
     def is_valid_cluster_name(
         cls: "OLAmazonMemcachedConfig", cluster_name: str  # noqa: N805
     ) -> str:
+        max_cluster_name_length = 51
         is_valid: bool = True
-        is_valid = 1 < len(cluster_name) < 51
+        is_valid = 1 < len(cluster_name) < max_cluster_name_length
         is_valid = not bool(re.search("[^a-zA-Z-9-]", cluster_name))
         if not is_valid:
             raise ValueError(
-                "The cluster name does not comply with the Elasticache naming constraints for Memcached"
+                "The cluster name does not comply with the Elasticache naming "
+                "constraints for Memcached"
             )
         return cluster_name
 
@@ -146,7 +158,9 @@ class OLAmazonCache(pulumi.ComponentResource):
             None,
             opts,
         )
-        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore
+        resource_options = pulumi.ResourceOptions(parent=self).merge(
+            opts
+        )  # type: ignore
 
         clustered_redis = cache_config.engine == "redis" and getattr(  # noqa: B009
             cache_config, "cluster_mode_enabled"
@@ -170,7 +184,7 @@ class OLAmazonCache(pulumi.ComponentResource):
                 cache_options = resource_options
 
         self.parameter_group = elasticache.ParameterGroup(
-            f"{cache_config.cluster_name}-{cache_config.engine}-{cache_config.engine_version}-parameter-group",
+            f"{cache_config.cluster_name}-{cache_config.engine}-{cache_config.engine_version}-parameter-group",  # noqa: E501
             name=f"{cache_config.cluster_name}-parameter-group",
             family=parameter_group_family(
                 cache_config.engine, cache_config.engine_version
@@ -182,7 +196,7 @@ class OLAmazonCache(pulumi.ComponentResource):
         if clustered_redis:
             cast(OLAmazonRedisConfig, cache_config)
             self.cache_cluster = elasticache.ReplicationGroup(
-                f"{cache_config.cluster_name}-{cache_config.engine}-elasticache-cluster",
+                f"{cache_config.cluster_name}-{cache_config.engine}-elasticache-cluster",  # noqa: E501
                 apply_immediately=cache_config.apply_immediately,
                 at_rest_encryption_enabled=cache_config.encrypted,
                 auth_token=cache_config.auth_token,
@@ -211,7 +225,7 @@ class OLAmazonCache(pulumi.ComponentResource):
         else:
             cast(OLAmazonMemcachedConfig, cache_config)
             self.cache_cluster = elasticache.Cluster(
-                f"{cache_config.cluster_name}-{cache_config.engine}-elasticache-cluster",
+                f"{cache_config.cluster_name}-{cache_config.engine}-elasticache-cluster",  # noqa: E501
                 engine=cache_config.engine,
                 cluster_id=cache_config.cluster_name,
                 opts=resource_options,
