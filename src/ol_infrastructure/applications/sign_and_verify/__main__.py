@@ -17,6 +17,7 @@ import json
 from pulumi import Config, Output, StackReference
 from pulumi_aws import acm, ecs, iam, lb, route53, secretsmanager
 
+from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -81,7 +82,7 @@ sign_and_verify_alb_listener = lb.Listener(
     f"sign-and-verify-alb-listener-{stack_info.env_suffix}",
     certificate_arn=sign_and_verify_acm_cert.arn,
     load_balancer_arn=sign_and_verify_load_balancer.arn,
-    port=443,
+    port=DEFAULT_HTTPS_PORT,
     protocol="HTTPS",
     default_actions=[
         lb.ListenerDefaultActionArgs(
@@ -91,13 +92,14 @@ sign_and_verify_alb_listener = lb.Listener(
     ],
 )
 
-# Store the Unlocked DID in AWS secrets manager because it contains private key information
+# Store the Unlocked DID in AWS secrets manager because it contains private key
+# information
 
 sign_and_verify_config = Config("sign_and_verify")
 unlocked_did_secret = secretsmanager.Secret(
     f"sign-and-verify-unlocked-did-{stack_info.env_suffix}",
-    description="Base64 encoded JSON object of the Unlocked DID that specifies the signing keys "
-    "for the digital credentials sign and verify service.",
+    description="Base64 encoded JSON object of the Unlocked DID that specifies the "
+    "signing keys for the digital credentials sign and verify service.",
     name_prefix=f"sign-and-verify-unlocked-did-{stack_info.env_suffix}",
     tags=aws_config.tags,
 )
@@ -122,7 +124,8 @@ hmac_secret_value = secretsmanager.SecretVersion(
     secret_id=hmac_secret.id,
     secret_string=sign_and_verify_config.require_secret("hmac_secret"),
 )
-# Create the task execution role to grant access to retrieve the Unlocked DID secret and send logs to Cloudwatch
+# Create the task execution role to grant access to retrieve the Unlocked DID secret and
+# send logs to Cloudwatch
 
 sign_and_verify_task_execution_role = iam.Role(
     "digital-credentials-sign-and-verify-task-execution-role",
@@ -143,8 +146,8 @@ sign_and_verify_task_execution_role = iam.Role(
 
 sign_and_verify_execution_policy = iam.Policy(
     "ecs-fargate-sign-and-verify-task-execution-policy",
-    description="ECS Fargate task execution policy for sign and verify service to grant access for retrieving the "
-    "Unlocked DID value from AWS Secrets Manager",
+    description="ECS Fargate task execution policy for sign and verify service to "
+    "grant access for retrieving the Unlocked DID value from AWS Secrets Manager",
     name=f"ecs-fargate-sign-and-verify-task-execution-policy-{stack_info.env_suffix}",
     path=f"/digital-credentials/sign-and-verify-execution-{stack_info.env_suffix}/",
     policy=Output.all(unlocked_did_secret.arn, hmac_secret.arn).apply(
@@ -183,7 +186,8 @@ iam.RolePolicyAttachment(
     role=sign_and_verify_task_execution_role.name,
 )
 
-# Create an ECS/Fargate cluster,define the task including container details, and register that with a service
+# Create an ECS/Fargate cluster,define the task including container details, and
+# register that with a service
 sign_and_verify_cluster = ecs.Cluster(
     f"ecs-cluster-sign-and-verify-{stack_info.env_suffix}",
     capacity_providers=["FARGATE"],
@@ -205,7 +209,7 @@ sign_and_verify_task = ecs.TaskDefinition(
             [
                 {
                     "name": "sign-and-verify",
-                    "image": f'mitodl/sign-and-verify:{sign_and_verify_config.require("docker_label")}',  # noqa: WPS237
+                    "image": f'mitodl/sign-and-verify:{sign_and_verify_config.require("docker_label")}',  # noqa: WPS237, E501
                     "environment": [
                         {"name": "PORT", "value": f"{CONTAINER_PORT}"},
                         {"name": "DIGEST_CHECK", "value": "true"},
@@ -220,9 +224,9 @@ sign_and_verify_task = ecs.TaskDefinition(
                     "logConfiguration": {
                         "logDriver": "awslogs",
                         "options": {
-                            "awslogs-group": f"digital-credentials-sign-and-verify-{stack_info.env_suffix}",
+                            "awslogs-group": f"digital-credentials-sign-and-verify-{stack_info.env_suffix}",  # noqa: E501
                             "awslogs-region": "us-east-1",
-                            "awslogs-stream-prefix": f"sign-and-verify-{stack_info.env_suffix}",
+                            "awslogs-stream-prefix": f"sign-and-verify-{stack_info.env_suffix}",  # noqa: E501
                             "awslogs-create-group": "true",
                         },
                     },
@@ -236,7 +240,7 @@ sign_and_verify_service = ecs.Service(
     f"sign-and-verify-service-{stack_info.env_suffix}",
     cluster=sign_and_verify_cluster.arn,
     desired_count=2,
-    health_check_grace_period_seconds=30,
+    health_check_grace_period_seconds=30,  # noqa: WPS432
     platform_version="LATEST",
     launch_type="FARGATE",
     name=f"sign-and-verify-service-{stack_info.env_suffix}",
