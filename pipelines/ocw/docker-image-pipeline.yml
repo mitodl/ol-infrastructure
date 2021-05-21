@@ -1,0 +1,33 @@
+---
+resources:
+    - name: ol-infrastructure
+      type: git
+      source:
+          uri: https://github.com/mitodl/ol-infrastructure.git
+          branch: ((ol-infrastructure-git-ref))
+    - name: node-image
+      type: docker-image
+      check_every: 1h
+      source:
+          repository: node
+          tag: '14'
+    - name: ocw-course-publisher-image
+      type: docker-image
+      source:
+          username: ((docker-hub-username))
+          password: ((docker-hub-password))
+          repository: mitodl/ocw-course-publisher
+          tag: latest
+
+
+jobs:
+    - name: publish
+      public: true
+      serial: true
+      plan:
+          - get: node-image
+            trigger: true
+          - get: ol-infrastructure
+          - put: ocw-course-publisher-image
+            params:
+                build: ol-infrastructure/dockerfiles/ocw/node-hugo
