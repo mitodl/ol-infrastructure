@@ -12,7 +12,7 @@ resources:
       check_every: 1h
       source:
           repository: node
-          tag: '14'
+          tag: 14-buster-slim
     - name: ocw-course-publisher-image
       type: docker-image
       source:
@@ -29,6 +29,7 @@ jobs:
       plan:
           - get: node-image
             trigger: true
+            params: {skip_download: true}
           - get: ol-infrastructure
             trigger: true
           - put: ocw-course-publisher-image
