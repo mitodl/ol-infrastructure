@@ -14,8 +14,8 @@ resources:
     - name: ocw-course-publisher-image
       type: docker-image
       source:
-          username: ((docker-hub-username))
-          password: ((docker-hub-password))
+          username: ((dockerhub.username))
+          password: ((dockerhub.password))
           repository: mitodl/ocw-course-publisher
           tag: latest
 
