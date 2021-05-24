@@ -97,7 +97,8 @@ concourse_iam_permissions = {
             "Resource": [
                 "arn:aws:s3:::ocw-content*",
                 "arn:aws:s3:::ocw-content*/*",
-                "arn:aws:s3:::ol-eng-artifacts" "arn:aws:s3:::ol-eng-artifacts/*",
+                "arn:aws:s3:::ol-eng-artifacts",
+                "arn:aws:s3:::ol-eng-artifacts/*",
             ],
         },
     ],
