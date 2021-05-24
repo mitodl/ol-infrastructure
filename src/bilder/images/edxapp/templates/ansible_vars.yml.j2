@@ -1,41 +1,90 @@
+# Secrets/Credentials
+COMMON_MYSQL_ADMIN_PASS: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/admin>data>password"
+COMMON_MYSQL_ADMIN_USER: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/admin>data>username"
+COMMON_MYSQL_MIGRATE_PASS: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/admin>data>password"
+COMMON_MYSQL_MIGRATE_USER: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/admin>data>username"
+EDXAPP_CELERY_PASSWORD: "__vault__:cache:rabbitmq-{{ environment }}/creds/celery-{{ purpose }}>data>password"
+EDXAPP_CELERY_USER: "__vault__:cache:rabbitmq-{{ environment }}/creds/celery-{{ purpose }}>data>username"
+EDXAPP_COMMENTS_SERVICE_KEY: "__vault__:gen_if_missing:secret-{{ business_unit }}/global/forum-api-key>data>value"
+EDXAPP_EDXAPP_SECRET_KEY: "__vault__:gen_if_missing:secret-{{ business_unit }}/{{ environment }}/edxapp-django-secret-key>data>value"
+EDXAPP_EDX_API_KEY: "__vault__:gen_if_missing:secret-{{ business_unit }}/{{ environment }}/edx-api-key>data>value"
+EDXAPP_JWT_PRIVATE_SIGNING_JWK: "__vault__::secret-{{ business_unit }}/{{ environment }}/jwt-signing-jwk/private-key>data>value"
+EDXAPP_JWT_PUBLIC_SIGNING_JWK_SET: "__vault__::secret-{{ business_unit }}/{{ environment }}/jwt-signing-jwk/public-key>data>value"
+EDXAPP_JWT_SECRET_KEY: "__vault__:gen_if_missing:secret-{{ business_unit }}/{{ environment }}/edxapp-jwt-secret-key>data>value"
+EDXAPP_MONGO_PASSWORD: "__vault__:cache:mongodb-{{ environment }}/creds/contentstore-{{ purpose }}>data>password"
+EDXAPP_MONGO_USER: "__vault__:cache:mongodb-{{ environment }}/creds/contentstore-{{ purpose }}>data>username"
+EDXAPP_MYSQL_CSMH_PASSWORD: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/edxapp-csmh-{{ purpose }}>data>password"
+EDXAPP_MYSQL_CSMH_USER: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/edxapp-csmh-{{ purpose }}>data>username"
+EDXAPP_MYSQL_PASSWORD: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/edxapp-{{ purpose }}>data>password"
+EDXAPP_MYSQL_USER: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/edxapp-{{ purpose }}>data>username"
+EDXAPP_EMAIL_HOST_PASSWORD: {{ smtp_config.data.relay_password }}
+EDXAPP_EMAIL_HOST_USER: {{ smtp_config.data.relay_username }}
+EDXAPP_XQUEUE_DJANGO_AUTH:
+  username: {{ edxapp_xqueue_creds.data.username }}
+  password: {{ edxapp_xqueue_creds.data.password }}
+
+
+# Dynamic Values
+COMMON_LMS_BASE_URL: https://{{ LMS_DOMAIN }}
+EDXAPP_AWS_STORAGE_BUCKET_NAME: {{ bucket_prefix }}-storage-{{ purpose }}-{{ environment }}
+EDXAPP_CMS_BASE: "{{ CMS_DOMAIN }}"
+EDXAPP_CMS_ISSUER: "{{ EDXAPP_CMS_ISSUER }}"
+EDXAPP_CMS_ROOT_URL: "https://{{ CMS_DOMAIN }}"
+EDXAPP_CMS_SITE_NAME: "{{ purpose_data.domains.cms }}"
+EDXAPP_FILE_UPLOAD_STORAGE_BUCKET_NAME: {{ bucket_prefix }}-storage-{{ purpose }}-{{ environment }}
+EDXAPP_FILE_UPLOAD_STORAGE_PREFIX: "{{ edxapp_upload_storage_prefix }}"
+EDXAPP_IMPORT_EXPORT_BUCKET: {{ bucket_prefix }}-storage-{{ purpose }}-{{ environment }}
+EDXAPP_LMS_BASE: "{{ LMS_DOMAIN }}"
+EDXAPP_LMS_ISSUER: https://{{ context.lms_domain }}/oauth2
+EDXAPP_LMS_ROOT_URL: "https://{{ LMS_DOMAIN }}"
+EDXAPP_LMS_SITE_NAME: "{{ purpose_data.domains.lms }}"
+EDXAPP_LOGIN_REDIRECT_WHITELIST: {{ edxapp_domains|tojson }}
+EDXAPP_GRADE_BUCKET: {{ bucket_prefix }}-grades-{{ purpose }}-{{ environment }}
+EDXAPP_GRADE_ROOT_PATH: {{ edxapp_aws_grades_root_path }}
+EDXAPP_MKTG_URLS:
+  ROOT: "{{ env_data.purposes[purpose].domains.lms }}"
+  ABOUT: "{{ heroku_env }}/about-us"
+  CONTACT: "https://xpro.zendesk.com/hc/en-us/requests/new"
+  HONOR: "honor-code"
+  PRIVACY: "privacy-policy"
+  TOS: "terms-of-service"
+EDXAPP_VIDEO_IMAGE_SETTINGS:
+  VIDEO_IMAGE_MAX_BYTES : 2097152
+  VIDEO_IMAGE_MIN_BYTES : 2048
+  STORAGE_CLASS: 'storages.backends.s3boto.S3BotoStorage'
+  STORAGE_KWARGS:
+    bucket: {{ bucket_prefix }}-edx-video-upload-{{ purpose }}-{{ environment }}
+  DIRECTORY_PREFIX: 'video-images/'
+EDXAPP_VIDEO_TRANSCRIPTS_SETTINGS:
+  VIDEO_TRANSCRIPTS_MAX_BYTES : 3145728
+  STORAGE_CLASS: 'storages.backends.s3boto.S3BotoStorage'
+  STORAGE_KWARGS:
+    bucket: {{ bucket_prefix }}-storage-{{ purpose }}-{{ environment }}
+  DIRECTORY_PREFIX: 'video-transcripts/'
+
+
+# Static Values
 COMMON_ENABLE_AWS_ROLE: False
 COMMON_ENABLE_BASIC_AUTH: False
 COMMON_ENABLE_MINOS: False
 COMMON_ENABLE_NEWRELIC: False
 COMMON_ENABLE_NEWRELIC_INFRASTRUCTURE: False
-COMMON_LMS_BASE_URL: https://{{ LMS_DOMAIN }}
-COMMON_MYSQL_ADMIN_PASS: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/admin>data>password"
-COMMON_MYSQL_ADMIN_USER: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/admin>data>username"
-COMMON_MYSQL_MIGRATE_PASS: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/admin>data>password"
-COMMON_MYSQL_MIGRATE_USER: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/admin>data>username"
 EDXAPP_ANALYTICS_DASHBOARD_URL: !!null
-EDXAPP_AWS_STORAGE_BUCKET_NAME: {{ bucket_prefix }}-storage-{{ purpose }}-{{ environment }}
 EDXAPP_BUGS_EMAIL: {{ smtp_config.data.support_email }}
 EDXAPP_CACHE_BACKEND: "django_redis.cache.RedisCache"
 EDXAPP_CELERY_BROKER_HOSTNAME: edx-redis.service.consul
 EDXAPP_CELERY_BROKER_TRANSPORT: 'redis'
-EDXAPP_CELERY_PASSWORD: "__vault__:cache:rabbitmq-{{ environment }}/creds/celery-{{ purpose }}>data>password"
-EDXAPP_CELERY_USER: "__vault__:cache:rabbitmq-{{ environment }}/creds/celery-{{ purpose }}>data>username"
 EDXAPP_CELERY_USE_SSL: true
-EDXAPP_CMS_BASE: "{{ CMS_DOMAIN }}"
-EDXAPP_CMS_ISSUER: "{{ EDXAPP_CMS_ISSUER }}"
 EDXAPP_CMS_MAX_REQ: 1000
 EDXAPP_CMS_NGINX_PORT: 80
-EDXAPP_CMS_ROOT_URL: "https://{{ CMS_DOMAIN }}"
-EDXAPP_CMS_SITE_NAME: "{{ purpose_data.domains.cms }}"
 EDXAPP_CMS_SSL_NGINX_PORT: 443
-EDXAPP_COMMENTS_SERVICE_KEY: "__vault__:gen_if_missing:secret-{{ business_unit }}/global/forum-api-key>data>value"
 EDXAPP_COMMENTS_SERVICE_URL: "http://edx-forum.service.consul:4567"
 EDXAPP_CONTACT_EMAIL: {{ smtp_config.data.support_email }}
 EDXAPP_CUSTOM_COURSES_EDX: True
 EDXAPP_DEFAULT_FEEDBACK_EMAIL: "{{ smtp_config.data.support_email }}"
 EDXAPP_DEFAULT_FILE_STORAGE: 'storages.backends.s3boto.S3BotoStorage'
 EDXAPP_DEFAULT_FROM_EMAIL: "{{ smtp_config.data.support_email }}"
-EDXAPP_EDXAPP_SECRET_KEY: "__vault__:gen_if_missing:secret-{{ business_unit }}/{{ environment }}/edxapp-django-secret-key>data>value"
-EDXAPP_EDX_API_KEY: "__vault__:gen_if_missing:secret-{{ business_unit }}/{{ environment }}/edx-api-key>data>value"
 EDXAPP_EMAIL_HOST: {{ smtp_config.data.relay_host }}
-EDXAPP_EMAIL_HOST_PASSWORD: {{ smtp_config.data.relay_password }}
-EDXAPP_EMAIL_HOST_USER: {{ smtp_config.data.relay_username }}
 EDXAPP_EMAIL_PORT: {{ smtp_config.data.relay_port }}
 EDXAPP_EMAIL_USE_TLS: True
 EDXAPP_ENABLE_COMBINED_LOGIN_REGISTRATION: true
@@ -54,43 +103,23 @@ EDXAPP_ENABLE_READING_FROM_MULTIPLE_HISTORY_TABLES: false
 EDXAPP_ENABLE_SPECIAL_EXAMS: true
 EDXAPP_ENABLE_SPECIAL_EXAMS: true
 EDXAPP_ENABLE_THIRD_PARTY_AUTH: true
-EDXAPP_FILE_UPLOAD_STORAGE_BUCKET_NAME: {{ bucket_prefix }}-storage-{{ purpose }}-{{ environment }}
-EDXAPP_FILE_UPLOAD_STORAGE_PREFIX: "{{ edxapp_upload_storage_prefix }}"
 EDXAPP_GIT_REPO_DIR: "{{ edxapp_git_repo_dir }}"
 EDXAPP_GOOGLE_ANALYTICS_ACCOUNT: {{ edxapp_google_analytics_account }}
-EDXAPP_GRADE_BUCKET: {{ bucket_prefix }}-grades-{{ purpose }}-{{ environment }}
-EDXAPP_GRADE_ROOT_PATH: {{ edxapp_aws_grades_root_path }}
 EDXAPP_GRADE_STORAGE_TYPE: S3
-EDXAPP_IMPORT_EXPORT_BUCKET: {{ bucket_prefix }}-storage-{{ purpose }}-{{ environment }}
 EDXAPP_INSTALL_PRIVATE_REQUIREMENTS: true
 EDXAPP_JWT_AUDIENCE: '{{ business_unit }}-{{ environment }}-key'
-EDXAPP_JWT_PRIVATE_SIGNING_JWK: "__vault__::secret-{{ business_unit }}/{{ environment }}/jwt-signing-jwk/private-key>data>value"
-EDXAPP_JWT_PUBLIC_SIGNING_JWK_SET: "__vault__::secret-{{ business_unit }}/{{ environment }}/jwt-signing-jwk/public-key>data>value"
-EDXAPP_JWT_SECRET_KEY: "__vault__:gen_if_missing:secret-{{ business_unit }}/{{ environment }}/edxapp-jwt-secret-key>data>value"
-EDXAPP_JWT_SECRET_KEY: "__vault__:gen_if_missing:secret-{{ business_unit }}/{{ environment }}/jwt-secret-key>data>value"
 EDXAPP_JWT_SIGNING_ALGORITHM: 'RS512'
-EDXAPP_LMS_BASE: "{{ LMS_DOMAIN }}"
-EDXAPP_LMS_ISSUER: https://{{ context.lms_domain }}/oauth2
 EDXAPP_LMS_MAX_REQ: 1000
-EDXAPP_LMS_ROOT_URL: "https://{{ LMS_DOMAIN }}"
-EDXAPP_LMS_SITE_NAME: "{{ purpose_data.domains.lms }}"
-EDXAPP_LOGIN_REDIRECT_WHITELIST: {{ edxapp_domains|tojson }}
 EDXAPP_MANAGE_MICROFRONTENDS: True
 EDXAPP_MONGO_DB_NAME: edxapp
 EDXAPP_MONGO_HOSTS: mongodb-master.service.consul
-EDXAPP_MONGO_PASSWORD: "__vault__:cache:mongodb-{{ environment }}/creds/contentstore-{{ purpose }}>data>password"
 EDXAPP_MONGO_PORTS: 27017
 EDXAPP_MONGO_REPLICA_SET: rs0
-EDXAPP_MONGO_USER: "__vault__:cache:mongodb-{{ environment }}/creds/contentstore-{{ purpose }}>data>username"
 EDXAPP_MONGO_USE_SSL: "{{ MONGODB_USE_SSL }}"
 EDXAPP_MYSQL_CSMH_DB_NAME: edxapp_csmh
 EDXAPP_MYSQL_CSMH_HOST: edxapp-mysql.service.consul
-EDXAPP_MYSQL_CSMH_PASSWORD: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/edxapp-csmh-{{ purpose }}>data>password"
 EDXAPP_MYSQL_CSMH_PORT: {{ MYSQL_PORT }}
-EDXAPP_MYSQL_CSMH_USER: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/edxapp-csmh-{{ purpose }}>data>username"
 EDXAPP_MYSQL_HOST: edxapp-mysql.service.consul
-EDXAPP_MYSQL_PASSWORD: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/edxapp-{{ purpose }}>data>password"
-EDXAPP_MYSQL_USER: "__vault__:cache:{{ VAULT_MYSQL_MOUNT_POINT }}/creds/edxapp-{{ purpose }}>data>username"
 EDXAPP_ORA2_FILE_PREFIX: "{{ salt.grains.get('environment') }}-dev/ora2"
 EDXAPP_PLATFORM_DESCRIPTION: MITx Online Course Portal
 EDXAPP_PLATFORM_NAME: MITx Online
@@ -123,13 +152,9 @@ EDXAPP_LMS_ENV_EXTRA:
   BULK_EMAIL_DEFAULT_FROM_EMAIL: {{ smtp_config.data.support_email }}
   COMPLETION_BY_VIEWING_DELAY_MS: 1000
   COMPLETION_VIDEO_COMPLETE_PERCENTAGE: 0.85
-  COURSE_ABOUT_VISIBILITY_PERMISSION: staff
-  COURSE_CATALOG_VISIBILITY_PERMISSION: staff
   EMAIL_USE_DEFAULT_FROM_FOR_BULK: True
-  OAUTH_OIDC_ISSUER: "{{ EDXAPP_LMS_ISSUER }}"
   SERVER_EMAIL: {{ smtp_config.data.server_email }}
   STUDENT_FILEUPLOAD_MAX_SIZE: 52428800
-  OAUTH_OIDC_ISSUER: "{{ EDXAPP_LMS_ISSUER }}"
   TIME_ZONE_DISPLAYED_FOR_DEADLINES: "{{ TIME_ZONE }}"
   COURSE_MODE_DEFAULTS:
     bulk_sku: !!null
@@ -153,31 +178,6 @@ EDXAPP_REGISTRATION_EXTRA_FIELDS:
   terms_of_service: "hidden"
   city: "hidden"
   country: "hidden"
-EDXAPP_MKTG_URLS:
-  ROOT: "{{ env_data.purposes[purpose].domains.lms }}"
-  ABOUT: "{{ heroku_env }}/about-us"
-  CONTACT: "https://xpro.zendesk.com/hc/en-us/requests/new"
-  HONOR: "honor-code"
-  PRIVACY: "privacy-policy"
-  TOS: "terms-of-service"
-
-EDXAPP_XQUEUE_DJANGO_AUTH:
-  username: {{ edxapp_xqueue_creds.data.username }}
-  password: {{ edxapp_xqueue_creds.data.password }}
-
-EDXAPP_VIDEO_IMAGE_SETTINGS:
-  VIDEO_IMAGE_MAX_BYTES : 2097152
-  VIDEO_IMAGE_MIN_BYTES : 2048
-  STORAGE_CLASS: 'storages.backends.s3boto.S3BotoStorage'
-  STORAGE_KWARGS:
-    bucket: {{ bucket_prefix }}-edx-video-upload-{{ purpose }}-{{ environment }}
-  DIRECTORY_PREFIX: 'video-images/'
-EDXAPP_VIDEO_TRANSCRIPTS_SETTINGS:
-  VIDEO_TRANSCRIPTS_MAX_BYTES : 3145728
-  STORAGE_CLASS: 'storages.backends.s3boto.S3BotoStorage'
-  STORAGE_KWARGS:
-    bucket: {{ bucket_prefix }}-storage-{{ purpose }}-{{ environment }}
-  DIRECTORY_PREFIX: 'video-transcripts/'
 
 EDXAPP_CODE_JAIL_LIMITS:
   REALTIME: 10
@@ -185,16 +185,5 @@ EDXAPP_CODE_JAIL_LIMITS:
   FSIZE: 1048576
   PROXY: 0
   VMEM: 536870912
-
-EDXAPP_CMS_ENV_EXTRA:
-  FEATURES:
-    <<: *common_feature_flags
-    ALLOW_COURSE_RERUNS: true
-    ALLOW_HIDING_DISCUSSION_TAB: true
-    ALLOW_PUBLIC_ACCOUNT_CREATION: False
-    DISABLE_COURSE_CREATION: true
-    DISABLE_START_DATES: true
-    SEGMENT_IO: false
-  OAUTH_OIDC_ISSUER: "{{ EDXAPP_CMS_ISSUER }}"
 
 EDXAPP_FEATURES_EXTRA: {}
