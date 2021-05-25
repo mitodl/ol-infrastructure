@@ -64,11 +64,11 @@ EDXAPP_VIDEO_TRANSCRIPTS_SETTINGS:
 
 
 # Static Values
-COMMON_ENABLE_AWS_ROLE: False
-COMMON_ENABLE_BASIC_AUTH: False
-COMMON_ENABLE_MINOS: False
-COMMON_ENABLE_NEWRELIC: False
-COMMON_ENABLE_NEWRELIC_INFRASTRUCTURE: False
+COMMON_ENABLE_AWS_ROLE: false
+COMMON_ENABLE_BASIC_AUTH: false
+COMMON_ENABLE_MINOS: false
+COMMON_ENABLE_NEWRELIC: false
+COMMON_ENABLE_NEWRELIC_INFRASTRUCTURE: false
 EDXAPP_ANALYTICS_DASHBOARD_URL: !!null
 EDXAPP_BUGS_EMAIL: {{ smtp_config.data.support_email }}
 EDXAPP_CACHE_BACKEND: "django_redis.cache.RedisCache"
@@ -80,27 +80,23 @@ EDXAPP_CMS_NGINX_PORT: 80
 EDXAPP_CMS_SSL_NGINX_PORT: 443
 EDXAPP_COMMENTS_SERVICE_URL: "http://edx-forum.service.consul:4567"
 EDXAPP_CONTACT_EMAIL: {{ smtp_config.data.support_email }}
-EDXAPP_CUSTOM_COURSES_EDX: True
+EDXAPP_CUSTOM_COURSES_EDX: true
 EDXAPP_DEFAULT_FEEDBACK_EMAIL: "{{ smtp_config.data.support_email }}"
 EDXAPP_DEFAULT_FILE_STORAGE: 'storages.backends.s3boto.S3BotoStorage'
 EDXAPP_DEFAULT_FROM_EMAIL: "{{ smtp_config.data.support_email }}"
 EDXAPP_EMAIL_HOST: {{ smtp_config.data.relay_host }}
 EDXAPP_EMAIL_PORT: {{ smtp_config.data.relay_port }}
-EDXAPP_EMAIL_USE_TLS: True
+EDXAPP_EMAIL_USE_TLS: true
 EDXAPP_ENABLE_COMBINED_LOGIN_REGISTRATION: true
 EDXAPP_ENABLE_CORS_HEADERS: true
 EDXAPP_ENABLE_CROSS_DOMAIN_CSRF_COOKIE: true
 EDXAPP_ENABLE_CSMH_EXTENDED: true
 EDXAPP_ENABLE_DISCUSSION_HOME_PANEL: true
 EDXAPP_ENABLE_GRADE_DOWNLOADS: true
-EDXAPP_ENABLE_INSTRUCTOR_ANALYTICS: true
-EDXAPP_ENABLE_INSTRUCTOR_ANALYTICS: true
 EDXAPP_ENABLE_LTI_PROVIDER: true
-EDXAPP_ENABLE_MOBILE_REST_API: True
-EDXAPP_ENABLE_OAUTH2_PROVIDER: False
+EDXAPP_ENABLE_MOBILE_REST_API: true
 EDXAPP_ENABLE_OAUTH2_PROVIDER: true
 EDXAPP_ENABLE_READING_FROM_MULTIPLE_HISTORY_TABLES: false
-EDXAPP_ENABLE_SPECIAL_EXAMS: true
 EDXAPP_ENABLE_SPECIAL_EXAMS: true
 EDXAPP_ENABLE_THIRD_PARTY_AUTH: true
 EDXAPP_GIT_REPO_DIR: "{{ edxapp_git_repo_dir }}"
@@ -110,7 +106,8 @@ EDXAPP_INSTALL_PRIVATE_REQUIREMENTS: true
 EDXAPP_JWT_AUDIENCE: '{{ business_unit }}-{{ environment }}-key'
 EDXAPP_JWT_SIGNING_ALGORITHM: 'RS512'
 EDXAPP_LMS_MAX_REQ: 1000
-EDXAPP_MANAGE_MICROFRONTENDS: True
+EDXAPP_MANAGE_MICROFRONTENDS: true
+EDXAPP_MEMCACHE: edx-redis.service.consul:6379
 EDXAPP_MONGO_DB_NAME: edxapp
 EDXAPP_MONGO_HOSTS: mongodb-master.service.consul
 EDXAPP_MONGO_PORTS: 27017
@@ -128,14 +125,13 @@ EDXAPP_SEARCH_USE_SSL: false
 EDXAPP_SESSION_COOKIE_DOMAIN: .online.mitx.mit.edu
 EDXAPP_SESSION_COOKIE_NAME: {{ environment }}-{{ purpose }}-session
 EDXAPP_STATIC_URL_BASE: /static/
-EDXAPP_SUPPORT_SITE_LINK: 'https://xpro.zendesk.com/hc'
 EDXAPP_TECH_SUPPORT_EMAIL: {{ smtp_config.data.support_email }}
 EDXAPP_TIME_ZONE: "{{ TIME_ZONE }}"
 EDX_PLATFORM_VERSION: {{ purpose_data.versions.edxapp }}
 NGINX_ENABLE_SSL: True
 NGINX_HTTPS_REDIRECT_STRATEGY: forward_for_proto
 NGINX_LOG_FORMAT_NAME: 'app_metrics'
-NGINX_REDIRECT_TO_HTTPS: True
+NGINX_REDIRECT_TO_HTTPS: true
 NGINX_SSL_CERTIFICATE: '{{ TLS_LOCATION }}/{{ TLS_KEY_NAME }}.crt'
 NGINX_SSL_KEY: '{{ TLS_LOCATION }}/{{ TLS_KEY_NAME }}.key'
 OAUTH_OIDC_ISSUER: "{{ EDXAPP_CMS_ISSUER }}"
@@ -148,42 +144,11 @@ EDXAPP_LMS_ENV_EXTRA:
   ADMINS:
   - ['MITx Stacktrace Recipients', 'cuddle-bunnies@mit.edu']
   # 50 * 1024 *1024
-  ALLOW_ALL_ADVANCED_COMPONENTS: True
+  ALLOW_ALL_ADVANCED_COMPONENTS: true
   BULK_EMAIL_DEFAULT_FROM_EMAIL: {{ smtp_config.data.support_email }}
   COMPLETION_BY_VIEWING_DELAY_MS: 1000
   COMPLETION_VIDEO_COMPLETE_PERCENTAGE: 0.85
-  EMAIL_USE_DEFAULT_FROM_FOR_BULK: True
+  EMAIL_USE_DEFAULT_FROM_FOR_BULK: true
   SERVER_EMAIL: {{ smtp_config.data.server_email }}
   STUDENT_FILEUPLOAD_MAX_SIZE: 52428800
   TIME_ZONE_DISPLAYED_FOR_DEADLINES: "{{ TIME_ZONE }}"
-  COURSE_MODE_DEFAULTS:
-    bulk_sku: !!null
-    currency: 'usd'
-    description: !!null
-    expiration_datetime: !!null
-    min_price: 0
-    name: 'Professional'
-    sku: !!null
-    slug: 'no-id-professional'
-    suggested_prices: ''
-
-EDXAPP_REGISTRATION_EXTRA_FIELDS:
-  confirm_email: "hidden"
-  level_of_education: "optional"
-  gender: "optional"
-  year_of_birth: "optional"
-  mailing_address: "hidden"
-  goals: "optional"
-  honor_code: "required"
-  terms_of_service: "hidden"
-  city: "hidden"
-  country: "hidden"
-
-EDXAPP_CODE_JAIL_LIMITS:
-  REALTIME: 10
-  CPU: 3
-  FSIZE: 1048576
-  PROXY: 0
-  VMEM: 536870912
-
-EDXAPP_FEATURES_EXTRA: {}
