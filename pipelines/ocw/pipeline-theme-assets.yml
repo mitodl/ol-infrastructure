@@ -91,3 +91,37 @@ jobs:
                 - /courses/**
                 - --ignore-size
                 - --checksum
+      - task: clear-draft-cdn-cache
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source: {repository: curlimages/curl}
+          run:
+            path: curl
+            args:
+              - -f
+              - -X
+              - POST
+              - -H
+              - 'Fastly-Key: ((fastly-draft-api-token))'
+              - -H
+              - 'Fastly-Soft-Purge: 1'
+              - https://api.fastly.com/service/((fastly-draft-service-id))/purge_all
+      - task: clear-live-cdn-cache
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source: {repository: curlimages/curl}
+          run:
+            path: curl
+            args:
+              - -f
+              - -X
+              - POST
+              - -H
+              - 'Fastly-Key: ((fastly-live-api-token))'
+              - -H
+              - 'Fastly-Soft-Purge: 1'
+              - https://api.fastly.com/service/((fastly-live-service-id))/purge_all
