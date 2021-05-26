@@ -24,8 +24,8 @@ aws_config = AWSBase(
 mitx_zone_id = dns_stack.get_output("mitx_zone_id")
 mfe_app_learning_config = S3ServerlessSiteConfig(
     site_name=f"mfe-app-learning-{mitx_environment}",
-    domains=[f"mfe-app-learning-{mitx_environment}.mitx.mit.edu"],
-    bucket_name=f"mitx-mfe-app-learning-{mitx_environment}",
+    domains=[f"static-{mitx_environment}.mitx.mit.edu"],
+    bucket_name=f"mitx-mfe-{mitx_environment}",
     tags=aws_config.tags,
     site_index="index.html",
     cloudfront_price_class=CloudfrontPriceClass.us_eu,
@@ -40,6 +40,6 @@ mfe_app_learning_domain = route53.Record(
     zone_id=mitx_zone_id,
 )
 
-export("mfe_app_learning_bucket", mfe_app_learning.site_bucket.bucket)
-export("xpro_certs_distribution_id", mfe_app_learning.cloudfront_distribution.id)
-export("xpro_certs_acm_cname", mfe_app_learning.site_tls.domain_name)
+export("mitx_mfe_app_learning_bucket", mfe_app_learning.site_bucket.bucket)
+export("mfe_app_learning_distribution_id", mfe_app_learning.cloudfront_distribution.id)
+export("mfe_app_learning_acm_cname", mfe_app_learning.site_tls.domain_name)

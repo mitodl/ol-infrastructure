@@ -62,4 +62,4 @@ jobs:
         params:
           source: mfe-app-learning/dist
           destination:
-            - dir: "s3-remote:ol-eng-artifacts/mfe"
+            - dir: "s3-remote:mitx-mfe-qa/app-learning"
