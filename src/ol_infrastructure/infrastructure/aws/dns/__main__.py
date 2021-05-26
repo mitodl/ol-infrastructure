@@ -24,5 +24,16 @@ odl_dns_zone = route53.Zone(
     opts=odl_opts,
 )
 
+mitx_dns_name = "mitx.mit.edu"
+mitx_opts = zone_opts(mitx_dns_name)
+mitx_dns_zone = route53.Zone(
+    "mitx_subdomain",
+    name=mitx_dns_name,
+    comment="DNS Zone used for MITx resources",
+    tags=AWSBase(tags={"OU": "residential", "Environment": "mitx"}).tags,
+    opts=mitx_opts,
+)
+
 export("mitxpro_legacy_zone_id", mitxpro_legacy_dns_zone.id)
 export("odl_zone_id", odl_dns_zone.id)
+export("mitx_zone_id", mitx_dns_zone.id)
