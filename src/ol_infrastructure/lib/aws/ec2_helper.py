@@ -79,7 +79,8 @@ def availability_zones(region: str = "us-east-1") -> List[str]:
     zones = ec2_client.describe_availability_zones(
         Filters=[{"Name": "region-name", "Values": [region]}]
     )["AvailabilityZones"]
-    return [zone["ZoneName"] for zone in zones]
+    # Avoid using us-east-1e because it doesn't support newer instance types
+    return [zone["ZoneName"] for zone in zones if zone["ZoneName"] != "us-east-1e"]
 
 
 def _conditional_import(  # noqa: WPS210
