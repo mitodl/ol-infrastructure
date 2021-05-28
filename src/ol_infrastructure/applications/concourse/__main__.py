@@ -95,6 +95,8 @@ concourse_iam_permissions = {
                 "s3:ListBucket*",
             ],
             "Resource": [
+                "arn:aws:s3:::mitx-mfe-mitx-qa",
+                "arn:aws:s3:::mitx-mfe-mitx-qa/*",
                 "arn:aws:s3:::ocw-content*",
                 "arn:aws:s3:::ocw-content*/*",
                 "arn:aws:s3:::ol-eng-artifacts",

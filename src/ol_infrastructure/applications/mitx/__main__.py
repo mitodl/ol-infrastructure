@@ -22,24 +22,24 @@ aws_config = AWSBase(
 )
 
 mitx_zone_id = dns_stack.get_output("mitx_zone_id")
-mfe_app_learning_config = S3ServerlessSiteConfig(
-    site_name=f"mfe-app-learning-{mitx_environment}",
+mitx_mfe_config = S3ServerlessSiteConfig(
+    site_name=f"mitx-mfe-{mitx_environment}",
     domains=[f"static-{mitx_environment}.mitx.mit.edu"],
     bucket_name=f"mitx-mfe-{mitx_environment}",
     tags=aws_config.tags,
     site_index="index.html",
     cloudfront_price_class=CloudfrontPriceClass.us_eu,
 )
-mfe_app_learning = S3ServerlessSite(site_config=mfe_app_learning_config)
-mfe_app_learning_domain = route53.Record(
-    f"mfe-app-learning-domain-{mitx_environment}",
-    name=mfe_app_learning_config.domains[0],
+mitx_mfe = S3ServerlessSite(site_config=mitx_mfe_config)
+mitx_mfe_domain = route53.Record(
+    f"mitx-mfe-domain-{mitx_environment}",
+    name=mitx_mfe_config.domains[0],
     type="CNAME",
     ttl=fifteen_minutes,
-    records=[mfe_app_learning.cloudfront_distribution.domain_name],
+    records=[mitx_mfe.cloudfront_distribution.domain_name],
     zone_id=mitx_zone_id,
 )
 
-export("mitx_mfe_app_learning_bucket", mfe_app_learning.site_bucket.bucket)
-export("mfe_app_learning_distribution_id", mfe_app_learning.cloudfront_distribution.id)
-export("mfe_app_learning_acm_cname", mfe_app_learning.site_tls.domain_name)
+export("mitx_mfe_bucket", mitx_mfe.site_bucket.bucket)
+export("mitx_mfe_distribution_id", mitx_mfe.cloudfront_distribution.id)
+export("mitx_mfe_acm_cname", mitx_mfe.site_tls.domain_name)

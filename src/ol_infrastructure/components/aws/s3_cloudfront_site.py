@@ -27,7 +27,7 @@ class S3ServerlessSiteConfig(AWSBase):
     domains: List[str]
     bucket_name: str
     site_index: str = "index.html"
-    tag: Dict[str, str]
+    tags: Dict[str, str]
     cloudfront_price_class: CloudfrontPriceClass = CloudfrontPriceClass.us_eu
 
 
