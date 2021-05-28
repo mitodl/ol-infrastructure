@@ -4,7 +4,7 @@ from pulumi_aws import route53
 from ol_infrastructure.lib.aws.route53_helper import zone_opts
 from ol_infrastructure.lib.ol_types import AWSBase
 
-mitxpro_legacy_dns_name = "mitxpro.mit.edu."
+mitxpro_legacy_dns_name = "mitxpro.mit.edu"
 mitxpro_legacy_opts = zone_opts(mitxpro_legacy_dns_name)
 mitxpro_legacy_dns_zone = route53.Zone(
     "mitxpro_legacy_subdomain",
@@ -14,7 +14,7 @@ mitxpro_legacy_dns_zone = route53.Zone(
     opts=mitxpro_legacy_opts,
 )
 
-odl_dns_name = "odl.mit.edu."
+odl_dns_name = "odl.mit.edu"
 odl_opts = zone_opts(odl_dns_name)
 odl_dns_zone = route53.Zone(
     "mitodl_subdomain",
@@ -24,7 +24,7 @@ odl_dns_zone = route53.Zone(
     opts=odl_opts,
 )
 
-mitx_dns_name = "mitx.mit.edu."
+mitx_dns_name = "mitx.mit.edu"
 mitx_opts = zone_opts(mitx_dns_name)
 mitx_dns_zone = route53.Zone(
     "mitx_subdomain",
