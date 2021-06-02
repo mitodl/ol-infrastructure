@@ -2,70 +2,70 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.0.1
-    hooks:
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
-      - id: check-yaml
-      - id: check-added-large-files
-      - id: check-merge-conflict
-      - id: check-toml
-      - id: debug-statements
-  - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.26.1
-    hooks:
-      - id: yamllint
-        args: [--format, parsable, --strict]
-  - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
-    rev: 0.1.0
-    hooks:
-      - id: yamlfmt
-        args: [--mapping, '2', --sequence, '4', --offset, '2']
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v2.17.0
-    hooks:
-      - id: pyupgrade
-        args:
-          - --py37-plus
-  - repo: https://github.com/myint/autoflake/
-    rev: v1.4
-    hooks:
-      - id: autoflake
-        args:
-          - --in-place
-          - --ignore-init-module-imports
-          - --expand-star-imports
-          - --remove-unused-variables
-          - --remove-all-unused-imports
-  - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.1.0
-    hooks:
-      - id: detect-secrets
-        args:
-          - --exclude-lines (^encryptedkey:|secure:|^secretsprovider:)
-          - --exclude-files secrets/
-          - --exclude-files poetry.lock
-  - repo: https://github.com/timothycrosley/isort
-    rev: 5.8.0
-    hooks:
-      - id: isort
-  - repo: https://github.com/psf/black
-    rev: 21.5b1
-    hooks:
-      - id: black
-  - repo: https://gitlab.com/PyCQA/flake8
-    rev: 3.9.2
-    hooks:
-      - id: flake8
-        additional_dependencies:
-          - wemake-python-styleguide
-        args:
-          - --config=setup.cfg
-          - --extend-ignore=D1
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v0.812
-    hooks:
-      - id: mypy
-        additional_dependencies:
-          - pydantic
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.0.1
+  hooks:
+  - id: trailing-whitespace
+  - id: end-of-file-fixer
+  - id: check-yaml
+  - id: check-added-large-files
+  - id: check-merge-conflict
+  - id: check-toml
+  - id: debug-statements
+- repo: https://github.com/adrienverge/yamllint.git
+  rev: v1.26.1
+  hooks:
+  - id: yamllint
+    args: [--format, parsable, --strict, -d, relaxed]
+- repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
+  rev: 0.1.0
+  hooks:
+  - id: yamlfmt
+    args: [--mapping, '2', --sequence, '2', --offset, '0', --width, '80']
+- repo: https://github.com/asottile/pyupgrade
+  rev: v2.17.0
+  hooks:
+  - id: pyupgrade
+    args:
+    - --py37-plus
+- repo: https://github.com/myint/autoflake/
+  rev: v1.4
+  hooks:
+  - id: autoflake
+    args:
+    - --in-place
+    - --ignore-init-module-imports
+    - --expand-star-imports
+    - --remove-unused-variables
+    - --remove-all-unused-imports
+- repo: https://github.com/Yelp/detect-secrets
+  rev: v1.1.0
+  hooks:
+  - id: detect-secrets
+    args:
+    - --exclude-lines (^encryptedkey:|secure:|^secretsprovider:)
+    - --exclude-files secrets/
+    - --exclude-files poetry.lock
+- repo: https://github.com/timothycrosley/isort
+  rev: 5.8.0
+  hooks:
+  - id: isort
+- repo: https://github.com/psf/black
+  rev: 21.5b1
+  hooks:
+  - id: black
+- repo: https://gitlab.com/PyCQA/flake8
+  rev: 3.9.2
+  hooks:
+  - id: flake8
+    additional_dependencies:
+    - wemake-python-styleguide
+    args:
+    - --config=setup.cfg
+    - --extend-ignore=D1
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v0.812
+  hooks:
+  - id: mypy
+    additional_dependencies:
+    - pydantic
