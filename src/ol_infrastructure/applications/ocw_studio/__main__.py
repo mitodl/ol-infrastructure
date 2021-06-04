@@ -4,9 +4,12 @@
 - Create a PostgreSQL database in AWS RDS for production environments
 - Create an IAM policy to grant access to S3 and other resources
 """
+import json
+
+import pulumi_github as github
+import pulumi_vault as vault
 from pulumi import Config, StackReference, export
 from pulumi_aws import ec2, iam, s3
-from pulumi_vault import aws
 
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -56,7 +59,8 @@ ocw_storage_bucket = s3.Bucket(
 
 ocw_studio_iam_policy = iam.Policy(
     f"ocw-studio-{stack_info.env_suffix}-policy",
-    description=f"AWS access controls for the OCW Studio application in the {stack_info.name} environment",
+    description="AWS access controls for the OCW Studio application in the "
+    f"{stack_info.name} environment",
     path=f"/ol-applications/ocw-studio/{stack_info.env_suffix}/",
     name_prefix="aws-permissions-",
     policy=lint_iam_policy(
@@ -98,7 +102,7 @@ ocw_studio_iam_policy = iam.Policy(
     ),
 )
 
-ocw_studio_vault_backend_role = aws.SecretBackendRole(
+ocw_studio_vault_backend_role = vault.aws.SecretBackendRole(
     f"ocw-studio-app-{stack_info.env_suffix}",
     name=f"ocw-studio-app-{stack_info.env_suffix}",
     backend="aws-mitx",
@@ -149,12 +153,41 @@ ocw_studio_db = OLAmazonDB(ocw_studio_db_config)
 
 ocw_studio_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=ocw_studio_db_config.db_name,
-    mount_point=f"{ocw_studio_db_config.engine}-ocw-studio-applications-{stack_info.env_suffix}",
+    mount_point=f"{ocw_studio_db_config.engine}-ocw-studio-applications-{stack_info.env_suffix}",  # noqa: E501
     db_admin_username=ocw_studio_db_config.username,
     db_admin_password=ocw_studio_db_config.password.get_secret_value(),
     db_host=ocw_studio_db.db_instance.address,
 )
 ocw_studio_vault_backend = OLVaultDatabaseBackend(ocw_studio_vault_backend_config)
 
+######################
+# Secrets Management #
+######################
+ocw_studio_secrets = vault.Mount(
+    "ocw-studio-vault-secrets-storage",
+    path="secret-ocw-studio",
+    type="kv-v2",
+    description="Static secrets storage for the OCW Studio application",
+)
 
+vault_secrets = ocw_studio_config.require_secret_object("vault_secrets")
+vault.generic.Secret(
+    "ocw-studio-vault-secrets",
+    path=ocw_studio_secrets.path.apply("{}/app-config".format),  # noqa: P103
+    data_json=vault_secrets.apply(json.dumps),
+)
+gh_repo = github.get_repository(full_name="mitodl/ocw-hugo-projects")
+ocw_starter_webhook = github.RepositoryWebhook(
+    "ocw-hugo-project-sync-with-ocw-studio-webhook",
+    repository=gh_repo.name,
+    events=["push"],
+    active=True,
+    configuration=github.RepositoryWebhookConfigurationArgs(
+        url="https://{}/api/starters/site_configs/".format(
+            ocw_studio_config.require("app_domain")
+        ),
+        content_type="application/json",
+        secret=vault_secrets["github_shared_secret"],
+    ),
+)
 export("ocw_studio_app", {"rds_host": ocw_studio_db.db_instance.address})

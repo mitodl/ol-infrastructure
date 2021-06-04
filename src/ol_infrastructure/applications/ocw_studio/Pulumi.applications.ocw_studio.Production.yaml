@@ -2,6 +2,9 @@
 secretsprovider: awskms://alias/PulumiSecrets
 encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQFSJFasGKTNtp/+YAP5nr9fAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMV1/grNZ9n1dQIkXxAgEQgDv4cLkj6Mxn0N0YbbZUnreJdfdgDXntO3DQycSVhyR6uq0qe8jb7f2mpxRLZW9RVj+InAxeXFRUoNMTrw==
 config:
-    aws:region: us-east-1
-    ocw_studio:db_password:
-        secure: v1:KkTvlMKkKDXJiaQM:W+vNsxirVQXnvf1FvsokCi49hercEQP+1nmCGvhuOfQZYEqYvPW/Y+eraoQ71t2THGB3xtvwf55DmHVqD87Gf+CvZCPnSMEYGIRmouZZ6xlnXRK1Ph0e/rbO
+  aws:region: us-east-1
+  ocw_studio:app_domain: ocw-studio.odl.mit.edu
+  ocw_studio:db_password:
+    secure: v1:KkTvlMKkKDXJiaQM:W+vNsxirVQXnvf1FvsokCi49hercEQP+1nmCGvhuOfQZYEqYvPW/Y+eraoQ71t2THGB3xtvwf55DmHVqD87Gf+CvZCPnSMEYGIRmouZZ6xlnXRK1Ph0e/rbO
+  ocw_studio:vault_secrets:
+    secure: v1:iE9CVHh9FxaXTIer:BDVGAiyigEEquTBgE0JzGwvYJQsSD6/Tu7v2x0jtzo7xQG+WhqGCio84PrcH4CmM944Iaz40ibEhIR9i7zkeLsLB092HhnByVMDUlm04oTU2AHfOv81tsQ==
