@@ -1,0 +1,56 @@
+---
+resource_types:
+- name: pypi
+  type: docker-image
+  source:
+    repository: cfplatformeng/concourse-pypi-resource
+    tag: latest
+
+resources:
+    - name: edx-sysadmin-repo
+      type: git
+      source:
+          uri: https://github.com/mitodl/edx-sysadmin.git
+          branch: ((release))
+
+    - name: edx-sysadmin-pypi
+      type: pypi
+      source:
+        name: edx-sysadmin
+        packaging: any
+        repository:
+          username: ((username))
+          password: ((password))
+
+
+jobs:
+- name: publish-edx-sysadmin-to-pypi
+  public: true
+  plan:
+  - get: edx-sysadmin
+    trigger: true
+
+  - task: build-and-upload
+      config:
+        platform: linux
+        image_resource:
+          type: registry-image
+          source:
+            repository: node
+        inputs:
+          - name: edx-sysadmin
+        outputs:
+          - name: edx-sysadmin/dist
+        run:
+          path: python
+          args:
+            - setup.py
+            - bdist_wheel
+            - sdist
+
+  - put: edx-sysadmin-pypi
+    params:
+      glob: 'edx-sysadmin/dist'
+    get_params:
+      count_retries: 10
+      delay_between_retries: 30
