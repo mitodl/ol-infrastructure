@@ -6,27 +6,22 @@ resource_types:
       repository: mitodl/concourse-rclone-resource
       tag: latest
 resources:
-  - name: ol-infrastructure
-    type: git
-    source:
-      uri: https://github.com/mitodl/ol-infrastructure.git
-      branch: ((ol-infrastructure-git-ref))
-  - name: ocw-www
-    type: git
-    source:
-      uri: https://github.com/mitodl/ocw-www.git
-      branch: ((ocw-www-git-ref))
   - name: ocw-hugo-themes
-    type: git
+    type: s3
     source:
-      uri: https://github.com/mitodl/ocw-hugo-themes.git
-      branch: ((ocw-hugo-theme-git-ref))
+      bucket: ((artifact-bucket))
+      regexp: ocw-hugo-themes/ocw-hugo-themes-(.*).tgz
   - name: course-markdown
     type: git
     source:
       uri: git@((git-domain)):((github-org))/((course-repo)).git
-      branch: main
+      branch: ((course-repo-branch))
       private_key: ((git-private-key))
+  - name: ocw-hugo-projects
+    type: git
+    source:
+      uri: https://github.com/mitodl/ocw-hugo-projects.git
+      branch: main
   - name: ocw-site
     type: rclone
     source:
@@ -41,30 +36,12 @@ jobs:
   - name: build-course
     serial: true
     plan:
-      - get: ol-infrastructure
-      - get: ocw-www
-        trigger: true
       - get: ocw-hugo-themes
+        trigger: true
+      - get: ocw-hugo-projects
         trigger: true
       - get: course-markdown
         trigger: true
-      - task: copy-go-mod-file
-        config:
-          platform: linux
-          image_resource:
-            type: docker-image
-            source: {repository: busybox}
-          inputs:
-            - name: ol-infrastructure
-            - name: ocw-hugo-themes
-            - name: ocw-www
-            - name: course-markdown
-          outputs:
-            - name: ocw-www
-            - name: ocw-hugo-themes
-            - name: course-markdown
-          run:
-            path: ol-infrastructure/pipelines/ocw/scripts/modify-go-mod.sh
       - task: build-course-task
         config:
           platform: linux
@@ -72,35 +49,35 @@ jobs:
             type: docker-image
             source: {repository: mitodl/ocw-course-publisher, tag: latest}
           inputs:
-            - name: ol-infrastructure
             - name: ocw-hugo-themes
-            - name: ocw-www
             - name: course-markdown
+            - name: ocw-hugo-projects
           outputs:
-            - name: ocw-www
-          params:
-            COURSE_BASE_URL: ((course-base-url))
+            - name: course-markdown
           run:
-            path: ol-infrastructure/pipelines/ocw/scripts/build-one-course.sh
+            path: sh
+            args:
+            - -exc
+            - |
+              ls -l
+              pwd
+              ls -l course-markdown
+              mkdir ocw-hugo-themes/theme
+              tar -xvzf ocw-hugo-themes/ocw-hugo-themes-*.tgz -C ocw-hugo-themes/theme
+              cd course-markdown
+              ls -l ../
+              hugo --config ../ocw-hugo-projects/((site-config))/config.yaml --themesDir ../ocw-hugo-themes/theme
+              ls -l
       - put: ocw-site
         params:
-          source: ocw-www/dist/courses/((course-id))/
+          source: course-markdown/public
           destination:
-            - dir: s3-remote:((ocw-draft-bucket))/courses/((course-id))
+            - dir: s3-remote:((ocw-bucket))/courses/((course-id))
               command: sync
               args:
                 - --ignore-size
                 - --checksum
-      - put: ocw-site
-        params:
-          source: ocw-www/dist/courses/((course-id))/
-          destination:
-            - dir: s3-remote:((ocw-live-bucket))/courses/((course-id))
-              command: sync
-              args:
-                - --ignore-size
-                - --checksum
-      - task: clear-draft-cdn-cache
+      - task: clear-cdn-cache
         config:
           platform: linux
           image_resource:
@@ -113,24 +90,7 @@ jobs:
               - -X
               - POST
               - -H
-              - 'Fastly-Key: ((fastly-draft-api-token))'
+              - 'Fastly-Key: ((fastly-api-token))'
               - -H
               - 'Fastly-Soft-Purge: 1'
-              - https://api.fastly.com/service/((fastly-draft-service-id))/purge/((course-id))
-      - task: clear-live-cdn-cache
-        config:
-          platform: linux
-          image_resource:
-            type: docker-image
-            source: {repository: curlimages/curl}
-          run:
-            path: curl
-            args:
-              - -f
-              - -X
-              - POST
-              - -H
-              - 'Fastly-Key: ((fastly-live-api-token))'
-              - -H
-              - 'Fastly-Soft-Purge: 1'
-              - https://api.fastly.com/service/((fastly-live-service-id))/purge/((course-id))
+              - https://api.fastly.com/service/((fastly-service-id))/purge/((course-id))
