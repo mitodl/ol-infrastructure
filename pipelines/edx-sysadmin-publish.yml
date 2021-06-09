@@ -11,7 +11,7 @@ resources:
       type: git
       source:
           uri: https://github.com/mitodl/edx-sysadmin.git
-          branch: ((release))
+          branch: release
 
     - name: edx-sysadmin-pypi
       type: pypi
@@ -19,9 +19,8 @@ resources:
         name: edx-sysadmin
         packaging: any
         repository:
-          username: ((username))
-          password: ((password))
-
+          username: ((pypi_creds.username))
+          password: ((pypi_creds.password))
 
 jobs:
 - name: publish-edx-sysadmin-to-pypi
@@ -34,9 +33,9 @@ jobs:
       config:
         platform: linux
         image_resource:
-          type: registry-image
+          type: docker-image
           source:
-            repository: node
+            repository: python
         inputs:
           - name: edx-sysadmin
         outputs:
