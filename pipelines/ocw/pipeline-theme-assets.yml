@@ -20,7 +20,6 @@ resources:
         provider = AWS
         env_auth = true
         region = us-east-1
-
 jobs:
   - name: build-theme-assets
     serial: true
@@ -46,7 +45,7 @@ jobs:
               yarn install --pure-lockfile
               npm run build:webpack
               mkdir -p dist/ocw-hugo-themes
-              tar -cvzf dist/ocw-hugo-themes/ocw-hugo-themes-$(date +%s).tgz base-theme www course
+              tar -cvzf dist/ocw-hugo-themes/ocw-hugo-themes-((ocw-hugo-theme-git-ref))-$(date +%s).tgz base-theme www course
       - put: ocw-artifacts
         params:
           source: ocw-hugo-themes/dist/
