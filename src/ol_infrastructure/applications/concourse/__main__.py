@@ -185,6 +185,15 @@ vault.generic.Secret(
         json.dumps
     ),
 )
+vault.generic.Secret(
+    "concourse-pypi-credentials",
+    path=concourse_secrets_mount.path.apply(
+        lambda mount_path: f"{mount_path}/main/pypi_creds"
+    ),
+    data_json=concourse_config.require_secret_object("pypi_credentials").apply(
+        json.dumps
+    ),
+)
 
 # Vault policy definition
 concourse_vault_policy = vault.Policy(
