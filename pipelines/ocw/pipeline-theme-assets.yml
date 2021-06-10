@@ -10,7 +10,7 @@ resources:
     type: git
     source:
       uri: https://github.com/mitodl/ocw-hugo-themes.git
-      branch: ((ocw-hugo-theme-git-ref))
+      branch: ((hugo-theme-branch))
   - name: ocw-artifacts
     type: rclone
     source:
@@ -44,8 +44,8 @@ jobs:
               cd ocw-hugo-themes
               yarn install --pure-lockfile
               npm run build:webpack
-              mkdir -p dist/ocw-hugo-themes
-              tar -cvzf dist/ocw-hugo-themes/ocw-hugo-themes-((ocw-hugo-theme-git-ref))-$(date +%s).tgz base-theme www course
+              mkdir -p dist/ocw-hugo-themes/((hugo-theme-branch))
+              tar -cvzf dist/ocw-hugo-themes/((hugo-theme-branch))/ocw-hugo-themes-$(date +%s).tgz base-theme www course
       - put: ocw-artifacts
         params:
           source: ocw-hugo-themes/dist/
