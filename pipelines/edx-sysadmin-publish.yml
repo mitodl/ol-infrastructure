@@ -28,8 +28,7 @@ jobs:
     plan:
     - get: edx-sysadmin
       trigger: true
-
-    - task: build-and-upload
+    - task: build
       config:
         platform: linux
         image_resource:
@@ -48,7 +47,7 @@ jobs:
             - python setup.py bdist_wheel sdist
     - put: edx-sysadmin-pypi
       params:
-        glob: 'edx-sysadmin/dist'
+        glob: 'edx-sysadmin/dist/*'
       get_params:
         count_retries: 10
         delay_between_retries: 30
