@@ -1,35 +1,34 @@
 ---
 resource_types:
-- name: pypi
-  type: docker-image
-  source:
-    repository: cfplatformeng/concourse-pypi-resource
-    tag: latest
+  - name: pypi
+    type: docker-image
+    source:
+      repository: cfplatformeng/concourse-pypi-resource
+      tag: latest
 
 resources:
-    - name: edx-sysadmin-repo
-      type: git
-      source:
-          uri: https://github.com/mitodl/edx-sysadmin.git
-          branch: release
-
-    - name: edx-sysadmin-pypi
-      type: pypi
-      source:
-        name: edx-sysadmin
-        packaging: any
-        repository:
-          username: ((pypi_creds.username))
-          password: ((pypi_creds.password))
+  - name: edx-sysadmin-repo
+    type: git
+    source:
+        uri: https://github.com/mitodl/edx-sysadmin.git
+        branch: release
+  - name: edx-sysadmin-pypi
+    type: pypi
+    source:
+      name: edx-sysadmin
+      packaging: any
+      repository:
+        username: ((pypi_creds.username))
+        password: ((pypi_creds.password))
 
 jobs:
-- name: publish-edx-sysadmin-to-pypi
-  public: true
-  plan:
-  - get: edx-sysadmin
-    trigger: true
+  - name: publish-edx-sysadmin-to-pypi
+    public: true
+    plan:
+    - get: edx-sysadmin-repo
+      trigger: true
 
-  - task: build-and-upload
+    - task: build-and-upload
       config:
         platform: linux
         image_resource:
@@ -37,19 +36,21 @@ jobs:
           source:
             repository: python
         inputs:
-          - name: edx-sysadmin
+          - name: edx-sysadmin-repo
         outputs:
           - name: edx-sysadmin/dist
         run:
-          path: python
+          path: sh
           args:
-            - setup.py
-            - bdist_wheel
-            - sdist
+            - -exc
+            - |
+              cd edx-sysadmin
+              python setup.py bdist_wheel sdist
 
-  - put: edx-sysadmin-pypi
-    params:
-      glob: 'edx-sysadmin/dist'
-    get_params:
-      count_retries: 10
-      delay_between_retries: 30
+
+    - put: edx-sysadmin-pypi
+      params:
+        glob: 'edx-sysadmin/dist'
+      get_params:
+        count_retries: 10
+        delay_between_retries: 30
