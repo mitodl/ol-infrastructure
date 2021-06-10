@@ -7,11 +7,12 @@ resource_types:
       tag: latest
 
 resources:
-  - name: edx-sysadmin-repo
+  - name: edx-sysadmin
     type: git
     source:
-        uri: https://github.com/mitodl/edx-sysadmin.git
-        branch: release
+      name: edx-sysadmin
+      uri: https://github.com/mitodl/edx-sysadmin.git
+      branch: release
   - name: edx-sysadmin-pypi
     type: pypi
     source:
@@ -25,7 +26,7 @@ jobs:
   - name: publish-edx-sysadmin-to-pypi
     public: true
     plan:
-    - get: edx-sysadmin-repo
+    - get: edx-sysadmin
       trigger: true
 
     - task: build-and-upload
@@ -36,18 +37,15 @@ jobs:
           source:
             repository: python
         inputs:
-          - name: edx-sysadmin-repo
+          - name: edx-sysadmin
         outputs:
           - name: edx-sysadmin/dist
         run:
+          dir: edx-sysadmin
           path: sh
           args:
             - -exc
-            - |
-              cd edx-sysadmin
-              python setup.py bdist_wheel sdist
-
-
+            - python setup.py bdist_wheel sdist
     - put: edx-sysadmin-pypi
       params:
         glob: 'edx-sysadmin/dist'
