@@ -1,0 +1,102 @@
+---
+resource_types:
+  - name: rclone
+    type: docker-image
+    source:
+      repository: mitodl/concourse-rclone-resource
+      tag: latest
+resources:
+  - name: ocw-hugo-themes
+    type: s3
+    source:
+      bucket: ((artifact-bucket))
+      regexp: ocw-hugo-themes/((hugo-theme-branch))/ocw-hugo-themes-(.*).tgz
+  - name: course-markdown
+    type: git
+    source:
+      uri: git@((git-domain)):((github-org))/((course-repo)).git
+      branch: ((course-repo-branch))
+      private_key: ((git-private-key))
+  - name: ocw-hugo-projects
+    type: git
+    source:
+      uri: https://github.com/mitodl/ocw-hugo-projects.git
+      branch: main
+  - name: ocw-site
+    type: rclone
+    source:
+      config: |
+        [s3-remote]
+        type = s3
+        provider = AWS
+        env_auth = true
+        region = us-east-1
+
+jobs:
+  - name: build-ocw-www
+    serial: true
+    plan:
+      - get: ocw-hugo-themes
+        trigger: true
+      - get: ocw-hugo-projects
+        trigger: true
+      - get: course-markdown
+        trigger: true
+      - task: build-ocw-www-task
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source: {repository: mitodl/ocw-course-publisher, tag: latest}
+          inputs:
+            - name: ocw-hugo-themes
+            - name: course-markdown
+            - name: ocw-hugo-projects
+          outputs:
+            - name: course-markdown
+            - name: ocw-hugo-themes
+          run:
+            path: sh
+            args:
+            - -exc
+            - |
+              mkdir ocw-hugo-themes/theme
+              tar -xvzf ocw-hugo-themes/ocw-hugo-themes-*.tgz -C ocw-hugo-themes/theme
+              cd course-markdown
+              export OCW_STUDIO_BASE_URL=((ocw-studio-url))
+              hugo --config ../ocw-hugo-projects/((site-config))/config.yaml --themesDir ../ocw-hugo-themes/theme
+      - put: ocw-site
+        params:
+          source: course-markdown/public
+          destination:
+            - dir: s3-remote:((ocw-bucket))
+              command: copyto
+              args:
+                - --ignore-size
+                - --checksum
+      - put: ocw-site
+        params:
+          source: ocw-hugo-themes/theme/base-theme/dist
+          destination:
+            - dir: s3-remote:((ocw-bucket))
+              command: copyto
+              args:
+                - --ignore-size
+                - --checksum
+      - task: clear-cdn-cache
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source: {repository: curlimages/curl}
+          run:
+            path: curl
+            args:
+              - -f
+              - -X
+              - POST
+              - -H
+              - 'Fastly-Key: ((fastly-api-token))'
+              - -H
+              - 'Fastly-Soft-Purge: 1'
+              - https://api.fastly.com/service/((fastly-service-id))/purge_all
