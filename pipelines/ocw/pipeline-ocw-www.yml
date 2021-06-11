@@ -14,8 +14,8 @@ resources:
   - name: course-markdown
     type: git
     source:
-      uri: git@((git-domain)):((github-org))/((course-repo)).git
-      branch: ((course-repo-branch))
+      uri: git@((git-domain)):((github-org))/((ocw-www-repo)).git
+      branch: ((ocw-www-repo-branch))
       private_key: ((git-private-key))
   - name: ocw-hugo-projects
     type: git
@@ -64,7 +64,7 @@ jobs:
               tar -xvzf ocw-hugo-themes/ocw-hugo-themes-*.tgz -C ocw-hugo-themes/theme
               cd course-markdown
               export OCW_STUDIO_BASE_URL=((ocw-studio-url))
-              hugo --config ../ocw-hugo-projects/((site-config))/config.yaml --themesDir ../ocw-hugo-themes/theme
+              hugo --config ../ocw-hugo-projects/ocw-www/config.yaml --themesDir ../ocw-hugo-themes/theme
       - put: ocw-site
         params:
           source: course-markdown/public
