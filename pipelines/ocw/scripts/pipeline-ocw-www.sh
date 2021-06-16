@@ -18,9 +18,8 @@ fi
 
 yes | fly -t $FLY_TARGET set-pipeline \
 -p ocw-www-pipeline-$SITE_BRANCH \
---team=$FLY_TEAM \
+--team=ocw \
 --config=pipelines/ocw/pipeline-ocw-www.yml \
--v artifact-bucket=$ARTIFACT_BUCKET \
 -v git-domain=$GITHUB_DOMAIN \
 -v github-org=$GIT_CONFIG_ORG \
 -v hugo-theme-branch=$HUGO_THEME_BRANCH \
