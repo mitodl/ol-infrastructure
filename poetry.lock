@@ -954,7 +954,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "4.1.0"
+version = "4.2.0"
 description = "A Pulumi package for creating and managing github cloud resources."
 category = "main"
 optional = false
@@ -1471,7 +1471,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "4b699a7c5a3bd72291e1d84eea0fdf92cce6cd8462a73b14c6704882916d51a4"
+content-hash = "e49210e95f83b2d4daf21c4a2ddc5cff6d6dc98bad518c14d0eb10d246a0def1"
 
 [metadata.files]
 anyio = [
@@ -2042,7 +2042,7 @@ pulumi-consul = [
     {file = "pulumi_consul-3.2.0.tar.gz", hash = "sha256:0d6f3f24e95076d20542eab68fe9f7ca749b0ba33aa51cc8e9c0c5bb8ee5fc79"},
 ]
 pulumi-github = [
-    {file = "pulumi_github-4.1.0.tar.gz", hash = "sha256:0de6becf6ce6e1700dee80fb73f9d631c1af3e62e6657b55895a2063fd9e0835"},
+    {file = "pulumi_github-4.2.0.tar.gz", hash = "sha256:b1fef290fdc6ce6b28c3c3f10a43a99308e51a6cc2be7aab01b87e40affff760"},
 ]
 pulumi-vault = [
     {file = "pulumi_vault-4.1.0.tar.gz", hash = "sha256:6a430cd5c7720f91e79a2d4d9686733782a3a499c559193a0cc67d81b15ac315"},
