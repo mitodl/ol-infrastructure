@@ -88,6 +88,7 @@ ocw_studio_iam_policy = iam.Policy(
                     "Action": [
                         "s3:ListBucket*",
                         "s3:PutObject",
+                        "s3:PutObjectAcl",
                         "s3:GetObject*",
                         "s3:DeleteObject*",
                     ],
@@ -99,6 +100,11 @@ ocw_studio_iam_policy = iam.Policy(
             ],
         },
         stringify=True,
+        parliament_config={
+            "PERMISSIONS_MANAGEMENT_ACTIONS": {
+                "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
+            }
+        },
     ),
 )
 
