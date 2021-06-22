@@ -10,7 +10,7 @@ resources:
     type: s3
     source:
       bucket: ol-eng-artifacts
-      regexp: ocw-hugo-themes/((hugo-theme-branch))/ocw-hugo-themes-(.*).tgz
+      regexp: ocw-hugo-themes/release/ocw-hugo-themes-(.*).tgz
   - name: course-markdown
     type: git
     source:
