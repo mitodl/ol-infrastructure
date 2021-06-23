@@ -1,0 +1,7 @@
+ALTERNATE_WORKER_QUEUES: lms
+- edx.cms.core.default
+- edx.cms.core.high
+COURSE_AUTHORING_MICROFRONTEND_URL: null
+COURSE_IMPORT_EXPORT_BUCKET: ''
+GIT_REPO_EXPORT_DIR: /edx/var/edxapp/export_course_repos
+PARSE_KEYS: {}
