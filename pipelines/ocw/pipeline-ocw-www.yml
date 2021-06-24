@@ -21,7 +21,7 @@ resources:
     type: git
     source:
       uri: https://github.com/mitodl/ocw-hugo-projects.git
-      branch: main
+      branch: ((ocw-hugo-projects-branch))
   - name: ocw-site
     type: rclone
     source:
