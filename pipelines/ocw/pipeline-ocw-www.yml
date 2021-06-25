@@ -5,12 +5,23 @@ resource_types:
     source:
       repository: mitodl/concourse-rclone-resource
       tag: latest
+  - name: simple-s3
+    type: docker-image
+    source:
+      repository: 18fgsa/s3-resource-simple
 resources:
   - name: ocw-hugo-themes
     type: s3
     source:
       bucket: ol-eng-artifacts
       regexp: ocw-hugo-themes/release/ocw-hugo-themes-(.*).tgz
+  - name: ocw-studio-s3
+    type: simple-s3
+    source:
+      bucket: ((ocw-studio-bucket))
+      options:
+        - "--exclude '*'"
+        - "--include '((ocw-www-site))/*'"
   - name: course-markdown
     type: git
     source:
@@ -42,6 +53,8 @@ jobs:
         trigger: true
       - get: course-markdown
         trigger: true
+      - get: ocw-studio-s3
+        trigger: false
       - task: build-ocw-www-task
         params:
           OCW_STUDIO_BASE_URL: ((ocw-studio-url))
@@ -78,6 +91,15 @@ jobs:
       - put: ocw-site
         params:
           source: ocw-hugo-themes/theme/base-theme/dist
+          destination:
+            - dir: s3-remote:((ocw-bucket))
+              command: copyto
+              args:
+                - --ignore-size
+                - --checksum
+      - put: ocw-site
+        params:
+          source: ocw-studio-s3
           destination:
             - dir: s3-remote:((ocw-bucket))
               command: copyto

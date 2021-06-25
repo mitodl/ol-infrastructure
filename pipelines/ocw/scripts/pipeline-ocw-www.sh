@@ -9,6 +9,8 @@
 # OCW_CONTENT_BUCKET_PREVIEW=<the S3 preview bucket>
 # OCW_CONTENT_BUCKET_RELEASE=<the S3 release bucket>
 # OCW_STUDIO_BASE_URL=<the ocw-studio base url>
+# OCW_STUDIO_BUCKET=<The S3 bucket used by ocw-studio>
+# OCW_STUDIO_SITE=<The ocw-www website name (ie slug) in studio>
 # OCW_HUGO_PROJECTS_BRANCH=<'release-candidate' on RC, 'release' on production>
 
 # The following need to be set via vault, per environment and pipeline group (preview, release):
@@ -42,6 +44,8 @@ do
   -v ocw-www-repo=$OCW_WWW_REPO \
   -v ocw-www-repo-branch=$branch \
   -v ocw-bucket=$OCW_CONTENT_BUCKET \
+  -v ocw-hugo-projects-branch=$OCW_HUGO_PROJECTS_BRANCH \
   -v ocw-studio-url=$OCW_STUDIO_BASE_URL \
-  -v ocw-hugo-projects-branch=$OCW_HUGO_PROJECTS_BRANCH
+  -v ocw-studio-bucket=$OCW_STUDIO_BUCKET \
+  -v ocw-www-site=$OCW_STUDIO_SITE
 done
