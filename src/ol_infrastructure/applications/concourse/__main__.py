@@ -103,6 +103,14 @@ concourse_iam_permissions = {
                 "arn:aws:s3:::ol-eng-artifacts/*",
             ],
         },
+        {
+            "Effect": "Allow",
+            "Action": ["s3:GetObject*", "s3:ListBucket"],
+            "Resource": [
+                "arn:aws:s3:::ol-ocw-studio-app*",
+                "arn:aws:s3:::ol-ocw-studio-app*/*",
+            ],
+        },
     ],
 }
 
