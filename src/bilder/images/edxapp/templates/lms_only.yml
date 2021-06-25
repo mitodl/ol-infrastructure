@@ -1,16 +1,19 @@
 ACCOUNT_MICROFRONTEND_URL: null
 ACE_CHANNEL_DEFAULT_EMAIL: django_email
-ACE_CHANNEL_SAILTHRU_API_KEY: ''
-ACE_CHANNEL_SAILTHRU_API_SECRET: ''
-ACE_CHANNEL_SAILTHRU_DEBUG: true
-ACE_CHANNEL_SAILTHRU_TEMPLATE_NAME: null
+############################
+# We aren't using Sailthru #
+############################
+# ACE_CHANNEL_SAILTHRU_API_KEY: ''
+# ACE_CHANNEL_SAILTHRU_API_SECRET: ''
+# ACE_CHANNEL_SAILTHRU_DEBUG: true
+# ACE_CHANNEL_SAILTHRU_TEMPLATE_NAME: null
 ACE_CHANNEL_TRANSACTIONAL_EMAIL: django_email
 ACE_ENABLED_CHANNELS:
 - django_email
 ACE_ENABLED_POLICIES:
 - bulk_email_optout
 ACE_ROUTING_KEY: edx.lms.core.default
-ALTERNATE_WORKER_QUEUES: cms
+# ALTERNATE_WORKER_QUEUES: cms  # The code already has this default
 ANALYTICS_API_KEY: ''
 ANALYTICS_API_URL: http://localhost:18100
 API_ACCESS_FROM_EMAIL: api-requests@example.com
@@ -25,15 +28,18 @@ DCS_SESSION_COOKIE_SAMESITE: Lax
 DCS_SESSION_COOKIE_SAMESITE_FORCE_ALL: true
 EDXNOTES_INTERNAL_API: http://localhost:18120/api/v1
 EDXNOTES_PUBLIC_API: http://localhost:18120/api/v1
-EDX_API_KEY: PUT_YOUR_API_KEY_HERE
-ENTERPRISE_COURSE_ENROLLMENT_AUDIT_MODES:
-- audit
-- honor
-ENTERPRISE_CUSTOMER_SUCCESS_EMAIL: customersuccess@edx.org
-ENTERPRISE_ENROLLMENT_API_URL: https://localhost:18000/api/enrollment/v1/
-ENTERPRISE_INTEGRATIONS_EMAIL: enterprise-integrations@edx.org
-ENTERPRISE_SUPPORT_URL: ''
-ENTERPRISE_TAGLINE: ''
+# EDX_API_KEY: PUT_YOUR_API_KEY_HERE  # DEPRECATED SETTING
+########################################################
+# We are not using any of the enterprise functionality #
+########################################################
+# ENTERPRISE_COURSE_ENROLLMENT_AUDIT_MODES:
+# - audit
+# - honor
+# ENTERPRISE_CUSTOMER_SUCCESS_EMAIL: customersuccess@edx.org
+# ENTERPRISE_ENROLLMENT_API_URL: https://localhost:18000/api/enrollment/v1/
+# ENTERPRISE_INTEGRATIONS_EMAIL: enterprise-integrations@edx.org
+# ENTERPRISE_SUPPORT_URL: ''
+# ENTERPRISE_TAGLINE: ''
 GIT_REPO_DIR: /edx/var/edxapp/course_repos
 GOOGLE_ANALYTICS_LINKEDIN: ''
 GOOGLE_ANALYTICS_TRACKING_ID: ''
