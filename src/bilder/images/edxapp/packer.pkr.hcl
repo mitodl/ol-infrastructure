@@ -21,7 +21,7 @@ variable "node_type" {
 
 source "amazon-ebs" "edx-platform" {
   ami_description         = "Deployment image for Open edX ${var.node_type} server generated at ${local.timestamp}"
-  ami_name                = "edx-${var.node_type}-${local.timestamp}"
+  ami_name                = "edx-platform-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
   launch_block_device_mappings {
@@ -71,25 +71,34 @@ build {
 
   provisioner "shell-local" {
     inline = [
-      "echo '${build.SSHPrivateKey}' > /tmp/packer-session.pem",
-      "chmod 600 /tmp/packer-session.pem"
+      "echo '${build.SSHPrivateKey}' > /tmp/packer-${build.ID}.pem",
+      "chmod 600 /tmp/packer-${build.ID}.pem"
+    ]
+  }
+  provisioner "shell-local" {
+    environment_vars = [
+      "DEBIAN_FRONTEND=noninteractive"
+    ]
+    inline = [
+      "pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} apt.packages packages='[\"git\", \"libmariadbclient-dev\", \"python3-pip\", \"python3-venv\", \"python3-dev\", \"build-essential\"]' upgrade=True update=True"
     ]
   }
   provisioner "shell" {
-    environment = [
-      "EDX_ANSIBLE_BRANCH=${var.ansible_branch}"
+    environment_vars = [
+      "EDX_ANSIBLE_BRANCH=${var.ansible_branch}",
     ]
     inline = [
-      "sudo apt-get update && sudo apt-get -y upgrade",
-      "sudo apt-get install -q -y git libmysqlclient-dev",
-      "sudo apt-get install -q -y python3-pip python3-venv python3-dev build-essential",
       "cd /tmp && git clone https://github.com/edx/configuration --depth 1 --branch $EDX_ANSIBLE_BRANCH",
       "cd /tmp/configuration && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt"
     ]
   }
   provisioner "ansible-local" {
-    playbook_file = "files/edx_${var.node_type}_playbook.yml"
+    playbook_file = "${path.root}/files/edx_${var.node_type}_playbook.yml"
     command = "/tmp/configuration/.venv/bin/ansible-playbook"
     staging_directory = "/tmp/configuration/playbooks/"
+  }
+  provisioner "shell-local" {
+    environment_vars = ["NODE_TYPE=${var.node_type}"]
+    inline = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} ${path.root}/deploy.py"]
   }
 }

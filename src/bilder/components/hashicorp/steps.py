@@ -91,7 +91,7 @@ def install_hashicorp_products(
             state=state,
             host=host,
         )
-        if hasattr(product, "data_directory"):  # noqa: WPS421
+        if product.data_directory:
             files.directory(
                 name=f"Create data directory for {product.name}",
                 path=product.data_directory,

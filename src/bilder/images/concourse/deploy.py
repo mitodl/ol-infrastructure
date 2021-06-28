@@ -1,6 +1,7 @@
 import os
 from functools import partial
 from pathlib import Path
+from typing import Union
 
 from pydantic import SecretStr
 from pyinfra import host
@@ -55,8 +56,9 @@ from bridge.lib.magic_numbers import (
 )
 
 VERSIONS = {  # noqa: WPS407
-    "concourse": "7.2.0",
+    "concourse": "7.3.2",
     "consul": "1.9.5",
+    "vault": "1.7.3",
 }
 CONCOURSE_WEB_NODE_TYPE = "web"
 CONCOURSE_WORKER_NODE_TYPE = "worker"
@@ -107,7 +109,11 @@ concourse_config_map = {
         baggageclaim_driver="btrfs",
     ),
 }
-concourse_config = concourse_config_map[node_type]()
+concourse_config: Union[
+    ConcourseWebConfig, ConcourseWorkerConfig
+] = concourse_config_map[
+    node_type
+]()  # type: ignore
 vault_template_map = {
     CONCOURSE_WEB_NODE_TYPE: [
         partial(
@@ -221,6 +227,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
 
 # Install Consul and Vault Agent
 vault = Vault(
+    version=VERSIONS["vault"],
     configuration=VaultAgentConfig(
         cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
         listener=[
@@ -253,7 +260,7 @@ vault = Vault(
                 destination=concourse_base_config.env_file_path,
             ),
         ],
-    )
+    ),
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 hashicorp_products = [vault, consul]
