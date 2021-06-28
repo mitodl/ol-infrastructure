@@ -26,19 +26,20 @@ do
   if [[ $branch == "preview" ]]
   then
     OCW_CONTENT_BUCKET=$OCW_CONTENT_BUCKET_PREVIEW
+    VERSION="draft"
   elif [[ $branch == "release" ]]
   then
     OCW_CONTENT_BUCKET=$OCW_CONTENT_BUCKET_RELEASE
+    VERSION="live"
   else
     echo "Invalid branch $1"
     exit 1
   fi
 
   yes | fly -t odl-concourse set-pipeline \
-  -p ocw-www-pipeline-via-vault \
+  -p ocw-www-pipeline-$VERSION \
   --team=ocw \
   --config=pipelines/ocw/pipeline-ocw-www.yml \
-  --instance-var branch=$branch \
   -v git-domain=$GITHUB_DOMAIN \
   -v github-org=$GIT_CONFIG_ORG \
   -v ocw-www-repo=$OCW_WWW_REPO \
