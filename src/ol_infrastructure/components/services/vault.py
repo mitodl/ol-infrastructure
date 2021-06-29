@@ -9,6 +9,7 @@ This includes:
 """
 import json
 from enum import Enum
+from string import Template
 from typing import Dict, List, Union
 
 from pulumi import ComponentResource, Output, ResourceOptions
@@ -78,7 +79,7 @@ class OLVaultPostgresDatabaseConfig(OLVaultDatabaseConfig):
         "postgresql://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/{db_name}"
     )
     db_type: str = DBEngines.postgres.value
-    role_statements: Dict[str, Dict[str, str]] = postgres_role_statements
+    role_statements: Dict[str, Dict[str, Template]] = postgres_role_statements
 
 
 class OLVaultMysqlDatabaseConfig(OLVaultDatabaseConfig):
@@ -87,7 +88,7 @@ class OLVaultMysqlDatabaseConfig(OLVaultDatabaseConfig):
     db_port: int = DEFAULT_MYSQL_PORT
     db_connection: str = "{{{{username}}}}:{{{{password}}}}@tcp({db_host}:{db_port})/"
     db_type: str = DBEngines.mysql_rds.value
-    role_statements: Dict[str, Dict[str, str]] = mysql_role_statements
+    role_statements: Dict[str, Dict[str, Template]] = mysql_role_statements
 
 
 class OLVaultMongoDatabaseConfig(OLVaultDatabaseConfig):
@@ -98,7 +99,7 @@ class OLVaultMongoDatabaseConfig(OLVaultDatabaseConfig):
         "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
     )
     db_type: str = DBEngines.mongodb.value
-    role_statements: Dict[str, Dict[str, str]] = mongodb_role_statements
+    role_statements: Dict[str, Dict[str, Template]] = mongodb_role_statements
 
 
 class OLVaultDatabaseBackend(ComponentResource):
@@ -110,7 +111,10 @@ class OLVaultDatabaseBackend(ComponentResource):
         opts: ResourceOptions = None,
     ):
         super().__init__(
-            "ol:services:Vault:DatabaseBackend", db_config.db_name, None, opts
+            f"ol:services:Vault:DatabaseBackend:{db_config.db_type}",
+            db_config.db_name,
+            None,
+            opts,
         )
 
         resource_opts = ResourceOptions.merge(
@@ -171,10 +175,10 @@ class OLVaultDatabaseBackend(ComponentResource):
                 backend=self.db_mount.path,
                 db_name=db_config.db_name,
                 creation_statements=[
-                    role_defs["create"].format(app_name=db_config.db_name)
+                    role_defs["create"].substitute(app_name=db_config.db_name)
                 ],
                 revocation_statements=[
-                    role_defs["revoke"].format(app_name=db_config.db_name)
+                    role_defs["revoke"].substitute(app_name=db_config.db_name)
                 ],
                 max_ttl=db_config.max_ttl,
                 default_ttl=db_config.default_ttl,

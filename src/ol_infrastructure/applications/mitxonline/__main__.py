@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from string import Template
 
 import pulumi_vault as vault
 from pulumi import Config
@@ -216,22 +217,28 @@ mitxonline_db = OLAmazonDB(mitxonline_db_config)
 edxapp_mysql_role_statements = mysql_role_statements.copy()
 edxapp_mysql_role_statements.pop("app")
 edxapp_mysql_role_statements["edxapp"] = {
-    "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
-    "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
-    "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp.* TO '{{{{name}}}}'@'%';",
-    "revoke": "DROP USER '{{{{name}}}}';",
+    "create": Template(
+        "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
+        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
+        "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp.* TO '{{name}}'@'%';"
+    ),
+    "revoke": Template("DROP USER '{{name}}';"),
 }
 edxapp_mysql_role_statements["edxapp-csmh"] = {
-    "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
-    "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
-    "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh.* TO '{{{{name}}}}'@'%';",
-    "revoke": "DROP USER '{{{{name}}}}';",
+    "create": Template(
+        "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
+        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
+        "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh.* TO '{{name}}'@'%';"
+    ),
+    "revoke": Template("DROP USER '{{name}}';"),
 }
 edxapp_mysql_role_statements["xqueue"] = {
-    "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
-    "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
-    "CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue.* TO '{{{{name}}}}'@'%';",
-    "revoke": "DROP USER '{{{{name}}}}';",
+    "create": Template(
+        "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
+        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
+        "CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue.* TO '{{name}}'@'%';"
+    ),
+    "revoke": Template("DROP USER '{{name}}';"),
 }
 
 mitxonline_db_vault_backend_config = OLVaultMysqlDatabaseConfig(
