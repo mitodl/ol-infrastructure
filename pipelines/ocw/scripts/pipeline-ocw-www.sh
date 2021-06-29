@@ -37,9 +37,10 @@ do
   fi
 
   yes | fly -t odl-concourse set-pipeline \
-  -p ocw-www-pipeline-$VERSION \
+  -p $VERSION \
   --team=ocw \
   --config=pipelines/ocw/pipeline-ocw-www.yml \
+  --instance-var site=$OCW_STUDIO_SITE \
   -v git-domain=$GITHUB_DOMAIN \
   -v github-org=$GIT_CONFIG_ORG \
   -v ocw-www-repo=$OCW_WWW_REPO \
