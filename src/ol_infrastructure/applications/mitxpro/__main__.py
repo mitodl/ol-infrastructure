@@ -10,7 +10,7 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import mysql_sql_statements
+from ol_infrastructure.lib.vault import mysql_role_statements
 
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -138,7 +138,7 @@ mitxpro_edxapp_db = OLAmazonDB(mitxpro_edxapp_db_config)
 
 hyphenated_db_purpose = xpro_db_purpose.replace("_", "-")
 
-edx_role_statments = mysql_sql_statements.update(
+edx_role_statments = mysql_role_statements.update(
     {
         f"edxapp-csmh-{hyphenated_db_purpose}": {
             "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
@@ -176,7 +176,7 @@ mitxpro_edxapp_db_vault_backend_config = OLVaultMysqlDatabaseConfig(
     db_admin_username=mitxpro_edxapp_db_config.username,
     db_admin_password=mitxpro_edxapp_db_config.password.get_secret_value(),
     db_host=mitxpro_edxapp_db.db_instance.address,
-    role_statements=mysql_sql_statements,
+    role_statements=mysql_role_statements,
 )
 mitxpro_edxapp_db_vault_backend = OLVaultDatabaseBackend(
     mitxpro_edxapp_db_vault_backend_config

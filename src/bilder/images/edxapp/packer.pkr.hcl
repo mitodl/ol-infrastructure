@@ -1,7 +1,7 @@
 locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
   business_unit = "operations"
-  app_name = "edx-platform"
+  app_name = "edxapp"
 }
 
 variable "ansible_branch" {
@@ -19,9 +19,9 @@ variable "node_type" {
   type = string
 }
 
-source "amazon-ebs" "edx-platform" {
+source "amazon-ebs" "edxapp" {
   ami_description         = "Deployment image for Open edX ${var.node_type} server generated at ${local.timestamp}"
-  ami_name                = "edx-platform-${var.node_type}-${local.timestamp}"
+  ami_name                = "edxapp-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
   launch_block_device_mappings {
@@ -66,7 +66,7 @@ source "amazon-ebs" "edx-platform" {
 
 build {
   sources = [
-    "source.amazon-ebs.edx-platform",
+    "source.amazon-ebs.edxapp",
   ]
 
   provisioner "shell-local" {

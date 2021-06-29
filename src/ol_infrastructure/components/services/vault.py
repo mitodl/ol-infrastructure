@@ -15,11 +15,16 @@ from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_vault import Mount, aws, database, pkisecret
 from pydantic import BaseModel, validator
 
-from bridge.lib.magic_numbers import DEFAULT_MYSQL_PORT, DEFAULT_POSTGRES_PORT
+from bridge.lib.magic_numbers import (
+    DEFAULT_MONGODB_PORT,
+    DEFAULT_MYSQL_PORT,
+    DEFAULT_POSTGRES_PORT,
+)
 from ol_infrastructure.lib.vault import (
     VaultPKIKeyTypeBits,
-    mysql_sql_statements,
-    postgres_sql_statements,
+    mongodb_role_statements,
+    mysql_role_statements,
+    postgres_role_statements,
 )
 
 SIX_MONTHS = 60 * 60 * 24 * 30 * 6  # noqa: WPS432
@@ -73,7 +78,7 @@ class OLVaultPostgresDatabaseConfig(OLVaultDatabaseConfig):
         "postgresql://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/{db_name}"
     )
     db_type: str = DBEngines.postgres.value
-    role_statements: Dict[str, Dict[str, str]] = postgres_sql_statements
+    role_statements: Dict[str, Dict[str, str]] = postgres_role_statements
 
 
 class OLVaultMysqlDatabaseConfig(OLVaultDatabaseConfig):
@@ -82,7 +87,18 @@ class OLVaultMysqlDatabaseConfig(OLVaultDatabaseConfig):
     db_port: int = DEFAULT_MYSQL_PORT
     db_connection: str = "{{{{username}}}}:{{{{password}}}}@tcp({db_host}:{db_port})/"
     db_type: str = DBEngines.mysql_rds.value
-    role_statements: Dict[str, Dict[str, str]] = mysql_sql_statements
+    role_statements: Dict[str, Dict[str, str]] = mysql_role_statements
+
+
+class OLVaultMongoDatabaseConfig(OLVaultDatabaseConfig):
+    """Configuration object for MongoDB instances to register with Vault."""
+
+    db_port: int = DEFAULT_MONGODB_PORT
+    db_connection: str = (
+        "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
+    )
+    db_type: str = DBEngines.mongodb.value
+    role_statements: Dict[str, Dict[str, str]] = mongodb_role_statements
 
 
 class OLVaultDatabaseBackend(ComponentResource):
@@ -155,10 +171,10 @@ class OLVaultDatabaseBackend(ComponentResource):
                 backend=self.db_mount.path,
                 db_name=db_config.db_name,
                 creation_statements=[
-                    role_defs["create"].format(role_name=db_config.db_name)
+                    role_defs["create"].format(app_name=db_config.db_name)
                 ],
                 revocation_statements=[
-                    role_defs["revoke"].format(role_name=db_config.db_name)
+                    role_defs["revoke"].format(app_name=db_config.db_name)
                 ],
                 max_ttl=db_config.max_ttl,
                 default_ttl=db_config.default_ttl,

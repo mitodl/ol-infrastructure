@@ -1,17 +1,17 @@
-{{ with secret "mongodb-mitxonline/creds/edx-platform" }}
+{{ with secret "mongodb-mitxonline/creds/edxapp" }}
 mongodb_settings: &mongo_params
   user: {{ .Data.username }}
   password: {{ .Data.password }}
   read_preference: SECONDARY_PREFERRED  # TODO: Make this default to PRIMARY for studio to provide read-after-write semantics
 {{ end }}
 
-{{ with secret "mysql-mitxonline/creds/edx-platform" }}
+{{ with secret "mysql-mitxonline/creds/edxapp" }}
 mysql_creds: &mysql_creds
   USER: {{ .Data.username }}
   PASSWORD: {{ .Data.password }}
 {{ end }}
 
-{{ with secret "secret-mitxonline/edx-platform" }}
+{{ with secret "secret-mitxonline/edxapp" }}
 CELERY_BROKER_PASSWORD: {{ .Data.data.redis_auth_token }}
 redis_cache_config: &redis_cache_config
   BACKEND: django_redis.cache.RedisCache
@@ -55,7 +55,7 @@ DATABASES:
     NAME: edxapp_csmh
     PORT: 3306
     OPTIONS: {}
-    {{ with secret "mysql-mitxonline/creds/edx-platform-csmh"}}
+    {{ with secret "mysql-mitxonline/creds/edxapp-csmh"}}
     PASSWORD: {{ .Data.password }}
     USER: {{ .Data.username }}
     {{ end }}
@@ -64,7 +64,7 @@ DATABASES:
 DOC_STORE_CONFIG:
   collection: modulestore
   connectTimeoutMS: 2000
-  db: edx_platform
+  db: edxapp
   host: mongodb-master.service.consul
   port: 27017
   replicaset: rs0
