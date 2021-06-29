@@ -50,7 +50,7 @@ jobs:
         params:
           source: ocw-hugo-themes/dist/
           destination:
-            - dir: s3-remote:((artifact-bucket))
+            - dir: s3-remote:ol-eng-artifacts
               command: sync
               args:
                 - --ignore-size
