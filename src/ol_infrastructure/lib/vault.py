@@ -102,7 +102,7 @@ mysql_role_statements = {
     "app": {
         "create": Template(
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
+            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "  # noqa: Q000
             "CREATE TEMPORARY TABLES, LOCK TABLES ON ${app_name}.* TO '{{name}}'@'%';"
         ),
         "revoke": Template("DROP USER '{{name}}';"),

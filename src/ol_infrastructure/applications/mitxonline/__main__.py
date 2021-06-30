@@ -3,13 +3,13 @@ from pathlib import Path
 from string import Template
 
 import pulumi_vault as vault
-from pulumi import Config
+from pulumi import Config, export
 from pulumi.stack_reference import StackReference
 from pulumi_aws import ec2, get_caller_identity, iam, s3
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import DEFAULT_MYSQL_PORT, DEFAULT_REDIS_PORT
-from ol_infrastructure.components.aws.cache import OLAmazonRedisConfig
+from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -30,6 +30,7 @@ policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
 consul_stack = StackReference(f"infrastructure.consul.mitxonline.{stack_info.name}")
 mitxonline_vpc = network_stack.require_output("mitxonline_vpc")
+operations_vpc = network_stack.require_output("operations_vpc")
 aws_config = AWSBase(
     tags={"OU": "mitxonline", "Environment": f"mitxonline-{stack_info.env_suffix}"}
 )
@@ -136,7 +137,7 @@ edxapp_policy = iam.Policy(
     description="AWS access permissions for edX application instances",
 )
 edxapp_iam_role = iam.Role(
-    "edxapp-instance-role",
+    "mitxonline-edxapp-instance-role",
     assume_role_policy=json.dumps(
         {
             "Version": IAM_POLICY_VERSION,
@@ -147,7 +148,7 @@ edxapp_iam_role = iam.Role(
             },
         }
     ),
-    name_prefix="edxapp-role-",
+    name_prefix="mitxonline-edxapp-role-",
     path=f"/ol-applications/edxapp/mitxonline/{stack_info.env_suffix}/",
     tags=aws_config.tags,
 )
@@ -163,6 +164,7 @@ iam.RolePolicyAttachment(
 )
 edxapp_instance_profile = iam.InstanceProfile(
     f"edxapp-instance-profile-{stack_info.env_suffix}",
+    name_prefix=f"mitxonline-edxapp-role-{stack_info.env_suffix}-",
     role=edxapp_iam_role.name,
     path="/ol-applications/edxapp/mitxonline/",
 )
@@ -173,8 +175,10 @@ group_name = f"edxapp-mitxonline-{stack_info.env_suffix}"
 edxapp_security_group = ec2.SecurityGroup(
     "edxapp-security-group",
     name=group_name,
+    ingress=[],
     egress=default_egress_args,
     tags=aws_config.merged_tags({"Name": group_name}),
+    vpc_id=mitxonline_vpc_id,
 )
 
 # Create security group for Mitxonline MariaDB database
@@ -187,7 +191,10 @@ mitxonline_db_security_group = ec2.SecurityGroup(
             security_groups=[edxapp_security_group.id],
             # TODO: Create Vault security group to act as source of allowed
             # traffic. (TMM 2021-05-04)
-            cidr_blocks=[mitxonline_vpc["cidr"]],
+            cidr_blocks=[
+                mitxonline_vpc["cidr"],
+                operations_vpc["cidr"],
+            ],
             protocol="tcp",
             from_port=DEFAULT_MYSQL_PORT,
             to_port=DEFAULT_MYSQL_PORT,
@@ -219,7 +226,7 @@ edxapp_mysql_role_statements.pop("app")
 edxapp_mysql_role_statements["edxapp"] = {
     "create": Template(
         "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
+        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "  # noqa: Q000
         "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp.* TO '{{name}}'@'%';"
     ),
     "revoke": Template("DROP USER '{{name}}';"),
@@ -227,7 +234,7 @@ edxapp_mysql_role_statements["edxapp"] = {
 edxapp_mysql_role_statements["edxapp-csmh"] = {
     "create": Template(
         "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
+        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "  # noqa: Q000
         "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh.* TO '{{name}}'@'%';"
     ),
     "revoke": Template("DROP USER '{{name}}';"),
@@ -235,7 +242,7 @@ edxapp_mysql_role_statements["edxapp-csmh"] = {
 edxapp_mysql_role_statements["xqueue"] = {
     "create": Template(
         "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES"  # noqa: Q000
+        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "  # noqa: Q000
         "CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue.* TO '{{name}}'@'%';"
     ),
     "revoke": Template("DROP USER '{{name}}';"),
@@ -298,7 +305,7 @@ mitxonline_mongo_vault_backend = OLVaultDatabaseBackend(mitxonline_mongo_vault_c
 redis_config = Config("redis")
 redis_cluster_security_group = ec2.SecurityGroup(
     f"edxapp-redis-cluster-{env_name}",
-    name=f"edxapp-redis-{env_name}",
+    name=f"mitxonline-edxapp-redis-{env_name}",
     description="Grant access to Redis from Open edX",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -330,6 +337,34 @@ redis_cache_config = OLAmazonRedisConfig(
     tags=aws_config.tags,
     **defaults(stack_info)["redis"],
 )
+mitxonline_redis_cache = OLAmazonCache(redis_cache_config)
+mitxonline_redis_consul_node = Node(
+    "mitxonline-redis-cache-node",
+    name="mitxonline-redis",
+    address=mitxonline_redis_cache.address,
+    datacenter=f"mitxonline-{stack_info.env_suffix}",
+)
+
+mitxonline_redis_consul_service = Service(
+    "mitxonline-redis-consul-service",
+    node=mitxonline_redis_consul_node.name,
+    name="edxapp-redis",
+    port=redis_cache_config.port,
+    meta={
+        "external-node": True,
+        "external-probe": True,
+    },
+    checks=[
+        ServiceCheckArgs(
+            check_id="mitxonline-redis",
+            interval="10s",
+            name="edxapp-redis",
+            timeout="60s",
+            status="passing",
+            tcp=f"{mitxonline_redis_cache.address}:{mitxonline_redis_cache.cache_cluster.port}",  # noqa: WPS237,E501
+        )
+    ],
+)
 
 ######################
 # Secrets Management #
@@ -338,7 +373,7 @@ mitxonline_vault_mount = vault.Mount(
     "mitxonline-vault-generic-secrets-mount",
     path="secret-mitxonline",
     description="Static secrets storage for MITx Online applications and services",
-    type="kv-v2",
+    type="kv",
 )
 edxapp_secrets = vault.generic.Secret(
     "edxapp-static-secrets",
@@ -377,7 +412,7 @@ vault.aws.AuthBackendRole(
 )
 
 vault.aws.AuthBackendRole(
-    "edxapp-web-ami-ec2-vault-auth",
+    "edxapp-worker-ami-ec2-vault-auth",
     backend="aws",
     auth_type="iam",
     role="edxapp-worker",
@@ -388,4 +423,13 @@ vault.aws.AuthBackendRole(
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[mitxonline_vpc_id],
     token_policies=[edxapp_vault_policy.name],
+)
+
+
+export(
+    "mitxonline_edxapp",
+    {
+        "mariadb": mitxonline_db.db_instance.address,
+        "redis": mitxonline_redis_cache.address,
+    },
 )

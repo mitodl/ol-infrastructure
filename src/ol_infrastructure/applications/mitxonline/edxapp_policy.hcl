@@ -1,12 +1,12 @@
-path "mysql-mitxonline/creds/edxapp" {
+path "mariadb-mitxonline/creds/edxapp" {
   capabilities = ["read"]
 }
 
-path "mysql-mitxonline/creds/edxapp" {
+path "mariadb-mitxonline/creds/edxapp" {
   capabilities = ["read"]
 }
 
-path "mysql-mitxonline/creds/edxapp-csmh" {
+path "mariadb-mitxonline/creds/edxapp-csmh" {
   capabilities = ["read"]
 }
 
@@ -16,4 +16,16 @@ path "mongodb-mitxonline/creds/app" {
 
 path "sys/leases/renew" {
   capabilities = [ "update" ]
+}
+
+path "secret-mitxonline/edxapp" {
+  capabilities = ["read"]
+}
+
+path "secret-mitxonline/edx-forum" {
+  capabilities = ["read"]
+}
+
+path "secret-mitxonline/edx-xqueue" {
+  capabilities = ["read"]
 }

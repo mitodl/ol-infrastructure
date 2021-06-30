@@ -47,8 +47,12 @@ node_type = host.data.node_type or os.environ.get("NODE_TYPE", WEB_NODE_TYPE)
 pip.packages(
     name="Install additional edX dependencies",
     packages=[
+        "redis-py-cluster",  # Support for clustered redis
         "django-redis",  # Support for Redis caching in Django
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
+        "mitxpro-openedx-extensions==0.2.2",
+        "social-auth-mitxpro==0.4",
+        "edx-username-changer==0.0.1",
     ],
     present=True,
     virtualenv="/edx/app/edxapp/venvs/edxapp/",
@@ -58,7 +62,7 @@ pip.packages(
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
 
 if node_type == WEB_NODE_TYPE:
-    consul_configuration[Path("01-concourse.json")] = ConsulConfig(
+    consul_configuration[Path("01-edxapp.json")] = ConsulConfig(
         services=[
             ConsulService(
                 name="edxapp",
@@ -86,14 +90,14 @@ vault = Vault(
             )
         ],
         vault=VaultConnectionConfig(
-            address=f"https://active.vault.service.consul:{VAULT_HTTP_PORT}",
+            address=f"https://active.vault.service.operations-qa.consul:{VAULT_HTTP_PORT}",
             tls_skip_verify=True,
         ),
         auto_auth=VaultAutoAuthConfig(
             method=VaultAutoAuthMethod(
                 type="aws",
                 mount_path="auth/aws",
-                config=VaultAutoAuthAWS(role="edxapp"),
+                config=VaultAutoAuthAWS(role=f"edxapp-{node_type}"),
             ),
             sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
         ),
@@ -126,7 +130,7 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as studio_template:
     files.put(
         name="Upload studio.yml template for Vault agent",
         src=studio_template.name,
-        dest=studio_template_path.name,
+        dest=studio_template_path,
         user="vault",
         group="vault",
         create_remote_dir=True,
@@ -137,7 +141,7 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as lms_template:
     files.put(
         name="Upload lms.yml template for Vault agent",
         src=lms_template.name,
-        dest=lms_template_path.name,
+        dest=lms_template_path,
         user="vault",
         group="vault",
         create_remote_dir=True,
