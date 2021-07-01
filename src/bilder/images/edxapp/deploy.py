@@ -5,6 +5,7 @@ from pathlib import Path
 from pyinfra import host
 from pyinfra.operations import files, pip
 
+from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models.consul import (
     Consul,
     ConsulConfig,
@@ -79,6 +80,8 @@ if node_type == WEB_NODE_TYPE:
 
 studio_template_path = Path("/etc/vault/templates/edxapp_studio.yml.tmpl")
 lms_template_path = Path("/etc/vault/templates/edxapp_lms.yml.tmpl")
+lms_config_path = Path("/edx/etc/lms.yml")
+studio_config_path = Path("/edx/etc/studio.yml")
 # Install Consul and Vault Agent
 vault = Vault(
     version=VERSIONS["vault"],
@@ -90,7 +93,7 @@ vault = Vault(
             )
         ],
         vault=VaultConnectionConfig(
-            address=f"https://active.vault.service.operations-qa.consul:{VAULT_HTTP_PORT}",
+            address=f"https://vault.query.consul:{VAULT_HTTP_PORT}",
             tls_skip_verify=True,
         ),
         auto_auth=VaultAutoAuthConfig(
@@ -104,11 +107,11 @@ vault = Vault(
         template=[
             VaultTemplate(
                 source=lms_template_path,
-                destination=Path("/edx/etc/lms.yml"),
+                destination=lms_config_path,
             ),
             VaultTemplate(
                 source=studio_template_path,
-                destination=Path("/edx/etc/studio.yml"),
+                destination=studio_config_path,
             ),
         ],
     ),
@@ -149,4 +152,20 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as lms_template:
 # Manage services
 if host.fact.has_systemd:
     register_services(hashicorp_products, start_services_immediately=False)
+    service_configuration_watches(
+        service_name="edxapp-lms",
+        watched_files=[lms_config_path],
+        onchange_command=(
+            f"chown www-data:edxapp {lms_config_path} &&"
+            " /edx/bin/supervisorctl restart lms"
+        ),
+    )
+    service_configuration_watches(
+        service_name="edxapp-cms",
+        watched_files=[studio_config_path],
+        onchange_command=(
+            f"chown www-data:edxapp {studio_config_path} &&"
+            " /edx/bin/supervisorctl restart lms"
+        ),
+    )
     proxy_consul_dns()

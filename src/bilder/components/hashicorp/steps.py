@@ -91,7 +91,7 @@ def install_hashicorp_products(
             state=state,
             host=host,
         )
-        if getattr(product, "data_directory"):
+        if hasattr(product, "data_directory"):
             files.directory(
                 name=f"Create data directory for {product.name}",
                 path=product.data_directory,

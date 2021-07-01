@@ -1,10 +1,22 @@
 from collections import defaultdict
+from enum import Enum, unique
 from functools import lru_cache
 from typing import Dict, List
 
 import boto3
 
 rds_client = boto3.client("rds")
+
+
+@unique
+class DBInstanceTypes(str, Enum):  # noqa: WPS600
+    small = "db.t3.small"
+    medium = "db.t3.medium"
+    large = "db.t3.large"
+    general_purpose_large = "db.m6g.large"
+    general_purpose_xlarge = "db.m6g.xlarge"
+    high_mem_regular = "db.r6g.large"
+    high_mem_xlarge = "db.r6g.xlarge"
 
 
 @lru_cache

@@ -1,10 +1,10 @@
+# TODO: Manage database object creation
 import json
 from pathlib import Path
 from string import Template
 
 import pulumi_vault as vault
-from pulumi import Config, export
-from pulumi.stack_reference import StackReference
+from pulumi import Config, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam, s3
 from pulumi_consul import Node, Service, ServiceCheckArgs
 

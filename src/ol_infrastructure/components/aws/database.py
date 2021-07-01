@@ -16,7 +16,11 @@ from pulumi_aws import rds
 from pulumi_aws.ec2 import SecurityGroup
 from pydantic import BaseModel, PositiveInt, SecretStr, conint, validator
 
-from ol_infrastructure.lib.aws.rds_helper import db_engines, parameter_group_family
+from ol_infrastructure.lib.aws.rds_helper import (
+    DBInstanceTypes,
+    db_engines,
+    parameter_group_family,
+)
 from ol_infrastructure.lib.ol_types import AWSBase
 
 MAX_BACKUP_DAYS = 35
@@ -55,7 +59,7 @@ class OLDBConfig(AWSBase):
     security_groups: List[SecurityGroup]
     backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore
     db_name: Optional[str] = None  # The name of the database schema to create
-    instance_size: str = "db.m5.large"
+    instance_size: str = DBInstanceTypes.general_purpose_large.value
     max_storage: Optional[PositiveInt] = None  # Set to allow for storage autoscaling
     multi_az: bool = True
     prevent_delete: bool = True
@@ -80,7 +84,7 @@ class OLDBConfig(AWSBase):
     def is_valid_version(
         cls: "OLDBConfig", engine_version: str, values: Dict  # noqa: N805, WPS110
     ) -> str:
-        engine: str = values.get("engine")
+        engine: str = values.get("engine")  # type: ignore
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
             raise ValueError(
