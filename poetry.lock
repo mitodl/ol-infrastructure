@@ -913,7 +913,7 @@ six = ">=1.9"
 
 [[package]]
 name = "pulumi"
-version = "3.5.1"
+version = "3.6.0"
 description = "Pulumi's Python SDK"
 category = "main"
 optional = false
@@ -1472,7 +1472,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "8692cde5878b6c2a79e9573a8256330d9f2c199a6838e7013d426ed07f05a7f7"
+content-hash = "a9af2f98206f4686f179362a79f1295dacfe2970d54d3bbe552ab5fea0926e0b"
 
 [metadata.files]
 anyio = [
@@ -2039,7 +2039,7 @@ protobuf = [
     {file = "protobuf-3.17.3.tar.gz", hash = "sha256:72804ea5eaa9c22a090d2803813e280fb273b62d5ae497aaf3553d141c4fdd7b"},
 ]
 pulumi = [
-    {file = "pulumi-3.5.1-py2.py3-none-any.whl", hash = "sha256:9a6c73f78d3e6569a14b9f88067c4b2f0889fafdad62717af43898c7c24de77b"},
+    {file = "pulumi-3.6.0-py2.py3-none-any.whl", hash = "sha256:7dac891a48e8d683a427048c14ded1d753ededead3beac000f19a9b7ddf6e91f"},
 ]
 pulumi-aws = [
     {file = "pulumi_aws-4.10.0.tar.gz", hash = "sha256:6a3775ec0cee8e5360ac3a6b0d58538ccb4cd00b9178c0c715adf1d53864635c"},
