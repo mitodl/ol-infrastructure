@@ -90,8 +90,8 @@ CONTENTSTORE:
 
 ACTIVATION_EMAIL_SUPPORT_LINK: ''
 AFFILIATE_COOKIE_NAME: dev_affiliate_id
-ANALYTICS_DASHBOARD_NAME: Your Platform Name Here Insights
-ANALYTICS_DASHBOARD_URL: http://localhost:18110/courses
+# ANALYTICS_DASHBOARD_NAME: Your Platform Name Here Insights
+# ANALYTICS_DASHBOARD_URL: http://localhost:18110/courses
 AUTH_PASSWORD_VALIDATORS:
 -   NAME: django.contrib.auth.password_validation.UserAttributeSimilarityValidator
 -   NAME: common.djangoapps.util.password_policy_validators.MinimumLengthValidator
@@ -286,7 +286,6 @@ FEATURES:
     ENABLE_PUBLISHER: false
     ENABLE_READING_FROM_MULTIPLE_HISTORY_TABLES: true
     ENABLE_SPECIAL_EXAMS: false
-    ENABLE_SYSADMIN_DASHBOARD: false
     ENABLE_THIRD_PARTY_AUTH: true
     ENABLE_VIDEO_UPLOAD_PIPELINE: false
     PREVIEW_LMS_BASE: preview.online-qa.mitx.mit.edu  # MODIFIED

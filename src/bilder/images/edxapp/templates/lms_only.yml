@@ -14,8 +14,8 @@ ACE_ENABLED_POLICIES:
 - bulk_email_optout
 ACE_ROUTING_KEY: edx.lms.core.default
 # ALTERNATE_WORKER_QUEUES: cms  # The code already has this default
-ANALYTICS_API_KEY: ''
-ANALYTICS_API_URL: http://localhost:18100
+# ANALYTICS_API_KEY: ''
+# ANALYTICS_API_URL: http://localhost:18100
 API_ACCESS_FROM_EMAIL: api-requests@example.com
 API_ACCESS_MANAGER_EMAIL: api-access@example.com
 API_DOCUMENTATION_URL: http://course-catalog-api-guide.readthedocs.io/en/latest/
