@@ -2,10 +2,6 @@ path "mariadb-mitxonline/creds/edxapp" {
   capabilities = ["read"]
 }
 
-path "mariadb-mitxonline/creds/edxapp" {
-  capabilities = ["read"]
-}
-
 path "mariadb-mitxonline/creds/edxapp-csmh" {
   capabilities = ["read"]
 }
