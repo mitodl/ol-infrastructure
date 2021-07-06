@@ -19,7 +19,7 @@ def proxy_consul_dns(state=None, host=None):
     )
     with tempfile.NamedTemporaryFile(delete=False, mode="w") as dhclient_config:
         dhclient_config.write(
-            'make_resolv_conf\necho "nameserver 127.0.0.1\\n$(cat /etc/resolv.conf)" '
+            r'make_resolv_conf\necho "nameserver 127.0.0.1\\n$(cat /etc/resolv.conf)" '
             "> /etc/resolv.conf"
         )
         files.put(
@@ -31,6 +31,8 @@ def proxy_consul_dns(state=None, host=None):
             state=state,
             host=host,
         )
+    # Allow hosts that default to using systemd-resolved to properly resolve Consul
+    # domains
     if host.fact.has_systemd and host.fact.systemd_enabled["systemd-resolved.service"]:
         with tempfile.NamedTemporaryFile(delete=False, mode="w") as resolved_conf:
             resolved_conf.write("[Resolve]\nDNS=127.0.0.1\nDomains=~consul")

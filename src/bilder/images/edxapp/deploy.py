@@ -53,7 +53,7 @@ pip.packages(
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "mitxpro-openedx-extensions==0.2.2",
         "social-auth-mitxpro==0.4",
-        "edx-username-changer==0.0.1",
+        "edx-username-changer==0.2.0",
     ],
     present=True,
     virtualenv="/edx/app/edxapp/venvs/edxapp/",
@@ -67,7 +67,7 @@ if node_type == WEB_NODE_TYPE:
         services=[
             ConsulService(
                 name="edxapp",
-                port=8080,
+                port=8080,  # noqa: WPS432
                 tags=["lms"],
                 check=ConsulServiceTCPCheck(
                     name="edxapp-lms",
@@ -134,8 +134,8 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as studio_template:
         name="Upload studio.yml template for Vault agent",
         src=studio_template.name,
         dest=studio_template_path,
-        user="vault",
-        group="vault",
+        user=vault.name,
+        group=vault.name,
         create_remote_dir=True,
     )
 with tempfile.NamedTemporaryFile("wt", delete=False) as lms_template:
@@ -145,8 +145,8 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as lms_template:
         name="Upload lms.yml template for Vault agent",
         src=lms_template.name,
         dest=lms_template_path,
-        user="vault",
-        group="vault",
+        user=vault.name,
+        group=vault.name,
         create_remote_dir=True,
     )
 # Manage services
@@ -165,7 +165,7 @@ if host.fact.has_systemd:
         watched_files=[studio_config_path],
         onchange_command=(
             f"chown www-data:edxapp {studio_config_path} &&"
-            " /edx/bin/supervisorctl restart lms"
+            " /edx/bin/supervisorctl restart cms"
         ),
     )
     proxy_consul_dns()
