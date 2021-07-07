@@ -25,3 +25,7 @@ path "secret-mitxonline/edx-forum" {
 path "secret-mitxonline/edx-xqueue" {
   capabilities = ["read"]
 }
+
+path "secret-operations/global/mitx_wildcard_cert" {
+  capabilities = ["read"]
+}

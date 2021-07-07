@@ -18,16 +18,6 @@ mysql_creds: &mysql_creds
 
 {{ with secret "secret-mitxonline/edxapp" }}
 CELERY_BROKER_PASSWORD: {{ .Data.redis_auth_token }}
-redis_cache_config: &redis_cache_config
-  BACKEND: django_redis.cache.RedisCache
-  LOCATION: rediss://edxapp-redis.service.consul:6379/0
-  KEY_FUNCTION: common.djangoapps.util.memcache.safe_key
-  OPTIONS:
-    CLIENT_CLASS: django_redis.client.DefaultClient
-    CONNECTION_POOL_CLASS: rediscluster.connection.ClusterConnectionPool
-    CONNECTION_POOL_KWARGS:
-      skip_full_coverage_check: True # AWS ElasticCache has disabled CONFIG commands
-    PASSWORD: {{ .Data.redis_auth_token }}
 SECRET_KEY: {{ .Data.django_secret_key }}
 JWT_AUTH:  # NEEDS ATTENTION
     JWT_PRIVATE_SIGNING_JWK: {{ .Data.private_signing_jwk }}
@@ -87,6 +77,16 @@ CONTENTSTORE:
         auth_source: ''
         ssl: false
         <<: *mongo_params
+
+redis_cache_config: &redis_cache_config
+  BACKEND: django_redis.cache.RedisCache
+  LOCATION: redis://edxapp-redis.service.consul:6379/0
+  KEY_FUNCTION: common.djangoapps.util.memcache.safe_key
+  OPTIONS:
+    REDIS_CLIENT_CLASS: rediscluster.RedisCluster
+    CONNECTION_POOL_CLASS: rediscluster.connection.ClusterConnectionPool
+    CONNECTION_POOL_KWARGS:
+      skip_full_coverage_check: True # AWS ElasticCache has disabled CONFIG commands
 
 ACTIVATION_EMAIL_SUPPORT_LINK: ''
 AFFILIATE_COOKIE_NAME: dev_affiliate_id

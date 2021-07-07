@@ -148,7 +148,7 @@ edxapp_iam_role = iam.Role(
             },
         }
     ),
-    name_prefix="mitxonline-edxapp-role-",
+    name_prefix=f"mitxonline-edxapp-role-{stack_info.env_suffix}-",
     path=f"/ol-applications/edxapp/mitxonline/{stack_info.env_suffix}/",
     tags=aws_config.tags,
 )
@@ -174,7 +174,7 @@ edxapp_instance_profile = iam.InstanceProfile(
 group_name = f"edxapp-mitxonline-{stack_info.env_suffix}"
 edxapp_security_group = ec2.SecurityGroup(
     "edxapp-security-group",
-    name=group_name,
+    name_prefix=f"{group_name}-",
     ingress=[],
     egress=default_egress_args,
     tags=aws_config.merged_tags({"Name": group_name}),
@@ -184,7 +184,7 @@ edxapp_security_group = ec2.SecurityGroup(
 # Create security group for Mitxonline MariaDB database
 mitxonline_db_security_group = ec2.SecurityGroup(
     f"mitxonline-db-access-{stack_info.env_suffix}",
-    name=f"mitxonline-db-access-{stack_info.env_suffix}",
+    name_prefix=f"mitxonline-db-access-{stack_info.env_suffix}-",
     description="Access from Mitxonline instances to the associated MariaDB database",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -226,7 +226,7 @@ edxapp_mysql_role_statements.pop("app")
 edxapp_mysql_role_statements["edxapp"] = {
     "create": Template(
         "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "  # noqa: Q000
+        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
         "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp.* TO '{{name}}'@'%';"
     ),
     "revoke": Template("DROP USER '{{name}}';"),
@@ -234,7 +234,7 @@ edxapp_mysql_role_statements["edxapp"] = {
 edxapp_mysql_role_statements["edxapp-csmh"] = {
     "create": Template(
         "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "  # noqa: Q000
+        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
         "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh.* TO '{{name}}'@'%';"
     ),
     "revoke": Template("DROP USER '{{name}}';"),
@@ -242,7 +242,7 @@ edxapp_mysql_role_statements["edxapp-csmh"] = {
 edxapp_mysql_role_statements["xqueue"] = {
     "create": Template(
         "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "  # noqa: Q000
+        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
         "CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue.* TO '{{name}}'@'%';"
     ),
     "revoke": Template("DROP USER '{{name}}';"),
@@ -305,7 +305,7 @@ mitxonline_mongo_vault_backend = OLVaultDatabaseBackend(mitxonline_mongo_vault_c
 redis_config = Config("redis")
 redis_cluster_security_group = ec2.SecurityGroup(
     f"edxapp-redis-cluster-{env_name}",
-    name=f"mitxonline-edxapp-redis-{env_name}",
+    name_prefix=f"mitxonline-edxapp-redis-{env_name}-",
     description="Grant access to Redis from Open edX",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -321,8 +321,7 @@ redis_cluster_security_group = ec2.SecurityGroup(
 )
 
 redis_cache_config = OLAmazonRedisConfig(
-    encrypt_transit=True,
-    auth_token=redis_config.require("auth_token"),
+    encrypt_transit=False,
     encrypted=True,
     engine_version="6.x",
     num_instances=3,

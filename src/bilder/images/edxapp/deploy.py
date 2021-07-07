@@ -53,7 +53,7 @@ pip.packages(
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "mitxpro-openedx-extensions==0.2.2",
         "social-auth-mitxpro==0.4",
-        "edx-username-changer==0.2.0",
+        "edx-username-changer==0.1.0",
     ],
     present=True,
     virtualenv="/edx/app/edxapp/venvs/edxapp/",
@@ -112,6 +112,20 @@ vault = Vault(
             VaultTemplate(
                 source=studio_template_path,
                 destination=studio_config_path,
+            ),
+            VaultTemplate(
+                contents=(
+                    '{{ with secret "secret-operations/global/mitx_wildcard_cert" }}'
+                    "{{ printf .Data.value }}{{ end }}"
+                ),
+                destination=Path("/etc/ssl/certs/mitx_wildcard.cert"),
+            ),
+            VaultTemplate(
+                contents=(
+                    '{{ with secret "secret-operations/global/mitx_wildcard_cert" }}'
+                    "{{ printf .Data.key }}{{ end }}"
+                ),
+                destination=Path("/etc/ssl/certs/mitx_wildcard.key"),
             ),
         ],
     ),
