@@ -61,8 +61,41 @@ pip.packages(
 )
 
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
+studio_template_path = Path("/etc/vault/templates/edxapp_studio.yml.tmpl")
+lms_template_path = Path("/etc/vault/templates/edxapp_lms.yml.tmpl")
+lms_config_path = Path("/edx/etc/lms.yml")
+studio_config_path = Path("/edx/etc/studio.yml")
+# Install Consul and Vault Agent
 
+vault_templates = [
+    VaultTemplate(
+        source=lms_template_path,
+        destination=lms_config_path,
+    ),
+    VaultTemplate(
+        source=studio_template_path,
+        destination=studio_config_path,
+    ),
+]
 if node_type == WEB_NODE_TYPE:
+    vault_templates.extend(
+        [
+            VaultTemplate(
+                contents=(
+                    '{{ with secret "secret-operations/global/mitx_wildcard_cert" }}'
+                    "{{ printf .Data.value }}{{ end }}"
+                ),
+                destination=Path("/etc/ssl/certs/mitx_wildcard.cert"),
+            ),
+            VaultTemplate(
+                contents=(
+                    '{{ with secret "secret-operations/global/mitx_wildcard_cert" }}'
+                    "{{ printf .Data.key }}{{ end }}"
+                ),
+                destination=Path("/etc/ssl/certs/mitx_wildcard.key"),
+            ),
+        ]
+    )
     consul_configuration[Path("01-edxapp.json")] = ConsulConfig(
         services=[
             ConsulService(
@@ -78,11 +111,6 @@ if node_type == WEB_NODE_TYPE:
         ]
     )
 
-studio_template_path = Path("/etc/vault/templates/edxapp_studio.yml.tmpl")
-lms_template_path = Path("/etc/vault/templates/edxapp_lms.yml.tmpl")
-lms_config_path = Path("/edx/etc/lms.yml")
-studio_config_path = Path("/edx/etc/studio.yml")
-# Install Consul and Vault Agent
 vault = Vault(
     version=VERSIONS["vault"],
     configuration=VaultAgentConfig(
@@ -104,30 +132,7 @@ vault = Vault(
             ),
             sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
         ),
-        template=[
-            VaultTemplate(
-                source=lms_template_path,
-                destination=lms_config_path,
-            ),
-            VaultTemplate(
-                source=studio_template_path,
-                destination=studio_config_path,
-            ),
-            VaultTemplate(
-                contents=(
-                    '{{ with secret "secret-operations/global/mitx_wildcard_cert" }}'
-                    "{{ printf .Data.value }}{{ end }}"
-                ),
-                destination=Path("/etc/ssl/certs/mitx_wildcard.cert"),
-            ),
-            VaultTemplate(
-                contents=(
-                    '{{ with secret "secret-operations/global/mitx_wildcard_cert" }}'
-                    "{{ printf .Data.key }}{{ end }}"
-                ),
-                destination=Path("/etc/ssl/certs/mitx_wildcard.key"),
-            ),
-        ],
+        template=vault_templates,
     ),
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)

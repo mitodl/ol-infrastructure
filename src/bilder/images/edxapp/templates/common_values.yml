@@ -19,8 +19,9 @@ mysql_creds: &mysql_creds
 {{ with secret "secret-mitxonline/edxapp" }}
 SECRET_KEY: {{ .Data.django_secret_key }}
 JWT_AUTH:  # NEEDS ATTENTION
-    JWT_PRIVATE_SIGNING_JWK: {{ .Data.private_signing_jwk }}
-    JWT_PUBLIC_SIGNING_JWK_SET: {{ .Data.public_signing_jwk }}
+    JWT_PRIVATE_SIGNING_JWK: '{{ .Data.private_signing_jwk }}'
+    JWT_PUBLIC_SIGNING_JWK_SET: '{{ .Data.public_signing_jwk }}'
+    JWT_AUDIENCE: mitxonline
 {{ end }}
 
 {{ with secret "secret-mitxonline/edx-forum" }}

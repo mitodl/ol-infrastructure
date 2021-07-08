@@ -23,21 +23,23 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import mysql_role_statements
 
-mitxonline_config = Config("mitxonline")
+edxapp_config = Config("edxapp")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
-consul_stack = StackReference(f"infrastructure.consul.mitxonline.{stack_info.name}")
-mitxonline_vpc = network_stack.require_output("mitxonline_vpc")
+consul_stack = StackReference(
+    f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
+)
+edxapp_vpc = network_stack.require_output(f"{stack_info.env_prefix}_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
+env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 aws_config = AWSBase(
-    tags={"OU": "mitxonline", "Environment": f"mitxonline-{stack_info.env_suffix}"}
+    tags={"OU": edxapp_config.require("business_unit"), "Environment": env_name}
 )
 
 aws_account = get_caller_identity()
-mitxonline_vpc_id = mitxonline_vpc["id"]
-env_name = f"mitxonline-{stack_info.env_suffix}"
+edxapp_vpc_id = edxapp_vpc["id"]
 edxapp_web_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["edxapp-web-*"]),
@@ -62,25 +64,25 @@ edxapp_worker_ami = ec2.get_ami(
 # S3 Buckets #
 ##############
 
-storage_bucket_name = f"mitxonline-edxapp-storage-{stack_info.env_suffix}"
+storage_bucket_name = f"{stack_info.env_prefix}-edxapp-storage-{stack_info.env_suffix}"
 edxapp_storage_bucket = s3.Bucket(
-    "mitxonline-edxapp-storage-bucket",
+    "edxapp-storage-bucket",
     bucket=storage_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
 )
 
-course_bucket_name = f"mitxonline-edxapp-courses-{stack_info.env_suffix}"
+course_bucket_name = f"{stack_info.env_prefi}-edxapp-courses-{stack_info.env_suffix}"
 edxapp_storage_bucket = s3.Bucket(
-    "mitxonline-edxapp-courses-bucket",
+    "edxapp-courses-bucket",
     bucket=course_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=False),
     tags=aws_config.tags,
 )
 
-grades_bucket_name = f"mitxonline-edxapp-grades-{stack_info.env_suffix}"
+grades_bucket_name = f"{stack_info.env_prefi}-edxapp-grades-{stack_info.env_suffix}"
 edxapp_storage_bucket = s3.Bucket(
-    "mitxonline-edxapp-grades-bucket",
+    "edxapp-grades-bucket",
     bucket=grades_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
@@ -128,7 +130,7 @@ edxapp_policy_document = {
 edxapp_policy = iam.Policy(
     "edxapp-policy",
     name_prefix="edxapp-policy-",
-    path=f"/ol-applications/edxapp/mitxonline/{stack_info.env_suffix}/",
+    path=f"/ol-applications/edxapp/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         edxapp_policy_document,
         stringify=True,
@@ -137,7 +139,7 @@ edxapp_policy = iam.Policy(
     description="AWS access permissions for edX application instances",
 )
 edxapp_iam_role = iam.Role(
-    "mitxonline-edxapp-instance-role",
+    "edxapp-instance-role",
     assume_role_policy=json.dumps(
         {
             "Version": IAM_POLICY_VERSION,
@@ -148,8 +150,8 @@ edxapp_iam_role = iam.Role(
             },
         }
     ),
-    name_prefix=f"mitxonline-edxapp-role-{stack_info.env_suffix}-",
-    path=f"/ol-applications/edxapp/mitxonline/{stack_info.env_suffix}/",
+    name_prefix=f"{stack_info.env_prefix}-edxapp-role-{stack_info.env_suffix}-",
+    path=f"/ol-applications/edxapp/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     tags=aws_config.tags,
 )
 iam.RolePolicyAttachment(
@@ -164,62 +166,62 @@ iam.RolePolicyAttachment(
 )
 edxapp_instance_profile = iam.InstanceProfile(
     f"edxapp-instance-profile-{stack_info.env_suffix}",
-    name_prefix=f"mitxonline-edxapp-role-{stack_info.env_suffix}-",
+    name_prefix=f"{stack_info.env_prefix}-edxapp-role-{stack_info.env_suffix}-",
     role=edxapp_iam_role.name,
-    path="/ol-applications/edxapp/mitxonline/",
+    path=f"/ol-applications/edxapp/{stack_info.env_prefix}/",
 )
 ##################################
 #     Network Access Control     #
 ##################################
-group_name = f"edxapp-mitxonline-{stack_info.env_suffix}"
+group_name = f"edxapp-{env_name}"
 edxapp_security_group = ec2.SecurityGroup(
     "edxapp-security-group",
     name_prefix=f"{group_name}-",
     ingress=[],
     egress=default_egress_args,
     tags=aws_config.merged_tags({"Name": group_name}),
-    vpc_id=mitxonline_vpc_id,
+    vpc_id=edxapp_vpc_id,
 )
 
-# Create security group for Mitxonline MariaDB database
-mitxonline_db_security_group = ec2.SecurityGroup(
-    f"mitxonline-db-access-{stack_info.env_suffix}",
-    name_prefix=f"mitxonline-db-access-{stack_info.env_suffix}-",
-    description="Access from Mitxonline instances to the associated MariaDB database",
+# Create security group for edxapp MariaDB database
+edxapp_db_security_group = ec2.SecurityGroup(
+    f"edxapp-db-access-{stack_info.env_suffix}",
+    name_prefix=f"edxapp-db-access-{stack_info.env_prefix}-{stack_info.env_suffix}-",
+    description="Access from Edxapp instances to the associated MariaDB database",
     ingress=[
         ec2.SecurityGroupIngressArgs(
             security_groups=[edxapp_security_group.id],
             # TODO: Create Vault security group to act as source of allowed
             # traffic. (TMM 2021-05-04)
             cidr_blocks=[
-                mitxonline_vpc["cidr"],
+                edxapp_vpc["cidr"],
                 operations_vpc["cidr"],
             ],
             protocol="tcp",
             from_port=DEFAULT_MYSQL_PORT,
             to_port=DEFAULT_MYSQL_PORT,
-            description="Access to MariaDB from Mitxonline web nodes",
+            description="Access to MariaDB from Edxapp web nodes",
         ),
     ],
     tags=aws_config.tags,
-    vpc_id=mitxonline_vpc_id,
+    vpc_id=edxapp_vpc_id,
 )
 
 
 ##########################
 #     Database Setup     #
 ##########################
-mitxonline_db_config = OLMariaDBConfig(
-    instance_name=f"mitxonline-db-{stack_info.env_suffix}",
-    password=mitxonline_config.require("db_password"),
-    subnet_group_name=mitxonline_vpc["rds_subnet"],
-    security_groups=[mitxonline_db_security_group],
+edxapp_db_config = OLMariaDBConfig(
+    instance_name=f"edxapp-db-{stack_info.env_prefix}-{stack_info.env_suffix}",
+    password=edxapp_config.require("db_password"),
+    subnet_group_name=edxapp_vpc["rds_subnet"],
+    security_groups=[edxapp_db_security_group],
     tags=aws_config.tags,
     db_name="edxapp",
     engine_version="10.5.8",
     **defaults(stack_info)["rds"],
 )
-mitxonline_db = OLAmazonDB(mitxonline_db_config)
+edxapp_db = OLAmazonDB(edxapp_db_config)
 
 edxapp_mysql_role_statements = mysql_role_statements.copy()
 edxapp_mysql_role_statements.pop("app")
@@ -248,40 +250,40 @@ edxapp_mysql_role_statements["xqueue"] = {
     "revoke": Template("DROP USER '{{name}}';"),
 }
 
-mitxonline_db_vault_backend_config = OLVaultMysqlDatabaseConfig(
-    db_name=mitxonline_db_config.db_name,
-    mount_point=f"{mitxonline_db_config.engine}-mitxonline",
-    db_admin_username=mitxonline_db_config.username,
-    db_admin_password=mitxonline_config.require("db_password"),
-    db_host=mitxonline_db.db_instance.address,
+edxapp_db_vault_backend_config = OLVaultMysqlDatabaseConfig(
+    db_name=edxapp_db_config.db_name,
+    mount_point=f"{edxapp_db_config.engine}-{stack_info.env_prefix}",
+    db_admin_username=edxapp_db_config.username,
+    db_admin_password=edxapp_config.require("db_password"),
+    db_host=edxapp_db.db_instance.address,
     role_statements=edxapp_mysql_role_statements,
 )
-mitxonline_db_vault_backend = OLVaultDatabaseBackend(mitxonline_db_vault_backend_config)
+edxapp_db_vault_backend = OLVaultDatabaseBackend(edxapp_db_vault_backend_config)
 
-mitxonline_db_consul_node = Node(
-    "mitxonline-instance-db-node",
-    name="mitxonline-mysql",
-    address=mitxonline_db.db_instance.address,
-    datacenter=f"mitxonline-{stack_info.env_suffix}",
+edxapp_db_consul_node = Node(
+    "edxapp-instance-db-node",
+    name="edxapp-mysql",
+    address=edxapp_db.db_instance.address,
+    datacenter=env_name,
 )
 
-mitxonline_db_consul_service = Service(
-    "mitxonline-instance-db-service",
-    node=mitxonline_db_consul_node.name,
+edxapp_db_consul_service = Service(
+    "edxapp-instance-db-service",
+    node=edxapp_db_consul_node.name,
     name="edxapp-db",
-    port=mitxonline_db_config.port,
+    port=edxapp_db_config.port,
     meta={
         "external-node": True,
         "external-probe": True,
     },
     checks=[
         ServiceCheckArgs(
-            check_id="mitxonline-db",
+            check_id="edxapp-db",
             interval="10s",
             name="edxapp-db",
             timeout="60s",
             status="passing",
-            tcp=f"{mitxonline_db.db_instance.address}:{mitxonline_db_config.port}",  # noqa: WPS237,E501
+            tcp=f"{edxapp_db.db_instance.address}:{edxapp_db_config.port}",  # noqa: WPS237,E501
         )
     ],
 )
@@ -289,14 +291,14 @@ mitxonline_db_consul_service = Service(
 #######################
 # MongoDB Vault Setup #
 #######################
-mitxonline_mongo_vault_config = OLVaultMongoDatabaseConfig(
+edxapp_mongo_vault_config = OLVaultMongoDatabaseConfig(
     db_name="edxapp",
-    mount_point="mongodb-mitxonline",
+    mount_point=f"mongodb-{stack_info.env_prefix}",
     db_admin_username="admin",
-    db_admin_password=mitxonline_config.require("mongo_admin_password"),
-    db_host=f"mongodb-master.service.mitxonline-{stack_info.env_suffix}.consul",
+    db_admin_password=edxapp_config.require("mongo_admin_password"),
+    db_host=f"mongodb-master.service.{stack_info.env_prefix}-{stack_info.env_suffix}.consul",
 )
-mitxonline_mongo_vault_backend = OLVaultDatabaseBackend(mitxonline_mongo_vault_config)
+edxapp_mongo_vault_backend = OLVaultDatabaseBackend(edxapp_mongo_vault_config)
 
 ###########################
 # Redis Elasticache Setup #
@@ -305,7 +307,7 @@ mitxonline_mongo_vault_backend = OLVaultDatabaseBackend(mitxonline_mongo_vault_c
 redis_config = Config("redis")
 redis_cluster_security_group = ec2.SecurityGroup(
     f"edxapp-redis-cluster-{env_name}",
-    name_prefix=f"mitxonline-edxapp-redis-{env_name}-",
+    name_prefix=f"edxapp-redis-{env_name}-",
     description="Grant access to Redis from Open edX",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -317,7 +319,7 @@ redis_cluster_security_group = ec2.SecurityGroup(
         )
     ],
     tags=aws_config.merged_tags({"Name": f"edxapp-redis-{env_name}"}),
-    vpc_id=mitxonline_vpc_id,
+    vpc_id=edxapp_vpc_id,
 )
 
 redis_cache_config = OLAmazonRedisConfig(
@@ -328,25 +330,25 @@ redis_cache_config = OLAmazonRedisConfig(
     shard_count=1,
     auto_upgrade=True,
     cluster_description="Redis cluster for edX platform tasks and caching",
-    cluster_name=f"edxapp-redis-{stack_info.env_suffix}",
+    cluster_name=f"edxapp-redis-{env_name}",
     security_groups=[redis_cluster_security_group.id],
-    subnet_group=mitxonline_vpc[
+    subnet_group=edxapp_vpc[
         "elasticache_subnet"
     ],  # the name of the subnet group created in the OLVPC component resource
     tags=aws_config.tags,
     **defaults(stack_info)["redis"],
 )
-mitxonline_redis_cache = OLAmazonCache(redis_cache_config)
-mitxonline_redis_consul_node = Node(
-    "mitxonline-redis-cache-node",
-    name="mitxonline-redis",
-    address=mitxonline_redis_cache.address,
-    datacenter=f"mitxonline-{stack_info.env_suffix}",
+edxapp_redis_cache = OLAmazonCache(redis_cache_config)
+edxapp_redis_consul_node = Node(
+    "edxapp-redis-cache-node",
+    name="edxapp-redis",
+    address=edxapp_redis_cache.address,
+    datacenter=env_name,
 )
 
-mitxonline_redis_consul_service = Service(
-    "mitxonline-redis-consul-service",
-    node=mitxonline_redis_consul_node.name,
+edxapp_redis_consul_service = Service(
+    "edxapp-redis-consul-service",
+    node=edxapp_redis_consul_node.name,
     name="edxapp-redis",
     port=redis_cache_config.port,
     meta={
@@ -355,12 +357,12 @@ mitxonline_redis_consul_service = Service(
     },
     checks=[
         ServiceCheckArgs(
-            check_id="mitxonline-redis",
+            check_id="edxapp-redis",
             interval="10s",
             name="edxapp-redis",
             timeout="60s",
             status="passing",
-            tcp=f"{mitxonline_redis_cache.address}:{mitxonline_redis_cache.cache_cluster.port}",  # noqa: WPS237,E501
+            tcp=f"{edxapp_redis_cache.address}:{edxapp_redis_cache.cache_cluster.port}",  # noqa: WPS237,E501
         )
     ],
 )
@@ -368,23 +370,21 @@ mitxonline_redis_consul_service = Service(
 ######################
 # Secrets Management #
 ######################
-mitxonline_vault_mount = vault.Mount(
-    "mitxonline-vault-generic-secrets-mount",
-    path="secret-mitxonline",
+edxapp_vault_mount = vault.Mount(
+    "edxapp-vault-generic-secrets-mount",
+    path=f"secret-{stack_info.env_prefix}",
     description="Static secrets storage for MITx Online applications and services",
     type="kv",
 )
 edxapp_secrets = vault.generic.Secret(
     "edxapp-static-secrets",
-    path=mitxonline_vault_mount.path.apply("{}/edxapp".format),
-    data_json=mitxonline_config.require_secret_object("edxapp_secrets").apply(
-        json.dumps
-    ),
+    path=edxapp_vault_mount.path.apply("{}/edxapp".format),
+    data_json=edxapp_config.require_secret_object("edxapp_secrets").apply(json.dumps),
 )
 forum_secrets = vault.generic.Secret(
     "edx-forum-static-secrets",
-    path=mitxonline_vault_mount.path.apply("{}/edx-forum".format),
-    data_json=mitxonline_config.require_secret_object("edx_forum_secrets").apply(
+    path=edxapp_vault_mount.path.apply("{}/edx-forum".format),
+    data_json=edxapp_config.require_secret_object("edx_forum_secrets").apply(
         json.dumps
     ),
 )
@@ -406,7 +406,7 @@ vault.aws.AuthBackendRole(
     bound_iam_instance_profile_arns=[edxapp_instance_profile.arn],
     bound_ami_ids=[edxapp_web_ami.id],
     bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[mitxonline_vpc_id],
+    bound_vpc_ids=[edxapp_vpc_id],
     token_policies=[edxapp_vault_policy.name],
 )
 
@@ -420,15 +420,15 @@ vault.aws.AuthBackendRole(
     bound_iam_instance_profile_arns=[edxapp_instance_profile.arn],
     bound_ami_ids=[edxapp_worker_ami.id],
     bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[mitxonline_vpc_id],
+    bound_vpc_ids=[edxapp_vpc_id],
     token_policies=[edxapp_vault_policy.name],
 )
 
 
 export(
-    "mitxonline_edxapp",
+    f"{stack_info.env_prefix}_edxapp",
     {
-        "mariadb": mitxonline_db.db_instance.address,
-        "redis": mitxonline_redis_cache.address,
+        "mariadb": edxapp_db.db_instance.address,
+        "redis": edxapp_redis_cache.address,
     },
 )
