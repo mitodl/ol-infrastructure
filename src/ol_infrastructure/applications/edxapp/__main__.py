@@ -72,7 +72,7 @@ edxapp_storage_bucket = s3.Bucket(
     tags=aws_config.tags,
 )
 
-course_bucket_name = f"{stack_info.env_prefi}-edxapp-courses-{stack_info.env_suffix}"
+course_bucket_name = f"{stack_info.env_prefix}-edxapp-courses-{stack_info.env_suffix}"
 edxapp_storage_bucket = s3.Bucket(
     "edxapp-courses-bucket",
     bucket=course_bucket_name,
@@ -80,7 +80,7 @@ edxapp_storage_bucket = s3.Bucket(
     tags=aws_config.tags,
 )
 
-grades_bucket_name = f"{stack_info.env_prefi}-edxapp-grades-{stack_info.env_suffix}"
+grades_bucket_name = f"{stack_info.env_prefix}-edxapp-grades-{stack_info.env_suffix}"
 edxapp_storage_bucket = s3.Bucket(
     "edxapp-grades-bucket",
     bucket=grades_bucket_name,
