@@ -186,7 +186,7 @@ edxapp_security_group = ec2.SecurityGroup(
 # Create security group for edxapp MariaDB database
 edxapp_db_security_group = ec2.SecurityGroup(
     f"edxapp-db-access-{stack_info.env_suffix}",
-    name_prefix=f"edxapp-db-access-{stack_info.env_prefix}-{stack_info.env_suffix}-",
+    name_prefix=f"edxapp-db-access-{env_name}-",
     description="Access from Edxapp instances to the associated MariaDB database",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -212,7 +212,7 @@ edxapp_db_security_group = ec2.SecurityGroup(
 #     Database Setup     #
 ##########################
 edxapp_db_config = OLMariaDBConfig(
-    instance_name=f"edxapp-db-{stack_info.env_prefix}-{stack_info.env_suffix}",
+    instance_name=f"edxapp-db-{env_name}",
     password=edxapp_config.require("db_password"),
     subnet_group_name=edxapp_vpc["rds_subnet"],
     security_groups=[edxapp_db_security_group],
@@ -296,7 +296,7 @@ edxapp_mongo_vault_config = OLVaultMongoDatabaseConfig(
     mount_point=f"mongodb-{stack_info.env_prefix}",
     db_admin_username="admin",
     db_admin_password=edxapp_config.require("mongo_admin_password"),
-    db_host=f"mongodb-master.service.{stack_info.env_prefix}-{stack_info.env_suffix}.consul",
+    db_host=f"mongodb-master.service.{env_name}.consul",
 )
 edxapp_mongo_vault_backend = OLVaultDatabaseBackend(edxapp_mongo_vault_config)
 
@@ -323,7 +323,9 @@ redis_cluster_security_group = ec2.SecurityGroup(
 )
 
 redis_cache_config = OLAmazonRedisConfig(
-    encrypt_transit=False,
+    encrypt_transit=True,
+    auth_token=redis_config.require("auth_token"),
+    cluster_mode_enabled=False,
     encrypted=True,
     engine_version="6.x",
     num_instances=3,

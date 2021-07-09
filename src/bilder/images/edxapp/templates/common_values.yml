@@ -17,6 +17,14 @@ mysql_creds: &mysql_creds
 {{ end }}
 
 {{ with secret "secret-mitxonline/edxapp" }}
+CELERY_BROKER_PASSWORD: {{ .Data.redis_auth_token }}
+redis_cache_config: &redis_cache_config
+  BACKEND: django_redis.cache.RedisCache
+  LOCATION: rediss://default@edxapp-redis.service.consul:6379/0
+  KEY_FUNCTION: common.djangoapps.util.memcache.safe_key
+  OPTIONS:
+    CLIENT_CLASS: django_redis.client.DefaultClient
+    PASSWORD: {{ .Data.redis_auth_token }}
 SECRET_KEY: {{ .Data.django_secret_key }}
 JWT_AUTH:  # NEEDS ATTENTION
     JWT_PRIVATE_SIGNING_JWK: '{{ .Data.private_signing_jwk }}'
@@ -77,16 +85,6 @@ CONTENTSTORE:
         auth_source: ''
         ssl: false
         <<: *mongo_params
-
-redis_cache_config: &redis_cache_config
-  BACKEND: django_redis.cache.RedisCache
-  LOCATION: redis://edxapp-redis.service.consul:6379/0
-  KEY_FUNCTION: common.djangoapps.util.memcache.safe_key
-  OPTIONS:
-    REDIS_CLIENT_CLASS: rediscluster.RedisCluster
-    CONNECTION_POOL_CLASS: rediscluster.connection.ClusterConnectionPool
-    CONNECTION_POOL_KWARGS:
-      skip_full_coverage_check: True # AWS ElasticCache has disabled CONFIG commands
 
 ACTIVATION_EMAIL_SUPPORT_LINK: ''
 AFFILIATE_COOKIE_NAME: dev_affiliate_id
@@ -154,9 +152,9 @@ CACHES:  # MODIFIED
 # CAS_SERVER_URL: ''
 CELERYBEAT_SCHEDULER: redbeat.RedBeatScheduler  # MODIFIED
 CELERY_BROKER_HOSTNAME: edxapp-redis.service.consul:6379  # MODIFIED
-CELERY_BROKER_TRANSPORT: redis  # MODIFIED - second "s" indicates "secure"
-CELERY_BROKER_USER: '' # MODIFIED
-CELERY_BROKER_USE_SSL: false  # MODIFIED
+CELERY_BROKER_TRANSPORT: rediss  # MODIFIED - second "s" indicates "secure"
+CELERY_BROKER_USER: default # MODIFIED
+CELERY_BROKER_USE_SSL: true  # MODIFIED
 CELERY_BROKER_VHOST: '1'  # MODIFIED
 CELERY_EVENT_QUEUE_TTL: null
 # CELERY_QUEUES:  # MODIFIED  - remove from YAML to allow sane defaults to work between CMS and LMS
