@@ -154,7 +154,9 @@ CELERYBEAT_SCHEDULER: redbeat.RedBeatScheduler  # MODIFIED
 CELERY_BROKER_HOSTNAME: edxapp-redis.service.consul:6379  # MODIFIED
 CELERY_BROKER_TRANSPORT: rediss  # MODIFIED - second "s" indicates "secure"
 CELERY_BROKER_USER: default # MODIFIED
-CELERY_BROKER_USE_SSL: true  # MODIFIED
+CELERY_BROKER_USE_SSL:  # MODIFIED
+  ssl_cert_reqs: optional  # This is the required dictionary for SSL support to work
+  # https://docs.celeryproject.org/en/stable/userguide/configuration.html#redis-backend-settings
 CELERY_BROKER_VHOST: '1'  # MODIFIED
 CELERY_EVENT_QUEUE_TTL: null
 # CELERY_QUEUES:  # MODIFIED  - remove from YAML to allow sane defaults to work between CMS and LMS

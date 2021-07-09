@@ -67,7 +67,6 @@ lms_template_path = Path("/etc/vault/templates/edxapp_lms.yml.tmpl")
 lms_config_path = Path("/edx/etc/lms.yml")
 studio_config_path = Path("/edx/etc/studio.yml")
 # Install Consul and Vault Agent
-
 vault_templates = [
     VaultTemplate(
         source=lms_template_path,
@@ -101,11 +100,11 @@ if node_type == WEB_NODE_TYPE:
         services=[
             ConsulService(
                 name="edxapp",
-                port=8080,  # noqa: WPS432
+                port=8000,  # noqa: WPS432
                 tags=["lms"],
                 check=ConsulServiceTCPCheck(
                     name="edxapp-lms",
-                    tcp="localhost:8080",
+                    tcp="localhost:8000",
                     interval="10s",
                 ),
             )
