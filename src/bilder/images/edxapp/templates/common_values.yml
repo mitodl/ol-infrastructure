@@ -105,7 +105,7 @@ AWS_SECRET_ACCESS_KEY: ""  # MODIFIED - not setting as we will use IAM Instance 
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
 AWS_SES_REGION_NAME: us-east-1
 AWS_STORAGE_BUCKET_NAME: mitxonline-edxapp-storage-qa  # MODIFIED
-BASE_COOKIE_DOMAIN: lms-online-qa.mitx.mit.edu # MODIFIED
+BASE_COOKIE_DOMAIN: lms-qa.mitxonline.mit.edu # MODIFIED
 BLOCKSTORE_API_URL: http://localhost:18250/api/v1
 BLOCKSTORE_PUBLIC_URL_ROOT: http://localhost:18250
 BLOCK_STRUCTURES_SETTINGS:
@@ -166,7 +166,7 @@ CERTIFICATE_TEMPLATE_LANGUAGES:
     en: English
     es: Español
 CERT_QUEUE: certificates
-CMS_BASE: studio-online-qa.mitx.mit.edu  # MODIFIED
+CMS_BASE: studio-qa.mitxonline.mit.edu  # MODIFIED
 CODE_JAIL:
     limits:
         CPU: 1
@@ -176,7 +176,7 @@ CODE_JAIL:
         VMEM: 536870912
     python_bin: /edx/app/edxapp/venvs/edxapp-sandbox/bin/python
     user: sandbox
-COMMENTS_SERVICE_URL: https://forum-online-qa.mitx.mit.edu  # MODIFIED
+COMMENTS_SERVICE_URL: https://forum-qa.mitxonline.mit.edu  # MODIFIED
 COMPREHENSIVE_THEME_DIRS:
 - ''
 COMPREHENSIVE_THEME_LOCALE_PATHS: []
@@ -286,7 +286,7 @@ FEATURES:
     ENABLE_SPECIAL_EXAMS: false
     ENABLE_THIRD_PARTY_AUTH: true
     ENABLE_VIDEO_UPLOAD_PIPELINE: false
-    PREVIEW_LMS_BASE: preview-online-qa.mitx.mit.edu  # MODIFIED
+    PREVIEW_LMS_BASE: preview-qa.mitxonline.mit.edu  # MODIFIED
     SHOW_FOOTER_LANGUAGE_SELECTOR: false
     SHOW_HEADER_LANGUAGE_SELECTOR: false
 FEEDBACK_SUBMISSION_EMAIL: ''
@@ -326,9 +326,9 @@ JWT_EXPIRATION: 30
 LANGUAGE_CODE: en
 LANGUAGE_COOKIE: openedx-language-preference
 LEARNER_PORTAL_URL_ROOT: https://learner-portal-localhost:18000
-LMS_BASE: lms-online-qa.mitx.mit.edu  # MODIFIED
-LMS_INTERNAL_ROOT_URL: https://lms-online-qa.mitx.mit.edu  # MODIFIED
-LMS_ROOT_URL: https://lms-online-qa.mitx.mit.edu  # MODIFIED
+LMS_BASE: lms-qa.mitxonline.mit.edu  # MODIFIED
+LMS_INTERNAL_ROOT_URL: https://lms-qa.mitxonline.mit.edu  # MODIFIED
+LMS_ROOT_URL: https://lms-qa.mitxonline.mit.edu  # MODIFIED
 LOCAL_LOGLEVEL: INFO
 LOGGING_ENV: sandbox
 LOGIN_REDIRECT_WHITELIST: []
@@ -409,7 +409,7 @@ RETIREMENT_STATES:
 - COMPLETE
 SEGMENT_KEY: null
 SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
-SESSION_COOKIE_DOMAIN: .mitx.mit.edu # MODIFIED
+SESSION_COOKIE_DOMAIN: .mitxonline.mit.edu # MODIFIED
 SESSION_COOKIE_NAME: sessionid
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
@@ -485,7 +485,7 @@ XQUEUE_INTERFACE:
     django_auth:
         password: password
         username: lms
-    url: https://xqueue-online-qa.mitx.mit.edu  # MODIFIED
+    url: https://xqueue-qa.mitxonline.mit.edu  # MODIFIED
 X_FRAME_OPTIONS: DENY
 YOUTUBE_API_KEY: PUT_YOUR_API_KEY_HERE
 ZENDESK_API_KEY: ''

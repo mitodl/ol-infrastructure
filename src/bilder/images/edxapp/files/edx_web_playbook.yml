@@ -6,7 +6,16 @@
   vars:
     serial_count: 1
     CLUSTER_NAME: edxapp
-    NGINX_ENABLE_SSL: false
+    EDXAPP_LMS_PREVIEW_NGINX_PORT: 80
+    EDXAPP_CMS_NGINX_PORT: 80
+    EDXAPP_LMS_NGINX_PORT: 80
+    EDXAPP_CMS_SSL_NGINX_PORT: 443
+    EDXAPP_LMS_SSL_NGINX_PORT: 443
+    NGINX_ENABLE_SSL: true
+    NGINX_REDIRECT_TO_HTTPS: true
+    NGINX_HTTPS_REDIRECT_STRATEGY: forward_for_proto
+    NGINX_SSL_CERTIFICATE: /etc/ssl/certs/mitxonline.cert
+    NGINX_SSL_KEY: /etc/ssl/certs/mitxonline.key
     COMMON_CONFIG_NO_LOGGING: false
     # yamllint disable-line rule:line-length
     EDXAPP_EDXAPP_SECRET_KEY: this-is-just-a-temporary-placeholder # pragma: allowlist secret
