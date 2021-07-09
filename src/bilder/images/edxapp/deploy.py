@@ -82,17 +82,17 @@ if node_type == WEB_NODE_TYPE:
         [
             VaultTemplate(
                 contents=(
-                    '{{ with secret "secret-operations/global/mitx_wildcard_cert" }}'
-                    "{{ printf .Data.value }}{{ end }}"
+                    '{{ with secret "secret-operations/global/mitxonline_wildcard_cert" }}'  # noqa: E501
+                    "{{ printf .Data.cert_chain }}{{ end }}"
                 ),
-                destination=Path("/etc/ssl/certs/mitx_wildcard.cert"),
+                destination=Path("/etc/ssl/certs/mitxonline.cert"),
             ),
             VaultTemplate(
                 contents=(
-                    '{{ with secret "secret-operations/global/mitx_wildcard_cert" }}'
+                    '{{ with secret "secret-operations/global/mitxonline_wildcard_cert" }}'  # noqa: E501
                     "{{ printf .Data.key }}{{ end }}"
                 ),
-                destination=Path("/etc/ssl/certs/mitx_wildcard.key"),
+                destination=Path("/etc/ssl/certs/mitxonline.key"),
             ),
         ]
     )
