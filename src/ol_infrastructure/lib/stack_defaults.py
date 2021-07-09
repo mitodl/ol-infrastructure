@@ -1,15 +1,19 @@
 from typing import Any, Dict
 
+from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 production_defaults = {
-    "rds": {"multi_az": True, "instance_size": "db.m6g.large"},
+    "rds": {
+        "multi_az": True,
+        "instance_size": DBInstanceTypes.general_purpose_large.value,
+    },
     "redis": {"instance_type": "cache.m6g.large"},
 }
 
 qa_defaults = {
     "rds": {
-        "instance_size": "db.t3.medium",
+        "instance_size": DBInstanceTypes.medium.value,
         "multi_az": False,
         "prevent_delete": False,
         "take_final_snapshot": False,
@@ -20,7 +24,7 @@ qa_defaults = {
 
 ci_defaults = {
     "rds": {
-        "instance_size": "db.t3.medium",
+        "instance_size": DBInstanceTypes.medium.value,
         "multi_az": False,
         "prevent_delete": False,
         "take_final_snapshot": False,

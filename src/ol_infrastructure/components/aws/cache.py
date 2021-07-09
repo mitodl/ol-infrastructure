@@ -5,7 +5,7 @@ This includes:
 - Create a clustered deployment of Redis or Memcached
 """
 import re
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, List, Optional, Union
 
 import pulumi
 from pulumi_aws import elasticache
@@ -44,20 +44,18 @@ class OLAmazonCacheConfig(AWSBase):
         str, pulumi.Output[str]
     ]  # the name of the subnet group created in the OLVPC component
 
-    class Config:  # noqa: WPS431, WPS306, D106
+    class Config:
         arbitrary_types_allowed = True
 
     @validator("engine")
-    def is_valid_engine(
-        cls: "OLAmazonCacheConfig", engine: str  # noqa: N805
-    ) -> str:  # noqa: D102
+    def is_valid_engine(cls: "OLAmazonCacheConfig", engine: str) -> str:  # noqa: N805
         valid_engines = cache_engines()
         if engine not in valid_engines:
             raise ValueError("The specified cache engine is not a valid option in AWS.")
         return engine
 
     @validator("engine_version")
-    def is_valid_version(  # noqa: D102
+    def is_valid_version(
         cls: "OLAmazonCacheConfig",  # noqa: N805
         engine_version: str,
         values: Dict,  # noqa: WPS110
@@ -72,7 +70,7 @@ class OLAmazonCacheConfig(AWSBase):
 
 
 class OLAmazonRedisConfig(OLAmazonCacheConfig):
-    cluster_mode_enabled: bool = True
+    cluster_mode_enabled: bool
     encrypt_transit: bool = True
     auth_token: Optional[PulumiString] = None
     encrypted: bool = True
@@ -98,9 +96,7 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
             raise ValueError("Cannot encrypt transit with no auth token configured")
         token_valid = min_token_length <= len(
             auth_token or ""
-        ) <= max_token_length and bool(
-            re.search(r"[^'\"/@\\W]+", auth_token or "")
-        )  # noqa: WPS221, W605, E501
+        ) <= max_token_length and bool(re.search(r"[^'\"/@\\W]+", auth_token or ""))
         if not token_valid:
             raise ValueError(
                 "The configured auth token has invalid characters. "
@@ -176,12 +172,6 @@ class OLAmazonCache(pulumi.ComponentResource):
                     name="cluster-enabled", value="yes"
                 )
             )
-            if cache_config.engine_version.startswith("6"):
-                cache_options = resource_options.merge(
-                    pulumi.ResourceOptions(ignore_changes=["engine_version"])
-                )  # type: ignore
-            else:
-                cache_options = resource_options
 
         self.parameter_group = elasticache.ParameterGroup(
             f"{cache_config.cluster_name}-{cache_config.engine}-{cache_config.engine_version}-parameter-group",  # noqa: E501
@@ -193,54 +183,23 @@ class OLAmazonCache(pulumi.ComponentResource):
             opts=resource_options,
         )
 
-        if clustered_redis:
-            cast(OLAmazonRedisConfig, cache_config)
-            self.cache_cluster = elasticache.ReplicationGroup(
-                f"{cache_config.cluster_name}-{cache_config.engine}-elasticache-cluster",  # noqa: E501
-                apply_immediately=cache_config.apply_immediately,
-                at_rest_encryption_enabled=cache_config.encrypted,
-                auth_token=cache_config.auth_token,
-                auto_minor_version_upgrade=cache_config.auto_upgrade,
-                automatic_failover_enabled=True,
-                cluster_mode=elasticache.ReplicationGroupClusterModeArgs(
-                    num_node_groups=cache_config.shard_count,
-                    replicas_per_node_group=cache_config.num_instances,
-                ),
-                engine="redis",
-                engine_version=cache_config.engine_version,
-                kms_key_id=cache_config.kms_key_id,
-                node_type=cache_config.instance_type,
-                opts=cache_options,
-                parameter_group_name=self.parameter_group.name,
-                port=cache_config.port,
-                replication_group_id=cache_config.cluster_name,
-                replication_group_description=cache_config.cluster_description,
-                security_group_ids=cache_config.security_groups,
-                snapshot_retention_limit=cache_config.snapshot_retention_days,
-                subnet_group_name=cache_config.subnet_group,
-                tags=cache_config.tags,
-                transit_encryption_enabled=cache_config.encrypt_transit,
+        if cache_config.engine == "redis":
+            if cache_config.engine_version.startswith("6"):
+                cache_options = resource_options.merge(
+                    pulumi.ResourceOptions(ignore_changes=["engine_version"])
+                )  # type: ignore
+            else:
+                cache_options = resource_options
+            cache_cluster, address = self.redis(
+                cache_config,
+                clustered_redis,
+                cache_options,
             )
-            self.address = self.cache_cluster.configuration_endpoint_address
         else:
-            cast(OLAmazonMemcachedConfig, cache_config)
-            self.cache_cluster = elasticache.Cluster(
-                f"{cache_config.cluster_name}-{cache_config.engine}-elasticache-cluster",  # noqa: E501
-                engine=cache_config.engine,
-                cluster_id=cache_config.cluster_name,
-                opts=resource_options,
-                engine_version=cache_config.engine_version,
-                az_mode="cross-az" if cache_config.num_instances > 1 else "single-az",
-                apply_immediately=cache_config.apply_immediately,
-                node_type=cache_config.instance_type,
-                num_cache_nodes=cache_config.num_instances,
-                parameter_group_name=self.parameter_group.name,
-                port=cache_config.port,
-                security_group_ids=cache_config.security_groups,
-                subnet_group_name=cache_config.subnet_group,
-                tags=cache_config.tags,
-            )
-            self.address = self.cache_cluster.member_clusters
+            cache_cluster, address = self.memcached(cache_config, resource_options)
+
+        self.cache_cluster = cache_cluster
+        self.address = address
 
         self.register_outputs(
             {
@@ -248,3 +207,74 @@ class OLAmazonCache(pulumi.ComponentResource):
                 "parameter_group": self.parameter_group.name,
             }
         )
+
+    def redis(
+        self,
+        cache_config: OLAmazonRedisConfig,
+        cluster_mode: bool,
+        resource_options: pulumi.ResourceOptions,
+    ):
+        if cluster_mode:
+            cluster_mode_param = elasticache.ReplicationGroupClusterModeArgs(
+                num_node_groups=cache_config.shard_count,
+                replicas_per_node_group=cache_config.num_instances,
+            )
+            cache_node_count = None
+        else:
+            cluster_mode_param = None  # type: ignore
+            cache_node_count = cache_config.num_instances
+
+        cache_cluster = elasticache.ReplicationGroup(
+            f"{cache_config.cluster_name}-{cache_config.engine}-elasticache-cluster",
+            apply_immediately=cache_config.apply_immediately,
+            at_rest_encryption_enabled=cache_config.encrypted,
+            auth_token=cache_config.auth_token,
+            auto_minor_version_upgrade=cache_config.auto_upgrade,
+            automatic_failover_enabled=True,
+            cluster_mode=cluster_mode_param,
+            engine="redis",
+            engine_version=cache_config.engine_version,
+            kms_key_id=cache_config.kms_key_id,
+            node_type=cache_config.instance_type,
+            number_cache_clusters=cache_node_count,
+            opts=resource_options,
+            parameter_group_name=self.parameter_group.name,
+            port=cache_config.port,
+            replication_group_description=cache_config.cluster_description,
+            replication_group_id=cache_config.cluster_name,
+            security_group_ids=cache_config.security_groups,
+            snapshot_retention_limit=cache_config.snapshot_retention_days,
+            subnet_group_name=cache_config.subnet_group,
+            tags=cache_config.tags,
+            transit_encryption_enabled=cache_config.encrypt_transit,
+        )
+        address = (
+            cache_cluster.configuration_endpoint_address
+            if cluster_mode
+            else cache_cluster.primary_endpoint_address
+        )
+        return (cache_cluster, address)
+
+    def memcached(
+        self,
+        cache_config: OLAmazonMemcachedConfig,
+        resource_options: pulumi.ResourceOptions,
+    ):
+        cache_cluster = elasticache.Cluster(
+            f"{cache_config.cluster_name}-{cache_config.engine}-elasticache-cluster",
+            engine=cache_config.engine,
+            cluster_id=cache_config.cluster_name,
+            opts=resource_options,
+            engine_version=cache_config.engine_version,
+            az_mode="cross-az" if cache_config.num_instances > 1 else "single-az",
+            apply_immediately=cache_config.apply_immediately,
+            node_type=cache_config.instance_type,
+            num_cache_nodes=cache_config.num_instances,
+            parameter_group_name=self.parameter_group.name,
+            port=cache_config.port,
+            security_group_ids=cache_config.security_groups,
+            subnet_group_name=cache_config.subnet_group,
+            tags=cache_config.tags,
+        )
+        address = cache_cluster.member_clusters
+        return (cache_cluster, address)

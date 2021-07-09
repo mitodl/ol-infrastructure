@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/systemctl restart {{ service_name }}.service
+ExecStart={{ onchange_command }}
 
 [Install]
 WantedBy=multi-user.target

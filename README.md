@@ -24,6 +24,14 @@ component is.
 Concrete implementations of infrastructure are located under `src/ol-infrastructure/infrastructure/` with a descriptive name that makes it
 evident what is contained in that project.
 
+Management of resources that rely on foundational infrastructure being provisioned, but
+which supports the operation of applications is located under
+`src/ol-infrastructure/substructure`. An Example of this includes Consul prepared queries.
+
+Provisioning of all of the resources needed to support and deploy a specific application
+is located under `src/ol-infrastructure/applications/` with a name that indicates the
+application being managed (e.g. `concourse`).
+
 Each component or concrete infrastructure that is more complex than a single resource will include a `diagram.py` file
 that uses the [diagrams](https://diagrams.mingrammer.com/) package to illustrate the system structure that it creates.
 

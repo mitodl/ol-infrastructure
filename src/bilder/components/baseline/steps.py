@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from pyinfra.api import deploy
 from pyinfra.operations import apt, files, systemd
@@ -23,14 +23,19 @@ def install_baseline_packages(
 def service_configuration_watches(
     service_name: str,
     watched_files: List[Path],
+    onchange_command: Optional[str] = None,
     state=None,
     host=None,
 ):
+    onchange_command = (
+        onchange_command or f"/usr/bin/systemctl restart {service_name}.service"
+    )
     restart_unit = files.template(
         name=f"Create {service_name} restarting service",
         dest=Path("/etc/systemd/system/").joinpath(f"{service_name}-restarter.service"),
         src=Path(__file__).parent.joinpath("templates", "service_restarter.service.j2"),
         service_name=service_name,
+        onchange_command=onchange_command,
         state=state,
         host=host,
     )

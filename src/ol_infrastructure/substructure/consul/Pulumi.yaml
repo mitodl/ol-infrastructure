@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-substructure-consul
+runtime: python
+description: Management of shared resources for Consul clusters such as prepared queries
+backend:
+  url: s3://mitol-pulumi-state/
