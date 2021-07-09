@@ -54,6 +54,7 @@ pip.packages(
         "mitxpro-openedx-extensions==0.2.2",
         "social-auth-mitxpro==0.4",
         "edx-username-changer==0.1.0",
+        "edx-sysadmin",
     ],
     present=True,
     virtualenv="/edx/app/edxapp/venvs/edxapp/",
@@ -82,14 +83,14 @@ if node_type == WEB_NODE_TYPE:
         [
             VaultTemplate(
                 contents=(
-                    '{{ with secret "secret-operations/global/mitxonline_wildcard_cert" }}'  # noqa: E501
+                    '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
                     "{{ printf .Data.cert_chain }}{{ end }}"
                 ),
                 destination=Path("/etc/ssl/certs/mitxonline.cert"),
             ),
             VaultTemplate(
                 contents=(
-                    '{{ with secret "secret-operations/global/mitxonline_wildcard_cert" }}'  # noqa: E501
+                    '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
                     "{{ printf .Data.key }}{{ end }}"
                 ),
                 destination=Path("/etc/ssl/certs/mitxonline.key"),
@@ -175,7 +176,7 @@ if host.fact.has_systemd:
         service_name="edxapp-lms",
         watched_files=[lms_config_path],
         onchange_command=(
-            f"chown www-data:edxapp {lms_config_path} &&"
+            f"chown edxapp:www-data {lms_config_path} &&"
             " /edx/bin/supervisorctl restart lms"
         ),
     )
@@ -183,7 +184,7 @@ if host.fact.has_systemd:
         service_name="edxapp-cms",
         watched_files=[studio_config_path],
         onchange_command=(
-            f"chown www-data:edxapp {studio_config_path} &&"
+            f"chown edxapp:www-data {studio_config_path} &&"
             " /edx/bin/supervisorctl restart cms"
         ),
     )
