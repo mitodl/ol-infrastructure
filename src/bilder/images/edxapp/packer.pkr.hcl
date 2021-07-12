@@ -93,7 +93,7 @@ build {
     ]
   }
   provisioner "ansible-local" {
-    playbook_file = "${path.root}/files/edx_${var.node_type}_playbook.yml"
+    playbook_file = "${path.root}/files/edxapp_${var.node_type}_playbook.yml"
     command = "/tmp/configuration/.venv/bin/ansible-playbook"
     staging_directory = "/tmp/configuration/playbooks/"
   }
