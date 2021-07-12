@@ -46,6 +46,7 @@ class Apps(str, Enum):  # noqa: WPS600
     odl_video_service = "ovs"
     mit_open = "open"
     starcellbio = "starcellbio"
+    edxapp = "edxapp"
 
 
 class AWSBase(BaseModel):

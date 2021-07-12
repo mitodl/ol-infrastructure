@@ -85,14 +85,14 @@ if node_type == WEB_NODE_TYPE:
                     '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
                     "{{ printf .Data.cert_chain }}{{ end }}"
                 ),
-                destination=Path("/etc/ssl/certs/mitxonline.cert"),
+                destination=Path("/etc/ssl/certs/edxapp.cert"),
             ),
             VaultTemplate(
                 contents=(
                     '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
                     "{{ printf .Data.key }}{{ end }}"
                 ),
-                destination=Path("/etc/ssl/certs/mitxonline.key"),
+                destination=Path("/etc/ssl/certs/edxapp.key"),
             ),
         ]
     )

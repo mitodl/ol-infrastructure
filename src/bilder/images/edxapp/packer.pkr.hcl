@@ -80,6 +80,7 @@ build {
       "DEBIAN_FRONTEND=noninteractive"
     ]
     inline = [
+      "sleep 15",
       "pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} apt.packages packages='[\"git\", \"libmariadbclient-dev\", \"python3-pip\", \"python3-venv\", \"python3-dev\", \"build-essential\"]' upgrade=True update=True"
     ]
   }
@@ -88,6 +89,7 @@ build {
       "EDX_ANSIBLE_BRANCH=${var.ansible_branch}",
     ]
     inline = [
+      "openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /tmp/edxapp.key -out /tmp/edxapp.cert -subj '/C=US/ST=MA/L=Cambridge/O=MIT Open Learning/OU=Engineering/CN=edxapp.example.com'",
       "cd /tmp && git clone https://github.com/edx/configuration --depth 1 --branch $EDX_ANSIBLE_BRANCH",
       "cd /tmp/configuration && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt"
     ]

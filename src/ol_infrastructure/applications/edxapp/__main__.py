@@ -1,14 +1,20 @@
 # TODO: Manage database object creation
+import base64
 import json
 from pathlib import Path
 from string import Template
 
 import pulumi_vault as vault
+import yaml
 from pulumi import Config, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam, s3
+from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53, s3
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
-from bridge.lib.magic_numbers import DEFAULT_MYSQL_PORT, DEFAULT_REDIS_PORT
+from bridge.lib.magic_numbers import (
+    DEFAULT_HTTPS_PORT,
+    DEFAULT_MYSQL_PORT,
+    DEFAULT_REDIS_PORT,
+)
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -16,12 +22,23 @@ from ol_infrastructure.components.services.vault import (
     OLVaultMongoDatabaseConfig,
     OLVaultMysqlDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
+from ol_infrastructure.lib.aws.ec2_helper import (
+    DiskTypes,
+    InstanceTypes,
+    default_egress_args,
+)
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import mysql_role_statements
+
+SSH_ACCESS_KEY_NAME = "salt-qa"
+MIN_WEB_NODES_DEFAULT = 3
+MAX_WEB_NODES_DEFAULT = 15
+MIN_WORKER_NODES_DEFAULT = 1
+MAX_WORKER_NODES_DEFAULT = 5
+FIVE_MINUTES = 60 * 5
 
 edxapp_config = Config("edxapp")
 stack_info = parse_stack()
@@ -35,11 +52,21 @@ edxapp_vpc = network_stack.require_output(f"{stack_info.env_prefix}_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 aws_config = AWSBase(
-    tags={"OU": edxapp_config.require("business_unit"), "Environment": env_name}
+    tags={
+        "OU": edxapp_config.require("business_unit"),
+        "Environment": env_name,
+        "Application": Apps.edxapp,
+        "Owner": "platform-engineering",
+    }
 )
 
 aws_account = get_caller_identity()
+consul_security_groups = consul_stack.require_output("security_groups")
 edxapp_vpc_id = edxapp_vpc["id"]
+edxapp_zone_id = dns_stack.require_output(
+    f"{edxapp_config.require('dns_zone')}_zone_id"
+)
+edxapp_domains = edxapp_config.require_object("domains")
 edxapp_web_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["edxapp-web-*"]),
@@ -425,6 +452,262 @@ vault.aws.AuthBackendRole(
     bound_vpc_ids=[edxapp_vpc_id],
     token_policies=[edxapp_vault_policy.name],
 )
+
+##########################
+#     EC2 Deployment     #
+##########################
+
+# Create load balancer for Edxapp web nodes
+edxapp_web_tag = f"edxapp-web-{env_name}"
+web_lb = lb.LoadBalancer(
+    "edxapp-web-load-balancer",
+    name=edxapp_web_tag,
+    ip_address_type="dualstack",
+    load_balancer_type="application",
+    enable_http2=True,
+    subnets=edxapp_vpc["subnet_ids"],
+    security_groups=[
+        edxapp_vpc["security_groups"]["web"],
+    ],
+    tags=aws_config.merged_tags({"Name": edxapp_web_tag}),
+)
+
+TARGET_GROUP_NAME_MAX_LENGTH = 32
+web_lb_target_group = lb.TargetGroup(
+    "edxapp-web-alb-target-group",
+    vpc_id=edxapp_vpc_id,
+    target_type="instance",
+    port=DEFAULT_HTTPS_PORT,
+    protocol="HTTPS",
+    health_check=lb.TargetGroupHealthCheckArgs(
+        healthy_threshold=2,
+        timeout=3,
+        interval=5,
+        path="/heartbeat",
+        port=str(DEFAULT_HTTPS_PORT),
+        protocol="HTTPS",
+    ),
+    name=edxapp_web_tag[:TARGET_GROUP_NAME_MAX_LENGTH],
+    tags=aws_config.tags,
+)
+edxapp_web_acm_cert = acm.Certificate(
+    "edxapp-load-balancer-acm-certificate",
+    domain_name=edxapp_domains["lms"],
+    subject_alternative_names=[
+        domain for key, domain in edxapp_domains.items() if key != "lms"
+    ],
+    validation_method="DNS",
+    tags=aws_config.tags,
+)
+
+
+def validate_acm_cert(validation_options):
+    records_array = []
+    for index, validation in enumerate(validation_options):
+        records_array.append(
+            route53.Record(
+                f"edxapp-acm-cert-validation-route53-record-{index}",
+                name=validation.resource_record_name,
+                zone_id=edxapp_zone_id,
+                type=validation.resource_record_type,
+                records=[validation.resource_record_value],
+                ttl=FIVE_MINUTES,
+                allow_overwrite=True,
+            )
+        )
+    return records_array
+
+
+edxapp_acm_cert_validation_records = (
+    edxapp_web_acm_cert.domain_validation_options.apply(validate_acm_cert)
+)
+
+edxapp_web_acm_validated_cert = acm.CertificateValidation(
+    "wait-for-edxapp-acm-cert-validation",
+    certificate_arn=edxapp_web_acm_cert.arn,
+    validation_record_fqdns=edxapp_acm_cert_validation_records.apply(
+        lambda validation_records: [
+            validation_record.fqdn for validation_record in validation_records
+        ]
+    ),
+)
+edxapp_web_alb_listener = lb.Listener(
+    "edxapp-web-alb-listener",
+    certificate_arn=edxapp_web_acm_validated_cert.certificate_arn,
+    load_balancer_arn=web_lb.arn,
+    port=DEFAULT_HTTPS_PORT,
+    protocol="HTTPS",
+    default_actions=[
+        lb.ListenerDefaultActionArgs(
+            type="forward",
+            target_group_arn=web_lb_target_group.arn,
+        )
+    ],
+)
+
+# Create auto scale group and launch configs for Edxapp web and worker
+cloud_init_user_data = base64.b64encode(
+    "#cloud-config\n{}".format(
+        yaml.dump(
+            {
+                "write_files": [
+                    {
+                        "path": "/etc/consul.d/99-autojoin.json",
+                        "content": json.dumps(
+                            {
+                                "retry_join": [
+                                    "provider=aws tag_key=consul_env "
+                                    f"tag_value={env_name}"
+                                ],
+                                "datacenter": env_name,
+                            }
+                        ),
+                        "owner": "consul:consul",
+                    },
+                ]
+            },
+            sort_keys=True,
+        )
+    ).encode("utf8")
+).decode("utf8")
+
+web_instance_type = edxapp_config.get("web_instance_type") or InstanceTypes.medium.name
+web_launch_config = ec2.LaunchTemplate(
+    "edxapp-web-launch-template",
+    name_prefix=f"edxapp-web-{env_name}-",
+    description=f"Launch template for deploying Edxapp web nodes in {env_name}",
+    iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
+        arn=edxapp_instance_profile.arn,
+    ),
+    image_id=edxapp_web_ami.id,
+    vpc_security_group_ids=[
+        edxapp_security_group.id,
+        edxapp_vpc["security_groups"]["web"],
+        consul_security_groups["consul_agent"],
+    ],
+    instance_type=InstanceTypes[web_instance_type].value,
+    key_name="",
+    tag_specifications=[
+        ec2.LaunchTemplateTagSpecificationArgs(
+            resource_type="instance",
+            tags=aws_config.merged_tags({"Name": edxapp_web_tag}),
+        ),
+        ec2.LaunchTemplateTagSpecificationArgs(
+            resource_type="volume",
+            tags=aws_config.merged_tags({"Name": edxapp_web_tag}),
+        ),
+    ],
+    tags=aws_config.tags,
+    user_data=cloud_init_user_data,
+)
+web_asg = autoscaling.Group(
+    "edxapp-web-autoscaling-group",
+    desired_capacity=edxapp_config.get_int("web_node_capacity")
+    or MIN_WEB_NODES_DEFAULT,
+    min_size=edxapp_config.get("min_web_nodes") or MIN_WEB_NODES_DEFAULT,
+    max_size=edxapp_config.get("max_web_nodes") or MAX_WEB_NODES_DEFAULT,
+    health_check_type="ELB",
+    vpc_zone_identifiers=edxapp_vpc["subnet_ids"],
+    launch_template=autoscaling.GroupLaunchTemplateArgs(
+        id=web_launch_config.id, version="$Latest"
+    ),
+    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
+        strategy="Rolling",
+        preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
+            min_healthy_percentage=50  # noqa: WPS432
+        ),
+    ),
+    target_group_arns=[web_lb_target_group.arn],
+    tags=[
+        autoscaling.GroupTagArgs(
+            key=key_name,
+            value=key_value,
+            propagate_at_launch=True,
+        )
+        for key_name, key_value in aws_config.tags.items()
+    ],
+)
+
+worker_instance_type = (
+    edxapp_config.get("worker_instance_type") or InstanceTypes.large.name
+)
+worker_launch_config = ec2.LaunchTemplate(
+    "edxapp-worker-launch-template",
+    name_prefix=f"edxapp-worker-{stack_info.env_suffix}-",
+    description="Launch template for deploying Edxapp worker nodes",
+    iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
+        arn=edxapp_instance_profile.arn,
+    ),
+    image_id=edxapp_worker_ami.id,
+    block_device_mappings=[
+        ec2.LaunchTemplateBlockDeviceMappingArgs(
+            device_name="/dev/xvda",
+            ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
+                volume_size=edxapp_config.get_int("worker_disk_size")
+                or 25,  # noqa: WPS432
+                volume_type=DiskTypes.ssd,
+            ),
+        )
+    ],
+    vpc_security_group_ids=[
+        edxapp_security_group.id,
+        consul_security_groups["consul_agent"],
+    ],
+    instance_type=InstanceTypes[worker_instance_type].value,
+    key_name=SSH_ACCESS_KEY_NAME,
+    tag_specifications=[
+        ec2.LaunchTemplateTagSpecificationArgs(
+            resource_type="instance",
+            tags=aws_config.merged_tags(
+                {"Name": f"edxapp-worker-{stack_info.env_suffix}"}
+            ),
+        ),
+        ec2.LaunchTemplateTagSpecificationArgs(
+            resource_type="volume",
+            tags=aws_config.merged_tags(
+                {"Name": f"edxapp-worker-{stack_info.env_suffix}"}
+            ),
+        ),
+    ],
+    tags=aws_config.tags,
+    user_data=cloud_init_user_data,
+)
+worker_asg = autoscaling.Group(
+    "edxapp-worker-autoscaling-group",
+    desired_capacity=edxapp_config.get_int("worker_node_capacity") or 1,
+    min_size=1,
+    max_size=50,  # noqa: WPS432
+    health_check_type="EC2",
+    vpc_zone_identifiers=edxapp_vpc["subnet_ids"],
+    launch_template=autoscaling.GroupLaunchTemplateArgs(
+        id=worker_launch_config.id, version="$Latest"
+    ),
+    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
+        strategy="Rolling",
+        preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
+            min_healthy_percentage=50  # noqa: WPS432
+        ),
+    ),
+    tags=[
+        autoscaling.GroupTagArgs(
+            key=key_name,
+            value=key_value,
+            propagate_at_launch=True,
+        )
+        for key_name, key_value in aws_config.tags.items()
+    ],
+)
+
+# Create Route53 DNS records for Edxapp web nodes
+for domain_key, domain_value in edxapp_domains.items():
+    route53.Record(
+        f"edxapp-web-{domain_key}-dns-record",
+        name=domain_value,
+        type="CNAME",
+        ttl=FIVE_MINUTES,
+        records=[web_lb.dns_name],
+        zone_id=edxapp_zone_id,
+    )
 
 
 export(
