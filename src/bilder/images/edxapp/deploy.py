@@ -175,16 +175,26 @@ if host.fact.has_systemd:
         service_name="edxapp-lms",
         watched_files=[lms_config_path],
         onchange_command=(
-            f"chown edxapp:www-data {lms_config_path} &&"
-            " /edx/bin/supervisorctl restart lms"
+            # Let edxapp read the rendered config file
+            f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} &&"  # noqa: WPS237, WPS221, E501
+            # Ensure that Vault can update the file when credentials refresh
+            f" setfacl -m u:vault:rwx {lms_config_path} &&"
+            # Restart the edxapp process to reload the configuration file
+            " /edx/bin/supervisorctl restart "
+            f"{'lms' if node_type == WEB_NODE_TYPE else 'all'}'"
         ),
     )
     service_configuration_watches(
         service_name="edxapp-cms",
         watched_files=[studio_config_path],
         onchange_command=(
-            f"chown edxapp:www-data {studio_config_path} &&"
-            " /edx/bin/supervisorctl restart cms"
+            # Let edxapp read the rendered config file
+            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} &&"  # noqa: WPS237, WPS221, E501
+            # Ensure that Vault can update the file when credentials refresh
+            f" setfacl -m u:vault:rwx {studio_config_path} &&"
+            # Restart the edxapp process to reload the configuration file
+            " /edx/bin/supervisorctl restart "
+            f"{'cms' if node_type == WEB_NODE_TYPE else 'all'}'"
         ),
     )
     proxy_consul_dns()
