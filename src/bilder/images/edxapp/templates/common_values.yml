@@ -102,6 +102,7 @@ AWS_ACCESS_KEY_ID: "" # MODIFIED - not setting as we will use IAM Instance Profi
 # AWS_QUERYSTRING_AUTH: false
 # AWS_S3_CUSTOM_DOMAIN: SET-ME-PLEASE (ex. bucket-name.s3.amazonaws.com)
 AWS_SECRET_ACCESS_KEY: ""  # MODIFIED - not setting as we will use IAM Instance Profiles
+AWS_SES_CONFIGURATION_SET: edxapp-ses-configuration
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
 AWS_SES_REGION_NAME: us-east-1
 AWS_STORAGE_BUCKET_NAME: mitxonline-edxapp-storage-qa  # MODIFIED
@@ -115,7 +116,7 @@ BLOCK_STRUCTURES_SETTINGS:
     TASK_MAX_RETRIES: 5
 BRANCH_IO_KEY: ''
 BUGS_EMAIL: odl-devops@mit.edu  # MODIFIED
-BULK_EMAIL_DEFAULT_FROM_EMAIL: mitxonline-no-reply@mit.edu  # MODIFIED
+BULK_EMAIL_DEFAULT_FROM_EMAIL: no-reply@edxapp-mail-qa.mitxonline.mit.edu  # MODIFIED
 BULK_EMAIL_EMAILS_PER_TASK: 500
 BULK_EMAIL_LOG_SENT_EMAILS: false
 CACHES:  # MODIFIED
@@ -182,7 +183,7 @@ COMMENTS_SERVICE_URL: https://forum-qa.mitxonline.mit.edu  # MODIFIED
 COMPREHENSIVE_THEME_DIRS:
 - ''
 COMPREHENSIVE_THEME_LOCALE_PATHS: []
-CONTACT_EMAIL: mitxonline-support@mit.edu # MODIFIED
+CONTACT_EMAIL: support@mitxonline.mit.edu # MODIFIED
 CORS_ORIGIN_ALLOW_ALL: false
 CORS_ORIGIN_WHITELIST: []
 COURSES_WITH_UNSAFE_CODE: []
@@ -200,9 +201,9 @@ CSRF_TRUSTED_ORIGINS: []
 DASHBOARD_COURSE_LIMIT: null
 DATA_DIR: /edx/var/edxapp  # Filesystem path where edx puts files for course export/import
 DEFAULT_COURSE_VISIBILITY_IN_CATALOG: both
-DEFAULT_FEEDBACK_EMAIL: mitxonline-support@mit.edu # MODIFIED
+DEFAULT_FEEDBACK_EMAIL: support@mitxonline.mit.edu # MODIFIED
 DEFAULT_FILE_STORAGE: storages.backends.s3boto.S3BotoStorage  # MODIFIED
-DEFAULT_FROM_EMAIL: mitxonline-support@mit.edu # MODIFIED
+DEFAULT_FROM_EMAIL: support@edxapp-mail-qa.mitxonline.mit.edu # MODIFIED
 ####################################################
 # This settings is deprecated and no longer in use #
 ####################################################
@@ -242,12 +243,12 @@ ELASTIC_SEARCH_CONFIG:
 -   host: elasticsearch.service.consul
     port: 9200
     use_ssl: false
-EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
-EMAIL_HOST: localhost
-EMAIL_HOST_PASSWORD: ''
-EMAIL_HOST_USER: ''
-EMAIL_PORT: 25
-EMAIL_USE_TLS: false
+EMAIL_BACKEND: django_ses.SESBackend  # MODIFIED
+# EMAIL_HOST: localhost
+# EMAIL_HOST_PASSWORD: ''
+# EMAIL_HOST_USER: ''
+# EMAIL_PORT: 25
+# EMAIL_USE_TLS: false
 ENABLE_COMPREHENSIVE_THEMING: false
 ###########################################
 # We will not be using the enterprise app #
@@ -375,13 +376,13 @@ PARTNER_SUPPORT_EMAIL: ''
 PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG:
     ENFORCE_COMPLIANCE_ON_LOGIN: false
 PASSWORD_RESET_SUPPORT_LINK: ''
-PAYMENT_SUPPORT_EMAIL: mitxonline-support@mit.edu  # MODIFIED
+PAYMENT_SUPPORT_EMAIL: support@mitxonline.mit.edu  # MODIFIED
 PLATFORM_DESCRIPTION: MITx Online QA # MODIFIED
 PLATFORM_FACEBOOK_ACCOUNT: http://www.facebook.com/YourPlatformFacebookAccount
 PLATFORM_NAME: MITx Online QA  # MODIFIED
 PLATFORM_TWITTER_ACCOUNT: '@YourPlatformTwitterAccount'
 POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
-PRESS_EMAIL: mitxonline-support@mit.edu # MODIFIED
+PRESS_EMAIL: support@mitxonline.mit.edu # MODIFIED
 PROCTORING_BACKENDS:
     DEFAULT: 'null'
     'null': {}
@@ -456,7 +457,7 @@ SUPPORT_SITE_LINK: ''
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
 TIME_ZONE: America/New_York
-UNIVERSITY_EMAIL: mitxonline-support@mit.edu # MODIFIED
+UNIVERSITY_EMAIL: support@mitxonline.mit.edu # MODIFIED
 USERNAME_REPLACEMENT_WORKER: OVERRIDE THIS WITH A VALID USERNAME
 VIDEO_IMAGE_MAX_AGE: 31536000
 VIDEO_IMAGE_SETTINGS:
