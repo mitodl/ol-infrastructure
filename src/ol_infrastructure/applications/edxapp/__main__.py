@@ -36,14 +36,15 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import mysql_role_statements
 
-SSH_ACCESS_KEY_NAME = "salt-qa"
+edxapp_config = Config("edxapp")
+
+SSH_ACCESS_KEY_NAME = edxapp_config.get("ssh_key_name") or "oldevops"
 MIN_WEB_NODES_DEFAULT = 3
 MAX_WEB_NODES_DEFAULT = 15
 MIN_WORKER_NODES_DEFAULT = 1
 MAX_WORKER_NODES_DEFAULT = 5
 FIVE_MINUTES = 60 * 5
 
-edxapp_config = Config("edxapp")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
@@ -578,7 +579,7 @@ web_launch_config = ec2.LaunchTemplate(
         consul_security_groups["consul_agent"],
     ],
     instance_type=InstanceTypes[web_instance_type].value,
-    key_name="",
+    key_name=SSH_ACCESS_KEY_NAME,
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="instance",
