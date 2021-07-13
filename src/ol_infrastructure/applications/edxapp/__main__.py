@@ -1,5 +1,4 @@
 # TODO: Manage database object creation
-# TODO: Manage SES and export details for email management
 import base64
 import json
 from functools import partial
@@ -8,8 +7,18 @@ from string import Template
 
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, StackReference, export
-from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53, s3
+from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi_aws import (
+    acm,
+    autoscaling,
+    ec2,
+    get_caller_identity,
+    iam,
+    lb,
+    route53,
+    s3,
+    ses,
+)
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
@@ -68,7 +77,7 @@ aws_account = get_caller_identity()
 consul_security_groups = consul_stack.require_output("security_groups")
 edxapp_vpc_id = edxapp_vpc["id"]
 edxapp_zone_id = dns_stack.require_output(
-    f"{edxapp_config.require('dns_zone')}_zone_id"
+    "{}_zone_id".format(edxapp_config.require("dns_zone"))
 )
 edxapp_domains = edxapp_config.require_object("domains")
 edxapp_web_ami = ec2.get_ami(
@@ -154,6 +163,16 @@ edxapp_policy_document = {
                 f"arn:aws:s3:::{course_bucket_name}",
                 f"arn:aws:s3:::{course_bucket_name}/*",
             ],
+        },
+        {
+            "Effect": "Allow",
+            "Action": ["ses:SendEmail", "ses:SendRawEmail"],
+            "Resource": "arn:*:ses:*:*:identity/*.mitxonline.mit.edu",
+        },
+        {
+            "Effect": "Allow",
+            "Action": ["ses:GetSendQuota"],
+            "Resource": "*",
         },
     ],
 }
@@ -404,6 +423,65 @@ edxapp_redis_consul_service = Service(
 # Create SES Service For edxapp Emails #
 ########################################
 
+edxapp_ses_domain_identity = ses.DomainIdentity(
+    "edxapp-ses-domain-identity", domain=edxapp_config.require("mail_domain")
+)
+edxapp_ses_verification_record = route53.Record(
+    "edxapp-ses-domain-identity-verification-dns-record",
+    zone_id=edxapp_zone_id,
+    name=edxapp_ses_domain_identity.id.apply("_amazonses.{}".format),
+    type="TXT",
+    ttl=FIVE_MINUTES,
+    records=[edxapp_ses_domain_identity.verification_token],
+)
+edxapp_ses_domain_identity_verification = ses.DomainIdentityVerification(
+    "edxapp-ses-domain-identity-verification-resource",
+    domain=edxapp_ses_domain_identity.id,
+    opts=ResourceOptions(depends_on=[edxapp_ses_verification_record]),
+)
+edxapp_mail_from = ses.MailFrom(
+    "edxapp-ses-mail-from-domain",
+    domain=edxapp_ses_domain_identity_verification.domain,
+    mail_from_domain=edxapp_ses_domain_identity_verification.domain.apply(
+        "bounce.{}".format
+    ),
+)
+# Example Route53 MX record
+edxapp_ses_domain_mail_from_mx = route53.Record(
+    f"edxapp-ses-mail-from-mx-record-for-{env_name}",
+    zone_id=edxapp_zone_id,
+    name=edxapp_mail_from.mail_from_domain,
+    type="MX",
+    ttl=FIVE_MINUTES,
+    records=["10 feedback-smtp.us-east-1.amazonses.com"],
+)
+ses_domain_mail_from_txt = route53.Record(
+    "edxapp-ses-domain-mail-from-text-record",
+    zone_id=edxapp_zone_id,
+    name=edxapp_mail_from.mail_from_domain,
+    type="TXT",
+    ttl=FIVE_MINUTES,
+    records=["v=spf1 include:amazonses.com -all"],
+)
+edxapp_ses_domain_dkim = ses.DomainDkim(
+    "edxapp-ses-domain-dkim", domain=edxapp_ses_domain_identity.domain
+)
+for loop_counter in range(0, 3):
+    route53.Record(
+        f"edxapp-ses-domain-dkim-record-{loop_counter}",
+        zone_id=edxapp_zone_id,
+        name=edxapp_ses_domain_dkim.dkim_tokens[loop_counter].apply(
+            "{}._domainkey".format
+        ),
+        type="CNAME",
+        ttl=FIVE_MINUTES,
+        records=[
+            edxapp_ses_domain_dkim.dkim_tokens[loop_counter].apply(
+                "{}.dkim.amazonses.com".format
+            )
+        ],
+    )
+# TODO: Add configuration set with events handling routed to CloudWatch
 
 ######################
 # Secrets Management #
