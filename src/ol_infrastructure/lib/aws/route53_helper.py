@@ -1,14 +1,20 @@
+from typing import List
+
 import boto3
 import pulumi
+from pulumi_aws import route53
+from pulumi_aws.acm.outputs import CertificateDomainValidationOption
 
+FIVE_MINUTES = 60 * 5
 route53_client = boto3.client("route53")
 
 
 def zone_opts(domain: str) -> pulumi.ResourceOptions:
     """Look up and conditionally import an existing hosted zone.
 
-    :param domain: The domain name to be looked up and optionally imported.  e.g. odl.mit.edu
-    :type domain: Text
+    :param domain: The domain name to be looked up and optionally imported.  e.g.
+        odl.mit.edu
+    :type domain: str
 
     :returns: A Pulumi ResourceOptions object that allows for importing unmanaged zones
 
@@ -36,3 +42,22 @@ def zone_opts(domain: str) -> pulumi.ResourceOptions:
                 AddTags=[{"Key": "pulumi_managed", "Value": "true"}],
             )
     return opts
+
+
+def acm_certificate_validation_records(
+    validation_options: List[CertificateDomainValidationOption], zone_id: str
+) -> List[route53.Record]:
+    records_array = []
+    for index, validation in enumerate(validation_options):
+        records_array.append(
+            route53.Record(
+                f"edxapp-acm-cert-validation-route53-record-{index}",
+                name=validation.resource_record_name,
+                zone_id=zone_id,
+                type=validation.resource_record_type,
+                records=[validation.resource_record_value],
+                ttl=FIVE_MINUTES,
+                allow_overwrite=True,
+            )
+        )
+    return records_array

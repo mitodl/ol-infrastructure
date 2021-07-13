@@ -1,3 +1,4 @@
+---
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QGxrnJ+jhHLuJokM5S8zndOAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMo53bqUNDbCTvBcF/AgEQgDsAe8gB0NwcmYHRW5FQhRokmUaBcfKWMa0mocOIQnaLrZ/jjXsfgIuGFd3cnQeytgce4vOEMB7zR27yvQ==
 config:
@@ -9,6 +10,11 @@ config:
   edxapp:business_unit: mitxonline
   edxapp:db_password:
     secure: v1:xHUw5WC3aN02zuAj:0BozwDxrtF0OA7wkYuv4R4CCnSHYdgXt+vi6/3eP9zwJgHgQO20+8sQfg7rXPC9SIUobEA==
+  edxapp:dns_zone: mitxonline
+  edxapp:domains:
+    cms: studio-qa.mitxonline.mit.edu
+    lms: lms-qa.mitxonline.mit.edu
+    preview: preview-qa.mitxonline.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:IqXRArQveCV+9lkE:cRaraFuN2dDmI29PD4QifOU7MrRFdszOoaUb7o3pDJordt4TSjw8fIxldWfMzNhZRLC+NS291DorO1IuN6ASdCbt5d53aMvHVt+3hA6wyuI11OFjk7U=
   edxapp:edxapp_secrets:

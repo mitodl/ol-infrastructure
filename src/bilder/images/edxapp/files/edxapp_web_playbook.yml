@@ -14,8 +14,8 @@
     NGINX_ENABLE_SSL: true
     NGINX_REDIRECT_TO_HTTPS: true
     NGINX_HTTPS_REDIRECT_STRATEGY: forward_for_proto
-    NGINX_SSL_CERTIFICATE: /etc/ssl/certs/mitxonline.cert
-    NGINX_SSL_KEY: /etc/ssl/certs/mitxonline.key
+    NGINX_SSL_CERTIFICATE: /tmp/edxapp.cert
+    NGINX_SSL_KEY: /tmp/edxapp.key
     COMMON_CONFIG_NO_LOGGING: false
     # yamllint disable-line rule:line-length
     EDXAPP_EDXAPP_SECRET_KEY: this-is-just-a-temporary-placeholder # pragma: allowlist secret
