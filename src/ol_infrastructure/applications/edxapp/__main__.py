@@ -1,6 +1,8 @@
 # TODO: Manage database object creation
+# TODO: Manage SES and export details for email management
 import base64
 import json
+from functools import partial
 from pathlib import Path
 from string import Template
 
@@ -28,6 +30,7 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     default_egress_args,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
@@ -396,6 +399,11 @@ edxapp_redis_consul_service = Service(
     ],
 )
 
+########################################
+# Create SES Service For edxapp Emails #
+########################################
+
+
 ######################
 # Secrets Management #
 ######################
@@ -500,26 +508,10 @@ edxapp_web_acm_cert = acm.Certificate(
     tags=aws_config.tags,
 )
 
-
-def validate_acm_cert(validation_options):
-    records_array = []
-    for index, validation in enumerate(validation_options):
-        records_array.append(
-            route53.Record(
-                f"edxapp-acm-cert-validation-route53-record-{index}",
-                name=validation.resource_record_name,
-                zone_id=edxapp_zone_id,
-                type=validation.resource_record_type,
-                records=[validation.resource_record_value],
-                ttl=FIVE_MINUTES,
-                allow_overwrite=True,
-            )
-        )
-    return records_array
-
-
 edxapp_acm_cert_validation_records = (
-    edxapp_web_acm_cert.domain_validation_options.apply(validate_acm_cert)
+    edxapp_web_acm_cert.domain_validation_options.apply(
+        partial(acm_certificate_validation_records, zone_id=edxapp_zone_id)
+    )
 )
 
 edxapp_web_acm_validated_cert = acm.CertificateValidation(
