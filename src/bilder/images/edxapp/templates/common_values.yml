@@ -102,7 +102,7 @@ AWS_ACCESS_KEY_ID: "" # MODIFIED - not setting as we will use IAM Instance Profi
 # AWS_QUERYSTRING_AUTH: false
 # AWS_S3_CUSTOM_DOMAIN: SET-ME-PLEASE (ex. bucket-name.s3.amazonaws.com)
 AWS_SECRET_ACCESS_KEY: ""  # MODIFIED - not setting as we will use IAM Instance Profiles
-AWS_SES_CONFIGURATION_SET: edxapp-ses-configuration
+AWS_SES_CONFIGURATION_SET: edxapp-ses-configuration  # ADDED KEY
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
 AWS_SES_REGION_NAME: us-east-1
 AWS_STORAGE_BUCKET_NAME: mitxonline-edxapp-storage-qa  # MODIFIED
@@ -341,6 +341,7 @@ MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
 MICROSITE_ROOT_DIR: /edx/app/edxapp/edx-microsite
+MITXPRO_CORE_REDIRECT_ALLOW_RE_LIST: ["^/(admin|auth|login|logout|register|api|oauth2|user_api|heartbeat)", "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"]  # ADDED VALUE
 MKTG_URLS: {}
 MKTG_URL_LINK_MAP: {}
 MOBILE_STORE_URLS: {}

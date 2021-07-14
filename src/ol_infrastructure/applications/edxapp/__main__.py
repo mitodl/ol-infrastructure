@@ -546,6 +546,7 @@ vault.aws.AuthBackendRole(
 
 # Create load balancer for Edxapp web nodes
 edxapp_web_tag = f"edxapp-web-{env_name}"
+edxapp_worker_tag = f"edxapp-worker-{env_name}"
 web_lb = lb.LoadBalancer(
     "edxapp-web-load-balancer",
     name=edxapp_web_tag,
@@ -704,7 +705,7 @@ worker_instance_type = (
 )
 worker_launch_config = ec2.LaunchTemplate(
     "edxapp-worker-launch-template",
-    name_prefix=f"edxapp-worker-{stack_info.env_suffix}-",
+    name_prefix=f"{edxapp_worker_tag}-",
     description="Launch template for deploying Edxapp worker nodes",
     iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
         arn=edxapp_instance_profile.arn,
@@ -729,15 +730,11 @@ worker_launch_config = ec2.LaunchTemplate(
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="instance",
-            tags=aws_config.merged_tags(
-                {"Name": f"edxapp-worker-{stack_info.env_suffix}"}
-            ),
+            tags=aws_config.merged_tags({"Name": edxapp_worker_tag}),
         ),
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="volume",
-            tags=aws_config.merged_tags(
-                {"Name": f"edxapp-worker-{stack_info.env_suffix}"}
-            ),
+            tags=aws_config.merged_tags({"Name": edxapp_worker_tag}),
         ),
     ],
     tags=aws_config.tags,
