@@ -1,7 +1,7 @@
 from bilder.components.baseline.steps import install_baseline_packages
 from bilder.components.hashicorp import steps as hashicorp_steps
-from bilder.components.hashicorp.consul.models.consul import Consul
-from bilder.components.hashicorp.consul.models.consul_template import ConsulTemplate
+from bilder.components.hashicorp.consul.models import Consul
+from bilder.components.hashicorp.consul_template.models import ConsulTemplate
 from bilder.components.hashicorp.nomad.models import Nomad
 from bilder.components.hashicorp.vault.models import Vault
 

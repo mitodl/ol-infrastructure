@@ -1,0 +1,87 @@
+---
+resource_types:
+- name: consul-kv
+  type: docker-image
+  source:
+    repository: clapclapexcitement/concourse-consul-kv-resource
+    tag: latest
+
+resources:
+- name: edxapp_templates
+  type: git
+  icon: github
+  source:
+    uri: https://github.com/mitodl/ol-infrastructure
+    branch: main
+    paths:
+    - src/bilder/images/edxapp/templates/lms_only.yml
+    - src/bilder/images/edxapp/templates/studio_only.yml
+    - src/bilder/images/edxapp/templates/common_values.yml
+- name: consul-lms
+  type: consul-kv
+  source:
+    host: 10.1.2.220
+    protocol: http
+    key: edxapp-template/lms@mitxonline-qa
+- name: consul-studio
+  type: consul-kv
+  source:
+    host: 10.1.2.220
+    protocol: http
+    key: edxapp-template/studio@mitxonline-qa
+
+jobs:
+- name: update-lms-template
+  plan:
+  - get: edxapp_templates
+    trigger: true
+  - task: compile-lms-template
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: debian
+      inputs:
+      - name: edxapp_templates
+      outputs:
+      - name: lms_template
+      run:
+        path: sh
+        args:
+        - -exc
+        - >-
+          /bin/cat
+          edxapp_templates/src/bilder/images/edxapp/templates/common_values.yml
+          edxapp_templates/src/bilder/images/edxapp/templates/lms_only.yml
+          > lms_template/lms.yml.tmpl
+  - put: consul-lms
+    params:
+      file: lms_template/lms.yml.tmpl
+- name: update-studio-template
+  plan:
+  - get: edxapp_templates
+    trigger: true
+  - task: compile-studio-template
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: debian
+      inputs:
+      - name: edxapp_templates
+      outputs:
+      - name: studio_template
+      run:
+        path: sh
+        args:
+        - -exc
+        - >-
+          /bin/cat
+          edxapp_templates/src/bilder/images/edxapp/templates/common_values.yml
+          edxapp_templates/src/bilder/images/edxapp/templates/studio_only.yml
+          > studio_template/studio.yml.tmpl
+  - put: consul-studio
+    params:
+      file: studio_template/studio.yml.tmpl

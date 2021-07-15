@@ -6,13 +6,22 @@ from pyinfra import host
 from pyinfra.operations import files, pip
 
 from bilder.components.baseline.steps import service_configuration_watches
-from bilder.components.hashicorp.consul.models.consul import (
+from bilder.components.hashicorp.consul.models import (
     Consul,
     ConsulConfig,
     ConsulService,
     ConsulServiceTCPCheck,
 )
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
+from bilder.components.hashicorp.consul_template.models import (
+    ConsulTemplate,
+    ConsulTemplateConfig,
+    ConsulTemplateTemplate,
+    ConsulTemplateVaultConfig,
+)
+from bilder.components.hashicorp.consul_template.steps import (
+    consul_template_permissions,
+)
 from bilder.components.hashicorp.steps import (
     configure_hashicorp_product,
     install_hashicorp_products,
@@ -38,6 +47,7 @@ from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 VERSIONS = {  # noqa: WPS407
     "consul": "1.10.0",
     "vault": "1.7.3",
+    "consul-template": "0.26.0",
 }
 
 WEB_NODE_TYPE = "web"
@@ -68,14 +78,14 @@ lms_config_path = Path("/edx/etc/lms.yml")
 studio_config_path = Path("/edx/etc/studio.yml")
 # Install Consul and Vault Agent
 vault_templates = [
-    VaultTemplate(
-        source=lms_template_path,
-        destination=lms_config_path,
-    ),
-    VaultTemplate(
-        source=studio_template_path,
-        destination=studio_config_path,
-    ),
+    # VaultTemplate(
+    #     source=lms_template_path,
+    #     destination=lms_config_path,
+    # ),
+    # VaultTemplate(
+    #     source=studio_template_path,
+    #     destination=studio_config_path,
+    # ),
 ]
 if node_type == WEB_NODE_TYPE:
     vault_templates.extend(
@@ -136,9 +146,37 @@ vault = Vault(
     ),
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
-hashicorp_products = [vault, consul]
+
+lms_intermediate_template = Path("/tmp/edxapp-lms.tmpl")
+studio_intermediate_template = Path("/tmp/edxapp-studio.tmpl")
+consul_template = ConsulTemplate(
+    version=VERSIONS["consul-template"],
+    configuration={
+        Path("00-default.json"): ConsulTemplateConfig(vault=ConsulTemplateVaultConfig())
+    },
+    vault_agent_token_file=vault.configuration.auto_auth.sink[0].config[0].path,
+    template=[
+        ConsulTemplateTemplate(
+            contents='{{ key "edxapp-template/studio" }}',
+            destination=studio_intermediate_template,
+        ),
+        ConsulTemplateTemplate(
+            source=studio_intermediate_template,
+            destination=studio_config_path,
+        ),
+        ConsulTemplateTemplate(
+            contents='{{ key "edxapp-template/lms" }}',
+            destination=lms_intermediate_template,
+        ),
+        ConsulTemplateTemplate(
+            source=lms_intermediate_template, destination=lms_config_path
+        ),
+    ],
+)
+hashicorp_products = [vault, consul, consul_template]
 install_hashicorp_products(hashicorp_products)
 vault_template_permissions(vault.configuration)
+consul_template_permissions(consul_template.configuration)
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 
