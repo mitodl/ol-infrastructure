@@ -1,4 +1,4 @@
-{{ with secret "mongodb-mitxonline/creds/app" }}
+{{ with secret "mongodb-mitxonline/creds/edxapp" }}
 mongodb_settings: &mongo_params
   host: mongodb-master.service.consul
   port: 27017
@@ -179,7 +179,7 @@ CODE_JAIL:
         VMEM: 536870912
     python_bin: /edx/app/edxapp/venvs/edxapp-sandbox/bin/python
     user: sandbox
-COMMENTS_SERVICE_URL: https://forum-qa.mitxonline.mit.edu  # MODIFIED
+COMMENTS_SERVICE_URL: http://localhost:4567  # MODIFIED
 COMPREHENSIVE_THEME_DIRS:
 - ''
 COMPREHENSIVE_THEME_LOCALE_PATHS: []
@@ -292,6 +292,7 @@ FEATURES:
     PREVIEW_LMS_BASE: preview-qa.mitxonline.mit.edu  # MODIFIED
     SHOW_FOOTER_LANGUAGE_SELECTOR: false
     SHOW_HEADER_LANGUAGE_SELECTOR: false
+    ALLOW_PUBLIC_ACCOUNT_CREATION: true
 FEEDBACK_SUBMISSION_EMAIL: ''
 FERNET_KEYS:
 - DUMMY KEY CHANGE BEFORE GOING TO PRODUCTION

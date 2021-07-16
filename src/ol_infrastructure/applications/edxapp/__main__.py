@@ -43,7 +43,7 @@ from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import mysql_role_statements
+from ol_infrastructure.lib.vault import mongodb_role_statements, mysql_role_statements
 
 edxapp_config = Config("edxapp")
 
@@ -126,8 +126,8 @@ edxapp_mfe_bucket = s3.Bucket(
         }
     ),
     cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
-    website={"indexDocument": "index.html"},
 )
+
 
 storage_bucket_name = f"{stack_info.env_prefix}-edxapp-storage-{stack_info.env_suffix}"
 edxapp_storage_bucket = s3.Bucket(
@@ -366,12 +366,23 @@ edxapp_db_consul_service = Service(
 #######################
 # MongoDB Vault Setup #
 #######################
+edxapp_mongo_role_statements = mongodb_role_statements
+edxapp_mongo_role_statements["edxapp"] = {
+    "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "edxapp"})),
+    "revoke": Template(json.dumps({"db": "edxapp"})),
+}
+edxapp_mongo_role_statements["forum"] = {
+    "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "forum"})),
+    "revoke": Template(json.dumps({"db": "forum"})),
+}
+
 edxapp_mongo_vault_config = OLVaultMongoDatabaseConfig(
     db_name="edxapp",
     mount_point=f"mongodb-{stack_info.env_prefix}",
     db_admin_username="admin",
     db_admin_password=edxapp_config.require("mongo_admin_password"),
     db_host=f"mongodb-master.service.{env_name}.consul",
+    role_statements=edxapp_mongo_role_statements,
 )
 edxapp_mongo_vault_backend = OLVaultDatabaseBackend(edxapp_mongo_vault_config)
 

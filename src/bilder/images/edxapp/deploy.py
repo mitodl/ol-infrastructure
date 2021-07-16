@@ -58,7 +58,6 @@ node_type = host.data.node_type or os.environ.get("NODE_TYPE", WEB_NODE_TYPE)
 pip.packages(
     name="Install additional edX dependencies",
     packages=[
-        "redis-py-cluster",  # Support for clustered redis
         "django-redis",  # Support for Redis caching in Django
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "mitxpro-openedx-extensions==0.2.2",
@@ -72,21 +71,11 @@ pip.packages(
 )
 
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
-studio_template_path = Path("/etc/vault/templates/edxapp_studio.yml.tmpl")
-lms_template_path = Path("/etc/vault/templates/edxapp_lms.yml.tmpl")
 lms_config_path = Path("/edx/etc/lms.yml")
 studio_config_path = Path("/edx/etc/studio.yml")
+forum_config_path = Path("/edx/app/forum/forum_env")
 # Install Consul and Vault Agent
-vault_templates = [
-    # VaultTemplate(
-    #     source=lms_template_path,
-    #     destination=lms_config_path,
-    # ),
-    # VaultTemplate(
-    #     source=studio_template_path,
-    #     destination=studio_config_path,
-    # ),
-]
+vault_templates = []
 if node_type == WEB_NODE_TYPE:
     vault_templates.extend(
         [
@@ -147,8 +136,11 @@ vault = Vault(
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 
-lms_intermediate_template = Path("/tmp/edxapp-lms.tmpl")
-studio_intermediate_template = Path("/tmp/edxapp-studio.tmpl")
+lms_intermediate_template = Path("/etc/consul-template.d/templates/edxapp-lms.tmpl")
+studio_intermediate_template = Path(
+    "/etc/consul-template.d/templates/edxapp-studio.tmpl"
+)
+forum_intermediate_template = Path("/etc/consul-template.d/templates/edx-forum.tmpl")
 consul_template = ConsulTemplate(
     version=VERSIONS["consul-template"],
     configuration={
@@ -171,6 +163,9 @@ consul_template = ConsulTemplate(
         ConsulTemplateTemplate(
             source=lms_intermediate_template, destination=lms_config_path
         ),
+        ConsulTemplateTemplate(
+            source=forum_intermediate_template, destination=forum_config_path
+        ),
     ],
 )
 hashicorp_products = [vault, consul, consul_template]
@@ -184,26 +179,37 @@ for product in hashicorp_products:
 common_config = Path(__file__).parent.joinpath("templates", "common_values.yml")
 studio_config = Path(__file__).parent.joinpath("templates", "studio_only.yml")
 lms_config = Path(__file__).parent.joinpath("templates", "lms_only.yml")
+forum_config = Path(__file__).parent.joinpath("templates", "forum.env")
 with tempfile.NamedTemporaryFile("wt", delete=False) as studio_template:
     studio_template.write(common_config.read_text())
     studio_template.write(studio_config.read_text())
     files.put(
         name="Upload studio.yml template for Vault agent",
         src=studio_template.name,
-        dest=studio_template_path,
-        user=vault.name,
-        group=vault.name,
+        dest=studio_intermediate_template,
+        user=consul_template.name,
+        group=consul_template.name,
         create_remote_dir=True,
     )
 with tempfile.NamedTemporaryFile("wt", delete=False) as lms_template:
     lms_template.write(common_config.read_text())
     lms_template.write(lms_config.read_text())
     files.put(
-        name="Upload lms.yml template for Vault agent",
+        name="Upload lms.yml template for consul-template agent",
         src=lms_template.name,
-        dest=lms_template_path,
-        user=vault.name,
-        group=vault.name,
+        dest=lms_intermediate_template,
+        user=consul_template.name,
+        group=consul_template.name,
+        create_remote_dir=True,
+    )
+with tempfile.NamedTemporaryFile("wt", delete=False) as forum_template:
+    forum_template.write(forum_config.read_text())
+    files.put(
+        name="Upload forum_env template for consul-template agent",
+        src=forum_template.name,
+        dest=forum_intermediate_template,
+        user=consul_template.name,
+        group=consul_template.name,
         create_remote_dir=True,
     )
 # Manage services

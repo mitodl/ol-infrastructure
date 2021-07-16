@@ -33,3 +33,4 @@
     nginx_extra_configs: '{{ NGINX_EDXAPP_EXTRA_CONFIGS }}'
     nginx_skip_enable_sites: '{{ EDXAPP_NGINX_SKIP_ENABLE_SITES }}'
   - edxapp
+  - forum
