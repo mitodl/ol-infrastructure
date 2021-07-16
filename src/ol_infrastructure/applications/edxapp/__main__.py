@@ -104,6 +104,31 @@ edxapp_worker_ami = ec2.get_ami(
 # S3 Buckets #
 ##############
 
+mfe_bucket_name = f"{stack_info.env_prefix}-edxapp-mfe-{stack_info.env_suffix}"
+edxapp_mfe_bucket = s3.Bucket(
+    "edxapp-mfe-bucket",
+    bucket=mfe_bucket_name,
+    versioning=s3.BucketVersioningArgs(enabled=False),
+    tags=aws_config.tags,
+    acl="public-read",
+    policy=json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "PublicRead",
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": ["s3:GetObject"],
+                    "Resource": [f"arn:aws:s3:::{mfe_bucket_name}/*"],
+                }
+            ],
+        }
+    ),
+    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
+    website={"indexDocument": "index.html"},
+)
+
 storage_bucket_name = f"{stack_info.env_prefix}-edxapp-storage-{stack_info.env_suffix}"
 edxapp_storage_bucket = s3.Bucket(
     "edxapp-storage-bucket",
@@ -783,5 +808,6 @@ export(
     {
         "mariadb": edxapp_db.db_instance.address,
         "redis": edxapp_redis_cache.address,
+        "mfe_bucket": mfe_bucket_name,
     },
 )
