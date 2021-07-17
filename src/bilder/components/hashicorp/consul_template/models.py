@@ -251,7 +251,7 @@ class ConsulTemplate(HashicorpProduct):
     configuration: Dict[Path, ConsulTemplateConfig] = {
         Path("00-default.json"): ConsulTemplateConfig()
     }
-    configuration_directory: Path = Path("/etc/consul-template.d/")
+    configuration_directory: Path = Path("/etc/consul-template/conf.d/")
 
     @property
     def systemd_template_context(self):

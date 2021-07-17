@@ -74,8 +74,28 @@ consul_configuration = {Path("00-default.json"): ConsulConfig()}
 lms_config_path = Path("/edx/etc/lms.yml")
 studio_config_path = Path("/edx/etc/studio.yml")
 forum_config_path = Path("/edx/app/forum/forum_env")
+lms_intermediate_template = Path("/etc/consul-template/templates/edxapp-lms.tmpl")
+studio_intermediate_template = Path("/etc/consul-template/templates/edxapp-studio.tmpl")
+forum_intermediate_template = Path("/etc/consul-template/templates/edx-forum.tmpl")
 # Install Consul and Vault Agent
 vault_templates = []
+consul_templates = [
+    ConsulTemplateTemplate(
+        contents='{{ key "edxapp-template/studio" }}',
+        destination=studio_intermediate_template,
+    ),
+    ConsulTemplateTemplate(
+        source=studio_intermediate_template,
+        destination=studio_config_path,
+    ),
+    ConsulTemplateTemplate(
+        contents='{{ key "edxapp-template/lms" }}',
+        destination=lms_intermediate_template,
+    ),
+    ConsulTemplateTemplate(
+        source=lms_intermediate_template, destination=lms_config_path
+    ),
+]
 if node_type == WEB_NODE_TYPE:
     vault_templates.extend(
         [
@@ -95,6 +115,13 @@ if node_type == WEB_NODE_TYPE:
             ),
         ]
     )
+    consul_templates.extend(
+        [
+            ConsulTemplateTemplate(
+                source=forum_intermediate_template, destination=forum_config_path
+            ),
+        ]
+    )
     consul_configuration[Path("01-edxapp.json")] = ConsulConfig(
         services=[
             ConsulService(
@@ -106,7 +133,16 @@ if node_type == WEB_NODE_TYPE:
                     tcp="localhost:8000",
                     interval="10s",
                 ),
-            )
+            ),
+            ConsulService(
+                name="forum",
+                port=4567,  # noqa: WPS432
+                check=ConsulServiceTCPCheck(
+                    name="edxapp-forum",
+                    tcp="localhost:4567",
+                    interval="10s",
+                ),
+            ),
         ]
     )
 
@@ -135,38 +171,12 @@ vault = Vault(
     ),
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
-
-lms_intermediate_template = Path("/etc/consul-template.d/templates/edxapp-lms.tmpl")
-studio_intermediate_template = Path(
-    "/etc/consul-template.d/templates/edxapp-studio.tmpl"
-)
-forum_intermediate_template = Path("/etc/consul-template.d/templates/edx-forum.tmpl")
 consul_template = ConsulTemplate(
     version=VERSIONS["consul-template"],
     configuration={
         Path("00-default.json"): ConsulTemplateConfig(
             vault=ConsulTemplateVaultConfig(),
-            vault_agent_token_file=vault.configuration.auto_auth.sink[0].config[0].path,
-            template=[
-                ConsulTemplateTemplate(
-                    contents='{{ key "edxapp-template/studio" }}',
-                    destination=studio_intermediate_template,
-                ),
-                ConsulTemplateTemplate(
-                    source=studio_intermediate_template,
-                    destination=studio_config_path,
-                ),
-                ConsulTemplateTemplate(
-                    contents='{{ key "edxapp-template/lms" }}',
-                    destination=lms_intermediate_template,
-                ),
-                ConsulTemplateTemplate(
-                    source=lms_intermediate_template, destination=lms_config_path
-                ),
-                ConsulTemplateTemplate(
-                    source=forum_intermediate_template, destination=forum_config_path
-                ),
-            ],
+            template=consul_templates,
         )
     },
 )
@@ -224,7 +234,7 @@ if host.fact.has_systemd:
             # Let edxapp read the rendered config file
             f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} &&"  # noqa: WPS237, WPS221, E501
             # Ensure that Vault can update the file when credentials refresh
-            f" setfacl -m u:vault:rwx {lms_config_path} &&"
+            f" setfacl -m u:consul-template:rwx {lms_config_path} &&"
             # Restart the edxapp process to reload the configuration file
             " /edx/bin/supervisorctl restart "
             f"{'lms' if node_type == WEB_NODE_TYPE else 'all'}'"
@@ -237,10 +247,22 @@ if host.fact.has_systemd:
             # Let edxapp read the rendered config file
             f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} &&"  # noqa: WPS237, WPS221, E501
             # Ensure that Vault can update the file when credentials refresh
-            f" setfacl -m u:vault:rwx {studio_config_path} &&"
+            f" setfacl -m u:consul-template:rwx {studio_config_path} &&"
             # Restart the edxapp process to reload the configuration file
             " /edx/bin/supervisorctl restart "
             f"{'cms' if node_type == WEB_NODE_TYPE else 'all'}'"
+        ),
+    )
+    service_configuration_watches(
+        service_name="edxapp-forum",
+        watched_files=[forum_config_path],
+        onchange_command=(
+            # Let edxapp read the rendered config file
+            f"/bin/bash -c 'chown forum:www-data {forum_config_path} &&"  # noqa: WPS237, WPS221, E501
+            # Ensure that Vault can update the file when credentials refresh
+            f" setfacl -m u:consul-template:rwx {forum_config_path} &&"
+            # Restart the edxapp process to reload the configuration file
+            " /edx/bin/supervisorctl restart forum"
         ),
     )
     proxy_consul_dns()
