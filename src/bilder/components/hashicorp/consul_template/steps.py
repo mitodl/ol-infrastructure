@@ -1,12 +1,15 @@
+from pathlib import Path
+from typing import Dict
+
 from pyinfra.api import deploy
 from pyinfra.operations import apt, server
 
 from bilder.components.hashicorp.consul_template.models import ConsulTemplateConfig
 
 
-@deploy("Manage Vault template destination permissions")
+@deploy("Manage consul-template template destination permissions")
 def consul_template_permissions(
-    consul_template_config: ConsulTemplateConfig, state=None, host=None
+    consul_template_configs: Dict[Path, ConsulTemplateConfig], state=None, host=None
 ):
     apt.packages(
         name="Install ACL package for more granular file permissions",
@@ -14,7 +17,10 @@ def consul_template_permissions(
         state=state,
         host=host,
     )
-    for template in consul_template_config.template or []:
+    templates = []
+    for config in consul_template_configs.values():
+        templates.extend(config.template or [])
+    for template in templates:
         filename = template.destination
         server.shell(
             commands=[

@@ -54,7 +54,7 @@ WEB_NODE_TYPE = "web"
 WORKER_NODE_TYPE = "worker"
 node_type = host.data.node_type or os.environ.get("NODE_TYPE", WEB_NODE_TYPE)
 
-# Install additional Python dependencies
+# Install additional Python dependencies for use with edxapp
 pip.packages(
     name="Install additional edX dependencies",
     packages=[
@@ -144,34 +144,34 @@ forum_intermediate_template = Path("/etc/consul-template.d/templates/edx-forum.t
 consul_template = ConsulTemplate(
     version=VERSIONS["consul-template"],
     configuration={
-        Path("00-default.json"): ConsulTemplateConfig(vault=ConsulTemplateVaultConfig())
+        Path("00-default.json"): ConsulTemplateConfig(
+            vault=ConsulTemplateVaultConfig(),
+            vault_agent_token_file=vault.configuration.auto_auth.sink[0].config[0].path,
+            template=[
+                ConsulTemplateTemplate(
+                    contents='{{ key "edxapp-template/studio" }}',
+                    destination=studio_intermediate_template,
+                ),
+                ConsulTemplateTemplate(
+                    source=studio_intermediate_template,
+                    destination=studio_config_path,
+                ),
+                ConsulTemplateTemplate(
+                    contents='{{ key "edxapp-template/lms" }}',
+                    destination=lms_intermediate_template,
+                ),
+                ConsulTemplateTemplate(
+                    source=lms_intermediate_template, destination=lms_config_path
+                ),
+                ConsulTemplateTemplate(
+                    source=forum_intermediate_template, destination=forum_config_path
+                ),
+            ],
+        )
     },
-    vault_agent_token_file=vault.configuration.auto_auth.sink[0].config[0].path,
-    template=[
-        ConsulTemplateTemplate(
-            contents='{{ key "edxapp-template/studio" }}',
-            destination=studio_intermediate_template,
-        ),
-        ConsulTemplateTemplate(
-            source=studio_intermediate_template,
-            destination=studio_config_path,
-        ),
-        ConsulTemplateTemplate(
-            contents='{{ key "edxapp-template/lms" }}',
-            destination=lms_intermediate_template,
-        ),
-        ConsulTemplateTemplate(
-            source=lms_intermediate_template, destination=lms_config_path
-        ),
-        ConsulTemplateTemplate(
-            source=forum_intermediate_template, destination=forum_config_path
-        ),
-    ],
 )
 hashicorp_products = [vault, consul, consul_template]
 install_hashicorp_products(hashicorp_products)
-vault_template_permissions(vault.configuration)
-consul_template_permissions(consul_template.configuration)
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 
@@ -212,6 +212,8 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as forum_template:
         group=consul_template.name,
         create_remote_dir=True,
     )
+vault_template_permissions(vault.configuration)
+consul_template_permissions(consul_template.configuration)
 # Manage services
 if host.fact.has_systemd:
     register_services(hashicorp_products, start_services_immediately=False)

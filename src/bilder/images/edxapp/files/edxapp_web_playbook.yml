@@ -20,17 +20,22 @@
     # yamllint disable-line rule:line-length
     EDXAPP_EDXAPP_SECRET_KEY: this-is-just-a-temporary-placeholder # pragma: allowlist secret
     CREATE_SERVICE_WORKER_USERS: false
+    FORUM_USE_TCP: true
+    # Set to empty values so that the tests don't fail since we are managing the config file directly
+    FORUM_MONGO_HOSTS: []
+    forum_services: []
   serial: '{{ serial_count }}'
   roles:
+  - forum
   - role: automated
     AUTOMATED_USERS: '{{ EDXAPP_AUTOMATED_USERS | default({}) }}'
   - role: nginx
     nginx_sites:
     - lms
     - cms
+    - forum
     nginx_default_sites: '{{ EDXAPP_NGINX_DEFAULT_SITES }}'
     nginx_extra_sites: '{{ NGINX_EDXAPP_EXTRA_SITES }}'
     nginx_extra_configs: '{{ NGINX_EDXAPP_EXTRA_CONFIGS }}'
     nginx_skip_enable_sites: '{{ EDXAPP_NGINX_SKIP_ENABLE_SITES }}'
   - edxapp
-  - forum
