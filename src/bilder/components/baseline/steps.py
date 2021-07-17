@@ -24,6 +24,7 @@ def service_configuration_watches(
     service_name: str,
     watched_files: List[Path],
     onchange_command: Optional[str] = None,
+    start_now: bool = True,
     state=None,
     host=None,
 ):
@@ -53,7 +54,7 @@ def service_configuration_watches(
         service=f"{service_name}.path",
         daemon_reload=path_unit.changed or restart_unit.changed,
         enabled=True,
-        running=True,
+        running=start_now,
         state=state,
         host=host,
     )

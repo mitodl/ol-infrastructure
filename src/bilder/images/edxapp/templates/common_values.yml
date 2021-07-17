@@ -185,7 +185,11 @@ COMPREHENSIVE_THEME_DIRS:
 COMPREHENSIVE_THEME_LOCALE_PATHS: []
 CONTACT_EMAIL: support@mitxonline.mit.edu # MODIFIED
 CORS_ORIGIN_ALLOW_ALL: false
-CORS_ORIGIN_WHITELIST: []
+CORS_ORIGIN_WHITELIST:
+  - learning-mfe-qa.mitxonline.mit.edu
+  - lms-qa.mitxonline.mit.edu
+  - studio-qa.mitxonline.mit.edu
+  - mitxonline-rc.mitxonline.mit.edu
 COURSES_WITH_UNSAFE_CODE: []
 COURSE_ABOUT_VISIBILITY_PERMISSION: see_exists
 COURSE_CATALOG_API_URL: http://localhost:8008/api/v1

@@ -230,6 +230,7 @@ if host.fact.has_systemd:
     service_configuration_watches(
         service_name="edxapp-lms",
         watched_files=[lms_config_path],
+        start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
             f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} &&"  # noqa: WPS237, WPS221, E501
@@ -243,6 +244,7 @@ if host.fact.has_systemd:
     service_configuration_watches(
         service_name="edxapp-cms",
         watched_files=[studio_config_path],
+        start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
             f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} &&"  # noqa: WPS237, WPS221, E501
@@ -256,6 +258,7 @@ if host.fact.has_systemd:
     service_configuration_watches(
         service_name="edxapp-forum",
         watched_files=[forum_config_path],
+        start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
             f"/bin/bash -c 'chown forum:www-data {forum_config_path} &&"  # noqa: WPS237, WPS221, E501
