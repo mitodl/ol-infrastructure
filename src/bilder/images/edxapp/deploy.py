@@ -83,6 +83,8 @@ consul_templates = [
     ConsulTemplateTemplate(
         contents='{{ key "edxapp-template/studio" }}',
         destination=studio_intermediate_template,
+        # Tell consul-template to reload the rendered template from disk
+        command="/usr/bin/pkill -HUP consul-template",
     ),
     ConsulTemplateTemplate(
         source=studio_intermediate_template,
@@ -91,6 +93,8 @@ consul_templates = [
     ConsulTemplateTemplate(
         contents='{{ key "edxapp-template/lms" }}',
         destination=lms_intermediate_template,
+        # Tell consul-template to reload the rendered template from disk
+        command="/usr/bin/pkill -HUP consul-template",
     ),
     ConsulTemplateTemplate(
         source=lms_intermediate_template, destination=lms_config_path
