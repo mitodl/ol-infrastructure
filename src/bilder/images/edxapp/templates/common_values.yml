@@ -106,7 +106,7 @@ AWS_SES_CONFIGURATION_SET: edxapp-ses-configuration  # ADDED KEY
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
 AWS_SES_REGION_NAME: us-east-1
 AWS_STORAGE_BUCKET_NAME: mitxonline-edxapp-storage-qa  # MODIFIED
-BASE_COOKIE_DOMAIN: lms-qa.mitxonline.mit.edu # MODIFIED
+BASE_COOKIE_DOMAIN: .mitxonline.mit.edu # MODIFIED
 BLOCKSTORE_API_URL: http://localhost:18250/api/v1
 BLOCKSTORE_PUBLIC_URL_ROOT: http://localhost:18250
 BLOCK_STRUCTURES_SETTINGS:
@@ -203,6 +203,7 @@ CROSS_DOMAIN_CSRF_COOKIE_NAME: edxapp-mitxonline-qa-csrftoken  # MODIFIED
 CSRF_COOKIE_SECURE: true  # MODIFIED
 CSRF_TRUSTED_ORIGINS:  # MODIFIED
   - learning-mfe-qa.mitxonline.mit.edu
+  - lms-qa.mitxonline.mit.edu
 DASHBOARD_COURSE_LIMIT: null
 DATA_DIR: /edx/var/edxapp  # Filesystem path where edx puts files for course export/import
 DEFAULT_COURSE_VISIBILITY_IN_CATALOG: both
