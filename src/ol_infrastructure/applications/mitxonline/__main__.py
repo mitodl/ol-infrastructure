@@ -4,7 +4,6 @@
 - Create a PostgreSQL database in AWS RDS for production environments
 - Create an IAM policy to grant access to S3 and other resources
 """
-import json
 
 import pulumi_vault as vault
 from pulumi import Config, StackReference, export
@@ -23,12 +22,13 @@ from ol_infrastructure.lib.stack_defaults import defaults
 mitxonline_config = Config("mitxonline")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-apps_vpc = network_stack.require_output("applications_vpc")
+mitxonline_vpc = network_stack.require_output("mitxonline_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
+mitxonline_environment = f"mitxonline-{stack_info.env_suffix}"
 aws_config = AWSBase(
     tags={
         "OU": "mitxonline",
-        "Environment": f"applications_{stack_info.env_suffix}",
+        "Environment": mitxonline_environment,
         "Application": "mitxonline",
     }
 )
@@ -52,7 +52,7 @@ mitxonline_iam_policy = iam.Policy(
     description="AWS access controls for the MITx Online application in the "
     f"{stack_info.name} environment",
     path=f"/ol-applications/mitxonline/{stack_info.env_suffix}/",
-    name_prefix="aws-permissions-",
+    name_prefix=f"mitxonline-{stack_info.env_suffix}-application-policy-",
     policy=lint_iam_policy(
         {
             "Version": "2012-10-17",
@@ -88,8 +88,8 @@ mitxonline_iam_policy = iam.Policy(
 )
 
 mitxonline_vault_backend_role = vault.aws.SecretBackendRole(
-    f"mitxonline-app-{stack_info.env_suffix}",
-    name=f"mitxonline-{stack_info.env_suffix}",
+    "mitxonline-app",
+    name="mitxonline",
     backend="aws-mitx",
     credential_type="iam_user",
     policy_arns=[mitxonline_iam_policy.arn],
@@ -121,13 +121,13 @@ mitxonline_db_security_group = ec2.SecurityGroup(
     tags=aws_config.merged_tags(
         {"name": "mitxonline-db-access-applications-{stack_info.env_suffix}"}
     ),
-    vpc_id=apps_vpc["id"],
+    vpc_id=mitxonline_vpc["id"],
 )
 
 mitxonline_db_config = OLPostgresDBConfig(
     instance_name=f"mitxonline-db-applications-{stack_info.env_suffix}",
     password=mitxonline_config.require("db_password"),
-    subnet_group_name=apps_vpc["rds_subnet"],
+    subnet_group_name=mitxonline_vpc["rds_subnet"],
     security_groups=[mitxonline_db_security_group],
     tags=aws_config.tags,
     db_name="mitxonline",
@@ -145,20 +145,4 @@ mitxonline_vault_backend_config = OLVaultPostgresDatabaseConfig(
 )
 mitxonline_vault_backend = OLVaultDatabaseBackend(mitxonline_vault_backend_config)
 
-######################
-# Secrets Management #
-######################
-mitxonline_secrets = vault.Mount(
-    "mitxonline-vault-secrets-storage",
-    path="secret-mitxonline",
-    type="kv-v2",
-    description="Static secrets storage for the MITx Online application",
-)
-
-vault_secrets = mitxonline_config.require_secret_object("vault_secrets")
-vault.generic.Secret(
-    "mitxonline-vault-secrets",
-    path=mitxonline_secrets.path.apply("{}/app-config".format),  # noqa: P103
-    data_json=vault_secrets.apply(json.dumps),
-)
 export("mitxonline_app", {"rds_host": mitxonline_db.db_instance.address})
