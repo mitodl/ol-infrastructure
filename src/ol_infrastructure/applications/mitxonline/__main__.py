@@ -1,6 +1,5 @@
 """Create the infrastructure and services needed to support the MITx Online application.
 
-- Create a Redis instance in AWS Elasticache
 - Create a PostgreSQL database in AWS RDS for production environments
 - Create an IAM policy to grant access to S3 and other resources
 """
