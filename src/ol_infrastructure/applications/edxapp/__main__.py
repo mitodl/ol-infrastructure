@@ -695,7 +695,7 @@ edxapp_studio_web_alb_listener_rule = lb.ListenerRule(
     "edxapp-web-studio-alb-listener-routing",
     listener_arn=edxapp_studio_web_alb_listener.arn,
     actions=[
-        lb.ListenerRuleAction(
+        lb.ListenerRuleActionArgs(
             type="forward",
             target_group_arn=studio_web_lb_target_group.arn,
         )
@@ -712,7 +712,7 @@ edxapp_lms_web_alb_listener_rule = lb.ListenerRule(
     "edxapp-web-lms-alb-listener-routing",
     listener_arn=edxapp_lms_web_alb_listener.arn,
     actions=[
-        lb.ListenerRuleAction(
+        lb.ListenerRuleActionArgs(
             type="forward",
             target_group_arn=lms_web_lb_target_group.arn,
         )
