@@ -15,7 +15,7 @@ repository = "https://github.com/mitodl/ol-infrastructure"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-boto3 = "^1.17"
+boto3 = "^1.18"
 httpx = "^0.18.2"
 parliament = "^1.4.0"
 pulumi = "^3.5.1"
