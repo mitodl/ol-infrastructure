@@ -115,7 +115,7 @@ if node_type == WEB_NODE_TYPE:
                     '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
                     "{{ printf .Data.key }}{{ end }}"
                 ),
-                destination=Path("/etc/ssl/certs/edxapp.key"),
+                destination=Path("/etc/ssl/private/edxapp.key"),
             ),
         ]
     )
@@ -231,17 +231,23 @@ consul_template_permissions(consul_template.configuration)
 # Manage services
 if host.fact.has_systemd:
     register_services(hashicorp_products, start_services_immediately=False)
+    proxy_consul_dns()
+    service_configuration_watches(
+        service_name="nginx",
+        watched_files=[Path("/etc/ssl/certs/edxapp.pem")],
+        start_now=False,
+    )
     service_configuration_watches(
         service_name="edxapp-lms",
         watched_files=[lms_config_path],
         start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
-            f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} &&"  # noqa: WPS237, WPS221, E501
+            f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} && "  # noqa: WPS237, WPS221, E501
             # Ensure that Vault can update the file when credentials refresh
-            f" setfacl -m u:consul-template:rwx {lms_config_path} &&"
+            f"setfacl -m u:consul-template:rwx {lms_config_path} && "
             # Restart the edxapp process to reload the configuration file
-            " /edx/bin/supervisorctl restart "
+            "/edx/bin/supervisorctl restart "
             f"{'lms' if node_type == WEB_NODE_TYPE else 'all'}'"
         ),
     )
@@ -251,11 +257,11 @@ if host.fact.has_systemd:
         start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
-            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} &&"  # noqa: WPS237, WPS221, E501
+            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} && "  # noqa: WPS237, WPS221, E501
             # Ensure that Vault can update the file when credentials refresh
-            f" setfacl -m u:consul-template:rwx {studio_config_path} &&"
+            f"setfacl -m u:consul-template:rwx {studio_config_path} && "
             # Restart the edxapp process to reload the configuration file
-            " /edx/bin/supervisorctl restart "
+            "/edx/bin/supervisorctl restart "
             f"{'cms' if node_type == WEB_NODE_TYPE else 'all'}'"
         ),
     )
@@ -264,12 +270,11 @@ if host.fact.has_systemd:
         watched_files=[forum_config_path],
         start_now=False,
         onchange_command=(
-            # Let edxapp read the rendered config file
-            f"/bin/bash -c 'chown forum:www-data {forum_config_path} &&"  # noqa: WPS237, WPS221, E501
-            # Ensure that Vault can update the file when credentials refresh
-            f" setfacl -m u:consul-template:rwx {forum_config_path} &&"
-            # Restart the edxapp process to reload the configuration file
-            " /edx/bin/supervisorctl restart forum"
+            # Let forum read the rendered config file
+            f"/bin/bash -c 'chown forum:www-data {forum_config_path} && "  # noqa: WPS237, WPS221, E501
+            # Ensure that consul-template can update the file when credentials refresh
+            f"setfacl -m u:consul-template:rwx {forum_config_path} && "
+            # Restart the forum process to reload the configuration file
+            "/edx/bin/supervisorctl restart forum"
         ),
     )
-    proxy_consul_dns()

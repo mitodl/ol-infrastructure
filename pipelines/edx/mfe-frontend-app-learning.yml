@@ -41,6 +41,7 @@ jobs:
       params:
         ACCESS_TOKEN_COOKIE_NAME: edx-jwt-cookie-header-payload
         BASE_URL: https://learning-mfe-qa.mitxonline.mit.edu
+        PUBLIC_PATH: /learning/
         CSRF_TOKEN_API_PATH: /csrf/api/v1/token
         LMS_BASE_URL: https://lms-qa.mitxonline.mit.edu
         LOGIN_URL: https://lms-qa.mitxonline.mit.edu/login
@@ -52,7 +53,6 @@ jobs:
         STUDIO_BASE_URL: https://studio-qa.mitxonline.mit.edu
         USER_INFO_COOKIE_NAME: edx-user-info
         SESSION_COOKIE_DOMAIN: .mitxonline.mit.edu
-        NODE_ENV: production
       run:
         path: sh
         dir: mfe-app-learning
@@ -60,7 +60,7 @@ jobs:
         - -exc
         - |
           npm install
-          npm run build
+          NODE_ENV=production npm run build
   - put: mfe-app-learning-bucket
     params:
       source: mfe-app-learning/dist
