@@ -341,7 +341,10 @@ LMS_INTERNAL_ROOT_URL: https://lms-qa.mitxonline.mit.edu  # MODIFIED
 LMS_ROOT_URL: https://lms-qa.mitxonline.mit.edu  # MODIFIED
 LOCAL_LOGLEVEL: INFO
 LOGGING_ENV: sandbox
-LOGIN_REDIRECT_WHITELIST: []
+LOGIN_REDIRECT_WHITELIST:  # MODIFIED
+  - studio-qa.mitxonline.mit.edu
+  - lms-qa.mitxonline.mit.edu
+  - learning-mfe-qa.mitxonline.mit.edu
 LOG_DIR: /edx/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed

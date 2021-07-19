@@ -78,7 +78,7 @@ lms_intermediate_template = Path("/etc/consul-template/templates/edxapp-lms.tmpl
 studio_intermediate_template = Path("/etc/consul-template/templates/edxapp-studio.tmpl")
 forum_intermediate_template = Path("/etc/consul-template/templates/edx-forum.tmpl")
 # Install Consul and Vault Agent
-vault_templates = []
+vault_templates = None
 consul_templates = [
     ConsulTemplateTemplate(
         contents='{{ key "edxapp-template/studio" }}',
@@ -101,24 +101,22 @@ consul_templates = [
     ),
 ]
 if node_type == WEB_NODE_TYPE:
-    vault_templates.extend(
-        [
-            VaultTemplate(
-                contents=(
-                    '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
-                    "{{ printf .Data.cert_chain }}{{ end }}"
-                ),
-                destination=Path("/etc/ssl/certs/edxapp.cert"),
+    vault_templates = [
+        VaultTemplate(
+            contents=(
+                '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
+                "{{ printf .Data.cert_chain }}{{ end }}"
             ),
-            VaultTemplate(
-                contents=(
-                    '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
-                    "{{ printf .Data.key }}{{ end }}"
-                ),
-                destination=Path("/etc/ssl/private/edxapp.key"),
+            destination=Path("/etc/ssl/certs/edxapp.cert"),
+        ),
+        VaultTemplate(
+            contents=(
+                '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
+                "{{ printf .Data.key }}{{ end }}"
             ),
-        ]
-    )
+            destination=Path("/etc/ssl/private/edxapp.key"),
+        ),
+    ]
     consul_templates.extend(
         [
             ConsulTemplateTemplate(
