@@ -744,7 +744,9 @@ cloud_init_user_data = base64.b64encode(
     ).encode("utf8")
 ).decode("utf8")
 
-web_instance_type = edxapp_config.get("web_instance_type") or InstanceTypes.medium.name
+web_instance_type = (
+    edxapp_config.get("web_instance_type") or InstanceTypes.high_mem_regular.name
+)
 web_launch_config = ec2.LaunchTemplate(
     "edxapp-web-launch-template",
     name_prefix=f"edxapp-web-{env_name}-",
