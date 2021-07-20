@@ -41,7 +41,6 @@ jobs:
       params:
         ACCESS_TOKEN_COOKIE_NAME: edx-jwt-cookie-header-payload
         BASE_URL: https://learning-mfe-qa.mitxonline.mit.edu
-        PUBLIC_PATH: /learning/
         CSRF_TOKEN_API_PATH: /csrf/api/v1/token
         LMS_BASE_URL: https://lms-qa.mitxonline.mit.edu
         LOGIN_URL: https://lms-qa.mitxonline.mit.edu/login
@@ -65,4 +64,4 @@ jobs:
     params:
       source: mfe-app-learning/dist
       destination:
-      - dir: s3-remote:mitxonline-edxapp-mfe-qa/learning
+      - dir: s3-remote:mitxonline-edxapp-mfe-qa/
