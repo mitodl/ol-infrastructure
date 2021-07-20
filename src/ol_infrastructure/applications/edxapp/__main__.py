@@ -586,8 +586,8 @@ web_lb = lb.LoadBalancer(
 )
 
 TARGET_GROUP_NAME_MAX_LENGTH = 32
-web_lb_target_group = lb.TargetGroup(
-    "edxapp-web-alb-target-group",
+lms_web_lb_target_group = lb.TargetGroup(
+    "edxapp-web-lms-alb-target-group",
     vpc_id=edxapp_vpc_id,
     target_type="instance",
     port=DEFAULT_HTTPS_PORT,
@@ -599,6 +599,32 @@ web_lb_target_group = lb.TargetGroup(
         path="/heartbeat",
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",
+    ),
+    name=edxapp_web_tag[:TARGET_GROUP_NAME_MAX_LENGTH],
+    tags=aws_config.tags,
+)
+# Studio has some workflows that are stateful, such as importing and exporting courses
+# which requires files to be written and read from the same EC2 instance. This adds
+# separate target groups and ALB listener rules to route requests for studio to a target
+# group with session stickiness enabled so that these stateful workflows don't fail.
+# TMM 2021-07-20
+studio_web_lb_target_group = lb.TargetGroup(
+    "edxapp-web-studio-alb-target-group",
+    vpc_id=edxapp_vpc_id,
+    target_type="instance",
+    port=DEFAULT_HTTPS_PORT,
+    protocol="HTTPS",
+    health_check=lb.TargetGroupHealthCheckArgs(
+        healthy_threshold=2,
+        timeout=3,
+        interval=5,
+        path="/heartbeat",
+        port=str(DEFAULT_HTTPS_PORT),
+        protocol="HTTPS",
+    ),
+    stickiness=lb.TargetGroupStickinessArgs(
+        type="lb_cookie",
+        enabled=True,
     ),
     name=edxapp_web_tag[:TARGET_GROUP_NAME_MAX_LENGTH],
     tags=aws_config.tags,
@@ -628,8 +654,8 @@ edxapp_web_acm_validated_cert = acm.CertificateValidation(
         ]
     ),
 )
-edxapp_web_alb_listener = lb.Listener(
-    "edxapp-web-alb-listener",
+edxapp_lms_web_alb_listener = lb.Listener(
+    "edxapp-web-lms-alb-listener",
     certificate_arn=edxapp_web_acm_validated_cert.certificate_arn,
     load_balancer_arn=web_lb.arn,
     port=DEFAULT_HTTPS_PORT,
@@ -637,9 +663,56 @@ edxapp_web_alb_listener = lb.Listener(
     default_actions=[
         lb.ListenerDefaultActionArgs(
             type="forward",
-            target_group_arn=web_lb_target_group.arn,
+            target_group_arn=lms_web_lb_target_group.arn,
         )
     ],
+)
+edxapp_studio_web_alb_listener = lb.Listener(
+    "edxapp-web-studio-alb-listener",
+    certificate_arn=edxapp_web_acm_validated_cert.certificate_arn,
+    load_balancer_arn=web_lb.arn,
+    port=DEFAULT_HTTPS_PORT,
+    protocol="HTTPS",
+    default_actions=[
+        lb.ListenerDefaultActionArgs(
+            type="forward",
+            target_group_arn=studio_web_lb_target_group.arn,
+        )
+    ],
+)
+edxapp_studio_web_alb_listener_rule = lb.ListenerRule(
+    "edxapp-web-studio-alb-listener-routing",
+    listener_arn=edxapp_studio_web_alb_listener.arn,
+    actions=[
+        lb.ListenerRuleAction(
+            type="forward",
+            target_group_arn=studio_web_lb_target_group.arn,
+        )
+    ],
+    conditions=[
+        lb.ListenerRuleConditionArgs(
+            host_header=lb.ListenerRuleConditionHostHeaderArgs(values=["studio*"])
+        )
+    ],
+    priority=1,
+    tags=aws_config.tags,
+)
+edxapp_lms_web_alb_listener_rule = lb.ListenerRule(
+    "edxapp-web-lms-alb-listener-routing",
+    listener_arn=edxapp_lms_web_alb_listener.arn,
+    actions=[
+        lb.ListenerRuleAction(
+            type="forward",
+            target_group_arn=lms_web_lb_target_group.arn,
+        )
+    ],
+    conditions=[
+        lb.ListenerRuleConditionArgs(
+            host_header=lb.ListenerRuleConditionHostHeaderArgs(values=["lms*"])
+        )
+    ],
+    priority=2,
+    tags=aws_config.tags,
 )
 
 # Create auto scale group and launch configs for Edxapp web and worker
@@ -714,7 +787,7 @@ web_asg = autoscaling.Group(
             min_healthy_percentage=50  # noqa: WPS432
         ),
     ),
-    target_group_arns=[web_lb_target_group.arn],
+    target_group_arns=[lms_web_lb_target_group.arn, studio_web_lb_target_group.arn],
     tags=[
         autoscaling.GroupTagArgs(
             key=key_name,
