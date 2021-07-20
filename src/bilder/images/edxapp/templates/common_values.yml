@@ -1,4 +1,4 @@
-{{ with secret "mongodb-mitxonline/creds/app" }}
+{{ with secret "mongodb-mitxonline/creds/edxapp" }}
 mongodb_settings: &mongo_params
   host: mongodb-master.service.consul
   port: 27017
@@ -27,9 +27,21 @@ redis_cache_config: &redis_cache_config
     PASSWORD: {{ .Data.redis_auth_token }}
 SECRET_KEY: {{ .Data.django_secret_key }}
 JWT_AUTH:  # NEEDS ATTENTION
+    JWT_AUDIENCE: mitxonline
+    JWT_AUTH_COOKIE: edx-jwt-cookie
+    JWT_AUTH_COOKIE_HEADER_PAYLOAD: edx-jwt-cookie-header-payload
+    JWT_AUTH_COOKIE_SIGNATURE: edx-jwt-cookie-signature
+    JWT_ISSUER: 'https://lms-qa.mitxonline.mit.edu/oauth2'
+    JWT_LOGIN_CLIENT_ID: login-service-client-id
+    JWT_LOGIN_SERVICE_USERNAME: login_service_user
     JWT_PRIVATE_SIGNING_JWK: '{{ .Data.private_signing_jwk }}'
     JWT_PUBLIC_SIGNING_JWK_SET: '{{ .Data.public_signing_jwk }}'
-    JWT_AUDIENCE: mitxonline
+    JWT_SECRET_KEY: {{ .Data.django_secret_key }}
+    JWT_SIGNING_ALGORITHM: RS512
+    JWT_ISSUERS:
+      - ISSUER: https://lms-qa.mitxonline.mit.edu/oauth2
+        AUDIENCE: mitxonline
+        SECRET_KEY: {{ .Data.django_secret_key }}
 {{ end }}
 
 {{ with secret "secret-mitxonline/edx-forum" }}
@@ -106,7 +118,7 @@ AWS_SES_CONFIGURATION_SET: edxapp-ses-configuration  # ADDED KEY
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
 AWS_SES_REGION_NAME: us-east-1
 AWS_STORAGE_BUCKET_NAME: mitxonline-edxapp-storage-qa  # MODIFIED
-BASE_COOKIE_DOMAIN: lms-qa.mitxonline.mit.edu # MODIFIED
+BASE_COOKIE_DOMAIN: .mitxonline.mit.edu # MODIFIED
 BLOCKSTORE_API_URL: http://localhost:18250/api/v1
 BLOCKSTORE_PUBLIC_URL_ROOT: http://localhost:18250
 BLOCK_STRUCTURES_SETTINGS:
@@ -179,13 +191,17 @@ CODE_JAIL:
         VMEM: 536870912
     python_bin: /edx/app/edxapp/venvs/edxapp-sandbox/bin/python
     user: sandbox
-COMMENTS_SERVICE_URL: https://forum-qa.mitxonline.mit.edu  # MODIFIED
+COMMENTS_SERVICE_URL: http://localhost:4567  # MODIFIED
 COMPREHENSIVE_THEME_DIRS:
 - ''
 COMPREHENSIVE_THEME_LOCALE_PATHS: []
 CONTACT_EMAIL: support@mitxonline.mit.edu # MODIFIED
 CORS_ORIGIN_ALLOW_ALL: false
-CORS_ORIGIN_WHITELIST: []
+CORS_ORIGIN_WHITELIST:
+  - learning-mfe-qa.mitxonline.mit.edu
+  - lms-qa.mitxonline.mit.edu
+  - studio-qa.mitxonline.mit.edu
+  - mitxonline-rc.mitxonline.mit.edu
 COURSES_WITH_UNSAFE_CODE: []
 COURSE_ABOUT_VISIBILITY_PERMISSION: see_exists
 COURSE_CATALOG_API_URL: http://localhost:8008/api/v1
@@ -194,10 +210,12 @@ COURSE_CATALOG_VISIBILITY_PERMISSION: see_exists
 CREDENTIALS_INTERNAL_SERVICE_URL: http://localhost:8005
 CREDENTIALS_PUBLIC_SERVICE_URL: http://localhost:8005
 CREDIT_PROVIDER_SECRET_KEYS: {}
-CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: ''
-CROSS_DOMAIN_CSRF_COOKIE_NAME: ''
+CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: .mitxonline.mit.edu  # MODIFIED
+CROSS_DOMAIN_CSRF_COOKIE_NAME: edxapp-mitxonline-qa-csrftoken  # MODIFIED
 CSRF_COOKIE_SECURE: true  # MODIFIED
-CSRF_TRUSTED_ORIGINS: []
+CSRF_TRUSTED_ORIGINS:  # MODIFIED
+  - learning-mfe-qa.mitxonline.mit.edu
+  - lms-qa.mitxonline.mit.edu
 DASHBOARD_COURSE_LIMIT: null
 DATA_DIR: /edx/var/edxapp  # Filesystem path where edx puts files for course export/import
 DEFAULT_COURSE_VISIBILITY_IN_CATALOG: both
@@ -267,11 +285,11 @@ FEATURES:
     CUSTOM_COURSES_EDX: false
     ENABLE_BULK_ENROLLMENT_VIEW: false
     ENABLE_COMBINED_LOGIN_REGISTRATION: true
-    ENABLE_CORS_HEADERS: false
+    ENABLE_CORS_HEADERS: true  # MODIFIED
     ENABLE_COUNTRY_ACCESS: false
     ENABLE_CREDIT_API: false
     ENABLE_CREDIT_ELIGIBILITY: false
-    ENABLE_CROSS_DOMAIN_CSRF_COOKIE: false
+    ENABLE_CROSS_DOMAIN_CSRF_COOKIE: true  # MODIFIED
     ENABLE_CSMH_EXTENDED: true
     ENABLE_DISCUSSION_HOME_PANEL: true
     ENABLE_DISCUSSION_SERVICE: true
@@ -292,6 +310,7 @@ FEATURES:
     PREVIEW_LMS_BASE: preview-qa.mitxonline.mit.edu  # MODIFIED
     SHOW_FOOTER_LANGUAGE_SELECTOR: false
     SHOW_HEADER_LANGUAGE_SELECTOR: false
+    ALLOW_PUBLIC_ACCOUNT_CREATION: true
 FEEDBACK_SUBMISSION_EMAIL: ''
 FERNET_KEYS:
 - DUMMY KEY CHANGE BEFORE GOING TO PRODUCTION
@@ -334,7 +353,10 @@ LMS_INTERNAL_ROOT_URL: https://lms-qa.mitxonline.mit.edu  # MODIFIED
 LMS_ROOT_URL: https://lms-qa.mitxonline.mit.edu  # MODIFIED
 LOCAL_LOGLEVEL: INFO
 LOGGING_ENV: sandbox
-LOGIN_REDIRECT_WHITELIST: []
+LOGIN_REDIRECT_WHITELIST:  # MODIFIED
+  - studio-qa.mitxonline.mit.edu
+  - lms-qa.mitxonline.mit.edu
+  - learning-mfe-qa.mitxonline.mit.edu
 LOG_DIR: /edx/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
@@ -414,7 +436,7 @@ RETIREMENT_STATES:
 SEGMENT_KEY: null
 SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
 SESSION_COOKIE_DOMAIN: .mitxonline.mit.edu # MODIFIED
-SESSION_COOKIE_NAME: edxapp-sessionid
+SESSION_COOKIE_NAME: edxapp-sessionid  # MODIFIED
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
 SITE_NAME: MITx Online QA  # MODIFIED

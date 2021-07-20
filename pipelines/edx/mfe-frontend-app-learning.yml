@@ -1,0 +1,67 @@
+---
+resource_types:
+- name: rclone
+  type: docker-image
+  source:
+    repository: sothr/concourse-rclone-resource
+    tag: latest
+
+resources:
+- name: mfe-app-learning
+  type: git
+  source:
+    uri: https://github.com/edx/frontend-app-learning.git
+    branch: master
+- name: mfe-app-learning-bucket
+  type: rclone
+  source:
+    config: |
+      [s3-remote]
+      type = s3
+      provider = AWS
+      env_auth = true
+      region = us-east-1
+
+jobs:
+- name: build
+  plan:
+  - get: mfe-app-learning
+    trigger: true
+  - task: npm-install-and-build
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: node
+      inputs:
+      - name: mfe-app-learning
+      outputs:
+      - name: mfe-app-learning/dist
+      params:
+        ACCESS_TOKEN_COOKIE_NAME: edx-jwt-cookie-header-payload
+        BASE_URL: https://learning-mfe-qa.mitxonline.mit.edu
+        CSRF_TOKEN_API_PATH: /csrf/api/v1/token
+        LMS_BASE_URL: https://lms-qa.mitxonline.mit.edu
+        LOGIN_URL: https://lms-qa.mitxonline.mit.edu/login
+        LOGOUT_URL: https://lms-qa.mitxonline.mit.edu/logout
+        MARKETING_SITE_BASE_URL: https://lms-qa.mitxonline.mit.edu
+        REFRESH_ACCESS_TOKEN_ENDPOINT: https://lms-qa.mitxonline.mit.edu/login_refresh
+        SEARCH_CATALOG_URL: https://lms-qa.mitxonline.mit.edu/courses
+        SITE_NAME: MITx Online QA
+        STUDIO_BASE_URL: https://studio-qa.mitxonline.mit.edu
+        USER_INFO_COOKIE_NAME: edx-user-info
+        SESSION_COOKIE_DOMAIN: .mitxonline.mit.edu
+      run:
+        path: sh
+        dir: mfe-app-learning
+        args:
+        - -exc
+        - |
+          npm install
+          NODE_ENV=production npm run build
+  - put: mfe-app-learning-bucket
+    params:
+      source: mfe-app-learning/dist
+      destination:
+      - dir: s3-remote:mitxonline-edxapp-mfe-qa/

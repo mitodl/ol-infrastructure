@@ -6,13 +6,22 @@ from pyinfra import host
 from pyinfra.operations import files, pip
 
 from bilder.components.baseline.steps import service_configuration_watches
-from bilder.components.hashicorp.consul.models.consul import (
+from bilder.components.hashicorp.consul.models import (
     Consul,
     ConsulConfig,
     ConsulService,
     ConsulServiceTCPCheck,
 )
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
+from bilder.components.hashicorp.consul_template.models import (
+    ConsulTemplate,
+    ConsulTemplateConfig,
+    ConsulTemplateTemplate,
+    ConsulTemplateVaultConfig,
+)
+from bilder.components.hashicorp.consul_template.steps import (
+    consul_template_permissions,
+)
 from bilder.components.hashicorp.steps import (
     configure_hashicorp_product,
     install_hashicorp_products,
@@ -38,17 +47,17 @@ from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 VERSIONS = {  # noqa: WPS407
     "consul": "1.10.0",
     "vault": "1.7.3",
+    "consul-template": "0.26.0",
 }
 
 WEB_NODE_TYPE = "web"
 WORKER_NODE_TYPE = "worker"
 node_type = host.data.node_type or os.environ.get("NODE_TYPE", WEB_NODE_TYPE)
 
-# Install additional Python dependencies
+# Install additional Python dependencies for use with edxapp
 pip.packages(
     name="Install additional edX dependencies",
     packages=[
-        "redis-py-cluster",  # Support for clustered redis
         "django-redis",  # Support for Redis caching in Django
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "mitxpro-openedx-extensions==0.2.2",
@@ -62,37 +71,56 @@ pip.packages(
 )
 
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
-studio_template_path = Path("/etc/vault/templates/edxapp_studio.yml.tmpl")
-lms_template_path = Path("/etc/vault/templates/edxapp_lms.yml.tmpl")
 lms_config_path = Path("/edx/etc/lms.yml")
 studio_config_path = Path("/edx/etc/studio.yml")
+forum_config_path = Path("/edx/app/forum/forum_env")
+lms_intermediate_template = Path("/etc/consul-template/templates/edxapp-lms.tmpl")
+studio_intermediate_template = Path("/etc/consul-template/templates/edxapp-studio.tmpl")
+forum_intermediate_template = Path("/etc/consul-template/templates/edx-forum.tmpl")
 # Install Consul and Vault Agent
-vault_templates = [
-    VaultTemplate(
-        source=lms_template_path,
-        destination=lms_config_path,
+vault_templates = None
+consul_templates = [
+    ConsulTemplateTemplate(
+        contents='{{ key "edxapp-template/studio" }}',
+        destination=studio_intermediate_template,
+        # Tell consul-template to reload the rendered template from disk
+        command="/usr/bin/pkill -HUP consul-template",
     ),
-    VaultTemplate(
-        source=studio_template_path,
+    ConsulTemplateTemplate(
+        source=studio_intermediate_template,
         destination=studio_config_path,
+    ),
+    ConsulTemplateTemplate(
+        contents='{{ key "edxapp-template/lms" }}',
+        destination=lms_intermediate_template,
+        # Tell consul-template to reload the rendered template from disk
+        command="/usr/bin/pkill -HUP consul-template",
+    ),
+    ConsulTemplateTemplate(
+        source=lms_intermediate_template, destination=lms_config_path
     ),
 ]
 if node_type == WEB_NODE_TYPE:
-    vault_templates.extend(
-        [
-            VaultTemplate(
-                contents=(
-                    '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
-                    "{{ printf .Data.cert_chain }}{{ end }}"
-                ),
-                destination=Path("/etc/ssl/certs/edxapp.cert"),
+    vault_templates = [
+        VaultTemplate(
+            contents=(
+                '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
+                "{{ printf .Data.cert_chain }}{{ end }}"
             ),
-            VaultTemplate(
-                contents=(
-                    '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
-                    "{{ printf .Data.key }}{{ end }}"
-                ),
-                destination=Path("/etc/ssl/certs/edxapp.key"),
+            destination=Path("/etc/ssl/certs/edxapp.cert"),
+        ),
+        VaultTemplate(
+            contents=(
+                '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
+                "{{ printf .Data.key }}{{ end }}"
+            ),
+            destination=Path("/etc/ssl/private/edxapp.key"),
+        ),
+    ]
+    consul_templates.extend(
+        [
+            ConsulTemplateTemplate(
+                source=forum_intermediate_template, destination=forum_config_path
             ),
         ]
     )
@@ -107,7 +135,16 @@ if node_type == WEB_NODE_TYPE:
                     tcp="localhost:8000",
                     interval="10s",
                 ),
-            )
+            ),
+            ConsulService(
+                name="forum",
+                port=4567,  # noqa: WPS432
+                check=ConsulServiceTCPCheck(
+                    name="edxapp-forum",
+                    tcp="localhost:4567",
+                    interval="10s",
+                ),
+            ),
         ]
     )
 
@@ -136,9 +173,17 @@ vault = Vault(
     ),
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
-hashicorp_products = [vault, consul]
+consul_template = ConsulTemplate(
+    version=VERSIONS["consul-template"],
+    configuration={
+        Path("00-default.json"): ConsulTemplateConfig(
+            vault=ConsulTemplateVaultConfig(),
+            template=consul_templates,
+        )
+    },
+)
+hashicorp_products = [vault, consul, consul_template]
 install_hashicorp_products(hashicorp_products)
-vault_template_permissions(vault.configuration)
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 
@@ -146,55 +191,88 @@ for product in hashicorp_products:
 common_config = Path(__file__).parent.joinpath("templates", "common_values.yml")
 studio_config = Path(__file__).parent.joinpath("templates", "studio_only.yml")
 lms_config = Path(__file__).parent.joinpath("templates", "lms_only.yml")
+forum_config = Path(__file__).parent.joinpath("templates", "forum.env")
 with tempfile.NamedTemporaryFile("wt", delete=False) as studio_template:
     studio_template.write(common_config.read_text())
     studio_template.write(studio_config.read_text())
     files.put(
         name="Upload studio.yml template for Vault agent",
         src=studio_template.name,
-        dest=studio_template_path,
-        user=vault.name,
-        group=vault.name,
+        dest=studio_intermediate_template,
+        user=consul_template.name,
+        group=consul_template.name,
         create_remote_dir=True,
     )
 with tempfile.NamedTemporaryFile("wt", delete=False) as lms_template:
     lms_template.write(common_config.read_text())
     lms_template.write(lms_config.read_text())
     files.put(
-        name="Upload lms.yml template for Vault agent",
+        name="Upload lms.yml template for consul-template agent",
         src=lms_template.name,
-        dest=lms_template_path,
-        user=vault.name,
-        group=vault.name,
+        dest=lms_intermediate_template,
+        user=consul_template.name,
+        group=consul_template.name,
         create_remote_dir=True,
     )
+with tempfile.NamedTemporaryFile("wt", delete=False) as forum_template:
+    forum_template.write(forum_config.read_text())
+    files.put(
+        name="Upload forum_env template for consul-template agent",
+        src=forum_template.name,
+        dest=forum_intermediate_template,
+        user=consul_template.name,
+        group=consul_template.name,
+        create_remote_dir=True,
+    )
+vault_template_permissions(vault.configuration)
+consul_template_permissions(consul_template.configuration)
 # Manage services
 if host.fact.has_systemd:
     register_services(hashicorp_products, start_services_immediately=False)
+    proxy_consul_dns()
+    service_configuration_watches(
+        service_name="nginx",
+        watched_files=[Path("/etc/ssl/certs/edxapp.pem")],
+        start_now=False,
+    )
     service_configuration_watches(
         service_name="edxapp-lms",
         watched_files=[lms_config_path],
+        start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
-            f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} &&"  # noqa: WPS237, WPS221, E501
+            f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} && "  # noqa: WPS237, WPS221, E501
             # Ensure that Vault can update the file when credentials refresh
-            f" setfacl -m u:vault:rwx {lms_config_path} &&"
+            f"setfacl -m u:consul-template:rwx {lms_config_path} && "
             # Restart the edxapp process to reload the configuration file
-            " /edx/bin/supervisorctl restart "
+            "/edx/bin/supervisorctl restart "
             f"{'lms' if node_type == WEB_NODE_TYPE else 'all'}'"
         ),
     )
     service_configuration_watches(
         service_name="edxapp-cms",
         watched_files=[studio_config_path],
+        start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
-            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} &&"  # noqa: WPS237, WPS221, E501
+            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} && "  # noqa: WPS237, WPS221, E501
             # Ensure that Vault can update the file when credentials refresh
-            f" setfacl -m u:vault:rwx {studio_config_path} &&"
+            f"setfacl -m u:consul-template:rwx {studio_config_path} && "
             # Restart the edxapp process to reload the configuration file
-            " /edx/bin/supervisorctl restart "
+            "/edx/bin/supervisorctl restart "
             f"{'cms' if node_type == WEB_NODE_TYPE else 'all'}'"
         ),
     )
-    proxy_consul_dns()
+    service_configuration_watches(
+        service_name="edxapp-forum",
+        watched_files=[forum_config_path],
+        start_now=False,
+        onchange_command=(
+            # Let forum read the rendered config file
+            f"/bin/bash -c 'chown forum:www-data {forum_config_path} && "  # noqa: WPS237, WPS221, E501
+            # Ensure that consul-template can update the file when credentials refresh
+            f"setfacl -m u:consul-template:rwx {forum_config_path} && "
+            # Restart the forum process to reload the configuration file
+            "/edx/bin/supervisorctl restart forum"
+        ),
+    )

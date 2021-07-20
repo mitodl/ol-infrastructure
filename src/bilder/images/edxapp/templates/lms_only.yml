@@ -1,3 +1,8 @@
+{{ with secret "secret-mitxonline/edxapp" }}
+SOCIAL_AUTH_OAUTH_SECRETS:
+  mitxpro-oauth2: {{ .Data.mitxonline_oauth_secret }}
+{{ end }}
+
 ACCOUNT_MICROFRONTEND_URL: null
 ACE_CHANNEL_DEFAULT_EMAIL: django_email
 ############################
@@ -45,7 +50,7 @@ GOOGLE_ANALYTICS_LINKEDIN: ''
 GOOGLE_ANALYTICS_TRACKING_ID: ''
 GOOGLE_SITE_VERIFICATION_ID: ''
 HTTPS: 'on'
-LEARNING_MICROFRONTEND_URL: null
+LEARNING_MICROFRONTEND_URL: https://learning-mfe-qa.mitxonline.mit.edu
 LTI_AGGREGATE_SCORE_PASSBACK_DELAY: 900
 LTI_USER_EMAIL_DOMAIN: lti.example.com
 MAILCHIMP_NEW_USER_LIST_ID: null
@@ -95,8 +100,8 @@ PROFILE_MICROFRONTEND_URL: null
 PROGRAM_CERTIFICATES_ROUTING_KEY: edx.lms.core.default
 PROGRAM_CONSOLE_MICROFRONTEND_URL: null
 RECALCULATE_GRADES_ROUTING_KEY: edx.lms.core.default
-SOCIAL_AUTH_OAUTH_SECRETS: ''
 THIRD_PARTY_AUTH_BACKENDS:
+- social_auth_mitxpro.backends.MITxProOAuth2
 - social_core.backends.google.GoogleOAuth2
 - social_core.backends.linkedin.LinkedinOAuth2
 - social_core.backends.facebook.FacebookOAuth2

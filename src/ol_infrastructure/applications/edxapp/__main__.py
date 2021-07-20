@@ -43,7 +43,7 @@ from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import mysql_role_statements
+from ol_infrastructure.lib.vault import mongodb_role_statements, mysql_role_statements
 
 edxapp_config = Config("edxapp")
 
@@ -126,8 +126,8 @@ edxapp_mfe_bucket = s3.Bucket(
         }
     ),
     cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
-    website={"indexDocument": "index.html"},
 )
+
 
 storage_bucket_name = f"{stack_info.env_prefix}-edxapp-storage-{stack_info.env_suffix}"
 edxapp_storage_bucket = s3.Bucket(
@@ -366,12 +366,23 @@ edxapp_db_consul_service = Service(
 #######################
 # MongoDB Vault Setup #
 #######################
+edxapp_mongo_role_statements = mongodb_role_statements
+edxapp_mongo_role_statements["edxapp"] = {
+    "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "edxapp"})),
+    "revoke": Template(json.dumps({"db": "edxapp"})),
+}
+edxapp_mongo_role_statements["forum"] = {
+    "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "forum"})),
+    "revoke": Template(json.dumps({"db": "forum"})),
+}
+
 edxapp_mongo_vault_config = OLVaultMongoDatabaseConfig(
     db_name="edxapp",
     mount_point=f"mongodb-{stack_info.env_prefix}",
     db_admin_username="admin",
     db_admin_password=edxapp_config.require("mongo_admin_password"),
     db_host=f"mongodb-master.service.{env_name}.consul",
+    role_statements=edxapp_mongo_role_statements,
 )
 edxapp_mongo_vault_backend = OLVaultDatabaseBackend(edxapp_mongo_vault_config)
 
@@ -586,8 +597,30 @@ web_lb = lb.LoadBalancer(
 )
 
 TARGET_GROUP_NAME_MAX_LENGTH = 32
-web_lb_target_group = lb.TargetGroup(
-    "edxapp-web-alb-target-group",
+lms_web_lb_target_group = lb.TargetGroup(
+    "edxapp-web-lms-alb-target-group",
+    vpc_id=edxapp_vpc_id,
+    target_type="instance",
+    port=DEFAULT_HTTPS_PORT,
+    protocol="HTTPS",
+    health_check=lb.TargetGroupHealthCheckArgs(
+        healthy_threshold=3,
+        timeout=3,
+        interval=10,
+        path="/heartbeat",
+        port=str(DEFAULT_HTTPS_PORT),
+        protocol="HTTPS",
+    ),
+    name_prefix=f"lms-{stack_info.env_suffix}-"[:6],
+    tags=aws_config.tags,
+)
+# Studio has some workflows that are stateful, such as importing and exporting courses
+# which requires files to be written and read from the same EC2 instance. This adds
+# separate target groups and ALB listener rules to route requests for studio to a target
+# group with session stickiness enabled so that these stateful workflows don't fail.
+# TMM 2021-07-20
+studio_web_lb_target_group = lb.TargetGroup(
+    "edxapp-web-studio-alb-target-group",
     vpc_id=edxapp_vpc_id,
     target_type="instance",
     port=DEFAULT_HTTPS_PORT,
@@ -600,7 +633,11 @@ web_lb_target_group = lb.TargetGroup(
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",
     ),
-    name=edxapp_web_tag[:TARGET_GROUP_NAME_MAX_LENGTH],
+    stickiness=lb.TargetGroupStickinessArgs(
+        type="lb_cookie",
+        enabled=True,
+    ),
+    name_prefix=f"studio-{stack_info.env_suffix}-"[:6],
     tags=aws_config.tags,
 )
 edxapp_web_acm_cert = acm.Certificate(
@@ -637,9 +674,48 @@ edxapp_web_alb_listener = lb.Listener(
     default_actions=[
         lb.ListenerDefaultActionArgs(
             type="forward",
-            target_group_arn=web_lb_target_group.arn,
+            target_group_arn=lms_web_lb_target_group.arn,
         )
     ],
+    opts=ResourceOptions(delete_before_replace=True),
+)
+edxapp_studio_web_alb_listener_rule = lb.ListenerRule(
+    "edxapp-web-studio-alb-listener-routing",
+    listener_arn=edxapp_web_alb_listener.arn,
+    actions=[
+        lb.ListenerRuleActionArgs(
+            type="forward",
+            target_group_arn=studio_web_lb_target_group.arn,
+        )
+    ],
+    conditions=[
+        lb.ListenerRuleConditionArgs(
+            host_header=lb.ListenerRuleConditionHostHeaderArgs(
+                values=[edxapp_domains["studio"]]
+            )
+        )
+    ],
+    priority=1,
+    tags=aws_config.tags,
+)
+edxapp_lms_web_alb_listener_rule = lb.ListenerRule(
+    "edxapp-web-lms-alb-listener-routing",
+    listener_arn=edxapp_web_alb_listener.arn,
+    actions=[
+        lb.ListenerRuleActionArgs(
+            type="forward",
+            target_group_arn=lms_web_lb_target_group.arn,
+        )
+    ],
+    conditions=[
+        lb.ListenerRuleConditionArgs(
+            host_header=lb.ListenerRuleConditionHostHeaderArgs(
+                values=[edxapp_domains["lms"]]
+            )
+        )
+    ],
+    priority=2,
+    tags=aws_config.tags,
 )
 
 # Create auto scale group and launch configs for Edxapp web and worker
@@ -714,7 +790,7 @@ web_asg = autoscaling.Group(
             min_healthy_percentage=50  # noqa: WPS432
         ),
     ),
-    target_group_arns=[web_lb_target_group.arn],
+    target_group_arns=[lms_web_lb_target_group.arn, studio_web_lb_target_group.arn],
     tags=[
         autoscaling.GroupTagArgs(
             key=key_name,

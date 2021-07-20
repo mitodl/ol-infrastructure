@@ -23,7 +23,7 @@ from bilder.components.concourse.steps import (
     install_concourse,
     register_concourse_service,
 )
-from bilder.components.hashicorp.consul.models.consul import (
+from bilder.components.hashicorp.consul.models import (
     Consul,
     ConsulConfig,
     ConsulService,
