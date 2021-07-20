@@ -611,7 +611,7 @@ lms_web_lb_target_group = lb.TargetGroup(
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",
     ),
-    name=edxapp_web_tag[:TARGET_GROUP_NAME_MAX_LENGTH],
+    name_prefix=f"lms-{stack_info.env_suffix}-"[:6],
     tags=aws_config.tags,
 )
 # Studio has some workflows that are stateful, such as importing and exporting courses
@@ -637,7 +637,7 @@ studio_web_lb_target_group = lb.TargetGroup(
         type="lb_cookie",
         enabled=True,
     ),
-    name=edxapp_web_tag[:TARGET_GROUP_NAME_MAX_LENGTH],
+    name_prefix=f"studio-{stack_info.env_suffix}-"[:6],
     tags=aws_config.tags,
 )
 edxapp_web_acm_cert = acm.Certificate(
@@ -665,8 +665,8 @@ edxapp_web_acm_validated_cert = acm.CertificateValidation(
         ]
     ),
 )
-edxapp_lms_web_alb_listener = lb.Listener(
-    "edxapp-web-lms-alb-listener",
+edxapp_web_alb_listener = lb.Listener(
+    "edxapp-web-alb-listener",
     certificate_arn=edxapp_web_acm_validated_cert.certificate_arn,
     load_balancer_arn=web_lb.arn,
     port=DEFAULT_HTTPS_PORT,
@@ -677,23 +677,11 @@ edxapp_lms_web_alb_listener = lb.Listener(
             target_group_arn=lms_web_lb_target_group.arn,
         )
     ],
-)
-edxapp_studio_web_alb_listener = lb.Listener(
-    "edxapp-web-studio-alb-listener",
-    certificate_arn=edxapp_web_acm_validated_cert.certificate_arn,
-    load_balancer_arn=web_lb.arn,
-    port=DEFAULT_HTTPS_PORT,
-    protocol="HTTPS",
-    default_actions=[
-        lb.ListenerDefaultActionArgs(
-            type="forward",
-            target_group_arn=studio_web_lb_target_group.arn,
-        )
-    ],
+    opts=ResourceOptions(delete_before_replace=True),
 )
 edxapp_studio_web_alb_listener_rule = lb.ListenerRule(
     "edxapp-web-studio-alb-listener-routing",
-    listener_arn=edxapp_studio_web_alb_listener.arn,
+    listener_arn=edxapp_web_alb_listener.arn,
     actions=[
         lb.ListenerRuleActionArgs(
             type="forward",
@@ -702,7 +690,9 @@ edxapp_studio_web_alb_listener_rule = lb.ListenerRule(
     ],
     conditions=[
         lb.ListenerRuleConditionArgs(
-            host_header=lb.ListenerRuleConditionHostHeaderArgs(values=["studio*"])
+            host_header=lb.ListenerRuleConditionHostHeaderArgs(
+                values=[edxapp_domains["studio"]]
+            )
         )
     ],
     priority=1,
@@ -710,7 +700,7 @@ edxapp_studio_web_alb_listener_rule = lb.ListenerRule(
 )
 edxapp_lms_web_alb_listener_rule = lb.ListenerRule(
     "edxapp-web-lms-alb-listener-routing",
-    listener_arn=edxapp_lms_web_alb_listener.arn,
+    listener_arn=edxapp_web_alb_listener.arn,
     actions=[
         lb.ListenerRuleActionArgs(
             type="forward",
@@ -719,7 +709,9 @@ edxapp_lms_web_alb_listener_rule = lb.ListenerRule(
     ],
     conditions=[
         lb.ListenerRuleConditionArgs(
-            host_header=lb.ListenerRuleConditionHostHeaderArgs(values=["lms*"])
+            host_header=lb.ListenerRuleConditionHostHeaderArgs(
+                values=[edxapp_domains["lms"]]
+            )
         )
     ],
     priority=2,
