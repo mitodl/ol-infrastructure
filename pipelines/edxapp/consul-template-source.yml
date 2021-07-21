@@ -31,15 +31,15 @@ jobs:
           repository: consul
         type: registry-image
       inputs:
-      - name: studio_template
+      - name: lms_template
       platform: linux
       run:
         args:
         - -exc
         - |
-          consul agent -data-dir=/tmp/consul-test -retry-join="provider=aws tag_key=consul_env tag_value=operations-qa" -encrypt=((consul-encrypt)) -datacenter=operations-qa -pid-file=/tmp/consul.pid &
+          consul agent -data-dir=/tmp/consul-test -retry-join="provider=aws tag_key=consul_env tag_value=operations-qa" -encrypt=((consul.encrypt_key)) -datacenter=((operations_datacenter)) -pid-file=/tmp/consul.pid &
           until [ 3 -le $(consul members | wc -l) ]; do sleep 1; done
-          consul kv put -datacenter=mitxonline-qa edxapp-template/lms '@lms_template/lms.yml.tmpl'
+          consul kv put -datacenter=((edxapp_datacenter)) edxapp-template/lms '@lms_template/lms.yml.tmpl'
           kill -INT $(cat /tmp/consul.pid)
         path: sh
     task: consul-lms
@@ -76,9 +76,9 @@ jobs:
         args:
         - -exc
         - |
-          consul agent -data-dir=/tmp/consul-test -retry-join="provider=aws tag_key=consul_env tag_value=operations-qa" -encrypt=((consul-encrypt)) -datacenter=operations-qa -pid-file=/tmp/consul.pid &
+          consul agent -data-dir=/tmp/consul-test -retry-join="provider=aws tag_key=consul_env tag_value=operations-qa" -encrypt=((consul.encrypt_key)) -datacenter=((operations_datacenter)) -pid-file=/tmp/consul.pid &
           until [ 3 -le $(consul members | wc -l) ]; do sleep 1; done
-          consul kv put -datacenter=mitxonline-qa edxapp-template/studio '@studio_template/studio.yml.tmpl'
+          consul kv put -datacenter=((edxapp_datacenter)) edxapp-template/studio '@studio_template/studio.yml.tmpl'
           kill -INT $(cat /tmp/consul.pid)
         path: sh
     task: consul-studio

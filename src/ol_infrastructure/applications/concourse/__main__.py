@@ -202,6 +202,15 @@ vault.generic.Secret(
         json.dumps
     ),
 )
+vault.generic.Secret(
+    "concourse-consul-credentials",
+    path=concourse_secrets_mount.path.apply(
+        lambda mount_path: f"{mount_path}/main/consul"
+    ),
+    data_json=concourse_config.require_secret_object("consul_credentials").apply(
+        json.dumps
+    ),
+)
 
 # Vault policy definition
 concourse_vault_policy = vault.Policy(
