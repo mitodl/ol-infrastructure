@@ -4,7 +4,7 @@ from itertools import chain
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import autoscaling, ec2, get_caller_identity, iam, route53
 
-from bilder.lib.magic_numbers import (
+from bridge.lib.magic_numbers import (
     CONSUL_DNS_PORT,
     CONSUL_HTTP_PORT,
     CONSUL_LAN_SERF_PORT,
