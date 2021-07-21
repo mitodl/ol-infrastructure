@@ -18,7 +18,7 @@ resources:
       name: edx-sysadmin
       uri: https://github.com/mitodl/edx-sysadmin.git
       branch: release
-  name: edx-sysadmin-status
+  - name: edx-sysadmin-status
     type: github-status
     source:
       repository: mitodl/edx-sysadmin
