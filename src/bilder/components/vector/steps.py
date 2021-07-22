@@ -31,6 +31,20 @@ def _install_from_package(state=None, host=None):
         state=state,
         host=host,
     )
+    files.directory(
+        "Remove example configurations",
+        path="/etc/vector/examples/",
+        present=False,
+        state=state,
+        host=host,
+    )
+    files.file(
+        name="Remove example vector.toml",
+        path="/etc/vector/vector.toml",
+        present=False,
+        state=state,
+        host=host,
+    )
 
 
 @deploy("Install vector")

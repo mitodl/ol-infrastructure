@@ -763,7 +763,7 @@ cloud_init_user_data = base64.b64encode(
                         "content": textwrap.dedent(
                             f"""\
                         ENVIRONMENT={env_name}
-                        VECTOR_CONFIG=/etc/vector/*
+                        VECTOR_CONFIG_DIR=/etc/vector/
                         """
                         ),  # noqa: WPS355
                         "owner": "root:root",
