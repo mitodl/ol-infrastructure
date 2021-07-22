@@ -1,0 +1,83 @@
+---
+sources:
+  nginx_access_log:
+    type: file
+    file_key: log_file
+    include:
+    - /edx/var/log/nginx/access.log
+  nginx_error_log:
+    type: file
+    file_key: log_file
+    include:
+    - /edx/var/log/nginx/error.log
+transforms:
+  nginx_access_log_parser:
+    inputs:
+    - nginx_access_log
+    type: remap
+    source: |
+      parsed, err = parse_logfmt(.message)
+      if parsed != null {
+        .@timestamp = parse_timestamp!(parsed.time, "%FT%T%:z")
+        del(.message)
+        . = merge(., parsed)
+        .labels = ["nginx_access", "edx_nginx_access"]
+        .environment = "${ENVIRONMENT}"
+      } else {
+        log(err, level: "error")
+        .malformed = true
+      }
+
+  nginx_access_log_malformed_message_filter:
+    inputs:
+    - nginx_access_log_parser
+    type: filter
+    condition: .malformed != true
+
+  nginx_access_log_healthcheck_filter:
+    inputs:
+    - nginx_access_log_malformed_message_filter
+    type: filter
+    condition: '! contains!(.user_agent, "ELB-HealthChecker")'
+
+  nginx_error_log_parser:
+    inputs:
+    - nginx_error_log
+    type: remap
+    source: |
+      matches, err = parse_regex(
+        .message,
+        r'^(?P<time>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?P<log_level>\w+)\] \S+ (?P<message>.*)$'
+      )
+      if matches != null {
+        .message = matches.message
+        .@timestamp = parse_timestamp!(matches.time, "%Y/%m/%d %T")
+        .time = .@timestamp
+        .labels = ["nginx_error", "edx_nginx_error"]
+        .environment = "${ENVIRONMENT}"
+      } else {
+        log(err, level: "error")
+        .malformed = true
+      }
+
+  nginx_error_log_malformed_message_filter:
+    inputs:
+    - nginx_error_log_parser
+    type: filter
+    condition: .malformed != true
+sinks:
+  elasticsearch_nginx_access:
+    inputs:
+    - nginx_access_log_healthcheck_filter
+    type: elasticsearch
+    endpoint: http://operations-elasticsearch.query.consul:9200
+    index: logs-${ENVIRONMENT}-nginx-access-%Y.%W
+    healthcheck: false
+
+  elasticsearch_nginx_error:
+    inputs:
+    - nginx_error_log_malformed_message_filter
+    type: elasticsearch
+    endpoint: http://operations-elasticsearch.query.consul:9200
+    index: logs-${ENVIRONMENT}-nginx-error-%Y.%W
+    healthcheck: false

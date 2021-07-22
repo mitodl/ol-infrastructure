@@ -1,0 +1,72 @@
+---
+api:
+  enabled: true
+
+log_schema:
+  timestamp_key: vector_timestamp
+  host_key: log_host
+
+sources:
+
+  cms_log:
+    type: file
+    include:
+    - /edx/var/log/cms/edx.log
+
+  lms_log:
+    type: file
+    include:
+    - /edx/var/log/lms/edx.log
+
+  auth_log:
+    type: file
+    file_key: log_file
+    include:
+    - /var/log/auth.log
+
+transforms:
+
+  auth_log_parser:
+    inputs:
+    - auth_log
+    type: remap
+    source: |
+      parsed, err = parse_syslog(.message)
+      if parsed != null {
+        . = merge(., parsed)
+        .@timestamp = .timestamp
+        del(.timestamp)
+        .labels = ["authlog", "edx_authlog"]
+      } else {
+        .malformed = true
+      }
+
+  auth_log_malformed_message_filter:
+    inputs:
+    - auth_log_parser
+    type: filter
+    condition: .malformed != true
+
+  auth_log_cron_filter:
+    inputs:
+    - auth_log_malformed_message_filter
+    type: filter
+    condition: .appname != "CRON"
+
+sinks:
+
+  elasticsearch_lms_cms_worker:
+    inputs:
+    - cms_log
+    - lms_log
+    type: elasticsearch
+    endpoint: http://operations-elasticsearch.query.consul:9200
+    index: logs-${ENVIRONMENT}-edxapp-%Y.%W
+    healthcheck: false
+
+  elasticsearch_authlog:
+    inputs:
+    - auth_log_cron_filter
+    type: elasticsearch
+    endpoint: http://operations-elasticsearch.query.consul:9200
+    index: logs-${ENVIRONMENT}-authlog-%Y.%W
