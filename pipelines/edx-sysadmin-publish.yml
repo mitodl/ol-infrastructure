@@ -22,7 +22,7 @@ resources:
     type: github-status
     source:
       repository: mitodl/edx-sysadmin
-      access_token: {{repo_github_token}}
+      access_token: ((github.access_token))
       branch: release
   - name: edx-sysadmin-pypi
     type: pypi
