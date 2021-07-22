@@ -43,7 +43,7 @@ def install_vector(vector_config: VectorConfig, state=None, host=None):
 def configure_vector(vector_config: VectorConfig, state=None, host=None):
     for fpath, context in vector_config.configuration_templates.items():
         files.template(
-            name="Upload Vector configuration file",
+            name=f"Upload Vector configuration file {fpath}",
             src=fpath,
             dest=vector_config.configuration_directory.joinpath(fpath.name),
             user=vector_config.user,

@@ -107,7 +107,7 @@ edxapp_worker_ami = ec2.get_ami(
 
 mfe_bucket_name = f"{env_name}-edxapp-mfe"
 edxapp_mfe_bucket = s3.Bucket(
-    "edxapp-mfe-bucket",
+    "edxapp-mfe-s3-bucket",
     bucket=mfe_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=False),
     tags=aws_config.tags,
@@ -132,7 +132,7 @@ edxapp_mfe_bucket = s3.Bucket(
 
 storage_bucket_name = f"{env_name}-edxapp-storage"
 edxapp_storage_bucket = s3.Bucket(
-    "edxapp-storage-bucket",
+    "edxapp-storage-s3-bucket",
     bucket=storage_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
@@ -140,7 +140,7 @@ edxapp_storage_bucket = s3.Bucket(
 
 course_bucket_name = f"{env_name}-edxapp-courses"
 edxapp_storage_bucket = s3.Bucket(
-    "edxapp-courses-bucket",
+    "edxapp-courses-s3-bucket",
     bucket=course_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=False),
     tags=aws_config.tags,
@@ -148,7 +148,7 @@ edxapp_storage_bucket = s3.Bucket(
 
 grades_bucket_name = f"{env_name}-edxapp-grades"
 edxapp_storage_bucket = s3.Bucket(
-    "edxapp-grades-bucket",
+    "edxapp-grades-s3-bucket",
     bucket=grades_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
@@ -156,7 +156,7 @@ edxapp_storage_bucket = s3.Bucket(
 
 tracking_bucket_name = f"{env_name}-edxapp-tracking"
 edxapp_tracking_bucket = s3.Bucket(
-    "edxapp-tracking-logs-bucket",
+    "edxapp-tracking-logs-s3-bucket",
     bucket=tracking_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
@@ -765,7 +765,7 @@ cloud_init_user_data = base64.b64encode(
                         ENVIRONMENT={env_name}
                         VECTOR_CONFIG=/etc/vector/*
                         """
-                        ),
+                        ),  # noqa: WPS355
                         "owner": "root:root",
                     },
                 ]
@@ -918,5 +918,6 @@ export(
         "mariadb": edxapp_db.db_instance.address,
         "redis": edxapp_redis_cache.address,
         "mfe_bucket": mfe_bucket_name,
+        "load_balancer": {"dns_name": web_lb.dns_name, "arn": web_lb.arn},
     },
 )
