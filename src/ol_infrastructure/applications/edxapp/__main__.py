@@ -1,6 +1,7 @@
 # TODO: Manage database object creation
 import base64
 import json
+import textwrap
 from functools import partial
 from pathlib import Path
 from string import Template
@@ -104,7 +105,7 @@ edxapp_worker_ami = ec2.get_ami(
 # S3 Buckets #
 ##############
 
-mfe_bucket_name = f"{stack_info.env_prefix}-edxapp-mfe-{stack_info.env_suffix}"
+mfe_bucket_name = f"{env_name}-edxapp-mfe"
 edxapp_mfe_bucket = s3.Bucket(
     "edxapp-mfe-bucket",
     bucket=mfe_bucket_name,
@@ -129,7 +130,7 @@ edxapp_mfe_bucket = s3.Bucket(
 )
 
 
-storage_bucket_name = f"{stack_info.env_prefix}-edxapp-storage-{stack_info.env_suffix}"
+storage_bucket_name = f"{env_name}-edxapp-storage"
 edxapp_storage_bucket = s3.Bucket(
     "edxapp-storage-bucket",
     bucket=storage_bucket_name,
@@ -137,7 +138,7 @@ edxapp_storage_bucket = s3.Bucket(
     tags=aws_config.tags,
 )
 
-course_bucket_name = f"{stack_info.env_prefix}-edxapp-courses-{stack_info.env_suffix}"
+course_bucket_name = f"{env_name}-edxapp-courses"
 edxapp_storage_bucket = s3.Bucket(
     "edxapp-courses-bucket",
     bucket=course_bucket_name,
@@ -145,10 +146,18 @@ edxapp_storage_bucket = s3.Bucket(
     tags=aws_config.tags,
 )
 
-grades_bucket_name = f"{stack_info.env_prefix}-edxapp-grades-{stack_info.env_suffix}"
+grades_bucket_name = f"{env_name}-edxapp-grades"
 edxapp_storage_bucket = s3.Bucket(
     "edxapp-grades-bucket",
     bucket=grades_bucket_name,
+    versioning=s3.BucketVersioningArgs(enabled=True),
+    tags=aws_config.tags,
+)
+
+tracking_bucket_name = f"{env_name}-edxapp-tracking"
+edxapp_tracking_bucket = s3.Bucket(
+    "edxapp-tracking-logs-bucket",
+    bucket=tracking_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
 )
@@ -187,6 +196,18 @@ edxapp_policy_document = {
                 f"arn:aws:s3:::{grades_bucket_name}/*",
                 f"arn:aws:s3:::{course_bucket_name}",
                 f"arn:aws:s3:::{course_bucket_name}/*",
+            ],
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject*",
+                "s3:PutObject",
+                "s3:ListBucket",
+            ],
+            "Resource": [
+                f"arn:aws:s3:::{tracking_bucket_name}",
+                f"arn:aws:s3:::{tracking_bucket_name}/*",
             ],
         },
         {
@@ -736,6 +757,16 @@ cloud_init_user_data = base64.b64encode(
                             }
                         ),
                         "owner": "consul:consul",
+                    },
+                    {
+                        "path": "/etc/default/vector",
+                        "content": textwrap.dedent(
+                            f"""\
+                        ENVIRONMENT={env_name}
+                        VECTOR_CONFIG=/etc/vector/*
+                        """
+                        ),
+                        "owner": "root:root",
                     },
                 ]
             },

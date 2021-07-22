@@ -60,7 +60,7 @@ sinks:
     - cms_log
     - lms_log
     type: elasticsearch
-    endpoint: http://operations-elasticsearch.query.consul:9200
+    endpoint: http://logging-elasticsearch.query.consul:9200
     index: logs-${ENVIRONMENT}-edxapp-%Y.%W
     healthcheck: false
 
@@ -68,5 +68,5 @@ sinks:
     inputs:
     - auth_log_cron_filter
     type: elasticsearch
-    endpoint: http://operations-elasticsearch.query.consul:9200
+    endpoint: http://logging-elasticsearch.query.consul:9200
     index: logs-${ENVIRONMENT}-authlog-%Y.%W

@@ -438,7 +438,7 @@ web_launch_config = ec2.LaunchTemplate(
         consul_security_groups["consul_agent"],
     ],
     instance_type=InstanceTypes[web_instance_type].value,
-    key_name="salt-production",
+    key_name="oldevops",
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="instance",
@@ -526,6 +526,7 @@ worker_launch_config = ec2.LaunchTemplate(
                 volume_size=concourse_config.get_int("worker_disk_size")
                 or 25,  # noqa: WPS432
                 volume_type=DiskTypes.ssd,
+                delete_on_termination=True,
             ),
         )
     ],
@@ -534,7 +535,7 @@ worker_launch_config = ec2.LaunchTemplate(
         consul_security_groups["consul_agent"],
     ],
     instance_type=InstanceTypes[worker_instance_type].value,
-    key_name="salt-production",
+    key_name="oldevops",
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="instance",

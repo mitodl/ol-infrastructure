@@ -1,4 +1,8 @@
-from pulumi_consul import PreparedQuery, PreparedQueryFailoverArgs
+from pulumi_consul import (
+    PreparedQuery,
+    PreparedQueryFailoverArgs,
+    PreparedQueryTemplateArgs,
+)
 
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
@@ -11,5 +15,28 @@ vault_operations_query = PreparedQuery(
     tags=["active"],
     failover=PreparedQueryFailoverArgs(
         datacenters=["operations-ci", "operations-qa", "operations"]
+    ),
+)
+
+operations_log_service_query = PreparedQuery(
+    "operations-log-service-query",
+    name="logging",
+    service="${match(2)}",
+    tags=["logging"],
+    failover=PreparedQueryFailoverArgs(
+        datacenters=["operations-ci", "operations-qa", "operations"]
+    ),
+    template=PreparedQueryTemplateArgs(
+        regexp="^(operations|logging)-(.*?)$", type="name_prefix_match"
+    ),
+)
+
+nearest_service_query = PreparedQuery(
+    "neearest-service-query",
+    name="nearest",
+    service="${match(1)}",
+    near="_agent",
+    template=PreparedQueryTemplateArgs(
+        regexp="^nearest-(.*?)$", type="name_prefix_match"
     ),
 )

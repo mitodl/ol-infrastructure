@@ -70,7 +70,7 @@ sinks:
     inputs:
     - nginx_access_log_healthcheck_filter
     type: elasticsearch
-    endpoint: http://operations-elasticsearch.query.consul:9200
+    endpoint: http://logging-elasticsearch.query.consul:9200
     index: logs-${ENVIRONMENT}-nginx-access-%Y.%W
     healthcheck: false
 
@@ -78,6 +78,6 @@ sinks:
     inputs:
     - nginx_error_log_malformed_message_filter
     type: elasticsearch
-    endpoint: http://operations-elasticsearch.query.consul:9200
+    endpoint: http://logging-elasticsearch.query.consul:9200
     index: logs-${ENVIRONMENT}-nginx-error-%Y.%W
     healthcheck: false

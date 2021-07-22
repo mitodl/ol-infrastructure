@@ -64,4 +64,4 @@ jobs:
     params:
       source: mfe-app-learning/dist
       destination:
-      - dir: s3-remote:mitxonline-edxapp-mfe-qa/
+      - dir: s3-remote:mitxonline-qa-edxapp-mfe/
