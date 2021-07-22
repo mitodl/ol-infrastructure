@@ -21,15 +21,17 @@ from ol_infrastructure.lib.aws.ec2_helper import (
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+'''
 from ol_infrastructure.providers.salt.minion import (
     OLSaltStackMinion,
     OLSaltStackMinionInputs,
 )
+'''
 
 stack_info = parse_stack()
 env_config = Config("environment")
 consul_config = Config("consul")
-salt_config = Config("saltstack")
+# salt_config = Config("saltstack")
 environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 business_unit = env_config.get("business_unit") or "operations"
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -171,7 +173,7 @@ consul_instances = []
 export_data = {}
 subnets = destination_vpc["subnet_ids"]
 subnet_id = subnets.apply(chain)
-salt_environment = Config("saltstack").get("environment_name") or environment_name
+# salt_environment = Config("saltstack").get("environment_name") or environment_name
 instance_range = range(consul_config.get_int("instance_count") or 3)
 for count, subnet in zip(instance_range, subnets):  # type:ignore
     subnet_object = ec2.get_subnet(id=subnet)
@@ -184,16 +186,19 @@ for count, subnet in zip(instance_range, subnets):  # type:ignore
     if subnet_object.availability_zone == "us-east-1e":
         continue
     instance_name = f"consul-{environment_name}-{count}"
+    '''
     salt_minion = OLSaltStackMinion(
         f"saltstack-minion-{instance_name}",
         OLSaltStackMinionInputs(minion_id=instance_name),
     )
+    '''
 
+    # Will cloud init be needed for pyinfra, rather than salt, setup?
     cloud_init_userdata = build_userdata(
         instance_name=instance_name,
-        minion_keys=salt_minion,
+        # minion_keys=salt_minion,
         minion_roles=["consul_server", "service_discovery"],
-        minion_environment=salt_environment,
+        # minion_environment=salt_environment,
         salt_host=f"salt-{stack_info.env_suffix}.private.odl.mit.edu",
     )
 
@@ -209,17 +214,17 @@ for count, subnet in zip(instance_range, subnets):  # type:ignore
         tags=instance_tags,
         volume_tags=instance_tags,
         subnet_id=subnet,
-        key_name=salt_config.require("key_name"),
+        # key_name=salt_config.require("key_name"),
         root_block_device=ec2.InstanceRootBlockDeviceArgs(
             volume_type=DiskTypes.ssd, volume_size=20
         ),
         vpc_security_group_ids=[
             destination_vpc["security_groups"]["default"],
-            destination_vpc["security_groups"]["salt_minion"],
+            # destination_vpc["security_groups"]["salt_minion"],
             destination_vpc["security_groups"]["web"],
             consul_server_security_group.id,
         ],
-        opts=ResourceOptions(depends_on=[salt_minion]),
+        # opts=ResourceOptions(depends_on=[salt_minion]),
     )
     consul_instances.append(consul_instance)
 
@@ -233,7 +238,7 @@ for count, subnet in zip(instance_range, subnets):  # type:ignore
 fifteen_minutes = 60 * 15
 consul_domain = route53.Record(
     f"consul-{environment_name}-dns-record",
-    name=f"consul-{salt_environment}.odl.mit.edu",
+    # name=f"consul-{salt_environment}.odl.mit.edu",
     type="A",
     ttl=fifteen_minutes,
     records=[consul_server.public_ip for consul_server in consul_instances],
@@ -259,7 +264,7 @@ consul_launch_config = ec2.LaunchTemplate(
     iam_instance_profile=consul_instance_profile.id,
     image_id=consul_ami.id,
     instance_type=InstanceTypes[instance_type_name].value,
-    key_name=salt_config.require("key_name"),
+    # key_name=salt_config.require("key_name"),
     tags=instance_tags,
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
@@ -272,7 +277,7 @@ consul_launch_config = ec2.LaunchTemplate(
         ),
     ],
     vpc_security_group_ids=[
-        destination_vpc["security_groups"]["salt_minion"],
+        # destination_vpc["security_groups"]["salt_minion"],
         destination_vpc["security_groups"]["web"],
         consul_server_security_group.id,
     ],
@@ -284,13 +289,22 @@ consul_asg = autoscaling.Group(
     desired_capacity=3,
     max_size=5,
     min_size=3,
+    health_check_type="EC2",  # consider custom health check to verify consul health
     launch_template=autoscaling.GroupLaunchTemplateArgs(
         id=consul_launch_config.id,
         version="$Latest",
     ),
-    instance_refresh=autoscaling.GroupInstanceRfereshArgs(
-        strategy="Rolling",
+    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
+            strategy="Rolling",
     ),
+    tags=[
+        autoscaling.GroupTagArgs(
+            key=key_name,
+            value=key_value,
+            propagate_at_launch=True,
+        )
+        for key_name, key_value in aws_config.tags.items()
+    ],
 )
 
 export(
