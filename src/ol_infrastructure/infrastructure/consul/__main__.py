@@ -21,18 +21,12 @@ from ol_infrastructure.lib.aws.ec2_helper import (
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
-'''
-from ol_infrastructure.providers.salt.minion import (
-    OLSaltStackMinion,
-    OLSaltStackMinionInputs,
-)
-'''
 
-stack_info = parse_stack()
+
+stack_info = parse_stack()  # needed without salt?
 env_config = Config("environment")
 consul_config = Config("consul")
-# salt_config = Config("saltstack")
-environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"  # without salt format?
 business_unit = env_config.get("business_unit") or "operations"
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
@@ -173,7 +167,6 @@ consul_instances = []
 export_data = {}
 subnets = destination_vpc["subnet_ids"]
 subnet_id = subnets.apply(chain)
-# salt_environment = Config("saltstack").get("environment_name") or environment_name
 instance_range = range(consul_config.get_int("instance_count") or 3)
 for count, subnet in zip(instance_range, subnets):  # type:ignore
     subnet_object = ec2.get_subnet(id=subnet)
@@ -186,12 +179,6 @@ for count, subnet in zip(instance_range, subnets):  # type:ignore
     if subnet_object.availability_zone == "us-east-1e":
         continue
     instance_name = f"consul-{environment_name}-{count}"
-    '''
-    salt_minion = OLSaltStackMinion(
-        f"saltstack-minion-{instance_name}",
-        OLSaltStackMinionInputs(minion_id=instance_name),
-    )
-    '''
 
     # Will cloud init be needed for pyinfra, rather than salt, setup?
     cloud_init_userdata = build_userdata(
