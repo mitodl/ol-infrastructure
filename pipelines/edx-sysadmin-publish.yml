@@ -5,6 +5,11 @@ resource_types:
     source:
       repository: cfplatformeng/concourse-pypi-resource
       tag: latest
+  - name: github-status
+    type: docker-image
+    source:
+      repository: dpb587/github-status-resource
+      tag: master
 
 resources:
   - name: edx-sysadmin
@@ -12,6 +17,12 @@ resources:
     source:
       name: edx-sysadmin
       uri: https://github.com/mitodl/edx-sysadmin.git
+      branch: release
+  - name: edx-sysadmin-status
+    type: github-status
+    source:
+      repository: mitodl/edx-sysadmin
+      access_token: ((github.access_token))
       branch: release
   - name: edx-sysadmin-pypi
     type: pypi
@@ -26,8 +37,12 @@ jobs:
   - name: publish-edx-sysadmin-to-pypi
     public: true
     plan:
-    - get: edx-sysadmin
+    - get: edx-sysadmin-status
+      params:
+        commit: edx-sysadmin
+        state: success
       trigger: true
+    - get: edx-sysadmin
     - task: build
       config:
         platform: linux
