@@ -1,4 +1,5 @@
 # TODO: Manage database object creation
+# TODO: Add encryption of EBS volumes
 import base64
 import json
 import textwrap
@@ -62,6 +63,8 @@ dns_stack = StackReference("infrastructure.aws.dns")
 consul_stack = StackReference(
     f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
 )
+kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
+s3_kms_key = kms_stack.require_output("kms_s3_data_analytics_key")
 edxapp_vpc = network_stack.require_output(f"{stack_info.env_prefix}_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
@@ -159,7 +162,23 @@ edxapp_tracking_bucket = s3.Bucket(
     "edxapp-tracking-logs-s3-bucket",
     bucket=tracking_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
+    acl="private",
+    server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(  # noqa: E501
+        rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
+                sse_algorithm="aws:kms",
+                kms_master_key_id=s3_kms_key["id"],
+            ),
+            bucket_key_enabled=True,
+        )
+    ),
     tags=aws_config.tags,
+)
+s3.BucketPublicAccessBlock(
+    "edxapp-tracking-bucket-prevent-public-access",
+    bucket=edxapp_tracking_bucket.bucket,
+    block_public_acls=True,
+    block_public_policy=True,
 )
 
 ########################
