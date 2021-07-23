@@ -18,7 +18,7 @@ class VaultAutoAuthSinkConfig(FlexibleBaseModel, abc.ABC):
 
 
 class VaultAutoAuthFileSink(VaultAutoAuthSinkConfig):
-    path: Path = Path("/tmp/vault_agent_token")  # noqa: S108
+    path: Path = Path("/etc/vault/vault_agent_token")  # noqa: S108
     mode: Optional[int]
 
 
