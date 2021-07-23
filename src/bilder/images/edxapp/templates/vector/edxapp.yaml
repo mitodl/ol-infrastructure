@@ -7,17 +7,10 @@ log_schema:
   host_key: log_host
 
 sources:
-
-  cms_log:
-    type: file
-    include:
-    - /edx/var/log/cms/edx.log
-
-  lms_log:
-    type: file
-    include:
-    - /edx/var/log/lms/edx.log
-
+  edxapp:
+    type: journald
+    include_units:
+    - supervisor
   auth_log:
     type: file
     file_key: log_file
@@ -57,8 +50,7 @@ sinks:
 
   elasticsearch_lms_cms_worker:
     inputs:
-    - cms_log
-    - lms_log
+    - edxapp
     type: elasticsearch
     endpoint: http://logging-elasticsearch.query.consul:9200
     index: logs-${ENVIRONMENT}-edxapp-%Y.%W
