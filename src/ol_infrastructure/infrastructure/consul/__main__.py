@@ -201,7 +201,7 @@ for count, subnet in zip(instance_range, subnets):  # type:ignore
         tags=instance_tags,
         volume_tags=instance_tags,
         subnet_id=subnet,
-        # key_name=salt_config.require("key_name"),
+        key_name="oldevops",
         root_block_device=ec2.InstanceRootBlockDeviceArgs(
             volume_type=DiskTypes.ssd, volume_size=20
         ),
@@ -251,7 +251,7 @@ consul_launch_config = ec2.LaunchTemplate(
     iam_instance_profile=consul_instance_profile.id,
     image_id=consul_ami.id,
     instance_type=InstanceTypes[instance_type_name].value,
-    # key_name=salt_config.require("key_name"),
+    key_name="oldevops",
     tags=instance_tags,
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
@@ -273,8 +273,8 @@ consul_launch_config = ec2.LaunchTemplate(
 consul_asg = autoscaling.Group(
     f"consul-{environment_name}-autoscaling-group",
     availability_zones=availability_zones,
-    desired_capacity=3,
-    max_size=5,
+    desired_capacity=3,  # fetch this from stack config with 3 as a default
+    max_size=3,
     min_size=3,
     health_check_type="EC2",  # consider custom health check to verify consul health
     launch_template=autoscaling.GroupLaunchTemplateArgs(
