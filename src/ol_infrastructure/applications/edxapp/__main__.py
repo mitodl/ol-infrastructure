@@ -1,6 +1,8 @@
 # TODO: Manage database object creation
+# TODO: Add encryption of EBS volumes
 import base64
 import json
+import textwrap
 from functools import partial
 from pathlib import Path
 from string import Template
@@ -61,6 +63,8 @@ dns_stack = StackReference("infrastructure.aws.dns")
 consul_stack = StackReference(
     f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
 )
+kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
+kms_s3_key = kms_stack.require_output("kms_s3_data_analytics_key")
 edxapp_vpc = network_stack.require_output(f"{stack_info.env_prefix}_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
@@ -104,9 +108,9 @@ edxapp_worker_ami = ec2.get_ami(
 # S3 Buckets #
 ##############
 
-mfe_bucket_name = f"{stack_info.env_prefix}-edxapp-mfe-{stack_info.env_suffix}"
+mfe_bucket_name = f"{env_name}-edxapp-mfe"
 edxapp_mfe_bucket = s3.Bucket(
-    "edxapp-mfe-bucket",
+    "edxapp-mfe-s3-bucket",
     bucket=mfe_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=False),
     tags=aws_config.tags,
@@ -129,28 +133,52 @@ edxapp_mfe_bucket = s3.Bucket(
 )
 
 
-storage_bucket_name = f"{stack_info.env_prefix}-edxapp-storage-{stack_info.env_suffix}"
+storage_bucket_name = f"{env_name}-edxapp-storage"
 edxapp_storage_bucket = s3.Bucket(
-    "edxapp-storage-bucket",
+    "edxapp-storage-s3-bucket",
     bucket=storage_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
 )
 
-course_bucket_name = f"{stack_info.env_prefix}-edxapp-courses-{stack_info.env_suffix}"
+course_bucket_name = f"{env_name}-edxapp-courses"
 edxapp_storage_bucket = s3.Bucket(
-    "edxapp-courses-bucket",
+    "edxapp-courses-s3-bucket",
     bucket=course_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=False),
     tags=aws_config.tags,
 )
 
-grades_bucket_name = f"{stack_info.env_prefix}-edxapp-grades-{stack_info.env_suffix}"
+grades_bucket_name = f"{env_name}-edxapp-grades"
 edxapp_storage_bucket = s3.Bucket(
-    "edxapp-grades-bucket",
+    "edxapp-grades-s3-bucket",
     bucket=grades_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
+)
+
+tracking_bucket_name = f"{env_name}-edxapp-tracking"
+edxapp_tracking_bucket = s3.Bucket(
+    "edxapp-tracking-logs-s3-bucket",
+    bucket=tracking_bucket_name,
+    versioning=s3.BucketVersioningArgs(enabled=True),
+    acl="private",
+    server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(  # noqa: E501
+        rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
+                sse_algorithm="aws:kms",
+                kms_master_key_id=kms_s3_key["id"],
+            ),
+            bucket_key_enabled=True,
+        )
+    ),
+    tags=aws_config.tags,
+)
+s3.BucketPublicAccessBlock(
+    "edxapp-tracking-bucket-prevent-public-access",
+    bucket=edxapp_tracking_bucket.bucket,
+    block_public_acls=True,
+    block_public_policy=True,
 )
 
 ########################
@@ -187,6 +215,18 @@ edxapp_policy_document = {
                 f"arn:aws:s3:::{grades_bucket_name}/*",
                 f"arn:aws:s3:::{course_bucket_name}",
                 f"arn:aws:s3:::{course_bucket_name}/*",
+            ],
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject*",
+                "s3:PutObject",
+                "s3:ListBucket",
+            ],
+            "Resource": [
+                f"arn:aws:s3:::{tracking_bucket_name}",
+                f"arn:aws:s3:::{tracking_bucket_name}/*",
             ],
         },
         {
@@ -737,6 +777,16 @@ cloud_init_user_data = base64.b64encode(
                         ),
                         "owner": "consul:consul",
                     },
+                    {
+                        "path": "/etc/default/vector",
+                        "content": textwrap.dedent(
+                            f"""\
+                        ENVIRONMENT={env_name}
+                        VECTOR_CONFIG_DIR=/etc/vector/
+                        """
+                        ),  # noqa: WPS355
+                        "owner": "root:root",
+                    },
                 ]
             },
             sort_keys=True,
@@ -887,5 +937,6 @@ export(
         "mariadb": edxapp_db.db_instance.address,
         "redis": edxapp_redis_cache.address,
         "mfe_bucket": mfe_bucket_name,
+        "load_balancer": {"dns_name": web_lb.dns_name, "arn": web_lb.arn},
     },
 )

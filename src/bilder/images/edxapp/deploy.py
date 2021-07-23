@@ -41,6 +41,12 @@ from bilder.components.hashicorp.vault.models import (
     VaultTemplate,
 )
 from bilder.components.hashicorp.vault.steps import vault_template_permissions
+from bilder.components.vector.models import VectorConfig
+from bilder.components.vector.steps import (
+    configure_vector,
+    install_vector,
+    vector_service,
+)
 from bilder.facts import has_systemd  # noqa: F401
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 
@@ -70,6 +76,11 @@ pip.packages(
     sudo_user="edxapp",
 )
 
+vector = VectorConfig(
+    configuration_templates={
+        Path(__file__).parent.joinpath("templates", "vector", "edxapp.yaml"): {},
+    }
+)
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
 lms_config_path = Path("/edx/etc/lms.yml")
 studio_config_path = Path("/edx/etc/studio.yml")
@@ -101,6 +112,14 @@ consul_templates = [
     ),
 ]
 if node_type == WEB_NODE_TYPE:
+    vector.configuration_templates.update(
+        {
+            Path(__file__).parent.joinpath("templates", "vector", "nginx.yaml"): {},
+            Path(__file__).parent.joinpath(
+                "templates", "vector", "edx_tracking.yaml"
+            ): {},
+        }
+    )
     vault_templates = [
         VaultTemplate(
             contents=(
@@ -226,10 +245,16 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as forum_template:
     )
 vault_template_permissions(vault.configuration)
 consul_template_permissions(consul_template.configuration)
+
+# Install Vector log agent
+install_vector(vector)
+configure_vector(vector)
+
 # Manage services
 if host.fact.has_systemd:
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
+    vector_service(vector)
     service_configuration_watches(
         service_name="nginx",
         watched_files=[Path("/etc/ssl/certs/edxapp.pem")],

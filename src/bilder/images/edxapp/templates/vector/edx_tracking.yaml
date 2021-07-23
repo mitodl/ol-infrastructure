@@ -1,0 +1,58 @@
+---
+sources:
+  tracking_log:
+    file_key: log_file
+    type: file
+    include:
+    - /edx/var/log/tracking/tracking.log
+transforms:
+  tracking_log_parser:
+    inputs:
+    - tracking_log
+    type: remap
+    source: |
+      parsed, err = parse_json(.message)
+      if parsed != null {
+        del(.message)
+        . = merge!(., parsed)
+        .labels = ["edx_tracking"]
+        .environment = "${ENVIRONMENT}"
+      } else {
+        log(err, level: "error")
+        .malformed = true
+      }
+
+  tracking_log_malformed_message_filter:
+    inputs:
+    - tracking_log_parser
+    type: filter
+    condition: .malformed != true
+
+  tracking_log_elasticsearch_timestamper:
+    inputs:
+    - tracking_log_malformed_message_filter
+    type: remap
+    source: |
+      .@timestamp = parse_timestamp!(.time, "%FT%T%.6f%:z")
+      .time = .@timestamp
+sinks:
+  elasticsearch_tracking:
+    inputs:
+    - tracking_log_elasticsearch_timestamper
+    type: elasticsearch
+    endpoint: http://logging-elasticsearch.query.consul:9200
+    index: logs-${ENVIRONMENT}-edx-tracking-%Y.%W
+    healthcheck: false
+  s3_tracking:
+    inputs:
+    - tracking_log_malformed_message_filter
+    type: aws_s3
+    bucket: ${ENVIRONMENT}-edxapp-tracking
+    region: us-east-1
+    key_prefix: logs/%F-%H_
+    encoding:
+      codec: ndjson
+    batch:
+      timeout_secs: {{60 * 60}}
+      max_bytes: {{1024 * 1024 * 1024 * 2}}
+    healthcheck: false

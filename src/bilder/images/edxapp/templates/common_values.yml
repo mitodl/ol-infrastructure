@@ -117,7 +117,7 @@ AWS_SECRET_ACCESS_KEY: ""  # MODIFIED - not setting as we will use IAM Instance 
 AWS_SES_CONFIGURATION_SET: edxapp-ses-configuration  # ADDED KEY
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
 AWS_SES_REGION_NAME: us-east-1
-AWS_STORAGE_BUCKET_NAME: mitxonline-edxapp-storage-qa  # MODIFIED
+AWS_STORAGE_BUCKET_NAME: mitxonline-qa-edxapp-storage  # MODIFIED
 BASE_COOKIE_DOMAIN: .mitxonline.mit.edu # MODIFIED
 BLOCKSTORE_API_URL: http://localhost:18250/api/v1
 BLOCKSTORE_PUBLIC_URL_ROOT: http://localhost:18250
@@ -314,7 +314,7 @@ FEATURES:
 FEEDBACK_SUBMISSION_EMAIL: ''
 FERNET_KEYS:
 - DUMMY KEY CHANGE BEFORE GOING TO PRODUCTION
-FILE_UPLOAD_STORAGE_BUCKET_NAME: mitxonline-edxapp-storage-qa
+FILE_UPLOAD_STORAGE_BUCKET_NAME: mitxonline-qa-edxapp-storage
 FILE_UPLOAD_STORAGE_PREFIX: submissions_attachments
 FINANCIAL_REPORTS:
     BUCKET: null
@@ -324,7 +324,7 @@ FOOTER_ORGANIZATION_IMAGE: images/logo.png
 GITHUB_REPO_ROOT: /edx/var/edxapp/data
 GOOGLE_ANALYTICS_ACCOUNT: null
 GRADES_DOWNLOAD:
-    BUCKET: mitxonline-edxapp-grades-qa  # MODIFIED
+    BUCKET: mitxonline-qa-edxapp-grades  # MODIFIED
     ROOT_PATH: grades  # MODIFIED
     STORAGE_CLASS: django.core.files.storage.S3Storage  # MODIFIED
     STORAGE_KWARGS:
