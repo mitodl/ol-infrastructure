@@ -1,12 +1,12 @@
 ---
 secretsprovider: awskms://alias/PulumiSecrets
-encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEfv9Q1cyfdz2aqY/peW/dgAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMBSvJow6mYib+SaqBAgEQgDv9MYz/5UCsreTwGJy2eJSIfRDc13pK/DU2IzzHKCGpC32o/J2+VFfvgJnOowzRCLvqGhLWcDoIo0faBQ== # pragma: allowlist secret
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEfv9Q1cyfdz2aqY/peW/dgAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMBSvJow6mYib+SaqBAgEQgDv9MYz/5UCsreTwGJy2eJSIfRDc13pK/DU2IzzHKCGpC32o/J2+VFfvgJnOowzRCLvqGhLWcDoIo0faBQ==
 config:
-    aws:region: us-east-1
-    consul:address: https://consul-mitxpro-production.odl.mit.edu
-    consul:http_auth:
-        secure: v1:NiN8iManSKIvT0Y5:anAdRnHBV+lG2wkheycMw1C994jRSSUZRDm59nRimB4V48ArcQlpS5lQoWgOIIjI3dQQxvTMkA==
-    consul:scheme: https
-    mitxpro_edxapp:db_password:
-        secure: v1:8yjbkXdLeTgf0q/9:Jr1PuL5qk+3HohpHHRG9w7WyfY1KtRiZK8+L3juBocO/p6q8fmY9lW0HZDXHtXJZLp1CEJxch4Q=
-    mitxpro_edxapp:db_purpose: xpro_production
+  aws:region: us-east-1
+  consul:address: https://consul-mitxpro-production.odl.mit.edu
+  consul:http_auth:
+    secure: v1:NiN8iManSKIvT0Y5:anAdRnHBV+lG2wkheycMw1C994jRSSUZRDm59nRimB4V48ArcQlpS5lQoWgOIIjI3dQQxvTMkA==
+  consul:scheme: https
+  mitxpro_edxapp:db_password:
+    secure: v1:8yjbkXdLeTgf0q/9:Jr1PuL5qk+3HohpHHRG9w7WyfY1KtRiZK8+L3juBocO/p6q8fmY9lW0HZDXHtXJZLp1CEJxch4Q=
+  mitxpro_edxapp:db_purpose: xpro_production

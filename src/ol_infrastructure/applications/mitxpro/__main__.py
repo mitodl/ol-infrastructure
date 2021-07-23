@@ -1,3 +1,14 @@
+##############
+# DEPRECATED #
+##############
+# This module is deprecated as it partially duplicates functionality from
+# applications.edxapp which is more complete.  Do not add new functionality to this
+# module. Once the MITx Online deployment has been rolled out we will migrate our other
+# edxapp deployments to use the functionality from the applications.edxapp project.
+# TMM 2021-07-23
+
+from string import Template
+
 from pulumi import Config, StackReference, export
 from pulumi_aws import ec2
 from pulumi_consul import Node, Service
@@ -14,7 +25,6 @@ from ol_infrastructure.lib.vault import mysql_role_statements
 
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-operations_stack = StackReference(f"infrastructure.operations.xpro.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
 dagster_app = StackReference(f"applications.dagster.{stack_info.name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
@@ -141,31 +151,37 @@ hyphenated_db_purpose = xpro_db_purpose.replace("_", "-")
 edx_role_statments = mysql_role_statements.update(
     {
         f"edxapp-csmh-{hyphenated_db_purpose}": {
-            "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
-            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
-            f"CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh_{xpro_db_purpose}.* "
-            "TO '{{{{name}}}}'@'%';"
-            f"GRANT REFERENCES ON edxapp_csmh_{xpro_db_purpose}.* "
-            "TO '{{{{name}}}}'@'%';",
-            "revoke": "DROP USER '{{{{name}}}}';",
+            "create": Template(
+                "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
+                "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
+                f"CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh_{xpro_db_purpose}.* "
+                "TO '{{name}}'@'%';"
+                f"GRANT REFERENCES ON edxapp_csmh_{xpro_db_purpose}.* "
+                "TO '{{name}}'@'%';"
+            ),
+            "revoke": Template("DROP USER '{{name}}';"),
         },
         f"edxapp-{hyphenated_db_purpose}": {
-            "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
-            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
-            f"CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_{xpro_db_purpose}.* "
-            "TO '{{{{name}}}}'@'%';"
-            f"GRANT REFERENCES ON edxapp_{xpro_db_purpose}.* "
-            "TO '{{{{name}}}}'@'%';",
-            "revoke": "DROP USER '{{{{name}}}}';",
+            "create": Template(
+                "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
+                "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
+                f"CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_{xpro_db_purpose}.* "
+                "TO '{{name}}'@'%';"
+                f"GRANT REFERENCES ON edxapp_{xpro_db_purpose}.* "
+                "TO '{{name}}'@'%';"
+            ),
+            "revoke": Template("DROP USER '{{name}}';"),
         },
         f"xqueue-{hyphenated_db_purpose}": {
-            "create": "CREATE USER '{{{{name}}}}'@'%' IDENTIFIED BY '{{{{password}}}}';"
-            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
-            f"CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue_{xpro_db_purpose}.* "
-            "TO '{{{{name}}}}'@'%';"
-            f"GRANT REFERENCES ON xqueue_{xpro_db_purpose}.* "
-            "TO '{{{{name}}}}'@'%';",
-            "revoke": "DROP USER '{{{{name}}}}';",
+            "create": Template(
+                "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
+                "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
+                f"CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue_{xpro_db_purpose}.* "
+                "TO '{{name}}'@'%';"
+                f"GRANT REFERENCES ON xqueue_{xpro_db_purpose}.* "
+                "TO '{{name}}'@'%';"
+            ),
+            "revoke": Template("DROP USER '{{name}}';"),
         },
     }
 )
