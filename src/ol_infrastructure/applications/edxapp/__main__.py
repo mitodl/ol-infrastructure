@@ -64,7 +64,7 @@ consul_stack = StackReference(
     f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
 )
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
-s3_kms_key = kms_stack.require_output("kms_s3_data_analytics_key")
+kms_s3_key = kms_stack.require_output("kms_s3_data_analytics_key")
 edxapp_vpc = network_stack.require_output(f"{stack_info.env_prefix}_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
@@ -167,7 +167,7 @@ edxapp_tracking_bucket = s3.Bucket(
         rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
             apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
                 sse_algorithm="aws:kms",
-                kms_master_key_id=s3_kms_key["id"],
+                kms_master_key_id=kms_s3_key["id"],
             ),
             bucket_key_enabled=True,
         )
