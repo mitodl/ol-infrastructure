@@ -5,7 +5,10 @@ from pathlib import Path
 from pyinfra import host
 from pyinfra.operations import files, pip
 
-from bilder.components.baseline.steps import service_configuration_watches
+from bilder.components.baseline.steps import (
+    install_baseline_packages,
+    service_configuration_watches,
+)
 from bilder.components.hashicorp.consul.models import (
     Consul,
     ConsulConfig,
@@ -60,6 +63,7 @@ WEB_NODE_TYPE = "web"
 WORKER_NODE_TYPE = "worker"
 node_type = host.data.node_type or os.environ.get("NODE_TYPE", WEB_NODE_TYPE)
 
+install_baseline_packages()
 # Install additional Python dependencies for use with edxapp
 pip.packages(
     name="Install additional edX dependencies",

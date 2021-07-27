@@ -23,6 +23,13 @@ def _debian_pkg_repo(state=None, host=None):
 
 
 def _install_from_package(state=None, host=None):
+    server.packages(
+        name="Install Curl for Vector repo setup script",
+        packages=["curl"],
+        present=True,
+        state=state,
+        host=host,
+    )
     _debian_pkg_repo(state=state, host=host)
     server.packages(
         name="Install Vector package",
@@ -32,7 +39,7 @@ def _install_from_package(state=None, host=None):
         host=host,
     )
     files.directory(
-        "Remove example configurations",
+        name="Remove example configurations",
         path="/etc/vector/examples/",
         present=False,
         state=state,

@@ -19,6 +19,12 @@ sources:
 
 transforms:
 
+  edxapp_logs:
+    inputs:
+    - edxapp
+    type: filter
+    condition: contains('service_variant', .message)
+
   auth_log_parser:
     inputs:
     - auth_log
@@ -50,7 +56,7 @@ sinks:
 
   elasticsearch_lms_cms_worker:
     inputs:
-    - edxapp
+    - edxapp_logs
     type: elasticsearch
     endpoint: http://logging-elasticsearch.query.consul:9200
     index: logs-${ENVIRONMENT}-edxapp-%Y.%W
@@ -62,3 +68,4 @@ sinks:
     type: elasticsearch
     endpoint: http://logging-elasticsearch.query.consul:9200
     index: logs-${ENVIRONMENT}-authlog-%Y.%W
+    healthcheck: false
