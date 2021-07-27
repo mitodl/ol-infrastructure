@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from pyinfra.api import host
@@ -22,7 +23,7 @@ from bilder.facts import has_systemd  # noqa: F401
 
 VERSIONS = {  # noqa: WPS407
     "caddy_route53": "v1.1.1",
-    "consul": "1.9.5",
+    "consul": os.environ.get("CONSUL_VERSION", "1.10.0"),
 }
 
 install_baseline_packages()
