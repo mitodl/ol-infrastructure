@@ -25,16 +25,22 @@ def build_consul_userdata(env_name):
                             ),
                             "owner": "consul:consul",
                         },
-                        {
-                            "path": "/etc/default/vector",
-                            "content": textwrap.dedent(
-                                f"""\
-                            ENVIRONMENT={env_name}
-                            VECTOR_CONFIG_DIR=/etc/vector/
-                            """
-                            ),  # noqa: WPS355
-                            "owner": "root:root",
+                        """
+                        TODO add consul esm config
+                         {
+                            "path": "/etc/consul-esm.d/config.json",
+                            "content": json.dumps(
+                                {
+                                    "retry_join": [
+                                        "provider=aws tag_key=consul_env "
+                                        f"tag_value={env_name}"
+                                    ],
+                                    "datacenter": env_name,
+                                }
+                            ),
+                            "owner": "consul:consul",
                         },
+                        """
                     ]
                 },
                 sort_keys=True,
