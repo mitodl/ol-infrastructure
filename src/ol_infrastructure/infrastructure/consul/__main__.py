@@ -1,5 +1,4 @@
 import json
-from itertools import chain
 
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import autoscaling, ec2, get_caller_identity, iam, route53
@@ -15,18 +14,17 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
     availability_zones,
-    build_userdata,
     debian_10_ami,
     default_egress_args,
 )
+from ol_infrastructure.lib.consul import build_consul_userdata
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
-
-stack_info = parse_stack()  # needed without salt?
+stack_info = parse_stack()
 env_config = Config("environment")
-consul_config = Config("consul")  # where is this located?
-environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"  # without salt format?
+consul_config = Config("consul")
+environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 business_unit = env_config.get("business_unit") or "operations"
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
@@ -38,6 +36,11 @@ aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name}
 destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))
 dns_stack = StackReference("infrastructure.aws.dns")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
+
+
+#############
+# IAM Setup #
+#############
 
 consul_instance_role = iam.Role(
     f"consul-instance-role-{environment_name}",
@@ -66,6 +69,11 @@ consul_instance_profile = iam.InstanceProfile(
     role=consul_instance_role.name,
     path="/ol-operations/consul/profile/",
 )
+
+
+########################
+# Security Group Setup #
+########################
 
 consul_server_security_group = ec2.SecurityGroup(
     f"consul-server-{environment_name}-security-group",
@@ -160,69 +168,13 @@ security_groups = {
     "consul_agent": consul_agent_security_group.id,
 }
 
-# This section will need to be replaced with Launch Template config
-instance_type_name = consul_config.get("instance_type") or InstanceTypes.medium.name
-instance_type = InstanceTypes[instance_type_name].value
-consul_instances = []
-export_data = {}
-subnets = destination_vpc["subnet_ids"]
-subnet_id = subnets.apply(chain)
-instance_range = range(consul_config.get_int("instance_count") or 3)
-for count, subnet in zip(instance_range, subnets):  # type:ignore
-    subnet_object = ec2.get_subnet(id=subnet)
-    # This is only necessary for the operations environment because the 1i AZ is lacking
-    # support for newer instance types. We need to retire that subnet to avoid further
-    # hacks like this one.
 
-    # TODO: redeploy or otherwise migrate instances out of the 1e AZ and delete the
-    # associated subnet. (TMM 2021-05-07)
-    if subnet_object.availability_zone == "us-east-1e":
-        continue
-    instance_name = f"consul-{environment_name}-{count}"
-
-    # Will cloud init be needed for pyinfra, rather than salt, setup?
-    cloud_init_userdata = build_userdata(
-        instance_name=instance_name,
-        # minion_keys=salt_minion,
-        minion_roles=["consul_server", "service_discovery"],
-        # minion_environment=salt_environment,
-        salt_host=f"salt-{stack_info.env_suffix}.private.odl.mit.edu",
-    )
-
-    instance_tags = aws_config.merged_tags(
-        {"Name": instance_name, "consul_env": environment_name}
-    )
-    consul_instance = ec2.Instance(
-        f"consul-instance-{environment_name}-{count}",
-        ami=debian_10_ami.id,
-        user_data=cloud_init_userdata,
-        instance_type=instance_type,
-        iam_instance_profile=consul_instance_profile.id,
-        tags=instance_tags,
-        volume_tags=instance_tags,
-        subnet_id=subnet,
-        key_name="oldevops",
-        root_block_device=ec2.InstanceRootBlockDeviceArgs(
-            volume_type=DiskTypes.ssd, volume_size=20
-        ),
-        vpc_security_group_ids=[
-            destination_vpc["security_groups"]["default"],
-            # destination_vpc["security_groups"]["salt_minion"],
-            destination_vpc["security_groups"]["web"],
-            consul_server_security_group.id,
-        ],
-        # opts=ResourceOptions(depends_on=[salt_minion]),
-    )
-    consul_instances.append(consul_instance)
-
-    export_data[instance_name] = {
-        "public_ip": consul_instance.public_ip,
-        "private_ip": consul_instance.private_ip,
-        "ipv6_address": consul_instance.ipv6_addresses,
-    }
-######
+##################
+# Route 53 Setup #
+##################
 
 fifteen_minutes = 60 * 15
+# TODO set up to reference LB
 consul_domain = route53.Record(
     f"consul-{environment_name}-dns-record",
     # name=f"consul-{salt_environment}.odl.mit.edu",
@@ -233,6 +185,12 @@ consul_domain = route53.Record(
     opts=ResourceOptions(depends_on=consul_instances),
 )
 
+
+#########################
+# Launch Template Setup #
+#########################
+
+# Find AMI
 aws_account = get_caller_identity()
 consul_ami = ec2.get_ami(
     filters=[
@@ -244,15 +202,21 @@ consul_ami = ec2.get_ami(
     owners=[aws_account.account_id],
 )
 
+# Select instance type
+instance_type_name = consul_config.get("instance_type") or InstanceTypes.medium.name
+instance_type = InstanceTypes[instance_type_name].value
+
 consul_launch_config = ec2.LaunchTemplate(
     "consul-launch-template",
     name_prefix=f"consul-{environment_name}-",
     description="Launch template for deploying Consul cluster",
+    # block_device_mappings  TODO: additional block device mappings needed here, or to be defined in AMI?
     iam_instance_profile=consul_instance_profile.id,
     image_id=consul_ami.id,
-    instance_type=InstanceTypes[instance_type_name].value,
+    instance_type=instance_type,
     key_name="oldevops",
-    tags=instance_tags,
+    tags=aws_config.tags,
+    # TODO: tag volumes via LaunchTemplate, or in AMI?
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="instance",
@@ -263,16 +227,28 @@ consul_launch_config = ec2.LaunchTemplate(
             tags=aws_config.merged_tags({"Name": f"consul-{stack_info.env_suffix}"}),
         ),
     ],
+    user_data=build_consul_userdata(
+        env_name=environment_name,
+    ),
     vpc_security_group_ids=[
-        # destination_vpc["security_groups"]["salt_minion"],
         destination_vpc["security_groups"]["web"],
-        consul_server_security_group.id,
+        security_groups["consul_server"],
+        security_groups["consul_agent"],
     ],
 )
 
+
+#########################
+# Autoscale Group Setup #
+#########################
+
+
 # instance_count should be 1, 3, or 5
-# ref:
 consul_capacity = consul_config.get_int("instance_count") or 3
+
+# Define list of available subnets -- vpc zone identifiers -- for autoscale group
+subnet_ids = destination_vpc["subnet_ids"]
+
 consul_asg = autoscaling.Group(
     f"consul-{environment_name}-autoscaling-group",
     availability_zones=availability_zones,
@@ -296,15 +272,15 @@ consul_asg = autoscaling.Group(
         )
         for key_name, key_value in aws_config.tags.items()
     ],
+    vpc_zone_identifiers=subnet_ids,
 )
 
-export(
-    "security_groups",
-    {
-        "consul_server": consul_server_security_group.id,
-        "consul_agent": consul_agent_security_group.id,
-    },
-)
-export("instances", export_data)
+
+#################
+# Stack Exports #
+#################
+
+export("security_groups", security_groups)
+export("instances", export_data)  # TODO: export LB reference
 export("consul_launch_config", consul_launch_config.id)
 export("consul_asg", consul_asg.id)
