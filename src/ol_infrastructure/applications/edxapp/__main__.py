@@ -557,7 +557,34 @@ for loop_counter in range(0, 3):
             )
         ],
     )
-# TODO: Add configuration set with events handling routed to CloudWatch
+edxapp_ses_configuration_set = ses.ConfigurationSet(
+    "edxapp-ses-configuration-set",
+    reputation_metrics_enabled=True,
+    sending_enabled=True,
+    name=f"edxapp-{env_name}",
+)
+edxapp_ses_event_destintations = ses.EventDestination(
+    "edxapp-ses-event-destination-routing",
+    configuration_set_name=edxapp_ses_configuration_set.name,
+    enabled=True,
+    matching_types=[
+        "send",
+        "reject",
+        "bounce",
+        "complaint",
+        "delivery",
+        "open",
+        "click",
+        "renderingFailure",
+    ],
+    cloudwatch_destinations=[
+        ses.EventDestinationCloudwatchDestinationArgs(
+            default_value="default",
+            dimension_name=f"edxapp-{env_name}",
+            value_source="emailHeader",
+        )
+    ],
+)
 
 ######################
 # Secrets Management #
@@ -938,5 +965,6 @@ export(
         "redis": edxapp_redis_cache.address,
         "mfe_bucket": mfe_bucket_name,
         "load_balancer": {"dns_name": web_lb.dns_name, "arn": web_lb.arn},
+        "ses_configuration_set": edxapp_ses_configuration_set.name,
     },
 )
