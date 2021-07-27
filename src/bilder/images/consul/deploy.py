@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from pyinfra import host
+from pyinfra.api import host
 
-from bilder.components.baseline.setup import install_baseline_packages
+from bilder.components.baseline.steps import install_baseline_packages
 from bilder.components.caddy.models import CaddyConfig, CaddyPlugin
 from bilder.components.caddy.steps import caddy_service, configure_caddy, install_caddy
-from bilder.components.hashicorp.consul.models.consul import (
+from bilder.components.hashicorp.consul.models import (
     Consul,
     ConsulACL,
     ConsulACLToken,

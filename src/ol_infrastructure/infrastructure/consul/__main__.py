@@ -25,7 +25,7 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 stack_info = parse_stack()  # needed without salt?
 env_config = Config("environment")
-consul_config = Config("consul")
+consul_config = Config("consul")  # where is this located?
 environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"  # without salt format?
 business_unit = env_config.get("business_unit") or "operations"
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -270,17 +270,21 @@ consul_launch_config = ec2.LaunchTemplate(
     ],
 )
 
+# instance_count should be 1, 3, or 5
+# ref:
+consul_capacity = consul_config.get_int("instance_count") or 3
 consul_asg = autoscaling.Group(
     f"consul-{environment_name}-autoscaling-group",
     availability_zones=availability_zones,
-    desired_capacity=3,  # fetch this from stack config with 3 as a default
-    max_size=3,
-    min_size=3,
+    desired_capacity=consul_capacity,
+    max_size=consul_capacity,
+    min_size=consul_capacity,
     health_check_type="EC2",  # consider custom health check to verify consul health
     launch_template=autoscaling.GroupLaunchTemplateArgs(
         id=consul_launch_config.id,
         version="$Latest",
     ),
+    instance_type_name=None,
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
             strategy="Rolling",
     ),
