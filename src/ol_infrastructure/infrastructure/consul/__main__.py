@@ -11,10 +11,8 @@ from bridge.lib.magic_numbers import (
     CONSUL_WAN_SERF_PORT,
 )
 from ol_infrastructure.lib.aws.ec2_helper import (
-    DiskTypes,
     InstanceTypes,
     availability_zones,
-    debian_10_ami,
     default_egress_args,
 )
 from ol_infrastructure.lib.consul import build_consul_userdata
@@ -24,7 +22,7 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 stack_info = parse_stack()
 env_config = Config("environment")
 consul_config = Config("consul")
-environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 business_unit = env_config.get("business_unit") or "operations"
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
@@ -32,7 +30,7 @@ destination_vpc = network_stack.require_output(env_config.require("vpc_reference
 peer_vpcs = destination_vpc["peers"].apply(
     lambda peers: {peer: network_stack.require_output(peer) for peer in peers}
 )
-aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
+aws_config = AWSBase(tags={"OU": business_unit, "Environment": env_name})
 destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))
 dns_stack = StackReference("infrastructure.aws.dns")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
@@ -43,7 +41,7 @@ mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 #############
 
 consul_instance_role = iam.Role(
-    f"consul-instance-role-{environment_name}",
+    f"consul-instance-role-{env_name}",
     assume_role_policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -59,13 +57,13 @@ consul_instance_role = iam.Role(
 )
 
 iam.RolePolicyAttachment(
-    f"consul-describe-instance-role-policy-{environment_name}",
+    f"consul-describe-instance-role-policy-{env_name}",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
     role=consul_instance_role.name,
 )
 
 consul_instance_profile = iam.InstanceProfile(
-    f"consul-instance-profile-{environment_name}",
+    f"consul-instance-profile-{env_name}",
     role=consul_instance_role.name,
     path="/ol-operations/consul/profile/",
 )
@@ -75,50 +73,51 @@ consul_instance_profile = iam.InstanceProfile(
 # Security Group Setup #
 ########################
 
+cidr_blocks = [destination_vpc["cidr"]]
 consul_server_security_group = ec2.SecurityGroup(
-    f"consul-server-{environment_name}-security-group",
-    name=f"{environment_name}-consul-server",
+    f"consul-server-{env_name}-security-group",
+    name=f"{env_name}-consul-server",
     description="Access control between Consul severs and agents",
-    tags=aws_config.merged_tags({"Name": f"{environment_name}-consul-server"}),
+    tags=aws_config.merged_tags({"Name": f"{env_name}-consul-server"}),
     vpc_id=destination_vpc["id"],
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=[destination_vpc["cidr"]],
+            cidr_blocks=cidr_blocks,
             protocol="tcp",
             from_port=CONSUL_HTTP_PORT,
             to_port=CONSUL_HTTP_PORT,
             description="HTTP API access",
         ),
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=[destination_vpc["cidr"]],
+            cidr_blocks=cidr_blocks,
             protocol="udp",
             from_port=CONSUL_HTTP_PORT,
             to_port=CONSUL_HTTP_PORT,
             description="HTTP API access",
         ),
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=[destination_vpc["cidr"]],
+            cidr_blocks=cidr_blocks,
             protocol="tcp",
             from_port=CONSUL_DNS_PORT,
             to_port=CONSUL_DNS_PORT,
             description="DNS access",
         ),
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=[destination_vpc["cidr"]],
+            cidr_blocks=cidr_blocks,
             protocol="udp",
             from_port=CONSUL_DNS_PORT,
             to_port=CONSUL_DNS_PORT,
             description="DNS access",
         ),
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=[destination_vpc["cidr"]],
+            cidr_blocks=cidr_blocks,
             protocol="tcp",
             from_port=CONSUL_RPC_PORT,
             to_port=CONSUL_LAN_SERF_PORT,
             description="LAN gossip protocol",
         ),
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=[destination_vpc["cidr"]],
+            cidr_blocks=cidr_blocks,
             protocol="udp",
             from_port=CONSUL_RPC_PORT,
             to_port=CONSUL_LAN_SERF_PORT,
@@ -138,10 +137,10 @@ consul_server_security_group = ec2.SecurityGroup(
 )
 
 consul_agent_security_group = ec2.SecurityGroup(
-    f"consul-agent-{environment_name}-security-group",
-    name=f"{environment_name}-consul-agent",
+    f"consul-agent-{env_name}-security-group",
+    name=f"{env_name}-consul-agent",
     description="Access control between Consul agents",
-    tags=aws_config.merged_tags({"Name": f"{environment_name}-consul-agent"}),
+    tags=aws_config.merged_tags({"Name": f"{env_name}-consul-agent"}),
     vpc_id=destination_vpc["id"],
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -176,7 +175,7 @@ security_groups = {
 fifteen_minutes = 60 * 15
 # TODO set up to reference LB
 consul_domain = route53.Record(
-    f"consul-{environment_name}-dns-record",
+    f"consul-{env_name}-dns-record",
     # name=f"consul-{salt_environment}.odl.mit.edu",
     type="A",
     ttl=fifteen_minutes,
@@ -208,9 +207,10 @@ instance_type = InstanceTypes[instance_type_name].value
 
 consul_launch_config = ec2.LaunchTemplate(
     "consul-launch-template",
-    name_prefix=f"consul-{environment_name}-",
+    name_prefix=f"consul-{env_name}-",
     description="Launch template for deploying Consul cluster",
-    # block_device_mappings  TODO: additional block device mappings needed here, or to be defined in AMI?
+    # block_device_mappings
+    # TODO: additional block device mappings needed here or to be defined in AMI?
     iam_instance_profile=consul_instance_profile.id,
     image_id=consul_ami.id,
     instance_type=instance_type,
@@ -220,15 +220,15 @@ consul_launch_config = ec2.LaunchTemplate(
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="instance",
-            tags=aws_config.merged_tags({"Name": f"consul-{stack_info.env_suffix}"}),
+            tags=aws_config.merged_tags({"Name": f"consul-{env_name}"}),
         ),
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="volume",
-            tags=aws_config.merged_tags({"Name": f"consul-{stack_info.env_suffix}"}),
+            tags=aws_config.merged_tags({"Name": f"consul-{env_name}"}),
         ),
     ],
     user_data=build_consul_userdata(
-        env_name=environment_name,
+        env_name=env_name,
     ),
     vpc_security_group_ids=[
         destination_vpc["security_groups"]["web"],
@@ -250,7 +250,7 @@ consul_capacity = consul_config.get_int("instance_count") or 3
 subnet_ids = destination_vpc["subnet_ids"]
 
 consul_asg = autoscaling.Group(
-    f"consul-{environment_name}-autoscaling-group",
+    f"consul-{env_name}-autoscaling-group",
     availability_zones=availability_zones,
     desired_capacity=consul_capacity,
     max_size=consul_capacity,
@@ -262,7 +262,7 @@ consul_asg = autoscaling.Group(
     ),
     instance_type_name=None,
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
-            strategy="Rolling",
+        strategy="Rolling",
     ),
     tags=[
         autoscaling.GroupTagArgs(
