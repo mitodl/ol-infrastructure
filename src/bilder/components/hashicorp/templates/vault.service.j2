@@ -21,6 +21,7 @@ CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
 NoNewPrivileges=yes
 ExecStart=/usr/local/bin/vault {{ context.mode }} -config={{ context.configuration_file }}
 ExecReload=/bin/kill --signal HUP $MAINPID
+EnvironmentFile=-/etc/default/vault
 KillMode=process
 KillSignal=SIGINT
 Restart=on-failure

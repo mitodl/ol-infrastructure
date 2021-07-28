@@ -214,3 +214,37 @@ export(
         "alias": infrastructure_as_code_key_alias.name,
     },
 )
+
+vault_server_unseal_key = kms.Key(
+    "vault-server-auto-unseal-kms-key",
+    customer_master_key_spec=DEFAULT_KEY_SPEC,
+    description=(
+        "Key for automatically initializing and unsealing Vault servers in an "
+        "autoscale group"
+    ),
+    enable_key_rotation=True,
+    is_enabled=True,
+    key_usage=ENCRYPT_KEY_USAGE,
+    tags=AWSBase(
+        tags={
+            "OU": "operations",
+            "Environment": "operations-{stack_info.env_suffix}",
+            "Owner": "platform-engineering",
+        }
+    ).tags,
+    policy=json.dumps(kms_infrastructure_as_code_encryption_policy),
+)
+vault_server_unseal_key_alias = kms.Alias(
+    "vault-server-auto-unseal-kms-key-alias",
+    name=f"alias/vault-auto-unseal-{stack_info.env_suffix}",
+    target_key_id=vault_server_unseal_key.id,
+)
+
+export(
+    "vault_auto_unseal_key",
+    {
+        "id": vault_server_unseal_key.id,
+        "arn": vault_server_unseal_key.arn,
+        "alias": vault_server_unseal_key_alias.name,
+    },
+)

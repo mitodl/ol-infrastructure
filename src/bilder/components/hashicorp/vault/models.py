@@ -2,6 +2,8 @@ import abc
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple, Union
 
+from pydantic.types import conint
+
 from bilder.components.hashicorp.models import (
     FlexibleBaseModel,
     HashicorpConfig,
@@ -75,6 +77,13 @@ class VaultStorageBackend(FlexibleBaseModel, abc.ABC):
     pass  # noqa: WPS420, WPS604
 
 
+class VaultAwsKmsSealConfig(VaultSealConfig):
+    region: Optional[str] = "us-east-1"
+    access_key: Optional[str]
+    secret_key: Optional[str]
+    kms_key_id: str
+
+
 class VaultTelemetryConfig(FlexibleBaseModel):
     usage_gauge_period: Optional[str]
     maximum_gauge_cardinality: Optional[int]
@@ -98,6 +107,11 @@ class ConsulStorageBackend(VaultStorageBackend):
     tls_cert_file: Optional[Path]
     tls_key_file: Optional[Path]
     tls_min_version: Optional[str] = "tls12"
+
+
+class IntegratedStorageBackend(VaultStorageBackend):
+    path: Path
+    performance_multiplier: conint(ge=0, le=10) = 0  # type: ignore
 
 
 class VaultAutoAuthConfig(FlexibleBaseModel):
