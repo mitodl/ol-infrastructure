@@ -25,6 +25,14 @@ transforms:
     type: filter
     condition: match, err = contains(.message, "[service_variant=")
 
+  edxapp_labeled_logs:
+    inputs:
+    - edxapp_logs
+    type: remap
+    source: |
+      .labels = ["edxapp", "${ENVIRONMENT}"]
+      .environment = "${ENVIRONMENT}"
+
   auth_log_parser:
     inputs:
     - auth_log
@@ -35,7 +43,8 @@ transforms:
         . = merge(., parsed)
         .@timestamp = .timestamp
         del(.timestamp)
-        .labels = ["authlog", "edx_authlog"]
+        .labels = ["authlog", "edx_authlog", "${ENVIRONMENT}"]
+        .environment = "${ENVIRONMENT}"
       } else {
         .malformed = true
       }
@@ -56,7 +65,7 @@ sinks:
 
   elasticsearch_lms_cms_worker:
     inputs:
-    - edxapp_logs
+    - edxapp_labeled_logs
     type: elasticsearch
     endpoint: http://logging-elasticsearch.query.consul:9200
     index: logs-${ENVIRONMENT}-edxapp-%Y.%W
