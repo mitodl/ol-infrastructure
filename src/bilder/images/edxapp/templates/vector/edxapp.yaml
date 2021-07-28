@@ -23,7 +23,7 @@ transforms:
     inputs:
     - edxapp
     type: filter
-    condition: err = contains("[service_variant=", .message)
+    condition: match, err = contains(.message, "[service_variant=")
 
   auth_log_parser:
     inputs:
