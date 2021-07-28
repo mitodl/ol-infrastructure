@@ -232,6 +232,8 @@ instance_type_name = consul_config.get("instance_type") or InstanceTypes.medium.
 instance_type = InstanceTypes[instance_type_name].value
 
 # Auto Join WAN Envs
+# using the VPC ID to denote datacenter
+datacenter_name = destination_vpc["id"]
 wan_envs = [peer["id"] for peer in peer_vpcs]
 retry_join_wan = [
     f"provider=aws tag_key=consul_env tag_value={wan_env}" for wan_env in wan_envs
@@ -251,7 +253,7 @@ cloud_init_user_data = base64.b64encode(
                                     "provider=aws tag_key=consul_env "
                                     f"tag_value={env_name}"
                                 ],
-                                "datacenter": env_name,
+                                "datacenter": datacenter_name,
                             }
                         ),
                         "owner": "consul:consul",
