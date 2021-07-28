@@ -935,6 +935,7 @@ worker_asg = autoscaling.Group(
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
             min_healthy_percentage=50  # noqa: WPS432
         ),
+        triggers=["tag"],
     ),
     tags=[
         autoscaling.GroupTagArgs(
