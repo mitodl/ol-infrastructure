@@ -1,3 +1,5 @@
+# TODO: Mount separate disk for Raft data to simplify snapshot backup/restore
+# TODO: Create substructure module to populate secrets mounts
 import os
 from pathlib import Path
 
@@ -18,13 +20,20 @@ from bilder.components.hashicorp.steps import (
     register_services,
 )
 from bilder.components.hashicorp.vault.models import (
+    ConsulServiceRegistration,
+    IntegratedRaftStorageBackend,
     Vault,
+    VaultAwsKmsSealConfig,
     VaultListener,
+    VaultSealConfig,
     VaultServerConfig,
+    VaultServiceRegistration,
+    VaultStorageBackend,
+    VaultTCPListener,
 )
 from bilder.components.hashicorp.vault.steps import vault_template_permissions
 from bilder.facts import has_systemd  # noqa: F401
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.magic_numbers import HOURS_IN_MONTH, VAULT_CLUSTER_PORT, VAULT_HTTP_PORT
 
 VERSIONS = {  # noqa: WPS407
     "vault": os.environ.get("VAULT_VERSION", "1.8.0"),
@@ -52,9 +61,35 @@ if host.fact.has_systemd:
     caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
 
 # Install Consul agent and Vault server
+hours_in_six_months = HOURS_IN_MONTH * 6
 vault = Vault(
     configuration=VaultServerConfig(
-        listener=[VaultListener(type="tcp", address=f"0.0.0.0:{VAULT_HTTP_PORT}")],
+        listener=[
+            VaultListener(
+                tcp=VaultTCPListener(
+                    address=f"[::]:{VAULT_HTTP_PORT}",
+                    cluster_address=f"[::]:{VAULT_CLUSTER_PORT}"
+                    # TODO: Provision TLS key and cert during build for HTTPS traffic
+                )
+            )
+        ],
+        # Disable swapping to disk because we are using the integrated raft storage
+        # backend.
+        disable_mlock=True,
+        storage=[
+            VaultStorageBackend(
+                raft=IntegratedRaftStorageBackend(
+                    path=Path("/var/lib/vault/raft/"),
+                )
+            )
+        ],
+        ui=True,
+        service_registration=VaultServiceRegistration(
+            consul=ConsulServiceRegistration()
+        ),
+        plugin_directory=Path("/var/lib/vault/plugins/"),
+        max_lease_ttl=f"{hours_in_six_months}h",  # 6 months
+        seal=[VaultSealConfig(awskms=VaultAwsKmsSealConfig())],
     )
 )
 consul_configuration = {

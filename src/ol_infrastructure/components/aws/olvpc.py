@@ -244,6 +244,17 @@ class OLVPC(ComponentResource):  # noqa: WPS230
             vpc_id=self.olvpc.id,
             route_table_ids=[self.route_table.id],
             tags=vpc_config.tags,
+            private_dns_enabled=True,
+            opts=ResourceOptions(parent=self),
+        )
+
+        self.kms_endpoint = ec2.VpcEndpoint(
+            f"{vpc_config.vpc_name}-kms-endpoint",
+            service_name="com.amazonaws.us-east-1.kms",
+            vpc_id=self.olvpc.id,
+            route_table_ids=[self.route_table.id],
+            tags=vpc_config.tags,
+            private_dns_enabled=True,
             opts=ResourceOptions(parent=self),
         )
 
@@ -258,10 +269,7 @@ class OLVPC(ComponentResource):  # noqa: WPS230
 
 
 class OLVPCPeeringConnection(ComponentResource):
-    """
-    A Pulumi component for creating a VPC peering connection and populating
-    bidirectional routes.
-    """
+    """Component for creating a VPC peering connection and populating routes."""
 
     def __init__(
         self,
