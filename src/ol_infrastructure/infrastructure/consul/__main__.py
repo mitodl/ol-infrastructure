@@ -2,7 +2,7 @@ import base64
 import json
 
 import yaml
-from pulumi import Config, StackReference, export
+from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import autoscaling, ec2, get_caller_identity, iam, lb, route53
 
 from bridge.lib.magic_numbers import (
@@ -11,6 +11,7 @@ from bridge.lib.magic_numbers import (
     CONSUL_LAN_SERF_PORT,
     CONSUL_RPC_PORT,
     CONSUL_WAN_SERF_PORT,
+    DEFAULT_HTTPS_PORT,
 )
 from ol_infrastructure.lib.aws.ec2_helper import (
     InstanceTypes,
@@ -74,7 +75,9 @@ consul_instance_profile = iam.InstanceProfile(
 # Security Group Setup #
 ########################
 
+vpc_id = destination_vpc["id"]
 cidr_blocks = [destination_vpc["cidr"]]
+
 consul_server_security_group = ec2.SecurityGroup(
     f"consul-server-{env_name}-security-group",
     name=f"{env_name}-consul-server",
@@ -142,7 +145,7 @@ consul_agent_security_group = ec2.SecurityGroup(
     name=f"{env_name}-consul-agent",
     description="Access control between Consul agents",
     tags=aws_config.merged_tags({"Name": f"{env_name}-consul-agent"}),
-    vpc_id=destination_vpc["id"],
+    vpc_id=vpc_id,
     ingress=[
         ec2.SecurityGroupIngressArgs(
             security_groups=[consul_server_security_group.id],
@@ -170,7 +173,7 @@ security_groups = {
 
 
 #############
-# NLB Setup #
+# ALB Setup #
 #############
 
 # Assumes that there are at least as many subnets as there is consul instances
@@ -194,7 +197,43 @@ consul_elb = lb.LoadBalancer(
     tags=aws_config.merged_tags({"Name": consul_elb_tag}),
 )
 
-# TODO ELB Health Check + Listeners
+TARGET_GROUP_NAME_MAX_LENGTH = 32
+consul_lb_target_group = lb.TargetGroup(
+    "consul-lb-target-group",
+    vpc_id=vpc_id,
+    target_type="instance",
+    port=DEFAULT_HTTPS_PORT,
+    protocol="HTTPS",
+    health_check=lb.TargetGroupHealthCheckArgs(
+        healthy_threshold=3,
+        timeout=3,
+        interval=10,
+        path="/health",
+        port=str(DEFAULT_HTTPS_PORT),
+        protocol="HTTPS",
+    ),
+    name_prefix=f"consul-{stack_info.env_suffix}-"[:6],
+    tags=aws_config.tags,
+)
+
+# Hardcoded ARN for wildcard *.odl.mit.edu cert
+wildcard_arn_cert = "arn:aws:acm:us-east-1:610119931565:certificate/0b8b39d2-89a8-440f-8d07-876a66fcbc8a"
+
+consul_lb_listener = lb.Listener(
+    "consul-lb-listener",
+    certificate_arn=wildcard_arn_cert,
+    load_balancer_arn=consul_elb.arn,
+    port=DEFAULT_HTTPS_PORT,
+    protocol="HTTPS",
+    # more than default listener rule needed?
+    default_actions=[
+        lb.ListenerDefaultActionArgs(
+            type="forward",
+            target_group_arn=consul_lb_target_group.arn,
+        )
+    ],
+    opts=ResourceOptions(delete_before_replace=True),  # Other options needed?
+)
 
 
 ##################
@@ -233,7 +272,6 @@ instance_type = InstanceTypes[instance_type_name].value
 
 # Auto Join WAN Envs
 # using the VPC ID to denote datacenter
-datacenter_name = destination_vpc["id"]
 wan_envs = [peer["id"] for peer in peer_vpcs]
 retry_join_wan = [
     f"provider=aws tag_key=consul_env tag_value={wan_env}" for wan_env in wan_envs
@@ -253,7 +291,7 @@ cloud_init_user_data = base64.b64encode(
                                     "provider=aws tag_key=consul_env "
                                     f"tag_value={env_name}"
                                 ],
-                                "datacenter": datacenter_name,
+                                "datacenter": vpc_id,
                             }
                         ),
                         "owner": "consul:consul",
@@ -316,7 +354,7 @@ consul_asg = autoscaling.Group(
     desired_capacity=consul_capacity,
     max_size=consul_capacity,
     min_size=consul_capacity,
-    health_check_type="ELB",  # TODO ELB health check
+    health_check_type="ELB",
     launch_template=autoscaling.GroupLaunchTemplateArgs(
         id=consul_launch_config.id,
         version="$Latest",
