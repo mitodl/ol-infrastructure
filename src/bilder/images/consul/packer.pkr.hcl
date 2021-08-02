@@ -11,7 +11,7 @@ variable "CONSUL_VERSION" {
 
 variable "build_environment" {
   type = string
-  default = "mitx-online-qa"
+  default = "mitxonline-qa"
 }
 
 source "amazon-ebs" "concourse" {
