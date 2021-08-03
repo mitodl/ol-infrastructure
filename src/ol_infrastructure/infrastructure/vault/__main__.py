@@ -13,13 +13,15 @@
 """
 import base64
 import json
+from typing import Any, Dict
 
 import yaml
 from pulumi import Config, ResourceOptions, StackReference, export
-from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb
+from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
 
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
+    FIVE_MINUTES,
     VAULT_CLUSTER_PORT,
     VAULT_HTTP_PORT,
 )
@@ -55,6 +57,7 @@ vault_ami = ec2.get_ami(
     owners=[aws_account.account_id],
 )
 kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
+odl_zone_id = dns_stack.require_output("odl_zone_id")
 
 # write file
 
@@ -62,51 +65,91 @@ kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 # Access and Security #
 #######################
 
-# IAM Policy and role
-vault_policy_document = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "kms:Encrypt",
-                "kms:Decrypt",
-                "kms:DescribeKey",
-            ],
-            "Resource": kms_stack.require_output("vault_auto_unseal_key")[
-                "arn"
-            ],  # noqa: E501
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "iam:AttachUserPolicy",
-                "iam:CreateAccessKey",
-                "iam:CreateUser",
-                "iam:DeleteAccessKey",
-                "iam:DeleteUser",
-                "iam:DeleteUserPolicy",
-                "iam:DetachUserPolicy",
-                "iam:ListAccessKeys",
-                "iam:ListAttachedUserPolicies",
-                "iam:ListGroupsForUser",
-                "iam:ListUserPolicies",
-                "iam:PutUserPolicy",
-                "iam:AddUserToGroup",
-                "iam:RemoveUserFromGroup",
-            ],
-            "Resource": ["arn:aws:iam:::user/vault-*"],
-        },
-    ],
+
+def vault_policy_document(vault_key_arn) -> Dict[str, Any]:
+    return {
+        "Version": IAM_POLICY_VERSION,
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:DescribeKey",
+                ],
+                "Resource": vault_key_arn,
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "iam:AttachUserPolicy",
+                    "iam:CreateAccessKey",
+                    "iam:CreateUser",
+                    "iam:DeleteAccessKey",
+                    "iam:DeleteUser",
+                    "iam:DeleteUserPolicy",
+                    "iam:DetachUserPolicy",
+                    "iam:ListAccessKeys",
+                    "iam:ListAttachedUserPolicies",
+                    "iam:ListGroupsForUser",
+                    "iam:ListUserPolicies",
+                    "iam:PutUserPolicy",
+                    "iam:AddUserToGroup",
+                    "iam:RemoveUserFromGroup",
+                ],
+                "Resource": ["arn:*:iam::*:user/vault-*", "arn:*:iam::*:group/*"],
+            },
+        ],
+    }
+
+
+parliament_config = {
+    "CREDENTIALS_EXPOSURE": {
+        "ignore_locations": [{"actions": ["iam:createaccesskey"]}]
+    },
+    "PRIVILEGE_ESCALATION": {
+        "ignore_locations": [
+            {"type": "CreateAccessKey", "actions": ["iam:createaccesskey"]},
+            {
+                "type": "AttachUserPolicy",
+                "actions": ["iam:attachuserpolicy"],
+            },
+            {
+                "type": "PutUserPolicy",
+                "actions": ["iam:putuserpolicy"],
+            },
+            {"type": "AddUserToGroup", "actions": ["iam:addusertogroup"]},
+        ]
+    },
+    "PERMISSIONS_MANAGEMENT_ACTIONS": {
+        "ignore_locations": [
+            {
+                "actions": [
+                    "iam:deleteuserpolicy",
+                    "iam:deleteuser",
+                    "iam:attachuserpolicy",
+                    "iam:putuserpolicy",
+                    "iam:createaccesskey",
+                    "iam:deleteaccesskey",
+                    "iam:detachuserpolicy",
+                    "iam:createuser",
+                ]
+            }
+        ]
+    },
 }
 
+# IAM Policy and role
 vault_policy = iam.Policy(
     "vault-policy",
     name_prefix="vault-server-policy-",
     path=f"/ol-applications/vault/{stack_info.env_prefix}/{stack_info.env_suffix}/",
-    policy=lint_iam_policy(
-        vault_policy_document,
-        stringify=True,
+    policy=kms_stack.require_output("vault_auto_unseal_key")["arn"].apply(
+        lambda arn: lint_iam_policy(
+            vault_policy_document(arn),
+            stringify=True,
+            parliament_config=parliament_config,
+        )
     ),
     description="AWS access permissions for Vault server instances",
 )
@@ -179,7 +222,7 @@ vault_security_group = ec2.SecurityGroup(
 # Create load balancer for Edxapp web nodes
 web_lb = lb.LoadBalancer(
     "vault-web-load-balancer",
-    name_prefix=f"vault-server-{env_name}-",
+    name_prefix=f"vault-server-{env_name}-"[:6],
     ip_address_type="dualstack",
     load_balancer_type="application",
     enable_http2=True,
@@ -214,7 +257,7 @@ odl_wildcard_cert = acm.get_certificate(
 )
 vault_web_alb_listener = lb.Listener(
     "vault-web-alb-listener",
-    certificate_arn=odl_wildcard_cert.certificate_arn,
+    certificate_arn=odl_wildcard_cert.arn,
     load_balancer_arn=web_lb.arn,
     port=DEFAULT_HTTPS_PORT,
     protocol="HTTPS",
@@ -230,8 +273,10 @@ vault_web_alb_listener = lb.Listener(
 ###################
 # Autoscale Group #
 ###################
-cloud_init_user_data = (
-    base64.b64encode(
+
+
+def cloud_init_user_data(consul_vpc_id, consul_env_name, vault_domain) -> str:
+    return base64.b64encode(
         "#cloud-config\n{}".format(
             yaml.dump(
                 {
@@ -242,18 +287,16 @@ cloud_init_user_data = (
                                 {
                                     "retry_join": [
                                         "provider=aws tag_key=consul_env "
-                                        f"tag_value={env_name}"
+                                        f"tag_value={consul_env_name}"
                                     ],
-                                    "datacenter": env_name,
+                                    "datacenter": consul_vpc_id,
                                 }
                             ),
                             "owner": "consul:consul",
                         },
                         {
                             "path": "/etc/default/caddy",
-                            "content": "DOMAIN={}".format(
-                                vault_config.require("domain")
-                            ),
+                            "content": f"DOMAIN={vault_domain}",
                         },
                     ],
                     "fs_setup": [
@@ -278,8 +321,9 @@ cloud_init_user_data = (
                 sort_keys=True,
             )
         ).encode("utf8")
-    ).decode("utf8"),
-)
+    ).decode("utf8")
+
+
 vault_instance_type = (
     vault_config.get("instance_type") or InstanceTypes.general_purpose_large.name
 )
@@ -291,7 +335,11 @@ worker_launch_config = ec2.LaunchTemplate(
         arn=vault_instance_profile.arn,
     ),
     image_id=vault_ami.id,
-    user_data=cloud_init_user_data,
+    user_data=target_vpc["id"].apply(
+        lambda vpc_id: cloud_init_user_data(
+            vpc_id, env_name, vault_config.require("domain")
+        )
+    ),
     block_device_mappings=[
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name="/dev/xvda",
@@ -300,18 +348,18 @@ worker_launch_config = ec2.LaunchTemplate(
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
                 encrypted=True,
-                kms_key_id=kms_ebs["id"],
+                kms_key_id=kms_ebs["arn"],
             ),
         ),
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name="/dev/xvdb",
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=vault_config.get("storage_disk_capacity")
+                volume_size=vault_config.get_int("storage_disk_capacity")
                 or 100,  # noqa: WPS432
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
                 encrypted=True,
-                kms_key_id=kms_ebs["id"],
+                kms_key_id=kms_ebs["arn"],
             ),
         ),
     ],
@@ -333,7 +381,8 @@ worker_launch_config = ec2.LaunchTemplate(
     ],
     tags=aws_config.tags,
 )
-cluster_count = vault_config.get("cluster_size") or 3  # Valid values are 3, 5, or 7
+# Valid values are 3, 5, or 7
+cluster_count = vault_config.get_int("cluster_size") or 3
 vault_asg = autoscaling.Group(
     "vault-server-autoscaling-group",
     desired_capacity=cluster_count,
@@ -361,6 +410,14 @@ vault_asg = autoscaling.Group(
     ],
 )
 
+route53.Record(
+    "vault-server-dns-record",
+    name=vault_config.require("domain"),
+    type="CNAME",
+    ttl=FIVE_MINUTES,
+    records=[web_lb.dns_name],
+    zone_id=odl_zone_id,
+)
 #################
 # Stack Exports #
 #################

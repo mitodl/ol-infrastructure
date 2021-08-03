@@ -228,7 +228,7 @@ vault_server_unseal_key = kms.Key(
     tags=AWSBase(
         tags={
             "OU": "operations",
-            "Environment": "operations-{stack_info.env_suffix}",
+            "Environment": f"operations-{stack_info.env_suffix}",
             "Owner": "platform-engineering",
         }
     ).tags,
