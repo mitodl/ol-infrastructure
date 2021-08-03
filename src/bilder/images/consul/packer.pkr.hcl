@@ -53,15 +53,9 @@ source "amazon-ebs" "consul" {
   }
 }
 
-source "docker" "consul" {
-  image = "debian:buster"
-  commit = true
-}
-
 build {
   sources = [
     "source.amazon-ebs.consul",
-    "source.docker.consul",
   ]
 
   provisioner "shell-local" {
