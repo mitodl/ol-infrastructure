@@ -6,11 +6,8 @@ from pathlib import Path
 from pyinfra import host
 from pyinfra.operations import files
 
-from bilder.components.baseline.steps import (
-    install_baseline_packages,
-    service_configuration_watches,
-)
-from bilder.components.caddy.models import CaddyConfig
+from bilder.components.baseline.steps import install_baseline_packages
+from bilder.components.caddy.models import CaddyConfig, CaddyPlugin
 from bilder.components.caddy.steps import caddy_service, configure_caddy, install_caddy
 from bilder.components.hashicorp.consul.models import Consul, ConsulConfig
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
@@ -36,7 +33,8 @@ from bridge.lib.magic_numbers import HOURS_IN_MONTH, VAULT_CLUSTER_PORT, VAULT_H
 
 VERSIONS = {  # noqa: WPS407
     "vault": os.environ.get("VAULT_VERSION", "1.8.0"),
-    "consul": os.environ.get("CONSUL_VERSION", "1.10.0"),
+    "consul": os.environ.get("CONSUL_VERSION", "1.10.1"),
+    "caddy_route53": "v1.1.2",
 }
 
 install_baseline_packages(packages=["curl", "gnupg"])
@@ -44,22 +42,19 @@ install_baseline_packages(packages=["curl", "gnupg"])
 
 # Install Caddy
 caddy_config = CaddyConfig(
+    plugins=[
+        CaddyPlugin(
+            repository="github.com/caddy-dns/route53",
+            version=VERSIONS["caddy_route53"],
+        )
+    ],
     caddyfile=Path(__file__)
     .parent.resolve()
-    .joinpath("templates", "concourse_caddyfile.j2"),
+    .joinpath("templates", "vault_caddyfile.j2"),
 )
 caddy_config.template_context = caddy_config.dict()
 install_caddy(caddy_config)
 caddy_config_changed = configure_caddy(caddy_config)
-if host.fact.has_systemd:
-    service_configuration_watches(
-        service_name="caddy",
-        watched_files=[
-            Path("/etc/caddy/odl_wildcard.cert"),
-            Path("/etc/caddy/odl_wildcard.key"),
-        ],
-    )
-    caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
 
 # Install Consul agent and Vault server
 hours_in_six_months = HOURS_IN_MONTH * 6
@@ -70,9 +65,9 @@ vault = Vault(
                 VaultListener(
                     tcp=VaultTCPListener(
                         address=f"[::]:{VAULT_HTTP_PORT}",
-                        cluster_address=f"[::]:{VAULT_CLUSTER_PORT}"
-                        # TODO: Provision TLS key and cert during build for HTTPS
-                        # traffic
+                        cluster_address=f"[::]:{VAULT_CLUSTER_PORT}",
+                        tls_cert_file=Path("/etc/vault/vault.cert"),
+                        tls_key_file=Path("/etc/vault/vault.key"),
                     )
                 )
             ],
@@ -107,6 +102,7 @@ for product in hashicorp_products:
 
 # Manage services
 if host.fact.has_systemd:
+    caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
 

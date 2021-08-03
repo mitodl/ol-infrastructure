@@ -11,10 +11,10 @@
 - Uses the cloud auto-join functionality to automate new instances joining the
   cluster.  The requisite configuration is passed in via cloud-init user data.
 """
-
-# TODO: Mount separate disk for Raft data to simplify snapshot backup/restore
+import base64
 import json
 
+import yaml
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb
 
@@ -30,12 +30,12 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 vault_config = Config("vault")
 stack_info = parse_stack()
-target_vpc = vault_config.require("target_vpc")
+target_network = vault_config.require("target_vpc")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
-target_vpc = network_stack.require_output(target_vpc)
+target_vpc = network_stack.require_output(f"{target_network}_vpc")
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 aws_config = AWSBase(
     tags={
@@ -73,7 +73,9 @@ vault_policy_document = {
                 "kms:Decrypt",
                 "kms:DescribeKey",
             ],
-            "Resource": f"arn:aws:kms:us-east-1:{aws_account}:alias/vault-auto-unseal-{stack_info.env_suffix}",  # noqa: E501
+            "Resource": kms_stack.require_output("vault_auto_unseal_key")[
+                "arn"
+            ],  # noqa: E501
         },
         {
             "Effect": "Allow",
@@ -93,7 +95,7 @@ vault_policy_document = {
                 "iam:AddUserToGroup",
                 "iam:RemoveUserFromGroup",
             ],
-            "Resource": [f"arn:aws:iam::{aws_account}:user/vault-*"],
+            "Resource": ["arn:aws:iam:::user/vault-*"],
         },
     ],
 }
@@ -127,6 +129,11 @@ vault_iam_role = iam.Role(
 iam.RolePolicyAttachment(
     "vault-describe-instances-permission",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
+    role=vault_iam_role.name,
+)
+iam.RolePolicyAttachment(
+    "caddy-route53-records-permission",
+    policy_arn=policy_stack.require_output("iam_policies")["route53_odl_zone_records"],
     role=vault_iam_role.name,
 )
 iam.RolePolicyAttachment(
@@ -223,9 +230,58 @@ vault_web_alb_listener = lb.Listener(
 ###################
 # Autoscale Group #
 ###################
-# TODO: Encrypt EBS
+cloud_init_user_data = (
+    base64.b64encode(
+        "#cloud-config\n{}".format(
+            yaml.dump(
+                {
+                    "write_files": [
+                        {
+                            "path": "/etc/consul.d/99-autojoin.json",
+                            "content": json.dumps(
+                                {
+                                    "retry_join": [
+                                        "provider=aws tag_key=consul_env "
+                                        f"tag_value={env_name}"
+                                    ],
+                                    "datacenter": env_name,
+                                }
+                            ),
+                            "owner": "consul:consul",
+                        },
+                        {
+                            "path": "/etc/default/caddy",
+                            "content": "DOMAIN={}".format(
+                                vault_config.require("domain")
+                            ),
+                        },
+                    ],
+                    "fs_setup": [
+                        {
+                            "device": "/dev/nvme0n1",
+                            "filesystem": "ext4",
+                            "label": "vault_storage",
+                            "partition": "None",
+                        }
+                    ],
+                    "mounts": [
+                        [
+                            "LABEL=vault_storage",
+                            "/var/lib/vault/",
+                            "ext4",
+                            "defaults",
+                            "0",
+                            "0",
+                        ]
+                    ],
+                },
+                sort_keys=True,
+            )
+        ).encode("utf8")
+    ).decode("utf8"),
+)
 vault_instance_type = (
-    vault_config.get("worker_instance_type") or InstanceTypes.general_purpose_large.name
+    vault_config.get("instance_type") or InstanceTypes.general_purpose_large.name
 )
 worker_launch_config = ec2.LaunchTemplate(
     "vault-server-launch-template",
@@ -235,6 +291,7 @@ worker_launch_config = ec2.LaunchTemplate(
         arn=vault_instance_profile.arn,
     ),
     image_id=vault_ami.id,
+    user_data=cloud_init_user_data,
     block_device_mappings=[
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name="/dev/xvda",
@@ -276,11 +333,12 @@ worker_launch_config = ec2.LaunchTemplate(
     ],
     tags=aws_config.tags,
 )
-worker_asg = autoscaling.Group(
-    "vault-worker-autoscaling-group",
-    desired_capacity=vault_config.get_int("worker_node_capacity") or 1,
-    min_size=1,
-    max_size=50,  # noqa: WPS432
+cluster_count = vault_config.get("cluster_size") or 3  # Valid values are 3, 5, or 7
+vault_asg = autoscaling.Group(
+    "vault-server-autoscaling-group",
+    desired_capacity=cluster_count,
+    min_size=cluster_count,
+    max_size=cluster_count,  # noqa: WPS432
     health_check_type="EC2",
     vpc_zone_identifiers=target_vpc["subnet_ids"],
     launch_template=autoscaling.GroupLaunchTemplateArgs(
@@ -289,7 +347,7 @@ worker_asg = autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50  # noqa: WPS432
+            min_healthy_percentage=75  # noqa: WPS432
         ),
         triggers=["tag"],
     ),

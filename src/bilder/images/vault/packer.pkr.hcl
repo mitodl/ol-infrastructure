@@ -50,7 +50,7 @@ source "amazon-ebs" "vault" {
 }
 
 build {
-  source = "source.amazon-ebs.vault"
+  sources = ["source.amazon-ebs.vault"]
 
   provisioner "shell-local" {
     inline = [
@@ -60,8 +60,12 @@ build {
   }
   provisioner "shell-local" {
     except = ["docker.vault"]
-    environment_vars = ["NODE_TYPE=${var.node_type}"]
     inline = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} ${path.root}/deploy.py"]
+  }
+  provisioner "shell" {
+    inline = [
+      "sudo openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /etc/vault/vault.key -out /etc/vault/vault.cert -subj '/C=US/ST=MA/L=Cambridge/O=MIT Open Learning/OU=Engineering/CN=vault.service.consul'"
+    ]
   }
   # provisioner "shell-local" {
   #   except = ["docker.vault"]

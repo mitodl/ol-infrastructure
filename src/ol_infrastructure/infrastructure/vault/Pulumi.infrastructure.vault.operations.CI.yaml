@@ -1,3 +1,11 @@
 ---
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHjEYf3gV5ZTnviCJcHwGnUuLzld5EuYumgMrRde6bvXUgEw9qZV909uOvshim0dwPKjAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMdGo6kDAixpIV0AKDAgEQgDtIvpeCOHDJwkPuBYgHLLju0n1CQF84ovnB2xfWyeZSt3Ns21gFsN47ZMbxqVzWSa2ASMU8Pfr7N9Q6mg==
+config:
+  aws:region: us-east-1
+  vault:business_unit: operations
+  vault:cluster_size: '3'
+  vault:storage_disk_capacity: '50'
+  vault:target_vpc: operations
+  vault:instance_type: medium
+  vault:domain: vault-ci.odl.mit.edu

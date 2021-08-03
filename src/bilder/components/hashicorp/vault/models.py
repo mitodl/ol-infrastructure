@@ -2,6 +2,7 @@ import abc
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple, Union
 
+from pydantic import validator
 from pydantic.types import conint
 
 from bilder.components.hashicorp.models import (
@@ -256,16 +257,26 @@ class Vault(HashicorpProduct):
     _name: str = "vault"
     version: str = "1.6.3"
     configuration: Dict[Path, HashicorpConfig] = {
-        Path("/etc/vault/vault.json"): VaultAgentConfig()
+        Path("vault.json"): VaultAgentConfig()
     }
     configuration_directory: Path = Path("/etc/vault/")
     data_directory: Path = Path("/var/lib/vault/")
 
+    @validator("configuration")
+    def validate_consistent_config_types(cls, configuration):
+        type_set = {type(config_obj) for config_obj in configuration.values()}
+        if len(type_set) > 1:
+            raise ValueError("There are server and agent configuration objects present")
+        return configuration
+
+    def operating_mode(self) -> str:
+        mode_map = {VaultAgentConfig: "agent", VaultServerConfig: "server"}
+        return mode_map[{type(conf) for conf in self.configuration.values()}.pop()]
+
     @property
     def systemd_template_context(self):
-        mode_map = {VaultAgentConfig: "agent", VaultServerConfig: "server"}
         return {
-            "mode": mode_map[type(self.configuration)],
+            "mode": self.operating_mode,
             "configuration_directory": self.configuration_directory,
         }
 

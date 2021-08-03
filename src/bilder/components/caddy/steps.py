@@ -86,7 +86,7 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
         )
     files.put(
         name="Configure systemd to load environment variables from file",
-        dest="/etc/systemd/system/caddy.service",
+        dest="/etc/systemd/system/caddy.service.d/load_env.conf",
         src=Path(__file__).parent.joinpath("templates", "caddy.service.override"),
         state=state,
         host=host,
