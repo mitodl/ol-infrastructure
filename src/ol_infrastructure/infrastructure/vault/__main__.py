@@ -400,6 +400,7 @@ vault_asg = autoscaling.Group(
         ),
         triggers=["tag"],
     ),
+    target_group_arns=[vault_web_lb_target_group.arn],
     tags=[
         autoscaling.GroupTagArgs(
             key=key_name,
