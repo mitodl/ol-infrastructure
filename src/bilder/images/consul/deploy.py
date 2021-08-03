@@ -8,8 +8,6 @@ from bilder.components.caddy.models import CaddyConfig, CaddyPlugin
 from bilder.components.caddy.steps import caddy_service, configure_caddy, install_caddy
 from bilder.components.hashicorp.consul.models import (
     Consul,
-    ConsulACL,
-    ConsulACLToken,
     ConsulConfig,
     ConsulTelemetry,
 )
@@ -27,9 +25,9 @@ VERSIONS = {  # noqa: WPS407
 }
 
 install_baseline_packages()
+# TODO bootstrap Consul ACL
 consul_configuration = {
     Path("00-default.json"): ConsulConfig(
-        acl=ConsulACL([ConsulACLToken(master="<value>")]),
         bootstrap_expect=3,
         server=True,
         telemetry=ConsulTelemetry(),
@@ -65,4 +63,3 @@ if host.fact.has_systemd:
     caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
-
