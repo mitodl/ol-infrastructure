@@ -14,7 +14,7 @@ variable "build_environment" {
   default = "mitxonline-qa"
 }
 
-source "amazon-ebs" "concourse" {
+source "amazon-ebs" "consul" {
   ami_description         = "Deployment image for Consul server generated at ${local.timestamp}"
   ami_name                = "consul"
   ami_virtualization_type = "hvm"
