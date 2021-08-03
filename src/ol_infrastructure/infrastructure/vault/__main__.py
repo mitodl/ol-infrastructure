@@ -234,8 +234,8 @@ web_lb = lb.LoadBalancer(
 )
 
 TARGET_GROUP_NAME_MAX_LENGTH = 32
-lms_web_lb_target_group = lb.TargetGroup(
-    "vault-web-lms-alb-target-group",
+vault_web_lb_target_group = lb.TargetGroup(
+    "vault-web-alb-target-group",
     vpc_id=target_vpc["id"],
     target_type="instance",
     port=DEFAULT_HTTPS_PORT,
@@ -249,7 +249,7 @@ lms_web_lb_target_group = lb.TargetGroup(
         protocol="HTTPS",
         matcher="200,429",
     ),
-    name_prefix=f"lms-{stack_info.env_suffix}-"[:6],
+    name_prefix=f"vault-{stack_info.env_suffix}-"[:6],
     tags=aws_config.tags,
 )
 odl_wildcard_cert = acm.get_certificate(
@@ -264,7 +264,7 @@ vault_web_alb_listener = lb.Listener(
     default_actions=[
         lb.ListenerDefaultActionArgs(
             type="forward",
-            target_group_arn=lms_web_lb_target_group.arn,
+            target_group_arn=vault_web_lb_target_group.arn,
         )
     ],
     opts=ResourceOptions(delete_before_replace=True),
