@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from pyinfra.api import host
+from pyinfra import host
 
 from bilder.components.baseline.steps import install_baseline_packages
 from bilder.components.caddy.models import CaddyConfig, CaddyPlugin
@@ -54,7 +54,7 @@ caddy_config_changed = configure_caddy(caddy_config)
 hashicorp_products = [
     Consul(version=VERSIONS["consul"], configuration=consul_configuration),
 ]
-install_hashicorp_products([hashicorp_products])
+install_hashicorp_products(hashicorp_products)
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 
