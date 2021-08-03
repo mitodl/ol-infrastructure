@@ -1,0 +1,18 @@
+{
+    storage file_system {
+        root {{ context.data_directory }}
+    }
+    default_sni {$DOMAIN:consul.odl.mit.edu}
+    email odl-devops@mit.edu
+}
+
+{$DOMAIN:consul.odl.mit.edu} {
+    log {
+        format json
+        output file {{ context.log_file }}
+    }
+
+    tls /etc/caddy/odl_wildcard.cert /etc/caddy/odl_wildcard.key
+
+    reverse_proxy http://127.0.0.1:8500
+}
