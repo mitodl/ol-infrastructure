@@ -69,7 +69,7 @@ kms_ec2_ebs_encryption_policy = {
             "Resource": ANY_RESOURCE,
             "Condition": {
                 "StringEquals": {
-                    "kms:ViaService": "ec2.amazonaws.com",
+                    "kms:ViaService": "ec2.us-east-1.amazonaws.com",
                     "kms:CallerAccount": f"{owner}",
                 }
             },
