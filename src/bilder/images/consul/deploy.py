@@ -12,6 +12,10 @@ from bilder.components.hashicorp.consul.models import (
     ConsulTelemetry,
 )
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
+from bilder.components.hashicorp.consul_esm.models import (
+    ConsulExternalServicesMonitor,
+    ConsulExternalServicesMonitorConfig,
+)
 from bilder.components.hashicorp.steps import (
     configure_hashicorp_product,
     install_hashicorp_products,
@@ -34,6 +38,12 @@ consul_configuration = {
     )
 }
 
+# TODO ACL token
+consul_esm_configuration = {
+    Path("00-default.json"): ConsulExternalServicesMonitorConfig(token=""),
+}
+
+
 # Install Caddy
 caddy_config = CaddyConfig(
     caddyfile=Path(__file__)
@@ -50,9 +60,10 @@ caddy_config.template_context = caddy_config.dict()
 install_caddy(caddy_config)
 caddy_config_changed = configure_caddy(caddy_config)
 
-# Install Consul
+# Install Consul and Consul ESM
 hashicorp_products = [
     Consul(version=VERSIONS["consul"], configuration=consul_configuration),
+    ConsulExternalServicesMonitor(configuration=consul_esm_configuration),
 ]
 install_hashicorp_products(hashicorp_products)
 for product in hashicorp_products:
