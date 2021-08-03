@@ -65,12 +65,6 @@ build {
     ]
   }
   provisioner "shell-local" {
-    except = ["docker.consul"]
     inline = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session.pem ${build.Host} ${path.root}/deploy.py"]
-  }
-
-  provisioner "shell-local" {
-    only = ["docker.consul"]
-    inline = ["pyinfra @docker/${build.ID} ${path.root}/deploy.py"]
   }
 }
