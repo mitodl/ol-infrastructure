@@ -212,12 +212,15 @@ consul_lb_target_group = lb.TargetGroup(
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",
     ),
-    name_prefix=f"consul-{stack_info.env_suffix}-"[:6],
+    name_prefix=f"consul-{env_name}-"[:6],
     tags=aws_config.tags,
 )
 
-# Hardcoded ARN for wildcard *.odl.mit.edu cert
-wildcard_arn_cert = "arn:aws:acm:us-east-1:610119931565:certificate/0b8b39d2-89a8-440f-8d07-876a66fcbc8a"
+wildcard_arn_cert = acm.get_certificate(
+    domain="*.odl.mit.edu",
+    most_recent=True,
+    statuses=["ISSUED"],
+)
 
 consul_lb_listener = lb.Listener(
     "consul-lb-listener",
@@ -323,11 +326,16 @@ consul_launch_config = ec2.LaunchTemplate(
     instance_type=instance_type,
     key_name="oldevops",
     tags=aws_config.tags,
-    # TODO: tag volumes via LaunchTemplate, or in AMI?
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="instance",
-            tags=aws_config.merged_tags({"Name": f"consul-{env_name}"}),
+            tags=aws_config.merged_tags(
+                {
+                    "Name": f"consul-{env_name}",
+                    "consul_env": env_name,
+                    "consul_vpc": vpc_id,
+                }
+            ),
         ),
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="volume",
