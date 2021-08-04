@@ -232,7 +232,10 @@ edxapp_policy_document = {
         {
             "Effect": "Allow",
             "Action": ["ses:SendEmail", "ses:SendRawEmail"],
-            "Resource": "arn:*:ses:*:*:identity/*.mitxonline.mit.edu",
+            "Resource": [
+                "arn:*:ses:*:*:identity/*.mitxonline.mit.edu",
+                f"arn:aws:ses:*:*:configuration-set/edxapp-mitxonline-{stack_info.env_suffix}",  # noqa: E501
+            ],
         },
         {
             "Effect": "Allow",
