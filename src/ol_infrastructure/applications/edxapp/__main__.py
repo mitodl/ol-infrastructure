@@ -502,8 +502,10 @@ edxapp_redis_consul_service = Service(
 # Create SES Service For edxapp Emails #
 ########################################
 
+edxapp_mail_domain = edxapp_config.require("mail_domain")
 edxapp_ses_domain_identity = ses.DomainIdentity(
-    "edxapp-ses-domain-identity", domain=edxapp_config.require("mail_domain")
+    "edxapp-ses-domain-identity",
+    domain=edxapp_mail_domain,
 )
 edxapp_ses_verification_record = route53.Record(
     "edxapp-ses-domain-identity-verification-dns-record",
@@ -550,7 +552,7 @@ for loop_counter in range(0, 3):
         f"edxapp-ses-domain-dkim-record-{loop_counter}",
         zone_id=edxapp_zone_id,
         name=edxapp_ses_domain_dkim.dkim_tokens[loop_counter].apply(
-            "{}._domainkey".format
+            lambda dkim_name: f"{dkim_name}._domainkey.{edxapp_mail_domain}"
         ),
         type="CNAME",
         ttl=FIVE_MINUTES,
