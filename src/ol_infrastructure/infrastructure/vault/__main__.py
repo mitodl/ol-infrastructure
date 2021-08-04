@@ -194,7 +194,7 @@ vault_instance_profile = iam.InstanceProfile(
 # Security Group
 vault_security_group = ec2.SecurityGroup(
     "vault-server-security-group",
-    name_prefix="vault-server-{env_name}-",
+    name_prefix=f"vault-server-{env_name}-",
     description="Network access controls for traffic to and from Vault servers",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -280,25 +280,6 @@ def cloud_init_user_data(consul_vpc_id, consul_env_name, vault_domain) -> str:
         "#cloud-config\n{}".format(
             yaml.dump(
                 {
-                    "write_files": [
-                        {
-                            "path": "/etc/consul.d/99-autojoin.json",
-                            "content": json.dumps(
-                                {
-                                    "retry_join": [
-                                        "provider=aws tag_key=consul_env "
-                                        f"tag_value={consul_env_name}"
-                                    ],
-                                    "datacenter": consul_vpc_id,
-                                }
-                            ),
-                            "owner": "consul:consul",
-                        },
-                        {
-                            "path": "/etc/default/caddy",
-                            "content": f"DOMAIN={vault_domain}",
-                        },
-                    ],
                     "fs_setup": [
                         {
                             "device": "/dev/nvme0n1",
@@ -317,8 +298,31 @@ def cloud_init_user_data(consul_vpc_id, consul_env_name, vault_domain) -> str:
                             "0",
                         ]
                     ],
+                    "write_files": [
+                        {
+                            "path": "/etc/consul.d/99-autojoin.json",
+                            "content": json.dumps(
+                                {
+                                    "retry_join": [
+                                        "provider=aws tag_key=consul_env "
+                                        f"tag_value={consul_env_name}"
+                                    ],
+                                    "datacenter": consul_vpc_id,
+                                }
+                            ),
+                            "owner": "consul:consul",
+                        },
+                        {
+                            "path": "/etc/default/caddy",
+                            "content": f"DOMAIN={vault_domain}",
+                        },
+                        {
+                            "path": "/var/lib/vault/raft/vault.db",
+                            "owner": "vault:vault",
+                        },
+                    ],
                 },
-                sort_keys=True,
+                sort_keys=False,
             )
         ).encode("utf8")
     ).decode("utf8")

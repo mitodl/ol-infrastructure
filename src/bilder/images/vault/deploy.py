@@ -66,8 +66,8 @@ vault = Vault(
                     tcp=VaultTCPListener(
                         address=f"[::]:{VAULT_HTTP_PORT}",
                         cluster_address=f"[::]:{VAULT_CLUSTER_PORT}",
-                        tls_cert_file=Path("/etc/vault/vault.cert"),
-                        tls_key_file=Path("/etc/vault/vault.key"),
+                        tls_cert_file=Path("/etc/vault/ssl/vault.cert"),
+                        tls_key_file=Path("/etc/vault/ssl/vault.key"),
                     )
                 )
             ],
@@ -111,7 +111,7 @@ if host.fact.has_systemd:
         # Automate setting the vault cluster address to use the private IP
         vault_env.write(
             "VAULT_CLUSTER_ADDR=https://"
-            "$(ip -o route get to 8.8.8.8 | sed -n 's/.*src \\([0-9.]\\+\\).*/\1/p')"  # noqa: WPS342, E501
+            r"$(ip -o route get to 8.8.8.8 | sed -n 's/.*src \\([0-9.]\\+\\).*/\1/p')"
             f":{VAULT_CLUSTER_PORT}\n"
         )
         files.put(

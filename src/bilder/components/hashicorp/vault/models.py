@@ -276,7 +276,7 @@ class Vault(HashicorpProduct):
     @property
     def systemd_template_context(self):
         return {
-            "mode": self.operating_mode,
+            "mode": self.operating_mode(),
             "configuration_directory": self.configuration_directory,
         }
 
