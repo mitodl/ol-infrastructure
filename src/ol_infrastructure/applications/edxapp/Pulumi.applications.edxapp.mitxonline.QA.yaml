@@ -11,6 +11,7 @@ config:
   edxapp:db_password:
     secure: v1:xHUw5WC3aN02zuAj:0BozwDxrtF0OA7wkYuv4R4CCnSHYdgXt+vi6/3eP9zwJgHgQO20+8sQfg7rXPC9SIUobEA==
   edxapp:dns_zone: mitxonline
+  edxapp:elb_healthcheck_interval: 30
   edxapp:domains:
     lms: lms-qa.mitxonline.mit.edu
     preview: preview-qa.mitxonline.mit.edu
