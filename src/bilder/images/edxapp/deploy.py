@@ -213,7 +213,7 @@ install_hashicorp_products(hashicorp_products)
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 
-# Upload templates for Vault agent
+# Upload templates for consul-template agent
 common_config = Path(__file__).parent.joinpath("templates", "common_values.yml")
 studio_config = Path(__file__).parent.joinpath("templates", "studio_only.yml")
 lms_config = Path(__file__).parent.joinpath("templates", "lms_only.yml")

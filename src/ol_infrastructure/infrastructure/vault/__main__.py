@@ -277,54 +277,58 @@ vault_web_alb_listener = lb.Listener(
 
 
 def cloud_init_user_data(kms_key_id, vpc_id, consul_env_name, vault_domain) -> str:
+    cloud_config_contents = {
+        "write_files": [
+            {
+                "path": "/etc/consul.d/99-autojoin.json",
+                "content": json.dumps(
+                    {
+                        "retry_join": [
+                            "provider=aws tag_key=consul_env "
+                            f"tag_value={consul_env_name}"
+                        ],
+                        "datacenter": vpc_id,
+                    }
+                ),
+                "owner": "consul:consul",
+            },
+            {
+                "path": "/etc/default/caddy",
+                "content": f"DOMAIN={vault_domain}",
+            },
+            {
+                "path": "/etc/default/vault",
+                "content": (f"VAULT_AWSKMS_SEAL_KEY_ID={kms_key_id}\n"),
+                "owner": "vault:vault",
+            },
+            {
+                "path": "/etc/vault/zz-autojoin.json",
+                "content": json.dumps(
+                    {
+                        "storage": {
+                            "raft": {
+                                "retry_join": [
+                                    {
+                                        "auto_join": (
+                                            "provider=aws "
+                                            "tag_key=vault_env "
+                                            f"tag_value={vpc_id}"
+                                        ),
+                                        "leader_tls_servername": "vault.service.consul",
+                                    }
+                                ],
+                                "performance_multiplier": 5,
+                                "path": "/var/lib/vault/raft/",
+                            }
+                        }
+                    }
+                ),
+            },
+        ],
+    }
     cloud_config = "#cloud-config\n{}".format(
         yaml.dump(
-            {
-                "write_files": [
-                    {
-                        "path": "/etc/consul.d/99-autojoin.json",
-                        "content": json.dumps(
-                            {
-                                "retry_join": [
-                                    "provider=aws tag_key=consul_env "
-                                    f"tag_value={consul_env_name}"
-                                ],
-                                "datacenter": vpc_id,
-                            }
-                        ),
-                        "owner": "consul:consul",
-                    },
-                    {
-                        "path": "/etc/default/caddy",
-                        "content": f"DOMAIN={vault_domain}",
-                    },
-                    {
-                        "path": "/etc/default/vault",
-                        "content": (f"VAULT_AWSKMS_SEAL_KEY_ID={kms_key_id}\n"),
-                        "owner": "vault:vault",
-                    },
-                    {
-                        "path": "/etc/vault/99-autojoin.json",
-                        "content": json.dumps(
-                            {
-                                "storage": {
-                                    "raft": {
-                                        "retry_join": [
-                                            {
-                                                "auto_join": [
-                                                    "provider=aws "
-                                                    "tag_key=vault_env "
-                                                    f"tag_value={vpc_id}"
-                                                ]
-                                            }
-                                        ]
-                                    }
-                                }
-                            }
-                        ),
-                    },
-                ],
-            },
+            cloud_config_contents,
             sort_keys=False,
         )
     ).encode("utf8")
@@ -411,7 +415,9 @@ vault_asg = autoscaling.Group(
             value=key_value,
             propagate_at_launch=True,
         )
-        for key_name, key_value in aws_config.tags.items()
+        for key_name, key_value in aws_config.merged_tags(
+            {"ami_id": vault_ami.id}
+        ).items()
     ],
 )
 

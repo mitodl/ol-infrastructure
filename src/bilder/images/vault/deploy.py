@@ -60,7 +60,7 @@ hours_in_six_months = HOURS_IN_MONTH * 6
 raft_config = IntegratedRaftStorageBackend()
 vault = Vault(
     configuration={
-        Path("vault.json"): VaultServerConfig(
+        Path("00-vault.json"): VaultServerConfig(
             api_addr=f"https://active.vault.service.consul:{VAULT_HTTP_PORT}",
             cluster_addr=f"https://active.vault.service.consul:{VAULT_CLUSTER_PORT}",
             listener=[
@@ -98,6 +98,7 @@ files.directory(
     name="Ensure raft directory exists with proper permissions",
     path=raft_config.path,
     present=True,
+    mode="700",
     user=vault.name,
     group=vault.name,
 )

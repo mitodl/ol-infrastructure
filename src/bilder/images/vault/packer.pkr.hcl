@@ -69,8 +69,4 @@ build {
       "sudo chown -R vault:vault /etc/vault/"
     ]
   }
-  # provisioner "shell-local" {
-  #   except = ["docker.vault"]
-  #   inline = ["py.test --ssh-identity-file=/tmp/packer-session.pem --hosts='ssh://${build.User}@${build.Host}:${build.Port}' ${path.root}/test_deploy.py"]
-  # }
 }
