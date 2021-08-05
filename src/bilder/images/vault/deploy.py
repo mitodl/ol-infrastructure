@@ -1,6 +1,5 @@
 # TODO: Create substructure module to populate secrets mounts
 import os
-import tempfile
 from pathlib import Path
 
 from pyinfra import host
@@ -32,7 +31,7 @@ from bilder.facts import has_systemd  # noqa: F401
 from bridge.lib.magic_numbers import HOURS_IN_MONTH, VAULT_CLUSTER_PORT, VAULT_HTTP_PORT
 
 VERSIONS = {  # noqa: WPS407
-    "vault": os.environ.get("VAULT_VERSION", "1.8.0"),
+    "vault": os.environ.get("VAULT_VERSION", "1.8.1"),
     "consul": os.environ.get("CONSUL_VERSION", "1.10.1"),
     "caddy_route53": "v1.1.2",
 }
@@ -58,9 +57,12 @@ caddy_config_changed = configure_caddy(caddy_config)
 
 # Install Consul agent and Vault server
 hours_in_six_months = HOURS_IN_MONTH * 6
+raft_config = IntegratedRaftStorageBackend()
 vault = Vault(
     configuration={
         Path("vault.json"): VaultServerConfig(
+            api_addr=f"https://active.vault.service.consul:{VAULT_HTTP_PORT}",
+            cluster_addr=f"https://active.vault.service.consul:{VAULT_CLUSTER_PORT}",
             listener=[
                 VaultListener(
                     tcp=VaultTCPListener(
@@ -74,13 +76,7 @@ vault = Vault(
             # Disable swapping to disk because we are using the integrated raft storage
             # backend.
             disable_mlock=True,
-            storage=[
-                VaultStorageBackend(
-                    raft=IntegratedRaftStorageBackend(
-                        path=Path("/var/lib/vault/raft/"),
-                    )
-                )
-            ],
+            storage=VaultStorageBackend(raft=raft_config),
             ui=True,
             service_registration=VaultServiceRegistration(
                 consul=ConsulServiceRegistration()
@@ -89,7 +85,8 @@ vault = Vault(
             max_lease_ttl=f"{hours_in_six_months}h",  # 6 months
             seal=[VaultSealConfig(awskms=VaultAwsKmsSealConfig())],
         )
-    }
+    },
+    version=VERSIONS["vault"],
 )
 consul_configuration = {
     Path("00-default.json"): ConsulConfig(),
@@ -97,6 +94,13 @@ consul_configuration = {
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
+files.directory(
+    name="Ensure raft directory exists with proper permissions",
+    path=raft_config.path,
+    present=True,
+    user=vault.name,
+    group=vault.name,
+)
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 
@@ -105,17 +109,3 @@ if host.fact.has_systemd:
     caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
-
-    # Write to /etc/default/vault
-    with tempfile.NamedTemporaryFile(delete=False, mode="w") as vault_env:
-        # Automate setting the vault cluster address to use the private IP
-        vault_env.write(
-            "VAULT_CLUSTER_ADDR=https://"
-            r"$(ip -o route get to 8.8.8.8 | sed -n 's/.*src \\([0-9.]\\+\\).*/\1/p')"
-            f":{VAULT_CLUSTER_PORT}\n"
-        )
-        files.put(
-            name="Upload Vault environment file",
-            src=vault_env.name,
-            dest="/etc/default/vault",
-        )

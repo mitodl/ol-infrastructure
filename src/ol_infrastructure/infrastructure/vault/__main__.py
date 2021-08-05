@@ -16,7 +16,7 @@ import json
 from typing import Any, Dict
 
 import yaml
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
 
 from bridge.lib.magic_numbers import (
@@ -56,6 +56,7 @@ vault_ami = ec2.get_ami(
     most_recent=True,
     owners=[aws_account.account_id],
 )
+vault_unseal_key = kms_stack.require_output("vault_auto_unseal_key")
 kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 odl_zone_id = dns_stack.require_output("odl_zone_id")
 
@@ -144,7 +145,7 @@ vault_policy = iam.Policy(
     "vault-policy",
     name_prefix="vault-server-policy-",
     path=f"/ol-applications/vault/{stack_info.env_prefix}/{stack_info.env_suffix}/",
-    policy=kms_stack.require_output("vault_auto_unseal_key")["arn"].apply(
+    policy=vault_unseal_key["arn"].apply(
         lambda arn: lint_iam_policy(
             vault_policy_document(arn),
             stringify=True,
@@ -275,57 +276,59 @@ vault_web_alb_listener = lb.Listener(
 ###################
 
 
-def cloud_init_user_data(consul_vpc_id, consul_env_name, vault_domain) -> str:
-    return base64.b64encode(
-        "#cloud-config\n{}".format(
-            yaml.dump(
-                {
-                    "fs_setup": [
-                        {
-                            "device": "/dev/nvme0n1",
-                            "filesystem": "ext4",
-                            "label": "vault_storage",
-                            "partition": "None",
-                        }
-                    ],
-                    "mounts": [
-                        [
-                            "LABEL=vault_storage",
-                            "/var/lib/vault/",
-                            "ext4",
-                            "defaults",
-                            "0",
-                            "0",
-                        ]
-                    ],
-                    "write_files": [
-                        {
-                            "path": "/etc/consul.d/99-autojoin.json",
-                            "content": json.dumps(
-                                {
-                                    "retry_join": [
-                                        "provider=aws tag_key=consul_env "
-                                        f"tag_value={consul_env_name}"
-                                    ],
-                                    "datacenter": consul_vpc_id,
+def cloud_init_user_data(kms_key_id, vpc_id, consul_env_name, vault_domain) -> str:
+    cloud_config = "#cloud-config\n{}".format(
+        yaml.dump(
+            {
+                "write_files": [
+                    {
+                        "path": "/etc/consul.d/99-autojoin.json",
+                        "content": json.dumps(
+                            {
+                                "retry_join": [
+                                    "provider=aws tag_key=consul_env "
+                                    f"tag_value={consul_env_name}"
+                                ],
+                                "datacenter": vpc_id,
+                            }
+                        ),
+                        "owner": "consul:consul",
+                    },
+                    {
+                        "path": "/etc/default/caddy",
+                        "content": f"DOMAIN={vault_domain}",
+                    },
+                    {
+                        "path": "/etc/default/vault",
+                        "content": (f"VAULT_AWSKMS_SEAL_KEY_ID={kms_key_id}\n"),
+                        "owner": "vault:vault",
+                    },
+                    {
+                        "path": "/etc/vault/99-autojoin.json",
+                        "content": json.dumps(
+                            {
+                                "storage": {
+                                    "raft": {
+                                        "retry_join": [
+                                            {
+                                                "auto_join": [
+                                                    "provider=aws "
+                                                    "tag_key=vault_env "
+                                                    f"tag_value={vpc_id}"
+                                                ]
+                                            }
+                                        ]
+                                    }
                                 }
-                            ),
-                            "owner": "consul:consul",
-                        },
-                        {
-                            "path": "/etc/default/caddy",
-                            "content": f"DOMAIN={vault_domain}",
-                        },
-                        {
-                            "path": "/var/lib/vault/raft/vault.db",
-                            "owner": "vault:vault",
-                        },
-                    ],
-                },
-                sort_keys=False,
-            )
-        ).encode("utf8")
-    ).decode("utf8")
+                            }
+                        ),
+                    },
+                ],
+            },
+            sort_keys=False,
+        )
+    ).encode("utf8")
+    return base64.b64encode(cloud_config).decode("utf8")
 
 
 vault_instance_type = (
@@ -339,24 +342,17 @@ worker_launch_config = ec2.LaunchTemplate(
         arn=vault_instance_profile.arn,
     ),
     image_id=vault_ami.id,
-    user_data=target_vpc["id"].apply(
-        lambda vpc_id: cloud_init_user_data(
-            vpc_id, env_name, vault_config.require("domain")
+    user_data=Output.all(vpc_id=target_vpc["id"], key_id=vault_unseal_key["id"]).apply(
+        lambda init_inputs: cloud_init_user_data(
+            init_inputs["key_id"],
+            init_inputs["vpc_id"],
+            env_name,
+            vault_config.require("domain"),
         )
     ),
     block_device_mappings=[
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name="/dev/xvda",
-            ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=25,  # noqa: WPS432
-                volume_type=DiskTypes.ssd,
-                delete_on_termination=True,
-                encrypted=True,
-                kms_key_id=kms_ebs["arn"],
-            ),
-        ),
-        ec2.LaunchTemplateBlockDeviceMappingArgs(
-            device_name="/dev/xvdb",
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
                 volume_size=vault_config.get_int("storage_disk_capacity")
                 or 100,  # noqa: WPS432
@@ -376,11 +372,15 @@ worker_launch_config = ec2.LaunchTemplate(
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="instance",
-            tags=aws_config.merged_tags({"Name": f"vault-server-{env_name}"}),
+            tags=aws_config.merged_tags(
+                {"Name": f"vault-server-{env_name}", "vault_env": target_vpc["id"]}
+            ),
         ),
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="volume",
-            tags=aws_config.merged_tags({"Name": f"vault-server-{env_name}"}),
+            tags=aws_config.merged_tags(
+                {"Name": f"vault-server-{env_name}", "vault_env": target_vpc["id"]}
+            ),
         ),
     ],
     tags=aws_config.tags,

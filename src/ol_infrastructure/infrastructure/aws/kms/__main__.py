@@ -19,12 +19,18 @@ aws_config = AWSBase(
 )
 ANY_RESOURCE = "*"
 
+kms_key_root_statement = {
+    "Effect": "Allow",
+    "Principal": {"AWS": f"arn:aws:iam::{owner}:root"},
+    "Action": "kms:*",
+    "Resource": "*",
+}
+
 kms_key_access_statement = {
     # Allow direct access to key metadata to the account
     "Effect": "Allow",
     "Principal": {
         "AWS": [
-            f"arn:aws:iam::{owner}:root",
             f"arn:aws:iam::{owner}:user/eberg",
             f"arn:aws:iam::{owner}:user/shaidar",
             f"arn:aws:iam::{owner}:user/tmacey",
@@ -75,12 +81,14 @@ kms_ec2_ebs_encryption_policy = {
             },
         },
         kms_key_access_statement,
+        kms_key_root_statement,
     ],
 }
 
 kms_s3_data_encryption_policy = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
+        kms_key_root_statement,
         kms_key_access_statement,
         {
             "Effect": "Allow",
@@ -107,6 +115,7 @@ kms_s3_data_encryption_policy = {
 kms_infrastructure_as_code_encryption_policy = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
+        kms_key_root_statement,
         kms_key_access_statement,
         {
             "Effect": "Allow",

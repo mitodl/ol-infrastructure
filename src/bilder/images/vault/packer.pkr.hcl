@@ -65,7 +65,8 @@ build {
   provisioner "shell" {
     inline = [
       "sudo mkdir -p /etc/vault/ssl/",
-      "sudo openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /etc/vault/ssl/vault.key -out /etc/vault/ssl/vault.cert -subj '/C=US/ST=MA/L=Cambridge/O=MIT Open Learning/OU=Engineering/CN=vault.service.consul'"
+      "sudo openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /etc/vault/ssl/vault.key -out /etc/vault/ssl/vault.cert -subj '/C=US/ST=MA/L=Cambridge/O=MIT Open Learning/OU=Engineering/CN=vault.service.consul'",
+      "sudo chown -R vault:vault /etc/vault/"
     ]
   }
   # provisioner "shell-local" {
