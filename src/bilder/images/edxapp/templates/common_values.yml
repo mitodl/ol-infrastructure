@@ -198,6 +198,7 @@ COMPREHENSIVE_THEME_LOCALE_PATHS: []
 CONTACT_EMAIL: support@mitxonline.mit.edu # MODIFIED
 CORS_ORIGIN_ALLOW_ALL: false
 CORS_ORIGIN_WHITELIST:
+  - gradebook-mfe-qa.mitxonline.mit.edu
   - learning-mfe-qa.mitxonline.mit.edu
   - lms-qa.mitxonline.mit.edu
   - studio-qa.mitxonline.mit.edu
