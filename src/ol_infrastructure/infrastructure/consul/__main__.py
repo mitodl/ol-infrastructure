@@ -2,8 +2,8 @@ import base64
 import json
 
 import yaml
-from pulumi import Config, ResourceOptions, StackReference, export
-from pulumi_aws import autoscaling, ec2, get_caller_identity, iam, lb, route53
+from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
 
 from bridge.lib.magic_numbers import (
     CONSUL_DNS_PORT,
@@ -13,11 +13,7 @@ from bridge.lib.magic_numbers import (
     CONSUL_WAN_SERF_PORT,
     DEFAULT_HTTPS_PORT,
 )
-from ol_infrastructure.lib.aws.ec2_helper import (
-    InstanceTypes,
-    availability_zones,
-    default_egress_args,
-)
+from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
@@ -36,6 +32,7 @@ aws_config = AWSBase(tags={"OU": business_unit, "Environment": env_name})
 destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))
 dns_stack = StackReference("infrastructure.aws.dns")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
+vpc_id = destination_vpc["id"]
 
 
 #############
@@ -75,7 +72,6 @@ consul_instance_profile = iam.InstanceProfile(
 # Security Group Setup #
 ########################
 
-vpc_id = destination_vpc["id"]
 cidr_blocks = [destination_vpc["cidr"]]
 
 consul_server_security_group = ec2.SecurityGroup(
@@ -178,13 +174,13 @@ security_groups = {
 
 # Assumes that there are at least as many subnets as there is consul instances
 consul_capacity = consul_config.get_int("instance_count") or 3
-instance_range = range(consul_capacity)
 subnet_ids = destination_vpc["subnet_ids"]
 
 # Create Application LB
 # Could be converted to an EC2 running HAProxy
 consul_elb_tag = f"consul-lb-{env_name}"
 consul_elb = lb.LoadBalancer(
+    "consul-server-load-balancer",
     name="consul-lb",
     load_balancer_type="application",
     ip_address_type="dualstack",
@@ -224,7 +220,7 @@ wildcard_arn_cert = acm.get_certificate(
 
 consul_lb_listener = lb.Listener(
     "consul-lb-listener",
-    certificate_arn=wildcard_arn_cert,
+    certificate_arn=wildcard_arn_cert.arn,
     load_balancer_arn=consul_elb.arn,
     port=DEFAULT_HTTPS_PORT,
     protocol="HTTPS",
@@ -245,6 +241,7 @@ consul_lb_listener = lb.Listener(
 
 FIFTEEN_MINUTES = 60 * 15
 consul_domain = route53.Record(
+    "consul-server-dns-record",
     name=f"consul-{env_name}.odl.mit.edu",
     type="CNAME",
     ttl=FIFTEEN_MINUTES,
@@ -275,45 +272,52 @@ instance_type = InstanceTypes[instance_type_name].value
 
 # Auto Join WAN Envs
 # using the VPC ID to denote datacenter
-wan_envs = [peer["id"] for peer in peer_vpcs]
-retry_join_wan = [
-    f"provider=aws tag_key=consul_env tag_value={wan_env}" for wan_env in wan_envs
-]
+retry_join_wan = peer_vpcs.apply(
+    lambda vpc_dict: [
+        f"provider=aws tag_key=consul_vpc tag_value={peer['id']}"
+        for peer in vpc_dict.values()
+    ]
+)
+
 
 # Make cloud-init userdata
-cloud_init_user_data = base64.b64encode(
-    "#cloud-config\n{}".format(
-        yaml.dump(
+def cloud_init_userdata(consul_vpc_id, consul_env_name, retry_join_wan_array):
+    cloud_config_contents = {
+        "write_files": [
             {
-                "write_files": [
+                "path": "/etc/consul.d/99-autojoin.json",
+                "content": json.dumps(
                     {
-                        "path": "/etc/consul.d/99-autojoin.json",
-                        "content": json.dumps(
-                            {
-                                "retry_join": [
-                                    "provider=aws tag_key=consul_env "
-                                    f"tag_value={env_name}"
-                                ],
-                                "datacenter": vpc_id,
-                            }
-                        ),
-                        "owner": "consul:consul",
-                    },
-                    {
-                        "path": "/etc/consul.d/99-autojoin-wan.json.json",
-                        "content": json.dumps(
-                            {
-                                "retry_join_wan": retry_join_wan,
-                            }
-                        ),
-                        "owner": "consul:consul",
-                    },
-                ]
+                        "retry_join": [
+                            "provider=aws tag_key=consul_env "
+                            f"tag_value={consul_env_name}"
+                        ],
+                        "datacenter": consul_vpc_id,
+                    }
+                ),
+                "owner": "consul:consul",
             },
-            sort_keys=True,
-        )
-    ).encode("utf8")
-).decode("utf8")
+            {
+                "path": "/etc/consul.d/99-autojoin-wan.json.json",
+                "content": json.dumps(
+                    {
+                        "retry_join_wan": retry_join_wan_array,
+                    }
+                ),
+                "owner": "consul:consul",
+            },
+        ]
+    }
+
+    return base64.b64encode(
+        "#cloud-config\n{}".format(
+            yaml.dump(
+                cloud_config_contents,
+                sort_keys=True,
+            )
+        ).encode("utf8")
+    ).decode("utf8")
+
 
 consul_launch_config = ec2.LaunchTemplate(
     "consul-launch-template",
@@ -321,7 +325,9 @@ consul_launch_config = ec2.LaunchTemplate(
     description="Launch template for deploying Consul cluster",
     # block_device_mappings
     # TODO: additional block device mappings needed here or to be defined in AMI?
-    iam_instance_profile=consul_instance_profile.id,
+    iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
+        arn=consul_instance_profile.arn,
+    ),
     image_id=consul_ami.id,
     instance_type=instance_type,
     key_name="oldevops",
@@ -342,7 +348,11 @@ consul_launch_config = ec2.LaunchTemplate(
             tags=aws_config.merged_tags({"Name": f"consul-{env_name}"}),
         ),
     ],
-    user_data=cloud_init_user_data,
+    user_data=Output.all(vpc_id=vpc_id, retry_join_wan=retry_join_wan).apply(
+        lambda init_dict: cloud_init_userdata(
+            init_dict["vpc_id"], env_name, init_dict["retry_join_wan"]
+        )
+    ),
     vpc_security_group_ids=[
         destination_vpc["security_groups"]["web"],
         security_groups["consul_server"],
@@ -358,7 +368,6 @@ consul_launch_config = ec2.LaunchTemplate(
 
 consul_asg = autoscaling.Group(
     f"consul-{env_name}-autoscaling-group",
-    availability_zones=availability_zones,
     desired_capacity=consul_capacity,
     max_size=consul_capacity,
     min_size=consul_capacity,
@@ -367,6 +376,7 @@ consul_asg = autoscaling.Group(
         id=consul_launch_config.id,
         version="$Latest",
     ),
+    target_group_arns=[consul_lb_target_group.arn],
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
     ),
@@ -379,13 +389,6 @@ consul_asg = autoscaling.Group(
         for key_name, key_value in aws_config.tags.items()
     ],
     vpc_zone_identifiers=subnet_ids,
-)
-
-# Attach ASG to LB
-asg_attachment_consul = autoscaling.Attachment(
-    "asgAttachmentConsul",  # more precise / different name?
-    autoscaling_group_name=consul_asg.id,
-    elb=consul_elb.id,
 )
 
 #################
