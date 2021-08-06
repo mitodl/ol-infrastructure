@@ -307,7 +307,7 @@ FEATURES:
     ENABLE_READING_FROM_MULTIPLE_HISTORY_TABLES: true
     ENABLE_SPECIAL_EXAMS: false
     ENABLE_THIRD_PARTY_AUTH: true
-    ENABLE_VIDEO_UPLOAD_PIPELINE: false
+    ENABLE_VIDEO_UPLOAD_PIPELINE: true # MODIFIED
     PREVIEW_LMS_BASE: preview-qa.mitxonline.mit.edu  # MODIFIED
     SHOW_FOOTER_LANGUAGE_SELECTOR: false
     SHOW_HEADER_LANGUAGE_SELECTOR: false
@@ -489,6 +489,7 @@ VIDEO_IMAGE_SETTINGS:
     STORAGE_KWARGS:
         base_url: /media/
         location: media/  # MODIFIED
+        bucket: mitxonline-qa-edxapp-storage # MODIFIED
     VIDEO_IMAGE_MAX_BYTES: 2097152
     VIDEO_IMAGE_MIN_BYTES: 2048
 VIDEO_TRANSCRIPTS_MAX_AGE: 31536000
@@ -497,6 +498,7 @@ VIDEO_TRANSCRIPTS_SETTINGS:
     STORAGE_KWARGS:
         base_url: /media/
         location: media/  # MODIFIED
+        bucket: mitxonline-qa-edxapp-storage # MODIFIED
     VIDEO_TRANSCRIPTS_MAX_BYTES: 3145728
 VIDEO_UPLOAD_PIPELINE:
     BUCKET: ''
