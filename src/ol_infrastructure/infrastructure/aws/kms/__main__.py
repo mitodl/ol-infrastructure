@@ -19,12 +19,18 @@ aws_config = AWSBase(
 )
 ANY_RESOURCE = "*"
 
+kms_key_root_statement = {
+    "Effect": "Allow",
+    "Principal": {"AWS": f"arn:aws:iam::{owner}:root"},
+    "Action": "kms:*",
+    "Resource": "*",
+}
+
 kms_key_access_statement = {
     # Allow direct access to key metadata to the account
     "Effect": "Allow",
     "Principal": {
         "AWS": [
-            f"arn:aws:iam::{owner}:root",
             f"arn:aws:iam::{owner}:user/eberg",
             f"arn:aws:iam::{owner}:user/shaidar",
             f"arn:aws:iam::{owner}:user/tmacey",
@@ -69,18 +75,20 @@ kms_ec2_ebs_encryption_policy = {
             "Resource": ANY_RESOURCE,
             "Condition": {
                 "StringEquals": {
-                    "kms:ViaService": "ec2.amazonaws.com",
+                    "kms:ViaService": "ec2.us-east-1.amazonaws.com",
                     "kms:CallerAccount": f"{owner}",
                 }
             },
         },
         kms_key_access_statement,
+        kms_key_root_statement,
     ],
 }
 
 kms_s3_data_encryption_policy = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
+        kms_key_root_statement,
         kms_key_access_statement,
         {
             "Effect": "Allow",
@@ -107,6 +115,7 @@ kms_s3_data_encryption_policy = {
 kms_infrastructure_as_code_encryption_policy = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
+        kms_key_root_statement,
         kms_key_access_statement,
         {
             "Effect": "Allow",
@@ -212,5 +221,39 @@ export(
         "id": infrastructure_as_code_key.id,
         "arn": infrastructure_as_code_key.arn,
         "alias": infrastructure_as_code_key_alias.name,
+    },
+)
+
+vault_server_unseal_key = kms.Key(
+    "vault-server-auto-unseal-kms-key",
+    customer_master_key_spec=DEFAULT_KEY_SPEC,
+    description=(
+        "Key for automatically initializing and unsealing Vault servers in an "
+        "autoscale group"
+    ),
+    enable_key_rotation=True,
+    is_enabled=True,
+    key_usage=ENCRYPT_KEY_USAGE,
+    tags=AWSBase(
+        tags={
+            "OU": "operations",
+            "Environment": f"operations-{stack_info.env_suffix}",
+            "Owner": "platform-engineering",
+        }
+    ).tags,
+    policy=json.dumps(kms_infrastructure_as_code_encryption_policy),
+)
+vault_server_unseal_key_alias = kms.Alias(
+    "vault-server-auto-unseal-kms-key-alias",
+    name=f"alias/vault-auto-unseal-{stack_info.env_suffix}",
+    target_key_id=vault_server_unseal_key.id,
+)
+
+export(
+    "vault_auto_unseal_key",
+    {
+        "id": vault_server_unseal_key.id,
+        "arn": vault_server_unseal_key.arn,
+        "alias": vault_server_unseal_key_alias.name,
     },
 )

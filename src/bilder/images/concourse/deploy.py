@@ -46,6 +46,7 @@ from bilder.components.hashicorp.vault.models import (
     VaultAutoAuthSink,
     VaultConnectionConfig,
     VaultListener,
+    VaultTCPListener,
     VaultTemplate,
 )
 from bilder.components.hashicorp.vault.steps import vault_template_permissions
@@ -232,7 +233,9 @@ vault = Vault(
         cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
         listener=[
             VaultListener(
-                type="tcp", address=f"127.0.0.1:{VAULT_HTTP_PORT}", tls_disable=True
+                tcp=VaultTCPListener(
+                    address=f"127.0.0.1:{VAULT_HTTP_PORT}", tls_disable=True
+                )
             )
         ],
         vault=VaultConnectionConfig(

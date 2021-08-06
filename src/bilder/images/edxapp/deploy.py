@@ -41,6 +41,7 @@ from bilder.components.hashicorp.vault.models import (
     VaultAutoAuthSink,
     VaultConnectionConfig,
     VaultListener,
+    VaultTCPListener,
     VaultTemplate,
 )
 from bilder.components.hashicorp.vault.steps import vault_template_permissions
@@ -177,7 +178,9 @@ vault = Vault(
         cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
         listener=[
             VaultListener(
-                type="tcp", address=f"127.0.0.1:{VAULT_HTTP_PORT}", tls_disable=True
+                tcp=VaultTCPListener(
+                    address=f"127.0.0.1:{VAULT_HTTP_PORT}", tls_disable=True
+                )
             )
         ],
         vault=VaultConnectionConfig(
@@ -210,7 +213,7 @@ install_hashicorp_products(hashicorp_products)
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 
-# Upload templates for Vault agent
+# Upload templates for consul-template agent
 common_config = Path(__file__).parent.joinpath("templates", "common_values.yml")
 studio_config = Path(__file__).parent.joinpath("templates", "studio_only.yml")
 lms_config = Path(__file__).parent.joinpath("templates", "lms_only.yml")

@@ -11,6 +11,7 @@ This includes:
 - Create an RDS subnet group
 
 """
+from functools import partial
 from ipaddress import IPv4Network, IPv6Network
 from itertools import cycle
 from typing import List, Optional
@@ -37,6 +38,12 @@ SUBNET_PREFIX_V4 = (
     24  # A CIDR block of prefix length 24 allows for up to 255 individual IP addresses
 )
 SUBNET_PREFIX_V6 = 64
+
+
+def subnet_v6(subnet_number: int, cidr_block: IPv6Network) -> str:
+    network = IPv6Network(cidr_block)
+    subnets = network.subnets(new_prefix=SUBNET_PREFIX_V6)
+    return str(list(subnets)[subnet_number])
 
 
 class OLVPCConfig(AWSBase):
@@ -182,19 +189,13 @@ class OLVPC(ComponentResource):  # noqa: WPS230
 
         self.olvpc_subnets: List[ec2.Subnet] = []
         zones: List[str] = availability_zones(vpc_config.region)
-        v6net = self.olvpc.ipv6_cidr_block.apply(
-            lambda cidr: [
-                str(net)
-                for net in IPv6Network(cidr).subnets(new_prefix=SUBNET_PREFIX_V6)
-            ]
-        )
         subnet_iterator = zip(
             range(vpc_config.num_subnets),
             cycle(zones),
             vpc_config.cidr_block.subnets(new_prefix=SUBNET_PREFIX_V4),
-            v6net,
         )
-        for index, zone, subnet_v4, subnet_v6 in subnet_iterator:
+
+        for index, zone, subnet_v4 in subnet_iterator:  # noqa: WPS426
             net_name = f"{vpc_config.vpc_name}-subnet-{index + 1}"  # noqa: WPS237
             subnet_resource_opts, imported_subnet_id = subnet_opts(
                 subnet_v4, imported_vpc_id
@@ -205,12 +206,14 @@ class OLVPC(ComponentResource):  # noqa: WPS230
             ol_subnet = ec2.Subnet(
                 net_name,
                 cidr_block=str(subnet_v4),
-                ipv6_cidr_block=subnet_v6,
+                ipv6_cidr_block=self.olvpc.ipv6_cidr_block.apply(
+                    partial(subnet_v6, index)
+                ),
                 availability_zone=zone,
                 vpc_id=self.olvpc.id,
                 map_public_ip_on_launch=vpc_config.default_public_ip,
                 tags=vpc_config.merged_tags({"Name": net_name}),
-                assign_ipv6_address_on_creation=vpc_config.enable_ipv6,
+                assign_ipv6_address_on_creation=True,
                 opts=ResourceOptions.merge(resource_options, subnet_resource_opts),
             )
             ec2.RouteTableAssociation(
@@ -258,10 +261,7 @@ class OLVPC(ComponentResource):  # noqa: WPS230
 
 
 class OLVPCPeeringConnection(ComponentResource):
-    """
-    A Pulumi component for creating a VPC peering connection and populating
-    bidirectional routes.
-    """
+    """Component for creating a VPC peering connection and populating routes."""
 
     def __init__(
         self,

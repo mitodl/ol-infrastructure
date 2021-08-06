@@ -27,6 +27,7 @@ pyinfra = "1.4.4"  # Locking to 1.4.4 until https://github.com/Fizzadar/pyinfra/
 pyyaml = "^5.3.1"
 salt-pepper = "^0.7.6"
 pulumi-github = "^4.2.0"
+pulumi-tls = "^4.0.0"
 
 [tool.poetry.dev-dependencies]
 black = "*"
