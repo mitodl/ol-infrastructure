@@ -995,6 +995,19 @@ pulumi = ">=3.0.0,<4.0.0"
 semver = ">=2.8.1"
 
 [[package]]
+name = "pulumi-tls"
+version = "4.0.0"
+description = "A Pulumi package to create TLS resources in Pulumi programs."
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+parver = ">=0.2.1"
+pulumi = ">=3.0.0a1,<4.0.0"
+semver = ">=2.8.1"
+
+[[package]]
 name = "pulumi-vault"
 version = "4.2.0"
 description = "A Pulumi package for creating and managing vault cloud resources."
@@ -1509,7 +1522,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "c1bb0c64aa69050ac679d398c3b99383b781c3549208017b21c82c1cde615d7b"
+content-hash = "4611d8cca92068d1e282cdee1b252b156596dc1c54f76a60f71bfde50d4d6c9e"
 
 [metadata.files]
 anyio = [
@@ -2081,6 +2094,9 @@ pulumi-consul = [
 ]
 pulumi-github = [
     {file = "pulumi_github-4.2.0.tar.gz", hash = "sha256:b1fef290fdc6ce6b28c3c3f10a43a99308e51a6cc2be7aab01b87e40affff760"},
+]
+pulumi-tls = [
+    {file = "pulumi_tls-4.0.0.tar.gz", hash = "sha256:10c23b8cc049869f946f86f8ce150a7bd25d24e6fd7f037ddfa99d8a7720553a"},
 ]
 pulumi-vault = [
     {file = "pulumi_vault-4.2.0.tar.gz", hash = "sha256:daa1df2877db69e6a91a327b6aa38095741d74b34b0644a68bae74273a2f3b1f"},

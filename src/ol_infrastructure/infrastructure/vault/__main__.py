@@ -15,12 +15,23 @@ import base64
 import json
 from typing import Any, Dict
 
+import pulumi_tls as tls
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
+from pulumi_aws import (
+    acm,
+    acmpca,
+    autoscaling,
+    ec2,
+    get_caller_identity,
+    iam,
+    lb,
+    route53,
+)
 
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
+    DEFAULT_RSA_KEY_SIZE,
     FIVE_MINUTES,
     VAULT_CLUSTER_PORT,
     VAULT_HTTP_PORT,
@@ -30,6 +41,9 @@ from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_po
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
+###############
+# Stack Setup #
+###############
 vault_config = Config("vault")
 stack_info = parse_stack()
 target_network = vault_config.require("target_vpc")
@@ -37,7 +51,11 @@ network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
-target_vpc = network_stack.require_output(f"{target_network}_vpc")
+ca_stack = StackReference("infrastructure.aws.private_ca")
+
+##################
+# Variable Setup #
+##################
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 aws_config = AWSBase(
     tags={
@@ -47,6 +65,12 @@ aws_config = AWSBase(
     }
 )
 aws_account = get_caller_identity()
+kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
+odl_zone_id = dns_stack.require_output("odl_zone_id")
+root_ca = ca_stack.require_output("root_ca")
+target_vpc = network_stack.require_output(f"{target_network}_vpc")
+vault_domain = vault_config.require("domain")
+vault_unseal_key = kms_stack.require_output("vault_auto_unseal_key")
 vault_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["vault-server-*"]),
@@ -56,11 +80,6 @@ vault_ami = ec2.get_ami(
     most_recent=True,
     owners=[aws_account.account_id],
 )
-vault_unseal_key = kms_stack.require_output("vault_auto_unseal_key")
-kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
-odl_zone_id = dns_stack.require_output("odl_zone_id")
-
-# write file
 
 #######################
 # Access and Security #
@@ -271,13 +290,52 @@ vault_web_alb_listener = lb.Listener(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
+##########################
+# Certificate Management #
+##########################
+vault_listener_key = tls.PrivateKey(
+    "vault-server-listener-tls-key",
+    algorithm="RSA",
+    rsa_bits=DEFAULT_RSA_KEY_SIZE,
+)
+vault_listener_csr = tls.CertRequest(
+    "vault-server-lisetner-tls-cert-request",
+    dns_names=[
+        "active.vault.service.consul",
+        "vault.service.consul",
+        "vault.query.consul",
+    ],
+    key_algorithm=vault_listener_key.algorithm,
+    private_key_pem=vault_listener_key.private_key_pem,
+    subjects=[
+        tls.CertRequestSubjectArgs(
+            country="US",
+            province="Massachusetts",
+            locality="Cambridge",
+            organization="Massachusetts Institute of Technology",
+            organizational_unit="Open Learning",
+            common_name=vault_domain,
+        )
+    ],
+)
+vault_listener_cert = acmpca.Certificate(
+    "vault-server-listener-tls-certificate",
+    certificate_authority_arn=root_ca["arn"],
+    certificate_signing_request=vault_listener_csr.cert_request_pem,
+    signing_algorithm="SHA512WITHRSA",
+    validity=acmpca.CertificateValidityArgs(type="YEARS", value="1"),
+)
+
 ###################
 # Autoscale Group #
 ###################
 
 
-def cloud_init_user_data(kms_key_id, vpc_id, consul_env_name, vault_domain) -> str:
+def cloud_init_user_data(
+    kms_key_id, vpc_id, consul_env_name, vault_dns_name, tls_key, tls_cert, ca_cert
+) -> str:
     cloud_config_contents = {
+        ""
         "write_files": [
             {
                 "path": "/etc/consul.d/99-autojoin.json",
@@ -294,12 +352,11 @@ def cloud_init_user_data(kms_key_id, vpc_id, consul_env_name, vault_domain) -> s
             },
             {
                 "path": "/etc/default/caddy",
-                "content": f"DOMAIN={vault_domain}",
+                "content": (f"DOMAIN={vault_dns_name}\n"),
             },
             {
-                "path": "/etc/default/vault",
-                "content": (f"VAULT_AWSKMS_SEAL_KEY_ID={kms_key_id}\n"),
-                "owner": "vault:vault",
+                "path": "/var/opt/kms_key_id",
+                "content": kms_key_id,
             },
             {
                 "path": "/etc/vault/zz-autojoin.json",
@@ -314,7 +371,8 @@ def cloud_init_user_data(kms_key_id, vpc_id, consul_env_name, vault_domain) -> s
                                             "tag_key=vault_env "
                                             f"tag_value={vpc_id}"
                                         ),
-                                        "leader_tls_servername": "vault.service.consul",
+                                        "leader_tls_servername": "active.vault.service.consul",  # noqa: E501
+                                        "leader_ca_cert_file": "/etc/ssl/ol_root_ca.pem",  # noqa: E501
                                     }
                                 ],
                                 "performance_multiplier": 5,
@@ -324,6 +382,21 @@ def cloud_init_user_data(kms_key_id, vpc_id, consul_env_name, vault_domain) -> s
                     }
                 ),
             },
+            # TODO: Move TLS key and cert injection to Packer build so that private key
+            # information isn't being passed as userdata (TMM 2021-08-06)
+            {
+                "path": "/etc/vault/ssl/vault.key",
+                "content": tls_key,
+                "permissions": "0400",
+                "owner": "vault:vault",
+            },
+            {
+                "path": "/etc/vault/ssl/vault.cert",
+                "content": tls_cert,
+                "permissions": "0400",
+                "owner": "vault:vault",
+            },
+            {"path": "/etc/ssl/ol_root_ca.pem", "content": ca_cert},
         ],
     }
     cloud_config = "#cloud-config\n{}".format(
@@ -334,6 +407,24 @@ def cloud_init_user_data(kms_key_id, vpc_id, consul_env_name, vault_domain) -> s
     ).encode("utf8")
     return base64.b64encode(cloud_config).decode("utf8")
 
+
+cloud_init_param = Output.all(
+    vpc_id=target_vpc["id"],
+    key_id=vault_unseal_key["id"],
+    tls_key=vault_listener_key.private_key_pem,
+    tls_cert=vault_listener_cert.certificate,
+    ca_cert=root_ca["certificate"],
+).apply(
+    lambda init_inputs: cloud_init_user_data(
+        init_inputs["key_id"],
+        init_inputs["vpc_id"],
+        env_name,
+        vault_domain,
+        init_inputs["tls_key"],
+        init_inputs["tls_cert"],
+        init_inputs["ca_cert"],
+    )
+)
 
 vault_instance_type = (
     vault_config.get("instance_type") or InstanceTypes.general_purpose_large.name
@@ -346,20 +437,13 @@ worker_launch_config = ec2.LaunchTemplate(
         arn=vault_instance_profile.arn,
     ),
     image_id=vault_ami.id,
-    user_data=Output.all(vpc_id=target_vpc["id"], key_id=vault_unseal_key["id"]).apply(
-        lambda init_inputs: cloud_init_user_data(
-            init_inputs["key_id"],
-            init_inputs["vpc_id"],
-            env_name,
-            vault_config.require("domain"),
-        )
-    ),
+    user_data=cloud_init_param,
     block_device_mappings=[
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name="/dev/xvda",
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
                 volume_size=vault_config.get_int("storage_disk_capacity")
-                or 100,  # noqa: WPS432
+                or 100,  # noqa: WPS432, E501
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
                 encrypted=True,

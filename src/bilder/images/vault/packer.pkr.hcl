@@ -59,14 +59,13 @@ build {
     ]
   }
   provisioner "shell-local" {
-    except = ["docker.vault"]
     inline = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} ${path.root}/deploy.py"]
   }
+  provisioner "file" {
+    source = "${path.root}/files/vault_env_script.sh"
+    destination = "/tmp/vault_env_script.sh"
+  }
   provisioner "shell" {
-    inline = [
-      "sudo mkdir -p /etc/vault/ssl/",
-      "sudo openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /etc/vault/ssl/vault.key -out /etc/vault/ssl/vault.cert -subj '/C=US/ST=MA/L=Cambridge/O=MIT Open Learning/OU=Engineering/CN=vault.service.consul' -extensions san -config <(echo '[req]'; echo 'distinguished_name=req'; echo '[san]'; echo 'subjectAltName=DNS:vault.service.consul'; echo 'subjectAltName=DNS:active.vault.service.consul';)",
-      "sudo chown -R vault:vault /etc/vault/"
-    ]
+    inline = ["sudo mv /tmp/vault_env_script.sh /var/lib/cloud/scripts/per-instance/vault_env_script.sh"]
   }
 }

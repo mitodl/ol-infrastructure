@@ -62,7 +62,6 @@ vault = Vault(
     configuration={
         Path("00-vault.json"): VaultServerConfig(
             api_addr=f"https://active.vault.service.consul:{VAULT_HTTP_PORT}",
-            cluster_addr=f"https://active.vault.service.consul:{VAULT_CLUSTER_PORT}",
             listener=[
                 VaultListener(
                     tcp=VaultTCPListener(
