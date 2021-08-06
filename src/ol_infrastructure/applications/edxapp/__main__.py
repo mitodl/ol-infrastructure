@@ -232,7 +232,10 @@ edxapp_policy_document = {
         {
             "Effect": "Allow",
             "Action": ["ses:SendEmail", "ses:SendRawEmail"],
-            "Resource": "arn:*:ses:*:*:identity/*.mitxonline.mit.edu",
+            "Resource": [
+                "arn:*:ses:*:*:identity/*.mitxonline.mit.edu",
+                f"arn:aws:ses:*:*:configuration-set/edxapp-mitxonline-{stack_info.env_suffix}",  # noqa: E501
+            ],
         },
         {
             "Effect": "Allow",
@@ -499,8 +502,10 @@ edxapp_redis_consul_service = Service(
 # Create SES Service For edxapp Emails #
 ########################################
 
+edxapp_mail_domain = edxapp_config.require("mail_domain")
 edxapp_ses_domain_identity = ses.DomainIdentity(
-    "edxapp-ses-domain-identity", domain=edxapp_config.require("mail_domain")
+    "edxapp-ses-domain-identity",
+    domain=edxapp_mail_domain,
 )
 edxapp_ses_verification_record = route53.Record(
     "edxapp-ses-domain-identity-verification-dns-record",
@@ -547,7 +552,7 @@ for loop_counter in range(0, 3):
         f"edxapp-ses-domain-dkim-record-{loop_counter}",
         zone_id=edxapp_zone_id,
         name=edxapp_ses_domain_dkim.dkim_tokens[loop_counter].apply(
-            "{}._domainkey".format
+            lambda dkim_name: f"{dkim_name}._domainkey.{edxapp_mail_domain}"
         ),
         type="CNAME",
         ttl=FIVE_MINUTES,
@@ -673,7 +678,7 @@ lms_web_lb_target_group = lb.TargetGroup(
     health_check=lb.TargetGroupHealthCheckArgs(
         healthy_threshold=3,
         timeout=3,
-        interval=10,
+        interval=edxapp_config.get_int("elb_healthcheck_interval") or 10,
         path="/heartbeat",
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",

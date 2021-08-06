@@ -15,16 +15,21 @@ postgres_role_statements = {
     },
     "admin": {
         "create": Template(
-            """CREATE USER "{{name}}" WITH PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'
-          IN ROLE "rds_superuser" INHERIT CREATEROLE CREATEDB;
-          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{{name}}" WITH GRANT OPTION;
-          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{{name}}" WITH GRANT OPTION;"""
+            """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+             VALID UNTIL '{{expiration}}' IN ROLE "rds_superuser"
+             INHERIT CREATEROLE CREATEDB;
+          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{{name}}"
+             WITH GRANT OPTION;
+          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{{name}}"
+             WITH GRANT OPTION;"""
         ),
         "revoke": Template(
-            """GRANT "{{name}}" TO ${app_name} WITH ADMIN OPTION;
+            """REVOKE "${app_name}" FROM "{{name}}";
+          GRANT "{{name}}" TO ${app_name} WITH ADMIN OPTION;
+          SET ROLE ${app_name};
           REASSIGN OWNED BY "{{name}}" TO "${app_name}";
+          RESET ROLE;
           DROP OWNED BY "{{name}}";
-          REVOKE "${app_name}" FROM "{{name}}";
           REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";
           REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
           REVOKE USAGE ON SCHEMA public FROM "{{name}}";
@@ -33,30 +38,36 @@ postgres_role_statements = {
     },
     "app": {
         "create": Template(
-            """CREATE USER "{{name}}" WITH PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'
-          IN ROLE "${app_name}" INHERIT;
-          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{{name}}" WITH GRANT OPTION;
-          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{{name}}" WITH GRANT OPTION;
-          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${app_name}" WITH GRANT OPTION;
-          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "${app_name}" WITH GRANT OPTION;
+            """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+            VALID UNTIL '{{expiration}}' IN ROLE "${app_name}" INHERIT;
+          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{{name}}"
+             WITH GRANT OPTION;
+          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{{name}}"
+             WITH GRANT OPTION;
+          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${app_name}"
+             WITH GRANT OPTION;
+          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "${app_name}"
+             WITH GRANT OPTION;
           SET ROLE "{{name}}";
-          ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES
-          TO "{{name}}" WITH GRANT OPTION;
-          ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES
-          TO "{{name}}" WITH GRANT OPTION;
+          ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public
+            GRANT ALL PRIVILEGES ON TABLES TO "{{name}}" WITH GRANT OPTION;
+          ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public
+            GRANT ALL PRIVILEGES ON SEQUENCES TO "{{name}}" WITH GRANT OPTION;
           SET ROLE "${app_name}";
-          ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES
-          TO "${app_name}" WITH GRANT OPTION;
-          ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES
-          TO "${app_name}" WITH GRANT OPTION;
+          ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA public
+            GRANT ALL PRIVILEGES ON TABLES TO "${app_name}" WITH GRANT OPTION;
+          ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA public
+            GRANT ALL PRIVILEGES ON SEQUENCES TO "${app_name}" WITH GRANT OPTION;
           RESET ROLE;
           ALTER ROLE "{{name}}" SET ROLE "${app_name}";"""
         ),
         "revoke": Template(
-            """GRANT "{{name}}" TO ${app_name} WITH ADMIN OPTION;
+            """REVOKE "${app_name}" FROM "{{name}}";
+          GRANT "{{name}}" TO ${app_name} WITH ADMIN OPTION;
+          SET ROLE ${app_name};
           REASSIGN OWNED BY "{{name}}" TO "${app_name}";
+          RESET ROLE;
           DROP OWNED BY "{{name}}";
-          REVOKE "${app_name}" FROM "{{name}}";
           REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";
           REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
           REVOKE USAGE ON SCHEMA public FROM "{{name}}";
@@ -65,22 +76,19 @@ postgres_role_statements = {
     },
     "readonly": {
         "create": Template(
-            """CREATE USER "{{name}}" WITH PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
+            """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+             VALID UNTIL '{{expiration}}';
           GRANT SELECT ON ALL TABLES IN SCHEMA public TO "{{name}}";
           GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO "{{name}}";
           SET ROLE "{{name}}";
-          ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public GRANT SELECT ON TABLES TO "{{name}}"
-          WITH GRANT OPTION;
-          ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public GRANT SELECT ON SEQUENCES TO "{{name}}"
-          WITH GRANT OPTION;
+          ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public GRANT SELECT
+             ON TABLES TO "{{name}}";
+          ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public GRANT SELECT
+             ON SEQUENCES TO "{{name}}";
           RESET ROLE;"""
         ),
         "revoke": Template(
-            """GRANT "{{name}}" TO ${app_name} WITH ADMIN OPTION;
-          REASSIGN OWNED BY "{{name}}" TO "${app_name}";
-          DROP OWNED BY "{{name}}";
-          REVOKE "${app_name}" FROM "{{name}}";
-          REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";
+            """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";
           REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
           REVOKE USAGE ON SCHEMA public FROM "{{name}}";
           DROP USER "{{name}}";"""
@@ -92,18 +100,20 @@ mysql_role_statements = {
     "admin": {
         "create": Template(
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER, "
-            "CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, CREATE VIEW, SHOW VIEW, "
-            "CREATE ROUTINE, ALTER ROUTINE, EVENT, TRIGGER ON `%`.* TO '{{name}}' "
-            "WITH GRANT OPTION; GRANT RELOAD, LOCK TABLES ON *.* to '{{name}}';"
+            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, "
+            "ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, CREATE VIEW, "
+            "SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, EVENT, TRIGGER "
+            "ON `%`.* TO '{{name}}' WITH GRANT OPTION; "
+            "GRANT RELOAD, LOCK TABLES ON *.* to '{{name}}';"
         ),
         "revoke": Template("DROP USER '{{name}}';"),
     },
     "app": {
         "create": Template(
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "  # noqa: Q000
-            "CREATE TEMPORARY TABLES, LOCK TABLES ON ${app_name}.* TO '{{name}}'@'%';"
+            "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "
+            "REFERENCES, CREATE TEMPORARY TABLES, LOCK TABLES "
+            "ON ${app_name}.* TO '{{name}}'@'%';"
         ),
         "revoke": Template("DROP USER '{{name}}';"),
     },

@@ -13,7 +13,7 @@ repos:
   - id: check-toml
   - id: debug-statements
 - repo: https://github.com/adrienverge/yamllint.git
-  rev: v1.26.1
+  rev: v1.26.2
   hooks:
   - id: yamllint
     args: [--format, parsable, --strict, -d, relaxed]
@@ -23,7 +23,7 @@ repos:
   - id: yamlfmt
     args: [--mapping, '2', --sequence, '2', --offset, '0', --width, '80']
 - repo: https://github.com/asottile/pyupgrade
-  rev: v2.23.1
+  rev: v2.23.3
   hooks:
   - id: pyupgrade
     args:
