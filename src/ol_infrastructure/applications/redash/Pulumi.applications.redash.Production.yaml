@@ -2,11 +2,11 @@
 secretsprovider: awskms://alias/PulumiSecrets
 encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEHumXiM+6KVFVBQvSpaYghAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMpAtsYnBqw7yxT5aKAgEQgDvYpSPSxANlKBfMsJ2Jr8QMUSNx+nYBYsZA+wNn59wYKYs2jyzW+8tED3Jsfsg2L9Nq5COeRtv9Wc7OVA==
 config:
-    aws:region: us-east-1
-    redash:domain: bi.odl.mit.edu
-    redash:instance_type: high_mem_regular
-    redash:db_password:
-        secure: v1:cj9j7XyMAGY1OKbq:EnB9a3A83D4DxPNZj1b7pcO+4AJE8oGjU1y9cojaElkd5MVAr948ow+9lkCPdM145FI9PimBipMSHRF4eQeQ7YvAnErKYtDatPIVqrjIDzKFdAtDlZU/PA==
-    redis:auth_token:
-        secure: v1:/n7FUHThbxtHRmC2:PzixAyTQ4gqW+pRbAzdW2BpWwL1cxy7uaZQFAmuJkicDtsDKbQn1CW/8en+tCD1TQnM49EcumUvqfv/ponehFxaX+ODnVn4zq/vfuNQowdDToQ89FRiOMZgn
-    saltstack:key_name: salt-qa
+  aws:region: us-east-1
+  redash:domain: bi.odl.mit.edu
+  redash:instance_type: high_mem_regular
+  redash:db_password:
+    secure: v1:cj9j7XyMAGY1OKbq:EnB9a3A83D4DxPNZj1b7pcO+4AJE8oGjU1y9cojaElkd5MVAr948ow+9lkCPdM145FI9PimBipMSHRF4eQeQ7YvAnErKYtDatPIVqrjIDzKFdAtDlZU/PA==
+  redis:auth_token:
+    secure: v1:/n7FUHThbxtHRmC2:PzixAyTQ4gqW+pRbAzdW2BpWwL1cxy7uaZQFAmuJkicDtsDKbQn1CW/8en+tCD1TQnM49EcumUvqfv/ponehFxaX+ODnVn4zq/vfuNQowdDToQ89FRiOMZgn
+  saltstack:key_name: salt-qa

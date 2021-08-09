@@ -1,6 +1,7 @@
 ---
 name: ol-infrastructure-redash-application
 runtime: python
-description: Pulumi project for deploying the stack of services needed by the Redash business intelligence platform
+description: Pulumi project for deploying the stack of services needed by the Redash
+  business intelligence platform
 backend:
-    url: s3://mitol-pulumi-state/
+  url: s3://mitol-pulumi-state/

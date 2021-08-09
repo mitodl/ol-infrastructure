@@ -1,12 +1,13 @@
+---
 creation_rules:
-  - path_regex: (ci.env$|.*\.ci\.ya?ml)
-    kms: 'arn:aws:kms:us-east-1:610119931565:alias/infrastructure-secrets-ci'
-    pgp: dfd1205a98269f34c43c9221d6260c616bd0fa33,B905F0256A801D3F1D15B5126A1D27A4BE75B1C2,51BB820DC5F14FE9
-  - path_regex: (qa.env$|.*\.?qa\.ya?ml|rc.env$|.*\.?rc\.ya?ml)
-    kms: 'arn:aws:kms:us-east-1:610119931565:alias/infrastructure-secrets-qa'
-    pgp: dfd1205a98269f34c43c9221d6260c616bd0fa33,B905F0256A801D3F1D15B5126A1D27A4BE75B1C2,51BB820DC5F14FE9
-  - path_regex: (production.env$|.*\.?production\.ya?ml)
-    kms: 'arn:aws:kms:us-east-1:610119931565:alias/infrastructure-secrets-production'
-    pgp: dfd1205a98269f34c43c9221d6260c616bd0fa33,B905F0256A801D3F1D15B5126A1D27A4BE75B1C2,51BB820DC5F14FE9
-  - kms: 'arn:aws:kms:us-east-1:610119931565:alias/infrastructure-secrets-production'
-    pgp: dfd1205a98269f34c43c9221d6260c616bd0fa33,B905F0256A801D3F1D15B5126A1D27A4BE75B1C2,51BB820DC5F14FE9
+- path_regex: (ci.env$|.*\.ci\.ya?ml)
+  kms: arn:aws:kms:us-east-1:610119931565:alias/infrastructure-secrets-ci
+  pgp: dfd1205a98269f34c43c9221d6260c616bd0fa33,B905F0256A801D3F1D15B5126A1D27A4BE75B1C2,51BB820DC5F14FE9
+- path_regex: (qa.env$|.*\.?qa\.ya?ml|rc.env$|.*\.?rc\.ya?ml)
+  kms: arn:aws:kms:us-east-1:610119931565:alias/infrastructure-secrets-qa
+  pgp: dfd1205a98269f34c43c9221d6260c616bd0fa33,B905F0256A801D3F1D15B5126A1D27A4BE75B1C2,51BB820DC5F14FE9
+- path_regex: (production.env$|.*\.?production\.ya?ml)
+  kms: arn:aws:kms:us-east-1:610119931565:alias/infrastructure-secrets-production
+  pgp: dfd1205a98269f34c43c9221d6260c616bd0fa33,B905F0256A801D3F1D15B5126A1D27A4BE75B1C2,51BB820DC5F14FE9
+- kms: arn:aws:kms:us-east-1:610119931565:alias/infrastructure-secrets-production
+  pgp: dfd1205a98269f34c43c9221d6260c616bd0fa33,B905F0256A801D3F1D15B5126A1D27A4BE75B1C2,51BB820DC5F14FE9
