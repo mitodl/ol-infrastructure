@@ -172,31 +172,33 @@ if node_type == WEB_NODE_TYPE:
         ]
     )
 
+vault_config = VaultAgentConfig(
+    cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
+    listener=[
+        VaultListener(
+            tcp=VaultTCPListener(
+                address=f"127.0.0.1:{VAULT_HTTP_PORT}", tls_disable=True
+            )
+        )
+    ],
+    vault=VaultConnectionConfig(
+        address=f"https://vault.query.consul:{VAULT_HTTP_PORT}",
+        tls_skip_verify=True,
+    ),
+    auto_auth=VaultAutoAuthConfig(
+        method=VaultAutoAuthMethod(
+            type="aws",
+            mount_path="auth/aws",
+            config=VaultAutoAuthAWS(role=f"edxapp-{node_type}"),
+        ),
+        sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
+    ),
+    template=vault_templates,
+)
+
 vault = Vault(
     version=VERSIONS["vault"],
-    configuration=VaultAgentConfig(
-        cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
-        listener=[
-            VaultListener(
-                tcp=VaultTCPListener(
-                    address=f"127.0.0.1:{VAULT_HTTP_PORT}", tls_disable=True
-                )
-            )
-        ],
-        vault=VaultConnectionConfig(
-            address=f"https://vault.query.consul:{VAULT_HTTP_PORT}",
-            tls_skip_verify=True,
-        ),
-        auto_auth=VaultAutoAuthConfig(
-            method=VaultAutoAuthMethod(
-                type="aws",
-                mount_path="auth/aws",
-                config=VaultAutoAuthAWS(role=f"edxapp-{node_type}"),
-            ),
-            sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
-        ),
-        template=vault_templates,
-    ),
+    configuration={Path("vault.json"): vault_config},
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 consul_template = ConsulTemplate(
@@ -250,7 +252,7 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as forum_template:
         group=consul_template.name,
         create_remote_dir=True,
     )
-vault_template_permissions(vault.configuration)
+vault_template_permissions(vault_config)
 consul_template_permissions(consul_template.configuration)
 
 # Install Vector log agent

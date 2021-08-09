@@ -227,48 +227,49 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
         caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
 
 # Install Consul and Vault Agent
+vault_config = VaultAgentConfig(
+    cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
+    listener=[
+        VaultListener(
+            tcp=VaultTCPListener(
+                address=f"127.0.0.1:{VAULT_HTTP_PORT}", tls_disable=True
+            )
+        )
+    ],
+    vault=VaultConnectionConfig(
+        address=f"https://active.vault.service.consul:{VAULT_HTTP_PORT}",
+        tls_skip_verify=True,
+    ),
+    auto_auth=VaultAutoAuthConfig(
+        method=VaultAutoAuthMethod(
+            type="aws",
+            mount_path="auth/aws",
+            config=VaultAutoAuthAWS(
+                role=f"concourse-{concourse_config._node_type}"  # noqa: WPS437
+            ),
+        ),
+        sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
+    ),
+    template=[partial_func() for partial_func in vault_template_map[node_type]]
+    + [
+        VaultTemplate(
+            contents=get_template(
+                "{% for env_var, env_value in concourse_env.items() -%}\n"
+                "{{ env_var }}={{ env_value }}\n{% endfor -%}",
+                is_string=True,
+            ).render(concourse_env=concourse_config.concourse_env()),
+            destination=concourse_base_config.env_file_path,
+        ),
+    ],
+)
 vault = Vault(
     version=VERSIONS["vault"],
-    configuration=VaultAgentConfig(
-        cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
-        listener=[
-            VaultListener(
-                tcp=VaultTCPListener(
-                    address=f"127.0.0.1:{VAULT_HTTP_PORT}", tls_disable=True
-                )
-            )
-        ],
-        vault=VaultConnectionConfig(
-            address=f"https://active.vault.service.consul:{VAULT_HTTP_PORT}",
-            tls_skip_verify=True,
-        ),
-        auto_auth=VaultAutoAuthConfig(
-            method=VaultAutoAuthMethod(
-                type="aws",
-                mount_path="auth/aws",
-                config=VaultAutoAuthAWS(
-                    role=f"concourse-{concourse_config._node_type}"  # noqa: WPS437
-                ),
-            ),
-            sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
-        ),
-        template=[partial_func() for partial_func in vault_template_map[node_type]]
-        + [
-            VaultTemplate(
-                contents=get_template(
-                    "{% for env_var, env_value in concourse_env.items() -%}\n"
-                    "{{ env_var }}={{ env_value }}\n{% endfor -%}",
-                    is_string=True,
-                ).render(concourse_env=concourse_config.concourse_env()),
-                destination=concourse_base_config.env_file_path,
-            ),
-        ],
-    ),
+    configuration={Path("vault.json"): vault_config},
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
-vault_template_permissions(vault.configuration)
+vault_template_permissions(vault_config)
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 
