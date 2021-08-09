@@ -275,10 +275,13 @@ class Vault(HashicorpProduct):
 
     @property
     def systemd_template_context(self):
-        return {
+        context_dict = {
             "mode": self.operating_mode(),
             "configuration_directory": self.configuration_directory,
         }
+        if self.operating_mode() == "agent":
+            context_dict["configuration_file"] = list(self.configuration.keys())[0]
+        return context_dict
 
     def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
         for fpath, config in self.configuration.items():  # noqa: WPS526

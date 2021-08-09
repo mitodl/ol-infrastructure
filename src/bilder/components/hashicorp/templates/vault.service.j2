@@ -19,7 +19,7 @@ AmbientCapabilities=CAP_IPC_LOCK
 Capabilities=CAP_IPC_LOCK+ep
 CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
 NoNewPrivileges=yes
-ExecStart=/usr/local/bin/vault {{ context.mode }} -config={{ context.configuration_directory }}
+ExecStart=/usr/local/bin/vault {{ context.mode }} -config={{ context.configuration_directory }}/{% if context.mode == "agent" %}{{ context.configuration_file }}{% endif %}
 ExecReload=/bin/kill --signal HUP $MAINPID
 EnvironmentFile=-/etc/default/vault
 KillMode=process
