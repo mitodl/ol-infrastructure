@@ -496,6 +496,7 @@ web_asg = autoscaling.Group(
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
             min_healthy_percentage=50  # noqa: WPS432
         ),
+        triggers=["tags"],
     ),
     target_group_arns=[web_lb_target_group.arn],
     tags=[
@@ -504,7 +505,9 @@ web_asg = autoscaling.Group(
             value=key_value,
             propagate_at_launch=True,
         )
-        for key_name, key_value in aws_config.tags.items()
+        for key_name, key_value in aws_config.merged_tags(
+            {"ami_id": concourse_web_ami.id}
+        ).items()
     ],
 )
 
@@ -591,6 +594,7 @@ worker_asg = autoscaling.Group(
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
             min_healthy_percentage=50  # noqa: WPS432
         ),
+        triggers=["tags"],
     ),
     tags=[
         autoscaling.GroupTagArgs(
@@ -598,7 +602,9 @@ worker_asg = autoscaling.Group(
             value=key_value,
             propagate_at_launch=True,
         )
-        for key_name, key_value in aws_config.tags.items()
+        for key_name, key_value in aws_config.merged_tags(
+            {"ami_id": concourse_worker_ami.id}
+        ).items()
     ],
 )
 

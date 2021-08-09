@@ -72,14 +72,14 @@ build {
 
   provisioner "shell-local" {
     inline = [
-      "echo '${build.SSHPrivateKey}' > /tmp/packer-session.pem",
-      "chmod 600 /tmp/packer-session.pem"
+      "echo '${build.SSHPrivateKey}' > /tmp/packer-${build.ID}.pem",
+      "chmod 600 /tmp/packer-${build.ID}.pem"
     ]
   }
   provisioner "shell-local" {
     except = ["docker.concourse"]
     environment_vars = ["NODE_TYPE=${var.node_type}"]
-    inline = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session.pem ${build.Host} ${path.root}/deploy.py"]
+    inline = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} ${path.root}/deploy.py"]
   }
   # provisioner "shell-local" {
   #   except = ["docker.concourse"]

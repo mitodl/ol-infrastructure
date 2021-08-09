@@ -22,7 +22,7 @@ class IframeOptions(str, Enum):  # noqa: WPS600
 
 class ConcourseBaseConfig(OLBaseSettings):
     user: str = "concourse"
-    version: str = "7.1.0"
+    version: str = "7.4.0"
     configuration_directory: Path = Path("/etc/concourse")
     deploy_directory: Path = Path("/usr/local/concourse/")
     data_directory: Path = Path("/var/lib/concourse")
@@ -389,6 +389,11 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         default=True,
         concourse_env_var="CONCOURSE_ENABLE_RESOURCE_AUDITING",
         description="Enable auditing for all api requests connected to resources.",
+    )
+    enable_resource_causality: Optional[bool] = Field(
+        default=True,
+        concourse_env_var="CONCOURSE_ENABLE_RESOURCE_CAUSALITY",
+        description="Enable mapping of up and downstream dependencies for resources.",
     )
     enable_system_auditing: Optional[bool] = Field(
         default=True,
