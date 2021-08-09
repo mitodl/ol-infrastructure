@@ -193,7 +193,7 @@ CODE_JAIL:
     user: sandbox
 COMMENTS_SERVICE_URL: http://localhost:4567  # MODIFIED
 COMPREHENSIVE_THEME_DIRS:
-- ''
+- /edx/app/edxapp/themes/  # MODIFIED
 COMPREHENSIVE_THEME_LOCALE_PATHS: []
 CONTACT_EMAIL: support@mitxonline.mit.edu # MODIFIED
 CORS_ORIGIN_ALLOW_ALL: false
@@ -231,7 +231,7 @@ DEFAULT_FROM_EMAIL: support@edxapp-mail-qa.mitxonline.mit.edu # MODIFIED
 #     ISSUER: http://127.0.0.1:8000/oauth2
 #     SECRET_KEY: SET-ME-PLEASE
 DEFAULT_MOBILE_AVAILABLE: false
-DEFAULT_SITE_THEME: ''
+DEFAULT_SITE_THEME: mitxonline-theme  # MODIFIED
 DEPRECATED_ADVANCED_COMPONENT_TYPES: []
 DJFS:
     directory_root: /edx/var/edxapp/django-pyfs/static/django-pyfs
@@ -268,7 +268,7 @@ EMAIL_BACKEND: django_ses.SESBackend  # MODIFIED
 # EMAIL_HOST_USER: ''
 # EMAIL_PORT: 25
 # EMAIL_USE_TLS: false
-ENABLE_COMPREHENSIVE_THEMING: false
+ENABLE_COMPREHENSIVE_THEMING: true  # MODIFIED
 ###########################################
 # We will not be using the enterprise app #
 ###########################################

@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 
 from pyinfra import host
-from pyinfra.operations import files, pip
+from pyinfra.operations import files, git, pip, server
 
 from bilder.components.baseline.steps import (
     install_baseline_packages,
@@ -65,6 +65,10 @@ WORKER_NODE_TYPE = "worker"
 node_type = host.data.node_type or os.environ.get("NODE_TYPE", WEB_NODE_TYPE)
 
 install_baseline_packages()
+
+###########
+# edX App #
+###########
 # Install additional Python dependencies for use with edxapp
 pip.packages(
     name="Install additional edX dependencies",
@@ -117,6 +121,17 @@ consul_templates = [
     ),
 ]
 if node_type == WEB_NODE_TYPE:
+    git.repo(
+        name="Load theme repository",
+        src="https://github.com/mitodl/mitxonline-theme",
+        dest="/edx/app/edxapp/themes/",
+        branch="main",
+        user="edxapp",
+        group="edxapp",
+    )
+    server.shell(
+        name="Compile theme assets", commands=["/edx/bin/edxapp-update-assets"]
+    )
     vector.configuration_templates.update(
         {
             Path(__file__).parent.joinpath("templates", "vector", "nginx.yaml"): {},
