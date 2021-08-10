@@ -4,6 +4,8 @@
 - Create an IAM policy to grant access to S3 and other resources
 """
 
+import json
+
 import pulumi_vault as vault
 from pulumi import Config, StackReference, export
 from pulumi_aws import ec2, iam, s3
@@ -43,6 +45,22 @@ mitxonline_bucket = s3.Bucket(
         enabled=True,
     ),
     tags=aws_config.tags,
+    acl="public-read",
+    policy=json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "PublicRead",
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": ["s3:GetObject"],
+                    "Resource": [f"arn:aws:s3:::{mitxonline_bucket_name}/*"],
+                }
+            ],
+        }
+    ),
+    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
 )
 
 
