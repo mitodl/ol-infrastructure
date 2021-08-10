@@ -12,7 +12,9 @@
         output file {{ context.log_file }}
     }
 
-    tls /etc/caddy/odl_wildcard.cert /etc/caddy/odl_wildcard.key
+    tls {
+        dns route53
+    }
 
     reverse_proxy http://127.0.0.1:8500
 }
