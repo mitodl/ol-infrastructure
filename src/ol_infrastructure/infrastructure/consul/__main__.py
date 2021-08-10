@@ -292,6 +292,7 @@ retry_join_wan = peer_vpcs.apply(
     ]
 )
 
+
 # Make cloud-init userdata
 def cloud_init_userdata(consul_vpc_id, consul_env_name, retry_join_wan_array):
     cloud_config_contents = {
@@ -402,6 +403,10 @@ consul_asg = autoscaling.Group(
     target_group_arns=[consul_lb_target_group.arn],
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
+        preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
+            min_healthy_percentage=50  # noqa: WPS432
+        ),
+        triggers=["tag"],
     ),
     tags=[
         autoscaling.GroupTagArgs(
@@ -409,7 +414,9 @@ consul_asg = autoscaling.Group(
             value=key_value,
             propagate_at_launch=True,
         )
-        for key_name, key_value in aws_config.tags.items()
+        for key_name, key_value in aws_config.merged_tags(
+            {"ami_id": consul_ami.id}
+        ).items()
     ],
     vpc_zone_identifiers=subnet_ids,
 )
