@@ -34,8 +34,8 @@ class ConsulExternalServicesMonitor(HashicorpProduct):
     def systemd_template_context(self):
         return self
 
-    def render_configuration_files(self) -> Iterable[Tuple[str, str]]:
+    def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
         for fpath, config in self.configuration.items():  # noqa: WPS526
-            yield str(self.configuration_directory.joinpath(fpath)), config.json(
+            yield self.configuration_directory.joinpath(fpath), config.json(
                 exclude_none=True, indent=2
             )
