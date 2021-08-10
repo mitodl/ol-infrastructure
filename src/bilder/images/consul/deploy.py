@@ -24,7 +24,7 @@ from bilder.components.hashicorp.steps import (
 from bilder.facts import has_systemd  # noqa: F401
 
 VERSIONS = {  # noqa: WPS407
-    "caddy_route53": "v1.1.1",
+    "caddy_route53": "v1.1.2",
     "consul": os.environ.get("CONSUL_VERSION", "1.10.0"),
 }
 

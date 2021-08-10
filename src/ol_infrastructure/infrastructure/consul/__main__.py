@@ -13,7 +13,11 @@ from bridge.lib.magic_numbers import (
     CONSUL_WAN_SERF_PORT,
     DEFAULT_HTTPS_PORT,
 )
-from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
+from ol_infrastructure.lib.aws.ec2_helper import (
+    DiskTypes,
+    InstanceTypes,
+    default_egress_args,
+)
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
@@ -33,6 +37,8 @@ destination_vpc = network_stack.require_output(env_config.require("vpc_reference
 dns_stack = StackReference("infrastructure.aws.dns")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 vpc_id = destination_vpc["id"]
+kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
+kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 
 
 #############
@@ -58,6 +64,11 @@ consul_instance_role = iam.Role(
 iam.RolePolicyAttachment(
     f"consul-describe-instance-role-policy-{env_name}",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
+    role=consul_instance_role.name,
+)
+iam.RolePolicyAttachment(
+    "caddy-route53-records-permission",
+    policy_arn=policy_stack.require_output("iam_policies")["route53_odl_zone_records"],
     role=consul_instance_role.name,
 )
 
@@ -323,8 +334,19 @@ consul_launch_config = ec2.LaunchTemplate(
     "consul-launch-template",
     name_prefix=f"consul-{env_name}-",
     description="Launch template for deploying Consul cluster",
-    # block_device_mappings
-    # TODO: additional block device mappings needed here or to be defined in AMI?
+    block_device_mappings=[
+        ec2.LaunchTemplateBlockDeviceMappingArgs(
+            device_name="/dev/xvda",
+            ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
+                volume_size=consul_config.get_int("storage_disk_capacity")
+                or 100,  # noqa: WPS432, E501
+                volume_type=DiskTypes.ssd,
+                delete_on_termination=True,
+                encrypted=True,
+                kms_key_id=kms_ebs["arn"],
+            ),
+        ),
+    ],
     iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
         arn=consul_instance_profile.arn,
     ),
@@ -371,7 +393,7 @@ consul_asg = autoscaling.Group(
     desired_capacity=consul_capacity,
     max_size=consul_capacity,
     min_size=consul_capacity,
-    health_check_type="ELB",
+    health_check_type="EC2",
     launch_template=autoscaling.GroupLaunchTemplateArgs(
         id=consul_launch_config.id,
         version="$Latest",
