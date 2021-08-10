@@ -106,7 +106,8 @@ concourse_config_map = {
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
-        container_runtime="guardian",
+        container_runtime="containerd",
+        containerd_dns_server="8.8.8.8",
         baggageclaim_driver="btrfs",
     ),
 }

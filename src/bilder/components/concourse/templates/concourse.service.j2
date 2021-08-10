@@ -15,6 +15,7 @@ EnvironmentFile=-{{ concourse_config.env_file_path }}
 ExecReload=/bin/kill -HUP $MAINPID
 {% endif %}
 {% if concourse_config._node_type == "worker" %}
+Delegate=true  {# Allow the Concourse worker to manage its own cgroups for container execution #}
 KillSignal=SIGUSR2
 KillMode=process
 LimitNPROC=infinity
