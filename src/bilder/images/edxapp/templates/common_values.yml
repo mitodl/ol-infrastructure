@@ -414,7 +414,7 @@ PROCTORING_SETTINGS: {}
 REGISTRATION_EXTRA_FIELDS:
     city: hidden
     confirm_email: hidden
-    country: required
+    country: hidden
     gender: optional
     goals: optional
     honor_code: required
