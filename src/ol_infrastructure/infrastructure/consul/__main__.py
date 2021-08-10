@@ -136,7 +136,9 @@ consul_server_security_group = ec2.SecurityGroup(
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=peer_vpcs.apply(
-                lambda peer_vpcs: [peer["cidr"] for peer in peer_vpcs.values()]
+                lambda peer_vpcs: [
+                    peer.apply(lambda vpc: vpc["cidr"]) for peer in peer_vpcs.values()
+                ]
             ),
             protocol="tcp",
             from_port=CONSUL_RPC_PORT,
@@ -285,11 +287,10 @@ instance_type = InstanceTypes[instance_type_name].value
 # using the VPC ID to denote datacenter
 retry_join_wan = peer_vpcs.apply(
     lambda vpc_dict: [
-        f"provider=aws tag_key=consul_vpc tag_value={peer['id']}"
+        peer.apply(lambda vpc: f"provider=aws tag_key=consul_vpc tag_value={vpc['id']}")
         for peer in vpc_dict.values()
     ]
 )
-
 
 # Make cloud-init userdata
 def cloud_init_userdata(consul_vpc_id, consul_env_name, retry_join_wan_array):
@@ -309,7 +310,7 @@ def cloud_init_userdata(consul_vpc_id, consul_env_name, retry_join_wan_array):
                 "owner": "consul:consul",
             },
             {
-                "path": "/etc/consul.d/99-autojoin-wan.json.json",
+                "path": "/etc/consul.d/99-autojoin-wan.json",
                 "content": json.dumps(
                     {
                         "retry_join_wan": retry_join_wan_array,
