@@ -23,10 +23,16 @@ source "amazon-ebs" "edxapp" {
   ami_description         = "Deployment image for Open edX ${var.node_type} server generated at ${local.timestamp}"
   ami_name                = "edxapp-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
-  instance_type           = "t3a.medium"
+  instance_type           = "m5.xlarge"
   launch_block_device_mappings {
       device_name = "/dev/sda1"
       volume_size = 25
+  }
+  run_tags = {
+    Name    = "${local.app_name}-${var.node_type}-packer-builder"
+    OU      = "${local.business_unit}"
+    app     = "${local.app_name}"
+    purpose = "${local.app_name}-${var.node_type}"
   }
   run_volume_tags = {
     OU      = "${local.business_unit}"
