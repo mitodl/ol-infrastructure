@@ -8,13 +8,19 @@ User={{ concourse_config.user }}
 Group={{ concourse_config.user }}
 ExecStart={{ concourse_config.deploy_directory }}/bin/concourse {{ concourse_config._node_type }}
 Restart=always
-RestartSec=2
+Restart=on-failure
+RestartSec=3
 EnvironmentFile=-{{ concourse_config.env_file_path }}
 {% if concourse_config._node_type == "web" %}
 ExecReload=/bin/kill -HUP $MAINPID
 {% endif %}
 {% if concourse_config._node_type == "worker" %}
 KillSignal=SIGUSR2
+KillMode=process
+LimitNPROC=infinity
+LimitNOFILE=infinity
+TasksMax=infinity
+TimeoutStopSec=300
 {% endif %}
 
 [Install]
