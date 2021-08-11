@@ -360,6 +360,7 @@ LOGIN_REDIRECT_WHITELIST:  # MODIFIED
   - learning-mfe-qa.mitxonline.mit.edu
 LOG_DIR: /edx/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
+MARKETING_SITE_BASE_URL: https://rc.mitxonline.mit.edu/ # ADDED - to support mitxonline-theme
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
