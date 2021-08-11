@@ -59,7 +59,7 @@ VERSIONS = {  # noqa: WPS407
     "vault": "1.7.3",
     "consul-template": "0.26.0",
 }
-
+TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 WEB_NODE_TYPE = "web"
 WORKER_NODE_TYPE = "worker"
 node_type = host.data.node_type or os.environ.get("NODE_TYPE", WEB_NODE_TYPE)
@@ -87,7 +87,7 @@ pip.packages(
 
 vector = VectorConfig(
     configuration_templates={
-        Path(__file__).parent.joinpath("templates", "vector", "edxapp.yaml"): {},
+        TEMPLATES_DIRECTORY.joinpath("vector", "edxapp.yaml"): {},
     }
 )
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
@@ -124,7 +124,7 @@ if node_type == WEB_NODE_TYPE:
     git.repo(
         name="Load theme repository",
         src="https://github.com/mitodl/mitxonline-theme",
-        dest="/edx/app/edxapp/themes/",
+        dest="/edx/app/edxapp/themes/mitxonline-theme",
         branch="main",
         user="edxapp",
         group="edxapp",
@@ -134,7 +134,7 @@ if node_type == WEB_NODE_TYPE:
     )
     vector.configuration_templates.update(
         {
-            Path(__file__).parent.joinpath("templates", "vector", "nginx.yaml"): {},
+            TEMPLATES_DIRECTORY.joinpath("vector", "nginx.yaml"): {},
             Path(__file__).parent.joinpath(
                 "templates", "vector", "edx_tracking.yaml"
             ): {},
@@ -231,10 +231,10 @@ for product in hashicorp_products:
     configure_hashicorp_product(product)
 
 # Upload templates for consul-template agent
-common_config = Path(__file__).parent.joinpath("templates", "common_values.yml")
-studio_config = Path(__file__).parent.joinpath("templates", "studio_only.yml")
-lms_config = Path(__file__).parent.joinpath("templates", "lms_only.yml")
-forum_config = Path(__file__).parent.joinpath("templates", "forum.env")
+common_config = TEMPLATES_DIRECTORY.joinpath("common_values.yml")
+studio_config = TEMPLATES_DIRECTORY.joinpath("studio_only.yml")
+lms_config = TEMPLATES_DIRECTORY.joinpath("lms_only.yml")
+forum_config = TEMPLATES_DIRECTORY.joinpath("forum.env")
 with tempfile.NamedTemporaryFile("wt", delete=False) as studio_template:
     studio_template.write(common_config.read_text())
     studio_template.write(studio_config.read_text())
