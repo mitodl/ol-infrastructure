@@ -6,7 +6,6 @@ import httpx
 from pyinfra.api import deploy
 from pyinfra.operations import files, server, systemd
 
-from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.concourse.models import (
     ConcourseBaseConfig,
     ConcourseWebConfig,
@@ -245,12 +244,6 @@ def register_concourse_service(
         src=Path(__file__).parent.joinpath("templates/concourse.service.j2"),
         dest="/etc/systemd/system/concourse.service",
         concourse_config=concourse_config,
-        state=state,
-        host=host,
-    )
-    service_configuration_watches(
-        service_name="concourse",
-        watched_files=list(concourse_config.configuration_paths()),
         state=state,
         host=host,
     )

@@ -106,7 +106,6 @@ concourse_config_map = {
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
-        container_runtime="containerd",
         containerd_dns_server="8.8.8.8",
         baggageclaim_driver="btrfs",
     ),
@@ -281,3 +280,25 @@ if host.fact.has_systemd:
     )
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
+    watched_concourse_files = [
+        concourse_config.env_file_path,
+    ]
+    if node_type == CONCOURSE_WEB_NODE_TYPE:
+        watched_concourse_files.extend(
+            [
+                concourse_config.authorized_keys_file,
+                concourse_config.session_signing_key_path,
+                concourse_config.tsa_host_key_path,
+            ]
+        )
+    else:
+        watched_concourse_files.extend(
+            [
+                concourse_config.worker_private_key_path,
+                concourse_config.tsa_public_key_path,
+            ]
+        )
+    service_configuration_watches(
+        service_name="concourse",
+        watched_files=watched_concourse_files,
+    )
