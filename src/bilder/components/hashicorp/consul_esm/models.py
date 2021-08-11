@@ -28,6 +28,7 @@ class ConsulExternalServicesMonitor(HashicorpProduct):
     _name: str = "consul-esm"
     version: str = "0.5.0"
     configuration_directory: Path = Path("/etc/consul-esm.d/")
+    systemd_execution_type: str = "notify"
 
     @property
     def systemd_template_context(self):
@@ -35,4 +36,6 @@ class ConsulExternalServicesMonitor(HashicorpProduct):
 
     def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
         for fpath, config in self.configuration.items():  # noqa: WPS526
-            yield fpath, config.json(exclude_none=True, indent=2)
+            yield self.configuration_directory.joinpath(fpath), config.json(
+                exclude_none=True, indent=2
+            )

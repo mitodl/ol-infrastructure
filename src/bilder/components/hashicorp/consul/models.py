@@ -92,7 +92,7 @@ class ConsulConfig(HashicorpConfig):
 
 class Consul(HashicorpProduct):
     _name: str = "consul"
-    version: str = "1.9.4"
+    version: str = "1.10.0"
     configuration: Dict[Path, ConsulConfig] = {Path("00-default.json"): ConsulConfig()}
     configuration_directory: Path = Path("/etc/consul.d/")
     systemd_execution_type: str = "notify"

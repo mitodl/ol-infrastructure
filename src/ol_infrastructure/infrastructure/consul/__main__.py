@@ -1,28 +1,30 @@
+import base64
 import json
-from itertools import chain
 
-from pulumi import Config, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, iam, route53
+import yaml
+from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
 
+from bridge.lib.magic_numbers import (
+    CONSUL_DNS_PORT,
+    CONSUL_HTTP_PORT,
+    CONSUL_LAN_SERF_PORT,
+    CONSUL_RPC_PORT,
+    CONSUL_WAN_SERF_PORT,
+    DEFAULT_HTTPS_PORT,
+)
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
-    build_userdata,
-    debian_10_ami,
     default_egress_args,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
-from ol_infrastructure.providers.salt.minion import (
-    OLSaltStackMinion,
-    OLSaltStackMinionInputs,
-)
 
 stack_info = parse_stack()
 env_config = Config("environment")
 consul_config = Config("consul")
-salt_config = Config("saltstack")
-environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 business_unit = env_config.get("business_unit") or "operations"
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
@@ -30,13 +32,21 @@ destination_vpc = network_stack.require_output(env_config.require("vpc_reference
 peer_vpcs = destination_vpc["peers"].apply(
     lambda peers: {peer: network_stack.require_output(peer) for peer in peers}
 )
-aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
+aws_config = AWSBase(tags={"OU": business_unit, "Environment": env_name})
 destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))
 dns_stack = StackReference("infrastructure.aws.dns")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
+vpc_id = destination_vpc["id"]
+kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
+kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
+
+
+#############
+# IAM Setup #
+#############
 
 consul_instance_role = iam.Role(
-    f"consul-instance-role-{environment_name}",
+    f"consul-instance-role-{env_name}",
     assume_role_policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -52,73 +62,87 @@ consul_instance_role = iam.Role(
 )
 
 iam.RolePolicyAttachment(
-    f"consul-describe-instance-role-policy-{environment_name}",
+    f"consul-describe-instance-role-policy-{env_name}",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
+    role=consul_instance_role.name,
+)
+iam.RolePolicyAttachment(
+    "caddy-route53-records-permission",
+    policy_arn=policy_stack.require_output("iam_policies")["route53_odl_zone_records"],
     role=consul_instance_role.name,
 )
 
 consul_instance_profile = iam.InstanceProfile(
-    f"consul-instance-profile-{environment_name}",
+    f"consul-instance-profile-{env_name}",
     role=consul_instance_role.name,
     path="/ol-operations/consul/profile/",
 )
 
+
+########################
+# Security Group Setup #
+########################
+
+cidr_blocks = [destination_vpc["cidr"]]
+
 consul_server_security_group = ec2.SecurityGroup(
-    f"consul-server-{environment_name}-security-group",
-    name=f"{environment_name}-consul-server",
+    f"consul-server-{env_name}-security-group",
+    name=f"{env_name}-consul-server",
     description="Access control between Consul severs and agents",
-    tags=aws_config.merged_tags({"Name": f"{environment_name}-consul-server"}),
+    tags=aws_config.merged_tags({"Name": f"{env_name}-consul-server"}),
     vpc_id=destination_vpc["id"],
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=[destination_vpc["cidr"]],
+            cidr_blocks=cidr_blocks,
             protocol="tcp",
-            from_port=8500,
-            to_port=8500,
+            from_port=CONSUL_HTTP_PORT,
+            to_port=CONSUL_HTTP_PORT,
             description="HTTP API access",
         ),
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=[destination_vpc["cidr"]],
+            cidr_blocks=cidr_blocks,
             protocol="udp",
-            from_port=8500,
-            to_port=8500,
+            from_port=CONSUL_HTTP_PORT,
+            to_port=CONSUL_HTTP_PORT,
             description="HTTP API access",
         ),
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=[destination_vpc["cidr"]],
+            cidr_blocks=cidr_blocks,
             protocol="tcp",
-            from_port=8600,
-            to_port=8600,
+            from_port=CONSUL_DNS_PORT,
+            to_port=CONSUL_DNS_PORT,
             description="DNS access",
         ),
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=[destination_vpc["cidr"]],
+            cidr_blocks=cidr_blocks,
             protocol="udp",
-            from_port=8600,
-            to_port=8600,
+            from_port=CONSUL_DNS_PORT,
+            to_port=CONSUL_DNS_PORT,
             description="DNS access",
         ),
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=[destination_vpc["cidr"]],
+            cidr_blocks=cidr_blocks,
             protocol="tcp",
-            from_port=8300,
-            to_port=8301,
+            from_port=CONSUL_RPC_PORT,
+            to_port=CONSUL_LAN_SERF_PORT,
             description="LAN gossip protocol",
         ),
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=[destination_vpc["cidr"]],
+            cidr_blocks=cidr_blocks,
             protocol="udp",
-            from_port=8300,
-            to_port=8301,
+            from_port=CONSUL_RPC_PORT,
+            to_port=CONSUL_LAN_SERF_PORT,
             description="LAN gossip protocol",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=peer_vpcs.apply(
-                lambda peer_vpcs: [peer["cidr"] for peer in peer_vpcs.values()]
+                lambda peer_vpcs: [
+                    peer.apply(lambda vpc: vpc["cidr"]) for peer in peer_vpcs.values()
+                ]
             ),
             protocol="tcp",
-            from_port=8300,
-            to_port=8302,
+            from_port=CONSUL_RPC_PORT,
+            to_port=CONSUL_WAN_SERF_PORT,
             description="WAN cross-datacenter communication",
         ),
     ],
@@ -126,25 +150,25 @@ consul_server_security_group = ec2.SecurityGroup(
 )
 
 consul_agent_security_group = ec2.SecurityGroup(
-    f"consul-agent-{environment_name}-security-group",
-    name=f"{environment_name}-consul-agent",
+    f"consul-agent-{env_name}-security-group",
+    name=f"{env_name}-consul-agent",
     description="Access control between Consul agents",
-    tags=aws_config.merged_tags({"Name": f"{environment_name}-consul-agent"}),
-    vpc_id=destination_vpc["id"],
+    tags=aws_config.merged_tags({"Name": f"{env_name}-consul-agent"}),
+    vpc_id=vpc_id,
     ingress=[
         ec2.SecurityGroupIngressArgs(
             security_groups=[consul_server_security_group.id],
             protocol="tcp",
-            from_port=8301,
-            to_port=8301,
+            from_port=CONSUL_LAN_SERF_PORT,
+            to_port=CONSUL_LAN_SERF_PORT,
             self=True,
             description="LAN gossip protocol from servers",
         ),
         ec2.SecurityGroupIngressArgs(
             security_groups=[consul_server_security_group.id],
             protocol="udp",
-            from_port=8301,
-            to_port=8301,
+            from_port=CONSUL_LAN_SERF_PORT,
+            to_port=CONSUL_LAN_SERF_PORT,
             self=True,
             description="LAN gossip protocol from servers",
         ),
@@ -156,86 +180,274 @@ security_groups = {
     "consul_agent": consul_agent_security_group.id,
 }
 
+
+#############
+# ALB Setup #
+#############
+
+# Assumes that there are at least as many subnets as there is consul instances
+consul_capacity = consul_config.get_int("instance_count") or 3
+subnet_ids = destination_vpc["subnet_ids"]
+
+# Create Application LB
+# Could be converted to an EC2 running HAProxy
+consul_elb_tag = f"consul-lb-{env_name}"
+consul_elb = lb.LoadBalancer(
+    "consul-server-load-balancer",
+    name="consul-lb",
+    load_balancer_type="application",
+    ip_address_type="dualstack",
+    enable_http2=True,
+    subnets=subnet_ids,
+    security_groups=[
+        destination_vpc["security_groups"]["default"],
+        destination_vpc["security_groups"]["web"],
+    ],
+    tags=aws_config.merged_tags({"Name": consul_elb_tag}),
+)
+
+TARGET_GROUP_NAME_MAX_LENGTH = 32
+consul_lb_target_group = lb.TargetGroup(
+    "consul-lb-target-group",
+    vpc_id=vpc_id,
+    target_type="instance",
+    port=DEFAULT_HTTPS_PORT,
+    protocol="HTTPS",
+    health_check=lb.TargetGroupHealthCheckArgs(
+        healthy_threshold=3,
+        timeout=3,
+        interval=10,
+        path="/health",
+        port=str(DEFAULT_HTTPS_PORT),
+        protocol="HTTPS",
+    ),
+    name_prefix=f"consul-{env_name}-"[:6],
+    tags=aws_config.tags,
+)
+
+wildcard_arn_cert = acm.get_certificate(
+    domain="*.odl.mit.edu",
+    most_recent=True,
+    statuses=["ISSUED"],
+)
+
+consul_lb_listener = lb.Listener(
+    "consul-lb-listener",
+    certificate_arn=wildcard_arn_cert.arn,
+    load_balancer_arn=consul_elb.arn,
+    port=DEFAULT_HTTPS_PORT,
+    protocol="HTTPS",
+    # more than default listener rule needed?
+    default_actions=[
+        lb.ListenerDefaultActionArgs(
+            type="forward",
+            target_group_arn=consul_lb_target_group.arn,
+        )
+    ],
+    opts=ResourceOptions(delete_before_replace=True),  # Other options needed?
+)
+
+
+##################
+# Route 53 Setup #
+##################
+
+FIFTEEN_MINUTES = 60 * 15
+consul_dns_name = f"consul-{env_name}.odl.mit.edu"
+consul_domain = route53.Record(
+    "consul-server-dns-record",
+    name=consul_dns_name,
+    type="CNAME",
+    ttl=FIFTEEN_MINUTES,
+    records=[consul_elb.dns_name],
+    zone_id=mitodl_zone_id,  # should this be consul_elb.zone_id...?
+)
+
+
+#########################
+# Launch Template Setup #
+#########################
+
+# Find AMI
+aws_account = get_caller_identity()
+consul_ami = ec2.get_ami(
+    filters=[
+        ec2.GetAmiFilterArgs(name="name", values=["consul"]),
+        ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
+    ],
+    most_recent=True,
+    owners=[aws_account.account_id],
+)
+print(consul_ami)
+
+# Select instance type
 instance_type_name = consul_config.get("instance_type") or InstanceTypes.medium.name
 instance_type = InstanceTypes[instance_type_name].value
-consul_instances = []
-export_data = {}
-subnets = destination_vpc["subnet_ids"]
-subnet_id = subnets.apply(chain)
-salt_environment = Config("saltstack").get("environment_name") or environment_name
-instance_range = range(consul_config.get_int("instance_count") or 3)
-for count, subnet in zip(instance_range, subnets):  # type:ignore
-    subnet_object = ec2.get_subnet(id=subnet)
-    # This is only necessary for the operations environment because the 1i AZ is lacking
-    # support for newer instance types. We need to retire that subnet to avoid further
-    # hacks like this one.
 
-    # TODO: redeploy or otherwise migrate instances out of the 1e AZ and delete the
-    # associated subnet. (TMM 2021-05-07)
-    if subnet_object.availability_zone == "us-east-1e":
-        continue
-    instance_name = f"consul-{environment_name}-{count}"
-    salt_minion = OLSaltStackMinion(
-        f"saltstack-minion-{instance_name}",
-        OLSaltStackMinionInputs(minion_id=instance_name),
-    )
+# Auto Join WAN Envs
+# using the VPC ID to denote datacenter
+retry_join_wan = peer_vpcs.apply(
+    lambda vpc_dict: [
+        peer.apply(lambda vpc: f"provider=aws tag_key=consul_vpc tag_value={vpc['id']}")
+        for peer in vpc_dict.values()
+    ]
+)
 
-    cloud_init_userdata = build_userdata(
-        instance_name=instance_name,
-        minion_keys=salt_minion,
-        minion_roles=["consul_server", "service_discovery"],
-        minion_environment=salt_environment,
-        salt_host=f"salt-{stack_info.env_suffix}.private.odl.mit.edu",
-    )
 
-    instance_tags = aws_config.merged_tags(
-        {"Name": instance_name, "consul_env": environment_name}
-    )
-    consul_instance = ec2.Instance(
-        f"consul-instance-{environment_name}-{count}",
-        ami=debian_10_ami.id,
-        user_data=cloud_init_userdata,
-        instance_type=instance_type,
-        iam_instance_profile=consul_instance_profile.id,
-        tags=instance_tags,
-        volume_tags=instance_tags,
-        subnet_id=subnet,
-        key_name=salt_config.require("key_name"),
-        root_block_device=ec2.InstanceRootBlockDeviceArgs(
-            volume_type=DiskTypes.ssd, volume_size=20
-        ),
-        vpc_security_group_ids=[
-            destination_vpc["security_groups"]["default"],
-            destination_vpc["security_groups"]["salt_minion"],
-            destination_vpc["security_groups"]["web"],
-            consul_server_security_group.id,
-        ],
-        opts=ResourceOptions(depends_on=[salt_minion]),
-    )
-    consul_instances.append(consul_instance)
-
-    export_data[instance_name] = {
-        "public_ip": consul_instance.public_ip,
-        "private_ip": consul_instance.private_ip,
-        "ipv6_address": consul_instance.ipv6_addresses,
+# Make cloud-init userdata
+def cloud_init_userdata(
+    consul_vpc_id,
+    consul_env_name,
+    retry_join_wan_array,
+    domain_name,
+    basic_auth_password,
+):
+    cloud_config_contents = {
+        "write_files": [
+            {
+                "path": "/etc/consul.d/99-autojoin.json",
+                "content": json.dumps(
+                    {
+                        "retry_join": [
+                            "provider=aws tag_key=consul_env "
+                            f"tag_value={consul_env_name}"
+                        ],
+                        "datacenter": consul_vpc_id,
+                    }
+                ),
+                "owner": "consul:consul",
+            },
+            {
+                "path": "/etc/consul.d/99-autojoin-wan.json",
+                "content": json.dumps(
+                    {
+                        "retry_join_wan": retry_join_wan_array,
+                    }
+                ),
+                "owner": "consul:consul",
+            },
+            {
+                "path": "/etc/default/caddy",
+                "content": (
+                    f"DOMAIN={domain_name}\n"
+                    f"PULUMI_BASIC_AUTH_PASSWORD={basic_auth_password}\n"
+                ),
+            },
+        ]
     }
 
-fifteen_minutes = 60 * 15
-consul_domain = route53.Record(
-    f"consul-{environment_name}-dns-record",
-    name=f"consul-{salt_environment}.odl.mit.edu",
-    type="A",
-    ttl=fifteen_minutes,
-    records=[consul_server.public_ip for consul_server in consul_instances],
-    zone_id=mitodl_zone_id,
-    opts=ResourceOptions(depends_on=consul_instances),
+    return base64.b64encode(
+        "#cloud-config\n{}".format(
+            yaml.dump(
+                cloud_config_contents,
+                sort_keys=True,
+            )
+        ).encode("utf8")
+    ).decode("utf8")
+
+
+consul_launch_config = ec2.LaunchTemplate(
+    "consul-launch-template",
+    name_prefix=f"consul-{env_name}-",
+    description="Launch template for deploying Consul cluster",
+    block_device_mappings=[
+        ec2.LaunchTemplateBlockDeviceMappingArgs(
+            device_name="/dev/xvda",
+            ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
+                volume_size=consul_config.get_int("storage_disk_capacity")
+                or 100,  # noqa: WPS432, E501
+                volume_type=DiskTypes.ssd,
+                delete_on_termination=True,
+                encrypted=True,
+                kms_key_id=kms_ebs["arn"],
+            ),
+        ),
+    ],
+    iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
+        arn=consul_instance_profile.arn,
+    ),
+    image_id=consul_ami.id,
+    instance_type=instance_type,
+    key_name="oldevops",
+    tags=aws_config.tags,
+    tag_specifications=[
+        ec2.LaunchTemplateTagSpecificationArgs(
+            resource_type="instance",
+            tags=aws_config.merged_tags(
+                {
+                    "Name": f"consul-{env_name}",
+                    "consul_env": env_name,
+                    "consul_vpc": vpc_id,
+                }
+            ),
+        ),
+        ec2.LaunchTemplateTagSpecificationArgs(
+            resource_type="volume",
+            tags=aws_config.merged_tags({"Name": f"consul-{env_name}"}),
+        ),
+    ],
+    user_data=Output.all(
+        vpc_id=vpc_id,
+        retry_join_wan=retry_join_wan,
+        pulumi_password=consul_config.require("basic_auth_password_hash"),
+    ).apply(
+        lambda init_dict: cloud_init_userdata(
+            init_dict["vpc_id"],
+            env_name,
+            init_dict["retry_join_wan"],
+            consul_dns_name,
+            init_dict["pulumi_password"],
+        )
+    ),
+    vpc_security_group_ids=[
+        destination_vpc["security_groups"]["web"],
+        security_groups["consul_server"],
+        security_groups["consul_agent"],
+    ],
 )
 
-export(
-    "security_groups",
-    {
-        "consul_server": consul_server_security_group.id,
-        "consul_agent": consul_agent_security_group.id,
-    },
+
+#########################
+# Autoscale Group Setup #
+#########################
+
+
+consul_asg = autoscaling.Group(
+    f"consul-{env_name}-autoscaling-group",
+    desired_capacity=consul_capacity,
+    max_size=consul_capacity,
+    min_size=consul_capacity,
+    health_check_type="EC2",
+    launch_template=autoscaling.GroupLaunchTemplateArgs(
+        id=consul_launch_config.id,
+        version="$Latest",
+    ),
+    target_group_arns=[consul_lb_target_group.arn],
+    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
+        strategy="Rolling",
+        preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
+            min_healthy_percentage=50  # noqa: WPS432
+        ),
+        triggers=["tag"],
+    ),
+    tags=[
+        autoscaling.GroupTagArgs(
+            key=key_name,
+            value=key_value,
+            propagate_at_launch=True,
+        )
+        for key_name, key_value in aws_config.merged_tags(
+            {"ami_id": consul_ami.id}
+        ).items()
+    ],
+    vpc_zone_identifiers=subnet_ids,
 )
-export("instances", export_data)
+
+#################
+# Stack Exports #
+#################
+
+export("security_groups", security_groups)
+export("consul_lb", {"dns_name": consul_elb.dns_name, "arn": consul_elb.arn})
+export("consul_launch_config", consul_launch_config.id)
+export("consul_asg", consul_asg.id)

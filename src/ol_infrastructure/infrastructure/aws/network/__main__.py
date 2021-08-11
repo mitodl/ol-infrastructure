@@ -151,7 +151,7 @@ data_vpc_exports = vpc_exports(
     data_vpc,
     [
         "applications_vpc",
-        "mitx_online_vpc",
+        "mitxonline_vpc",
         "operations_vpc",
         "residential_mitx_vpc",
         "xpro_vpc",
@@ -297,7 +297,7 @@ operations_vpc_exports = vpc_exports(
     [
         "applications_vpc",
         "data_vpc",
-        "mitx_online_vpc",
+        "mitxonline_vpc",
         "residential_mitx_vpc",
         "xpro_vpc",
     ],

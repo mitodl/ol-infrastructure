@@ -1,0 +1,24 @@
+{
+    storage file_system {
+        root {{ context.data_directory }}
+    }
+    default_sni {$DOMAIN:consul.odl.mit.edu}
+    email odl-devops@mit.edu
+}
+
+{$DOMAIN:consul.odl.mit.edu} {
+    log {
+        format json
+        output file {{ context.log_file }}
+    }
+
+    tls {
+        dns route53
+    }
+
+    basicauth * {
+        pulumi {$PULUMI_BASIC_AUTH_PASSWORD:test}
+    }
+
+    reverse_proxy http://127.0.0.1:8500
+}
