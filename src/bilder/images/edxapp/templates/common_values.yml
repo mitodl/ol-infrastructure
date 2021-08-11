@@ -49,7 +49,7 @@ XQUEUE_INTERFACE:
     django_auth:
         password: {{ .Data.xqueue_edxapp_password }}
         username: edxapp
-    url: https://internal-edx-ida-mitxonline-qa-695536730.us-east-1.elb.amazonaws.com  # MODIFIED
+    url: http://internal-edx-ida-mitxonline-qa-695536730.us-east-1.elb.amazonaws.com  # MODIFIED
 {{ end }}
 
 {{ with secret "secret-mitxonline/edx-forum" }}
