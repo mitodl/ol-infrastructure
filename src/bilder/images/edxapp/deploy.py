@@ -121,6 +121,13 @@ consul_templates = [
     ),
 ]
 if node_type == WEB_NODE_TYPE:
+    files.directory(
+        name="Ensure themes directory is present",
+        path="/edx/app/edxapp/themes/",
+        user="edxapp",
+        group="edxapp",
+        present=True,
+    )
     git.repo(
         name="Load theme repository",
         src="https://github.com/mitodl/mitxonline-theme",
