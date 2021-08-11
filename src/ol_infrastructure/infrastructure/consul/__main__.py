@@ -273,12 +273,12 @@ aws_account = get_caller_identity()
 consul_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["consul"]),
-        ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
     ],
     most_recent=True,
     owners=[aws_account.account_id],
 )
+print(consul_ami)
 
 # Select instance type
 instance_type_name = consul_config.get("instance_type") or InstanceTypes.medium.name

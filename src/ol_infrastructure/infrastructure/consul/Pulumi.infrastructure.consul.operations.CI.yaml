@@ -1,9 +1,8 @@
----
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHjEYf3gV5ZTnviCJcHwGnUuLzld5EuYumgMrRde6bvXUgGK4FkbwDS0ZeDpgkQAh8ItAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMtO+UqtMKyjAfH/c4AgEQgDvm3+MhAJ83i/ME0PIrhvUbmsSQT6Bzj8M34mGAEC0IKaeyB3Mk5BDNgGn66xACm3tr2deydCNPmY8Glg==
 config:
   aws:region: us-east-1
+  consul:basic_auth_password_hash:
+    secure: v1:GpTV7AI0dZUM4y/R:dRP2S2XgrjwbBMgP3n8d3gaDRrpJp6eUOhgoMQft9Fa4t5aGK2SgurGC/3/QRbZPHCttoOJLXDIfAi/4IVFb/a0btr6aYAXa1ifDqw==
   environment:business_unit: operations
   environment:vpc_reference: operations_vpc
-  ol-infrastructure-consul:basic_auth_password_hash:
-    secure: v1:GpTV7AI0dZUM4y/R:dRP2S2XgrjwbBMgP3n8d3gaDRrpJp6eUOhgoMQft9Fa4t5aGK2SgurGC/3/QRbZPHCttoOJLXDIfAi/4IVFb/a0btr6aYAXa1ifDqw==
