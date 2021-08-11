@@ -1673,6 +1673,12 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
         description="Path to a config file to use for the Garden backend. "
         "e.g. 'foo-bar=a,b' for '--foo-bar a --foo-bar b'.",
     )
+    garden_dns_server: Optiona[str] = Field(
+        None,
+        concourse_env_var="CONCOURSE_GARDEN_DNS_SERVER",
+        description="DNS server IP address to use instead of automatically determined "
+        "servers.",
+    )
     garden_enable_dns_proxy: Optional[bool] = Field(
         None,
         concourse_env_var="CONCOURSE_GARDEN_DNS_PROXY_ENABLE",
