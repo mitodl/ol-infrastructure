@@ -15,8 +15,10 @@
     tls {
         dns route53
     }
+
     basicauth * {
         pulumi {$PULUMI_BASIC_AUTH_PASSWORD:test}
     }
+
     reverse_proxy http://127.0.0.1:8500
 }
