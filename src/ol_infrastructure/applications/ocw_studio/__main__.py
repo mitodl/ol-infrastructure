@@ -212,7 +212,7 @@ ocw_studio_mediaconvert_queue = mediaconvert.Queue(
 
 # Configure SNS Topic and Subscription
 ocw_studio_sns_topic = sns.Topic(
-    f"ocw-studio-sns-{stack_info.env_suffix}-topic", tags=aws_config.tags
+    f"ocw-studio-{stack_info.env_suffix}-sns-topic", tags=aws_config.tags
 )
 
 ocw_studio_sns_topic_subscription = sns.TopicSubscription(
@@ -228,20 +228,13 @@ ocw_studio_sns_topic_subscription = sns.TopicSubscription(
 ocw_studio_mediaconvert_cloudwatch_rule = cloudwatch.EventRule(
     "ocw-studio-mediaconvert-cloudwatch-eventrule",
     description="Capture MediaConvert Events for use with OCW Studio",
-    event_pattern="""{
-      "source": [
-        "aws.mediaconvert"
-      ],
-      "detail-type": [
-        "MediaConvert Job State Change"
-      ],
-      "detail": {
-        "status": [
-          "COMPLETE",
-          "ERROR"
-        ]
-      }
-    }""",
+    event_pattern=json.dumps(
+        {
+            "source": ["aws.mediaconvert"],
+            "detail-type": ["MediaConvert Job State Change"],
+            "detail": {"status": ["COMPLETE", "ERROR"]},
+        }
+    ),
 )
 
 ocw_studio_mediaconvert_cloudwatch_target = cloudwatch.EventTarget(
@@ -250,5 +243,10 @@ ocw_studio_mediaconvert_cloudwatch_target = cloudwatch.EventTarget(
     arn=ocw_studio_sns_topic.arn,
 )
 
-
-export("ocw_studio_app", {"rds_host": ocw_studio_db.db_instance.address})
+export(
+    "ocw_studio_app",
+    {
+        "rds_host": ocw_studio_db.db_instance.address,
+        "mediaconvert_queue": ocw_studio_mediaconvert_queue.id,
+    },
+)
