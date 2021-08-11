@@ -253,9 +253,10 @@ consul_lb_listener = lb.Listener(
 ##################
 
 FIFTEEN_MINUTES = 60 * 15
+consul_dns_name = f"consul-{env_name}.odl.mit.edu"
 consul_domain = route53.Record(
     "consul-server-dns-record",
-    name=f"consul-{env_name}.odl.mit.edu",
+    name=consul_dns_name,
     type="CNAME",
     ttl=FIFTEEN_MINUTES,
     records=[consul_elb.dns_name],
@@ -294,7 +295,13 @@ retry_join_wan = peer_vpcs.apply(
 
 
 # Make cloud-init userdata
-def cloud_init_userdata(consul_vpc_id, consul_env_name, retry_join_wan_array):
+def cloud_init_userdata(
+    consul_vpc_id,
+    consul_env_name,
+    retry_join_wan_array,
+    domain_name,
+    basic_auth_password,
+):
     cloud_config_contents = {
         "write_files": [
             {
@@ -318,6 +325,13 @@ def cloud_init_userdata(consul_vpc_id, consul_env_name, retry_join_wan_array):
                     }
                 ),
                 "owner": "consul:consul",
+            },
+            {
+                "path": "/etc/default/caddy",
+                "content": (
+                    f"DOMAIN={domain_name}\n"
+                    f"PULUMI_BASIC_AUTH_PASSWORD={basic_auth_password}\n"
+                ),
             },
         ]
     }
@@ -372,9 +386,17 @@ consul_launch_config = ec2.LaunchTemplate(
             tags=aws_config.merged_tags({"Name": f"consul-{env_name}"}),
         ),
     ],
-    user_data=Output.all(vpc_id=vpc_id, retry_join_wan=retry_join_wan).apply(
+    user_data=Output.all(
+        vpc_id=vpc_id,
+        retry_join_wan=retry_join_wan,
+        pulumi_password=consul_config.require("basic_auth_password_hash"),
+    ).apply(
         lambda init_dict: cloud_init_userdata(
-            init_dict["vpc_id"], env_name, init_dict["retry_join_wan"]
+            init_dict["vpc_id"],
+            env_name,
+            init_dict["retry_join_wan"],
+            consul_dns_name,
+            init_dict["pulumi_password"],
         )
     ),
     vpc_security_group_ids=[
