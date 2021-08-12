@@ -136,7 +136,7 @@ ocw_studio_mediaconvert_role = iam.Role(
             "Statement": {
                 "Effect": "Allow",
                 "Action": "sts:AssumeRole",
-                "Principal": {"Service": "ec2.amazonaws.com"},
+                "Principal": {"Service": "mediaconvert.amazonaws.com"},
             },
         }
     ),
