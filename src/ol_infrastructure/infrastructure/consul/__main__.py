@@ -278,7 +278,6 @@ consul_ami = ec2.get_ami(
     most_recent=True,
     owners=[aws_account.account_id],
 )
-print(consul_ami)
 
 # Select instance type
 instance_type_name = consul_config.get("instance_type") or InstanceTypes.medium.name
@@ -302,6 +301,9 @@ def cloud_init_userdata(
     domain_name,
     basic_auth_password,
 ):
+    b64_password_hash = base64.b64encode(basic_auth_password.encode("utf8")).decode(
+        "utf8"
+    )
     cloud_config_contents = {
         "write_files": [
             {
@@ -330,7 +332,7 @@ def cloud_init_userdata(
                 "path": "/etc/default/caddy",
                 "content": (
                     f"DOMAIN={domain_name}\n"
-                    f"PULUMI_BASIC_AUTH_PASSWORD={basic_auth_password}\n"
+                    f"PULUMI_BASIC_AUTH_PASSWORD={b64_password_hash}\n"
                 ),
             },
         ]
