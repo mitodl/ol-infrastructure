@@ -102,6 +102,21 @@ ocw_studio_iam_policy = iam.Policy(
                     "Action": ["execute-api:Invoke", "execute-api:ManageConnections"],
                     "Resource": "arn:aws:execute-api:*:*:*",
                 },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "mediaconvert:ListQueues",
+                        "mediaconvert:DescribeEndpoints",
+                        "mediaconvert:ListPresets",
+                        "mediaconvert:CreatePreset",
+                        "mediaconvert:DisassociateCertificate",
+                        "mediaconvert:CreateQueue",
+                        "mediaconvert:AssociateCertificate",
+                        "mediaconvert:CreateJob",
+                        "mediaconvert:ListJobTemplates",
+                    ],
+                    "Resource": "*",
+                },
             ],
         },
         stringify=True,
@@ -111,6 +126,29 @@ ocw_studio_iam_policy = iam.Policy(
             }
         },
     ),
+)
+
+ocw_studio_mediaconvert_role = iam.Role(
+    "ocw-studio-mediaconvert-role",
+    assume_role_policy=json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": {
+                "Effect": "Allow",
+                "Action": "sts:AssumeRole",
+                "Principal": {"Service": "ec2.amazonaws.com"},
+            },
+        }
+    ),
+    name=f"ocw-studio-mediaconvert-role-{stack_info.env_suffix}",
+    path="/ol-applications/ocw-studio-role/",
+    tags=aws_config.tags,
+)
+
+iam.RolePolicyAttachment(
+    f"ocw-studio-{stack_info.env_suffix}-mediaconvert-role-policy",
+    policy_arn=ocw_studio_iam_policy.arn,
+    role=ocw_studio_mediaconvert_role.name,
 )
 
 ocw_studio_vault_backend_role = vault.aws.SecretBackendRole(
