@@ -9,7 +9,7 @@ import json
 import pulumi_github as github
 import pulumi_vault as vault
 from pulumi import Config, StackReference, export
-from pulumi_aws import ec2, iam, s3
+from pulumi_aws import cloudwatch, ec2, iam, mediaconvert, s3, sns
 
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -96,6 +96,11 @@ ocw_studio_iam_policy = iam.Policy(
                         f"arn:aws:s3:::{ocw_storage_bucket_name}",
                         f"arn:aws:s3:::{ocw_storage_bucket_name}/*",
                     ],
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": ["execute-api:Invoke", "execute-api:ManageConnections"],
+                    "Resource": "arn:aws:execute-api:*:*:*",
                 },
             ],
         },
@@ -196,4 +201,52 @@ ocw_starter_webhook = github.RepositoryWebhook(
         secret=vault_secrets["github_shared_secret"],
     ),
 )
-export("ocw_studio_app", {"rds_host": ocw_studio_db.db_instance.address})
+
+# Setup AWS MediaConvert Queue
+ocw_studio_mediaconvert_queue = mediaconvert.Queue(
+    "ocw-studio-mediaconvert-queue",
+    description="OCW Studio Queue",
+    name=f"ocw-studio-mediaconvert-queue-{stack_info.env_suffix}",
+    tags=aws_config.tags,
+)
+
+# Configure SNS Topic and Subscription
+ocw_studio_sns_topic = sns.Topic(
+    f"ocw-studio-{stack_info.env_suffix}-sns-topic", tags=aws_config.tags
+)
+
+ocw_studio_sns_topic_subscription = sns.TopicSubscription(
+    "ocw-studio-sns-topic-subscription",
+    endpoint="https://{}/api/transcode-jobs/".format(
+        ocw_studio_config.require("app_domain")
+    ),
+    protocol="https",
+    topic=ocw_studio_sns_topic.arn,
+)
+
+# Configure Cloudwatch EventRule and EventTarget
+ocw_studio_mediaconvert_cloudwatch_rule = cloudwatch.EventRule(
+    "ocw-studio-mediaconvert-cloudwatch-eventrule",
+    description="Capture MediaConvert Events for use with OCW Studio",
+    event_pattern=json.dumps(
+        {
+            "source": ["aws.mediaconvert"],
+            "detail-type": ["MediaConvert Job State Change"],
+            "detail": {"status": ["COMPLETE", "ERROR"]},
+        }
+    ),
+)
+
+ocw_studio_mediaconvert_cloudwatch_target = cloudwatch.EventTarget(
+    "ocw-studio-mediaconvert-cloudwatch-eventtarget",
+    rule=ocw_studio_mediaconvert_cloudwatch_rule.name,
+    arn=ocw_studio_sns_topic.arn,
+)
+
+export(
+    "ocw_studio_app",
+    {
+        "rds_host": ocw_studio_db.db_instance.address,
+        "mediaconvert_queue": ocw_studio_mediaconvert_queue.id,
+    },
+)
