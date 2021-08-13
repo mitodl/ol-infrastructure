@@ -440,7 +440,7 @@ vault_launch_config = ec2.LaunchTemplate(
     user_data=cloud_init_param,
     block_device_mappings=[
         ec2.LaunchTemplateBlockDeviceMappingArgs(
-            device_name="/dev/xvda",
+            device_name=vault_ami.root_device_name,
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
                 volume_size=vault_config.get_int("storage_disk_capacity")
                 or 100,  # noqa: WPS432, E501
@@ -506,7 +506,7 @@ vault_asg = autoscaling.Group(
     ],
 )
 
-route53.Record(
+vault_public_dns = route53.Record(
     "vault-server-dns-record",
     name=vault_config.require("domain"),
     type="CNAME",
@@ -519,7 +519,5 @@ route53.Record(
 #################
 export(
     "vault_server",
-    {
-        "security_group": vault_security_group.id,
-    },
+    {"security_group": vault_security_group.id, "public_dns": vault_public_dns.fqdn},
 )

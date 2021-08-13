@@ -195,7 +195,7 @@ subnet_ids = destination_vpc["subnet_ids"]
 consul_elb_tag = f"consul-lb-{env_name}"
 consul_elb = lb.LoadBalancer(
     "consul-server-load-balancer",
-    name="consul-lb",
+    name=f"consul-{env_name}",
     load_balancer_type="application",
     ip_address_type="dualstack",
     enable_http2=True,

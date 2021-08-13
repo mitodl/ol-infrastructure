@@ -1,5 +1,4 @@
 # TODO: Manage database object creation
-# TODO: Add encryption of EBS volumes
 import base64
 import json
 import textwrap
@@ -13,7 +12,9 @@ from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import (
     acm,
     autoscaling,
+    docdb,
     ec2,
+    elasticsearch,
     get_caller_identity,
     iam,
     lb,
@@ -25,6 +26,7 @@ from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
+    DEFAULT_MONGODB_PORT,
     DEFAULT_MYSQL_PORT,
     DEFAULT_REDIS_PORT,
 )
@@ -48,7 +50,9 @@ from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import mongodb_role_statements, mysql_role_statements
 
 edxapp_config = Config("edxapp")
-
+#############
+# Constants #
+#############
 SSH_ACCESS_KEY_NAME = edxapp_config.get("ssh_key_name") or "oldevops"
 MIN_WEB_NODES_DEFAULT = 3
 MAX_WEB_NODES_DEFAULT = 15
@@ -56,6 +60,9 @@ MIN_WORKER_NODES_DEFAULT = 1
 MAX_WORKER_NODES_DEFAULT = 5
 FIVE_MINUTES = 60 * 5
 
+#####################
+# Stack Information #
+#####################
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
@@ -64,10 +71,12 @@ consul_stack = StackReference(
     f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
 )
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
-kms_s3_key = kms_stack.require_output("kms_s3_data_analytics_key")
-edxapp_vpc = network_stack.require_output(f"{stack_info.env_prefix}_vpc")
-operations_vpc = network_stack.require_output("operations_vpc")
+
+#############
+# Variables #
+#############
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+aws_account = get_caller_identity()
 aws_config = AWSBase(
     tags={
         "OU": edxapp_config.require("business_unit"),
@@ -76,14 +85,10 @@ aws_config = AWSBase(
         "Owner": "platform-engineering",
     }
 )
-
-aws_account = get_caller_identity()
 consul_security_groups = consul_stack.require_output("security_groups")
-edxapp_vpc_id = edxapp_vpc["id"]
-edxapp_zone_id = dns_stack.require_output(
-    "{}_zone_id".format(edxapp_config.require("dns_zone"))
-)
 edxapp_domains = edxapp_config.require_object("domains")
+edxapp_vpc = network_stack.require_output(f"{stack_info.env_prefix}_vpc")
+edxapp_vpc_id = edxapp_vpc["id"]
 edxapp_web_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["edxapp-web-*"]),
@@ -93,7 +98,6 @@ edxapp_web_ami = ec2.get_ami(
     most_recent=True,
     owners=[aws_account.account_id],
 )
-
 edxapp_worker_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["edxapp-worker-*"]),
@@ -103,6 +107,12 @@ edxapp_worker_ami = ec2.get_ami(
     most_recent=True,
     owners=[aws_account.account_id],
 )
+edxapp_zone_id = dns_stack.require_output(
+    "{}_zone_id".format(edxapp_config.require("dns_zone"))
+)
+kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
+kms_s3_key = kms_stack.require_output("kms_s3_data_analytics_key")
+operations_vpc = network_stack.require_output("operations_vpc")
 
 ##############
 # S3 Buckets #
@@ -382,7 +392,6 @@ edxapp_db_consul_node = Node(
     "edxapp-instance-db-node",
     name="edxapp-mysql",
     address=edxapp_db.db_instance.address,
-    datacenter=env_name,
 )
 
 edxapp_db_consul_service = Service(
@@ -406,9 +415,77 @@ edxapp_db_consul_service = Service(
     ],
 )
 
+##############################
+# Elasticsearch Consul Setup #
+##############################
+if elasticsearch_domain_name := edxapp_config.get("elasticsearch_domain_name"):
+    edxapp_es = elasticsearch.get_domain(domain_name=elasticsearch_domain_name)
+    edxapp_es_consul_node = Node(
+        "edxapp-elasticsearch-cluster-node",
+        name="edxapp-elasticsearch",
+        address=edxapp_es.endpoint,
+    )
+
+    edxapp_es_consul_service = Service(
+        "edxapp-elasticsearch-service",
+        node=edxapp_es_consul_node.name,
+        name="elasticsearch",
+        port=DEFAULT_MONGODB_PORT,
+        meta={
+            "external-node": True,
+            "external-probe": True,
+        },
+        checks=[
+            ServiceCheckArgs(
+                check_id="edxapp-elasticsearch",
+                interval="10s",
+                name="edxapp-elasticsearch",
+                timeout="60s",
+                status="passing",
+                tcp=edxapp_es.endpoint,
+            )
+        ],
+    )
+
 #######################
 # MongoDB Vault Setup #
 #######################
+edxapp_mongo_host_name = None
+docdb_params = ""
+if docdb_cluster_id := edxapp_config.get("docdb_cluster_id"):
+    edxapp_mongo_host = docdb.Cluster.get(
+        "edxapp-docdb-cluster",
+        id=docdb_cluster_id,
+    )
+    edxapp_mongo_host_name = edxapp_mongo_host.endpoint
+    docdb_params = "?tls=true&tlsInsecure=true"
+    edxapp_mongo_consul_node = Node(
+        "edxapp-mongodb-cluster-node",
+        name="edxapp-mongodb",
+        address=edxapp_mongo_host.endpoint,
+    )
+
+    edxapp_mongo_consul_service = Service(
+        "edxapp-mongodb-service",
+        node=edxapp_mongo_consul_node.name,
+        name="mongodb-master",
+        port=DEFAULT_MONGODB_PORT,
+        meta={
+            "external-node": True,
+            "external-probe": True,
+        },
+        checks=[
+            ServiceCheckArgs(
+                check_id="edxapp-mongo",
+                interval="10s",
+                name="mongodb-master",
+                timeout="60s",
+                status="passing",
+                tcp=f"{edxapp_mongo_host_name}:{edxapp_mongo_host.port}",
+            )
+        ],
+    )
+
 edxapp_mongo_role_statements = mongodb_role_statements
 edxapp_mongo_role_statements["edxapp"] = {
     "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "edxapp"})),
@@ -422,9 +499,13 @@ edxapp_mongo_role_statements["forum"] = {
 edxapp_mongo_vault_config = OLVaultMongoDatabaseConfig(
     db_name="edxapp",
     mount_point=f"mongodb-{stack_info.env_prefix}",
-    db_admin_username="admin",
+    db_connection=(
+        "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
+        + docdb_params
+    ),
+    db_admin_username=edxapp_config.get("mongo_admin_user") or "admin",
     db_admin_password=edxapp_config.require("mongo_admin_password"),
-    db_host=f"mongodb-master.service.{env_name}.consul",
+    db_host=edxapp_mongo_host_name or f"mongodb-master.service.{env_name}.consul",
     role_statements=edxapp_mongo_role_statements,
 )
 edxapp_mongo_vault_backend = OLVaultDatabaseBackend(edxapp_mongo_vault_config)
@@ -474,7 +555,6 @@ edxapp_redis_consul_node = Node(
     "edxapp-redis-cache-node",
     name="edxapp-redis",
     address=edxapp_redis_cache.address,
-    datacenter=env_name,
 )
 
 edxapp_redis_consul_service = Service(
@@ -791,40 +871,47 @@ edxapp_lms_web_alb_listener_rule = lb.ListenerRule(
 )
 
 # Create auto scale group and launch configs for Edxapp web and worker
-cloud_init_user_data = base64.b64encode(
-    "#cloud-config\n{}".format(
-        yaml.dump(
+def cloud_init_user_data_func(vpc_id, cloud_env_name):
+    cloud_config_content = {
+        "write_files": [
             {
-                "write_files": [
+                "path": "/etc/consul.d/99-autojoin.json",
+                "content": json.dumps(
                     {
-                        "path": "/etc/consul.d/99-autojoin.json",
-                        "content": json.dumps(
-                            {
-                                "retry_join": [
-                                    "provider=aws tag_key=consul_env "
-                                    f"tag_value={env_name}"
-                                ],
-                                "datacenter": env_name,
-                            }
-                        ),
-                        "owner": "consul:consul",
-                    },
-                    {
-                        "path": "/etc/default/vector",
-                        "content": textwrap.dedent(
-                            f"""\
-                        ENVIRONMENT={env_name}
+                        "retry_join": [
+                            "provider=aws tag_key=consul_env "
+                            f"tag_value={cloud_env_name}"
+                        ],
+                        "datacenter": vpc_id,
+                    }
+                ),
+                "owner": "consul:consul",
+            },
+            {
+                "path": "/etc/default/vector",
+                "content": textwrap.dedent(
+                    f"""\
+                        ENVIRONMENT={cloud_env_name}
                         VECTOR_CONFIG_DIR=/etc/vector/
                         """
-                        ),  # noqa: WPS355
-                        "owner": "root:root",
-                    },
-                ]
+                ),  # noqa: WPS355
+                "owner": "root:root",
             },
-            sort_keys=True,
-        )
-    ).encode("utf8")
-).decode("utf8")
+        ]
+    }
+    return base64.b64encode(
+        "#cloud-config\n{}".format(
+            yaml.dump(
+                cloud_config_content,
+                sort_keys=True,
+            )
+        ).encode("utf8")
+    ).decode("utf8")
+
+
+cloud_init_user_data = edxapp_vpc["id"].apply(
+    lambda vpc: cloud_init_user_data_func(vpc, env_name)
+)
 
 web_instance_type = (
     edxapp_config.get("web_instance_type") or InstanceTypes.high_mem_regular.name
@@ -841,6 +928,18 @@ web_launch_config = ec2.LaunchTemplate(
         edxapp_security_group.id,
         edxapp_vpc["security_groups"]["web"],
         consul_security_groups["consul_agent"],
+    ],
+    block_device_mappings=[
+        ec2.LaunchTemplateBlockDeviceMappingArgs(
+            device_name=edxapp_web_ami.root_device_name,
+            ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
+                volume_size=25,  # noqa: WPS432
+                volume_type=DiskTypes.ssd,
+                delete_on_termination=True,
+                encrypted=True,
+                kms_key_id=kms_ebs["arn"],
+            ),
+        ),
     ],
     instance_type=InstanceTypes[web_instance_type].value,
     key_name=SSH_ACCESS_KEY_NAME,
@@ -901,11 +1000,14 @@ worker_launch_config = ec2.LaunchTemplate(
     image_id=edxapp_worker_ami.id,
     block_device_mappings=[
         ec2.LaunchTemplateBlockDeviceMappingArgs(
-            device_name="/dev/xvda",
+            device_name=edxapp_worker_ami.root_device_name,
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
                 volume_size=edxapp_config.get_int("worker_disk_size")
                 or 25,  # noqa: WPS432
                 volume_type=DiskTypes.ssd,
+                delete_on_termination=True,
+                encrypted=True,
+                kms_key_id=kms_ebs["arn"],
             ),
         )
     ],
