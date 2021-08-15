@@ -31,7 +31,7 @@ JWT_AUTH:  # NEEDS ATTENTION
     JWT_AUTH_COOKIE: edx-jwt-cookie
     JWT_AUTH_COOKIE_HEADER_PAYLOAD: edx-jwt-cookie-header-payload
     JWT_AUTH_COOKIE_SIGNATURE: edx-jwt-cookie-signature
-    JWT_ISSUER: 'https://lms-qa.mitxonline.mit.edu/oauth2'
+    JWT_ISSUER: 'https://{{ key "edxapp/lms-domain" }}/oauth2'
     JWT_LOGIN_CLIENT_ID: login-service-client-id
     JWT_LOGIN_SERVICE_USERNAME: login_service_user
     JWT_PRIVATE_SIGNING_JWK: '{{ .Data.private_signing_jwk }}'
@@ -39,7 +39,7 @@ JWT_AUTH:  # NEEDS ATTENTION
     JWT_SECRET_KEY: {{ .Data.django_secret_key }}
     JWT_SIGNING_ALGORITHM: RS512
     JWT_ISSUERS:
-      - ISSUER: https://lms-qa.mitxonline.mit.edu/oauth2
+      - ISSUER: https://{{ key "edxapp/lms-domain" }}/oauth2
         AUDIENCE: mitxonline
         SECRET_KEY: {{ .Data.django_secret_key }}
 XQUEUE_INTERFACE:
@@ -49,7 +49,7 @@ XQUEUE_INTERFACE:
     django_auth:
         password: {{ .Data.xqueue_edxapp_password }}
         username: edxapp
-    url: http://internal-edx-ida-mitxonline-qa-695536730.us-east-1.elb.amazonaws.com  # MODIFIED
+    url: http://xqueue-{{ env "ENVIRONMENT" }}.private.odl.mit.edu  # MODIFIED
 {{ end }}
 
 {{ with secret "secret-mitxonline/edx-forum" }}
@@ -122,11 +122,11 @@ AWS_ACCESS_KEY_ID: "" # MODIFIED - not setting as we will use IAM Instance Profi
 # AWS_QUERYSTRING_AUTH: false
 # AWS_S3_CUSTOM_DOMAIN: SET-ME-PLEASE (ex. bucket-name.s3.amazonaws.com)
 AWS_SECRET_ACCESS_KEY: ""  # MODIFIED - not setting as we will use IAM Instance Profiles
-AWS_SES_CONFIGURATION_SET: edxapp-mitxonline-qa  # ADDED KEY
+AWS_SES_CONFIGURATION_SET: {{ key "edxapp/ses-configuration-set" }}  # ADDED KEY
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
 AWS_SES_REGION_NAME: us-east-1
-AWS_STORAGE_BUCKET_NAME: mitxonline-qa-edxapp-storage  # MODIFIED
-BASE_COOKIE_DOMAIN: .mitxonline.mit.edu # MODIFIED
+AWS_STORAGE_BUCKET_NAME: {{ key "edxapp/s3-storage-bucket" }}  # MODIFIED
+BASE_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
 BLOCKSTORE_API_URL: http://localhost:18250/api/v1
 BLOCKSTORE_PUBLIC_URL_ROOT: http://localhost:18250
 BLOCK_STRUCTURES_SETTINGS:
@@ -136,7 +136,7 @@ BLOCK_STRUCTURES_SETTINGS:
     TASK_MAX_RETRIES: 5
 BRANCH_IO_KEY: ''
 BUGS_EMAIL: odl-devops@mit.edu  # MODIFIED
-BULK_EMAIL_DEFAULT_FROM_EMAIL: no-reply@edxapp-mail-qa.mitxonline.mit.edu  # MODIFIED
+BULK_EMAIL_DEFAULT_FROM_EMAIL: no-reply@{{ key "edxapp/ses-mail-domain" }}  # MODIFIED
 BULK_EMAIL_EMAILS_PER_TASK: 500
 BULK_EMAIL_LOG_SENT_EMAILS: false
 CACHES:  # MODIFIED
@@ -189,7 +189,7 @@ CERTIFICATE_TEMPLATE_LANGUAGES:
     en: English
     es: Español
 CERT_QUEUE: certificates
-CMS_BASE: studio-qa.mitxonline.mit.edu  # MODIFIED
+CMS_BASE: {{ key "edxapp/studio-domain" }}  # MODIFIED
 CODE_JAIL:
     limits:
         CPU: 1
@@ -208,8 +208,8 @@ CORS_ORIGIN_ALLOW_ALL: false
 CORS_ORIGIN_WHITELIST:
   - gradebook-mfe-qa.mitxonline.mit.edu
   - learning-mfe-qa.mitxonline.mit.edu
-  - lms-qa.mitxonline.mit.edu
-  - studio-qa.mitxonline.mit.edu
+  - {{ key "edxapp/lms-domain" }}
+  - {{ key "edxapp/studio-domain" }}
   - mitxonline-rc.mitxonline.mit.edu
 COURSES_WITH_UNSAFE_CODE: []
 COURSE_ABOUT_VISIBILITY_PERMISSION: see_exists
@@ -219,12 +219,12 @@ COURSE_CATALOG_VISIBILITY_PERMISSION: see_exists
 CREDENTIALS_INTERNAL_SERVICE_URL: http://localhost:8005
 CREDENTIALS_PUBLIC_SERVICE_URL: http://localhost:8005
 CREDIT_PROVIDER_SECRET_KEYS: {}
-CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: .mitxonline.mit.edu  # MODIFIED
-CROSS_DOMAIN_CSRF_COOKIE_NAME: edxapp-mitxonline-qa-csrftoken  # MODIFIED
+CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }}  # MODIFIED
+CROSS_DOMAIN_CSRF_COOKIE_NAME: edxapp-{{ env "ENVIRONMENT" }}-csrftoken  # MODIFIED
 CSRF_COOKIE_SECURE: true  # MODIFIED
 CSRF_TRUSTED_ORIGINS:  # MODIFIED
   - learning-mfe-qa.mitxonline.mit.edu
-  - lms-qa.mitxonline.mit.edu
+  - {{ key "edxapp/lms-domain" }}
 DASHBOARD_COURSE_LIMIT: null
 DATA_DIR: /edx/var/edxapp  # Filesystem path where edx puts files for course export/import
 DEFAULT_COURSE_VISIBILITY_IN_CATALOG: both
@@ -316,14 +316,14 @@ FEATURES:
     ENABLE_SPECIAL_EXAMS: false
     ENABLE_THIRD_PARTY_AUTH: true
     ENABLE_VIDEO_UPLOAD_PIPELINE: true # MODIFIED
-    PREVIEW_LMS_BASE: preview-qa.mitxonline.mit.edu  # MODIFIED
+    PREVIEW_LMS_BASE: {{ key "edxapp/preview-domain" }}  # MODIFIED
     SHOW_FOOTER_LANGUAGE_SELECTOR: false
     SHOW_HEADER_LANGUAGE_SELECTOR: false
     ALLOW_PUBLIC_ACCOUNT_CREATION: true
 FEEDBACK_SUBMISSION_EMAIL: ''
 FERNET_KEYS:
 - DUMMY KEY CHANGE BEFORE GOING TO PRODUCTION
-FILE_UPLOAD_STORAGE_BUCKET_NAME: mitxonline-qa-edxapp-storage
+FILE_UPLOAD_STORAGE_BUCKET_NAME: {{ key "edxapp/s3-storage-bucket" }}
 FILE_UPLOAD_STORAGE_PREFIX: submissions_attachments
 FINANCIAL_REPORTS:
     BUCKET: null
@@ -333,7 +333,7 @@ FOOTER_ORGANIZATION_IMAGE: images/logo.png
 GITHUB_REPO_ROOT: /edx/var/edxapp/data
 GOOGLE_ANALYTICS_ACCOUNT: G-1EW36DF67W
 GRADES_DOWNLOAD:
-    BUCKET: mitxonline-qa-edxapp-grades  # MODIFIED
+    BUCKET: {{ key "edxapp/s3-grades-bucket" }}  # MODIFIED
     ROOT_PATH: grades  # MODIFIED
     STORAGE_CLASS: django.core.files.storage.S3Storage  # MODIFIED
     STORAGE_KWARGS:
@@ -357,14 +357,14 @@ JWT_EXPIRATION: 30
 LANGUAGE_CODE: en
 LANGUAGE_COOKIE: openedx-language-preference
 LEARNER_PORTAL_URL_ROOT: https://learner-portal-localhost:18000
-LMS_BASE: lms-qa.mitxonline.mit.edu  # MODIFIED
-LMS_INTERNAL_ROOT_URL: https://lms-qa.mitxonline.mit.edu  # MODIFIED
-LMS_ROOT_URL: https://lms-qa.mitxonline.mit.edu  # MODIFIED
+LMS_BASE: {{ key "edxapp/lms-domain" }}  # MODIFIED
+LMS_INTERNAL_ROOT_URL: https://{{ key "edxapp/lms-domain" }}  # MODIFIED
+LMS_ROOT_URL: https://{{ key "edxapp/lms-domain" }}  # MODIFIED
 LOCAL_LOGLEVEL: INFO
 LOGGING_ENV: sandbox
 LOGIN_REDIRECT_WHITELIST:  # MODIFIED
-  - studio-qa.mitxonline.mit.edu
-  - lms-qa.mitxonline.mit.edu
+  - {{ key "edxapp/studio-domain" }}
+  - {{ key "edxapp/lms-domain" }}
   - learning-mfe-qa.mitxonline.mit.edu
 LOG_DIR: /edx/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
@@ -445,7 +445,7 @@ RETIREMENT_STATES:
 - COMPLETE
 SEGMENT_KEY: null
 SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
-SESSION_COOKIE_DOMAIN: .mitxonline.mit.edu # MODIFIED
+SESSION_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
 SESSION_COOKIE_NAME: edxapp-sessionid  # MODIFIED
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
@@ -498,7 +498,7 @@ VIDEO_IMAGE_SETTINGS:
     STORAGE_KWARGS:
         base_url: /media/
         location: media/  # MODIFIED
-        bucket: mitxonline-qa-edxapp-storage # MODIFIED
+        bucket: {{ key "edxapp/s3-storage-bucket" }} # MODIFIED
     VIDEO_IMAGE_MAX_BYTES: 2097152
     VIDEO_IMAGE_MIN_BYTES: 2048
 VIDEO_TRANSCRIPTS_MAX_AGE: 31536000
@@ -507,7 +507,7 @@ VIDEO_TRANSCRIPTS_SETTINGS:
     STORAGE_KWARGS:
         base_url: /media/
         location: media/  # MODIFIED
-        bucket: mitxonline-qa-edxapp-storage # MODIFIED
+        bucket: {{ key "edxapp/s3-storage-bucket" }} # MODIFIED
     VIDEO_TRANSCRIPTS_MAX_BYTES: 3145728
 VIDEO_UPLOAD_PIPELINE:
     BUCKET: ''

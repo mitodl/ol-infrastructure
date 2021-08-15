@@ -47,11 +47,14 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 vault_config = Config("vault")
 stack_info = parse_stack()
 target_network = vault_config.require("target_vpc")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
+ca_stack = StackReference("infrastructure.aws.private_ca")
+consul_stack = StackReference(
+    f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
+)
 dns_stack = StackReference("infrastructure.aws.dns")
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
-ca_stack = StackReference("infrastructure.aws.private_ca")
+network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+policy_stack = StackReference("infrastructure.aws.policies")
 
 ##################
 # Variable Setup #
@@ -345,7 +348,7 @@ def cloud_init_user_data(
                             "provider=aws tag_key=consul_env "
                             f"tag_value={consul_env_name}"
                         ],
-                        "datacenter": vpc_id,
+                        "datacenter": consul_env_name,
                     }
                 ),
                 "owner": "consul:consul",
@@ -454,6 +457,7 @@ vault_launch_config = ec2.LaunchTemplate(
     vpc_security_group_ids=[
         vault_security_group.id,
         target_vpc["security_groups"]["web"],
+        consul_stack.require_output("security_groups")["consul_agent"],
     ],
     instance_type=InstanceTypes[vault_instance_type].value,
     key_name="oldevops",

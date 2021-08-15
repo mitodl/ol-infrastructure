@@ -6,6 +6,7 @@ from functools import partial
 from pathlib import Path
 from string import Template
 
+import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, ResourceOptions, StackReference, export
@@ -87,6 +88,7 @@ aws_config = AWSBase(
 )
 consul_security_groups = consul_stack.require_output("security_groups")
 edxapp_domains = edxapp_config.require_object("domains")
+edxapp_mail_domain = edxapp_config.require("mail_domain")
 edxapp_vpc = network_stack.require_output(f"{stack_info.env_prefix}_vpc")
 edxapp_vpc_id = edxapp_vpc["id"]
 edxapp_web_ami = ec2.get_ami(
@@ -107,9 +109,8 @@ edxapp_worker_ami = ec2.get_ami(
     most_recent=True,
     owners=[aws_account.account_id],
 )
-edxapp_zone_id = dns_stack.require_output(
-    "{}_zone_id".format(edxapp_config.require("dns_zone"))
-)
+edxapp_zone = dns_stack.require_output(edxapp_config.require("dns_zone"))
+edxapp_zone_id = edxapp_zone["id"]
 kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 kms_s3_key = kms_stack.require_output("kms_s3_data_analytics_key")
 operations_vpc = network_stack.require_output("operations_vpc")
@@ -189,6 +190,27 @@ s3.BucketPublicAccessBlock(
     bucket=edxapp_tracking_bucket.bucket,
     block_public_acls=True,
     block_public_policy=True,
+)
+
+######################
+# Manage Consul Data #
+######################
+consul_kv_data = {
+    "s3-storage-bucket": storage_bucket_name,
+    "s3-grades-bucket": grades_bucket_name,
+    "s3-course-bucket": course_bucket_name,
+    "lms-domain": edxapp_domains["lms"],
+    "studio-domain": edxapp_domains["studio"],
+    "preview-domain": edxapp_domains["preview"],
+    "cookie-domain": f".{edxapp_zone['domain']}",
+    "ses-mail-domain": edxapp_mail_domain,
+}
+consul.Keys(
+    "edxapp-consul-template-data",
+    keys=[
+        consul.KeysKeyArgs(path=f"edxapp/{key}", value=data)
+        for key, data in consul_kv_data.items()
+    ],
 )
 
 ########################
@@ -582,7 +604,6 @@ edxapp_redis_consul_service = Service(
 # Create SES Service For edxapp Emails #
 ########################################
 
-edxapp_mail_domain = edxapp_config.require("mail_domain")
 edxapp_ses_domain_identity = ses.DomainIdentity(
     "edxapp-ses-domain-identity",
     domain=edxapp_mail_domain,
@@ -870,8 +891,9 @@ edxapp_lms_web_alb_listener_rule = lb.ListenerRule(
     tags=aws_config.tags,
 )
 
+
 # Create auto scale group and launch configs for Edxapp web and worker
-def cloud_init_user_data_func(vpc_id, cloud_env_name):
+def cloud_init_user_data_func(consul_env_name):
     cloud_config_content = {
         "write_files": [
             {
@@ -880,9 +902,9 @@ def cloud_init_user_data_func(vpc_id, cloud_env_name):
                     {
                         "retry_join": [
                             "provider=aws tag_key=consul_env "
-                            f"tag_value={cloud_env_name}"
+                            f"tag_value={consul_env_name}"
                         ],
-                        "datacenter": vpc_id,
+                        "datacenter": consul_env_name,
                     }
                 ),
                 "owner": "consul:consul",
@@ -891,7 +913,7 @@ def cloud_init_user_data_func(vpc_id, cloud_env_name):
                 "path": "/etc/default/vector",
                 "content": textwrap.dedent(
                     f"""\
-                        ENVIRONMENT={cloud_env_name}
+                        ENVIRONMENT={consul_env_name}
                         VECTOR_CONFIG_DIR=/etc/vector/
                         """
                 ),  # noqa: WPS355
@@ -909,8 +931,8 @@ def cloud_init_user_data_func(vpc_id, cloud_env_name):
     ).decode("utf8")
 
 
-cloud_init_user_data = edxapp_vpc["id"].apply(
-    lambda vpc: cloud_init_user_data_func(vpc, env_name)
+cloud_init_user_data = consul_stack.require_output("datacenter").apply(
+    cloud_init_user_data_func
 )
 
 web_instance_type = (
