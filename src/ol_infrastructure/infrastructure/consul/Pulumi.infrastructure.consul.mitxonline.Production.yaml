@@ -7,3 +7,4 @@ config:
     secure: v1:rtrYfHGFRTYWQGq+:ySWa1bDC4rLMCm9UobelUZKMZR/CCGfLgnGBRhxLsixavaLQ6Lwamp0Zd9thiJOOMTYGbfqQaF+dXGzdBZ+LSWLCl9Rz6ogZFYIGaQ==
   environment:business_unit: mitxonline
   environment:vpc_reference: mitxonline_vpc
+  consul:instance_count: 5
