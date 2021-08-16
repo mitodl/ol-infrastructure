@@ -201,7 +201,7 @@ class ConsulServiceRegistration(FlexibleBaseModel):
     scheme: Optional[str] = "http"
     service: Optional[str] = "vault"
     service_tags: Optional[List[str]]
-    service_address: Optional[str]
+    service_address: Optional[str] = ""
     token: Optional[str]  # Consul ACL token to authorize setting the service definition
     tls_ca_file: Optional[Path]
     tls_cert_file: Optional[Path]

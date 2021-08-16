@@ -20,7 +20,6 @@ vault_operations_query = PreparedQuery(
             "operations-ci",
             "operations-qa",
             "operations",
-            operations_vpc["id"],
         ]
     ),
 )
@@ -35,7 +34,6 @@ operations_log_service_query = PreparedQuery(
             "operations-ci",
             "operations-qa",
             "operations",
-            operations_vpc["id"],
         ]
     ),
     template=PreparedQueryTemplateArgs(

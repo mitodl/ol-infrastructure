@@ -202,8 +202,9 @@ consul_kv_data = {
     "lms-domain": edxapp_domains["lms"],
     "studio-domain": edxapp_domains["studio"],
     "preview-domain": edxapp_domains["preview"],
-    "cookie-domain": f".{edxapp_zone['domain']}",
+    "cookie-domain": edxapp_zone["domain"].apply(".{}".format),
     "ses-mail-domain": edxapp_mail_domain,
+    "ses-configuration-set": f"edxapp-{env_name}",
 }
 consul.Keys(
     "edxapp-consul-template-data",
@@ -377,6 +378,7 @@ edxapp_mysql_role_statements = mysql_role_statements.copy()
 edxapp_mysql_role_statements.pop("app")
 edxapp_mysql_role_statements["edxapp"] = {
     "create": Template(
+        "CREATE DATABASE IF NOT EXISTS edxapp;"
         "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
         "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
         "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp.* TO '{{name}}'@'%';"
@@ -385,6 +387,7 @@ edxapp_mysql_role_statements["edxapp"] = {
 }
 edxapp_mysql_role_statements["edxapp-csmh"] = {
     "create": Template(
+        "CREATE DATABASE IF NOT EXISTS edxapp_csmh;"
         "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
         "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
         "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh.* TO '{{name}}'@'%';"
@@ -393,6 +396,7 @@ edxapp_mysql_role_statements["edxapp-csmh"] = {
 }
 edxapp_mysql_role_statements["xqueue"] = {
     "create": Template(
+        "CREATE DATABASE IF NOT EXISTS xqueue;"
         "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
         "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
         "CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue.* TO '{{name}}'@'%';"
@@ -452,7 +456,7 @@ if elasticsearch_domain_name := edxapp_config.get("elasticsearch_domain_name"):
         "edxapp-elasticsearch-service",
         node=edxapp_es_consul_node.name,
         name="elasticsearch",
-        port=DEFAULT_MONGODB_PORT,
+        port=9200,
         meta={
             "external-node": True,
             "external-probe": True,
@@ -510,11 +514,15 @@ if docdb_cluster_id := edxapp_config.get("docdb_cluster_id"):
 
 edxapp_mongo_role_statements = mongodb_role_statements
 edxapp_mongo_role_statements["edxapp"] = {
-    "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "edxapp"})),
+    "create": Template(
+        json.dumps({"roles": [{"role": "readWrite", "db": "admin"}], "db": "edxapp"})
+    ),
     "revoke": Template(json.dumps({"db": "edxapp"})),
 }
 edxapp_mongo_role_statements["forum"] = {
-    "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "forum"})),
+    "create": Template(
+        json.dumps({"roles": [{"role": "readWrite", "db": "admin"}], "db": "forum"})
+    ),
     "revoke": Template(json.dumps({"db": "forum"})),
 }
 
@@ -918,6 +926,10 @@ def cloud_init_user_data_func(consul_env_name):
                         """
                 ),  # noqa: WPS355
                 "owner": "root:root",
+            },
+            {
+                "path": "/etc/default/consul-template",
+                "content": f"ENVIRONMENT={consul_env_name}",
             },
         ]
     }

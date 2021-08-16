@@ -6,6 +6,8 @@ mongodb_settings: &mongo_params
   replicaset: rs0
   user: {{ .Data.username }}
   password: {{ .Data.password }}
+  tls: true
+  tlsInsecure: true
 {{ end }}
 
 {{ with secret "mariadb-mitxonline/creds/edxapp" }}
@@ -87,7 +89,6 @@ DOC_STORE_CONFIG: &docstore_config
   collection: modulestore
   connectTimeoutMS: 2000
   socketTimeoutMS: 3000
-  ssl: false
   <<: *mongo_params
 
 CONTENTSTORE:
@@ -98,12 +99,10 @@ CONTENTSTORE:
         connectTimeoutMS: 2000
         replicaSet: rs0
         socketTimeoutMS: 3000
-        ssl: false
         <<: *mongo_params
     ENGINE: xmodule.contentstore.mongo.MongoContentStore
     OPTIONS:
         auth_source: ''
-        ssl: false
         <<: *mongo_params
 
 ACTIVATION_EMAIL_SUPPORT_LINK: ''

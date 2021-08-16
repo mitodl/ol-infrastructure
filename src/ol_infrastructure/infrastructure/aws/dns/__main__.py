@@ -47,5 +47,4 @@ mitxonline_dns_zone = route53.Zone(
 export("mitxpro_legacy_zone_id", mitxpro_legacy_dns_zone.id)
 export("odl_zone_id", odl_dns_zone.id)
 export("mitx_zone_id", mitx_dns_zone.id)
-export("mitxonline_zone_id", mitxonline_dns_zone.id)
 export("mitxonline", {"id": mitxonline_dns_zone.id, "domain": mitxonline_dns_zone.name})
