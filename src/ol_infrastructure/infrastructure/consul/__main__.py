@@ -273,7 +273,7 @@ consul_domain = route53.Record(
 aws_account = get_caller_identity()
 consul_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["consul"]),
+        ec2.GetAmiFilterArgs(name="name", values=["consul-server-*"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
     ],
     most_recent=True,
