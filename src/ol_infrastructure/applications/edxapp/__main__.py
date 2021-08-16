@@ -1,4 +1,11 @@
-# TODO: Manage database object creation
+"""Provision and deploy the resources needed for an edxapp installation
+- Create S3 buckets required by edxapp
+- Create IAM role to allow access to AWS resources from edxapp instances
+- Create MariaDB instance in RDS
+- Create Redis cluster in Elasticache for use as a Django cache and Celery queue
+- Create ALB with listeners for routing to deployed edxapp instances
+- Create autoscale groups for web and worker instances
+"""
 import base64
 import json
 import textwrap
