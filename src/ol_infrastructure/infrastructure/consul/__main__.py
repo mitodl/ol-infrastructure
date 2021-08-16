@@ -12,6 +12,7 @@ from bridge.lib.magic_numbers import (
     CONSUL_RPC_PORT,
     CONSUL_WAN_SERF_PORT,
     DEFAULT_HTTPS_PORT,
+    FIVE_MINUTES,
 )
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
@@ -428,7 +429,8 @@ consul_asg = autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50  # noqa: WPS432
+            min_healthy_percentage=85,  # noqa: WPS432
+            instance_warmup=FIVE_MINUTES,
         ),
         triggers=["tag"],
     ),

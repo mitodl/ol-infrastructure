@@ -429,7 +429,7 @@ cloud_init_param = Output.all(
 vault_instance_type = (
     vault_config.get("instance_type") or InstanceTypes.general_purpose_large.name
 )
-worker_launch_config = ec2.LaunchTemplate(
+vault_launch_config = ec2.LaunchTemplate(
     "vault-server-launch-template",
     name_prefix=f"vault-{env_name}-",
     description="Launch template for deploying Vault server nodes",
@@ -483,12 +483,13 @@ vault_asg = autoscaling.Group(
     health_check_type="EC2",
     vpc_zone_identifiers=target_vpc["subnet_ids"],
     launch_template=autoscaling.GroupLaunchTemplateArgs(
-        id=worker_launch_config.id, version="$Latest"
+        id=vault_launch_config.id, version="$Latest"
     ),
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=75  # noqa: WPS432
+            min_healthy_percentage=90,  # noqa: WPS432
+            instance_warmup=FIVE_MINUTES,
         ),
         triggers=["tag"],
     ),
