@@ -1,3 +1,4 @@
+from pulumi import StackReference
 from pulumi_consul import (
     PreparedQuery,
     PreparedQueryFailoverArgs,
@@ -7,14 +8,19 @@ from pulumi_consul import (
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 stack_info = parse_stack()
-
+network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+operations_vpc = network_stack.require_output("operations_vpc")
 vault_operations_query = PreparedQuery(
     "vault-active-server-prepared-query",
     name="vault",
     service="vault",
     tags=["active"],
     failover=PreparedQueryFailoverArgs(
-        datacenters=["operations-ci", "operations-qa", "operations"]
+        datacenters=[
+            "operations-ci",
+            "operations-qa",
+            "operations",
+        ]
     ),
 )
 
@@ -24,7 +30,11 @@ operations_log_service_query = PreparedQuery(
     service="${match(2)}",
     tags=["logging"],
     failover=PreparedQueryFailoverArgs(
-        datacenters=["operations-ci", "operations-qa", "operations"]
+        datacenters=[
+            "operations-ci",
+            "operations-qa",
+            "operations",
+        ]
     ),
     template=PreparedQueryTemplateArgs(
         regexp="^(operations|logging)-(.*?)$", type="name_prefix_match"

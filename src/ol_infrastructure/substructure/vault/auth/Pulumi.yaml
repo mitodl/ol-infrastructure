@@ -1,0 +1,7 @@
+---
+name: ol-infrastructure-substructure-vault-auth
+runtime: python
+description: Mount and configure authentication backends to use for connecting to
+  Vault
+backend:
+  url: s3://mitol-pulumi-state/

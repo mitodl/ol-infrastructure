@@ -47,11 +47,14 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 vault_config = Config("vault")
 stack_info = parse_stack()
 target_network = vault_config.require("target_vpc")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-policy_stack = StackReference("infrastructure.aws.policies")
+ca_stack = StackReference("infrastructure.aws.private_ca")
+consul_stack = StackReference(
+    f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
+)
 dns_stack = StackReference("infrastructure.aws.dns")
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
-ca_stack = StackReference("infrastructure.aws.private_ca")
+network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+policy_stack = StackReference("infrastructure.aws.policies")
 
 ##################
 # Variable Setup #
@@ -345,7 +348,7 @@ def cloud_init_user_data(
                             "provider=aws tag_key=consul_env "
                             f"tag_value={consul_env_name}"
                         ],
-                        "datacenter": vpc_id,
+                        "datacenter": consul_env_name,
                     }
                 ),
                 "owner": "consul:consul",
@@ -440,7 +443,7 @@ vault_launch_config = ec2.LaunchTemplate(
     user_data=cloud_init_param,
     block_device_mappings=[
         ec2.LaunchTemplateBlockDeviceMappingArgs(
-            device_name="/dev/xvda",
+            device_name=vault_ami.root_device_name,
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
                 volume_size=vault_config.get_int("storage_disk_capacity")
                 or 100,  # noqa: WPS432, E501
@@ -454,6 +457,7 @@ vault_launch_config = ec2.LaunchTemplate(
     vpc_security_group_ids=[
         vault_security_group.id,
         target_vpc["security_groups"]["web"],
+        consul_stack.require_output("security_groups")["consul_agent"],
     ],
     instance_type=InstanceTypes[vault_instance_type].value,
     key_name="oldevops",
@@ -506,7 +510,7 @@ vault_asg = autoscaling.Group(
     ],
 )
 
-route53.Record(
+vault_public_dns = route53.Record(
     "vault-server-dns-record",
     name=vault_config.require("domain"),
     type="CNAME",
@@ -519,7 +523,5 @@ route53.Record(
 #################
 export(
     "vault_server",
-    {
-        "security_group": vault_security_group.id,
-    },
+    {"security_group": vault_security_group.id, "public_dns": vault_public_dns.fqdn},
 )

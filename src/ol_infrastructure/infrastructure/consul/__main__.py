@@ -195,7 +195,7 @@ subnet_ids = destination_vpc["subnet_ids"]
 consul_elb_tag = f"consul-lb-{env_name}"
 consul_elb = lb.LoadBalancer(
     "consul-server-load-balancer",
-    name="consul-lb",
+    name=f"consul-{env_name}",
     load_balancer_type="application",
     ip_address_type="dualstack",
     enable_http2=True,
@@ -315,7 +315,7 @@ def cloud_init_userdata(
                             "provider=aws tag_key=consul_env "
                             f"tag_value={consul_env_name}"
                         ],
-                        "datacenter": consul_vpc_id,
+                        "datacenter": consul_env_name,
                     }
                 ),
                 "owner": "consul:consul",
@@ -455,3 +455,4 @@ export("security_groups", security_groups)
 export("consul_lb", {"dns_name": consul_elb.dns_name, "arn": consul_elb.arn})
 export("consul_launch_config", consul_launch_config.id)
 export("consul_asg", consul_asg.id)
+export("datacenter", env_name)

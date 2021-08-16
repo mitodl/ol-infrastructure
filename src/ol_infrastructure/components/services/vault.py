@@ -10,7 +10,7 @@ This includes:
 import json
 from enum import Enum
 from string import Template
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_vault import Mount, aws, database, pkisecret
@@ -63,6 +63,7 @@ class OLVaultDatabaseConfig(BaseModel):
     db_host: Union[str, Output[str]]
     max_ttl: int = SIX_MONTHS
     default_ttl: int = SIX_MONTHS
+    connection_options: Optional[Dict[str, str]]
 
     class Config:  # noqa: WPS431, D106
         arbitrary_types_allowed = True
@@ -148,6 +149,9 @@ class OLVaultDatabaseBackend(ComponentResource):
                     "db_host": db_config.db_host,
                 }
             )
+
+        db_option_dict = {"connection_url": connection_url}
+        db_option_dict.update(db_config.connection_options or {})
         self.db_connection = database.SecretBackendConnection(
             f"{db_config.db_name}-database-connection",
             opts=resource_opts.merge(
@@ -161,7 +165,7 @@ class OLVaultDatabaseBackend(ComponentResource):
                 "username": db_config.db_admin_username,
                 "password": db_config.db_admin_password,
             },
-            **{db_config.db_type: {"connection_url": connection_url}},
+            **{db_config.db_type: db_option_dict},
         )
 
         self.db_roles = {}
