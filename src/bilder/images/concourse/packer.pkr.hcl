@@ -32,7 +32,7 @@ source "amazon-ebs" "concourse" {
   # Base all builds off of the most recent Debian 10 image built by the Debian organization.
   source_ami_filter {
     filters = {
-      name                = "debian-10-amd64*"
+      name                = "debian-11-amd64*"
       root-device-type    = "ebs"
       virtualization-type = "hvm"
     }
