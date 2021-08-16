@@ -1,6 +1,6 @@
 locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
-  business_unit = "mitx-online"
+  business_unit = "operations"
   app_name = "consul"
 }
 
@@ -11,15 +11,13 @@ variable "CONSUL_VERSION" {
 
 variable "build_environment" {
   type = string
-  default = "mitxonline-qa"
+  default = "operations-ci"
 }
 
 source "amazon-ebs" "consul" {
   ami_description         = "Deployment image for Consul server generated at ${local.timestamp}"
-  ami_name                = "consul"
+  ami_name                = "consul-server-${local.timestamp}"
   ami_virtualization_type = "hvm"
-  force_deregister        = true
-  force_delete_snapshot   = true
   instance_type           = "t3a.medium"
   run_volume_tags = {
     OU      = "${local.business_unit}"
