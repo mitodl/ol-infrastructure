@@ -521,15 +521,11 @@ if docdb_cluster_id := edxapp_config.get("docdb_cluster_id"):
 
 edxapp_mongo_role_statements = mongodb_role_statements
 edxapp_mongo_role_statements["edxapp"] = {
-    "create": Template(
-        json.dumps({"roles": [{"role": "readWrite", "db": "admin"}], "db": "edxapp"})
-    ),
+    "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "edxapp"})),
     "revoke": Template(json.dumps({"db": "edxapp"})),
 }
 edxapp_mongo_role_statements["forum"] = {
-    "create": Template(
-        json.dumps({"roles": [{"role": "readWrite", "db": "admin"}], "db": "forum"})
-    ),
+    "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "forum"})),
     "revoke": Template(json.dumps({"db": "forum"})),
 }
 

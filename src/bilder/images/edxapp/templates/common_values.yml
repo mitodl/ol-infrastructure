@@ -6,8 +6,6 @@ mongodb_settings: &mongo_params
   replicaset: rs0
   user: {{ .Data.username }}
   password: {{ .Data.password }}
-  tls: true
-  tlsInsecure: true
 {{ end }}
 
 {{ with secret "mariadb-mitxonline/creds/edxapp" }}

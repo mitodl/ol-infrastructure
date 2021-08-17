@@ -4,7 +4,7 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-mitxonline-qa.odl.mit.edu
   consul:http_auth:
-    secure: v1:OjRqlx4I3+NuMJP8:hBZpsqZHse7eFUtknsfxaCybrD+Gg7Qnvv4+Dccfgx4+jwrgLPACFSBkfxJrdBWM8edRS5honQ==
+    secure: v1:Fa4X7VjchQQhRf6+:LxDvDXBPZUPOgMpcqvo9PxwjMK2lDKrnmJGbaJA7e0i5sVsUyQXTLYpa7lDmC5d1QddyLLkjyQjK5Hi/fEeoJle5986uRKVHXNyjRpcJqx8sN2SbFPHrCDpWQfrsz38=
   consul:scheme: https
   edxapp:business_unit: mitxonline
   edxapp:db_password:
