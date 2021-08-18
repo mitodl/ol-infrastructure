@@ -136,7 +136,7 @@ mitxonline_db_security_group = ec2.SecurityGroup(
         )
     ],
     tags=aws_config.merged_tags(
-        {"name": "mitxonline-db-access-applications-{stack_info.env_suffix}"}
+        {"Name": "mitxonline-db-access-applications-{stack_info.env_suffix}"}
     ),
     vpc_id=mitxonline_vpc["id"],
 )
@@ -155,7 +155,7 @@ mitxonline_db = OLAmazonDB(mitxonline_db_config)
 
 mitxonline_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=mitxonline_db_config.db_name,
-    mount_point=f"{mitxonline_db_config.engine}-mitxonline-{stack_info.env_suffix}",  # noqa: E501
+    mount_point=f"{mitxonline_db_config.engine}-mitxonline",
     db_admin_username=mitxonline_db_config.username,
     db_admin_password=mitxonline_db_config.password.get_secret_value(),
     db_host=mitxonline_db.db_instance.address,
