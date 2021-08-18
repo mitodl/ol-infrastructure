@@ -1,4 +1,5 @@
-"""Provision and deploy the resources needed for an edxapp installation
+"""Provision and deploy the resources needed for an edxapp installation.
+
 - Create S3 buckets required by edxapp
 - Create IAM role to allow access to AWS resources from edxapp instances
 - Create MariaDB instance in RDS
@@ -308,9 +309,9 @@ edxapp_iam_role = iam.Role(
             },
         }
     ),
-    name_prefix=f"{stack_info.env_prefix}-edxapp-role-{stack_info.env_suffix}-",
+    name_prefix=f"edxapp-role-{env_name}-"[:32],
     path=f"/ol-applications/edxapp/{stack_info.env_prefix}/{stack_info.env_suffix}/",
-    tags=aws_config.tags,
+    tags=aws_config.merged_tags({"Name": f"{env_name}-edxapp-role"}),
 )
 iam.RolePolicyAttachment(
     "edxapp-describe-instances-permission",

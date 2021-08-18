@@ -6,6 +6,6 @@ config:
   elasticsearch:instance_type: medium
   elasticsearch:disk_size: 100
   environment:business_unit: mitxonline
-  environment:vpc_reference: mitx_online_vpc
+  environment:vpc_reference: mitxonline_vpc
   saltstack:environment_name: mitxonline-qa
   saltstack:key_name: salt-qa

@@ -29,9 +29,7 @@ network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 operations_vpc = network_stack.require_output("operations_vpc")
 consul_stack = StackReference(
-    "infrastructure.consul."  # noqa: WPS237, WPS221
-    f"{stack_info.namespace.rsplit('.', 1)[1]}."  # noqa: WPS237, WPS221
-    f"{stack_info.name}"
+    f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
 )
 destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))
 
@@ -101,7 +99,7 @@ subnets = destination_vpc["subnet_ids"]
 salt_environment = Config("saltstack").get("environment_name") or environment_name
 instance_nums = range(mongodb_config.get_int("instance_count") or 3)
 
-for instance_num, subnet in zip(instance_nums, subnets):
+for instance_num in instance_nums:
     instance_name = f"mongodb-{environment_name}-{instance_num}"
     salt_minion = OLSaltStackMinion(
         f"saltstack-minion-{instance_name}",
@@ -156,7 +154,7 @@ for instance_num, subnet in zip(instance_nums, subnets):
         iam_instance_profile=mongodb_instance_profile.id,
         tags=instance_tags,
         volume_tags=instance_tags,
-        subnet_id=subnet,
+        subnet_id=subnets[instance_num],
         key_name=salt_config.require("key_name"),
         root_block_device=ec2.InstanceRootBlockDeviceArgs(
             volume_type=DiskTypes.ssd,

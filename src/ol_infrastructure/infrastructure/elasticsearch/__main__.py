@@ -1,5 +1,4 @@
 import json
-from itertools import chain
 
 from pulumi import Config, ResourceOptions
 from pulumi.stack_reference import StackReference
@@ -153,11 +152,10 @@ instance_type = InstanceTypes[instance_type_name].value
 elasticsearch_instances = []
 export_data = {}
 subnets = destination_vpc["subnet_ids"]
-subnet_id = subnets.apply(chain)
 salt_environment = Config("saltstack").get("environment_name") or environment_name
 instance_nums = range(elasticsearch_config.get_int("instance_count") or 3)
 
-for instance_num, subnet in zip(instance_nums, subnets):
+for instance_num in instance_nums:
     instance_name = f"elasticsearch-{environment_name}-{instance_num}"
     salt_minion = OLSaltStackMinion(
         f"saltstack-minion-{instance_name}",
@@ -214,7 +212,7 @@ for instance_num, subnet in zip(instance_nums, subnets):
         iam_instance_profile=elasticsearch_instance_profile.id,
         tags=instance_tags,
         volume_tags=instance_tags,
-        subnet_id=subnet,
+        subnet_id=subnets[instance_num],
         key_name=salt_config.require("key_name"),
         root_block_device=ec2.InstanceRootBlockDeviceArgs(
             volume_type=DiskTypes.ssd,
