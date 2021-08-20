@@ -203,8 +203,7 @@ COMPREHENSIVE_THEME_LOCALE_PATHS: []
 CONTACT_EMAIL: support@mitxonline.mit.edu # MODIFIED
 CORS_ORIGIN_ALLOW_ALL: false
 CORS_ORIGIN_WHITELIST:
-  - gradebook-mfe-qa.mitxonline.mit.edu
-  - learning-mfe-qa.mitxonline.mit.edu
+  - mfe-qa.mitxonline.mit.edu
   - {{ key "edxapp/lms-domain" }}
   - {{ key "edxapp/studio-domain" }}
   - mitxonline-rc.mitxonline.mit.edu
@@ -220,7 +219,7 @@ CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }}  # MODIFIED
 CROSS_DOMAIN_CSRF_COOKIE_NAME: edxapp-{{ env "ENVIRONMENT" }}-csrftoken  # MODIFIED
 CSRF_COOKIE_SECURE: true  # MODIFIED
 CSRF_TRUSTED_ORIGINS:  # MODIFIED
-  - learning-mfe-qa.mitxonline.mit.edu
+  - mfe-qa.mitxonline.mit.edu
   - {{ key "edxapp/lms-domain" }}
 DASHBOARD_COURSE_LIMIT: null
 DATA_DIR: /edx/var/edxapp  # Filesystem path where edx puts files for course export/import
@@ -362,7 +361,7 @@ LOGGING_ENV: sandbox
 LOGIN_REDIRECT_WHITELIST:  # MODIFIED
   - {{ key "edxapp/studio-domain" }}
   - {{ key "edxapp/lms-domain" }}
-  - learning-mfe-qa.mitxonline.mit.edu
+  - mfe-qa.mitxonline.mit.edu
 LOG_DIR: /edx/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MARKETING_SITE_BASE_URL: https://rc.mitxonline.mit.edu/ # ADDED - to support mitxonline-theme
