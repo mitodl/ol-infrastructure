@@ -142,7 +142,7 @@ mitxonline_db_security_group = ec2.SecurityGroup(
 )
 
 mitxonline_db_config = OLPostgresDBConfig(
-    instance_name=f"mitxonline-db-applications-{stack_info.env_suffix}",
+    instance_name=f"mitxonline-{stack_info.env_suffix}-app-db",
     password=mitxonline_config.require("db_password"),
     subnet_group_name=mitxonline_vpc["rds_subnet"],
     security_groups=[mitxonline_db_security_group],
