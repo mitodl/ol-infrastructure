@@ -46,7 +46,7 @@ jobs:
         LOGIN_URL: https://courses-qa.mitxonline.mit.edu/login
         LOGOUT_URL: https://courses-qa.mitxonline.mit.edu/logout
         MARKETING_SITE_BASE_URL: https://courses-qa.mitxonline.mit.edu
-        PUBLIC_PATH: /learning
+        PUBLIC_PATH: /learn
         REFRESH_ACCESS_TOKEN_ENDPOINT: https://courses-qa.mitxonline.mit.edu/login_refresh
         SEARCH_CATALOG_URL: https://courses-qa.mitxonline.mit.edu/courses
         SITE_NAME: MITx Online QA
@@ -66,4 +66,4 @@ jobs:
       source: mfe-app-learning/dist
       command: sync
       destination:
-      - dir: s3-remote:mitxonline-qa-edxapp-mfe/learning/
+      - dir: s3-remote:mitxonline-qa-edxapp-mfe/learn/
