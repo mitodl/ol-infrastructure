@@ -203,10 +203,10 @@ COMPREHENSIVE_THEME_LOCALE_PATHS: []
 CONTACT_EMAIL: support@mitxonline.mit.edu # MODIFIED
 CORS_ORIGIN_ALLOW_ALL: false
 CORS_ORIGIN_WHITELIST:
-  - mfe-qa.mitxonline.mit.edu
   - {{ key "edxapp/lms-domain" }}
+  - {{ key "edxapp/mfe-domain" }}
   - {{ key "edxapp/studio-domain" }}
-  - mitxonline-rc.mitxonline.mit.edu
+  - {{ key "edxapp/marketing-domain" }}
 COURSES_WITH_UNSAFE_CODE: []
 COURSE_ABOUT_VISIBILITY_PERMISSION: see_exists
 COURSE_CATALOG_API_URL: http://localhost:8008/api/v1
@@ -219,14 +219,14 @@ CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }}  # MODIFIED
 CROSS_DOMAIN_CSRF_COOKIE_NAME: edxapp-{{ env "ENVIRONMENT" }}-csrftoken  # MODIFIED
 CSRF_COOKIE_SECURE: true  # MODIFIED
 CSRF_TRUSTED_ORIGINS:  # MODIFIED
-  - mfe-qa.mitxonline.mit.edu
+  - {{ key "edxapp/mfe-domain" }}
   - {{ key "edxapp/lms-domain" }}
 DASHBOARD_COURSE_LIMIT: null
 DATA_DIR: /edx/var/edxapp  # Filesystem path where edx puts files for course export/import
 DEFAULT_COURSE_VISIBILITY_IN_CATALOG: both
 DEFAULT_FEEDBACK_EMAIL: support@mitxonline.mit.edu # MODIFIED
 DEFAULT_FILE_STORAGE: storages.backends.s3boto.S3BotoStorage  # MODIFIED
-DEFAULT_FROM_EMAIL: support@edxapp-mail-qa.mitxonline.mit.edu # MODIFIED
+DEFAULT_FROM_EMAIL: mitxonline-support@mit.edu # MODIFIED
 ####################################################
 # This settings is deprecated and no longer in use #
 ####################################################
@@ -361,10 +361,10 @@ LOGGING_ENV: sandbox
 LOGIN_REDIRECT_WHITELIST:  # MODIFIED
   - {{ key "edxapp/studio-domain" }}
   - {{ key "edxapp/lms-domain" }}
-  - mfe-qa.mitxonline.mit.edu
+  - {{ key "edxapp/mfe-domain" }}
 LOG_DIR: /edx/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
-MARKETING_SITE_BASE_URL: https://rc.mitxonline.mit.edu/ # ADDED - to support mitxonline-theme
+MARKETING_SITE_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support mitxonline-theme
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
@@ -400,7 +400,7 @@ MODULESTORE:
                 default_class: xmodule.hidden_module.HiddenDescriptor
                 fs_root: /edx/var/edxapp/data
                 render_template: common.djangoapps.edxmako.shortcuts.render_to_string
-ORA2_FILE_PREFIX: mitxonline-qa/ora2  # MODIFIED
+ORA2_FILE_PREFIX: mitxonline/ora2  # MODIFIED
 PARTNER_SUPPORT_EMAIL: ''
 PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG:
     ENFORCE_COMPLIANCE_ON_LOGIN: false

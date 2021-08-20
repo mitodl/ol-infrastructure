@@ -206,15 +206,16 @@ s3.BucketPublicAccessBlock(
 # Manage Consul Data #
 ######################
 consul_kv_data = {
-    "s3-storage-bucket": storage_bucket_name,
-    "s3-grades-bucket": grades_bucket_name,
-    "s3-course-bucket": course_bucket_name,
-    "lms-domain": edxapp_domains["lms"],
-    "studio-domain": edxapp_domains["studio"],
-    "preview-domain": edxapp_domains["preview"],
     "cookie-domain": edxapp_zone["domain"].apply(".{}".format),
-    "ses-mail-domain": edxapp_mail_domain,
+    "lms-domain": edxapp_domains["lms"],
+    "mfe-domain": edxapp_domains["mfe"],
+    "preview-domain": edxapp_domains["preview"],
+    "s3-course-bucket": course_bucket_name,
+    "s3-grades-bucket": grades_bucket_name,
+    "s3-storage-bucket": storage_bucket_name,
     "ses-configuration-set": f"edxapp-{env_name}",
+    "ses-mail-domain": edxapp_mail_domain,
+    "studio-domain": edxapp_domains["studio"],
 }
 consul.Keys(
     "edxapp-consul-template-data",
@@ -1114,7 +1115,7 @@ worker_asg = autoscaling.Group(
 
 # Create Route53 DNS records for Edxapp web nodes
 for domain_key, domain_value in edxapp_domains.items():
-    if domain_key == "lms":
+    if domain_key in ["lms", "mfe"]:
         route53.Record(
             f"edxapp-web-{domain_key}-dns-record",
             name=domain_value,
