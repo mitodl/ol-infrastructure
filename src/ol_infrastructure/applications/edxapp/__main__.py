@@ -34,6 +34,8 @@ from pulumi_aws import (
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
+    DEFAULT_ELASTICSEARCH_PORT,
+    DEFAULT_HTTP_PORT,
     DEFAULT_HTTPS_PORT,
     DEFAULT_MONGODB_PORT,
     DEFAULT_MYSQL_PORT,
@@ -464,7 +466,7 @@ if elasticsearch_domain_name := edxapp_config.get("elasticsearch_domain_name"):
         "edxapp-elasticsearch-service",
         node=edxapp_es_consul_node.name,
         name="elasticsearch",
-        port=9200,
+        port=DEFAULT_ELASTICSEARCH_PORT,
         meta={
             "external-node": True,
             "external-probe": True,
@@ -850,6 +852,19 @@ edxapp_web_acm_validated_cert = acm.CertificateValidation(
         ]
     ),
 )
+edxapp_web_alb_http_listener = lb.Listener(
+    "edxapp-web--alb-listener-http",
+    load_balancer_arn=web_lb.arn,
+    port=DEFAULT_HTTP_PORT,
+    protocol="HTTP",
+    default_actions=[
+        lb.ListenerDefaultActionArgs(
+            type="forward",
+            target_group_arn=lms_web_lb_target_group.arn,
+        )
+    ],
+    opts=ResourceOptions(delete_before_replace=True),
+)
 edxapp_web_alb_listener = lb.Listener(
     "edxapp-web-alb-listener",
     certificate_arn=edxapp_web_acm_validated_cert.certificate_arn,
@@ -1099,14 +1114,24 @@ worker_asg = autoscaling.Group(
 
 # Create Route53 DNS records for Edxapp web nodes
 for domain_key, domain_value in edxapp_domains.items():
-    route53.Record(
-        f"edxapp-web-{domain_key}-dns-record",
-        name=domain_value,
-        type="CNAME",
-        ttl=FIVE_MINUTES,
-        records=[web_lb.dns_name],
-        zone_id=edxapp_zone_id,
-    )
+    if domain_key == "lms":
+        route53.Record(
+            f"edxapp-web-{domain_key}-dns-record",
+            name=domain_value,
+            type="CNAME",
+            ttl=FIVE_MINUTES,
+            records=["j.sni.global.fastly.net"],
+            zone_id=edxapp_zone_id,
+        )
+    else:
+        route53.Record(
+            f"edxapp-web-{domain_key}-dns-record",
+            name=domain_value,
+            type="CNAME",
+            ttl=FIVE_MINUTES,
+            records=[web_lb.dns_name],
+            zone_id=edxapp_zone_id,
+        )
 
 
 export(
