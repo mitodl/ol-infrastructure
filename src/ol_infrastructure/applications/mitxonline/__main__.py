@@ -6,6 +6,7 @@
 
 import json
 
+import pulumi_consul as consul
 import pulumi_vault as vault
 from pulumi import Config, StackReference, export
 from pulumi_aws import ec2, iam, s3
@@ -161,5 +162,15 @@ mitxonline_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_host=mitxonline_db.db_instance.address,
 )
 mitxonline_vault_backend = OLVaultDatabaseBackend(mitxonline_vault_backend_config)
+
+# Set Consul key for use in edxapp configuration template
+consul.Keys(
+    "mitxonline-app-domain-for-edxapp",
+    keys=[
+        consul.KeysKeyArgs(
+            path="edxapp/marketing-domain", value=mitxonline_config.require("domain")
+        )
+    ],
+)
 
 export("mitxonline_app", {"rds_host": mitxonline_db.db_instance.address})
