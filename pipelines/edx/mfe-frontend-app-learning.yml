@@ -66,4 +66,4 @@ jobs:
       source: mfe-app-learning/dist
       command: sync
       destination:
-      - dir: s3-remote:mitxonline-qa-edxapp-mfe/
+      - dir: s3-remote:mitxonline-qa-edxapp-mfe/learning/
