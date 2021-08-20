@@ -46,6 +46,7 @@ jobs:
         LOGIN_URL: https://lms-qa.mitxonline.mit.edu/login
         LOGOUT_URL: https://lms-qa.mitxonline.mit.edu/logout
         MARKETING_SITE_BASE_URL: https://lms-qa.mitxonline.mit.edu
+        PUBLIC_PATH: /learning
         REFRESH_ACCESS_TOKEN_ENDPOINT: https://lms-qa.mitxonline.mit.edu/login_refresh
         SEARCH_CATALOG_URL: https://lms-qa.mitxonline.mit.edu/courses
         SITE_NAME: MITx Online QA
