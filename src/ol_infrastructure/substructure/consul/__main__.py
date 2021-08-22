@@ -24,9 +24,26 @@ vault_operations_query = PreparedQuery(
     ),
 )
 
-operations_log_service_query = PreparedQuery(
+log_service_query = PreparedQuery(
     "operations-log-service-query",
     name="logging",
+    service="${match(2)}",
+    tags=["logging"],
+    failover=PreparedQueryFailoverArgs(
+        datacenters=[
+            "operations-ci",
+            "operations-qa",
+            "operations",
+        ]
+    ),
+    template=PreparedQueryTemplateArgs(
+        regexp="^(operations|logging)-(.*?)$", type="name_prefix_match"
+    ),
+)
+
+operations_service_query = PreparedQuery(
+    "operations-service-query",
+    name="operations",
     service="${match(2)}",
     tags=["logging"],
     failover=PreparedQueryFailoverArgs(
