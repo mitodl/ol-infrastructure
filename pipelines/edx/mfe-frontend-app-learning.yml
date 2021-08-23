@@ -45,6 +45,10 @@ jobs:
         LMS_BASE_URL: https://courses-qa.mitxonline.mit.edu
         LOGIN_URL: https://courses-qa.mitxonline.mit.edu/login
         LOGOUT_URL: https://courses-qa.mitxonline.mit.edu/logout
+        LOGO_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png
+        LOGO_TRADEMARK_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png
+        LOGO_WHITE_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png
+        FAVICON_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico
         MARKETING_SITE_BASE_URL: https://courses-qa.mitxonline.mit.edu
         PUBLIC_PATH: /learn
         REFRESH_ACCESS_TOKEN_ENDPOINT: https://courses-qa.mitxonline.mit.edu/login_refresh
