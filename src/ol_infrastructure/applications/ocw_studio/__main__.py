@@ -140,8 +140,7 @@ ocw_studio_mediaconvert_role = iam.Role(
             },
         }
     ),
-    name=f"ocw-studio-mediaconvert-role-{stack_info.env_suffix}",
-    path="/ol-applications/ocw-studio-role/",
+    name=f"service-role-mediaconvert-ocw-studio-{stack_info.env_suffix}",
     tags=aws_config.tags,
 )
 
