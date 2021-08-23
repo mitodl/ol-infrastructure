@@ -105,6 +105,7 @@ ocw_studio_iam_policy = iam.Policy(
                 {
                     "Effect": "Allow",
                     "Action": [
+                        "mediaconvert:GetJob",
                         "mediaconvert:ListQueues",
                         "mediaconvert:DescribeEndpoints",
                         "mediaconvert:ListPresets",
@@ -116,6 +117,14 @@ ocw_studio_iam_policy = iam.Policy(
                         "mediaconvert:ListJobTemplates",
                     ],
                     "Resource": "*",
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "sts:AssumeRole",
+                        "iam:PassRole",
+                    ],
+                    "Resource": "arn:aws:iam::610119931565:role/service-role-mediaconvert-ocw-studio-qa",
                 },
             ],
         },
