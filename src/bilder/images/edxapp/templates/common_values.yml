@@ -340,7 +340,8 @@ HELP_TOKENS_BOOKS:
     learner: http://edx.readthedocs.io/projects/open-edx-learner-guide
 ICP_LICENSE: null
 ICP_LICENSE_INFO: {}
-IDA_LOGOUT_URI_LIST: []
+IDA_LOGOUT_URI_LIST:
+  - https://{{ key "edxapp/marketing-domain" }}/logout
 ID_VERIFICATION_SUPPORT_LINK: ''
 INTEGRATED_CHANNELS_API_CHUNK_TRANSMISSION_LIMIT:
     SAP: 1
