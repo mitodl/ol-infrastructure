@@ -124,7 +124,7 @@ ocw_studio_iam_policy = iam.Policy(
                         "sts:AssumeRole",
                         "iam:PassRole",
                     ],
-                    "Resource": "arn:aws:iam::610119931565:role/service-role-mediaconvert-ocw-studio-qa",
+                    "Resource": f"arn:aws:iam::610119931565:role/service-role-mediaconvert-ocw-studio-{stack_info.env_suffix}",
                 },
             ],
         },
