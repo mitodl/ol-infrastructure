@@ -163,12 +163,6 @@ CACHES:  # MODIFIED
     staticfiles:
       <<: *redis_cache_config
       KEY_PREFIX: staticfiles
-##############################
-# CAS Is No Longer Supported #
-##############################
-# CAS_ATTRIBUTE_CALLBACK: ''
-# CAS_EXTRA_LOGIN_PARAMS: ''
-# CAS_SERVER_URL: ''
 CELERYBEAT_SCHEDULER: redbeat.RedBeatScheduler  # MODIFIED
 CELERY_BROKER_HOSTNAME: edxapp-redis.service.consul:6379  # MODIFIED
 CELERY_BROKER_TRANSPORT: rediss  # MODIFIED - second "s" indicates "secure"
@@ -228,13 +222,6 @@ DEFAULT_COURSE_VISIBILITY_IN_CATALOG: both
 DEFAULT_FEEDBACK_EMAIL: support@mitxonline.mit.edu # MODIFIED
 DEFAULT_FILE_STORAGE: storages.backends.s3boto.S3BotoStorage  # MODIFIED
 DEFAULT_FROM_EMAIL: mitxonline-support@mit.edu # MODIFIED
-####################################################
-# This settings is deprecated and no longer in use #
-####################################################
-# DEFAULT_JWT_ISSUER:
-#     AUDIENCE: SET-ME-PLEASE
-#     ISSUER: http://127.0.0.1:8000/oauth2
-#     SECRET_KEY: SET-ME-PLEASE
 DEFAULT_MOBILE_AVAILABLE: false
 DEFAULT_SITE_THEME: mitxonline-theme  # MODIFIED
 DEPRECATED_ADVANCED_COMPONENT_TYPES: []
@@ -255,12 +242,6 @@ DJFS:
 #     ssl: false
 #     user: edxapp
 
-##############################################
-# We will not be using the edX Ecommerce app #
-##############################################
-# ECOMMERCE_API_SIGNING_KEY: SET-ME-PLEASE
-# ECOMMERCE_API_URL: http://localhost:8002/api/v2
-# ECOMMERCE_PUBLIC_URL_ROOT: http://localhost:8002
 EDXMKTG_USER_INFO_COOKIE_NAME: edx-user-info
 EDX_PLATFORM_REVISION: release
 ELASTIC_SEARCH_CONFIG:
@@ -274,12 +255,6 @@ EMAIL_BACKEND: django_ses.SESBackend  # MODIFIED
 # EMAIL_PORT: 25
 # EMAIL_USE_TLS: false
 ENABLE_COMPREHENSIVE_THEMING: true  # MODIFIED
-###########################################
-# We will not be using the enterprise app #
-###########################################
-# ENTERPRISE_API_URL: https://localhost:18000/enterprise/api/v1
-# ENTERPRISE_MARKETING_FOOTER_QUERY_PARAMS: {}
-# ENTERPRISE_SERVICE_WORKER_USERNAME: enterprise_worker
 EVENT_TRACKING_SEGMENTIO_EMIT_WHITELIST: []
 EXTRA_MIDDLEWARE_CLASSES: []
 FACEBOOK_API_VERSION: v2.1
@@ -347,11 +322,6 @@ ID_VERIFICATION_SUPPORT_LINK: ''
 INTEGRATED_CHANNELS_API_CHUNK_TRANSMISSION_LIMIT:
     SAP: 1
 JWT_EXPIRATION: 30
-#############################################
-# Deprecated settings that are no longer used #
-#############################################
-# JWT_ISSUER: http://127.0.0.1:8000/oauth2
-# JWT_PRIVATE_SIGNING_KEY: null
 LANGUAGE_CODE: en
 LANGUAGE_COOKIE: openedx-language-preference
 LEARNER_PORTAL_URL_ROOT: https://learner-portal-localhost:18000
@@ -364,6 +334,7 @@ LOGIN_REDIRECT_WHITELIST:  # MODIFIED
   - {{ key "edxapp/studio-domain" }}
   - {{ key "edxapp/lms-domain" }}
   - {{ key "edxapp/mfe-domain" }}
+  - {{ key "edxapp/marketing-domain" }}
 LOG_DIR: /edx/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MARKETING_SITE_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support mitxonline-theme
@@ -448,13 +419,6 @@ SESSION_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edxapp-sessionid  # MODIFIED
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
 SITE_NAME: MITx Online QA  # MODIFIED
-#######################################
-# Not Using SAML For This Environment #
-#######################################
-# SOCIAL_AUTH_SAML_SP_PRIVATE_KEY: ''
-# SOCIAL_AUTH_SAML_SP_PRIVATE_KEY_DICT: {}
-# SOCIAL_AUTH_SAML_SP_PUBLIC_CERT: ''
-# SOCIAL_AUTH_SAML_SP_PUBLIC_CERT_DICT: {}
 SOCIAL_MEDIA_FOOTER_URLS: {}
 SOCIAL_SHARING_SETTINGS:
     CERTIFICATE_FACEBOOK: false
@@ -467,24 +431,6 @@ STATIC_URL_BASE: /static/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
 SUPPORT_SITE_LINK: ''
-############################################################
-# Used for integrating with OpenStack Swift Object Storage #
-# Commenting out/removing because we don't use it          #
-############################################################
-# SWIFT_AUTH_URL: null
-# SWIFT_AUTH_VERSION: null
-# SWIFT_KEY: null
-# SWIFT_REGION_NAME: null
-# SWIFT_TEMP_URL_DURATION: 1800
-# SWIFT_TEMP_URL_KEY: null
-# SWIFT_TENANT_ID: null
-# SWIFT_TENANT_NAME: null
-# SWIFT_USERNAME: null
-# SWIFT_USE_TEMP_URLS: false
-#######################################
-# Doesn't Appear To Get Used Anywhere #
-#######################################
-# SYSLOG_SERVER: ''
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
 TIME_ZONE: America/New_York
@@ -522,3 +468,65 @@ ZENDESK_GROUP_ID_MAPPING: {}
 ZENDESK_OAUTH_ACCESS_TOKEN: ''
 ZENDESK_URL: ''
 ZENDESK_USER: ''
+
+############################################################
+# Used for integrating with OpenStack Swift Object Storage #
+# Commenting out/removing because we don't use it          #
+############################################################
+# SWIFT_AUTH_URL: null
+# SWIFT_AUTH_VERSION: null
+# SWIFT_KEY: null
+# SWIFT_REGION_NAME: null
+# SWIFT_TEMP_URL_DURATION: 1800
+# SWIFT_TEMP_URL_KEY: null
+# SWIFT_TENANT_ID: null
+# SWIFT_TENANT_NAME: null
+# SWIFT_USERNAME: null
+# SWIFT_USE_TEMP_URLS: false
+#######################################
+# Doesn't Appear To Get Used Anywhere #
+#######################################
+# SYSLOG_SERVER: ''
+
+#######################################
+# Not Using SAML For This Environment #
+#######################################
+# SOCIAL_AUTH_SAML_SP_PRIVATE_KEY: ''
+# SOCIAL_AUTH_SAML_SP_PRIVATE_KEY_DICT: {}
+# SOCIAL_AUTH_SAML_SP_PUBLIC_CERT: ''
+# SOCIAL_AUTH_SAML_SP_PUBLIC_CERT_DICT: {}
+
+##############################
+# CAS Is No Longer Supported #
+##############################
+# CAS_ATTRIBUTE_CALLBACK: ''
+# CAS_EXTRA_LOGIN_PARAMS: ''
+# CAS_SERVER_URL: ''
+
+###########################################
+# We will not be using the enterprise app #
+###########################################
+# ENTERPRISE_API_URL: https://localhost:18000/enterprise/api/v1
+# ENTERPRISE_MARKETING_FOOTER_QUERY_PARAMS: {}
+# ENTERPRISE_SERVICE_WORKER_USERNAME: enterprise_worker
+
+##############################################
+# We will not be using the edX Ecommerce app #
+##############################################
+# ECOMMERCE_API_SIGNING_KEY: SET-ME-PLEASE
+# ECOMMERCE_API_URL: http://localhost:8002/api/v2
+# ECOMMERCE_PUBLIC_URL_ROOT: http://localhost:8002
+
+#############################################
+# Deprecated settings that are no longer used #
+#############################################
+# JWT_ISSUER: http://127.0.0.1:8000/oauth2
+# JWT_PRIVATE_SIGNING_KEY: null
+
+####################################################
+# This settings is deprecated and no longer in use #
+####################################################
+# DEFAULT_JWT_ISSUER:
+#     AUDIENCE: SET-ME-PLEASE
+#     ISSUER: http://127.0.0.1:8000/oauth2
+#     SECRET_KEY: SET-ME-PLEASE
