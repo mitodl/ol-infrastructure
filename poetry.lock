@@ -132,14 +132,14 @@ uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
 name = "boto3"
-version = "1.18.25"
+version = "1.18.27"
 description = "The AWS SDK for Python"
 category = "main"
 optional = false
 python-versions = ">= 3.6"
 
 [package.dependencies]
-botocore = ">=1.21.25,<1.22.0"
+botocore = ">=1.21.27,<1.22.0"
 jmespath = ">=0.7.1,<1.0.0"
 s3transfer = ">=0.5.0,<0.6.0"
 
@@ -148,7 +148,7 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.21.25"
+version = "1.21.27"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
 optional = false
@@ -485,7 +485,7 @@ flake8 = "*"
 
 [[package]]
 name = "flake8-quotes"
-version = "3.2.0"
+version = "3.3.0"
 description = "Flake8 lint for quotes."
 category = "dev"
 optional = false
@@ -961,7 +961,7 @@ six = ">=1.12.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "4.16.0"
+version = "4.17.0"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 category = "main"
 optional = false
@@ -1108,7 +1108,7 @@ python-versions = ">=3.5"
 
 [[package]]
 name = "pyinfra"
-version = "1.4.12"
+version = "1.4.4"
 description = "pyinfra automates/provisions/manages/deploys infrastructure."
 category = "main"
 optional = false
@@ -1120,7 +1120,7 @@ colorama = "<1"
 configparser = "*"
 distro = "1.5.0"
 gevent = ">=1.5"
-jinja2 = ">2,<4"
+jinja2 = ">2,<3"
 paramiko = ">=2.7,<3"
 python-dateutil = ">2,<3"
 pywinrm = "*"
@@ -1539,7 +1539,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "0d8e6b7342c9f757243f62d2ad987052f0cd383d6b021f9e8a6f8bce8bb10b2a"
+content-hash = "6af8a1cd86f81cf2dc84b01de276abe7a03f5d33eb529396367c3984c2b6a6aa"
 
 [metadata.files]
 anyio = [
@@ -1588,12 +1588,12 @@ black = [
     {file = "black-21.7b0.tar.gz", hash = "sha256:c8373c6491de9362e39271630b65b964607bc5c79c83783547d76c839b3aa219"},
 ]
 boto3 = [
-    {file = "boto3-1.18.25-py3-none-any.whl", hash = "sha256:057196ac15de4de2221a24a3a0a41692414fa1dd697994d062ebd447163265e7"},
-    {file = "boto3-1.18.25.tar.gz", hash = "sha256:852e776cea4287f74edcb45564f8345fb6b0168dde0fd5bf46668b94c3f21177"},
+    {file = "boto3-1.18.27-py3-none-any.whl", hash = "sha256:7209b79833bdf13753aa24f76bf533890ffed2cc4fe1fe08619d223c209bbd11"},
+    {file = "boto3-1.18.27.tar.gz", hash = "sha256:f46c93d09acd4d4bfc6b9522ed852fecbdc508e0365f29ddfb3c146aae784b4e"},
 ]
 botocore = [
-    {file = "botocore-1.21.25-py3-none-any.whl", hash = "sha256:201e10d3b1b40d65b7c9214be7087d78ed65de00e7362bd1e020741301d09fbc"},
-    {file = "botocore-1.21.25.tar.gz", hash = "sha256:b9820ee29d70059c9b0e2a69ec13ebf80f4a0bc85f47578f17e951438c506b2d"},
+    {file = "botocore-1.21.27-py3-none-any.whl", hash = "sha256:8c99abd7093ab11ce8d09c68732aeeb6065a53d2fe371568452e99291817fff5"},
+    {file = "botocore-1.21.27.tar.gz", hash = "sha256:b9e2c90bad164d111c229102f58f995c28576e719dd116b446965e1b786f8fa5"},
 ]
 certifi = [
     {file = "certifi-2021.5.30-py2.py3-none-any.whl", hash = "sha256:50b1e4f8446b06f41be7dd6338db18e0990601dce795c2b1686458aa7e8fa7d8"},
@@ -1754,7 +1754,7 @@ flake8-polyfill = [
     {file = "flake8_polyfill-1.0.2-py2.py3-none-any.whl", hash = "sha256:12be6a34ee3ab795b19ca73505e7b55826d5f6ad7230d31b18e106400169b9e9"},
 ]
 flake8-quotes = [
-    {file = "flake8-quotes-3.2.0.tar.gz", hash = "sha256:3f1116e985ef437c130431ac92f9b3155f8f652fda7405ac22ffdfd7a9d1055e"},
+    {file = "flake8-quotes-3.3.0.tar.gz", hash = "sha256:f1dd87830ed77ff2ce47fc0ee0fd87ae20e8f045355354ffbf4dcaa18d528217"},
 ]
 flake8-rst-docstrings = [
     {file = "flake8-rst-docstrings-0.2.3.tar.gz", hash = "sha256:3045794e1c8467fba33aaea5c246b8369efc9c44ef8b0b20199bb6df7a4bd47b"},
@@ -2103,7 +2103,7 @@ pulumi = [
     {file = "pulumi-3.10.3-py2.py3-none-any.whl", hash = "sha256:c94e2e613b742d14386d5e254f8d05f449cd59e1b0c4bbe9071d1b6b419d02f6"},
 ]
 pulumi-aws = [
-    {file = "pulumi_aws-4.16.0.tar.gz", hash = "sha256:a462fce1fb17274437a4638550ecac62922823444cebca114a6c4b5b3e15e93f"},
+    {file = "pulumi_aws-4.17.0.tar.gz", hash = "sha256:1fa7eaf374fccfd80a185e4d039c54736553f759ea96d2c5a279e0b54d07850a"},
 ]
 pulumi-consul = [
     {file = "pulumi_consul-3.2.0.tar.gz", hash = "sha256:0d6f3f24e95076d20542eab68fe9f7ca749b0ba33aa51cc8e9c0c5bb8ee5fc79"},
@@ -2169,8 +2169,8 @@ pygments = [
     {file = "Pygments-2.10.0.tar.gz", hash = "sha256:f398865f7eb6874156579fdf36bc840a03cab64d1cde9e93d68f46a425ec52c6"},
 ]
 pyinfra = [
-    {file = "pyinfra-1.4.12-py2.py3-none-any.whl", hash = "sha256:bfdec71bd9137149891ffe2fd1a0b65f922cfbd425636a883595b3c2945f845b"},
-    {file = "pyinfra-1.4.12.tar.gz", hash = "sha256:3fb21d7c1f08821c0282c1e08d8725d11e932ee3cffed0e11ac82e7462bb725d"},
+    {file = "pyinfra-1.4.4-py2.py3-none-any.whl", hash = "sha256:3756d732ac971235a467346e5d2067761e9c5f11faf8585769c723f550917e61"},
+    {file = "pyinfra-1.4.4.tar.gz", hash = "sha256:83abb88fe98cdb8d62a9ebd746cae6747a6629b06185ad61da5df27663644771"},
 ]
 pynacl = [
     {file = "PyNaCl-1.4.0-cp27-cp27m-macosx_10_10_x86_64.whl", hash = "sha256:ea6841bc3a76fa4942ce00f3bda7d436fda21e2d91602b9e21b7ca9ecab8f3ff"},
