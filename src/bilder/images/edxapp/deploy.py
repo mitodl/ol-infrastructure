@@ -1,14 +1,10 @@
-import os
 import tempfile
 from pathlib import Path
 
 from pyinfra import host
-from pyinfra.operations import files, git, pip, server
+from pyinfra.operations import files, pip
 
-from bilder.components.baseline.steps import (
-    install_baseline_packages,
-    service_configuration_watches,
-)
+from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models import (
     Consul,
     ConsulConfig,
@@ -52,6 +48,7 @@ from bilder.components.vector.steps import (
     vector_service,
 )
 from bilder.facts import has_systemd  # noqa: F401
+from bilder.images.edxapp.lib import WEB_NODE_TYPE, node_type
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 
 VERSIONS = {  # noqa: WPS407
@@ -60,11 +57,6 @@ VERSIONS = {  # noqa: WPS407
     "consul-template": "0.26.0",
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
-WEB_NODE_TYPE = "web"
-WORKER_NODE_TYPE = "worker"
-node_type = host.data.node_type or os.environ.get("NODE_TYPE", WEB_NODE_TYPE)
-
-install_baseline_packages()
 
 ###########
 # edX App #
@@ -121,24 +113,6 @@ consul_templates = [
     ),
 ]
 if node_type == WEB_NODE_TYPE:
-    files.directory(
-        name="Ensure themes directory is present",
-        path="/edx/app/edxapp/themes/",
-        user="edxapp",
-        group="edxapp",
-        present=True,
-    )
-    git.repo(
-        name="Load theme repository",
-        src="https://github.com/mitodl/mitxonline-theme",
-        dest="/edx/app/edxapp/themes/mitxonline-theme",
-        branch="main",
-        user="edxapp",
-        group="edxapp",
-    )
-    server.shell(
-        name="Compile theme assets", commands=["/edx/bin/edxapp-update-assets"]
-    )
     vector.configuration_templates.update(
         {
             TEMPLATES_DIRECTORY.joinpath("vector", "nginx.yaml"): {},

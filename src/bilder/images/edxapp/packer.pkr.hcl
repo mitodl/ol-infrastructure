@@ -87,7 +87,7 @@ build {
     ]
     inline = [
       "sleep 15",
-      "pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} apt.packages packages='[\"git\", \"libmariadbclient-dev\", \"python3-pip\", \"python3-venv\", \"python3-dev\", \"build-essential\"]' upgrade=True update=True"
+      "pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} ${path.root}/prebuild.py"
     ]
   }
   provisioner "shell" {

@@ -6,28 +6,32 @@
   vars:
     serial_count: 1
     CLUSTER_NAME: edxapp
-    EDXAPP_CMS_MAX_REQ: 1000
-    EDXAPP_LMS_MAX_REQ: 1000
-    EDXAPP_LMS_PREVIEW_NGINX_PORT: 80
-    EDXAPP_CMS_NGINX_PORT: 80
-    EDXAPP_LMS_NGINX_PORT: 80
-    EDXAPP_CMS_SSL_NGINX_PORT: 443
-    EDXAPP_LMS_SSL_NGINX_PORT: 443
-    NGINX_ENABLE_SSL: true
-    NGINX_REDIRECT_TO_HTTPS: true
-    NGINX_HTTPS_REDIRECT_STRATEGY: forward_for_proto
-    NGINX_SSL_CERTIFICATE: /tmp/edxapp.cert
-    NGINX_SSL_KEY: /tmp/edxapp.key
-    NGINX_LOG_FORMAT_NAME: app_metrics
     COMMON_CONFIG_NO_LOGGING: false
+    CREATE_SERVICE_WORKER_USERS: false
+    EDXAPP_CMS_MAX_REQ: 1000
+    EDXAPP_CMS_NGINX_PORT: 80
+    EDXAPP_CMS_SSL_NGINX_PORT: 443
+    EDXAPP_COMPREHENSIVE_THEME_DIRS:
+    - /edx/app/edxapp/themes/
+    EDXAPP_DEFAULT_SITE_THEME: edxapp-theme
     # yamllint disable-line rule:line-length
     EDXAPP_EDXAPP_SECRET_KEY: this-is-just-a-temporary-placeholder # pragma: allowlist secret
-    CREATE_SERVICE_WORKER_USERS: false
-    FORUM_USE_TCP: true
+    EDXAPP_ENABLE_COMPREHENSIVE_THEMING: true
+    EDXAPP_LMS_MAX_REQ: 1000
+    EDXAPP_LMS_NGINX_PORT: 80
+    EDXAPP_LMS_PREVIEW_NGINX_PORT: 80
+    EDXAPP_LMS_SSL_NGINX_PORT: 443
     # Set to empty values so that the tests don't fail since we are managing the
     # config file directly
     FORUM_MONGO_HOSTS: []
     forum_services: []
+    FORUM_USE_TCP: true
+    NGINX_ENABLE_SSL: true
+    NGINX_HTTPS_REDIRECT_STRATEGY: forward_for_proto
+    NGINX_LOG_FORMAT_NAME: app_metrics
+    NGINX_REDIRECT_TO_HTTPS: true
+    NGINX_SSL_CERTIFICATE: /tmp/edxapp.cert
+    NGINX_SSL_KEY: /tmp/edxapp.key
   serial: '{{ serial_count }}'
   roles:
   - forum
