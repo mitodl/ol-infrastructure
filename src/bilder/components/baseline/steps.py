@@ -7,20 +7,23 @@ from pyinfra.operations import apt, files, systemd
 
 @deploy("Install baseline requirements")
 def install_baseline_packages(
-    packages: List[str] = None, state=None, host=None, sudo=True
+    packages: List[str] = None,
+    upgrade_system: bool = False,
+    state=None,
+    host=None,
 ):
     apt.packages(
         name="Install baseline packages for Debian based hosts",
         packages=packages or ["curl"],
         update=True,
+        upgrade=upgrade_system,
         state=state,
         host=host,
-        sudo=sudo,
     )
 
 
 @deploy("Reload services on config change")
-def service_configuration_watches(
+def service_configuration_watches(  # noqa: WPS211
     service_name: str,
     watched_files: List[Path],
     onchange_command: Optional[str] = None,
