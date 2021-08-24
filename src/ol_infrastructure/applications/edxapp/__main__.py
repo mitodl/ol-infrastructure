@@ -213,6 +213,7 @@ consul_kv_data = {
     "s3-course-bucket": course_bucket_name,
     "s3-grades-bucket": grades_bucket_name,
     "s3-storage-bucket": storage_bucket_name,
+    "sender-email-address": edxapp_config.require("sender_email_address"),
     "ses-configuration-set": f"edxapp-{env_name}",
     "ses-mail-domain": edxapp_mail_domain,
     "studio-domain": edxapp_domains["studio"],
@@ -277,7 +278,7 @@ edxapp_policy_document = {
             "Effect": "Allow",
             "Action": ["ses:SendEmail", "ses:SendRawEmail"],
             "Resource": [
-                "arn:*:ses:*:*:identity/*.mitxonline.mit.edu",
+                "arn:*:ses:*:*:identity/*mit.edu",
                 f"arn:aws:ses:*:*:configuration-set/edxapp-mitxonline-{stack_info.env_suffix}",  # noqa: E501
             ],
         },
@@ -636,18 +637,22 @@ edxapp_ses_domain_identity_verification = ses.DomainIdentityVerification(
     domain=edxapp_ses_domain_identity.id,
     opts=ResourceOptions(depends_on=[edxapp_ses_verification_record]),
 )
-edxapp_mail_from = ses.MailFrom(
+edxapp_mail_from_domain = ses.MailFrom(
     "edxapp-ses-mail-from-domain",
     domain=edxapp_ses_domain_identity_verification.domain,
     mail_from_domain=edxapp_ses_domain_identity_verification.domain.apply(
         "bounce.{}".format
     ),
 )
+edxapp_mail_from_address = ses.EmailIdentity(
+    "edxapp-ses-mail-from-identity",
+    email=consul_kv_data["sender-email-address"],
+)
 # Example Route53 MX record
 edxapp_ses_domain_mail_from_mx = route53.Record(
     f"edxapp-ses-mail-from-mx-record-for-{env_name}",
     zone_id=edxapp_zone_id,
-    name=edxapp_mail_from.mail_from_domain,
+    name=edxapp_mail_from_domain.mail_from_domain,
     type="MX",
     ttl=FIVE_MINUTES,
     records=["10 feedback-smtp.us-east-1.amazonses.com"],
@@ -655,7 +660,7 @@ edxapp_ses_domain_mail_from_mx = route53.Record(
 ses_domain_mail_from_txt = route53.Record(
     "edxapp-ses-domain-mail-from-text-record",
     zone_id=edxapp_zone_id,
-    name=edxapp_mail_from.mail_from_domain,
+    name=edxapp_mail_from_domain.mail_from_domain,
     type="TXT",
     ttl=FIVE_MINUTES,
     records=["v=spf1 include:amazonses.com -all"],

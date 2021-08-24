@@ -133,7 +133,6 @@ BLOCK_STRUCTURES_SETTINGS:
     TASK_MAX_RETRIES: 5
 BRANCH_IO_KEY: ''
 BUGS_EMAIL: odl-devops@mit.edu  # MODIFIED
-DEFAULT_FROM_EMAIL: mitxonline-support@mit.edu  # MODIFIED
 EMAIL_USE_DEFAULT_FROM_FOR_BULK: true
 BULK_EMAIL_EMAILS_PER_TASK: 500
 BULK_EMAIL_LOG_SENT_EMAILS: false
@@ -221,7 +220,7 @@ DATA_DIR: /edx/var/edxapp  # Filesystem path where edx puts files for course exp
 DEFAULT_COURSE_VISIBILITY_IN_CATALOG: both
 DEFAULT_FEEDBACK_EMAIL: support@mitxonline.mit.edu # MODIFIED
 DEFAULT_FILE_STORAGE: storages.backends.s3boto.S3BotoStorage  # MODIFIED
-DEFAULT_FROM_EMAIL: mitxonline-support@mit.edu # MODIFIED
+DEFAULT_FROM_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_MOBILE_AVAILABLE: false
 DEFAULT_SITE_THEME: edxapp-theme  # MODIFIED - Using a generic name to simplify usage across deployments
 DEPRECATED_ADVANCED_COMPONENT_TYPES: []

@@ -1,4 +1,3 @@
----
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgENampzZMkU93B2tG7uS7RhAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMzF8jd7uKVx40h9mJAgEQgDutJz3ChtPuf+29eN8z5to4y9BGIIIseHU+BRbHAgiy0RBYs5rG6vd78v/TmGRcAkmtfI7KNkh1GXlJyQ==
 config:
@@ -23,5 +22,6 @@ config:
   edxapp:mail_domain: edxapp-mail.mitxonline.mit.edu
   edxapp:mongo_admin_password:
     secure: v1:Z57JZ5RX59bVTb2j:zIERkkj7Vs1e7J+qZNhaPOo3H6owlQn3Ovj9VpikQaXbWa4uBV4B7Lf6I9KWoDMohXYJoId1Dn5waiSlmOBp19NhoPQNilteLJDmjyl5T2N6zNxsLi8T3u7C
+  edxapp:sender_email_address: mitxonline-support@mit.edu
   redis:auth_token:
     secure: v1:xwt8BtzB0StXaEP0:mbsLXD3jC2yxq8TnyaOIgK42ltgUqE6uPo0z7lpDtupr/Vn4rMod5I7/9C9MlXKZTQCKyY97
