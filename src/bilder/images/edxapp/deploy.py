@@ -131,7 +131,8 @@ if node_type == WEB_NODE_TYPE:
     git.repo(
         name="Load theme repository",
         src="https://github.com/mitodl/mitxonline-theme",
-        dest="/edx/app/edxapp/themes/mitxonline-theme",
+        # Using a generic directory to simplify usage across deployments
+        dest="/edx/app/edxapp/themes/edxapp-theme",
         branch="main",
         user="edxapp",
         group="edxapp",
