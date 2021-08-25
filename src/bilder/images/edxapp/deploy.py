@@ -275,7 +275,7 @@ if host.fact.has_systemd:
             # Ensure that Vault can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {lms_config_path} && "
             # Restart the edxapp process to reload the configuration file
-            "/edx/bin/supervisorctl restart "
+            "/edx/bin/supervisorctl signal HUP "
             f"{'lms' if node_type == WEB_NODE_TYPE else 'all'}'"
         ),
     )
@@ -289,7 +289,7 @@ if host.fact.has_systemd:
             # Ensure that Vault can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {studio_config_path} && "
             # Restart the edxapp process to reload the configuration file
-            "/edx/bin/supervisorctl restart "
+            "/edx/bin/supervisorctl signal HUP "
             f"{'cms' if node_type == WEB_NODE_TYPE else 'all'}'"
         ),
     )
