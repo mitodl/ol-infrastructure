@@ -12,7 +12,6 @@ config:
   edxapp:dns_zone: mitxonline
   edxapp:domains:
     lms: courses-qa.mitxonline.mit.edu
-    mfe: mfe-qa.mitxonline.mit.edu
     preview: preview-qa.mitxonline.mit.edu
     studio: studio-qa.mitxonline.mit.edu
   edxapp:edx_forum_secrets:

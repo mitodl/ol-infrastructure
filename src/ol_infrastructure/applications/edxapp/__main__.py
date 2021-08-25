@@ -208,7 +208,6 @@ s3.BucketPublicAccessBlock(
 consul_kv_data = {
     "cookie-domain": edxapp_zone["domain"].apply(".{}".format),
     "lms-domain": edxapp_domains["lms"],
-    "mfe-domain": edxapp_domains["mfe"],
     "preview-domain": edxapp_domains["preview"],
     "s3-course-bucket": course_bucket_name,
     "s3-grades-bucket": grades_bucket_name,
@@ -221,8 +220,8 @@ consul_kv_data = {
 consul.Keys(
     "edxapp-consul-template-data",
     keys=[
-        consul.KeysKeyArgs(path=f"edxapp/{key}", value=data)
-        for key, data in consul_kv_data.items()
+        consul.KeysKeyArgs(path=f"edxapp/{key}", value=config_value)
+        for key, config_value in consul_kv_data.items()
     ],
 )
 
@@ -1120,7 +1119,7 @@ worker_asg = autoscaling.Group(
 
 # Create Route53 DNS records for Edxapp web nodes
 for domain_key, domain_value in edxapp_domains.items():
-    if domain_key in ["lms", "mfe"]:
+    if domain_key == "lms":
         route53.Record(
             f"edxapp-web-{domain_key}-dns-record",
             name=domain_value,
