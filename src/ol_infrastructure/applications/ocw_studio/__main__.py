@@ -268,6 +268,7 @@ ocw_studio_sns_topic_subscription = sns.TopicSubscription(
         ocw_studio_config.require("app_domain")
     ),
     protocol="https",
+    raw_message_delivery=True,
     topic=ocw_studio_sns_topic.arn,
 )
 
