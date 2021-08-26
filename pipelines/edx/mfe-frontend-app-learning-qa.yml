@@ -68,6 +68,6 @@ jobs:
   - put: mfe-app-learning-bucket
     params:
       source: mfe-app-learning/dist
-      command: sync
       destination:
-      - dir: s3-remote:mitxonline-qa-edxapp-mfe/learn/
+      - command: sync
+        dir: s3-remote:mitxonline-qa-edxapp-mfe/learn/
