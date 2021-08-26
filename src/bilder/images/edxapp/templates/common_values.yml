@@ -194,7 +194,7 @@ COMMENTS_SERVICE_URL: http://localhost:4567  # MODIFIED
 COMPREHENSIVE_THEME_DIRS:
 - /edx/app/edxapp/themes/  # MODIFIED
 COMPREHENSIVE_THEME_LOCALE_PATHS: []
-CONTACT_EMAIL: support@mitxonline.mit.edu # MODIFIED
+CONTACT_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 CORS_ORIGIN_ALLOW_ALL: false
 CORS_ORIGIN_WHITELIST:
   - {{ key "edxapp/lms-domain" }}
@@ -216,7 +216,7 @@ CSRF_TRUSTED_ORIGINS:  # MODIFIED
 DASHBOARD_COURSE_LIMIT: null
 DATA_DIR: /edx/var/edxapp  # Filesystem path where edx puts files for course export/import
 DEFAULT_COURSE_VISIBILITY_IN_CATALOG: both
-DEFAULT_FEEDBACK_EMAIL: support@mitxonline.mit.edu # MODIFIED
+DEFAULT_FEEDBACK_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_FILE_STORAGE: storages.backends.s3boto.S3BotoStorage  # MODIFIED
 DEFAULT_FROM_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_MOBILE_AVAILABLE: false
@@ -226,18 +226,6 @@ DJFS:
     directory_root: /edx/var/edxapp/django-pyfs/static/django-pyfs
     type: osfs
     url_root: /static/django-pyfs
-# DOC_STORE_CONFIG:  # Moved to top of file
-#     authsource: ''
-#     collection: modulestore
-#     connectTimeoutMS: 2000
-#     db: edxapp
-#     host: localhost
-#     password: password
-#     port: 27017
-#     replicaSet: ''
-#     socketTimeoutMS: 3000
-#     ssl: false
-#     user: edxapp
 
 EDXMKTG_USER_INFO_COOKIE_NAME: edx-user-info
 EDX_PLATFORM_REVISION: release
@@ -375,7 +363,7 @@ PARTNER_SUPPORT_EMAIL: ''
 PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG:
     ENFORCE_COMPLIANCE_ON_LOGIN: false
 PASSWORD_RESET_SUPPORT_LINK: ''
-PAYMENT_SUPPORT_EMAIL: support@mitxonline.mit.edu  # MODIFIED
+PAYMENT_SUPPORT_EMAIL: {{ key "edxapp/sender-email-address" }}  # MODIFIED
 PLATFORM_DESCRIPTION: MITx Online # MODIFIED
 PLATFORM_FACEBOOK_ACCOUNT: http://www.facebook.com/YourPlatformFacebookAccount
 PLATFORM_NAME: MITx Online  # MODIFIED
@@ -431,7 +419,7 @@ SUPPORT_SITE_LINK: ''
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
 TIME_ZONE: America/New_York
-UNIVERSITY_EMAIL: support@mitxonline.mit.edu # MODIFIED
+UNIVERSITY_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 USERNAME_REPLACEMENT_WORKER: OVERRIDE THIS WITH A VALID USERNAME
 VIDEO_IMAGE_MAX_AGE: 31536000
 VIDEO_IMAGE_SETTINGS:
