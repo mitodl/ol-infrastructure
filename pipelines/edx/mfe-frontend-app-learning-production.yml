@@ -49,7 +49,7 @@ jobs:
         LOGO_TRADEMARK_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png
         LOGO_WHITE_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png
         FAVICON_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico
-        MARKETING_SITE_BASE_URL: https://courses.mitxonline.mit.edu
+        MARKETING_SITE_BASE_URL: https://mitxonline.mit.edu
         PUBLIC_PATH: /learn/
         REFRESH_ACCESS_TOKEN_ENDPOINT: https://courses.mitxonline.mit.edu/login_refresh
         SEARCH_CATALOG_URL: https://courses.mitxonline.mit.edu/courses
