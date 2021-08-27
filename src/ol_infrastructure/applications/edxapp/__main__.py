@@ -1091,7 +1091,6 @@ web_asg = autoscaling.Group(
 web_asg_scale_up_policy = autoscaling.Policy(
     "edxapp-web-scale-up-policy",
     adjustment_type="PercentChangeInCapacity",
-    cooldown=300,
     estimated_instance_warmup=300,
     policy_type="StepScaling",
     step_adjustments=[
@@ -1116,7 +1115,6 @@ web_asg_scale_up_policy = autoscaling.Policy(
 web_asg_scale_down_policy = autoscaling.Policy(
     "edxapp-web-scale-down-policy",
     adjustment_type="PercentChangeInCapacity",
-    cooldown=300,
     estimated_instance_warmup=300,
     policy_type="StepScaling",
     step_adjustments=[
