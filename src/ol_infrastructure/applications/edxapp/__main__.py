@@ -415,6 +415,15 @@ edxapp_mysql_role_statements["xqueue"] = {
     ),
     "revoke": Template("DROP USER '{{name}}';"),
 }
+edxapp_mysql_role_statements["notes"] = {
+    "create": Template(
+        "CREATE DATABASE IF NOT EXISTS edx_notes_api;"
+        "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
+        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
+        "CREATE TEMPORARY TABLES, LOCK TABLES ON edx_notes_api.* TO '{{name}}'@'%';"
+    ),
+    "revoke": Template("DROP USER '{{name}}';"),
+}
 
 edxapp_db_vault_backend_config = OLVaultMysqlDatabaseConfig(
     db_name=edxapp_db_config.db_name,
@@ -741,7 +750,7 @@ edxapp_vault_policy = vault.Policy(
     policy=Path(__file__).parent.joinpath("edxapp_policy.hcl").read_text(),
 )
 # Register edX Platform AMI for Vault AWS auth
-vault.aws.AuthBackendRole(
+edxapp_web_vault_auth_role = vault.aws.AuthBackendRole(
     "edxapp-web-ami-ec2-vault-auth",
     backend="aws",
     auth_type="iam",
@@ -755,7 +764,7 @@ vault.aws.AuthBackendRole(
     token_policies=[edxapp_vault_policy.name],
 )
 
-vault.aws.AuthBackendRole(
+edxapp_worker_vault_auth_role = vault.aws.AuthBackendRole(
     "edxapp-worker-ami-ec2-vault-auth",
     backend="aws",
     auth_type="iam",
@@ -767,6 +776,39 @@ vault.aws.AuthBackendRole(
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[edxapp_vpc_id],
     token_policies=[edxapp_vault_policy.name],
+)
+
+edx_notes_vault_policy = vault.Policy(
+    "edx-notes-api-vault-policy",
+    name="edx-notes-api",
+    policy=Path(__file__).parent.joinpath("edx_notes_api_policy.hcl").read_text(),
+)
+edxapp_notes_iam_role = iam.Role(
+    "edx-notes-api-iam-role",
+    assume_role_policy=json.dumps(
+        {
+            "Version": IAM_POLICY_VERSION,
+            "Statement": {
+                "Effect": "Allow",
+                "Action": "sts:AssumeRole",
+                "Principal": {"Service": "ecs-tasks.amazonaws.com"},
+            },
+        }
+    ),
+    name_prefix=f"edx-notes-role-{env_name}-"[:32],
+    path=f"/ol-applications/edx-notes-api/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    tags=aws_config.merged_tags({"Name": f"{env_name}-edx-notes-api-role"}),
+)
+edxapp_notes_vault_auth_role = vault.aws.AuthBackendRole(
+    "edx-notes-iam-vault-auth",
+    backend="aws",
+    auth_type="iam",
+    role="edx-notes-api",
+    bound_account_ids=[aws_account.account_id],
+    bound_vpc_ids=[edxapp_vpc_id],
+    token_policies=[edx_notes_vault_policy.name],
+    bound_iam_role_arns=[edxapp_notes_iam_role.arn],
+    bound_iam_principal_arns=[edxapp_notes_iam_role.arn],
 )
 
 ##########################
@@ -1217,5 +1259,6 @@ export(
         "mfe_bucket": mfe_bucket_name,
         "load_balancer": {"dns_name": web_lb.dns_name, "arn": web_lb.arn},
         "ses_configuration_set": edxapp_ses_configuration_set.name,
+        "edx_notes_iam_role": edxapp_notes_iam_role.arn,
     },
 )
