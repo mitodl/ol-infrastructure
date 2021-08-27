@@ -20,6 +20,7 @@ from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import (
     acm,
     autoscaling,
+    cloudwatch,
     docdb,
     ec2,
     elasticsearch,
@@ -1022,6 +1023,75 @@ web_asg = autoscaling.Group(
             {"ami_id": edxapp_web_ami.id}
         ).items()
     ],
+)
+
+web_asg_scale_up_policy = autoscaling.Policy(
+    "edxapp-web-scale-up-policy",
+    adjustment_type="PercentChangeInCapacity",
+    cooldown=300,
+    estimated_instance_warmup=300,
+    policy_type="StepScaling",
+    step_adjustments=[
+        autoscaling.PolicyStepAdjustmentArgs(
+            scaling_adjustment=0,
+            metric_interval_lower_bound=0,
+            metric_interval_upper_bound=10,
+        ),
+        autoscaling.PolicyStepAdjustmentArgs(
+            scaling_adjustment=10,
+            metric_interval_lower_bound=10,
+            metric_interval_upper_bound=20,
+        ),
+        autoscaling.PolicyStepAdjustmentArgs(
+            scaling_adjustment=30,
+            metric_interval_lower_bound=20,
+        ),
+    ],
+    autoscaling_group_name=web_asg.name,
+)
+
+web_asg_scale_down_policy = autoscaling.Policy(
+    "edxapp-web-scale-down-policy",
+    adjustment_type="PercentChangeInCapacity",
+    cooldown=300,
+    estimated_instance_warmup=300,
+    policy_type="StepScaling",
+    step_adjustments=[
+        autoscaling.PolicyStepAdjustmentArgs(
+            scaling_adjustment=0,
+            metric_interval_lower_bound=-10,
+            metric_interval_upper_bound=0,
+        ),
+        autoscaling.PolicyStepAdjustmentArgs(
+            scaling_adjustment=-10,
+            metric_interval_lower_bound=-20,
+            metric_interval_upper_bound=-10,
+        ),
+        autoscaling.PolicyStepAdjustmentArgs(
+            scaling_adjustment=-30,
+            metric_interval_upper_bound=-20,
+        ),
+    ],
+    autoscaling_group_name=web_asg.name,
+)
+
+web_alb_metric_alarm = cloudwatch.MetricAlarm(
+    "edxapp-web-alb-metric-alarm",
+    comparison_operator="GreaterThanOrEqualToThreshold",
+    evaluation_periods=5,
+    metric_name="TargetResponseTime",
+    namespace="AWS/ApplicationELB",
+    period=120,
+    statistic="Average",
+    threshold=1,
+    dimensions={
+        "AutoScalingGroupName": web_asg.name,
+    },
+    datapoints_to_alarm=5,
+    alarm_description="Time elapsed after the request leaves the load balancer until a response from the target is received",
+    alarm_actions=[web_asg_scale_up_policy.arn],
+    ok_actions=[web_asg_scale_down_policy.arn],
+    tags=aws_config.tags,
 )
 
 worker_instance_type = (
