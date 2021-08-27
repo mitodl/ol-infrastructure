@@ -3,7 +3,7 @@ resource_types:
 - name: rclone
   type: docker-image
   source:
-    repository: sothr/concourse-rclone-resource
+    repository: mitodl/concourse-rclone-resource
     tag: latest
 
 resources:

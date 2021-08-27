@@ -4,7 +4,7 @@ resources:
   type: git
   source:
     uri: https://github.com/mitodl/concourse-rclone-resource.git
-    branch: mitodl
+    branch: master
 - name: concourse-rclone-resource-image
   type: docker-image
   source:
