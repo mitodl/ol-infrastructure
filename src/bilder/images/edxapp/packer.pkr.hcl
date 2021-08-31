@@ -97,7 +97,7 @@ build {
     inline = [
       "openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /tmp/edxapp.key -out /tmp/edxapp.cert -subj '/C=US/ST=MA/L=Cambridge/O=MIT Open Learning/OU=Engineering/CN=edxapp.example.com'",
       "cd /tmp && git clone https://github.com/edx/configuration --depth 1 --branch $EDX_ANSIBLE_BRANCH",
-      "cd /tmp/configuration && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt"
+      "cd /tmp/configuration && python3 -m venv .venv && .venv/bin/pip install wheel && .venv/bin/pip install -r requirements.txt"
     ]
   }
   provisioner "ansible-local" {

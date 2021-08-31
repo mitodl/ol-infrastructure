@@ -11,6 +11,7 @@ pip.packages(
     virtualenv="/edx/app/edxapp/venvs/edxapp/",
     sudo_user="edxapp",
 )
+
 files.directory(
     name="Create .ssh directory for www-data user to clone course repositories",
     path=Path("/var/www/.ssh/"),
@@ -23,6 +24,5 @@ for host in ("github.com", "github.mit.edu"):
     ssh.keyscan(
         name=f"Add {host} public SSH fingerprint for course import/export",
         hostname=host,
-        su_user="www-data",
-        su_shell="/bin/bash",
+        sudo_user="www-data",
     )
