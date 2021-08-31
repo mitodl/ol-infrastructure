@@ -18,6 +18,7 @@ import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi.output import Output
 from pulumi_aws import (
     acm,
     autoscaling,
@@ -1146,7 +1147,9 @@ web_alb_metric_alarm = cloudwatch.MetricAlarm(
     statistic="Average",
     threshold=1,
     dimensions={
-        "AutoScalingGroupName": web_asg.name,
+        "LoadBalancer": Output.all(lb_arn=web_lb.arn_suffix).apply(
+            lambda lb_attrs: f"{lb_attrs['lb_arn']}"
+        ),
     },
     datapoints_to_alarm=5,
     alarm_description="Time elapsed after the request leaves the load balancer until a response from the target is received",
