@@ -50,6 +50,7 @@ XQUEUE_INTERFACE:
         password: {{ .Data.xqueue_edxapp_password }}
         username: edxapp
     url: http://xqueue-{{ env "ENVIRONMENT" }}.private.odl.mit.edu  # MODIFIED
+EOX_CORE_SENTRY_INTEGRATION_DSN: {{ .Data.sentry_dsn }}  # ADDED KEY
 {{ end }}
 
 {{ with secret "secret-mitxonline/edx-forum" }}
@@ -242,6 +243,8 @@ EMAIL_BACKEND: django_ses.SESBackend  # MODIFIED
 ENABLE_COMPREHENSIVE_THEMING: true  # MODIFIED
 EVENT_TRACKING_SEGMENTIO_EMIT_WHITELIST: []
 EXTRA_MIDDLEWARE_CLASSES: []
+EOX_CORE_SENTRY_IGNORED_ERRORS: []  # ADDED KEY
+EOX_CORE_SENTRY_ENVIRONMENT: {{ env "ENVIRONMENT" }}
 FACEBOOK_API_VERSION: v2.1
 FACEBOOK_APP_ID: FACEBOOK_APP_ID
 FACEBOOK_APP_SECRET: FACEBOOK_APP_SECRET

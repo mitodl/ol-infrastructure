@@ -72,6 +72,7 @@ pip.packages(
         "social-auth-mitxpro==0.4",
         "edx-username-changer==0.1.0",
         "edx-sysadmin",
+        "eox-core[sentry]",
     ],
     present=True,
     virtualenv="/edx/app/edxapp/venvs/edxapp/",
