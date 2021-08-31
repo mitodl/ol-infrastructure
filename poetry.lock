@@ -132,14 +132,14 @@ uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
 name = "boto3"
-version = "1.18.30"
+version = "1.18.31"
 description = "The AWS SDK for Python"
 category = "main"
 optional = false
 python-versions = ">= 3.6"
 
 [package.dependencies]
-botocore = ">=1.21.30,<1.22.0"
+botocore = ">=1.21.31,<1.22.0"
 jmespath = ">=0.7.1,<1.0.0"
 s3transfer = ">=0.5.0,<0.6.0"
 
@@ -148,7 +148,7 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.21.30"
+version = "1.21.31"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
 optional = false
@@ -918,7 +918,7 @@ ssh = ["paramiko"]
 
 [[package]]
 name = "pre-commit"
-version = "2.14.0"
+version = "2.14.1"
 description = "A framework for managing and maintaining multi-language pre-commit hooks."
 category = "dev"
 optional = false
@@ -1539,7 +1539,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "2863099eeb4f0f99eb0e6e03c5063ca3fcbec47631580567d96df35dc4fb3806"
+content-hash = "5bb5d408cfd7a2a282d95b97e5e30587d82bad81041567a16fbed7b4a5ad25e8"
 
 [metadata.files]
 anyio = [
@@ -1588,12 +1588,12 @@ black = [
     {file = "black-21.7b0.tar.gz", hash = "sha256:c8373c6491de9362e39271630b65b964607bc5c79c83783547d76c839b3aa219"},
 ]
 boto3 = [
-    {file = "boto3-1.18.30-py3-none-any.whl", hash = "sha256:542336dda9a728c250cf24aea6d87454136d9d6f3d8a84ec5a737a7edba3b932"},
-    {file = "boto3-1.18.30.tar.gz", hash = "sha256:9bf2a281a6df9f8948d3d322d532d03a1039f57a049a1aa2b72b4a28c9627013"},
+    {file = "boto3-1.18.31-py3-none-any.whl", hash = "sha256:203e86311253d291d39588ae2e8dce82eecc10b9f4567ef765d7c54ec02a3e2b"},
+    {file = "boto3-1.18.31.tar.gz", hash = "sha256:59445d0e1d55c8c9675697ea41c98a0d82089a4be3076ea60e3a87cbe94dc141"},
 ]
 botocore = [
-    {file = "botocore-1.21.30-py3-none-any.whl", hash = "sha256:26ab09126dd05c968fbbcb894a1d623355e6119ff6d4a2bf5d292e3ad7cdd628"},
-    {file = "botocore-1.21.30.tar.gz", hash = "sha256:9b0b3dbc144178e2b803097abcc95712a03b8dde5a02e4335ac870bc6c129dd9"},
+    {file = "botocore-1.21.31-py3-none-any.whl", hash = "sha256:8bc35ae34256cac76828ab96c80bc6653b942f85ad1898e7e265196fe92b659e"},
+    {file = "botocore-1.21.31.tar.gz", hash = "sha256:58cd315e2ae0971acdb3d7cda9c9c36b41c73181f41943a7443812d6d3c9ad18"},
 ]
 certifi = [
     {file = "certifi-2021.5.30-py2.py3-none-any.whl", hash = "sha256:50b1e4f8446b06f41be7dd6338db18e0990601dce795c2b1686458aa7e8fa7d8"},
@@ -2098,8 +2098,8 @@ plumbum = [
     {file = "plumbum-1.7.0.tar.gz", hash = "sha256:317744342c755319907c773cc87c3a30adaa3a41b0d34c0ce02d9d1904922dce"},
 ]
 pre-commit = [
-    {file = "pre_commit-2.14.0-py2.py3-none-any.whl", hash = "sha256:ec3045ae62e1aa2eecfb8e86fa3025c2e3698f77394ef8d2011ce0aedd85b2d4"},
-    {file = "pre_commit-2.14.0.tar.gz", hash = "sha256:2386eeb4cf6633712c7cc9ede83684d53c8cafca6b59f79c738098b51c6d206c"},
+    {file = "pre_commit-2.14.1-py2.py3-none-any.whl", hash = "sha256:a22d12a02da4d8df314187dfe7a61bda6291d57992060522feed30c8cd658b68"},
+    {file = "pre_commit-2.14.1.tar.gz", hash = "sha256:7977a3103927932d4823178cbe4719ab55bb336f42a9f3bb2776cff99007a117"},
 ]
 protobuf = [
     {file = "protobuf-3.17.3-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:ab6bb0e270c6c58e7ff4345b3a803cc59dbee19ddf77a4719c5b635f1d547aa8"},

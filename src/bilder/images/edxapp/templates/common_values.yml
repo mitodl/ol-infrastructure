@@ -217,7 +217,7 @@ DASHBOARD_COURSE_LIMIT: null
 DATA_DIR: /edx/var/edxapp  # Filesystem path where edx puts files for course export/import
 DEFAULT_COURSE_VISIBILITY_IN_CATALOG: both
 DEFAULT_FEEDBACK_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
-DEFAULT_FILE_STORAGE: storages.backends.s3boto.S3BotoStorage  # MODIFIED
+DEFAULT_FILE_STORAGE: storages.backends.s3boto3.S3Boto3Storage  # MODIFIED
 DEFAULT_FROM_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_MOBILE_AVAILABLE: false
 DEFAULT_SITE_THEME: edxapp-theme  # MODIFIED - Using a generic name to simplify usage across deployments
