@@ -104,8 +104,6 @@ CONTENTSTORE:
         <<: *mongo_params
 
 ACTIVATION_EMAIL_SUPPORT_LINK: ''
-ADDL_INSTALLED_APPS:  # ADDED KEY
-  - git_auto_export
 AFFILIATE_COOKIE_NAME: dev_affiliate_id
 # ANALYTICS_DASHBOARD_NAME: Your Platform Name Here Insights
 # ANALYTICS_DASHBOARD_URL: http://localhost:18110/courses
