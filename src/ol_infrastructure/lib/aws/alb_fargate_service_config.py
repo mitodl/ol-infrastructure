@@ -1,7 +1,7 @@
 from enum import unique, Enum
 from typing import List, Optional
-from pulumi_aws.ec2.security_group import SecurityGroup
-from pulumi_aws.lb.load_balancer import LoadBalancer
+from pulumi_aws.ec2 import SecurityGroup
+from pulumi_aws.lb import LoadBalancer
 from pulumi import Output
 
 from pydantic.types import PositiveInt
@@ -113,8 +113,8 @@ class OLApplicationLoadBalancedFargateConfig(AWSBase):
     """Type of IP address used by subnets, for the load balancer"""
     ip_address_type: str = "ipv4"
 
-    """List of security group ids to be assigned to Fargate Service"""
-    security_groups: List[SecurityGroup] = None
+    """Security groups associated with the service and tasks"""
+    security_groups: List[SecurityGroup]
 
     """List of subnet ids to attach to load balancer"""
     subnets: List[str] = None

@@ -47,7 +47,7 @@ class OLFargateContainerDefinitionConfig(BaseModel):
     is_essential: bool = False
 
     """Environment variables to pass to container"""
-    environment: Dict[str, str] = None
+    environment: Optional[Dict[str, str]] = None
 
     """Secrets that will be exposed to your container"""
     secrets: Optional[List[Secret]] = None

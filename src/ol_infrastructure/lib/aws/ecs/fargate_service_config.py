@@ -43,8 +43,8 @@ class OLFargateServiceConfig(AWSBase):
     """ECS cluster that will be parent of ECS Service. Will be created if not provided"""
     cluster: Optional[Cluster]
 
-    """Determines whether ECS Fargate service will have public IP or not"""
-    assign_public_ip: bool = False 
+    """Determines whether ECS Fargate service will have public IP or not. Defaults to true"""
+    assign_public_ip: bool = True 
 
     """IAM Role for ECS Service to use for Load Balancer communication"""
     service_role: Optional[Role]
@@ -83,7 +83,7 @@ class OLFargateServiceConfig(AWSBase):
     _deployment_controller: DeploymentControllerTypes = DeploymentControllerTypes.ecs
 
     """Lastest Fargate version will always be used"""
-    _fargate_platform_version: str = "latest"
+    _fargate_platform_version: str = "LATEST"
 
     """Launch type for service and tasks. Only FARGATE is supported"""
     _launch_type: LaunchTypes = LaunchTypes.fargate

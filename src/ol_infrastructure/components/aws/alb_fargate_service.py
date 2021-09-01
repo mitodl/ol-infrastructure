@@ -1,7 +1,25 @@
-from os import name
+"""This module defines a Pulumi component resource for encapsulating our best practices for building Application Load Balanced ECS Fargate Services.
+
+This includes:
+
+- ECS Cluster
+- ECS Service
+- ECS Task Definition - Single image task or multiple images (sidecar)
+- EC2 Security Group(s)
+- EC2 Load Balancer
+- EC2 Listener
+- EC2 Target Group
+- Route53 Zone (optional)
+- ACM Certificate (optional)
+
+Required On Input:
+- VPC
+- Subnets (Implicit)
+"""
+
 import pulumi
 from typing import Tuple, List
-from pulumi_aws.ec2.route import Route
+from pulumi.resource import ResourceOptions
 
 from pulumi_aws.route53 import (
     Record,
@@ -37,8 +55,7 @@ from ol_infrastructure.lib.aws.alb_fargate_service_config import (
 
 from ol_infrastructure.lib.aws.ecs.fargate_service_config import OLFargateServiceConfig
 
-
-class ApplicationLoadBalancedFargateService(pulumi.ComponentResource):
+class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
     def __init__(self, config: OLApplicationLoadBalancedFargateConfig, opts: pulumi.ResourceOptions = None):
 
         super().__init__(
@@ -54,6 +71,8 @@ class ApplicationLoadBalancedFargateService(pulumi.ComponentResource):
         subnets = get_subnet_ids(
             vpc_id=config.vpc_id,
         )
+
+        pulumi.log.debug("Retrieve subnet ids from vpc")
 
         ingress_cidr = ["0.0.0.0/0"]
         if not config.listener_open_to_all_traffic:
@@ -89,22 +108,32 @@ class ApplicationLoadBalancedFargateService(pulumi.ComponentResource):
                 to_port=0,
                 cidr_blocks=["0.0.0.0/0"]
             )],
-            tags=config.tags
+            tags=config.tags,
+            opts=resource_options
         )
 
-        """Only Application load balancer types are supported"""
-        self.load_balancer = LoadBalancer(
-            f"{config.service_name}-lb",
-            access_logs=config.access_log,
-            internal=config.internal,
-            ip_address_type=config.ip_address_type,
-            name=config.load_balancer_name,
-            subnets=subnets.ids,
-            load_balancer_type=config._load_balancer_type,
-            security_groups=[lb_security_group],
-            opts=resource_options,
-            tags=config.tags
-        )
+        pulumi.log.debug(f"Security group for load balancer created for port {config.listener_port}")
+
+        if config.load_balancer:
+            self.load_balancer = config.load_balancer
+
+            pulumi.log.debug("Existing load balancer utilized")
+        else:
+            """Only Application load balancer types are supported"""
+            self.load_balancer = LoadBalancer(
+                f"{config.service_name}-lb",
+                access_logs=config.access_log,
+                internal=config.internal,
+                ip_address_type=config.ip_address_type,
+                name=config.load_balancer_name,
+                subnets=subnets.ids,
+                load_balancer_type=config._load_balancer_type,
+                security_groups=[lb_security_group],
+                opts=resource_options,
+                tags=config.tags
+            )
+
+            pulumi.log.debug("New load balancer created")
 
         # target group will be used to attach containers to LB
         target_group = self.build_target_group(config, resource_options)
@@ -118,11 +147,14 @@ class ApplicationLoadBalancedFargateService(pulumi.ComponentResource):
         """Protocol is either HTTP or HTTPS; ssl_policy is allowed and required only for HTTPS"""
         listener_protocol, ssl_policy, redirect = self.build_protocol_details(config)
         if redirect:
+            pulumi.log.debug("HTTP requests will be redirected to HTTPS")
+
             default_actions.append(redirect)
 
         cert_arn = None
         if listener_protocol == Protocol.https:
-            self.record, cert_arn = self.build_domain_resources(config, self.load_balancer)
+            self.record, cert_arn = self.build_domain_resources(
+                config, self.load_balancer, resource_options)
 
         self.listener = Listener(
             f"{config.service_name}-listener",
@@ -143,7 +175,7 @@ class ApplicationLoadBalancedFargateService(pulumi.ComponentResource):
             config, target_group)
 
         config = OLFargateServiceConfig(
-            service_name="ecs-test",
+            service_name=config.service_name,
             desired_count=config.desired_count,
             assign_public_ip=config.assign_public_ip,
             vpc_id=config.vpc_id,
@@ -166,9 +198,9 @@ class ApplicationLoadBalancedFargateService(pulumi.ComponentResource):
         component_outputs = {
             "cluster": self.service.cluster,
             "service": self.service.service,
+            "task_definition": self.service.task_definition,
             "load_balancer": self.load_balancer,
             "listener": self.listener,
-            "record": self.record
         }
 
         self.register_outputs(component_outputs)
@@ -187,7 +219,6 @@ class ApplicationLoadBalancedFargateService(pulumi.ComponentResource):
             ssl_policy = "ELBSecurityPolicy-2016-08"
             config.listener_port = 443
 
-            redirect = None
             # redirect all http -> https if caller asks
             if config.redirect_http:
                 redirect = ListenerDefaultActionArgs(
@@ -198,6 +229,8 @@ class ApplicationLoadBalancedFargateService(pulumi.ComponentResource):
                         status_code="HTTP_301"
                     )
                 )
+
+        pulumi.log.debug(f"{listener_protocol} being utilized for load balancer listener")
 
         return listener_protocol, ssl_policy, redirect
 
@@ -218,7 +251,7 @@ class ApplicationLoadBalancedFargateService(pulumi.ComponentResource):
             target_type="ip",
             vpc_id=config.vpc_id,
             tags=config.tags,
-            opts=opts,
+            opts=opts
         )
 
     """Iterate through all container definitions and attach to LB, if the appropriate flag is set"""
@@ -230,6 +263,9 @@ class ApplicationLoadBalancedFargateService(pulumi.ComponentResource):
 
             # if container asks to be attached, we will attach it to the target group created that is mounted to the LB
             if container.attach_to_load_balancer:
+
+                pulumi.log.debug(f"Container {container.container_name} will be attached to load balancer")
+
                 load_balancer_configuration.append(ServiceLoadBalancerArgs(
                     target_group_arn=target_group.arn,
                     container_name=container.container_name,
@@ -238,7 +274,7 @@ class ApplicationLoadBalancedFargateService(pulumi.ComponentResource):
 
         return load_balancer_configuration
 
-    def build_domain_resources(self, config: OLApplicationLoadBalancedFargateConfig, load_balancer: LoadBalancer) -> Tuple[Record, str]:
+    def build_domain_resources(self, config: OLApplicationLoadBalancedFargateConfig, load_balancer: LoadBalancer, opts: ResourceOptions) -> Tuple[Record, str]:
 
         zone = get_zone(config.zone_name)
         cert = get_certificate(
@@ -246,6 +282,8 @@ class ApplicationLoadBalancedFargateService(pulumi.ComponentResource):
             most_recent=True,
             statuses=["ISSUED"]
         )
+
+        pulumi.log.debug(f"Route 53 zone {config.zone_name} and ACM certificate {config.zone_name} retrieved")
 
         record = None
         if config.route53_record_type == Route53RecordType.alias:
@@ -259,7 +297,8 @@ class ApplicationLoadBalancedFargateService(pulumi.ComponentResource):
                     name=load_balancer.dns_name,
                     zone_id=load_balancer.zone_id,
                     evaluate_target_health=True
-                )]
+                )],
+                opts=opts
             )
 
         elif config.route53_record_type == Route53RecordType.cname:

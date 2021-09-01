@@ -10,7 +10,7 @@ from pulumi_aws.cloudwatch import LogGroup
 from pulumi_aws.ecs import Cluster
 
 from ol_infrastructure.components.aws.fargate_service import OLFargateService
-from ol_infrastructure.components.aws.alb_fargate_service import ApplicationLoadBalancedFargateService
+from ol_infrastructure.components.aws.alb_fargate_service import OLApplicationLoadBalancedFargateService
 from ol_infrastructure.lib.aws.alb_fargate_service_config import (
     OLApplicationLoadBalancedFargateConfig, Protocol
 )
@@ -27,7 +27,7 @@ vpc_stack = pulumi.StackReference("phillipedwards/ecs-vpc/dev")
 vpc_id = vpc_stack.require_output("vpcId")
 
 desired_task_count = 3
-circuit_breaker = False
+circuit_breaker = True
 health_check = 60
 
 # Since all tasks are in a public subnet, give them public IPs to interact with internet
@@ -62,7 +62,6 @@ security_group = SecurityGroup(
     tags=aws_config.tags
 )
 
-# move log group to fargate service
 log_group = LogGroup(
     "ecs-log-group",
     name="ecs/test/log_group",
@@ -161,7 +160,7 @@ else:
         tags=aws_config.tags
     )
 
-    app = ApplicationLoadBalancedFargateService(
+    app = OLApplicationLoadBalancedFargateService(
         config=config
     )
 

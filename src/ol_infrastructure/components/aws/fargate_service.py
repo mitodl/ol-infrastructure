@@ -1,4 +1,4 @@
-"""This module defines a Pulumi component resource for encapsulating our best practices for building ECS Fargate Services.
+"""This module defines a Pulumi component resource for encapsulating our best practices for building ECS Fargate Services. This module can accept a load balancer, if the caller chooses, but it is not required.
 
 This includes:
 
@@ -41,11 +41,11 @@ from ol_infrastructure.lib.aws.ecs.fargate_service_config import (
 
 class OLFargateService(pulumi.ComponentResource):
 
-    def __init__(self, fargate_config: OLFargateServiceConfig, opts: pulumi.ResourceOptions = None):
+    def __init__(self, config: OLFargateServiceConfig, opts: pulumi.ResourceOptions = None):
 
         super().__init__(
             "ol:infrastructure:aws:ecs:OLFargateService",
-            fargate_config.service_name,
+            config.service_name,
             None,
             opts,
         )
@@ -53,21 +53,21 @@ class OLFargateService(pulumi.ComponentResource):
         self.resource_options = pulumi.ResourceOptions(
             parent=self).merge(opts)  # type: ignore
 
-        if fargate_config.cluster:
+        if config.cluster:
             pulumi.log.debug(
-                f"using existing ECS Cluster '{fargate_config.cluster.id}' provided in arguments")
-            self.cluster = fargate_config.cluster
+                f"using existing ECS Cluster '{config.cluster.id}' provided in arguments")
+            self.cluster = config.cluster
         else:
             pulumi.log.debug("creating new ECS cluster")
             self.cluster = Cluster(
-                f"{fargate_config.service_name}_cluster",
-                tags=fargate_config.tags,
+                f"{config.service_name}_cluster",
+                tags=config.tags,
                 opts=self.resource_options
             )
 
         """We'll enable rollback, as well as, circuit breaker if caller opts in"""
         circuit_breaker = None
-        if fargate_config.deployment_circuit_breaker_enabled:
+        if config.deployment_circuit_breaker_enabled:
 
             pulumi.log.debug("ecs service deployment service breaker enabled")
 
@@ -76,19 +76,19 @@ class OLFargateService(pulumi.ComponentResource):
                 rollback=True
             )
 
-        task_config = fargate_config.task_definition_config
+        task_config = config.task_definition_config
 
-        container_definition = self.build_container_definition(fargate_config)
+        container_definition = self.build_container_definition(config)
 
         pulumi.log.debug("container definitions constructed")
 
-        task_definition = TaskDefinition(
-            f"{fargate_config.service_name}_task_def",
+        self.task_definition = TaskDefinition(
+            f"{config.service_name}_task_def",
             family=task_config.task_def_name,
             cpu=task_config.cpu,
-            execution_role_arn=self.get_execution_role_arn(fargate_config),
+            execution_role_arn=self.get_execution_role_arn(config),
             memory=task_config.memory_mib,
-            tags=fargate_config.tags,
+            tags=config.tags,
             task_role_arn=task_config.task_execution_role_arn,
             network_mode="awsvpc",
             requires_compatibilities=["FARGATE"],
@@ -97,35 +97,43 @@ class OLFargateService(pulumi.ComponentResource):
         )
 
         service_role_arn = ""
-        if fargate_config.service_role:
-            service_role_arn = fargate_config.service_role.arn
+        if config.service_role:
+            pulumi.log.debug(f"Attaching existing service role {config.service_role}")
+            
+            service_role_arn = config.service_role.arn
         
         health_check_grace_period = None
-        if fargate_config.load_balancer_configuration:
-            health_check_grace_period = fargate_config.health_check_grace_period_seconds
+        if config.load_balancer_configuration:
+            pulumi.log.debug(f"Setting health check grace period to {config.health_check_grace_period_seconds} seconds")
+
+            health_check_grace_period = config.health_check_grace_period_seconds
 
         self.service = Service(
-            f"{fargate_config.service_name}_service",
-            name=f"{fargate_config.service_name}_service",
+            f"{config.service_name}_service",
+            name=f"{config.service_name}_service",
             cluster=self.cluster.id,
-            desired_count=fargate_config.desired_count,
+            desired_count=config.desired_count,
             iam_role=service_role_arn,
-            deployment_maximum_percent=fargate_config.deployment_max_percent,
-            deployment_minimum_healthy_percent=fargate_config.deployment_min_percent,
-            deployment_controller=fargate_config.get_deployment_controller(),
+            deployment_maximum_percent=config.deployment_max_percent,
+            deployment_minimum_healthy_percent=config.deployment_min_percent,
+            deployment_controller=config.get_deployment_controller(),
             deployment_circuit_breaker=circuit_breaker,
             health_check_grace_period_seconds=health_check_grace_period,
-            launch_type=fargate_config._launch_type,
-            network_configuration=fargate_config.get_service_network_configuration(),
-            load_balancers=fargate_config.load_balancer_configuration,
-            task_definition=task_definition.arn,
-            tags=fargate_config.tags,
+            launch_type=config._launch_type,
+            network_configuration=config.get_service_network_configuration(),
+            load_balancers=config.load_balancer_configuration,
+            task_definition=self.task_definition.arn,
+            platform_version=config._fargate_platform_version,
+            force_new_deployment=config.force_new_deployment,
+            enable_ecs_managed_tags=config.enable_ecs_managed_tags,
+            tags=config.tags,
             opts=self.resource_options
         )
 
         component_outputs = {
             "cluster": self.cluster,
-            "service": self.service
+            "service": self.service,
+            "task_definition": self.task_definition
         }
 
         self.register_outputs(component_outputs)
@@ -154,7 +162,7 @@ class OLFargateService(pulumi.ComponentResource):
                 for key in container.environment.keys():
                     environment.append({
                         "name": key,
-                        "Value": container.environment[key]
+                        "value": container.environment[key]
                     })
 
             outputs.append({
