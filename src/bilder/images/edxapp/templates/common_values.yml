@@ -50,6 +50,7 @@ XQUEUE_INTERFACE:
         password: {{ .Data.xqueue_edxapp_password }}
         username: edxapp
     url: http://xqueue-{{ env "ENVIRONMENT" }}.private.odl.mit.edu  # MODIFIED
+SENTRY_DSN: {{ .Data.sentry_dsn }}
 {{ end }}
 
 {{ with secret "secret-mitxonline/edx-forum" }}
@@ -399,6 +400,7 @@ RETIREMENT_STATES:
 - ABORTED
 - COMPLETE
 SEGMENT_KEY: null
+SENTRY_ENVIRONMENT: {{ env "ENVIRONMENT" }}
 SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
 SESSION_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
 SESSION_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edxapp-sessionid  # MODIFIED
