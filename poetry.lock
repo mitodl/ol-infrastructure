@@ -975,7 +975,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-consul"
-version = "3.2.0"
+version = "3.3.0"
 description = "A Pulumi package for creating and managing consul resources."
 category = "main"
 optional = false
@@ -1540,7 +1540,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "975e23e7c7b79a2d66c8945423972e724fac3b4387c149435cfc8b09bd65a680"
+content-hash = "1bc197889e84bec8c3b31d2df403e561fb742fa18a93fc216cb4eb7df4e8bb54"
 
 [metadata.files]
 anyio = [
@@ -2141,7 +2141,7 @@ pulumi-aws = [
     {file = "pulumi_aws-4.18.0.tar.gz", hash = "sha256:a19b498328c7142b39a0c2778db889001dd836ecc471ddaa7d1558100c5d1697"},
 ]
 pulumi-consul = [
-    {file = "pulumi_consul-3.2.0.tar.gz", hash = "sha256:0d6f3f24e95076d20542eab68fe9f7ca749b0ba33aa51cc8e9c0c5bb8ee5fc79"},
+    {file = "pulumi_consul-3.3.0.tar.gz", hash = "sha256:9d7205d8759efc44d6bbab741f7e2654debe8819e30f614597f86b95ceaf599d"},
 ]
 pulumi-fastly = [
     {file = "pulumi_fastly-3.6.0.tar.gz", hash = "sha256:7fbd23d2c8c0e68c199cec034e056b2e6e06a91e6ad5578e5be9725596ffba93"},
