@@ -8,9 +8,10 @@ log_schema:
 
 sources:
   edxapp:
-    type: journald
-    include_units:
-    - supervisor
+    type: file
+    file_key: log_file
+    include:
+    - /var/log/edxapp/*.log
   auth_log:
     type: file
     file_key: log_file
@@ -19,19 +20,21 @@ sources:
 
 transforms:
 
-  edxapp_logs:
-    inputs:
-    - edxapp
-    type: filter
-    condition: match, err = contains(.message, "[service_variant=")
-
   edxapp_labeled_logs:
     inputs:
-    - edxapp_logs
+    - edxapp
     type: remap
     source: |
-      .labels = ["edxapp", "${ENVIRONMENT}"]
-      .environment = "${ENVIRONMENT}"
+      event, err = parse_json(.message)
+      if event != null {
+        . = merge!(., event)
+        .@timestamp = .timestamp
+        .labels = ["edxapp", "${ENVIRONMENT}"]
+        .application = "edxapp"
+        .environment = "${ENVIRONMENT}"
+      } else {
+        .malformed = true
+      }
 
   auth_log_parser:
     inputs:
@@ -61,11 +64,17 @@ transforms:
     type: filter
     condition: .appname != "CRON"
 
+  edxapp_enriched_logs:
+    type: aws_ec2_metadata
+    inputs:
+      - edxapp_labeled_logs
+    namespace: ec2
+
 sinks:
 
-  elasticsearch_lms_cms_worker:
+  elasticsearch_lms_cms:
     inputs:
-    - edxapp_labeled_logs
+    - edxapp_enriched_logs
     type: elasticsearch
     endpoint: http://logging-elasticsearch.query.consul:9200
     index: logs-${ENVIRONMENT}-edxapp-%Y.%W
