@@ -13,11 +13,11 @@ Vagrant.configure("2") do |config|
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://vagrantcloud.com/search.
   config.vm.define "debian" do |debian|
-    debian.vm.box = "debian/buster64"
+    debian.vm.box = "debian/bullseye64"
   end
 
   config.vm.define "centos" do |centos|
-    centos.vm.box = "centos/7"
+    centos.vm.box = "bento/rockylinux-8"
   end
 
   config.vm.define "ubuntu" do |ubuntu|

@@ -30,6 +30,10 @@ path "secret-mitxonline/edx-xqueue" {
   capabilities = ["read"]
 }
 
+path "secret-operations/global/github-enterprise-ssh" {
+  capabilities = ["read"]
+}
+
 path "secret-mitxonline/mitxonline-wildcard-certificate" {
   capabilities = ["read"]
 }

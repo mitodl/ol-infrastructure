@@ -42,6 +42,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_MONGODB_PORT,
     DEFAULT_MYSQL_PORT,
     DEFAULT_REDIS_PORT,
+    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
 )
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
@@ -456,9 +457,13 @@ edxapp_db_consul_service = Service(
             check_id="edxapp-db",
             interval="10s",
             name="edxapp-db",
-            timeout="60s",
+            timeout="1m0s",
             status="passing",
-            tcp=f"{edxapp_db.db_instance.address}:{edxapp_db_config.port}",  # noqa: WPS237,E501
+            tcp=Output.all(
+                address=edxapp_db.db_instance.address, port=edxapp_db_config.port
+            ).apply(
+                lambda db: "{address}:{port}".format(**db)
+            ),  # noqa: WPS237,E501
         )
     ],
 )
@@ -488,7 +493,7 @@ if elasticsearch_domain_name := edxapp_config.get("elasticsearch_domain_name"):
                 check_id="edxapp-elasticsearch",
                 interval="10s",
                 name="edxapp-elasticsearch",
-                timeout="60s",
+                timeout="1m0s",
                 status="passing",
                 tcp=edxapp_es.endpoint,
             )
@@ -527,7 +532,7 @@ if docdb_cluster_id := edxapp_config.get("docdb_cluster_id"):
                 check_id="edxapp-mongo",
                 interval="10s",
                 name="mongodb-master",
-                timeout="60s",
+                timeout="1m0s",
                 status="passing",
                 tcp=f"{edxapp_mongo_host_name}:{edxapp_mongo_host.port}",
             )
@@ -619,9 +624,12 @@ edxapp_redis_consul_service = Service(
             check_id="edxapp-redis",
             interval="10s",
             name="edxapp-redis",
-            timeout="60s",
+            timeout="1m0s",
             status="passing",
-            tcp=f"{edxapp_redis_cache.address}:{edxapp_redis_cache.cache_cluster.port}",  # noqa: WPS237,E501
+            tcp=Output.all(
+                address=edxapp_redis_cache.address,
+                port=edxapp_redis_cache.cache_cluster.port,
+            ).apply(lambda cluster: "{address}:{port}".format(**cluster)),
         )
     ],
 )
@@ -796,8 +804,8 @@ edxapp_notes_iam_role = iam.Role(
             },
         }
     ),
-    name_prefix=f"edx-notes-role-{env_name}-"[:32],
-    path=f"/ol-applications/edx-notes-api/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    name_prefix=f"edx-notes-role-{env_name}-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
+    path=f"/ol-applications/edx-notes-api/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
     tags=aws_config.merged_tags({"Name": f"{env_name}-edx-notes-api-role"}),
 )
 edxapp_notes_vault_auth_role = vault.aws.AuthBackendRole(
@@ -805,10 +813,8 @@ edxapp_notes_vault_auth_role = vault.aws.AuthBackendRole(
     backend="aws",
     auth_type="iam",
     role="edx-notes-api",
-    bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[edxapp_vpc_id],
+    resolve_aws_unique_ids=True,
     token_policies=[edx_notes_vault_policy.name],
-    bound_iam_role_arns=[edxapp_notes_iam_role.arn],
     bound_iam_principal_arns=[edxapp_notes_iam_role.arn],
 )
 

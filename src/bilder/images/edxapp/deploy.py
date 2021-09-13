@@ -49,6 +49,7 @@ from bilder.components.vector.steps import (
 )
 from bilder.facts import has_systemd  # noqa: F401
 from bilder.images.edxapp.lib import WEB_NODE_TYPE, node_type
+from bilder.images.edxapp.plugins import git_export_import  # noqa: F401
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 
 VERSIONS = {  # noqa: WPS407
@@ -71,6 +72,7 @@ pip.packages(
         "social-auth-mitxpro==0.4",
         "edx-username-changer==0.1.0",
         "edx-sysadmin",
+        "ol-openedx-sentry",
     ],
     present=True,
     virtualenv="/edx/app/edxapp/venvs/edxapp/",
@@ -90,7 +92,15 @@ lms_intermediate_template = Path("/etc/consul-template/templates/edxapp-lms.tmpl
 studio_intermediate_template = Path("/etc/consul-template/templates/edxapp-studio.tmpl")
 forum_intermediate_template = Path("/etc/consul-template/templates/edx-forum.tmpl")
 # Install Consul and Vault Agent
-vault_templates = None
+vault_templates = [
+    VaultTemplate(
+        contents=(
+            '{{with secret "secret-operations/global/github-enterprise-ssh" }}'
+            "{{ printf .Data.private_key }}{{ end }}"
+        ),
+        destination=Path("/var/www/.ssh/id_rsa"),
+    )
+]
 consul_templates = [
     ConsulTemplateTemplate(
         contents='{{ key "edxapp-template/studio" }}',
@@ -121,22 +131,24 @@ if node_type == WEB_NODE_TYPE:
             ): {},
         }
     )
-    vault_templates = [
-        VaultTemplate(
-            contents=(
-                '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
-                "{{ printf .Data.cert_chain }}{{ end }}"
+    vault_templates.extend(
+        [
+            VaultTemplate(
+                contents=(
+                    '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
+                    "{{ printf .Data.cert_chain }}{{ end }}"
+                ),
+                destination=Path("/etc/ssl/certs/edxapp.cert"),
             ),
-            destination=Path("/etc/ssl/certs/edxapp.cert"),
-        ),
-        VaultTemplate(
-            contents=(
-                '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
-                "{{ printf .Data.key }}{{ end }}"
+            VaultTemplate(
+                contents=(
+                    '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
+                    "{{ printf .Data.key }}{{ end }}"
+                ),
+                destination=Path("/etc/ssl/private/edxapp.key"),
             ),
-            destination=Path("/etc/ssl/private/edxapp.key"),
-        ),
-    ]
+        ]
+    )
     consul_templates.extend(
         [
             ConsulTemplateTemplate(
