@@ -1,3 +1,7 @@
+"""
+This application is just an example of how the ECS Component Resources (OLFargateService and OLApplicationLoadBalancedFargateService can be utilized)
+"""
+
 import pulumi
 from pulumi_aws.ec2 import (
     SecurityGroup,
@@ -23,7 +27,7 @@ aws_config = AWSBase(
     tags={"OU": "data", "Environment": "DEV"},
 )
 
-vpc_stack = pulumi.StackReference("phillipedwards/ecs-vpc/dev")
+vpc_stack = pulumi.StackReference("VPC-STACK-REQUIRED")
 vpc_id = vpc_stack.require_output("vpcId")
 
 desired_task_count = 3
@@ -131,7 +135,7 @@ else:
     listener_port = 443 if load_balancer_protocol == Protocol.https else 80
 
     if load_balancer_protocol == Protocol.https:
-        hostname = "ndexable.com"
+        hostname = "VALID-HOSTNAME-IN-AWS-ACCOUNT"
         zone = hostname
         domain = f"api.{hostname}"
 
