@@ -73,10 +73,21 @@ pip.packages(
         "edx-username-changer==0.1.0",
         "edx-sysadmin",
         "ol-openedx-sentry",
+        "ol-openedx-logging",
     ],
     present=True,
     virtualenv="/edx/app/edxapp/venvs/edxapp/",
     sudo_user="edxapp",
+)
+
+files.directory(
+    name="Create edX log directory and set permissions",
+    path=Path("/var/log/edxapp/"),
+    present=True,
+    mode="0775",
+    user="www-data",
+    group="edxapp",
+    recursive=True,
 )
 
 vector = VectorConfig(
