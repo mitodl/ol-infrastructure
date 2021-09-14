@@ -1,6 +1,6 @@
 import json
 
-from ol_infrastructure.lib.aws.alb_fargate_service_config import OLApplicationLoadBalancedFargateConfig, Protocol
+from ol_infrastructure.lib.aws.alb_fargate_service_config import OLApplicationLoadBalancedFargateConfig
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.components.aws.alb_fargate_service import OLApplicationLoadBalancedFargateService
 from ol_infrastructure.lib.aws.ecs.task_definition_config import OLFargateTaskDefinitionConfig

@@ -7,7 +7,6 @@ from ol_infrastructure.components.aws.fargate_service import OLFargateService
 from pulumi_aws.ec2 import SecurityGroup, SecurityGroupIngressArgs, SecurityGroupEgressArgs
 import pulumi
 
-
 class PulumiMocks(pulumi.runtime.Mocks):
     def new_resource(self, args: pulumi.runtime.MockResourceArgs):
 
