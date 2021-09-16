@@ -1,12 +1,25 @@
 import json
 
-from ol_infrastructure.lib.aws.alb_fargate_service_config import OLApplicationLoadBalancedFargateConfig
-from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.components.aws.alb_fargate_service import OLApplicationLoadBalancedFargateService
-from ol_infrastructure.lib.aws.ecs.task_definition_config import OLFargateTaskDefinitionConfig
-from ol_infrastructure.lib.aws.ecs.container_definition_config import OLContainerLogConfig, OLFargateContainerDefinitionConfig
-from pulumi_aws.ec2 import SecurityGroup, SecurityGroupIngressArgs, SecurityGroupEgressArgs
 import pulumi
+from pulumi_aws.ec2 import (
+    SecurityGroup,
+    SecurityGroupEgressArgs,
+    SecurityGroupIngressArgs,
+)
+
+from ol_infrastructure.components.aws.alb_fargate_service import (
+    OLApplicationLoadBalancedFargateService,
+)
+from ol_infrastructure.lib.aws.alb_fargate_service_config import (
+    OLApplicationLoadBalancedFargateConfig,
+)
+from ol_infrastructure.lib.aws.ecs.container_definition_config import (
+    OLFargateContainerDefinitionConfig,
+)
+from ol_infrastructure.lib.aws.ecs.task_definition_config import (
+    OLFargateTaskDefinitionConfig,
+)
+from ol_infrastructure.lib.ol_types import AWSBase
 
 
 class PulumiMocks(pulumi.runtime.Mocks):
@@ -19,34 +32,27 @@ class PulumiMocks(pulumi.runtime.Mocks):
                 **args.inputs,
             }
         elif args.typ == "aws:iam/role:Role":
-            outputs = {
-                **args.inputs,
-                "arn": exec_role_arn
-            }
+            outputs = {**args.inputs, "arn": exec_role_arn}
 
-        return [args.name + '_id', outputs]
+        return [f"{args.name}_id", outputs]
 
     def call(self, args: pulumi.runtime.MockCallArgs):
 
         output = {}
 
         for key in args.args.keys():
-            print(F"Key - {key}, Value - {args.args[key]}")
+            print(f"Key - {key}, Value - {args.args[key]}")
 
         if args.token == "aws:ec2/getSubnetIds:getSubnetIds":
             vpc_id = args.args["vpcId"]
-            output = {
-                "id": vpc_id,
-                "ids": subnet_ids,
-                "vpc_id": vpc_id
-            }
+            output = {"id": vpc_id, "ids": subnet_ids, "vpc_id": vpc_id}
 
         return output
 
 
 pulumi.runtime.set_mocks(PulumiMocks())
 
-exec_role_arn = "arn:aws:iam::542799376554:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS"
+exec_role_arn = "arn:aws:iam::542799376554:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS"  # noqa: E501
 
 aws_config = AWSBase(
     tags={"OU": "data", "Environment": "DEV"},
@@ -54,26 +60,26 @@ aws_config = AWSBase(
 
 base_name = "ecs-alb-test"
 vpc_id = "vpc-03eb7d7b50a80dafc"
-subnet_ids = ["subnet-0da77f2c073f5d7dd",
-              "subnet-0c839a69e91c42739",
-              "subnet-083aa2f93a0efa159"]
+subnet_ids = [
+    "subnet-0da77f2c073f5d7dd",
+    "subnet-0c839a69e91c42739",
+    "subnet-083aa2f93a0efa159",
+]
 
 security_group = SecurityGroup(
     "ecs-task-sec-group",
     vpc_id=vpc_id,
-    ingress=[SecurityGroupIngressArgs(
-        protocol="tcp",
-        from_port=80,
-        to_port=80,
-        cidr_blocks=["0.0.0.0/0"]
-    )],
-    egress=[SecurityGroupEgressArgs(
-        protocol="-1",
-        from_port=0,
-        to_port=0,
-        cidr_blocks=["0.0.0.0/0"]
-    )],
-    tags=aws_config.tags
+    ingress=[
+        SecurityGroupIngressArgs(
+            protocol="tcp", from_port=80, to_port=80, cidr_blocks=["0.0.0.0/0"]
+        )
+    ],
+    egress=[
+        SecurityGroupEgressArgs(
+            protocol="-1", from_port=0, to_port=0, cidr_blocks=["0.0.0.0/0"]
+        )
+    ],
+    tags=aws_config.tags,
 )
 
 
@@ -84,20 +90,22 @@ class TestClassBaseAlbFargateArguments:
             name=base_name,
             service_name=base_name,
             vpc_id=pulumi.Output.from_input(vpc_id),
-            load_balancer_name=base_name + "-lb",
+            load_balancer_name=f"{base_name}-lb",
             security_groups=[security_group],
             assign_public_ip=True,
             health_check_grace_period_seconds=60,
             task_definition_config=OLFargateTaskDefinitionConfig(
                 task_def_name="task-test",
-                container_definition_configs=[OLFargateContainerDefinitionConfig(
-                    container_name="nginx",
-                    image="nginx",
-                    attach_to_load_balancer=True
-                )],
-                tags=aws_config.tags
+                container_definition_configs=[
+                    OLFargateContainerDefinitionConfig(
+                        container_name="nginx",
+                        image="nginx",
+                        attach_to_load_balancer=True,
+                    )
+                ],
+                tags=aws_config.tags,
             ),
-            tags=aws_config.tags
+            tags=aws_config.tags,
         )
     )
 
@@ -115,7 +123,9 @@ class TestClassBaseAlbFargateArguments:
             assert "Environment" in tags, "Tags must container environment"
             assert cluster_id == f"{base_name}_cluster_id", "Cluster ID mismatch"
 
-        return pulumi.Output.all(self.service.tags, self.service.name, self.cluster.id).apply(check_name_tags_ids)
+        return pulumi.Output.all(
+            self.service.tags, self.service.name, self.cluster.id
+        ).apply(check_name_tags_ids)
 
     @pulumi.runtime.test
     def test_empty_properties(self):
@@ -128,18 +138,24 @@ class TestClassBaseAlbFargateArguments:
             assert subnet_mappings is None
 
         return pulumi.Output.all(
-            self.load_balancer.access_logs, 
-            self.load_balancer.customer_owned_ipv4_pool, 
-            self.load_balancer.name_prefix, 
-            self.load_balancer.subnet_mappings
+            self.load_balancer.access_logs,
+            self.load_balancer.customer_owned_ipv4_pool,
+            self.load_balancer.name_prefix,
+            self.load_balancer.subnet_mappings,
         ).apply(check_empty_properties)
 
     @pulumi.runtime.test
     def test_default_parameters(self):
         def check_defaults(args):
-            drop_invalid_header_fields, enable_cross_zone_load_balancing, enable_deletion_protection, enable_http2, idle_timeout = args
+            (  # noqa: WPS236
+                drop_invalid_header_fields,
+                enable_cross_zone_load_balancing,
+                enable_deletion_protection,
+                enable_http2,
+                idle_timeout,
+            ) = args
 
-            assert not drop_invalid_header_fields 
+            assert not drop_invalid_header_fields
             assert not enable_cross_zone_load_balancing
             assert not enable_deletion_protection
             assert enable_http2 is None or enable_http2
@@ -150,26 +166,22 @@ class TestClassBaseAlbFargateArguments:
             self.load_balancer.enable_cross_zone_load_balancing,
             self.load_balancer.enable_deletion_protection,
             self.load_balancer.enable_http2,
-            self.load_balancer.idle_timeout
+            self.load_balancer.idle_timeout,
         ).apply(check_defaults)
-
-    @pulumi.runtime.test
-    def test_base_service_info(self):
-        def check_name_tags_ids(args):
-            tags, name, cluster_id = args
-
-            assert name == f"{base_name}_service", "Service name mismatch"
-            assert "Environment" in tags, "Tags must container environment"
-            assert cluster_id == f"{base_name}_cluster_id", "Cluster ID mismatch"
-
-        return pulumi.Output.all(self.service.tags, self.service.name, self.cluster.id).apply(check_name_tags_ids)
 
     @pulumi.runtime.test
     def test_default_deployment_info(self):
         def check_task_info(args):
-            deployment_controller, deployment_maximum_percent, deployment_minimum_healthy_percent, desired_count = args
+            (
+                deployment_controller,
+                deployment_maximum_percent,
+                deployment_minimum_healthy_percent,
+                desired_count,
+            ) = args
 
-            assert deployment_controller["type"] == "ECS", "Deployment controller must be ECS"
+            assert (
+                deployment_controller["type"] == "ECS"
+            ), "Deployment controller must be ECS"
             assert deployment_maximum_percent == 100
             assert deployment_minimum_healthy_percent == 50
             assert desired_count == 1
@@ -178,16 +190,19 @@ class TestClassBaseAlbFargateArguments:
             self.service.deployment_controller,
             self.service.deployment_maximum_percent,
             self.service.deployment_minimum_healthy_percent,
-            self.service.desired_count).apply(check_task_info)
+            self.service.desired_count,
+        ).apply(check_task_info)
 
     @pulumi.runtime.test
     def test_circuit_breaker(self):
         def check_circuit_breaker_is_disabled(args):
             deployment_circuit_breaker = args
 
-            assert deployment_circuit_breaker == None
+            assert deployment_circuit_breaker is None
 
-        return self.service.deployment_circuit_breaker.apply(check_circuit_breaker_is_disabled)
+        return self.service.deployment_circuit_breaker.apply(
+            check_circuit_breaker_is_disabled
+        )
 
     @pulumi.runtime.test
     def test_load_balancer_info_is_empty(self):
@@ -197,7 +212,9 @@ class TestClassBaseAlbFargateArguments:
             assert health_check_grace_period_seconds == 60
             assert load_balancers is not None
 
-        return pulumi.Output.all(self.service.health_check_grace_period_seconds, self.service.load_balancers).apply(check_load_balancer)
+        return pulumi.Output.all(
+            self.service.health_check_grace_period_seconds, self.service.load_balancers
+        ).apply(check_load_balancer)
 
     @pulumi.runtime.test
     def test_launch_type_platform_version(self):
@@ -207,7 +224,9 @@ class TestClassBaseAlbFargateArguments:
             assert launch_type == "FARGATE", "Only FARGATE launch type is supported"
             assert platform_version == "LATEST"
 
-        return pulumi.Output.all(self.service.launch_type, self.service.platform_version).apply(check_launch_type_version)
+        return pulumi.Output.all(
+            self.service.launch_type, self.service.platform_version
+        ).apply(check_launch_type_version)
 
     @pulumi.runtime.test
     def test_network_configuration(self):
@@ -215,15 +234,15 @@ class TestClassBaseAlbFargateArguments:
             network_configuration = args
             subnets = network_configuration["subnets"]
 
-            for key in subnets:
-                assert key in subnet_ids
+            for subnet in subnets:
+                assert subnet in subnet_ids
 
             assert network_configuration["assign_public_ip"]
 
             security_groups = network_configuration["security_groups"]
 
-            for key in security_groups:
-                assert key == "ecs-task-sec-group_id"
+            for group in security_groups:
+                assert group == "ecs-task-sec-group_id"
 
         return self.service.network_configuration.apply(check_network_configuration)
 
@@ -244,7 +263,9 @@ class TestClassBaseAlbFargateArguments:
             assert cpu == 256
             assert memory == 512
 
-        return pulumi.Output.all(self.task_def.cpu, self.task_def.memory).apply(check_cpu_mem)
+        return pulumi.Output.all(self.task_def.cpu, self.task_def.memory).apply(
+            check_cpu_mem
+        )
 
     @pulumi.runtime.test
     def test_exeuction_role(self):
@@ -296,10 +317,10 @@ class TestClassBaseAlbFargateArguments:
             assert container["portMappings"][0]["protocol"] == "tcp"
 
             assert container["memory"] == 512
-            assert container["command"] == None
-            assert container["cpu"] == None
-            assert container["environment"] == []
+            assert container["command"] is None
+            assert container["cpu"] is None
+            assert container["environment"] == []  # noqa: WPS520
             assert not container["essential"]
-            assert container["logConfiguration"] == None
+            assert container["logConfiguration"] is None
 
         return self.task_def.container_definitions.apply(check_container_info)

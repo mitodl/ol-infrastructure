@@ -1,11 +1,23 @@
 import json
-from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.aws.ecs.task_definition_config import OLFargateTaskDefinitionConfig
-from ol_infrastructure.lib.aws.ecs.fargate_service_config import OLFargateServiceConfig
-from ol_infrastructure.lib.aws.ecs.container_definition_config import OLContainerLogConfig, OLFargateContainerDefinitionConfig
-from ol_infrastructure.components.aws.fargate_service import OLFargateService
-from pulumi_aws.ec2 import SecurityGroup, SecurityGroupIngressArgs, SecurityGroupEgressArgs
+
 import pulumi
+from pulumi_aws.ec2 import (
+    SecurityGroup,
+    SecurityGroupEgressArgs,
+    SecurityGroupIngressArgs,
+)
+
+from ol_infrastructure.components.aws.fargate_service import OLFargateService
+from ol_infrastructure.lib.aws.ecs.container_definition_config import (
+    OLContainerLogConfig,
+    OLFargateContainerDefinitionConfig,
+)
+from ol_infrastructure.lib.aws.ecs.fargate_service_config import OLFargateServiceConfig
+from ol_infrastructure.lib.aws.ecs.task_definition_config import (
+    OLFargateTaskDefinitionConfig,
+)
+from ol_infrastructure.lib.ol_types import AWSBase
+
 
 class PulumiMocks(pulumi.runtime.Mocks):
     def new_resource(self, args: pulumi.runtime.MockResourceArgs):
@@ -18,33 +30,27 @@ class PulumiMocks(pulumi.runtime.Mocks):
                 **args.inputs,
             }
         elif args.typ == "aws:iam/role:Role":
-            outputs = {
-                **args.inputs,
-                "arn": exec_role_arn
-            }
+            outputs = {**args.inputs, "arn": exec_role_arn}
 
-        return [args.name + '_id', outputs]
+        return [f"{args.name}_id", outputs]
 
     def call(self, args: pulumi.runtime.MockCallArgs):
 
         output = {}
 
         for key in args.args.keys():
-            print(F"Key - {key}, Value - {args.args[key]}")
+            print(f"Key - {key}, Value - {args.args[key]}")
 
         if args.token == "aws:ec2/getSubnetIds:getSubnetIds":
             vpc_id = args.args["vpcId"]
-            output = {
-                "id": vpc_id,
-                "ids": subnet_ids,
-                "vpc_id": vpc_id
-            }
+            output = {"id": vpc_id, "ids": subnet_ids, "vpc_id": vpc_id}
 
         return output
 
+
 pulumi.runtime.set_mocks(PulumiMocks())
 
-exec_role_arn = "arn:aws:iam::542799376554:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS"
+exec_role_arn = "arn:aws:iam::542799376554:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS"  # noqa: E501
 
 aws_config = AWSBase(
     tags={"OU": "data", "Environment": "DEV"},
@@ -52,27 +58,28 @@ aws_config = AWSBase(
 
 base_name = "test-run"
 vpc_id = "vpc-03eb7d7b50a80dafc"
-subnet_ids = ["subnet-0da77f2c073f5d7dd",
-              "subnet-0c839a69e91c42739",
-              "subnet-083aa2f93a0efa159"]
+subnet_ids = [
+    "subnet-0da77f2c073f5d7dd",
+    "subnet-0c839a69e91c42739",
+    "subnet-083aa2f93a0efa159",
+]
 
 security_group = SecurityGroup(
     "ecs-task-sec-group",
     vpc_id=vpc_id,
-    ingress=[SecurityGroupIngressArgs(
-        protocol="tcp",
-        from_port=80,
-        to_port=80,
-        cidr_blocks=["0.0.0.0/0"]
-    )],
-    egress=[SecurityGroupEgressArgs(
-        protocol="-1",
-        from_port=0,
-        to_port=0,
-        cidr_blocks=["0.0.0.0/0"]
-    )],
-    tags=aws_config.tags
+    ingress=[
+        SecurityGroupIngressArgs(
+            protocol="tcp", from_port=80, to_port=80, cidr_blocks=["0.0.0.0/0"]
+        )
+    ],
+    egress=[
+        SecurityGroupEgressArgs(
+            protocol="-1", from_port=0, to_port=0, cidr_blocks=["0.0.0.0/0"]
+        )
+    ],
+    tags=aws_config.tags,
 )
+
 
 class TestClassBaseFargateArguments:
 
@@ -83,13 +90,15 @@ class TestClassBaseFargateArguments:
             service_name=base_name,
             task_definition_config=OLFargateTaskDefinitionConfig(
                 task_def_name="task-test",
-                container_definition_configs=[OLFargateContainerDefinitionConfig(
-                    container_name="nginx",
-                    image="nginx",
-                )],
-                tags=aws_config.tags
+                container_definition_configs=[
+                    OLFargateContainerDefinitionConfig(
+                        container_name="nginx",
+                        image="nginx",
+                    )
+                ],
+                tags=aws_config.tags,
             ),
-            tags=aws_config.tags
+            tags=aws_config.tags,
         ),
     )
 
@@ -106,14 +115,23 @@ class TestClassBaseFargateArguments:
             assert "Environment" in tags, "Tags must container environment"
             assert cluster_id == f"{base_name}_cluster_id", "Cluster ID mismatch"
 
-        return pulumi.Output.all(self.service.tags, self.service.name, self.cluster.id).apply(check_name_tags_ids)
+        return pulumi.Output.all(
+            self.service.tags, self.service.name, self.cluster.id
+        ).apply(check_name_tags_ids)
 
     @pulumi.runtime.test
     def test_default_deployment_info(self):
         def check_task_info(args):
-            deployment_controller, deployment_maximum_percent, deployment_minimum_healthy_percent, desired_count = args
+            (
+                deployment_controller,
+                deployment_maximum_percent,
+                deployment_minimum_healthy_percent,
+                desired_count,
+            ) = args
 
-            assert deployment_controller["type"] == "ECS", "Deployment controller must be ECS"
+            assert (
+                deployment_controller["type"] == "ECS"
+            ), "Deployment controller must be ECS"
             assert deployment_maximum_percent == 100
             assert deployment_minimum_healthy_percent == 50
             assert desired_count == 1
@@ -122,16 +140,19 @@ class TestClassBaseFargateArguments:
             self.service.deployment_controller,
             self.service.deployment_maximum_percent,
             self.service.deployment_minimum_healthy_percent,
-            self.service.desired_count).apply(check_task_info)
+            self.service.desired_count,
+        ).apply(check_task_info)
 
     @pulumi.runtime.test
     def test_circuit_breaker(self):
         def check_circuit_breaker_is_disabled(args):
             deployment_circuit_breaker = args
 
-            assert deployment_circuit_breaker == None
+            assert deployment_circuit_breaker is None
 
-        return self.service.deployment_circuit_breaker.apply(check_circuit_breaker_is_disabled)
+        return self.service.deployment_circuit_breaker.apply(
+            check_circuit_breaker_is_disabled
+        )
 
     @pulumi.runtime.test
     def test_load_balancer_info_is_empty(self):
@@ -141,7 +162,9 @@ class TestClassBaseFargateArguments:
             assert health_check_grace_period_seconds is None
             assert load_balancers is None
 
-        return pulumi.Output.all(self.service.health_check_grace_period_seconds, self.service.load_balancers).apply(check_load_balancer)
+        return pulumi.Output.all(
+            self.service.health_check_grace_period_seconds, self.service.load_balancers
+        ).apply(check_load_balancer)
 
     @pulumi.runtime.test
     def test_launch_type_platform_version(self):
@@ -151,7 +174,9 @@ class TestClassBaseFargateArguments:
             assert launch_type == "FARGATE", "Only FARGATE launch type is supported"
             assert platform_version == "LATEST"
 
-        return pulumi.Output.all(self.service.launch_type, self.service.platform_version).apply(check_launch_type_version)
+        return pulumi.Output.all(
+            self.service.launch_type, self.service.platform_version
+        ).apply(check_launch_type_version)
 
     @pulumi.runtime.test
     def test_network_configuration(self):
@@ -159,15 +184,15 @@ class TestClassBaseFargateArguments:
             network_configuration = args
             subnets = network_configuration["subnets"]
 
-            for key in subnets:
-                assert key in subnet_ids
+            for subnet in subnets:
+                assert subnet in subnet_ids
 
             assert network_configuration["assign_public_ip"]
 
             security_groups = network_configuration["security_groups"]
 
-            for key in security_groups:
-                assert key == "ecs-task-sec-group_id"
+            for group in security_groups:
+                assert group == "ecs-task-sec-group_id"
 
         return self.service.network_configuration.apply(check_network_configuration)
 
@@ -188,7 +213,9 @@ class TestClassBaseFargateArguments:
             assert cpu == 256
             assert memory == 512
 
-        return pulumi.Output.all(self.task_def.cpu, self.task_def.memory).apply(check_cpu_mem)
+        return pulumi.Output.all(self.task_def.cpu, self.task_def.memory).apply(
+            check_cpu_mem
+        )
 
     @pulumi.runtime.test
     def test_exeuction_role(self):
@@ -240,11 +267,11 @@ class TestClassBaseFargateArguments:
             assert container["portMappings"][0]["protocol"] == "tcp"
 
             assert container["memory"] == 512
-            assert container["command"] == None
-            assert container["cpu"] == None
-            assert container["environment"] == []
+            assert container["command"] is None
+            assert container["cpu"] is None
+            assert container["environment"] == []  # noqa: WPS520
             assert not container["essential"]
-            assert container["logConfiguration"] == None
+            assert container["logConfiguration"] is None
 
         return self.task_def.container_definitions.apply(check_container_info)
 
@@ -272,44 +299,37 @@ class TestClassAllFargateArguments:
                 task_def_name="task-test",
                 cpu=512,
                 memory_mib=1024,
-                container_definition_configs=[OLFargateContainerDefinitionConfig(
-                    container_name="nginx",
-                    image="nginx",
-                    memory=512,
-                    cpu=256,
-                    container_port=80,
-                    is_essential=True,
-                    environment={
-                        "var": "nginx"
-                    },
-                    log_configuration=OLContainerLogConfig(
-                        log_driver="awslogs",
-                        options={
-                            "awslogs-group": "ecs-nginx"
-                        }
+                container_definition_configs=[
+                    OLFargateContainerDefinitionConfig(
+                        container_name="nginx",
+                        image="nginx",
+                        memory=512,
+                        cpu=256,
+                        container_port=80,
+                        is_essential=True,
+                        environment={"var": "nginx"},
+                        log_configuration=OLContainerLogConfig(
+                            log_driver="awslogs", options={"awslogs-group": "ecs-nginx"}
+                        ),
+                        attach_to_load_balancer=False,
                     ),
-                    attach_to_load_balancer=False
-                ), OLFargateContainerDefinitionConfig(
-                    container_name="otel",
-                    image="otel",
-                    container_port=4317,
-                    memory=512,
-                    cpu=256,
-                    is_essential=False,
-                    environment={
-                        "var": "otel"
-                    },
-                    log_configuration=OLContainerLogConfig(
-                        log_driver="awslogs",
-                        options={
-                            "awslogs-group": "ecs-otel"
-                        }
+                    OLFargateContainerDefinitionConfig(
+                        container_name="otel",
+                        image="otel",
+                        container_port=4317,
+                        memory=512,
+                        cpu=256,
+                        is_essential=False,
+                        environment={"var": "otel"},
+                        log_configuration=OLContainerLogConfig(
+                            log_driver="awslogs", options={"awslogs-group": "ecs-otel"}
+                        ),
+                        attach_to_load_balancer=False,
                     ),
-                    attach_to_load_balancer=False
-                )],
-                tags=aws_config.tags
+                ],
+                tags=aws_config.tags,
             ),
-            tags=aws_config.tags
+            tags=aws_config.tags,
         ),
     )
 
@@ -320,7 +340,12 @@ class TestClassAllFargateArguments:
     @pulumi.runtime.test
     def test_explicit_deployment_info(self):
         def check_task_info(args):
-            deployment_controller, deployment_maximum_percent, deployment_minimum_healthy_percent, desired_count = args
+            (
+                deployment_controller,
+                deployment_maximum_percent,
+                deployment_minimum_healthy_percent,
+                desired_count,
+            ) = args
 
             assert deployment_controller["type"] == "ECS"
             assert deployment_maximum_percent == self.max_percent
@@ -331,7 +356,8 @@ class TestClassAllFargateArguments:
             self.service.deployment_controller,
             self.service.deployment_maximum_percent,
             self.service.deployment_minimum_healthy_percent,
-            self.service.desired_count).apply(check_task_info)
+            self.service.desired_count,
+        ).apply(check_task_info)
 
     @pulumi.runtime.test
     def test_network_configuration(self):
@@ -360,7 +386,9 @@ class TestClassAllFargateArguments:
             assert deployment_circuit_breaker["enable"]
             assert deployment_circuit_breaker["rollback"]
 
-        return self.service.deployment_circuit_breaker.apply(check_circuit_breaker_is_enabled)
+        return self.service.deployment_circuit_breaker.apply(
+            check_circuit_breaker_is_enabled
+        )
 
     @pulumi.runtime.test
     def test_ecs_tags_enabled(self):
@@ -409,7 +437,10 @@ class TestClassAllFargateArguments:
 
                 assert container["command"] == None
                 if image == "nginx":
-                    assert container["logConfiguration"]["options"]["awslogs-group"] == "ecs-nginx"
+                    assert (
+                        container["logConfiguration"]["options"]["awslogs-group"]
+                        == "ecs-nginx"
+                    )
                     assert container["essential"]
                     assert container["environment"][0]["name"] == "var"
                     assert container["environment"][0]["value"] == "nginx"
@@ -417,7 +448,10 @@ class TestClassAllFargateArguments:
                     assert container["portMappings"][0]["containerName"] == "nginx"
                     assert container["portMappings"][0]["protocol"] == "tcp"
                 elif image == "otel":
-                    assert container["logConfiguration"]["options"]["awslogs-group"] == "ecs-otel"
+                    assert (
+                        container["logConfiguration"]["options"]["awslogs-group"]
+                        == "ecs-otel"
+                    )
                     assert not container["essential"]
                     assert container["environment"][0]["name"] == "var"
                     assert container["environment"][0]["value"] == "otel"
@@ -428,4 +462,6 @@ class TestClassAllFargateArguments:
             assert int(cpu) == total_cpu
             assert int(memory) == total_mem
 
-        return pulumi.Output.all(self.task_def.cpu, self.task_def.memory, self.task_def.container_definitions).apply(check_cpu_mem)
+        return pulumi.Output.all(
+            self.task_def.cpu, self.task_def.memory, self.task_def.container_definitions
+        ).apply(check_cpu_mem)
