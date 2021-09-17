@@ -8,10 +8,8 @@ from pulumi_aws.ec2 import (
 )
 
 from ol_infrastructure.components.aws.alb_fargate_service import (
-    OLApplicationLoadBalancedFargateService,
-)
-from ol_infrastructure.lib.aws.alb_fargate_service_config import (
     OLApplicationLoadBalancedFargateConfig,
+    OLApplicationLoadBalancedFargateService,
 )
 from ol_infrastructure.lib.aws.ecs.container_definition_config import (
     OLFargateContainerDefinitionConfig,

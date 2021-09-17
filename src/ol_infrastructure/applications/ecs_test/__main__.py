@@ -20,18 +20,18 @@ from bridge.lib.magic_numbers import (
     ONE_GIGAHERTZ,
 )
 from ol_infrastructure.components.aws.alb_fargate_service import (
-    OLApplicationLoadBalancedFargateService,
-)
-from ol_infrastructure.components.aws.fargate_service import OLFargateService
-from ol_infrastructure.lib.aws.alb_fargate_service_config import (
     OLApplicationLoadBalancedFargateConfig,
+    OLApplicationLoadBalancedFargateService,
     Protocol,
+)
+from ol_infrastructure.components.aws.fargate_service import (
+    OLFargateService,
+    OLFargateServiceConfig,
 )
 from ol_infrastructure.lib.aws.ecs.container_definition_config import (
     OLContainerLogConfig,
     OLFargateContainerDefinitionConfig,
 )
-from ol_infrastructure.lib.aws.ecs.fargate_service_config import OLFargateServiceConfig
 from ol_infrastructure.lib.aws.ecs.task_definition_config import (
     OLFargateTaskDefinitionConfig,
 )
