@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, StackReference
+from pulumi import Config, Output, StackReference
 from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -111,6 +111,7 @@ concourse_iam_permissions = {
                 "arn:aws:s3:::ol-ocw-studio-app*/*",
             ],
         },
+        {"Effect": "Allow", "Action": ["cloudwatch:PutMetricData"], "Resource": "*"},
     ],
 }
 
@@ -297,7 +298,10 @@ concourse_db_security_group = ec2.SecurityGroup(
     description="Access from Concourse instances to the associated Postgres database",
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            security_groups=[concourse_web_security_group.id],
+            security_groups=[
+                concourse_web_security_group.id,
+                consul_security_groups["consul_server"],
+            ],
             # TODO: Create Vault security group to act as source of allowed
             # traffic. (TMM 2021-05-04)
             cidr_blocks=[operations_vpc["cidr"]],
@@ -336,15 +340,10 @@ concourse_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
 )
 concourse_db_vault_backend = OLVaultDatabaseBackend(concourse_db_vault_backend_config)
 
-if stack_info.env_suffix == "production":
-    consul_datacenter = "operations"
-else:
-    consul_datacenter = "operations-qa"
 concourse_db_consul_node = Node(
     "concourse-instance-db-node",
     name="concourse-postgres-db",
     address=concourse_db.db_instance.address,
-    datacenter=consul_datacenter,
 )
 
 concourse_db_consul_service = Service(
@@ -363,7 +362,10 @@ concourse_db_consul_service = Service(
             name="concourse-instance-id",
             timeout="60s",
             status="passing",
-            tcp=f"{concourse_db.db_instance.address}:{concourse_db_config.port}",  # noqa: WPS237,E501
+            tcp=Output.all(
+                address=concourse_db.db_instance.address,
+                port=concourse_db.db_instance.port,
+            ).apply(lambda db: "{address}:{port}".format(**db)),
         )
     ],
 )
@@ -424,6 +426,10 @@ concourse_web_alb_listener = lb.Listener(
 web_instance_type = (
     concourse_config.get("web_instance_type") or InstanceTypes.medium.name
 )
+if stack_info.env_suffix == "production":
+    consul_datacenter = "operations"
+else:
+    consul_datacenter = "operations-qa"
 web_launch_config = ec2.LaunchTemplate(
     "concourse-web-launch-template",
     name_prefix=f"concourse-web-{stack_info.env_suffix}-",
@@ -474,6 +480,11 @@ web_launch_config = ec2.LaunchTemplate(
                                 concourse_config.require("web_host_domain")
                             ),
                         },
+                        {
+                            "path": "/etc/default/vector",
+                            "content": (f"ENVIRONMENT={consul_datacenter}\n"
+                                        "VECTOR_CONFIG_DIR=/etc/vector/")
+                        }
                     ]
                 },
                 sort_keys=True,

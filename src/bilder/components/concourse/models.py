@@ -1,8 +1,9 @@
 import secrets
 from enum import Enum
 from functools import partial
+from ipaddress import IPv4Address, IPv6Address
 from pathlib import Path
-from typing import Dict, Generator, List, Optional
+from typing import Dict, Generator, List, Optional, Union
 
 from pydantic import Field, PositiveInt, SecretStr, validator
 
@@ -1003,12 +1004,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         concourse_env_var="CONCOURSE_POLICY_CHECK_FILTER_HTTP_METHOD",
         description="API http method to go through policy check",
     )
-    prometheus_bind_ip: Optional[str] = Field(
+    prometheus_bind_ip: Optional[Union[IPv4Address, IPv6Address]] = Field(
         None,
         concourse_env_var="CONCOURSE_PROMETHEUS_BIND_IP",
         description="IP to listen on to expose Prometheus metrics.",
     )
-    prometheus_bind_port: Optional[str] = Field(
+    prometheus_bind_port: Optional[int] = Field(
         None,
         concourse_env_var="CONCOURSE_PROMETHEUS_BIND_PORT",
         description="Port to listen on to expose Prometheus metrics.",
@@ -1673,7 +1674,7 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
         description="Path to a config file to use for the Garden backend. "
         "e.g. 'foo-bar=a,b' for '--foo-bar a --foo-bar b'.",
     )
-    garden_dns_server: Optiona[str] = Field(
+    garden_dns_server: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_GARDEN_DNS_SERVER",
         description="DNS server IP address to use instead of automatically determined "
