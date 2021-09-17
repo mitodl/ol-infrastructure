@@ -292,7 +292,7 @@ FINANCIAL_REPORTS:
     STORAGE_TYPE: localfs
 FOOTER_ORGANIZATION_IMAGE: images/logo.png
 GITHUB_REPO_ROOT: /edx/var/edxapp/data
-GOOGLE_ANALYTICS_ACCOUNT: UA-5145472-46 
+GOOGLE_ANALYTICS_ACCOUNT: {{ key "edxapp/google-analytics-id" }}
 GRADES_DOWNLOAD:
     BUCKET: {{ key "edxapp/s3-grades-bucket" }}  # MODIFIED
     ROOT_PATH: grades  # MODIFIED
