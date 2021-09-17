@@ -40,19 +40,10 @@ postgres_role_statements = {
         "create": Template(
             """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
             VALID UNTIL '{{expiration}}' IN ROLE "${app_name}" INHERIT;
-          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{{name}}"
-             WITH GRANT OPTION;
-          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{{name}}"
-             WITH GRANT OPTION;
           GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${app_name}"
              WITH GRANT OPTION;
           GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "${app_name}"
              WITH GRANT OPTION;
-          SET ROLE "{{name}}";
-          ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public
-            GRANT ALL PRIVILEGES ON TABLES TO "{{name}}" WITH GRANT OPTION;
-          ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public
-            GRANT ALL PRIVILEGES ON SEQUENCES TO "{{name}}" WITH GRANT OPTION;
           SET ROLE "${app_name}";
           ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA public
             GRANT ALL PRIVILEGES ON TABLES TO "${app_name}" WITH GRANT OPTION;
@@ -148,6 +139,6 @@ mongodb_role_statements = {
 }
 
 
-class VaultPKIKeyTypeBits(int, Enum):
+class VaultPKIKeyTypeBits(int, Enum):  # noqa: WPS600
     rsa = 4096
     ec = 256
