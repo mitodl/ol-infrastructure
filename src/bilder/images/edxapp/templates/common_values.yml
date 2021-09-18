@@ -198,9 +198,9 @@ COMPREHENSIVE_THEME_LOCALE_PATHS: []
 CONTACT_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 CORS_ORIGIN_ALLOW_ALL: false
 CORS_ORIGIN_WHITELIST:
-  - {{ key "edxapp/lms-domain" }}
-  - {{ key "edxapp/studio-domain" }}
-  - {{ key "edxapp/marketing-domain" }}
+  - https://{{ key "edxapp/lms-domain" }}
+  - https://{{ key "edxapp/studio-domain" }}
+  - https://{{ key "edxapp/marketing-domain" }}
 COURSES_WITH_UNSAFE_CODE: []
 COURSE_ABOUT_VISIBILITY_PERMISSION: see_exists
 COURSE_CATALOG_API_URL: http://localhost:8008/api/v1
@@ -250,6 +250,7 @@ FEATURES:
     AUTH_USE_OPENID_PROVIDER: true
     AUTOMATIC_AUTH_FOR_TESTING: false
     CUSTOM_COURSES_EDX: false
+    EMBARGO: true  # ADDED KEY
     ENABLE_BULK_ENROLLMENT_VIEW: false
     ENABLE_COMBINED_LOGIN_REGISTRATION: true
     ENABLE_CORS_HEADERS: true  # MODIFIED
@@ -274,6 +275,7 @@ FEATURES:
     ENABLE_READING_FROM_MULTIPLE_HISTORY_TABLES: true
     ENABLE_SPECIAL_EXAMS: false
     ENABLE_THIRD_PARTY_AUTH: true
+    ENABLE_UNICODE_USERNAME: true  # ADDED KEY
     ENABLE_VIDEO_UPLOAD_PIPELINE: true # MODIFIED
     PREVIEW_LMS_BASE: {{ key "edxapp/preview-domain" }}  # MODIFIED
     SHOW_FOOTER_LANGUAGE_SELECTOR: false
@@ -291,7 +293,7 @@ FINANCIAL_REPORTS:
     STORAGE_TYPE: localfs
 FOOTER_ORGANIZATION_IMAGE: images/logo.png
 GITHUB_REPO_ROOT: /edx/var/edxapp/data
-GOOGLE_ANALYTICS_ACCOUNT: G-1EW36DF67W
+GOOGLE_ANALYTICS_ACCOUNT: {{ key "edxapp/google-analytics-id" }}
 GRADES_DOWNLOAD:
     BUCKET: {{ key "edxapp/s3-grades-bucket" }}  # MODIFIED
     ROOT_PATH: grades  # MODIFIED
