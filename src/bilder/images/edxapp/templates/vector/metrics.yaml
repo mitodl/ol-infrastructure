@@ -1,0 +1,22 @@
+---
+sources:
+  vector_metrics:
+    type: internal_metrics
+    scrape_interval_secs: 5
+  host_metrics:
+    type: host_metrics
+  nginx_metrics:
+    type: nginx_metrics
+    endpoints:
+    - http://localhost/nginx_status
+
+sinks:
+  grafana_cortex_metrics:
+    inputs:
+    - '*metrics'
+    type: prometheus_remote_write
+    endpoint: https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom/push
+    auth:
+      strategy: basic
+      user: ${GRAFANA_CLOUD_PROMETHEUS_API_USER}
+      password: ${GRAFANA_CLOUD_API_KEY}

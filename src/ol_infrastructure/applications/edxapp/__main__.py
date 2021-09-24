@@ -976,7 +976,9 @@ edxapp_lms_web_alb_listener_rule = lb.ListenerRule(
 
 
 # Create auto scale group and launch configs for Edxapp web and worker
-def cloud_init_user_data_func(consul_env_name):
+def cloud_init_user_data_func(
+    consul_env_name, grafana_api_key, grafana_loki_user, grafana_prometheus_user
+):
     cloud_config_content = {
         "write_files": [
             {
@@ -996,9 +998,12 @@ def cloud_init_user_data_func(consul_env_name):
                 "path": "/etc/default/vector",
                 "content": textwrap.dedent(
                     f"""\
-                        ENVIRONMENT={consul_env_name}
-                        VECTOR_CONFIG_DIR=/etc/vector/
-                        """
+                    ENVIRONMENT={consul_env_name}
+                    VECTOR_CONFIG_DIR=/etc/vector/
+                    GRAFANA_CLOUD_API_KEY={grafana_api_key}
+                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_prometheus_user}
+                    GRAFANA_CLOUD_LOKI_API_UESR={grafana_loki_user}
+                    """
                 ),  # noqa: WPS355
                 "owner": "root:root",
             },
@@ -1018,9 +1023,13 @@ def cloud_init_user_data_func(consul_env_name):
     ).decode("utf8")
 
 
-cloud_init_user_data = consul_stack.require_output("datacenter").apply(
-    cloud_init_user_data_func
-)
+grafana_config = Config("grafana")
+cloud_init_user_data = Output.all(
+    consul_stack.require_output("datacenter"),
+    grafana_config.require_secret("api_key"),
+    grafana_config.require("loki_user"),
+    grafana_config.require("prometheus_user"),
+).apply(lambda args: cloud_init_user_data_func(*args))
 
 web_instance_type = (
     edxapp_config.get("web_instance_type") or InstanceTypes.high_mem_regular.name
