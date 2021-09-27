@@ -262,6 +262,7 @@ FEATURES:
     ENABLE_DISCUSSION_HOME_PANEL: true
     ENABLE_DISCUSSION_SERVICE: true
     ENABLE_EDXNOTES: false
+    ENABLE_EDX_USERNAME_CHANGER: true  # ADDED KEY
     ENABLE_ENROLLMENT_RESET: false
     ENABLE_EXPORT_GIT: true  # MODIFIED
     ENABLE_GIT_AUTO_EXPORT: true  # ADDED KEY
@@ -331,7 +332,7 @@ MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
 MICROSITE_ROOT_DIR: /edx/app/edxapp/edx-microsite
-MITXPRO_CORE_REDIRECT_ALLOW_RE_LIST: ["^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat)", "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"]  # ADDED VALUE
+MITXPRO_CORE_REDIRECT_ALLOW_RE_LIST: ["^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh)", "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"]  # ADDED VALUE
 MKTG_URLS: {}
 MKTG_URL_LINK_MAP: {}
 MOBILE_STORE_URLS: {}
