@@ -5,6 +5,7 @@ This module consists of constants that are used to provide meaningful representa
 integer values used in infrastructure management.
 """
 
+CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT = 9391
 CONCOURSE_WEB_HOST_COMMUNICATION_PORT = 2222
 CONSUL_DNS_PORT = 8600
 CONSUL_HTTP_PORT = 8500

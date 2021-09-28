@@ -1,0 +1,46 @@
+---
+sources:
+  concourse_metrics:
+    type: prometheus_scrape
+    endpoints:
+    - http://localhost:{{ context.concourse_prometheus_port }}/metrics
+    scrape_interval_secs: 10
+
+  concourse_logs:
+    type: journald
+    include_units:
+    - concourse
+
+transforms:
+  concourse_parsed_message:
+    type: remap
+    inputs:
+    - concourse_logs
+    source: |
+      event, err = parse_json(.message)
+      if event != null {
+        . = merge(., event)
+        .@timestamp = .timestamp
+        .labels = ["concourse", "${ENVIRONMENT}"]
+        .environment = "${ENVIRONMENT}"
+      }
+
+  concourse_enriched_logs:
+    type: aws_ec2_metadata
+    inputs:
+    - concourse_parsed_message
+    namespace: ec2
+
+sinks:
+  elasticsearch_logs:
+    type: elasticsearch
+    inputs:
+    - concourse_enriched_logs
+    endpoint: http://logging-elasticsearch.query.consul:9200
+    index: logs-${ENVIRONMENT}-concourse-%Y.%W
+    healthcheck: false
+
+  cloudwatch_metrics:
+    type: cloudwatch_metrics
+    inputs:
+    - concourse_metrics
