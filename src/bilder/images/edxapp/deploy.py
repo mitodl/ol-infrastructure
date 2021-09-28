@@ -69,7 +69,7 @@ pip.packages(
         "django-redis",  # Support for Redis caching in Django
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "mitxpro-openedx-extensions==0.2.2",
-        "social-auth-mitxpro==0.4",
+        "social-auth-mitxpro==0.5",
         "edx-username-changer==0.2.0",
         "edx-sysadmin",
         "ol-openedx-sentry",
