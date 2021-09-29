@@ -67,7 +67,7 @@ transforms:
   edxapp_enriched_logs:
     type: aws_ec2_metadata
     inputs:
-      - edxapp_labeled_logs
+    - edxapp_labeled_logs
     namespace: ec2
 
 sinks:
@@ -87,3 +87,20 @@ sinks:
     endpoint: http://logging-elasticsearch.query.consul:9200
     index: logs-${ENVIRONMENT}-authlog-%Y.%W
     healthcheck: false
+
+  grafana_loki_logs:
+    inputs:
+    - edxapp_enriched_logs
+    - auth_log_cron_filter
+    type: loki
+    auth:
+      strategy: basic
+      password: ${GRAFANA_CLOUD_API_KEY}
+      user: "${GRAFANA_CLOUD_LOKI_API_USER}"
+    endpoint: https://logs-prod-us-central1.grafana.net
+    labels:
+      environment: ${ENVIRONMENT}
+      application: edxapp
+      service: mitxonline
+      hostname: ${HOSTNAME}
+    out_of_order_action: rewrite_timestamp
