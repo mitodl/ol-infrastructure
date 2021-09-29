@@ -1002,7 +1002,7 @@ def cloud_init_user_data_func(
                     VECTOR_CONFIG_DIR=/etc/vector/
                     GRAFANA_CLOUD_API_KEY={grafana_api_key}
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_prometheus_user}
-                    GRAFANA_CLOUD_LOKI_API_UESR={grafana_loki_user}
+                    GRAFANA_CLOUD_LOKI_API_USER={grafana_loki_user}
                     """
                 ),  # noqa: WPS355
                 "owner": "root:root",

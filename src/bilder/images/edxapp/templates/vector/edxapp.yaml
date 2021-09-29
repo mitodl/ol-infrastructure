@@ -96,8 +96,8 @@ sinks:
     auth:
       strategy: basic
       password: ${GRAFANA_CLOUD_API_KEY}
-      user: ${GRAFANA_CLOUD_LOKI_API_USER}
-    endpoint: https://logs-prod-us-central1.grafana.net/loki/api/v1/push
+      user: "${GRAFANA_CLOUD_LOKI_API_USER}"
+    endpoint: https://logs-prod-us-central1.grafana.net
     labels:
       environment: ${ENVIRONMENT}
       application: edxapp
