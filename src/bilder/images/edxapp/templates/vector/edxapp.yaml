@@ -102,5 +102,5 @@ sinks:
       environment: ${ENVIRONMENT}
       application: edxapp
       service: mitxonline
-      host: ${HOSTNAME}
+      hostname: ${HOSTNAME}
     out_of_order_action: rewrite_timestamp

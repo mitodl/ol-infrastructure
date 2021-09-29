@@ -10,10 +10,21 @@ sources:
     endpoints:
     - http://localhost/nginx_status
 
+transforms:
+  add_labels_to_metrics:
+    type: remap
+    inputs:
+    - '*metrics'
+    source: |
+      .tags.environment = "${ENVIRONMENT}"
+      .tags.application = "edxapp"
+      .tags.service = "mitxonline"
+      .tags.hostname = "${HOSTNAME}"
+
 sinks:
   grafana_cortex_metrics:
     inputs:
-    - '*metrics'
+    - add_labels_to_metrics
     type: prometheus_remote_write
     endpoint: https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom/push
     healthcheck: false
