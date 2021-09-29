@@ -98,6 +98,8 @@ sinks:
       password: ${GRAFANA_CLOUD_API_KEY}
       user: "${GRAFANA_CLOUD_LOKI_API_USER}"
     endpoint: https://logs-prod-us-central1.grafana.net
+    encoding:
+      codec: json
     labels:
       environment: ${ENVIRONMENT}
       application: edxapp
