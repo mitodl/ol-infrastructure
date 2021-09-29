@@ -2,7 +2,7 @@
 sources:
   vector_metrics:
     type: internal_metrics
-    scrape_interval_secs: 5
+    scrape_interval_secs: 30
   host_metrics:
     type: host_metrics
   nginx_metrics:
@@ -11,10 +11,32 @@ sources:
     - http://localhost/nginx_status
 
 transforms:
+  vector_metrics_relabel:
+    type: remap
+    inputs:
+      - vector_metrics
+    source: |
+      .tags.job = "integrations/vector_agent"
+
+  host_metrics_relabel:
+    type: remap
+    inputs:
+      - host_metrics
+    source: |
+      .tags.job = "integrations/linux_host"
+      .tags.instance = "${HOSTNAME}"
+
+  nginx_metrics_relabel:
+    type: remap
+    inputs:
+      - nginx_metrics
+    source: |
+      .tags.job = "integrations/nginx"
+
   add_labels_to_metrics:
     type: remap
     inputs:
-    - '*metrics'
+    - '*metrics_relabel'
     source: |
       .tags.environment = "${ENVIRONMENT}"
       .tags.application = "edxapp"
