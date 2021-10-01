@@ -24,6 +24,8 @@ config:
   edxapp:mongo_admin_password:
     secure: v1:Z57JZ5RX59bVTb2j:zIERkkj7Vs1e7J+qZNhaPOo3H6owlQn3Ovj9VpikQaXbWa4uBV4B7Lf6I9KWoDMohXYJoId1Dn5waiSlmOBp19NhoPQNilteLJDmjyl5T2N6zNxsLi8T3u7C
   edxapp:sender_email_address: mitxonline-support@mit.edu
+  edxapp:web_node_capacity: '6'
+  edxapp:worker_node_capacity: '3'
   grafana:api_key:
     secure: v1:yuzEbQbvy0I01aU7:IuWVim+wvl+Bw9nAiiwSJCFXk9/PtXvpk+8wT6GlC7Wk18wmvBcGoNcwCTGCC6pDgG0q5/KDkVg+jSIIi2QTqc03oU8DurX1rCwjHdnNiT3Zh/WXuNesU/w3sJmWF9G7AoiYpaEYV3qZs/CSi2wwIrWk8b3UB9m2AAm2Wf9cVdLgmYgQC2BbBFoCytK+pWVSkqJZZg==
   grafana:loki_user: '105204'
