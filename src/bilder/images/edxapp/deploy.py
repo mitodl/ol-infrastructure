@@ -144,10 +144,7 @@ if node_type == WEB_NODE_TYPE:
     )
     vector.configuration_templates.update(
         {
-            TEMPLATES_DIRECTORY.joinpath("vector", "nginx.yaml"): {},
-            Path(__file__).parent.joinpath(
-                "templates", "vector", "edx_tracking.yaml"
-            ): {},
+            TEMPLATES_DIRECTORY.joinpath("vector", "edx_tracking.yaml"): {},
         }
     )
     vault_templates.extend(
