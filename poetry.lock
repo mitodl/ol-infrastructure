@@ -1027,7 +1027,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-vault"
-version = "4.4.0"
+version = "4.5.0"
 description = "A Pulumi package for creating and managing vault cloud resources."
 category = "main"
 optional = false
@@ -1540,7 +1540,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "5df8be95908499da1579c0356238b5c41445e11ba561b475d3f3b6dc2301a2bf"
+content-hash = "3b077aacc437e38b005a5ad14fe48afc38cf91f2876d2fb636af6f3e83a6e423"
 
 [metadata.files]
 anyio = [
@@ -2148,7 +2148,7 @@ pulumi-tls = [
     {file = "pulumi_tls-4.0.0.tar.gz", hash = "sha256:10c23b8cc049869f946f86f8ce150a7bd25d24e6fd7f037ddfa99d8a7720553a"},
 ]
 pulumi-vault = [
-    {file = "pulumi_vault-4.4.0.tar.gz", hash = "sha256:df0a3953c0741751b64f5ba153a26c453cb925d16908fd7f4ed176a3c8d29dbf"},
+    {file = "pulumi_vault-4.5.0.tar.gz", hash = "sha256:1a3f5898d953d6fcfa89fed25f99d7e38e47b1067882ab04259e3a400d6b6d01"},
 ]
 py = [
     {file = "py-1.10.0-py2.py3-none-any.whl", hash = "sha256:3b80836aa6d1feeaa108e046da6423ab8f6ceda6468545ae8d02d9d58d18818a"},
