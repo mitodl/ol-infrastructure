@@ -28,7 +28,7 @@
     FORUM_USE_TCP: true
     NGINX_ENABLE_SSL: true
     NGINX_HTTPS_REDIRECT_STRATEGY: forward_for_proto
-    NGINX_LOG_FORMAT_NAME: app_metrics
+    NGINX_LOG_FORMAT_NAME: json_analytics
     NGINX_REDIRECT_TO_HTTPS: true
     NGINX_SSL_CERTIFICATE: /tmp/edxapp.cert
     NGINX_SSL_KEY: /tmp/edxapp.key

@@ -33,9 +33,9 @@ sources:
     type: journald
     current_boot_only: true
     include_units:
-      - consul
-      - consul-template
-      - vault
+    - consul
+    - consul-template
+    - vault
 
 transforms:
 
@@ -83,7 +83,7 @@ transforms:
     - nginx_access_log
     type: remap
     source: |
-      parsed, err = parse_logfmt(.message)
+      parsed, err = parse_json(.message)
       if parsed != null {
         .@timestamp = parse_timestamp!(parsed.time, "%FT%T%:z")
         . = merge(., parsed)
@@ -101,7 +101,7 @@ transforms:
     inputs:
     - nginx_access_log_malformed_message_filter
     type: filter
-    condition: '! contains!(.user_agent, "ELB-HealthChecker")'
+    condition: '! contains!(.http_user_agent, "ELB-HealthChecker")'
 
   nginx_error_log_parser:
     inputs:
