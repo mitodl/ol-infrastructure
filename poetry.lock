@@ -132,14 +132,14 @@ uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
 name = "boto3"
-version = "1.18.48"
+version = "1.18.53"
 description = "The AWS SDK for Python"
 category = "main"
 optional = false
 python-versions = ">= 3.6"
 
 [package.dependencies]
-botocore = ">=1.21.48,<1.22.0"
+botocore = ">=1.21.53,<1.22.0"
 jmespath = ">=0.7.1,<1.0.0"
 s3transfer = ">=0.5.0,<0.6.0"
 
@@ -148,7 +148,7 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.21.48"
+version = "1.21.53"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
 optional = false
@@ -946,7 +946,7 @@ six = ">=1.9"
 
 [[package]]
 name = "pulumi"
-version = "3.13.0"
+version = "3.13.2"
 description = "Pulumi's Python SDK"
 category = "main"
 optional = false
@@ -962,7 +962,7 @@ six = ">=1.12.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "4.21.2"
+version = "4.22.1"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 category = "main"
 optional = false
@@ -988,7 +988,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-fastly"
-version = "3.6.0"
+version = "3.7.0"
 description = "A Pulumi package for creating and managing fastly cloud resources."
 category = "main"
 optional = false
@@ -1027,7 +1027,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-vault"
-version = "4.4.0"
+version = "4.5.0"
 description = "A Pulumi package for creating and managing vault cloud resources."
 category = "main"
 optional = false
@@ -1540,7 +1540,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "7748e685d5e172bd6ce1cef66a8ef58a1124e1f9db01c98bba4914068f4fa396"
+content-hash = "45394f187d95149527d8d1a0b373f4358f25684d329d8960022b79b667032991"
 
 [metadata.files]
 anyio = [
@@ -1589,12 +1589,12 @@ black = [
     {file = "black-21.7b0.tar.gz", hash = "sha256:c8373c6491de9362e39271630b65b964607bc5c79c83783547d76c839b3aa219"},
 ]
 boto3 = [
-    {file = "boto3-1.18.48-py3-none-any.whl", hash = "sha256:c388da7dc1a596755f39de990a72e05cee558d098e81de63de55bd9598cc5134"},
-    {file = "boto3-1.18.48.tar.gz", hash = "sha256:7b45b224442c479de4bc6e6e9cb0557b642fc7a77edc8702e393ccaa2e0aa128"},
+    {file = "boto3-1.18.53-py3-none-any.whl", hash = "sha256:9dea5a820282bcd752bba118e38e44d683024e7cd8792ea89e72e3df7c61978e"},
+    {file = "boto3-1.18.53.tar.gz", hash = "sha256:4c20f183b680f6b02f70fb32b03df8b52ab9e0fc7a48dc309c159babaf5c9497"},
 ]
 botocore = [
-    {file = "botocore-1.21.48-py3-none-any.whl", hash = "sha256:9d5b70be2f417d0aa30788049fd20473ad27218eccd05e71f545b4b4e09c79a0"},
-    {file = "botocore-1.21.48.tar.gz", hash = "sha256:2c25a76f09223b2f00ad578df34492b7b84cd4828fc90c08ccbdd1d70abbd7eb"},
+    {file = "botocore-1.21.53-py3-none-any.whl", hash = "sha256:09f82a17a352f8b694ac6542eae34fe39169b049c4ca55e17040a0796b8f399b"},
+    {file = "botocore-1.21.53.tar.gz", hash = "sha256:650604ca5231b819d64430c6b2d1748646bab1095a02fb81bad99cd59f6f6cf5"},
 ]
 certifi = [
     {file = "certifi-2021.5.30-py2.py3-none-any.whl", hash = "sha256:50b1e4f8446b06f41be7dd6338db18e0990601dce795c2b1686458aa7e8fa7d8"},
@@ -2130,16 +2130,16 @@ protobuf = [
     {file = "protobuf-3.17.3.tar.gz", hash = "sha256:72804ea5eaa9c22a090d2803813e280fb273b62d5ae497aaf3553d141c4fdd7b"},
 ]
 pulumi = [
-    {file = "pulumi-3.13.0-py2.py3-none-any.whl", hash = "sha256:4e600da91b8c156fcaac0ff2b2914c850eb8e76dcc7979d90df58063438f6e26"},
+    {file = "pulumi-3.13.2-py2.py3-none-any.whl", hash = "sha256:2f9de82cbdf5bc2e586aad1dc3589ca723da95a24b72a8f1db658c1490fcb090"},
 ]
 pulumi-aws = [
-    {file = "pulumi_aws-4.21.2.tar.gz", hash = "sha256:24f33433016af37034d71703c30c116e0b1abc93d4512659091fb813b389d44c"},
+    {file = "pulumi_aws-4.22.1.tar.gz", hash = "sha256:5ac65f80a9214f83036a5dfcb432a402f2109260be5ad623ad4f2f207a2b6467"},
 ]
 pulumi-consul = [
     {file = "pulumi_consul-3.3.0.tar.gz", hash = "sha256:9d7205d8759efc44d6bbab741f7e2654debe8819e30f614597f86b95ceaf599d"},
 ]
 pulumi-fastly = [
-    {file = "pulumi_fastly-3.6.0.tar.gz", hash = "sha256:7fbd23d2c8c0e68c199cec034e056b2e6e06a91e6ad5578e5be9725596ffba93"},
+    {file = "pulumi_fastly-3.7.0.tar.gz", hash = "sha256:b69f369fd39f872f613438b6c1e766848f6799e1304f6b4f17c3daad742efa9e"},
 ]
 pulumi-github = [
     {file = "pulumi_github-4.4.0.tar.gz", hash = "sha256:18f6c4d67c084d10558d1f56d54d307a0dc315b58d68241e62a24fc203b884f3"},
@@ -2148,7 +2148,7 @@ pulumi-tls = [
     {file = "pulumi_tls-4.0.0.tar.gz", hash = "sha256:10c23b8cc049869f946f86f8ce150a7bd25d24e6fd7f037ddfa99d8a7720553a"},
 ]
 pulumi-vault = [
-    {file = "pulumi_vault-4.4.0.tar.gz", hash = "sha256:df0a3953c0741751b64f5ba153a26c453cb925d16908fd7f4ed176a3c8d29dbf"},
+    {file = "pulumi_vault-4.5.0.tar.gz", hash = "sha256:1a3f5898d953d6fcfa89fed25f99d7e38e47b1067882ab04259e3a400d6b6d01"},
 ]
 py = [
     {file = "py-1.10.0-py2.py3-none-any.whl", hash = "sha256:3b80836aa6d1feeaa108e046da6423ab8f6ceda6468545ae8d02d9d58d18818a"},

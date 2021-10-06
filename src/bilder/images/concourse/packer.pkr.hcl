@@ -46,6 +46,12 @@ source "amazon-ebs" "concourse" {
     }
     random = true
   }
+  run_tags = {
+    Name    = "${local.app_name}-${var.node_type}"
+    OU      = "${local.business_unit}"
+    app     = "${local.app_name}"
+    purpose = "${local.app_name}-${var.node_type}"
+  }
   tags = {
     Name    = "${local.app_name}-${var.node_type}"
     OU      = "${local.business_unit}"

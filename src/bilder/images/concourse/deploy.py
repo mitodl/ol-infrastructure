@@ -1,5 +1,6 @@
 import os
 from functools import partial
+from ipaddress import IPv4Address
 from pathlib import Path
 from typing import Union
 
@@ -50,16 +51,23 @@ from bilder.components.hashicorp.vault.models import (
     VaultTemplate,
 )
 from bilder.components.hashicorp.vault.steps import vault_template_permissions
+from bilder.components.vector.models import VectorConfig
+from bilder.components.vector.steps import (
+    configure_vector,
+    install_vector,
+    vector_service,
+)
 from bilder.facts import has_systemd  # noqa: F401
 from bridge.lib.magic_numbers import (
+    CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
     CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
     VAULT_HTTP_PORT,
 )
 
 VERSIONS = {  # noqa: WPS407
-    "concourse": os.environ.get("CONCOURSE_VERSION", "7.4.0"),
-    "consul": os.environ.get("CONSUL_VERSION", "1.10.1"),
-    "vault": os.environ.get("VAULT_VERSION", "1.8.1"),
+    "concourse": os.environ.get("CONCOURSE_VERSION", "7.5.0"),
+    "consul": os.environ.get("CONSUL_VERSION", "1.10.2"),
+    "vault": os.environ.get("VAULT_VERSION", "1.8.2"),
 }
 CONCOURSE_WEB_NODE_TYPE = "web"
 CONCOURSE_WORKER_NODE_TYPE = "worker"
@@ -103,6 +111,8 @@ concourse_config_map = {
         vault_url=f"http://localhost:{VAULT_HTTP_PORT}",
         vault_client_token="this-token-gets-overridden-by-the-vault-agent",
         vault_path_prefix="/secret-concourse",
+        prometheus_bind_ip=IPv4Address("127.0.0.1"),
+        prometheus_bind_port=CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
@@ -226,6 +236,16 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
             ],
         )
         caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
+    vector_config = VectorConfig(
+        configuration_templates={
+            Path(__file__).parent.joinpath("templates", "vector.yaml"): {
+                "concourse_prometheus_port": concourse_config.prometheus_bind_port
+            },
+        },
+    )
+    install_vector(vector_config)
+    configure_vector(vector_config)
+    vector_service(vector_config)
 
 # Install Consul and Vault Agent
 vault_config = VaultAgentConfig(

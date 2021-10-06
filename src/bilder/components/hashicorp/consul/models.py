@@ -71,6 +71,7 @@ class ConsulConfig(HashicorpConfig):
     enable_syslog: bool = True
     leave_on_terminate: bool = True
     log_level: Optional[str] = "WARN"
+    log_json: bool = True
     primary_datacenter: Optional[str]
     recursors: Optional[List[str]] = Field(
         None,

@@ -1,3 +1,5 @@
+import json
+
 from pulumi import Config, export
 from pulumi_aws import iam, s3
 
@@ -21,18 +23,51 @@ aws_config = AWSBase(
 # See http://docs.odl.mit.edu/ocw-next/s3-buckets
 
 draft_bucket_name = f"ocw-content-draft-{stack_info.env_suffix}"
+draft_bucket_arn = f"arn:aws:s3:::{draft_bucket_name}"
 live_bucket_name = f"ocw-content-live-{stack_info.env_suffix}"
+live_bucket_arn = f"arn:aws:s3:::{live_bucket_name}"
 
 draft_bucket = s3.Bucket(
     draft_bucket_name,
     bucket=draft_bucket_name,
     tags=aws_config.tags,
+    acl="public-read",
+    policy=json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "PublicRead",
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": ["s3:GetObject"],
+                    "Resource": [f"arn:aws:s3:::{draft_bucket_name}/*"],
+                }
+            ],
+        }
+    ),
+    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
 )
 
 live_bucket = s3.Bucket(
     live_bucket_name,
     bucket=live_bucket_name,
     tags=aws_config.tags,
+    policy=json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "PublicRead",
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": ["s3:GetObject"],
+                    "Resource": [f"{live_bucket_arn}/*"],
+                }
+            ],
+        }
+    ),
+    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
 )
 
 policy_description = (
@@ -55,10 +90,10 @@ s3_bucket_iam_policy = iam.Policy(
                         "s3:GetObject*",
                     ],
                     "Resource": [
-                        f"arn:aws:s3:::{draft_bucket_name}",
-                        f"arn:aws:s3:::{draft_bucket_name}/*",
-                        f"arn:aws:s3:::{live_bucket_name}",
-                        f"arn:aws:s3:::{live_bucket_name}/*",
+                        draft_bucket_arn,
+                        f"{draft_bucket_arn}/*",
+                        live_bucket_arn,
+                        f"{live_bucket_arn}/*",
                     ],
                 }
             ],

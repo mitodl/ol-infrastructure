@@ -53,9 +53,9 @@ from bilder.images.edxapp.plugins import git_export_import  # noqa: F401
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 
 VERSIONS = {  # noqa: WPS407
-    "consul": "1.10.0",
-    "vault": "1.7.3",
-    "consul-template": "0.26.0",
+    "consul": "1.10.2",
+    "vault": "1.8.2",
+    "consul-template": "0.27.1",
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 
@@ -69,8 +69,8 @@ pip.packages(
         "django-redis",  # Support for Redis caching in Django
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "mitxpro-openedx-extensions==0.2.2",
-        "social-auth-mitxpro==0.4",
-        "edx-username-changer==0.1.0",
+        "social-auth-mitxpro==0.5",
+        "edx-username-changer==0.2.0",
         "edx-sysadmin",
         "ol-openedx-sentry",
         "ol-openedx-logging",
@@ -93,6 +93,7 @@ files.directory(
 vector = VectorConfig(
     configuration_templates={
         TEMPLATES_DIRECTORY.joinpath("vector", "edxapp.yaml"): {},
+        TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml"): {},
     }
 )
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
@@ -134,12 +135,16 @@ consul_templates = [
     ),
 ]
 if node_type == WEB_NODE_TYPE:
+    files.put(
+        name="Set up Nginx status endpoint for metrics collection",
+        src=Path(__file__).parent.joinpath("files", "nginx_status.conf"),
+        dest=Path("/etc/nginx/sites-enabled/status_monitor"),
+        user="www-data",
+        group="www-data",
+    )
     vector.configuration_templates.update(
         {
-            TEMPLATES_DIRECTORY.joinpath("vector", "nginx.yaml"): {},
-            Path(__file__).parent.joinpath(
-                "templates", "vector", "edx_tracking.yaml"
-            ): {},
+            TEMPLATES_DIRECTORY.joinpath("vector", "edx_tracking.yaml"): {},
         }
     )
     vault_templates.extend(
