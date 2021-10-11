@@ -1001,7 +1001,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "4.4.0"
+version = "4.5.0"
 description = "A Pulumi package for creating and managing github cloud resources."
 category = "main"
 optional = false
@@ -1540,7 +1540,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "22cf1e10077acca773bbad54f6b788de2d9ff69eb45c82538b640c6b32fba788"
+content-hash = "807e4f6d24d7809780c5061e95f3b1fd1138f0aa9c929f3e8ff2abb553d0050c"
 
 [metadata.files]
 anyio = [
@@ -2142,7 +2142,7 @@ pulumi-fastly = [
     {file = "pulumi_fastly-3.7.0.tar.gz", hash = "sha256:b69f369fd39f872f613438b6c1e766848f6799e1304f6b4f17c3daad742efa9e"},
 ]
 pulumi-github = [
-    {file = "pulumi_github-4.4.0.tar.gz", hash = "sha256:18f6c4d67c084d10558d1f56d54d307a0dc315b58d68241e62a24fc203b884f3"},
+    {file = "pulumi_github-4.5.0.tar.gz", hash = "sha256:f6e83a77c3597e359f5f36742cf9716b7ec2ced7d3aa859450c5b5c358ee12f9"},
 ]
 pulumi-tls = [
     {file = "pulumi_tls-4.0.0.tar.gz", hash = "sha256:10c23b8cc049869f946f86f8ce150a7bd25d24e6fd7f037ddfa99d8a7720553a"},
