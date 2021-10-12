@@ -4,6 +4,7 @@ encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQFHcpFhbPNNfHC+eZ
 config:
   aws:region: us-east-1
   mongodb:instance_type: general_purpose_large
+  mongodb:instance_count: 5
   mongodb:disk_size: 500
   environment:business_unit: residential
   environment:vpc_reference: residential_mitx_vpc
