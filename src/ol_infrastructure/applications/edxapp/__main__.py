@@ -17,7 +17,7 @@ from string import Template
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi.output import Output
 from pulumi_aws import (
     acm,
@@ -744,7 +744,11 @@ edxapp_vault_mount = vault.Mount(
 edxapp_secrets = vault.generic.Secret(
     "edxapp-static-secrets",
     path=edxapp_vault_mount.path.apply("{}/edxapp".format),
-    data_json=json.dumps(read_yaml_secrets(Path("edxapp/mitxonline.qa.yaml"))),
+    data_json=Output.secret(
+        read_yaml_secrets(
+            Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
+        )
+    ).apply(json.dumps),
 )
 forum_secrets = vault.generic.Secret(
     "edx-forum-static-secrets",
