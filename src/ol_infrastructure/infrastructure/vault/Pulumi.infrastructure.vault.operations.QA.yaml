@@ -1,0 +1,11 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QEEv+U1oDhFGrH/8+YwVqJ/AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMRjCxvrdAXlWYRvxmAgEQgDssmgnTuZnD6jhiZIYiG338KEllNkpHZZ82BgyQoelMPmQ7duWRSS6xIlxrqGntuW+9JjDG+oiLzf3vtA==
+config:
+  aws:region: us-east-1
+  vault:business_unit: operations
+  vault:cluster_size: '5'
+  vault:domain: vault-qa.odl.mit.edu
+  vault:instance_type: large
+  vault:storage_disk_capacity: '100'
+  vault:target_vpc: operations
