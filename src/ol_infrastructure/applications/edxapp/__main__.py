@@ -17,7 +17,7 @@ from string import Template
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi.output import Output
 from pulumi_aws import (
     acm,
@@ -44,6 +44,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_REDIS_PORT,
     IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
 )
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -743,7 +744,11 @@ edxapp_vault_mount = vault.Mount(
 edxapp_secrets = vault.generic.Secret(
     "edxapp-static-secrets",
     path=edxapp_vault_mount.path.apply("{}/edxapp".format),
-    data_json=edxapp_config.require_secret_object("edxapp_secrets").apply(json.dumps),
+    data_json=Output.secret(
+        read_yaml_secrets(
+            Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
+        )
+    ).apply(json.dumps),
 )
 forum_secrets = vault.generic.Secret(
     "edx-forum-static-secrets",

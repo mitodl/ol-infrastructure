@@ -1,6 +1,6 @@
 ---
-secretsprovider: awskms://alias/infrastructure-secrets-ci
-encryptedkey: AQICAHjEYf3gV5ZTnviCJcHwGnUuLzld5EuYumgMrRde6bvXUgG0NuGxuciUOUHhP1tZyHF3AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM9bsC9GV4ySfLwLmOAgEQgDuezZ5q7HcL7ipEnXE1Gvg2QqqTozAo8eJ7CIyhK75F1jblIPgmVLfHIC2ZFyOtpb+doYAYNUH+erzcDw==
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QHhz0xnN+wDezPJei/xvnnAAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMRH44dcjjn++7miXvAgEQgDuKeVpuhxJyyuLtmvqsxrSzYPR4AkQ7Q7Yrnt664nG0SsRuJHsjIrrcJiqiZbPar5g0e2mOe+amTWCZPg==
 config:
   vault_setup:key_shares: '2'
   vault_setup:pgp_keys:
