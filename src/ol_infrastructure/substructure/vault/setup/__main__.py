@@ -64,7 +64,7 @@ def init_vault_cluster(vault_addr):  # noqa: WPS231
                     )
 
                 vault_client.sys.create_or_update_policy(
-                    name=PULUMI,
+                    name="cluster-admin",
                     policy=Path(__file__)
                     .parent.joinpath("pulumi_policy.hcl")
                     .read_text(),
