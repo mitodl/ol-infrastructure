@@ -45,7 +45,13 @@ def init_vault_cluster(vault_addr):  # noqa: WPS231
         recovery_keys = init_response["recovery_keys"]
 
         vault_client.token = vault_root_token  # noqa: WPS428
-        pulumi.log.info("Retain these keys for recovering the cluster: ", recovery_keys)
+        pulumi.log.info(
+            "IMPORTANT!: Retain the keys in vault_recovery_keys.txt for "
+            "recovering the cluster."
+        )
+
+        with open("vault_recovery_keys.txt", "w") as vault_recovery_keys_file:
+            vault_recovery_keys_file.write("\n".join(recovery_keys))
 
         vault_ready = False
         while not vault_ready:
@@ -137,11 +143,4 @@ vault_user_pass_auth = vault.AuthBackend(
     type="userpass",
     description="Username and password based authentication for Vault",
     tune=vault.AuthBackendTuneArgs(token_type="default-service"),  # noqa: S106
-)
-
-pulumi.export(
-    "vault",
-    {
-        "recovery_keys": vault_recovery_keys,
-    },
 )
