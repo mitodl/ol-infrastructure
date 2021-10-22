@@ -405,8 +405,9 @@ RETIREMENT_STATES:
 SEGMENT_KEY: null
 SENTRY_ENVIRONMENT: {{ env "ENVIRONMENT" }}
 SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
-SESSION_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
-SESSION_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edxapp-sessionid  # MODIFIED
+# Removing the session cookie domain as it is no longer needed for sharing the cookie
+# between LMS and Studio (TMM 2021-10-22)
+# SESSION_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
 SITE_NAME: MITx Online  # MODIFIED
