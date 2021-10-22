@@ -10,9 +10,9 @@ GIT_EXPORT_DEFAULT_IDENT:
 PARSE_KEYS: {}
 
 {{ with secret "secret-mitxonline/edxapp" }}
-SOCIAL_AUTH_EDX_OAUTH2_KEY: {{ .Data.studio-oauth-client.id }}
-SOCIAL_AUTH_EDX_OAUTH2_SECRET: {{ .Data.studio-oauth-client.secret }}
+SOCIAL_AUTH_EDX_OAUTH2_KEY: {{ .Data.studio_oauth_client.id }}
+SOCIAL_AUTH_EDX_OAUTH2_SECRET: {{ .Data.studio_oauth_client.secret }}
 {{ end }}
 SOCIAL_AUTH_EDX_OAUTH2_URL_ROOT: https://{{ key "edxapp/lms-domain" }}  # possibly same as public LMS root URL
-SOCIAL_AUTH_EDX_OAUTH2_PUBLIC_URL_ROOT: 'https://{{ key "edxapp/lms-domain" }}'
+SOCIAL_AUTH_EDX_OAUTH2_PUBLIC_URL_ROOT: https://{{ key "edxapp/lms-domain" }}
 SESSION_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-studio-sessionid  # MODIFIED

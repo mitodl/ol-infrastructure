@@ -384,7 +384,7 @@ edxapp_db_config = OLMariaDBConfig(
     security_groups=[edxapp_db_security_group],
     tags=aws_config.tags,
     db_name="edxapp",
-    engine_version="10.5.8",
+    engine_version="10.5.12",
     **defaults(stack_info)["rds"],
 )
 edxapp_db = OLAmazonDB(edxapp_db_config)
