@@ -210,7 +210,6 @@ s3.BucketPublicAccessBlock(
 # Manage Consul Data #
 ######################
 consul_kv_data = {
-    "cookie-domain": edxapp_zone["domain"].apply(".{}".format),
     "google-analytics-id": edxapp_config.require("google_analytics_id"),
     "lms-domain": edxapp_domains["lms"],
     "preview-domain": edxapp_domains["preview"],
