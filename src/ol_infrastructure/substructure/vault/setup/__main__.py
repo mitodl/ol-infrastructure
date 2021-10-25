@@ -8,14 +8,17 @@ import pulumi_vault as vault
 
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.vault import get_vault_provider
 
 vault_config = pulumi.Config("vault_setup")
 stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+env_namespace = f"{stack_info.env_prefix}.{stack_info.env_suffix}"
 vault_cluster = pulumi.StackReference(
     f"infrastructure.vault.{stack_info.env_prefix}.{stack_info.name}"
 )
-vault_address = vault_cluster.outputs["vault_server"]["public_dns"]
+vault_dns = vault_cluster.outputs["vault_server"]["public_dns"]
+vault_address = vault_cluster.outputs["vault_server"]["cluster_address"]
 key_shares = vault_config.get_int("key_shares") or 3
 recovery_threshold = vault_config.get_int("recovery_threshold") or 2
 pgp_public_keys: List[str] = vault_config.get_object("pgp_keys")
@@ -25,7 +28,9 @@ if pgp_public_keys and len(pgp_public_keys) != key_shares:
 
 PULUMI = "pulumi"
 pulumi_vault_creds = read_yaml_secrets(
-    Path().joinpath(PULUMI, f"vault.{stack_info.env_suffix}.yaml")
+    Path().joinpath(
+        PULUMI, f"vault.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"
+    )
 )
 
 
@@ -94,22 +99,10 @@ def init_vault_cluster(vault_addr):  # noqa: WPS231
     return recovery_keys
 
 
-vault_recovery_keys = vault_address.apply(init_vault_cluster)
+vault_recovery_keys = vault_dns.apply(init_vault_cluster)
 
-vault_provider = vault.Provider(  # noqa: S106
-    "vault-provider",
-    address=vault_address.apply("https://{}".format),
-    add_address_to_env=True,
-    token="",
-    auth_logins=[
-        vault.ProviderAuthLoginArgs(
-            path=f"auth/pulumi/login/{pulumi_vault_creds['auth_username']}",
-            method="userpass",
-            parameters={
-                "password": pulumi_vault_creds["auth_password"],
-            },
-        )
-    ],
+vault_provider = vault_address.apply(
+    lambda address: get_vault_provider(address, env_namespace)
 )
 
 vault_opts = pulumi.ResourceOptions(provider=vault_provider)

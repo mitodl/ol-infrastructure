@@ -6,7 +6,14 @@
 
 import json
 from enum import Enum
+from functools import lru_cache
+from pathlib import Path
 from string import Template
+
+import pulumi
+import pulumi_vault
+
+from bridge.secrets.sops import read_yaml_secrets
 
 postgres_role_statements = {
     "approle": {
@@ -142,3 +149,49 @@ mongodb_role_statements = {
 class VaultPKIKeyTypeBits(int, Enum):  # noqa: WPS600
     rsa = 4096
     ec = 256
+
+
+@lru_cache
+def get_vault_provider(
+    vault_address: str, vault_env_namespace: str, provider_name: str = None
+) -> pulumi.ResourceTransformationResult:
+    pulumi_vault_creds = read_yaml_secrets(
+        Path().joinpath(
+            # We are forcing the assumption that the Vault cluster is in the operations
+            # environment/namespace.(TMM 2021-10-19)
+            "pulumi",
+            f"vault.{vault_env_namespace}.yaml",
+        )
+    )
+    return pulumi_vault.Provider(  # noqa: S106
+        provider_name or "vault-provider",
+        address=vault_address,
+        add_address_to_env=True,
+        token="",
+        auth_logins=[
+            pulumi_vault.ProviderAuthLoginArgs(
+                path=f"auth/pulumi/login/{pulumi_vault_creds['auth_username']}",
+                method="userpass",
+                parameters={
+                    "password": pulumi.Output.secret(
+                        pulumi_vault_creds["auth_password"]
+                    )
+                },
+            )
+        ],
+    )
+
+
+def set_vault_provider(
+    vault_address: str,
+    vault_env_namespace: str,
+    resource_args: pulumi.ResourceTransformationArgs,
+) -> pulumi.ResourceTransformationResult:
+    if resource_args.type_.split(":")[0] == "vault":
+        resource_args.opts.provider = get_vault_provider(
+            vault_address, vault_env_namespace
+        )
+    return pulumi.ResourceTransformationResult(
+        props=resource_args.props,
+        opts=resource_args.opts,
+    )

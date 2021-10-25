@@ -14,6 +14,7 @@ from functools import partial
 from pathlib import Path
 from string import Template
 
+import pulumi
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
@@ -58,10 +59,19 @@ from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import mongodb_role_statements, mysql_role_statements
+from ol_infrastructure.lib.vault import (
+    mongodb_role_statements,
+    mysql_role_statements,
+    set_vault_provider,
+)
 
 stack_info = parse_stack()
 edxapp_config = Config("edxapp")
+vault_address = Config("vault").require("address")
+vault_env_namespace = Config("vault_server").require("env_namespace")
+pulumi.runtime.register_stack_transformation(
+    partial(set_vault_provider, vault_address, vault_env_namespace)
+)
 #############
 # Constants #
 #############
