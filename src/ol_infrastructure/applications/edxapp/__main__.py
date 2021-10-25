@@ -14,6 +14,7 @@ from functools import partial
 from pathlib import Path
 from string import Template
 
+import pulumi
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
