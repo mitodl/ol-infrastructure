@@ -6,7 +6,7 @@
 
 import json
 from enum import Enum
-from functools import lru_cache
+from functools import lru_cache, partial
 from pathlib import Path
 from string import Template
 
@@ -194,4 +194,12 @@ def set_vault_provider(
     return pulumi.ResourceTransformationResult(
         props=resource_args.props,
         opts=resource_args.opts,
+    )
+
+
+def setup_vault_provider():
+    vault_address = pulumi.Config("vault").require("address")
+    vault_env_namespace = pulumi.Config("vault_server").require("env_namespace")
+    pulumi.runtime.register_stack_transformation(
+        partial(set_vault_provider, vault_address, vault_env_namespace)
     )
