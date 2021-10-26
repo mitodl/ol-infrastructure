@@ -423,7 +423,7 @@ STATIC_ROOT_BASE: /edx/var/edxapp/staticfiles
 STATIC_URL_BASE: /static/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
-SUPPORT_SITE_LINK: ''
+SUPPORT_SITE_LINK: https://mitx-micromasters.zendesk.com/hc/en-us/requests/new
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
 TIME_ZONE: America/New_York
