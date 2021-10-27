@@ -71,6 +71,7 @@ caddy_config_changed = configure_caddy(caddy_config)
 vector_config = VectorConfig(
     configuration_templates={
         TEMPLATES_DIRECTORY.joinpath("vector", "vector.yaml"): {},
+        TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml"): {},
     }
 )
 install_vector(vector_config)
