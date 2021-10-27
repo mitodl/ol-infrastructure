@@ -1,5 +1,6 @@
 import base64
 import json
+from pathlib import Path
 
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
@@ -14,6 +15,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     FIVE_MINUTES,
 )
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
@@ -40,7 +42,6 @@ mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 vpc_id = destination_vpc["id"]
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
 kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
-
 
 #############
 # IAM Setup #
@@ -392,7 +393,11 @@ consul_launch_config = ec2.LaunchTemplate(
     user_data=Output.all(
         vpc_id=vpc_id,
         retry_join_wan=retry_join_wan,
-        pulumi_password=consul_config.require("basic_auth_password_hash"),
+        pulumi_password=Output.secret(
+            read_yaml_secrets(Path(f"pulumi/consul.{stack_info.env_suffix}.yaml"))[
+                "basic_auth_password"
+            ]
+        ),
     ).apply(
         lambda init_dict: cloud_init_userdata(
             init_dict["vpc_id"],

@@ -5,5 +5,3 @@ config:
   aws:region: us-east-1
   environment:business_unit: mitxpro
   environment:vpc_reference: xpro_vpc
-  saltstack:environment_name: mitxpro-qa
-  saltstack:key_name: salt-qa
