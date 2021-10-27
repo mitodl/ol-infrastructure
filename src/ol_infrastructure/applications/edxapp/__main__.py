@@ -160,6 +160,19 @@ edxapp_storage_bucket = s3.Bucket(
     bucket=storage_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
+    cors_rules=[
+        s3.BucketCorsRuleArgs(
+            allowed_headers=["*"],
+            allowed_methods=[
+                "GET",
+                "PUT",
+                "POST",
+            ],
+            allowed_origins=[f"https://{domain}" for domain in edxapp_domains.values()],
+            expose_headers=["ETag"],
+            max_age_seconds=3000,
+        )
+    ],
 )
 
 course_bucket_name = f"{env_name}-edxapp-courses"
