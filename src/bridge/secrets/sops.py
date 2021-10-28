@@ -31,5 +31,6 @@ def set_env_secrets(sops_file: Path) -> None:
         capture_output=True,
     )
     for line in env_data.stdout.decode("utf8").split("\n"):
-        env_key, env_value = line.split("=")
-        os.environ[env_key] = env_value
+        if "=" in line:
+            env_key, env_value = line.split("=")
+            os.environ[env_key] = env_value
