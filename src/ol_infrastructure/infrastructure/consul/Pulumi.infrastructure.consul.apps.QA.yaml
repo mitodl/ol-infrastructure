@@ -5,5 +5,3 @@ config:
   aws:region: us-east-1
   environment:business_unit: operations
   environment:vpc_reference: applications_vpc
-  saltstack:environment_name: rc-apps
-  saltstack:key_name: salt-qa

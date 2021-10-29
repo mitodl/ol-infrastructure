@@ -5,4 +5,3 @@ config:
   aws:region: us-east-1
   environment:business_unit: residential
   environment:vpc_reference: residential_mitx_vpc
-  saltstack:key_name: salt-qa
