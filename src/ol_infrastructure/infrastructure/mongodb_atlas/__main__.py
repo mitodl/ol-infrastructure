@@ -87,9 +87,7 @@ atlas_security_group = aws.ec2.SecurityGroup(
 
 atlas_aws_network_peer = atlas.NetworkPeering(
     f"mongo-atlas-network-peering-{environment_name}",
-    accepter_region_name=target_vpc["region"].apply(
-        lambda region: region.replace("-", "_").upper()
-    ),
+    accepter_region_name=target_vpc["region"],
     container_id=atlas_cluster.container_id,
     vpc_id=target_vpc["id"],
     aws_account_id=aws.get_caller_identity().account_id,
@@ -103,4 +101,20 @@ accept_atlas_network_peer = aws.ec2.VpcPeeringConnectionAccepter(
     vpc_peering_connection_id=atlas_aws_network_peer.connection_id,
     auto_accept=True,
     tags=aws_config.tags,
+)
+
+atlas_network_access = atlas.ProjectIpAccessList(
+    "mongo-atlas-network-permissions",
+    aws_security_group=atlas_security_group.id,
+    project_id=atlas_project.id,
+)
+
+pulumi.export(
+    "atlas_cluster",
+    {
+        "mongo_uri": atlas_cluster.mongo_uri,
+        "mongo_uri_with_options": atlas_cluster.mongo_uri_with_options,
+        "connection_strings": atlas_cluster.connection_strings,
+        "srv_record": atlas_cluster.srv_address,
+    },
 )
