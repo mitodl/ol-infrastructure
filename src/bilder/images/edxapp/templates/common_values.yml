@@ -309,6 +309,7 @@ ICP_LICENSE: null
 ICP_LICENSE_INFO: {}
 IDA_LOGOUT_URI_LIST:
   - https://{{ key "edxapp/marketing-domain" }}/logout
+  - https://{{ key "edxapp/studio-domain" }}/logout
 ID_VERIFICATION_SUPPORT_LINK: ''
 INTEGRATED_CHANNELS_API_CHUNK_TRANSMISSION_LIMIT:
     SAP: 1
@@ -405,8 +406,9 @@ RETIREMENT_STATES:
 SEGMENT_KEY: null
 SENTRY_ENVIRONMENT: {{ env "ENVIRONMENT" }}
 SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
-SESSION_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
-SESSION_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edxapp-sessionid  # MODIFIED
+# Removing the session cookie domain as it is no longer needed for sharing the cookie
+# between LMS and Studio (TMM 2021-10-22)
+# SESSION_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
 SITE_NAME: MITx Online  # MODIFIED
@@ -421,7 +423,7 @@ STATIC_ROOT_BASE: /edx/var/edxapp/staticfiles
 STATIC_URL_BASE: /static/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
-SUPPORT_SITE_LINK: ''
+SUPPORT_SITE_LINK: https://mitx-micromasters.zendesk.com/hc/en-us/requests/new
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
 TIME_ZONE: America/New_York

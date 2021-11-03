@@ -23,9 +23,7 @@ from pulumi_aws import (
     acm,
     autoscaling,
     cloudwatch,
-    docdb,
     ec2,
-    elasticsearch,
     get_caller_identity,
     iam,
     lb,
@@ -36,10 +34,8 @@ from pulumi_aws import (
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
-    DEFAULT_ELASTICSEARCH_PORT,
     DEFAULT_HTTP_PORT,
     DEFAULT_HTTPS_PORT,
-    DEFAULT_MONGODB_PORT,
     DEFAULT_MYSQL_PORT,
     DEFAULT_REDIS_PORT,
     IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
@@ -64,6 +60,7 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import mongodb_role_statements, mysql_role_statements
 
+stack_info = parse_stack()
 edxapp_config = Config("edxapp")
 #############
 # Constants #
@@ -78,7 +75,6 @@ FIVE_MINUTES = 60 * 5
 #####################
 # Stack Information #
 #####################
-stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
@@ -164,6 +160,19 @@ edxapp_storage_bucket = s3.Bucket(
     bucket=storage_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
+    cors_rules=[
+        s3.BucketCorsRuleArgs(
+            allowed_headers=["*"],
+            allowed_methods=[
+                "GET",
+                "PUT",
+                "POST",
+            ],
+            allowed_origins=[f"https://{domain}" for domain in edxapp_domains.values()],
+            expose_headers=["ETag"],
+            max_age_seconds=3000,
+        )
+    ],
 )
 
 course_bucket_name = f"{env_name}-edxapp-courses"
@@ -210,7 +219,6 @@ s3.BucketPublicAccessBlock(
 # Manage Consul Data #
 ######################
 consul_kv_data = {
-    "cookie-domain": edxapp_zone["domain"].apply(".{}".format),
     "google-analytics-id": edxapp_config.require("google_analytics_id"),
     "lms-domain": edxapp_domains["lms"],
     "preview-domain": edxapp_domains["preview"],
@@ -385,7 +393,7 @@ edxapp_db_config = OLMariaDBConfig(
     security_groups=[edxapp_db_security_group],
     tags=aws_config.tags,
     db_name="edxapp",
-    engine_version="10.5.8",
+    engine_version="10.5.12",
     **defaults(stack_info)["rds"],
 )
 edxapp_db = OLAmazonDB(edxapp_db_config)
@@ -470,77 +478,9 @@ edxapp_db_consul_service = Service(
     ],
 )
 
-##############################
-# Elasticsearch Consul Setup #
-##############################
-if elasticsearch_domain_name := edxapp_config.get("elasticsearch_domain_name"):
-    edxapp_es = elasticsearch.get_domain(domain_name=elasticsearch_domain_name)
-    edxapp_es_consul_node = Node(
-        "edxapp-elasticsearch-cluster-node",
-        name="edxapp-elasticsearch",
-        address=edxapp_es.endpoint,
-    )
-
-    edxapp_es_consul_service = Service(
-        "edxapp-elasticsearch-service",
-        node=edxapp_es_consul_node.name,
-        name="elasticsearch",
-        port=DEFAULT_ELASTICSEARCH_PORT,
-        meta={
-            "external-node": True,
-            "external-probe": True,
-        },
-        checks=[
-            ServiceCheckArgs(
-                check_id="edxapp-elasticsearch",
-                interval="10s",
-                name="edxapp-elasticsearch",
-                timeout="1m0s",
-                status="passing",
-                tcp=edxapp_es.endpoint,
-            )
-        ],
-    )
-
 #######################
 # MongoDB Vault Setup #
 #######################
-edxapp_mongo_host_name = None
-docdb_params = ""
-if docdb_cluster_id := edxapp_config.get("docdb_cluster_id"):
-    edxapp_mongo_host = docdb.Cluster.get(
-        "edxapp-docdb-cluster",
-        id=docdb_cluster_id,
-    )
-    edxapp_mongo_host_name = edxapp_mongo_host.endpoint
-    docdb_params = "?tls=true&tlsInsecure=true"
-    edxapp_mongo_consul_node = Node(
-        "edxapp-mongodb-cluster-node",
-        name="edxapp-mongodb",
-        address=edxapp_mongo_host.endpoint,
-    )
-
-    edxapp_mongo_consul_service = Service(
-        "edxapp-mongodb-service",
-        node=edxapp_mongo_consul_node.name,
-        name="mongodb-master",
-        port=DEFAULT_MONGODB_PORT,
-        meta={
-            "external-node": True,
-            "external-probe": True,
-        },
-        checks=[
-            ServiceCheckArgs(
-                check_id="edxapp-mongo",
-                interval="10s",
-                name="mongodb-master",
-                timeout="1m0s",
-                status="passing",
-                tcp=f"{edxapp_mongo_host_name}:{edxapp_mongo_host.port}",
-            )
-        ],
-    )
-
 edxapp_mongo_role_statements = mongodb_role_statements
 edxapp_mongo_role_statements["edxapp"] = {
     "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "edxapp"})),
@@ -556,11 +496,10 @@ edxapp_mongo_vault_config = OLVaultMongoDatabaseConfig(
     mount_point=f"mongodb-{stack_info.env_prefix}",
     db_connection=(
         "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
-        + docdb_params
     ),
     db_admin_username=edxapp_config.get("mongo_admin_user") or "admin",
     db_admin_password=edxapp_config.require("mongo_admin_password"),
-    db_host=edxapp_mongo_host_name or f"mongodb-master.service.{env_name}.consul",
+    db_host=f"mongodb-master.service.{env_name}.consul",
     role_statements=edxapp_mongo_role_statements,
 )
 edxapp_mongo_vault_backend = OLVaultDatabaseBackend(edxapp_mongo_vault_config)
@@ -982,8 +921,11 @@ edxapp_lms_web_alb_listener_rule = lb.ListenerRule(
 
 # Create auto scale group and launch configs for Edxapp web and worker
 def cloud_init_user_data_func(
-    consul_env_name, grafana_api_key, grafana_loki_user, grafana_prometheus_user
+    consul_env_name,
 ):
+    grafana_credentials = read_yaml_secrets(
+        Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
+    )
     cloud_config_content = {
         "write_files": [
             {
@@ -1005,9 +947,9 @@ def cloud_init_user_data_func(
                     f"""\
                     ENVIRONMENT={consul_env_name}
                     VECTOR_CONFIG_DIR=/etc/vector/
-                    GRAFANA_CLOUD_API_KEY={grafana_api_key}
-                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_prometheus_user}
-                    GRAFANA_CLOUD_LOKI_API_USER={grafana_loki_user}
+                    GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
+                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
+                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                     """
                 ),  # noqa: WPS355
                 "owner": "root:root",
@@ -1029,12 +971,9 @@ def cloud_init_user_data_func(
 
 
 grafana_config = Config("grafana")
-cloud_init_user_data = Output.all(
-    consul_stack.require_output("datacenter"),
-    grafana_config.require_secret("api_key"),
-    grafana_config.require("loki_user"),
-    grafana_config.require("prometheus_user"),
-).apply(lambda args: cloud_init_user_data_func(*args))
+cloud_init_user_data = Output.secret(
+    consul_stack.require_output("datacenter").apply(cloud_init_user_data_func)
+)
 
 web_instance_type = (
     edxapp_config.get("web_instance_type") or InstanceTypes.high_mem_regular.name

@@ -16,20 +16,21 @@ repository = "https://github.com/mitodl/ol-infrastructure"
 [tool.poetry.dependencies]
 python = "^3.8"
 boto3 = "^1.18"
-httpx = "^0.19.0"
+httpx = "^0.20.0"
 hvac = {extras = ["parser"], version = "^0.11.2"}
 parliament = "^1.4.1"
-pulumi = "^3.14.0"
+pulumi = "^3.16.0"
 pulumi-aws = "^4.24.1"
 pulumi-fastly = "^3.7.0"
 pulumi-github = "^4.5.0"
 pulumi-tls = "^4.0.0"
 pulumi-vault = "^4.5.1"
-pulumi_consul = "^3.2.0"
+pulumi_consul = "^3.4.0"
 pydantic = "^1"
 pyinfra = "1.4.4"  # Locking to 1.4.4 until https://github.com/Fizzadar/pyinfra/issues/615 is resolved
 pyyaml = "^5.3.1"
 salt-pepper = "^0.7.6"
+pulumi-mongodbatlas = "^3.0.0"
 
 [tool.poetry.dev-dependencies]
 black = "*"

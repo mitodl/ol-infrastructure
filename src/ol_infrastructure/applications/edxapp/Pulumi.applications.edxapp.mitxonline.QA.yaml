@@ -23,9 +23,5 @@ config:
   edxapp:mongo_admin_password:
     secure: v1:LSQgiUW2n8fzAks9:+ZYckckuLvNozc/WBbKA+Ppjf9pZWoP+OjLlLAunW81jR/3iJnbcn0MJBdAcgNtdTHVKDqu5
   edxapp:sender_email_address: support@edxapp-mail-qa.mitxonline.mit.edu
-  grafana:api_key:
-    secure: v1:L5rmIkFto5iBRUVv:knfsQYhnqWtTMuw2xP1AmKU5ggUzYGO97RpkIgaqo5OMFyx+4UCI39avtKDh0cDLYontY+v1S5J08Guhr3cZiQZXrRrPNESq+RK3SauT7EG0YmXo/wg+ktGxFvmQJ2A0RZoOjCVy0OwOhkTEo7ckV5gQP3fM/sL1nyLhapGNIns=
-  grafana:loki_user: '105206'
-  grafana:prometheus_user: '212469'
   redis:auth_token:
     secure: v1:uFZFB99Yk40m0l+V:zgfnmbI5F7uPME/NLqmLN8R+0njnx7AQ1KX//AR+AebW7dJ+U4+pj02tnwFDzP98FLhP/27m

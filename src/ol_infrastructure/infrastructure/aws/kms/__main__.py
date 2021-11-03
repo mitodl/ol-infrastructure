@@ -31,7 +31,6 @@ kms_key_access_statement = {
     "Effect": "Allow",
     "Principal": {
         "AWS": [
-            f"arn:aws:iam::{owner}:user/eberg",
             f"arn:aws:iam::{owner}:user/shaidar",
             f"arn:aws:iam::{owner}:user/tmacey",
         ]
@@ -123,7 +122,6 @@ kms_infrastructure_as_code_encryption_policy = {
                 "AWS": [
                     f"arn:aws:iam::{owner}:user/tmacey",
                     f"arn:aws:iam::{owner}:user/shaidar",
-                    f"arn:aws:iam::{owner}:user/eberg",
                 ]
             },
             "Action": [
