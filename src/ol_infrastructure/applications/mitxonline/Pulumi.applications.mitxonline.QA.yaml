@@ -10,3 +10,4 @@ config:
   mitxonline:db_password:
     secure: v1:72AVczMFP7U0adTg:qiVKioH1VjNf38HfLkNIZsCdc8RqKs0bkaou+fU6SSRK9W4kbS1do2PwdD3JWYlc37eojd+sdAL8npp+tyEeQ66q5mHmWDQK3WlqgdWbf8G41fizyMwoy2AQdZmtZtJe40IoeqaSX3ntfJvhI0uP7YWmpge4G9e6KMNBmhZ0wl0T6qHU4z180aId1ZpjCM4=
   mitxonline:domain: rc.mitxonline.mit.edu
+  mitxonline:proctortrack_url: preproduction.verificient.com
