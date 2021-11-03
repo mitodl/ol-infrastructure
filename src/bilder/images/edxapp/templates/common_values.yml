@@ -274,10 +274,11 @@ FEATURES:
     ENABLE_OAUTH2_PROVIDER: true
     ENABLE_PUBLISHER: false
     ENABLE_READING_FROM_MULTIPLE_HISTORY_TABLES: true
-    ENABLE_SPECIAL_EXAMS: false
+    ENABLE_SPECIAL_EXAMS: true # MODIFIED FOR PROCTORTRACK
     ENABLE_THIRD_PARTY_AUTH: true
     ENABLE_UNICODE_USERNAME: true  # ADDED KEY
     ENABLE_VIDEO_UPLOAD_PIPELINE: true # MODIFIED
+    MILESTONES_APP: true # ADDED KEY FOR PROCTORTRACK
     PREVIEW_LMS_BASE: {{ key "edxapp/preview-domain" }}  # MODIFIED
     SHOW_FOOTER_LANGUAGE_SELECTOR: false
     SHOW_HEADER_LANGUAGE_SELECTOR: false
@@ -377,8 +378,14 @@ PLATFORM_TWITTER_ACCOUNT: '@YourPlatformTwitterAccount'
 POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
 PRESS_EMAIL: support@mitxonline.mit.edu # MODIFIED
 PROCTORING_BACKENDS:
-    DEFAULT: 'null'
-    'null': {}
+    DEFAULT: 'proctortrack'
+    'proctortrack':
+      {{ with secret "secret-mitxonline/edxapp" }}
+      'client_id': '{{ .Data.proctortrack-client-id }}'
+      'client_secret': '{{ . Data.proctortrack-client-secret }}'
+      {{ end }}
+      'base_url': 'https://{{ key "edxapp/proctortrack-base-url" }}'
+
 PROCTORING_SETTINGS: {}
 REGISTRATION_EXTRA_FIELDS:
     city: hidden
