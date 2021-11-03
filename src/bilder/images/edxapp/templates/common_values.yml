@@ -381,10 +381,11 @@ PROCTORING_BACKENDS:
     DEFAULT: 'proctortrack'
     'proctortrack':
       {{ with secret "secret-mitxonline/edxapp" }}
-      'client_id': '{{ .Data.proctortrack-client-id }}'
-      'client_secret': '{{ . Data.proctortrack-client-secret }}'
+      'client_id': '{{ .Data.proctortrack_client_id }}'
+      'client_secret': '{{ .Data.proctortrack_client_secret }}'
       {{ end }}
       'base_url': 'https://{{ key "edxapp/proctortrack-base-url" }}'
+    'null': {}
 
 PROCTORING_SETTINGS: {}
 REGISTRATION_EXTRA_FIELDS:
