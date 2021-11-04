@@ -168,8 +168,13 @@ consul.Keys(
     "mitxonline-app-domain-for-edxapp",
     keys=[
         consul.KeysKeyArgs(
-            path="edxapp/marketing-domain", value=mitxonline_config.require("domain")
-        )
+            path="edxapp/marketing-domain",
+            value=mitxonline_config.require("domain"),
+        ),
+        consul.KeysKeyArgs(
+            path="edxapp/proctortrack-base-url",
+            value=mitxonline_config.require("proctortrack_url"),
+        ),
     ],
 )
 
