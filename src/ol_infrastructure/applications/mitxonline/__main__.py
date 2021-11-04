@@ -166,7 +166,6 @@ mitxonline_vault_backend = OLVaultDatabaseBackend(mitxonline_vault_backend_confi
 # Set Consul key for use in edxapp configuration template
 consul.Keys(
     "mitxonline-app-domain-for-edxapp",
-    "mitxonline-app-proctortrack-url",
     keys=[
         consul.KeysKeyArgs(
             path="edxapp/marketing-domain",

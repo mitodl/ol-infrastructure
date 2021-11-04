@@ -384,7 +384,7 @@ PROCTORING_BACKENDS:
       'client_id': '{{ .Data.proctortrack_client_id }}'
       'client_secret': '{{ .Data.proctortrack_client_secret }}'
       {{ end }}
-      'base_url': 'http://{{ key "edxapp/proctortrack-base-url" }}'
+      'base_url': '{{ key "edxapp/proctortrack-base-url" }}'
     'null': {}
 
 PROCTORING_SETTINGS: {}
