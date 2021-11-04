@@ -1,0 +1,7 @@
+---
+name: ol-infrastructure-opensearch
+runtime: python
+description: Deploy and manage OpenSearch/ElasticSearch clusters in the AWS managed
+  service
+backend:
+  url: s3://mitol-pulumi-state/
