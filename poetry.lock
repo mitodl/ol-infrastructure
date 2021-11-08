@@ -838,7 +838,7 @@ invoke = ["invoke (>=1.3)"]
 
 [[package]]
 name = "parliament"
-version = "1.4.1"
+version = "1.5.0"
 description = "parliament audits your AWS IAM policies"
 category = "main"
 optional = false
@@ -1579,7 +1579,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "6c7357d1dea52ecc80ca599a3861b5c7059760139988717427534b43c1fb1bfd"
+content-hash = "99e6614a67dbab044e7f11b81d9da284cdf91c304075c780a0ca2b799de761a7"
 
 [metadata.files]
 anyio = [
@@ -2129,8 +2129,8 @@ paramiko = [
     {file = "paramiko-2.8.0.tar.gz", hash = "sha256:e673b10ee0f1c80d46182d3af7751d033d9b573dd7054d2d0aa46be186c3c1d2"},
 ]
 parliament = [
-    {file = "parliament-1.4.1-py3-none-any.whl", hash = "sha256:b5377d6d896abe266e286285c49864cf145287b2eda176a6d23478e3ac142a9f"},
-    {file = "parliament-1.4.1.tar.gz", hash = "sha256:f94ca078a90a56e8d22fb3c551daef7d6e9d4157e6032c7e7a1226d4280edd65"},
+    {file = "parliament-1.5.0-py3-none-any.whl", hash = "sha256:a0752dcdd5f66ec957b5cd457c567a5ac700011bf4fc1de8797c9e9f1f6c819d"},
+    {file = "parliament-1.5.0.tar.gz", hash = "sha256:97527eed203241a2ab4702929da42d60dbd1c95eb9f51634f2fd6b5e8824d511"},
 ]
 parver = [
     {file = "parver-0.3.1-py2.py3-none-any.whl", hash = "sha256:41a548c51b006a2f2522b54293cbfd2514bffa10774ece8430c9964a20cbd8b4"},
