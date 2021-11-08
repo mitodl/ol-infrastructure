@@ -59,6 +59,16 @@ jobs:
         SUPPORT_URL: https://mitx-micromasters.zendesk.com/hc/en-us/requests/new
         USER_INFO_COOKIE_NAME: edx-user-info
         SESSION_COOKIE_DOMAIN: .mitxonline.mit.edu
+        ABOUT_US_URL: https://rc.mitxonline.mit.edu/about-us/
+        PRIVACY_POLICY_URL: https://rc.mitxonline.mit.edu/privacy-policy/
+        HONOR_CODE_URL: https://rc.mitxonline.mit.edu/honor-code/
+        TERMS_OF_SERVICE_URL: https://rc.mitxonline.mit.edu/terms-of-service/
+        Contact: mailto:mitxonline-support@mit.edu
+        SUPPORT_CENTER_URL:  https://mitx-micromasters.zendesk.com/hc/
+        SUPPORT_CENTER_TEXT: Support Center
+        TRADEMARK_TEXT: © MITxOnline. All rights reserved except where noted.
+        SITE_URL: https://rc.mitxonline.mit.edu
+        LOGO_ALT_TEXT: ''
       run:
         path: sh
         dir: mfe-app-learning
@@ -66,6 +76,7 @@ jobs:
         - -exc
         - |
           npm install
+          npm install @edx/frontend-component-footer@npm:@mitodl/frontend-component-footer-mitol@^1.0.0-semantically-released
           NODE_ENV=production npm run build
   - put: mfe-app-learning-bucket
     params:
