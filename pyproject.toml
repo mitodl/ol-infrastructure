@@ -30,7 +30,7 @@ pydantic = "^1"
 pyinfra = "1.4.4"  # Locking to 1.4.4 until https://github.com/Fizzadar/pyinfra/issues/615 is resolved
 pyyaml = "^5.3.1"
 salt-pepper = "^0.7.6"
-pulumi-mongodbatlas = "^3.0.0"
+pulumi-mongodbatlas = "^3.0.1"
 
 [tool.poetry.dev-dependencies]
 black = "*"
