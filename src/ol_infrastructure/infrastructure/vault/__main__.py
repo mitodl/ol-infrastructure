@@ -29,6 +29,7 @@ from pulumi_aws import (
     iam,
     lb,
     route53,
+    s3,
 )
 
 from bridge.lib.magic_numbers import (
@@ -85,6 +86,26 @@ vault_ami = ec2.get_ami(
     ],
     most_recent=True,
     owners=[aws_account.account_id],
+)
+
+####################
+# S3 Backup Bucket #
+####################
+vault_snapshots_bucket = s3.Bucket(
+    "vault-backup-snapshots-bucket",
+    bucket=f"vault-cluster-snapshots-{env_name}",
+    versioning=s3.BucketVersioningArgs(enabled=True),
+    acl="private",
+    server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(  # noqa: E501
+        rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
+                sse_algorithm="aws:kms",
+                kms_master_key_id=vault_unseal_key["id"],
+            ),
+            bucket_key_enabled=True,
+        )
+    ),
+    tags=aws_config.tags,
 )
 
 #######################
@@ -563,5 +584,6 @@ export(
         "public_dns": vault_public_dns.fqdn,
         "cluster_address": vault_public_dns.fqdn.apply("https://{}".format),
         "environment_namespace": f"{stack_info.env_prefix}.{stack_info.env_suffix}",
+        "backup_bucket": vault_snapshots_bucket.bucket,
     },
 )

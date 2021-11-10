@@ -13,3 +13,7 @@ path "secret-operations/global/odl_wildcard_cert" {
 path "sys/leases/renew" {
   capabilities = ["update"]
 }
+
+path "sys/storage/raft/snapshot" {
+  capabilities = ["read"]
+}

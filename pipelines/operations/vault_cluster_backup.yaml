@@ -1,0 +1,92 @@
+---
+resource_types:
+- name: s3-sync
+  source:
+    repository: mitodl/concourse-s3-sync-resource
+  type: docker-image
+- name: cron-resource
+  type: docker-image
+  source:
+    repository: cftoolsmiths/cron-resource
+
+resources:
+- name: vault-snapshot-upload
+  source:
+    bucket: ((vault-snapshot-bucket))
+  type: s3-sync
+
+- name: 60-min-trigger
+  type: cron-resource
+  source:
+    expression: '*/60 * * * *'
+    fire_immediately: true
+
+
+jobs:
+- name: backup_vault_cluster
+  plan:
+  - task: snapshot_vault_cluster
+    config:
+      image_resource:
+        source:
+          repository: vault
+          label: latest
+        type: registry-image
+      outputs:
+      - name: snapshot
+      platform: linux
+      run:
+        params:
+          VAULT_ADDR: ((vault-cluster-address))
+        path: sh
+        args:
+        - -exc
+        - |
+          cat <<EOF > /etc/vault.json
+          {
+            "vault": {
+              "address": "https://vault.query.consul:8200",
+              "tls_skip_verify": true
+            },
+            "auto_auth": {
+              "method": {
+                "type": "aws",
+                "mount_path": "auth/aws",
+                "config": {
+                  "type": "iam",
+                  "role": "edxapp-web",
+                  "region": "us-east-1"
+                }
+              },
+              "sink": [
+                {
+                  "type": "file",
+                  "derive_key": false,
+                  "config": [
+                    {
+                      "path": "/etc/vault/vault_agent_token"
+                    }
+                  ]
+                }
+              ]
+            },
+            "cache": {
+              "use_auto_auth_token": "force"
+            },
+            "exit_after_auth": false,
+            "listener": [
+              {
+                "tcp": {
+                  "address": "127.0.0.1:8200",
+                  "tls_disable": true
+                }
+              }
+            ]
+          }
+          EOF
+          vault agent -config /etc/vault.json -pid&
+          vault operator raft snapshot save ../snapshot/$(date -Is).snap
+          pkill -INT vault
+  - put: vault-snapshot-upload
+    input:
+    - snapshot
