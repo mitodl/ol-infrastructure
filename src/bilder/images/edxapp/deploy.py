@@ -1,3 +1,4 @@
+import os
 import tempfile
 from pathlib import Path
 
@@ -58,6 +59,7 @@ VERSIONS = {  # noqa: WPS407
     "consul-template": "0.27.1",
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
+EDX_INSTALLATION_NAME = os.environ.get("EDX_INSTALLATION", "mitxonline")
 
 ###########
 # edX App #
@@ -65,16 +67,7 @@ TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 # Install additional Python dependencies for use with edxapp
 pip.packages(
     name="Install additional edX dependencies",
-    packages=[
-        "django-redis",  # Support for Redis caching in Django
-        "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
-        "mitxpro-openedx-extensions==0.2.2",
-        "social-auth-mitxpro==0.5",
-        "edx-username-changer==0.2.0",
-        "edx-sysadmin",
-        "ol-openedx-sentry",
-        "ol-openedx-logging",
-    ],
+    packages=host.data.edx_plugins[EDX_INSTALLATION_NAME],
     present=True,
     virtualenv="/edx/app/edxapp/venvs/edxapp/",
     sudo_user="edxapp",
@@ -92,8 +85,12 @@ files.directory(
 
 vector = VectorConfig(
     configuration_templates={
-        TEMPLATES_DIRECTORY.joinpath("vector", "edxapp.yaml"): {},
-        TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml"): {},
+        TEMPLATES_DIRECTORY.joinpath("vector", "edxapp.yaml"): {
+            "edx_installation": EDX_INSTALLATION_NAME
+        },
+        TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml"): {
+            "edx_installation": EDX_INSTALLATION_NAME
+        },
     }
 )
 consul_configuration = {Path("00-default.json"): ConsulConfig()}

@@ -170,6 +170,6 @@ sinks:
     labels:
       environment: ${ENVIRONMENT}
       application: edxapp
-      service: mitxonline
+      service: {{edx_installation}}
       hostname: ${HOSTNAME}
     out_of_order_action: rewrite_timestamp
