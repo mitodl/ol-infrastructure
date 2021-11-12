@@ -1,23 +1,28 @@
 locals {
-  timestamp = regex_replace(timestamp(), "[- TZ:]", "")
+  timestamp     = regex_replace(timestamp(), "[- TZ:]", "")
   business_unit = "operations"
-  app_name = "edxapp"
+  app_name      = "edxapp"
 }
 
 variable "build_environment" {
-  type = string
+  type    = string
   default = "mitxonline-qa"
 }
 
 variable "edx_platform_version" {
-  type = string
+  type    = string
   default = "release"
 }
 
 # Allowed values are mitxonline, xpro, or mitx
 variable "installation_target" {
-  type = string
+  type    = string
   default = "mitxonline"
+}
+
+# Available options are "web" or "worker". Used to determine which type of node to build an image for.
+variable "node_type" {
+  type = string
 }
 
 source "amazon-ebs" "edxapp" {
@@ -26,8 +31,8 @@ source "amazon-ebs" "edxapp" {
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
   launch_block_device_mappings {
-      device_name = "/dev/sda1"
-      volume_size = 25
+    device_name = "/dev/sda1"
+    volume_size = 25
   }
   run_tags = {
     Name    = "${local.app_name}-${var.node_type}-packer-builder"
@@ -55,11 +60,11 @@ source "amazon-ebs" "edxapp" {
     most_recent = true
     owners      = ["610119931565"]
   }
-  ssh_username = "ubuntu"
+  ssh_username  = "ubuntu"
   ssh_interface = "public_ip"
   subnet_filter {
     filters = {
-          "tag:Environment": var.build_environment
+      "tag:Environment" : var.build_environment
     }
     random = true
   }
@@ -84,7 +89,7 @@ build {
   }
 
   provisioner "shell-local" {
-    environment_vars = ["NODE_TYPE=${var.node_type}"]
-    inline = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} ${path.root}/deploy.py"]
+    environment_vars = ["NODE_TYPE=${var.node_type}", "EDX_INSTALLATION=${var.installation_target}"]
+    inline           = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} ${path.root}/deploy.py"]
   }
 }

@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 
 from pyinfra import host
-from pyinfra.operations import files, pip
+from pyinfra.operations import apt, files, pip
 
 from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models import (
@@ -50,7 +50,7 @@ from bilder.components.vector.steps import (
 )
 from bilder.facts import has_systemd  # noqa: F401
 from bilder.images.edxapp.lib import WEB_NODE_TYPE, node_type
-from bilder.images.edxapp.plugins import git_export_import  # noqa: F401
+from bilder.images.edxapp.plugins.git_export_import import git_auto_export  # noqa: F401
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 
 VERSIONS = {  # noqa: WPS407
@@ -58,12 +58,19 @@ VERSIONS = {  # noqa: WPS407
     "vault": "1.8.2",
     "consul-template": "0.27.1",
 }
-TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
+TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 EDX_INSTALLATION_NAME = os.environ.get("EDX_INSTALLATION", "mitxonline")
+
+apt.packages(
+    name="Remove unattended-upgrades to prevent race conditions during build",
+    packages=["unattended-upgrades"],
+    present=False,
+)
 
 ###########
 # edX App #
 ###########
+git_auto_export()
 # Install additional Python dependencies for use with edxapp
 pip.packages(
     name="Install additional edX dependencies",
@@ -125,7 +132,7 @@ consul_templates = [
 if node_type == WEB_NODE_TYPE:
     files.put(
         name="Set up Nginx status endpoint for metrics collection",
-        src=Path(__file__).parent.joinpath("files", "nginx_status.conf"),
+        src=Path(__file__).resolve().parent.joinpath("files", "nginx_status.conf"),
         dest=Path("/etc/nginx/sites-enabled/status_monitor"),
         user="www-data",
         group="www-data",

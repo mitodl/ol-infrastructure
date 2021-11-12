@@ -56,7 +56,7 @@ def proxy_consul_dns(state=None, host=None):
     files.put(
         name="Configure Unbound to resolve .consul domains locally",
         dest="/etc/unbound/unbound.conf.d/consul.conf",
-        src=Path(__file__).parent.joinpath("files", "unbound_config.conf"),
+        src=Path(__file__).resolve().parent.joinpath("files", "unbound_config.conf"),
         create_remote_dir=True,
         state=state,
         host=host,

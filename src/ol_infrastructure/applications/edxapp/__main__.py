@@ -18,7 +18,6 @@ import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi.output import Output
 from pulumi_aws import (
     acm,
     autoscaling,
@@ -108,7 +107,9 @@ edxapp_vpc = network_stack.require_output(f"{stack_info.env_prefix}_vpc")
 edxapp_vpc_id = edxapp_vpc["id"]
 edxapp_web_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["edxapp-web-*"]),
+        ec2.GetAmiFilterArgs(
+            name="name", values=["edxapp-web-{stack_info.env_prefix}-*"]
+        ),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
     ],
@@ -117,7 +118,9 @@ edxapp_web_ami = ec2.get_ami(
 )
 edxapp_worker_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["edxapp-worker-*"]),
+        ec2.GetAmiFilterArgs(
+            name="name", values=[f"edxapp-worker-{stack_info.enf_prefix}-*"]
+        ),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
     ],

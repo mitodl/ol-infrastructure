@@ -1,16 +1,16 @@
 locals {
-  timestamp = regex_replace(timestamp(), "[- TZ:]", "")
+  timestamp     = regex_replace(timestamp(), "[- TZ:]", "")
   business_unit = "operations"
-  app_name = "edxapp"
+  app_name      = "edxapp"
 }
 
 variable "build_environment" {
-  type = string
+  type    = string
   default = "mitxonline-qa"
 }
 
 variable "edx_platform_version" {
-  type = string
+  type    = string
   default = "release"
 }
 
@@ -25,8 +25,8 @@ source "amazon-ebs" "edxapp" {
   ami_virtualization_type = "hvm"
   instance_type           = "m5.xlarge"
   launch_block_device_mappings {
-      device_name = "/dev/sda1"
-      volume_size = 25
+    device_name = "/dev/sda1"
+    volume_size = 25
   }
   run_tags = {
     Name    = "${local.app_name}-${var.node_type}-packer-builder"
@@ -54,11 +54,11 @@ source "amazon-ebs" "edxapp" {
     most_recent = true
     owners      = ["099720109477"]
   }
-  ssh_username = "ubuntu"
+  ssh_username  = "ubuntu"
   ssh_interface = "public_ip"
   subnet_filter {
     filters = {
-          "tag:Environment": var.build_environment
+      "tag:Environment" : var.build_environment
     }
     random = true
   }
@@ -101,8 +101,8 @@ build {
     ]
   }
   provisioner "ansible-local" {
-    playbook_file = "${path.root}/files/edxapp_${var.node_type}_playbook.yml"
-    command = "/tmp/configuration/.venv/bin/ansible-playbook --extra-vars 'EDX_PLATFORM_VERSION=${var.edx_platform_version}'"
+    playbook_file     = "${path.root}/files/edxapp_${var.node_type}_playbook.yml"
+    command           = "/tmp/configuration/.venv/bin/ansible-playbook --extra-vars 'EDX_PLATFORM_VERSION=${var.edx_platform_version}'"
     staging_directory = "/tmp/configuration/playbooks/"
   }
 }

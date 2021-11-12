@@ -1,9 +1,15 @@
-from pyinfra.operations import files, git, server
+from pyinfra.operations import apt, files, git, server
 
 from bilder.components.baseline.steps import install_baseline_packages
 from bilder.images.edxapp.lib import WEB_NODE_TYPE, node_type
 
 EDX_USER = "edxapp"
+
+apt.packages(
+    name="Remove unattended-upgrades to prevent race conditions during build",
+    packages=["unattended-upgrades"],
+    present=False,
+)
 
 install_baseline_packages(
     packages=[
