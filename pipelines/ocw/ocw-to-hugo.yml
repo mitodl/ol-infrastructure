@@ -49,7 +49,10 @@ jobs:
         - >
           yarn install --pure-lockfile
 
-          node . -i ../ocw-json -o ../ocw-markdown --staticPrefix /courses
+          node . \
+          -i ../ocw-json \
+          -o ../ocw-markdown \
+          --staticPrefix /courses \
           --strips3
         dir: ocw-to-hugo
         path: sh
