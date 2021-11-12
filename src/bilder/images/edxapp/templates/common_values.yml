@@ -378,15 +378,16 @@ PLATFORM_NAME: MITx Online  # MODIFIED
 PLATFORM_TWITTER_ACCOUNT: '@YourPlatformTwitterAccount'
 POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
 PRESS_EMAIL: support@mitxonline.mit.edu # MODIFIED
+{{ with secret "secret-mitxonline/edxapp" }}
 PROCTORING_BACKENDS:
     DEFAULT: 'proctortrack'
     'proctortrack':
-      {{ with secret "secret-mitxonline/edxapp" }}
       'client_id': '{{ .Data.proctortrack_client_id }}'
       'client_secret': '{{ .Data.proctortrack_client_secret }}'
-      {{ end }}
       'base_url': '{{ key "edxapp/proctortrack-base-url" }}'
     'null': {}
+PROCTORING_USER_OBFUSCATION_KEY: {{ .Data.proctortrack_user_obfuscation_key }}
+{{ end }}
 
 PROCTORING_SETTINGS: {}
 REGISTRATION_EXTRA_FIELDS:
