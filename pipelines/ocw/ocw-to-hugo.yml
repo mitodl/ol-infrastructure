@@ -20,15 +20,15 @@ jobs:
         path: sh
         args:
         - -exc
-        - |-
-          aws s3 sync \
-          s3://((open-learning-course-data-bucket))/ \
-          s3://((ol-ocw-studio-app-bucket))/courses/ \
-          --include '*' \
-          --exclude "extracts/*" \
-          --exclude "*.html" \
-          --exclude "*.html.json" \
-          --exclude "*_master.json" \
+        - >-
+          aws s3 sync
+          s3://((open-learning-course-data-bucket))/
+          s3://((ol-ocw-studio-app-bucket))/courses/
+          --include '*'
+          --exclude "extracts/*"
+          --exclude "*.html"
+          --exclude "*.html.json"
+          --exclude "*_master.json"
           --exclude "*parsed.json"
   - config:
       image_resource:
