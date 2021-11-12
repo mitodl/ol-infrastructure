@@ -94,13 +94,8 @@ vector = VectorConfig(
     }
 )
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
-lms_config_path = Path("/edx/etc/lms.yml")
-studio_config_path = Path("/edx/etc/studio.yml")
-forum_config_path = Path("/edx/app/forum/forum_env")
-lms_intermediate_template = Path("/etc/consul-template/templates/edxapp-lms.tmpl")
-studio_intermediate_template = Path("/etc/consul-template/templates/edxapp-studio.tmpl")
-forum_intermediate_template = Path("/etc/consul-template/templates/edx-forum.tmpl")
-# Install Consul and Vault Agent
+
+# Manage Vault templates
 vault_templates = [
     VaultTemplate(
         contents=(
@@ -110,22 +105,18 @@ vault_templates = [
         destination=Path("/var/www/.ssh/id_rsa"),
     )
 ]
+
+# Set up Consul templates
+lms_config_path = Path("/edx/etc/lms.yml")
+studio_config_path = Path("/edx/etc/studio.yml")
+forum_config_path = Path("/edx/app/forum/forum_env")
+lms_intermediate_template = Path("/etc/consul-template/templates/edxapp-lms.tmpl")
+studio_intermediate_template = Path("/etc/consul-template/templates/edxapp-studio.tmpl")
+forum_intermediate_template = Path("/etc/consul-template/templates/edx-forum.tmpl")
 consul_templates = [
-    ConsulTemplateTemplate(
-        contents='{{ key "edxapp-template/studio" }}',
-        destination=studio_intermediate_template,
-        # Tell consul-template to reload the rendered template from disk
-        command="/usr/bin/pkill -HUP consul-template",
-    ),
     ConsulTemplateTemplate(
         source=studio_intermediate_template,
         destination=studio_config_path,
-    ),
-    ConsulTemplateTemplate(
-        contents='{{ key "edxapp-template/lms" }}',
-        destination=lms_intermediate_template,
-        # Tell consul-template to reload the rendered template from disk
-        command="/usr/bin/pkill -HUP consul-template",
     ),
     ConsulTemplateTemplate(
         source=lms_intermediate_template, destination=lms_config_path
@@ -237,10 +228,12 @@ for product in hashicorp_products:
     configure_hashicorp_product(product)
 
 # Upload templates for consul-template agent
-common_config = TEMPLATES_DIRECTORY.joinpath("common_values.yml")
-studio_config = TEMPLATES_DIRECTORY.joinpath("studio_only.yml")
-lms_config = TEMPLATES_DIRECTORY.joinpath("lms_only.yml")
-forum_config = TEMPLATES_DIRECTORY.joinpath("forum.env")
+EDX_TEMPLATES_DIRECTORY = TEMPLATES_DIRECTORY.joinpath("edxapp", EDX_INSTALLATION_NAME)
+common_config = EDX_TEMPLATES_DIRECTORY.joinpath("common_values.yml")
+studio_config = EDX_TEMPLATES_DIRECTORY.joinpath("studio_only.yml")
+lms_config = EDX_TEMPLATES_DIRECTORY.joinpath("lms_only.yml")
+forum_config = EDX_TEMPLATES_DIRECTORY.joinpath("forum.env")
+
 with tempfile.NamedTemporaryFile("wt", delete=False) as studio_template:
     studio_template.write(common_config.read_text())
     studio_template.write(studio_config.read_text())
