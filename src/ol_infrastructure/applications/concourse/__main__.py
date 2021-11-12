@@ -83,7 +83,9 @@ concourse_iam_permissions = {
     "Statement": [
         {
             "Effect": "Allow",
-            "Action": "s3:ListAllMyBuckets",
+            "Action": [
+                "s3:ListAllMyBuckets",
+            ],
             "Resource": "*",
         },
         {
@@ -99,9 +101,16 @@ concourse_iam_permissions = {
                 "arn:aws:s3:::*-edxapp-mfe/*",
                 "arn:aws:s3:::ocw-content*",
                 "arn:aws:s3:::ocw-content*/*",
+                "arn:aws:s3:::ocw-to-hugo-output*",
+                "arn:aws:s3:::ocw-to-hugo-output*/*",
                 "arn:aws:s3:::ol-eng-artifacts",
                 "arn:aws:s3:::ol-eng-artifacts/*",
             ],
+        },
+        {
+            "Effect": "Allow",
+            "Action": "s3:ListBucketVersions",
+            "Resource": "arn:aws:s3:::*",
         },
         {
             "Effect": "Allow",
@@ -109,6 +118,8 @@ concourse_iam_permissions = {
             "Resource": [
                 "arn:aws:s3:::ol-ocw-studio-app*",
                 "arn:aws:s3:::ol-ocw-studio-app*/*",
+                "arn:aws:s3:::open-learning-course-data*",
+                "arn:aws:s3:::open-learning-course-data*/*",
             ],
         },
         {"Effect": "Allow", "Action": ["cloudwatch:PutMetricData"], "Resource": "*"},
@@ -326,7 +337,7 @@ concourse_db_config = OLPostgresDBConfig(
     security_groups=[concourse_db_security_group],
     tags=aws_config.tags,
     db_name="concourse",
-    engine_version="12.5",
+    engine_version="12.7",
     **defaults(stack_info)["rds"],
 )
 concourse_db = OLAmazonDB(concourse_db_config)
@@ -482,9 +493,11 @@ web_launch_config = ec2.LaunchTemplate(
                         },
                         {
                             "path": "/etc/default/vector",
-                            "content": (f"ENVIRONMENT={consul_datacenter}\n"
-                                        "VECTOR_CONFIG_DIR=/etc/vector/")
-                        }
+                            "content": (
+                                f"ENVIRONMENT={consul_datacenter}\n"
+                                "VECTOR_CONFIG_DIR=/etc/vector/"
+                            ),
+                        },
                     ]
                 },
                 sort_keys=True,
