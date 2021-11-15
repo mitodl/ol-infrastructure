@@ -18,6 +18,8 @@ mysql_creds: &mysql_creds
 
 {{ with secret "secret-xpro/edxapp" }}
 CELERY_BROKER_PASSWORD: {{ .Data.redis_auth_token }}
+EMAIL_HOST_PASSWORD: {{ .Data.email_password }}
+EMAIL_HOST_USER: {{ .Data.email_username }}
 redis_cache_config: &redis_cache_config
   BACKEND: django_redis.cache.RedisCache
   LOCATION: rediss://default@edxapp-redis.service.consul:6379/0
@@ -284,6 +286,30 @@ FEATURES:
     SHOW_HEADER_LANGUAGE_SELECTOR: false
     SKIP_EMAIL_VALIDATION: true # ADDED KEY
     ALLOW_PUBLIC_ACCOUNT_CREATION: true
+    # FROM xPRO CONFIG
+    ALLOW_ALL_ADVANCED_COMPONENTS: true
+    ALLOW_COURSE_STAFF_GRADE_DOWNLOADS: true
+    AUTH_USE_CERTIFICATES: false
+    BYPASS_ACTIVATION_EMAIL_FOR_EXTAUTH: true
+    CERTIFICATES_ENABLED: false
+    DISABLE_LOGIN_BUTTON: false
+    ENABLE_AUTO_COURSE_REGISTRATION: true
+    ENABLE_COURSE_BLOCKS_NAVIGATION_API: true
+    ENABLE_INSTRUCTOR_EMAIL: true
+    ENABLE_INSTRUCTOR_LEGACY_DASHBOARD: true
+    ENABLE_INSTRUCTOR_REMOTE_GRADEBOOK_CONTROLS: true
+    ENABLE_PAID_COURSE_REGISTRATION: false
+    ENABLE_PREREQUISITE_COURSES: true
+    ENABLE_RENDER_XBLOCK_API: true
+    ENABLE_SHOPPING_CART: true
+    ENABLE_SYSADMIN_DASHBOARD: true
+    INDIVIDUAL_DUE_DATES: true
+    LICENSING: true
+    MILESTONES_APP: true
+    REQUIRE_COURSE_EMAIL_AUTH: false
+    REROUTE_ACTIVATION_EMAIL: support@xpro.mit.edu
+    RESTRICT_ENROLL_BY_REG_METHOD: false
+    SESSION_COOKIE_SECURE: true
 FEEDBACK_SUBMISSION_EMAIL: ''
 FERNET_KEYS:
 - DUMMY KEY CHANGE BEFORE GOING TO PRODUCTION
@@ -326,6 +352,7 @@ LOGGING_ENV: sandbox
 LOGIN_REDIRECT_WHITELIST:  # MODIFIED
   - {{ key "edxapp/studio-domain" }}
   - {{ key "edxapp/lms-domain" }}
+  - {{ key "edxapp/preview-domain" }}
   - {{ key "edxapp/marketing-domain" }}
 LOG_DIR: /edx/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
@@ -371,9 +398,9 @@ PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG:
     ENFORCE_COMPLIANCE_ON_LOGIN: false
 PASSWORD_RESET_SUPPORT_LINK: ''
 PAYMENT_SUPPORT_EMAIL: {{ key "edxapp/sender-email-address" }}  # MODIFIED
-PLATFORM_DESCRIPTION: MITx Online # MODIFIED
+PLATFORM_DESCRIPTION: MIT xPRO # MODIFIED
 PLATFORM_FACEBOOK_ACCOUNT: http://www.facebook.com/YourPlatformFacebookAccount
-PLATFORM_NAME: MITx Online  # MODIFIED
+PLATFORM_NAME: MIT xPRO  # MODIFIED
 PLATFORM_TWITTER_ACCOUNT: '@YourPlatformTwitterAccount'
 POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
 PRESS_EMAIL: support@xpro.mit.edu # MODIFIED
@@ -394,7 +421,7 @@ REGISTRATION_EXTRA_FIELDS:
     country: hidden
     gender: optional
     goals: optional
-    honor_code: required
+    honor_code: hidden
     level_of_education: optional
     mailing_address: hidden
     terms_of_service: hidden
@@ -419,7 +446,7 @@ SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
 # SESSION_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
-SITE_NAME: MITx Online  # MODIFIED
+SITE_NAME: MIT xPRO  # MODIFIED
 SOCIAL_MEDIA_FOOTER_URLS: {}
 SOCIAL_SHARING_SETTINGS:
     CERTIFICATE_FACEBOOK: false
@@ -531,3 +558,20 @@ ZENDESK_USER: ''
 #     AUDIENCE: SET-ME-PLEASE
 #     ISSUER: http://127.0.0.1:8000/oauth2
 #     SECRET_KEY: SET-ME-PLEASE
+
+
+COURSE_MODE_DEFAULTS:
+  name: Professional
+  bulk_sku: null
+  currency: usd
+  description: null
+  expiration_datetime: null
+  min_price: 0
+  sku: null
+  slug: no-id-professional
+  suggested_prices:
+EMAIL_HOST: smtp.mailgun.org
+EMAIL_PORT: 587
+EMAIL_USE_TLS: true
+FIELD_OVERRIDE_PROVIDERS:
+  - lms.djangoapps.courseware.student_field_overrides.IndividualStudentOverrideProvider

@@ -17,7 +17,11 @@ mysql_creds: &mysql_creds
 {{ end }}
 
 {{ with secret "secret-mitx/edxapp" }}
+CANVAS_ACCESS_TOKEN: {{ .Data.canvas_access_token }}
 CELERY_BROKER_PASSWORD: {{ .Data.redis_auth_token }}
+EMAIL_HOST_PASSWORD: {{ .Data.email_password }}
+EMAIL_HOST_USER: {{ .Data.email_username }}
+FERNET_KEYS: {{ .Data.fernet_keys }}  # ADDED KEY - Needs to be an array
 redis_cache_config: &redis_cache_config
   BACKEND: django_redis.cache.RedisCache
   LOCATION: rediss://default@edxapp-redis.service.consul:6379/0
@@ -51,6 +55,10 @@ XQUEUE_INTERFACE:
         username: edxapp
     url: http://xqueue-{{ env "ENVIRONMENT" }}.private.odl.mit.edu  # MODIFIED
 SENTRY_DSN: {{ .Data.sentry_dsn }}
+SOCIAL_AUTH_SAML_SP_PRIVATE_KEY: '{{ .Data.saml_private_key }}'
+SOCIAL_AUTH_SAML_SP_PUBLIC_CERT: '{{ .Data.saml_public_cert }}'
+SYSADMIN_GITHUB_WEBHOOK_KEY: {{ .Data.sysadmin_git_webhook_secret }}
+YOUTUBE_API_KEY: {{ .Data.youtube_api_key }}
 {{ end }}
 
 {{ with secret "secret-mitx/edx-forum" }}
@@ -163,6 +171,7 @@ CACHES:  # MODIFIED
     staticfiles:
       <<: *redis_cache_config
       KEY_PREFIX: staticfiles
+CANVAS_BASE_URL: {{ key "edxapp/canvas-url" }}
 CELERYBEAT_SCHEDULER: redbeat.RedBeatScheduler  # MODIFIED
 CELERY_BROKER_HOSTNAME: edxapp-redis.service.consul:6379  # MODIFIED
 CELERY_BROKER_TRANSPORT: rediss  # MODIFIED - second "s" indicates "secure"
@@ -184,10 +193,10 @@ CERT_QUEUE: certificates
 CMS_BASE: {{ key "edxapp/studio-domain" }}  # MODIFIED
 CODE_JAIL:
     limits:
-        CPU: 1
+        CPU: 3
         FSIZE: 1048576
         PROXY: 0
-        REALTIME: 3
+        REALTIME: 10
         VMEM: 536870912
     python_bin: /edx/app/edxapp/venvs/edxapp-sandbox/bin/python
     user: sandbox
@@ -200,12 +209,21 @@ CORS_ORIGIN_ALLOW_ALL: false
 CORS_ORIGIN_WHITELIST:
   - https://{{ key "edxapp/lms-domain" }}
   - https://{{ key "edxapp/studio-domain" }}
-  - https://{{ key "edxapp/marketing-domain" }}
 COURSES_WITH_UNSAFE_CODE: []
 COURSE_ABOUT_VISIBILITY_PERMISSION: see_exists
 COURSE_CATALOG_API_URL: http://localhost:8008/api/v1
 COURSE_CATALOG_URL_ROOT: http://localhost:8008
 COURSE_CATALOG_VISIBILITY_PERMISSION: see_exists
+COURSE_MODE_DEFAULTS:
+    bulk_sku: null
+    currency: usd
+    description: null
+    expiration_datetime: null
+    min_price: 0
+    name: Honor
+    sku: null
+    slug: honor
+    suggested_prices: ''
 CREDENTIALS_INTERNAL_SERVICE_URL: http://localhost:8005
 CREDENTIALS_PUBLIC_SERVICE_URL: http://localhost:8005
 CREDIT_PROVIDER_SECRET_KEYS: {}
@@ -284,9 +302,46 @@ FEATURES:
     SHOW_HEADER_LANGUAGE_SELECTOR: false
     SKIP_EMAIL_VALIDATION: true # ADDED KEY
     ALLOW_PUBLIC_ACCOUNT_CREATION: true
+    # FEATURES From Residential
+    ALLOW_ALL_ADVANCED_COMPONENTS: true
+    ALLOW_COURSE_STAFF_GRADE_DOWNLOADS: true
+    AUTH_USE_CAS: false
+    AUTH_USE_CERTIFICATES: false
+    BYPASS_ACTIVATION_EMAIL_FOR_EXTAUTH: true
+    CERTIFICATES_ENABLED: false
+    DISABLE_HONOR_CERTIFICATES: true
+    DISABLE_LOGIN_BUTTON: false
+    ENABLE_AUTO_COURSE_REGISTRATION: true
+    ENABLE_CANVAS_INTEGRATION: true
+    ENABLE_COURSE_BLOCKS_NAVIGATION_API: true
+    ENABLE_INSTRUCTOR_BACKGROUND_TASKS: true
+    ENABLE_INSTRUCTOR_EMAIL: true
+    ENABLE_INSTRUCTOR_LEGACY_DASHBOARD: true
+    ENABLE_INSTRUCTOR_REMOTE_GRADEBOOK_CONTROLS: true
+    ENABLE_PAID_COURSE_REGISTRATION: false
+    ENABLE_PREREQUISITE_COURSES: true
+    ENABLE_RENDER_XBLOCK_API: true
+    ENABLE_SHOPPING_CART: true
+    ENABLE_SYSADMIN_DASHBOARD: false
+    ENABLE_THIRD_PARTY_ONLY_AUTH: true
+    INDIVIDUAL_DUE_DATES: true
+    LICENSING: true
+    MILESTONES_APP: true
+    REQUIRE_COURSE_EMAIL_AUTH: false
+    REROUTE_ACTIVATION_EMAIL: mitx-support@mit.edu
+    RESTRICT_ENROLL_BY_REG_METHOD: false
+    RESTRICT_ENROLL_SOCIAL_PROVIDERS:
+    - mit-kerberos
+    SESSION_COOKIE_SECURE: true
+    ALLOW_COURSE_RERUNS: true
+    ALLOW_HIDING_DISCUSSION_TAB: true
+    DISABLE_COURSE_CREATION: true
+    DISABLE_START_DATES: true
+    ENABLE_EXPORT_GIT: true
+    ENABLE_GIT_AUTO_EXPORT: true
+    SEGMENT_IO: false
+    STAFF_EMAIL: mitx-support@mit.edu
 FEEDBACK_SUBMISSION_EMAIL: ''
-FERNET_KEYS:
-- DUMMY KEY CHANGE BEFORE GOING TO PRODUCTION
 FILE_UPLOAD_STORAGE_BUCKET_NAME: {{ key "edxapp/s3-storage-bucket" }}
 FILE_UPLOAD_STORAGE_PREFIX: submissions_attachments
 FINANCIAL_REPORTS:
@@ -326,10 +381,9 @@ LOGGING_ENV: sandbox
 LOGIN_REDIRECT_WHITELIST:  # MODIFIED
   - {{ key "edxapp/studio-domain" }}
   - {{ key "edxapp/lms-domain" }}
-  - {{ key "edxapp/marketing-domain" }}
+  - {{ key "edxapp/preview-domain" }}
 LOG_DIR: /edx/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
-MARKETING_SITE_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support mitx-theme
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
@@ -387,7 +441,8 @@ PROCTORING_BACKENDS:
       'base_url': '{{ key "edxapp/proctortrack-base-url" }}'
     'null': {}
 
-PROCTORING_SETTINGS: {}
+PROCTORING_SETTINGS:
+    MUST_BE_VERIFIED_TRACK: false
 REGISTRATION_EXTRA_FIELDS:
     city: hidden
     confirm_email: hidden
@@ -462,7 +517,6 @@ XBLOCK_FS_STORAGE_BUCKET: null
 XBLOCK_FS_STORAGE_PREFIX: null
 XBLOCK_SETTINGS: {}
 X_FRAME_OPTIONS: DENY
-YOUTUBE_API_KEY: PUT_YOUR_API_KEY_HERE
 ZENDESK_API_KEY: ''
 ZENDESK_CUSTOM_FIELDS: {}
 ZENDESK_GROUP_ID_MAPPING: {}
@@ -488,14 +542,6 @@ ZENDESK_USER: ''
 # Doesn't Appear To Get Used Anywhere #
 #######################################
 # SYSLOG_SERVER: ''
-
-#######################################
-# Not Using SAML For This Environment #
-#######################################
-# SOCIAL_AUTH_SAML_SP_PRIVATE_KEY: ''
-# SOCIAL_AUTH_SAML_SP_PRIVATE_KEY_DICT: {}
-# SOCIAL_AUTH_SAML_SP_PUBLIC_CERT: ''
-# SOCIAL_AUTH_SAML_SP_PUBLIC_CERT_DICT: {}
 
 ##############################
 # CAS Is No Longer Supported #
@@ -531,3 +577,25 @@ ZENDESK_USER: ''
 #     AUDIENCE: SET-ME-PLEASE
 #     ISSUER: http://127.0.0.1:8000/oauth2
 #     SECRET_KEY: SET-ME-PLEASE
+
+TIME_ZONE_DISPLAYED_FOR_DEADLINES: America/New_York
+STUDENT_FILEUPLOAD_MAX_SIZE: 52428800
+FIELD_OVERRIDE_PROVIDERS:
+  - lms.djangoapps.courseware.student_field_overrides.IndividualStudentOverrideProvider
+EMAIL_HOST: outgoing.mit.edu
+EMAIL_PORT: 587
+EMAIL_USE_TLS: true
+COURSE_MODE_DEFAULTS:
+  name: Honor
+  bulk_sku: null
+  currency: usd
+  description: null
+  expiration_datetime: null
+  min_price: 0
+  sku: null
+  slug: honor
+  suggested_prices:
+ADMINS:
+  - "MITx Stacktrace Recipients"
+  - cuddle-bunnies@mit.edu
+ALLOW_ALL_ADVANCED_COMPONENTS: true

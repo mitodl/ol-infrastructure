@@ -5,8 +5,8 @@ COURSE_AUTHORING_MICROFRONTEND_URL:
 COURSE_IMPORT_EXPORT_BUCKET: {{ key "edxapp/s3-course-bucket" }}  # MODIFIED
 GIT_REPO_EXPORT_DIR: /edx/var/edxapp/export_course_repos
 GIT_EXPORT_DEFAULT_IDENT:
-  name: MITx Online
-  email: mitx-devops@mit.edu
+  name: MIT xPRO
+  email: odl-devops@mit.edu
 PARSE_KEYS: {}
 
 {{ with secret "secret-xpro/edxapp" }}
