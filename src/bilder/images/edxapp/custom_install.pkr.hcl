@@ -14,7 +14,7 @@ variable "edx_platform_version" {
   default = "release"
 }
 
-# Allowed values are mitxonline, xpro, or mitx
+# Allowed values are mitxonline, xpro, mitx, or mitx-staging
 variable "installation_target" {
   type    = string
   default = "mitxonline"

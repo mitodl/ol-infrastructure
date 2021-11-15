@@ -28,6 +28,7 @@ class BusinessUnit(str, Enum):  # noqa: WPS600
     operations = "operations"
     ovs = "odl-video"
     residential = "residential"
+    residential_staging = "residential-staging"
     starteam = "starteam"
     xpro = "mitxpro"
 
@@ -37,16 +38,19 @@ class Apps(str, Enum):  # noqa: WPS600
     """Canonical source of truth for defining apps."""
 
     bootcamps = "bootcamps"
-    micromasters = "micromasters"
-    ocw_build = "ocw-build"
-    redash = "redash"
     dagster = "dagster"
-    mitxpro_edx = "xpro-edx"
-    mitx_edx = "mitx-edx"
-    odl_video_service = "ovs"
-    mit_open = "open"
-    starcellbio = "starcellbio"
     edxapp = "edxapp"
+    micromasters = "micromasters"
+    mit_open = "open"
+    mitx_edx = "mitx-edx"
+    mitxonline = "mitxonline"
+    mitxonline_edx = "mitxonline-edx"
+    mitxpro_edx = "xpro-edx"
+    ocw_build = "ocw-build"
+    odl_video_service = "ovs"
+    redash = "redash"
+    starcellbio = "starcellbio"
+    xpro = "xpro"
 
 
 class AWSBase(BaseModel):

@@ -10,4 +10,5 @@ config:
   operations_vpc:cidr_block: 172.16.0.0/16
   operations_vpc:name: operations-ci
   residential_vpc:cidr_block: 172.19.0.0/16
+  residential_staging_vpc:cidr_block: 172.22.0.0/16
   xpro_vpc:cidr_block: 172.20.0.0/16

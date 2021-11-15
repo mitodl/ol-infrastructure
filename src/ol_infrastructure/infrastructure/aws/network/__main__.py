@@ -120,6 +120,20 @@ residential_mitx_vpc_config = OLVPCConfig(
 )
 residential_mitx_vpc = OLVPC(residential_mitx_vpc_config)
 
+mitx_staging_config = Config("residential_staging_vpc")
+residential_staging_mitx_vpc_config = OLVPCConfig(
+    vpc_name=f"mitx-staging-{stack_info.env_suffix}",
+    cidr_block=mitx_staging_config.require("cidr_block"),
+    num_subnets=4,
+    tags={
+        "OU": "residential-staging",
+        "Environment": f"mitx-staging-{stack_info.env_suffix}",
+        "business_unit": "residential-staging",
+        "Name": f"MITx {stack_info.name} Staging",
+    },
+)
+residential_staging_mitx_vpc = OLVPC(residential_staging_mitx_vpc_config)
+
 mitx_online_config = Config("mitx_online_vpc")
 mitx_online_vpc_config = OLVPCConfig(
     vpc_name=f"mitx-online-{stack_info.env_suffix}",
@@ -211,6 +225,37 @@ residential_mitx_vpc_exports.update(
 )
 export("residential_mitx_vpc", residential_mitx_vpc_exports)
 
+residential_staging_mitx_vpc_exports = vpc_exports(
+    residential_staging_mitx_vpc, ["operations_vpc"]
+)
+residential_staging_mitx_vpc_exports.update(
+    {
+        "security_groups": {
+            "default": residential_staging_mitx_vpc.olvpc.id.apply(default_group).id,
+            "web": public_web(
+                residential_staging_mitx_vpc_config.vpc_name,
+                residential_staging_mitx_vpc.olvpc,
+            )(
+                tags=residential_staging_mitx_vpc_config.merged_tags(
+                    {"Name": f"mitx-staging-{stack_info.env_suffix}-public-web"}
+                ),
+                name=f"mitx-staging-{stack_info.env_suffix}-public-web",
+            ).id,
+            "salt_minion": salt_minion(
+                residential_staging_mitx_vpc_config.vpc_name,
+                residential_staging_mitx_vpc.olvpc,
+                operations_vpc.olvpc,
+            )(
+                tags=residential_staging_mitx_vpc_config.merged_tags(
+                    {"Name": f"mitx-staging-{stack_info.env_suffix}-salt-minion"}
+                ),
+                name=f"mitx-staging-{stack_info.env_suffix}-salt-minion",
+            ).id,
+        }
+    }
+)
+export("residential_staging_mitx_vpc", residential_staging_mitx_vpc_exports)
+
 mitx_online_vpc_exports = vpc_exports(mitx_online_vpc, ["data_vpc", "operations_vpc"])
 mitx_online_vpc_exports.update(
     {
@@ -300,6 +345,7 @@ operations_vpc_exports = vpc_exports(
         "data_vpc",
         "mitxonline_vpc",
         "residential_mitx_vpc",
+        "residential_staging_mitx_vpc",
         "xpro_vpc",
     ],
 )
