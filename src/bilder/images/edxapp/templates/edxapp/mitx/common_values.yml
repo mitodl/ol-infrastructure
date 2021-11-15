@@ -486,7 +486,6 @@ STATIC_ROOT_BASE: /edx/var/edxapp/staticfiles
 STATIC_URL_BASE: /static/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
-SUPPORT_SITE_LINK: https://mitx-micromasters.zendesk.com/hc/en-us/requests/new
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
 TIME_ZONE: America/New_York
@@ -580,8 +579,6 @@ ZENDESK_USER: ''
 
 TIME_ZONE_DISPLAYED_FOR_DEADLINES: America/New_York
 STUDENT_FILEUPLOAD_MAX_SIZE: 52428800
-FIELD_OVERRIDE_PROVIDERS:
-  - lms.djangoapps.courseware.student_field_overrides.IndividualStudentOverrideProvider
 EMAIL_HOST: outgoing.mit.edu
 EMAIL_PORT: 587
 EMAIL_USE_TLS: true

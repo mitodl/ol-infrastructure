@@ -195,6 +195,7 @@ CORS_ORIGIN_ALLOW_ALL: false
 CORS_ORIGIN_WHITELIST:
   - https://{{ key "edxapp/lms-domain" }}
   - https://{{ key "edxapp/studio-domain" }}
+  - https://{{ key "edxapp/preview-domain" }}
   - https://{{ key "edxapp/marketing-domain" }}
 COURSES_WITH_UNSAFE_CODE: []
 COURSE_ABOUT_VISIBILITY_PERMISSION: see_exists
@@ -273,7 +274,6 @@ FEATURES:
     ENABLE_THIRD_PARTY_AUTH: true
     ENABLE_UNICODE_USERNAME: true  # ADDED KEY
     ENABLE_VIDEO_UPLOAD_PIPELINE: true # MODIFIED
-    MILESTONES_APP: true # ADDED KEY FOR PROCTORTRACK
     PREVIEW_LMS_BASE: {{ key "edxapp/preview-domain" }}  # MODIFIED
     SHOW_FOOTER_LANGUAGE_SELECTOR: false
     SHOW_HEADER_LANGUAGE_SELECTOR: false
@@ -289,14 +289,12 @@ FEATURES:
     ENABLE_AUTO_COURSE_REGISTRATION: true
     ENABLE_COURSE_BLOCKS_NAVIGATION_API: true
     ENABLE_INSTRUCTOR_EMAIL: true
-    ENABLE_INSTRUCTOR_LEGACY_DASHBOARD: true
     ENABLE_INSTRUCTOR_REMOTE_GRADEBOOK_CONTROLS: true
     ENABLE_PAID_COURSE_REGISTRATION: false
     ENABLE_PREREQUISITE_COURSES: true
     ENABLE_RENDER_XBLOCK_API: true
     ENABLE_SHOPPING_CART: true
     ENABLE_SYSADMIN_DASHBOARD: true
-    INDIVIDUAL_DUE_DATES: true
     LICENSING: true
     MILESTONES_APP: true
     REQUIRE_COURSE_EMAIL_AUTH: false
@@ -396,13 +394,7 @@ PLATFORM_TWITTER_ACCOUNT: '@YourPlatformTwitterAccount'
 POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
 PRESS_EMAIL: support@xpro.mit.edu # MODIFIED
 PROCTORING_BACKENDS:
-    DEFAULT: 'proctortrack'
-    'proctortrack':
-      {{ with secret "secret-xpro/edxapp" }}
-      'client_id': '{{ .Data.proctortrack_client_id }}'
-      'client_secret': '{{ .Data.proctortrack_client_secret }}'
-      {{ end }}
-      'base_url': '{{ key "edxapp/proctortrack-base-url" }}'
+    DEFAULT: 'null'
     'null': {}
 
 PROCTORING_SETTINGS: {}
@@ -449,7 +441,7 @@ STATIC_ROOT_BASE: /edx/var/edxapp/staticfiles
 STATIC_URL_BASE: /static/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
-SUPPORT_SITE_LINK: https://mitx-micromasters.zendesk.com/hc/en-us/requests/new
+SUPPORT_SITE_LINK: https://xpro.zendesk.com/hc
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
 TIME_ZONE: America/New_York
@@ -480,7 +472,7 @@ XBLOCK_FS_STORAGE_BUCKET: null
 XBLOCK_FS_STORAGE_PREFIX: null
 XBLOCK_SETTINGS: {}
 X_FRAME_OPTIONS: DENY
-YOUTUBE_API_KEY: PUT_YOUR_API_KEY_HERE
+YOUTUBE_API_KEY: null
 ZENDESK_API_KEY: ''
 ZENDESK_CUSTOM_FIELDS: {}
 ZENDESK_GROUP_ID_MAPPING: {}
@@ -564,5 +556,3 @@ COURSE_MODE_DEFAULTS:
 EMAIL_HOST: smtp.mailgun.org
 EMAIL_PORT: 587
 EMAIL_USE_TLS: true
-FIELD_OVERRIDE_PROVIDERS:
-  - lms.djangoapps.courseware.student_field_overrides.IndividualStudentOverrideProvider
