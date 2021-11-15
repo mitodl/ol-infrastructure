@@ -21,7 +21,7 @@ CANVAS_ACCESS_TOKEN: {{ .Data.canvas_access_token }}
 CELERY_BROKER_PASSWORD: {{ .Data.redis_auth_token }}
 EMAIL_HOST_PASSWORD: {{ .Data.email_password }}
 EMAIL_HOST_USER: {{ .Data.email_username }}
-FERNET_KEYS: {{ .Data.fernet_keys }}  # ADDED KEY - Needs to be an array
+FERNET_KEYS: {{ .Data.fernet_keys }}  # MODIFIED KEY - Needs to be an array
 redis_cache_config: &redis_cache_config
   BACKEND: django_redis.cache.RedisCache
   LOCATION: rediss://default@edxapp-redis.service.consul:6379/0
@@ -425,9 +425,9 @@ PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG:
     ENFORCE_COMPLIANCE_ON_LOGIN: false
 PASSWORD_RESET_SUPPORT_LINK: ''
 PAYMENT_SUPPORT_EMAIL: {{ key "edxapp/sender-email-address" }}  # MODIFIED
-PLATFORM_DESCRIPTION: MITx Online # MODIFIED
+PLATFORM_DESCRIPTION: MITx Residential # MODIFIED
 PLATFORM_FACEBOOK_ACCOUNT: http://www.facebook.com/YourPlatformFacebookAccount
-PLATFORM_NAME: MITx Online  # MODIFIED
+PLATFORM_NAME: MITx Residential  # MODIFIED
 PLATFORM_TWITTER_ACCOUNT: '@YourPlatformTwitterAccount'
 POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
 PRESS_EMAIL: support@mitx.mit.edu # MODIFIED
@@ -474,7 +474,7 @@ SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
 # SESSION_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
-SITE_NAME: MITx Online  # MODIFIED
+SITE_NAME: MITx Residential  # MODIFIED
 SOCIAL_MEDIA_FOOTER_URLS: {}
 SOCIAL_SHARING_SETTINGS:
     CERTIFICATE_FACEBOOK: false

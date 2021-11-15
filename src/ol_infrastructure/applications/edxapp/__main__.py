@@ -91,6 +91,7 @@ kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
 # Variables #
 #############
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+target_vpc = edxapp_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
 aws_account = get_caller_identity()
 aws_config = AWSBase(
     tags={
@@ -103,7 +104,7 @@ aws_config = AWSBase(
 consul_security_groups = consul_stack.require_output("security_groups")
 edxapp_domains = edxapp_config.require_object("domains")
 edxapp_mail_domain = edxapp_config.require("mail_domain")
-edxapp_vpc = network_stack.require_output(f"{stack_info.env_prefix}_vpc")
+edxapp_vpc = network_stack.require_output(target_vpc)
 edxapp_vpc_id = edxapp_vpc["id"]
 edxapp_web_ami = ec2.get_ami(
     filters=[
@@ -119,7 +120,7 @@ edxapp_web_ami = ec2.get_ami(
 edxapp_worker_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(
-            name="name", values=[f"edxapp-worker-{stack_info.enf_prefix}-*"]
+            name="name", values=[f"edxapp-worker-{stack_info.env_prefix}-*"]
         ),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
@@ -536,7 +537,11 @@ redis_cluster_security_group = ec2.SecurityGroup(
 
 redis_cache_config = OLAmazonRedisConfig(
     encrypt_transit=True,
-    auth_token=redis_config.require("auth_token"),
+    auth_token=Output.secret(
+        read_yaml_secrets(
+            Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
+        )["redis_auth_token"]
+    ),
     cluster_mode_enabled=False,
     encrypted=True,
     engine_version="6.x",
@@ -685,7 +690,7 @@ edxapp_ses_event_destintations = ses.EventDestination(
 edxapp_vault_mount = vault.Mount(
     "edxapp-vault-generic-secrets-mount",
     path=f"secret-{stack_info.env_prefix}",
-    description="Static secrets storage for MITx Online applications and services",
+    description="Static secrets storage for Open edX {stack_info.env_prefix} applications and services",  # noqa: E501
     type="kv",
 )
 edxapp_secrets = vault.generic.Secret(

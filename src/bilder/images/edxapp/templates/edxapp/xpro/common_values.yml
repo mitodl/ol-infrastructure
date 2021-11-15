@@ -20,6 +20,7 @@ mysql_creds: &mysql_creds
 CELERY_BROKER_PASSWORD: {{ .Data.redis_auth_token }}
 EMAIL_HOST_PASSWORD: {{ .Data.email_password }}
 EMAIL_HOST_USER: {{ .Data.email_username }}
+FERNET_KEYS: {{ .Data.fernet_keys }}
 redis_cache_config: &redis_cache_config
   BACKEND: django_redis.cache.RedisCache
   LOCATION: rediss://default@edxapp-redis.service.consul:6379/0
@@ -44,14 +45,6 @@ JWT_AUTH:  # NEEDS ATTENTION
       - ISSUER: https://{{ key "edxapp/lms-domain" }}/oauth2
         AUDIENCE: xpro
         SECRET_KEY: {{ .Data.django_secret_key }}
-XQUEUE_INTERFACE:
-    basic_auth:
-    - edx
-    - edx
-    django_auth:
-        password: {{ .Data.xqueue_edxapp_password }}
-        username: edxapp
-    url: http://xqueue-{{ env "ENVIRONMENT" }}.private.odl.mit.edu  # MODIFIED
 SENTRY_DSN: {{ .Data.sentry_dsn }}
 {{ end }}
 
@@ -236,7 +229,7 @@ ELASTIC_SEARCH_CONFIG:
 -   host: elasticsearch.service.consul
     port: 9200
     use_ssl: false
-EMAIL_BACKEND: django_ses.SESBackend  # MODIFIED
+EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend  # MODIFIED
 # EMAIL_HOST: localhost
 # EMAIL_HOST_PASSWORD: ''
 # EMAIL_HOST_USER: ''
@@ -311,8 +304,6 @@ FEATURES:
     RESTRICT_ENROLL_BY_REG_METHOD: false
     SESSION_COOKIE_SECURE: true
 FEEDBACK_SUBMISSION_EMAIL: ''
-FERNET_KEYS:
-- DUMMY KEY CHANGE BEFORE GOING TO PRODUCTION
 FILE_UPLOAD_STORAGE_BUCKET_NAME: {{ key "edxapp/s3-storage-bucket" }}
 FILE_UPLOAD_STORAGE_PREFIX: submissions_attachments
 FINANCIAL_REPORTS:
