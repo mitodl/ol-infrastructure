@@ -20,7 +20,7 @@ edx_plugins = {
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "django-redis",  # Support for Redis caching in Django
         "edx-sysadmin",
-        "edx-username-changer==0.2.0",
+        "edx-username-changer==0.2.1",
         "mitxpro-openedx-extensions==0.2.2",
         "ol-openedx-logging",
         "ol-openedx-sentry",
@@ -30,7 +30,7 @@ edx_plugins = {
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "django-redis",  # Support for Redis caching in Django
         "edx-sysadmin",
-        "edx-username-changer==0.2.0",
+        "edx-username-changer==0.2.1",
         "mitxpro-openedx-extensions==0.2.2",
         "ol-openedx-logging",
         "ol-openedx-sentry",
@@ -41,9 +41,9 @@ edx_plugins = {
         "django-redis",  # Support for Redis caching in Django
         "edx-sga==0.17.2",
         "edx-sysadmin",
-        "git+https://github.com/raccoongang/xblock-pdf.git@8d63047c53bc8fdd84fa7b0ec577bb0a729c215f#egg=xblock-pdf",
+        "git+https://github.com/raccoongang/xblock-pdf.git@8d63047c53bc8fdd84fa7b0ec577bb0a729c215f#egg=xblock-pdf",  # noqa: E501
         "ol-openedx-logging",
         "ol-openedx-sentry",
-        "rapid-response-xblock==0.1.0",
+        "rapid-response-xblock==0.6.0",
     ],
 }
