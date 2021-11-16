@@ -2,6 +2,7 @@ import base64
 import json
 from pathlib import Path
 
+import bcrypt
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
@@ -303,9 +304,10 @@ def cloud_init_userdata(
     domain_name,
     basic_auth_password,
 ):
-    b64_password_hash = base64.b64encode(basic_auth_password.encode("utf8")).decode(
-        "utf8"
+    hashed_password = bcrypt.hashpw(
+        basic_auth_password.encode("utf8"), bcrypt.gensalt()
     )
+    b64_password_hash = base64.b64encode(hashed_password).decode("utf8")
     cloud_config_contents = {
         "write_files": [
             {
