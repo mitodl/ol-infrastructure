@@ -43,6 +43,7 @@ def vpc_exports(vpc: OLVPC, peers: Optional[List[str]] = None) -> Dict[str, Any]
         "id": vpc.olvpc.id,
         "name": vpc.vpc_config.vpc_name,
         "peers": peers or [],
+        "region": vpc.vpc_config.region,
         "rds_subnet": vpc.db_subnet_group.name,
         "elasticache_subnet": vpc.cache_subnet_group.name,
         "subnet_ids": [subnet.id for subnet in vpc.olvpc_subnets],

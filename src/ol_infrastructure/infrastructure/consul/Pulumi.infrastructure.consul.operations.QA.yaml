@@ -5,4 +5,3 @@ config:
   aws:region: us-east-1
   environment:business_unit: operations
   environment:vpc_reference: operations_vpc
-  saltstack:key_name: salt-qa

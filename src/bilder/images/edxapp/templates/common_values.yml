@@ -274,15 +274,17 @@ FEATURES:
     ENABLE_OAUTH2_PROVIDER: true
     ENABLE_PUBLISHER: false
     ENABLE_READING_FROM_MULTIPLE_HISTORY_TABLES: true
-    ENABLE_SPECIAL_EXAMS: false
+    ENABLE_SPECIAL_EXAMS: true # MODIFIED FOR PROCTORTRACK
     ENABLE_THIRD_PARTY_AUTH: true
     ENABLE_UNICODE_USERNAME: true  # ADDED KEY
     ENABLE_VIDEO_UPLOAD_PIPELINE: true # MODIFIED
+    MILESTONES_APP: true # ADDED KEY FOR PROCTORTRACK
     PREVIEW_LMS_BASE: {{ key "edxapp/preview-domain" }}  # MODIFIED
     SHOW_FOOTER_LANGUAGE_SELECTOR: false
     SHOW_HEADER_LANGUAGE_SELECTOR: false
     SKIP_EMAIL_VALIDATION: true # ADDED KEY
     ALLOW_PUBLIC_ACCOUNT_CREATION: true
+    ALLOW_COURSE_STAFF_GRADE_DOWNLOADS: true # ADDED KEY
 FEEDBACK_SUBMISSION_EMAIL: ''
 FERNET_KEYS:
 - DUMMY KEY CHANGE BEFORE GOING TO PRODUCTION
@@ -309,6 +311,7 @@ ICP_LICENSE: null
 ICP_LICENSE_INFO: {}
 IDA_LOGOUT_URI_LIST:
   - https://{{ key "edxapp/marketing-domain" }}/logout
+  - https://{{ key "edxapp/studio-domain" }}/logout
 ID_VERIFICATION_SUPPORT_LINK: ''
 INTEGRATED_CHANNELS_API_CHUNK_TRANSMISSION_LIMIT:
     SAP: 1
@@ -375,9 +378,17 @@ PLATFORM_NAME: MITx Online  # MODIFIED
 PLATFORM_TWITTER_ACCOUNT: '@YourPlatformTwitterAccount'
 POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
 PRESS_EMAIL: support@mitxonline.mit.edu # MODIFIED
+{{ with secret "secret-mitxonline/edxapp" }}
 PROCTORING_BACKENDS:
-    DEFAULT: 'null'
+    DEFAULT: 'proctortrack'
+    'proctortrack':
+      'client_id': '{{ .Data.proctortrack_client_id }}'
+      'client_secret': '{{ .Data.proctortrack_client_secret }}'
+      'base_url': '{{ key "edxapp/proctortrack-base-url" }}'
     'null': {}
+PROCTORING_USER_OBFUSCATION_KEY: {{ .Data.proctortrack_user_obfuscation_key }}
+{{ end }}
+
 PROCTORING_SETTINGS: {}
 REGISTRATION_EXTRA_FIELDS:
     city: hidden
@@ -405,8 +416,9 @@ RETIREMENT_STATES:
 SEGMENT_KEY: null
 SENTRY_ENVIRONMENT: {{ env "ENVIRONMENT" }}
 SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
-SESSION_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
-SESSION_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edxapp-sessionid  # MODIFIED
+# Removing the session cookie domain as it is no longer needed for sharing the cookie
+# between LMS and Studio (TMM 2021-10-22)
+# SESSION_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
 SITE_NAME: MITx Online  # MODIFIED
@@ -421,7 +433,7 @@ STATIC_ROOT_BASE: /edx/var/edxapp/staticfiles
 STATIC_URL_BASE: /static/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
-SUPPORT_SITE_LINK: ''
+SUPPORT_SITE_LINK: https://mitx-micromasters.zendesk.com/hc/en-us/requests/new
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
 TIME_ZONE: America/New_York
