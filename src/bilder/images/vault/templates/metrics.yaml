@@ -1,0 +1,51 @@
+---
+sources:
+  vault_metrics:
+    type: prometheus_scrape
+    endpoints:
+    - http://localhost:8200/metrics
+    scrape_interval_secs: 60
+
+  vector_metrics:
+    type: internal_metrics
+    scrape_interval_secs: 30
+  host_metrics:
+    type: host_metrics
+
+transforms:
+  vector_metrics_relabel:
+    type: remap
+    inputs:
+    - vector_metrics
+    source: |
+      .tags.job = "integrations/vector_agent"
+
+  host_metrics_relabel:
+    type: remap
+    inputs:
+    - host_metrics
+    source: |
+      .tags.job = "integrations/linux_host"
+      .tags.instance = "${HOSTNAME}"
+
+  add_labels_to_metrics:
+    type: remap
+    inputs:
+    - '*metrics_relabel'
+    source: |
+      .tags.environment = "${ENVIRONMENT}"
+      .tags.application = "vault"
+      .tags.service = "vault"
+      .tags.hostname = "${HOSTNAME}"
+
+sinks:
+  grafana_cortex_metrics:
+    inputs:
+    - add_labels_to_metrics
+    type: prometheus_remote_write
+    endpoint: https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom/push
+    healthcheck: false
+    auth:
+      strategy: basic
+      user: ${GRAFANA_CLOUD_PROMETHEUS_API_USER}
+      password: ${GRAFANA_CLOUD_API_KEY}

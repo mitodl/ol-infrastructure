@@ -307,6 +307,9 @@ def cloud_init_userdata(
     hashed_password = bcrypt.hashpw(
         basic_auth_password.encode("utf8"), bcrypt.gensalt()
     )
+    grafana_credentials = read_yaml_secrets(
+        Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
+    )
     b64_password_hash = base64.b64encode(hashed_password).decode("utf8")
     cloud_config_contents = {
         "write_files": [
@@ -338,6 +341,19 @@ def cloud_init_userdata(
                     f"DOMAIN={domain_name}\n"
                     f"PULUMI_BASIC_AUTH_PASSWORD={b64_password_hash}\n"
                 ),
+            },
+            {
+                "path": "/etc/default/vector",
+                "content": textwrap.dedent(
+                    f"""\
+                    ENVIRONMENT={consul_env_name}
+                    VECTOR_CONFIG_DIR=/etc/vector/
+                    GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
+                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
+                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
+                    """
+                ),  # noqa: WPS355
+                "owner": "root:root",
             },
         ]
     }

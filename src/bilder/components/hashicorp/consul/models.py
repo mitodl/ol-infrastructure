@@ -55,7 +55,9 @@ class ConsulService(FlexibleBaseModel):
 
 
 class ConsulTelemetry(FlexibleBaseModel):
-    dogstatsd_addr: str = "127.0.0.1:8125"
+    dogstatsd_addr: Optional[str]
+    disable_hostname: Optional[bool] = True
+    prometheus_retention_time: Optional[str] = "60s"
 
 
 class ConsulConfig(HashicorpConfig):

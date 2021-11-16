@@ -21,12 +21,19 @@ from bilder.components.hashicorp.steps import (
     install_hashicorp_products,
     register_services,
 )
+from bilder.components.vector.models import VectorConfig
+from bilder.components.vector.steps import (
+    configure_vector,
+    install_vector,
+    vector_service,
+)
 from bilder.facts import has_systemd  # noqa: F401
 
 VERSIONS = {  # noqa: WPS407
     "caddy_route53": "v1.1.2",
     "consul": os.environ.get("CONSUL_VERSION", "1.10.0"),
 }
+TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 
 install_baseline_packages()
 # TODO bootstrap Consul ACL
@@ -60,6 +67,16 @@ caddy_config.template_context = caddy_config.dict()
 install_caddy(caddy_config)
 caddy_config_changed = configure_caddy(caddy_config)
 
+# Install vector
+vector_config = VectorConfig(
+    configuration_templates={
+        TEMPLATES_DIRECTORY.joinpath("vector", "vector.yaml"): {},
+        TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml"): {},
+    }
+)
+install_vector(vector_config)
+configure_vector(vector_config)
+
 # Install Consul and Consul ESM
 hashicorp_products = [
     Consul(version=VERSIONS["consul"], configuration=consul_configuration),
@@ -74,3 +91,4 @@ if host.fact.has_systemd:
     caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
+    vector_service(vector_config)

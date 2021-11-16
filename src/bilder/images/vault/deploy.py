@@ -27,6 +27,12 @@ from bilder.components.hashicorp.vault.models import (
     VaultStorageBackend,
     VaultTCPListener,
 )
+from bilder.components.vector.models import VectorConfig
+from bilder.components.vector.steps import (
+    configure_vector,
+    install_vector,
+    vector_service,
+)
 from bilder.facts import has_systemd  # noqa: F401
 from bridge.lib.magic_numbers import HOURS_IN_MONTH, VAULT_CLUSTER_PORT, VAULT_HTTP_PORT
 
@@ -35,6 +41,7 @@ VERSIONS = {  # noqa: WPS407
     "consul": os.environ.get("CONSUL_VERSION", "1.10.1"),
     "caddy_route53": "v1.1.2",
 }
+TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 
 install_baseline_packages(packages=["curl", "gnupg"])
 # Set up configuration objects
@@ -104,8 +111,19 @@ files.directory(
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 
+# Install vector
+vector_config = VectorConfig(
+    configuration_templates={
+        TEMPLATES_DIRECTORY.joinpath("vector", "vault.yaml"): {},
+        TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml"): {},
+    }
+)
+install_vector(vector_config)
+configure_vector(vector_config)
+
 # Manage services
 if host.fact.has_systemd:
     caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
+    vector_service(vector_config)

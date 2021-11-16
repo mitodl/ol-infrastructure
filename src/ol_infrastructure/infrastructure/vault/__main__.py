@@ -13,6 +13,8 @@
 """
 import base64
 import json
+import textwrap
+from pathlib import Path
 from typing import Any, Dict
 
 import pulumi_tls as tls
@@ -36,6 +38,7 @@ from bridge.lib.magic_numbers import (
     VAULT_CLUSTER_PORT,
     VAULT_HTTP_PORT,
 )
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -335,8 +338,17 @@ vault_listener_cert = acmpca.Certificate(
 
 
 def cloud_init_user_data(
-    kms_key_id, vpc_id, consul_env_name, vault_dns_name, tls_key, tls_cert, ca_cert
+    kms_key_id,
+    vpc_id,
+    consul_env_name,
+    vault_dns_name,
+    tls_key,
+    tls_cert,
+    ca_cert,
 ) -> str:
+    grafana_credentials = read_yaml_secrets(
+        Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
+    )
     cloud_config_contents = {
         ""
         "write_files": [
@@ -384,6 +396,19 @@ def cloud_init_user_data(
                         }
                     }
                 ),
+            },
+            {
+                "path": "/etc/default/vector",
+                "content": textwrap.dedent(
+                    f"""\
+                    ENVIRONMENT={consul_env_name}
+                    VECTOR_CONFIG_DIR=/etc/vector/
+                    GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
+                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
+                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
+                    """
+                ),  # noqa: WPS355
+                "owner": "root:root",
             },
             # TODO: Move TLS key and cert injection to Packer build so that private key
             # information isn't being passed as userdata (TMM 2021-08-06)

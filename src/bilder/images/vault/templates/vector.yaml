@@ -1,0 +1,88 @@
+---
+api:
+  enabled: true
+
+log_schema:
+  timestamp_key: vector_timestamp
+  host_key: log_host
+
+sources:
+  auth_log:
+    type: file
+    file_key: log_file
+    include:
+    - /var/log/auth.log
+
+  journald_log:
+    type: journald
+    current_boot_only: true
+    include_units:
+    - vault
+    - caddy
+
+transforms:
+  vault_parsed_message:
+    type: remap
+    inputs:
+    - journald_log
+    source: |
+      event, err = parse_json(.message)
+      if event != null {
+        . = merge(., event)
+        .@timestamp = .timestamp
+        .labels = ["vault", "${ENVIRONMENT}"]
+        .environment = "${ENVIRONMENT}"
+      }
+
+  vault_enriched_logs:
+    type: aws_ec2_metadata
+    inputs:
+    - vault_parsed_message
+    namespace: ec2
+
+  auth_log_parser:
+    inputs:
+    - auth_log
+    type: remap
+    source: |
+      parsed, err = parse_syslog(.message)
+      if parsed != null {
+        . = merge(., parsed)
+        .@timestamp = .timestamp
+        del(.timestamp)
+        .log_process = "authlog"
+        .environment = "${ENVIRONMENT}"
+      }
+
+  auth_log_malformed_message_filter:
+    inputs:
+    - auth_log_parser
+    type: filter
+    condition: .malformed != true
+
+  auth_log_cron_filter:
+    inputs:
+    - auth_log_malformed_message_filter
+    type: filter
+    condition: .appname != "CRON"
+
+sinks:
+  grafana_loki_logs:
+    inputs:
+    - journald_log
+    - vault_enriched_logs
+    - auth_log_cron_filter
+    type: loki
+    auth:
+      strategy: basic
+      password: ${GRAFANA_CLOUD_API_KEY}
+      user: ${GRAFANA_CLOUD_LOKI_API_USER}
+    endpoint: https://logs-prod-us-central1.grafana.net
+    encoding:
+      codec: json
+    labels:
+      environment: ${ENVIRONMENT}
+      application: vault
+      service: vault
+      hostname: ${HOSTNAME}
+    out_of_order_action: rewrite_timestamp
