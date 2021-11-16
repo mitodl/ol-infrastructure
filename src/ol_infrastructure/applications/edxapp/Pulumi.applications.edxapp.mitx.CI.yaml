@@ -23,4 +23,3 @@ config:
   edxapp:mongo_admin_password:
     secure: v1:LSQgiUW2n8fzAks9:+ZYckckuLvNozc/WBbKA+Ppjf9pZWoP+OjLlLAunW81jR/3iJnbcn0MJBdAcgNtdTHVKDqu5
   edxapp:sender_email_address: support@edxapp-mail-ci.mitx.mit.edu
-  edxapp:target_vpc: mitx_vpc

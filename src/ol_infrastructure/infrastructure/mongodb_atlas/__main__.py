@@ -1,8 +1,13 @@
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
 import pulumi
 import pulumi_aws as aws
+import pulumi_consul as consul
 import pulumi_mongodbatlas as atlas
 
 from bridge.lib.magic_numbers import DEFAULT_MONGODB_PORT
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -51,7 +56,7 @@ atlas_cluster = atlas.Cluster(
     provider_name="AWS",
     cloud_backup=True,
     cluster_type="REPLICASET",
-    disk_size_gb=atlas_config.get("disk_size_gb"),
+    disk_size_gb=atlas_config.get_int("disk_size_gb"),
     mongo_db_major_version=atlas_config.get("version") or "4.4",
     pit_enabled=True,
     project_id=atlas_project.id,
@@ -107,14 +112,57 @@ atlas_network_access = atlas.ProjectIpAccessList(
     "mongo-atlas-network-permissions",
     aws_security_group=atlas_security_group.id,
     project_id=atlas_project.id,
+    opts=pulumi.ResourceOptions(
+        depends_on=[atlas_aws_network_peer, accept_atlas_network_peer]
+    ),
+)
+
+consul.Keys(
+    "set-mongo-connection-info-in-consul",
+    keys=[
+        consul.KeysKeyArgs(
+            path="mongodb/host",
+            delete=True,
+            value=atlas_cluster.mongo_uri.apply(lambda uri: urlparse(uri).netloc),
+        ),
+        consul.KeysKeyArgs(
+            path="mongodb/use-ssl",
+            delete=True,
+            value=atlas_cluster.mongo_uri_with_options.apply(
+                lambda uri: parse_qs(urlparse(uri).query)["ssl"][0]
+            ),
+        ),
+        consul.KeysKeyArgs(
+            path="mongodb/replica-set",
+            delete=True,
+            value=atlas_cluster.mongo_uri_with_options.apply(
+                lambda uri: parse_qs(urlparse(uri).query)["replicaSet"][0]
+            ),
+        ),
+    ],
+    opts=pulumi.ResourceOptions(
+        provider=consul.Provider(
+            "consul-provider",
+            address=pulumi.Config("consul").require("address"),
+            scheme="https",
+            http_auth="pulumi:{}".format(
+                read_yaml_secrets(Path(f"pulumi/consul.{stack_info.env_suffix}.yaml"))[
+                    "basic_auth_password"
+                ]
+            ),
+        )
+    ),
 )
 
 pulumi.export(
     "atlas_cluster",
     {
+        "id": atlas_cluster.cluster_id,
         "mongo_uri": atlas_cluster.mongo_uri,
         "mongo_uri_with_options": atlas_cluster.mongo_uri_with_options,
         "connection_strings": atlas_cluster.connection_strings,
         "srv_record": atlas_cluster.srv_address,
     },
 )
+
+pulumi.export("project", {"id": atlas_project.id})

@@ -1,11 +1,12 @@
 {{ with secret "mongodb-mitx/creds/edxapp" }}
 mongodb_settings: &mongo_params
-  host: mongodb-master.service.consul
+  host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
   port: 27017
   db: edxapp
-  replicaset: rs0
+  replicaSet: {{ keyOrDefault "mongodb/replica-set" "rs0" }}
   user: {{ .Data.username }}
   password: {{ .Data.password }}
+  ssl: {{ keyOrDefault "mongodb/use-ssl" "false" }}
 {{ end }}
 
 {{ with secret "mariadb-mitx/creds/edxapp" }}
@@ -35,7 +36,7 @@ JWT_AUTH:  # NEEDS ATTENTION
     JWT_AUTH_COOKIE: {{ env "ENVIRONMENT"}}-edx-jwt-cookie
     JWT_AUTH_COOKIE_HEADER_PAYLOAD: edx-jwt-cookie-header-payload
     JWT_AUTH_COOKIE_SIGNATURE: edx-jwt-cookie-signature
-    JWT_ISSUER: 'https://{{ key "edxapp/lms-domain" }}/oauth2'
+    JWT_ISSUER: https://{{ key "edxapp/lms-domain" }}/oauth2
     JWT_LOGIN_CLIENT_ID: login-service-client-id
     JWT_LOGIN_SERVICE_USERNAME: login_service_user
     JWT_PRIVATE_SIGNING_JWK: '{{ .Data.private_signing_jwk }}'
@@ -101,10 +102,8 @@ DOC_STORE_CONFIG: &docstore_config
 CONTENTSTORE:
     ADDITIONAL_OPTIONS: {}
     DOC_STORE_CONFIG:
-        authsource: ''
         collection: modulestore
         connectTimeoutMS: 2000
-        replicaSet: rs0
         socketTimeoutMS: 3000
         <<: *mongo_params
     ENGINE: xmodule.contentstore.mongo.MongoContentStore

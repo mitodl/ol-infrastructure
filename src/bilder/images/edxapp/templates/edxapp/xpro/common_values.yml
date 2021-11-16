@@ -1,11 +1,12 @@
-{{ with secret "mongodb-xpro/creds/edxapp" }}
+{{ with secret "mongodb-mitx/creds/edxapp" }}
 mongodb_settings: &mongo_params
-  host: mongodb-master.service.consul
+  host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
   port: 27017
   db: edxapp
-  replicaset: rs0
+  replicaSet: {{ keyOrDefault "mongodb/replica-set" "rs0" }}
   user: {{ .Data.username }}
   password: {{ .Data.password }}
+  ssl: {{ keyOrDefault "mongodb/use-ssl" "false" }}
 {{ end }}
 
 {{ with secret "mariadb-xpro/creds/edxapp" }}
@@ -91,7 +92,6 @@ CONTENTSTORE:
         authsource: ''
         collection: modulestore
         connectTimeoutMS: 2000
-        replicaSet: rs0
         socketTimeoutMS: 3000
         <<: *mongo_params
     ENGINE: xmodule.contentstore.mongo.MongoContentStore
