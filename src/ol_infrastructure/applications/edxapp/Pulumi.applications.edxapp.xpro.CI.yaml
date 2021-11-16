@@ -4,22 +4,20 @@ encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQEGbYgV2EePyiT5w7
 config:
   aws:region: us-east-1
   consul:address: https://consul-xpro-ci.odl.mit.edu
-  consul:http_auth:
-    secure: v1:Fa4X7VjchQQhRf6+:LxDvDXBPZUPOgMpcqvo9PxwjMK2lDKrnmJGbaJA7e0i5sVsUyQXTLYpa7lDmC5d1QddyLLkjyQjK5Hi/fEeoJle5986uRKVHXNyjRpcJqx8sN2SbFPHrCDpWQfrsz38=
-  consul:scheme: https
   edxapp:business_unit: mitxpro
   edxapp:db_password:
-    secure: v1:xHUw5WC3aN02zuAj:0BozwDxrtF0OA7wkYuv4R4CCnSHYdgXt+vi6/3eP9zwJgHgQO20+8sQfg7rXPC9SIUobEA==
+    secure: v1:H9bdf7ompG4RrFBy:WSyk8mD5VgBVcvJvWvjnrkOEZVeC2lgm3n5qtuTH28g0Q9ipJYCmt605dOKZDh2EQmEFZselfIe3ffOfSR5JDHnLFBMfKEaRLzeiT0ExicVpumecuGEHj5tz
   edxapp:dns_zone: xpro
   edxapp:domains:
     lms: courses-ci.xpro.mit.edu
     preview: preview-ci.xpro.mit.edu
     studio: studio-ci.xpro.mit.edu
   edxapp:edx_forum_secrets:
-    secure: v1:IqXRArQveCV+9lkE:cRaraFuN2dDmI29PD4QifOU7MrRFdszOoaUb7o3pDJordt4TSjw8fIxldWfMzNhZRLC+NS291DorO1IuN6ASdCbt5d53aMvHVt+3hA6wyuI11OFjk7U=
+    secure: v1:QSW6gq7cQ6t65Glo:OGJ5X4YYEi2ZdyrpnML25p10mQrodNNLaF5zyV1242ZcQz1TkRsTdpmv9HghIhgHxykYd2NK7kyRkvphd5pfI56xAg/de/8PuHNuPx5kg3IZCrFktYuE2Nyzjxhg7aGHNhA6JQEf95925WPwAG3V
   edxapp:elb_healthcheck_interval: '30'
   edxapp:google_analytics_id: ''
   edxapp:mail_domain: edxapp-mail-ci.xpro.mit.edu
-  edxapp:mongo_admin_password:
-    secure: v1:LSQgiUW2n8fzAks9:+ZYckckuLvNozc/WBbKA+Ppjf9pZWoP+OjLlLAunW81jR/3iJnbcn0MJBdAcgNtdTHVKDqu5
   edxapp:sender_email_address: support@edxapp-mail-ci.xpro.mit.edu
+  mongodb:admin_password:
+    secure: v1:kbjk234zbtsT8tWC:A7+IOP/7/pkY1PcFT9J4PtrTzHsMrOZVQkkCLtQHr3zmkY0F9Q70kWE1EiDSQNH2uUlemkEjh23aohDPqdkgFHzTjv1sr0aToibOd5ic19gVr9c7r/410Uja
+  vault:address: https://vault-ci.odl.mit.edu

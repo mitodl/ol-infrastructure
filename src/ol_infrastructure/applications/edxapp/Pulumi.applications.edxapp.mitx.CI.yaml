@@ -9,17 +9,17 @@ config:
   consul:scheme: https
   edxapp:business_unit: residential
   edxapp:db_password:
-    secure: v1:xHUw5WC3aN02zuAj:0BozwDxrtF0OA7wkYuv4R4CCnSHYdgXt+vi6/3eP9zwJgHgQO20+8sQfg7rXPC9SIUobEA==
+    secure: v1:L8njaENQ/ieFMZmc:1h12iRPIkT2WscohMcOFeLdr6kL78tLHSE4meF38RFHLiI8wc59MaoIOMiQ91JBU3wKi7o2WRD2+Aqd8XSdHmnTaJc6HZr6/bW45FULweQQHidQXsM2yVP3H
   edxapp:dns_zone: mitx
   edxapp:domains:
     lms: lms-ci.mitx.mit.edu
     preview: preview-ci.mitx.mit.edu
     studio: studio-ci.mitx.mit.edu
   edxapp:edx_forum_secrets:
-    secure: v1:IqXRArQveCV+9lkE:cRaraFuN2dDmI29PD4QifOU7MrRFdszOoaUb7o3pDJordt4TSjw8fIxldWfMzNhZRLC+NS291DorO1IuN6ASdCbt5d53aMvHVt+3hA6wyuI11OFjk7U=
+    secure: v1:Cv6WRoXTzc4X0Mt/:JfUayMiJ3oXbRcmhCWfCLJqVvMAx3c8M0z4e5fXVj9L2fLMHfRVUhhQEn1O5lrbwnewNkzGIci1ArchaMiC9BpbVRYqfihQhT5/KH2UkaoVS6kvbgbL/M489Wa7AYpLxK47F/BPaBGLGkIZMesuo
   edxapp:elb_healthcheck_interval: '30'
   edxapp:google_analytics_id: ''
   edxapp:mail_domain: edxapp-mail-ci.mitx.mit.edu
-  edxapp:mongo_admin_password:
-    secure: v1:LSQgiUW2n8fzAks9:+ZYckckuLvNozc/WBbKA+Ppjf9pZWoP+OjLlLAunW81jR/3iJnbcn0MJBdAcgNtdTHVKDqu5
   edxapp:sender_email_address: support@edxapp-mail-ci.mitx.mit.edu
+  mongodb:admin_password:
+    secure: v1:hL8gea3r+b7JGgBY:EF1GAWlfpvG7yaf8cVIMB7Y+6Ocg1Ri+r3ntg1T1Kfhp+QZf2N+FPwEySVGVKlEbBZX9ZADOD/xPwFMu7WKElM9Spjiq3M5je7nRGN9h0xNjkiK1HRmtTF94

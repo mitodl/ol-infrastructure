@@ -54,6 +54,7 @@ from ol_infrastructure.lib.aws.ec2_helper import (
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
+from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
@@ -102,6 +103,7 @@ aws_config = AWSBase(
     }
 )
 consul_security_groups = consul_stack.require_output("security_groups")
+consul_provider = get_consul_provider(stack_info)
 edxapp_domains = edxapp_config.require_object("domains")
 edxapp_mail_domain = edxapp_config.require("mail_domain")
 edxapp_vpc = network_stack.require_output(target_vpc)
@@ -244,6 +246,7 @@ consul.Keys(
         consul.KeysKeyArgs(path=f"edxapp/{key}", value=config_value)
         for key, config_value in consul_kv_data.items()
     ],
+    opts=consul_provider,
 )
 
 ########################
@@ -459,6 +462,7 @@ edxapp_db_consul_node = Node(
     "edxapp-instance-db-node",
     name="edxapp-mysql",
     address=edxapp_db.db_instance.address,
+    opts=consul_provider,
 )
 
 edxapp_db_consul_service = Service(
@@ -484,11 +488,34 @@ edxapp_db_consul_service = Service(
             ),  # noqa: WPS237,E501
         )
     ],
+    opts=consul_provider,
 )
 
 #######################
 # MongoDB Vault Setup #
 #######################
+mongodb_config = Config("mongodb")
+mongodb_admin_username = mongodb_config.get("admin_username") or "admin"
+mongodb_admin_password = mongodb_config.require("admin_password")
+mongo_admin_user = None
+mongo_host = (
+    mongodb_config.get("mongo_host") or f"mongodb-master.service.{env_name}.consul"
+)
+if atlas_project_id := mongodb_config.get("atlas_project_id"):
+    import pulumi_mongodbatlas as atlas
+
+    mongo_admin_user = atlas.DatabaseUser(
+        "mongo-atlas-admin-user",
+        project_id=atlas_project_id,
+        username=mongodb_admin_username,
+        password=mongodb_admin_password,
+        roles=[
+            atlas.DatabaseUserRoleArgs(
+                database_name="admin", role_name="userAdminAnyDatabase"
+            )
+        ],
+    )
+
 edxapp_mongo_role_statements = mongodb_role_statements
 edxapp_mongo_role_statements["edxapp"] = {
     "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "edxapp"})),
@@ -505,9 +532,9 @@ edxapp_mongo_vault_config = OLVaultMongoDatabaseConfig(
     db_connection=(
         "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
     ),
-    db_admin_username=edxapp_config.get("mongo_admin_user") or "admin",
-    db_admin_password=edxapp_config.require("mongo_admin_password"),
-    db_host=f"mongodb-master.service.{env_name}.consul",
+    db_admin_username=mongodb_admin_username,
+    db_admin_password=mongodb_admin_password,
+    db_host=mongo_host,
     role_statements=edxapp_mongo_role_statements,
 )
 edxapp_mongo_vault_backend = OLVaultDatabaseBackend(edxapp_mongo_vault_config)
