@@ -1,7 +1,11 @@
 locals {
-  timestamp     = regex_replace(timestamp(), "[- TZ:]", "")
-  business_unit = "operations"
-  app_name      = "edxapp"
+  timestamp = regex_replace(timestamp(), "[- TZ:]", "")
+  app_name  = "edxapp"
+}
+
+variable "business_unit" {
+  type    = string
+  default = "operations"
 }
 
 variable "build_environment" {
@@ -36,17 +40,17 @@ source "amazon-ebs" "edxapp" {
   }
   run_tags = {
     Name    = "${local.app_name}-${var.node_type}-packer-builder"
-    OU      = "${local.business_unit}"
+    OU      = "${var.business_unit}"
     app     = "${local.app_name}"
     purpose = "${local.app_name}-${var.node_type}"
   }
   run_volume_tags = {
-    OU      = "${local.business_unit}"
+    OU      = "${var.business_unit}"
     app     = "${local.app_name}"
     purpose = "edx-${var.node_type}"
   }
   snapshot_tags = {
-    OU      = "${local.business_unit}"
+    OU      = "${var.business_unit}"
     app     = "${local.app_name}"
     purpose = "${local.app_name}-${var.node_type}"
   }
@@ -69,11 +73,11 @@ source "amazon-ebs" "edxapp" {
     random = true
   }
   tags = {
-    Name    = "${local.app_name}-${var.node_type}-${var.edx_platform_version}"
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
+    Name       = "${local.app_name}-${var.node_type}-${var.edx_platform_version}"
+    OU         = "${var.business_unit}"
+    app        = "${local.app_name}"
     deployment = "${var.installation_target}"
-    purpose = "${local.app_name}-${var.node_type}"
+    purpose    = "${local.app_name}-${var.node_type}"
   }
 }
 
