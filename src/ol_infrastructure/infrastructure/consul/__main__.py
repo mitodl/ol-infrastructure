@@ -1,5 +1,6 @@
 import base64
 import json
+from pathlib import Path
 
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
@@ -14,6 +15,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     FIVE_MINUTES,
 )
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
@@ -298,15 +300,15 @@ retry_join_wan = peer_vpcs.apply(
 def cloud_init_userdata(
     consul_vpc_id,
     consul_env_name,
-    grafana_api_key,
-    grafana_loki_user,
-    grafana_prometheus_user,
     retry_join_wan_array,
     domain_name,
     basic_auth_password,
 ):
     b64_password_hash = base64.b64encode(basic_auth_password.encode("utf8")).decode(
         "utf8"
+    )
+    grafana_credentials = read_yaml_secrets(
+        Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
     )
     cloud_config_contents = {
         "write_files": [
@@ -345,9 +347,9 @@ def cloud_init_userdata(
                     f"""\
                     ENVIRONMENT={consul_env_name}
                     VECTOR_CONFIG_DIR=/etc/vector/
-                    GRAFANA_CLOUD_API_KEY={grafana_api_key}
-                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_prometheus_user}
-                    GRAFANA_CLOUD_LOKI_API_USER={grafana_loki_user}
+                    GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
+                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
+                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                     """
                 ),  # noqa: WPS355
                 "owner": "root:root",
@@ -416,9 +418,6 @@ consul_launch_config = ec2.LaunchTemplate(
             init_dict["retry_join_wan"],
             consul_dns_name,
             init_dict["pulumi_password"],
-            init_dict["grafana_api_key"],
-            init_dict["grafana_prometheus_user"],
-            init_dict["grafana_loki_user"],
         )
     ),
     vpc_security_group_ids=[

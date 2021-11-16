@@ -14,6 +14,7 @@
 import base64
 import json
 import textwrap
+from pathlib import Path
 from typing import Any, Dict
 
 import pulumi_tls as tls
@@ -37,6 +38,7 @@ from bridge.lib.magic_numbers import (
     VAULT_CLUSTER_PORT,
     VAULT_HTTP_PORT,
 )
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -339,14 +341,14 @@ def cloud_init_user_data(
     kms_key_id,
     vpc_id,
     consul_env_name,
-    grafana_api_key,
-    grafana_loki_user,
-    grafana_prometheus_user,
     vault_dns_name,
     tls_key,
     tls_cert,
     ca_cert,
 ) -> str:
+    grafana_credentials = read_yaml_secrets(
+        Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
+    )
     cloud_config_contents = {
         ""
         "write_files": [
@@ -401,9 +403,9 @@ def cloud_init_user_data(
                     f"""\
                     ENVIRONMENT={consul_env_name}
                     VECTOR_CONFIG_DIR=/etc/vector/
-                    GRAFANA_CLOUD_API_KEY={grafana_api_key}
-                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_prometheus_user}
-                    GRAFANA_CLOUD_LOKI_API_USER={grafana_loki_user}
+                    GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
+                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
+                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                     """
                 ),  # noqa: WPS355
                 "owner": "root:root",
@@ -449,9 +451,6 @@ cloud_init_param = Output.all(
         init_inputs["tls_key"],
         init_inputs["tls_cert"],
         init_inputs["ca_cert"],
-        init_inputs["grafana_api_key"],
-        init_inputs["grafana_prometheus_user"],
-        init_inputs["grafana_loki_user"],
     )
 )
 
