@@ -72,6 +72,7 @@ source "amazon-ebs" "edxapp" {
     Name    = "${local.app_name}-${var.node_type}-${var.edx_platform_version}"
     OU      = "${local.business_unit}"
     app     = "${local.app_name}"
+    deployment = "${var.installation_target}"
     purpose = "${local.app_name}-${var.node_type}"
   }
 }

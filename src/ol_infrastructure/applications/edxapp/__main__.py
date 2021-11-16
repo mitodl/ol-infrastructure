@@ -108,11 +108,10 @@ edxapp_vpc = network_stack.require_output(target_vpc)
 edxapp_vpc_id = edxapp_vpc["id"]
 edxapp_web_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(
-            name="name", values=["edxapp-web-{stack_info.env_prefix}-*"]
-        ),
+        ec2.GetAmiFilterArgs(name="name", values=["edxapp-web-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
+        ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
     ],
     most_recent=True,
     owners=[aws_account.account_id],
