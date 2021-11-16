@@ -124,7 +124,7 @@ mitx_staging_config = Config("residential_staging_vpc")
 residential_staging_mitx_vpc_config = OLVPCConfig(
     vpc_name=f"mitx-staging-{stack_info.env_suffix}",
     cidr_block=mitx_staging_config.require("cidr_block"),
-    num_subnets=4,
+    num_subnets=3,
     tags={
         "OU": "residential-staging",
         "Environment": f"mitx-staging-{stack_info.env_suffix}",
@@ -413,6 +413,13 @@ operations_to_mitx_peer = OLVPCPeeringConnection(
     "ol-operations-{0}-to-residential-mitx-{0}-vpc-peer".format(stack_info.env_suffix),
     operations_vpc,
     residential_mitx_vpc,
+)
+operations_to_mitx_staging_peer = OLVPCPeeringConnection(
+    "ol-operations-{0}-to-residential-mitx-staging-{0}-vpc-peer".format(
+        stack_info.env_suffix
+    ),
+    operations_vpc,
+    residential_staging_mitx_vpc,
 )
 operations_to_xpro_peer = OLVPCPeeringConnection(
     "ol-operations-{0}-to-mitxpro-{0}-vpc-peer".format(stack_info.env_suffix),
