@@ -298,6 +298,9 @@ retry_join_wan = peer_vpcs.apply(
 def cloud_init_userdata(
     consul_vpc_id,
     consul_env_name,
+    grafana_api_key,
+    grafana_loki_user,
+    grafana_prometheus_user,
     retry_join_wan_array,
     domain_name,
     basic_auth_password,
@@ -335,6 +338,19 @@ def cloud_init_userdata(
                     f"DOMAIN={domain_name}\n"
                     f"PULUMI_BASIC_AUTH_PASSWORD={b64_password_hash}\n"
                 ),
+            },
+            {
+                "path": "/etc/default/vector",
+                "content": textwrap.dedent(
+                    f"""\
+                    ENVIRONMENT={consul_env_name}
+                    VECTOR_CONFIG_DIR=/etc/vector/
+                    GRAFANA_CLOUD_API_KEY={grafana_api_key}
+                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_prometheus_user}
+                    GRAFANA_CLOUD_LOKI_API_USER={grafana_loki_user}
+                    """
+                ),  # noqa: WPS355
+                "owner": "root:root",
             },
         ]
     }
@@ -400,6 +416,9 @@ consul_launch_config = ec2.LaunchTemplate(
             init_dict["retry_join_wan"],
             consul_dns_name,
             init_dict["pulumi_password"],
+            init_dict["grafana_api_key"],
+            init_dict["grafana_prometheus_user"],
+            init_dict["grafana_loki_user"],
         )
     ),
     vpc_security_group_ids=[

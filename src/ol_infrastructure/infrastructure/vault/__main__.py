@@ -13,6 +13,7 @@
 """
 import base64
 import json
+import textwrap
 from typing import Any, Dict
 
 import pulumi_tls as tls
@@ -335,7 +336,16 @@ vault_listener_cert = acmpca.Certificate(
 
 
 def cloud_init_user_data(
-    kms_key_id, vpc_id, consul_env_name, vault_dns_name, tls_key, tls_cert, ca_cert
+    kms_key_id,
+    vpc_id,
+    consul_env_name,
+    grafana_api_key,
+    grafana_loki_user,
+    grafana_prometheus_user,
+    vault_dns_name,
+    tls_key,
+    tls_cert,
+    ca_cert,
 ) -> str:
     cloud_config_contents = {
         ""
@@ -385,6 +395,19 @@ def cloud_init_user_data(
                     }
                 ),
             },
+            {
+                "path": "/etc/default/vector",
+                "content": textwrap.dedent(
+                    f"""\
+                    ENVIRONMENT={consul_env_name}
+                    VECTOR_CONFIG_DIR=/etc/vector/
+                    GRAFANA_CLOUD_API_KEY={grafana_api_key}
+                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_prometheus_user}
+                    GRAFANA_CLOUD_LOKI_API_USER={grafana_loki_user}
+                    """
+                ),  # noqa: WPS355
+                "owner": "root:root",
+            },
             # TODO: Move TLS key and cert injection to Packer build so that private key
             # information isn't being passed as userdata (TMM 2021-08-06)
             {
@@ -426,6 +449,9 @@ cloud_init_param = Output.all(
         init_inputs["tls_key"],
         init_inputs["tls_cert"],
         init_inputs["ca_cert"],
+        init_inputs["grafana_api_key"],
+        init_inputs["grafana_prometheus_user"],
+        init_inputs["grafana_loki_user"],
     )
 )
 
