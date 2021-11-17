@@ -4,12 +4,9 @@ encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQFx9m+5C+NdLferEI
 config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-ci.odl.mit.edu
-  consul:http_auth:
-    secure: v1:Fa4X7VjchQQhRf6+:LxDvDXBPZUPOgMpcqvo9PxwjMK2lDKrnmJGbaJA7e0i5sVsUyQXTLYpa7lDmC5d1QddyLLkjyQjK5Hi/fEeoJle5986uRKVHXNyjRpcJqx8sN2SbFPHrCDpWQfrsz38=
-  consul:scheme: https
   edxapp:business_unit: residential
   edxapp:db_password:
-    secure: v1:L8njaENQ/ieFMZmc:1h12iRPIkT2WscohMcOFeLdr6kL78tLHSE4meF38RFHLiI8wc59MaoIOMiQ91JBU3wKi7o2WRD2+Aqd8XSdHmnTaJc6HZr6/bW45FULweQQHidQXsM2yVP3H
+    secure: v1:Q1uI9EWaIrq2z2sY:pTBVK/vatuCQXgO3Z2ItArDb4P1QLpN/lP/jT9690boozaKjjJudoQZOyWjkbCFwGLieh+L9auw=
   edxapp:dns_zone: mitx
   edxapp:domains:
     lms: lms-ci.mitx.mit.edu
@@ -21,5 +18,7 @@ config:
   edxapp:google_analytics_id: ''
   edxapp:mail_domain: edxapp-mail-ci.mitx.mit.edu
   edxapp:sender_email_address: support@edxapp-mail-ci.mitx.mit.edu
-  mongodb:admin_password:
-    secure: v1:hL8gea3r+b7JGgBY:EF1GAWlfpvG7yaf8cVIMB7Y+6Ocg1Ri+r3ntg1T1Kfhp+QZf2N+FPwEySVGVKlEbBZX9ZADOD/xPwFMu7WKElM9Spjiq3M5je7nRGN9h0xNjkiK1HRmtTF94
+  edxapp:target_vpc: residential_mitx_vpc
+  mongodb:atlas_project_id: 617858f961f3016e0ade73e7
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

@@ -34,6 +34,16 @@ mitx_dns_zone = route53.Zone(
     opts=mitx_opts,
 )
 
+xpro_dns_name = "xpro.mit.edu"
+xpro_opts = zone_opts(xpro_dns_name)
+xpro_dns_zone = route53.Zone(
+    "xpro_subdomain",
+    name=xpro_dns_name,
+    comment="DNS Zone used for xPRO resources",
+    tags=AWSBase(tags={"OU": "mitxpro", "Environment": "xpro"}).tags,
+    opts=xpro_opts,
+)
+
 mitxonline_dns_name = "mitxonline.mit.edu"
 mitxonline_opts = zone_opts(mitxonline_dns_name)
 mitxonline_dns_zone = route53.Zone(
@@ -46,5 +56,6 @@ mitxonline_dns_zone = route53.Zone(
 
 export("mitxpro_legacy_zone_id", mitxpro_legacy_dns_zone.id)
 export("odl_zone_id", odl_dns_zone.id)
-export("mitx_zone_id", mitx_dns_zone.id)
 export("mitxonline", {"id": mitxonline_dns_zone.id, "domain": mitxonline_dns_zone.name})
+export("xpro", {"id": xpro_dns_zone.id, "domain": xpro_dns_zone.name})
+export("mitx", {"id": mitx_dns_zone.id, "domain": mitx_dns_zone.name})

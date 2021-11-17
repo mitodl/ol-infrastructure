@@ -1,4 +1,4 @@
-{{ with secret "mongodb-mitx/creds/edxapp" }}
+{{ with secret "mongodb-xpro/creds/edxapp" }}
 mongodb_settings: &mongo_params
   host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
   port: 27017

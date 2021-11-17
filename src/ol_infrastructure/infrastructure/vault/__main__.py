@@ -125,6 +125,13 @@ def vault_policy_document(vault_key_arn) -> Dict[str, Any]:
                 ],
                 "Resource": ["arn:*:iam::*:user/vault-*", "arn:*:iam::*:group/*"],
             },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "iam:GetRole",
+                ],
+                "Resource": ["arn:*:iam::*:role/*"],
+            },
         ],
     }
 
@@ -163,6 +170,7 @@ parliament_config = {
             }
         ]
     },
+    "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []},
 }
 
 # IAM Policy and role
@@ -517,8 +525,8 @@ vault_asg = autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=90,  # noqa: WPS432
-            instance_warmup=FIVE_MINUTES,
+            min_healthy_percentage=100,  # noqa: WPS432
+            instance_warmup=FIVE_MINUTES * 3,
         ),
         triggers=["tag"],
     ),

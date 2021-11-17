@@ -50,6 +50,7 @@ class DBEngines(str, Enum):  # noqa: WPS600
     mysql = "mysql"
     mysql_rds = "mysql_rds"
     mongodb = "mongodb"
+    mongodb_atlas = "mongodbatlas"
 
 
 class OLVaultDatabaseConfig(BaseModel):
@@ -103,6 +104,16 @@ class OLVaultMongoDatabaseConfig(OLVaultDatabaseConfig):
     role_statements: Dict[str, Dict[str, Template]] = mongodb_role_statements
 
 
+class OLVaultMongoAtlasDatabaseConfig(OLVaultDatabaseConfig):
+    """Configuration object for MongoDB instances to register with Vault."""
+
+    db_host: str = None
+    db_admin_username: str = None
+    db_admin_password: str = None
+    db_type: str = DBEngines.mongodb_atlas.value
+    role_statements: Dict[str, Dict[str, Template]] = mongodb_role_statements
+
+
 class OLVaultDatabaseBackend(ComponentResource):
     """Resource for encapsulating the steps needed to connect Vault to a database."""
 
@@ -124,33 +135,20 @@ class OLVaultDatabaseBackend(ComponentResource):
 
         self.db_mount = Mount(
             f"{db_config.db_name}-mount-point",
-            opts=resource_opts,
+            opts=resource_opts.merge(ResourceOptions(delete_before_replace=True)),
             path=db_config.mount_point,
             type="database",
             max_lease_ttl_seconds=db_config.max_ttl,
             default_lease_ttl_seconds=db_config.default_ttl,
         )
 
-        if isinstance(db_config.db_host, Output):
-            connection_url: Union[str, Output[str]] = db_config.db_host.apply(
-                lambda host: db_config.db_connection.format_map(
-                    {
-                        "db_port": db_config.db_port,
-                        "db_name": db_config.db_name,
-                        "db_host": host,
-                    }
-                )
-            )
-        else:
-            connection_url = db_config.db_connection.format_map(
-                {
-                    "db_port": db_config.db_port,
-                    "db_name": db_config.db_name,
-                    "db_host": db_config.db_host,
-                }
+        db_option_dict = {}
+
+        if hasattr(db_config, "db_connection"):
+            db_option_dict.update(
+                {"connection_url": self.format_connection_string(db_config)}
             )
 
-        db_option_dict = {"connection_url": connection_url}
         db_option_dict.update(db_config.connection_options or {})
         self.db_connection = database.SecretBackendConnection(
             f"{db_config.db_name}-database-connection",
@@ -188,6 +186,29 @@ class OLVaultDatabaseBackend(ComponentResource):
                 default_ttl=db_config.default_ttl,
             )
         self.register_outputs({})
+
+    def format_connection_string(
+        self, db_config: OLVaultDatabaseConfig
+    ) -> Union[Output[str], str]:
+        if isinstance(db_config.db_host, Output):
+            connection_url: Union[str, Output[str]] = db_config.db_host.apply(
+                lambda host: db_config.db_connection.format_map(
+                    {
+                        "db_port": db_config.db_port,
+                        "db_name": db_config.db_name,
+                        "db_host": host,
+                    }
+                )
+            )
+        else:
+            connection_url = db_config.db_connection.format_map(
+                {
+                    "db_port": db_config.db_port,
+                    "db_name": db_config.db_name,
+                    "db_host": db_config.db_host,
+                }
+            )
+        return connection_url
 
 
 class OLVaultAWSSecretsEngineConfig(BaseModel):

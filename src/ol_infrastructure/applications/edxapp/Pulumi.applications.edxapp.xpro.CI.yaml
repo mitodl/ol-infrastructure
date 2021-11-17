@@ -6,7 +6,7 @@ config:
   consul:address: https://consul-xpro-ci.odl.mit.edu
   edxapp:business_unit: mitxpro
   edxapp:db_password:
-    secure: v1:H9bdf7ompG4RrFBy:WSyk8mD5VgBVcvJvWvjnrkOEZVeC2lgm3n5qtuTH28g0Q9ipJYCmt605dOKZDh2EQmEFZselfIe3ffOfSR5JDHnLFBMfKEaRLzeiT0ExicVpumecuGEHj5tz
+    secure: v1:gkXc0/WssuL5whQt:/28AEA/UN9lAkRHEl1B6D6OjWjysfgzUTG0KGFd6aYvrAU5bbBxUsZUe6RMI9wyKFA5f0l9z3hQ=
   edxapp:dns_zone: xpro
   edxapp:domains:
     lms: courses-ci.xpro.mit.edu
@@ -18,6 +18,6 @@ config:
   edxapp:google_analytics_id: ''
   edxapp:mail_domain: edxapp-mail-ci.xpro.mit.edu
   edxapp:sender_email_address: support@edxapp-mail-ci.xpro.mit.edu
-  mongodb:admin_password:
-    secure: v1:kbjk234zbtsT8tWC:A7+IOP/7/pkY1PcFT9J4PtrTzHsMrOZVQkkCLtQHr3zmkY0F9Q70kWE1EiDSQNH2uUlemkEjh23aohDPqdkgFHzTjv1sr0aToibOd5ic19gVr9c7r/410Uja
+  mongodb:atlas_project_id: 619395b5ab3fc40d5942a23c
   vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

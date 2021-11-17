@@ -34,6 +34,19 @@ class BusinessUnit(str, Enum):  # noqa: WPS600
 
 
 @unique
+class Environment(str, Enum):
+    """Canonical reference for valid environment names."""
+
+    xpro = "xpro"
+    mitx_staging = "mitx-staging"
+    mitx = "mitx"
+    mitx_online = "mitxonline"
+    applications = "applications"
+    data = "data"
+    operations = "operations"
+
+
+@unique
 class Apps(str, Enum):  # noqa: WPS600
     """Canonical source of truth for defining apps."""
 

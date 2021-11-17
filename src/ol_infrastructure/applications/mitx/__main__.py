@@ -21,7 +21,7 @@ aws_config = AWSBase(
     }
 )
 
-mitx_zone_id = dns_stack.get_output("mitx_zone_id")
+mitx_zone_id = dns_stack.get_output("mitx")["id"]
 mitx_mfe_config = S3ServerlessSiteConfig(
     site_name=f"mitx-mfe-{mitx_environment}",
     domains=[f"static-{mitx_environment}.mitx.mit.edu"],

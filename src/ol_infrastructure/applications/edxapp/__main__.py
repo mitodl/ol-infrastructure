@@ -14,7 +14,6 @@ from functools import partial
 from pathlib import Path
 from string import Template
 
-import pulumi
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
@@ -45,6 +44,7 @@ from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisC
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
+    OLVaultMongoAtlasDatabaseConfig,
     OLVaultMongoDatabaseConfig,
     OLVaultMysqlDatabaseConfig,
 )
@@ -303,7 +303,7 @@ edxapp_policy_document = {
             "Action": ["ses:SendEmail", "ses:SendRawEmail"],
             "Resource": [
                 "arn:*:ses:*:*:identity/*mit.edu",
-                f"arn:aws:ses:*:*:configuration-set/edxapp-mitxonline-{stack_info.env_suffix}",  # noqa: E501
+                f"arn:aws:ses:*:*:configuration-set/edxapp-{stack_info.env_prefix}-{stack_info.env_suffix}",  # noqa: E501
             ],
         },
         {
@@ -497,25 +497,7 @@ edxapp_db_consul_service = Service(
 #######################
 mongodb_config = Config("mongodb")
 mongodb_admin_username = mongodb_config.get("admin_username") or "admin"
-mongodb_admin_password = mongodb_config.require("admin_password")
-mongo_admin_user = None
-mongo_host = (
-    mongodb_config.get("mongo_host") or f"mongodb-master.service.{env_name}.consul"
-)
-if atlas_project_id := mongodb_config.get("atlas_project_id"):
-    import pulumi_mongodbatlas as atlas
-
-    mongo_admin_user = atlas.DatabaseUser(
-        "mongo-atlas-admin-user",
-        project_id=atlas_project_id,
-        username=mongodb_admin_username,
-        password=mongodb_admin_password,
-        roles=[
-            atlas.DatabaseUserRoleArgs(
-                database_name="admin", role_name="userAdminAnyDatabase"
-            )
-        ],
-    )
+mongodb_admin_password = mongodb_config.get("admin_password")
 
 edxapp_mongo_role_statements = mongodb_role_statements
 edxapp_mongo_role_statements["edxapp"] = {
@@ -527,17 +509,39 @@ edxapp_mongo_role_statements["forum"] = {
     "revoke": Template(json.dumps({"db": "forum"})),
 }
 
-edxapp_mongo_vault_config = OLVaultMongoDatabaseConfig(
-    db_name="edxapp",
-    mount_point=f"mongodb-{stack_info.env_prefix}",
-    db_connection=(
-        "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
-    ),
-    db_admin_username=mongodb_admin_username,
-    db_admin_password=mongodb_admin_password,
-    db_host=mongo_host,
-    role_statements=edxapp_mongo_role_statements,
-)
+if atlas_project_id := mongodb_config.get("atlas_project_id"):
+    atlas_connection_options = {"project_id": atlas_project_id}
+    atlas_connection_options.update(
+        read_yaml_secrets(Path("pulumi/mongodb_atlas.yaml"))
+    )
+    edxapp_mongo_vault_config = OLVaultMongoAtlasDatabaseConfig(
+        db_name="edxapp",
+        mount_point=f"mongodb-{stack_info.env_prefix}",
+        role_statements=edxapp_mongo_role_statements,
+        connection_options=atlas_connection_options,
+    )
+    edxapp_mongo_role_statements["edxapp"] = {
+        "create": Template(
+            json.dumps({"roles": [{"roleName": "readWrite", "databaseName": "edxapp"}]})
+        ),
+    }
+    edxapp_mongo_role_statements["forum"] = {
+        "create": Template(
+            json.dumps({"roles": [{"roleName": "readWrite", "databaseName": "forum"}]})
+        ),
+    }
+else:
+    edxapp_mongo_vault_config = OLVaultMongoDatabaseConfig(
+        db_name="edxapp",
+        mount_point=f"mongodb-{stack_info.env_prefix}",
+        db_connection=(
+            "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
+        ),
+        db_admin_username=mongodb_admin_username,
+        db_admin_password=mongodb_admin_password,
+        db_host=f"mongodb-master.service.{env_name}.consul",
+        role_statements=edxapp_mongo_role_statements,
+    )
 edxapp_mongo_vault_backend = OLVaultDatabaseBackend(edxapp_mongo_vault_config)
 
 ###########################
@@ -564,11 +568,9 @@ redis_cluster_security_group = ec2.SecurityGroup(
 
 redis_cache_config = OLAmazonRedisConfig(
     encrypt_transit=True,
-    auth_token=Output.secret(
-        read_yaml_secrets(
-            Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
-        )["redis_auth_token"]
-    ),
+    auth_token=read_yaml_secrets(
+        Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
+    )["redis_auth_token"],
     cluster_mode_enabled=False,
     encrypted=True,
     engine_version="6.x",
@@ -589,6 +591,7 @@ edxapp_redis_consul_node = Node(
     "edxapp-redis-cache-node",
     name="edxapp-redis",
     address=edxapp_redis_cache.address,
+    opts=consul_provider,
 )
 
 edxapp_redis_consul_service = Service(
@@ -613,6 +616,7 @@ edxapp_redis_consul_service = Service(
             ).apply(lambda cluster: "{address}:{port}".format(**cluster)),
         )
     ],
+    opts=consul_provider,
 )
 
 ########################################
@@ -740,13 +744,16 @@ forum_secrets = vault.generic.Secret(
 # Vault policy definition
 edxapp_vault_policy = vault.Policy(
     "edxapp-vault-policy",
-    name="edxapp",
-    policy=Path(__file__).parent.joinpath("edxapp_policy.hcl").read_text(),
+    name=f"edxapp-{stack_info.env_prefix}",
+    policy=Path(__file__)
+    .parent.joinpath(f"edxapp_{stack_info.env_prefix}_policy.hcl")
+    .read_text(),
 )
 # Register edX Platform AMI for Vault AWS auth
+aws_vault_backend = f"aws-{stack_info.env_prefix}"
 edxapp_web_vault_auth_role = vault.aws.AuthBackendRole(
     "edxapp-web-ami-ec2-vault-auth",
-    backend="aws",
+    backend=aws_vault_backend,
     auth_type="iam",
     role="edxapp-web",
     inferred_entity_type="ec2_instance",
@@ -760,7 +767,7 @@ edxapp_web_vault_auth_role = vault.aws.AuthBackendRole(
 
 edxapp_worker_vault_auth_role = vault.aws.AuthBackendRole(
     "edxapp-worker-ami-ec2-vault-auth",
-    backend="aws",
+    backend=aws_vault_backend,
     auth_type="iam",
     role="edxapp-worker",
     inferred_entity_type="ec2_instance",
@@ -774,7 +781,7 @@ edxapp_worker_vault_auth_role = vault.aws.AuthBackendRole(
 
 edx_notes_vault_policy = vault.Policy(
     "edx-notes-api-vault-policy",
-    name="edx-notes-api",
+    name=f"edx-notes-api-{stack_info.env_suffix}",
     policy=Path(__file__).parent.joinpath("edx_notes_api_policy.hcl").read_text(),
 )
 edxapp_notes_iam_role = iam.Role(
@@ -795,7 +802,7 @@ edxapp_notes_iam_role = iam.Role(
 )
 edxapp_notes_vault_auth_role = vault.aws.AuthBackendRole(
     "edx-notes-iam-vault-auth",
-    backend="aws",
+    backend=aws_vault_backend,
     auth_type="iam",
     role="edx-notes-api",
     resolve_aws_unique_ids=True,

@@ -5,6 +5,5 @@ config:
   vault:business_unit: operations
   vault:cluster_size: "3"
   vault:domain: vault-ci.odl.mit.edu
-  vault:instance_type: medium
   vault:storage_disk_capacity: "50"
   vault:target_vpc: operations

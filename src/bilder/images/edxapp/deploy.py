@@ -146,14 +146,14 @@ if node_type == WEB_NODE_TYPE:
         [
             VaultTemplate(
                 contents=(
-                    '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
+                    f'{{ with secret "secret-{EDX_INSTALLATION_NAME}/{EDX_INSTALLATION_NAME}-wildcard-certificate" }}'  # noqa: E501
                     "{{ printf .Data.cert_chain }}{{ end }}"
                 ),
                 destination=Path("/etc/ssl/certs/edxapp.cert"),
             ),
             VaultTemplate(
                 contents=(
-                    '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
+                    '{{ with secret "secret-{EDX_INSTALLATION_NAME}/{EDX_INSTALLATION_NAME}-wildcard-certificate" }}'  # noqa: E501
                     "{{ printf .Data.key }}{{ end }}"
                 ),
                 destination=Path("/etc/ssl/private/edxapp.key"),
@@ -207,7 +207,7 @@ vault_config = VaultAgentConfig(
     auto_auth=VaultAutoAuthConfig(
         method=VaultAutoAuthMethod(
             type="aws",
-            mount_path="auth/aws",
+            mount_path=f"auth/aws-{EDX_INSTALLATION_NAME}",
             config=VaultAutoAuthAWS(role=f"edxapp-{node_type}"),
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],

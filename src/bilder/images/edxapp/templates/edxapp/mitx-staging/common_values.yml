@@ -1,4 +1,4 @@
-{{ with secret "mongodb-mitx/creds/edxapp" }}
+{{ with secret "mongodb-mitx-staging/creds/edxapp" }}
 mongodb_settings: &mongo_params
   host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
   port: 27017
@@ -9,7 +9,7 @@ mongodb_settings: &mongo_params
   ssl: {{ keyOrDefault "mongodb/use-ssl" "false" }}
 {{ end }}
 
-{{ with secret "mariadb-mitx/creds/edxapp" }}
+{{ with secret "mariadb-mitx-staging/creds/edxapp" }}
 mysql_creds: &mysql_creds
   ENGINE: django.db.backends.mysql
   PORT: 3306
@@ -17,7 +17,7 @@ mysql_creds: &mysql_creds
   PASSWORD: {{ .Data.password }}
 {{ end }}
 
-{{ with secret "secret-mitx/edxapp" }}
+{{ with secret "secret-mitx-staging/edxapp" }}
 CANVAS_ACCESS_TOKEN: {{ .Data.canvas_access_token }}
 CELERY_BROKER_PASSWORD: {{ .Data.redis_auth_token }}
 EMAIL_HOST_PASSWORD: {{ .Data.email_password }}
@@ -62,7 +62,7 @@ SYSADMIN_GITHUB_WEBHOOK_KEY: {{ .Data.sysadmin_git_webhook_secret }}
 YOUTUBE_API_KEY: {{ .Data.youtube_api_key }}
 {{ end }}
 
-{{ with secret "secret-mitx/edx-forum" }}
+{{ with secret "secret-mitx-staging/edx-forum" }}
 COMMENTS_SERVICE_KEY: {{ .Data.forum_api_key }}
 {{ end }}
 
@@ -87,7 +87,7 @@ DATABASES:
     HOST: edxapp-db.service.consul
     NAME: edxapp_csmh
     OPTIONS: {}
-    {{ with secret "mariadb-mitx/creds/edxapp-csmh"}}
+    {{ with secret "mariadb-mitx-staging/creds/edxapp-csmh"}}
     PASSWORD: {{ .Data.password }}
     USER: {{ .Data.username }}
     {{ end }}
@@ -419,7 +419,7 @@ MODULESTORE:
                 default_class: xmodule.hidden_module.HiddenDescriptor
                 fs_root: /edx/var/edxapp/data
                 render_template: common.djangoapps.edxmako.shortcuts.render_to_string
-ORA2_FILE_PREFIX: mitx/ora2  # MODIFIED
+ORA2_FILE_PREFIX: mitx-staging/ora2  # MODIFIED
 PARTNER_SUPPORT_EMAIL: ''
 PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG:
     ENFORCE_COMPLIANCE_ON_LOGIN: false
@@ -434,7 +434,7 @@ PRESS_EMAIL: support@mitx.mit.edu # MODIFIED
 PROCTORING_BACKENDS:
     DEFAULT: 'proctortrack'
     'proctortrack':
-      {{ with secret "secret-mitx/edxapp" }}
+      {{ with secret "secret-mitx-staging/edxapp" }}
       'client_id': '{{ .Data.proctortrack_client_id }}'
       'client_secret': '{{ .Data.proctortrack_client_secret }}'
       {{ end }}

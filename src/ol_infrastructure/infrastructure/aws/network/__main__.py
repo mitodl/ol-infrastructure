@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from pulumi import Config, export
 from pulumi_aws import ec2
-from security_groups import default_group, public_web, salt_minion
+from security_groups import default_group, public_ssh, public_web, salt_minion
 
 from ol_infrastructure.components.aws.olvpc import (
     OLVPC,
@@ -176,6 +176,12 @@ data_vpc_exports.update(
     {
         "security_groups": {
             "default": data_vpc.olvpc.id.apply(default_group).id,
+            "ssh": public_ssh(data_vpc_config.vpc_name, data_vpc.olvpc)(
+                tags=data_vpc_config.merged_tags(
+                    {"Name": f"ol-data-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"ol-data-{stack_info.env_suffix}-public-ssh",
+            ).id,
             "web": public_web(data_vpc_config.vpc_name, data_vpc.olvpc)(
                 tags=data_vpc_config.merged_tags(
                     {"Name": f"ol-data-{stack_info.env_suffix}-public-web"}
@@ -202,6 +208,14 @@ residential_mitx_vpc_exports.update(
     {
         "security_groups": {
             "default": residential_mitx_vpc.olvpc.id.apply(default_group).id,
+            "ssh": public_ssh(
+                residential_mitx_vpc_config.vpc_name, residential_mitx_vpc.olvpc
+            )(
+                tags=residential_mitx_vpc_config.merged_tags(
+                    {"Name": f"mitx-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"mitx-{stack_info.env_suffix}-public-ssh",
+            ).id,
             "web": public_web(
                 residential_mitx_vpc_config.vpc_name, residential_mitx_vpc.olvpc
             )(
@@ -232,6 +246,15 @@ residential_mitx_staging_vpc_exports.update(
     {
         "security_groups": {
             "default": residential_mitx_staging_vpc.olvpc.id.apply(default_group).id,
+            "ssh": public_ssh(
+                residential_mitx_staging_vpc_config.vpc_name,
+                residential_mitx_staging_vpc.olvpc,
+            )(
+                tags=residential_mitx_staging_vpc_config.merged_tags(
+                    {"Name": f"mitx-staging-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"mitx-staging-{stack_info.env_suffix}-public-ssh",
+            ).id,
             "web": public_web(
                 residential_mitx_staging_vpc_config.vpc_name,
                 residential_mitx_staging_vpc.olvpc,
@@ -261,6 +284,12 @@ mitx_online_vpc_exports.update(
     {
         "security_groups": {
             "default": mitx_online_vpc.olvpc.id.apply(default_group).id,
+            "ssh": public_ssh(mitx_online_vpc_config.vpc_name, mitx_online_vpc.olvpc)(
+                tags=mitx_online_vpc_config.merged_tags(
+                    {"Name": f"mitxonline-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"mitxonline-{stack_info.env_suffix}-public-ssh",
+            ).id,
             "web": public_web(mitx_online_vpc_config.vpc_name, mitx_online_vpc.olvpc)(
                 tags=mitx_online_vpc_config.merged_tags(
                     {"Name": f"mitxonline-{stack_info.env_suffix}-public-web"}
@@ -293,6 +322,12 @@ xpro_vpc_exports.update(
                 ),
                 name=f"mitxpro-{stack_info.env_suffix}-public-web",
             ).id,
+            "ssh": public_ssh(xpro_vpc_config.vpc_name, xpro_vpc.olvpc)(
+                tags=xpro_vpc_config.merged_tags(
+                    {"Name": f"mitxpro-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"mitxpro-{stack_info.env_suffix}-public-ssh",
+            ).id,
             "salt_minion": salt_minion(
                 xpro_vpc_config.vpc_name,
                 xpro_vpc.olvpc,
@@ -318,6 +353,12 @@ applications_vpc_exports.update(
                     {"Name": f"applications-{stack_info.env_suffix}-public-web"}
                 ),
                 name=f"applications-{stack_info.env_suffix}-public-web",
+            ).id,
+            "ssh": public_ssh(applications_vpc_config.vpc_name, applications_vpc.olvpc)(
+                tags=applications_vpc_config.merged_tags(
+                    {"Name": f"applications-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"applications-{stack_info.env_suffix}-public-ssh",
             ).id,
             "salt_minion": salt_minion(
                 applications_vpc_config.vpc_name,
@@ -358,6 +399,12 @@ operations_vpc_exports.update(
                     {"Name": f"operations-{stack_info.env_suffix}-public-web"}
                 ),
                 name=f"operations-{stack_info.env_suffix}-public-web",
+            ).id,
+            "ssh": public_ssh(operations_vpc_config.vpc_name, operations_vpc.olvpc)(
+                tags=operations_vpc_config.merged_tags(
+                    {"Name": f"operations-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"operations-{stack_info.env_suffix}-public-ssh",
             ).id,
             "salt_minion": salt_minion(
                 operations_vpc_config.vpc_name,
