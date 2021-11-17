@@ -114,7 +114,7 @@ for product in hashicorp_products:
 # Install vector
 vector_config = VectorConfig(
     configuration_templates={
-        TEMPLATES_DIRECTORY.joinpath("vector", "vault.yaml"): {},
+        TEMPLATES_DIRECTORY.joinpath("vector", "vector.yaml"): {},
         TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml"): {},
     }
 )

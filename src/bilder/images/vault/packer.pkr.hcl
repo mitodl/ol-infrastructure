@@ -6,7 +6,7 @@ locals {
 
 variable "build_environment" {
   type = string
-  default = "operations-qa"
+  default = "operations-ci"
 }
 
 source "amazon-ebs" "vault" {
