@@ -6,3 +6,5 @@ config:
   consul:scheme: https
   environment:business_unit: residential
   environment:target_vpc: residential_mitx_vpc
+  consul:address: https://consul-mitx-ci.odl.mit.edu
+  consul:scheme: https

@@ -50,7 +50,9 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
         files.template(
             name="Create SystemD service definition for Caddy",
             dest="/usr/lib/systemd/system/caddy.service",
-            src=Path(__file__).parent.joinpath("templates", "caddy.service.j2"),
+            src=Path(__file__)
+            .resolve()
+            .parent.joinpath("templates", "caddy.service.j2"),
             state=state,
             host=host,
         )
@@ -87,7 +89,9 @@ def install_caddy(caddy_config: CaddyConfig, state=None, host=None):
     files.put(
         name="Configure systemd to load environment variables from file",
         dest="/etc/systemd/system/caddy.service.d/load_env.conf",
-        src=Path(__file__).parent.joinpath("templates", "caddy.service.override"),
+        src=Path(__file__)
+        .resolve()
+        .parent.joinpath("templates", "caddy.service.override"),
         state=state,
         host=host,
     )

@@ -12,3 +12,5 @@ config:
   mongodb_atlas:instance_size: M10
   mongodb_atlas:organization_id: 611ab793e07f5965c7b9e4f6
   mongodb_atlas:version: '4.4'
+  consul:address: https://consul-mitx-staging-ci.odl.mit.edu
+  consul:scheme: https
