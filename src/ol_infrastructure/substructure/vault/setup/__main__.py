@@ -11,6 +11,7 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import get_vault_provider
 
 vault_config = pulumi.Config("vault_setup")
+vault_server_config = pulumi.Config("vault_server")
 stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 env_namespace = f"{stack_info.env_prefix}.{stack_info.env_suffix}"
@@ -77,6 +78,7 @@ def init_vault_cluster(vault_addr):  # noqa: WPS231
                 vault_client.sys.create_or_update_policy(
                     name="cluster-admin",
                     policy=Path(__file__)
+                    .resolve()
                     .parent.joinpath("pulumi_policy.hcl")
                     .read_text(),
                 )
@@ -88,7 +90,7 @@ def init_vault_cluster(vault_addr):  # noqa: WPS231
                     username=pulumi_vault_creds["auth_username"],
                     password=pulumi_vault_creds["auth_password"],
                     mount_point=PULUMI,
-                    policies=[PULUMI],
+                    policies=["cluster-admin", PULUMI],
                 )
 
                 vault_client.revoke_self_token()
@@ -101,39 +103,41 @@ def init_vault_cluster(vault_addr):  # noqa: WPS231
 
 vault_recovery_keys = vault_dns.apply(init_vault_cluster)
 
-vault_provider = vault_address.apply(
-    lambda address: get_vault_provider(address, env_namespace)
+vault_provider = pulumi.ResourceOptions(
+    provider=get_vault_provider(
+        vault_address=vault_address,
+        vault_env_namespace=vault_server_config.get("env_namespace")
+        or f"operations.{stack_info.env_suffix}",
+    )
 )
-
-vault_opts = pulumi.ResourceOptions(provider=vault_provider)
 
 vault_syslog_audit = vault.Audit(
     "vault-server-syslog-audit-device",
-    opts=vault_opts,
     type="syslog",
     description="Vault syslog audit record",
     options={"format": "json"},
+    opts=vault_provider,
 )
 
 vault_file_audit = vault.Audit(
     "vault-server-file-audit-device",
-    opts=vault_opts,
     type="file",
     description="Vault file based audit record to stdout for JournalD",
     options={"file_path": "stdout", "format": "json"},
+    opts=vault_provider,
 )
 
 vault_pulumi_policy = vault.Policy(
     "vault-policy-for-pulumi",
-    opts=vault_opts,
     name=PULUMI,
     policy=Path(__file__).parent.joinpath("pulumi_policy.hcl").read_text(),
+    opts=vault_provider,
 )
 
 vault_user_pass_auth = vault.AuthBackend(
     "vault-user-auth-backend",
-    opts=vault_opts,
     type="userpass",
     description="Username and password based authentication for Vault",
     tune=vault.AuthBackendTuneArgs(token_type="default-service"),  # noqa: S106
+    opts=vault_provider,
 )
