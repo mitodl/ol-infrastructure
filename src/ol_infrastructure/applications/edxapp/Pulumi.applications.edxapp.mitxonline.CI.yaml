@@ -25,3 +25,5 @@ config:
   edxapp:mongo_admin_user: foo
   redis:auth_token:
     secure: v1:m+1DjImwe1XkS00o:oMGkzhG+tRcyUzJznSCS9WGz9DGuLWP3KzH9y0XqMk8BRYEKePZfcUXJSjDod5IU8E6FdhEC
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

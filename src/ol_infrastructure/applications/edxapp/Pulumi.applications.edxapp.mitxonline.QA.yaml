@@ -25,3 +25,5 @@ config:
   edxapp:sender_email_address: support@edxapp-mail-qa.mitxonline.mit.edu
   redis:auth_token:
     secure: v1:uFZFB99Yk40m0l+V:zgfnmbI5F7uPME/NLqmLN8R+0njnx7AQ1KX//AR+AebW7dJ+U4+pj02tnwFDzP98FLhP/27m
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

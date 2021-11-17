@@ -548,5 +548,10 @@ vault_public_dns = route53.Record(
 #################
 export(
     "vault_server",
-    {"security_group": vault_security_group.id, "public_dns": vault_public_dns.fqdn},
+    {
+        "security_group": vault_security_group.id,
+        "public_dns": vault_public_dns.fqdn,
+        "cluster_address": vault_public_dns.fqdn.apply("https://{}".format),
+        "environment_namespace": f"{stack_info.env_prefix}.{stack_info.env_suffix}",
+    },
 )

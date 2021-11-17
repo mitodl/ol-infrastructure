@@ -58,10 +58,15 @@ from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import mongodb_role_statements, mysql_role_statements
+from ol_infrastructure.lib.vault import (
+    mongodb_role_statements,
+    mysql_role_statements,
+    setup_vault_provider,
+)
 
 stack_info = parse_stack()
 edxapp_config = Config("edxapp")
+setup_vault_provider()
 #############
 # Constants #
 #############
