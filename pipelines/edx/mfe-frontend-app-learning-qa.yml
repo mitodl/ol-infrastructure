@@ -76,7 +76,7 @@ jobs:
         - -exc
         - |
           npm install
-          npm install @edx/frontend-component-footer@npm:@mitodl/frontend-component-footer-mitol@^1.0.0-semantically-released
+          npm install @edx/frontend-component-footer@npm:@mitodl/frontend-component-footer-mitol@latest --legacy-peer-deps
           NODE_ENV=production npm run build
   - put: mfe-app-learning-bucket
     params:
