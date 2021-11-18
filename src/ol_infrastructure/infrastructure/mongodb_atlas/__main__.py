@@ -90,6 +90,8 @@ atlas_security_group = aws.ec2.SecurityGroup(
     egress=default_egress_args,
 )
 
+# It is necessary to manually go to the Mongo Atlas UI and fetch the IP CIDR for adding
+# to the VPC route table
 atlas_aws_network_peer = atlas.NetworkPeering(
     f"mongo-atlas-network-peering-{environment_name}",
     accepter_region_name=target_vpc["region"],

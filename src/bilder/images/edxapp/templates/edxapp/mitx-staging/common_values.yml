@@ -227,7 +227,7 @@ COURSE_MODE_DEFAULTS:
 CREDENTIALS_INTERNAL_SERVICE_URL: http://localhost:8005
 CREDENTIALS_PUBLIC_SERVICE_URL: http://localhost:8005
 CREDIT_PROVIDER_SECRET_KEYS: {}
-CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }}  # MODIFIED
+CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {{ key "edxapp/lms-domain" }}  # MODIFIED
 CROSS_DOMAIN_CSRF_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edxapp-csrftoken  # MODIFIED
 CSRF_COOKIE_SECURE: true  # MODIFIED
 CSRF_TRUSTED_ORIGINS:  # MODIFIED
@@ -364,7 +364,6 @@ HELP_TOKENS_BOOKS:
 ICP_LICENSE: null
 ICP_LICENSE_INFO: {}
 IDA_LOGOUT_URI_LIST:
-  - https://{{ key "edxapp/marketing-domain" }}/logout
   - https://{{ key "edxapp/studio-domain" }}/logout
 ID_VERIFICATION_SUPPORT_LINK: ''
 INTEGRATED_CHANNELS_API_CHUNK_TRANSMISSION_LIMIT:
@@ -432,13 +431,7 @@ PLATFORM_TWITTER_ACCOUNT: '@YourPlatformTwitterAccount'
 POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
 PRESS_EMAIL: support@mitx.mit.edu # MODIFIED
 PROCTORING_BACKENDS:
-    DEFAULT: 'proctortrack'
-    'proctortrack':
-      {{ with secret "secret-mitx-staging/edxapp" }}
-      'client_id': '{{ .Data.proctortrack_client_id }}'
-      'client_secret': '{{ .Data.proctortrack_client_secret }}'
-      {{ end }}
-      'base_url': '{{ key "edxapp/proctortrack-base-url" }}'
+    DEFAULT: 'null'
     'null': {}
 
 PROCTORING_SETTINGS:
