@@ -1,4 +1,4 @@
-{{ with secret "mongodb-mitx/creds/edxapp" }}
+{{ with secret "secret-mitx/mongodb-edxapp" }}
 mongodb_settings: &mongo_params
   host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
   port: 27017
@@ -52,9 +52,9 @@ XQUEUE_INTERFACE:
     - edx
     - edx
     django_auth:
-        password: {{ .Data.xqueue_edxapp_password }}
+        password: edxapp
         username: edxapp
-    url: http://xqueue-{{ env "ENVIRONMENT" }}.private.odl.mit.edu  # MODIFIED
+    url: http://xqueue.service.consul  # MODIFIED
 SENTRY_DSN: {{ .Data.sentry_dsn }}
 SOCIAL_AUTH_SAML_SP_PRIVATE_KEY: '{{ .Data.saml_private_key }}'
 SOCIAL_AUTH_SAML_SP_PUBLIC_CERT: '{{ .Data.saml_public_cert }}'
@@ -131,7 +131,7 @@ AWS_SES_CONFIGURATION_SET: {{ key "edxapp/ses-configuration-set" }}  # ADDED KEY
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
 AWS_SES_REGION_NAME: us-east-1
 AWS_STORAGE_BUCKET_NAME: {{ key "edxapp/s3-storage-bucket" }}  # MODIFIED
-BASE_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
+BASE_COOKIE_DOMAIN: {{ key "edxapp/lms-domain" }} # MODIFIED
 BLOCKSTORE_API_URL: http://localhost:18250/api/v1
 BLOCKSTORE_PUBLIC_URL_ROOT: http://localhost:18250
 BLOCK_STRUCTURES_SETTINGS:

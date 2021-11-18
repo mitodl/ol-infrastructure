@@ -124,7 +124,7 @@ AWS_SES_CONFIGURATION_SET: {{ key "edxapp/ses-configuration-set" }}  # ADDED KEY
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
 AWS_SES_REGION_NAME: us-east-1
 AWS_STORAGE_BUCKET_NAME: {{ key "edxapp/s3-storage-bucket" }}  # MODIFIED
-BASE_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
+BASE_COOKIE_DOMAIN: {{ key "edxapp/lms-domain" }} # MODIFIED
 BLOCKSTORE_API_URL: http://localhost:18250/api/v1
 BLOCKSTORE_PUBLIC_URL_ROOT: http://localhost:18250
 BLOCK_STRUCTURES_SETTINGS:

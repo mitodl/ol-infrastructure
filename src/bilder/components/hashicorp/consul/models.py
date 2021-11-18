@@ -87,7 +87,7 @@ class ConsulConfig(HashicorpConfig):
     services: Optional[List[ConsulService]]
     skip_leave_on_interrupt: bool = True
     telemetry: Optional[ConsulTelemetry]
-    ui: bool = True
+    ui: bool = False
 
     class Config:  # noqa: WPS431
         env_prefix = "consul_"

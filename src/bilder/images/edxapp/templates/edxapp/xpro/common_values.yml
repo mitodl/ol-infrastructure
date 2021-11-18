@@ -1,4 +1,4 @@
-{{ with secret "mongodb-xpro/creds/edxapp" }}
+{{ with secret "secret-xpro/mongodb-edxapp" }}
 mongodb_settings: &mongo_params
   host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
   port: 27017
@@ -47,6 +47,14 @@ JWT_AUTH:  # NEEDS ATTENTION
         AUDIENCE: xpro
         SECRET_KEY: {{ .Data.django_secret_key }}
 SENTRY_DSN: {{ .Data.sentry_dsn }}
+XQUEUE_INTERFACE:
+    basic_auth:
+    - edx
+    - edx
+    django_auth:
+        password: edxapp
+        username: edxapp
+    url: http://xqueue.service.consul  # MODIFIED
 {{ end }}
 
 {{ with secret "secret-xpro/edx-forum" }}
@@ -119,7 +127,7 @@ AWS_SES_CONFIGURATION_SET: {{ key "edxapp/ses-configuration-set" }}  # ADDED KEY
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
 AWS_SES_REGION_NAME: us-east-1
 AWS_STORAGE_BUCKET_NAME: {{ key "edxapp/s3-storage-bucket" }}  # MODIFIED
-BASE_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
+BASE_COOKIE_DOMAIN: {{ key "edxapp/lms-domain" }} # MODIFIED
 BLOCKSTORE_API_URL: http://localhost:18250/api/v1
 BLOCKSTORE_PUBLIC_URL_ROOT: http://localhost:18250
 BLOCK_STRUCTURES_SETTINGS:

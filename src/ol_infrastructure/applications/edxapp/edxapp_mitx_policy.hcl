@@ -30,6 +30,14 @@ path "secret-mitx/edx-xqueue" {
   capabilities = ["read"]
 }
 
+path "secret-mitx/mongodb-edxapp" {
+  capabilities = ["read"]
+}
+
+path "secret-mitx/mongodb-forum" {
+  capabilities = ["read"]
+}
+
 path "secret-operations/global/github-enterprise-ssh" {
   capabilities = ["read"]
 }
