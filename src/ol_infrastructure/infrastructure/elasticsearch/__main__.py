@@ -146,7 +146,7 @@ elasticsearch_security_group = ec2.SecurityGroup(
 security_groups = {"elasticsearch_server": elasticsearch_security_group.id}
 
 instance_type_name = (
-    elasticsearch_config.get("instance_type") or InstanceTypes.medium.name
+    elasticsearch_config.get("instance_type") or InstanceTypes.burstable_medium.name
 )
 instance_type = InstanceTypes[instance_type_name].value
 elasticsearch_instances = []

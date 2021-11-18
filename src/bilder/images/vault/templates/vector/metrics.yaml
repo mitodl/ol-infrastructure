@@ -28,6 +28,14 @@ transforms:
       .tags.job = "integrations/linux_host"
       .tags.instance = "${HOSTNAME}"
 
+  vault_metrics_relabel:
+    type: remap
+    inputs:
+    - vault_metrics
+    source: |
+      .tags.job = "integrations/vault"
+      .tags.instance = "${HOSTNAME}"
+
   add_labels_to_metrics:
     type: remap
     inputs:

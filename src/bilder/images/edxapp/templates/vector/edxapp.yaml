@@ -86,7 +86,7 @@ transforms:
       parsed, err = parse_json(.message)
       if parsed != null {
         .@timestamp = parse_timestamp!(parsed.time, "%FT%T%:z")
-        . = merge(., parsed)
+        ., err = merge(., parsed)
         .log_process = "nginx"
         .environment = "${ENVIRONMENT}"
       }

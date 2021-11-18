@@ -187,7 +187,9 @@ redash_redis_config.security_groups = [redis_cluster_security_group.id]
 redash_redis_cluster = OLAmazonCache(redash_redis_config)
 
 # Deploy Redash instances on EC2
-instance_type_name = redash_config.get("instance_type") or InstanceTypes.medium.name
+instance_type_name = (
+    redash_config.get("instance_type") or InstanceTypes.burstable_medium.name
+)
 instance_type = InstanceTypes[instance_type_name].value
 redash_instances = []
 redash_export = {}

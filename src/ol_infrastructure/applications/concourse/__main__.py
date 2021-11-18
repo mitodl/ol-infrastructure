@@ -438,7 +438,7 @@ concourse_web_alb_listener = lb.Listener(
 
 # Create auto scale group and launch configs for Concourse web and worker
 web_instance_type = (
-    concourse_config.get("web_instance_type") or InstanceTypes.medium.name
+    concourse_config.get("web_instance_type") or InstanceTypes.burstable_medium.name
 )
 if stack_info.env_suffix == "production":
     consul_datacenter = "operations"
@@ -539,7 +539,7 @@ web_asg = autoscaling.Group(
 )
 
 worker_instance_type = (
-    concourse_config.get("worker_instance_type") or InstanceTypes.large.name
+    concourse_config.get("worker_instance_type") or InstanceTypes.burstable_large.name
 )
 worker_launch_config = ec2.LaunchTemplate(
     "concourse-worker-launch-template",

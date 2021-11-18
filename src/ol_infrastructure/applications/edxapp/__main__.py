@@ -500,37 +500,43 @@ mongodb_admin_username = mongodb_config.get("admin_username") or "admin"
 mongodb_admin_password = mongodb_config.get("admin_password")
 
 edxapp_mongo_role_statements = mongodb_role_statements
-edxapp_mongo_role_statements["edxapp"] = {
-    "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "edxapp"})),
-    "revoke": Template(json.dumps({"db": "edxapp"})),
-}
-edxapp_mongo_role_statements["forum"] = {
-    "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "forum"})),
-    "revoke": Template(json.dumps({"db": "forum"})),
-}
 
 if atlas_project_id := mongodb_config.get("atlas_project_id"):
     atlas_connection_options = {"project_id": atlas_project_id}
     atlas_connection_options.update(
         read_yaml_secrets(Path("pulumi/mongodb_atlas.yaml"))
     )
+    edxapp_mongo_role_statements["edxapp"] = {
+        "create": Template(
+            json.dumps({"roles": [{"roleName": "readWrite", "databaseName": "edxapp"}]})
+        ),
+        "revoke": Template(json.dumps({"db": "edxapp"})),
+    }
+    edxapp_mongo_role_statements["forum"] = {
+        "create": Template(
+            json.dumps({"roles": [{"roleName": "readWrite", "databaseName": "forum"}]})
+        ),
+        "revoke": Template(json.dumps({"db": "forum"})),
+    }
     edxapp_mongo_vault_config = OLVaultMongoAtlasDatabaseConfig(
         db_name="edxapp",
         mount_point=f"mongodb-{stack_info.env_prefix}",
         role_statements=edxapp_mongo_role_statements,
         connection_options=atlas_connection_options,
     )
+else:
     edxapp_mongo_role_statements["edxapp"] = {
         "create": Template(
-            json.dumps({"roles": [{"roleName": "readWrite", "databaseName": "edxapp"}]})
+            json.dumps({"roles": [{"role": "readWrite"}], "db": "edxapp"})
         ),
+        "revoke": Template(json.dumps({"db": "edxapp"})),
     }
     edxapp_mongo_role_statements["forum"] = {
         "create": Template(
-            json.dumps({"roles": [{"roleName": "readWrite", "databaseName": "forum"}]})
+            json.dumps({"roles": [{"role": "readWrite"}], "db": "forum"})
         ),
+        "revoke": Template(json.dumps({"db": "forum"})),
     }
-else:
     edxapp_mongo_vault_config = OLVaultMongoDatabaseConfig(
         db_name="edxapp",
         mount_point=f"mongodb-{stack_info.env_prefix}",
@@ -1166,7 +1172,7 @@ web_alb_metric_alarm = cloudwatch.MetricAlarm(
 )
 
 worker_instance_type = (
-    edxapp_config.get("worker_instance_type") or InstanceTypes.large.name
+    edxapp_config.get("worker_instance_type") or InstanceTypes.burstable_large.name
 )
 worker_launch_config = ec2.LaunchTemplate(
     "edxapp-worker-launch-template",

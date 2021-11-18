@@ -56,7 +56,7 @@ from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 VERSIONS = {  # noqa: WPS407
     "consul": "1.10.2",
     "vault": "1.8.2",
-    "consul-template": "0.27.1",
+    "consul-template": "0.27.2",
 }
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 EDX_INSTALLATION_NAME = os.environ.get("EDX_INSTALLATION", "mitxonline")
@@ -146,14 +146,22 @@ if node_type == WEB_NODE_TYPE:
         [
             VaultTemplate(
                 contents=(
-                    f'{{ with secret "secret-{EDX_INSTALLATION_NAME}/{EDX_INSTALLATION_NAME}-wildcard-certificate" }}'  # noqa: E501
+                    '{{ with secret "secret-'
+                    + EDX_INSTALLATION_NAME
+                    + "/"
+                    + EDX_INSTALLATION_NAME
+                    + '-wildcard-certificate" }}'  # noqa: E501
                     "{{ printf .Data.cert_chain }}{{ end }}"
                 ),
                 destination=Path("/etc/ssl/certs/edxapp.cert"),
             ),
             VaultTemplate(
                 contents=(
-                    '{{ with secret "secret-{EDX_INSTALLATION_NAME}/{EDX_INSTALLATION_NAME}-wildcard-certificate" }}'  # noqa: E501
+                    '{{ with secret "secret-'
+                    + EDX_INSTALLATION_NAME
+                    + "/"
+                    + EDX_INSTALLATION_NAME
+                    + '-wildcard-certificate" }}'  # noqa: E501
                     "{{ printf .Data.key }}{{ end }}"
                 ),
                 destination=Path("/etc/ssl/private/edxapp.key"),

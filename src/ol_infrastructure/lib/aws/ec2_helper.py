@@ -39,13 +39,17 @@ default_egress_args = [
 
 @unique
 class InstanceTypes(str, Enum):  # noqa: WPS600
-    small = "t3a.small"
-    medium = "t3a.medium"
-    large = "t3a.large"
+    burstable_small = "t3a.small"
+    burstable_medium = "t3a.medium"
+    burstable_large = "t3a.large"
     general_purpose_large = "m5a.large"
     general_purpose_xlarge = "m5a.xlarge"
+    general_purpose_2xlarge = "m5a.2xlarge"
+    general_purpose_intel_xlarge = "m5.xlarge"
+    general_purpose_intel_2xlarge = "m5.2xlarge"
     high_mem_regular = "r5a.large"
     high_mem_xlarge = "r5a.xlarge"
+    high_mem_2xlarge = "r5a.2xlarge"
 
 
 @unique
