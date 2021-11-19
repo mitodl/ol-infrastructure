@@ -114,7 +114,7 @@ concourse_iam_permissions = {
         },
         {
             "Effect": "Allow",
-            "Action": ["s3:GetObject*", "s3:ListBucket"],
+            "Action": ["s3:GetObject*", "s3:ListBucket", "s3:CopyObject"],
             "Resource": [
                 "arn:aws:s3:::ol-ocw-studio-app*",
                 "arn:aws:s3:::ol-ocw-studio-app*/*",
