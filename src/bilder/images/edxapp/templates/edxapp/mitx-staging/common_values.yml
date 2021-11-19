@@ -1,5 +1,6 @@
 {{ with secret "secret-mitx-staging/mongodb-edxapp" }}
 mongodb_settings: &mongo_params
+  authsource: admin
   host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
   port: 27017
   db: edxapp
@@ -102,14 +103,12 @@ DOC_STORE_CONFIG: &docstore_config
 CONTENTSTORE:
     ADDITIONAL_OPTIONS: {}
     DOC_STORE_CONFIG:
-        authsource: ''
         collection: modulestore
         connectTimeoutMS: 2000
         socketTimeoutMS: 3000
         <<: *mongo_params
     ENGINE: xmodule.contentstore.mongo.MongoContentStore
     OPTIONS:
-        auth_source: ''
         <<: *mongo_params
 
 ACTIVATION_EMAIL_SUPPORT_LINK: ''

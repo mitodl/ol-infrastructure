@@ -1,5 +1,6 @@
 {{ with secret "secret-xpro/mongodb-edxapp" }}
 mongodb_settings: &mongo_params
+  authsource: admin
   host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
   port: 27017
   db: edxapp
@@ -97,7 +98,6 @@ DOC_STORE_CONFIG: &docstore_config
 CONTENTSTORE:
     ADDITIONAL_OPTIONS: {}
     DOC_STORE_CONFIG:
-        authsource: ''
         collection: modulestore
         connectTimeoutMS: 2000
         socketTimeoutMS: 3000
