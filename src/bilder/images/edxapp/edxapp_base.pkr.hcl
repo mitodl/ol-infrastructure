@@ -14,6 +14,11 @@ variable "edx_platform_version" {
   default = "release"
 }
 
+variable "edx_ansible_branch" {
+  type    = string
+  default = "master"
+}
+
 # Available options are "web" or "worker". Used to determine which type of node to build an image for.
 variable "node_type" {
   type = string
@@ -92,7 +97,7 @@ build {
   }
   provisioner "shell" {
     environment_vars = [
-      "EDX_ANSIBLE_BRANCH=${var.edx_platform_version}",
+      "EDX_ANSIBLE_BRANCH=${var.edx_ansible_branch}",
     ]
     inline = [
       "openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /tmp/edxapp.key -out /tmp/edxapp.cert -subj '/C=US/ST=MA/L=Cambridge/O=MIT Open Learning/OU=Engineering/CN=edxapp.example.com'",

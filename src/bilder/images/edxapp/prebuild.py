@@ -40,7 +40,7 @@ if node_type == WEB_NODE_TYPE:
         group=EDX_USER,
         present=True,
     )
-    for deployment, config in host.data.edx_themes:
+    for deployment, config in host.data.edx_themes.items():
         git.repo(
             name="Load theme repository",
             src=config["repository"],

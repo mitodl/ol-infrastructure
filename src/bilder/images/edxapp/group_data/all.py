@@ -1,23 +1,21 @@
-edx_themes = [
-    {
-        "mitxonline": {
-            "repository": "https://github.com/mitodl/mitxonline-theme",
-            "branch": "main",
-        },
-        "xpro": {
-            "repository": "https://github.com/mitodl/mitxpro-theme",
-            "branch": "maple",
-        },
-        "mitx": {
-            "repository": "https://github.com/mitodl/mitx-theme",
-            "branch": "maple",
-        },
-        "mitx-staging": {
-            "repository": "https://github.com/mitodl/mitx-theme",
-            "branch": "maple",
-        },
-    }
-]
+edx_themes = {
+    "mitxonline": {
+        "repository": "https://github.com/mitodl/mitxonline-theme",
+        "branch": "main",
+    },
+    "xpro": {
+        "repository": "https://github.com/mitodl/mitxpro-theme",
+        "branch": "maple",
+    },
+    "mitx": {
+        "repository": "https://github.com/mitodl/mitx-theme",
+        "branch": "maple",
+    },
+    "mitx-staging": {
+        "repository": "https://github.com/mitodl/mitx-theme",
+        "branch": "maple",
+    },
+}
 
 edx_plugins = {
     "mitxonline": [
