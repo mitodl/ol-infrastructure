@@ -23,3 +23,5 @@ config:
   consul:http_auth:
     secure: v1:3KBur4GecXR9QEKY:xUQoSEJ8d9V648tASD5OnV7zVqlnQZ1SEgQe772KDw7O6z539r2ZomhqB/tkmyUwGug5PA5gJw==
   consul:scheme: https
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

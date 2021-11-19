@@ -34,7 +34,10 @@ from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_po
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
+from ol_infrastructure.lib.vault import setup_vault_provider
 
+if Config("vault_server").get("env_namespace"):
+    setup_vault_provider()
 concourse_config = Config("concourse")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -105,6 +108,8 @@ concourse_iam_permissions = {
                 "arn:aws:s3:::ocw-to-hugo-output*/*",
                 "arn:aws:s3:::ol-eng-artifacts",
                 "arn:aws:s3:::ol-eng-artifacts/*",
+                "arn:aws:s3:::ol-ocw-studio-app*",
+                "arn:aws:s3:::ol-ocw-studio-app*/*",
             ],
         },
         {
@@ -114,10 +119,8 @@ concourse_iam_permissions = {
         },
         {
             "Effect": "Allow",
-            "Action": ["s3:GetObject*", "s3:ListBucket", "s3:CopyObject"],
+            "Action": ["s3:GetObject*", "s3:ListBucket"],
             "Resource": [
-                "arn:aws:s3:::ol-ocw-studio-app*",
-                "arn:aws:s3:::ol-ocw-studio-app*/*",
                 "arn:aws:s3:::open-learning-course-data*",
                 "arn:aws:s3:::open-learning-course-data*/*",
             ],
