@@ -11,7 +11,7 @@ resources:
   type: git
   source:
     uri: https://github.com/edx/frontend-app-learning.git
-    branch: master
+    branch: open-release/maple.master
 - name: mfe-app-learning-bucket
   type: rclone
   source:
@@ -58,7 +58,7 @@ jobs:
         STUDIO_BASE_URL: https://studio-ci.xpro.mit.edu
         SUPPORT_URL: https://xpro.zendesk.com/hc
         USER_INFO_COOKIE_NAME: edx-user-info
-        SESSION_COOKIE_DOMAIN: .mitxpro.mit.edu
+        SESSION_COOKIE_DOMAIN: courses-ci.mitxpro.mit.edu
       run:
         path: sh
         dir: mfe-app-learning
