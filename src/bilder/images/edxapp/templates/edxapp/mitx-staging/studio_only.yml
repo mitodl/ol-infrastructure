@@ -1,7 +1,6 @@
 # ALTERNATE_WORKER_QUEUES: lms  # Already has a sane default in the code
 ADDL_INSTALLED_APPS:  # ADDED KEY
   - git_auto_export
-  - imagemodal
 COURSE_AUTHORING_MICROFRONTEND_URL:
 COURSE_IMPORT_EXPORT_BUCKET: {{ key "edxapp/s3-course-bucket" }}  # MODIFIED
 GIT_REPO_EXPORT_DIR: /edx/var/edxapp/export_course_repos

@@ -4,4 +4,4 @@ encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQF8EoHlv9WrkSOk7E
 config:
   aws:region: us-east-1
   environment:business_unit: residential-staging
-  environment:vpc_reference: residential_staging_mitx_vpc
+  environment:vpc_reference: residential_mitx_staging_vpc
