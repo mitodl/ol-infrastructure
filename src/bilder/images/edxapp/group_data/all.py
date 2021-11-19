@@ -22,21 +22,21 @@ edx_plugins = {
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "django-redis",  # Support for Redis caching in Django
         "edx-sysadmin",
-        "edx-username-changer==0.2.1",
-        "mitxpro-openedx-extensions==0.2.2",
+        "edx-username-changer==0.3.0",
+        "mitxpro-openedx-extensions==1.0.0",
         "ol-openedx-logging",
         "ol-openedx-sentry",
-        "social-auth-mitxpro==0.5",
+        "social-auth-mitxpro==0.6",
     ],
     "xpro": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "django-redis",  # Support for Redis caching in Django
         "edx-sysadmin",
-        "edx-username-changer==0.2.1",
-        "mitxpro-openedx-extensions==0.2.2",
+        "edx-username-changer==0.3.0",
+        "mitxpro-openedx-extensions==1.0.0",
         "ol-openedx-logging",
         "ol-openedx-sentry",
-        "social-auth-mitxpro==0.5",
+        "social-auth-mitxpro==0.6",
     ],
     "mitx": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
