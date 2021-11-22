@@ -1075,8 +1075,8 @@ web_asg = autoscaling.Group(
     "edxapp-web-autoscaling-group",
     desired_capacity=edxapp_config.get_int("web_node_capacity")
     or MIN_WEB_NODES_DEFAULT,
-    min_size=edxapp_config.get("min_web_nodes") or MIN_WEB_NODES_DEFAULT,
-    max_size=edxapp_config.get("max_web_nodes") or MAX_WEB_NODES_DEFAULT,
+    min_size=edxapp_config.get_int("min_web_nodes") or MIN_WEB_NODES_DEFAULT,
+    max_size=edxapp_config.get_int("max_web_nodes") or MAX_WEB_NODES_DEFAULT,
     health_check_type="ELB",
     vpc_zone_identifiers=edxapp_vpc["subnet_ids"],
     launch_template=autoscaling.GroupLaunchTemplateArgs(
