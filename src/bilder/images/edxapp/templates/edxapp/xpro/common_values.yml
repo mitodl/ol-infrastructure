@@ -225,7 +225,7 @@ DEFAULT_FEEDBACK_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_FILE_STORAGE: storages.backends.s3boto3.S3Boto3Storage  # MODIFIED
 DEFAULT_FROM_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_MOBILE_AVAILABLE: false
-DEFAULT_SITE_THEME: xpro  # MODIFIED TODO: Fix the xPro theme. Using mitxonline as a stopgap
+DEFAULT_SITE_THEME:   # MODIFIED
 DEPRECATED_ADVANCED_COMPONENT_TYPES: []
 DJFS:
     directory_root: /edx/var/edxapp/django-pyfs/static/django-pyfs
@@ -354,6 +354,7 @@ LOGIN_REDIRECT_WHITELIST:  # MODIFIED
 LOG_DIR: /edx/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MARKETING_SITE_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support xpro-theme
+XPRO_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support xpro-theme
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
