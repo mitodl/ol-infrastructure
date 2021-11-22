@@ -305,8 +305,6 @@ FEATURES:
     # FEATURES From Residential
     ALLOW_ALL_ADVANCED_COMPONENTS: true
     ALLOW_COURSE_STAFF_GRADE_DOWNLOADS: true
-    AUTH_USE_CAS: false
-    AUTH_USE_CERTIFICATES: false
     BYPASS_ACTIVATION_EMAIL_FOR_EXTAUTH: true
     CERTIFICATES_ENABLED: false
     DISABLE_HONOR_CERTIFICATES: true
@@ -322,11 +320,7 @@ FEATURES:
     ENABLE_PREREQUISITE_COURSES: true
     ENABLE_RENDER_XBLOCK_API: true
     ENABLE_SHOPPING_CART: true
-    ENABLE_SYSADMIN_DASHBOARD: false
     ENABLE_THIRD_PARTY_ONLY_AUTH: true
-    INDIVIDUAL_DUE_DATES: true
-    LICENSING: true
-    MILESTONES_APP: true
     REQUIRE_COURSE_EMAIL_AUTH: false
     REROUTE_ACTIVATION_EMAIL: mitx-support@mit.edu
     RESTRICT_ENROLL_BY_REG_METHOD: false
@@ -586,6 +580,5 @@ COURSE_MODE_DEFAULTS:
   slug: honor
   suggested_prices:
 ADMINS:
-  - "MITx Stacktrace Recipients"
-  - cuddle-bunnies@mit.edu
+  - ["MITx Stacktrace Recipients", "cuddle-bunnies@mit.edu"]
 ALLOW_ALL_ADVANCED_COMPONENTS: true

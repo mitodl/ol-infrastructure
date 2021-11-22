@@ -225,7 +225,7 @@ DEFAULT_FEEDBACK_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_FILE_STORAGE: storages.backends.s3boto3.S3Boto3Storage  # MODIFIED
 DEFAULT_FROM_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_MOBILE_AVAILABLE: false
-DEFAULT_SITE_THEME: mitxonline  # MODIFIED TODO: Fix the xPro theme. Using mitxonline as a stopgap
+DEFAULT_SITE_THEME: xpro  # MODIFIED TODO: Fix the xPro theme. Using mitxonline as a stopgap
 DEPRECATED_ADVANCED_COMPONENT_TYPES: []
 DJFS:
     directory_root: /edx/var/edxapp/django-pyfs/static/django-pyfs

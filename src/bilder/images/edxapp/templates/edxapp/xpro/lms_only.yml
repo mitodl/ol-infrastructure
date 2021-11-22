@@ -122,6 +122,3 @@ WRITABLE_GRADEBOOK_URL: null
 # ACE_CHANNEL_SAILTHRU_API_SECRET: ''
 # ACE_CHANNEL_SAILTHRU_DEBUG: true
 # ACE_CHANNEL_SAILTHRU_TEMPLATE_NAME: null
-
-FIELD_OVERRIDE_PROVIDERS:
-  - lms.djangoapps.courseware.student_field_overrides.IndividualStudentOverrideProvider
