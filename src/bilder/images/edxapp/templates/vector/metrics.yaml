@@ -40,7 +40,7 @@ transforms:
     source: |
       .tags.environment = "${ENVIRONMENT}"
       .tags.application = "edxapp"
-      .tags.service = "mitxonline"
+      .tags.service = "{{context.edx_installation}}"
       .tags.hostname = "${HOSTNAME}"
 
 sinks:

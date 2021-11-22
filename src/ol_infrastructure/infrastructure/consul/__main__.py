@@ -284,7 +284,9 @@ consul_ami = ec2.get_ami(
 )
 
 # Select instance type
-instance_type_name = consul_config.get("instance_type") or InstanceTypes.medium.name
+instance_type_name = (
+    consul_config.get("instance_type") or InstanceTypes.burstable_medium.name
+)
 instance_type = InstanceTypes[instance_type_name].value
 
 # Auto Join WAN Envs

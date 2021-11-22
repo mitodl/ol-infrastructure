@@ -125,6 +125,13 @@ def vault_policy_document(vault_key_arn) -> Dict[str, Any]:
                 ],
                 "Resource": ["arn:*:iam::*:user/vault-*", "arn:*:iam::*:group/*"],
             },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "iam:GetRole",
+                ],
+                "Resource": ["arn:*:iam::*:role/*"],
+            },
         ],
     }
 
@@ -163,6 +170,7 @@ parliament_config = {
             }
         ]
     },
+    "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []},
 }
 
 # IAM Policy and role
@@ -390,7 +398,7 @@ def cloud_init_user_data(
                                         "leader_ca_cert_file": "/etc/ssl/ol_root_ca.pem",  # noqa: E501
                                     }
                                 ],
-                                "performance_multiplier": 2,
+                                "performance_multiplier": 5,
                                 "path": "/var/lib/vault/raft/",
                             }
                         }
@@ -455,7 +463,8 @@ cloud_init_param = Output.all(
 )
 
 vault_instance_type = (
-    vault_config.get("instance_type") or InstanceTypes.general_purpose_large.name
+    vault_config.get("instance_type")
+    or InstanceTypes.general_purpose_intel_2xlarge.name
 )
 vault_launch_config = ec2.LaunchTemplate(
     "vault-server-launch-template",
@@ -518,7 +527,7 @@ vault_asg = autoscaling.Group(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
             min_healthy_percentage=90,  # noqa: WPS432
-            instance_warmup=FIVE_MINUTES,
+            instance_warmup=FIVE_MINUTES * 3,
         ),
         triggers=["tag"],
     ),

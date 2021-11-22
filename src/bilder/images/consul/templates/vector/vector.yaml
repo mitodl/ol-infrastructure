@@ -28,9 +28,7 @@ transforms:
     source: |
       event, err = parse_json(.message)
       if event != null {
-        . = merge(., event)
-        .@timestamp = .timestamp
-        .labels = ["consul", "${ENVIRONMENT}"]
+        ., err = merge(., event)
         .environment = "${ENVIRONMENT}"
       }
 
@@ -48,8 +46,6 @@ transforms:
       parsed, err = parse_syslog(.message)
       if parsed != null {
         . = merge(., parsed)
-        .@timestamp = .timestamp
-        del(.timestamp)
         .log_process = "authlog"
         .environment = "${ENVIRONMENT}"
       }

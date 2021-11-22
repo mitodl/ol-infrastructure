@@ -15,10 +15,10 @@ def _is_parliament_finding_filtered(
     if not issue_match:
         return False
     action_matches = []
-    for location in parliament_config[finding.issue][  # noqa: WPS426, WPS352
-        "ignore_locations"
-    ]:
-        for action in location["actions"]:  # noqa: WPS426
+    for location in parliament_config[finding.issue].get(  # noqa: WPS426, WPS352
+        "ignore_locations", []
+    ):
+        for action in location.get("actions", []):  # noqa: WPS426
             matches = map(
                 lambda finding_action: re.findall(
                     action, finding_action, re.IGNORECASE
@@ -26,6 +26,8 @@ def _is_parliament_finding_filtered(
                 finding.location["actions"],
             )
             action_matches.append(any(matches))
+    else:
+        action_matches.append("all")
     return any(action_matches)
 
 

@@ -1,0 +1,28 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQH3lrWmSrfJ6OGoyQvrwx1GAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM4J/T5eAboC8seh7uAgEQgDv9RL0j/cIjptkrvjnRRSa07lMZaiZT17j8gEToIxmZidrXYwO4ezztfb0+BQmX9Kp5naU7qq6SxO7lWA==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-mitx-staging-ci.odl.mit.edu
+  edxapp:business_unit: residential-staging
+  edxapp:db_password:
+    secure: v1:ZB90id7gJ0z4NB/r:S3dGQ6OhdFOl1VdJ8cMOyLTc1L/T36F3ULUBvwMi5XOpyCbRDSyPhxb1DXZQ75DMS8R54Qa8pYE=
+  edxapp:dns_zone: mitx
+  edxapp:domains:
+    lms: staging-ci.mitx.mit.edu
+    preview: preview-staging-ci.mitx.mit.edu
+    studio: studio-staging-ci.mitx.mit.edu
+  edxapp:edx_forum_secrets:
+    secure: v1:TMUUvuM6tlFYbT3r:Zmp7UuIteRPHVNghhms3+xqHZT+1DZjoJU1tEjsZiny0XCTIJJXY4E+OKNEDMoblo3FR4FtQEFdU719imPMdR9zk+Kb7oh3rZzf74QmMcMlSL2P743T98MchMvM3Fa1RyBf4PgebMSNZJ9GdDg==
+  edxapp:elb_healthcheck_interval: '30'
+  edxapp:google_analytics_id: ''
+  edxapp:mail_domain: edxapp-mail-staging-ci.mitx.mit.edu
+  edxapp:min_web_nodes: '1'
+  edxapp:min_worker_nodes: '1'
+  edxapp:sender_email_address: support@edxapp-mail-staging-ci.mitx.mit.edu
+  edxapp:target_vpc: residential_mitx_staging_vpc
+  edxapp:web_node_capacity: '1'
+  edxapp:worker_node_capacity: '1'
+  mongodb:atlas_project_id: 6193f02d576a70760e8bcb02
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

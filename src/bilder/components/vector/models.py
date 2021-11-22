@@ -13,7 +13,7 @@ class VectorConfig(OLBaseSettings):
     install_method: VectorInstallMethod = VectorInstallMethod.package
     user: str = "vector"
     configuration_templates: Dict[Path, Dict[str, Any]] = {
-        Path(__file__).parent.joinpath("templates", "vector.toml"): {}
+        Path(__file__).resolve().parent.joinpath("templates", "vector.toml"): {}
     }
     configuration_directory: Path = Path("/etc/vector/")
     data_directory: Path = Path("/var/lib/vector")

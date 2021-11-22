@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from pulumi import Config, export
 from pulumi_aws import ec2
-from security_groups import default_group, public_web, salt_minion
+from security_groups import default_group, public_ssh, public_web, salt_minion
 
 from ol_infrastructure.components.aws.olvpc import (
     OLVPC,
@@ -48,6 +48,7 @@ def vpc_exports(vpc: OLVPC, peers: Optional[List[str]] = None) -> Dict[str, Any]
         "elasticache_subnet": vpc.cache_subnet_group.name,
         "subnet_ids": [subnet.id for subnet in vpc.olvpc_subnets],
         "subnet_zones": [subnet.availability_zone for subnet in vpc.olvpc_subnets],
+        "route_table_id": vpc.route_table.id,
     }
 
 
@@ -120,6 +121,20 @@ residential_mitx_vpc_config = OLVPCConfig(
 )
 residential_mitx_vpc = OLVPC(residential_mitx_vpc_config)
 
+mitx_staging_config = Config("residential_staging_vpc")
+residential_mitx_staging_vpc_config = OLVPCConfig(
+    vpc_name=f"mitx-staging-{stack_info.env_suffix}",
+    cidr_block=mitx_staging_config.require("cidr_block"),
+    num_subnets=3,
+    tags={
+        "OU": "residential-staging",
+        "Environment": f"mitx-staging-{stack_info.env_suffix}",
+        "business_unit": "residential-staging",
+        "Name": f"MITx {stack_info.name} Staging",
+    },
+)
+residential_mitx_staging_vpc = OLVPC(residential_mitx_staging_vpc_config)
+
 mitx_online_config = Config("mitx_online_vpc")
 mitx_online_vpc_config = OLVPCConfig(
     vpc_name=f"mitx-online-{stack_info.env_suffix}",
@@ -162,6 +177,12 @@ data_vpc_exports.update(
     {
         "security_groups": {
             "default": data_vpc.olvpc.id.apply(default_group).id,
+            "ssh": public_ssh(data_vpc_config.vpc_name, data_vpc.olvpc)(
+                tags=data_vpc_config.merged_tags(
+                    {"Name": f"ol-data-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"ol-data-{stack_info.env_suffix}-public-ssh",
+            ).id,
             "web": public_web(data_vpc_config.vpc_name, data_vpc.olvpc)(
                 tags=data_vpc_config.merged_tags(
                     {"Name": f"ol-data-{stack_info.env_suffix}-public-web"}
@@ -188,6 +209,14 @@ residential_mitx_vpc_exports.update(
     {
         "security_groups": {
             "default": residential_mitx_vpc.olvpc.id.apply(default_group).id,
+            "ssh": public_ssh(
+                residential_mitx_vpc_config.vpc_name, residential_mitx_vpc.olvpc
+            )(
+                tags=residential_mitx_vpc_config.merged_tags(
+                    {"Name": f"mitx-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"mitx-{stack_info.env_suffix}-public-ssh",
+            ).id,
             "web": public_web(
                 residential_mitx_vpc_config.vpc_name, residential_mitx_vpc.olvpc
             )(
@@ -211,11 +240,57 @@ residential_mitx_vpc_exports.update(
 )
 export("residential_mitx_vpc", residential_mitx_vpc_exports)
 
+residential_mitx_staging_vpc_exports = vpc_exports(
+    residential_mitx_staging_vpc, ["operations_vpc"]
+)
+residential_mitx_staging_vpc_exports.update(
+    {
+        "security_groups": {
+            "default": residential_mitx_staging_vpc.olvpc.id.apply(default_group).id,
+            "ssh": public_ssh(
+                residential_mitx_staging_vpc_config.vpc_name,
+                residential_mitx_staging_vpc.olvpc,
+            )(
+                tags=residential_mitx_staging_vpc_config.merged_tags(
+                    {"Name": f"mitx-staging-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"mitx-staging-{stack_info.env_suffix}-public-ssh",
+            ).id,
+            "web": public_web(
+                residential_mitx_staging_vpc_config.vpc_name,
+                residential_mitx_staging_vpc.olvpc,
+            )(
+                tags=residential_mitx_staging_vpc_config.merged_tags(
+                    {"Name": f"mitx-staging-{stack_info.env_suffix}-public-web"}
+                ),
+                name=f"mitx-staging-{stack_info.env_suffix}-public-web",
+            ).id,
+            "salt_minion": salt_minion(
+                residential_mitx_staging_vpc_config.vpc_name,
+                residential_mitx_staging_vpc.olvpc,
+                operations_vpc.olvpc,
+            )(
+                tags=residential_mitx_staging_vpc_config.merged_tags(
+                    {"Name": f"mitx-staging-{stack_info.env_suffix}-salt-minion"}
+                ),
+                name=f"mitx-staging-{stack_info.env_suffix}-salt-minion",
+            ).id,
+        }
+    }
+)
+export("residential_mitx_staging_vpc", residential_mitx_staging_vpc_exports)
+
 mitx_online_vpc_exports = vpc_exports(mitx_online_vpc, ["data_vpc", "operations_vpc"])
 mitx_online_vpc_exports.update(
     {
         "security_groups": {
             "default": mitx_online_vpc.olvpc.id.apply(default_group).id,
+            "ssh": public_ssh(mitx_online_vpc_config.vpc_name, mitx_online_vpc.olvpc)(
+                tags=mitx_online_vpc_config.merged_tags(
+                    {"Name": f"mitxonline-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"mitxonline-{stack_info.env_suffix}-public-ssh",
+            ).id,
             "web": public_web(mitx_online_vpc_config.vpc_name, mitx_online_vpc.olvpc)(
                 tags=mitx_online_vpc_config.merged_tags(
                     {"Name": f"mitxonline-{stack_info.env_suffix}-public-web"}
@@ -248,6 +323,12 @@ xpro_vpc_exports.update(
                 ),
                 name=f"mitxpro-{stack_info.env_suffix}-public-web",
             ).id,
+            "ssh": public_ssh(xpro_vpc_config.vpc_name, xpro_vpc.olvpc)(
+                tags=xpro_vpc_config.merged_tags(
+                    {"Name": f"mitxpro-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"mitxpro-{stack_info.env_suffix}-public-ssh",
+            ).id,
             "salt_minion": salt_minion(
                 xpro_vpc_config.vpc_name,
                 xpro_vpc.olvpc,
@@ -273,6 +354,12 @@ applications_vpc_exports.update(
                     {"Name": f"applications-{stack_info.env_suffix}-public-web"}
                 ),
                 name=f"applications-{stack_info.env_suffix}-public-web",
+            ).id,
+            "ssh": public_ssh(applications_vpc_config.vpc_name, applications_vpc.olvpc)(
+                tags=applications_vpc_config.merged_tags(
+                    {"Name": f"applications-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"applications-{stack_info.env_suffix}-public-ssh",
             ).id,
             "salt_minion": salt_minion(
                 applications_vpc_config.vpc_name,
@@ -300,6 +387,7 @@ operations_vpc_exports = vpc_exports(
         "data_vpc",
         "mitxonline_vpc",
         "residential_mitx_vpc",
+        "residential_mitx_staging_vpc",
         "xpro_vpc",
     ],
 )
@@ -312,6 +400,12 @@ operations_vpc_exports.update(
                     {"Name": f"operations-{stack_info.env_suffix}-public-web"}
                 ),
                 name=f"operations-{stack_info.env_suffix}-public-web",
+            ).id,
+            "ssh": public_ssh(operations_vpc_config.vpc_name, operations_vpc.olvpc)(
+                tags=operations_vpc_config.merged_tags(
+                    {"Name": f"operations-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"operations-{stack_info.env_suffix}-public-ssh",
             ).id,
             "salt_minion": salt_minion(
                 operations_vpc_config.vpc_name,
@@ -367,6 +461,13 @@ operations_to_mitx_peer = OLVPCPeeringConnection(
     "ol-operations-{0}-to-residential-mitx-{0}-vpc-peer".format(stack_info.env_suffix),
     operations_vpc,
     residential_mitx_vpc,
+)
+operations_to_mitx_staging_peer = OLVPCPeeringConnection(
+    "ol-operations-{0}-to-residential-mitx-staging-{0}-vpc-peer".format(
+        stack_info.env_suffix
+    ),
+    operations_vpc,
+    residential_mitx_staging_vpc,
 )
 operations_to_xpro_peer = OLVPCPeeringConnection(
     "ol-operations-{0}-to-mitxpro-{0}-vpc-peer".format(stack_info.env_suffix),

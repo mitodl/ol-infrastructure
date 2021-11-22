@@ -1,9 +1,16 @@
-from pyinfra.operations import files, git, server
+from pyinfra import host
+from pyinfra.operations import apt, files, git, server
 
 from bilder.components.baseline.steps import install_baseline_packages
 from bilder.images.edxapp.lib import WEB_NODE_TYPE, node_type
 
 EDX_USER = "edxapp"
+
+apt.packages(
+    name="Remove unattended-upgrades to prevent race conditions during build",
+    packages=["unattended-upgrades"],
+    present=False,
+)
 
 install_baseline_packages(
     packages=[
@@ -33,12 +40,13 @@ if node_type == WEB_NODE_TYPE:
         group=EDX_USER,
         present=True,
     )
-    git.repo(
-        name="Load theme repository",
-        src="https://github.com/mitodl/mitxonline-theme",
-        # Using a generic directory to simplify usage across deployments
-        dest="/edx/app/edxapp/themes/edxapp-theme",
-        branch="main",
-        user=EDX_USER,
-        group=EDX_USER,
-    )
+    for deployment, config in host.data.edx_themes.items():
+        git.repo(
+            name="Load theme repository",
+            src=config["repository"],
+            # Using a generic directory to simplify usage across deployments
+            dest=f"/edx/app/edxapp/themes/{deployment}",
+            branch=config["branch"],
+            user=EDX_USER,
+            group=EDX_USER,
+        )

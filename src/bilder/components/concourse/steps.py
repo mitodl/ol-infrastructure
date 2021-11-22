@@ -88,7 +88,7 @@ def _manage_web_node_keys(
     # Create authorized_keys file
     files.template(
         name="Create authorized_keys file to permit worker connections",
-        src=Path(__file__).parent.joinpath("templates", "authorized_keys.j2"),
+        src=Path(__file__).resolve().parent.joinpath("templates", "authorized_keys.j2"),
         dest=concourse_config.authorized_keys_file,
         user=concourse_config.user,
         authorized_keys=concourse_config.authorized_worker_keys or [],
@@ -198,7 +198,7 @@ def configure_concourse(
 ):
     concourse_env_file = files.template(
         name="Create Concourse environment file",
-        src=Path(__file__).parent.joinpath("templates/env_file.j2"),
+        src=Path(__file__).resolve().parent.joinpath("templates/env_file.j2"),
         dest=concourse_config.env_file_path,
         concourse_config=concourse_config,
         user=concourse_config.user,
@@ -241,7 +241,7 @@ def register_concourse_service(
     # Create Systemd unit to manage Concourse service
     systemd_unit = files.template(
         name="Create concourse Systemd unit definition",
-        src=Path(__file__).parent.joinpath("templates/concourse.service.j2"),
+        src=Path(__file__).resolve().parent.joinpath("templates/concourse.service.j2"),
         dest="/etc/systemd/system/concourse.service",
         concourse_config=concourse_config,
         state=state,

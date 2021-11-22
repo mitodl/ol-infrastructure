@@ -31,7 +31,7 @@ from bilder.facts import has_systemd  # noqa: F401
 
 VERSIONS = {  # noqa: WPS407
     "caddy_route53": "v1.1.2",
-    "consul": os.environ.get("CONSUL_VERSION", "1.10.0"),
+    "consul": os.environ.get("CONSUL_VERSION", "1.10.3"),
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 
@@ -41,6 +41,7 @@ consul_configuration = {
     Path("00-default.json"): ConsulConfig(
         bootstrap_expect=3,
         server=True,
+        ui=True,
         telemetry=ConsulTelemetry(),
     )
 }

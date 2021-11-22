@@ -20,7 +20,7 @@ class CaddyPlugin(BaseModel):
 
 
 class CaddyConfig(OLBaseSettings):
-    caddyfile: Path = Path(__file__).parent.joinpath("templates/Caddyfile.j2")
+    caddyfile: Path = Path(__file__).resolve().parent.joinpath("templates/Caddyfile.j2")
     data_directory: Path = Path("/var/lib/caddy/")
     domains: Optional[List[str]]
     log_file: Optional[Path] = Path("/var/log/caddy/caddy.log")

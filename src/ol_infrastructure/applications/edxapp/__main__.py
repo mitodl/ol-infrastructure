@@ -18,7 +18,6 @@ import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi.output import Output
 from pulumi_aws import (
     acm,
     autoscaling,
@@ -45,6 +44,7 @@ from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisC
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
+    OLVaultMongoAtlasDatabaseConfig,
     OLVaultMongoDatabaseConfig,
     OLVaultMysqlDatabaseConfig,
 )
@@ -55,6 +55,7 @@ from ol_infrastructure.lib.aws.ec2_helper import (
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
+from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
@@ -92,6 +93,7 @@ kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
 # Variables #
 #############
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+target_vpc = edxapp_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
 aws_account = get_caller_identity()
 aws_config = AWSBase(
     tags={
@@ -102,22 +104,26 @@ aws_config = AWSBase(
     }
 )
 consul_security_groups = consul_stack.require_output("security_groups")
+consul_provider = get_consul_provider(stack_info)
 edxapp_domains = edxapp_config.require_object("domains")
 edxapp_mail_domain = edxapp_config.require("mail_domain")
-edxapp_vpc = network_stack.require_output(f"{stack_info.env_prefix}_vpc")
+edxapp_vpc = network_stack.require_output(target_vpc)
 edxapp_vpc_id = edxapp_vpc["id"]
 edxapp_web_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["edxapp-web-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
+        ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
     ],
     most_recent=True,
     owners=[aws_account.account_id],
 )
 edxapp_worker_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["edxapp-worker-*"]),
+        ec2.GetAmiFilterArgs(
+            name="name", values=[f"edxapp-worker-{stack_info.env_prefix}-*"]
+        ),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
     ],
@@ -241,6 +247,7 @@ consul.Keys(
         consul.KeysKeyArgs(path=f"edxapp/{key}", value=config_value)
         for key, config_value in consul_kv_data.items()
     ],
+    opts=consul_provider,
 )
 
 ########################
@@ -296,7 +303,7 @@ edxapp_policy_document = {
             "Action": ["ses:SendEmail", "ses:SendRawEmail"],
             "Resource": [
                 "arn:*:ses:*:*:identity/*mit.edu",
-                f"arn:aws:ses:*:*:configuration-set/edxapp-mitxonline-{stack_info.env_suffix}",  # noqa: E501
+                f"arn:aws:ses:*:*:configuration-set/edxapp-{stack_info.env_prefix}-{stack_info.env_suffix}",  # noqa: E501
             ],
         },
         {
@@ -456,6 +463,7 @@ edxapp_db_consul_node = Node(
     "edxapp-instance-db-node",
     name="edxapp-mysql",
     address=edxapp_db.db_instance.address,
+    opts=consul_provider,
 )
 
 edxapp_db_consul_service = Service(
@@ -481,32 +489,65 @@ edxapp_db_consul_service = Service(
             ),  # noqa: WPS237,E501
         )
     ],
+    opts=consul_provider,
 )
 
 #######################
 # MongoDB Vault Setup #
 #######################
-edxapp_mongo_role_statements = mongodb_role_statements
-edxapp_mongo_role_statements["edxapp"] = {
-    "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "edxapp"})),
-    "revoke": Template(json.dumps({"db": "edxapp"})),
-}
-edxapp_mongo_role_statements["forum"] = {
-    "create": Template(json.dumps({"roles": [{"role": "readWrite"}], "db": "forum"})),
-    "revoke": Template(json.dumps({"db": "forum"})),
-}
+mongodb_config = Config("mongodb")
+mongodb_admin_username = mongodb_config.get("admin_username") or "admin"
+mongodb_admin_password = mongodb_config.get("admin_password")
 
-edxapp_mongo_vault_config = OLVaultMongoDatabaseConfig(
-    db_name="edxapp",
-    mount_point=f"mongodb-{stack_info.env_prefix}",
-    db_connection=(
-        "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
-    ),
-    db_admin_username=edxapp_config.get("mongo_admin_user") or "admin",
-    db_admin_password=edxapp_config.require("mongo_admin_password"),
-    db_host=f"mongodb-master.service.{env_name}.consul",
-    role_statements=edxapp_mongo_role_statements,
-)
+edxapp_mongo_role_statements = mongodb_role_statements
+
+if atlas_project_id := mongodb_config.get("atlas_project_id"):
+    atlas_connection_options = {"project_id": atlas_project_id}
+    atlas_connection_options.update(
+        read_yaml_secrets(Path("pulumi/mongodb_atlas.yaml"))
+    )
+    edxapp_mongo_role_statements["edxapp"] = {
+        "create": Template(
+            json.dumps({"roles": [{"roleName": "readWrite", "databaseName": "edxapp"}]})
+        ),
+        "revoke": Template(json.dumps({"db": "edxapp"})),
+    }
+    edxapp_mongo_role_statements["forum"] = {
+        "create": Template(
+            json.dumps({"roles": [{"roleName": "readWrite", "databaseName": "forum"}]})
+        ),
+        "revoke": Template(json.dumps({"db": "forum"})),
+    }
+    edxapp_mongo_vault_config = OLVaultMongoAtlasDatabaseConfig(
+        db_name="edxapp",
+        mount_point=f"mongodb-{stack_info.env_prefix}",
+        role_statements=edxapp_mongo_role_statements,
+        connection_options=atlas_connection_options,
+    )
+else:
+    edxapp_mongo_role_statements["edxapp"] = {
+        "create": Template(
+            json.dumps({"roles": [{"role": "readWrite"}], "db": "edxapp"})
+        ),
+        "revoke": Template(json.dumps({"db": "edxapp"})),
+    }
+    edxapp_mongo_role_statements["forum"] = {
+        "create": Template(
+            json.dumps({"roles": [{"role": "readWrite"}], "db": "forum"})
+        ),
+        "revoke": Template(json.dumps({"db": "forum"})),
+    }
+    edxapp_mongo_vault_config = OLVaultMongoDatabaseConfig(
+        db_name="edxapp",
+        mount_point=f"mongodb-{stack_info.env_prefix}",
+        db_connection=(
+            "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
+        ),
+        db_admin_username=mongodb_admin_username,
+        db_admin_password=mongodb_admin_password,
+        db_host=f"mongodb-master.service.{env_name}.consul",
+        role_statements=edxapp_mongo_role_statements,
+    )
 edxapp_mongo_vault_backend = OLVaultDatabaseBackend(edxapp_mongo_vault_config)
 
 ###########################
@@ -533,7 +574,9 @@ redis_cluster_security_group = ec2.SecurityGroup(
 
 redis_cache_config = OLAmazonRedisConfig(
     encrypt_transit=True,
-    auth_token=redis_config.require("auth_token"),
+    auth_token=read_yaml_secrets(
+        Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
+    )["redis_auth_token"],
     cluster_mode_enabled=False,
     encrypted=True,
     engine_version="6.x",
@@ -554,6 +597,7 @@ edxapp_redis_consul_node = Node(
     "edxapp-redis-cache-node",
     name="edxapp-redis",
     address=edxapp_redis_cache.address,
+    opts=consul_provider,
 )
 
 edxapp_redis_consul_service = Service(
@@ -578,6 +622,7 @@ edxapp_redis_consul_service = Service(
             ).apply(lambda cluster: "{address}:{port}".format(**cluster)),
         )
     ],
+    opts=consul_provider,
 )
 
 ########################################
@@ -682,7 +727,7 @@ edxapp_ses_event_destintations = ses.EventDestination(
 edxapp_vault_mount = vault.Mount(
     "edxapp-vault-generic-secrets-mount",
     path=f"secret-{stack_info.env_prefix}",
-    description="Static secrets storage for MITx Online applications and services",
+    description="Static secrets storage for Open edX {stack_info.env_prefix} applications and services",  # noqa: E501
     type="kv",
 )
 edxapp_secrets = vault.generic.Secret(
@@ -705,13 +750,16 @@ forum_secrets = vault.generic.Secret(
 # Vault policy definition
 edxapp_vault_policy = vault.Policy(
     "edxapp-vault-policy",
-    name="edxapp",
-    policy=Path(__file__).parent.joinpath("edxapp_policy.hcl").read_text(),
+    name=f"edxapp-{stack_info.env_prefix}",
+    policy=Path(__file__)
+    .parent.joinpath(f"edxapp_{stack_info.env_prefix}_policy.hcl")
+    .read_text(),
 )
 # Register edX Platform AMI for Vault AWS auth
+aws_vault_backend = f"aws-{stack_info.env_prefix}"
 edxapp_web_vault_auth_role = vault.aws.AuthBackendRole(
     "edxapp-web-ami-ec2-vault-auth",
-    backend="aws",
+    backend=aws_vault_backend,
     auth_type="iam",
     role="edxapp-web",
     inferred_entity_type="ec2_instance",
@@ -725,7 +773,7 @@ edxapp_web_vault_auth_role = vault.aws.AuthBackendRole(
 
 edxapp_worker_vault_auth_role = vault.aws.AuthBackendRole(
     "edxapp-worker-ami-ec2-vault-auth",
-    backend="aws",
+    backend=aws_vault_backend,
     auth_type="iam",
     role="edxapp-worker",
     inferred_entity_type="ec2_instance",
@@ -739,7 +787,7 @@ edxapp_worker_vault_auth_role = vault.aws.AuthBackendRole(
 
 edx_notes_vault_policy = vault.Policy(
     "edx-notes-api-vault-policy",
-    name="edx-notes-api",
+    name=f"edx-notes-api-{stack_info.env_suffix}",
     policy=Path(__file__).parent.joinpath("edx_notes_api_policy.hcl").read_text(),
 )
 edxapp_notes_iam_role = iam.Role(
@@ -760,7 +808,7 @@ edxapp_notes_iam_role = iam.Role(
 )
 edxapp_notes_vault_auth_role = vault.aws.AuthBackendRole(
     "edx-notes-iam-vault-auth",
-    backend="aws",
+    backend=aws_vault_backend,
     auth_type="iam",
     role="edx-notes-api",
     resolve_aws_unique_ids=True,
@@ -1027,8 +1075,8 @@ web_asg = autoscaling.Group(
     "edxapp-web-autoscaling-group",
     desired_capacity=edxapp_config.get_int("web_node_capacity")
     or MIN_WEB_NODES_DEFAULT,
-    min_size=edxapp_config.get("min_web_nodes") or MIN_WEB_NODES_DEFAULT,
-    max_size=edxapp_config.get("max_web_nodes") or MAX_WEB_NODES_DEFAULT,
+    min_size=edxapp_config.get_int("min_web_nodes") or MIN_WEB_NODES_DEFAULT,
+    max_size=edxapp_config.get_int("max_web_nodes") or MAX_WEB_NODES_DEFAULT,
     health_check_type="ELB",
     vpc_zone_identifiers=edxapp_vpc["subnet_ids"],
     launch_template=autoscaling.GroupLaunchTemplateArgs(
@@ -1124,7 +1172,7 @@ web_alb_metric_alarm = cloudwatch.MetricAlarm(
 )
 
 worker_instance_type = (
-    edxapp_config.get("worker_instance_type") or InstanceTypes.large.name
+    edxapp_config.get("worker_instance_type") or InstanceTypes.burstable_large.name
 )
 worker_launch_config = ec2.LaunchTemplate(
     "edxapp-worker-launch-template",

@@ -20,10 +20,6 @@ config:
   edxapp:elb_healthcheck_interval: '30'
   edxapp:google_analytics_id: UA-5145472-46
   edxapp:mail_domain: edxapp-mail-qa.mitxonline.mit.edu
-  edxapp:mongo_admin_password:
-    secure: v1:LSQgiUW2n8fzAks9:+ZYckckuLvNozc/WBbKA+Ppjf9pZWoP+OjLlLAunW81jR/3iJnbcn0MJBdAcgNtdTHVKDqu5
   edxapp:sender_email_address: support@edxapp-mail-qa.mitxonline.mit.edu
-  redis:auth_token:
-    secure: v1:uFZFB99Yk40m0l+V:zgfnmbI5F7uPME/NLqmLN8R+0njnx7AQ1KX//AR+AebW7dJ+U4+pj02tnwFDzP98FLhP/27m
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

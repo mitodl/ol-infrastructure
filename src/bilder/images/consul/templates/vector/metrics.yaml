@@ -28,6 +28,14 @@ transforms:
       .tags.job = "integrations/linux_host"
       .tags.instance = "${HOSTNAME}"
 
+  consul_metrics_relabel:
+    type: remap
+    inputs:
+    - consul_metrics
+    source: |
+      .tags.job = "integrations/consul"
+      .tags.instance = "${HOSTNAME}"
+
   add_labels_to_metrics:
     type: remap
     inputs:

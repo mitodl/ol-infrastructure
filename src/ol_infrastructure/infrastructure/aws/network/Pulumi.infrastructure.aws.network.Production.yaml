@@ -9,5 +9,6 @@ config:
   operations_vpc:cidr_block: 10.0.0.0/16
   operations_vpc:name: operations
   residential_vpc:cidr_block: 10.7.0.0/16
+  residential_staging_vpc:cidr_block: 10.31.0.0/16
   xpro_vpc:cidr_block: 10.8.0.0/16
   xpro_vpc:name: mitxpro-production

@@ -115,9 +115,9 @@ def register_services(
         systemd_unit = files.template(
             name=f"Create service definition for {product.name}",
             dest=f"/usr/lib/systemd/system/{product.name}.service",
-            src=Path(__file__).parent.joinpath(
-                "templates", f"{product.name}.service.j2"
-            ),
+            src=Path(__file__)
+            .resolve()
+            .parent.joinpath("templates", f"{product.name}.service.j2"),
             context=product.systemd_template_context,
             state=state,
             host=host,

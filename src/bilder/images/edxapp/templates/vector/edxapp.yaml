@@ -86,7 +86,7 @@ transforms:
       parsed, err = parse_json(.message)
       if parsed != null {
         .@timestamp = parse_timestamp!(parsed.time, "%FT%T%:z")
-        . = merge(., parsed)
+        ., err = merge(., parsed)
         .log_process = "nginx"
         .environment = "${ENVIRONMENT}"
       }
@@ -170,6 +170,6 @@ sinks:
     labels:
       environment: ${ENVIRONMENT}
       application: edxapp
-      service: mitxonline
+      service: {{context.edx_installation}}
       hostname: ${HOSTNAME}
     out_of_order_action: rewrite_timestamp

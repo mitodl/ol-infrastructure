@@ -1,7 +1,11 @@
+from pathlib import Path
+
 import pulumi
 import pulumi_aws as aws
+import pulumi_consul as consul
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -72,6 +76,49 @@ search_domain = aws.elasticsearch.Domain(
     tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch-cluster"}),
 )
 
+consul_config = pulumi.Config("consul")
+consul_provider = consul.Provider(
+    "consul-provider",
+    address=consul_config.require("address"),
+    scheme="https",
+    http_auth="pulumi:{}".format(
+        read_yaml_secrets(Path(f"pulumi/consul.{stack_info.env_suffix}.yaml"))[
+            "basic_auth_password"
+        ]
+    ),
+)
+
+opensearch_node = consul.Node(
+    "aws-opensearch-consul-node",
+    address=search_domain.endpoint,
+    opts=pulumi.ResourceOptions(provider=consul_provider),
+)
+
+opensearch_service = consul.Service(
+    "aws-opensearch-consul-service",
+    node=opensearch_node.name,
+    name="elasticsearch",
+    port=DEFAULT_HTTPS_PORT,
+    meta={
+        "external-node": True,
+        "external-probe": True,
+    },
+    checks=[
+        consul.ServiceCheckArgs(
+            check_id="elasticsearch",
+            interval="10s",
+            name="elasticsearch",
+            timeout="1m0s",
+            status="passing",
+            tcp=pulumi.Output.all(
+                address=search_domain.endpoint, port=DEFAULT_HTTPS_PORT
+            ).apply(
+                lambda es: "{address}:{port}".format(**es)
+            ),  # noqa: WPS237,E501
+        )
+    ],
+    opts=pulumi.ResourceOptions(provider=consul_provider),
+)
 
 pulumi.export(
     "cluster",

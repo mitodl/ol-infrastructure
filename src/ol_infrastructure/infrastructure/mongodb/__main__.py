@@ -91,7 +91,9 @@ mongodb_security_group = ec2.SecurityGroup(
 
 security_groups = {"mongodb_server": mongodb_security_group.id}
 
-instance_type_name = mongodb_config.get("instance_type") or InstanceTypes.medium.name
+instance_type_name = (
+    mongodb_config.get("instance_type") or InstanceTypes.burstable_medium.name
+)
 instance_type = InstanceTypes[instance_type_name].value
 mongodb_instances = []
 export_data = {}

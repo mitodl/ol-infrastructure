@@ -1,7 +1,7 @@
 [Unit]
 Description=consul agent
 Requires=network-online.target
-After=network-online.target
+After=network-online.target vault.service consul.service
 
 [Service]
 EnvironmentFile=-/etc/default/consul-template

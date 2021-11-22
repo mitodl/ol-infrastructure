@@ -1,0 +1,27 @@
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQFx9m+5C+NdLferEI0btCZKAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMyumhy7Iitmb+QbeVAgEQgDsWf6EA6MbapG+Oj/VU4e+E9bMhpzXOObyHByUDT1VBvg7Jmgo8YHS+Ca8R+wG9nNzizvISO2S9V8SlLg==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-mitx-ci.odl.mit.edu
+  edxapp:business_unit: residential
+  edxapp:db_password:
+    secure: v1:Q1uI9EWaIrq2z2sY:pTBVK/vatuCQXgO3Z2ItArDb4P1QLpN/lP/jT9690boozaKjjJudoQZOyWjkbCFwGLieh+L9auw=
+  edxapp:dns_zone: mitx
+  edxapp:domains:
+    lms: lms-ci.mitx.mit.edu
+    preview: preview-ci.mitx.mit.edu
+    studio: studio-ci.mitx.mit.edu
+  edxapp:edx_forum_secrets:
+    secure: v1:Cv6WRoXTzc4X0Mt/:JfUayMiJ3oXbRcmhCWfCLJqVvMAx3c8M0z4e5fXVj9L2fLMHfRVUhhQEn1O5lrbwnewNkzGIci1ArchaMiC9BpbVRYqfihQhT5/KH2UkaoVS6kvbgbL/M489Wa7AYpLxK47F/BPaBGLGkIZMesuo
+  edxapp:elb_healthcheck_interval: "30"
+  edxapp:google_analytics_id: ""
+  edxapp:mail_domain: edxapp-mail-ci.mitx.mit.edu
+  edxapp:min_web_nodes: "1"
+  edxapp:min_worker_nodes: "1"
+  edxapp:sender_email_address: support@edxapp-mail-ci.mitx.mit.edu
+  edxapp:target_vpc: residential_mitx_vpc
+  edxapp:web_node_capacity: "1"
+  edxapp:worker_node_capacity: "1"
+  mongodb:atlas_project_id: 617858f961f3016e0ade73e7
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

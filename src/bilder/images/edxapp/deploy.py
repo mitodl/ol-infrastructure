@@ -1,8 +1,9 @@
+import os
 import tempfile
 from pathlib import Path
 
 from pyinfra import host
-from pyinfra.operations import files, pip
+from pyinfra.operations import apt, files, pip
 
 from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models import (
@@ -49,32 +50,31 @@ from bilder.components.vector.steps import (
 )
 from bilder.facts import has_systemd  # noqa: F401
 from bilder.images.edxapp.lib import WEB_NODE_TYPE, node_type
-from bilder.images.edxapp.plugins import git_export_import  # noqa: F401
+from bilder.images.edxapp.plugins.git_export_import import git_auto_export  # noqa: F401
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 
 VERSIONS = {  # noqa: WPS407
     "consul": "1.10.2",
     "vault": "1.8.2",
-    "consul-template": "0.27.1",
+    "consul-template": "0.27.2",
 }
-TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
+TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
+EDX_INSTALLATION_NAME = os.environ.get("EDX_INSTALLATION", "mitxonline")
+
+apt.packages(
+    name="Remove unattended-upgrades to prevent race conditions during build",
+    packages=["unattended-upgrades"],
+    present=False,
+)
 
 ###########
 # edX App #
 ###########
+git_auto_export()
 # Install additional Python dependencies for use with edxapp
 pip.packages(
     name="Install additional edX dependencies",
-    packages=[
-        "django-redis",  # Support for Redis caching in Django
-        "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
-        "mitxpro-openedx-extensions==0.2.2",
-        "social-auth-mitxpro==0.5",
-        "edx-username-changer==0.2.0",
-        "edx-sysadmin",
-        "ol-openedx-sentry",
-        "ol-openedx-logging",
-    ],
+    packages=host.data.edx_plugins[EDX_INSTALLATION_NAME],
     present=True,
     virtualenv="/edx/app/edxapp/venvs/edxapp/",
     sudo_user="edxapp",
@@ -92,18 +92,17 @@ files.directory(
 
 vector = VectorConfig(
     configuration_templates={
-        TEMPLATES_DIRECTORY.joinpath("vector", "edxapp.yaml"): {},
-        TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml"): {},
+        TEMPLATES_DIRECTORY.joinpath("vector", "edxapp.yaml"): {
+            "edx_installation": EDX_INSTALLATION_NAME
+        },
+        TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml"): {
+            "edx_installation": EDX_INSTALLATION_NAME
+        },
     }
 )
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
-lms_config_path = Path("/edx/etc/lms.yml")
-studio_config_path = Path("/edx/etc/studio.yml")
-forum_config_path = Path("/edx/app/forum/forum_env")
-lms_intermediate_template = Path("/etc/consul-template/templates/edxapp-lms.tmpl")
-studio_intermediate_template = Path("/etc/consul-template/templates/edxapp-studio.tmpl")
-forum_intermediate_template = Path("/etc/consul-template/templates/edx-forum.tmpl")
-# Install Consul and Vault Agent
+
+# Manage Vault templates
 vault_templates = [
     VaultTemplate(
         contents=(
@@ -113,22 +112,18 @@ vault_templates = [
         destination=Path("/var/www/.ssh/id_rsa"),
     )
 ]
+
+# Set up Consul templates
+lms_config_path = Path("/edx/etc/lms.yml")
+studio_config_path = Path("/edx/etc/studio.yml")
+forum_config_path = Path("/edx/app/forum/forum_env")
+lms_intermediate_template = Path("/etc/consul-template/templates/edxapp-lms.tmpl")
+studio_intermediate_template = Path("/etc/consul-template/templates/edxapp-studio.tmpl")
+forum_intermediate_template = Path("/etc/consul-template/templates/edx-forum.tmpl")
 consul_templates = [
-    ConsulTemplateTemplate(
-        contents='{{ key "edxapp-template/studio" }}',
-        destination=studio_intermediate_template,
-        # Tell consul-template to reload the rendered template from disk
-        command="/usr/bin/pkill -HUP consul-template",
-    ),
     ConsulTemplateTemplate(
         source=studio_intermediate_template,
         destination=studio_config_path,
-    ),
-    ConsulTemplateTemplate(
-        contents='{{ key "edxapp-template/lms" }}',
-        destination=lms_intermediate_template,
-        # Tell consul-template to reload the rendered template from disk
-        command="/usr/bin/pkill -HUP consul-template",
     ),
     ConsulTemplateTemplate(
         source=lms_intermediate_template, destination=lms_config_path
@@ -137,7 +132,7 @@ consul_templates = [
 if node_type == WEB_NODE_TYPE:
     files.put(
         name="Set up Nginx status endpoint for metrics collection",
-        src=Path(__file__).parent.joinpath("files", "nginx_status.conf"),
+        src=Path(__file__).resolve().parent.joinpath("files", "nginx_status.conf"),
         dest=Path("/etc/nginx/sites-enabled/status_monitor"),
         user="www-data",
         group="www-data",
@@ -151,14 +146,22 @@ if node_type == WEB_NODE_TYPE:
         [
             VaultTemplate(
                 contents=(
-                    '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
+                    '{{ with secret "secret-'
+                    + EDX_INSTALLATION_NAME
+                    + "/"
+                    + EDX_INSTALLATION_NAME
+                    + '-wildcard-certificate" }}'  # noqa: E501
                     "{{ printf .Data.cert_chain }}{{ end }}"
                 ),
                 destination=Path("/etc/ssl/certs/edxapp.cert"),
             ),
             VaultTemplate(
                 contents=(
-                    '{{ with secret "secret-mitxonline/mitxonline-wildcard-certificate" }}'  # noqa: E501
+                    '{{ with secret "secret-'
+                    + EDX_INSTALLATION_NAME
+                    + "/"
+                    + EDX_INSTALLATION_NAME
+                    + '-wildcard-certificate" }}'  # noqa: E501
                     "{{ printf .Data.key }}{{ end }}"
                 ),
                 destination=Path("/etc/ssl/private/edxapp.key"),
@@ -212,7 +215,7 @@ vault_config = VaultAgentConfig(
     auto_auth=VaultAutoAuthConfig(
         method=VaultAutoAuthMethod(
             type="aws",
-            mount_path="auth/aws",
+            mount_path=f"auth/aws-{EDX_INSTALLATION_NAME}",
             config=VaultAutoAuthAWS(role=f"edxapp-{node_type}"),
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
@@ -240,10 +243,12 @@ for product in hashicorp_products:
     configure_hashicorp_product(product)
 
 # Upload templates for consul-template agent
-common_config = TEMPLATES_DIRECTORY.joinpath("common_values.yml")
-studio_config = TEMPLATES_DIRECTORY.joinpath("studio_only.yml")
-lms_config = TEMPLATES_DIRECTORY.joinpath("lms_only.yml")
-forum_config = TEMPLATES_DIRECTORY.joinpath("forum.env")
+EDX_TEMPLATES_DIRECTORY = TEMPLATES_DIRECTORY.joinpath("edxapp", EDX_INSTALLATION_NAME)
+common_config = EDX_TEMPLATES_DIRECTORY.joinpath("common_values.yml")
+studio_config = EDX_TEMPLATES_DIRECTORY.joinpath("studio_only.yml")
+lms_config = EDX_TEMPLATES_DIRECTORY.joinpath("lms_only.yml")
+forum_config = EDX_TEMPLATES_DIRECTORY.joinpath("forum.env")
+
 with tempfile.NamedTemporaryFile("wt", delete=False) as studio_template:
     studio_template.write(common_config.read_text())
     studio_template.write(studio_config.read_text())
