@@ -8,7 +8,6 @@ User={{ concourse_config.user }}
 Group={{ concourse_config.user }}
 ExecStart={{ concourse_config.deploy_directory }}/bin/concourse {{ concourse_config._node_type }}
 Restart=always
-Restart=on-failure
 RestartSec=3
 EnvironmentFile=-{{ concourse_config.env_file_path }}
 {% if concourse_config._node_type == "web" %}
@@ -19,10 +18,10 @@ Delegate=true  {# Allow the Concourse worker to manage its own cgroups for conta
 KillSignal=SIGUSR2
 KillMode=process
 LimitNPROC=infinity
-LimitNOFILE=infinity
 TasksMax=infinity
 TimeoutStopSec=300
 {% endif %}
+LimitNOFILE=infinity
 
 [Install]
 WantedBy=multi-user.target

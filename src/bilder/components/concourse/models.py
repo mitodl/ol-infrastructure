@@ -786,7 +786,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     max_checks_per_second: Optional[int] = Field(
         None,
         concourse_env_var="CONCOURSE_MAX_CHECKS_PER_SECOND",
-        description="Maximum number of checks that can be started per second. If not specified, this will be calculated as (# of resources)/(resource checking interval). _1 value will remove this maximum limit of checks per second.",
+        description="Maximum number of checks that can be started per second. If not specified, this will be calculated as (# of resources)/(resource checking interval). -1 value will remove this maximum limit of checks per second.",
     )
     max_days_to_retain_build_logs: Optional[int] = Field(
         None,
