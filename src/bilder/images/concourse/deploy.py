@@ -65,9 +65,9 @@ from bridge.lib.magic_numbers import (
 )
 
 VERSIONS = {  # noqa: WPS407
-    "concourse": os.environ.get("CONCOURSE_VERSION", "7.5.0"),
-    "consul": os.environ.get("CONSUL_VERSION", "1.10.2"),
-    "vault": os.environ.get("VAULT_VERSION", "1.8.2"),
+    "concourse": os.environ.get("CONCOURSE_VERSION", "7.6.0"),
+    "consul": os.environ.get("CONSUL_VERSION", "1.10.3"),
+    "vault": os.environ.get("VAULT_VERSION", "1.9.0"),
 }
 CONCOURSE_WEB_NODE_TYPE = "web"
 CONCOURSE_WORKER_NODE_TYPE = "worker"

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, StackReference
+from pulumi import Config, Output, ResourceOptions, StackReference
 from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -31,6 +31,7 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     default_egress_args,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
@@ -73,6 +74,11 @@ concourse_worker_ami = ec2.get_ami(
     owners=[aws_account.account_id],
 )
 concourse_web_tag = f"concourse-web-{stack_info.env_suffix}"
+
+if Config("consul").get("http_auth"):
+    consul_provider = ResourceOptions()
+else:
+    consul_provider = get_consul_provider(stack_info)
 
 ###################################
 #    Security & Access Control    #
@@ -358,6 +364,7 @@ concourse_db_consul_node = Node(
     "concourse-instance-db-node",
     name="concourse-postgres-db",
     address=concourse_db.db_instance.address,
+    opts=consul_provider,
 )
 
 concourse_db_consul_service = Service(
@@ -382,6 +389,7 @@ concourse_db_consul_service = Service(
             ).apply(lambda db: "{address}:{port}".format(**db)),
         )
     ],
+    opts=consul_provider,
 )
 
 ##########################
