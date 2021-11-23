@@ -26,7 +26,7 @@ jobs:
 - name: build
   plan:
   - get: mfe-app-learning
-    trigger: false
+    trigger: true
   - task: npm-install-and-build
     config:
       platform: linux
@@ -72,4 +72,4 @@ jobs:
       source: mfe-app-learning/dist
       destination:
       - command: sync
-        dir: s3-remote: xpro-ci-edxapp-mfe/learn/
+        dir: s3-remote:xpro-ci-edxapp-mfe/learn/

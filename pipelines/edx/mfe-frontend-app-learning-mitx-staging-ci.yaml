@@ -26,7 +26,7 @@ jobs:
 - name: build
   plan:
   - get: mfe-app-learning
-    trigger: false
+    trigger: true
   - task: npm-install-and-build
     config:
       platform: linux
