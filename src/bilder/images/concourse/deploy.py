@@ -113,14 +113,14 @@ concourse_config_map = {
         vault_path_prefix="/secret-concourse",
         prometheus_bind_ip=IPv4Address("127.0.0.1"),
         prometheus_bind_port=CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
-        containerd_max_containers=500,
-        containerd_network_pool="10.250.0.0/16",
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
         container_runtime="containerd",
         containerd_dns_server="8.8.8.8",
         baggageclaim_driver="overlay",
+        containerd_max_containers=500,
+        containerd_network_pool="10.250.0.0/16",
     ),
 }
 concourse_config: Union[
