@@ -113,10 +113,8 @@ concourse_config_map = {
         vault_path_prefix="/secret-concourse",
         prometheus_bind_ip=IPv4Address("127.0.0.1"),
         prometheus_bind_port=CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
-        container_placement_strategy="limit-active-tasks",
-        gc_failed_grace_period="30m",
-        max_active_containers_per_worker=300,
-        max_active_tasks_per_worker=0,
+        containerd_max_containers=500,
+        containerd_network_pool="10.250.0.0/16",
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
