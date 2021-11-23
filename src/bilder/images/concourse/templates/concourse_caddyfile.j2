@@ -6,6 +6,10 @@
     email odl-devops@mit.edu
 }
 
+*:443 {
+    reverse_proxy /api/v1/info http://127.0.0.1:8080
+}
+
 {$DOMAIN:cicd.odl.mit.edu} {
     log {
         format json
