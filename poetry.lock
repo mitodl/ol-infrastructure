@@ -1007,7 +1007,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-fastly"
-version = "3.9.0"
+version = "3.10.0"
 description = "A Pulumi package for creating and managing fastly cloud resources."
 category = "main"
 optional = false
@@ -1583,7 +1583,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "dd52d6babb519f35e5137ff2ed7c3cc1a3a4d0eb06a32bfa048419cdc13893fb"
+content-hash = "c1d9f9844e333126003a6c2fbcf61c478662e68888819c3d8f89900c4ca98a9d"
 
 [metadata.files]
 anyio = [
@@ -2204,7 +2204,7 @@ pulumi-consul = [
     {file = "pulumi_consul-3.4.0.tar.gz", hash = "sha256:3a1361c0b4661c0f7c13f15771b7066d5af3a5189c7b7145718fde03efb58c72"},
 ]
 pulumi-fastly = [
-    {file = "pulumi_fastly-3.9.0.tar.gz", hash = "sha256:133b6f12103c0ce2addfc808cb3812582c21c3dee9c2d3de0f6c6e015a16cb5e"},
+    {file = "pulumi_fastly-3.10.0.tar.gz", hash = "sha256:23977775e6c8209c0306e5f1f47ca436ad3bdc5458acf0498816f522ff8e7941"},
 ]
 pulumi-github = [
     {file = "pulumi_github-4.6.0.tar.gz", hash = "sha256:4fe480daa7e1595606ffe1ccf3bfaa7c6ee93581c6ad58229577ecc0f886f994"},
