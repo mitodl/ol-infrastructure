@@ -34,6 +34,7 @@ jobs:
         type: registry-image
         source:
           repository: node
+          tag: 16-bullseye-slim
       inputs:
       - name: mfe-app-learning
       outputs:
@@ -64,7 +65,7 @@ jobs:
         HONOR_CODE_URL: https://rc.mitxonline.mit.edu/honor-code/
         TERMS_OF_SERVICE_URL: https://rc.mitxonline.mit.edu/terms-of-service/
         Contact: mailto:mitxonline-support@mit.edu
-        SUPPORT_CENTER_URL:  https://mitx-micromasters.zendesk.com/hc/
+        SUPPORT_CENTER_URL: https://mitx-micromasters.zendesk.com/hc/
         SUPPORT_CENTER_TEXT: Support Center
         TRADEMARK_TEXT: © MITxOnline. All rights reserved except where noted.
         SITE_URL: https://rc.mitxonline.mit.edu
