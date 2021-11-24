@@ -579,7 +579,7 @@ redis_cache_config = OLAmazonRedisConfig(
     )["redis_auth_token"],
     cluster_mode_enabled=False,
     encrypted=True,
-    engine_version="6.x",
+    engine_version="6.2",
     num_instances=3,
     shard_count=1,
     auto_upgrade=True,

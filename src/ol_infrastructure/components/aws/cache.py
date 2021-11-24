@@ -175,12 +175,13 @@ class OLAmazonCache(pulumi.ComponentResource):
 
         self.parameter_group = elasticache.ParameterGroup(
             f"{cache_config.cluster_name}-{cache_config.engine}-{cache_config.engine_version}-parameter-group",  # noqa: E501
-            name=f"{cache_config.cluster_name}-parameter-group",
+            name=(f"{cache_config.cluster_name}-{cache_config.engine_version.replace('.', '')}-parameter-group"),  # noqa: E501
             family=parameter_group_family(
                 cache_config.engine, cache_config.engine_version
             ),
             parameters=cache_parameters,
             opts=resource_options,
+            tags=cache_config.tags,
         )
 
         if cache_config.engine == "redis":
