@@ -42,7 +42,10 @@ def install_concourse(concourse_config: ConcourseBaseConfig, state=None, host=No
             name="Download the Concourse release archive",
             src=concourse_archive,
             dest=concourse_archive_path,
-            sha1sum=httpx.get(concourse_archive_hash).read().decode("utf8").split()[0],
+            sha1sum=httpx.get(concourse_archive_hash, follow_redirects=True)
+            .read()
+            .decode("utf8")
+            .split()[0],
             state=state,
             host=host,
         )
