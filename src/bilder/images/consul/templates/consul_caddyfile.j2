@@ -6,6 +6,10 @@
     email odl-devops@mit.edu
 }
 
+:443 {
+    reverse_proxy /health http://127.0.0.1:8500
+}
+
 {$DOMAIN:consul.odl.mit.edu} {
     log {
         format json

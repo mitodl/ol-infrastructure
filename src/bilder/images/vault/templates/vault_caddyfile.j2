@@ -6,6 +6,15 @@
     email odl-devops@mit.edu
 }
 
+:443 {
+    reverse_proxy /v1/sys/health {
+        to https://127.0.0.1:8200
+        transport http {
+            tls_insecure_skip_verify
+        }
+    }
+}
+
 {$DOMAIN:vault-ci.odl.mit.edu} {
     log {
         format json
