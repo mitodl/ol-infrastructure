@@ -42,6 +42,6 @@ path "secret-operations/global/github-enterprise-ssh" {
   capabilities = ["read"]
 }
 
-path "secret-mitx-staging/mitx-wildcard-certificate" {
+path "secret-mitx-staging/mitx-staging-wildcard-certificate" {
   capabilities = ["read"]
 }
