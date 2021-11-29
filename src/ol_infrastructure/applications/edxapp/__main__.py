@@ -311,6 +311,12 @@ edxapp_policy_document = {
             "Action": ["ses:GetSendQuota"],
             "Resource": "*",
         },
+        {
+            "Effect": "Allow",
+            "Action": ["es:ESHttp*"],
+            "Condition": {"IpAddress": {"aws:SourceIp": [edxapp_vpc["cidr"]]}},
+            "Resource": f"arn:aws:es:::domain/opensearch-{stack_info.env_prefix}-{stack_info.env_suffix}/*",
+        },
     ],
 }
 
