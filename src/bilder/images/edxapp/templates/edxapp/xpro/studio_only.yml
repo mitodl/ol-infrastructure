@@ -8,7 +8,7 @@ GIT_EXPORT_DEFAULT_IDENT:
   name: MIT xPRO
   email: odl-devops@mit.edu
 PARSE_KEYS: {}
-SITE_NAME: {{ key "edxapp/lms-domain" }}  # MODIFIED
+SITE_NAME: {{ key "edxapp/studio-domain" }}  # MODIFIED
 {{ with secret "secret-xpro/edxapp" }}
 SOCIAL_AUTH_EDX_OAUTH2_KEY: {{ .Data.studio_oauth_client.id }}
 SOCIAL_AUTH_EDX_OAUTH2_SECRET: {{ .Data.studio_oauth_client.secret }}
