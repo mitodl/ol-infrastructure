@@ -93,6 +93,7 @@ concourse_config_map = {
             "{{ .Data.password }}"
             "{{ end }}"
         ),
+        enable_global_resources=True,
         public_domain=(
             '{{ with secret "secret-concourse/web" }}'
             "{{ .Data.data.public_domain }}"
@@ -108,18 +109,21 @@ concourse_config_map = {
             "{{ .Data.data.github_client_secret }}"
             "{{ end }}"
         ),
+        prometheus_bind_ip=IPv4Address("127.0.0.1"),
+        prometheus_bind_port=CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
+        secret_cache_duration="5m",
+        secret_cache_enabled=True,
         vault_url=f"http://localhost:{VAULT_HTTP_PORT}",
         vault_client_token="this-token-gets-overridden-by-the-vault-agent",
         vault_path_prefix="/secret-concourse",
-        prometheus_bind_ip=IPv4Address("127.0.0.1"),
-        prometheus_bind_port=CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
+        vault_insecure_skip_verify=True,
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
+        baggageclaim_driver="overlay",
         container_runtime="containerd",
         containerd_dns_server="8.8.8.8",
-        baggageclaim_driver="overlay",
-        containerd_max_containers=500,
+        containerd_max_containers=750,
         containerd_network_pool="10.250.0.0/16",
     ),
 }
