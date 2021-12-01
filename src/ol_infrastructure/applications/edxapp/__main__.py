@@ -15,6 +15,7 @@ from pathlib import Path
 from string import Template
 
 import pulumi_consul as consul
+import pulumi_mongodbatlas as atlas
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
@@ -44,7 +45,6 @@ from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisC
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
-    OLVaultMongoAtlasDatabaseConfig,
     OLVaultMongoDatabaseConfig,
     OLVaultMysqlDatabaseConfig,
 )
@@ -395,6 +395,100 @@ edxapp_db_security_group = ec2.SecurityGroup(
     vpc_id=edxapp_vpc_id,
 )
 
+######################
+# Secrets Management #
+######################
+edxapp_vault_mount = vault.Mount(
+    "edxapp-vault-generic-secrets-mount",
+    path=f"secret-{stack_info.env_prefix}",
+    description="Static secrets storage for Open edX {stack_info.env_prefix} applications and services",  # noqa: E501
+    type="kv",
+)
+edxapp_secrets = vault.generic.Secret(
+    "edxapp-static-secrets",
+    path=edxapp_vault_mount.path.apply("{}/edxapp".format),
+    data_json=Output.secret(
+        read_yaml_secrets(
+            Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
+        )
+    ).apply(json.dumps),
+)
+forum_secrets = vault.generic.Secret(
+    "edx-forum-static-secrets",
+    path=edxapp_vault_mount.path.apply("{}/edx-forum".format),
+    data_json=edxapp_config.require_secret_object("edx_forum_secrets").apply(
+        json.dumps
+    ),
+)
+
+# Vault policy definition
+edxapp_vault_policy = vault.Policy(
+    "edxapp-vault-policy",
+    name=f"edxapp-{stack_info.env_prefix}",
+    policy=Path(__file__)
+    .parent.joinpath(f"edxapp_{stack_info.env_prefix}_policy.hcl")
+    .read_text(),
+)
+# Register edX Platform AMI for Vault AWS auth
+aws_vault_backend = f"aws-{stack_info.env_prefix}"
+edxapp_web_vault_auth_role = vault.aws.AuthBackendRole(
+    "edxapp-web-ami-ec2-vault-auth",
+    backend=aws_vault_backend,
+    auth_type="iam",
+    role="edxapp-web",
+    inferred_entity_type="ec2_instance",
+    inferred_aws_region="us-east-1",
+    bound_iam_instance_profile_arns=[edxapp_instance_profile.arn],
+    bound_ami_ids=[edxapp_web_ami.id],
+    bound_account_ids=[aws_account.account_id],
+    bound_vpc_ids=[edxapp_vpc_id],
+    token_policies=[edxapp_vault_policy.name],
+)
+
+edxapp_worker_vault_auth_role = vault.aws.AuthBackendRole(
+    "edxapp-worker-ami-ec2-vault-auth",
+    backend=aws_vault_backend,
+    auth_type="iam",
+    role="edxapp-worker",
+    inferred_entity_type="ec2_instance",
+    inferred_aws_region="us-east-1",
+    bound_iam_instance_profile_arns=[edxapp_instance_profile.arn],
+    bound_ami_ids=[edxapp_worker_ami.id],
+    bound_account_ids=[aws_account.account_id],
+    bound_vpc_ids=[edxapp_vpc_id],
+    token_policies=[edxapp_vault_policy.name],
+)
+
+edx_notes_vault_policy = vault.Policy(
+    "edx-notes-api-vault-policy",
+    name=f"edx-notes-api-{stack_info.env_suffix}",
+    policy=Path(__file__).parent.joinpath("edx_notes_api_policy.hcl").read_text(),
+)
+edxapp_notes_iam_role = iam.Role(
+    "edx-notes-api-iam-role",
+    assume_role_policy=json.dumps(
+        {
+            "Version": IAM_POLICY_VERSION,
+            "Statement": {
+                "Effect": "Allow",
+                "Action": "sts:AssumeRole",
+                "Principal": {"Service": "ecs-tasks.amazonaws.com"},
+            },
+        }
+    ),
+    name_prefix=f"edx-notes-role-{env_name}-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
+    path=f"/ol-applications/edx-notes-api/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
+    tags=aws_config.merged_tags({"Name": f"{env_name}-edx-notes-api-role"}),
+)
+edxapp_notes_vault_auth_role = vault.aws.AuthBackendRole(
+    "edx-notes-iam-vault-auth",
+    backend=aws_vault_backend,
+    auth_type="iam",
+    role="edx-notes-api",
+    resolve_aws_unique_ids=True,
+    token_policies=[edx_notes_vault_policy.name],
+    bound_iam_principal_arns=[edxapp_notes_iam_role.arn],
+)
 
 ##########################
 #     Database Setup     #
@@ -502,28 +596,45 @@ mongodb_admin_password = mongodb_config.get("admin_password")
 
 edxapp_mongo_role_statements = mongodb_role_statements
 
-if atlas_project_id := mongodb_config.get("atlas_project_id"):
-    atlas_connection_options = {"project_id": atlas_project_id}
-    atlas_connection_options.update(
-        read_yaml_secrets(Path("pulumi/mongodb_atlas.yaml"))
+if atlas_project_id := mongodb_config.get("atlas_project_id"):  # noqa: WPS332
+    mongo_atlas_credentials = read_yaml_secrets(
+        Path(
+            f"pulumi/mongodb_atlas.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"
+        )
     )
-    edxapp_mongo_role_statements["edxapp"] = {
-        "create": Template(
-            json.dumps({"roles": [{"roleName": "readWrite", "databaseName": "edxapp"}]})
+    edxapp_mongo_user = atlas.DatabaseUser(
+        "mongodb-atlas-edxapp-user",
+        project_id=atlas_project_id,
+        auth_database_name="admin",
+        password=Output.secret(mongo_atlas_credentials["edxapp"]),
+        username="edxapp",
+        roles=[
+            atlas.DatabaseUserRoleArgs(database_name="edxapp", role_name="readWrite")
+        ],
+    )
+    forum_mongo_user = atlas.DatabaseUser(
+        "mongodb-atlas-forum-user",
+        project_id=atlas_project_id,
+        auth_database_name="admin",
+        password=Output.secret(mongo_atlas_credentials["forum"]),
+        username="forum",
+        roles=[
+            atlas.DatabaseUserRoleArgs(database_name="forum", role_name="readWrite")
+        ],
+    )
+    vault.generic.Secret(
+        "edxapp-mongodb-atlas-user-password",
+        path=edxapp_vault_mount.path.apply("{}/mongodb-edxapp".format),
+        data_json=json.dumps(
+            {"username": "edxapp", "password": mongo_atlas_credentials["edxapp"]}
         ),
-        "revoke": Template(json.dumps({"db": "edxapp"})),
-    }
-    edxapp_mongo_role_statements["forum"] = {
-        "create": Template(
-            json.dumps({"roles": [{"roleName": "readWrite", "databaseName": "forum"}]})
+    )
+    vault.generic.Secret(
+        "forum-mongodb-atlas-user-password",
+        path=edxapp_vault_mount.path.apply("{}/mongodb-forum".format),
+        data_json=json.dumps(
+            {"username": "forum", "password": mongo_atlas_credentials["forum"]}
         ),
-        "revoke": Template(json.dumps({"db": "forum"})),
-    }
-    edxapp_mongo_vault_config = OLVaultMongoAtlasDatabaseConfig(
-        db_name="edxapp",
-        mount_point=f"mongodb-{stack_info.env_prefix}",
-        role_statements=edxapp_mongo_role_statements,
-        connection_options=atlas_connection_options,
     )
 else:
     edxapp_mongo_role_statements["edxapp"] = {
@@ -549,7 +660,7 @@ else:
         db_host=f"mongodb-master.service.{env_name}.consul",
         role_statements=edxapp_mongo_role_statements,
     )
-edxapp_mongo_vault_backend = OLVaultDatabaseBackend(edxapp_mongo_vault_config)
+    edxapp_mongo_vault_backend = OLVaultDatabaseBackend(edxapp_mongo_vault_config)
 
 ###########################
 # Redis Elasticache Setup #
@@ -720,101 +831,6 @@ edxapp_ses_event_destintations = ses.EventDestination(
             value_source="emailHeader",
         )
     ],
-)
-
-######################
-# Secrets Management #
-######################
-edxapp_vault_mount = vault.Mount(
-    "edxapp-vault-generic-secrets-mount",
-    path=f"secret-{stack_info.env_prefix}",
-    description="Static secrets storage for Open edX {stack_info.env_prefix} applications and services",  # noqa: E501
-    type="kv",
-)
-edxapp_secrets = vault.generic.Secret(
-    "edxapp-static-secrets",
-    path=edxapp_vault_mount.path.apply("{}/edxapp".format),
-    data_json=Output.secret(
-        read_yaml_secrets(
-            Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
-        )
-    ).apply(json.dumps),
-)
-forum_secrets = vault.generic.Secret(
-    "edx-forum-static-secrets",
-    path=edxapp_vault_mount.path.apply("{}/edx-forum".format),
-    data_json=edxapp_config.require_secret_object("edx_forum_secrets").apply(
-        json.dumps
-    ),
-)
-
-# Vault policy definition
-edxapp_vault_policy = vault.Policy(
-    "edxapp-vault-policy",
-    name=f"edxapp-{stack_info.env_prefix}",
-    policy=Path(__file__)
-    .parent.joinpath(f"edxapp_{stack_info.env_prefix}_policy.hcl")
-    .read_text(),
-)
-# Register edX Platform AMI for Vault AWS auth
-aws_vault_backend = f"aws-{stack_info.env_prefix}"
-edxapp_web_vault_auth_role = vault.aws.AuthBackendRole(
-    "edxapp-web-ami-ec2-vault-auth",
-    backend=aws_vault_backend,
-    auth_type="iam",
-    role="edxapp-web",
-    inferred_entity_type="ec2_instance",
-    inferred_aws_region="us-east-1",
-    bound_iam_instance_profile_arns=[edxapp_instance_profile.arn],
-    bound_ami_ids=[edxapp_web_ami.id],
-    bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[edxapp_vpc_id],
-    token_policies=[edxapp_vault_policy.name],
-)
-
-edxapp_worker_vault_auth_role = vault.aws.AuthBackendRole(
-    "edxapp-worker-ami-ec2-vault-auth",
-    backend=aws_vault_backend,
-    auth_type="iam",
-    role="edxapp-worker",
-    inferred_entity_type="ec2_instance",
-    inferred_aws_region="us-east-1",
-    bound_iam_instance_profile_arns=[edxapp_instance_profile.arn],
-    bound_ami_ids=[edxapp_worker_ami.id],
-    bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[edxapp_vpc_id],
-    token_policies=[edxapp_vault_policy.name],
-)
-
-edx_notes_vault_policy = vault.Policy(
-    "edx-notes-api-vault-policy",
-    name=f"edx-notes-api-{stack_info.env_suffix}",
-    policy=Path(__file__).parent.joinpath("edx_notes_api_policy.hcl").read_text(),
-)
-edxapp_notes_iam_role = iam.Role(
-    "edx-notes-api-iam-role",
-    assume_role_policy=json.dumps(
-        {
-            "Version": IAM_POLICY_VERSION,
-            "Statement": {
-                "Effect": "Allow",
-                "Action": "sts:AssumeRole",
-                "Principal": {"Service": "ecs-tasks.amazonaws.com"},
-            },
-        }
-    ),
-    name_prefix=f"edx-notes-role-{env_name}-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
-    path=f"/ol-applications/edx-notes-api/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
-    tags=aws_config.merged_tags({"Name": f"{env_name}-edx-notes-api-role"}),
-)
-edxapp_notes_vault_auth_role = vault.aws.AuthBackendRole(
-    "edx-notes-iam-vault-auth",
-    backend=aws_vault_backend,
-    auth_type="iam",
-    role="edx-notes-api",
-    resolve_aws_unique_ids=True,
-    token_policies=[edx_notes_vault_policy.name],
-    bound_iam_principal_arns=[edxapp_notes_iam_role.arn],
 )
 
 ##########################
