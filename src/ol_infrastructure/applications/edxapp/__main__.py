@@ -67,7 +67,8 @@ from ol_infrastructure.lib.vault import (
 
 stack_info = parse_stack()
 edxapp_config = Config("edxapp")
-setup_vault_provider()
+if Config("vault").get("address"):
+    setup_vault_provider()
 #############
 # Constants #
 #############
