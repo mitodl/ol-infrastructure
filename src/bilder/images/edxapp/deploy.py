@@ -290,6 +290,7 @@ configure_vector(vector)
 
 # Manage services
 if host.fact.has_systemd:
+    supervisor_command = "signal HUP" if node_type == WEB_NODE_TYPE else "restart"
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
     vector_service(vector)
@@ -307,8 +308,9 @@ if host.fact.has_systemd:
             f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} && "  # noqa: WPS237, WPS221, E501
             # Ensure that Vault can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {lms_config_path} && "
+            f"setfacl -m u:edxapp:rwx {lms_config_path} && "
             # Restart the edxapp process to reload the configuration file
-            "/edx/bin/supervisorctl signal HUP "
+            f"/edx/bin/supervisorctl {supervisor_command} "
             f"{'lms' if node_type == WEB_NODE_TYPE else 'all'}'"
         ),
     )
@@ -321,8 +323,9 @@ if host.fact.has_systemd:
             f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} && "  # noqa: WPS237, WPS221, E501
             # Ensure that Vault can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {studio_config_path} && "
+            f"setfacl -m u:edxapp:rwx {studio_config_path} && "
             # Restart the edxapp process to reload the configuration file
-            "/edx/bin/supervisorctl signal HUP "
+            f"/edx/bin/supervisorctl {supervisor_command} "
             f"{'cms' if node_type == WEB_NODE_TYPE else 'all'}'"
         ),
     )
@@ -335,6 +338,7 @@ if host.fact.has_systemd:
             f"/bin/bash -c 'chown forum:www-data {forum_config_path} && "  # noqa: WPS237, WPS221, E501
             # Ensure that consul-template can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {forum_config_path} && "
+            f"setfacl -m u:forum:rwx {forum_config_path} && "
             # Restart the forum process to reload the configuration file
             "/edx/bin/supervisorctl restart forum"
         ),
