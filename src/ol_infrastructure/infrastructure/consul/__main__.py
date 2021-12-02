@@ -221,7 +221,7 @@ consul_lb_target_group = lb.TargetGroup(
         healthy_threshold=3,
         timeout=3,
         interval=10,
-        path="/health",
+        path="/v1/agent/host",
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",
     ),
