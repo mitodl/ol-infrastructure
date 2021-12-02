@@ -394,6 +394,7 @@ def cloud_init_user_data(
                                             "tag_key=vault_env "
                                             f"tag_value={vpc_id}"
                                         ),
+                                        "auto_join_port": VAULT_HTTP_PORT,
                                         "leader_tls_servername": "active.vault.service.consul",  # noqa: E501
                                         "leader_ca_cert_file": "/etc/ssl/ol_root_ca.pem",  # noqa: E501
                                     }
