@@ -119,42 +119,44 @@ atlas_network_access = atlas.ProjectIpAccessList(
     ),
 )
 
-consul.Keys(
-    "set-mongo-connection-info-in-consul",
-    keys=[
-        consul.KeysKeyArgs(
-            path="mongodb/host",
-            delete=True,
-            value=atlas_cluster.mongo_uri.apply(lambda uri: urlparse(uri).netloc),
-        ),
-        consul.KeysKeyArgs(
-            path="mongodb/use-ssl",
-            delete=True,
-            value=atlas_cluster.mongo_uri_with_options.apply(
-                lambda uri: parse_qs(urlparse(uri).query)["ssl"][0]
+if atlas_config.get_bool("ready_for_traffic"):
+    consul.Keys(
+        "set-mongo-connection-info-in-consul",
+        keys=[
+            consul.KeysKeyArgs(
+                path="mongodb/host",
+                delete=True,
+                value=atlas_cluster.mongo_uri.apply(lambda uri: urlparse(uri).netloc),
             ),
-        ),
-        consul.KeysKeyArgs(
-            path="mongodb/replica-set",
-            delete=True,
-            value=atlas_cluster.mongo_uri_with_options.apply(
-                lambda uri: parse_qs(urlparse(uri).query)["replicaSet"][0]
+            consul.KeysKeyArgs(
+                path="mongodb/use-ssl",
+                delete=True,
+                value=atlas_cluster.mongo_uri_with_options.apply(
+                    lambda uri: parse_qs(urlparse(uri).query)["ssl"][0]
+                ),
             ),
-        ),
-    ],
-    opts=pulumi.ResourceOptions(
-        provider=consul.Provider(
-            "consul-provider",
-            address=pulumi.Config("consul").require("address"),
-            scheme="https",
-            http_auth="pulumi:{}".format(
-                read_yaml_secrets(Path(f"pulumi/consul.{stack_info.env_suffix}.yaml"))[
-                    "basic_auth_password"
-                ]
+            consul.KeysKeyArgs(
+                path="mongodb/replica-set",
+                delete=True,
+                value=atlas_cluster.mongo_uri_with_options.apply(
+                    lambda uri: parse_qs(urlparse(uri).query)["replicaSet"][0]
+                ),
             ),
-        )
-    ),
-)
+            consul.KeysKeyArgs(path="mongodb/auth-source", delete=True, value="admin"),
+        ],
+        opts=pulumi.ResourceOptions(
+            provider=consul.Provider(
+                "consul-provider",
+                address=pulumi.Config("consul").require("address"),
+                scheme="https",
+                http_auth="pulumi:{}".format(
+                    read_yaml_secrets(
+                        Path(f"pulumi/consul.{stack_info.env_suffix}.yaml")
+                    )["basic_auth_password"]
+                ),
+            )
+        ),
+    )
 
 pulumi.export(
     "atlas_cluster",
