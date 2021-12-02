@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pulumi
@@ -7,6 +8,7 @@ import pulumi_consul as consul
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
@@ -74,6 +76,26 @@ search_domain = aws.elasticsearch.Domain(
         volume_size=disk_size,
     ),
     tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch-cluster"}),
+)
+
+search_domain_policy = aws.elasticsearch.DomainPolicy(
+    "opensearch-domain-cluster-access-policy",
+    domain_name=search_domain.domain_name,
+    access_policies=search_domain.arn.apply(
+        lambda arn: json.dumps(
+            {
+                "Version": IAM_POLICY_VERSION,
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"AWS": "*"},
+                        "Action": "es:*",
+                        "Resource": f"{arn}/*",
+                    }
+                ],
+            }
+        )
+    ),
 )
 
 consul_config = pulumi.Config("consul")

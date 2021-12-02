@@ -5,4 +5,4 @@ config:
   consul:address: https://consul-mitx-staging-ci.odl.mit.edu
   consul:scheme: https
   environment:business_unit: residential-staging
-  environment:target_vpc: residential_staging_mitx_vpc
+  environment:target_vpc: residential_mitx_staging_vpc
