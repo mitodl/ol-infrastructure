@@ -23,6 +23,7 @@
     EDXAPP_LMS_SSL_NGINX_PORT: 443
     # Set to empty values so that the tests don't fail since we are managing the
     # config file directly
+    forum_source_repo: https://github.com/mitodl/cs_comments_service.git
     FORUM_MONGO_HOSTS: []
     forum_services: []
     FORUM_USE_TCP: true
