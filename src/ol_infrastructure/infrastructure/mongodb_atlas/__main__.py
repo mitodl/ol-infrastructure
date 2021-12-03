@@ -36,6 +36,7 @@ aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name}
 max_disk_size = atlas_config.get("disk_autoscale_max_gb")
 max_instance_type = atlas_config.get("cluster_autoscale_max_size")
 min_instance_type = atlas_config.get("cluster_autoscale_min_size")
+num_instances = atlas_config.get("cluster_instance_count") or 3
 vault_server = vault_stack.require_output("vault_server")
 
 #################
@@ -62,6 +63,9 @@ atlas_cluster = atlas.Cluster(
     project_id=atlas_project.id,
     provider_instance_size_name=atlas_config.get("instance_size") or "M10",
     provider_region_name=atlas_config.get("cloud_region") or "US_EAST_1",
+    provider_auto_scaling_compute_max_instance_size=max_instance_type,
+    provider_auto_scaling_compute_min_instance_size=min_instance_type,
+    replication_factor=num_instances,
 )
 
 atlas_security_group = aws.ec2.SecurityGroup(

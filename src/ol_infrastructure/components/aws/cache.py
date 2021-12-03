@@ -60,7 +60,7 @@ class OLAmazonCacheConfig(AWSBase):
         engine_version: str,
         values: Dict,  # noqa: WPS110
     ) -> str:
-        engine: str = values.get("engine")
+        engine: str = str(values.get("engine"))
         engines_map = cache_engines()
         if engine_version not in engines_map.get(engine, []):
             raise ValueError(
@@ -175,7 +175,9 @@ class OLAmazonCache(pulumi.ComponentResource):
 
         self.parameter_group = elasticache.ParameterGroup(
             f"{cache_config.cluster_name}-{cache_config.engine}-{cache_config.engine_version}-parameter-group",  # noqa: E501
-            name=(f"{cache_config.cluster_name}-{cache_config.engine_version.replace('.', '')}-parameter-group"),  # noqa: E501
+            name=(
+                f"{cache_config.cluster_name}-{cache_config.engine_version.replace('.', '')}-parameter-group"  # noqa: E501, WPS237
+            ),  # noqa: E501
             family=parameter_group_family(
                 cache_config.engine, cache_config.engine_version
             ),
@@ -234,7 +236,9 @@ class OLAmazonCache(pulumi.ComponentResource):
             automatic_failover_enabled=True,
             cluster_mode=cluster_mode_param,
             engine="redis",
-            engine_version=cache_config.engine_version,
+            engine_version="6.x"
+            if cache_config.engine_version.startswith("6")
+            else cache_config.engine_version,
             kms_key_id=cache_config.kms_key_id,
             node_type=cache_config.instance_type,
             number_cache_clusters=cache_node_count,

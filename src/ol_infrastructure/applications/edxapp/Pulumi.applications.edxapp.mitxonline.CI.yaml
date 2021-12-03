@@ -28,3 +28,4 @@ config:
   edxapp:web_node_capacity: '1'
   edxapp:min_worker_nodes: '1'
   edxapp:worker_node_capacity: '1'
+  edxapp:manage_dns: true
