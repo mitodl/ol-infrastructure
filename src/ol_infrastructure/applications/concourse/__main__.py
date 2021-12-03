@@ -340,6 +340,10 @@ concourse_db_security_group = ec2.SecurityGroup(
 ##########################
 #     Database Setup     #
 ##########################
+rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["instance_size"] = (
+    concourse_config.get("db_instance_size") or rds_defaults["instance_size"]
+)
 concourse_db_config = OLPostgresDBConfig(
     instance_name=f"concourse-db-{stack_info.env_suffix}",
     password=concourse_config.require("db_password"),
@@ -348,7 +352,7 @@ concourse_db_config = OLPostgresDBConfig(
     tags=aws_config.tags,
     db_name="concourse",
     engine_version="12.7",
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 concourse_db = OLAmazonDB(concourse_db_config)
 

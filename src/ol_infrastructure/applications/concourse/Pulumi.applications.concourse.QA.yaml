@@ -5,6 +5,7 @@ config:
   aws:region: us-east-1
   concourse:consul_credentials:
     secure: v1:duj9opywHxOvDHWd:teA1tnEZNwkvM9Lbg8AVtve9YA2Qq8+JkKTRcHDHuul50x+dVV4H3vCVVIL/gCQyjdq4jWBJfCZP7UROhPuF
+  concourse:db_instance_size: db.m6g.xlarge
   concourse:db_password:
     secure: v1:cINWNdW8VXvoHANP:vYFipTry9pNokRsD9FnC0+8eurxu28iewwca52MXCyrVflWnaWWvi3FD3LP9O73KL/wznZCUSXk9lbsv6vySTSDR+1II7fNr1AnrjdQclygaFKBpb2EJgcwd1w==
   concourse:dockerhub_credentials:
