@@ -110,13 +110,29 @@ accept_atlas_network_peer = aws.ec2.VpcPeeringConnectionAccepter(
     tags=aws_config.tags,
 )
 
-atlas_network_access = atlas.ProjectIpAccessList(
-    "mongo-atlas-network-permissions",
+atlas_secgroup_network_access = atlas.ProjectIpAccessList(
+    "mongo-atlas-network-security-group-permissions",
     aws_security_group=atlas_security_group.id,
     project_id=atlas_project.id,
     opts=pulumi.ResourceOptions(
         depends_on=[atlas_aws_network_peer, accept_atlas_network_peer]
     ),
+)
+
+atlas_cidr_network_access = atlas.ProjectIpAccessList(
+    "mongo-atlas-network-cidr-block-permissions",
+    project_id=atlas_project.id,
+    cidr_block=target_vpc["cidr"],
+    opts=pulumi.ResourceOptions(
+        depends_on=[atlas_aws_network_peer, accept_atlas_network_peer]
+    ),
+)
+
+aws.ec2.Route(
+    "mongo-atlas-network-route",
+    route_table_id=target_vpc["route_table_id"],
+    destination_cidr_block=atlas_config.get("project_cidr_block") or "192.168.248.0/21",
+    vpc_peering_connection_id=atlas_aws_network_peer.connection_id,
 )
 
 if atlas_config.get_bool("ready_for_traffic"):
