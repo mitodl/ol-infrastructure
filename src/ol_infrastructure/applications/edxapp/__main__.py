@@ -1261,25 +1261,26 @@ worker_asg = autoscaling.Group(
 )
 
 # Create Route53 DNS records for Edxapp web nodes
-for domain_key, domain_value in edxapp_domains.items():
-    if domain_key == "lms":
-        route53.Record(
-            f"edxapp-web-{domain_key}-dns-record",
-            name=domain_value,
-            type="CNAME",
-            ttl=FIVE_MINUTES,
-            records=["j.sni.global.fastly.net"],
-            zone_id=edxapp_zone_id,
-        )
-    else:
-        route53.Record(
-            f"edxapp-web-{domain_key}-dns-record",
-            name=domain_value,
-            type="CNAME",
-            ttl=FIVE_MINUTES,
-            records=[web_lb.dns_name],
-            zone_id=edxapp_zone_id,
-        )
+if edxapp_config.get_bool("manage_dns"):
+    for domain_key, domain_value in edxapp_domains.items():
+        if domain_key == "lms":
+            route53.Record(
+                f"edxapp-web-{domain_key}-dns-record",
+                name=domain_value,
+                type="CNAME",
+                ttl=FIVE_MINUTES,
+                records=["j.sni.global.fastly.net"],
+                zone_id=edxapp_zone_id,
+            )
+        else:
+            route53.Record(
+                f"edxapp-web-{domain_key}-dns-record",
+                name=domain_value,
+                type="CNAME",
+                ttl=FIVE_MINUTES,
+                records=[web_lb.dns_name],
+                zone_id=edxapp_zone_id,
+            )
 
 
 export(

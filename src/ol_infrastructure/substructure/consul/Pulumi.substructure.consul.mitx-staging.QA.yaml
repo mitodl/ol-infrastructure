@@ -1,0 +1,5 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QHdwsaUZvov36NuZ+zJLrnTAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM6Bs85RJA1my80qbpAgEQgDsoUWQlLaSqsuLMa6K/RD81mfvWV1h5/VCcfmblwPSpazLosHs91Rn8FRi5ZoJRlYC2+ox2U5TQQ/lNEg==
+config:
+  consul:address: https://consul-mitx-staging-qa.odl.mit.edu
