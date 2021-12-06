@@ -48,10 +48,10 @@ jobs:
           tar -cvzf dist/ocw-hugo-themes/((hugo-theme-branch))/ocw-hugo-themes-$(date +%s).tgz base-theme www course
   - put: ocw-artifacts
     params:
-      source: ocw-hugo-themes/dist/
+      source: ocw-hugo-themes/dist/ocw-hugo-themes/((hugo-theme-branch))
       destination:
-      - dir: s3-remote:ol-eng-artifacts
-        command: sync
+      - dir: s3-remote:ol-eng-artifacts/ocw-hugo-themes/((hugo-theme-branch))
+        command: copy
         args:
         - --ignore-size
         - --checksum
