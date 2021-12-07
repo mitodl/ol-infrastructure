@@ -24,7 +24,6 @@ from bilder.components.hashicorp.vault.models import (
     VaultSealConfig,
     VaultServerConfig,
     VaultServiceRegistration,
-    VaultStorageBackend,
     VaultTCPListener,
 )
 from bilder.components.vector.models import VectorConfig
@@ -64,7 +63,6 @@ caddy_config_changed = configure_caddy(caddy_config)
 
 # Install Consul agent and Vault server
 hours_in_six_months = HOURS_IN_MONTH * 6
-raft_config = IntegratedRaftStorageBackend()
 vault = Vault(
     configuration={
         Path("00-vault.json"): VaultServerConfig(
@@ -82,7 +80,6 @@ vault = Vault(
             # Disable swapping to disk because we are using the integrated raft storage
             # backend.
             disable_mlock=True,
-            storage=VaultStorageBackend(raft=raft_config),
             ui=True,
             service_registration=VaultServiceRegistration(
                 consul=ConsulServiceRegistration()
@@ -100,6 +97,8 @@ consul_configuration = {
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
+# Ensure raft config path exists but exact config is loaded via cloud-init
+raft_config = IntegratedRaftStorageBackend()
 files.directory(
     name="Ensure raft directory exists with proper permissions",
     path=raft_config.path,

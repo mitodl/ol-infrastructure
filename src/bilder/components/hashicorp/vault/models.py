@@ -245,7 +245,8 @@ class VaultServerConfig(HashicorpConfig):
     plugin_directory: Optional[Path]
     seal: Optional[List[VaultSealConfig]]
     service_registration: Optional[VaultServiceRegistration]
-    storage: VaultStorageBackend
+    # Set storage as optional to allow for splitting into a separate config file
+    storage: Optional[VaultStorageBackend]
     telemetry: Optional[VaultTelemetryConfig]
     ui: Optional[bool] = False
 
@@ -263,7 +264,7 @@ class Vault(HashicorpProduct):
     data_directory: Path = Path("/var/lib/vault/")
 
     @validator("configuration")
-    def validate_consistent_config_types(cls, configuration):
+    def validate_consistent_config_types(cls, configuration):  # noqa: N805
         type_set = {type(config_obj) for config_obj in configuration.values()}
         if len(type_set) > 1:
             raise ValueError("There are server and agent configuration objects present")
