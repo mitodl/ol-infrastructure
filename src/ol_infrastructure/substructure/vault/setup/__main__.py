@@ -141,3 +141,14 @@ vault_user_pass_auth = vault.AuthBackend(
     tune=vault.AuthBackendTuneArgs(token_type="default-service"),  # noqa: S106
     opts=vault_provider,
 )
+
+vault_autopilot = vault.RaftAutopilot(
+    "vault-configure-raft-autopilot",
+    cleanup_dead_servers=True,
+    dead_server_last_contact_threshold="1m0s",
+    last_contact_threshold="10s",
+    max_trailing_logs=1000,
+    min_quorum=3,
+    server_stabilization_time="10s",
+    opts=vault_provider,
+)
