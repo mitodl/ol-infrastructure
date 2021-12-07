@@ -58,6 +58,7 @@ class ConsulTelemetry(FlexibleBaseModel):
     dogstatsd_addr: Optional[str]
     disable_hostname: Optional[bool] = True
     prometheus_retention_time: Optional[str] = "60s"
+    disable_compat_19: bool = Field(default=True, alias="disable_compat_1.9")
 
 
 class ConsulConfig(HashicorpConfig):
@@ -107,7 +108,7 @@ class Consul(HashicorpProduct):
     def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
         for fpath, config in self.configuration.items():  # noqa: WPS526
             yield self.configuration_directory.joinpath(fpath), config.json(
-                exclude_none=True, indent=2
+                exclude_none=True, indent=2, by_alias=True
             )
 
     @property

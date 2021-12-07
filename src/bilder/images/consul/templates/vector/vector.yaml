@@ -32,7 +32,7 @@ transforms:
         .environment = "${ENVIRONMENT}"
       }
 
-  connsul_enriched_logs:
+  consul_enriched_logs:
     type: aws_ec2_metadata
     inputs:
     - consul_parsed_message

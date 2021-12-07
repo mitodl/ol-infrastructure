@@ -25,6 +25,7 @@ from bilder.components.hashicorp.vault.models import (
     VaultServerConfig,
     VaultServiceRegistration,
     VaultTCPListener,
+    VaultTelemetryConfig,
 )
 from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import (
@@ -74,6 +75,7 @@ vault = Vault(
                         cluster_address=f"[::]:{VAULT_CLUSTER_PORT}",
                         tls_cert_file=Path("/etc/vault/ssl/vault.cert"),
                         tls_key_file=Path("/etc/vault/ssl/vault.key"),
+                        unauthenticated_metrics_access=True,
                     )
                 )
             ],
@@ -87,6 +89,11 @@ vault = Vault(
             plugin_directory=Path("/var/lib/vault/plugins/"),
             max_lease_ttl=f"{hours_in_six_months}h",  # 6 months
             seal=[VaultSealConfig(awskms=VaultAwsKmsSealConfig())],
+            telemetry=VaultTelemetryConfig(
+                disable_hostname=True,
+                prometheus_retention_time="5m",
+                enable_hostname_label=True,
+            ),
         )
     },
     version=VERSIONS["vault"],
