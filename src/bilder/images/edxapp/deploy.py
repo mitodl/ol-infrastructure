@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 
 from pyinfra import host
-from pyinfra.operations import apt, files, pip
+from pyinfra.operations import apt, files, git, pip, server
 
 from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models import (
@@ -70,6 +70,25 @@ apt.packages(
 ###########
 # edX App #
 ###########
+# Check out desired repository and branch for edx-platform. This lets us manage our
+# custom code without having to bake it into the base image.
+git_remote = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["origin"]
+git_branch = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["branch"]
+edx_platform_path = "/edx/app/edxapp/edx-platform/"
+server.shell(
+    name="Ensure the edx-platform git origin is configured",
+    commands=[f"git remote add custom {git_remote}", "git fetch --all --prune --tags"],
+    chdir=edx_platform_path,
+)
+git.repo(
+    name="Check out the desired branch and branch",
+    src=git_remote,
+    dest=edx_platform_path,
+    branch=git_branch,
+    user="edxapp",
+    group="edxapp",
+)
+
 git_auto_export()
 # Install additional Python dependencies for use with edxapp
 pip.packages(

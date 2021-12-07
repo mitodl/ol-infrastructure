@@ -46,6 +46,8 @@ edx_plugins = {
         "ol-openedx-logging",
         "ol-openedx-sentry",
         "rapid-response-xblock==0.6.0",
+        "ol-openedx-canvas-integration",
+        "ol-openedx-rapid-response-reports",
     ],
     "mitx-staging": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
@@ -55,5 +57,26 @@ edx_plugins = {
         "ol-openedx-logging",
         "ol-openedx-sentry",
         "rapid-response-xblock==0.6.0",
+        "ol-openedx-canvas-integration",
+        "ol-openedx-rapid-response-reports",
     ],
+}
+
+edx_platform_repository = {
+    "mitxonline": {
+        "origin": "https://github.com/edx/edx-platform",
+        "branch": "release",
+    },
+    "xpro": {
+        "origin": "https://github.com/edx/edx-platform",
+        "branch": "open-release/maple.master",
+    },
+    "mitx": {
+        "origin": "https://github.com/mitodl/edx-platform",
+        "branch": "mitx/maple",
+    },
+    "mitx-staging": {
+        "origin": "https://github.com/mitodl/edx-platform",
+        "branch": "mitx/maple",
+    },
 }
