@@ -188,6 +188,7 @@ class VaultTCPListener(FlexibleBaseModel):
     tls_cert_file: Optional[Path]
     tls_key_file: Optional[Path]
     tls_min_version: Optional[str]
+    unauthenticated_metrics_access: bool = False
 
 
 class VaultListener(FlexibleBaseModel):

@@ -3,8 +3,10 @@ sources:
   vault_metrics:
     type: prometheus_scrape
     endpoints:
-    - http://localhost:8200/metrics
+    - https://localhost:8200/v1/sys/metrics?format=prometheus
     scrape_interval_secs: 60
+    tls:
+      verify_certificate: false
 
   vector_metrics:
     type: internal_metrics
@@ -26,7 +28,6 @@ transforms:
     - host_metrics
     source: |
       .tags.job = "integrations/linux_host"
-      .tags.instance = "${HOSTNAME}"
 
   vault_metrics_relabel:
     type: remap
@@ -34,7 +35,6 @@ transforms:
     - vault_metrics
     source: |
       .tags.job = "integrations/vault"
-      .tags.instance = "${HOSTNAME}"
 
   add_labels_to_metrics:
     type: remap
@@ -45,6 +45,7 @@ transforms:
       .tags.application = "vault"
       .tags.service = "vault"
       .tags.hostname = "${HOSTNAME}"
+      .tags.org_unit = "operations"
 
 sinks:
   grafana_cortex_metrics:

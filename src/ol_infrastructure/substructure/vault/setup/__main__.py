@@ -101,7 +101,7 @@ def init_vault_cluster(vault_addr):  # noqa: WPS231
     return recovery_keys
 
 
-vault_recovery_keys = vault_dns.apply(init_vault_cluster)
+vault_dns.apply(init_vault_cluster)
 
 vault_provider = pulumi.ResourceOptions(
     provider=get_vault_provider(
