@@ -1,3 +1,6 @@
+import json
+import tempfile
+
 from pyinfra import host
 from pyinfra.operations import apt, files, git, server
 
@@ -49,4 +52,23 @@ if node_type == WEB_NODE_TYPE:
             branch=config["branch"],
             user=EDX_USER,
             group=EDX_USER,
+        )
+    with tempfile.NamedTemporaryFile(mode="wt", delete=False) as worker_config:
+        worker_config.write(
+            json.dumps(
+                {
+                    "edx-proctoring-proctortrack": [
+                        "babel-polyfill",
+                        "/edx/app/edxapp/edx-platform/node_modules/edx-proctoring-proctortrack/edx_proctoring_proctortrack/static/proctortrack_custom.js",
+                    ]
+                }
+            )
+        )
+        files.put(
+            name="Create workers.json file to enable proctortrack extension",
+            src=worker_config.name,
+            dest="/edx/app/edxapp/workers.json",
+            user=EDX_USER,
+            group=EDX_USER,
+            create_remote_dir=True,
         )
