@@ -3,7 +3,7 @@ sources:
   vault_metrics:
     type: prometheus_scrape
     endpoints:
-    - https://localhost:8200/v1/sys/metrics?format=prometheus
+    - https://localhost:8202/v1/sys/metrics?format=prometheus
     scrape_interval_secs: 60
     tls:
       verify_certificate: false

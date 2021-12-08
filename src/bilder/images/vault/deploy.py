@@ -76,21 +76,27 @@ vault = Vault(
                         cluster_address=f"[::]:{VAULT_CLUSTER_PORT}",
                         tls_cert_file=Path("/etc/vault/ssl/vault.cert"),
                         tls_key_file=Path("/etc/vault/ssl/vault.key"),
+                    )
+                ),
+                VaultListener(
+                    tcp=VaultTCPListener(
+                        address=f"127.0.0.1:{VAULT_HTTP_PORT + 2}",
+                        cluster_address=f"127.0.0.1:{VAULT_CLUSTER_PORT + 2}",
+                        tls_cert_file=Path("/etc/vault/ssl/vault.cert"),
+                        tls_key_file=Path("/etc/vault/ssl/vault.key"),
                         telemetry=VaultTelemetryListener(
                             unauthenticated_metrics_access=True
                         ),
                     )
-                )
+                ),
             ],
-            # Disable swapping to disk because we are using the integrated raft storage
-            # backend.
             disable_mlock=True,
             ui=True,
             service_registration=VaultServiceRegistration(
                 consul=ConsulServiceRegistration()
             ),
             plugin_directory=Path("/var/lib/vault/plugins/"),
-            max_lease_ttl=f"{hours_in_six_months}h",  # 6 months
+            max_lease_ttl=f"{hours_in_six_months}h",
             seal=[VaultSealConfig(awskms=VaultAwsKmsSealConfig())],
             telemetry=VaultTelemetryConfig(
                 disable_hostname=True,
@@ -101,6 +107,7 @@ vault = Vault(
     },
     version=VERSIONS["vault"],
 )
+
 consul_configuration = {
     Path("00-default.json"): ConsulConfig(),
 }
