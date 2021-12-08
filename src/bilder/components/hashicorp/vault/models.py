@@ -175,6 +175,10 @@ class VaultTemplate(FlexibleBaseModel):
     command: Optional[str]
 
 
+class VaultTelemetryListener(FlexibleBaseModel):
+    unauthenticated_metrics_access: bool = False
+
+
 class VaultTCPListener(FlexibleBaseModel):
     address: Optional[str]
     cluster_address: Optional[str]
@@ -188,7 +192,7 @@ class VaultTCPListener(FlexibleBaseModel):
     tls_cert_file: Optional[Path]
     tls_key_file: Optional[Path]
     tls_min_version: Optional[str]
-    unauthenticated_metrics_access: bool = False
+    telemetry: Optional[VaultTelemetryListener]
 
 
 class VaultListener(FlexibleBaseModel):

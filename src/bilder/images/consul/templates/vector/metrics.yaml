@@ -3,7 +3,7 @@ sources:
   consul_metrics:
     type: prometheus_scrape
     endpoints:
-    - http://localhost:8200/v1/agent/metrics?format=prometheus
+    - http://localhost:8500/v1/agent/metrics?format=prometheus
     scrape_interval_secs: 60
 
   vector_metrics:

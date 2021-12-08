@@ -26,6 +26,7 @@ from bilder.components.hashicorp.vault.models import (
     VaultServiceRegistration,
     VaultTCPListener,
     VaultTelemetryConfig,
+    VaultTelemetryListener,
 )
 from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import (
@@ -75,7 +76,9 @@ vault = Vault(
                         cluster_address=f"[::]:{VAULT_CLUSTER_PORT}",
                         tls_cert_file=Path("/etc/vault/ssl/vault.cert"),
                         tls_key_file=Path("/etc/vault/ssl/vault.key"),
-                        unauthenticated_metrics_access=True,
+                        telemetry=VaultTelemetryListener(
+                            unauthenticated_metrics_access=True
+                        ),
                     )
                 )
             ],
