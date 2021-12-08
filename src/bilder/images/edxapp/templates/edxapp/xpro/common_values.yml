@@ -121,7 +121,7 @@ AUTH_PASSWORD_VALIDATORS:
         max_length: 75
 AWS_ACCESS_KEY_ID: "" # MODIFIED - not setting as we will use IAM Instance Profiles
 # AWS_QUERYSTRING_AUTH: false
-# AWS_S3_CUSTOM_DOMAIN: SET-ME-PLEASE (ex. bucket-name.s3.amazonaws.com)
+AWS_S3_CUSTOM_DOMAIN: {{ key "edxapp/s3-storage-bucket" }}.s3.amazonaws.com
 AWS_SECRET_ACCESS_KEY: ""  # MODIFIED - not setting as we will use IAM Instance Profiles
 AWS_SES_CONFIGURATION_SET: {{ key "edxapp/ses-configuration-set" }}  # ADDED KEY
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
