@@ -501,6 +501,7 @@ edxapp_db_config = OLMariaDBConfig(
     tags=aws_config.tags,
     db_name="edxapp",
     engine_version="10.5.12",
+    storage=edxapp_config.get("db_storage_gb") or 50,  # noqa: WPS432
     **defaults(stack_info)["rds"],
 )
 edxapp_db = OLAmazonDB(edxapp_db_config)
