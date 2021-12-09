@@ -97,7 +97,7 @@ class OLPostgresDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to Postgres."""
 
     engine: str = "postgres"
-    engine_version: str = "12.3"
+    engine_version: str = "13.4"
     port: PositiveInt = PositiveInt(5432)  # noqa: WPS432
     parameter_overrides: List[
         Dict[str, Union[str, bool, int, float]]
@@ -113,7 +113,7 @@ class OLMariaDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to MariaDB."""
 
     engine: str = "mariadb"
-    engine_version: str = "10.4.13"
+    engine_version: str = "10.5.13"
     port: PositiveInt = PositiveInt(3306)  # noqa: WPS432
     parameter_overrides: List[
         Dict[str, Union[str, bool, int, float]]
@@ -175,7 +175,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             max_allocated_storage=db_config.max_storage,
             multi_az=db_config.multi_az,
             name=db_config.db_name,
-            opts=resource_options,
+            opts=resource_options.merge(pulumi.ResourceOptions(ignore_changes=["engine_version"])),
             parameter_group_name=self.parameter_group.name,
             password=db_config.password.get_secret_value(),
             port=db_config.port,
