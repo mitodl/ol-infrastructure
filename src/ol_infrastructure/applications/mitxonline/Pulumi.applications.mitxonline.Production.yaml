@@ -9,3 +9,4 @@ config:
   mitxonline:db_password:
     secure: v1:1SGxkH66kKNXMVc0:P9FztYdyzfxIrapGHU3pD5gz9ZkW6Of/zTqhaZf4O+L+Y8yAbcissYxogKfyDMxSJYSSUxI12K0=
   mitxonline:domain: mitxonline.mit.edu
+  mitxonline:proctortrack_url: https://testing.verificient.com
