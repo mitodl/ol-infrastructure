@@ -41,25 +41,25 @@ jobs:
       - name: mfe-app-learning/dist
       params:
         ACCESS_TOKEN_COOKIE_NAME: edx-jwt-cookie-header-payload
-        BASE_URL: https://courses-ci.xpro.mit.edu
+        BASE_URL: https://courses.xpro.mit.edu
         CSRF_TOKEN_API_PATH: /csrf/api/v1/token
-        LMS_BASE_URL: https://courses-ci.xpro.mit.edu
-        LOGIN_URL: https://courses-ci.xpro.mit.edu/login
-        LOGOUT_URL: https://courses-ci.xpro.mit.edu/logout
+        LMS_BASE_URL: https://courses.xpro.mit.edu
+        LOGIN_URL: https://courses.xpro.mit.edu/login
+        LOGOUT_URL: https://courses.xpro.mit.edu/logout
         LOGO_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png
         LOGO_TRADEMARK_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png
         LOGO_WHITE_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png
         FAVICON_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico
-        MARKETING_SITE_BASE_URL: https://ci.xpro.mit.edu
+        MARKETING_SITE_BASE_URL: https://xpro.mit.edu
         ORDER_HISTORY_URL:
         PUBLIC_PATH: /learn/
-        REFRESH_ACCESS_TOKEN_ENDPOINT: https://courses-ci.xpro.mit.edu/login_refresh
-        SEARCH_CATALOG_URL: https://courses-ci.xpro.mit.edu/courses
+        REFRESH_ACCESS_TOKEN_ENDPOINT: https://courses.xpro.mit.edu/login_refresh
+        SEARCH_CATALOG_URL: https://courses.xpro.mit.edu/courses
         SITE_NAME: MIT xPRO
-        STUDIO_BASE_URL: https://studio-ci.xpro.mit.edu
+        STUDIO_BASE_URL: https://studio.xpro.mit.edu
         SUPPORT_URL: https://xpro.zendesk.com/hc
         USER_INFO_COOKIE_NAME: edx-user-info
-        SESSION_COOKIE_DOMAIN: courses-ci.mitxpro.mit.edu
+        SESSION_COOKIE_DOMAIN: courses.mitxpro.mit.edu
       run:
         path: sh
         dir: mfe-app-learning
@@ -73,4 +73,4 @@ jobs:
       source: mfe-app-learning/dist
       destination:
       - command: sync
-        dir: s3-remote:xpro-ci-edxapp-mfe/learn/
+        dir: s3-remote:xpro-production-edxapp-mfe/learn/
