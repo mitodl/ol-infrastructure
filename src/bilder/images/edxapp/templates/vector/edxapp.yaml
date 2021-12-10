@@ -47,7 +47,6 @@ transforms:
       event, err = parse_json(.message)
       if event != null {
         . = merge!(., event)
-        .@timestamp = .timestamp
         .log_process = "edxapp"
         .environment = "${ENVIRONMENT}"
       }
@@ -60,8 +59,6 @@ transforms:
       parsed, err = parse_syslog(.message)
       if parsed != null {
         . = merge(., parsed)
-        .@timestamp = .timestamp
-        del(.timestamp)
         .log_process = "authlog"
         .environment = "${ENVIRONMENT}"
       }
@@ -85,7 +82,6 @@ transforms:
     source: |
       parsed, err = parse_json(.message)
       if parsed != null {
-        .@timestamp = parse_timestamp!(parsed.time, "%FT%T%:z")
         ., err = merge(., parsed)
         .log_process = "nginx"
         .environment = "${ENVIRONMENT}"
@@ -114,7 +110,6 @@ transforms:
       )
       if matches != null {
         .message = matches.message
-        .@timestamp = parse_timestamp!(matches.time, "%Y/%m/%d %T")
         .log_process = "nginx"
         .environment = "${ENVIRONMENT}"
       } else {
@@ -135,23 +130,6 @@ transforms:
     namespace: ec2
 
 sinks:
-
-  elasticsearch_lms_cms:
-    inputs:
-    - edxapp_enriched_logs
-    type: elasticsearch
-    endpoint: http://logging-elasticsearch.query.consul:9200
-    index: logs-${ENVIRONMENT}-edxapp-%Y.%W
-    healthcheck: false
-
-  elasticsearch_authlog:
-    inputs:
-    - auth_log_cron_filter
-    type: elasticsearch
-    endpoint: http://logging-elasticsearch.query.consul:9200
-    index: logs-${ENVIRONMENT}-authlog-%Y.%W
-    healthcheck: false
-
   grafana_loki_logs:
     inputs:
     - journald_log

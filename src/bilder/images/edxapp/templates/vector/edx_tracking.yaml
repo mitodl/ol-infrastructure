@@ -28,17 +28,10 @@ transforms:
     type: filter
     condition: .malformed != true
 
-  tracking_log_elasticsearch_timestamper:
-    inputs:
-    - tracking_log_malformed_message_filter
-    type: remap
-    source: |
-      .@timestamp = parse_timestamp!(.time, "%FT%T%.6f%:z")
-      .time = .@timestamp
 sinks:
   elasticsearch_tracking:
     inputs:
-    - tracking_log_elasticsearch_timestamper
+    - tracking_log_malformed_message_filter
     type: elasticsearch
     endpoint: http://logging-elasticsearch.query.consul:9200
     index: logs-${ENVIRONMENT}-edx-tracking-%Y.%W
