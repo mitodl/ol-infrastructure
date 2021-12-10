@@ -252,7 +252,7 @@ ELASTIC_SEARCH_CONFIG:
 -   host: elasticsearch.service.consul
     port: 9200
     use_ssl: false
-EMAIL_BACKEND: django_ses.SESBackend  # MODIFIED
+EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend  # MODIFIED
 # EMAIL_HOST: localhost
 # EMAIL_HOST_PASSWORD: ''
 # EMAIL_HOST_USER: ''
@@ -458,7 +458,7 @@ SENTRY_ENVIRONMENT: {{ env "ENVIRONMENT" }}
 SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
 # Removing the session cookie domain as it is no longer needed for sharing the cookie
 # between LMS and Studio (TMM 2021-10-22)
-# SESSION_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
+# SESSION_COOKIE_DOMAIN:  # MODIFIED
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
 SOCIAL_MEDIA_FOOTER_URLS: {}

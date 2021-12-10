@@ -17,6 +17,7 @@ config:
   edxapp:elb_healthcheck_interval: '30'
   edxapp:google_analytics_id: ''
   edxapp:mail_domain: edxapp-mail-ci.xpro.mit.edu
+  edxapp:manage_dns: 'true'
   edxapp:min_web_nodes: '1'
   edxapp:min_worker_nodes: '1'
   edxapp:sender_email_address: support@edxapp-mail-ci.xpro.mit.edu
@@ -25,4 +26,3 @@ config:
   mongodb:atlas_project_id: 619395b5ab3fc40d5942a23c
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
-  edxapp:manage_dns: true
