@@ -111,6 +111,9 @@ accept_atlas_network_peer = aws.ec2.VpcPeeringConnectionAccepter(
     "mongo-atlas-peering-connection-accepter",
     vpc_peering_connection_id=atlas_aws_network_peer.connection_id,
     auto_accept=True,
+    accepter=aws.ec2.VpcPeeringConnectionAccepterAccepterArgs(
+        allow_remote_vpc_dns_resolution=True,
+    ),
     tags=aws_config.tags,
 )
 

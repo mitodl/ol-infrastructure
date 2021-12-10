@@ -8,7 +8,8 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 vault_config = Config("vault")
 stack_info = parse_stack()
 
-setup_vault_provider()
+if Config("vault_server").get("env_namespace"):
+    setup_vault_provider()
 
 # TODO:
 # - Mount AWS auth backend
@@ -18,8 +19,6 @@ setup_vault_provider()
 vault_aws_auth = vault.AuthBackend(
     "vault-aws-auth-backend",
     type="aws",
-    description="AWS authentication via EC2 IAM",
-    tune=vault.AuthBackendTuneArgs(token_type="default-service"),
 )
 
 vault_aws_auth_client = vault.aws.AuthBackendClient(
