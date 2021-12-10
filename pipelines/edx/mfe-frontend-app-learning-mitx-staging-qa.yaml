@@ -43,23 +43,23 @@ jobs:
         ACCESS_TOKEN_COOKIE_NAME: edx-jwt-cookie-header-payload
         BASE_URL: https://staging-qa.mitx.mit.edu
         CSRF_TOKEN_API_PATH: /csrf/api/v1/token
-        LMS_BASE_URL: https://staging-qa.mitx.mit.edu
-        LOGIN_URL: https://staging-qa.mitx.mit.edu/login
-        LOGOUT_URL: https://staging-qa.mitx.mit.edu/logout
+        LMS_BASE_URL: https://mitx-qa-draft.mitx.mit.edu
+        LOGIN_URL: https://mitx-qa-draft.mitx.mit.edu/login
+        LOGOUT_URL: https://mitx-qa-draft.mitx.mit.edu/logout
         LOGO_URL: https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png
         LOGO_TRADEMARK_URL: https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png
         LOGO_WHITE_URL: https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png
         FAVICON_URL: https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/favicon.ico
-        MARKETING_SITE_BASE_URL: https://staging-qa.mitx.mit.edu
+        MARKETING_SITE_BASE_URL: https://mitx-qa-draft.mitx.mit.edu
         ORDER_HISTORY_URL:
         PUBLIC_PATH: /learn/
-        REFRESH_ACCESS_TOKEN_ENDPOINT: https://staging-qa.mitx.mit.edu/login_refresh
-        SEARCH_CATALOG_URL: https://staging-qa.mitx.mit.edu/courses
+        REFRESH_ACCESS_TOKEN_ENDPOINT: https://mitx-qa-draft.mitx.mit.edu/login_refresh
+        SEARCH_CATALOG_URL: https://mitx-qa-draft.mitx.mit.edu/courses
         SITE_NAME: MITx Residential
-        STUDIO_BASE_URL: https://studio-staging-qa.mitx.mit.edu
+        STUDIO_BASE_URL: https://studio-mitx-qa-draft.mitx.mit.edu
         SUPPORT_URL: https://odl.zendesk.com/hc/en-us/requests/new
         USER_INFO_COOKIE_NAME: edx-user-info
-        SESSION_COOKIE_DOMAIN: staging-qa.mitx.mit.edu
+        SESSION_COOKIE_DOMAIN: staging-mitx-qa-draft.mitx.mit.edu
       run:
         path: sh
         dir: mfe-app-learning
