@@ -12,6 +12,8 @@ from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
+SEARCH_DOMAIN_NAME_MAX_LENGTH = 28
+
 ###############
 # STACK SETUP #
 ###############
@@ -56,7 +58,7 @@ search_security_group = aws.ec2.SecurityGroup(
 
 search_domain = aws.elasticsearch.Domain(
     "opensearch-domain-cluster",
-    domain_name=f"opensearch-{environment_name}",
+    domain_name=f"opensearch-{environment_name}"[:SEARCH_DOMAIN_NAME_MAX_LENGTH],
     elasticsearch_version=search_config.get("engine_version") or "7.10",
     cluster_config=aws.elasticsearch.DomainClusterConfigArgs(
         zone_awareness_enabled=True,

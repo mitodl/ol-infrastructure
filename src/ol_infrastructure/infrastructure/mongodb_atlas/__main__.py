@@ -22,9 +22,6 @@ network_stack = pulumi.StackReference(f"infrastructure.aws.network.{stack_info.n
 consul_stack = pulumi.StackReference(
     f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
 )
-vault_stack = pulumi.StackReference(
-    f"infrastructure.vault.operations.{stack_info.name}"
-)
 
 #############
 # VARIABLES #
@@ -33,11 +30,10 @@ environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))
 business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
-max_disk_size = atlas_config.get("disk_autoscale_max_gb")
+max_disk_size = atlas_config.get_int("disk_autoscale_max_gb")
 max_instance_type = atlas_config.get("cluster_autoscale_max_size")
 min_instance_type = atlas_config.get("cluster_autoscale_min_size")
-num_instances = atlas_config.get("cluster_instance_count") or 3
-vault_server = vault_stack.require_output("vault_server")
+num_instances = atlas_config.get_int("cluster_instance_count") or 3
 
 #################
 # ATLAS PROJECT #
@@ -82,13 +78,6 @@ atlas_security_group = aws.ec2.SecurityGroup(
             cidr_blocks=[target_vpc["cidr"]],
             ipv6_cidr_blocks=[target_vpc["cidr_v6"]],
             description=f"Access to Mongodb cluster from {environment_name}",
-        ),
-        aws.ec2.SecurityGroupIngressArgs(
-            security_groups=[vault_server["security_group"]],
-            protocol="tcp",
-            from_port=DEFAULT_MONGODB_PORT,
-            to_port=DEFAULT_MONGODB_PORT,
-            description="Access to Mongodb cluster from Vault",
         ),
     ],
     egress=default_egress_args,
