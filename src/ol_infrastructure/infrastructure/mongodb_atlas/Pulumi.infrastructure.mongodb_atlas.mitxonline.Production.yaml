@@ -13,3 +13,4 @@ config:
   mongodb_atlas:organization_id: 611ab793e07f5965c7b9e4f6
   mongodb_atlas:version: '4.4'
   mongodb_atlas:cluster_autoscale_max_size: M50
+  mongodb_atlas:cluster_instance_count: 5
