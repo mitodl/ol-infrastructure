@@ -1,0 +1,27 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgF4aGd/aPWQE/Xl6+yg2i3QAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQML9B70uczH/BrDBcvAgEQgDvj4qpjZtDzwWyzwS//9PivKEIscFC5isQm6YJKeBcTP7pxVAxiGSEdeOf/6KANIcQX4RYoroRw6WYMXA==
+config:
+  edxapp:db_password:
+    secure: v1:U83x0i6WAndxuOLK:XsAILALTGbtjCqGJllcqg3EaOM0FF/SNmuiMAK2r3E9X5joW26kjOQzYUcKr0slkHBv8RUEr3xA=
+  edxapp:edx_forum_secrets:
+    secure: v1:YHqAWSdn7TNUn7d+:IBgiGsl4r8vymID8NV43rnfJy+qsJSXm/jXaWWALUfF9zXqRO4zJZhLS0d+etijGVwaZnF8v5zXlo+EczFrCe7ICHpS85zHgifbfDcw=
+  edxapp:google_analytics_id: UA-5145472-38
+  aws:region: us-east-1
+  consul:address: https://consul-xpro-production.odl.mit.edu
+  edxapp:business_unit: mitxpro
+  edxapp:dns_zone: xpro
+  edxapp:domains:
+    lms: courses.xpro.mit.edu
+    preview: preview.xpro.mit.edu
+    studio: studio.xpro.mit.edu
+  edxapp:mail_domain: edxapp-mail-production.xpro.mit.edu
+  edxapp:manage_dns: 'false'
+  edxapp:min_web_nodes: '3'
+  edxapp:min_worker_nodes: '2'
+  edxapp:sender_email_address: support@edxapp-mail-production.xpro.mit.edu
+  edxapp:web_node_capacity: '5'
+  edxapp:worker_node_capacity: '3'
+  mongodb:atlas_project_id:
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

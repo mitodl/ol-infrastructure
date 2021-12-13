@@ -1,0 +1,5 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgFEwcddmq/BVrzrxjEnqdr+AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMleTH7BXtKs1zh1KQAgEQgDuKXcO3XyH8iSsUH7vTk8OpTdMImNpZsIbMBO8uXOsNmUU/Ie04Bzyyydhksz19OOKekPtN8147MsbAIA==
+config:
+  consul:address: https://consul-mitx-staging-production.odl.mit.edu

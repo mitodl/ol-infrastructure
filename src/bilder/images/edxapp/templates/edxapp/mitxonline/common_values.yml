@@ -210,7 +210,7 @@ COURSE_CATALOG_VISIBILITY_PERMISSION: see_exists
 CREDENTIALS_INTERNAL_SERVICE_URL: http://localhost:8005
 CREDENTIALS_PUBLIC_SERVICE_URL: http://localhost:8005
 CREDIT_PROVIDER_SECRET_KEYS: {}
-CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }}  # MODIFIED
+CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {{ key "edxapp/lms-domain" }}  # MODIFIED
 CROSS_DOMAIN_CSRF_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edxapp-csrftoken  # MODIFIED
 CSRF_COOKIE_SECURE: true  # MODIFIED
 CSRF_TRUSTED_ORIGINS:  # MODIFIED
@@ -420,7 +420,7 @@ SENTRY_ENVIRONMENT: {{ env "ENVIRONMENT" }}
 SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
 # Removing the session cookie domain as it is no longer needed for sharing the cookie
 # between LMS and Studio (TMM 2021-10-22)
-# SESSION_COOKIE_DOMAIN: {{ key "edxapp/cookie-domain" }} # MODIFIED
+# SESSION_COOKIE_DOMAIN:  # MODIFIED
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
 SOCIAL_MEDIA_FOOTER_URLS: {}
