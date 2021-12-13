@@ -3,7 +3,7 @@ secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QF1vipPwcs5DYUCID6n71sNAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM7MTxzuqtH4h1G7OjAgEQgDs1KFGvvzfEsUH+Ruqvoan4KiobuQwXywYiJnJGq1fYnIhY15awZKIWQ5G7vJke7b6zD4/YwST/BT0YDw==
 config:
   aws:region: us-east-1
-  consul:address: https://consul-mitx-qa.odl.mit.edu
+  consul:address: https://consul-mitx-staging-qa.odl.mit.edu
   edxapp:business_unit: residential-staging
   edxapp:db_password:
     secure: v1:trksER57bitzZxTJ:KCl9E7b1N9vfaNk0V4fJ2AmmXt5fCy6SQiZyqV8ULFkfUDChMD/Js2K50mlQMfN1kkRSnJtYSr4=

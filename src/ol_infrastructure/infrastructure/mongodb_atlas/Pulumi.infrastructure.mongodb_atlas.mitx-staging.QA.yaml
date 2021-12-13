@@ -8,7 +8,7 @@ config:
   environment:business_unit: residential-staging
   environment:target_vpc: residential_mitx_staging_vpc
   mongodb_atlas:disk_autoscale_max_gb: '200'
-  mongodb_atlas:disk_size_gb: 100
+  mongodb_atlas:disk_size_gb: '100'
   mongodb_atlas:instance_size: M20
   mongodb_atlas:organization_id: 611ab793e07f5965c7b9e4f6
   mongodb_atlas:ready_for_traffic: 'true'
