@@ -209,10 +209,11 @@ CORS_ORIGIN_WHITELIST:
   - https://{{ key "edxapp/lms-domain" }}
   - https://{{ key "edxapp/studio-domain" }}
 COURSES_WITH_UNSAFE_CODE: []
-COURSE_ABOUT_VISIBILITY_PERMISSION: see_exists
+COURSES_INVITE_ONLY: true
+COURSE_ABOUT_VISIBILITY_PERMISSION: staff
 COURSE_CATALOG_API_URL: http://localhost:8008/api/v1
 COURSE_CATALOG_URL_ROOT: http://localhost:8008
-COURSE_CATALOG_VISIBILITY_PERMISSION: see_exists
+COURSE_CATALOG_VISIBILITY_PERMISSION: staff
 COURSE_MODE_DEFAULTS:
     bulk_sku: null
     currency: usd
