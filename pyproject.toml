@@ -41,7 +41,7 @@ isort = "*"
 mypy = "<1.0"
 pre-commit = "^2.16.0"
 pytest = "^6.0.0"
-pytest-testinfra = "^6.4.0"
+pytest-testinfra = "^6.5.0"
 wemake-python-styleguide = "^0.15"
 
 [tool.black]
