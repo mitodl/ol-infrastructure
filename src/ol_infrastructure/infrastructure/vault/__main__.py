@@ -35,6 +35,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_RSA_KEY_SIZE,
     FIVE_MINUTES,
+    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
     VAULT_CLUSTER_PORT,
     VAULT_HTTP_PORT,
 )
@@ -199,7 +200,7 @@ vault_iam_role = iam.Role(
             },
         }
     ),
-    name_prefix=f"{env_name}-vault-server-role-",
+    name_prefix=f"{env_name}-vault-server-role-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
     path=f"/ol-applications/vault/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     tags=aws_config.tags,
 )
@@ -278,10 +279,10 @@ vault_web_lb_target_group = lb.TargetGroup(
         healthy_threshold=3,
         timeout=3,
         interval=10,
-        path="/v1/sys/health",
+        path="/v1/sys/health?uninitcode=499",
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",
-        matcher="200,429",
+        matcher="200,429,499",
     ),
     name_prefix=f"vault-{stack_info.env_suffix}-"[:6],
     tags=aws_config.tags,
