@@ -620,7 +620,7 @@ if atlas_project_id := mongodb_config.get("atlas_project_id"):  # noqa: WPS332
         roles=[
             atlas.DatabaseUserRoleArgs(database_name="edxapp", role_name="readWrite")
         ],
-        opts=atlas_provider,
+        opts=atlas_provider.merge(ResourceOptions(delete_before_replace=True)),
     )
     forum_mongo_user = atlas.DatabaseUser(
         "mongodb-atlas-forum-user",
@@ -631,7 +631,7 @@ if atlas_project_id := mongodb_config.get("atlas_project_id"):  # noqa: WPS332
         roles=[
             atlas.DatabaseUserRoleArgs(database_name="forum", role_name="readWrite")
         ],
-        opts=atlas_provider,
+        opts=atlas_provider.merge(ResourceOptions(delete_before_replace=True)),
     )
     vault.generic.Secret(
         "edxapp-mongodb-atlas-user-password",

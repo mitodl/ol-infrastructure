@@ -40,7 +40,7 @@ atlas_provider = pulumi.ResourceOptions(
         "mongodb-atlas-provider",
         private_key=atlas_creds["private_key"],
         public_key=atlas_creds["public_key"],
-    )
+    ),
 )
 
 #################
@@ -104,6 +104,7 @@ atlas_aws_network_peer = atlas.NetworkPeering(
     project_id=atlas_project.id,
     provider_name="AWS",
     route_table_cidr_block=target_vpc["cidr"],
+    opts=atlas_provider,
 )
 
 accept_atlas_network_peer = aws.ec2.VpcPeeringConnectionAccepter(
