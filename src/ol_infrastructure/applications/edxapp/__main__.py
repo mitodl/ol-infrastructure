@@ -598,6 +598,14 @@ mongodb_admin_password = mongodb_config.get("admin_password")
 edxapp_mongo_role_statements = mongodb_role_statements
 
 if atlas_project_id := mongodb_config.get("atlas_project_id"):  # noqa: WPS332
+    atlas_creds = read_yaml_secrets(Path("pulumi/mongodb_atlas.yaml"))
+    atlas_provider = ResourceOptions(
+        provider=atlas.Provider(
+            "mongodb-atlas-provider",
+            private_key=atlas_creds["private_key"],
+            public_key=atlas_creds["public_key"],
+        )
+    )
     mongo_atlas_credentials = read_yaml_secrets(
         Path(
             f"pulumi/mongodb_atlas.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"
@@ -612,6 +620,7 @@ if atlas_project_id := mongodb_config.get("atlas_project_id"):  # noqa: WPS332
         roles=[
             atlas.DatabaseUserRoleArgs(database_name="edxapp", role_name="readWrite")
         ],
+        opts=atlas_provider,
     )
     forum_mongo_user = atlas.DatabaseUser(
         "mongodb-atlas-forum-user",
@@ -622,6 +631,7 @@ if atlas_project_id := mongodb_config.get("atlas_project_id"):  # noqa: WPS332
         roles=[
             atlas.DatabaseUserRoleArgs(database_name="forum", role_name="readWrite")
         ],
+        opts=atlas_provider,
     )
     vault.generic.Secret(
         "edxapp-mongodb-atlas-user-password",

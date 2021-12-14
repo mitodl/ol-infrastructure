@@ -34,6 +34,14 @@ max_disk_size = atlas_config.get_int("disk_autoscale_max_gb")
 max_instance_type = atlas_config.get("cluster_autoscale_max_size")
 min_instance_type = atlas_config.get("cluster_autoscale_min_size")
 num_instances = atlas_config.get_int("cluster_instance_count") or 3
+atlas_creds = read_yaml_secrets(Path("pulumi/mongodb_atlas.yaml"))
+atlas_provider = pulumi.ResourceOptions(
+    provider=atlas.Provider(
+        "mongodb-atlas-provider",
+        private_key=atlas_creds["private_key"],
+        public_key=atlas_creds["public_key"],
+    )
+)
 
 #################
 # ATLAS PROJECT #
@@ -42,6 +50,7 @@ atlas_project = atlas.Project(
     f"mongo-atlas-project-{environment_name}",
     name=environment_name,
     org_id=atlas_config.require("organization_id"),
+    opts=atlas_provider,
 )
 
 atlas_cluster = atlas.Cluster(
@@ -62,6 +71,7 @@ atlas_cluster = atlas.Cluster(
     provider_auto_scaling_compute_max_instance_size=max_instance_type,
     provider_auto_scaling_compute_min_instance_size=min_instance_type,
     replication_factor=num_instances,
+    opts=atlas_provider,
 )
 
 atlas_security_group = aws.ec2.SecurityGroup(
@@ -112,7 +122,7 @@ atlas_secgroup_network_access = atlas.ProjectIpAccessList(
     project_id=atlas_project.id,
     opts=pulumi.ResourceOptions(
         depends_on=[atlas_aws_network_peer, accept_atlas_network_peer]
-    ),
+    ).merge(atlas_provider),
 )
 
 atlas_cidr_network_access = atlas.ProjectIpAccessList(
@@ -121,7 +131,7 @@ atlas_cidr_network_access = atlas.ProjectIpAccessList(
     cidr_block=target_vpc["cidr"],
     opts=pulumi.ResourceOptions(
         depends_on=[atlas_aws_network_peer, accept_atlas_network_peer]
-    ),
+    ).merge(atlas_provider),
 )
 
 aws.ec2.Route(
