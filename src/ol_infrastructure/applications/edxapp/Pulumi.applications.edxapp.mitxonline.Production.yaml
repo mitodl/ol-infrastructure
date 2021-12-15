@@ -25,3 +25,5 @@ config:
   edxapp:worker_node_capacity: '3'
   mongodb:admin_password:
     secure: v1:Z57JZ5RX59bVTb2j:zIERkkj7Vs1e7J+qZNhaPOo3H6owlQn3Ovj9VpikQaXbWa4uBV4B7Lf6I9KWoDMohXYJoId1Dn5waiSlmOBp19NhoPQNilteLJDmjyl5T2N6zNxsLi8T3u7C
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

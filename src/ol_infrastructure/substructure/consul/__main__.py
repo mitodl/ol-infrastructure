@@ -23,6 +23,7 @@ vault_operations_query = PreparedQuery(
             "operations-ci",
             "operations-qa",
             "operations",
+            "operations-production",
         ]
     ),
     opts=consul_provider,
@@ -38,6 +39,7 @@ log_service_query = PreparedQuery(
             "operations-ci",
             "operations-qa",
             "operations",
+            "operations-production",
         ]
     ),
     template=PreparedQueryTemplateArgs(
@@ -56,6 +58,7 @@ operations_service_query = PreparedQuery(
             "operations-ci",
             "operations-qa",
             "operations",
+            "operations-production",
         ]
     ),
     template=PreparedQueryTemplateArgs(
