@@ -358,6 +358,24 @@ if host.fact.has_systemd:
     )
 
 if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-staging"}:
+    files.link(
+        name="Enable xqueue service in Supervisor",
+        path="/edx/app/supervisor/conf.d/xqueue.conf",
+        target="/edx/app/supervisor/conf.available.d/xqueue.conf",
+        user="supervisor",
+        group="supervisor",
+        symbolic=True,
+        present=True,
+    )
+    files.link(
+        name="Enable xqueue_consumer service in Supervisor",
+        path="/edx/app/supervisor/conf.d/xqueue_consumer.conf",
+        target="/edx/app/supervisor/conf.available.d/xqueue_consumer.conf",
+        user="supervisor",
+        group="supervisor",
+        symbolic=True,
+        present=True,
+    )
     xqueue_config_path = Path("/edx/app/forum/forum_env")
     xqueue_template_path = Path("/etc/consul-template/templates/xqueue.tmpl")
     consul_configuration[Path("02-xqueue.json")] = ConsulConfig(
