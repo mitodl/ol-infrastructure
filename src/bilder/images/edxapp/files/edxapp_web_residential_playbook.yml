@@ -1,0 +1,25 @@
+---
+- name: Deploy edxapp
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    serial_count: 1
+    CLUSTER_NAME: edxapp
+    COMMON_CONFIG_NO_LOGGING: false
+    CREATE_SERVICE_WORKER_USERS: false
+    NGINX_ENABLE_SSL: true
+    NGINX_HTTPS_REDIRECT_STRATEGY: forward_for_proto
+    NGINX_LOG_FORMAT_NAME: json_analytics
+    NGINX_REDIRECT_TO_HTTPS: true
+    NGINX_SSL_CERTIFICATE: /tmp/edxapp.cert
+    NGINX_SSL_KEY: /tmp/edxapp.key
+    BLOCKSTORE_SECRET_KEY: this-is-just-a-placeholder
+  serial: '{{ serial_count }}'
+  roles:
+  - role: nginx
+    nginx_sites:
+    - xqueue
+  - role: xqueue
+    disable_edx_services: true
+  - blockstore
