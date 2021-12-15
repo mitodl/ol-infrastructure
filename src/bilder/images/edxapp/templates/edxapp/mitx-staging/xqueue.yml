@@ -1,4 +1,4 @@
-{{ with secret "mariadb-mitx/creds/xqueue" }}
+{{ with secret "mariadb-mitx-staging/creds/xqueue" }}
 mysql_creds: &mysql_creds
   ENGINE: django.db.backends.mysql
   PORT: 3306
@@ -6,7 +6,7 @@ mysql_creds: &mysql_creds
   PASSWORD: {{ .Data.password }}
 {{ end }}
 
-{{ with secret "secret-mitx/edx-xqueue" }}
+{{ with secret "secret-mitx-staging/edx-xqueue" }}
  USERS:
      edxapp: {{ .Data.edxapp_password }}
      xqwatcher: {{ .Data.xqwatcher_password }}
