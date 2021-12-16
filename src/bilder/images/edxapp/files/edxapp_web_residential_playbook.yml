@@ -8,4 +8,3 @@
     nginx_sites:
     - xqueue
   - role: xqueue
-    disable_edx_services: true

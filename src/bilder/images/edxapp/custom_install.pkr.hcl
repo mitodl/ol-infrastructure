@@ -113,7 +113,7 @@ build {
 
     content {
       playbook_file     = "${path.root}/files/edxapp_web_residential_playbook.yml"
-      command           = "/tmp/configuration/.venv/bin/ansible-playbook --extra-vars 'EDX_PLATFORM_VERSION=${var.edx_platform_version}'"
+      command           = "/tmp/configuration/.venv/bin/ansible-playbook --extra-vars 'EDX_PLATFORM_VERSION=${var.edx_platform_version}' --skip-tags 'manage:app-users'"
       staging_directory = "/tmp/configuration/playbooks/"
     }
   }
