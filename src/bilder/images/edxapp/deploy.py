@@ -376,16 +376,27 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
         symbolic=True,
         present=True,
     )
-    xqueue_config_path = Path("/edx/app/forum/forum_env")
+    # NOTE: In order for us to install xqueue during the AMI build we have to pass the
+    # `disable_edx_services` var to Ansible. This causes the `pre_supervisor_check`
+    # script to be installed, which prevents the Supervisor process from starting due to
+    # the lack of the expected EC2 tags. This is a hack and serves as a reminder of why
+    # we need to move off of our reliance on the edX Ansible repository.
+    files.file(
+        name="Remove unnecessary pre_supervisor_check that prevents supervisor startup",
+        path="/edx/app/supervisor/pre_supervisor_checks.py",
+        present=False,
+        assume_present=True,
+    )
+    xqueue_config_path = Path("/edx/etc/xqueue.yml")
     xqueue_template_path = Path("/etc/consul-template/templates/xqueue.tmpl")
-    consul_configuration[Path("02-xqueue.json")] = ConsulConfig(
+    consul.configuration[Path("02-xqueue.json")] = ConsulConfig(
         services=[
             ConsulService(
                 name="xqueue",
                 port=18040,  # noqa: WPS432
                 check=ConsulServiceTCPCheck(
                     name="edxapp-xqueue",
-                    tcp="localhost:18040",
+                    tcp="localhost:8040",
                     interval="10s",
                 ),
             ),
@@ -402,8 +413,8 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
             group=consul_template.name,
             create_remote_dir=True,
         )
-    consul_templates.extend(
-        [
+    consul_template.configuration[Path("02-xqueue.json")] = ConsulTemplateConfig(
+        template=[
             ConsulTemplateTemplate(
                 source=xqueue_template_path, destination=xqueue_config_path
             ),

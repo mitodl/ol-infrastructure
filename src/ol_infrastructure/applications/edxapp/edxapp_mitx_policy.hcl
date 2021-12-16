@@ -6,11 +6,7 @@ path "mariadb-mitx/creds/edxapp-csmh" {
   capabilities = ["read"]
 }
 
-path "mongodb-mitx/creds/edxapp" {
-  capabilities = ["read"]
-}
-
-path "mongodb-mitx/creds/forum" {
+path "mariadb-mitx/creds/xqueue" {
   capabilities = ["read"]
 }
 

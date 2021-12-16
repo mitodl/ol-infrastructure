@@ -54,7 +54,7 @@ SOCIAL_AUTH_SAML_SP_PUBLIC_CERT: '{{ .Data.saml_public_cert }}'
 SYSADMIN_GITHUB_WEBHOOK_KEY: {{ .Data.sysadmin_git_webhook_secret }}
 YOUTUBE_API_KEY: {{ .Data.youtube_api_key }}
 {{ end }}
-{{ with secret "secret-mitx/edx-xqueue" }}
+{{ with secret "secret-mitx-staging/edx-xqueue" }}
 XQUEUE_INTERFACE:
     django_auth:
         password: {{ .Data.edxapp_password }}

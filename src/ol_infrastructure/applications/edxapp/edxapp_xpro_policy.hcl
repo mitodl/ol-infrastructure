@@ -6,14 +6,6 @@ path "mariadb-xpro/creds/edxapp-csmh" {
   capabilities = ["read"]
 }
 
-path "mongodb-xpro/creds/edxapp" {
-  capabilities = ["read"]
-}
-
-path "mongodb-xpro/creds/forum" {
-  capabilities = ["read"]
-}
-
 path "sys/leases/renew" {
   capabilities = [ "update" ]
 }
