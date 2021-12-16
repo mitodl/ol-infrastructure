@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, ResourceOptions, StackReference
+from pulumi import Config, Output, StackReference
 from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -74,11 +74,7 @@ concourse_worker_ami = ec2.get_ami(
     owners=[aws_account.account_id],
 )
 concourse_web_tag = f"concourse-web-{stack_info.env_suffix}"
-
-if Config("consul").get("http_auth"):
-    consul_provider = ResourceOptions()
-else:
-    consul_provider = get_consul_provider(stack_info)
+consul_provider = get_consul_provider(stack_info)
 
 ###################################
 #    Security & Access Control    #
@@ -453,10 +449,7 @@ concourse_web_alb_listener = lb.Listener(
 web_instance_type = (
     concourse_config.get("web_instance_type") or InstanceTypes.burstable_medium.name
 )
-if stack_info.env_suffix == "production":
-    consul_datacenter = "operations"
-else:
-    consul_datacenter = "operations-qa"
+consul_datacenter = "operations-{stack_info.env_suffix}"
 web_launch_config = ec2.LaunchTemplate(
     "concourse-web-launch-template",
     name_prefix=f"concourse-web-{stack_info.env_suffix}-",
