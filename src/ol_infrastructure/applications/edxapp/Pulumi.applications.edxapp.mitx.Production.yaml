@@ -17,7 +17,7 @@ config:
     secure: v1:abC4Zew/4Q9nzIm8:ntKKmUgT7z8jIEgKV2EkTbSJ6zcckEH2YHHInsBo8WOGqPNydNkxidhKYZ/bXy8y8E3iBOFF0uRROTyuHhrmzcbGygu01zYGFIBe+v8=
   edxapp:google_analytics_id: UA-5145472-4
   edxapp:mail_domain: edxapp-mail-production.mitx.mit.edu
-  edxapp:manage_dns: 'true'
+  edxapp:manage_dns: 'false'
   edxapp:min_web_nodes: '5'
   edxapp:min_worker_nodes: '2'
   edxapp:sender_email_address: support@edxapp-mail-production.mitx.mit.edu

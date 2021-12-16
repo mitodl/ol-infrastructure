@@ -34,6 +34,7 @@ from pulumi_aws import (
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
+    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
     DEFAULT_HTTP_PORT,
     DEFAULT_HTTPS_PORT,
     DEFAULT_MYSQL_PORT,
@@ -853,7 +854,7 @@ edxapp_web_tag = f"edxapp-web-{env_name}"
 edxapp_worker_tag = f"edxapp-worker-{env_name}"
 web_lb = lb.LoadBalancer(
     "edxapp-web-load-balancer",
-    name=edxapp_web_tag,
+    name=edxapp_web_tag[:AWS_LOAD_BALANCER_NAME_MAX_LENGTH],
     ip_address_type="dualstack",
     load_balancer_type="application",
     enable_http2=True,
