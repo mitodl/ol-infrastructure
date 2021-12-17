@@ -258,8 +258,8 @@ consul_template = ConsulTemplate(
 )
 hashicorp_products = [vault, consul, consul_template]
 install_hashicorp_products(hashicorp_products)
-for product in hashicorp_products:
-    configure_hashicorp_product(product)
+# Install Vector log agent
+install_vector(vector)
 
 # Upload templates for consul-template agent
 EDX_TEMPLATES_DIRECTORY = TEMPLATES_DIRECTORY.joinpath("edxapp", EDX_INSTALLATION_NAME)
@@ -300,12 +300,6 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as forum_template:
         group=consul_template.name,
         create_remote_dir=True,
     )
-vault_template_permissions(vault_config)
-consul_template_permissions(consul_template.configuration)
-
-# Install Vector log agent
-install_vector(vector)
-configure_vector(vector)
 
 # Manage services
 if host.fact.has_systemd:
@@ -362,3 +356,58 @@ if host.fact.has_systemd:
             "/edx/bin/supervisorctl restart forum"
         ),
     )
+
+if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-staging"}:
+    xqueue_config_path = Path("/edx/etc/xqueue.yml")
+    xqueue_template_path = Path("/etc/consul-template/templates/xqueue.tmpl")
+    consul.configuration[Path("02-xqueue.json")] = ConsulConfig(
+        services=[
+            ConsulService(
+                name="xqueue",
+                port=18040,  # noqa: WPS432
+                check=ConsulServiceTCPCheck(
+                    name="edxapp-xqueue",
+                    tcp="localhost:8040",
+                    interval="10s",
+                ),
+            ),
+        ]
+    )
+    xqueue_config = EDX_TEMPLATES_DIRECTORY.joinpath("xqueue.yml")
+    with tempfile.NamedTemporaryFile("wt", delete=False) as xqueue_template:
+        xqueue_template.write(xqueue_config.read_text())
+        files.put(
+            name="Upload xqueue config template for consul-template agent",
+            src=xqueue_template.name,
+            dest=xqueue_template_path,
+            user=consul_template.name,
+            group=consul_template.name,
+            create_remote_dir=True,
+        )
+    consul_template.configuration[Path("02-xqueue.json")] = ConsulTemplateConfig(
+        template=[
+            ConsulTemplateTemplate(
+                source=xqueue_template_path, destination=xqueue_config_path
+            ),
+        ]
+    )
+    service_configuration_watches(
+        service_name="edxapp-xqueue",
+        watched_files=[forum_config_path],
+        start_now=False,
+        onchange_command=(
+            # Let forum read the rendered config file
+            f"/bin/bash -c 'chown xqueue:www-data {xqueue_config_path} && "  # noqa: WPS237, WPS221, E501
+            # Ensure that consul-template can update the file when credentials refresh
+            f"setfacl -m u:consul-template:rwx {xqueue_config_path} && "
+            f"setfacl -m u:xqueue:rwx {xqueue_config_path} && "
+            # Restart the forum process to reload the configuration file
+            "/edx/bin/supervisorctl restart xqueue"
+        ),
+    )
+
+configure_vector(vector)
+for product in hashicorp_products:
+    configure_hashicorp_product(product)
+vault_template_permissions(vault_config)
+consul_template_permissions(consul_template.configuration)

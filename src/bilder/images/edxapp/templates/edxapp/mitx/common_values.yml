@@ -48,21 +48,19 @@ JWT_AUTH:  # NEEDS ATTENTION
       - ISSUER: https://{{ key "edxapp/lms-domain" }}/oauth2
         AUDIENCE: mitx
         SECRET_KEY: {{ .Data.django_secret_key }}
-XQUEUE_INTERFACE:
-    basic_auth:
-    - edx
-    - edx
-    django_auth:
-        password: edxapp
-        username: edxapp
-    url: http://xqueue.service.consul  # MODIFIED
 SENTRY_DSN: {{ .Data.sentry_dsn }}
 SOCIAL_AUTH_SAML_SP_PRIVATE_KEY: '{{ .Data.saml_private_key }}'
 SOCIAL_AUTH_SAML_SP_PUBLIC_CERT: '{{ .Data.saml_public_cert }}'
 SYSADMIN_GITHUB_WEBHOOK_KEY: {{ .Data.sysadmin_git_webhook_secret }}
 YOUTUBE_API_KEY: {{ .Data.youtube_api_key }}
 {{ end }}
-
+{{ with secret "secret-mitx/edx-xqueue" }}
+XQUEUE_INTERFACE:
+    django_auth:
+        password: {{ .Data.edxapp_password }}
+        username: edxapp
+    url: http://xqueue.service.consul  # MODIFIED
+{{ end }}
 {{ with secret "secret-mitx/edx-forum" }}
 COMMENTS_SERVICE_KEY: {{ .Data.forum_api_key }}
 {{ end }}

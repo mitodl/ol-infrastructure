@@ -421,6 +421,14 @@ forum_secrets = vault.generic.Secret(
         json.dumps
     ),
 )
+if xqueue_secret := edxapp_config.get_secret_object(
+    "edx_xqueue_secrets"
+):  # noqa: WPS332, E501
+    xqueue_secrets = vault.generic.Secret(
+        "edx-xqueue-static-secrets",
+        path=edxapp_vault_mount.path.apply("{}/edx-xqueue".format),
+        data_json=xqueue_secret.apply(json.dumps),
+    )
 
 # Vault policy definition
 edxapp_vault_policy = vault.Policy(

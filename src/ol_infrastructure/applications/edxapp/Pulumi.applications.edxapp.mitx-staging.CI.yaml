@@ -1,4 +1,3 @@
----
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQH3lrWmSrfJ6OGoyQvrwx1GAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM4J/T5eAboC8seh7uAgEQgDv9RL0j/cIjptkrvjnRRSa07lMZaiZT17j8gEToIxmZidrXYwO4ezztfb0+BQmX9Kp5naU7qq6SxO7lWA==
 config:
@@ -14,16 +13,18 @@ config:
     studio: studio-staging-ci.mitx.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:TMUUvuM6tlFYbT3r:Zmp7UuIteRPHVNghhms3+xqHZT+1DZjoJU1tEjsZiny0XCTIJJXY4E+OKNEDMoblo3FR4FtQEFdU719imPMdR9zk+Kb7oh3rZzf74QmMcMlSL2P743T98MchMvM3Fa1RyBf4PgebMSNZJ9GdDg==
-  edxapp:elb_healthcheck_interval: '30'
-  edxapp:google_analytics_id: ''
+  edxapp:edx_xqueue_secrets:
+    secure: v1:yojXnLWnr80P8t0T:sS5KRaJa6JUwEckAjQr0Ln4l/6O1ma69CHF38VhXUfG/pUUqxw1Q8XJBVzlRIVT4yzq7O6UhzRYc2dizDbw5iQsH4/54mdUhfrFreZaZSAO5Ta9uKAmzv4vG1lJ5hI5hwFsg0fm+mUKBq2LFa2tiCVAwoS64BSW1uoO4GBWTUl1hYPXZaouIX0rAd/sgzLq35w==
+  edxapp:elb_healthcheck_interval: "30"
+  edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-staging-ci.mitx.mit.edu
-  edxapp:manage_dns: 'true'
-  edxapp:min_web_nodes: '1'
-  edxapp:min_worker_nodes: '1'
+  edxapp:manage_dns: "true"
+  edxapp:min_web_nodes: "1"
+  edxapp:min_worker_nodes: "1"
   edxapp:sender_email_address: support@edxapp-mail-staging-ci.mitx.mit.edu
   edxapp:target_vpc: residential_mitx_staging_vpc
-  edxapp:web_node_capacity: '1'
-  edxapp:worker_node_capacity: '1'
+  edxapp:web_node_capacity: "1"
+  edxapp:worker_node_capacity: "1"
   mongodb:atlas_project_id: 6193f02d576a70760e8bcb02
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
