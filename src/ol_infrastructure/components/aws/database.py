@@ -153,7 +153,9 @@ class OLAmazonDB(pulumi.ComponentResource):
         self.parameter_group = rds.ParameterGroup(
             f"{db_config.instance_name}-{db_config.engine}-parameter-group",
             family=parameter_group_family(db_config.engine, db_config.engine_version),
-            opts=resource_options,
+            opts=resource_options.merge(
+                pulumi.ResourceOptions(ignore_changes=["family"])
+            ),
             name=f"{db_config.instance_name}-{db_config.engine}-parameter-group",
             tags=db_config.tags,
             parameters=db_config.parameter_overrides,
@@ -175,7 +177,9 @@ class OLAmazonDB(pulumi.ComponentResource):
             max_allocated_storage=db_config.max_storage,
             multi_az=db_config.multi_az,
             name=db_config.db_name,
-            opts=resource_options.merge(pulumi.ResourceOptions(ignore_changes=["engine_version"])),
+            opts=resource_options.merge(
+                pulumi.ResourceOptions(ignore_changes=["engine_version"])
+            ),
             parameter_group_name=self.parameter_group.name,
             password=db_config.password.get_secret_value(),
             port=db_config.port,

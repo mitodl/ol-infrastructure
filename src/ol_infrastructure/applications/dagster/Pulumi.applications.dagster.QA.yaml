@@ -2,18 +2,16 @@
 secretsprovider: awskms://alias/PulumiSecrets
 encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEGccCx6w+aU1z9VNPzXzwIAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkTCVUUXv23ZgiFtbAgEQgDusl6M2Rs0caUtV7jakSKAqsXTqm8f7M0UuEu0hjZ5KdbCp8HUDBShST/yKEpt0ExGXlODrlmL3gGN6fg==
 config:
-    aws:region: us-east-1
-    consul:address: https://consul-data-qa.odl.mit.edu
-    consul:http_auth:
-        secure: v1:PEzTCMfXyX1OP5Li:o/tPn/JE7hsf+AD+ji6rJEpfa+T/VoZAyhDXisviKzqTUF9pMo1P+FdVTDKEg2uacuy3WtTn0g==
-    consul:scheme: https
-    dagster:db_password:
-        secure: v1:XI74KBKUpbjHPTtE:3ZRZk+kvQ9w92TJPRRC4qw6kdK3etaumBDAgnySVagHjzYgRPfr8MhSeag==
-    dagster:domain: pipelines-qa.odl.mit.edu
-    dagster:instance_type: t3a.medium
-    saltstack:api_password:
-        secure: v1:jcxzqwIOoxQ2261K:PsHmBDKsQetmclqZPtQmAD43OgsnLlDu9NAVVVP9iNtNzPmFNb1fj7QeBANm1uxyhY1cMN7spWYR2w==
-    saltstack:api_url: https://salt-qa.odl.mit.edu
-    saltstack:api_user: pulumi
-    saltstack:key_name: salt-qa
-    vault:skip_tls_verify: 'true'
+  aws:region: us-east-1
+  consul:address: https://consul-data-qa.odl.mit.edu
+  dagster:db_password:
+    secure: v1:XI74KBKUpbjHPTtE:3ZRZk+kvQ9w92TJPRRC4qw6kdK3etaumBDAgnySVagHjzYgRPfr8MhSeag==
+  dagster:domain: pipelines-qa.odl.mit.edu
+  dagster:instance_type: t3a.medium
+  saltstack:api_password:
+    secure: v1:jcxzqwIOoxQ2261K:PsHmBDKsQetmclqZPtQmAD43OgsnLlDu9NAVVVP9iNtNzPmFNb1fj7QeBANm1uxyhY1cMN7spWYR2w==
+  saltstack:api_url: https://salt-qa.odl.mit.edu
+  saltstack:api_user: pulumi
+  saltstack:key_name: salt-qa
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa
