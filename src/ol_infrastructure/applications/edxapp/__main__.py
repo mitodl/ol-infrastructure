@@ -123,11 +123,10 @@ edxapp_web_ami = ec2.get_ami(
 )
 edxapp_worker_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(
-            name="name", values=[f"edxapp-worker-{stack_info.env_prefix}-*"]
-        ),
+        ec2.GetAmiFilterArgs(name="name", values=["edxapp-worker-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
+        ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
     ],
     most_recent=True,
     owners=[aws_account.account_id],
@@ -186,10 +185,24 @@ edxapp_storage_bucket = s3.Bucket(
             max_age_seconds=3000,
         )
     ],
+    policy=lint_iam_policy(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": "s3:GetObject",
+                    "Resource": f"arn:aws:s3:::{storage_bucket_name}/media/video-images/*",  # noqa: E501
+                }
+            ],
+        },
+        stringify=True,
+    ),
 )
 
 course_bucket_name = f"{env_name}-edxapp-courses"
-edxapp_storage_bucket = s3.Bucket(
+edxapp_course_bucket = s3.Bucket(
     "edxapp-courses-s3-bucket",
     bucket=course_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=False),
