@@ -7,9 +7,9 @@ mysql_creds: &mysql_creds
 {{ end }}
 
 {{ with secret "secret-mitx-staging/edx-xqueue" }}
- USERS:
-     edxapp: {{ .Data.edxapp_password }}
-     xqwatcher: {{ .Data.xqwatcher_password }}
+USERS:
+  edxapp: {{ .Data.edxapp_password }}
+  xqwatcher: {{ .Data.xqwatcher_password }}
 {{ end }}
 
 AWS_ACCESS_KEY_ID: ""
