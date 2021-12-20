@@ -12,7 +12,7 @@ from typing import Dict, List, Union
 
 from pulumi import ResourceOptions, StackReference, export
 from pulumi.config import get_config
-from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
+from pulumi_aws import ec2, iam, route53, s3
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -22,14 +22,17 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, build_userdata
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
+from ol_infrastructure.lib.vault import setup_vault_provider
 from ol_infrastructure.providers.salt.minion import (
     OLSaltStackMinion,
     OLSaltStackMinionInputs,
 )
 
+setup_vault_provider()
 stack_info = parse_stack()
 data_warehouse_stack = StackReference(
     f"infrastructure.aws.data_warehouse.{stack_info.name}"
@@ -44,6 +47,7 @@ dagster_environment = f"data-{stack_info.env_suffix}"
 aws_config = AWSBase(
     tags={"OU": "data", "Environment": dagster_environment},
 )
+consul_provider = get_consul_provider(stack_info)
 
 dagster_bucket_name = f"dagster-{dagster_environment}"
 dagster_s3_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
@@ -200,6 +204,8 @@ dagster_iam_permissions = {
     "Statement": dagster_s3_permissions + athena_permissions,
 }
 
+parliament_config = {"RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []}}
+
 dagster_runtime_bucket = s3.Bucket(
     dagster_bucket_name,
     bucket=dagster_bucket_name,
@@ -220,7 +226,9 @@ dagster_iam_policy = iam.Policy(
     f"dagster-policy-{stack_info.env_suffix}",
     name=f"dagster-policy-{stack_info.env_suffix}",
     path=f"/ol-data/etl-policy-{stack_info.env_suffix}/",
-    policy=lint_iam_policy(dagster_iam_permissions, stringify=True),
+    policy=lint_iam_policy(
+        dagster_iam_permissions, stringify=True, parliament_config=parliament_config
+    ),
     description="Policy for granting acces for batch data workflows to AWS resources",
 )
 
@@ -304,6 +312,7 @@ dagster_db_consul_node = Node(
     name="dagster-postgres-db",
     address=dagster_db.db_instance.address,
     datacenter=dagster_environment,
+    opts=consul_provider,
 )
 
 dagster_db_consul_service = Service(
@@ -322,9 +331,12 @@ dagster_db_consul_service = Service(
             name="dagster-instance-id",
             timeout="60s",
             status="passing",
-            tcp=f"{dagster_db.db_instance.address}:{dagster_db_config.port}",  # noqa: WPS237
+            tcp=dagster_db.db_instance.address.apply(
+                lambda address: f"{address}:{dagster_db_config.port}"
+            ),  # noqa: WPS237
         )
     ],
+    opts=consul_provider,
 )
 
 dagster_minion_id = f"dagster-{dagster_environment}-0"
@@ -346,19 +358,14 @@ cloud_init_userdata = build_userdata(
     salt_host=f"salt-{stack_info.env_suffix}.private.odl.mit.edu",
 )
 
-dagster_image = ec2.get_ami(
+dagster_image = ec2.get_ami(  # noqa: WPS114
     filters=[
-        {
-            "name": "tag:Name",
-            "values": ["dagster"],
-        },
-        {
-            "name": "virtualization-type",
-            "values": ["hvm"],
-        },
+        {"name": "virtualization-type", "values": ["hvm"]},
+        {"name": "root-device-type", "values": ["ebs"]},
+        {"name": "name", "values": ["debian-11-amd64*"]},
     ],
     most_recent=True,
-    owners=[str(get_caller_identity().account_id)],
+    owners=["136693071363"],
 )
 instance_tags = aws_config.merged_tags({"Name": dagster_minion_id})
 dagster_instance = ec2.Instance(
