@@ -1,6 +1,7 @@
 {{ with secret "secret-xpro/edxapp" }}
 SOCIAL_AUTH_OAUTH_SECRETS:
   mitxpro-oauth2: {{ .Data.xpro_oauth_secret }}
+EDX_API_KEY: {{ .Data.edxapp_api_key }}  # DEPRECATED SETTING
 {{ end }}
 
 ACCOUNT_MICROFRONTEND_URL: null
@@ -26,7 +27,6 @@ DCS_SESSION_COOKIE_SAMESITE: Lax
 DCS_SESSION_COOKIE_SAMESITE_FORCE_ALL: true
 EDXNOTES_INTERNAL_API: http://localhost:18120/api/v1
 EDXNOTES_PUBLIC_API: http://localhost:18120/api/v1
-# EDX_API_KEY: PUT_YOUR_API_KEY_HERE  # DEPRECATED SETTING
 GIT_REPO_DIR: /edx/var/edxapp/course_repos
 GOOGLE_ANALYTICS_LINKEDIN: ''
 GOOGLE_ANALYTICS_TRACKING_ID: ''
