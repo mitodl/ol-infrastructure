@@ -401,7 +401,7 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
             # Ensure that consul-template can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {xqueue_config_path} && "
             f"setfacl -m u:xqueue:rwx {xqueue_config_path} && "
-            # Restart the forum process to reload the configuration file
+            # Restart the xqueue process to reload the configuration file
             "/edx/bin/supervisorctl restart xqueue"
         ),
     )
