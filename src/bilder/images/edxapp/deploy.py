@@ -393,7 +393,7 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
     )
     service_configuration_watches(
         service_name="edxapp-xqueue",
-        watched_files=[forum_config_path],
+        watched_files=[xqueue_config_path],
         start_now=False,
         onchange_command=(
             # Let forum read the rendered config file
