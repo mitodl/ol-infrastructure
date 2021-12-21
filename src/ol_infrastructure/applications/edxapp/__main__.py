@@ -254,6 +254,9 @@ consul_kv_data = {
     "sender-email-address": edxapp_config.require("sender_email_address"),
     "ses-configuration-set": f"edxapp-{env_name}",
     "ses-mail-domain": edxapp_mail_domain,
+    "session-cookie-domain": edxapp_domains["lms"].apply(
+        lambda domain: ".{}".format(domain.split(".", 1)[-1])
+    ),
     "studio-domain": edxapp_domains["studio"],
 }
 consul.Keys(
