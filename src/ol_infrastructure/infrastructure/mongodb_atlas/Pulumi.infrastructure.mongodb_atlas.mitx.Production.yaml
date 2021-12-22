@@ -9,8 +9,8 @@ config:
   environment:target_vpc: residential_mitx_vpc
   mongodb_atlas:cluster_autoscale_max_size: M50
   mongodb_atlas:cluster_instance_count: '5'
-  mongodb_atlas:disk_autoscale_max_gb: '300'
-  mongodb_atlas:disk_size: '200'
+  mongodb_atlas:disk_autoscale_max_gb: '250'
+  mongodb_atlas:disk_size_gb: '120'
   mongodb_atlas:instance_size: M30
   mongodb_atlas:organization_id: 611ab793e07f5965c7b9e4f6
   mongodb_atlas:ready_for_traffic: 'true'

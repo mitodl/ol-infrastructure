@@ -7,7 +7,7 @@ config:
   edxapp:business_unit: residential
   edxapp:db_password:
     secure: v1:vkG4n/X+C+SBaMf7:W/zi1Bxqkab0Hx1HAAiVhZuj/8WOJ7v94lxfERa5YIF5dD037uuULgPxIt+3zzHVur26pBcVIk4=
-  edxapp:db_storage_gb: '300'
+  edxapp:db_storage_gb: 300s
   edxapp:dns_zone: mitx
   edxapp:domains:
     lms: lms.mitx.mit.edu
@@ -19,7 +19,7 @@ config:
     secure: v1:MSer6cBbKNVi/Pas:v5XAeVblUaT5pyxdhhk9wn9cVjadZcHscOWhN1nlPHBsCD8/HgEtsvAjtTOWnW/yVMYaMzlIjOxoKvEw0/qNESQj0M7bFKC7/dtfU+qlrWyI0PJEVVmiz9QPLAOvl4rA8In2hJTAmN+BAREDqSRFM9YiOKmdOuoDssTGv+fD1+oC5EcFz4BKPUnbZDQ1
   edxapp:google_analytics_id: UA-5145472-4
   edxapp:mail_domain: edxapp-mail-production.mitx.mit.edu
-  edxapp:manage_dns: 'false'
+  edxapp:manage_dns: 'true'
   edxapp:min_web_nodes: '5'
   edxapp:min_worker_nodes: '2'
   edxapp:sender_email_address: support@edxapp-mail-production.mitx.mit.edu
