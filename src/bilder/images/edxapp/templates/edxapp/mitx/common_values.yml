@@ -424,6 +424,7 @@ POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
 PRESS_EMAIL: support@mitx.mit.edu # MODIFIED
 PROCTORING_BACKENDS:
     DEFAULT: 'null'
+    'proctortrack': {}
     'null': {}
 
 PROCTORING_SETTINGS:
