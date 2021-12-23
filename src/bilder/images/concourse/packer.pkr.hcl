@@ -1,32 +1,16 @@
-locals {
-  timestamp = regex_replace(timestamp(), "[- TZ:]", "")
-  business_unit = "operations"
-  app_name = "concourse"
-}
-
-variable "build_environment" {
-  type = string
-  default = "operations-qa"
-}
-
-# Available options are "web" or "worker". Used to determine which type of node to build an image for.
-variable "node_type" {
-  type = string
-}
-
 source "amazon-ebs" "concourse" {
   ami_description         = "Deployment image for Concourse ${var.node_type} server generated at ${local.timestamp}"
   ami_name                = "concourse-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
   run_volume_tags = {
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
+    OU      = local.business_unit
+    app     = local.app_name
     purpose = "concourse-${var.node_type}"
   }
   snapshot_tags = {
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
+    OU      = local.business_unit
+    app     = local.app_name
     purpose = "${local.app_name}-${var.node_type}"
   }
   # Base all builds off of the most recent Debian 10 image built by the Debian organization.
@@ -42,26 +26,26 @@ source "amazon-ebs" "concourse" {
   ssh_username = "admin"
   subnet_filter {
     filters = {
-          "tag:Environment": var.build_environment
+      "tag:Environment" : var.build_environment
     }
     random = true
   }
   run_tags = {
     Name    = "${local.app_name}-${var.node_type}"
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
+    OU      = local.business_unit
+    app     = local.app_name
     purpose = "${local.app_name}-${var.node_type}"
   }
   tags = {
     Name    = "${local.app_name}-${var.node_type}"
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
+    OU      = local.business_unit
+    app     = local.app_name
     purpose = "${local.app_name}-${var.node_type}"
   }
 }
 
 source "docker" "concourse" {
-  image = "debian:buster"
+  image  = "debian:buster"
   commit = true
   changes = [
     "USER concourse",
@@ -83,16 +67,16 @@ build {
     ]
   }
   provisioner "shell-local" {
-    except = ["docker.concourse"]
+    except           = ["docker.concourse"]
     environment_vars = ["NODE_TYPE=${var.node_type}"]
-    inline = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} ${path.root}/deploy.py"]
+    inline           = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} ${path.root}/deploy.py"]
   }
   # provisioner "shell-local" {
   #   except = ["docker.concourse"]
   #   inline = ["py.test --ssh-identity-file=/tmp/packer-session.pem --hosts='ssh://${build.User}@${build.Host}:${build.Port}' ${path.root}/test_deploy.py"]
   # }
   provisioner "shell-local" {
-    only = ["docker.concourse"]
+    only   = ["docker.concourse"]
     inline = ["pyinfra @docker/${build.ID} ${path.root}/deploy.py"]
   }
   # provisioner "shell-local" {
