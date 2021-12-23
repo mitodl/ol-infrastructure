@@ -109,6 +109,19 @@ files.directory(
     recursive=True,
 )
 
+apt.packages(
+    name="Install ACL package for more granular file permissions",
+    packages=["acl"],
+    present=True,
+)
+log_file = Path("/var/log/edxapp/app.log")
+server.shell(
+    name="Allow edxapp user to write to the log file",
+    commands=[
+        f"setfacl -R -d -m u:edxapp:rwx {log_file.parent}",
+    ],
+)
+
 vector = VectorConfig(
     configuration_templates={
         TEMPLATES_DIRECTORY.joinpath("vector", "edxapp.yaml"): {
@@ -358,6 +371,17 @@ if host.fact.has_systemd:
     )
 
 if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-staging"}:
+    # Recompile static assets to ensure that the Canvas tweaks are rendered at runtime.
+    server.shell(
+        name="Compile static assets for Canvas integration",
+        commands=["/edx/bin/edxapp-update-assets"],
+    )
+    server.shell(
+        name="Allow xqueue user to always read config file",
+        commands=[
+            f"setfacl -R -d -m u:xqueue:r /edx/etc/",
+        ],
+    )
     xqueue_config_path = Path("/edx/etc/xqueue.yml")
     xqueue_template_path = Path("/etc/consul-template/templates/xqueue.tmpl")
     consul.configuration[Path("02-xqueue.json")] = ConsulConfig(

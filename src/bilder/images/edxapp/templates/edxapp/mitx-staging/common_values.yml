@@ -425,6 +425,7 @@ PRESS_EMAIL: support@mitx.mit.edu # MODIFIED
 PROCTORING_BACKENDS:
     DEFAULT: 'null'
     'null': {}
+    'proctortrack': {}
 
 PROCTORING_SETTINGS:
     MUST_BE_VERIFIED_TRACK: false

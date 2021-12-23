@@ -33,7 +33,7 @@ source "amazon-ebs" "edxapp" {
   ami_description         = "Deployment image for Open edX ${var.node_type} server generated at ${local.timestamp}"
   ami_name                = "edxapp-${var.node_type}-${var.installation_target}-${local.timestamp}"
   ami_virtualization_type = "hvm"
-  instance_type           = "t3a.medium"
+  instance_type           = "m5.xlarge"
   launch_block_device_mappings {
     device_name = "/dev/sda1"
     volume_size = 25

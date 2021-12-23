@@ -24,9 +24,9 @@ def consul_template_permissions(
         filename = template.destination
         server.shell(
             commands=[
-                # Recursively add read/write/execute permissions for consul-template to
+                # Recursively add read/write permissions for consul-template to
                 # directory
-                f"setfacl -R -m u:consul-template:rwx {filename.parent}",
+                f"setfacl -R -d -m u:consul-template:rwx {filename.parent}",
             ],
             state=state,
             host=host,
