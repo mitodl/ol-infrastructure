@@ -17,6 +17,7 @@ def vault_template_permissions(vault_config: VaultAgentConfig, state=None, host=
         server.shell(
             commands=[
                 # Recursively add read/write permissions for Vault to directory
+                f"setfacl -R -m u:vault:rwx {filename.parent}",
                 f"setfacl -R -d -m u:vault:rwx {filename.parent}",
             ],
             state=state,
