@@ -28,6 +28,7 @@ consul_stack = pulumi.StackReference(
 #############
 environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))
+data_vpc = network_stack.require_output("data_vpc")
 business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
 max_disk_size = atlas_config.get_int("disk_autoscale_max_gb")
@@ -180,6 +181,119 @@ if atlas_config.get_bool("ready_for_traffic"):
             )
         ),
     )
+
+########################
+# Data Pipeline Access #
+########################
+atlas_data_security_group = aws.ec2.SecurityGroup(
+    f"mongodb-atlas-data {stack_info.env_suffix}",
+    name=f"mongodb-atlas-data {stack_info.env_suffix}",
+    description=f"Access control to Mongodb Atlas instances in data {stack_info.env_suffix}",  # noqa: E501
+    tags=aws_config.merged_tags(
+        {"Name": f"data {stack_info.env_suffix}-mongodb-atlas"}
+    ),
+    vpc_id=target_vpc["id"],
+    ingress=[
+        aws.ec2.SecurityGroupIngressArgs(
+            protocol="tcp",
+            from_port=DEFAULT_MONGODB_PORT,
+            to_port=DEFAULT_MONGODB_PORT,
+            cidr_blocks=[target_vpc["cidr"]],
+            ipv6_cidr_blocks=[target_vpc["cidr_v6"]],
+            description=f"Access to Mongodb cluster from data {stack_info.env_suffix}",
+        ),
+    ],
+    egress=default_egress_args,
+)
+
+# It is necessary to manually go to the Mongo Atlas UI and fetch the IP CIDR for adding
+# to the VPC route table
+atlas_aws_data_network_peer = atlas.NetworkPeering(
+    f"mongo-atlas-network-peering-data-{stack_info.env_suffix}",
+    accepter_region_name=data_vpc["region"],
+    container_id=atlas_cluster.container_id,
+    vpc_id=data_vpc["id"],
+    aws_account_id=aws.get_caller_identity().account_id,
+    project_id=atlas_project.id,
+    provider_name="AWS",
+    route_table_cidr_block=data_vpc["cidr"],
+    opts=atlas_provider,
+)
+
+accept_atlas_data_network_peer = aws.ec2.VpcPeeringConnectionAccepter(
+    "mongo-atlas-data-peering-connection-accepter",
+    vpc_peering_connection_id=atlas_aws_network_peer.connection_id,
+    auto_accept=True,
+    accepter=aws.ec2.VpcPeeringConnectionAccepterAccepterArgs(
+        allow_remote_vpc_dns_resolution=True,
+    ),
+    tags=aws_config.tags,
+)
+
+atlas_data_secgroup_network_access = atlas.ProjectIpAccessList(
+    "mongo-atlas-data-network-security-group-permissions",
+    aws_security_group=atlas_security_group.id,
+    project_id=atlas_project.id,
+    opts=pulumi.ResourceOptions(
+        depends_on=[atlas_aws_network_peer, accept_atlas_network_peer]
+    ).merge(atlas_provider),
+)
+
+atlas_data_cidr_network_access = atlas.ProjectIpAccessList(
+    "mongo-atlas-data-network-cidr-block-permissions",
+    project_id=atlas_project.id,
+    cidr_block=data_vpc["cidr"],
+    opts=pulumi.ResourceOptions(
+        depends_on=[atlas_aws_network_peer, accept_atlas_network_peer]
+    ).merge(atlas_provider),
+)
+
+aws.ec2.Route(
+    "mongo-atlas-data-network-route",
+    route_table_id=data_vpc["route_table_id"],
+    destination_cidr_block=atlas_config.get("project_cidr_block") or "192.168.248.0/21",
+    vpc_peering_connection_id=atlas_aws_data_network_peer.connection_id,
+)
+
+consul.Keys(
+    "set-mongo-connection-info-in-consul-for-data-pipelines",
+    keys=[
+        consul.KeysKeyArgs(
+            path="mongodb/host",
+            delete=True,
+            value=atlas_cluster.mongo_uri.apply(lambda uri: urlparse(uri).netloc),
+        ),
+        consul.KeysKeyArgs(
+            path="mongodb/use-ssl",
+            delete=True,
+            value=atlas_cluster.mongo_uri_with_options.apply(
+                lambda uri: parse_qs(urlparse(uri).query)["ssl"][0]
+            ),
+        ),
+        consul.KeysKeyArgs(
+            path="mongodb/replica-set",
+            delete=True,
+            value=atlas_cluster.mongo_uri_with_options.apply(
+                lambda uri: parse_qs(urlparse(uri).query)["replicaSet"][0]
+            ),
+        ),
+        consul.KeysKeyArgs(path="mongodb/auth-source", delete=True, value="admin"),
+    ],
+    opts=pulumi.ResourceOptions(
+        provider=consul.Provider(
+            "consul-operations-provider",
+            # Writing to the operations Consul so that Salt can template the values
+            address=f"https://consul-operations-{stack_info.env_suffix}.odl.mit.edu",
+            scheme="https",
+            http_auth="pulumi:{}".format(
+                read_yaml_secrets(Path(f"pulumi/consul.{stack_info.env_suffix}.yaml"))[
+                    "basic_auth_password"
+                ]
+            ),
+        )
+    ),
+)
+
 
 pulumi.export(
     "atlas_cluster",
