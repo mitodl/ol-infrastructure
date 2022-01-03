@@ -21,7 +21,7 @@ hvac = {extras = ["parser"], version = "^0.11.2"}
 parliament = "^1.5.0"
 pulumi = "^3.21.0"
 pulumi-aws = "^4.33.0"
-pulumi-fastly = "^3.10.0"
+pulumi-fastly = "^3.11.0"
 pulumi-github = "^4.9.0"
 pulumi-tls = "^4.1.0"
 pulumi-vault = "^5.1.0"
