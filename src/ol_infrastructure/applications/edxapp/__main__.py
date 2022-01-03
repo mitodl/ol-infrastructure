@@ -380,7 +380,18 @@ group_name = f"edxapp-{env_name}"
 edxapp_security_group = ec2.SecurityGroup(
     "edxapp-security-group",
     name_prefix=f"{group_name}-",
-    ingress=[],
+    ingress=[
+        ec2.SecurityGroupIngressArgs(
+            from_port=18040,  # noqa: WPS432
+            to_port=18040,  # noqa: WPS432
+            cidr_blocks=[
+                edxapp_vpc["cidr"],
+            ],
+            protocol="tcp",
+            description="Allow traffic to the Xqueue process running on the edxapp "
+            "instances",
+        ),
+    ],
     egress=default_egress_args,
     tags=aws_config.merged_tags({"Name": group_name}),
     vpc_id=edxapp_vpc_id,

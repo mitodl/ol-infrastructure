@@ -366,7 +366,7 @@ if host.fact.has_systemd:
             f"setfacl -m u:consul-template:rwx {forum_config_path} && "
             f"setfacl -m u:forum:rwx {forum_config_path} && "
             # Restart the forum process to reload the configuration file
-            "/edx/bin/supervisorctl restart forum"
+            "/edx/bin/supervisorctl restart forum'"
         ),
     )
 
@@ -426,7 +426,8 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
             f"setfacl -m u:consul-template:rwx {xqueue_config_path} && "
             f"setfacl -m u:xqueue:rwx {xqueue_config_path} && "
             # Restart the xqueue process to reload the configuration file
-            "/edx/bin/supervisorctl restart xqueue"
+            "/edx/bin/supervisorctl restart xqueue && "
+            "/edx/bin/supervisorctl restart xqueue_consumer'"
         ),
     )
 

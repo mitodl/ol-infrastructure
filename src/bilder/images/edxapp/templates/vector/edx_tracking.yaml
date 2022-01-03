@@ -29,13 +29,6 @@ transforms:
     condition: .malformed != true
 
 sinks:
-  elasticsearch_tracking:
-    inputs:
-    - tracking_log_malformed_message_filter
-    type: elasticsearch
-    endpoint: http://logging-elasticsearch.query.consul:9200
-    index: logs-${ENVIRONMENT}-edx-tracking-%Y.%W
-    healthcheck: false
   s3_tracking:
     inputs:
     - tracking_log_malformed_message_filter
