@@ -1033,7 +1033,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-mongodbatlas"
-version = "3.1.1"
+version = "3.1.2"
 description = "A Pulumi package for creating and managing mongodbatlas cloud resources."
 category = "main"
 optional = false
@@ -1583,7 +1583,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "0a5fac43adf99b6f3389ccabc8cb11571472878721f8bbdea5c4b84fb6fefbbb"
+content-hash = "f7da1de15851ef4dbf064034507fc7a1ba5fd9e6e207342a17e8c95025a7ca2d"
 
 [metadata.files]
 anyio = [
@@ -2223,7 +2223,7 @@ pulumi-github = [
     {file = "pulumi_github-4.9.0.tar.gz", hash = "sha256:9d3214079895e080172b0146fdc046b5452f0429fe34afd04452279404ff0cc5"},
 ]
 pulumi-mongodbatlas = [
-    {file = "pulumi_mongodbatlas-3.1.1.tar.gz", hash = "sha256:867e578a4e8f316a66b8f16029e3155c84cbbe0f2dbcc933147fbdb053adb721"},
+    {file = "pulumi_mongodbatlas-3.1.2.tar.gz", hash = "sha256:257fe23a594cdaa60a4064d081faa66e62cf97fe02df5258d8909a5e8b3b1460"},
 ]
 pulumi-tls = [
     {file = "pulumi_tls-4.1.0.tar.gz", hash = "sha256:313fea7a6f1b205e72152b15f5858d334966fda1b2eaae2a5e709199de20896d"},
