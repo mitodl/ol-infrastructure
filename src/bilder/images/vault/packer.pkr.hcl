@@ -1,27 +1,16 @@
-locals {
-  timestamp = regex_replace(timestamp(), "[- TZ:]", "")
-  business_unit = "operations"
-  app_name = "vault"
-}
-
-variable "build_environment" {
-  type = string
-  default = "operations-ci"
-}
-
 source "amazon-ebs" "vault" {
   ami_description         = "Deployment image for Vault server generated at ${local.timestamp}"
   ami_name                = "vault-server-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
   run_volume_tags = {
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
+    OU      = local.business_unit
+    app     = local.app_name
     purpose = "vault-server"
   }
   snapshot_tags = {
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
+    OU      = local.business_unit
+    app     = local.app_name
     purpose = "${local.app_name}-server"
   }
   # Base all builds off of the most recent Debian 10 image built by the Debian organization.
@@ -37,14 +26,14 @@ source "amazon-ebs" "vault" {
   ssh_username = "admin"
   subnet_filter {
     filters = {
-          "tag:Environment": var.build_environment
+      "tag:Environment" : var.build_environment
     }
     random = true
   }
   tags = {
     Name    = "vault-server"
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
+    OU      = local.business_unit
+    app     = local.app_name
     purpose = "vault-server"
   }
 }
@@ -62,7 +51,7 @@ build {
     inline = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} ${path.root}/deploy.py"]
   }
   provisioner "file" {
-    source = "${path.root}/files/vault_env_script.sh"
+    source      = "${path.root}/files/vault_env_script.sh"
     destination = "/tmp/vault_env_script.sh"
   }
   provisioner "shell" {

@@ -1,31 +1,15 @@
-locals {
-  timestamp = regex_replace(timestamp(), "[- TZ:]", "")
-  business_unit = "operations"
-  app_name = "consul"
-}
-
-variable "CONSUL_VERSION" {
-  type = string
-  default = "1.10.0"
-}
-
-variable "build_environment" {
-  type = string
-  default = "operations-ci"
-}
-
 source "amazon-ebs" "consul" {
   ami_description         = "Deployment image for Consul server generated at ${local.timestamp}"
   ami_name                = "consul-server-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
   run_volume_tags = {
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
+    OU  = local.business_unit
+    app = local.app_name
   }
   snapshot_tags = {
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
+    OU  = local.business_unit
+    app = local.app_name
   }
   # Base all builds off of the most recent Debian 10 image built by the Debian organization.
   source_ami_filter {
@@ -40,14 +24,14 @@ source "amazon-ebs" "consul" {
   ssh_username = "admin"
   subnet_filter {
     filters = {
-          "tag:Environment": var.build_environment
+      "tag:Environment" : var.build_environment
     }
     random = true
   }
   tags = {
-    Name    = "${local.app_name}-ami"
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
+    Name = "${local.app_name}-ami"
+    OU   = local.business_unit
+    app  = local.app_name
   }
 }
 
