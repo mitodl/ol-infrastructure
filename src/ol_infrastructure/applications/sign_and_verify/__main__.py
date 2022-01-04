@@ -1,4 +1,4 @@
-"""Deploy the Digital Credentials Sign and Verify service to AWS Fargate
+"""Deploy the Digital Credentials Sign and Verify service to AWS Fargate.
 
 This module sets up the services necessary to deploy a set of Docker containers to run
 the sign and verify service needed for the Digital Credentials project.
@@ -12,12 +12,15 @@ the sign and verify service needed for the Digital Credentials project.
     - Register the service with Route 53 DNS
 """
 
+import base64
 import json
+from pathlib import Path
 
 from pulumi import Config, Output, StackReference
 from pulumi_aws import acm, ecs, iam, lb, route53, secretsmanager
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
+from bridge.secrets.sops import read_json_secrets
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -107,8 +110,16 @@ unlocked_did_secret = secretsmanager.Secret(
 unlocked_did_secret_value = secretsmanager.SecretVersion(
     f"sign-and-verify-unlocked-did-value-{stack_info.env_suffix}",
     secret_id=unlocked_did_secret.id,
-    secret_string=sign_and_verify_config.require_secret(
-        "unlocked_did"
+    secret_string=Output.secret(
+        base64.b64encode(
+            json.dumps(
+                read_json_secrets(
+                    Path(
+                        f"digital_credentials/sign_and_verify.{stack_info.env_suffix}.json"  # noqa: E501
+                    )
+                )
+            ).encode("utf8")
+        ).decode("utf8")
     ),  # Base64 encoded JSON object of unlocked DID
 )
 

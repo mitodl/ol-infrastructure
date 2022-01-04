@@ -22,7 +22,7 @@ def read_json_secrets(sops_file: Path) -> Dict[str, Any]:
         [SOPS_BINARY, "--decrypt", Path(__file__).parent.joinpath(sops_file)],
         capture_output=True,
     )
-    return json.loads(json_data.stdout)
+    return json.loads(json_data.stdout.decode("utf8"))
 
 
 def set_env_secrets(sops_file: Path) -> None:
