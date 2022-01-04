@@ -1,17 +1,17 @@
 source "amazon-ebs" "third-party" {
-  ami_description         = "Deployment image for ${title(var.app_name)} server generated at ${local.timestamp}"
-  ami_name                = "${var.app_name}-server-${local.timestamp}"
+  ami_description         = "Deployment image for ${title(var.app_name)} ${var.node_type} generated at ${local.timestamp}"
+  ami_name                = "${var.app_name}-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
   run_volume_tags = {
     OU      = var.business_unit
     app     = var.app_name
-    purpose = "${var.app_name}-server"
+    purpose = "${var.app_name}-${var.node_type}"
   }
   snapshot_tags = {
     OU      = var.business_unit
     app     = var.app_name
-    purpose = "${var.app_name}-server"
+    purpose = "${var.app_name}-${var.node_type}"
   }
   # Base all builds off of the most recent Debian 11 image built by the Debian organization.
   source_ami_filter {
@@ -31,11 +31,21 @@ source "amazon-ebs" "third-party" {
     random = true
   }
   tags = {
-    Name    = "${var.app_name}-server"
+    Name    = "${var.app_name}-${var.node_type}"
     OU      = var.business_unit
     app     = var.app_name
-    purpose = "${var.app_name}-server"
+    purpose = "${var.app_name}-${var.node_type}"
   }
+}
+
+source "docker" "concourse" {
+  image  = "debian:buster"
+  commit = true
+  changes = [
+    "USER concourse",
+    "WORKDIR /opt/concourse",
+    "ENTRYPOINT /opt/concourse/bin/concourse ${var.node_type}"
+  ]
 }
 
 build {
@@ -48,7 +58,8 @@ build {
     ]
   }
   provisioner "shell-local" {
-    inline = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} ${path.root}/${var.app_name}/pyinfra/deploy.py"]
+    environment_vars = ["NODE_TYPE=${var.node_type}"]
+    inline           = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} ${path.root}/${var.app_name}/pyinfra/deploy.py"]
   }
 
   # TODO: move to vault pyinfra
@@ -58,5 +69,14 @@ build {
   }
   provisioner "shell" {
     inline = ["sudo mv /tmp/vault_env_script.sh /var/lib/cloud/scripts/per-instance/vault_env_script.sh"]
+  }
+}
+
+build {
+  sources = ["source.docker.concourse"]
+
+  provisioner "shell-local" {
+    only   = ["docker.concourse"]
+    inline = ["pyinfra @docker/${build.ID} ${path.root}/${var.app_name}/pyinfra/deploy.py"]
   }
 }
