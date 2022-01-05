@@ -12,6 +12,8 @@ policy_definition = {
         {
             "Effect": "Allow",
             "Action": [
+                "autoscaling:DescribeAutoScalingGroups",
+                "autoscaling:DescribeLaunchConfigurations",
                 "ec2:AttachVolume",
                 "ec2:AuthorizeSecurityGroupIngress",
                 "ec2:CopyImage",
@@ -28,8 +30,10 @@ policy_definition = {
                 "ec2:DeregisterImage",
                 "ec2:DescribeImageAttribute",
                 "ec2:DescribeImages",
-                "ec2:DescribeInstances",
                 "ec2:DescribeInstanceStatus",
+                "ec2:DescribeInstances",
+                "ec2:DescribeLaunchTemplates",
+                "ec2:DescribeLaunchTemplateVersions",
                 "ec2:DescribeRegions",
                 "ec2:DescribeSecurityGroups",
                 "ec2:DescribeSnapshots",

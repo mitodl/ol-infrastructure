@@ -1,0 +1,83 @@
+---
+policies:
+- name: find-mitodl-asg
+  resource: aws.asg
+  description: |
+    Find all MIT ODL autoscale groups and take no action. Linked launch templates are used in the next policy.
+  filters:
+  - "tag:pulumi_managed": present
+  - not:
+    - "tag:OU": "ike"
+
+- name: find-mitodl-ltv
+  resource: aws.launch-template-version
+  description: |
+    Find all inactive MIT ODL launch template version and take no action. Will used the linked AMI in the next policy.
+  filters:
+  - type: value
+    key: LaunchTemplateId
+    op: in
+    value_from:
+      url: file:find-mitodl-asg/resources.json
+      format: json
+      expr: "[].Instances[].LaunchTemplate.LaunchTemplateId"
+  - DefaultVersion: false
+
+- name: find-and-mark-mitodl-ami
+  resource: aws.ami
+  description: |
+    Find all MIT ODL AMI IDs that go with the inactive launch template versions and tag them for cleanup.
+  filters:
+  - type: value
+    key: ImageId
+    op: in
+    value_from:
+      url: file:find-mitodl-ltv/resources.json
+      format: json
+      expr: "[].LaunchTemplateData.ImageId"
+  - type: image-age
+    op: gt
+    days: 30
+  - type: unused
+    value: true
+# Action Block to tag the AMI for cleanup
+
+- name: find-and-mark-mitodl-ami-snapshots
+  resource: aws.ebs-snapshot
+  description: |
+    Find the snapshots associated with the unused AMIs from the previous policy. Tag them for deletion. Found snapshots will be used in the next policy to tmark the volumes for cleanup as well.
+  filters:
+  - type: value
+    key: SnapshotId
+    op: in
+    value_from:
+      url: file:find-and-mark-mitodl-ami/resources.json
+      format: json
+      expr: "[].BlockDeviceMappings[].Ebs.SnapshotId"
+  - type: value
+    key: Description
+    op: regex-case
+    value: '^.*CreateImage.*$'
+  actions:
+  - type: mark-for-op
+    op: delete
+    days: 30
+
+- name: find-and-mark-mitodl-ami-volumes
+  resource: aws.ebs
+  description: |
+    Find the volumes associated with inactive AMIs and tag them for deletion.
+  filters:
+  - and:
+    - Attachments: []
+    - type: value
+      key: "VolumeId"
+      op: in
+      value_from:
+        url: file:find-and-mark-mitodl-ami-snapshots/resources.json
+        format: json
+        expr: "[].VolumeId"
+  actions:
+  - type: mark-for-op
+    op: delete
+    days: 30
