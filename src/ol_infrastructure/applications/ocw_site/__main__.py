@@ -41,7 +41,7 @@ draft_bucket = s3.Bucket(
                     "Effect": "Allow",
                     "Principal": "*",
                     "Action": ["s3:GetObject"],
-                    "Resource": [f"arn:aws:s3:::{draft_bucket_name}/*"],
+                    "Resource": [f"{draft_bucket_arn}/*"],
                 }
             ],
         }
@@ -53,6 +53,7 @@ live_bucket = s3.Bucket(
     live_bucket_name,
     bucket=live_bucket_name,
     tags=aws_config.tags,
+    acl="public-read",
     policy=json.dumps(
         {
             "Version": "2012-10-17",
