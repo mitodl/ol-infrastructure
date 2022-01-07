@@ -120,7 +120,6 @@ server.shell(
     name="Allow edxapp user to write to the log file",
     commands=[
         f"setfacl -R -d -m u:edxapp:rwx {log_file.parent}",
-        f"setfacl -R -m u:edxapp:rwx {log_file}",
     ],
 )
 
