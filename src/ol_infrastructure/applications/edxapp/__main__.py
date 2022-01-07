@@ -787,7 +787,7 @@ edxapp_mail_from_domain = ses.MailFrom(
 )
 edxapp_mail_from_address = ses.EmailIdentity(
     "edxapp-ses-mail-from-identity",
-    email=consul_kv_data["sender-email-address"],
+    email=edxapp_config.require("sender_email_address"),
 )
 # Example Route53 MX record
 edxapp_ses_domain_mail_from_mx = route53.Record(
