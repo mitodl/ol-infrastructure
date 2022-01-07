@@ -26,7 +26,6 @@ transforms:
     - host_metrics
     source: |
       .tags.job = "integrations/linux_host"
-      .tags.instance = "${HOSTNAME}"
 
   consul_metrics_relabel:
     type: remap
@@ -34,7 +33,6 @@ transforms:
     - consul_metrics
     source: |
       .tags.job = "integrations/consul"
-      .tags.instance = "${HOSTNAME}"
 
   add_labels_to_metrics:
     type: remap
@@ -44,7 +42,6 @@ transforms:
       .tags.environment = "${ENVIRONMENT}"
       .tags.application = "consul"
       .tags.service = "consul"
-      .tags.hostname = "${HOSTNAME}"
 
 sinks:
   grafana_cortex_metrics:

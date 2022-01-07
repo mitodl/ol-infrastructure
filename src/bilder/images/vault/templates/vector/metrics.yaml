@@ -44,7 +44,6 @@ transforms:
       .tags.environment = "${ENVIRONMENT}"
       .tags.application = "vault"
       .tags.service = "vault"
-      .tags.hostname = "${HOSTNAME}"
       .tags.org_unit = "operations"
 
 sinks:

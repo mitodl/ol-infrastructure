@@ -14,22 +14,21 @@ transforms:
   vector_metrics_relabel:
     type: remap
     inputs:
-      - vector_metrics
+    - vector_metrics
     source: |
       .tags.job = "integrations/vector_agent"
 
   host_metrics_relabel:
     type: remap
     inputs:
-      - host_metrics
+    - host_metrics
     source: |
       .tags.job = "integrations/linux_host"
-      .tags.instance = "${HOSTNAME}"
 
   nginx_metrics_relabel:
     type: remap
     inputs:
-      - nginx_metrics
+    - nginx_metrics
     source: |
       .tags.job = "integrations/nginx"
 
@@ -41,7 +40,6 @@ transforms:
       .tags.environment = "${ENVIRONMENT}"
       .tags.application = "edxapp"
       .tags.service = "{{context.edx_installation}}"
-      .tags.hostname = "${HOSTNAME}"
 
 sinks:
   grafana_cortex_metrics:
