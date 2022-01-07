@@ -13,7 +13,7 @@ mongodb_settings: &mongo_params
 {{ with secret "mariadb-mitxonline/creds/edxapp" }}
 mysql_creds: &mysql_creds
   ENGINE: django.db.backends.mysql
-  HOST: {{ keyOrDefault "edxapp/rds-host", "edxapp-db.service.consul" }}
+  HOST: {{ keyOrDefault "edxapp/rds-host" "edxapp-db.service.consul" }}
   PORT: 3306
   USER: {{ .Data.username }}
   PASSWORD: {{ .Data.password }}
@@ -76,7 +76,7 @@ DATABASES:
     CONN_MAX_AGE: 0
     ENGINE: django.db.backends.mysql
     PORT: 3306
-    HOST: {{ keyOrDefault "edxapp/rds-host", "edxapp-db.service.consul" }}
+    HOST: {{ keyOrDefault "edxapp/rds-host" "edxapp-db.service.consul" }}
     NAME: edxapp_csmh
     OPTIONS: {}
     {{ with secret "mariadb-mitxonline/creds/edxapp-csmh"}}
