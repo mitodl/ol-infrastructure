@@ -241,31 +241,6 @@ s3.BucketPublicAccessBlock(
     block_public_policy=True,
 )
 
-######################
-# Manage Consul Data #
-######################
-consul_kv_data = {
-    "google-analytics-id": edxapp_config.require("google_analytics_id"),
-    "lms-domain": edxapp_domains["lms"],
-    "preview-domain": edxapp_domains["preview"],
-    "s3-course-bucket": course_bucket_name,
-    "s3-grades-bucket": grades_bucket_name,
-    "s3-storage-bucket": storage_bucket_name,
-    "sender-email-address": edxapp_config.require("sender_email_address"),
-    "ses-configuration-set": f"edxapp-{env_name}",
-    "ses-mail-domain": edxapp_mail_domain,
-    "session-cookie-domain": ".{}".format(edxapp_domains["lms"].split(".", 1)[-1]),
-    "studio-domain": edxapp_domains["studio"],
-}
-consul.Keys(
-    "edxapp-consul-template-data",
-    keys=[
-        consul.KeysKeyArgs(path=f"edxapp/{key}", value=config_value)
-        for key, config_value in consul_kv_data.items()
-    ],
-    opts=consul_provider,
-)
-
 ########################
 # IAM Roles & Policies #
 ########################
@@ -876,6 +851,32 @@ edxapp_ses_event_destintations = ses.EventDestination(
             value_source="emailHeader",
         )
     ],
+)
+
+######################
+# Manage Consul Data #
+######################
+consul_kv_data = {
+    "google-analytics-id": edxapp_config.require("google_analytics_id"),
+    "lms-domain": edxapp_domains["lms"],
+    "preview-domain": edxapp_domains["preview"],
+    "rds-host": edxapp_db.db_instance.address,
+    "s3-course-bucket": course_bucket_name,
+    "s3-grades-bucket": grades_bucket_name,
+    "s3-storage-bucket": storage_bucket_name,
+    "sender-email-address": edxapp_config.require("sender_email_address"),
+    "ses-configuration-set": f"edxapp-{env_name}",
+    "ses-mail-domain": edxapp_mail_domain,
+    "session-cookie-domain": ".{}".format(edxapp_domains["lms"].split(".", 1)[-1]),
+    "studio-domain": edxapp_domains["studio"],
+}
+consul.Keys(
+    "edxapp-consul-template-data",
+    keys=[
+        consul.KeysKeyArgs(path=f"edxapp/{key}", value=config_value)
+        for key, config_value in consul_kv_data.items()
+    ],
+    opts=consul_provider,
 )
 
 ##########################
