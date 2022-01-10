@@ -28,10 +28,11 @@ from bilder.components.vector.steps import (
     vector_service,
 )
 from bilder.facts import has_systemd  # noqa: F401
+from bridge.lib.versions import CONSUL_VERSION
 
 VERSIONS = {  # noqa: WPS407
     "caddy_route53": "v1.1.2",
-    "consul": os.environ.get("CONSUL_VERSION", "1.10.3"),
+    "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 

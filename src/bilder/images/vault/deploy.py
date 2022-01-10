@@ -36,10 +36,11 @@ from bilder.components.vector.steps import (
 )
 from bilder.facts import has_systemd  # noqa: F401
 from bridge.lib.magic_numbers import HOURS_IN_MONTH, VAULT_CLUSTER_PORT, VAULT_HTTP_PORT
+from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
 
 VERSIONS = {  # noqa: WPS407
-    "vault": os.environ.get("VAULT_VERSION", "1.9.0"),
-    "consul": os.environ.get("CONSUL_VERSION", "1.10.3"),
+    "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
+    "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "caddy_route53": "v1.1.2",
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
