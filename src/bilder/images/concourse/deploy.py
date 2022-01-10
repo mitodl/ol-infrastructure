@@ -110,6 +110,8 @@ concourse_config_map = {
             "{{ .Data.data.github_client_secret }}"
             "{{ end }}"
         ),
+        enable_p2p_volume_streaming=True,
+        p2p_volume_streaming_timeout="10m",
         prometheus_bind_ip=IPv4Address("127.0.0.1"),
         prometheus_bind_port=CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
         secret_cache_duration="5m",
@@ -126,6 +128,8 @@ concourse_config_map = {
         containerd_dns_server="8.8.8.8",
         containerd_max_containers=0,  # Don't set a limit on the number of containers
         containerd_network_pool="10.250.0.0/16",
+        baggageclaim_p2p_interface_family="4"
+        baggageclaim_p2p_interface_name_pattern="ens\d+"
     ),
 }
 concourse_config: Union[
