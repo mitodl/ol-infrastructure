@@ -63,11 +63,12 @@ from bridge.lib.magic_numbers import (
     CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
     VAULT_HTTP_PORT,
 )
+from bridge.lib.versions import CONCOURSE_VERSION, CONSUL_VERSION, VAULT_VERSION
 
 VERSIONS = {  # noqa: WPS407
-    "concourse": os.environ.get("CONCOURSE_VERSION", "7.6.0"),
-    "consul": os.environ.get("CONSUL_VERSION", "1.10.3"),
-    "vault": os.environ.get("VAULT_VERSION", "1.9.0"),
+    "concourse": os.environ.get("CONCOURSE_VERSION", CONCOURSE_VERSION),
+    "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
+    "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
 }
 CONCOURSE_WEB_NODE_TYPE = "web"
 CONCOURSE_WORKER_NODE_TYPE = "worker"

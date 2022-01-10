@@ -52,14 +52,16 @@ from bilder.facts import has_systemd  # noqa: F401
 from bilder.images.edxapp.lib import WEB_NODE_TYPE, node_type
 from bilder.images.edxapp.plugins.git_export_import import git_auto_export  # noqa: F401
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
 
 VERSIONS = {  # noqa: WPS407
-    "consul": "1.10.2",
-    "vault": "1.8.2",
-    "consul-template": "0.27.2",
+    "consul": CONSUL_VERSION,
+    "vault": VAULT_VERSION,
+    "consul-template": CONSUL_TEMPLATE_VERSION,
 }
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 EDX_INSTALLATION_NAME = os.environ.get("EDX_INSTALLATION", "mitxonline")
+EDX_USER = "edxapp"
 
 apt.packages(
     name="Remove unattended-upgrades to prevent race conditions during build",
@@ -86,8 +88,8 @@ git.repo(
     dest=edx_platform_path,
     branch=git_branch,
     pull=False,
-    user="edxapp",
-    group="edxapp",
+    user=EDX_USER,
+    group=EDX_USER,
 )
 
 git_auto_export()
@@ -97,7 +99,7 @@ pip.packages(
     packages=host.data.edx_plugins[EDX_INSTALLATION_NAME],
     present=True,
     virtualenv="/edx/app/edxapp/venvs/edxapp/",
-    sudo_user="edxapp",
+    sudo_user=EDX_USER,
 )
 
 files.directory(
@@ -106,7 +108,7 @@ files.directory(
     present=True,
     mode="0775",
     user="www-data",
-    group="edxapp",
+    group=EDX_USER,
     recursive=True,
 )
 
@@ -380,7 +382,7 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
     server.shell(
         name="Allow xqueue user to always read config file",
         commands=[
-            f"setfacl -R -d -m u:xqueue:r /edx/etc/",
+            "setfacl -R -d -m u:xqueue:r /edx/etc/",
         ],
     )
     xqueue_config_path = Path("/edx/etc/xqueue.yml")
