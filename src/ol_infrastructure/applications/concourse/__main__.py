@@ -7,6 +7,7 @@
 """
 import base64
 import json
+import importlib
 from pathlib import Path
 
 import pulumi_vault as vault
@@ -31,7 +32,7 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     InstanceTypes,
     default_egress_args,
 )
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -42,19 +43,23 @@ if Config("vault_server").get("env_namespace"):
     setup_vault_provider()
 concourse_config = Config("concourse")
 stack_info = parse_stack()
+env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
 consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
+target_vpc = concourse_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+
 consul_security_groups = consul_stack.require_output("security_groups")
-operations_vpc = network_stack.require_output("operations_vpc")
+
 aws_config = AWSBase(
-    tags={"OU": "operations", "Environment": f"operations-{stack_info.env_suffix}"}
+    tags={"OU": "operations", "Environment": f"operations-{env_name}"}
 )
 aws_account = get_caller_identity()
-ops_vpc_id = operations_vpc["id"]
+ops_vpc_id = target_vpc["id"]
 concourse_web_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["concourse-web-*"]),
@@ -74,76 +79,12 @@ concourse_worker_ami = ec2.get_ami(
     most_recent=True,
     owners=[aws_account.account_id],
 )
-concourse_web_tag = f"concourse-web-{stack_info.env_suffix}"
+concourse_web_tag = f"concourse-web-{env_name}"
 consul_provider = get_consul_provider(stack_info)
-
-###################################
-#    Security & Access Control    #
-###################################
-
-# AWS Permissions Document
-# S3 bucket permissions for publishing OCW
-# S3 bucket permissions for uploading software artifacts
-concourse_iam_permissions = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:ListAllMyBuckets",
-            ],
-            "Resource": "*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:GetObject*",
-                "s3:PutObject",
-                "s3:PutObjectTagging",
-                "s3:DeleteObject",
-                "s3:ListBucket*",
-            ],
-            "Resource": [
-                "arn:aws:s3:::*-edxapp-mfe",
-                "arn:aws:s3:::*-edxapp-mfe/*",
-                "arn:aws:s3:::ocw-content*",
-                "arn:aws:s3:::ocw-content*/*",
-                "arn:aws:s3:::ocw-to-hugo-output*",
-                "arn:aws:s3:::ocw-to-hugo-output*/*",
-                "arn:aws:s3:::ol-eng-artifacts",
-                "arn:aws:s3:::ol-eng-artifacts/*",
-                "arn:aws:s3:::ol-ocw-studio-app*",
-                "arn:aws:s3:::ol-ocw-studio-app*/*",
-            ],
-        },
-        {
-            "Effect": "Allow",
-            "Action": "s3:ListBucketVersions",
-            "Resource": "arn:aws:s3:::*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": ["s3:GetObject*", "s3:ListBucket"],
-            "Resource": [
-                "arn:aws:s3:::open-learning-course-data*",
-                "arn:aws:s3:::open-learning-course-data*/*",
-            ],
-        },
-        {"Effect": "Allow", "Action": ["cloudwatch:PutMetricData"], "Resource": "*"},
-    ],
-}
-
-concourse_iam_policy = iam.Policy(
-    "cicd-iam-permissions-policy",
-    path=f"/ol-infrastructure/iam/cicd-{stack_info.env_suffix}/",
-    policy=lint_iam_policy(concourse_iam_permissions, stringify=True),
-    name_prefix=f"cicd-policy-{stack_info.env_suffix}",
-    tags=aws_config.tags,
-)
 
 # IAM and instance profile
 concourse_instance_role = iam.Role(
-    f"concourse-instance-role-{stack_info.env_suffix}",
+    f"concourse-instance-role-{env_name}",
     assume_role_policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -158,14 +99,30 @@ concourse_instance_role = iam.Role(
     tags=aws_config.tags,
 )
 
+# Dynamically load IAM policies from the IAM policies module and then attach them to the role
+for iam_policy in concourse_config.get_object('iam_polices') or []:
+    policy_module = importlib.import_module(f".iam_policies.{iam_policy}")
+    iam_policy_object = iam.Policy(
+        f"cicd-iam-permissions-policy-{iam_policy}-{env_name}",
+        path=f"/ol-infrastructure/iam/cicd-{env_name}/",
+        policy=lint_iam_policy(policy_module.concourse_ocw_iam_permissions, stringify=True),
+        name_prefix=f"cicd-policy-{iam_policy}-{env_name}",
+        tags=aws_config.tags,
+    )
+    iam.RolePolicyAttachment(
+        f"concourse-instance-policy-{iam_policy}-{env_name}",
+        policy_arn=iam_policy_object.arn
+        role=concourse_instance_role.name
+    )
+    
 iam.RolePolicyAttachment(
-    f"concourse-describe-instance-role-policy-{stack_info.env_suffix}",
+    f"concourse-describe-instance-role-policy-{env_name}",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
     role=concourse_instance_role.name,
 )
 
 iam.RolePolicyAttachment(
-    f"concourse-route53-role-policy-{stack_info.env_suffix}",
+    f"concourse-route53-role-policy-{env_name}",
     policy_arn=policy_stack.require_output("iam_policies")["route53_odl_zone_records"],
     role=concourse_instance_role.name,
 )
@@ -177,7 +134,7 @@ iam.RolePolicyAttachment(
 )
 
 concourse_instance_profile = iam.InstanceProfile(
-    f"concourse-instance-profile-{stack_info.env_suffix}",
+    f"concourse-instance-profile-{env_name}",
     role=concourse_instance_role.name,
     path="/ol-applications/concourse/profile/",
 )
@@ -276,8 +233,8 @@ vault.aws.AuthBackendRole(
 
 # Create worker node security group
 concourse_worker_security_group = ec2.SecurityGroup(
-    f"concourse-worker-security-group-{stack_info.env_suffix}",
-    name=f"concourse-worker-operations-{stack_info.env_suffix}",
+    f"concourse-worker-security-group-{env_name}",
+    name=f"concourse-worker-operations-{env_name}",
     description="Access control for Concourse worker servers",
     egress=default_egress_args,
     vpc_id=ops_vpc_id,
@@ -285,8 +242,8 @@ concourse_worker_security_group = ec2.SecurityGroup(
 
 # Create web node security group
 concourse_web_security_group = ec2.SecurityGroup(
-    f"concourse-web-security-group-{stack_info.env_suffix}",
-    name=f"concourse-web-operations-{stack_info.env_suffix}",
+    f"concourse-web-security-group-{env_name}",
+    name=f"concourse-web-operations-{env_name}",
     description="Access control for Concourse web servers",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -315,8 +272,8 @@ ec2.SecurityGroupRule(
 
 # Create security group for Concourse Postgres database
 concourse_db_security_group = ec2.SecurityGroup(
-    f"concourse-db-access-{stack_info.env_suffix}",
-    name=f"concourse-db-access-{stack_info.env_suffix}",
+    f"concourse-db-access-{env_name}",
+    name=f"concourse-db-access-{env_name}",
     description="Access from Concourse instances to the associated Postgres database",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -326,7 +283,7 @@ concourse_db_security_group = ec2.SecurityGroup(
             ],
             # TODO: Create Vault security group to act as source of allowed
             # traffic. (TMM 2021-05-04)
-            cidr_blocks=[operations_vpc["cidr"]],
+            cidr_blocks=[target_vpc["cidr"]],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
@@ -346,9 +303,9 @@ rds_defaults["instance_size"] = (
     concourse_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
 concourse_db_config = OLPostgresDBConfig(
-    instance_name=f"concourse-db-{stack_info.env_suffix}",
+    instance_name=f"concourse-db-{env_name}",
     password=concourse_config.require("db_password"),
-    subnet_group_name=operations_vpc["rds_subnet"],
+    subnet_group_name=target_vpc["rds_subnet"],
     security_groups=[concourse_db_security_group],
     tags=aws_config.tags,
     db_name="concourse",
@@ -409,9 +366,9 @@ web_lb = lb.LoadBalancer(
     ip_address_type="dualstack",
     load_balancer_type="application",
     enable_http2=True,
-    subnets=operations_vpc["subnet_ids"],
+    subnets=target_vpc["subnet_ids"],
     security_groups=[
-        operations_vpc["security_groups"]["web"],
+        target_vpc["security_groups"]["web"],
     ],
     tags=aws_config.merged_tags({"Name": concourse_web_tag}),
 )
@@ -454,10 +411,10 @@ concourse_web_alb_listener = lb.Listener(
 web_instance_type = (
     concourse_config.get("web_instance_type") or InstanceTypes.burstable_medium.name
 )
-consul_datacenter = f"operations-{stack_info.env_suffix}"
+consul_datacenter = f"operations-{env_name}"
 web_launch_config = ec2.LaunchTemplate(
     "concourse-web-launch-template",
-    name_prefix=f"concourse-web-{stack_info.env_suffix}-",
+    name_prefix=f"concourse-web-{env_name}-",
     description="Launch template for deploying Concourse web nodes",
     iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
         arn=concourse_instance_profile.arn,
@@ -476,7 +433,7 @@ web_launch_config = ec2.LaunchTemplate(
     ],
     vpc_security_group_ids=[
         concourse_web_security_group.id,
-        operations_vpc["security_groups"]["web"],
+        target_vpc["security_groups"]["web"],
         consul_security_groups["consul_agent"],
     ],
     instance_type=InstanceTypes[web_instance_type].value,
@@ -503,7 +460,7 @@ web_launch_config = ec2.LaunchTemplate(
                                 {
                                     "retry_join": [
                                         "provider=aws tag_key=consul_env "
-                                        f"tag_value=operations-{stack_info.env_suffix}"
+                                        f"tag_value=operations-{env_name}"
                                     ],
                                     "datacenter": consul_datacenter,
                                 }
@@ -536,7 +493,7 @@ web_asg = autoscaling.Group(
     min_size=1,
     max_size=5,
     health_check_type="ELB",
-    vpc_zone_identifiers=operations_vpc["subnet_ids"],
+    vpc_zone_identifiers=target_vpc["subnet_ids"],
     launch_template=autoscaling.GroupLaunchTemplateArgs(
         id=web_launch_config.id, version="$Latest"
     ),
@@ -565,7 +522,7 @@ worker_instance_type = (
 )
 worker_launch_config = ec2.LaunchTemplate(
     "concourse-worker-launch-template",
-    name_prefix=f"concourse-worker-{stack_info.env_suffix}-",
+    name_prefix=f"concourse-worker-{env_name}-",
     description="Launch template for deploying Concourse worker nodes",
     iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
         arn=concourse_instance_profile.arn,
@@ -592,13 +549,13 @@ worker_launch_config = ec2.LaunchTemplate(
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="instance",
             tags=aws_config.merged_tags(
-                {"Name": f"concourse-worker-{stack_info.env_suffix}"}
+                {"Name": f"concourse-worker-{env_name}"}
             ),
         ),
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="volume",
             tags=aws_config.merged_tags(
-                {"Name": f"concourse-worker-{stack_info.env_suffix}"}
+                {"Name": f"concourse-worker-{env_name}"}
             ),
         ),
     ],
@@ -634,7 +591,7 @@ worker_asg = autoscaling.Group(
     min_size=1,
     max_size=50,  # noqa: WPS432
     health_check_type="EC2",
-    vpc_zone_identifiers=operations_vpc["subnet_ids"],
+    vpc_zone_identifiers=target_vpc["subnet_ids"],
     launch_template=autoscaling.GroupLaunchTemplateArgs(
         id=worker_launch_config.id, version="$Latest"
     ),

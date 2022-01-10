@@ -3,6 +3,9 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgFY9u5ocQG+o+sndf23MIlyAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMTUkwVa0Z1Qyk+S5BAgEQgDspkXL/TSxU8EhflHb1ANICwEE4O+k5t1yQArv1+UG+s3C14Wh+UeWPu93RDnAV9xI6FwkSwX0ea7vo/w==
 config:
   aws:region: us-east-1
+  concourse:target_vpc: operations_vpc
+  concourse:iam_policies:
+  - operations
   concourse:consul_credentials:
     secure: v1:odRZcznoHvnBu/tX:eJ0FHmofwnccKwNWNGwbGV/EoZPG6btyd8irQ4M1DZ6OX/4VWPD8LOp9n/gNHeeYw9S4hnoej1gB9ljUHrim
   concourse:db_instance_size: db.m6g.xlarge
