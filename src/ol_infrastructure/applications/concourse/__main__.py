@@ -20,6 +20,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     MAXIMUM_PORT_NUMBER,
 )
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -191,16 +192,20 @@ concourse_secrets_mount = vault.Mount(
 vault.generic.Secret(
     "concourse-web-secret-values",
     path=concourse_secrets_mount.path.apply(lambda mount_path: f"{mount_path}/web"),
-    data_json=concourse_config.require_secret_object("web_vault_secrets").apply(
-        json.dumps
-    ),
+    data_json=Output.secret(
+        read_yaml_secrets(
+            Path(f"pulumi/concourse.operations.{stack_info.env_suffix}.yaml")
+        )["web"]
+    ).apply(json.dumps),
 )
 vault.generic.Secret(
     "concourse-worker-secret-values",
     path=concourse_secrets_mount.path.apply(lambda mount_path: f"{mount_path}/worker"),
-    data_json=concourse_config.require_secret_object("worker_vault_secrets").apply(
-        json.dumps
-    ),
+    data_json=Output.secret(
+        read_yaml_secrets(
+            Path(f"pulumi/concourse.operations.{stack_info.env_suffix}.yaml")
+        )["worker"]
+    ).apply(json.dumps),
 )
 vault.generic.Secret(
     "concourse-dockerhub-credentials",
