@@ -58,7 +58,7 @@ caddy_config = CaddyConfig(
     ],
     caddyfile=Path(__file__)
     .resolve()
-    .parent.joinpath("templates", "vault_caddyfile.j2"),
+    .parent.joinpath("templates", "caddyfile.j2"),
 )
 caddy_config.template_context = caddy_config.dict()
 install_caddy(caddy_config)

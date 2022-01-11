@@ -57,7 +57,7 @@ consul_esm_configuration = {
 caddy_config = CaddyConfig(
     caddyfile=Path(__file__)
     .parent.resolve()
-    .joinpath("templates", "consul_caddyfile.j2"),
+    .joinpath("templates", "caddyfile.j2"),
     plugins=[
         CaddyPlugin(
             repository="github.com/caddy-dns/route53",
