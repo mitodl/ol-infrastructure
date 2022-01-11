@@ -117,7 +117,7 @@ unlocked_did_secret_value = secretsmanager.SecretVersion(
                     Path(
                         f"digital_credentials/sign_and_verify.{stack_info.env_suffix}.json"  # noqa: E501
                     )
-                )
+                )["secretKeySeed"]
             ).encode("utf8")
         ).decode("utf8")
     ),  # Base64 encoded JSON object of unlocked DID
@@ -224,9 +224,13 @@ sign_and_verify_task = ecs.TaskDefinition(
                     "environment": [
                         {"name": "PORT", "value": f"{CONTAINER_PORT}"},
                         {"name": "DIGEST_CHECK", "value": "true"},
+                        {
+                            "name": "ISSUER_MEMBERSHIP_REGISTRY_URL",
+                            "value": "https://digitalcredentials.github.io/issuer-registry/registry.json",  # noqa: E501
+                        },
                     ],
                     "secrets": [
-                        {"name": "UNLOCKED_DID", "valueFrom": arns[0]},
+                        {"name": "DID_SEED", "valueFrom": arns[0]},
                         {"name": "HMAC_SECRET", "valueFrom": arns[1]},
                     ],
                     "portMappings": [
