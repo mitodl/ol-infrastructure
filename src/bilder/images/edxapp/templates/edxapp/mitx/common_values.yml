@@ -571,3 +571,4 @@ EMAIL_USE_TLS: true
 ADMINS:
   - ["MITx Stacktrace Recipients", "cuddle-bunnies@mit.edu"]
 ALLOW_ALL_ADVANCED_COMPONENTS: true
+SYSADMIN_DEFAULT_BRANCH: live
