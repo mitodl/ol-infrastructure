@@ -1,0 +1,25 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+config:
+  aws.region: us-east-1
+  concourse:target_vpc: operations_vpc
+  concourse:iam_policies:
+  - operations
+  concourse:consul_credentials:
+    secure: 
+  concourse:db_instance_size:
+  concourse:db_password:
+    secure:
+  concourse:dockerhub_credentials:
+    secure:
+  concourse:pypi_credentials:
+    secure:
+  concourse:web_host_domain: cicd-ci.odl.mit.edu
+  concourse:web_instance_type:
+  concourse:web_node_capacity: 3
+  concourse:worker_disk_size: 200
+  concourse:worker_instance_type:
+  concourse:worker_node_capacity: 3
+  consul:address: https://consul-operations-ci.odl.mit.edu
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
