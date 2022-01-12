@@ -411,7 +411,7 @@ concourse_web_alb_listener = lb.Listener(
 web_instance_type = (
     concourse_config.get("web_instance_type") or InstanceTypes.burstable_medium.name
 )
-consul_datacenter = f"operations-{env_name}"
+consuL_datacenter = consul_stack.require_output("datacenter")
 web_launch_config = ec2.LaunchTemplate(
     "concourse-web-launch-template",
     name_prefix=f"concourse-web-{env_name}-",
