@@ -1,25 +1,24 @@
----
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 config:
-  aws.region: us-east-1
-  concourse:target_vpc: operations_vpc
+  aws:region: us-east-1
+  concourse:consul_credentials:
+    secure: v1:5KxQDZzjcrkKQUro:V/Yfx056dylqBL25WIutQw1i3DCc18CMUCyyI/7DfwV7ZNkBlh6qXW8/UAUxIHVPxs9zlkJXTp6u51GNO4Td
+	concourse:db_instance_size: db.m6g.large
+  concourse:db_password:
+    secure: v1:qHlfVScY6TRQO3Xy:Yvn53MfChba/lCUxcp3hKjKJX9cqjfR2OcsrbJFEY36IhwJIW7V16PKpuHc9cjjk
+  concourse:dockerhub_credentials:
+    secure: v1:slySRgEfav4QWI/c:WGfHXvftFBvFnuK5SctOZTn9zjkx+bPb9PGsoaL4T2LFUK/M3Ba1JC9hu3h2IPjTOG4RIaD155eMhC/LJ0GCw5c8hQFJHhZJ1dbatoY1bo6kH483ICy7EZ0hUQf/bPZmMag=
   concourse:iam_policies:
   - operations
-  concourse:consul_credentials:
-    secure: 
-  concourse:db_instance_size:
-  concourse:db_password:
-    secure:
-  concourse:dockerhub_credentials:
-    secure:
   concourse:pypi_credentials:
-    secure:
+    secure: v1:GxB2bdvsKAefNBQi:CmibK+AuqOF8K77zHl9qjzOvQ6wplpNKFgTpxdFwY8wDoQJKpD7mOArnyaBI1OO/BzSAl5HmgFdSskWHKFrZXV8DlzRo2N2sx2n1P7HF4/dHAXTIY7yhWLgavogXAw==
+  concourse:target_vpc: operations_vpc
   concourse:web_host_domain: cicd-ci.odl.mit.edu
-  concourse:web_instance_type:
-  concourse:web_node_capacity: 3
-  concourse:worker_disk_size: 200
-  concourse:worker_instance_type:
-  concourse:worker_node_capacity: 3
+	concourse:web_instance_type: general_purpose_large
+  concourse:web_node_capacity: "1"
+  concourse:worker_disk_size: "200"
+  concourse:worker_instance_type: general_purpose_large
+  concourse:worker_node_capacity: "2"
   consul:address: https://consul-operations-ci.odl.mit.edu
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
