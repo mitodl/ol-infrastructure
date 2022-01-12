@@ -48,7 +48,7 @@ env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
-consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
+consul_stack = StackReference(f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
 target_vpc = concourse_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
