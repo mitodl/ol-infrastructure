@@ -39,6 +39,6 @@ sinks:
     encoding:
       codec: ndjson
     batch:
-      timeout_secs: {{60 * 60}}
-      max_bytes: {{1024 * 1024 * 1024 * 2}}
+      timeout_secs: {{60 * 60: null}: null}
+      max_bytes: {{1024 * 1024 * 1024 * 2: null}: null}
     healthcheck: false
