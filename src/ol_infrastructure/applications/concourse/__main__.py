@@ -6,8 +6,8 @@
 - Create an autoscaling group for Concourse worker instances
 """
 import base64
-import json
 import importlib
+import json
 from pathlib import Path
 
 import pulumi_vault as vault
@@ -48,16 +48,16 @@ env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
-consul_stack = StackReference(f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}")
+consul_stack = StackReference(
+    f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
+)
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
 target_vpc = concourse_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
 
 consul_security_groups = consul_stack.require_output("security_groups")
 
-aws_config = AWSBase(
-    tags={"OU": "operations", "Environment": f"operations-{env_name}"}
-)
+aws_config = AWSBase(tags={"OU": "operations", "Environment": f"operations-{env_name}"})
 aws_account = get_caller_identity()
 ops_vpc_id = target_vpc["id"]
 concourse_web_ami = ec2.get_ami(
@@ -100,21 +100,21 @@ concourse_instance_role = iam.Role(
 )
 
 # Dynamically load IAM policies from the IAM policies module and then attach them to the role
-for iam_policy in concourse_config.get_object('iam_polices') or []:
+for iam_policy in concourse_config.get_object("iam_polices") or []:
     policy_module = importlib.import_module(f".iam_policies.{iam_policy}")
     iam_policy_object = iam.Policy(
         f"cicd-iam-permissions-policy-{iam_policy}-{env_name}",
         path=f"/ol-infrastructure/iam/cicd-{env_name}/",
-        policy=lint_iam_policy(policy_module.concourse_ocw_iam_permissions, stringify=True),
+        policy=lint_iam_policy(policy_module.policy_definition, stringify=True),
         name_prefix=f"cicd-policy-{iam_policy}-{env_name}",
         tags=aws_config.tags,
     )
     iam.RolePolicyAttachment(
         f"concourse-instance-policy-{iam_policy}-{env_name}",
-        policy_arn=iam_policy_object.arn
-        role=concourse_instance_role.name
+        policy_arn=iam_policy_object.arn,
+        role=concourse_instance_role.name,
     )
-    
+
 iam.RolePolicyAttachment(
     f"concourse-describe-instance-role-policy-{env_name}",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
@@ -124,12 +124,6 @@ iam.RolePolicyAttachment(
 iam.RolePolicyAttachment(
     f"concourse-route53-role-policy-{env_name}",
     policy_arn=policy_stack.require_output("iam_policies")["route53_odl_zone_records"],
-    role=concourse_instance_role.name,
-)
-
-iam.RolePolicyAttachment(
-    "concourse-cicd-permissions-policy",
-    policy_arn=concourse_iam_policy.arn,
     role=concourse_instance_role.name,
 )
 
@@ -411,7 +405,7 @@ concourse_web_alb_listener = lb.Listener(
 web_instance_type = (
     concourse_config.get("web_instance_type") or InstanceTypes.burstable_medium.name
 )
-consuL_datacenter = consul_stack.require_output("datacenter")
+consul_datacenter = consul_stack.require_output("datacenter")
 web_launch_config = ec2.LaunchTemplate(
     "concourse-web-launch-template",
     name_prefix=f"concourse-web-{env_name}-",
@@ -460,7 +454,7 @@ web_launch_config = ec2.LaunchTemplate(
                                 {
                                     "retry_join": [
                                         "provider=aws tag_key=consul_env "
-                                        f"tag_value=operations-{env_name}"
+                                        f"tag_value={env_name}"
                                     ],
                                     "datacenter": consul_datacenter,
                                 }
@@ -548,15 +542,11 @@ worker_launch_config = ec2.LaunchTemplate(
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="instance",
-            tags=aws_config.merged_tags(
-                {"Name": f"concourse-worker-{env_name}"}
-            ),
+            tags=aws_config.merged_tags({"Name": f"concourse-worker-{env_name}"}),
         ),
         ec2.LaunchTemplateTagSpecificationArgs(
             resource_type="volume",
-            tags=aws_config.merged_tags(
-                {"Name": f"concourse-worker-{env_name}"}
-            ),
+            tags=aws_config.merged_tags({"Name": f"concourse-worker-{env_name}"}),
         ),
     ],
     tags=aws_config.tags,
