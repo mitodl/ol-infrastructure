@@ -57,15 +57,15 @@ jobs:
         SEARCH_CATALOG_URL: https://courses.mitxonline.mit.edu/courses
         SITE_NAME: MITx Online
         STUDIO_BASE_URL: https://studio.mitxonline.mit.edu
-        SUPPORT_URL: https://mitx-micromasters.zendesk.com/hc/en-us/requests/new
+        SUPPORT_URL: https://mitxonline.zendesk.com/hc/en-us
         USER_INFO_COOKIE_NAME: edx-user-info
         SESSION_COOKIE_DOMAIN: .mitxonline.mit.edu
         ABOUT_US_URL: https://mitxonline.mit.edu/about-us/
         PRIVACY_POLICY_URL: https://mitxonline.mit.edu/privacy-policy/
         HONOR_CODE_URL: https://mitxonline.mit.edu/honor-code/
         TERMS_OF_SERVICE_URL: https://mitxonline.mit.edu/terms-of-service/
-        Contact: mailto:mitxonline-support@mit.edu
-        SUPPORT_CENTER_URL: https://mitx-micromasters.zendesk.com/hc/
+        Contact: https://mitxonline.zendesk.com/hc/en-us/requests/new
+        SUPPORT_CENTER_URL: https://mitxonline.zendesk.com/hc/en-us
         SUPPORT_CENTER_TEXT: Support Center
         TRADEMARK_TEXT: © MITxOnline. All rights reserved except where noted.
         SITE_URL: https://mitxonline.mit.edu
