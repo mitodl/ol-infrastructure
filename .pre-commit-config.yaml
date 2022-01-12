@@ -12,11 +12,6 @@ repos:
   - id: check-merge-conflict
   - id: check-toml
   - id: debug-statements
-- repo: https://github.com/adrienverge/yamllint.git
-  rev: v1.26.3
-  hooks:
-  - id: yamllint
-    args: [--format, parsable, --strict, -d, relaxed]
 - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
   rev: 0.1.0
   hooks:
