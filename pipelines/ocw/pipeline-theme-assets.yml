@@ -36,6 +36,8 @@ jobs:
       - name: ocw-hugo-themes
       outputs:
       - name: ocw-hugo-themes
+      params:
+        SEARCH_API_URL: ((search-api-url))
       run:
         path: sh
         args:

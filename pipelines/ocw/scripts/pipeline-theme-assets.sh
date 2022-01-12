@@ -11,5 +11,5 @@ do
   --team=ocw \
   --config=pipelines/ocw/pipeline-theme-assets.yml \
   --instance-var branch=$branch \
-  -v hugo-theme-branch=$branch
+  --load-vars-from pipelines/ocw/vars/pipeline-theme-assets/$branch.yml
 done
