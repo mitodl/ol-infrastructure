@@ -7,6 +7,7 @@
     COMMON_CONFIG_NO_LOGGING: false
     # yamllint disable-line rule:line-length
     EDXAPP_EDXAPP_SECRET_KEY: this-is-just-a-temporary-placeholder # pragma: allowlist secret
+    EDXAPP_ENABLE_CELERY_BEAT: true
     CREATE_SERVICE_WORKER_USERS: false
   roles:
   - role: edxapp
