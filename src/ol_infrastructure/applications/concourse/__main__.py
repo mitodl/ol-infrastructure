@@ -53,7 +53,8 @@ consul_stack = StackReference(
 )
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
-target_vpc = concourse_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+target_vpc_name = concourse_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+target_vpc = network_stack.require_output(target_vpc_name)
 
 consul_security_groups = consul_stack.require_output("security_groups")
 
@@ -456,7 +457,7 @@ web_launch_config = ec2.LaunchTemplate(
                                         "provider=aws tag_key=consul_env "
                                         f"tag_value={env_name}"
                                     ],
-                                    "datacenter": consul_datacenter,
+                                    "datacenter": f"{consul_datacenter}",
                                 }
                             ),
                             "owner": "consul:consul",
@@ -563,7 +564,7 @@ worker_launch_config = ec2.LaunchTemplate(
                                         "provider=aws tag_key=consul_env "
                                         f"tag_value=operations-{stack_info.env_suffix}"
                                     ],
-                                    "datacenter": consul_datacenter,
+                                    "datacenter": f"{consul_datacenter}",
                                 }
                             ),
                             "owner": "consul:consul",
