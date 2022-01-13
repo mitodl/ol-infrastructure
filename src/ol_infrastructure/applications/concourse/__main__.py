@@ -100,7 +100,8 @@ concourse_instance_role = iam.Role(
     tags=aws_config.tags,
 )
 
-# Dynamically load IAM policies from the IAM policies module and then attach them to the role
+# Dynamically load IAM policies from the IAM policies module and then attach them to the
+# role
 for iam_policy in concourse_config.get_object("iam_polices") or []:
     policy_module = importlib.import_module(f".iam_policies.{iam_policy}")
     iam_policy_object = iam.Policy(
@@ -444,43 +445,45 @@ web_launch_config = ec2.LaunchTemplate(
         ),
     ],
     tags=aws_config.tags,
-    user_data=base64.b64encode(
-        "#cloud-config\n{}".format(
-            yaml.dump(
-                {
-                    "write_files": [
-                        {
-                            "path": "/etc/consul.d/02-autojoin.json",
-                            "content": json.dumps(
-                                {
-                                    "retry_join": [
-                                        "provider=aws tag_key=consul_env "
-                                        f"tag_value={env_name}"
-                                    ],
-                                    "datacenter": f"{consul_datacenter}",
-                                }
-                            ),
-                            "owner": "consul:consul",
-                        },
-                        {
-                            "path": "/etc/default/caddy",
-                            "content": "DOMAIN={}".format(
-                                concourse_config.require("web_host_domain")
-                            ),
-                        },
-                        {
-                            "path": "/etc/default/vector",
-                            "content": (
-                                f"ENVIRONMENT={consul_datacenter}\n"
-                                "VECTOR_CONFIG_DIR=/etc/vector/"
-                            ),
-                        },
-                    ]
-                },
-                sort_keys=True,
-            )
-        ).encode("utf8")
-    ).decode("utf8"),
+    user_data=consul_datacenter.apply(
+        lambda consul_dc: base64.b64encode(
+            "#cloud-config\n{}".format(
+                yaml.dump(
+                    {
+                        "write_files": [
+                            {
+                                "path": "/etc/consul.d/02-autojoin.json",
+                                "content": json.dumps(
+                                    {
+                                        "retry_join": [
+                                            "provider=aws tag_key=consul_env "
+                                            f"tag_value={consul_dc}"
+                                        ],
+                                        "datacenter": consul_dc,
+                                    }
+                                ),
+                                "owner": "consul:consul",
+                            },
+                            {
+                                "path": "/etc/default/caddy",
+                                "content": "DOMAIN={}".format(
+                                    concourse_config.require("web_host_domain")
+                                ),
+                            },
+                            {
+                                "path": "/etc/default/vector",
+                                "content": (
+                                    f"ENVIRONMENT={consul_dc}\n"
+                                    "VECTOR_CONFIG_DIR=/etc/vector/"
+                                ),
+                            },
+                        ]
+                    },
+                    sort_keys=True,
+                )
+            ).encode("utf8")
+        ).decode("utf8")
+    ),
 )
 web_asg = autoscaling.Group(
     "concourse-web-autoscaling-group",
@@ -551,30 +554,32 @@ worker_launch_config = ec2.LaunchTemplate(
         ),
     ],
     tags=aws_config.tags,
-    user_data=base64.b64encode(
-        "#cloud-config\n{}".format(
-            yaml.dump(
-                {
-                    "write_files": [
-                        {
-                            "path": "/etc/consul.d/02-autojoin.json",
-                            "content": json.dumps(
-                                {
-                                    "retry_join": [
-                                        "provider=aws tag_key=consul_env "
-                                        f"tag_value=operations-{stack_info.env_suffix}"
-                                    ],
-                                    "datacenter": f"{consul_datacenter}",
-                                }
-                            ),
-                            "owner": "consul:consul",
-                        },
-                    ]
-                },
-                sort_keys=True,
-            )
-        ).encode("utf8")
-    ).decode("utf8"),
+    user_data=consul_datacenter.apply(
+        lambda consul_dc: base64.b64encode(
+            "#cloud-config\n{}".format(
+                yaml.dump(
+                    {
+                        "write_files": [
+                            {
+                                "path": "/etc/consul.d/02-autojoin.json",
+                                "content": json.dumps(
+                                    {
+                                        "retry_join": [
+                                            "provider=aws tag_key=consul_env "
+                                            f"tag_value={consul_dc}"
+                                        ],
+                                        "datacenter": consul_dc,
+                                    }
+                                ),
+                                "owner": "consul:consul",
+                            },
+                        ]
+                    },
+                    sort_keys=True,
+                )
+            ).encode("utf8")
+        ).decode("utf8")
+    ),
 )
 worker_asg = autoscaling.Group(
     "concourse-worker-autoscaling-group",
