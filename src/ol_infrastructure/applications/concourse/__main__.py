@@ -463,6 +463,17 @@ web_launch_config = ec2.LaunchTemplate(
         arn=concourse_instance_profile.arn,
     ),
     image_id=concourse_web_ami.id,
+    block_device_mappings=[
+        ec2.LaunchTemplateBlockDeviceMappingArgs(
+            device_name="/dev/xvda",
+            ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
+                volume_size=concourse_config.get_int("web_disk_size")
+                or 25,  # noqa: WPS432
+                volume_type=DiskTypes.ssd,
+                delete_on_termination=True,
+            ),
+        )
+    ],
     vpc_security_group_ids=[
         concourse_web_security_group.id,
         operations_vpc["security_groups"]["web"],
