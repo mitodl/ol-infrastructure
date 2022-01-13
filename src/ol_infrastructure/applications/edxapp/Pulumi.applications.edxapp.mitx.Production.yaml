@@ -24,6 +24,7 @@ config:
   edxapp:min_worker_nodes: '2'
   edxapp:sender_email_address: support@edxapp-mail-production.mitx.mit.edu
   edxapp:target_vpc: residential_mitx_vpc
+  edxapp:web_instance_type: general_purpose_xlarge
   edxapp:web_node_capacity: '5'
   edxapp:worker_node_capacity: '2'
   mongodb:atlas_project_id: 61b728704656cb4747e589a0
