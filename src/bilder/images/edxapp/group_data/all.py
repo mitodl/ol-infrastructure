@@ -72,8 +72,8 @@ edx_platform_repository = {
         BRANCH: "release",
     },
     "xpro": {
-        "origin": "https://github.com/edx/edx-platform",
-        BRANCH: "open-release/maple.master",
+        "origin": "https://github.com/mitodl/edx-platform",
+        BRANCH: "xpro/maple",
     },
     "mitx": {
         "origin": "https://github.com/mitodl/edx-platform",
