@@ -111,14 +111,6 @@ vault_provider = pulumi.ResourceOptions(
     )
 )
 
-vault_syslog_audit = vault.Audit(
-    "vault-server-syslog-audit-device",
-    type="syslog",
-    description="Vault syslog audit record",
-    options={"format": "json"},
-    opts=vault_provider,
-)
-
 vault_file_audit = vault.Audit(
     "vault-server-file-audit-device",
     type="file",
