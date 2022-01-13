@@ -373,12 +373,14 @@ if host.fact.has_systemd:
         ),
     )
 
-if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-staging"}:
-    # Recompile static assets to ensure that the Canvas tweaks are rendered at runtime.
+if "mitodl" in git_remote:
+    # Recompile static assets to ensure that any JS tweaks are rendered at runtime.
     server.shell(
         name="Compile static assets for Canvas integration",
         commands=["/edx/bin/edxapp-update-assets"],
     )
+
+if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-staging"}:
     server.shell(
         name="Allow xqueue user to always read config file",
         commands=[
