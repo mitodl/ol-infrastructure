@@ -56,9 +56,7 @@ caddy_config = CaddyConfig(
             version=VERSIONS["caddy_route53"],
         )
     ],
-    caddyfile=Path(__file__)
-    .resolve()
-    .parent.joinpath("templates", "caddyfile.j2"),
+    caddyfile=Path(__file__).resolve().parent.joinpath("templates", "caddyfile.j2"),
 )
 caddy_config.template_context = caddy_config.dict()
 install_caddy(caddy_config)

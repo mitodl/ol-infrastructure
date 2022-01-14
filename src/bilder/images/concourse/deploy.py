@@ -110,7 +110,7 @@ concourse_config_map = {
             "{{ .Data.data.github_client_secret }}"
             "{{ end }}"
         ),
-				enable_across_step=True,
+        enable_across_step=True,
         enable_p2p_volume_streaming=True,
         p2p_volume_streaming_timeout="10m",
         prometheus_bind_ip=IPv4Address("127.0.0.1"),
@@ -232,9 +232,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
 
     # Install Caddy
     caddy_config = CaddyConfig(
-        caddyfile=Path(__file__)
-        .resolve()
-        .parent.joinpath("templates", "caddyfile.j2"),
+        caddyfile=Path(__file__).resolve().parent.joinpath("templates", "caddyfile.j2"),
     )
     caddy_config.template_context = caddy_config.dict()
     install_caddy(caddy_config)
