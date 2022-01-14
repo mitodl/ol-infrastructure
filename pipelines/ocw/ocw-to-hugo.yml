@@ -7,8 +7,7 @@ jobs:
     trigger: true
   - get: ocw-json
     trigger: true
-  - get: sync-static-resources
-    trigger: true
+  - put: sync-static-resources
   - config:
       image_resource:
         name: ''
