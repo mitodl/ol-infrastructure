@@ -7,29 +7,8 @@ jobs:
     trigger: true
   - get: ocw-json
     trigger: true
-  - task: sync-static-resources-task
-    config:
-      platform: linux
-      image_resource:
-        name: ''
-        source:
-          repository: amazon/aws-cli
-          tag: latest
-        type: docker-image
-      run:
-        path: sh
-        args:
-        - -exc
-        - >-
-          aws s3 sync
-          s3://((open-learning-course-data-bucket))/
-          s3://((ol-ocw-studio-app-bucket))/courses/
-          --include '*'
-          --exclude "extracts/*"
-          --exclude "*.html"
-          --exclude "*.html.json"
-          --exclude "*_master.json"
-          --exclude "*parsed.json"
+  - get: sync-static-resources
+    trigger: true
   - config:
       image_resource:
         name: ''
@@ -71,6 +50,19 @@ resources:
     options:
     - --exclude "*"
     - --include "*_parsed.json"
+  type: s3-sync
+- name: sync-static-resources
+  source:
+    source_bucket: ((open-learning-course-data-bucket))
+    bucket: ((ol-ocw-studio-app-bucket))
+    path: courses/
+    options:
+    - --include '*'
+    - --exclude "extracts/*"
+    - --exclude "*.html"
+    - --exclude "*.html.json"
+    - --exclude "*_master.json"
+    - --exclude "*parsed.json"
   type: s3-sync
 - name: ocw-markdown-upload
   source:
