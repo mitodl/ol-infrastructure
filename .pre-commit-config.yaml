@@ -55,7 +55,7 @@ repos:
     - --exclude-lines (^encryptedkey:|secure:|^secretsprovider:)
     - --exclude-files secrets/
     - --exclude-files poetry.lock
-- repo: https://github.com/timothycrosley/isort
+- repo: https://github.com/PyCQA/isort
   rev: 5.10.1
   hooks:
   - id: isort
@@ -63,8 +63,8 @@ repos:
   rev: 21.12b0
   hooks:
   - id: black
-- repo: https://gitlab.com/PyCQA/flake8
-  rev: 3.9.2
+- repo: https://github.com/PyCQA/flake8
+  rev: 4.0.1
   hooks:
   - id: flake8
     additional_dependencies:
