@@ -82,7 +82,7 @@ SaltStack:
 For each deployable unit of work we need to have a Pulumi project defined. The Pulumi CLI has a `new` command, but that
 introduces extra files that we don't want. The minimum necessary work to signal that a given directory is a project is
 the presence of a `Pulumi.yaml` file and a `__main__.py` where the deployment code is located. The contents of the
-`Pulumi.yaml` file should follow this structure:  
+`Pulumi.yaml` file should follow this structure:
 
 ```
 name: ol-infrastructure-dagster-application # Change the name here to be descriptive of the purpose of this project

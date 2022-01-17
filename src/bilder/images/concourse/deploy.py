@@ -129,7 +129,7 @@ concourse_config_map = {
         containerd_max_containers=0,  # Don't set a limit on the number of containers
         containerd_network_pool="10.250.0.0/16",
         baggageclaim_p2p_interface_family="4"
-        baggageclaim_p2p_interface_name_pattern="ens\d+"
+        baggageclaim_p2p_interface_name_pattern=r"ens\d+"
     ),
 }
 concourse_config: Union[
