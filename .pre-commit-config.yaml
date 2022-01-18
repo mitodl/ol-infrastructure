@@ -17,6 +17,11 @@ repos:
   hooks:
   - id: yamlfmt
     args: [--mapping, '2', --sequence, '2', --offset, '0', --width, '80']
+- repo: https://github.com/adrienverge/yamllint.git
+  rev: v1.26.3
+  hooks:
+  - id: yamllint
+    args: [--format, parsable, --strict, -d, relaxed]
 - repo: https://github.com/asottile/pyupgrade
   rev: v2.31.0
   hooks:
