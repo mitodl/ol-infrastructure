@@ -50,7 +50,7 @@ from bilder.components.vector.steps import (
 )
 from bilder.facts import has_systemd  # noqa: F401
 from bilder.images.edxapp.lib import WEB_NODE_TYPE, node_type
-from bilder.images.edxapp.plugins.git_export_import import git_auto_export  # noqa: F401
+from bilder.images.edxapp.plugins.git_export_import import git_auto_export
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
 
@@ -185,7 +185,7 @@ if node_type == WEB_NODE_TYPE:
                     + EDX_INSTALLATION_NAME
                     + "/"
                     + EDX_INSTALLATION_NAME
-                    + '-wildcard-certificate" }}'  # noqa: E501
+                    + '-wildcard-certificate" }}'
                     "{{ printf .Data.cert_chain }}{{ end }}"
                 ),
                 destination=Path("/etc/ssl/certs/edxapp.cert"),
@@ -196,7 +196,7 @@ if node_type == WEB_NODE_TYPE:
                     + EDX_INSTALLATION_NAME
                     + "/"
                     + EDX_INSTALLATION_NAME
-                    + '-wildcard-certificate" }}'  # noqa: E501
+                    + '-wildcard-certificate" }}'
                     "{{ printf .Data.key }}{{ end }}"
                 ),
                 destination=Path("/etc/ssl/private/edxapp.key"),
@@ -279,9 +279,9 @@ install_vector(vector)
 
 # Upload templates for consul-template agent
 EDX_TEMPLATES_DIRECTORY = TEMPLATES_DIRECTORY.joinpath("edxapp", EDX_INSTALLATION_NAME)
-common_config = EDX_TEMPLATES_DIRECTORY.joinpath("common_values.yml")
-studio_config = EDX_TEMPLATES_DIRECTORY.joinpath("studio_only.yml")
-lms_config = EDX_TEMPLATES_DIRECTORY.joinpath("lms_only.yml")
+common_config = EDX_TEMPLATES_DIRECTORY.joinpath("common_values.yml.tmpl")
+studio_config = EDX_TEMPLATES_DIRECTORY.joinpath("studio_only.yml.tmpl")
+lms_config = EDX_TEMPLATES_DIRECTORY.joinpath("lms_only.yml.tmpl")
 forum_config = EDX_TEMPLATES_DIRECTORY.joinpath("forum.env")
 
 with tempfile.NamedTemporaryFile("wt", delete=False) as studio_template:
@@ -334,7 +334,7 @@ if host.fact.has_systemd:
         start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
-            f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} && "  # noqa: WPS237, WPS221, E501
+            f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} && "  # noqa: WPS237
             # Ensure that Vault can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {lms_config_path} && "
             f"setfacl -m u:edxapp:rwx {lms_config_path} && "
@@ -349,7 +349,7 @@ if host.fact.has_systemd:
         start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
-            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} && "  # noqa: WPS237, WPS221, E501
+            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} && "  # noqa: WPS237, E501
             # Ensure that Vault can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {studio_config_path} && "
             f"setfacl -m u:edxapp:rwx {studio_config_path} && "
@@ -364,7 +364,7 @@ if host.fact.has_systemd:
         start_now=False,
         onchange_command=(
             # Let forum read the rendered config file
-            f"/bin/bash -c 'chown forum:www-data {forum_config_path} && "  # noqa: WPS237, WPS221, E501
+            f"/bin/bash -c 'chown forum:www-data {forum_config_path} && "
             # Ensure that consul-template can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {forum_config_path} && "
             f"setfacl -m u:forum:rwx {forum_config_path} && "
@@ -402,7 +402,7 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
             ),
         ]
     )
-    xqueue_config = EDX_TEMPLATES_DIRECTORY.joinpath("xqueue.yml")
+    xqueue_config = EDX_TEMPLATES_DIRECTORY.joinpath("xqueue.yml.tmpl")
     with tempfile.NamedTemporaryFile("wt", delete=False) as xqueue_template:
         xqueue_template.write(xqueue_config.read_text())
         files.put(
@@ -426,7 +426,7 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
         start_now=False,
         onchange_command=(
             # Let forum read the rendered config file
-            f"/bin/bash -c 'chown xqueue:www-data {xqueue_config_path} && "  # noqa: WPS237, WPS221, E501
+            f"/bin/bash -c 'chown xqueue:www-data {xqueue_config_path} && "
             # Ensure that consul-template can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {xqueue_config_path} && "
             f"setfacl -m u:xqueue:rwx {xqueue_config_path} && "
