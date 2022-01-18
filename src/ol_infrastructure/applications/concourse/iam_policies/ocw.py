@@ -59,4 +59,3 @@ policy_definition = {
         },
     ],
 }
-

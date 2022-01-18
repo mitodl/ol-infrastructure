@@ -1,7 +1,7 @@
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 
 # AWS Permissions Document
-# These are default permissions a 'non-ocw' worker would require. 
+# These are default permissions a 'non-ocw' worker would require.
 policy_definition = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
