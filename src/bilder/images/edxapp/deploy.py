@@ -127,10 +127,10 @@ server.shell(
 
 vector = VectorConfig(
     configuration_templates={
-        TEMPLATES_DIRECTORY.joinpath("vector", "edxapp.yaml"): {
+        TEMPLATES_DIRECTORY.joinpath("vector", "edxapp.yaml.j2"): {
             "edx_installation": EDX_INSTALLATION_NAME
         },
-        TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml"): {
+        TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml.j2"): {
             "edx_installation": EDX_INSTALLATION_NAME
         },
     }
