@@ -46,6 +46,7 @@ jobs:
           cd ocw-hugo-themes
           yarn install --pure-lockfile
           npm run build:webpack
+          npm run build:githash
           dt=$(date +%s)
           echo $dt > base-theme/dist/static/version.$dt.txt
           mkdir -p dist/ocw-hugo-themes/((hugo-theme-branch))
