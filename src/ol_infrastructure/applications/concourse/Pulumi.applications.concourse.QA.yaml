@@ -14,10 +14,10 @@ config:
     secure: v1:LqP0Y/263bKeJDvo:2OOk40+MkkZvclKWn+l1lQer0DH6nG7FzGXHO2yjSmXG0KCBAdZldwjU+17+Yrj6hiQSZuDe7C/fUo+egWWKO9lRIR7zebOvywdXMlCOd0/d/nh5uXeeUcqTeQiVlg==
   concourse:web_host_domain: cicd-qa.odl.mit.edu
   concourse:web_instance_type: general_purpose_large
-  concourse:web_node_capacity: '3'
-  concourse:worker_disk_size: '200'
+  concourse:web_node_capacity: "3"
+  concourse:worker_disk_size: "200"
   concourse:worker_instance_type: general_purpose_xlarge
-  concourse:worker_node_capacity: '30'
+  concourse:worker_node_capacity: "30"
   consul:address: https://consul-operations-qa.odl.mit.edu
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

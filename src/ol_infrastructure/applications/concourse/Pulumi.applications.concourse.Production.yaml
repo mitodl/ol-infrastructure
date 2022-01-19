@@ -14,10 +14,10 @@ config:
     secure: v1:i3a+7goVdWZMQS9Y:wnaKtictwJtO06zrMQAowVQCenHH1A9z3GjL31QtmHDyxwJKApCzlxcpUDEAaMGBW/EUogMnrrKxjO/PLCt0/HBqe6Rc8RCoSI+TlKeqbADFFxRB3RkIMyPt
   concourse:web_host_domain: cicd.odl.mit.edu
   concourse:web_instance_type: general_purpose_large
-  concourse:web_node_capacity: '3'
-  concourse:worker_disk_size: '200'
+  concourse:web_node_capacity: "3"
+  concourse:worker_disk_size: "200"
   concourse:worker_instance_type: general_purpose_xlarge
-  concourse:worker_node_capacity: '5'
+  concourse:worker_node_capacity: "5"
   consul:address: https://consul-operations-production.odl.mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
