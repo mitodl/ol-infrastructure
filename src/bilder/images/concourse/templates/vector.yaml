@@ -41,6 +41,6 @@ sinks:
     healthcheck: false
 
   cloudwatch_metrics:
-    type: cloudwatch_metrics
+    type: aws_cloudwatch_metrics
     inputs:
     - concourse_metrics
