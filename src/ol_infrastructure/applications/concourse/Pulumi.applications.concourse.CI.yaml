@@ -14,6 +14,7 @@ config:
   concourse:pypi_credentials:
     secure: v1:GxB2bdvsKAefNBQi:CmibK+AuqOF8K77zHl9qjzOvQ6wplpNKFgTpxdFwY8wDoQJKpD7mOArnyaBI1OO/BzSAl5HmgFdSskWHKFrZXV8DlzRo2N2sx2n1P7HF4/dHAXTIY7yhWLgavogXAw==
   concourse:target_vpc: operations_vpc
+  concourse:db_capacity: "334"
   concourse:web_host_domain: cicd-ci.odl.mit.edu
   concourse:web_node_capacity: "1"
   concourse:worker_disk_size: "200"

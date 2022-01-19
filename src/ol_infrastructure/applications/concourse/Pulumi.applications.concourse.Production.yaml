@@ -17,6 +17,7 @@ config:
     secure: v1:RHqcCACmlYI66ydu:Ip3KUF8DM0GkBcWQg3Jfz+bQHtJ0IgQK2D3s8VdI+U+fcMdqy4xxeM8uEwkES/OrWeAYgIUzEHao7KtqS9O6vbtd0K7lib6n7KEdLSS4HWt6CmkPHaV+/EY+APJHpZqx8BQ=
   concourse:pypi_credentials:
     secure: v1:i3a+7goVdWZMQS9Y:wnaKtictwJtO06zrMQAowVQCenHH1A9z3GjL31QtmHDyxwJKApCzlxcpUDEAaMGBW/EUogMnrrKxjO/PLCt0/HBqe6Rc8RCoSI+TlKeqbADFFxRB3RkIMyPt
+  concourse:db_capacity: "334"
   concourse:web_host_domain: cicd.odl.mit.edu
   concourse:web_instance_type: general_purpose_large
   concourse:web_node_capacity: "3"

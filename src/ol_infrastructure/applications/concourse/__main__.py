@@ -298,6 +298,7 @@ rds_defaults["instance_size"] = (
 concourse_db_config = OLPostgresDBConfig(
     instance_name=f"concourse-db-{stack_info.env_suffix}",
     password=concourse_config.require("db_password"),
+    storage=concourse_config.get("db_capacity"),
     subnet_group_name=target_vpc["rds_subnet"],
     security_groups=[concourse_db_security_group],
     tags=aws_config.tags,
