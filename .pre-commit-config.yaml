@@ -63,6 +63,10 @@ repos:
   rev: 21.12b0
   hooks:
   - id: black
+- repo: https://github.com/asottile/yesqa
+  rev: v1.3.0
+  hooks:
+  - id: yesqa
 - repo: https://github.com/PyCQA/flake8
   rev: 4.0.1
   hooks:
