@@ -1,4 +1,3 @@
-# noqa: WPS226
 """Creation and revocation statements used for Vault role definitions."""
 
 # These strings are passed through the `.format` method so the variables that need to remain in the template

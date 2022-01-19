@@ -136,9 +136,7 @@ opensearch_service = consul.Service(
             status="passing",
             tcp=pulumi.Output.all(
                 address=search_domain.endpoint, port=DEFAULT_HTTPS_PORT
-            ).apply(
-                lambda es: "{address}:{port}".format(**es)
-            ),  # noqa: WPS237,E501
+            ).apply(lambda es: "{address}:{port}".format(**es)),
         )
     ],
     opts=pulumi.ResourceOptions(provider=consul_provider),

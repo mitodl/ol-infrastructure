@@ -153,7 +153,7 @@ edx_role_statments = mysql_role_statements.update(
         f"edxapp-csmh-{hyphenated_db_purpose}": {
             "create": Template(
                 "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-                "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
+                "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "
                 f"CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh_{xpro_db_purpose}.* "
                 "TO '{{name}}'@'%';"
                 f"GRANT REFERENCES ON edxapp_csmh_{xpro_db_purpose}.* "
@@ -164,7 +164,7 @@ edx_role_statments = mysql_role_statements.update(
         f"edxapp-{hyphenated_db_purpose}": {
             "create": Template(
                 "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-                "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
+                "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "
                 f"CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_{xpro_db_purpose}.* "
                 "TO '{{name}}'@'%';"
                 f"GRANT REFERENCES ON edxapp_{xpro_db_purpose}.* "
@@ -175,7 +175,7 @@ edx_role_statments = mysql_role_statements.update(
         f"xqueue-{hyphenated_db_purpose}": {
             "create": Template(
                 "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-                "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "  # noqa: Q000
+                "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "
                 f"CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue_{xpro_db_purpose}.* "
                 "TO '{{name}}'@'%';"
                 f"GRANT REFERENCES ON xqueue_{xpro_db_purpose}.* "

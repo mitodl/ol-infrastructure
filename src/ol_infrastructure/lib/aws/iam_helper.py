@@ -15,7 +15,7 @@ def _is_parliament_finding_filtered(
     if not issue_match:
         return False
     action_matches = []
-    for location in parliament_config[finding.issue].get(  # noqa: WPS426, WPS352
+    for location in parliament_config[finding.issue].get(  # noqa: WPS352, WPS426
         "ignore_locations", []
     ):
         for action in location.get("actions", []):  # noqa: WPS426

@@ -60,7 +60,7 @@ class ConcourseBaseConfig(OLBaseSettings):
                     ] = val_transform(attr_val)
         return concourse_env_dict
 
-    class Config:  # noqa: WPS431
+    class Config:
         env_prefix = "concourse_"
 
 
@@ -287,7 +287,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     )
     db_max_conns_backend: PositiveInt = Field(
         PositiveInt(50),
-        concourse_env_var="CONCOURSE_BACKEND_MAX_CONNS",  # noqa: WPS432
+        concourse_env_var="CONCOURSE_BACKEND_MAX_CONNS",
         description="The maximum number of open connections for the backend connection pool. (default: 50)",
     )
     debug_bind_ip: Optional[str] = Field(
@@ -1437,7 +1437,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         description="Web public/ directory to serve live for local development.",
     )
 
-    class Config:  # noqa: WPS431
+    class Config:
         env_prefix = "concourse_web_"
         arbitrary_types_allowed = True
 
@@ -1790,5 +1790,5 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
         "the TSA.",
     )
 
-    class Config:  # noqa: WPS431
+    class Config:
         env_prefix = "concourse_worker_"

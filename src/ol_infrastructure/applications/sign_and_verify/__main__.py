@@ -220,7 +220,7 @@ sign_and_verify_task = ecs.TaskDefinition(
             [
                 {
                     "name": "sign-and-verify",
-                    "image": f'mitodl/sign-and-verify:{sign_and_verify_config.require("docker_label")}',  # noqa: WPS237, E501
+                    "image": f'mitodl/sign-and-verify:{sign_and_verify_config.require("docker_label")}',  # noqa: E501, WPS237
                     "environment": [
                         {"name": "PORT", "value": f"{CONTAINER_PORT}"},
                         {"name": "DIGEST_CHECK", "value": "true"},

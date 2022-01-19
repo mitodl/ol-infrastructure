@@ -481,8 +481,7 @@ vault_launch_config = ec2.LaunchTemplate(
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name=vault_ami.root_device_name,
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=vault_config.get_int("storage_disk_capacity")
-                or 100,  # noqa: WPS432, E501
+                volume_size=vault_config.get_int("storage_disk_capacity") or 100,
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
                 encrypted=True,
@@ -519,7 +518,7 @@ vault_asg = autoscaling.Group(
     "vault-server-autoscaling-group",
     desired_capacity=cluster_count,
     min_size=cluster_count,
-    max_size=cluster_count,  # noqa: WPS432
+    max_size=cluster_count,
     health_check_type="EC2",
     vpc_zone_identifiers=target_vpc["subnet_ids"],
     launch_template=autoscaling.GroupLaunchTemplateArgs(

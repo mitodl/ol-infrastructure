@@ -90,7 +90,7 @@ class ConsulConfig(HashicorpConfig):
     telemetry: Optional[ConsulTelemetry]
     ui: bool = False
 
-    class Config:  # noqa: WPS431
+    class Config:
         env_prefix = "consul_"
 
 

@@ -15,7 +15,7 @@ class OLContainerLogConfig(BaseModel):
     options: Optional[Dict[str, str]] = None
     secret_options: Optional[List[Secret]] = None
 
-    class Config:  # noqa: WPS431, D106
+    class Config:  # noqa: D106
         arbitrary_types_allowed = True
 
 
@@ -49,5 +49,5 @@ class OLFargateContainerDefinitionConfig(BaseModel):
     # the port_mappings name and container port
     attach_to_load_balancer: bool = False
 
-    class Config:  # noqa: WPS431, D106
+    class Config:  # noqa: D106
         arbitrary_types_allowed = True

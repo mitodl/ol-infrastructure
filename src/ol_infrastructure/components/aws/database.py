@@ -42,7 +42,7 @@ class OLReplicaDBConfig(BaseModel):
     public_access: bool = False
     security_groups: Optional[List[SecurityGroup]] = None
 
-    class Config:  # noqa: WPS431, D106
+    class Config:  # noqa: D106
         arbitrary_types_allowed = True
 
 
@@ -70,11 +70,11 @@ class OLDBConfig(AWSBase):
     username: str = "oldevops"
     read_replica: Optional[OLReplicaDBConfig] = None
 
-    class Config:  # noqa: WPS431, WPS306, D106
+    class Config:  # noqa: D106
         arbitrary_types_allowed = True
 
     @validator("engine")
-    def is_valid_engine(cls: "OLDBConfig", engine: str) -> str:  # noqa: N805, D102
+    def is_valid_engine(cls: "OLDBConfig", engine: str) -> str:  # noqa: D102, N805
         valid_engines = db_engines()
         if engine not in valid_engines:
             raise ValueError("The specified DB engine is not a valid option in AWS.")
@@ -99,9 +99,7 @@ class OLPostgresDBConfig(OLDBConfig):
     engine: str = "postgres"
     engine_version: str = "13.4"
     port: PositiveInt = PositiveInt(5432)  # noqa: WPS432
-    parameter_overrides: List[
-        Dict[str, Union[str, bool, int, float]]
-    ] = [  # noqa: WPS234
+    parameter_overrides: List[Dict[str, Union[str, bool, int, float]]] = [
         {"name": "client_encoding", "value": "UTF-8"},
         {"name": "timezone", "value": "UTC"},
         {"name": "rds.force_ssl", "value": 1},
@@ -115,9 +113,7 @@ class OLMariaDBConfig(OLDBConfig):
     engine: str = "mariadb"
     engine_version: str = "10.5.13"
     port: PositiveInt = PositiveInt(3306)  # noqa: WPS432
-    parameter_overrides: List[
-        Dict[str, Union[str, bool, int, float]]
-    ] = [  # noqa: WPS234
+    parameter_overrides: List[Dict[str, Union[str, bool, int, float]]] = [
         {"name": "character_set_client", "value": "utf8mb4"},
         {"name": "character_set_connection", "value": "utf8mb4"},
         {"name": "character_set_database", "value": "utf8mb4"},

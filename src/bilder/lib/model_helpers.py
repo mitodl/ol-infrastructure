@@ -2,5 +2,5 @@ from pydantic import BaseSettings
 
 
 class OLBaseSettings(BaseSettings):
-    class Config:  # noqa: WPS431
+    class Config:
         case_sensitive = False

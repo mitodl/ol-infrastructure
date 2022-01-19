@@ -333,7 +333,7 @@ dagster_db_consul_service = Service(
             status="passing",
             tcp=dagster_db.db_instance.address.apply(
                 lambda address: f"{address}:{dagster_db_config.port}"
-            ),  # noqa: WPS237
+            ),
         )
     ],
     opts=consul_provider,
@@ -358,7 +358,7 @@ cloud_init_userdata = build_userdata(
     salt_host=f"salt-{stack_info.env_suffix}.private.odl.mit.edu",
 )
 
-dagster_image = ec2.get_ami(  # noqa: WPS114
+dagster_image = ec2.get_ami(
     filters=[
         {"name": "virtualization-type", "values": ["hvm"]},
         {"name": "root-device-type", "values": ["ebs"]},

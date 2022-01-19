@@ -421,9 +421,7 @@ forum_secrets = vault.generic.Secret(
         json.dumps
     ),
 )
-if xqueue_secret := edxapp_config.get_secret_object(
-    "edx_xqueue_secrets"
-):  # noqa: WPS332, E501
+if xqueue_secret := edxapp_config.get_secret_object("edx_xqueue_secrets"):
     xqueue_secrets = vault.generic.Secret(
         "edx-xqueue-static-secrets",
         path=edxapp_vault_mount.path.apply("{}/edx-xqueue".format),
@@ -589,9 +587,7 @@ edxapp_db_consul_service = Service(
             status="passing",
             tcp=Output.all(
                 address=edxapp_db.db_instance.address, port=edxapp_db_config.port
-            ).apply(
-                lambda db: "{address}:{port}".format(**db)
-            ),  # noqa: WPS237,E501
+            ).apply(lambda db: "{address}:{port}".format(**db)),
         )
     ],
     opts=consul_provider,

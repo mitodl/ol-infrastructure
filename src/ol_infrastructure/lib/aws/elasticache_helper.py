@@ -17,7 +17,7 @@ def cache_engines() -> Dict[str, List[str]]:
     """
     all_engines_paginator = cache_client.get_paginator("describe_cache_engine_versions")
     engines_versions = defaultdict(list)
-    for engines_page in all_engines_paginator.paginate():  # noqa: WPS122
+    for engines_page in all_engines_paginator.paginate():
         for engine in engines_page["CacheEngineVersions"]:
             engines_versions[engine["Engine"]].append(engine["EngineVersion"])
     return dict(engines_versions)

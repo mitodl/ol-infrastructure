@@ -28,7 +28,7 @@ def db_engines() -> Dict[str, List[str]]:
     """
     all_engines_paginator = rds_client.get_paginator("describe_db_engine_versions")
     engines_versions = defaultdict(list)
-    for engines_page in all_engines_paginator.paginate():  # noqa: WPS122
+    for engines_page in all_engines_paginator.paginate():
         for engine in engines_page["DBEngineVersions"]:
             engines_versions[engine["Engine"]].append(engine["EngineVersion"])
     return dict(engines_versions)

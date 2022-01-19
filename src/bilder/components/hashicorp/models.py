@@ -8,12 +8,12 @@ from bilder.lib.model_helpers import OLBaseSettings
 
 
 class HashicorpConfig(OLBaseSettings, abc.ABC):
-    class Config:  # noqa: WPS431
+    class Config:
         extra = "allow"
 
 
 class FlexibleBaseModel(BaseModel):
-    class Config:  # noqa: WPS431
+    class Config:
         extra = "allow"
 
 

@@ -231,7 +231,7 @@ ocw_studio_secrets = vault.Mount(
 vault_secrets = ocw_studio_config.require_secret_object("vault_secrets")
 vault.generic.Secret(
     "ocw-studio-vault-secrets",
-    path=ocw_studio_secrets.path.apply("{}/app-config".format),  # noqa: P103
+    path=ocw_studio_secrets.path.apply("{}/app-config".format),
     data_json=vault_secrets.apply(json.dumps),
 )
 gh_repo = github.get_repository(full_name="mitodl/ocw-hugo-projects")

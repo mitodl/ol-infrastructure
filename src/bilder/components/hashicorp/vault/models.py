@@ -21,7 +21,7 @@ class VaultAutoAuthSinkConfig(FlexibleBaseModel, abc.ABC):
 
 
 class VaultAutoAuthFileSink(VaultAutoAuthSinkConfig):
-    path: Path = Path("/etc/vault/vault_agent_token")  # noqa: S108
+    path: Path = Path("/etc/vault/vault_agent_token")
     mode: Optional[int]
 
 
@@ -148,7 +148,7 @@ class VaultStorageBackend(FlexibleBaseModel):
     {"storage": {"raft": {"path": "/data/storage/path"}}}
     """
 
-    consul: Optional[ConsulStorageBackend]  # noqa: WPS420, WPS604
+    consul: Optional[ConsulStorageBackend]
     raft: Optional[IntegratedRaftStorageBackend]
 
 
@@ -228,7 +228,7 @@ class VaultAgentConfig(HashicorpConfig):
     template: Optional[List[VaultTemplate]]
     listener: Optional[List[VaultListener]]
 
-    class Config:  # noqa: WPS431
+    class Config:
         env_prefix = "vault_agent_"
 
 
@@ -255,7 +255,7 @@ class VaultServerConfig(HashicorpConfig):
     telemetry: Optional[VaultTelemetryConfig]
     ui: Optional[bool] = False
 
-    class Config:  # noqa: WPS431
+    class Config:
         env_prefix = "vault_"
 
 

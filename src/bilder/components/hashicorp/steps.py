@@ -11,7 +11,7 @@ from bilder.facts import has_systemd, system  # noqa: F401
 from bilder.lib.linux_helpers import linux_family
 
 
-@deploy("Install Hashicorp Products")  # noqa: WPS210
+@deploy("Install Hashicorp Products")
 def install_hashicorp_products(
     hashicorp_products: List[HashicorpProduct], state=None, host=None
 ):
@@ -56,7 +56,7 @@ def install_hashicorp_products(
         target_directory = product.install_directory or "/usr/local/bin/"
         download_binary = files.download(
             name=f"Download {product.name} archive",
-            src=f"https://releases.hashicorp.com/{product.name}/{product.version}/{file_download}",  # noqa: WPS221,E501
+            src=f"https://releases.hashicorp.com/{product.name}/{product.version}/{file_download}",  # noqa: E501
             dest=download_destination,
             sha256sum=file_hash_map[file_download],
             state=state,

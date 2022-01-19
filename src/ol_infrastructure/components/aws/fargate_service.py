@@ -130,7 +130,7 @@ class OLFargateServiceConfig(AWSBase):
 
         return ServiceDeploymentControllerArgs(type=self._deployment_controller)
 
-    class Config:  # noqa: WPS431, D106
+    class Config:  # noqa: D106
         arbitrary_types_allowed = True
 
 
@@ -344,7 +344,7 @@ class OLFargateService(pulumi.ComponentResource):
         )
 
         RolePolicyAttachment(
-            f"{config.task_definition_config.task_def_name}-policy-attachment",  # noqa: WPS237, E501
+            f"{config.task_definition_config.task_def_name}-policy-attachment",  # noqa: E501, WPS237
             role=role.name,
             policy_arn=ManagedPolicy.AMAZON_ECS_TASK_EXECUTION_ROLE_POLICY,
             opts=self.resource_options,

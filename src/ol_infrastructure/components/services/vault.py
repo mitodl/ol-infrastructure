@@ -66,7 +66,7 @@ class OLVaultDatabaseConfig(BaseModel):
     default_ttl: int = SIX_MONTHS
     connection_options: Optional[Dict[str, str]]
 
-    class Config:  # noqa: WPS431, D106
+    class Config:  # noqa: D106
         arbitrary_types_allowed = True
 
 
@@ -385,7 +385,7 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
 
         # Generate CSR for pki-intermediate-{env} backend
         self.pki_intermediate_envrionment_cert_request = (
-            pkisecret.SecretBackendIntermediateCertRequest(  # noqa: E501
+            pkisecret.SecretBackendIntermediateCertRequest(
                 f"pki-intermediate-{backend_config.environment_name}-csr",
                 backend=self.pki_intermediate_environment_backend.id,
                 common_name=f"pki-intermediate-{backend_config.environment_name} "
@@ -402,7 +402,7 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
 
         # Sign genereated CSR for pki-intermediate-{env} backend by pki-intermediate-ca
         self.pki_intermediate_environment_signed_csr = (
-            pkisecret.SecretBackendRootSignIntermediate(  # noqa: E501
+            pkisecret.SecretBackendRootSignIntermediate(
                 f"pki-intermediate-{backend_config.environment_name}-signed-csr",
                 backend="pki-intermediate-ca",
                 common_name=f"pki-intermediate-{backend_config.environment_name} "

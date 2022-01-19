@@ -241,7 +241,7 @@ class ConsulTemplateConfig(HashicorpConfig):
     vault: Optional[ConsulTemplateVaultConfig]
     consul: Optional[ConsulTemplateConsulConfig] = ConsulTemplateConsulConfig()
 
-    class Config:  # noqa: WPS431
+    class Config:
         env_prefix = "consul_template_"
 
 

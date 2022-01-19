@@ -177,7 +177,7 @@ class OLAmazonCache(pulumi.ComponentResource):
             f"{cache_config.cluster_name}-{cache_config.engine}-{cache_config.engine_version}-parameter-group",  # noqa: E501
             name=(
                 f"{cache_config.cluster_name}-{cache_config.engine_version.replace('.', '')}-parameter-group"  # noqa: E501, WPS237
-            ),  # noqa: E501
+            ),
             family=parameter_group_family(
                 cache_config.engine, cache_config.engine_version
             ),

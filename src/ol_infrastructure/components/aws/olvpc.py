@@ -195,7 +195,7 @@ class OLVPC(ComponentResource):  # noqa: WPS230
             vpc_config.cidr_block.subnets(new_prefix=SUBNET_PREFIX_V4),
         )
 
-        for index, zone, subnet_v4 in subnet_iterator:  # noqa: WPS426
+        for index, zone, subnet_v4 in subnet_iterator:
             net_name = f"{vpc_config.vpc_name}-subnet-{index + 1}"  # noqa: WPS237
             subnet_resource_opts, imported_subnet_id = subnet_opts(
                 subnet_v4, imported_vpc_id
@@ -298,26 +298,26 @@ class OLVPCPeeringConnection(ComponentResource):
             str(destination_vpc.vpc_config.cidr_block),
         )
         self.peering_connection = ec2.VpcPeeringConnection(
-            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-vpc-peer",  # noqa: WPS237, E501
+            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-vpc-peer",  # noqa: E501, WPS237
             auto_accept=True,
             vpc_id=source_vpc.olvpc.id,
             peer_vpc_id=destination_vpc.olvpc.id,
             tags=source_vpc.vpc_config.merged_tags(
                 {
-                    "Name": f"{source_vpc.vpc_config.vpc_name} to {destination_vpc.vpc_config.vpc_name} peer"  # noqa: WPS237, E501
+                    "Name": f"{source_vpc.vpc_config.vpc_name} to {destination_vpc.vpc_config.vpc_name} peer"  # noqa: E501, WPS237
                 }
             ),
             opts=resource_options.merge(vpc_peer_resource_opts),  # type: ignore
         )
         self.source_to_dest_route = ec2.Route(
-            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-route",  # noqa: WPS237, E501
+            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-route",  # noqa: E501, WPS237
             route_table_id=source_vpc.route_table.id,
             destination_cidr_block=destination_vpc.olvpc.cidr_block,
             vpc_peering_connection_id=self.peering_connection.id,
             opts=resource_options,
         )
         self.dest_to_source_route = ec2.Route(
-            f"{destination_vpc.vpc_config.vpc_name}-to-{source_vpc.vpc_config.vpc_name}-route",  # noqa: WPS237, E501
+            f"{destination_vpc.vpc_config.vpc_name}-to-{source_vpc.vpc_config.vpc_name}-route",  # noqa: E501, WPS237
             route_table_id=destination_vpc.route_table.id,
             destination_cidr_block=source_vpc.olvpc.cidr_block,
             vpc_peering_connection_id=self.peering_connection.id,

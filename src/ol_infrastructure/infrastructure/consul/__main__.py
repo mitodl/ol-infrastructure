@@ -379,8 +379,7 @@ consul_launch_config = ec2.LaunchTemplate(
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name="/dev/xvda",
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=consul_config.get_int("storage_disk_capacity")
-                or 100,  # noqa: WPS432, E501
+                volume_size=consul_config.get_int("storage_disk_capacity") or 100,
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
                 encrypted=True,

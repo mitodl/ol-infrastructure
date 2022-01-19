@@ -50,7 +50,7 @@ def init_vault_cluster(vault_addr):  # noqa: WPS231
         vault_root_token = init_response["root_token"]
         recovery_keys = init_response["recovery_keys"]
 
-        vault_client.token = vault_root_token  # noqa: WPS428
+        vault_client.token = vault_root_token
         pulumi.log.info(
             "IMPORTANT!: Retain the keys in vault_recovery_keys.txt for "
             "recovering the cluster."

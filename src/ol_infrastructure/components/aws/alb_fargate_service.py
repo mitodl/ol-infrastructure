@@ -141,7 +141,7 @@ class OLApplicationLoadBalancedFargateConfig(AWSBase):
     # Defines what type of load balancer to use. Always set to 'application'
     _load_balancer_type: str = "application"
 
-    class Config:  # noqa: WPS431, D106
+    class Config:  # noqa: D106
         arbitrary_types_allowed = True
 
 

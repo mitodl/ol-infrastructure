@@ -31,5 +31,5 @@ class OLFargateTaskDefinitionConfig(BaseModel):
     # List of container definitions that will be attached to task
     container_definition_configs: List[OLFargateContainerDefinitionConfig]
 
-    class Config:  # noqa: WPS431, D106
+    class Config:  # noqa: D106
         arbitrary_types_allowed = True

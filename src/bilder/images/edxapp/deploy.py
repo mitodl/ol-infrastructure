@@ -349,7 +349,7 @@ if host.fact.has_systemd:
         start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
-            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} && "  # noqa: WPS237, E501
+            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} && "  # noqa: E501, WPS237
             # Ensure that Vault can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {studio_config_path} && "
             f"setfacl -m u:edxapp:rwx {studio_config_path} && "

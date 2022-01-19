@@ -28,7 +28,7 @@ class CaddyConfig(OLBaseSettings):
     template_context: Optional[Dict[str, Any]]
     upstream_address: Optional[str]
 
-    class Config:  # noqa: WPS431
+    class Config:
         env_prefix = "caddy_"
 
     def custom_download_url(self, os: str = "linux", arch: str = "amd64"):

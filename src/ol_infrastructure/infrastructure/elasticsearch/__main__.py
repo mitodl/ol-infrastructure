@@ -28,8 +28,8 @@ business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 consul_stack = StackReference(
-    "infrastructure.consul."  # noqa: WPS237, WPS221
-    f"{stack_info.namespace.rsplit('.', 1)[1]}."  # noqa: WPS237, WPS221
+    "infrastructure.consul."  # noqa: WPS237
+    f"{stack_info.namespace.rsplit('.', 1)[1]}."
     f"{stack_info.name}"
 )
 destination_vpc = network_stack.require_output(env_config.require("vpc_reference"))

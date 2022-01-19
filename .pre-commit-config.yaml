@@ -36,7 +36,7 @@ repos:
   hooks:
   - id: pyupgrade
     args:
-    - --py37-plus
+    - --py38-plus
 - repo: https://github.com/myint/autoflake/
   rev: v1.4
   hooks:
@@ -52,21 +52,23 @@ repos:
   hooks:
   - id: detect-secrets
     args:
-    - --exclude-lines (^encryptedkey:|secure:|^secretsprovider:)
-    - --exclude-files secrets/
+    - --exclude-lines (^encryptedkey:|^secure:|^secretsprovider:)
+    - --exclude-files src/bridge/secrets/
     - --exclude-files poetry.lock
 - repo: https://github.com/PyCQA/isort
   rev: 5.10.1
   hooks:
   - id: isort
-- repo: https://github.com/psf/black
-  rev: 21.12b0
-  hooks:
-  - id: black
 - repo: https://github.com/asottile/yesqa
   rev: v1.3.0
   hooks:
   - id: yesqa
+    additional_dependencies:
+    - wemake-python-styleguide
+- repo: https://github.com/psf/black
+  rev: 21.12b0
+  hooks:
+  - id: black
 - repo: https://github.com/PyCQA/flake8
   rev: 4.0.1
   hooks:

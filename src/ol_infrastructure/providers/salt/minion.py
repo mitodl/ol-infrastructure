@@ -53,12 +53,12 @@ class OLSaltStackMinionInputs:
                     self,
                     attr,
                     salt_config.get(lookups[0]) or os.environ.get(lookups[1]),
-                )  # noqa: WPS221
+                )
                 if not getattr(self, attr):
                     raise ValueError(
                         "The SaltStack minion provider is missing a required parameter. "
                         f"Please set the Pulumi config saltstack:{lookups[0]} or set the "
-                        f"environment variable {lookups[1]}",  # noqa: WPS326
+                        f"environment variable {lookups[1]}",
                     )
 
 

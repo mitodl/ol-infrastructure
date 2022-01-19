@@ -20,7 +20,7 @@ class ConsulExternalServicesMonitorConfig(HashicorpConfig):
     passing_threshold: int = 0
     critical_threshold: int = 5
 
-    class Config:  # noqa: WPS431
+    class Config:
         env_prefix = "consul_esm_"
 
 

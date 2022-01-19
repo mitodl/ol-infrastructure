@@ -18,12 +18,12 @@ class NomadConfig(OLBaseSettings):
     data_dir: Optional[Path] = Path("/var/lib/nomad/")
     server: Optional[NomadServerConfig]
 
-    class Config:  # noqa: WPS431
+    class Config:
         env_prefix = "nomad_"
 
 
 class NomadJob(OLBaseSettings):
-    class Config:  # noqa: WPS431
+    class Config:
         env_prefix = "nomad_job_"
 
 

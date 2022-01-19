@@ -87,7 +87,7 @@ def availability_zones(region: str = "us-east-1") -> List[str]:
     return [zone["ZoneName"] for zone in zones if zone["ZoneName"] != "us-east-1e"]
 
 
-def _conditional_import(  # noqa: WPS210
+def _conditional_import(
     discover_func: FunctionType,
     filters: AWSFilterType,
     attributes_key: str,
@@ -143,7 +143,7 @@ def _conditional_import(  # noqa: WPS210
         resource = resources[0]
         tags = resource["Tags"]
         resource_id = resource[attribute_id_key]
-    if not tags or "pulumi_managed" in {tag["Key"] for tag in tags}:  # noqa: C412
+    if not tags or "pulumi_managed" in {tag["Key"] for tag in tags}:
         opts = pulumi.ResourceOptions()
     else:
         opts = pulumi.ResourceOptions(
