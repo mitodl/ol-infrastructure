@@ -3,6 +3,11 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgFY9u5ocQG+o+sndf23MIlyAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMTUkwVa0Z1Qyk+S5BAgEQgDspkXL/TSxU8EhflHb1ANICwEE4O+k5t1yQArv1+UG+s3C14Wh+UeWPu93RDnAV9xI6FwkSwX0ea7vo/w==
 config:
   aws:region: us-east-1
+  concourse:target_vpc: operations_vpc
+  concourse:iam_policies:
+  - operations
+  - ocw
+  - infra
   concourse:consul_credentials:
     secure: v1:odRZcznoHvnBu/tX:eJ0FHmofwnccKwNWNGwbGV/EoZPG6btyd8irQ4M1DZ6OX/4VWPD8LOp9n/gNHeeYw9S4hnoej1gB9ljUHrim
   concourse:db_instance_size: db.m6g.xlarge
@@ -12,12 +17,13 @@ config:
     secure: v1:RHqcCACmlYI66ydu:Ip3KUF8DM0GkBcWQg3Jfz+bQHtJ0IgQK2D3s8VdI+U+fcMdqy4xxeM8uEwkES/OrWeAYgIUzEHao7KtqS9O6vbtd0K7lib6n7KEdLSS4HWt6CmkPHaV+/EY+APJHpZqx8BQ=
   concourse:pypi_credentials:
     secure: v1:i3a+7goVdWZMQS9Y:wnaKtictwJtO06zrMQAowVQCenHH1A9z3GjL31QtmHDyxwJKApCzlxcpUDEAaMGBW/EUogMnrrKxjO/PLCt0/HBqe6Rc8RCoSI+TlKeqbADFFxRB3RkIMyPt
+  concourse:db_capacity: "334"
   concourse:web_host_domain: cicd.odl.mit.edu
   concourse:web_instance_type: general_purpose_large
-  concourse:web_node_capacity: '3'
-  concourse:worker_disk_size: '200'
+  concourse:web_node_capacity: "3"
+  concourse:worker_disk_size: "200"
   concourse:worker_instance_type: general_purpose_xlarge
-  concourse:worker_node_capacity: '5'
+  concourse:worker_node_capacity: "5"
   consul:address: https://consul-operations-production.odl.mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

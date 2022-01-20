@@ -6,6 +6,7 @@
 - Create an autoscaling group for Concourse worker instances
 """
 import base64
+import importlib
 import json
 from pathlib import Path
 
@@ -31,7 +32,7 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     InstanceTypes,
     default_egress_args,
 )
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -48,13 +49,15 @@ dns_stack = StackReference("infrastructure.aws.dns")
 consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
+target_vpc_name = concourse_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
+target_vpc = network_stack.require_output(target_vpc_name)
+
 consul_security_groups = consul_stack.require_output("security_groups")
-operations_vpc = network_stack.require_output("operations_vpc")
 aws_config = AWSBase(
     tags={"OU": "operations", "Environment": f"operations-{stack_info.env_suffix}"}
 )
 aws_account = get_caller_identity()
-ops_vpc_id = operations_vpc["id"]
+ops_vpc_id = target_vpc["id"]
 concourse_web_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["concourse-web-*"]),
@@ -77,70 +80,6 @@ concourse_worker_ami = ec2.get_ami(
 concourse_web_tag = f"concourse-web-{stack_info.env_suffix}"
 consul_provider = get_consul_provider(stack_info)
 
-###################################
-#    Security & Access Control    #
-###################################
-
-# AWS Permissions Document
-# S3 bucket permissions for publishing OCW
-# S3 bucket permissions for uploading software artifacts
-concourse_iam_permissions = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:ListAllMyBuckets",
-            ],
-            "Resource": "*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:GetObject*",
-                "s3:PutObject",
-                "s3:PutObjectTagging",
-                "s3:DeleteObject",
-                "s3:ListBucket*",
-            ],
-            "Resource": [
-                "arn:aws:s3:::*-edxapp-mfe",
-                "arn:aws:s3:::*-edxapp-mfe/*",
-                "arn:aws:s3:::ocw-content*",
-                "arn:aws:s3:::ocw-content*/*",
-                "arn:aws:s3:::ocw-to-hugo-output*",
-                "arn:aws:s3:::ocw-to-hugo-output*/*",
-                "arn:aws:s3:::ol-eng-artifacts",
-                "arn:aws:s3:::ol-eng-artifacts/*",
-                "arn:aws:s3:::ol-ocw-studio-app*",
-                "arn:aws:s3:::ol-ocw-studio-app*/*",
-            ],
-        },
-        {
-            "Effect": "Allow",
-            "Action": "s3:ListBucketVersions",
-            "Resource": "arn:aws:s3:::*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": ["s3:GetObject*", "s3:ListBucket"],
-            "Resource": [
-                "arn:aws:s3:::open-learning-course-data*",
-                "arn:aws:s3:::open-learning-course-data*/*",
-            ],
-        },
-        {"Effect": "Allow", "Action": ["cloudwatch:PutMetricData"], "Resource": "*"},
-    ],
-}
-
-concourse_iam_policy = iam.Policy(
-    "cicd-iam-permissions-policy",
-    path=f"/ol-infrastructure/iam/cicd-{stack_info.env_suffix}/",
-    policy=lint_iam_policy(concourse_iam_permissions, stringify=True),
-    name_prefix=f"cicd-policy-{stack_info.env_suffix}",
-    tags=aws_config.tags,
-)
-
 # IAM and instance profile
 concourse_instance_role = iam.Role(
     f"concourse-instance-role-{stack_info.env_suffix}",
@@ -158,6 +97,23 @@ concourse_instance_role = iam.Role(
     tags=aws_config.tags,
 )
 
+# Dynamically load IAM policies from the IAM policies module and then attach them to the
+# role
+for iam_policy in concourse_config.get_object("iam_polices") or []:
+    policy_module = importlib.import_module(f".iam_policies.{iam_policy}")
+    iam_policy_object = iam.Policy(
+        f"cicd-iam-permissions-policy-{iam_policy}-{stack_info.env_suffix}",
+        path=f"/ol-infrastructure/iam/cicd-{stack_info.env_suffix}/",
+        policy=lint_iam_policy(policy_module.policy_definition, stringify=True),
+        name_prefix=f"cicd-policy-{iam_policy}-{stack_info.env_suffix}",
+        tags=aws_config.tags,
+    )
+    iam.RolePolicyAttachment(
+        f"concourse-instance-policy-{iam_policy}-{stack_info.env_suffix}",
+        policy_arn=iam_policy_object.arn,
+        role=concourse_instance_role.name,
+    )
+
 iam.RolePolicyAttachment(
     f"concourse-describe-instance-role-policy-{stack_info.env_suffix}",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
@@ -167,12 +123,6 @@ iam.RolePolicyAttachment(
 iam.RolePolicyAttachment(
     f"concourse-route53-role-policy-{stack_info.env_suffix}",
     policy_arn=policy_stack.require_output("iam_policies")["route53_odl_zone_records"],
-    role=concourse_instance_role.name,
-)
-
-iam.RolePolicyAttachment(
-    "concourse-cicd-permissions-policy",
-    policy_arn=concourse_iam_policy.arn,
     role=concourse_instance_role.name,
 )
 
@@ -326,7 +276,7 @@ concourse_db_security_group = ec2.SecurityGroup(
             ],
             # TODO: Create Vault security group to act as source of allowed
             # traffic. (TMM 2021-05-04)
-            cidr_blocks=[operations_vpc["cidr"]],
+            cidr_blocks=[target_vpc["cidr"]],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
@@ -348,7 +298,8 @@ rds_defaults["instance_size"] = (
 concourse_db_config = OLPostgresDBConfig(
     instance_name=f"concourse-db-{stack_info.env_suffix}",
     password=concourse_config.require("db_password"),
-    subnet_group_name=operations_vpc["rds_subnet"],
+    storage=concourse_config.get("db_capacity"),
+    subnet_group_name=target_vpc["rds_subnet"],
     security_groups=[concourse_db_security_group],
     tags=aws_config.tags,
     db_name="concourse",
@@ -409,9 +360,9 @@ web_lb = lb.LoadBalancer(
     ip_address_type="dualstack",
     load_balancer_type="application",
     enable_http2=True,
-    subnets=operations_vpc["subnet_ids"],
+    subnets=target_vpc["subnet_ids"],
     security_groups=[
-        operations_vpc["security_groups"]["web"],
+        target_vpc["security_groups"]["web"],
     ],
     tags=aws_config.merged_tags({"Name": concourse_web_tag}),
 )
@@ -454,7 +405,7 @@ concourse_web_alb_listener = lb.Listener(
 web_instance_type = (
     concourse_config.get("web_instance_type") or InstanceTypes.burstable_medium.name
 )
-consul_datacenter = f"operations-{stack_info.env_suffix}"
+consul_datacenter = consul_stack.require_output("datacenter")
 web_launch_config = ec2.LaunchTemplate(
     "concourse-web-launch-template",
     name_prefix=f"concourse-web-{stack_info.env_suffix}-",
@@ -467,8 +418,7 @@ web_launch_config = ec2.LaunchTemplate(
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name="/dev/xvda",
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=concourse_config.get_int("web_disk_size")
-                or 25,  # noqa: WPS432
+                volume_size=concourse_config.get_int("web_disk_size") or 25,
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
             ),
@@ -476,7 +426,7 @@ web_launch_config = ec2.LaunchTemplate(
     ],
     vpc_security_group_ids=[
         concourse_web_security_group.id,
-        operations_vpc["security_groups"]["web"],
+        target_vpc["security_groups"]["web"],
         consul_security_groups["consul_agent"],
     ],
     instance_type=InstanceTypes[web_instance_type].value,
@@ -492,43 +442,45 @@ web_launch_config = ec2.LaunchTemplate(
         ),
     ],
     tags=aws_config.tags,
-    user_data=base64.b64encode(
-        "#cloud-config\n{}".format(
-            yaml.dump(
-                {
-                    "write_files": [
-                        {
-                            "path": "/etc/consul.d/02-autojoin.json",
-                            "content": json.dumps(
-                                {
-                                    "retry_join": [
-                                        "provider=aws tag_key=consul_env "
-                                        f"tag_value=operations-{stack_info.env_suffix}"
-                                    ],
-                                    "datacenter": consul_datacenter,
-                                }
-                            ),
-                            "owner": "consul:consul",
-                        },
-                        {
-                            "path": "/etc/default/caddy",
-                            "content": "DOMAIN={}".format(
-                                concourse_config.require("web_host_domain")
-                            ),
-                        },
-                        {
-                            "path": "/etc/default/vector",
-                            "content": (
-                                f"ENVIRONMENT={consul_datacenter}\n"
-                                "VECTOR_CONFIG_DIR=/etc/vector/"
-                            ),
-                        },
-                    ]
-                },
-                sort_keys=True,
-            )
-        ).encode("utf8")
-    ).decode("utf8"),
+    user_data=consul_datacenter.apply(
+        lambda consul_dc: base64.b64encode(
+            "#cloud-config\n{}".format(
+                yaml.dump(
+                    {
+                        "write_files": [
+                            {
+                                "path": "/etc/consul.d/02-autojoin.json",
+                                "content": json.dumps(
+                                    {
+                                        "retry_join": [
+                                            "provider=aws tag_key=consul_env "
+                                            f"tag_value={consul_dc}"
+                                        ],
+                                        "datacenter": consul_dc,
+                                    }
+                                ),
+                                "owner": "consul:consul",
+                            },
+                            {
+                                "path": "/etc/default/caddy",
+                                "content": "DOMAIN={}".format(
+                                    concourse_config.require("web_host_domain")
+                                ),
+                            },
+                            {
+                                "path": "/etc/default/vector",
+                                "content": (
+                                    f"ENVIRONMENT={consul_dc}\n"
+                                    "VECTOR_CONFIG_DIR=/etc/vector/"
+                                ),
+                            },
+                        ]
+                    },
+                    sort_keys=True,
+                )
+            ).encode("utf8")
+        ).decode("utf8")
+    ),
 )
 web_asg = autoscaling.Group(
     "concourse-web-autoscaling-group",
@@ -536,14 +488,14 @@ web_asg = autoscaling.Group(
     min_size=1,
     max_size=5,
     health_check_type="ELB",
-    vpc_zone_identifiers=operations_vpc["subnet_ids"],
+    vpc_zone_identifiers=target_vpc["subnet_ids"],
     launch_template=autoscaling.GroupLaunchTemplateArgs(
         id=web_launch_config.id, version="$Latest"
     ),
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50  # noqa: WPS432
+            min_healthy_percentage=50
         ),
         triggers=["tags"],
     ),
@@ -575,8 +527,7 @@ worker_launch_config = ec2.LaunchTemplate(
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name="/dev/xvda",
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=concourse_config.get_int("worker_disk_size")
-                or 25,  # noqa: WPS432
+                volume_size=concourse_config.get_int("worker_disk_size") or 25,
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
             ),
@@ -603,45 +554,47 @@ worker_launch_config = ec2.LaunchTemplate(
         ),
     ],
     tags=aws_config.tags,
-    user_data=base64.b64encode(
-        "#cloud-config\n{}".format(
-            yaml.dump(
-                {
-                    "write_files": [
-                        {
-                            "path": "/etc/consul.d/02-autojoin.json",
-                            "content": json.dumps(
-                                {
-                                    "retry_join": [
-                                        "provider=aws tag_key=consul_env "
-                                        f"tag_value=operations-{stack_info.env_suffix}"
-                                    ],
-                                    "datacenter": consul_datacenter,
-                                }
-                            ),
-                            "owner": "consul:consul",
-                        },
-                    ]
-                },
-                sort_keys=True,
-            )
-        ).encode("utf8")
-    ).decode("utf8"),
+    user_data=consul_datacenter.apply(
+        lambda consul_dc: base64.b64encode(
+            "#cloud-config\n{}".format(
+                yaml.dump(
+                    {
+                        "write_files": [
+                            {
+                                "path": "/etc/consul.d/02-autojoin.json",
+                                "content": json.dumps(
+                                    {
+                                        "retry_join": [
+                                            "provider=aws tag_key=consul_env "
+                                            f"tag_value={consul_dc}"
+                                        ],
+                                        "datacenter": consul_dc,
+                                    }
+                                ),
+                                "owner": "consul:consul",
+                            },
+                        ]
+                    },
+                    sort_keys=True,
+                )
+            ).encode("utf8")
+        ).decode("utf8")
+    ),
 )
 worker_asg = autoscaling.Group(
     "concourse-worker-autoscaling-group",
     desired_capacity=concourse_config.get_int("worker_node_capacity") or 1,
     min_size=1,
-    max_size=50,  # noqa: WPS432
+    max_size=50,
     health_check_type="EC2",
-    vpc_zone_identifiers=operations_vpc["subnet_ids"],
+    vpc_zone_identifiers=target_vpc["subnet_ids"],
     launch_template=autoscaling.GroupLaunchTemplateArgs(
         id=worker_launch_config.id, version="$Latest"
     ),
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50  # noqa: WPS432
+            min_healthy_percentage=50
         ),
         triggers=["tags"],
     ),

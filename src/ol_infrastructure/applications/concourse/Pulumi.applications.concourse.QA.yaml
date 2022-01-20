@@ -10,14 +10,20 @@ config:
     secure: v1:cINWNdW8VXvoHANP:vYFipTry9pNokRsD9FnC0+8eurxu28iewwca52MXCyrVflWnaWWvi3FD3LP9O73KL/wznZCUSXk9lbsv6vySTSDR+1II7fNr1AnrjdQclygaFKBpb2EJgcwd1w==
   concourse:dockerhub_credentials:
     secure: v1:mTp3onp07/AT5WuS:iz87DQjylNjzuYMCyvpQohqo6nxBiAHGpt0OOUMRjVgAVekosjiXT7yabTTxXmQobnxwOuGcH/SOvwmu6wy+hmVlTLJjkO7Hd6O5SW5/KRADBzYLyrP/1Kl8LU5aU2qFZpc=
+  concourse:iam_policies:
+  - operations
+  - ocw
+  - infra
   concourse:pypi_credentials:
     secure: v1:LqP0Y/263bKeJDvo:2OOk40+MkkZvclKWn+l1lQer0DH6nG7FzGXHO2yjSmXG0KCBAdZldwjU+17+Yrj6hiQSZuDe7C/fUo+egWWKO9lRIR7zebOvywdXMlCOd0/d/nh5uXeeUcqTeQiVlg==
+  concourse:target_vpc: operations_vpc
+  concourse:db_capacity: "334"
   concourse:web_host_domain: cicd-qa.odl.mit.edu
   concourse:web_instance_type: general_purpose_large
-  concourse:web_node_capacity: '3'
-  concourse:worker_disk_size: '200'
+  concourse:web_node_capacity: "3"
+  concourse:worker_disk_size: "200"
   concourse:worker_instance_type: general_purpose_xlarge
-  concourse:worker_node_capacity: '30'
+  concourse:worker_node_capacity: "30"
   consul:address: https://consul-operations-qa.odl.mit.edu
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
