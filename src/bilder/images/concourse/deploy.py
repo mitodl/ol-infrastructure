@@ -115,7 +115,7 @@ concourse_config_map = {
         p2p_volume_streaming_timeout="10m",
         prometheus_bind_ip=IPv4Address("127.0.0.1"),
         prometheus_bind_port=CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
-        secret_cache_duration="5m",
+        secret_cache_duration="5m",  # pragma: allowlist secret
         secret_cache_enabled=True,
         vault_url=f"http://localhost:{VAULT_HTTP_PORT}",
         vault_client_token="this-token-gets-overridden-by-the-vault-agent",
@@ -124,13 +124,15 @@ concourse_config_map = {
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
+        bind_ip="0.0.0.0",
+        baggageclaim_bind_ip="0.0.0.0",
         baggageclaim_driver="overlay",
         container_runtime="containerd",
         containerd_dns_server="8.8.8.8",
         containerd_max_containers=0,  # Don't set a limit on the number of containers
         containerd_network_pool="10.250.0.0/16",
         baggageclaim_p2p_interface_family="4",
-        baggageclaim_p2p_interface_name_pattern=r"ens\d+",
+        baggageclaim_p2p_interface_name_pattern="ens5",
     ),
 }
 concourse_config: Union[

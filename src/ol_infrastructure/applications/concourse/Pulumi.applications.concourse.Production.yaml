@@ -5,9 +5,9 @@ config:
   aws:region: us-east-1
   concourse:target_vpc: operations_vpc
   concourse:iam_policies:
-  - operations
+  - base
   - ocw
-  - infra
+  - operations
   concourse:consul_credentials:
     secure: v1:odRZcznoHvnBu/tX:eJ0FHmofwnccKwNWNGwbGV/EoZPG6btyd8irQ4M1DZ6OX/4VWPD8LOp9n/gNHeeYw9S4hnoej1gB9ljUHrim
   concourse:db_instance_size: db.m6g.xlarge

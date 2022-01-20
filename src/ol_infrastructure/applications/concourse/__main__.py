@@ -8,6 +8,8 @@
 import base64
 import importlib
 import json
+import sys
+import textwrap
 from pathlib import Path
 
 import pulumi_vault as vault
@@ -96,11 +98,10 @@ concourse_instance_role = iam.Role(
     path="/ol-applications/concourse/role/",
     tags=aws_config.tags,
 )
-
 # Dynamically load IAM policies from the IAM policies module and then attach them to the
 # role
-for iam_policy in concourse_config.get_object("iam_polices") or []:
-    policy_module = importlib.import_module(f".iam_policies.{iam_policy}")
+for iam_policy in concourse_config.get_object("iam_policies") or []:
+    policy_module = importlib.import_module(f"iam_policies.{iam_policy}")
     iam_policy_object = iam.Policy(
         f"cicd-iam-permissions-policy-{iam_policy}-{stack_info.env_suffix}",
         path=f"/ol-infrastructure/iam/cicd-{stack_info.env_suffix}/",
@@ -198,7 +199,7 @@ vault.aws.AuthBackendRole(
     auth_type="iam",
     role="concourse-web",
     inferred_entity_type="ec2_instance",
-    inferred_aws_region="us-east-1",
+    inferred_aws_region=aws_config.region,
     bound_iam_instance_profile_arns=[concourse_instance_profile.arn],
     bound_ami_ids=[concourse_web_ami.id],
     bound_account_ids=[aws_account.account_id],
@@ -211,7 +212,7 @@ vault.aws.AuthBackendRole(
     backend="aws",
     auth_type="iam",
     inferred_entity_type="ec2_instance",
-    inferred_aws_region="us-east-1",
+    inferred_aws_region=aws_config.region,
     bound_iam_instance_profile_arns=[concourse_instance_profile.arn],
     role="concourse-worker",
     bound_ami_ids=[concourse_worker_ami.id],
@@ -229,6 +230,15 @@ concourse_worker_security_group = ec2.SecurityGroup(
     f"concourse-worker-security-group-{stack_info.env_suffix}",
     name=f"concourse-worker-operations-{stack_info.env_suffix}",
     description="Access control for Concourse worker servers",
+    ingress=[
+        ec2.SecurityGroupIngressArgs(
+            self=True,
+            from_port=0,
+            to_port=MAXIMUM_PORT_NUMBER,
+            protocol="tcp",
+            description="Allow Concourse workers to connect to all other concourse workers for p2p streaming.",
+        )
+    ],
     egress=default_egress_args,
     vpc_id=ops_vpc_id,
 )
@@ -406,6 +416,11 @@ web_instance_type = (
     concourse_config.get("web_instance_type") or InstanceTypes.burstable_medium.name
 )
 consul_datacenter = consul_stack.require_output("datacenter")
+
+grafana_credentials = read_yaml_secrets(
+    Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
+)
+
 web_launch_config = ec2.LaunchTemplate(
     "concourse-web-launch-template",
     name_prefix=f"concourse-web-{stack_info.env_suffix}-",
@@ -469,10 +484,17 @@ web_launch_config = ec2.LaunchTemplate(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": (
-                                    f"ENVIRONMENT={consul_dc}\n"
-                                    "VECTOR_CONFIG_DIR=/etc/vector/"
-                                ),
+                                "content": textwrap.dedent(
+                                    f"""\
+                                    ENVIRONMENT={consul_dc}
+                                    VECTOR_CONFIG_DIR=/etc/vector/
+                                    AWS_REGION={aws_config.region}
+                                    GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
+                                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
+                                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
+                                    """
+                                ),  # noqa: WPS355
+                                "owner": "root:root",
                             },
                         ]
                     },

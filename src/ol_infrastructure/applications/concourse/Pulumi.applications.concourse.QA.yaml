@@ -11,9 +11,9 @@ config:
   concourse:dockerhub_credentials:
     secure: v1:mTp3onp07/AT5WuS:iz87DQjylNjzuYMCyvpQohqo6nxBiAHGpt0OOUMRjVgAVekosjiXT7yabTTxXmQobnxwOuGcH/SOvwmu6wy+hmVlTLJjkO7Hd6O5SW5/KRADBzYLyrP/1Kl8LU5aU2qFZpc=
   concourse:iam_policies:
-  - operations
+  - base
   - ocw
-  - infra
+  - operations
   concourse:pypi_credentials:
     secure: v1:LqP0Y/263bKeJDvo:2OOk40+MkkZvclKWn+l1lQer0DH6nG7FzGXHO2yjSmXG0KCBAdZldwjU+17+Yrj6hiQSZuDe7C/fUo+egWWKO9lRIR7zebOvywdXMlCOd0/d/nh5uXeeUcqTeQiVlg==
   concourse:target_vpc: operations_vpc
