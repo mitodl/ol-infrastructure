@@ -40,7 +40,7 @@ jobs:
       outputs:
       - name: mfe-app-learning/dist
       params:
-        ACCESS_TOKEN_COOKIE_NAME: edx-jwt-cookie-header-payload
+        ACCESS_TOKEN_COOKIE_NAME: xpro-ci-edx-jwt-cookie-header-payload
         BASE_URL: https://courses-ci.xpro.mit.edu
         CSRF_TOKEN_API_PATH: /csrf/api/v1/token
         FAVICON_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico
@@ -59,7 +59,7 @@ jobs:
         SITE_NAME: MIT xPRO
         STUDIO_BASE_URL: https://studio-ci.xpro.mit.edu
         SUPPORT_URL: https://xpro.zendesk.com/hc
-        USER_INFO_COOKIE_NAME: edx-user-info
+        USER_INFO_COOKIE_NAME: xpro-ci-edx-user-info
       run:
         path: sh
         dir: mfe-app-learning

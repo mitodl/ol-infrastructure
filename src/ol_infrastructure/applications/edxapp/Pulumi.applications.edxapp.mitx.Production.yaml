@@ -22,7 +22,7 @@ config:
   edxapp:manage_dns: 'true'
   edxapp:min_web_nodes: '5'
   edxapp:min_worker_nodes: '2'
-  edxapp:sender_email_address: support@edxapp-mail-production.mitx.mit.edu
+  edxapp:sender_email_address: mitx-support@mit.edu
   edxapp:target_vpc: residential_mitx_vpc
   edxapp:web_instance_type: general_purpose_xlarge
   edxapp:web_node_capacity: '5'
