@@ -30,7 +30,7 @@ repos:
   rev: v1.26.3
   hooks:
   - id: yamllint
-    args: [--format, parsable, --strict, -d, relaxed]
+    args: [--format, parsable, -d, relaxed]
 - repo: https://github.com/asottile/pyupgrade
   rev: v2.31.0
   hooks:
