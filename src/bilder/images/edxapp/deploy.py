@@ -119,9 +119,10 @@ apt.packages(
 )
 log_file = Path("/var/log/edxapp/app.log")
 server.shell(
-    name="Allow edxapp user to write to the log file",
+    name="Allow edxapp and www-data users to write to the log file",
     commands=[
         f"setfacl -R -d -m u:edxapp:rwx {log_file.parent}",
+        f"setfacl -R -d -m u:www-data:rwx {log_file.parent}",
     ],
 )
 
