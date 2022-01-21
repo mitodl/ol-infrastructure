@@ -373,7 +373,7 @@ if host.fact.has_systemd:
         ),
     )
 
-if "mitodl" in git_remote:
+if "mitodl" in git_remote and node_type == WEB_NODE_TYPE:
     # Recompile static assets to ensure that any JS tweaks are rendered at runtime.
     server.shell(
         name="Compile static assets for Canvas integration",
