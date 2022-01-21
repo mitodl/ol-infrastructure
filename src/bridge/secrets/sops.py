@@ -1,14 +1,14 @@
 import json
 import os
-import platform
 import subprocess  # noqa: S404
 from pathlib import Path
+from platform import system
 from typing import Any, Dict
 
 import yaml
 
-if platform.system() == "Darwin" and platform.machine() == "arm64":
-    SOPS_BINARY = Path(__file__).parent.joinpath("bin", "sops_macos_arm64")
+if system() == "Darwin":
+    SOPS_BINARY = Path(__file__).parent.joinpath("bin", "sops_macos")
 else:
     SOPS_BINARY = Path(__file__).parent.joinpath("bin", "sops")
 
