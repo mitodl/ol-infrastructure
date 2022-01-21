@@ -40,36 +40,36 @@ jobs:
       outputs:
       - name: mfe-app-learning/dist
       params:
-        ACCESS_TOKEN_COOKIE_NAME: edx-jwt-cookie-header-payload
+        ABOUT_US_URL: https://mitxonline.mit.edu/about-us/
+        ACCESS_TOKEN_COOKIE_NAME: mitxonline-production-edx-jwt-cookie-header-payload
         BASE_URL: https://courses.mitxonline.mit.edu/learn
         CSRF_TOKEN_API_PATH: /csrf/api/v1/token
+        Contact: https://mitxonline.zendesk.com/hc/en-us/requests/new
+        FAVICON_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico
+        HONOR_CODE_URL: https://mitxonline.mit.edu/honor-code/
         LMS_BASE_URL: https://courses.mitxonline.mit.edu
         LOGIN_URL: https://courses.mitxonline.mit.edu/login
         LOGOUT_URL: https://courses.mitxonline.mit.edu/logout
-        LOGO_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png
+        LOGO_ALT_TEXT: ''
         LOGO_TRADEMARK_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png
+        LOGO_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png
         LOGO_WHITE_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png
-        FAVICON_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico
         MARKETING_SITE_BASE_URL: https://mitxonline.mit.edu
         ORDER_HISTORY_URL:
+        PRIVACY_POLICY_URL: https://mitxonline.mit.edu/privacy-policy/
         PUBLIC_PATH: /learn/
         REFRESH_ACCESS_TOKEN_ENDPOINT: https://courses.mitxonline.mit.edu/login_refresh
         SEARCH_CATALOG_URL: https://courses.mitxonline.mit.edu/courses
-        SITE_NAME: MITx Online
-        STUDIO_BASE_URL: https://studio.mitxonline.mit.edu
-        SUPPORT_URL: https://mitxonline.zendesk.com/hc/en-us
-        USER_INFO_COOKIE_NAME: edx-user-info
         SESSION_COOKIE_DOMAIN: .mitxonline.mit.edu
-        ABOUT_US_URL: https://mitxonline.mit.edu/about-us/
-        PRIVACY_POLICY_URL: https://mitxonline.mit.edu/privacy-policy/
-        HONOR_CODE_URL: https://mitxonline.mit.edu/honor-code/
-        TERMS_OF_SERVICE_URL: https://mitxonline.mit.edu/terms-of-service/
-        Contact: https://mitxonline.zendesk.com/hc/en-us/requests/new
-        SUPPORT_CENTER_URL: https://mitxonline.zendesk.com/hc/en-us
-        SUPPORT_CENTER_TEXT: Support Center
-        TRADEMARK_TEXT: © MITxOnline. All rights reserved except where noted.
+        SITE_NAME: MITx Online
         SITE_URL: https://mitxonline.mit.edu
-        LOGO_ALT_TEXT: ''
+        STUDIO_BASE_URL: https://studio.mitxonline.mit.edu
+        SUPPORT_CENTER_TEXT: Support Center
+        SUPPORT_CENTER_URL: https://mitxonline.zendesk.com/hc/en-us
+        SUPPORT_URL: https://mitxonline.zendesk.com/hc/en-us
+        TERMS_OF_SERVICE_URL: https://mitxonline.mit.edu/terms-of-service/
+        TRADEMARK_TEXT: © MITxOnline. All rights reserved except where noted.
+        USER_INFO_COOKIE_NAME: mitxonline-production-edx-user-info
       run:
         path: sh
         dir: mfe-app-learning

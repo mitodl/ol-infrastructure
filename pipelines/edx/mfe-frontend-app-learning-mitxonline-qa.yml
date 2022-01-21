@@ -41,7 +41,7 @@ jobs:
       - name: mfe-app-learning/dist
       params:
         ABOUT_US_URL: https://rc.mitxonline.mit.edu/about-us/
-        ACCESS_TOKEN_COOKIE_NAME: edx-jwt-cookie-header-payload
+        ACCESS_TOKEN_COOKIE_NAME: mitxonline-qa-edx-jwt-cookie-header-payload
         BASE_URL: https://courses-qa.mitxonline.mit.edu/learn
         CSRF_TOKEN_API_PATH: /csrf/api/v1/token
         Contact: mailto:mitxonline-support@mit.edu
@@ -69,7 +69,7 @@ jobs:
         SUPPORT_URL: https://mitx-micromasters.zendesk.com/hc/en-us/requests/new
         TERMS_OF_SERVICE_URL: https://rc.mitxonline.mit.edu/terms-of-service/
         TRADEMARK_TEXT: © MITxOnline. All rights reserved except where noted.
-        USER_INFO_COOKIE_NAME: edx-user-info
+        USER_INFO_COOKIE_NAME: mitxonline-qa-edx-user-info
       run:
         path: sh
         dir: mfe-app-learning
