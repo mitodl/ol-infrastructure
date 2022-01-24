@@ -1,11 +1,5 @@
 ---
 sources:
-  vector_metrics:
-    type: internal_metrics
-    scrape_interval_secs: 30
-  host_metrics:
-    type: host_metrics
-
   concourse_metrics:
     type: prometheus_scrape
     endpoints:
@@ -39,7 +33,6 @@ transforms:
       .tags.environment = "${ENVIRONMENT}"
       .tags.application = "concourse"
       .tags.service = "concourse"
-      .tags.hostname = "${HOSTNAME}"
 
   concourse_enriched_logs:
     type: aws_ec2_metadata
@@ -63,7 +56,6 @@ sinks:
       environment: ${ENVIRONMENT}
       application: concourse
       service: concourse
-      hostname: ${HOSTNAME}
     out_of_order_action: rewrite_timestamp
 
   cloudwatch_metrics:
