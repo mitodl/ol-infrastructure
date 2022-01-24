@@ -6,6 +6,9 @@ sources:
     - http://localhost:{{ context.concourse_prometheus_port }}/metrics
     scrape_interval_secs: 10
 
+  host_metrics:
+    type: host_metrics
+
   concourse_logs:
     type: journald
     include_units:
