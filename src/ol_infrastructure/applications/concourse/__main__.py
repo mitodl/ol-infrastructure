@@ -8,7 +8,6 @@
 import base64
 import importlib
 import json
-import sys
 import textwrap
 from pathlib import Path
 

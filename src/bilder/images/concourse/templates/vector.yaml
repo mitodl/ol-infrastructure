@@ -68,7 +68,7 @@ sinks:
 
   cloudwatch_metrics:
     default_namespace: "${ENVIRONMENT}"
-    region:  "${AWS_REGION}"
+    region: "${AWS_REGION}"
     type: aws_cloudwatch_metrics
     inputs:
     - concourse_metrics
