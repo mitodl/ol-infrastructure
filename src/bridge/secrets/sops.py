@@ -2,11 +2,15 @@ import json
 import os
 import subprocess  # noqa: S404
 from pathlib import Path
+from platform import system
 from typing import Any, Dict
 
 import yaml
 
-SOPS_BINARY = Path(__file__).parent.joinpath("bin", "sops")
+if system() == "Darwin":
+    SOPS_BINARY = Path(__file__).parent.joinpath("bin", "sops_macos")
+else:
+    SOPS_BINARY = Path(__file__).parent.joinpath("bin", "sops")
 
 
 def read_yaml_secrets(sops_file: Path) -> Dict[str, Any]:

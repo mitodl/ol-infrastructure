@@ -6,6 +6,9 @@ sources:
     - http://localhost:{{ context.concourse_prometheus_port }}/metrics
     scrape_interval_secs: 10
 
+  host_metrics:
+    type: host_metrics
+
   concourse_logs:
     type: journald
     include_units:
@@ -19,11 +22,20 @@ transforms:
     source: |
       event, err = parse_json(.message)
       if event != null {
-        . = merge(., event)
+        .,err = merge(., event)
         .@timestamp = .timestamp
         .labels = ["concourse", "${ENVIRONMENT}"]
         .environment = "${ENVIRONMENT}"
       }
+
+  add_labels_to_metrics:
+    type: remap
+    inputs:
+    - '*metrics'
+    source: |
+      .tags.environment = "${ENVIRONMENT}"
+      .tags.application = "concourse"
+      .tags.service = "concourse"
 
   concourse_enriched_logs:
     type: aws_ec2_metadata
@@ -32,15 +44,37 @@ transforms:
     namespace: ec2
 
 sinks:
-  elasticsearch_logs:
-    type: elasticsearch
+  grafana_loki_logs:
     inputs:
     - concourse_enriched_logs
-    endpoint: http://logging-elasticsearch.query.consul:9200
-    index: logs-${ENVIRONMENT}-concourse-%Y.%W
-    healthcheck: false
+    type: loki
+    auth:
+      strategy: basic
+      password: ${GRAFANA_CLOUD_API_KEY}
+      user: "${GRAFANA_CLOUD_LOKI_API_USER}"
+    endpoint: https://logs-prod-us-central1.grafana.net
+    encoding:
+      codec: json
+    labels:
+      environment: ${ENVIRONMENT}
+      application: concourse
+      service: concourse
+    out_of_order_action: rewrite_timestamp
 
   cloudwatch_metrics:
+    default_namespace: "${ENVIRONMENT}"
+    region: "${AWS_REGION}"
     type: aws_cloudwatch_metrics
     inputs:
     - concourse_metrics
+
+  grafana_cortex_metrics:
+    inputs:
+    - add_labels_to_metrics
+    type: prometheus_remote_write
+    endpoint: https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom/push
+    healthcheck: false
+    auth:
+      strategy: basic
+      user: "${GRAFANA_CLOUD_PROMETHEUS_API_USER}"
+      password: ${GRAFANA_CLOUD_API_KEY}

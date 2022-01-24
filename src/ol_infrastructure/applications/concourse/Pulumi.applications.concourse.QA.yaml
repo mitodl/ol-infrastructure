@@ -5,19 +5,19 @@ config:
   aws:region: us-east-1
   concourse:consul_credentials:
     secure: v1:duj9opywHxOvDHWd:teA1tnEZNwkvM9Lbg8AVtve9YA2Qq8+JkKTRcHDHuul50x+dVV4H3vCVVIL/gCQyjdq4jWBJfCZP7UROhPuF
-  concourse:db_instance_size: db.m6g.xlarge
+  concourse:db_capacity: "334"
+  concourse:db_instance_size: db.m6g.2xlarge
   concourse:db_password:
     secure: v1:cINWNdW8VXvoHANP:vYFipTry9pNokRsD9FnC0+8eurxu28iewwca52MXCyrVflWnaWWvi3FD3LP9O73KL/wznZCUSXk9lbsv6vySTSDR+1II7fNr1AnrjdQclygaFKBpb2EJgcwd1w==
   concourse:dockerhub_credentials:
     secure: v1:mTp3onp07/AT5WuS:iz87DQjylNjzuYMCyvpQohqo6nxBiAHGpt0OOUMRjVgAVekosjiXT7yabTTxXmQobnxwOuGcH/SOvwmu6wy+hmVlTLJjkO7Hd6O5SW5/KRADBzYLyrP/1Kl8LU5aU2qFZpc=
   concourse:iam_policies:
-  - operations
+  - base
   - ocw
-  - infra
+  - operations
   concourse:pypi_credentials:
     secure: v1:LqP0Y/263bKeJDvo:2OOk40+MkkZvclKWn+l1lQer0DH6nG7FzGXHO2yjSmXG0KCBAdZldwjU+17+Yrj6hiQSZuDe7C/fUo+egWWKO9lRIR7zebOvywdXMlCOd0/d/nh5uXeeUcqTeQiVlg==
   concourse:target_vpc: operations_vpc
-  concourse:db_capacity: "334"
   concourse:web_host_domain: cicd-qa.odl.mit.edu
   concourse:web_instance_type: general_purpose_large
   concourse:web_node_capacity: "3"
