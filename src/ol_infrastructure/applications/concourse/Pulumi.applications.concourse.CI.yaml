@@ -10,17 +10,63 @@ config:
     secure: v1:qHlfVScY6TRQO3Xy:Yvn53MfChba/lCUxcp3hKjKJX9cqjfR2OcsrbJFEY36IhwJIW7V16PKpuHc9cjjk
   concourse:dockerhub_credentials:
     secure: v1:slySRgEfav4QWI/c:WGfHXvftFBvFnuK5SctOZTn9zjkx+bPb9PGsoaL4T2LFUK/M3Ba1JC9hu3h2IPjTOG4RIaD155eMhC/LJ0GCw5c8hQFJHhZJ1dbatoY1bo6kH483ICy7EZ0hUQf/bPZmMag=
-  concourse:iam_policies:
-  - base
-  - ocw
-  - operations
   concourse:pypi_credentials:
     secure: v1:GxB2bdvsKAefNBQi:CmibK+AuqOF8K77zHl9qjzOvQ6wplpNKFgTpxdFwY8wDoQJKpD7mOArnyaBI1OO/BzSAl5HmgFdSskWHKFrZXV8DlzRo2N2sx2n1P7HF4/dHAXTIY7yhWLgavogXAw==
   concourse:target_vpc: operations_vpc
+  concourse:web_auto_scale:
+    desired: 1
+    max: 3
+    min: 1
   concourse:web_host_domain: cicd-ci.odl.mit.edu
-  concourse:web_node_capacity: "1"
-  concourse:worker_disk_size: "200"
-  concourse:worker_node_capacity: "2"
+  concourse:web_iam_policies:
+  - base
+  - ocw
+  - operations
+  concourse:workers:
+  - auto_scale:
+      desired: 1
+      max: 10
+      min: 1
+    aws_tags:
+      OU: open-courseware
+    concourse_tags: []
+    concourse_team:
+    - ocw
+    disk_size_gb: 200
+    iam_policies:
+    - base
+    - ocw
+    instance_type: m5a.xlarge
+    name: ocw
+  - auto_scale:
+      desired: 1
+      max: 2
+      min: 1
+    aws_tags:
+      OU: operations
+    concourse_tags: []
+    concourse_team:
+    - infra
+    disk_size_gb: 100
+    iam_policies:
+    - base
+    instance_type: t3a.medium
+    name: infrastructure
+  - auto_scale:
+      desired: 1
+      max: 2
+      min: 1
+    aws_tags:
+      OU: operations
+    concourse_tags:
+    concourse_team:
+    desired_capacity: 2
+    disk_size_gb: 100
+    iam_policies:
+    - base
+    - operations
+    instance_type: t3a.medium
+    name: generic
   consul:address: https://consul-operations-ci.odl.mit.edu
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
