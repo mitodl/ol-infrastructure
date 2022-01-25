@@ -420,7 +420,7 @@ export(
     "dagster_app",
     {
         "rds_host": dagster_db.db_instance.address,
-        "elastic_ip": dagster_elastic_ip.address,
+        "elastic_ip": dagster_elastic_ip.public_ip,
         "ec2_private_address": dagster_instance.private_ip,
         "ec2_public_address": dagster_instance.public_ip,
         "ec2_address_v6": dagster_instance.ipv6_addresses,
