@@ -363,11 +363,13 @@ dagster_image = ec2.get_ami(
         {"name": "virtualization-type", "values": ["hvm"]},
         {"name": "root-device-type", "values": ["ebs"]},
         {"name": "name", "values": ["debian-11-amd64*"]},
+        {"name": "image-id", "values": ["ami-00fd4f335e00c21ce"]},
     ],
     most_recent=True,
     owners=["136693071363"],
 )
 instance_tags = aws_config.merged_tags({"Name": dagster_minion_id})
+
 dagster_instance = ec2.Instance(
     f"dagster-instance-{dagster_environment}",
     ami=dagster_image.id,
@@ -388,6 +390,10 @@ dagster_instance = ec2.Instance(
         dagster_instance_security_group.id,
     ],
     opts=ResourceOptions(depends_on=[salt_minion]),
+)
+
+dagster_elastic_ip = ec2.Eip(
+    "dagster-instance-elastic-ip", instance=dagster_instance.id, vpc=True
 )
 
 fifteen_minutes = 60 * 15
@@ -414,6 +420,7 @@ export(
     "dagster_app",
     {
         "rds_host": dagster_db.db_instance.address,
+        "elastic_ip": dagster_elastic_ip.address,
         "ec2_private_address": dagster_instance.private_ip,
         "ec2_public_address": dagster_instance.public_ip,
         "ec2_address_v6": dagster_instance.ipv6_addresses,
