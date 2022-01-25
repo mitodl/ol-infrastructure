@@ -6,20 +6,10 @@ sources:
     - http://localhost:8500/v1/agent/metrics?format=prometheus
     scrape_interval_secs: 60
 
-  vector_metrics:
-    type: internal_metrics
-    scrape_interval_secs: 60
   host_metrics:
     type: host_metrics
 
 transforms:
-  vector_metrics_relabel:
-    type: remap
-    inputs:
-    - vector_metrics
-    source: |
-      .tags.job = "integrations/vector_agent"
-
   host_metrics_relabel:
     type: remap
     inputs:
