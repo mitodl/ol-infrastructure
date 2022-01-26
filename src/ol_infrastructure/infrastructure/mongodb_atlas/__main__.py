@@ -18,7 +18,11 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 atlas_config = pulumi.Config("mongodb_atlas")
 env_config = pulumi.Config("environment")
 stack_info = parse_stack()
+dagster_env_name = stack_info.name
+if stack_info.name == "CI":
+    dagster_env_name = "QA"
 network_stack = pulumi.StackReference(f"infrastructure.aws.network.{stack_info.name}")
+dagster_stack = pulumi.StackReference(f"applications.dagster.{dagster_env_name}")
 consul_stack = pulumi.StackReference(
     f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
 )
@@ -28,6 +32,7 @@ consul_stack = pulumi.StackReference(
 #############
 environment_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))
+dagster_ip = dagster_stack.require_output("dagster_app")["elastic_ip"]
 business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
 max_disk_size = atlas_config.get_int("disk_autoscale_max_gb")
@@ -180,6 +185,63 @@ if atlas_config.get_bool("ready_for_traffic"):
             )
         ),
     )
+
+########################
+# Data Pipeline Access #
+########################
+atlas_data_cidr_network_access = atlas.ProjectIpAccessList(
+    "mongo-atlas-data-network-cidr-block-permissions",
+    project_id=atlas_project.id,
+    cidr_block=dagster_ip.apply("{}/32".format),
+    opts=pulumi.ResourceOptions(
+        depends_on=[atlas_aws_network_peer, accept_atlas_network_peer]
+    ).merge(atlas_provider),
+)
+
+consul.Keys(
+    "set-mongo-connection-info-in-consul-for-data-pipelines",
+    keys=[
+        consul.KeysKeyArgs(
+            path=f"{stack_info.env_prefix}/mongodb/host",
+            delete=True,
+            value=atlas_cluster.mongo_uri.apply(lambda uri: urlparse(uri).netloc),
+        ),
+        consul.KeysKeyArgs(
+            path=f"{stack_info.env_prefix}/mongodb/use-ssl",
+            delete=True,
+            value=atlas_cluster.mongo_uri_with_options.apply(
+                lambda uri: parse_qs(urlparse(uri).query)["ssl"][0]
+            ),
+        ),
+        consul.KeysKeyArgs(
+            path=f"{stack_info.env_prefix}/mongodb/replica-set",
+            delete=True,
+            value=atlas_cluster.mongo_uri_with_options.apply(
+                lambda uri: parse_qs(urlparse(uri).query)["replicaSet"][0]
+            ),
+        ),
+        consul.KeysKeyArgs(
+            path=f"{stack_info.env_prefix}/mongodb/connection-string",
+            delete=True,
+            value=atlas_cluster.mongo_uri_with_options,
+        ),
+        consul.KeysKeyArgs(path="mongodb/auth-source", delete=True, value="admin"),
+    ],
+    opts=pulumi.ResourceOptions(
+        provider=consul.Provider(
+            "consul-operations-provider",
+            # Writing to the operations Consul so that Salt can template the values
+            address=f"https://consul-operations-{stack_info.env_suffix}.odl.mit.edu",
+            scheme="https",
+            http_auth="pulumi:{}".format(
+                read_yaml_secrets(Path(f"pulumi/consul.{stack_info.env_suffix}.yaml"))[
+                    "basic_auth_password"
+                ]
+            ),
+        )
+    ),
+)
+
 
 pulumi.export(
     "atlas_cluster",

@@ -7,10 +7,10 @@ config:
   consul:scheme: https
   environment:business_unit: mitxonline
   environment:target_vpc: mitxonline_vpc
-  mongodb_atlas:disk_autoscale_max_gb: '200'
-  mongodb_atlas:disk_size_gb: 50
+  mongodb_atlas:cluster_autoscale_max_size: M50
+  mongodb_atlas:cluster_instance_count: "5"
+  mongodb_atlas:disk_autoscale_max_gb: "200"
+  mongodb_atlas:disk_size_gb: "50"
   mongodb_atlas:instance_size: M30
   mongodb_atlas:organization_id: 611ab793e07f5965c7b9e4f6
-  mongodb_atlas:version: '4.4'
-  mongodb_atlas:cluster_autoscale_max_size: M50
-  mongodb_atlas:cluster_instance_count: 5
+  mongodb_atlas:version: "4.4"
