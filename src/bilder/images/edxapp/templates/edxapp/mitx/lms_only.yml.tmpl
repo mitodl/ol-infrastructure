@@ -89,7 +89,7 @@ VERIFY_STUDENT:
     EXPIRING_SOON_WINDOW: 28
 VIDEO_CDN_URL:
     EXAMPLE_COUNTRY_CODE: http://example.com/edx/video?s3_url=
-WRITABLE_GRADEBOOK_URL: /gradebook # MODIFIED for use with Gradeook MFE
+WRITABLE_GRADEBOOK_URL: {{ keyOrDefault "edxapp/gradebook-url" "" }} # MODIFIED for use with Gradeook MFE
 
 ########################################################
 # We are not using any of the enterprise functionality #

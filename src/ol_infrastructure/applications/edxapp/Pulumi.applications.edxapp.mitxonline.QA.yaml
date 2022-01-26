@@ -19,8 +19,8 @@ config:
     secure: v1:IqXRArQveCV+9lkE:cRaraFuN2dDmI29PD4QifOU7MrRFdszOoaUb7o3pDJordt4TSjw8fIxldWfMzNhZRLC+NS291DorO1IuN6ASdCbt5d53aMvHVt+3hA6wyuI11OFjk7U=
   edxapp:elb_healthcheck_interval: "30"
   edxapp:google_analytics_id: UA-5145472-46
+  edxapp:gradebook_url: /gradebook
   edxapp:mail_domain: edxapp-mail-qa.mitxonline.mit.edu
-  edxapp:manage_dns: "true"
   edxapp:sender_email_address: support@edxapp-mail-qa.mitxonline.mit.edu
   mongodb:admin_password:
     secure: v1:LSQgiUW2n8fzAks9:+ZYckckuLvNozc/WBbKA+Ppjf9pZWoP+OjLlLAunW81jR/3iJnbcn0MJBdAcgNtdTHVKDqu5

@@ -7,7 +7,7 @@ config:
   edxapp:business_unit: residential-staging
   edxapp:db_password:
     secure: v1:ZWtTTF60+1g61/XW:K9osJstG/oeHJvYXOUQS6KSIUuTcQFgR1cjECmosVk7BPLCJMPkzlLviW7swdiUhUIPErfyYNqs=
-  edxapp:db_storage_gb: '150'
+  edxapp:db_storage_gb: "150"
   edxapp:dns_zone: mitx
   edxapp:domains:
     lms: staging.mitx.mit.edu
@@ -17,16 +17,15 @@ config:
     secure: v1:Yh0hsiSt2TTi7gX0:ZIMrOO7lw+EhZ6d+x5UP/Lk/41TOJ/AS2EiQQOQB0SqmR8n3F28uthxe933kplAoSnisJBwiTu3kWztLWCyc7LJqNK7KDMAGlhQY6Ow=
   edxapp:edx_xqueue_secrets:
     secure: v1:jgBYHCVD4xbM2TGu:P0rmQmQm2SYH/pQh928vZq5C5ZRXWQsKvRijEitpVjsIo5YfzyYGM84GOIQQG2FTINUdINXCGkWXHNUsfYFGq1dKcOsrql9n5nUka8k/4bWcqEuyBy0dI0bCpoEf6Ui0hL1On/Or4/rV7itDycwjIsTe7Eq6pE2oLRw+64RV77e3ho9f1M/63BC00rzYynBkaw==
-  edxapp:google_analytics_id: ''
+  edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-staging-production.mitx.mit.edu
-  edxapp:manage_dns: 'true'
-  edxapp:min_web_nodes: '1'
-  edxapp:min_worker_nodes: '1'
+  edxapp:min_web_nodes: "1"
+  edxapp:min_worker_nodes: "1"
   edxapp:sender_email_address: support@edxapp-mail-staging-production.mitx.mit.edu
   edxapp:target_vpc: residential_mitx_staging_vpc
   edxapp:web_instance_type: general_purpose_xlarge
-  edxapp:web_node_capacity: '2'
-  edxapp:worker_node_capacity: '1'
+  edxapp:web_node_capacity: "2"
+  edxapp:worker_node_capacity: "1"
   mongodb:atlas_project_id: 61b72cf6148de8714e671440
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
