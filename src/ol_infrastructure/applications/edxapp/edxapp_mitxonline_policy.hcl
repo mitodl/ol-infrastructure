@@ -26,6 +26,14 @@ path "secret-mitxonline/edx-forum" {
   capabilities = ["read"]
 }
 
+path "secret-mitxonline/mongodb-edxapp" {
+  capabilities = ["read"]
+}
+
+path "secret-mitxonline/mongodb-forum" {
+  capabilities = ["read"]
+}
+
 path "secret-mitxonline/edx-xqueue" {
   capabilities = ["read"]
 }

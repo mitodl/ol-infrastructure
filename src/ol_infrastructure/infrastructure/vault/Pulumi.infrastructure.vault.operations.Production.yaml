@@ -4,7 +4,7 @@ encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgFlw/+s87LoA/OVc5
 config:
   aws:region: us-east-1
   vault:business_unit: operations
-  vault:cluster_size: '5'
+  vault:cluster_size: "5"
   vault:domain: vault-production.odl.mit.edu
-  vault:storage_disk_capacity: '200'
+  vault:storage_disk_capacity: "200"
   vault:target_vpc: operations

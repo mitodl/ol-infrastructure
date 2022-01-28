@@ -1,6 +1,6 @@
-{{ with secret "mongodb-mitxonline/creds/edxapp" }}
+{{ with secret "secret-mitxonline/mongodb-edxapp" }}
 mongodb_settings: &mongo_params
-  # authsource: admin
+  authsource: admin
   host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
   port: 27017
   db: edxapp
