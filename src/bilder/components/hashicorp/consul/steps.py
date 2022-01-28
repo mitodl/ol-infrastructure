@@ -17,20 +17,16 @@ def proxy_consul_dns(state=None, host=None):
         state=state,
         host=host,
     )
-    with tempfile.NamedTemporaryFile(delete=False, mode="w") as dhclient_config:
-        dhclient_config.write(
-            r'make_resolv_conf\necho "nameserver 127.0.0.1\\n$(cat /etc/resolv.conf)" '
-            "> /etc/resolv.conf"
-        )
-        files.put(
-            name="Configure dhclient to use local DNS",
-            dest="/etc/dhcp/dhclient-enter-hooks.d/consul",
-            src=dhclient_config.name,
-            create_remote_dir=True,
-            mode="0755",
-            state=state,
-            host=host,
-        )
+    files.line(
+        name="Configure dhclient to always put 127.0.0.1 as the first DNS server.",
+        path="/etc/dhcp/dhclient.conf",
+        line="#prepend domain-name-servers 127.0.0.1;",
+        replace="prepend domain-name-servers 127.0.0.1;",
+        present=True,
+        state=state,
+        host=host,
+    )
+
     # Allow hosts that default to using systemd-resolved to properly resolve Consul
     # domains
     if host.fact.has_systemd and host.fact.systemd_enabled["systemd-resolved.service"]:
