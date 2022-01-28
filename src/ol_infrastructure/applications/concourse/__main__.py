@@ -507,7 +507,7 @@ web_asg = autoscaling.Group(
     "concourse-web-autoscaling-group",
     desired_capacity=concourse_config.get_int("web_node_capacity") or 1,
     min_size=1,
-    max_size=5,
+    max_size=concourse_config.get_int("web_node_max_capacity") or 12,
     health_check_type="ELB",
     vpc_zone_identifiers=target_vpc["subnet_ids"],
     launch_template=autoscaling.GroupLaunchTemplateArgs(
