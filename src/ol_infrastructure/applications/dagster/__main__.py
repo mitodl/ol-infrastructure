@@ -39,6 +39,7 @@ data_warehouse_stack = StackReference(
 )
 dns_stack = StackReference("infrastructure.aws.dns")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+policy_stack = StackReference("infrastructure.aws.policies")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
@@ -252,6 +253,12 @@ dagster_role = iam.Role(
 iam.RolePolicyAttachment(
     f"dagster-role-policy-{stack_info.env_suffix}",
     policy_arn=dagster_iam_policy.arn,
+    role=dagster_role.name,
+)
+
+iam.RolePolicyAttachment(
+    f"dagster-describe-instance-role-policy-{stack_info.env_suffix}",
+    policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
     role=dagster_role.name,
 )
 
