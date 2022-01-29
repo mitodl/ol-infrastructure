@@ -21,7 +21,7 @@ config:
   concourse:web_host_domain: cicd.odl.mit.edu
   concourse:web_instance_type: general_purpose_large
   concourse:web_node_capacity: "6"
-  concourse:worker_disk_size: "200"
+  concourse:worker_disk_size: "500"
   concourse:worker_instance_type: general_purpose_xlarge
   concourse:worker_node_capacity: "30"
   consul:address: https://consul-operations-production.odl.mit.edu
