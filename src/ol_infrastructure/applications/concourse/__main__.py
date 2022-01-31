@@ -623,7 +623,7 @@ for worker_def in concourse_config.get_object("workers") or []:
                 resource_type="instance",
                 tags=aws_config.merged_tags(
                     {
-                        "Name": f"concoruse-worker-{worker_class_name}-{stack_info.env_suffix}"
+                        "Name": f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}"
                     },
                     worker_def["aws_tags"],
                 ),
@@ -632,7 +632,7 @@ for worker_def in concourse_config.get_object("workers") or []:
                 resource_type="volume",
                 tags=aws_config.merged_tags(
                     {
-                        "Name": f"concoruse-worker-{worker_class_name}-{stack_info.env_suffix}"
+                        "Name": f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}"
                     },
                     worker_def["aws_tags"],
                 ),
