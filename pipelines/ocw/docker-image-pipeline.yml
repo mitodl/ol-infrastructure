@@ -21,7 +21,6 @@ resources:
     repository: mitodl/ocw-course-publisher
     tag: latest
 
-
 jobs:
 - name: publish
   public: true
@@ -35,3 +34,4 @@ jobs:
   - put: ocw-course-publisher-image
     params:
       build: ol-infrastructure/dockerfiles/ocw/node-hugo
+      additional_tags: ol-infrastructure/dockerfiles/ocw/node-hugo/tag
