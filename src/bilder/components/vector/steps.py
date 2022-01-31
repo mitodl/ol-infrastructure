@@ -68,7 +68,9 @@ def configure_vector(vector_config: VectorConfig, state=None, host=None):
         files.template(
             name=f"Upload Vector configuration file {fpath}",
             src=fpath,
-            dest=vector_config.configuration_directory.joinpath(fpath.name),
+            dest=vector_config.configuration_directory.joinpath(
+                fpath.name.removesuffix(".j2")
+            ),
             user=vector_config.user,
             context=context,
             state=state,
