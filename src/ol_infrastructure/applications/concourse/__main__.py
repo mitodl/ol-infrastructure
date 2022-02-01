@@ -175,13 +175,15 @@ for iam_policy in iam_policy_names or []:
     iam_policy_object = iam.Policy(
         f"cicd-iam-permissions-policy-{iam_policy}-{stack_info.env_suffix}",
         path=f"/ol-infrastructure/iam/cicd-{stack_info.env_suffix}/",
-        policy=lint_iam_policy(policy_module.policy_definition,
-        parliament_config={
-            "PERMISSIONS_MANAGEMENT_ACTIONS": {
-                "ignore_locations": [{"actions": ["ec2:modifysnapshotattributte"]}]
+        policy=lint_iam_policy(
+            policy_module.policy_definition,
+            parliament_config={
+                "PERMISSIONS_MANAGEMENT_ACTIONS": {
+                    "ignore_locations": [{"actions": ["ec2:modifysnapshotattributte"]}]
+                },
+                "RESOURCE_STAR": {},
             },
-            "RESOURCE_STAR": {},
-        }),
+        ),
         name_prefix=f"cicd-policy-{iam_policy}-{stack_info.env_suffix}",
         tags=aws_config.tags,
     )
@@ -608,7 +610,7 @@ web_asg = autoscaling.Group(
 ############################################
 #     Worker Node IAM + EC2 Deployment     #
 ############################################
-concourse_worker_instance_profiles = [] 
+concourse_worker_instance_profiles = []
 
 for worker_def in concourse_config.get_object("workers") or []:
     worker_class_name = worker_def["name"]
@@ -646,12 +648,11 @@ for worker_def in concourse_config.get_object("workers") or []:
 
     concourse_worker_instance_profiles.append(concourse_worker_instance_profile)
 
-
     # Create EC2 resources
     build_worker_user_data_partial = partial(
         build_worker_user_data,
-        worker_def["concourse_team"],
-        worker_def["concourse_tags"],
+        worker_def.get("concourse_team"),
+        worker_def.get("concourse_tags") or [],
     )
 
     worker_instance_type = (
@@ -741,7 +742,10 @@ vault.aws.AuthBackendRole(
     auth_type="iam",
     inferred_entity_type="ec2_instance",
     inferred_aws_region=aws_config.region,
-    bound_iam_instance_profile_arns=[iam_instance_profile.arn for iam_instance_profile in concourse_worker_instance_profiles],
+    bound_iam_instance_profile_arns=[
+        iam_instance_profile.arn
+        for iam_instance_profile in concourse_worker_instance_profiles
+    ],
     role=f"concourse-worker",
     bound_ami_ids=[concourse_worker_ami.id],
     bound_account_ids=[aws_account.account_id],
