@@ -9,6 +9,7 @@ import base64
 import importlib
 import json
 import textwrap
+from functools import partial
 from pathlib import Path
 from typing import List
 
@@ -41,9 +42,61 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
+
+def build_worker_user_data(concourse_team, concourse_tags, consul_dc):
+    yaml_contents = {
+        "write_files": [
+            {
+                "path": "/etc/consul.d/02-autojoin.json",
+                "content": json.dumps(
+                    {
+                        "retry_join": [
+                            "provider=aws tag_key=consul_env " f"tag_value={consul_dc}"
+                        ],
+                        "datacenter": consul_dc,
+                    }
+                ),
+                "owner": "consul:consul",
+            },
+        ]
+    }
+    if concourse_team:
+        yaml_contents["write_files"].append(
+            {
+                "path": "/etc/default/concourse-team",
+                "content": textwrap.dedent(
+                    f"""\
+                     CONCOURSE_TEAM={concourse_team}
+                     """
+                ),  # noqa: WPS355
+                "owner": "root:root",
+            }
+        )
+    if concourse_tags:
+        yaml_contents["write_files"].append(
+            {
+                "path": "/etc/default/concourse-tags",
+                "content": textwrap.dedent(
+                    f"""\
+                 CONCOURSE_TAG={",".join(concourse_tags)}
+                """
+                ),  # noqa: WPS355
+                "owner": "root:root",
+            }
+        )
+    return base64.b64encode(
+        "#cloud-config\n{}".format(
+            yaml.dump(
+                yaml_contents,
+                sort_keys=True,
+            )
+        ).encode("utf8")
+    ).decode("utf8")
+
+
 ##################################
 ##    Setup + Config Retrival   ##
-####################################
+##################################
 
 if Config("vault_server").get("env_namespace"):
     setup_vault_provider()
@@ -122,7 +175,13 @@ for iam_policy in iam_policy_names or []:
     iam_policy_object = iam.Policy(
         f"cicd-iam-permissions-policy-{iam_policy}-{stack_info.env_suffix}",
         path=f"/ol-infrastructure/iam/cicd-{stack_info.env_suffix}/",
-        policy=lint_iam_policy(policy_module.policy_definition, stringify=True),
+        policy=lint_iam_policy(policy_module.policy_definition,
+        parliament_config={
+            "PERMISSIONS_MANAGEMENT_ACTIONS": {
+                "ignore_locations": [{"actions": ["ec2:modifysnapshotattributte"]}]
+            },
+            "RESOURCE_STAR": {},
+        }),
         name_prefix=f"cicd-policy-{iam_policy}-{stack_info.env_suffix}",
         tags=aws_config.tags,
     )
@@ -225,20 +284,6 @@ vault.aws.AuthBackendRole(
     inferred_aws_region=aws_config.region,
     bound_iam_instance_profile_arns=[concourse_instance_profile.arn],
     bound_ami_ids=[concourse_web_ami.id],
-    bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[ops_vpc_id],
-    token_policies=[concourse_vault_policy.name],
-)
-
-vault.aws.AuthBackendRole(
-    "concourse-worker-ami-ec2-vault-auth",
-    backend="aws",
-    auth_type="iam",
-    inferred_entity_type="ec2_instance",
-    inferred_aws_region=aws_config.region,
-    bound_iam_instance_profile_arns=[concourse_instance_profile.arn],
-    role="concourse-worker",
-    bound_ami_ids=[concourse_worker_ami.id],
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[ops_vpc_id],
     token_policies=[concourse_vault_policy.name],
@@ -563,6 +608,8 @@ web_asg = autoscaling.Group(
 ############################################
 #     Worker Node IAM + EC2 Deployment     #
 ############################################
+concourse_worker_instance_profiles = [] 
+
 for worker_def in concourse_config.get_object("workers") or []:
     worker_class_name = worker_def["name"]
 
@@ -582,6 +629,7 @@ for worker_def in concourse_config.get_object("workers") or []:
         path="/ol-applications/concourse/role/",
         tags=aws_config.tags,  # We will leave all the IAM resources with default tags.
     )
+
     for iam_policy_name in worker_def["iam_policies"] or []:
         iam_policy_object = iam_policy_objects[iam_policy_name]
         iam.RolePolicyAttachment(
@@ -590,7 +638,22 @@ for worker_def in concourse_config.get_object("workers") or []:
             role=concourse_worker_instance_role.name,
         )
 
+    concourse_worker_instance_profile = iam.InstanceProfile(
+        f"concourse-instance-profile-worker-{worker_class_name}-{stack_info.env_suffix}",
+        role=concourse_worker_instance_role.name,
+        path="/ol-applications/concourse/profile/",
+    )
+
+    concourse_worker_instance_profiles.append(concourse_worker_instance_profile)
+
+
     # Create EC2 resources
+    build_worker_user_data_partial = partial(
+        build_worker_user_data,
+        worker_def["concourse_team"],
+        worker_def["concourse_tags"],
+    )
+
     worker_instance_type = (
         worker_def["instance_type"] or InstanceTypes.burstable_large.name
     )
@@ -599,7 +662,7 @@ for worker_def in concourse_config.get_object("workers") or []:
         name_prefix=f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}-",
         description=f"Launch template for deploying concourse worker-{worker_class_name} nodes.",
         iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
-            arn=concourse_worker_instance_role.arn,
+            arn=concourse_worker_instance_profile.arn,
         ),
         image_id=concourse_worker_ami.id,
         block_device_mappings=[
@@ -639,32 +702,7 @@ for worker_def in concourse_config.get_object("workers") or []:
             ),
         ],
         tags=aws_config.merged_tags(worker_def["aws_tags"]),
-        user_data=consul_datacenter.apply(
-            lambda consul_dc: base64.b64encode(
-                "#cloud-config\n{}".format(
-                    yaml.dump(
-                        {
-                            "write_files": [
-                                {
-                                    "path": "/etc/consul.d/02-autojoin.json",
-                                    "content": json.dumps(
-                                        {
-                                            "retry_join": [
-                                                "provider=aws tag_key=consul_env "
-                                                f"tag_value={consul_dc}"
-                                            ],
-                                            "datacenter": consul_dc,
-                                        }
-                                    ),
-                                    "owner": "consul:consul",
-                                },
-                            ]
-                        },
-                        sort_keys=True,
-                    )
-                ).encode("utf8")
-            ).decode("utf8")
-        ),
+        user_data=consul_datacenter.apply(build_worker_user_data_partial),
     )
 
     auto_scale_config = worker_def["auto_scale"]
@@ -676,7 +714,7 @@ for worker_def in concourse_config.get_object("workers") or []:
         health_check_type="EC2",
         vpc_zone_identifiers=target_vpc["subnet_ids"],
         launch_template=autoscaling.GroupLaunchTemplateArgs(
-            id=worker_launch_config.id, version="$latest"
+            id=worker_launch_config.id, version="$Latest"
         ),
         instance_refresh=autoscaling.GroupInstanceRefreshArgs(
             strategy="Rolling",
@@ -697,6 +735,19 @@ for worker_def in concourse_config.get_object("workers") or []:
         ],
     )
 
+vault.aws.AuthBackendRole(
+    f"concourse-worker-ami-ec2-vault-auth",
+    backend="aws",
+    auth_type="iam",
+    inferred_entity_type="ec2_instance",
+    inferred_aws_region=aws_config.region,
+    bound_iam_instance_profile_arns=[iam_instance_profile.arn for iam_instance_profile in concourse_worker_instance_profiles],
+    role=f"concourse-worker",
+    bound_ami_ids=[concourse_worker_ami.id],
+    bound_account_ids=[aws_account.account_id],
+    bound_vpc_ids=[ops_vpc_id],
+    token_policies=[concourse_vault_policy.name],
+)
 
 # Create Route53 DNS records for Concourse web nodes
 five_minutes = 60 * 5

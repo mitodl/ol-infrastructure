@@ -9,6 +9,8 @@ policy_definition = {
         {
             "Effect": "Allow",
             "Action": [
+                "ec2:DescribeInstances",
+                "ec2:DescribeInstanceStatus",
                 "cloudwatch:PutMetricData",
             ],
             "Resource": "*",
