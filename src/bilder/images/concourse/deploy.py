@@ -110,6 +110,7 @@ concourse_config_map = {
             "{{ .Data.data.github_client_secret }}"
             "{{ end }}"
         ),
+        container_placement_strategy="fewest-build-containers",
         default_build_logs_to_retain="10",
         default_days_to_retain_build_logs="10",
         enable_build_auditing=False,
