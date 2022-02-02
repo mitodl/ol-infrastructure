@@ -43,7 +43,9 @@ from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 
-def build_worker_user_data(concourse_team, concourse_tags, consul_dc):
+def build_worker_user_data(
+    concourse_team: str, concourse_tags: List[str], consul_dc: str
+) -> str:
     yaml_contents = {
         "write_files": [
             {
@@ -652,7 +654,7 @@ for worker_def in concourse_config.get_object("workers") or []:
     build_worker_user_data_partial = partial(
         build_worker_user_data,
         worker_def.get("concourse_team"),
-        worker_def.get("concourse_tags") or [],
+        worker_def.get("concourse_tags", []),
     )
 
     worker_instance_type = (
