@@ -96,14 +96,15 @@ class AWSBase(BaseModel):
             raise ValueError("The specified region does not exist")
         return region
 
-    def merged_tags(self, new_tags: Dict[str, str]) -> Dict[str, str]:
+    def merged_tags(self, *new_tags: Dict[str, str]) -> Dict[str, str]:
         """Return a dictionary of existing tags with the ones passed in.
 
         This generates a new dictionary of tags in order to allow for a broadly
-        applicable set of tagsto then be updated with specific tags to be set on child
+        applicable set of tags to then be updated with specific tags to be set on child
         resources in a ComponentResource class.
 
-        :param new_tags: Dictionary of specific tags to be set on a child resource.
+        :param *new_tags: One or more dictionaries of specific tags to be set on
+                                                                        a child resource.
         :type new_tags: Dict[Text, Text]
 
         :returns: Merged dictionary of base tags and specific tags to be set on a child
@@ -112,5 +113,6 @@ class AWSBase(BaseModel):
         :rtype: Dict[Text, Text]
         """
         tag_dict = self.tags.copy()
-        tag_dict.update(new_tags)
+        for tags in new_tags:
+            tag_dict.update(tags)
         return tag_dict

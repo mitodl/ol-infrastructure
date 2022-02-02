@@ -11,19 +11,59 @@ config:
     secure: v1:MVLu2ciX/IoD8sgo:Jgmo9VuyRaTNqVBdX0vQtBmI2cMQ5dbrSJ6AWReAw9mh6BRFs4M3mWdOlLha7P2FJz1i+zyiy4z8s0/LHvYtJBDJuvDvn6OEAt58zF+F1LMyr3k3+H7/Vryg
   concourse:dockerhub_credentials:
     secure: v1:RHqcCACmlYI66ydu:Ip3KUF8DM0GkBcWQg3Jfz+bQHtJ0IgQK2D3s8VdI+U+fcMdqy4xxeM8uEwkES/OrWeAYgIUzEHao7KtqS9O6vbtd0K7lib6n7KEdLSS4HWt6CmkPHaV+/EY+APJHpZqx8BQ=
-  concourse:iam_policies:
-  - base
-  - ocw
-  - operations
   concourse:pypi_credentials:
     secure: v1:i3a+7goVdWZMQS9Y:wnaKtictwJtO06zrMQAowVQCenHH1A9z3GjL31QtmHDyxwJKApCzlxcpUDEAaMGBW/EUogMnrrKxjO/PLCt0/HBqe6Rc8RCoSI+TlKeqbADFFxRB3RkIMyPt
   concourse:target_vpc: operations_vpc
   concourse:web_host_domain: cicd.odl.mit.edu
   concourse:web_instance_type: general_purpose_large
-  concourse:web_node_capacity: "6"
-  concourse:worker_disk_size: "500"
-  concourse:worker_instance_type: general_purpose_xlarge
-  concourse:worker_node_capacity: "30"
+  concourse:web_iam_policies:
+  - base
+  - ocw
+  - operations
+  concourse:web_auto_scale:
+    desired: 4
+    max: 10
+    min: 1
+  concourse:workers:
+  - auto_scale:
+      desired: 20
+      max: 50
+      min: 3
+    aws_tags:
+      OU: open-courseware
+    concourse_team: ocw
+    disk_size_gb: 500
+    iam_policies:
+    - base
+    - ocw
+    instance_type: m5a.xlarge
+    name: ocw
+  - auto_scale:
+      desired: 2
+      max: 2
+      min: 2
+    aws_tags:
+      OU: operations
+    concourse_team: infrastructure
+    disk_size_gb: 100
+    iam_policies:
+    - base
+    - infra
+    - operations
+    instance_type: t3a.medium
+    name: infra
+  - auto_scale:
+      desired: 3
+      max: 5
+      min: 2
+    aws_tags:
+      OU: operations
+    disk_size_gb: 200
+    iam_policies:
+    - base
+    - operations
+    instance_type: t3a.large
+    name: generic
   consul:address: https://consul-operations-production.odl.mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
