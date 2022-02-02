@@ -46,7 +46,6 @@ from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisC
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
-    OLVaultMongoDatabaseConfig,
     OLVaultMysqlDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import (
@@ -60,11 +59,7 @@ from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import (
-    mongodb_role_statements,
-    mysql_role_statements,
-    setup_vault_provider,
-)
+from ol_infrastructure.lib.vault import mysql_role_statements, setup_vault_provider
 
 stack_info = parse_stack()
 edxapp_config = Config("edxapp")
@@ -136,6 +131,7 @@ edxapp_zone_id = edxapp_zone["id"]
 kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 kms_s3_key = kms_stack.require_output("kms_s3_data_analytics_key")
 operations_vpc = network_stack.require_output("operations_vpc")
+data_vpc = network_stack.require_output("data_vpc")
 
 ##############
 # S3 Buckets #
@@ -385,6 +381,7 @@ edxapp_db_security_group = ec2.SecurityGroup(
             cidr_blocks=[
                 edxapp_vpc["cidr"],
                 operations_vpc["cidr"],
+                data_vpc["cidr"],
             ],
             protocol="tcp",
             from_port=DEFAULT_MYSQL_PORT,
@@ -597,86 +594,50 @@ edxapp_db_consul_service = Service(
 # MongoDB Vault Setup #
 #######################
 mongodb_config = Config("mongodb")
-mongodb_admin_username = mongodb_config.get("admin_username") or "admin"
-mongodb_admin_password = mongodb_config.get("admin_password")
-
-edxapp_mongo_role_statements = mongodb_role_statements
-
-if atlas_project_id := mongodb_config.get("atlas_project_id"):  # noqa: WPS332
-    atlas_creds = read_yaml_secrets(Path("pulumi/mongodb_atlas.yaml"))
-    atlas_provider = ResourceOptions(
-        provider=atlas.Provider(
-            "mongodb-atlas-provider",
-            private_key=atlas_creds["private_key"],
-            public_key=atlas_creds["public_key"],
-        )
+atlas_project_id = mongodb_config.get("atlas_project_id")
+atlas_creds = read_yaml_secrets(Path("pulumi/mongodb_atlas.yaml"))
+atlas_provider = ResourceOptions(
+    provider=atlas.Provider(
+        "mongodb-atlas-provider",
+        private_key=atlas_creds["private_key"],
+        public_key=atlas_creds["public_key"],
     )
-    mongo_atlas_credentials = read_yaml_secrets(
-        Path(
-            f"pulumi/mongodb_atlas.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"
-        )
-    )
-    edxapp_mongo_user = atlas.DatabaseUser(
-        "mongodb-atlas-edxapp-user",
-        project_id=atlas_project_id,
-        auth_database_name="admin",
-        password=Output.secret(mongo_atlas_credentials["edxapp"]),
-        username="edxapp",
-        roles=[
-            atlas.DatabaseUserRoleArgs(database_name="edxapp", role_name="readWrite")
-        ],
-        opts=atlas_provider.merge(ResourceOptions(delete_before_replace=True)),
-    )
-    forum_mongo_user = atlas.DatabaseUser(
-        "mongodb-atlas-forum-user",
-        project_id=atlas_project_id,
-        auth_database_name="admin",
-        password=Output.secret(mongo_atlas_credentials["forum"]),
-        username="forum",
-        roles=[
-            atlas.DatabaseUserRoleArgs(database_name="forum", role_name="readWrite")
-        ],
-        opts=atlas_provider.merge(ResourceOptions(delete_before_replace=True)),
-    )
-    vault.generic.Secret(
-        "edxapp-mongodb-atlas-user-password",
-        path=edxapp_vault_mount.path.apply("{}/mongodb-edxapp".format),
-        data_json=json.dumps(
-            {"username": "edxapp", "password": mongo_atlas_credentials["edxapp"]}
-        ),
-    )
-    vault.generic.Secret(
-        "forum-mongodb-atlas-user-password",
-        path=edxapp_vault_mount.path.apply("{}/mongodb-forum".format),
-        data_json=json.dumps(
-            {"username": "forum", "password": mongo_atlas_credentials["forum"]}
-        ),
-    )
-else:
-    edxapp_mongo_role_statements["edxapp"] = {
-        "create": Template(
-            json.dumps({"roles": [{"role": "readWrite"}], "db": "edxapp"})
-        ),
-        "revoke": Template(json.dumps({"db": "edxapp"})),
-    }
-    edxapp_mongo_role_statements["forum"] = {
-        "create": Template(
-            json.dumps({"roles": [{"role": "readWrite"}], "db": "forum"})
-        ),
-        "revoke": Template(json.dumps({"db": "forum"})),
-    }
-    edxapp_mongo_vault_config = OLVaultMongoDatabaseConfig(
-        db_name="edxapp",
-        mount_point=f"mongodb-{stack_info.env_prefix}",
-        db_connection=(
-            "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
-        ),
-        db_admin_username=mongodb_admin_username,
-        db_admin_password=mongodb_admin_password,
-        db_host=f"mongodb-master.service.{env_name}.consul",
-        role_statements=edxapp_mongo_role_statements,
-    )
-    edxapp_mongo_vault_backend = OLVaultDatabaseBackend(edxapp_mongo_vault_config)
+)
+mongo_atlas_credentials = read_yaml_secrets(
+    Path(f"pulumi/mongodb_atlas.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
+)
+edxapp_mongo_user = atlas.DatabaseUser(
+    "mongodb-atlas-edxapp-user",
+    project_id=atlas_project_id,
+    auth_database_name="admin",
+    password=Output.secret(mongo_atlas_credentials["edxapp"]),
+    username="edxapp",
+    roles=[atlas.DatabaseUserRoleArgs(database_name="edxapp", role_name="readWrite")],
+    opts=atlas_provider.merge(ResourceOptions(delete_before_replace=True)),
+)
+forum_mongo_user = atlas.DatabaseUser(
+    "mongodb-atlas-forum-user",
+    project_id=atlas_project_id,
+    auth_database_name="admin",
+    password=Output.secret(mongo_atlas_credentials["forum"]),
+    username="forum",
+    roles=[atlas.DatabaseUserRoleArgs(database_name="forum", role_name="readWrite")],
+    opts=atlas_provider.merge(ResourceOptions(delete_before_replace=True)),
+)
+vault.generic.Secret(
+    "edxapp-mongodb-atlas-user-password",
+    path=edxapp_vault_mount.path.apply("{}/mongodb-edxapp".format),
+    data_json=json.dumps(
+        {"username": "edxapp", "password": mongo_atlas_credentials["edxapp"]}
+    ),
+)
+vault.generic.Secret(
+    "forum-mongodb-atlas-user-password",
+    path=edxapp_vault_mount.path.apply("{}/mongodb-forum".format),
+    data_json=json.dumps(
+        {"username": "forum", "password": mongo_atlas_credentials["forum"]}
+    ),
+)
 
 ###########################
 # Redis Elasticache Setup #
