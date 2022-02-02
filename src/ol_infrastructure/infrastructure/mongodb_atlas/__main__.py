@@ -76,7 +76,7 @@ atlas_cluster = atlas.Cluster(
     provider_auto_scaling_compute_max_instance_size=max_instance_type,
     provider_auto_scaling_compute_min_instance_size=min_instance_type,
     replication_factor=num_instances,
-    opts=atlas_provider,
+    opts=atlas_provider.merge(pulumi.ResourceOptions(ignore_changes=["disk_size_gb"])),
 )
 
 atlas_security_group = aws.ec2.SecurityGroup(
