@@ -1,0 +1,157 @@
+---
+resource_types:
+- name: packer
+  type: docker-image
+  source:
+    repository: mitodl/concourse-packer-resource
+    tag: latest
+- name: packer-builder
+  type: docker-image
+  source:
+    repository: mitodl/concourse-packer-resource-builder
+    tag: latest
+
+resources:
+- icon: github
+  name: packer_templates
+  source:
+    branch: main
+    paths:
+    - src/bilder/images/
+    uri: https://github.com/mitodl/ol-infrastructure
+  type: git
+- name: artifact-build-schedule
+  type: time
+  icon: clock-outline
+  source:
+    start: 0400
+    stop: 0500
+    days: [Sunday]
+- name: packer-validate
+  type: packer
+- name: packer-build
+  type: packer-builder
+
+jobs:
+- name: packer-validate-workflow
+  plan:
+  - get: packer_templates
+    trigger: true
+    params:
+      depth: 1
+  - in_parallel:
+    - put: packer-validate
+      params:
+        template: packer_templates/src/bilder/images/.
+        objective: validate
+        vars:
+          app_name: concourse
+          node_type: web
+    - put: packer-validate
+      params:
+        template: packer_templates/src/bilder/images/.
+        objective: validate
+        vars:
+          app_name: concourse
+          node_type: worker
+    - put: packer-validate
+      params:
+        template: packer_templates/src/bilder/images/.
+        objective: validate
+        vars:
+          app_name: consul
+        only:
+        - amazon-ebs.third-party
+    - put: packer-validate
+      params:
+        template: packer_templates/src/bilder/images/edxapp/edxapp_base.pkr.hcl
+        objective: validate
+        vars:
+          node_type: web
+    - put: packer-validate
+      params:
+        template: packer_templates/src/bilder/images/edxapp/edxapp_base.pkr.hcl
+        objective: validate
+        vars:
+          node_type: worker
+    - put: packer-validate
+      params:
+        template: packer_templates/src/bilder/images/.
+        objective: validate
+        vars:
+          app_name: vault
+        only:
+        - amazon-ebs.third-party
+- name: packer-build-workflow
+  plan:
+  - get: artifact-build-schedule
+    trigger: true
+  - get: packer_templates
+    trigger: false
+    params:
+      depth: 1
+  - in_parallel:
+    - put: packer-build
+      params:
+        template: packer_templates/src/bilder/images/.
+        objective: build
+        vars:
+          app_name: concourse
+          node_type: web
+        env_vars:
+          AWS_REGION: us-east-1
+          PYTHONPATH: "${PYTHONPATH}:packer_templates/src"
+        only:
+        - amazon-ebs.third-party
+    - put: packer-build
+      params:
+        template: packer_templates/src/bilder/images/.
+        objective: build
+        vars:
+          app_name: concourse
+          node_type: worker
+        env_vars:
+          AWS_REGION: us-east-1
+          PYTHONPATH: "${PYTHONPATH}:packer_templates/src"
+        only:
+        - amazon-ebs.third-party
+    - put: packer-build
+      params:
+        template: packer_templates/src/bilder/images/.
+        objective: build
+        vars:
+          app_name: consul
+        env_vars:
+          AWS_REGION: us-east-1
+          PYTHONPATH: "${PYTHONPATH}:packer_templates/src"
+        only:
+        - amazon-ebs.third-party
+    - put: packer-build
+      params:
+        template: packer_templates/src/bilder/images/edxapp/edxapp_base.pkr.hcl
+        objective: build
+        vars:
+          node_type: web
+        env_vars:
+          AWS_REGION: us-east-1
+          PYTHONPATH: "${PYTHONPATH}:packer_templates/src"
+    - put: packer-build
+      params:
+        template: packer_templates/src/bilder/images/edxapp/edxapp_base.pkr.hcl
+        objective: build
+        vars:
+          node_type: worker
+        env_vars:
+          AWS_REGION: us-east-1
+          PYTHONPATH: "${PYTHONPATH}:packer_templates/src"
+    - put: packer-build
+      params:
+        template: packer_templates/src/bilder/images/.
+        objective: build
+        vars:
+          app_name: vault
+        only:
+        - amazon-ebs.third-party
+        env_vars:
+          AWS_REGION: us-east-1
+          PYTHONPATH: "${PYTHONPATH}:packer_templates/src"
