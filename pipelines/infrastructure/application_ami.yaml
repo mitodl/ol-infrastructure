@@ -24,8 +24,8 @@ resources:
   type: time
   icon: clock-outline
   source:
-    start: 0400
-    stop: 0500
+    start: 4:00 AM
+    stop: 5:00 AM
     days: [Sunday]
 - name: packer-validate
   type: packer
