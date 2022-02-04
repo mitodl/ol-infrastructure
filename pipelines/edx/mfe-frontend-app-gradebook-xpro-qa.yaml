@@ -33,8 +33,8 @@ jobs:
       image_resource:
         type: registry-image
         source:
-          repository: nikolaik/python-nodejs
-          tag: 1python3.10-nodejs12
+          repository: node
+          tag: 14-bullseye-slim
       inputs:
       - name: mfe-app-gradebook
       outputs:
@@ -66,6 +66,8 @@ jobs:
         args:
         - -exc
         - |
+          apt-get update
+          apt-get install -q -y python build-essential
           npm install
           npm install @edx/frontend-component-footer@npm:@mitodl/frontend-component-footer-mitol@latest --legacy-peer-deps
           npm install @edx/frontend-component-header@npm:@mitodl/frontend-component-header-mitol@latest --legacy-peer-deps
