@@ -48,6 +48,13 @@ policy_definition = {
                 "ec2:TerminateInstances",
             ],
             "Resource": "*",
-        }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "kms:Decrypt",
+            ],
+            "Resource": "*",
+        },
     ],
 }
