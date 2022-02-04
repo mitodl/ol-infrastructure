@@ -8,7 +8,7 @@ config:
   environment:business_unit: mitxonline
   environment:target_vpc: mitxonline_vpc
   mongodb_atlas:cluster_autoscale_max_size: M50
-  mongodb_atlas:cluster_instance_count: "5"
+  mongodb_atlas:cluster_instance_count: "3"
   mongodb_atlas:disk_autoscale_max_gb: "200"
   mongodb_atlas:disk_size_gb: "50"
   mongodb_atlas:instance_size: M30
