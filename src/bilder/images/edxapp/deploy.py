@@ -53,6 +53,7 @@ from bilder.images.edxapp.lib import WEB_NODE_TYPE, node_type
 from bilder.images.edxapp.plugins.git_export_import import git_auto_export
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
+from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {  # noqa: WPS407
     "consul": CONSUL_VERSION,
@@ -62,6 +63,7 @@ VERSIONS = {  # noqa: WPS407
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 EDX_INSTALLATION_NAME = os.environ.get("EDX_INSTALLATION", "mitxonline")
 EDX_USER = "edxapp"
+set_env_secrets(Path("consul/consul.env"))
 
 apt.packages(
     name="Remove unattended-upgrades to prevent race conditions during build",

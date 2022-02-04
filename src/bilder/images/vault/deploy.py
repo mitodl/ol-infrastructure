@@ -37,6 +37,7 @@ from bilder.components.vector.steps import (
 from bilder.facts import has_systemd  # noqa: F401
 from bridge.lib.magic_numbers import HOURS_IN_MONTH, VAULT_CLUSTER_PORT, VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
+from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {  # noqa: WPS407
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
@@ -47,7 +48,7 @@ TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 
 install_baseline_packages(packages=["curl", "gnupg"])
 # Set up configuration objects
-
+set_env_secrets(Path("consul/consul.env"))
 # Install Caddy
 caddy_config = CaddyConfig(
     plugins=[

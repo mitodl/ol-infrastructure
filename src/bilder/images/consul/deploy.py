@@ -29,6 +29,7 @@ from bilder.components.vector.steps import (
 )
 from bilder.facts import has_systemd  # noqa: F401
 from bridge.lib.versions import CONSUL_VERSION
+from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {  # noqa: WPS407
     "caddy_route53": "v1.1.2",
@@ -38,6 +39,7 @@ TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 
 install_baseline_packages()
 # TODO bootstrap Consul ACL
+set_env_secrets(Path("consul/consul.env"))
 consul_configuration = {
     Path("00-default.json"): ConsulConfig(
         bootstrap_expect=3,

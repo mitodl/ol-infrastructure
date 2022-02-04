@@ -64,6 +64,7 @@ from bridge.lib.magic_numbers import (
     VAULT_HTTP_PORT,
 )
 from bridge.lib.versions import CONCOURSE_VERSION, CONSUL_VERSION, VAULT_VERSION
+from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {  # noqa: WPS407
     "concourse": os.environ.get("CONCOURSE_VERSION", CONCOURSE_VERSION),
@@ -74,6 +75,7 @@ CONCOURSE_WEB_NODE_TYPE = "web"
 CONCOURSE_WORKER_NODE_TYPE = "worker"
 node_type = host.data.node_type or os.environ.get("NODE_TYPE", CONCOURSE_WEB_NODE_TYPE)
 # Set up configuration objects
+set_env_secrets(Path("consul/consul.env"))
 concourse_base_config = ConcourseBaseConfig(version=VERSIONS["concourse"])
 concourse_config_map = {
     CONCOURSE_WEB_NODE_TYPE: partial(  # noqa: S106
