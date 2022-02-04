@@ -40,36 +40,36 @@ jobs:
       outputs:
       - name: mfe-app-gradebook/dist
       params:
-        ACCESS_TOKEN_COOKIE_NAME: edx-jwt-cookie-header-payload
+        ABOUT_US_URL: https://rc.mitxonline.mit.edu/about-us/
+        ACCESS_TOKEN_COOKIE_NAME: mitxonline-qa-edx-jwt-cookie-header-payload
         BASE_URL: https://courses-qa.mitxonline.mit.edu
         CSRF_TOKEN_API_PATH: /csrf/api/v1/token
+        Contact: https://mitxonline.zendesk.com/hc/en-us/requests/new
+        FAVICON_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico
+        HONOR_CODE_URL: https://rc.mitxonline.mit.edu/honor-code/
         LMS_BASE_URL: https://courses-qa.mitxonline.mit.edu
         LOGIN_URL: https://courses-qa.mitxonline.mit.edu/login
         LOGOUT_URL: https://courses-qa.mitxonline.mit.edu/logout
-        LOGO_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png
+        LOGO_ALT_TEXT: ''
         LOGO_TRADEMARK_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png
+        LOGO_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png
         LOGO_WHITE_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png
-        FAVICON_URL: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico
         MARKETING_SITE_BASE_URL: https://rc.mitxonline.mit.edu
         ORDER_HISTORY_URL:
+        PRIVACY_POLICY_URL: https://rc.mitxonline.mit.edu/privacy-policy/
         PUBLIC_PATH: /gradebook/
         REFRESH_ACCESS_TOKEN_ENDPOINT: https://courses-qa.mitxonline.mit.edu/login_refresh
         SEARCH_CATALOG_URL: https://courses-qa.mitxonline.mit.edu/courses
-        SITE_NAME: MITx Online QA
-        STUDIO_BASE_URL: https://studio-qa.mitxonline.mit.edu
-        SUPPORT_URL: https://mitx-micromasters.zendesk.com/hc/en-us/requests/new
-        USER_INFO_COOKIE_NAME: edx-user-info
         SESSION_COOKIE_DOMAIN: .mitxonline.mit.edu
-        ABOUT_US_URL: https://rc.mitxonline.mit.edu/about-us/
-        PRIVACY_POLICY_URL: https://rc.mitxonline.mit.edu/privacy-policy/
-        HONOR_CODE_URL: https://rc.mitxonline.mit.edu/honor-code/
-        TERMS_OF_SERVICE_URL: https://rc.mitxonline.mit.edu/terms-of-service/
-        Contact: mailto:mitxonline-support@mit.edu
-        SUPPORT_CENTER_URL: https://mitx-micromasters.zendesk.com/hc/
-        SUPPORT_CENTER_TEXT: Support Center
-        TRADEMARK_TEXT: © MITxOnline. All rights reserved except where noted.
+        SITE_NAME: MITx Online QA
         SITE_URL: https://rc.mitxonline.mit.edu
-        LOGO_ALT_TEXT: ''
+        STUDIO_BASE_URL: https://studio-qa.mitxonline.mit.edu
+        SUPPORT_CENTER_TEXT: Support Center
+        SUPPORT_CENTER_URL: https://mitx-micromasters.zendesk.com/hc/
+        SUPPORT_URL: https://mitx-micromasters.zendesk.com/hc/en-us/requests/new
+        TERMS_OF_SERVICE_URL: https://rc.mitxonline.mit.edu/terms-of-service/
+        TRADEMARK_TEXT: © MITxOnline. All rights reserved except where noted.
+        USER_INFO_COOKIE_NAME: mitxonline-qa-edx-user-info
       run:
         path: sh
         dir: mfe-app-gradebook
