@@ -71,6 +71,7 @@ VERSIONS = {  # noqa: WPS407
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
 }
+TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 CONCOURSE_WEB_NODE_TYPE = "web"
 CONCOURSE_WORKER_NODE_TYPE = "worker"
 node_type = host.data.node_type or os.environ.get("NODE_TYPE", CONCOURSE_WEB_NODE_TYPE)
@@ -112,7 +113,6 @@ concourse_config_map = {
             "{{ .Data.data.github_client_secret }}"
             "{{ end }}"
         ),
-        container_placement_strategy="fewest-build-containers",
         default_build_logs_to_retain="10",
         default_days_to_retain_build_logs="10",
         enable_build_auditing=False,
@@ -125,12 +125,12 @@ concourse_config_map = {
         enable_volume_auditing=False,
         enable_worker_auditing=False,
         gc_hijack_grace_period="30m",
-        global_resource_check_timeout="5m",
-        lidar_scanner_interval="60s",
-        max_checks_per_second="100",
+        gc_failed_grace_period="2h",
+        global_resource_check_timeout="10m",
+        lidar_scanner_interval="15s",
+        max_checks_per_second="30",
         enable_across_step=True,
         enable_p2p_volume_streaming=True,
-        p2p_volume_streaming_timeout="10m",
         prometheus_bind_ip=IPv4Address("127.0.0.1"),
         prometheus_bind_port=CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
         secret_cache_duration="5m",  # pragma: allowlist secret
@@ -266,11 +266,11 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
             ],
         )
         caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
+    # Install Vector
     vector_config = VectorConfig(
         configuration_templates={
-            Path(__file__)
-            .resolve()
-            .parent.joinpath("templates", "vector.yaml"): {
+            TEMPLATES_DIRECTORY.joinpath("vector", "vector.yaml"): {},
+            TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml"): {
                 "concourse_prometheus_port": concourse_config.prometheus_bind_port
             },
         },
