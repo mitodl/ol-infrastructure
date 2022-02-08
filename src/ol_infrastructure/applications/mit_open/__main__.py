@@ -6,7 +6,9 @@ from pulumi_vault import aws
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.vault import setup_vault_provider
 
+setup_vault_provider()
 mit_open_config = Config("mit_open")
 stack_info = parse_stack()
 aws_config = AWSBase(
@@ -47,7 +49,8 @@ course_data_bucket = s3.Bucket(
 parliament_config = {
     "PERMISSIONS_MANAGEMENT_ACTIONS": {
         "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
-    }
+    },
+    "RESOURCE_EFFECTIVELY_STAR": {},
 }
 
 s3_bucket_permissions = [
