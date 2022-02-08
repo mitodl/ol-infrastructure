@@ -79,6 +79,7 @@ s3_bucket_permissions = [
             "arn:aws:s3:::ol-olx-course-exports/*",
             "arn:aws:s3:::ocw-content-storage",
             "arn:aws:s3:::ocw-content-storage/*",
+            f"arn:aws:s3:::ol-ocw-studio-app-{app_env_suffix}",
         ],
     },
 ]
