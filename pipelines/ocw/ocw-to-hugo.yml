@@ -70,6 +70,6 @@ resources:
   type: s3-sync
 - name: ocw-to-hugo
   source:
-    branch: release
+    branch: ((branch))
     uri: https://github.com/mitodl/ocw-to-hugo
   type: git
