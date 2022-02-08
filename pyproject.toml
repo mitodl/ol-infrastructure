@@ -19,7 +19,7 @@ boto3 = "^1.20"
 httpx = "^0.22.0"
 hvac = {extras = ["parser"], version = "^0.11.2"}
 parliament = "^1.5.0"
-pulumi = "^3.23.2"
+pulumi = "^3.24.1"
 pulumi-aws = "^4.36.0"
 pulumi-fastly = "^3.11.0"
 pulumi-github = "^4.9.1"
