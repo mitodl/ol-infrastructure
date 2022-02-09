@@ -45,7 +45,7 @@ edx_plugins = {
     "mitx": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "django-redis",  # Support for Redis caching in Django
-        "edx-sga==0.17.3", # remove pin when upgrading to nutmeg
+        "edx-sga==0.17.3",  # remove pin when upgrading to nutmeg
         "edx-sysadmin",
         "git+https://github.com/raccoongang/xblock-pdf.git@8d63047c53bc8fdd84fa7b0ec577bb0a729c215f#egg=xblock-pdf",  # noqa: E501
         "ol-openedx-logging",
@@ -57,7 +57,7 @@ edx_plugins = {
     "mitx-staging": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "django-redis",  # Support for Redis caching in Django
-        "edx-sga==0.17.3", # remove pin when upgrading to nutmeg
+        "edx-sga==0.17.3",  # remove pin when upgrading to nutmeg
         "edx-sysadmin",
         "git+https://github.com/raccoongang/xblock-pdf.git@8d63047c53bc8fdd84fa7b0ec577bb0a729c215f#egg=xblock-pdf",  # noqa: E501
         "ol-openedx-logging",
