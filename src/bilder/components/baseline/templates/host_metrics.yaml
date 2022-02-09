@@ -1,12 +1,6 @@
 ---
 sources:
-  consul_metrics:
-    type: prometheus_scrape
-    endpoints:
-    - http://localhost:8500/v1/agent/metrics?format=prometheus
-    scrape_interval_secs: 60
-
-  host_metrics:
+  collect_host_metrics:
     type: host_metrics
     scrape_interval_secs: 60
     collectors:
@@ -18,17 +12,10 @@ sources:
     - network
 
 transforms:
-  host_metrics_relabel:
-    type: remap
-    inputs:
-    - 'host_metrics'
-    source: |
-      .tags.job = "integrations/linux_host"
-
   cleanup_host_metrics:
     type: remap
     inputs:
-    - 'host_metrics_relabel'
+    - 'collect_host_metrics'
     source: |
       # Drop all the not-real filesystems metrics
       abort_match_filesystem, err = !(match_any(.tags.filesystem, [r'ext.', r'btrfs', r'xfs']))
@@ -36,27 +23,19 @@ transforms:
         abort
       }
 
-  consul_metrics_relabel:
+  add_labels_to_host_metrics:
     type: remap
     inputs:
-    - 'consul_metrics'
-    source: |
-      .tags.job = "integrations/consul"
-
-  add_labels_to_metrics:
-    type: remap
-    inputs:
-    - 'consul_metrics_relabel'
     - 'cleanup_host_metrics'
     source: |
       .tags.environment = "${ENVIRONMENT}"
-      .tags.application = "consul"
-      .tags.service = "consul"
+      .tags.instance = "${HOSTNAME}"
+      .tags.job = "integrations/linux_host"
 
 sinks:
-  grafana_cortex_metrics:
+  ship_host_metrics_to_grafana_cloud:
     inputs:
-    - 'add_labels_to_metrics'
+    - 'add_labels_to_host_metrics'
     type: prometheus_remote_write
     endpoint: https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom/push
     healthcheck: false

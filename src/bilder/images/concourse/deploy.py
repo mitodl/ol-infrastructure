@@ -269,8 +269,8 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
     # Install Vector
     vector_config = VectorConfig(
         configuration_templates={
-            TEMPLATES_DIRECTORY.joinpath("vector", "vector.yaml"): {},
-            TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml"): {
+            TEMPLATES_DIRECTORY.joinpath("vector", "concourse_logs.yaml"): {},
+            TEMPLATES_DIRECTORY.joinpath("vector", "concourse_metrics.yaml"): {
                 "concourse_prometheus_port": concourse_config.prometheus_bind_port
             },
         },
