@@ -127,17 +127,13 @@ server.shell(
         f"setfacl -R -d -m u:www-data:rwx {log_file.parent}",
     ],
 )
-
-vector = VectorConfig(
-    configuration_templates={
-        TEMPLATES_DIRECTORY.joinpath("vector", "edxapp.yaml.j2"): {
-            "edx_installation": EDX_INSTALLATION_NAME
-        },
-        TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml.j2"): {
-            "edx_installation": EDX_INSTALLATION_NAME
-        },
-    }
-)
+vector_config = VectorConfig()
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "edxapp_logs.yaml.j2")
+] = {"edx_installation": EDX_INSTALLATION_NAME}
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "edxapp_metrics.yaml.j2")
+] = {"edx_installation": EDX_INSTALLATION_NAME}
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
 
 # Manage Vault templates
@@ -175,11 +171,9 @@ if node_type == WEB_NODE_TYPE:
         user="www-data",
         group="www-data",
     )
-    vector.configuration_templates.update(
-        {
-            TEMPLATES_DIRECTORY.joinpath("vector", "edx_tracking.yaml.j2"): {},
-        }
-    )
+    vector_config.configuration_templates[
+        TEMPLATES_DIRECTORY.joinpath("vector", "edxapp_tracking.yaml.j2")
+    ] = {}
     vault_templates.extend(
         [
             VaultTemplate(
@@ -278,7 +272,7 @@ consul_template = ConsulTemplate(
 hashicorp_products = [vault, consul, consul_template]
 install_hashicorp_products(hashicorp_products)
 # Install Vector log agent
-install_vector(vector)
+install_vector(vector_config)
 
 # Upload templates for consul-template agent
 EDX_TEMPLATES_DIRECTORY = TEMPLATES_DIRECTORY.joinpath("edxapp", EDX_INSTALLATION_NAME)
@@ -325,7 +319,7 @@ if host.fact.has_systemd:
     supervisor_command = "signal HUP" if node_type == WEB_NODE_TYPE else "restart"
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
-    vector_service(vector)
+    vector_service(vector_config)
     service_configuration_watches(
         service_name="nginx",
         watched_files=[Path("/etc/ssl/certs/edxapp.pem")],
@@ -439,7 +433,7 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
         ),
     )
 
-configure_vector(vector)
+configure_vector(vector_config)
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 vault_template_permissions(vault_config)
