@@ -128,12 +128,13 @@ for product in hashicorp_products:
     configure_hashicorp_product(product)
 
 # Install vector
-vector_config = VectorConfig(
-    configuration_templates={
-        TEMPLATES_DIRECTORY.joinpath("vector", "vault_logs.yaml"): {},
-        TEMPLATES_DIRECTORY.joinpath("vector", "vault_metrics.yaml"): {},
-    }
-)
+vector_config = VectorConfig()
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "vault_logs.yaml")
+] = {}
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "vault_metrics.yaml")
+] = {}
 install_vector(vector_config)
 configure_vector(vector_config)
 
