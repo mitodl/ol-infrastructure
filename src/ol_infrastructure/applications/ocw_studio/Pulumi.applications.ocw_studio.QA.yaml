@@ -8,3 +8,5 @@ config:
     secure: v1:lSm4Y1lRKps+MvKl:sUdOgCFDFuFa5/3mrrVB8KdWc1/fagKJqgV/dPbBybsKulWq4qW2zKU+LZQirRMJaQZMAD9QPiBdcIKXknY4n1aO1Fo/Bv6JkNhANj1EI5RqBQiVtDJ6CSrA
   ocw_studio:vault_secrets:
     secure: v1:KtI8F4nQ9zRwvqb4:fGY2Fd8PTlU6g8FHcP2dZGhbszmUjqjiM3gn68CuRfgegc2zBDLEDeQHpdPKjAJ3xv0mT4qmGgxKbN3SzxejyH054gwhqnJxiCqXsvkT69e+WwxXL4Go0w==
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa
