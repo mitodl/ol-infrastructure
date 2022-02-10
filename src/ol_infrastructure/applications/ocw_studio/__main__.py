@@ -20,7 +20,9 @@ from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
+from ol_infrastructure.lib.vault import setup_vault_provider
 
+setup_vault_provider()
 ocw_studio_config = Config("ocw_studio")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -133,7 +135,8 @@ ocw_studio_iam_policy = iam.Policy(
         parliament_config={
             "PERMISSIONS_MANAGEMENT_ACTIONS": {
                 "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
-            }
+            },
+            "RESOURCE_EFFECTIVELY_STAR": {},
         },
     ),
 )
