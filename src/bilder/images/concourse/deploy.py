@@ -267,14 +267,13 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
         )
         caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
     # Install Vector
-    vector_config = VectorConfig(
-        configuration_templates={
-            TEMPLATES_DIRECTORY.joinpath("vector", "vector.yaml"): {},
-            TEMPLATES_DIRECTORY.joinpath("vector", "metrics.yaml"): {
-                "concourse_prometheus_port": concourse_config.prometheus_bind_port
-            },
-        },
-    )
+    vector_config = VectorConfig()
+    vector_config.configuration_templates[
+        TEMPLATES_DIRECTORY.joinpath("vector", "concourse_logs.yaml")
+    ] = {}
+    vector_config.configuration_templates[
+        TEMPLATES_DIRECTORY.joinpath("vector", "concourse_metrics.yaml")
+    ] = {"concourse_prometheus_port": concourse_config.prometheus_bind_port}
     install_vector(vector_config)
     configure_vector(vector_config)
     vector_service(vector_config)

@@ -1,30 +1,27 @@
 ---
-api:
-  enabled: true
-
 log_schema:
   timestamp_key: vector_timestamp
   host_key: log_host
 
 sources:
-  auth_log:
+  collect_consul_auth_logs:
     type: file
     file_key: log_file
     include:
     - /var/log/auth.log
 
-  journald_log:
+  collect_consul_journald_logs:
     type: journald
     current_boot_only: true
     include_units:
-    - vault
+    - consul
     - caddy
 
 transforms:
-  vault_parsed_message:
+  parse_consul_journald_logs:
     type: remap
     inputs:
-    - journald_log
+    - 'collect_consul_journald_logs'
     source: |
       event, err = parse_json(.message)
       if event != null {
@@ -32,15 +29,15 @@ transforms:
         .environment = "${ENVIRONMENT}"
       }
 
-  vault_enriched_logs:
+  enrich_consul_journald_logs:
     type: aws_ec2_metadata
     inputs:
-    - vault_parsed_message
+    - 'parse_consul_journald_logs'
     namespace: ec2
 
-  auth_log_parser:
+  parse_consul_auth_logs:
     inputs:
-    - auth_log
+    - 'collect_consul_auth_logs'
     type: remap
     source: |
       parsed, err = parse_syslog(.message)
@@ -50,24 +47,23 @@ transforms:
         .environment = "${ENVIRONMENT}"
       }
 
-  auth_log_malformed_message_filter:
+  filter_malformed_message_consul_auth_logs:
     inputs:
-    - auth_log_parser
+    - 'parse_consul_auth_logs'
     type: filter
     condition: .malformed != true
 
-  auth_log_cron_filter:
+  filter_cron_consul_auth_logs:
     inputs:
-    - auth_log_malformed_message_filter
+    - 'filter_malformed_message_consul_auth_logs'
     type: filter
     condition: .appname != "CRON"
 
 sinks:
-  grafana_loki_logs:
+  ship_consul_logs_to_grafana_cloud:
     inputs:
-    - journald_log
-    - vault_enriched_logs
-    - auth_log_cron_filter
+    - 'filter_cron_consul_auth_logs'
+    - 'enrich_consul_journald_logs'
     type: loki
     auth:
       strategy: basic
@@ -78,7 +74,7 @@ sinks:
       codec: json
     labels:
       environment: ${ENVIRONMENT}
-      application: vault
-      service: vault
+      application: consul
+      service: consul
       hostname: ${HOSTNAME}
     out_of_order_action: rewrite_timestamp

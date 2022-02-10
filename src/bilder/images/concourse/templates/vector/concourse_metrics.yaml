@@ -1,27 +1,16 @@
 ---
 sources:
-  concourse_metrics:
+  collect_concourse_metrics:
     type: prometheus_scrape
     endpoints:
     - http://localhost:{{ context.concourse_prometheus_port }}/metrics
     scrape_interval_secs: 10
 
-  host_metrics:
-    type: host_metrics
-    scrape_interval_secs: 60
-    collectors:
-    - cpu
-    - filesystem
-    - load
-    - host
-    - memory
-    - network
-
 transforms:
-  add_host_name_to_concourse_metrics:
+  add_hostname_to_concourse_metrics:
     type: remap
     inputs:
-    - 'concourse_metrics'
+    - 'collect_concourse_metrics'
     source: |
       ## We're going to add the instance to all metrics and then selectively remove it below
       .tags.instance = "${HOSTNAME}"
@@ -30,7 +19,7 @@ transforms:
     type: remap
     drop_on_abort: true
     inputs:
-    - 'add_host_name_to_concourse_metrics'
+    - 'add_hostname_to_concourse_metrics'
     source: |
       ## Any metrics that match these prefixes or names will be dropped entirely
       abort_name_match, err = match_any(.name, [r'^prom.*', r'^process.*', r'go_.*', r'concourse_builds_duration_seconds', r'concourse_http_responses_duration_seconds', r'concourse_steps_wait_duration'])
@@ -44,38 +33,26 @@ transforms:
       }
       .tags.job = "integrations/concourse"
 
-  cleanup_host_metrics:
+  add_labels_to_concourse_metrics:
     type: remap
     inputs:
-    - 'host_metrics'
-    source: |
-      # Drop all the not-real filesystems metrics (HUGE Cardinality savings here)
-      abort_match_filesystem, err = !(match_any(.tags.filesystem, [r'ext.', r'btrfs', r'xfs']))
-      if abort_match_filesystem {
-        abort
-      }
-      .tags.job = "integrations/linux_host"
-
-  add_labels_to_metrics:
-    type: remap
-    inputs:
-    - 'cleanup_*'
+    - 'cleanup_concourse_metrics'
     source: |
       .tags.environment = "${ENVIRONMENT}"
       .tags.application = "concourse"
       .tags.service = "concourse"
 
 sinks:
-  cloudwatch_metrics:
+  ship_concourse_metrics_to_cloudwatch:
     default_namespace: "${ENVIRONMENT}"
     region: "${AWS_REGION}"
     type: aws_cloudwatch_metrics
     inputs:
-    - add_labels_to_metrics
+    - add_labels_to_concourse_metrics
 
-  grafana_cortex_metrics:
+  ship_concourse_metrics_to_grafana_cloud:
     inputs:
-    - add_labels_to_metrics
+    - add_labels_to_concourse_metrics
     type: prometheus_remote_write
     endpoint: https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom/push
     healthcheck: false

@@ -1,0 +1,30 @@
+---
+sources:
+  collect_consul_metrics:
+    type: prometheus_scrape
+    endpoints:
+    - http://localhost:8500/v1/agent/metrics?format=prometheus
+    scrape_interval_secs: 60
+
+transforms:
+  add_labels_to_consul_metrics:
+    type: remap
+    inputs:
+    - 'collect_consul_metrics'
+    source: |
+      .tags.job = "integrations/consul"
+      .tags.environment = "${ENVIRONMENT}"
+      .tags.application = "consul"
+      .tags.service = "consul"
+
+sinks:
+  ship_consul_metrics_to_grafana_cloud:
+    inputs:
+    - 'add_labels_to_consul_metrics'
+    type: prometheus_remote_write
+    endpoint: https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom/push
+    healthcheck: false
+    auth:
+      strategy: basic
+      user: "${GRAFANA_CLOUD_PROMETHEUS_API_USER}"
+      password: ${GRAFANA_CLOUD_API_KEY}
