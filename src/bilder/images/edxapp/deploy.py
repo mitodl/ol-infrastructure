@@ -46,6 +46,7 @@ from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import (
     configure_vector,
     install_vector,
+    validate_vector,
     vector_service,
 )
 from bilder.facts import has_systemd  # noqa: F401
@@ -434,6 +435,7 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
     )
 
 configure_vector(vector_config)
+validate_vector()
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 vault_template_permissions(vault_config)

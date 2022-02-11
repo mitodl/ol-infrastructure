@@ -55,6 +55,7 @@ from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import (
     configure_vector,
     install_vector,
+    validate_vector,
     vector_service,
 )
 from bilder.facts import has_systemd  # noqa: F401
@@ -323,6 +324,7 @@ vault_template_permissions(vault_config)
 
 install_vector(vector_config)
 configure_vector(vector_config)
+validate_vector()
 vector_service(vector_config)
 
 for product in hashicorp_products:

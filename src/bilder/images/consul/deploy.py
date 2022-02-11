@@ -25,6 +25,7 @@ from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import (
     configure_vector,
     install_vector,
+    validate_vector,
     vector_service,
 )
 from bilder.facts import has_systemd  # noqa: F401
@@ -79,6 +80,7 @@ vector_config.configuration_templates[
 ] = {}
 install_vector(vector_config)
 configure_vector(vector_config)
+validate_vector()
 
 # Install Consul and Consul ESM
 hashicorp_products = [

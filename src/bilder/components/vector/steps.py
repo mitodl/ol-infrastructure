@@ -78,6 +78,18 @@ def configure_vector(vector_config: VectorConfig, state=None, host=None):
         )
 
 
+@deploy("Validate vector configurations")
+def validate_vector(state=None, host=None):
+    server.shell(
+        name="Run vector validate",
+        commands=[
+            "VECTOR_CONFIG_DIR=/etc/vector AWS_REGION=us-east-1 ENVIRONMENT=placeholder GRAFANA_CLOUD_API_KEY=placeholder /usr/bin/vector validate --no-environment"
+        ],
+        state=state,
+        host=host,
+    )
+
+
 @deploy("Manage Vector service")
 def vector_service(
     vector_config: VectorConfig,
