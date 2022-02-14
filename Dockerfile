@@ -7,4 +7,7 @@ ENV PATH /bin:/usr/bin/:/usr/local/bin:/home/app/.local/bin
 RUN poetry config virtualenvs.in-project true
 COPY ./pyproject.toml pyproject.toml
 COPY ./poetry.lock poetry.lock
-RUN poetry install
+COPY --chown=app ./src src
+COPY ./README.md README.md
+RUN poetry install --no-dev
+RUN rm -rf src/

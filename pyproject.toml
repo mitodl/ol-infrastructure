@@ -13,9 +13,9 @@ classifiers = [
 ]
 repository = "https://github.com/mitodl/ol-infrastructure"
 packages = [
-    {include = "ol_infrastructure", from="src"},
-    {include = "bridge", from="src"},
-    {include = "bilder", from="src"},
+    {include = "ol_infrastructure", from = "src"},
+    {include = "bridge", from = "src"},
+    {include = "bilder", from = "src"},
 ]
 
 [tool.poetry.dependencies]
