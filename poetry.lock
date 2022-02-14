@@ -269,7 +269,7 @@ python-versions = ">=3.6,<4.0"
 
 [[package]]
 name = "diagrams"
-version = "0.21.0"
+version = "0.21.1"
 description = "Diagram as Code"
 category = "dev"
 optional = false
@@ -1721,8 +1721,8 @@ darglint = [
     {file = "darglint-1.8.1.tar.gz", hash = "sha256:080d5106df149b199822e7ee7deb9c012b49891538f14a11be681044f0bb20da"},
 ]
 diagrams = [
-    {file = "diagrams-0.21.0-py3-none-any.whl", hash = "sha256:643e1baabec918335bc526452bcd4cbf23eb1c7ae19f8245b65e3f829e35ba5f"},
-    {file = "diagrams-0.21.0.tar.gz", hash = "sha256:741251174a65e6f4686f96acd37d8f274abcd7aac670526b00ad2891bf39f862"},
+    {file = "diagrams-0.21.1-py3-none-any.whl", hash = "sha256:1d0fea187ed76136dadccf943da914dd9974ebdd3cbb993f4283ec8f51cf90f2"},
+    {file = "diagrams-0.21.1.tar.gz", hash = "sha256:732caa4e61113a06b9a80965be6171c4c5858f3570b5b1f5ba52304a6eeade60"},
 ]
 dill = [
     {file = "dill-0.3.4-py2.py3-none-any.whl", hash = "sha256:7e40e4a70304fd9ceab3535d36e58791d9c4a776b38ec7f7ec9afc8d3dca4d4f"},
