@@ -19,6 +19,7 @@ config:
     secure: v1:8gxklYODxX1veWAk:hMnDmIkA5pDq3fdkWCKpNUdF/XDhbjoGKtcffutGdgWfjZVGrRrcpIEZoDvxI/YWPB3oL12c8mpYsE75yJupx3tijTYU33Ym5+++ZauQGBlxnsbgEA4SmWHm1bPmKjQieAWt+lKcLvvkAYMS5qTalYHpTrdf9ud9CYMd8bFgT3za/RDaAEGEaw9qOqUbdJQDWA==
   edxapp:elb_healthcheck_interval: "30"
   edxapp:google_analytics_id: ""
+  edxapp:gradebook_url: /gradebook
   edxapp:mail_domain: edxapp-mail-qa.mitx.mit.edu
   edxapp:min_web_nodes: "1"
   edxapp:min_worker_nodes: "1"
