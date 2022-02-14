@@ -20,6 +20,7 @@ from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, rout
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
+    CONCOURSE_WORKER_HEALTHCHECK_PORT,
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
     MAXIMUM_PORT_NUMBER,
@@ -708,13 +709,62 @@ for worker_def in concourse_config.get_object("workers") or []:
         user_data=consul_datacenter.apply(build_worker_user_data_partial),
     )
 
+    # We will create a 'fake' lb, targetgroup and lblistener to make use of
+    # aws's ability to do healthchecks and automatically swap out stalled
+    # concourse workers.
+    # We will never actually interact with workers via these resources.
+    worker_lb = lb.LoadBalancer(
+        f"concourse-worker-{worker_class_name}-load-balancer",
+        internal=True,
+        ip_address_type="dualstack",
+        load_balancer_type="application",
+        name=f"concourse-worker-alb-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}",
+        security_groups=[concourse_worker_security_group.id],
+        subnets=target_vpc["subnet_ids"],
+        tags=aws_config.merged_tags({}),
+    )
+
+    worker_target_group = lb.TargetGroup(
+        f"concourse-worker-{worker_class_name}-target-group",
+        vpc_id=ops_vpc_id,
+        port=CONCOURSE_WORKER_HEALTHCHECK_PORT,
+        protocol="HTTP",
+        health_check=lb.TargetGroupHealthCheckArgs(
+            healthy_threshold=2,
+            interval=60,
+            matcher="200",
+            path="/",
+            port=CONCOURSE_WORKER_HEALTHCHECK_PORT,
+            protocol="HTTP",
+            timeout=20,
+            unhealthy_threshold=5,
+        ),
+        name=f"concourse-worker-tg-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}"[
+            :TARGET_GROUP_NAME_MAX_LENGTH
+        ],
+        tags=aws_config.merged_tags(worker_def["aws_tags"]),
+    )
+
+    worker_lb_alb_listener = lb.Listener(
+        f"concourse-worker-{worker_class_name}-alb-listener",
+        load_balancer_arn=worker_lb.arn,
+        port=CONCOURSE_WORKER_HEALTHCHECK_PORT,
+        protocol="HTTP",
+        default_actions=[
+            lb.ListenerDefaultActionArgs(
+                type="forward",
+                target_group_arn=worker_target_group.arn,
+            )
+        ],
+    )
+
     auto_scale_config = worker_def["auto_scale"]
     worker_asg = autoscaling.Group(
         f"concourse-worker-{worker_class_name}-autoscaling-group",
         desired_capacity=auto_scale_config["desired"] or 1,
         min_size=auto_scale_config["min"] or 1,
         max_size=auto_scale_config["max"] or 50,
-        health_check_type="EC2",
+        health_check_type="ELB",
         vpc_zone_identifiers=target_vpc["subnet_ids"],
         launch_template=autoscaling.GroupLaunchTemplateArgs(
             id=worker_launch_config.id, version="$Latest"
@@ -736,6 +786,7 @@ for worker_def in concourse_config.get_object("workers") or []:
                 {"ami_id": concourse_worker_ami.id}
             ).items()
         ],
+        target_group_arns=[worker_target_group.arn],
     )
 
 vault.aws.AuthBackendRole(
