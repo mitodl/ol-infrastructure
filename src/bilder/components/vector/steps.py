@@ -76,10 +76,8 @@ def configure_vector(vector_config: VectorConfig, state=None, host=None):
             state=state,
             host=host,
         )
-
-
-@deploy("Validate vector configurations")
-def validate_vector(state=None, host=None):
+    # Validate the vector configuration files that were laid down
+    # and confirm that vector starts without issue.
     server.shell(
         name="Run vector validate",
         commands=[
