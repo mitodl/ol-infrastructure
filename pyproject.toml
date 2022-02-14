@@ -12,6 +12,11 @@ classifiers = [
     'Programming Language :: Python :: 3.8',
 ]
 repository = "https://github.com/mitodl/ol-infrastructure"
+packages = [
+    {include = "ol_infrastructure", from="src"},
+    {include = "bridge", from="src"},
+    {include = "bilder", from="src"},
+]
 
 [tool.poetry.dependencies]
 python = "^3.8"
