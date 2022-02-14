@@ -228,6 +228,8 @@ concourse_config_changed = configure_concourse(concourse_config)
 
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
 
+vector_config = VectorConfig()
+
 if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
     # Setting this attribute after instantiating the object to bypass validation
     concourse_config.encryption_key = SecretStr(
@@ -267,16 +269,12 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
         )
         caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
     # Install Vector
-    vector_config = VectorConfig()
     vector_config.configuration_templates[
         TEMPLATES_DIRECTORY.joinpath("vector", "concourse_logs.yaml")
     ] = {}
     vector_config.configuration_templates[
         TEMPLATES_DIRECTORY.joinpath("vector", "concourse_metrics.yaml")
     ] = {"concourse_prometheus_port": concourse_config.prometheus_bind_port}
-    install_vector(vector_config)
-    configure_vector(vector_config)
-    vector_service(vector_config)
 
 # Install Consul and Vault Agent
 vault_config = VaultAgentConfig(
@@ -322,6 +320,11 @@ consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
 vault_template_permissions(vault_config)
+
+install_vector(vector_config)
+configure_vector(vector_config)
+vector_service(vector_config)
+
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 

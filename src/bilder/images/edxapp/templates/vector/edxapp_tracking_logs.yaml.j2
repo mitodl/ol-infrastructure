@@ -1,14 +1,15 @@
 ---
 sources:
-  tracking_log:
+  collect_edx_tracking_logs:
     file_key: log_file
     type: file
     include:
     - /edx/var/log/tracking/tracking.log
+
 transforms:
-  tracking_log_parser:
+  parse_edx_tracking_logs:
     inputs:
-    - tracking_log
+    - 'collect_edx_tracking_logs'
     type: remap
     source: |
       parsed, err = parse_json(.message)
@@ -22,16 +23,16 @@ transforms:
         .malformed = true
       }
 
-  tracking_log_malformed_message_filter:
+  filter_malformed_message_edx_tracking_logs:
     inputs:
-    - tracking_log_parser
+    - 'parse_edx_tracking_logs'
     type: filter
     condition: .malformed != true
 
 sinks:
-  s3_tracking:
+  ship_edx_tracking_logs_to_s3:
     inputs:
-    - tracking_log_malformed_message_filter
+    - 'filter_malformed_message_edx_tracking_logs'
     type: aws_s3
     bucket: ${ENVIRONMENT}-edxapp-tracking
     region: us-east-1

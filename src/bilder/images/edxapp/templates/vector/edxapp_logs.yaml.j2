@@ -1,35 +1,32 @@
 ---
-api:
-  enabled: true
-
 log_schema:
   timestamp_key: vector_timestamp
   host_key: log_host
 
 sources:
-  nginx_access_log:
+  collect_edxapp_nginx_access_logs:
     type: file
     file_key: log_file
     include:
     - /edx/var/log/nginx/access.log
-  nginx_error_log:
+  collect_edxapp_nginx_error_logs:
     type: file
     file_key: log_file
     include:
     - /edx/var/log/nginx/error.log
 
-  edxapp:
+  collect_edxapp_logs:
     type: file
     file_key: log_file
     include:
     - /var/log/edxapp/*.log
-  auth_log:
+  collect_edxapp_system_auth_logs:
     type: file
     file_key: log_file
     include:
     - /var/log/auth.log
 
-  journald_log:
+  collect_edxapp_journald_logs:
     type: journald
     current_boot_only: true
     include_units:
@@ -39,9 +36,9 @@ sources:
 
 transforms:
 
-  edxapp_labeled_logs:
+  parse_edxapp_logs:
     inputs:
-    - edxapp
+    - 'collect_edxapp_logs'
     type: remap
     source: |
       event, err = parse_json(.message)
@@ -51,9 +48,15 @@ transforms:
         .environment = "${ENVIRONMENT}"
       }
 
-  auth_log_parser:
+  enrich_edxapp_logs:
+    type: aws_ec2_metadata
     inputs:
-    - auth_log
+    - 'parse_edxapp_logs'
+    namespace: ec2
+
+  parse_edxapp_system_auth_logs:
+    inputs:
+    - 'collect_edxapp_system_auth_logs'
     type: remap
     source: |
       parsed, err = parse_syslog(.message)
@@ -63,21 +66,21 @@ transforms:
         .environment = "${ENVIRONMENT}"
       }
 
-  auth_log_malformed_message_filter:
+  filter_malformed_message_edxapp_system_auth_logs:
     inputs:
-    - auth_log_parser
+    - 'parse_edxapp_system_auth_logs'
     type: filter
     condition: .malformed != true
 
-  auth_log_cron_filter:
+  filter_cron_edxapp_system_auth_log:
     inputs:
-    - auth_log_malformed_message_filter
+    - 'filter_malformed_message_edxapp_system_auth_logs'
     type: filter
     condition: .appname != "CRON"
 
-  nginx_access_log_parser:
+  parse_edxapp_nginx_access_logs:
     inputs:
-    - nginx_access_log
+    - 'collect_edxapp_nginx_access_logs'
     type: remap
     source: |
       parsed, err = parse_json(.message)
@@ -87,21 +90,21 @@ transforms:
         .environment = "${ENVIRONMENT}"
       }
 
-  nginx_access_log_malformed_message_filter:
+  filter_malformed_message_edxapp_nginx_access_logs:
     inputs:
-    - nginx_access_log_parser
+    - 'parse_edxapp_nginx_access_logs'
     type: filter
     condition: .malformed != true
 
-  nginx_access_log_healthcheck_filter:
+  filter_healthchecks_edxapp_nginx_access_logs:
     inputs:
-    - nginx_access_log_malformed_message_filter
+    - 'filter_malformed_message_edxapp_nginx_access_logs'
     type: filter
     condition: '! contains!(.http_user_agent, "ELB-HealthChecker")'
 
-  nginx_error_log_parser:
+  parse_edxapp_nginx_error_logs:
     inputs:
-    - nginx_error_log
+    - 'collect_edxapp_nginx_error_logs'
     type: remap
     source: |
       matches, err = parse_regex(
@@ -117,26 +120,20 @@ transforms:
         .malformed = true
       }
 
-  nginx_error_log_malformed_message_filter:
+  filter_malformed_message_edxapp_nginx_error_logs:
     inputs:
-    - nginx_error_log_parser
+    - 'parse_edxapp_nginx_error_logs'
     type: filter
     condition: .malformed != true
 
-  edxapp_enriched_logs:
-    type: aws_ec2_metadata
-    inputs:
-    - edxapp_labeled_logs
-    namespace: ec2
-
 sinks:
-  grafana_loki_logs:
+  ship_edxapp_logs_to_grafana_cloud:
     inputs:
-    - journald_log
-    - edxapp_enriched_logs
-    - auth_log_cron_filter
-    - nginx_error_log_malformed_message_filter
-    - nginx_access_log_healthcheck_filter
+    - 'collect_edxapp_journald_logs'
+    - 'enrich_edxapp_logs'
+    - 'filter_cron_edxapp_system_auth_log'
+    - 'filter_healthchecks_edxapp_nginx_access_logs'
+		- 'filter_malformed_message_edxapp_nginx_error_logs'
     type: loki
     auth:
       strategy: basic

@@ -1,49 +1,31 @@
 ---
 sources:
-  host_metrics:
-    type: host_metrics
-    scrape_interval_secs: 60
-    collectors:
-      - cpu
-      - disk
-      - filesystem
-      - load
-      - host
-      - memory
-      - network
-  nginx_metrics:
+  collect_nginx_metrics:
     type: nginx_metrics
     endpoints:
     - http://localhost/nginx_status
 
 transforms:
-  host_metrics_relabel:
+  relabel_nginx_metrics
     type: remap
     inputs:
-    - host_metrics
-    source: |
-      .tags.job = "integrations/linux_host"
-
-  nginx_metrics_relabel:
-    type: remap
-    inputs:
-    - nginx_metrics
+    - 'collect_nginx_metrics'
     source: |
       .tags.job = "integrations/nginx"
 
-  add_labels_to_metrics:
+  add_labels_to_nginx_metrics:
     type: remap
     inputs:
-    - '*metrics_relabel'
+    - 'relabel_nginx_metrics'
     source: |
       .tags.environment = "${ENVIRONMENT}"
       .tags.application = "edxapp"
       .tags.service = "{{context.edx_installation}}"
 
 sinks:
-  grafana_cortex_metrics:
+  ship_nginx_metrics_to_grafana_cloud:
     inputs:
-    - add_labels_to_metrics
+    - 'add_labels_to_nginx_metrics'
     type: prometheus_remote_write
     endpoint: https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom/push
     healthcheck: false
