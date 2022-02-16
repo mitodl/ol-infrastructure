@@ -1464,6 +1464,14 @@ class ConcourseWebConfig(ConcourseBaseConfig):
 class ConcourseWorkerConfig(ConcourseBaseConfig):
     _node_type: str = "worker"
     user: str = "root"
+    ## TODO: MAD 02162022 Correct this deploy_directory reference.
+    ## This 'works' but it isn't correct. It will always reference the default value for
+    ## deploy_directory, rather than any that is overridden in the actual instantiation, whereever
+    ## that may be. Be aware.
+    resource_types_directory: Path = (
+        ConcourseBaseConfig().deploy_directory / "resource-types"
+    )
+
     baggageclaim_bind_ip: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_BAGGAGECLAIM_BIND_IP",
@@ -1724,6 +1732,11 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
         "info",
         concourse_env_var="CONCOURSE_LOG_LEVEL",
         description="Minimum level of logs to see. (default: info)",
+    )
+    prepackaged_resources: Optional[List[str]] = Field(
+        None,
+        description="A list of resource names to pull "
+        "from s3://ol-eng-artifacts/bundled-concourse-resources/.",
     )
     rebalance_interval: Optional[str] = Field(
         None,
