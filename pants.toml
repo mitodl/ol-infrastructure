@@ -16,8 +16,12 @@ pants_ignore = ['copier_templates/*', 'edx_configs/*',]
 [source]
 root_patterns = ['src/', 'tests/']
 
-[python-setup]
+[python]
 interpreter_constraints = ['>=3.8']
 
 [flake8]
 config = 'setup.cfg'
+
+[anonymous-telemetry]
+enabled = true
+repo_id = 'e270ade3-30ce-4252-b559-259daf6042b4'
