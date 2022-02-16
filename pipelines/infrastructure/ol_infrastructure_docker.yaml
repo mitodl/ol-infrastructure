@@ -10,6 +10,7 @@ resources:
     - pyproject.toml
     - poetry.lock
     - Dockerfile
+    - src/bridge
 
 - name: ol-infrastructure-image
   type: registry-image

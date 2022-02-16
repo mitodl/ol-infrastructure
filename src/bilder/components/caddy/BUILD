@@ -1,8 +1,5 @@
-python_library(
-    dependencies=[":templates"]
-)
+python_sources()
 
-resources(
-    name="templates",
-    sources=["templates/*.j2"]
+python_tests(
+    name="tests",
 )
