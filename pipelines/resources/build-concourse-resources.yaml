@@ -1,0 +1,151 @@
+---
+resource_types:
+# We will used an 'unbundled' version of this resource here to prevent any dependency loops
+- name: s3-sync-unbundled
+  source:
+    repository: mitodl/concourse-s3-sync-resource
+    tag: 0.1
+  type: docker-image
+
+resources:
+- name: rclone-git-resource
+  check_every: 60m
+  icon: github
+  type: git
+  source:
+    uri: https://github.com/mitodl/concourse-rclone-resource.git
+    branch: master
+- name: s3-sync-git-resource
+  icon: github
+  check_every: 60m
+  type: git
+  source:
+    uri: https://github.com/mitodl/concourse-s3-sync-resource
+    branch: master
+
+- name: rclone-docker-resource
+  icon: docker
+  check_every: never
+  type: docker-image
+  source:
+    username: ((dockerhub.username))
+    password: ((dockerhub.password))
+    repository: mitodl/concourse-rclone-resource
+    tag: latest
+- name: s3-sync-docker-resource
+  icon: docker
+  check_every: never
+  type: docker-image
+  source:
+    username: ((dockerhub.username))
+    password: ((dockerhub.password))
+    repository: mitodl/concourse-s3-sync-resource
+    tag: latest
+
+- name: publish-bundled-resource
+  icon: aws
+  check_every: never
+  type: s3-sync-unbundled
+  source:
+    path: bundled-concourse-resources
+    bucket: ol-eng-artifacts
+    directory: bundled-resources
+    options:
+    - "--exclude '*'"
+    - "--include '*.tgz'"
+
+jobs:
+- name: build-and-publish-s3-sync-resource
+  public: false
+  serial: true
+  plan:
+  - get: s3-sync-git-resource
+    trigger: true
+  - put: s3-sync-docker-resource
+    params:
+      build: s3-sync-git-resource
+      additional_tags: s3-sync-git-resource/tag
+  - task: tar-resource-files
+    config:
+      image_resource:
+        name: ''
+        source:
+          repository: node
+          tag: 14-buster-slim
+        type: docker-image
+      inputs:
+      - name: s3-sync-docker-resource
+      - name: s3-sync-git-resource
+      outputs:
+      - name: bundled-resources
+      platform: linux
+      run:
+        # Inspired by https://github.com/concourse/ci/blob/master/tasks/build-resource-types-image.yml
+        args:
+        - -exc
+        - >-
+          echo "Packaging s3-sync";
+          cd s3-sync-docker-resource;
+          tar czf rootfs.tgz --directory=rootfs .;
+          rm -rf ./rootfs/;
+          version=$(cat ../s3-sync-git-resource/tag);
+          echo { >> resource_metadata.json;
+          echo \ \ \"type\": \"s3-sync\", >> resource_metadata.json;
+          echo \ \ \"version\": \"${version}\", >> resource_metadata.json;
+          echo \ \ \"privileged\": false, >> resource_metadata.json;
+          echo \ \ \"version_history\": false >> resource_metadata.json;
+          echo } >> resource_metadata.json;
+          echo "resource_metadata.json contents:";
+          cat resource_metadata.json;
+          tar czf ./s3-sync.tgz rootfs.tgz resource_metadata.json;
+          mv ./s3-sync.tgz ../bundled-resources
+        path: sh
+  - put: publish-bundled-resource
+    get: noop
+
+- name: build-and-publish-rclone-resource
+  public: false
+  serial: true
+  plan:
+  - get: rclone-git-resource
+    trigger: true
+  - put: rclone-docker-resource
+    params:
+      build: rclone-git-resource
+      additional_tags: rclone-git-resource/tag
+  - task: tar-resource-files
+    config:
+      image_resource:
+        name: ''
+        source:
+          repository: node
+          tag: 14-buster-slim
+        type: docker-image
+      inputs:
+      - name: rclone-docker-resource
+      - name: rclone-git-resource
+      outputs:
+      - name: bundled-resources
+      platform: linux
+      run:
+        # Inspired by https://github.com/concourse/ci/blob/master/tasks/build-resource-types-image.yml
+        args:
+        - -exc
+        - >-
+          echo "Packaging rclone";
+          cd rclone-docker-resource;
+          tar czf rootfs.tgz --directory=rootfs .;
+          rm -rf ./rootfs/;
+          version=$(cat ../rclone-git-resource/tag);
+          echo { >> resource_metadata.json;
+          echo \ \ \"type\": \"rclone\", >> resource_metadata.json;
+          echo \ \ \"version\": \"${version}\", >> resource_metadata.json;
+          echo \ \ \"privileged\": false, >> resource_metadata.json;
+          echo \ \ \"version_history\": false >> resource_metadata.json;
+          echo } >> resource_metadata.json;
+          echo "resource_metadata.json contents:";
+          cat resource_metadata.json;
+          tar czf ./rclone.tgz rootfs.tgz resource_metadata.json;
+          mv ./rclone.tgz ../bundled-resources
+        path: sh
+  - put: publish-bundled-resource
