@@ -196,9 +196,9 @@ def _manage_worker_node_keys(
 def _install_resource_types(
     concourse_config: ConcourseWorkerConfig, sudo=True, host=None, state=None
 ):
-    if concourse_config.prepackaged_resources:
-        for resource in concourse_config.prepackaged_resources:
-            resource_archive = f"https://ol-eng-artifacts.s3.amazonaws.com/bundled-concourse-resources/{resource}.tgz"
+    if concourse_config.additional_resource_types:
+        for resource in concourse_config.additional_resource_types:
+            resource_archive = f"https://{concourse_config.additional_resource_types_s3_location}/{resource}.tgz"
             resource_path = f"/tmp/{resource}"
             resource_archive_path = f"{resource_path}/{resource}.tgz"
             server.shell(
@@ -219,14 +219,14 @@ def _install_resource_types(
                 commands=[
                     f"tar -xvzf {resource_archive_path} -C {resource_path}",
                     f"rm -f {resource_archive_path}",
-                    f"mv {resource_path} {concourse_config.resource_types_directory}/",
+                    f"mv {resource_path} {concourse_config.additional_resource_types_directory}/",
                 ],
                 state=state,
                 host=host,
             )
             files.directory(
                 name=f"Set ownership of resource_type {resource} directory",
-                path=f"{concourse_config.resource_types_directory}/{resource}",
+                path=f"{concourse_config.additional_resource_types_directory}/{resource}",
                 user=concourse_config.user,
                 state=state,
                 host=host,

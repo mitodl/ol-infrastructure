@@ -142,6 +142,8 @@ concourse_config_map = {
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
+        additional_resource_types=["rclone", "s3-sync"],
+        additional_resource_types_s3_location="ol-eng-artifacts.s3.amazonaws.com/bundled-concourse-resources",
         baggageclaim_bind_ip="0.0.0.0",
         baggageclaim_driver="overlay",
         baggageclaim_p2p_interface_family="4",
@@ -151,7 +153,6 @@ concourse_config_map = {
         containerd_dns_server="8.8.8.8",
         containerd_max_containers=0,  # Don't set a limit on the number of containers
         containerd_network_pool="10.250.0.0/16",
-        prepackaged_resources=["rclone", "s3-sync"],
     ),
 }
 concourse_config: Union[
