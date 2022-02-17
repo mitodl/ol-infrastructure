@@ -287,8 +287,8 @@ ocw_studio_mediaconvert_cloudwatch_rule = cloudwatch.EventRule(
                 "userMetadata": {
                     "filter": [f"ocw-studio-mediaconvert-queue-{stack_info.env_suffix}"]
                 },
-                "status": ["COMPLETE", "ERROR"]
-            }
+                "status": ["COMPLETE", "ERROR"],
+            },
         }
     ),
 )
