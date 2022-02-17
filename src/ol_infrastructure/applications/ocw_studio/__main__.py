@@ -283,7 +283,12 @@ ocw_studio_mediaconvert_cloudwatch_rule = cloudwatch.EventRule(
         {
             "source": ["aws.mediaconvert"],
             "detail-type": ["MediaConvert Job State Change"],
-            "detail": {"status": ["COMPLETE", "ERROR"]},
+            "detail": {
+                "userMetadata": {
+                    "filter": [f"ocw-studio-mediaconvert-queue-{stack_info.env_suffix}"]
+                },
+                "status": ["COMPLETE", "ERROR"]
+            }
         }
     ),
 )
