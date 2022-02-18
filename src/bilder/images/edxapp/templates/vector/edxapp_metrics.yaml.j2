@@ -6,7 +6,7 @@ sources:
     - http://localhost/nginx_status
 
 transforms:
-  relabel_nginx_metrics
+  relabel_nginx_metrics:
     type: remap
     inputs:
     - 'collect_nginx_metrics'

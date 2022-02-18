@@ -172,7 +172,7 @@ if node_type == WEB_NODE_TYPE:
         group="www-data",
     )
     vector_config.configuration_templates[
-        TEMPLATES_DIRECTORY.joinpath("vector", "edxapp_tracking.yaml.j2")
+        TEMPLATES_DIRECTORY.joinpath("vector", "edxapp_tracking_logs.yaml.j2")
     ] = {}
     vault_templates.extend(
         [
