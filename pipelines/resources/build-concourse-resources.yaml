@@ -49,6 +49,8 @@ jobs:
     params:
       build: ((resource-name))-git-resource
       additional_tags: ((resource-name))-git-resource/tag
+      tag_file: ((resource-name))-git-resource/.git/short_ref
+      tag_as_latest: true
   - task: 'tar-resource-files'
     config:
       image_resource:
