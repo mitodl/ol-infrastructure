@@ -3,6 +3,7 @@ python_sources()
 resources(
     name="sops_secrets",
     sources=[
+        "bin/*"
         "**/*.yaml",
         "**/*.json",
         "**/*.env"
