@@ -29,6 +29,7 @@ edx_plugins = {
         "mitxpro-openedx-extensions==1.0.0",
         "ol-openedx-logging",
         "ol-openedx-sentry",
+        "ol-openedx-course-export",
         "social-auth-mitxpro==0.6",
     ],
     "xpro": [
@@ -39,6 +40,7 @@ edx_plugins = {
         "mitxpro-openedx-extensions==1.0.0",
         "ol-openedx-logging",
         "ol-openedx-sentry",
+        "ol-openedx-course-export",
         "social-auth-mitxpro==0.6",
         "git+https://github.com/ubc/ubcpi.git@1.0.0#egg=ubcpi-xblock",
     ],
@@ -50,6 +52,7 @@ edx_plugins = {
         "git+https://github.com/raccoongang/xblock-pdf.git@8d63047c53bc8fdd84fa7b0ec577bb0a729c215f#egg=xblock-pdf",  # noqa: E501
         "ol-openedx-logging",
         "ol-openedx-sentry",
+        "ol-openedx-course-export",
         "rapid-response-xblock==0.6.0",
         "ol-openedx-canvas-integration",
         "ol-openedx-rapid-response-reports",
@@ -62,6 +65,7 @@ edx_plugins = {
         "git+https://github.com/raccoongang/xblock-pdf.git@8d63047c53bc8fdd84fa7b0ec577bb0a729c215f#egg=xblock-pdf",  # noqa: E501
         "ol-openedx-logging",
         "ol-openedx-sentry",
+        "ol-openedx-course-export",
         "rapid-response-xblock==0.6.0",
         "ol-openedx-canvas-integration",
         "ol-openedx-rapid-response-reports",
