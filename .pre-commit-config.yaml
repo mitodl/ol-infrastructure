@@ -48,7 +48,7 @@ repos:
     - --remove-unused-variables
     - --remove-all-unused-imports
 - repo: https://github.com/Yelp/detect-secrets
-  rev: v1.1.0
+  rev: v1.2.0
   hooks:
   - id: detect-secrets
     args:
