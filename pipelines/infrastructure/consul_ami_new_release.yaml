@@ -15,11 +15,12 @@ resource_types:
     tag: latest
   type: docker-image
 
+
 resources:
 - check_every: 24h
-  name: vault
+  name: consul
   source:
-    project: vault
+    project: consul
   type: hashicorp-release
 - icon: github
   name: packer_templates
@@ -37,36 +38,38 @@ resources:
 jobs:
 - name: packer-validate-workflow
   plan:
-  - get: vault
+  - get: consul
     params:
       regexp: linux_amd64
     trigger: true
   - get: packer_templates
-    trigger: false
+    trigger: true
+    params:
+      depth: 1
   - put: packer-validate
     params:
+      template: packer_templates/src/bilder/images/.
       objective: validate
+      vars:
+        app_name: consul
       only:
       - amazon-ebs.third-party
-      template: packer_templates/src/bilder/images/.
-      vars:
-        app_name: vault
 
 - name: packer-build-workflow
   plan:
   - get: packer_templates
     passed: [packer-validate-workflow]
+    trigger: false
     params:
       depth: 1
-    trigger: false
   - put: packer-build
     params:
+      template: packer_templates/src/bilder/images/.
+      objective: build
+      vars:
+        app_name: consul
       env_vars:
         AWS_REGION: us-east-1
-        PYTHONPATH: ${PYTHONPATH}:packer_templates/src
-      objective: build
+        PYTHONPATH: "${PYTHONPATH}:packer_templates/src"
       only:
       - amazon-ebs.third-party
-      template: packer_templates/src/bilder/images/.
-      vars:
-        app_name: vault
