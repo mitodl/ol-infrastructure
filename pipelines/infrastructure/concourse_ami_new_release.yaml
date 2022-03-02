@@ -1,10 +1,10 @@
 ---
 resource_types:
-- name: packer
-  source:
-    repository: mitodl/concourse-packer-resource
-    tag: latest
-  type: docker-image
+# - name: packer
+#   source:
+#     repository: mitodl/concourse-packer-resource
+#     tag: latest
+#   type: docker-image
 - name: packer-builder
   source:
     repository: mitodl/concourse-packer-resource-builder
@@ -31,7 +31,7 @@ resources:
     uri: https://github.com/mitodl/ol-infrastructure
   type: git
 - name: packer-validate
-  type: packer
+  type: packer-builder
 - name: packer-build
   type: packer-builder
 
