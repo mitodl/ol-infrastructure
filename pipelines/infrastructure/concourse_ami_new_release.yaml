@@ -23,6 +23,8 @@ resources:
   source:
     owner: concourse
     repository: concourse
+- name: packer
+  type: packer-builder
 - icon: github
   name: packer_templates
   source:
@@ -31,8 +33,6 @@ resources:
     - src/bilder/images/
     uri: https://github.com/mitodl/ol-infrastructure
   type: git
-- name: packer
-  type: packer-builder
 
 jobs:
 - name: packer-validate-workflow
