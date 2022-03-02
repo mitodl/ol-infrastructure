@@ -6,10 +6,11 @@ resource_types:
 #     tag: latest
 #   type: docker-image
 - name: packer-builder
+  type: docker-image
   source:
     repository: mitodl/concourse-packer-resource-builder
-    tag: latest
-  type: docker-image
+    tag: testing
+
 - name: github-release
   type: registry-image
   source:
