@@ -30,9 +30,7 @@ resources:
     - src/bilder/images/
     uri: https://github.com/mitodl/ol-infrastructure
   type: git
-- name: packer-validate
-  type: packer-builder
-- name: packer-build
+- name: packer
   type: packer-builder
 
 jobs:
@@ -42,14 +40,14 @@ jobs:
     trigger: true
   - get: packer_templates
     trigger: false
-  - put: packer-validate
+  - put: packer
     params:
       template: packer_templates/src/bilder/images/.
       objective: validate
       vars:
         app_name: concourse
         node_type: web
-  - put: packer-validate
+  - put: packer
     params:
       template: packer_templates/src/bilder/images/.
       objective: validate
@@ -64,7 +62,7 @@ jobs:
     params:
       depth: 1
     trigger: false
-  - put: packer-build
+  - put: packer
     params:
       template: packer_templates/src/bilder/images/.
       objective: build
@@ -76,7 +74,7 @@ jobs:
         PYTHONPATH: "${PYTHONPATH}:packer_templates/src"
       only:
       - amazon-ebs.third-party
-  - put: packer-build
+  - put: packer
     params:
       template: packer_templates/src/bilder/images/.
       objective: build
