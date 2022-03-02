@@ -15,9 +15,9 @@ config:
     secure: v1:i3a+7goVdWZMQS9Y:wnaKtictwJtO06zrMQAowVQCenHH1A9z3GjL31QtmHDyxwJKApCzlxcpUDEAaMGBW/EUogMnrrKxjO/PLCt0/HBqe6Rc8RCoSI+TlKeqbADFFxRB3RkIMyPt
   concourse:target_vpc: operations_vpc
   concourse:web_auto_scale:
-    desired: 4
-    max: 10
-    min: 1
+    desired: 5
+    max: 8
+    min: 3
   concourse:web_host_domain: cicd.odl.mit.edu
   concourse:web_iam_policies:
   - base
@@ -26,8 +26,8 @@ config:
   concourse:web_instance_type: general_purpose_large
   concourse:workers:
   - auto_scale:
-      desired: 20
-      max: 50
+      desired: 5
+      max: 8
       min: 3
     aws_tags:
       OU: open-courseware
