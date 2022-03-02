@@ -40,21 +40,22 @@ jobs:
   plan:
   - get: gh-release
     trigger: true
-  - in_parallel:
-    - put: packer-validate
-      params:
-        template: packer_templates/src/bilder/images/.
-        objective: validate
-        vars:
-          app_name: concourse
-          node_type: web
-    - put: packer-validate
-      params:
-        template: packer_templates/src/bilder/images/.
-        objective: validate
-        vars:
-          app_name: concourse
-          node_type: worker
+  - get: packer_templates
+    trigger: false
+  - put: packer-validate
+    params:
+      template: packer_templates/src/bilder/images/.
+      objective: validate
+      vars:
+        app_name: concourse
+        node_type: web
+  - put: packer-validate
+    params:
+      template: packer_templates/src/bilder/images/.
+      objective: validate
+      vars:
+        app_name: concourse
+        node_type: worker
 
 - name: packer-build-workflow
   plan:
