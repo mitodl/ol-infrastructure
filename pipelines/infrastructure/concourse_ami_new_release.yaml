@@ -45,6 +45,7 @@ jobs:
     params:
       template: packer_templates/src/bilder/images/.
       objective: validate
+      debug: true
       vars:
         app_name: concourse
         node_type: web
@@ -67,6 +68,7 @@ jobs:
     params:
       template: packer_templates/src/bilder/images/.
       objective: build
+      debug: true
       vars:
         app_name: concourse
         node_type: web
@@ -79,6 +81,7 @@ jobs:
     params:
       template: packer_templates/src/bilder/images/.
       objective: build
+      debug: true
       vars:
         app_name: concourse
         node_type: worker
