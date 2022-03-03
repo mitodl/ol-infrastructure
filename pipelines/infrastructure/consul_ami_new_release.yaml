@@ -25,7 +25,7 @@ resources:
 - icon: github
   name: packer_templates
   source:
-    branch: main
+    branch: add_app_version_to_ami
     paths:
     - src/bilder/images/
     uri: https://github.com/mitodl/ol-infrastructure
@@ -59,7 +59,7 @@ jobs:
   plan:
   - get: packer_templates
     passed: [packer-validate-workflow]
-    trigger: false
+    trigger: true
     params:
       depth: 1
   - put: packer-build
@@ -71,5 +71,7 @@ jobs:
       env_vars:
         AWS_REGION: us-east-1
         PYTHONPATH: "${PYTHONPATH}:packer_templates/src"
+      env_vars_from_files:
+        CONSUL_VERSION: consul/version
       only:
       - amazon-ebs.third-party

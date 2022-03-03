@@ -58,12 +58,14 @@ jobs:
     passed: [packer-validate-workflow]
     params:
       depth: 1
-    trigger: false
+    trigger: true
   - put: packer-build
     params:
       env_vars:
         AWS_REGION: us-east-1
         PYTHONPATH: ${PYTHONPATH}:packer_templates/src
+      env_vars_from_files:
+        VAULT_VERSION: vault/version
       objective: build
       only:
       - amazon-ebs.third-party

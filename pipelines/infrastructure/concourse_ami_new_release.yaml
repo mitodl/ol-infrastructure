@@ -69,6 +69,9 @@ jobs:
     passed: [packer-validate-workflow]
     params:
       depth: 1
+    trigger: true
+  - get: gh-release
+    trigger: false
   - put: packer-build
     params:
       template: packer_templates/src/bilder/images/.
@@ -79,6 +82,8 @@ jobs:
       env_vars:
         AWS_REGION: us-east-1
         PYTHONPATH: "${PYTHONPATH}:packer_templates/src"
+      env_vars_from_files:
+        CONCOURSE_VERSION: gh-release/version
       only:
       - amazon-ebs.third-party
   - put: packer-build
@@ -91,5 +96,7 @@ jobs:
       env_vars:
         AWS_REGION: us-east-1
         PYTHONPATH: "${PYTHONPATH}:packer_templates/src"
+      env_vars_from_files:
+        CONCOURSE_VERSION: gh-release/version
       only:
       - amazon-ebs.third-party
