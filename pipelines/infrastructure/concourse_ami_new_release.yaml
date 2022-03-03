@@ -1,30 +1,36 @@
 ---
 resource_types:
-# - name: packer
-#   source:
-#     repository: mitodl/concourse-packer-resource
-#     tag: latest
-#   type: docker-image
-- name: packer-builder
+- name: packer-validate
   type: docker-image
   source:
-    repository: mitodl/concourse-packer-resource-builder
-    tag: testing
+    repository: mitodl/concourse-packer-resource
+    tag: latest
 
 - name: github-release
   type: registry-image
   source:
     repository: concourse/github-release-resource
 
+- name: packer-builder
+  type: docker-image
+  source:
+    repository: mitodl/concourse-packer-resource-builder
+    tag: latest
+
 resources:
+- name: packer
+  type: packer-validate
+
+- name: packer-build
+  type: packer-builder
+
 - check_every: 24h
   name: gh-release
   type: github-release
   source:
     owner: concourse
     repository: concourse
-- name: packer
-  type: packer-builder
+    release: true
 - icon: github
   name: packer_templates
   source:
@@ -32,6 +38,8 @@ resources:
     paths:
     - src/bilder/images/
     uri: https://github.com/mitodl/ol-infrastructure
+    version:
+      ref: refs/heads/master
   type: git
 
 jobs:
@@ -40,12 +48,10 @@ jobs:
   - get: gh-release
     trigger: true
   - get: packer_templates
-    trigger: false
   - put: packer
     params:
       template: packer_templates/src/bilder/images/.
       objective: validate
-      debug: true
       vars:
         app_name: concourse
         node_type: web
@@ -63,12 +69,10 @@ jobs:
     passed: [packer-validate-workflow]
     params:
       depth: 1
-    trigger: false
-  - put: packer
+  - put: packer-build
     params:
       template: packer_templates/src/bilder/images/.
       objective: build
-      debug: true
       vars:
         app_name: concourse
         node_type: web
@@ -77,11 +81,10 @@ jobs:
         PYTHONPATH: "${PYTHONPATH}:packer_templates/src"
       only:
       - amazon-ebs.third-party
-  - put: packer
+  - put: packer-build
     params:
       template: packer_templates/src/bilder/images/.
       objective: build
-      debug: true
       vars:
         app_name: concourse
         node_type: worker
