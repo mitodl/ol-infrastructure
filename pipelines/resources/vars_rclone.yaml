@@ -1,0 +1,4 @@
+---
+resource-name: rclone
+git-repo: https://github.com/mitodl/concourse-rclone-resource.git
+docker-repo: mitodl/concourse-rclone-resource

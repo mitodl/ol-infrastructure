@@ -1,0 +1,4 @@
+---
+resource-name: s3-sync
+git-repo: https://github.com/mitodl/concourse-s3-sync-resource
+docker-repo: mitodl/concourse-s3-sync-resource

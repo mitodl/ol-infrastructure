@@ -192,6 +192,46 @@ def _manage_worker_node_keys(
         )
 
 
+@deploy("Pull down pre-bundled resource types")
+def _install_resource_types(
+    concourse_config: ConcourseWorkerConfig, sudo=True, host=None, state=None
+):
+    for resource in concourse_config.additional_resource_types or []:
+        resource_archive = f"https://{concourse_config.additional_resource_types_s3_location}/{resource}.tgz"
+        resource_path = f"/tmp/{resource}"
+        resource_archive_path = f"{resource_path}/{resource}.tgz"
+        server.shell(
+            name=f"Setup directory structure for resource_type {resource}",
+            commands=[f"mkdir {resource_path}"],
+            state=state,
+            host=host,
+        )
+        files.download(
+            name=f"Download resource_type {resource}.tgz archive.",
+            src=resource_archive,
+            dest=resource_archive_path,
+            state=state,
+            host=host,
+        )
+        server.shell(
+            name=f"Extract the resource_type {resource}.tgz archive.",
+            commands=[
+                f"tar -xvzf {resource_archive_path} -C {resource_path}",
+                f"rm -f {resource_archive_path}",
+                f"mv {resource_path} {concourse_config.additional_resource_types_directory}/",
+            ],
+            state=state,
+            host=host,
+        )
+        files.directory(
+            name=f"Set ownership of resource_type {resource} directory",
+            path=f"{concourse_config.additional_resource_types_directory}/{resource}",
+            user=concourse_config.user,
+            state=state,
+            host=host,
+        )
+
+
 @deploy("Configure Concourse")
 def configure_concourse(
     concourse_config: Union[ConcourseWebConfig, ConcourseWorkerConfig],
@@ -231,6 +271,7 @@ def configure_concourse(
             host=host,
         )
         _manage_worker_node_keys(concourse_config, state=state, host=host)
+        _install_resource_types(concourse_config, state=state, host=host)
     return concourse_env_file.changed
 
 

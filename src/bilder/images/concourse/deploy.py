@@ -142,15 +142,17 @@ concourse_config_map = {
     ),
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
-        bind_ip="0.0.0.0",
+        additional_resource_types=["rclone", "s3-sync"],
+        additional_resource_types_s3_location="ol-eng-artifacts.s3.amazonaws.com/bundled-concourse-resources",
         baggageclaim_bind_ip="0.0.0.0",
         baggageclaim_driver="overlay",
+        baggageclaim_p2p_interface_family="4",
+        baggageclaim_p2p_interface_name_pattern="ens5",
+        bind_ip="0.0.0.0",
         container_runtime="containerd",
         containerd_dns_server="8.8.8.8",
         containerd_max_containers=0,  # Don't set a limit on the number of containers
         containerd_network_pool="10.250.0.0/16",
-        baggageclaim_p2p_interface_family="4",
-        baggageclaim_p2p_interface_name_pattern="ens5",
     ),
 }
 concourse_config: Union[
@@ -268,7 +270,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
             ],
         )
         caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
-    # Install Vector
+    # Add vector configurations specific to concourse web nodes
     vector_config.configuration_templates[
         TEMPLATES_DIRECTORY.joinpath("vector", "concourse_logs.yaml")
     ] = {}
@@ -321,6 +323,7 @@ hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
 vault_template_permissions(vault_config)
 
+# Install vector
 install_vector(vector_config)
 configure_vector(vector_config)
 vector_service(vector_config)

@@ -1464,6 +1464,20 @@ class ConcourseWebConfig(ConcourseBaseConfig):
 class ConcourseWorkerConfig(ConcourseBaseConfig):
     _node_type: str = "worker"
     user: str = "root"
+
+    additional_resource_types_directory: Path = Field(
+        Path("resource_types"),
+        description="The sub-path to use underneat the configured deploy_directory",
+    )
+    additional_resource_types_s3_location: Optional[str] = Field(
+        None,
+        description="Address and path of s3 bucket to find additional concourse resource types.",
+    )
+    additional_resource_types: Optional[List[str]] = Field(
+        None,
+        description="A list of resource names to pull from s3",
+    )
+
     baggageclaim_bind_ip: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_BAGGAGECLAIM_BIND_IP",
@@ -1792,3 +1806,12 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
 
     class Config:
         env_prefix = "concourse_worker_"
+
+    # TODO MAD 20220217 : Create validators around the additional_resource_types* atrributes
+
+    @validator("additional_resource_types_directory")
+    def validate_additional_resource_types_directory(
+        cls, additional_resource_types_directory, values
+    ):
+        """Ensure that the resource types directory is always beneath the deploy_directory"""
+        return values["deploy_directory"] / additional_resource_types_directory
