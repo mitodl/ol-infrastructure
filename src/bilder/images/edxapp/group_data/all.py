@@ -74,12 +74,12 @@ edx_plugins = {
 
 edx_platform_repository = {
     "mitxonline": {
-        "origin": "https://github.com/edx/edx-platform",
+        "origin": "https://github.com/openedx/edx-platform",
         BRANCH: "release",
     },
     "xpro": {
-        "origin": "https://github.com/mitodl/edx-platform",
-        BRANCH: "xpro/maple",
+        "origin": "https://github.com/openedx/edx-platform",
+        BRANCH: "open-release/maple.master",
     },
     "mitx": {
         "origin": "https://github.com/mitodl/edx-platform",
