@@ -171,7 +171,7 @@ else:
                         {
                             "Effect": "Allow",
                             "Principal": {"AWS": "*"},
-                            "Action": "es:*",
+                            "Action": "es:ESHttp*",
                             "Resource": f"{arn}/*",
                         }
                     ],
