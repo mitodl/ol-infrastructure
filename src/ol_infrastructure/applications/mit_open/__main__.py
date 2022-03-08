@@ -1,4 +1,4 @@
-from pulumi import Config, export
+from pulumi import Config, StackReference, export
 from pulumi.output import Output
 from pulumi_aws import iam, s3
 from pulumi_vault import aws
@@ -11,6 +11,11 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 setup_vault_provider()
 mit_open_config = Config("mit_open")
 stack_info = parse_stack()
+opensearch_stack = StackReference(
+    f"infrastructure.aws.opensearch.apps.{stack_info.name}"
+)
+opensearch_iam_policies = opensearch_stack.require_output("iam_policies")
+
 aws_config = AWSBase(
     tags={
         "OU": "mit-open",
@@ -199,13 +204,15 @@ mit_open_iam_policy = iam.Policy(
     ),
 )
 
+policy_arns = [mit_open_iam_policy.arn, opensearch_iam_policies["read_only_policy_arn"]]
+
 mit_open_vault_iam_role = aws.SecretBackendRole(
     f"mit-open-iam-permissions-vault-policy-{stack_info.env_suffix}",
     name=f"mit-open-application-{stack_info.env_suffix}",
     # TODO: Make this configurable to support multiple AWS backends. TMM 2021-03-04
     backend="aws-mitx",
     credential_type="iam_user",
-    policy_arns=[mit_open_iam_policy.arn],
+    policy_arns=policy_arns,
 )
 
 export(
