@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pulumi
 import pulumi_aws as aws
-import pulumi_aws.iam as iam
 import pulumi_consul as consul
+from pulumi_aws import iam
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
@@ -38,13 +38,17 @@ aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name}
 cluster_size = search_config.get_int("cluster_size") or 3
 cluster_instance_type = search_config.get("instance_type") or "t3.medium.elasticsearch"
 disk_size = search_config.get_int("disk_size_gb") or 30  # noqa: WPS432
+is_public_web = search_config.get_bool("public_web") or False
+consul_service_name = (
+    search_config.get("consul_service_name") or "elasticsearch"
+)  # Default is for legacy compatability
 
 ##########
 # CREATE #
 ##########
 
 # Networking
-if search_config.get_bool("public_web"):
+if is_public_web:
     sg_ingress_rules = [
         aws.ec2.SecurityGroupIngressArgs(
             from_port=DEFAULT_HTTPS_PORT,
@@ -97,7 +101,7 @@ if search_config.get_bool("secured_cluster"):
 search_domain = aws.elasticsearch.Domain(
     "opensearch-domain-cluster",
     domain_name=f"opensearch-{environment_name}"[:SEARCH_DOMAIN_NAME_MAX_LENGTH],
-    elasticsearch_version=search_config.get("engine_version") or 7.10,
+    elasticsearch_version=search_config.get("engine_version") or "7.10",
     cluster_config=aws.elasticsearch.DomainClusterConfigArgs(
         zone_awareness_enabled=True,
         zone_awareness_config=aws.elasticsearch.DomainClusterConfigZoneAwarenessConfigArgs(  # noqa: E501
@@ -116,7 +120,7 @@ search_domain = aws.elasticsearch.Domain(
 )
 
 # IAM / Access Control
-if search_config.get_bool("public_web"):
+if is_public_web:
     read_only_policy = iam.Policy(
         f"opensearch-read-only-policy-{environment_name}",
         policy=search_domain.arn.apply(
@@ -197,7 +201,7 @@ opensearch_node = consul.Node(
 opensearch_service = consul.Service(
     "aws-opensearch-consul-service",
     node=opensearch_node.name,
-    name="opensearch",
+    name=consul_service_name,
     port=DEFAULT_HTTPS_PORT,
     meta={
         "external-node": True,
@@ -205,9 +209,9 @@ opensearch_service = consul.Service(
     },
     checks=[
         consul.ServiceCheckArgs(
-            check_id="opensearch",
+            check_id=consul_service_name,
             interval="10s",
-            name="opensearch",
+            name=consul_service_name,
             timeout="1m0s",
             status="passing",
             tcp=pulumi.Output.all(
@@ -230,7 +234,7 @@ pulumi.export(
     },
 )
 pulumi.export("security_group", search_security_group.id)
-if search_config.get_bool("public_web"):
+if is_public_web:
     pulumi.export(
         "iam_policies",
         {
