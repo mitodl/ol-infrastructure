@@ -26,7 +26,10 @@ resources:
   source:
     branch: main
     paths:
-    - src/bilder/images/
+      - src/bilder/images/vault
+      - src/bilder/images/packer.pkr.hcl
+      - src/bilder/images/variables.pkr.hcl
+      - src/bilder/images/config.pkr.hcl
     uri: https://github.com/mitodl/ol-infrastructure
   type: git
 - name: packer-validate
