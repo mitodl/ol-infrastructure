@@ -1,9 +1,9 @@
 ---
-secretsprovider: awskms://alias/infrastructure-secrets-qa
-encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QGRWbQhwT8b0I8SE9CeSIH8AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM+NCPw3cAnEMXeaIAAgEQgDvQzHKhsCsBmHEQAo6TgsO3ELzRCZrgcM70K+OaF1H64onL6S4gV3KWoAOoeVkSBk9b96m0CT7kcndy+Q==
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQHg9KIREter7GVF091bq5tVAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMdT0eZUhWBTcAO2thAgEQgDtsXsQrTOl0cd5HiFFfaEHOjldcRmxUx8uD60zxsrqowj6pSomFQBL1y5/DHUwdwv38G/Oqyuy5UZ2bOg==
 config:
   aws:region: us-east-1
-  consul:address: https://consul-apps-qa.odl.mit.edu
+  consul:address: https://consul-apps-ci.odl.mit.edu
   consul:scheme: https
   environment:business_unit: operations
   environment:target_vpc: applications_vpc
