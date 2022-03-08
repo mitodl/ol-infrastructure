@@ -60,6 +60,7 @@ jobs:
         STUDIO_BASE_URL: https://studio-ci.xpro.mit.edu
         SUPPORT_URL: https://xpro.zendesk.com/hc
         USER_INFO_COOKIE_NAME: xpro-ci-edx-user-info
+        SHOW_FULLNAME: true
       run:
         path: sh
         dir: mfe-app-learning
