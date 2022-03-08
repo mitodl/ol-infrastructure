@@ -1,14 +1,14 @@
-import json
 from pathlib import Path
 
 import pulumi
 import pulumi_aws as aws
 import pulumi_consul as consul
+from pulumi_aws import iam
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
@@ -38,23 +38,65 @@ aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name}
 cluster_size = search_config.get_int("cluster_size") or 3
 cluster_instance_type = search_config.get("instance_type") or "t3.medium.elasticsearch"
 disk_size = search_config.get_int("disk_size_gb") or 30  # noqa: WPS432
+is_public_web = search_config.get_bool("public_web") or False
+consul_service_name = (
+    search_config.get("consul_service_name") or "elasticsearch"
+)  # Default is for legacy compatability
 
-search_security_group = aws.ec2.SecurityGroup(
-    "opensearch-security-group",
-    name_prefix=f"{environment_name}-opensearch-",
-    tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch"}),
-    description="Grant access to the OpenSearch service domain",
-    egress=default_egress_args,
-    ingress=[
+##########
+# CREATE #
+##########
+
+# Networking
+if is_public_web:
+    sg_ingress_rules = [
+        aws.ec2.SecurityGroupIngressArgs(
+            from_port=DEFAULT_HTTPS_PORT,
+            to_port=DEFAULT_HTTPS_PORT,
+            cidr_blocks=["0.0.0.0/0"],
+            protocol="tcp",
+        )
+    ]
+else:
+    sg_ingress_rules = [
         aws.ec2.SecurityGroupIngressArgs(
             from_port=DEFAULT_HTTPS_PORT,
             to_port=DEFAULT_HTTPS_PORT,
             cidr_blocks=[target_vpc["cidr"]],
             protocol="tcp",
         )
-    ],
+    ]
+search_security_group = aws.ec2.SecurityGroup(
+    "opensearch-security-group",
+    name_prefix=f"{environment_name}-opensearch-",
+    tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch"}),
+    description="Grant access to the OpenSearch service domain",
+    egress=default_egress_args,
+    ingress=sg_ingress_rules,
     vpc_id=target_vpc["id"],
 )
+
+# OpenSearch Domain
+conditional_kwargs = {}
+if not search_config.get_bool("public_web"):
+    conditional_kwargs["vpc_options"] = aws.elasticsearch.DomainVpcOptionsArgs(
+        subnet_ids=target_vpc["subnet_ids"][:3],
+        security_group_ids=[search_security_group.id],
+    )
+
+if search_config.get_bool("secured_cluster"):
+    ## TODO 20220307 MAD, look at encryption @ rest and other options
+    conditional_kwargs[
+        "domain_endpoint_options"
+    ] = aws.elasticsearch.DomainDomainEndpointOptionsArgs(
+        enforce_https=True,
+        tls_security_policy="Policy-Min-TLS-1-2-2019-07",
+    )
+    conditional_kwargs[
+        "node_to_node_encryption"
+    ] = aws.elasticsearch.DomainNodeToNodeEncryptionArgs(
+        enabled=True,
+    )
 
 search_domain = aws.elasticsearch.Domain(
     "opensearch-domain-cluster",
@@ -68,38 +110,78 @@ search_domain = aws.elasticsearch.Domain(
         instance_count=cluster_size,
         instance_type=cluster_instance_type,
     ),
-    vpc_options=aws.elasticsearch.DomainVpcOptionsArgs(
-        subnet_ids=target_vpc["subnet_ids"][:3],
-        security_group_ids=[search_security_group.id],
-    ),
     ebs_options=aws.elasticsearch.DomainEbsOptionsArgs(
         ebs_enabled=True,
         volume_type="gp2",
         volume_size=disk_size,
     ),
     tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch-cluster"}),
+    **conditional_kwargs,
 )
 
-search_domain_policy = aws.elasticsearch.DomainPolicy(
-    "opensearch-domain-cluster-access-policy",
-    domain_name=search_domain.domain_name,
-    access_policies=search_domain.arn.apply(
-        lambda arn: json.dumps(
-            {
-                "Version": IAM_POLICY_VERSION,
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Principal": {"AWS": "*"},
-                        "Action": "es:*",
-                        "Resource": f"{arn}/*",
-                    }
-                ],
-            }
-        )
-    ),
-)
+# IAM / Access Control
+if is_public_web:
+    read_only_policy = iam.Policy(
+        f"opensearch-read-only-policy-{environment_name}",
+        policy=search_domain.arn.apply(
+            lambda arn: lint_iam_policy(
+                {
+                    "Version": IAM_POLICY_VERSION,
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "es:ESHttpGet",
+                            "Resource": f"{arn}/*",
+                        }
+                    ],
+                },
+                stringify=True,
+            )
+        ),
+    )
+    read_write_policy = iam.Policy(
+        f"opensearch-read-write-policy-{environment_name}",
+        policy=search_domain.arn.apply(
+            lambda arn: lint_iam_policy(
+                {
+                    "Version": IAM_POLICY_VERSION,
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "es:ESHttp*",
+                            "Resource": f"{arn}/*",
+                        }
+                    ],
+                },
+                stringify=True,
+            )
+        ),
+    )
 
+else:
+    # Private clusters just get a simple domain policy rather than IAM users
+    search_domain_policy = aws.elasticsearch.DomainPolicy(
+        "opensearch-domain-cluster-access-policy",
+        domain_name=search_domain.domain_name,
+        access_policies=search_domain.arn.apply(
+            lambda arn: lint_iam_policy(
+                {
+                    "Version": IAM_POLICY_VERSION,
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {"AWS": "*"},
+                            "Action": "es:ESHttp*",
+                            "Resource": f"{arn}/*",
+                        }
+                    ],
+                },
+                stringify=True,
+            )
+        ),
+    )
+
+# Consul Service
 consul_config = pulumi.Config("consul")
 consul_provider = consul.Provider(
     "consul-provider",
@@ -111,17 +193,15 @@ consul_provider = consul.Provider(
         ]
     ),
 )
-
 opensearch_node = consul.Node(
     "aws-opensearch-consul-node",
     address=search_domain.endpoint,
     opts=pulumi.ResourceOptions(provider=consul_provider),
 )
-
 opensearch_service = consul.Service(
     "aws-opensearch-consul-service",
     node=opensearch_node.name,
-    name="elasticsearch",
+    name=consul_service_name,
     port=DEFAULT_HTTPS_PORT,
     meta={
         "external-node": True,
@@ -129,9 +209,9 @@ opensearch_service = consul.Service(
     },
     checks=[
         consul.ServiceCheckArgs(
-            check_id="elasticsearch",
+            check_id=consul_service_name,
             interval="10s",
-            name="elasticsearch",
+            name=consul_service_name,
             timeout="1m0s",
             status="passing",
             tcp=pulumi.Output.all(
@@ -142,6 +222,7 @@ opensearch_service = consul.Service(
     opts=pulumi.ResourceOptions(provider=consul_provider),
 )
 
+# Export Resources for shared use
 pulumi.export(
     "cluster",
     {
@@ -152,5 +233,12 @@ pulumi.export(
         "urn": search_domain.urn,
     },
 )
-
 pulumi.export("security_group", search_security_group.id)
+if is_public_web:
+    pulumi.export(
+        "iam_policies",
+        {
+            "read_only_policy_arn": read_only_policy.arn,
+            "read_write_policy_arn": read_write_policy.arn,
+        },
+    )
