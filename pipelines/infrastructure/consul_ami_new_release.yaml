@@ -1,0 +1,80 @@
+---
+resource_types:
+- name: hashicorp-release
+  source:
+    repository: starkandwayne/hashicorp-release-resource
+  type: docker-image
+- name: packer
+  source:
+    repository: mitodl/concourse-packer-resource
+    tag: latest
+  type: docker-image
+- name: packer-builder
+  source:
+    repository: mitodl/concourse-packer-resource-builder
+    tag: latest
+  type: docker-image
+
+
+resources:
+- check_every: 24h
+  name: consul
+  source:
+    project: consul
+  type: hashicorp-release
+- icon: github
+  name: packer_templates
+  source:
+    branch: main
+    paths:
+    - src/bilder/images/consul
+    - src/bilder/images/packer.pkr.hcl
+    - src/bilder/images/variables.pkr.hcl
+    - src/bilder/images/config.pkr.hcl
+    uri: https://github.com/mitodl/ol-infrastructure
+  type: git
+- name: packer-validate
+  type: packer
+- name: packer-build
+  type: packer-builder
+
+jobs:
+- name: packer-validate-workflow
+  plan:
+  - get: consul
+    params:
+      regexp: linux_amd64
+    trigger: true
+  - get: packer_templates
+    trigger: true
+    params:
+      depth: 1
+  - put: packer-validate
+    params:
+      template: packer_templates/src/bilder/images/.
+      objective: validate
+      vars:
+        app_name: consul
+      only:
+      - amazon-ebs.third-party
+
+- name: packer-build-workflow
+  plan:
+  - get: packer_templates
+    passed: [packer-validate-workflow]
+    trigger: true
+    params:
+      depth: 1
+  - put: packer-build
+    params:
+      template: packer_templates/src/bilder/images/.
+      objective: build
+      vars:
+        app_name: consul
+      env_vars:
+        AWS_REGION: us-east-1
+        PYTHONPATH: "${PYTHONPATH}:packer_templates/src"
+      env_vars_from_files:
+        CONSUL_VERSION: consul/version
+      only:
+      - amazon-ebs.third-party
