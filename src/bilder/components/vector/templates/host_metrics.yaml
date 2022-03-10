@@ -5,11 +5,18 @@ sources:
     scrape_interval_secs: 60
     collectors:
     - cpu
+    - disk
     - filesystem
     - load
     - host
     - memory
     - network
+    disk:
+      devices:
+        excludes:
+        - '*'
+        includes:
+        - 'nvme?n?'
 
 transforms:
   cleanup_host_metrics:
