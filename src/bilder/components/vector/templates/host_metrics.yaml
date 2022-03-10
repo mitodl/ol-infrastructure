@@ -13,8 +13,6 @@ sources:
     - network
     disk:
       devices:
-        excludes:
-        - '*'
         includes:
         - 'nvme?n?'
 
