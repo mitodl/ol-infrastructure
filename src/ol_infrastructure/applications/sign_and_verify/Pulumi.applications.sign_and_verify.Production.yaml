@@ -7,3 +7,4 @@ config:
   sign_and_verify:docker_label: release
   sign_and_verify:hmac_secret:
     secure: v1:nVPwlAPwhiCebLXj:UUB5tQvAaaXhkWqwUyw7wcM3I7muH17DCnhVvitguUSqph65mFcKiolNkfs2eV1YPeKu5p6hTYfP4hlmyJUrL2F9k3Y+cl0DWpeX4iSShh2l6DppFKIHt9bBoA==
+  sign_and_verify:oidc_issuer_url: https://xpro.mit.edu

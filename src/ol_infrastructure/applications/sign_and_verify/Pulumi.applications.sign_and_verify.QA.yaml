@@ -7,3 +7,4 @@ config:
   sign_and_verify:domain: digitalcredentials-rc.odl.mit.edu
   sign_and_verify:hmac_secret:
     secure: v1:1au0eh6XI6+9GEGf:PzkSbnvvewPbZa6cOH8jNPb4+xbM64rLhZXjtH4D3imKIODlC6tNJp95eeKWYG3UELL+hNIxj/39IptZCpFKFkePZEvQHDYN+6lW0uQghHNXo91yqHQWfTCl
+  sign_and_verify:oidc_issuer_url: https://rc.xpro.mit.edu

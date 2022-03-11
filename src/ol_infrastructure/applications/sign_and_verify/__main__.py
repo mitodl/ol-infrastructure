@@ -14,6 +14,7 @@ the sign and verify service needed for the Digital Credentials project.
 
 import base64
 import json
+import os
 from pathlib import Path
 
 from pulumi import Config, Output, StackReference
@@ -206,6 +207,11 @@ sign_and_verify_cluster = ecs.Cluster(
     tags=aws_config.merged_tags({"Name": f"sign-and-verify-{stack_info.env_suffix}"}),
 )
 
+container_label = (
+    sign_and_verify_config.get("docker_label")
+    or os.environ.get("SIGN_AND_VERIFY_CONTAINER_LABEL")
+    or "latest"
+)
 sign_and_verify_task = ecs.TaskDefinition(
     f"sign-and-verify-task-{stack_info.env_suffix}",
     cpu="256",
@@ -220,13 +226,17 @@ sign_and_verify_task = ecs.TaskDefinition(
             [
                 {
                     "name": "sign-and-verify",
-                    "image": f'mitodl/sign-and-verify:{sign_and_verify_config.require("docker_label")}',  # noqa: E501, WPS237
+                    "image": f"mitodl/sign-and-verify:{container_label}",
                     "environment": [
                         {"name": "PORT", "value": f"{CONTAINER_PORT}"},
                         {"name": "DIGEST_CHECK", "value": "true"},
                         {
                             "name": "ISSUER_MEMBERSHIP_REGISTRY_URL",
                             "value": "https://digitalcredentials.github.io/issuer-registry/registry.json",  # noqa: E501
+                        },
+                        {
+                            "name": "OIDC_ISSUER_URL",
+                            "value": sign_and_verify_config.require("oidc_issuer_url"),
                         },
                     ],
                     "secrets": [
