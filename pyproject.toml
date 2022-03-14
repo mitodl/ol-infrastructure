@@ -40,7 +40,7 @@ bcrypt = "^3.2.0"
 
 [tool.poetry.dev-dependencies]
 black = "*"
-copier = "^5.1.0"
+copier = "*"
 diagrams = "*"
 isort = "*"
 mypy = "<1.0"
