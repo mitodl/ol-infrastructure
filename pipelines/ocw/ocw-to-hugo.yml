@@ -8,6 +8,7 @@ jobs:
   - get: ocw-json
     trigger: true
   - put: sync-static-resources
+    timeout: 120m
   - config:
       image_resource:
         name: ''

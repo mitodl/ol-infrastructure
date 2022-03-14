@@ -6,4 +6,4 @@ yes | fly -t odl-concourse set-pipeline \
 	-p ocw-to-hugo-rc \
 	--team=ocw \
 	--config=pipelines/ocw/ocw-to-hugo.yml \
-	--load-vars-from pipelines/ocw/vars/pipeline-theme-assets/qa.yml
+	--load-vars-from pipelines/ocw/vars/ocw-to-hugo/qa.yml
