@@ -29,9 +29,6 @@ config:
       min: 1
     aws_tags:
       OU: open-courseware
-    concourse_tags:
-    - tag1
-    - tag2
     concourse_team: ocw
     disk_size_gb: 200
     iam_policies:
@@ -45,12 +42,13 @@ config:
       min: 1
     aws_tags:
       OU: operations
-    concourse_tags:
-    - tag3
-    concourse_team: infra
+    concourse_team: infrastructure
     disk_size_gb: 100
     iam_policies:
     - base
+    - operations
+    - cloud_custodian
+    - infra
     instance_type: t3a.medium
     name: infrastructure
   - auto_scale:
@@ -59,14 +57,11 @@ config:
       min: 1
     aws_tags:
       OU: operations
-    concourse_tags:
-    concourse_team:
     desired_capacity: 2
     disk_size_gb: 100
     iam_policies:
     - base
     - operations
-    - infra
     instance_type: t3a.medium
     name: generic
   consul:address: https://consul-operations-ci.odl.mit.edu
