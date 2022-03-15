@@ -40,7 +40,10 @@ policies:
     days: 30
   - type: unused
     value: true
-# Action Block to tag the AMI for cleanup
+  actions:
+  - type: mark-for-op
+    op: delete
+    days: 30
 
 - name: find-and-mark-mitodl-ami-snapshots
   resource: aws.ebs-snapshot

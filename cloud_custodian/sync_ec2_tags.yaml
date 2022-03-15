@@ -20,8 +20,6 @@ policies:
     key: "VolumeId"
     op: in
     value_from:
-      # TODO, will need to figure out what the concourse path will be here?
-      # Include a comment on how to run it locally?
       url: file:find-mitodl-ec2-instances/resources.json
       format: json
       expr: "[].BlockDeviceMappings[].Ebs.VolumeId"
@@ -39,8 +37,6 @@ policies:
     key: "SnapshotId"
     op: in
     value_from:
-      # TODO, will need to figure out what the concourse path will be here?
-      # Include a comment on how to run it locally?
       url: file:find-and-propagate-tags-mitodl-ebs-volumes/resources.json
       format: json
       expr: "[].SnapshotId"

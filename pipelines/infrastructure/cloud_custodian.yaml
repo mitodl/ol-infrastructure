@@ -9,9 +9,8 @@ resources:
   type: git
   icon: github
   source:
-    branch: main  ###
+    branch: feat/cloud_custodian_pipelines
     uri: https://github.com/mitodl/ol-infrastructure
-
 jobs:
 - name: sync-ec2-tags
   plan:
@@ -30,11 +29,11 @@ jobs:
           tag: 0.9.15.0
       run:
         path: sh
+        user: root
         args:
         - -exc
         - |
-          mkdir /tmp/sync-ec2-tags
-          AWS_DEFAULT_REGION='us-east-1' custodian run --dry-run policies/pipelines/infrastructure/cloud_custodian_policies/sync_ec2_tags.yaml -s /tmp/sync-ec2-tags
+          custodian run --region 'us-east-1' --output-dir '.' 'policies/cloud_custodian/sync_ec2_tags.yaml'
 - name: tag-ebs-resources-for-cleanup
   plan:
   - get: build-schedule
@@ -52,8 +51,8 @@ jobs:
           tag: 0.9.15.0
       run:
         path: sh
+        user: root
         args:
         - -exc
         - |
-          mkdir /tmp/sync-ec2-tags
-          AWS_DEFAULT_REGION='us-east-1' custodian run --dry-run policies/pipelines/infrastructure/cloud_custodian_policies/tag_ebs_resources_for_cleanup.yaml -s /tmp/tag_ebs_resources_for_cleanup
+          custodian run --region 'us-east-1' --output-dir '.' 'policies/cloud_custodian/tag_ebs_resources_for_cleanup.yaml'

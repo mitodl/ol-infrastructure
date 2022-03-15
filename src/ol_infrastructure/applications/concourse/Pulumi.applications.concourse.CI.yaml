@@ -1,3 +1,4 @@
+---
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHjEYf3gV5ZTnviCJcHwGnUuLzld5EuYumgMrRde6bvXUgE9rvKwMh36kigoyf0oNRRpAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM3ptgm6NCCpX9CmtCAgEQgDseumxlwIAYWyEvpYheyiv6TaJwKSlDTcyCRfrJ30eGefNBoi3DJK6NfWf2V7R6RsCBq8uoJfoOL/Cshw==
 config:
@@ -28,9 +29,6 @@ config:
       min: 1
     aws_tags:
       OU: open-courseware
-    concourse_tags:
-    - tag1
-    - tag2
     concourse_team: ocw
     disk_size_gb: 200
     iam_policies:
@@ -44,12 +42,13 @@ config:
       min: 1
     aws_tags:
       OU: operations
-    concourse_tags:
-    - tag3
-    concourse_team: infra
+    concourse_team: infrastructure
     disk_size_gb: 100
     iam_policies:
     - base
+    - operations
+    - cloud_custodian
+    - infra
     instance_type: t3a.medium
     name: infrastructure
   - auto_scale:
@@ -58,14 +57,11 @@ config:
       min: 1
     aws_tags:
       OU: operations
-    concourse_tags: null
-    concourse_team: null
     desired_capacity: 2
     disk_size_gb: 100
     iam_policies:
     - base
     - operations
-    - infra
     instance_type: t3a.medium
     name: generic
   consul:address: https://consul-operations-ci.odl.mit.edu
