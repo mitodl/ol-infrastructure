@@ -2,7 +2,7 @@ from pulumi import export
 from pulumi_aws import route53
 
 from ol_infrastructure.lib.aws.route53_helper import zone_opts
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit, Environment
 
 mitxpro_legacy_dns_name = "mitxpro.mit.edu"
 mitxpro_legacy_opts = zone_opts(mitxpro_legacy_dns_name)
@@ -54,8 +54,21 @@ mitxonline_dns_zone = route53.Zone(
     opts=mitxonline_opts,
 )
 
+ocw_dns_name = "ocw.mit.edu"
+ocw_opts = zone_opts(ocw_dns_name)
+ocw_dns_zone = route53.Zone(
+    "mitodl_subdomain",
+    name=odl_dns_name,
+    comment="DNS Zone used for OCW resources",
+    tags=AWSBase(
+        tags={"OU": BusinessUnit.ocw, "Environment": Environment.applications}
+    ).tags,
+    opts=ocw_opts,
+)
+
 export("mitxpro_legacy_zone_id", mitxpro_legacy_dns_zone.id)
 export("odl_zone_id", odl_dns_zone.id)
 export("mitxonline", {"id": mitxonline_dns_zone.id, "domain": mitxonline_dns_zone.name})
 export("xpro", {"id": xpro_dns_zone.id, "domain": xpro_dns_zone.name})
 export("mitx", {"id": mitx_dns_zone.id, "domain": mitx_dns_zone.name})
+export("ocw", {"id": ocw_dns_zone.id, "domain": ocw_dns_zone.name})
