@@ -58,7 +58,7 @@ ocw_dns_name = "ocw.mit.edu"
 ocw_opts = zone_opts(ocw_dns_name)
 ocw_dns_zone = route53.Zone(
     "ocw_subdomain",
-    name=odl_dns_name,
+    name=ocw_dns_name,
     comment="DNS Zone used for OCW resources",
     tags=AWSBase(
         tags={"OU": BusinessUnit.ocw, "Environment": Environment.applications}
