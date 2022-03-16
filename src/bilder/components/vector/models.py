@@ -18,6 +18,8 @@ class VectorConfig(OLBaseSettings):
     }
     configuration_directory: Path = Path("/etc/vector/")
     data_directory: Path = Path("/var/lib/vector")
+    is_proxy: bool = False
+    tls_config_dir: str = "/etc/ssl/private/vector"
 
     class Config:
         env_prefix = "vector_"

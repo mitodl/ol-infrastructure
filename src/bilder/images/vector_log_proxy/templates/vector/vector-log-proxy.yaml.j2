@@ -1,0 +1,42 @@
+---
+api:
+  enabled: false
+sources:
+  heroku_log_proxy:
+    type: heroku_logs
+    acknowledgements: false
+    address: 0.0.0.0:9000
+    decoding:
+      codec: bytes
+    auth:
+      password: "${HEROKU_PROXY_PASSWORD}"
+      username: "${HEROKU_PROXY_USERNAME}"
+    tls:
+      enabled: true
+      key_file: '/etc/ssl/private/vector/odl_wildcard.key'
+      crt_file: '/etc/ssl/private/vector/odl_wildcard.cert'
+      verify_certificate: false
+    query_parameters:
+    - "app_name"
+    - "environment"
+    - "service"
+transforms: {}
+sinks:
+  ship_herok_logs_to_grafana_cloud:
+    inputs:
+    - 'heroku_log_proxy'
+    type: loki
+    auth:
+      strategy: basic
+      password: ${GRAFANA_CLOUD_API_KEY}
+      user: "${GRAFANA_CLOUD_LOKI_API_USER}"
+    endpoint: https://logs-prod-us-central1.grafana.net
+    encoding:
+      codec: json
+    labels:
+    {% raw %}
+      environment: "{{ environment }}"
+      application: "{{ app_name }}"
+      service: "{{ service }}"
+    {% endraw %}
+    out_of_order_action: rewrite_timestamp
