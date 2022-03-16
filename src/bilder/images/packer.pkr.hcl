@@ -64,7 +64,7 @@ build {
     ]
   }
   provisioner "shell-local" {
-    environment_vars = ["NODE_TYPE=${var.node_type}", "PATH=/bin:/usr/bin:/usr/local/bin"]
+    environment_vars = ["NODE_TYPE=${var.node_type}"]
     inline           = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} ${path.root}/${var.app_name}/deploy.py"]
   }
 
