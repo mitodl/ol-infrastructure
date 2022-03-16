@@ -60,6 +60,11 @@ jobs:
 
 - name: packer-build-workflow
   plan:
+  - get: consul
+    passed: [packer-validate-workflow]
+    params:
+      regexp: linux_amd64
+    trigger: true
   - get: packer_templates
     passed: [packer-validate-workflow]
     trigger: true

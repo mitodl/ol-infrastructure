@@ -57,6 +57,11 @@ jobs:
 
 - name: packer-build-workflow
   plan:
+  - get: vault
+    params:
+      regexp: linux_amd64
+    trigger: true
+    passed: [packer-validate-workflow]
   - get: packer_templates
     passed: [packer-validate-workflow]
     params:
