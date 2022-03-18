@@ -9,7 +9,7 @@ def git_auto_export(state=None, host=None):
     pip.packages(
         name="Install edx-git-auto-export",
         packages=[
-            "git+https://github.com/mitodl/edx-git-auto-export.git@v0.3#egg=edx-git-auto-export",  # noqa: E501
+            "edx-git-auto-export",
         ],
         present=True,
         virtualenv="/edx/app/edxapp/venvs/edxapp/",
