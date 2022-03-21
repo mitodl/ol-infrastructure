@@ -106,6 +106,20 @@ dagster_s3_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS2
             f"arn:aws:s3:::ol-warehouse-results-{stack_info.env_suffix}/*",
         ],
     },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "s3:GetBucketLocation",
+            "s3:GetObject",
+            "s3:ListBucket",
+            "s3:PutObject",
+            "s3:DeleteObject",
+        ],
+        "Resource": [
+            f"arn:aws:s3:::*-{stack_info.env_suffix}-edxapp-courses",
+            f"arn:aws:s3:::*-{stack_info.env_suffix}-edxapp-courses/*",
+        ],
+    },
 ]
 
 athena_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
