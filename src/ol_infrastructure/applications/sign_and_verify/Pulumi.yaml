@@ -5,4 +5,3 @@ description: Pulumi project for deploying the digital credentials Sign and Verif
   service on AWS Fargate
 backend:
   url: s3://mitol-pulumi-state/
-aws:region: us-east-1
