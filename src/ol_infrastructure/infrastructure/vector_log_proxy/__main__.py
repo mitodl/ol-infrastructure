@@ -188,7 +188,7 @@ vector_log_proxy_lb_target_group = lb.TargetGroup(
         path="/events",
         port=str(VECTOR_LOG_PROXY_PORT),
         protocol="HTTPS",
-        matcher="401",
+        matcher="405",
     ),
     name=vector_log_proxy_tag[:TARGET_GROUP_NAME_MAX_LENGTH],
     tags=aws_config.tags,
