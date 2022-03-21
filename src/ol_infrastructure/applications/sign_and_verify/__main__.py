@@ -17,14 +17,23 @@ import json
 import os
 from pathlib import Path
 
-from pulumi import Config, Output, StackReference
-from pulumi_aws import acm, ecs, iam, lb, route53, secretsmanager
+from pulumi import Config, Output, ResourceOptions, StackReference
+from pulumi_aws import Provider, acm, ecs, iam, lb, route53, secretsmanager
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_json_secrets
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+
+aws_provider = Provider(
+    "aws-provider",
+    region="us-east-1",
+    skip_metadata_api_check=False,
+    skip_credentials_validation=False,
+)
+
+aws_opts = ResourceOptions(provider=aws_provider)
 
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -59,6 +68,7 @@ sign_and_verify_load_balancer = lb.LoadBalancer(
     tags=aws_config.merged_tags(
         {"Name": f"sign-and-verify-load-balancer-{stack_info.env_suffix}"}
     ),
+    opts=aws_opts,
 )
 
 sign_and_verify_target_group = lb.TargetGroup(
@@ -76,10 +86,14 @@ sign_and_verify_target_group = lb.TargetGroup(
     ),
     name=f"sign-and-verify-alb-group-{stack_info.env_suffix}",
     tags=aws_config.tags,
+    opts=aws_opts,
 )
 
 sign_and_verify_acm_cert = acm.get_certificate(
-    domain="*.odl.mit.edu", most_recent=True, statuses=["ISSUED"]
+    domain="*.odl.mit.edu",
+    most_recent=True,
+    statuses=["ISSUED"],
+    opts=aws_opts,
 )
 
 sign_and_verify_alb_listener = lb.Listener(
@@ -94,6 +108,7 @@ sign_and_verify_alb_listener = lb.Listener(
             target_group_arn=sign_and_verify_target_group.arn,
         )
     ],
+    opts=aws_opts,
 )
 
 # Store the Unlocked DID in AWS secrets manager because it contains private key
@@ -106,6 +121,7 @@ unlocked_did_secret = secretsmanager.Secret(
     "signing keys for the digital credentials sign and verify service.",
     name_prefix=f"sign-and-verify-unlocked-did-{stack_info.env_suffix}",
     tags=aws_config.tags,
+    opts=aws_opts,
 )
 
 unlocked_did_secret_value = secretsmanager.SecretVersion(
@@ -122,6 +138,7 @@ unlocked_did_secret_value = secretsmanager.SecretVersion(
             ).encode("utf8")
         ).decode("utf8")
     ),  # Base64 encoded JSON object of unlocked DID
+    opts=aws_opts,
 )
 
 hmac_secret = secretsmanager.Secret(
@@ -129,12 +146,14 @@ hmac_secret = secretsmanager.Secret(
     description="Shared secret for validating HMAC",
     name_prefix=f"sign-and-verify-hmac-secret-{stack_info.env_suffix}",
     tags=aws_config.tags,
+    opts=aws_opts,
 )
 
 hmac_secret_value = secretsmanager.SecretVersion(
     f"sign-and-verify-hmac-{stack_info.env_suffix}",
     secret_id=hmac_secret.id,
     secret_string=sign_and_verify_config.require_secret("hmac_secret"),
+    opts=aws_opts,
 )
 # Create the task execution role to grant access to retrieve the Unlocked DID secret and
 # send logs to Cloudwatch
@@ -154,6 +173,7 @@ sign_and_verify_task_execution_role = iam.Role(
         }
     ),
     tags=aws_config.tags,
+    opts=aws_opts,
 )
 
 sign_and_verify_execution_policy = iam.Policy(
@@ -184,18 +204,21 @@ sign_and_verify_execution_policy = iam.Policy(
             stringify=True,
         )
     ),
+    opts=aws_opts,
 )
 
 iam.RolePolicyAttachment(
     "sign-and-verify-task-execution-role-policy-attachment",
     policy_arn=sign_and_verify_execution_policy.arn,
     role=sign_and_verify_task_execution_role.name,
+    opts=aws_opts,
 )
 
 iam.RolePolicyAttachment(
     "sign-and-verify-task-execution-create-log-group-permissions",
     policy_arn=iam_policies["cloudwatch_logging"],
     role=sign_and_verify_task_execution_role.name,
+    opts=aws_opts,
 )
 
 # Create an ECS/Fargate cluster,define the task including container details, and
@@ -205,6 +228,7 @@ sign_and_verify_cluster = ecs.Cluster(
     capacity_providers=["FARGATE"],
     name=f"sign-and-verify-{stack_info.env_suffix}",
     tags=aws_config.merged_tags({"Name": f"sign-and-verify-{stack_info.env_suffix}"}),
+    opts=aws_opts,
 )
 
 container_label = (
@@ -259,6 +283,7 @@ sign_and_verify_task = ecs.TaskDefinition(
             ]
         )
     ),
+    opts=aws_opts,
 )
 
 sign_and_verify_service = ecs.Service(
@@ -291,6 +316,7 @@ sign_and_verify_service = ecs.Service(
             target_group_arn=sign_and_verify_target_group.arn,
         )
     ],
+    opts=aws_opts,
 )
 
 # Create a DNS record to point to the ALB for routing inbound traffic.
