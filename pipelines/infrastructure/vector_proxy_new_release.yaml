@@ -1,0 +1,85 @@
+---
+resource_types:
+- name: packer-validate
+  type: docker-image
+  source:
+    repository: mitodl/concourse-packer-resource
+    tag: latest
+
+- name: github-release
+  type: registry-image
+  source:
+    repository: concourse/github-release-resource
+
+- name: packer-builder
+  type: docker-image
+  source:
+    repository: mitodl/concourse-packer-resource-builder
+    tag: latest
+
+resources:
+- name: packer
+  type: packer-validate
+
+- name: packer-build
+  type: packer-builder
+
+- check_every: 24h
+  name: gh-release
+  type: github-release
+  source:
+    owner: vectordotdev
+    repository: vector
+    release: true
+- icon: github
+  name: packer_templates
+  source:
+    branch: vector_proxy
+    paths:
+    - src/bilder/images/vector_log_proxy
+    - src/bilder/images/packer.pkr.hcl
+    - src/bilder/images/variables.pkr.hcl
+    - src/bilder/images/config.pkr.hcl
+
+    uri: https://github.com/mitodl/ol-infrastructure
+    version:
+      ref: refs/heads/vector_proxy
+  type: git
+
+jobs:
+- name: packer-validate-workflow
+  plan:
+  - get: gh-release
+    trigger: true
+  - get: packer_templates
+  - put: packer
+    params:
+      template: packer_templates/src/bilder/images/.
+      objective: validate
+      vars:
+        app_name: vector_log_proxy
+        node_type: server
+
+- name: packer-build-workflow
+  plan:
+  - get: packer_templates
+    passed: [packer-validate-workflow]
+    params:
+      depth: 1
+    trigger: true
+  - get: gh-release
+    trigger: false
+  - put: packer-build
+    params:
+      template: packer_templates/src/bilder/images/.
+      objective: build
+      vars:
+        app_name: vector_log_proxy
+        node_type: server
+      env_vars:
+        AWS_REGION: us-east-1
+        PYTHONPATH: "${PYTHONPATH}:packer_templates/src"
+      #env_vars_from_files:
+      #  VECTOR_VERSION: gh-release/version
+      only:
+      - amazon-ebs.third-party
