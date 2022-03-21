@@ -1,0 +1,9 @@
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QGcm9SEVTe6GH5dWCfsTMRvAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMO48njPZCA/sRnJ5fAgEQgDtZvhfXWtifUPW5oNorhsvcpMafW6YZwwkqtCzFYRBoPFJ3QUfuOQcRvlQbzKi2UPWd9Wlad6vg08KJKg==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-operations-qa.odl.mit.edu
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa
+  vector_log_proxy:target_vpc: operations_vpc
+  vector_log_proxy:web_host_domain: log-proxy-qa.odl.mit.edu

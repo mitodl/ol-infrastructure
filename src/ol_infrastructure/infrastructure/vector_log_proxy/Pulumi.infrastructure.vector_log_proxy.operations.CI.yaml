@@ -6,7 +6,5 @@ config:
   consul:address: https://consul-operations-ci.odl.mit.edu
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
-  vector_log_proxy:basic_auth_credentials:
-    secure: v1:LW9hdO8lkcx3yPqA:YYwmesrFKl8hIQyJXHUFQ7L/kpx/ghdCBXPewyEdM74obdrLxqHs+dagPThsOGRuC5Hvjoph/1A+gmgHuFG9a5pc2byUllbV5XcUHCaropp0fOrhoJIvoPo821uX
   vector_log_proxy:target_vpc: operations_vpc
   vector_log_proxy:web_host_domain: log-proxy-ci.odl.mit.edu

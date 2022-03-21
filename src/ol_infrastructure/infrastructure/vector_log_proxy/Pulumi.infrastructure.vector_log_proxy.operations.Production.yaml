@@ -1,0 +1,9 @@
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgFILwleBy7ygORfoGO6VA7vAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM2cYa5W1swVP6rjG4AgEQgDveu6a6q1yh2BDpM1uU4WnJu46uLJ7XKnX5oFkZGP0eFmu8wicYF5yvaQ5CYIgBPT5mpFHgXXGHVg+sYg==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-operations-production.odl.mit.edu
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
+  vector_log_proxy:target_vpc: operations_vpc
+  vector_log_proxy:web_host_domain: log-proxy.odl.mit.edu
