@@ -60,13 +60,11 @@ def _install_from_package(state=None, host=None):
 def install_vector(vector_config: VectorConfig, state=None, host=None):
     install_method_map = {"package": _install_from_package}
     install_method_map[vector_config.install_method](state, host)
-
     if vector_config.is_proxy:
         files.directory(
             name="Ensure TLS config directory exists",
-            path=vector_config.tls_config_dir,
-            user="root",
-            group="root",
+            path=vector_config.tls_config_directory,
+            user=vector_config.user,
             present=True,
             state=state,
             host=host,
@@ -84,17 +82,6 @@ def configure_vector(vector_config: VectorConfig, state=None, host=None):
             ),
             user=vector_config.user,
             context=context,
-            state=state,
-            host=host,
-        )
-
-    if vector_config.is_proxy:
-        server.shell(
-            name="Set facl permissions on wildcard cert and key",
-            commands=[
-                f"setfacl -R -m u:{vector_config.user}:rwx {vector_config.tls_config_dir}",
-                f"setfacl -R -d -m u:{vector_config.user}:rwx {vector_config.tls_config_dir}",
-            ],
             state=state,
             host=host,
         )
