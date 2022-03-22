@@ -36,6 +36,8 @@ dns_stack = StackReference("infrastructure.aws.dns")
 consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
+env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+
 target_vpc_name = (
     vector_log_proxy_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
 )
@@ -45,10 +47,13 @@ VECTOR_LOG_PROXY_PORT = vector_log_proxy_config.get("listener_port") or 9000
 
 consul_security_groups = consul_stack.require_output("security_groups")
 aws_config = AWSBase(
-    tags={"OU": "operations", "Environment": f"operations-{stack_info.env_suffix}"}
+    tags={
+        "OU": vector_log_proxy_config.get("business_unit") or "operations",
+        "Environment": f"{env_name}",
+    }
 )
 aws_account = get_caller_identity()
-ops_vpc_id = target_vpc["id"]
+vpc_id = target_vpc["id"]
 vector_log_proxy_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["vector_log_proxy-*"]),
@@ -59,7 +64,7 @@ vector_log_proxy_ami = ec2.get_ami(
     owners=[aws_account.account_id],
 )
 
-vector_log_proxy_tag = f"vector-log-proxy-{stack_info.env_suffix}"
+vector_log_proxy_tag = f"vector-server-{env_name}"
 consul_provider = get_consul_provider(stack_info)
 
 ###############################
@@ -68,7 +73,7 @@ consul_provider = get_consul_provider(stack_info)
 
 # IAM and instance profile
 vector_log_proxy_instance_role = iam.Role(
-    f"vector-log-proxy-instance-role-{stack_info.env_suffix}",
+    f"vector-log-proxy-instance-role-{env_name}",
     assume_role_policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -83,17 +88,17 @@ vector_log_proxy_instance_role = iam.Role(
     tags=aws_config.tags,
 )
 iam.RolePolicyAttachment(
-    f"vector-log-proxy-describe-instance-role-policy-{stack_info.env_suffix}",
+    f"vector-log-proxy-describe-instance-role-policy-{env_name}",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
     role=vector_log_proxy_instance_role.name,
 )
 iam.RolePolicyAttachment(
-    f"vector-log-proxy-route53-role-policy-{stack_info.env_suffix}",
+    f"vector-log-proxy-route53-role-policy-{env_name}",
     policy_arn=policy_stack.require_output("iam_policies")["route53_odl_zone_records"],
     role=vector_log_proxy_instance_role.name,
 )
 vector_log_proxy_instance_profile = iam.InstanceProfile(
-    f"vector-log-proxy-instance-profile-{stack_info.env_suffix}",
+    f"vector-log-proxy-instance-profile-{env_name}",
     role=vector_log_proxy_instance_role.name,
     path="/ol-infrastructure/vector-log-proxy/profile/",
 )
@@ -105,14 +110,20 @@ vector_log_proxy_secrets_mount = vault.Mount(
     path="secret-vector-log-proxy",
     type="kv-v2",
 )
+heroku_proxy_credentials = read_yaml_secrets(
+    Path(f"vector/heroku_proxy.{stack_info.env_suffix}.yaml")
+)
 vault.generic.Secret(
     "vector-log-proxy-http-auth-creds",
     path=vector_log_proxy_secrets_mount.path.apply(
         lambda mount_path: f"{mount_path}/basic_auth_credentials"
     ),
-    data_json=vector_log_proxy_config.require_secret_object(
-        "basic_auth_credentials"
-    ).apply(json.dumps),
+    data_json=json.dumps(
+        {
+            "username": heroku_proxy_credentials["username"],
+            "password": heroku_proxy_credentials["password"],
+        }
+    ),
 )
 
 # Vault policy definition
@@ -132,7 +143,7 @@ vault.aws.AuthBackendRole(
     bound_iam_instance_profile_arns=[vector_log_proxy_instance_profile.arn],
     bound_ami_ids=[vector_log_proxy_ami.id],
     bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[ops_vpc_id],
+    bound_vpc_ids=[vpc_id],
     token_policies=[vector_log_proxy_vault_policy.name],
 )
 
@@ -141,8 +152,8 @@ vault.aws.AuthBackendRole(
 ##################################
 # Create security group
 vector_log_proxy_security_group = ec2.SecurityGroup(
-    f"vector-log-proxy-security-group-{stack_info.env_suffix}",
-    name=f"vector-log-proxy-operations-{stack_info.env_suffix}",
+    f"vector-log-proxy-security-group-{env_name}",
+    name=f"vector-log-proxy-operations-{env_name}",
     description="Access control for vector-log-proxy servers",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -154,7 +165,7 @@ vector_log_proxy_security_group = ec2.SecurityGroup(
         ),
     ],
     egress=default_egress_args,
-    vpc_id=ops_vpc_id,
+    vpc_id=vpc_id,
 )
 
 ###################################
@@ -162,9 +173,12 @@ vector_log_proxy_security_group = ec2.SecurityGroup(
 ###################################
 
 # Create load balancer for Concourse web nodes
+LOAD_BALANCER_NAME_MAX_LENGTH = 32
 vector_log_proxy_lb = lb.LoadBalancer(
     "vector-log-proxy-load-balancer",
-    name=f"vector-log-proxy-alb-{stack_info.env_suffix}",
+    name=f"vector-log-proxy-alb-{stack_info.env_prefix[:3]}-{stack_info.env_prefix[:2]}"[
+        :LOAD_BALANCER_NAME_MAX_LENGTH
+    ],
     ip_address_type="dualstack",
     load_balancer_type="application",
     enable_http2=True,
@@ -178,7 +192,7 @@ vector_log_proxy_lb = lb.LoadBalancer(
 TARGET_GROUP_NAME_MAX_LENGTH = 32
 vector_log_proxy_lb_target_group = lb.TargetGroup(
     "vector-log-proxy-alb-target-group",
-    vpc_id=ops_vpc_id,
+    vpc_id=vpc_id,
     target_type="instance",
     port=VECTOR_LOG_PROXY_PORT,
     protocol="HTTPS",
@@ -219,13 +233,10 @@ consul_datacenter = consul_stack.require_output("datacenter")
 grafana_credentials = read_yaml_secrets(
     Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
 )
-heroku_proxy_credentials = read_yaml_secrets(
-    Path(f"vector/heroku_proxy.{stack_info.env_suffix}.yaml")
-)
 
 vector_log_proxy_launch_config = ec2.LaunchTemplate(
     "vector-log-proxy-launch-template",
-    name_prefix=f"vector-log-proxy-{stack_info.env_suffix}-",
+    name_prefix=f"vector-server-{env_name}-",
     description="Launch template for deploying vector-log-proxy nodes",
     iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
         arn=vector_log_proxy_instance_profile.arn,
@@ -235,7 +246,7 @@ vector_log_proxy_launch_config = ec2.LaunchTemplate(
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name="/dev/xvda",
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=vector_log_proxy_config.get_int("disk_size") or 8,
+                volume_size=vector_log_proxy_config.get_int("disk_size") or 25,
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
             ),
