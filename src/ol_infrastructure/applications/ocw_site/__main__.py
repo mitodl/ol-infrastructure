@@ -27,6 +27,11 @@ draft_bucket_arn = f"arn:aws:s3:::{draft_bucket_name}"
 live_bucket_name = f"ocw-content-live-{stack_info.env_suffix}"
 live_bucket_arn = f"arn:aws:s3:::{live_bucket_name}"
 
+draft_backup_bucket_name = f"ocw-content-backup-draft-{stack_info.env_suffix}"
+draft_backup_bucket_arn = f"arn:aws:s3:::{draft_bucket_name}"
+live_backup_bucket_name = f"ocw-content-backup-live-{stack_info.env_suffix}"
+live_backup_bucket_arn = f"arn:aws:s3:::{live_bucket_name}"
+
 draft_bucket = s3.Bucket(
     draft_bucket_name,
     bucket=draft_bucket_name,
@@ -42,6 +47,27 @@ draft_bucket = s3.Bucket(
                     "Principal": "*",
                     "Action": ["s3:GetObject"],
                     "Resource": [f"{draft_bucket_arn}/*"],
+                }
+            ],
+        }
+    ),
+    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
+)
+draft_backup_bucket = s3.Bucket(
+    draft_backup_bucket_name,
+    bucket=draft_backup_bucket_name,
+    tags=aws_config.tags,
+    acl="public-read",
+    policy=json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "PublicRead",
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": ["s3:GetObject"],
+                    "Resource": [f"{draft_backup_bucket_arn}/*"],
                 }
             ],
         }
@@ -64,6 +90,27 @@ live_bucket = s3.Bucket(
                     "Principal": "*",
                     "Action": ["s3:GetObject"],
                     "Resource": [f"{live_bucket_arn}/*"],
+                }
+            ],
+        }
+    ),
+    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
+)
+live_backup_bucket = s3.Bucket(
+    live_backup_bucket_name,
+    bucket=live_backup_bucket_name,
+    tags=aws_config.tags,
+    acl="public-read",
+    policy=json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "PublicRead",
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": ["s3:GetObject"],
+                    "Resource": [f"{live_backup_bucket_arn}/*"],
                 }
             ],
         }
@@ -93,8 +140,12 @@ s3_bucket_iam_policy = iam.Policy(
                     "Resource": [
                         draft_bucket_arn,
                         f"{draft_bucket_arn}/*",
+                        draft_backup_bucket_arn,
+                        f"{draft_backup_bucket_arn}/*",
                         live_bucket_arn,
                         f"{live_bucket_arn}/*",
+                        live_backup_bucket_arn,
+                        f"{live_backup_bucket_arn}/*",
                     ],
                 }
             ],
@@ -106,7 +157,12 @@ s3_bucket_iam_policy = iam.Policy(
 export(
     "ocw_site_buckets",
     {
-        "buckets": [draft_bucket_name, live_bucket_name],
+        "buckets": [
+            draft_bucket_name,
+            draft_backup_bucket_name,
+            live_bucket_name,
+            live_backup_bucket,
+        ],
         "policy": s3_bucket_iam_policy.name,
     },
 )
