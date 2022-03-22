@@ -161,7 +161,7 @@ export(
             draft_bucket_name,
             draft_backup_bucket_name,
             live_bucket_name,
-            live_backup_bucket,
+            live_backup_bucket_name,
         ],
         "policy": s3_bucket_iam_policy.name,
     },
