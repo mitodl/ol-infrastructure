@@ -28,9 +28,9 @@ live_bucket_name = f"ocw-content-live-{stack_info.env_suffix}"
 live_bucket_arn = f"arn:aws:s3:::{live_bucket_name}"
 
 draft_backup_bucket_name = f"ocw-content-backup-draft-{stack_info.env_suffix}"
-draft_backup_bucket_arn = f"arn:aws:s3:::{draft_bucket_name}"
+draft_backup_bucket_arn = f"arn:aws:s3:::{draft_backup_bucket_name}"
 live_backup_bucket_name = f"ocw-content-backup-live-{stack_info.env_suffix}"
-live_backup_bucket_arn = f"arn:aws:s3:::{live_bucket_name}"
+live_backup_bucket_arn = f"arn:aws:s3:::{live_backup_bucket_name}"
 
 draft_bucket = s3.Bucket(
     draft_bucket_name,
