@@ -10,8 +10,9 @@ Once a day we will copy the content from the real ocw s3 buckets to a backup buc
   - Navigate to the relevant service.
   - Clone the active configuration.
   - In your new clone, under `origins` and `hosts`, update references to `ocw-content-<draft|live>-<env>` to `ocw-content-backup-<draft|live>-<env>`.
+  - Additionally, be sure to check `override-host`, `SNI Host`, and `Certificate Host` sections for any values that need to be updated in the same manner.
   - Activate the new configuration.
-- Verify  << something >>
+- Verify by navigating to the appropriate OCW instance and verify that courses and resources are all working as expected. Try many different courses and resources.
 
 ### Runbook for un-DR of ocw-content
 
@@ -19,8 +20,9 @@ Once a day we will copy the content from the real ocw s3 buckets to a backup buc
   - Navigate to the relevant service.
   - Clone the active configuration.
   - In your new clone, under `origins` and `hosts`, update references to `ocw-content-backup-<draft|live>-<env>` to `ocw-content-<draft|live>-<env>`.
+  - Additionally, be sure to check `override-host`, `SNI Host`, and `Certificate Host` sections for any values that need to be updated in the same manner.
 - Unpause the backup pipeline or restore it with a `set-pipeline` command.
-- Verify << something >>
+- Verify by navigating to the appropriate OCW instance and verify that courses and resources are all working as expected. Try many different courses and resources.
 
 ### set-pipeline
 
