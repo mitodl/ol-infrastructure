@@ -4,17 +4,23 @@ Once a day we will copy the content from the real ocw s3 buckets to a backup buc
 
 ### Runbook for DR of ocw-content
 
-1. Confirm the last execution of the relevant `backup-ocw-content` job in concourse.
-2. IMPORTANT: Pause that pipeline so that no further executions will take place (which would sync the bad content from the real bucket over the backup bucket...). To  feel double safe, you can run a destroy-pipeline `fly` command on it as well.
-3. Go to fastly and << something >>
-4. Verify  << something >>
+- Confirm the last execution of the relevant `backup-ocw-content` job in concourse.
+- IMPORTANT: Pause that pipeline so that no further executions will take place (which would sync the bad content from the real bucket over the backup bucket...). To  feel double safe, you can run a destroy-pipeline `fly` command on it as well.
+- Go to fastly.
+  - Navigate to the relevant service.
+  - Clone the active configuration.
+  - In your new clone, under `origins` and `hosts`, update references to `ocw-content-<draft|live>-<env>` to `ocw-content-backup-<draft|live>-<env>`.
+  - Activate the new configuration.
+- Verify  << something >>
 
 ### Runbook for un-DR of ocw-content
 
-1. Go to fastly and << something >>
-2. Unpause the backup pipeline or restore it with a `set-pipeline` command.
-3. Verify << something >>
-
+- Go to fastly
+  - Navigate to the relevant service.
+  - Clone the active configuration.
+  - In your new clone, under `origins` and `hosts`, update references to `ocw-content-backup-<draft|live>-<env>` to `ocw-content-<draft|live>-<env>`.
+- Unpause the backup pipeline or restore it with a `set-pipeline` command.
+- Verify << something >>
 
 ### set-pipeline
 
