@@ -1466,7 +1466,7 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     user: str = "root"
 
     additional_resource_types_directory: Path = Field(
-        Path("resource_types"),
+        Path("resource-types"),
         description="The sub-path to use underneat the configured deploy_directory",
     )
     additional_resource_types_s3_location: Optional[str] = Field(
