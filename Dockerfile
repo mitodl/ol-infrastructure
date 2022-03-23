@@ -1,6 +1,5 @@
 FROM python:3.9-slim as build
-RUN apt-get update && apt-get install -q -y curl
-RUN useradd -m app
+RUN apt-get update -yqq && apt-get install -yqq curl  && useradd -m app
 USER app
 RUN mkdir /home/app/workspace && chown app:app /home/app/workspace
 WORKDIR /home/app/workspace
@@ -15,5 +14,6 @@ RUN poetry install --no-dev &&\
 FROM python:3.9-slim
 RUN useradd -m app
 USER app
-WORKDIR /home/app
+WORKDIR /home/app/workspace
+ENV PATH /bin:/usr/bin/:/usr/local/bin:/home/app/.local/bin:/home/app/workspace/.venv/bin/pyinfra
 COPY --from=build /home/app/workspace/.venv/ .venv
