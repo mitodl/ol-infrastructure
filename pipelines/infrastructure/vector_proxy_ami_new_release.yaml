@@ -26,7 +26,7 @@ resources:
 - icon: github
   name: packer_templates
   source:
-    branch: vector_proxy
+    branch: main
     paths:
     - src/bilder/images/vector_log_proxy
     - src/bilder/images/packer.pkr.hcl
