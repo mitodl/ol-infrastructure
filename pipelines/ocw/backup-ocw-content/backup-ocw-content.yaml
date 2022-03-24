@@ -1,0 +1,41 @@
+---
+resources:
+- name: build-schedule
+  type: time
+  icon: clock
+  source:
+    interval: 24h
+    start: 12:00 AM
+    stop: 1:00 AM
+    initial_version: true
+
+jobs:
+- name: backup-((env_name))-content
+  plan:
+  - get: build-schedule
+    trigger: true
+  - in_parallel:
+    - task: backup-draft
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source: {repository: amazon/aws-cli}
+        run:
+          path: sh
+          args:
+          - -exc
+          - |
+            aws s3 sync s3://((draft_source_bucket_name)) s3://((draft_destination_bucket_name))
+    - task: backup-live
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source: {repository: amazon/aws-cli}
+        run:
+          path: sh
+          args:
+          - -exc
+          - |
+            aws s3 sync s3://((live_source_bucket_name)) s3://((live_destination_bucket_name))
