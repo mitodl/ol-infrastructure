@@ -1,0 +1,11 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQHAJhm9A8+QCxlIc9kvWIeUAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMWgk3XpNyfVg/ICiIAgEQgDs4Zvc15mYMmCWH88SGzxMjDjZQSBDvdShVOCbyKEtglsiDvGhu8xvd6kObreD9f1QcO10KJBsHetIYRw==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-operations-ci.odl.mit.edu
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
+  vector_log_proxy:business_unit: operations
+  vector_log_proxy:target_vpc: operations_vpc
+  vector_log_proxy:web_host_domain: log-proxy-ci.odl.mit.edu

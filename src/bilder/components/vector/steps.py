@@ -60,6 +60,15 @@ def _install_from_package(state=None, host=None):
 def install_vector(vector_config: VectorConfig, state=None, host=None):
     install_method_map = {"package": _install_from_package}
     install_method_map[vector_config.install_method](state, host)
+    if vector_config.is_proxy:
+        files.directory(
+            name="Ensure TLS config directory exists",
+            path=vector_config.tls_config_directory,
+            user=vector_config.user,
+            present=True,
+            state=state,
+            host=host,
+        )
 
 
 @deploy("Configure Vector")
@@ -76,6 +85,7 @@ def configure_vector(vector_config: VectorConfig, state=None, host=None):
             state=state,
             host=host,
         )
+
     # Validate the vector configuration files that were laid down
     # and confirm that vector starts without issue.
     server.shell(
@@ -85,8 +95,10 @@ def configure_vector(vector_config: VectorConfig, state=None, host=None):
             "VECTOR_CONFIG_DIR": "/etc/vector",
             "AWS_REGION": "us-east-1",
             "ENVIRONMENT": "placeholder",
-            "GRAFANA_CLOUD_API_KEY": "placeholder",
+            "GRAFANA_CLOUD_API_KEY": "placeholder",  # pragma: allowlist secret
             "HOSTNAME": "placeholder",
+            "HEROKU_PROXY_PASSWORD": "placeholder",  # pragma: allowlist secret
+            "HEROKU_PROXY_USERNAME": "placeholder",
         },
         state=state,
         host=host,
