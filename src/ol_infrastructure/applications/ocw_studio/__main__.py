@@ -5,12 +5,14 @@
 - Create an IAM policy to grant access to S3 and other resources
 """
 import json
+from pathlib import Path
 
 import pulumi_github as github
 import pulumi_vault as vault
 from pulumi import Config, StackReference, export
 from pulumi_aws import cloudwatch, ec2, iam, mediaconvert, s3, sns
 
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -231,11 +233,13 @@ ocw_studio_secrets = vault.Mount(
     description="Static secrets storage for the OCW Studio application",
 )
 
-vault_secrets = ocw_studio_config.require_secret_object("vault_secrets")
+vault_secrets = read_yaml_secrets(
+    Path(f"ocw_studio/ocw_studio.{stack_info.env_suffix}.yaml")
+)
 vault.generic.Secret(
     "ocw-studio-vault-secrets",
     path=ocw_studio_secrets.path.apply("{}/app-config".format),
-    data_json=vault_secrets.apply(json.dumps),
+    data_json=vault_secrets["ocw_secrets"],
 )
 gh_repo = github.get_repository(full_name="mitodl/ocw-hugo-projects")
 ocw_starter_webhook = github.RepositoryWebhook(
@@ -248,7 +252,7 @@ ocw_starter_webhook = github.RepositoryWebhook(
             ocw_studio_config.require("app_domain")
         ),
         content_type="application/json",
-        secret=vault_secrets["github_shared_secret"],
+        secret=json.loads(vault_secrets["ocw_secrets"])["github_shared_secret"],
     ),
 )
 
