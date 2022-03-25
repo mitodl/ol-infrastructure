@@ -1,0 +1,1762 @@
+{
+    "version": 3,
+    "deployment": {
+        "manifest": {
+            "time": "2022-03-25T14:34:55.383296-04:00",
+            "magic": "716f0bdad25b3b8e2145d2be034ba3ea4bdfb2c5330ba1d595d227e45289fbfd",
+            "version": "v3.24.1"
+        },
+        "secrets_providers": {
+            "type": "cloud",
+            "state": {
+                "url": "awskms://alias/PulumiSecrets",
+                "encryptedkey": "AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQHf3dRcABsiB+A2qldraKoqAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMN+CAmk1102sg3gnDAgEQgDtsb+hxR9u+fCHBgXXz5M5hxz4FhC548ch2TiXQ2vaT7PgAbpKyKe7wvNoYn0Wyf2xUYcD58cKvc7P68A=="
+            }
+        },
+        "resources": [
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "custom": false,
+                "type": "pulumi:pulumi:Stack",
+                "outputs": {
+                    "ocw_studio_app": {
+                        "mediaconvert_queue": "ocw-studio-mediaconvert-queue-qa",
+                        "rds_host": "ocw-studio-db-applications-qa.cbnm7ajau6mi.us-east-1.rds.amazonaws.com"
+                    }
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default",
+                "custom": true,
+                "id": "6b3d7b2f-f51b-434c-becb-e072b0e9632b",
+                "type": "pulumi:providers:aws",
+                "inputs": {
+                    "region": "us-east-1",
+                    "version": "4.38.1"
+                },
+                "outputs": {
+                    "region": "us-east-1",
+                    "version": "4.38.1"
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:infrastructure:aws:database:OLAmazonDB::ocw-studio-db-applications-qa",
+                "custom": false,
+                "type": "ol:infrastructure:aws:database:OLAmazonDB",
+                "outputs": {
+                    "parameter_group": {
+                        "4dabf18193072939515e22adb298388d": "5cf8f73096256a8f31e491e813e4eb8e",
+                        "id": "ocw-studio-db-applications-qa-postgres-parameter-group",
+                        "packageVersion": "",
+                        "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:infrastructure:aws:database:OLAmazonDB$aws:rds/parameterGroup:ParameterGroup::ocw-studio-db-applications-qa-postgres-parameter-group"
+                    },
+                    "rds_instance": {
+                        "4dabf18193072939515e22adb298388d": "5cf8f73096256a8f31e491e813e4eb8e",
+                        "id": "ocw-studio-db-applications-qa",
+                        "packageVersion": "",
+                        "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:infrastructure:aws:database:OLAmazonDB$aws:rds/instance:Instance::ocw-studio-db-applications-qa-postgres-instance"
+                    }
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA"
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql::ocw_studio",
+                "custom": false,
+                "type": "ol:services:Vault:DatabaseBackend:postgresql",
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA"
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:github::default",
+                "custom": true,
+                "id": "080b89e7-f146-4a5b-967e-f9b436e3c82e",
+                "type": "pulumi:providers:github",
+                "inputs": {
+                    "version": "4.10.0"
+                },
+                "outputs": {
+                    "version": "4.10.0"
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:vault::vault-provider",
+                "custom": true,
+                "id": "7cde6325-984b-4a8a-aa28-2a6e98d83a91",
+                "type": "pulumi:providers:vault",
+                "inputs": {
+                    "addAddressToEnv": true,
+                    "address": "https://vault-qa.odl.mit.edu",
+                    "authLogins": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "ciphertext": "v1:1DFMdUK8t1aoBaFN:v7JSI1ZtsPifmM6k26++bBSg8KX8U3GzRzrBJCfrm31FKE2Y3/T1dSTUqq4DvlLetp2UIMSMop1mUiLiprY5giFZlpq3rTX7+07mAcVfCcVxIEfeqSuRn0++gbIz0wD+iDpZAJp+U8T+xOfOKfYLbEIaIJnhzN77djajZKOn527v8+ZBuZ0Ev5Lc/xKR2STch8Q5gc2uNX/s1bcmCfa/UdjsR+RW5xjMT2yJMDAgV9MyImskCcagQgFyUBlcvo8ZRvbU/A=="
+                    },
+                    "maxLeaseTtlSeconds": "1200",
+                    "maxRetries": "2",
+                    "token": "",
+                    "version": "5.3.0"
+                },
+                "outputs": {
+                    "addAddressToEnv": true,
+                    "address": "https://vault-qa.odl.mit.edu",
+                    "authLogins": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "ciphertext": "v1:f37YIsbVIdx8xvbo:hthMHV3ErXSQKUS1isNJskPSNJnPIP0oQzH3B/+Xw8vtrjHIersshwSuT17spw3a+aIkTyN4hoPSypZcEqXppgw+ORacaloO6gfIXkR1pyd5W4RsRqpjdfBdfkG/G9AKWAvo4pOTfPAwogi0l8npJgTp5IDwJ0gdDFKBo5Uq4u4rQ/LESzd5tKdcm0dKCOknLSQF+LQQL7227HJ4hWQsFNVISL/Z0+sFf95jmZKcxl+ar0OSen2XrgMJRmyabU5r3AiTow=="
+                    },
+                    "maxLeaseTtlSeconds": "1200",
+                    "maxRetries": "2",
+                    "token": "",
+                    "version": "5.3.0"
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "propertyDependencies": {
+                    "addAddressToEnv": null,
+                    "address": null,
+                    "authLogins": null,
+                    "maxLeaseTtlSeconds": null,
+                    "maxRetries": null,
+                    "token": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::vault:index/mount:Mount::ocw-studio-vault-secrets-storage",
+                "custom": true,
+                "id": "secret-ocw-studio",
+                "type": "vault:index/mount:Mount",
+                "inputs": {
+                    "__defaults": [
+                        "externalEntropyAccess"
+                    ],
+                    "description": "Static secrets storage for the OCW Studio application",
+                    "externalEntropyAccess": false,
+                    "path": "secret-ocw-studio",
+                    "type": "kv-v2"
+                },
+                "outputs": {
+                    "accessor": "kv_9fafdf5e",
+                    "auditNonHmacRequestKeys": [],
+                    "auditNonHmacResponseKeys": [],
+                    "defaultLeaseTtlSeconds": 0,
+                    "description": "Static secrets storage for the OCW Studio application",
+                    "externalEntropyAccess": false,
+                    "id": "secret-ocw-studio",
+                    "local": false,
+                    "maxLeaseTtlSeconds": 0,
+                    "options": {},
+                    "path": "secret-ocw-studio",
+                    "sealWrap": false,
+                    "type": "kv-v2"
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:vault::vault-provider::7cde6325-984b-4a8a-aa28-2a6e98d83a91",
+                "propertyDependencies": {
+                    "description": null,
+                    "path": null,
+                    "type": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount::ocw_studio-mount-point",
+                "custom": true,
+                "id": "postgres-ocw-studio-applications-qa",
+                "type": "vault:index/mount:Mount",
+                "inputs": {
+                    "__defaults": [
+                        "externalEntropyAccess"
+                    ],
+                    "defaultLeaseTtlSeconds": 15552000,
+                    "externalEntropyAccess": false,
+                    "maxLeaseTtlSeconds": 15552000,
+                    "path": "postgres-ocw-studio-applications-qa",
+                    "type": "database"
+                },
+                "outputs": {
+                    "accessor": "database_a1f95a67",
+                    "auditNonHmacRequestKeys": [],
+                    "auditNonHmacResponseKeys": [],
+                    "defaultLeaseTtlSeconds": 15552000,
+                    "description": "",
+                    "externalEntropyAccess": false,
+                    "id": "postgres-ocw-studio-applications-qa",
+                    "local": false,
+                    "maxLeaseTtlSeconds": 15552000,
+                    "options": {},
+                    "path": "postgres-ocw-studio-applications-qa",
+                    "sealWrap": false,
+                    "type": "database"
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql::ocw_studio",
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:vault::vault-provider::7cde6325-984b-4a8a-aa28-2a6e98d83a91",
+                "propertyDependencies": {
+                    "defaultLeaseTtlSeconds": null,
+                    "maxLeaseTtlSeconds": null,
+                    "path": null,
+                    "type": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default_4_38_1",
+                "custom": true,
+                "id": "a0a0edbf-ea6e-42f5-85d8-deac53710b25",
+                "type": "pulumi:providers:aws",
+                "inputs": {
+                    "region": "us-east-1",
+                    "version": "4.38.1"
+                },
+                "outputs": {
+                    "region": "us-east-1",
+                    "version": "4.38.1"
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::vault:generic/secret:Secret::ocw-studio-vault-secrets",
+                "custom": true,
+                "id": "secret-ocw-studio/app-config",
+                "type": "vault:generic/secret:Secret",
+                "inputs": {
+                    "__defaults": [
+                        "deleteAllVersions",
+                        "disableRead"
+                    ],
+                    "dataJson": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "ciphertext": "v1:lGJ0QzI9k2dpNCQR:URBPXWCkffE98alhtwLwyan1eMfdmoGCvqbmGbxWB/oLuoETJG1jAD3q2M/bpaqDYzFp1se4KrLNA2q4eEqkSKrFeq0CfZiCnmm807jglJ1aCrnKzmca"
+                    },
+                    "deleteAllVersions": false,
+                    "disableRead": false,
+                    "path": "secret-ocw-studio/app-config"
+                },
+                "outputs": {
+                    "__meta": "{\"schema_version\":\"1\"}",
+                    "data": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "ciphertext": "v1:xGGWjvgDf+4QcqtG:dfbPn8COY6IarFedJde84rV3yYdlyB3qINr7nN4PRXcCtfSbsaY6Kz+qkmVhSoQeCGWyhtmf1NMfFzbfOosVfHl0vq4i7eLaZkfTBbydKogr"
+                    },
+                    "dataJson": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "ciphertext": "v1:Rfjq5vIdAx98bA5t:rffYOEXxvxL/vfN/a+iTAbbGhLdnja46FSUxdrmOlxTmvo33ISwcNCFKf8nLr4PIPQJkO9NWxF+TBOwowGR3vbMGOw3LpGHhCCiQdBxjjy2TXoG6M++5"
+                    },
+                    "deleteAllVersions": false,
+                    "disableRead": false,
+                    "id": "secret-ocw-studio/app-config",
+                    "path": "secret-ocw-studio/app-config"
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "dependencies": [
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::vault:index/mount:Mount::ocw-studio-vault-secrets-storage"
+                ],
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:vault::vault-provider::7cde6325-984b-4a8a-aa28-2a6e98d83a91",
+                "propertyDependencies": {
+                    "dataJson": null,
+                    "path": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::vault:index/mount:Mount::ocw-studio-vault-secrets-storage"
+                    ]
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:s3/bucket:Bucket::ocw-to-hugo-output-qa",
+                "custom": true,
+                "id": "ocw-to-hugo-output-qa",
+                "type": "aws:s3/bucket:Bucket",
+                "inputs": {
+                    "__defaults": [
+                        "acl",
+                        "forceDestroy"
+                    ],
+                    "acl": "private",
+                    "bucket": "ocw-to-hugo-output-qa",
+                    "forceDestroy": false,
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    }
+                },
+                "outputs": {
+                    "accelerationStatus": "",
+                    "acl": "private",
+                    "arn": "arn:aws:s3:::ocw-to-hugo-output-qa",
+                    "bucket": "ocw-to-hugo-output-qa",
+                    "bucketDomainName": "ocw-to-hugo-output-qa.s3.amazonaws.com",
+                    "bucketRegionalDomainName": "ocw-to-hugo-output-qa.s3.amazonaws.com",
+                    "corsRules": [],
+                    "forceDestroy": false,
+                    "grants": [],
+                    "hostedZoneId": "Z3AQBSTGFYJSTF",
+                    "id": "ocw-to-hugo-output-qa",
+                    "lifecycleRules": [],
+                    "loggings": [],
+                    "objectLockConfiguration": null,
+                    "region": "us-east-1",
+                    "replicationConfiguration": null,
+                    "requestPayer": "BucketOwner",
+                    "serverSideEncryptionConfiguration": null,
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    },
+                    "tagsAll": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    },
+                    "versioning": {
+                        "enabled": false,
+                        "mfaDelete": false
+                    },
+                    "website": null
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default_4_38_1::a0a0edbf-ea6e-42f5-85d8-deac53710b25",
+                "propertyDependencies": {
+                    "bucket": null,
+                    "tags": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:iam/policy:Policy::ocw-studio-qa-policy",
+                "custom": true,
+                "id": "arn:aws:iam::610119931565:policy/ol-applications/ocw-studio/qa/aws-permissions-20210115204554035200000001",
+                "type": "aws:iam/policy:Policy",
+                "inputs": {
+                    "description": "AWS access controls for the OCW Studio application in the QA environment",
+                    "namePrefix": "aws-permissions-",
+                    "path": "/ol-applications/ocw-studio/qa/",
+                    "policy": "{\"Statement\":[{\"Action\":\"s3:ListAllMyBuckets\",\"Effect\":\"Allow\",\"Resource\":\"*\"},{\"Action\":[\"s3:ListBucket*\",\"s3:GetObject*\"],\"Effect\":\"Allow\",\"Resource\":[\"arn:aws:s3:::ocw-to-hugo-output-qa\",\"arn:aws:s3:::ocw-to-hugo-output-qa/*\"]},{\"Action\":[\"s3:ListBucket*\",\"s3:PutObject\",\"s3:PutObjectAcl\",\"s3:GetObject*\",\"s3:DeleteObject*\"],\"Effect\":\"Allow\",\"Resource\":[\"arn:aws:s3:::ol-ocw-studio-app-qa\",\"arn:aws:s3:::ol-ocw-studio-app-qa/*\"]},{\"Action\":[\"execute-api:Invoke\",\"execute-api:ManageConnections\"],\"Effect\":\"Allow\",\"Resource\":\"arn:aws:execute-api:*:*:*\"},{\"Action\":[\"mediaconvert:ListQueues\",\"mediaconvert:DescribeEndpoints\",\"mediaconvert:ListPresets\",\"mediaconvert:CreatePreset\",\"mediaconvert:DisassociateCertificate\",\"mediaconvert:CreateQueue\",\"mediaconvert:AssociateCertificate\",\"mediaconvert:CreateJob\",\"mediaconvert:ListJobTemplates\"],\"Effect\":\"Allow\",\"Resource\":\"*\"},{\"Action\":\"mediaconvert:GetJob\",\"Effect\":\"Allow\",\"Resource\":\"arn:*:mediaconvert:*:*:jobs/*\"},{\"Action\":\"iam:PassRole\",\"Effect\":\"Allow\",\"Resource\":\"arn:aws:iam::610119931565:role/service-role-mediaconvert-ocw-studio-qa\"}],\"Version\":\"2012-10-17\"}"
+                },
+                "outputs": {
+                    "arn": "arn:aws:iam::610119931565:policy/ol-applications/ocw-studio/qa/aws-permissions-20210115204554035200000001",
+                    "description": "AWS access controls for the OCW Studio application in the QA environment",
+                    "id": "arn:aws:iam::610119931565:policy/ol-applications/ocw-studio/qa/aws-permissions-20210115204554035200000001",
+                    "name": "aws-permissions-20210115204554035200000001",
+                    "namePrefix": "aws-permissions-",
+                    "path": "/ol-applications/ocw-studio/qa/",
+                    "policy": "{\"Statement\":[{\"Action\":\"s3:ListAllMyBuckets\",\"Effect\":\"Allow\",\"Resource\":\"*\"},{\"Action\":[\"s3:ListBucket*\",\"s3:GetObject*\"],\"Effect\":\"Allow\",\"Resource\":[\"arn:aws:s3:::ocw-to-hugo-output-qa\",\"arn:aws:s3:::ocw-to-hugo-output-qa/*\"]},{\"Action\":[\"s3:ListBucket*\",\"s3:PutObject\",\"s3:PutObjectAcl\",\"s3:GetObject*\",\"s3:DeleteObject*\"],\"Effect\":\"Allow\",\"Resource\":[\"arn:aws:s3:::ol-ocw-studio-app-qa\",\"arn:aws:s3:::ol-ocw-studio-app-qa/*\"]},{\"Action\":[\"execute-api:Invoke\",\"execute-api:ManageConnections\"],\"Effect\":\"Allow\",\"Resource\":\"arn:aws:execute-api:*:*:*\"},{\"Action\":[\"mediaconvert:ListQueues\",\"mediaconvert:DescribeEndpoints\",\"mediaconvert:ListPresets\",\"mediaconvert:CreatePreset\",\"mediaconvert:DisassociateCertificate\",\"mediaconvert:CreateQueue\",\"mediaconvert:AssociateCertificate\",\"mediaconvert:CreateJob\",\"mediaconvert:ListJobTemplates\"],\"Effect\":\"Allow\",\"Resource\":\"*\"},{\"Action\":\"mediaconvert:GetJob\",\"Effect\":\"Allow\",\"Resource\":\"arn:*:mediaconvert:*:*:jobs/*\"},{\"Action\":\"iam:PassRole\",\"Effect\":\"Allow\",\"Resource\":\"arn:aws:iam::610119931565:role/service-role-mediaconvert-ocw-studio-qa\"}],\"Version\":\"2012-10-17\"}",
+                    "policyId": "ANPAY4DP3K2WY472LHYBX",
+                    "tags": {},
+                    "tagsAll": {}
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default_4_38_1::a0a0edbf-ea6e-42f5-85d8-deac53710b25",
+                "propertyDependencies": {
+                    "description": null,
+                    "namePrefix": null,
+                    "path": null,
+                    "policy": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:s3/bucket:Bucket::ol-ocw-studio-app-qa",
+                "custom": true,
+                "id": "ol-ocw-studio-app-qa",
+                "type": "aws:s3/bucket:Bucket",
+                "inputs": {
+                    "__defaults": [
+                        "acl",
+                        "forceDestroy"
+                    ],
+                    "acl": "private",
+                    "bucket": "ol-ocw-studio-app-qa",
+                    "forceDestroy": false,
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    },
+                    "versioning": {
+                        "__defaults": [
+                            "mfaDelete"
+                        ],
+                        "enabled": true,
+                        "mfaDelete": false
+                    }
+                },
+                "outputs": {
+                    "accelerationStatus": "",
+                    "acl": "private",
+                    "arn": "arn:aws:s3:::ol-ocw-studio-app-qa",
+                    "bucket": "ol-ocw-studio-app-qa",
+                    "bucketDomainName": "ol-ocw-studio-app-qa.s3.amazonaws.com",
+                    "bucketRegionalDomainName": "ol-ocw-studio-app-qa.s3.amazonaws.com",
+                    "corsRules": [],
+                    "forceDestroy": false,
+                    "grants": [],
+                    "hostedZoneId": "Z3AQBSTGFYJSTF",
+                    "id": "ol-ocw-studio-app-qa",
+                    "lifecycleRules": [],
+                    "loggings": [],
+                    "objectLockConfiguration": null,
+                    "region": "us-east-1",
+                    "replicationConfiguration": null,
+                    "requestPayer": "BucketOwner",
+                    "serverSideEncryptionConfiguration": null,
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    },
+                    "tagsAll": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    },
+                    "versioning": {
+                        "enabled": true,
+                        "mfaDelete": false
+                    },
+                    "website": null
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default_4_38_1::a0a0edbf-ea6e-42f5-85d8-deac53710b25",
+                "propertyDependencies": {
+                    "bucket": null,
+                    "tags": null,
+                    "versioning": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:pulumi::default",
+                "custom": true,
+                "id": "a9225adc-381f-4eaf-9792-5297ee241f41",
+                "type": "pulumi:providers:pulumi"
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:iam/role:Role::ocw-studio-mediaconvert-role",
+                "custom": true,
+                "id": "service-role-mediaconvert-ocw-studio-qa",
+                "type": "aws:iam/role:Role",
+                "inputs": {
+                    "__defaults": [
+                        "forceDetachPolicies",
+                        "maxSessionDuration",
+                        "path"
+                    ],
+                    "assumeRolePolicy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"mediaconvert.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}",
+                    "forceDetachPolicies": false,
+                    "maxSessionDuration": 3600,
+                    "name": "service-role-mediaconvert-ocw-studio-qa",
+                    "path": "/",
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    }
+                },
+                "outputs": {
+                    "arn": "arn:aws:iam::610119931565:role/service-role-mediaconvert-ocw-studio-qa",
+                    "assumeRolePolicy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"mediaconvert.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}",
+                    "createDate": "2021-08-23T14:24:16Z",
+                    "description": "",
+                    "forceDetachPolicies": false,
+                    "id": "service-role-mediaconvert-ocw-studio-qa",
+                    "inlinePolicies": [
+                        {
+                            "name": "",
+                            "policy": ""
+                        }
+                    ],
+                    "managedPolicyArns": [
+                        "arn:aws:iam::610119931565:policy/ol-applications/ocw-studio/qa/aws-permissions-20210115204554035200000001"
+                    ],
+                    "maxSessionDuration": 3600,
+                    "name": "service-role-mediaconvert-ocw-studio-qa",
+                    "namePrefix": "",
+                    "path": "/",
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    },
+                    "tagsAll": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    },
+                    "uniqueId": "AROAY4DP3K2W3DNV55Y35"
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default_4_38_1::a0a0edbf-ea6e-42f5-85d8-deac53710b25",
+                "propertyDependencies": {
+                    "assumeRolePolicy": null,
+                    "name": null,
+                    "tags": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::vault:aws/secretBackendRole:SecretBackendRole::ocw-studio-app-qa",
+                "custom": true,
+                "id": "aws-mitx/roles/ocw-studio-app-qa",
+                "type": "vault:aws/secretBackendRole:SecretBackendRole",
+                "inputs": {
+                    "backend": "aws-mitx",
+                    "credentialType": "iam_user",
+                    "name": "ocw-studio-app-qa",
+                    "policyArns": [
+                        "arn:aws:iam::610119931565:policy/ol-applications/ocw-studio/qa/aws-permissions-20210115204554035200000001"
+                    ]
+                },
+                "outputs": {
+                    "backend": "aws-mitx",
+                    "credentialType": "iam_user",
+                    "defaultStsTtl": 0,
+                    "iamGroups": [],
+                    "id": "aws-mitx/roles/ocw-studio-app-qa",
+                    "maxStsTtl": 0,
+                    "name": "ocw-studio-app-qa",
+                    "policyArns": [
+                        "arn:aws:iam::610119931565:policy/ol-applications/ocw-studio/qa/aws-permissions-20210115204554035200000001"
+                    ],
+                    "policyDocument": "",
+                    "roleArns": []
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "dependencies": [
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:iam/policy:Policy::ocw-studio-qa-policy"
+                ],
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:vault::vault-provider::7cde6325-984b-4a8a-aa28-2a6e98d83a91",
+                "propertyDependencies": {
+                    "backend": null,
+                    "credentialType": null,
+                    "name": null,
+                    "policyArns": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:iam/policy:Policy::ocw-studio-qa-policy"
+                    ]
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:mediaconvert/queue:Queue::ocw-studio-mediaconvert-queue",
+                "custom": true,
+                "id": "ocw-studio-mediaconvert-queue-qa",
+                "type": "aws:mediaconvert/queue:Queue",
+                "inputs": {
+                    "__defaults": [
+                        "pricingPlan",
+                        "status"
+                    ],
+                    "description": "OCW Studio Queue",
+                    "name": "ocw-studio-mediaconvert-queue-qa",
+                    "pricingPlan": "ON_DEMAND",
+                    "status": "ACTIVE",
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    }
+                },
+                "outputs": {
+                    "arn": "arn:aws:mediaconvert:us-east-1:610119931565:queues/ocw-studio-mediaconvert-queue-qa",
+                    "description": "OCW Studio Queue",
+                    "id": "ocw-studio-mediaconvert-queue-qa",
+                    "name": "ocw-studio-mediaconvert-queue-qa",
+                    "pricingPlan": "ON_DEMAND",
+                    "reservationPlanSettings": null,
+                    "status": "ACTIVE",
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    },
+                    "tagsAll": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    }
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default_4_38_1::a0a0edbf-ea6e-42f5-85d8-deac53710b25",
+                "propertyDependencies": {
+                    "description": null,
+                    "name": null,
+                    "tags": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:sns/topic:Topic::ocw-studio-qa-sns-topic",
+                "custom": true,
+                "id": "arn:aws:sns:us-east-1:610119931565:ocw-studio-qa-sns-topic-8d38bb4",
+                "type": "aws:sns/topic:Topic",
+                "inputs": {
+                    "__defaults": [
+                        "contentBasedDeduplication",
+                        "fifoTopic",
+                        "name"
+                    ],
+                    "contentBasedDeduplication": false,
+                    "fifoTopic": false,
+                    "name": "ocw-studio-qa-sns-topic-8d38bb4",
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    }
+                },
+                "outputs": {
+                    "applicationFailureFeedbackRoleArn": "",
+                    "applicationSuccessFeedbackRoleArn": "",
+                    "applicationSuccessFeedbackSampleRate": 0,
+                    "arn": "arn:aws:sns:us-east-1:610119931565:ocw-studio-qa-sns-topic-8d38bb4",
+                    "contentBasedDeduplication": false,
+                    "deliveryPolicy": "",
+                    "displayName": "",
+                    "fifoTopic": false,
+                    "firehoseFailureFeedbackRoleArn": "",
+                    "firehoseSuccessFeedbackRoleArn": "",
+                    "firehoseSuccessFeedbackSampleRate": 0,
+                    "httpFailureFeedbackRoleArn": "",
+                    "httpSuccessFeedbackRoleArn": "",
+                    "httpSuccessFeedbackSampleRate": 0,
+                    "id": "arn:aws:sns:us-east-1:610119931565:ocw-studio-qa-sns-topic-8d38bb4",
+                    "kmsMasterKeyId": "",
+                    "lambdaFailureFeedbackRoleArn": "",
+                    "lambdaSuccessFeedbackRoleArn": "",
+                    "lambdaSuccessFeedbackSampleRate": 0,
+                    "name": "ocw-studio-qa-sns-topic-8d38bb4",
+                    "namePrefix": "",
+                    "owner": "610119931565",
+                    "policy": "{\"Version\":\"2012-10-17\",\"Id\":\"__default_policy_ID\",\"Statement\":[{\"Sid\":\"__default_statement_ID\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"*\"},\"Action\":[\"SNS:GetTopicAttributes\",\"SNS:SetTopicAttributes\",\"SNS:AddPermission\",\"SNS:RemovePermission\",\"SNS:DeleteTopic\",\"SNS:Subscribe\",\"SNS:ListSubscriptionsByTopic\",\"SNS:Publish\",\"SNS:Receive\"],\"Resource\":\"arn:aws:sns:us-east-1:610119931565:ocw-studio-qa-sns-topic-8d38bb4\",\"Condition\":{\"StringEquals\":{\"AWS:SourceOwner\":\"610119931565\"}}},{\"Sid\":\"AWSEvents_ocw-studio-mediaconvert-cloudwatch-eventrule-3dcce8c_ocw-studio-mediaconvert-cloudwatch-eventtarget-245b0a9\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"events.amazonaws.com\"},\"Action\":\"sns:Publish\",\"Resource\":\"arn:aws:sns:us-east-1:610119931565:ocw-studio-qa-sns-topic-8d38bb4\"}]}",
+                    "sqsFailureFeedbackRoleArn": "",
+                    "sqsSuccessFeedbackRoleArn": "",
+                    "sqsSuccessFeedbackSampleRate": 0,
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    },
+                    "tagsAll": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    }
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default_4_38_1::a0a0edbf-ea6e-42f5-85d8-deac53710b25",
+                "propertyDependencies": {
+                    "tags": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:cloudwatch/eventRule:EventRule::ocw-studio-mediaconvert-cloudwatch-eventrule",
+                "custom": true,
+                "id": "ocw-studio-mediaconvert-cloudwatch-eventrule-3dcce8c",
+                "type": "aws:cloudwatch/eventRule:EventRule",
+                "inputs": {
+                    "__defaults": [
+                        "eventBusName",
+                        "isEnabled",
+                        "name"
+                    ],
+                    "description": "Capture MediaConvert Events for use with OCW Studio",
+                    "eventBusName": "default",
+                    "eventPattern": "{\"source\": [\"aws.mediaconvert\"], \"detail-type\": [\"MediaConvert Job State Change\"], \"detail\": {\"userMetadata\": {\"filter\": [\"ocw-studio-mediaconvert-queue-qa\"]}, \"status\": [\"COMPLETE\", \"ERROR\"]}}",
+                    "isEnabled": true,
+                    "name": "ocw-studio-mediaconvert-cloudwatch-eventrule-3dcce8c"
+                },
+                "outputs": {
+                    "arn": "arn:aws:events:us-east-1:610119931565:rule/ocw-studio-mediaconvert-cloudwatch-eventrule-3dcce8c",
+                    "description": "Capture MediaConvert Events for use with OCW Studio",
+                    "eventBusName": "default",
+                    "eventPattern": "{\"detail\":{\"status\":[\"COMPLETE\",\"ERROR\"],\"userMetadata\":{\"filter\":[\"ocw-studio-mediaconvert-queue-qa\"]}},\"detail-type\":[\"MediaConvert Job State Change\"],\"source\":[\"aws.mediaconvert\"]}",
+                    "id": "ocw-studio-mediaconvert-cloudwatch-eventrule-3dcce8c",
+                    "isEnabled": true,
+                    "name": "ocw-studio-mediaconvert-cloudwatch-eventrule-3dcce8c",
+                    "namePrefix": "",
+                    "roleArn": "",
+                    "scheduleExpression": "",
+                    "tags": {},
+                    "tagsAll": {}
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default_4_38_1::a0a0edbf-ea6e-42f5-85d8-deac53710b25",
+                "propertyDependencies": {
+                    "description": null,
+                    "eventPattern": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:StackReference::infrastructure.aws.network.QA",
+                "custom": true,
+                "id": "infrastructure.aws.network.QA",
+                "type": "pulumi:pulumi:StackReference",
+                "inputs": {
+                    "name": "infrastructure.aws.network.QA"
+                },
+                "outputs": {
+                    "name": "infrastructure.aws.network.QA",
+                    "outputs": {
+                        "applications_vpc": {
+                            "cidr": "10.12.0.0/16",
+                            "cidr_v6": "2600:1f18:6db:3e00::/56",
+                            "elasticache_subnet": "applications-qa-cache-subnet-group",
+                            "id": "vpc-a3be84da",
+                            "name": "applications-qa",
+                            "peers": [
+                                "data_vpc",
+                                "operations_vpc"
+                            ],
+                            "rds_subnet": "applications-qa-db-subnet-group",
+                            "region": "us-east-1",
+                            "route_table_id": "rtb-8ba12bf0",
+                            "security_groups": {
+                                "default": "sg-a9c4c5d9",
+                                "salt_minion": "sg-05b49c9191a1430e3",
+                                "ssh": "sg-09bd261e56c57dc9f",
+                                "web": "sg-04924c944c9a1f2d3"
+                            },
+                            "subnet_ids": [
+                                "subnet-00725d51b334b7691",
+                                "subnet-677f584b",
+                                "subnet-2ed43165",
+                                "subnet-99e0b9c3"
+                            ],
+                            "subnet_zones": [
+                                "us-east-1a",
+                                "us-east-1b",
+                                "us-east-1c",
+                                "us-east-1d"
+                            ]
+                        },
+                        "data_vpc": {
+                            "cidr": "10.2.0.0/16",
+                            "cidr_v6": "2600:1f18:e4d:8900::/56",
+                            "elasticache_subnet": "ol-data-qa-cache-subnet-group",
+                            "id": "vpc-00fce97d0125725da",
+                            "name": "ol-data-qa",
+                            "peers": [
+                                "applications_vpc",
+                                "mitxonline_vpc",
+                                "operations_vpc",
+                                "residential_mitx_vpc",
+                                "xpro_vpc"
+                            ],
+                            "rds_subnet": "ol-data-qa-db-subnet-group",
+                            "region": "us-east-1",
+                            "route_table_id": "rtb-0a528eb56fc27b3fe",
+                            "security_groups": {
+                                "default": "sg-00899329837f7e01a",
+                                "salt_minion": "sg-02793b15ec2d31cd2",
+                                "ssh": "sg-09e4dba2e1c3fbd11",
+                                "web": "sg-0ddde8fe98823b7c7"
+                            },
+                            "subnet_ids": [
+                                "subnet-0e4a9c3626ecc0868",
+                                "subnet-0dd9f590abfdaa9c8",
+                                "subnet-0065248797d8a7f97"
+                            ],
+                            "subnet_zones": [
+                                "us-east-1a",
+                                "us-east-1b",
+                                "us-east-1c"
+                            ]
+                        },
+                        "mitxonline_vpc": {
+                            "cidr": "10.21.0.0/16",
+                            "cidr_v6": "2600:1f18:260a:b800::/56",
+                            "elasticache_subnet": "mitx-online-qa-cache-subnet-group",
+                            "id": "vpc-0bde1fd5a3e1ee133",
+                            "name": "mitx-online-qa",
+                            "peers": [
+                                "data_vpc",
+                                "operations_vpc"
+                            ],
+                            "rds_subnet": "mitx-online-qa-db-subnet-group",
+                            "region": "us-east-1",
+                            "route_table_id": "rtb-052dd89678a766190",
+                            "security_groups": {
+                                "default": "sg-052730e7fa5d8b73e",
+                                "salt_minion": "sg-06316826eee8e3d53",
+                                "ssh": "sg-015c1d095612e6b18",
+                                "web": "sg-021f6d5853e74d08c"
+                            },
+                            "subnet_ids": [
+                                "subnet-0c19101f4f6b47080",
+                                "subnet-0a7120ad33a6519d5",
+                                "subnet-0ce3040d260551c93",
+                                "subnet-0f2ecbe74212845c7",
+                                "subnet-0d91c3027c41e5cf8"
+                            ],
+                            "subnet_zones": [
+                                "us-east-1a",
+                                "us-east-1b",
+                                "us-east-1c",
+                                "us-east-1d",
+                                "us-east-1f"
+                            ]
+                        },
+                        "operations_vpc": {
+                            "cidr": "10.1.0.0/16",
+                            "cidr_v6": "2600:1f18:64a:9100::/56",
+                            "elasticache_subnet": "operations-qa-cache-subnet-group",
+                            "id": "vpc-0bb607267a8b06103",
+                            "name": "operations-qa",
+                            "peers": [
+                                "applications_vpc",
+                                "data_vpc",
+                                "mitxonline_vpc",
+                                "residential_mitx_vpc",
+                                "residential_mitx_staging_vpc",
+                                "xpro_vpc"
+                            ],
+                            "rds_subnet": "operations-qa-db-subnet-group",
+                            "region": "us-east-1",
+                            "route_table_id": "rtb-089afd24e7cbc5632",
+                            "security_groups": {
+                                "default": "sg-084b0bae7459f9d78",
+                                "salt_minion": "sg-031850fb03c2423a2",
+                                "ssh": "sg-0fbd7203585091f58",
+                                "web": "sg-0a197dd7ff593406d"
+                            },
+                            "subnet_ids": [
+                                "subnet-01a07883b610e318a",
+                                "subnet-07833694336c69986",
+                                "subnet-0c1547fb20fe0561f",
+                                "subnet-01d8fab4ac5ce5403"
+                            ],
+                            "subnet_zones": [
+                                "us-east-1a",
+                                "us-east-1d",
+                                "us-east-1b",
+                                "us-east-1c"
+                            ]
+                        },
+                        "residential_mitx_staging_vpc": {
+                            "cidr": "10.30.0.0/16",
+                            "cidr_v6": "2600:1f18:24b7:bd00::/56",
+                            "elasticache_subnet": "mitx-staging-qa-cache-subnet-group",
+                            "id": "vpc-0ad898aefe940ea92",
+                            "name": "mitx-staging-qa",
+                            "peers": [
+                                "operations_vpc"
+                            ],
+                            "rds_subnet": "mitx-staging-qa-db-subnet-group",
+                            "region": "us-east-1",
+                            "route_table_id": "rtb-08f017ba98e90b764",
+                            "security_groups": {
+                                "default": "sg-096fe68a571d0e948",
+                                "salt_minion": "sg-00339e509a52527b9",
+                                "ssh": "sg-007a564248aea02ed",
+                                "web": "sg-07b87ff012034c9ee"
+                            },
+                            "subnet_ids": [
+                                "subnet-01e9ca092b0f5fc27",
+                                "subnet-04aa0733fdeef1cc5",
+                                "subnet-0d2ebce60fc12f890"
+                            ],
+                            "subnet_zones": [
+                                "us-east-1a",
+                                "us-east-1b",
+                                "us-east-1c"
+                            ]
+                        },
+                        "residential_mitx_vpc": {
+                            "cidr": "10.5.0.0/16",
+                            "cidr_v6": "2600:1f18:4160:6b00::/56",
+                            "elasticache_subnet": "mitx-qa-cache-subnet-group",
+                            "id": "vpc-121ca275",
+                            "name": "mitx-qa",
+                            "peers": [
+                                "data_vpc",
+                                "operations_vpc"
+                            ],
+                            "rds_subnet": "mitx-qa-db-subnet-group",
+                            "region": "us-east-1",
+                            "route_table_id": "rtb-073a2b073b5a42d9f",
+                            "security_groups": {
+                                "default": "sg-447e363f",
+                                "salt_minion": "sg-0c72e8b0a92d8cb2c",
+                                "ssh": "sg-08ecdf73e7ade99e3",
+                                "web": "sg-07b4b5457a00d36c6"
+                            },
+                            "subnet_ids": [
+                                "subnet-045a4d42999088f35",
+                                "subnet-4b8bae13",
+                                "subnet-429ac168",
+                                "subnet-1a111a6c"
+                            ],
+                            "subnet_zones": [
+                                "us-east-1a",
+                                "us-east-1d",
+                                "us-east-1b",
+                                "us-east-1c"
+                            ]
+                        },
+                        "xpro_vpc": {
+                            "cidr": "10.6.0.0/16",
+                            "cidr_v6": "2600:1f18:17ae:c900::/56",
+                            "elasticache_subnet": "mitxpro-qa-cache-subnet-group",
+                            "id": "vpc-0252d6d2b9368377e",
+                            "name": "mitxpro-qa",
+                            "peers": [
+                                "data_vpc",
+                                "operations_vpc"
+                            ],
+                            "rds_subnet": "mitxpro-qa-db-subnet-group",
+                            "region": "us-east-1",
+                            "route_table_id": "rtb-00e10a23448394746",
+                            "security_groups": {
+                                "default": "sg-0fa7a93c6418f440a",
+                                "salt_minion": "sg-0e95e4415b006e24e",
+                                "ssh": "sg-00b307937cdd6b349",
+                                "web": "sg-0b8a0166caf99d29c"
+                            },
+                            "subnet_ids": [
+                                "subnet-0d106ae2b2916000b",
+                                "subnet-047032cfb609ab94d",
+                                "subnet-037cf9f2ae4902145",
+                                "subnet-033660a8572baab81"
+                            ],
+                            "subnet_zones": [
+                                "us-east-1a",
+                                "us-east-1b",
+                                "us-east-1c",
+                                "us-east-1d"
+                            ]
+                        }
+                    },
+                    "secretOutputNames": []
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "external": true,
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:pulumi::default::a9225adc-381f-4eaf-9792-5297ee241f41"
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:infrastructure:aws:database:OLAmazonDB$aws:rds/parameterGroup:ParameterGroup::ocw-studio-db-applications-qa-postgres-parameter-group",
+                "custom": true,
+                "id": "ocw-studio-db-applications-qa-postgres-parameter-group",
+                "type": "aws:rds/parameterGroup:ParameterGroup",
+                "inputs": {
+                    "description": "Managed by Pulumi",
+                    "family": "postgres12",
+                    "name": "ocw-studio-db-applications-qa-postgres-parameter-group",
+                    "parameters": [
+                        {
+                            "__defaults": [
+                                "applyMethod"
+                            ],
+                            "applyMethod": "immediate",
+                            "name": "rds.force_ssl",
+                            "value": "1"
+                        },
+                        {
+                            "__defaults": [
+                                "applyMethod"
+                            ],
+                            "applyMethod": "immediate",
+                            "name": "autovacuum",
+                            "value": "1"
+                        },
+                        {
+                            "__defaults": [
+                                "applyMethod"
+                            ],
+                            "applyMethod": "immediate",
+                            "name": "client_encoding",
+                            "value": "UTF-8"
+                        },
+                        {
+                            "applyMethod": "pending-reboot",
+                            "name": "timezone",
+                            "value": "UTC"
+                        }
+                    ],
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    }
+                },
+                "outputs": {
+                    "arn": "arn:aws:rds:us-east-1:610119931565:pg:ocw-studio-db-applications-qa-postgres-parameter-group",
+                    "description": "Managed by Pulumi",
+                    "family": "postgres12",
+                    "id": "ocw-studio-db-applications-qa-postgres-parameter-group",
+                    "name": "ocw-studio-db-applications-qa-postgres-parameter-group",
+                    "parameters": [
+                        {
+                            "applyMethod": "immediate",
+                            "name": "rds.force_ssl",
+                            "value": "1"
+                        },
+                        {
+                            "applyMethod": "immediate",
+                            "name": "autovacuum",
+                            "value": "1"
+                        },
+                        {
+                            "applyMethod": "immediate",
+                            "name": "client_encoding",
+                            "value": "UTF-8"
+                        },
+                        {
+                            "applyMethod": "pending-reboot",
+                            "name": "timezone",
+                            "value": "UTC"
+                        }
+                    ],
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    },
+                    "tagsAll": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    }
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:infrastructure:aws:database:OLAmazonDB::ocw-studio-db-applications-qa",
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default_4_38_1::a0a0edbf-ea6e-42f5-85d8-deac53710b25",
+                "propertyDependencies": {
+                    "description": null,
+                    "family": null,
+                    "name": null,
+                    "parameters": null,
+                    "tags": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:github::default_4_10_0",
+                "custom": true,
+                "id": "78e36f7b-a18a-4b0d-987d-fc1920aa3418",
+                "type": "pulumi:providers:github",
+                "inputs": {
+                    "version": "4.10.0"
+                },
+                "outputs": {
+                    "version": "4.10.0"
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:iam/rolePolicyAttachment:RolePolicyAttachment::ocw-studio-qa-mediaconvert-role-policy",
+                "custom": true,
+                "id": "service-role-mediaconvert-ocw-studio-qa-20210823142424611700000001",
+                "type": "aws:iam/rolePolicyAttachment:RolePolicyAttachment",
+                "inputs": {
+                    "policyArn": "arn:aws:iam::610119931565:policy/ol-applications/ocw-studio/qa/aws-permissions-20210115204554035200000001",
+                    "role": "service-role-mediaconvert-ocw-studio-qa"
+                },
+                "outputs": {
+                    "id": "service-role-mediaconvert-ocw-studio-qa-20210823142424611700000001",
+                    "policyArn": "arn:aws:iam::610119931565:policy/ol-applications/ocw-studio/qa/aws-permissions-20210115204554035200000001",
+                    "role": "service-role-mediaconvert-ocw-studio-qa"
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "dependencies": [
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:iam/role:Role::ocw-studio-mediaconvert-role",
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:iam/policy:Policy::ocw-studio-qa-policy"
+                ],
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default_4_38_1::a0a0edbf-ea6e-42f5-85d8-deac53710b25",
+                "propertyDependencies": {
+                    "policyArn": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:iam/policy:Policy::ocw-studio-qa-policy"
+                    ],
+                    "role": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:iam/role:Role::ocw-studio-mediaconvert-role"
+                    ]
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:sns/topicSubscription:TopicSubscription::ocw-studio-sns-topic-subscription",
+                "custom": true,
+                "id": "arn:aws:sns:us-east-1:610119931565:ocw-studio-qa-sns-topic-8d38bb4:48afbda9-cd79-4560-a14e-c1b10c894b42",
+                "type": "aws:sns/topicSubscription:TopicSubscription",
+                "inputs": {
+                    "__defaults": [
+                        "confirmationTimeoutInMinutes",
+                        "endpointAutoConfirms"
+                    ],
+                    "confirmationTimeoutInMinutes": 1,
+                    "endpoint": "https://ocw-studio-rc.odl.mit.edu/api/transcode-jobs/",
+                    "endpointAutoConfirms": false,
+                    "protocol": "https",
+                    "rawMessageDelivery": true,
+                    "topic": "arn:aws:sns:us-east-1:610119931565:ocw-studio-qa-sns-topic-8d38bb4"
+                },
+                "outputs": {
+                    "arn": "arn:aws:sns:us-east-1:610119931565:ocw-studio-qa-sns-topic-8d38bb4:48afbda9-cd79-4560-a14e-c1b10c894b42",
+                    "confirmationTimeoutInMinutes": 1,
+                    "confirmationWasAuthenticated": false,
+                    "deliveryPolicy": "",
+                    "endpoint": "https://ocw-studio-rc.odl.mit.edu/api/transcode-jobs/",
+                    "endpointAutoConfirms": false,
+                    "filterPolicy": "",
+                    "id": "arn:aws:sns:us-east-1:610119931565:ocw-studio-qa-sns-topic-8d38bb4:48afbda9-cd79-4560-a14e-c1b10c894b42",
+                    "ownerId": "610119931565",
+                    "pendingConfirmation": false,
+                    "protocol": "https",
+                    "rawMessageDelivery": true,
+                    "redrivePolicy": "",
+                    "subscriptionRoleArn": "",
+                    "topic": "arn:aws:sns:us-east-1:610119931565:ocw-studio-qa-sns-topic-8d38bb4"
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "dependencies": [
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:sns/topic:Topic::ocw-studio-qa-sns-topic"
+                ],
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default_4_38_1::a0a0edbf-ea6e-42f5-85d8-deac53710b25",
+                "propertyDependencies": {
+                    "endpoint": null,
+                    "protocol": null,
+                    "rawMessageDelivery": null,
+                    "topic": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:sns/topic:Topic::ocw-studio-qa-sns-topic"
+                    ]
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:cloudwatch/eventTarget:EventTarget::ocw-studio-mediaconvert-cloudwatch-eventtarget",
+                "custom": true,
+                "id": "ocw-studio-mediaconvert-cloudwatch-eventrule-3dcce8c-ocw-studio-mediaconvert-cloudwatch-eventtarget-245b0a9",
+                "type": "aws:cloudwatch/eventTarget:EventTarget",
+                "inputs": {
+                    "__defaults": [
+                        "eventBusName",
+                        "targetId"
+                    ],
+                    "arn": "arn:aws:sns:us-east-1:610119931565:ocw-studio-qa-sns-topic-8d38bb4",
+                    "eventBusName": "default",
+                    "rule": "ocw-studio-mediaconvert-cloudwatch-eventrule-3dcce8c",
+                    "targetId": "ocw-studio-mediaconvert-cloudwatch-eventtarget-245b0a9"
+                },
+                "outputs": {
+                    "__meta": "{\"schema_version\":\"1\"}",
+                    "arn": "arn:aws:sns:us-east-1:610119931565:ocw-studio-qa-sns-topic-8d38bb4",
+                    "batchTarget": null,
+                    "deadLetterConfig": null,
+                    "ecsTarget": null,
+                    "eventBusName": "default",
+                    "httpTarget": null,
+                    "id": "ocw-studio-mediaconvert-cloudwatch-eventrule-3dcce8c-ocw-studio-mediaconvert-cloudwatch-eventtarget-245b0a9",
+                    "input": "",
+                    "inputPath": "",
+                    "inputTransformer": null,
+                    "kinesisTarget": null,
+                    "redshiftTarget": null,
+                    "retryPolicy": null,
+                    "roleArn": "",
+                    "rule": "ocw-studio-mediaconvert-cloudwatch-eventrule-3dcce8c",
+                    "runCommandTargets": [],
+                    "sqsTarget": null,
+                    "targetId": "ocw-studio-mediaconvert-cloudwatch-eventtarget-245b0a9"
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "dependencies": [
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:cloudwatch/eventRule:EventRule::ocw-studio-mediaconvert-cloudwatch-eventrule",
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:sns/topic:Topic::ocw-studio-qa-sns-topic"
+                ],
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default_4_38_1::a0a0edbf-ea6e-42f5-85d8-deac53710b25",
+                "propertyDependencies": {
+                    "arn": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:sns/topic:Topic::ocw-studio-qa-sns-topic"
+                    ],
+                    "rule": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:cloudwatch/eventRule:EventRule::ocw-studio-mediaconvert-cloudwatch-eventrule"
+                    ]
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:ec2/securityGroup:SecurityGroup::ocw-studio-db-access-qa",
+                "custom": true,
+                "id": "sg-03909253db5430ba8",
+                "type": "aws:ec2/securityGroup:SecurityGroup",
+                "inputs": {
+                    "__defaults": [
+                        "name",
+                        "revokeRulesOnDelete"
+                    ],
+                    "description": "Access control for the OCW Studio DB in QA",
+                    "egress": [
+                        {
+                            "__defaults": [
+                                "self"
+                            ],
+                            "cidrBlocks": [
+                                "0.0.0.0/0"
+                            ],
+                            "fromPort": 0,
+                            "ipv6CidrBlocks": [
+                                "::/0"
+                            ],
+                            "protocol": "-1",
+                            "self": false,
+                            "toPort": 0
+                        }
+                    ],
+                    "ingress": [
+                        {
+                            "__defaults": [
+                                "self"
+                            ],
+                            "cidrBlocks": [
+                                "0.0.0.0/0"
+                            ],
+                            "description": "Allow access over the public internet from Heroku",
+                            "fromPort": 5432,
+                            "ipv6CidrBlocks": [
+                                "::/0"
+                            ],
+                            "protocol": "tcp",
+                            "self": false,
+                            "toPort": 5432
+                        }
+                    ],
+                    "name": "ocw-studio-db-access-qa-1b190f1",
+                    "revokeRulesOnDelete": false,
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "name": "ocw-studio-db-access-applications-{stack_info.env_suffix}",
+                        "pulumi_managed": "true"
+                    },
+                    "vpcId": "vpc-a3be84da"
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":600000000000,\"delete\":600000000000},\"schema_version\":\"1\"}",
+                    "arn": "arn:aws:ec2:us-east-1:610119931565:security-group/sg-03909253db5430ba8",
+                    "description": "Access control for the OCW Studio DB in QA",
+                    "egress": [
+                        {
+                            "cidrBlocks": [
+                                "0.0.0.0/0"
+                            ],
+                            "description": "",
+                            "fromPort": 0,
+                            "ipv6CidrBlocks": [
+                                "::/0"
+                            ],
+                            "prefixListIds": [],
+                            "protocol": "-1",
+                            "securityGroups": [],
+                            "self": false,
+                            "toPort": 0
+                        }
+                    ],
+                    "id": "sg-03909253db5430ba8",
+                    "ingress": [
+                        {
+                            "cidrBlocks": [
+                                "0.0.0.0/0"
+                            ],
+                            "description": "Allow access over the public internet from Heroku",
+                            "fromPort": 5432,
+                            "ipv6CidrBlocks": [
+                                "::/0"
+                            ],
+                            "prefixListIds": [],
+                            "protocol": "tcp",
+                            "securityGroups": [],
+                            "self": false,
+                            "toPort": 5432
+                        }
+                    ],
+                    "name": "ocw-studio-db-access-qa-1b190f1",
+                    "namePrefix": "",
+                    "ownerId": "610119931565",
+                    "revokeRulesOnDelete": false,
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "name": "ocw-studio-db-access-applications-{stack_info.env_suffix}",
+                        "pulumi_managed": "true"
+                    },
+                    "tagsAll": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "name": "ocw-studio-db-access-applications-{stack_info.env_suffix}",
+                        "pulumi_managed": "true"
+                    },
+                    "vpcId": "vpc-a3be84da"
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:Stack::ol-infrastructure-ocw-studio-application-applications.ocw_studio.QA",
+                "dependencies": [
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:StackReference::infrastructure.aws.network.QA"
+                ],
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default_4_38_1::a0a0edbf-ea6e-42f5-85d8-deac53710b25",
+                "propertyDependencies": {
+                    "description": null,
+                    "egress": null,
+                    "ingress": null,
+                    "tags": null,
+                    "vpcId": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:StackReference::infrastructure.aws.network.QA"
+                    ]
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:infrastructure:aws:database:OLAmazonDB$aws:rds/instance:Instance::ocw-studio-db-applications-qa-postgres-instance",
+                "custom": true,
+                "id": "ocw-studio-db-applications-qa",
+                "type": "aws:rds/instance:Instance",
+                "inputs": {
+                    "__defaults": [
+                        "deleteAutomatedBackups",
+                        "monitoringInterval",
+                        "performanceInsightsEnabled"
+                    ],
+                    "allocatedStorage": 50,
+                    "autoMinorVersionUpgrade": true,
+                    "backupRetentionPeriod": 7,
+                    "copyTagsToSnapshot": true,
+                    "dbSubnetGroupName": "applications-qa-db-subnet-group",
+                    "deleteAutomatedBackups": true,
+                    "deletionProtection": false,
+                    "engine": "postgres",
+                    "engineVersion": "12.7",
+                    "finalSnapshotIdentifier": "ocw-studio-db-applications-qa-postgres-final-snapshot",
+                    "identifier": "ocw-studio-db-applications-qa",
+                    "instanceClass": "db.t3.medium",
+                    "monitoringInterval": 0,
+                    "multiAz": false,
+                    "name": "ocw_studio",
+                    "parameterGroupName": "ocw-studio-db-applications-qa-postgres-parameter-group",
+                    "password": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "ciphertext": "v1:7DzTOvb4HuUcJbxU:mdoCxjutcDFjPJDZeItysofJnU3YyTrSqsh4W9K7zxNcI/JtiJHnpr3iUE8IMF0xOtGW5pQfdax7U/f3gxQnceCteLTZcEfRhwcr6yKZqxaD2KwW0/fWzWG5/Nk="
+                    },
+                    "performanceInsightsEnabled": false,
+                    "port": 5432,
+                    "publiclyAccessible": true,
+                    "skipFinalSnapshot": true,
+                    "storageEncrypted": true,
+                    "storageType": "gp2",
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    },
+                    "username": "oldevops",
+                    "vpcSecurityGroupIds": [
+                        "sg-03909253db5430ba8"
+                    ]
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":2400000000000,\"delete\":3600000000000,\"update\":4800000000000},\"schema_version\":\"1\"}",
+                    "address": "ocw-studio-db-applications-qa.cbnm7ajau6mi.us-east-1.rds.amazonaws.com",
+                    "allocatedStorage": 50,
+                    "arn": "arn:aws:rds:us-east-1:610119931565:db:ocw-studio-db-applications-qa",
+                    "autoMinorVersionUpgrade": true,
+                    "availabilityZone": "us-east-1b",
+                    "backupRetentionPeriod": 7,
+                    "backupWindow": "06:34-07:04",
+                    "caCertIdentifier": "rds-ca-2019",
+                    "characterSetName": "",
+                    "copyTagsToSnapshot": true,
+                    "customerOwnedIpEnabled": false,
+                    "dbSubnetGroupName": "applications-qa-db-subnet-group",
+                    "deleteAutomatedBackups": true,
+                    "deletionProtection": false,
+                    "domain": "",
+                    "domainIamRoleName": "",
+                    "enabledCloudwatchLogsExports": [],
+                    "endpoint": "ocw-studio-db-applications-qa.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432",
+                    "engine": "postgres",
+                    "engineVersion": "12.7",
+                    "engineVersionActual": "12.7",
+                    "finalSnapshotIdentifier": "ocw-studio-db-applications-qa-postgres-final-snapshot",
+                    "hostedZoneId": "Z2R2ITUGPM61AM",
+                    "iamDatabaseAuthenticationEnabled": false,
+                    "id": "ocw-studio-db-applications-qa",
+                    "identifier": "ocw-studio-db-applications-qa",
+                    "instanceClass": "db.t3.medium",
+                    "iops": 0,
+                    "kmsKeyId": "arn:aws:kms:us-east-1:610119931565:key/0ee33f36-878d-4707-a442-d99ef97530b4",
+                    "latestRestorableTime": "2022-03-25T18:29:14Z",
+                    "licenseModel": "postgresql-license",
+                    "maintenanceWindow": "sun:03:58-sun:04:28",
+                    "maxAllocatedStorage": 0,
+                    "monitoringInterval": 0,
+                    "monitoringRoleArn": "",
+                    "multiAz": false,
+                    "name": "ocw_studio",
+                    "ncharCharacterSetName": "",
+                    "optionGroupName": "default:postgres-12",
+                    "parameterGroupName": "ocw-studio-db-applications-qa-postgres-parameter-group",
+                    "password": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "ciphertext": "v1:QM74DKdm3+npaRkl:A84CJhjNXtjOO4no8/YDhrTrXls3B7iv2iW2ghOdfNS6oiHn8b5/zOKYJkjJxAN2g7a/smrlLUNGmSf8NKbM6jBP0F07pQBzGOBsFOTBJDNCttPGjYew0aUQdkU="
+                    },
+                    "performanceInsightsEnabled": false,
+                    "performanceInsightsKmsKeyId": "",
+                    "performanceInsightsRetentionPeriod": 0,
+                    "port": 5432,
+                    "publiclyAccessible": true,
+                    "replicaMode": "",
+                    "replicas": [],
+                    "replicateSourceDb": "",
+                    "resourceId": "db-L3HYQM6PWKANVRM4WAQRAD26DU",
+                    "restoreToPointInTime": null,
+                    "s3Import": null,
+                    "securityGroupNames": [],
+                    "skipFinalSnapshot": true,
+                    "status": "available",
+                    "storageEncrypted": true,
+                    "storageType": "gp2",
+                    "tags": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    },
+                    "tagsAll": {
+                        "Application": "ocw_studio",
+                        "Environment": "applications_qa",
+                        "OU": "open-courseware",
+                        "pulumi_managed": "true"
+                    },
+                    "timezone": "",
+                    "username": "oldevops",
+                    "vpcSecurityGroupIds": [
+                        "sg-03909253db5430ba8"
+                    ]
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:infrastructure:aws:database:OLAmazonDB::ocw-studio-db-applications-qa",
+                "dependencies": [
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:StackReference::infrastructure.aws.network.QA",
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:infrastructure:aws:database:OLAmazonDB$aws:rds/parameterGroup:ParameterGroup::ocw-studio-db-applications-qa-postgres-parameter-group",
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:ec2/securityGroup:SecurityGroup::ocw-studio-db-access-qa"
+                ],
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:aws::default_4_38_1::a0a0edbf-ea6e-42f5-85d8-deac53710b25",
+                "propertyDependencies": {
+                    "allocatedStorage": null,
+                    "autoMinorVersionUpgrade": null,
+                    "backupRetentionPeriod": null,
+                    "copyTagsToSnapshot": null,
+                    "dbSubnetGroupName": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:pulumi:StackReference::infrastructure.aws.network.QA"
+                    ],
+                    "deletionProtection": null,
+                    "engine": null,
+                    "engineVersion": null,
+                    "finalSnapshotIdentifier": null,
+                    "identifier": null,
+                    "instanceClass": null,
+                    "multiAz": null,
+                    "name": null,
+                    "parameterGroupName": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:infrastructure:aws:database:OLAmazonDB$aws:rds/parameterGroup:ParameterGroup::ocw-studio-db-applications-qa-postgres-parameter-group"
+                    ],
+                    "password": null,
+                    "port": null,
+                    "publiclyAccessible": null,
+                    "skipFinalSnapshot": null,
+                    "storageEncrypted": null,
+                    "storageType": null,
+                    "tags": null,
+                    "username": null,
+                    "vpcSecurityGroupIds": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::aws:ec2/securityGroup:SecurityGroup::ocw-studio-db-access-qa"
+                    ]
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount$vault:database/secretBackendConnection:SecretBackendConnection::ocw_studio-database-connection",
+                "custom": true,
+                "id": "postgres-ocw-studio-applications-qa/config/ocw_studio",
+                "type": "vault:database/secretBackendConnection:SecretBackendConnection",
+                "inputs": {
+                    "allowedRoles": [
+                        "admin",
+                        "app",
+                        "approle",
+                        "readonly"
+                    ],
+                    "backend": "postgres-ocw-studio-applications-qa",
+                    "data": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "ciphertext": "v1:D8jvu6kSFkiQQTSy:8hCHv5Ok9dpNqnAR1BR33i3axZM55xNXrB9K6yFTTNgkZkqagumrZFw/mEFpeemS6xVGYh41PJlMSStg4QuJb/X/doXXBYflXJFw669Q5M7gBu8HXOxFJAA+nVKfpl+t7+saUTWYTskFep9TV4tETjetlu47Lv2Tye+dxUv5NA=="
+                    },
+                    "name": "ocw_studio",
+                    "postgresql": {
+                        "__defaults": [
+                            "maxOpenConnections"
+                        ],
+                        "connectionUrl": "postgresql://{{username}}:{{password}}@ocw-studio-db-applications-qa.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/ocw_studio",
+                        "maxOpenConnections": 2
+                    },
+                    "verifyConnection": true
+                },
+                "outputs": {
+                    "allowedRoles": [
+                        "admin",
+                        "app",
+                        "approle",
+                        "readonly"
+                    ],
+                    "backend": "postgres-ocw-studio-applications-qa",
+                    "cassandra": null,
+                    "couchbase": null,
+                    "data": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "ciphertext": "v1:K63JYfPU72lJNWNb:0bHyB2XMjCT9ozDd4DNn+Ne9p5KD2LeL+06xJt4wXbAaQA4ogtK2Q1bXrqaTEdJCr9LQXyifDQAMy8iCubZP+R0fobwP9paHW010j6KUb33Ai8z8CbrVKNHg6w52SOX2pvDogJFjx7eWwJHSpq0tYQpPvFPgNf1LRDEBZZBd/g=="
+                    },
+                    "elasticsearch": null,
+                    "hana": null,
+                    "id": "postgres-ocw-studio-applications-qa/config/ocw_studio",
+                    "influxdb": null,
+                    "mongodb": null,
+                    "mongodbatlas": null,
+                    "mssql": null,
+                    "mysql": null,
+                    "mysqlAurora": null,
+                    "mysqlLegacy": null,
+                    "mysqlRds": null,
+                    "name": "ocw_studio",
+                    "oracle": null,
+                    "pluginName": "postgresql-database-plugin",
+                    "postgresql": {
+                        "connectionUrl": "postgresql://{{username}}:{{password}}@ocw-studio-db-applications-qa.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/ocw_studio",
+                        "maxConnectionLifetime": 0,
+                        "maxIdleConnections": 0,
+                        "maxOpenConnections": 2,
+                        "password": "",
+                        "username": "oldevops",
+                        "usernameTemplate": ""
+                    },
+                    "redshift": null,
+                    "rootRotationStatements": [],
+                    "snowflake": null,
+                    "verifyConnection": true
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount::ocw_studio-mount-point",
+                "dependencies": [
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:infrastructure:aws:database:OLAmazonDB$aws:rds/instance:Instance::ocw-studio-db-applications-qa-postgres-instance"
+                ],
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:vault::vault-provider::7cde6325-984b-4a8a-aa28-2a6e98d83a91",
+                "propertyDependencies": {
+                    "allowedRoles": null,
+                    "backend": null,
+                    "data": null,
+                    "name": null,
+                    "postgresql": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:infrastructure:aws:database:OLAmazonDB$aws:rds/instance:Instance::ocw-studio-db-applications-qa-postgres-instance"
+                    ],
+                    "verifyConnection": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount$vault:database/secretBackendConnection:SecretBackendConnection$vault:database/secretBackendRole:SecretBackendRole::ocw_studio-database-role-approle",
+                "custom": true,
+                "id": "postgres-ocw-studio-applications-qa/roles/approle",
+                "type": "vault:database/secretBackendRole:SecretBackendRole",
+                "inputs": {
+                    "backend": "postgres-ocw-studio-applications-qa",
+                    "creationStatements": [
+                        "CREATE ROLE ocw_studio;"
+                    ],
+                    "dbName": "ocw_studio",
+                    "defaultTtl": 15552000,
+                    "maxTtl": 15552000,
+                    "name": "approle",
+                    "revocationStatements": [
+                        "DROP ROLE ocw_studio;"
+                    ]
+                },
+                "outputs": {
+                    "backend": "postgres-ocw-studio-applications-qa",
+                    "creationStatements": [
+                        "CREATE ROLE ocw_studio;"
+                    ],
+                    "dbName": "ocw_studio",
+                    "defaultTtl": 15552000,
+                    "id": "postgres-ocw-studio-applications-qa/roles/approle",
+                    "maxTtl": 15552000,
+                    "name": "approle",
+                    "renewStatements": [],
+                    "revocationStatements": [
+                        "DROP ROLE ocw_studio;"
+                    ],
+                    "rollbackStatements": []
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount$vault:database/secretBackendConnection:SecretBackendConnection::ocw_studio-database-connection",
+                "dependencies": [
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount::ocw_studio-mount-point"
+                ],
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:vault::vault-provider::7cde6325-984b-4a8a-aa28-2a6e98d83a91",
+                "propertyDependencies": {
+                    "backend": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount::ocw_studio-mount-point"
+                    ],
+                    "creationStatements": null,
+                    "dbName": null,
+                    "defaultTtl": null,
+                    "maxTtl": null,
+                    "name": null,
+                    "revocationStatements": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount$vault:database/secretBackendConnection:SecretBackendConnection$vault:database/secretBackendRole:SecretBackendRole::ocw_studio-database-role-admin",
+                "custom": true,
+                "id": "postgres-ocw-studio-applications-qa/roles/admin",
+                "type": "vault:database/secretBackendRole:SecretBackendRole",
+                "inputs": {
+                    "backend": "postgres-ocw-studio-applications-qa",
+                    "creationStatements": [
+                        "CREATE USER \"{{name}}\" WITH PASSWORD '{{password}}'\n             VALID UNTIL '{{expiration}}' IN ROLE \"rds_superuser\"\n             INHERIT CREATEROLE CREATEDB;\n          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"{{name}}\"\n             WITH GRANT OPTION;\n          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\"\n             WITH GRANT OPTION;"
+                    ],
+                    "dbName": "ocw_studio",
+                    "defaultTtl": 15552000,
+                    "maxTtl": 15552000,
+                    "name": "admin",
+                    "revocationStatements": [
+                        "REVOKE \"ocw_studio\" FROM \"{{name}}\";\n          GRANT \"{{name}}\" TO ocw_studio WITH ADMIN OPTION;\n          SET ROLE ocw_studio;\n          REASSIGN OWNED BY \"{{name}}\" TO \"ocw_studio\";\n          RESET ROLE;\n          DROP OWNED BY \"{{name}}\";\n          REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";\n          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";\n          REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";\n          DROP USER \"{{name}}\";"
+                    ]
+                },
+                "outputs": {
+                    "backend": "postgres-ocw-studio-applications-qa",
+                    "creationStatements": [
+                        "CREATE USER \"{{name}}\" WITH PASSWORD '{{password}}'\n             VALID UNTIL '{{expiration}}' IN ROLE \"rds_superuser\"\n             INHERIT CREATEROLE CREATEDB;\n          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"{{name}}\"\n             WITH GRANT OPTION;\n          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\"\n             WITH GRANT OPTION;"
+                    ],
+                    "dbName": "ocw_studio",
+                    "defaultTtl": 15552000,
+                    "id": "postgres-ocw-studio-applications-qa/roles/admin",
+                    "maxTtl": 15552000,
+                    "name": "admin",
+                    "renewStatements": [],
+                    "revocationStatements": [
+                        "REVOKE \"ocw_studio\" FROM \"{{name}}\";\n          GRANT \"{{name}}\" TO ocw_studio WITH ADMIN OPTION;\n          SET ROLE ocw_studio;\n          REASSIGN OWNED BY \"{{name}}\" TO \"ocw_studio\";\n          RESET ROLE;\n          DROP OWNED BY \"{{name}}\";\n          REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";\n          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";\n          REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";\n          DROP USER \"{{name}}\";"
+                    ],
+                    "rollbackStatements": []
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount$vault:database/secretBackendConnection:SecretBackendConnection::ocw_studio-database-connection",
+                "dependencies": [
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount::ocw_studio-mount-point"
+                ],
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:vault::vault-provider::7cde6325-984b-4a8a-aa28-2a6e98d83a91",
+                "propertyDependencies": {
+                    "backend": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount::ocw_studio-mount-point"
+                    ],
+                    "creationStatements": null,
+                    "dbName": null,
+                    "defaultTtl": null,
+                    "maxTtl": null,
+                    "name": null,
+                    "revocationStatements": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount$vault:database/secretBackendConnection:SecretBackendConnection$vault:database/secretBackendRole:SecretBackendRole::ocw_studio-database-role-app",
+                "custom": true,
+                "id": "postgres-ocw-studio-applications-qa/roles/app",
+                "type": "vault:database/secretBackendRole:SecretBackendRole",
+                "inputs": {
+                    "backend": "postgres-ocw-studio-applications-qa",
+                    "creationStatements": [
+                        "CREATE USER \"{{name}}\" WITH PASSWORD '{{password}}'\n            VALID UNTIL '{{expiration}}' IN ROLE \"ocw_studio\" INHERIT;\n          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"ocw_studio\"\n             WITH GRANT OPTION;\n          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"ocw_studio\"\n             WITH GRANT OPTION;\n          SET ROLE \"ocw_studio\";\n          ALTER DEFAULT PRIVILEGES FOR ROLE \"ocw_studio\" IN SCHEMA public\n            GRANT ALL PRIVILEGES ON TABLES TO \"ocw_studio\" WITH GRANT OPTION;\n          ALTER DEFAULT PRIVILEGES FOR ROLE \"ocw_studio\" IN SCHEMA public\n            GRANT ALL PRIVILEGES ON SEQUENCES TO \"ocw_studio\" WITH GRANT OPTION;\n          RESET ROLE;\n          ALTER ROLE \"{{name}}\" SET ROLE \"ocw_studio\";"
+                    ],
+                    "dbName": "ocw_studio",
+                    "defaultTtl": 15552000,
+                    "maxTtl": 15552000,
+                    "name": "app",
+                    "revocationStatements": [
+                        "REVOKE \"ocw_studio\" FROM \"{{name}}\";\n          GRANT \"{{name}}\" TO ocw_studio WITH ADMIN OPTION;\n          SET ROLE ocw_studio;\n          REASSIGN OWNED BY \"{{name}}\" TO \"ocw_studio\";\n          RESET ROLE;\n          DROP OWNED BY \"{{name}}\";\n          REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";\n          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";\n          REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";\n          DROP USER \"{{name}}\";"
+                    ]
+                },
+                "outputs": {
+                    "backend": "postgres-ocw-studio-applications-qa",
+                    "creationStatements": [
+                        "CREATE USER \"{{name}}\" WITH PASSWORD '{{password}}'\n            VALID UNTIL '{{expiration}}' IN ROLE \"ocw_studio\" INHERIT;\n          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"ocw_studio\"\n             WITH GRANT OPTION;\n          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"ocw_studio\"\n             WITH GRANT OPTION;\n          SET ROLE \"ocw_studio\";\n          ALTER DEFAULT PRIVILEGES FOR ROLE \"ocw_studio\" IN SCHEMA public\n            GRANT ALL PRIVILEGES ON TABLES TO \"ocw_studio\" WITH GRANT OPTION;\n          ALTER DEFAULT PRIVILEGES FOR ROLE \"ocw_studio\" IN SCHEMA public\n            GRANT ALL PRIVILEGES ON SEQUENCES TO \"ocw_studio\" WITH GRANT OPTION;\n          RESET ROLE;\n          ALTER ROLE \"{{name}}\" SET ROLE \"ocw_studio\";"
+                    ],
+                    "dbName": "ocw_studio",
+                    "defaultTtl": 15552000,
+                    "id": "postgres-ocw-studio-applications-qa/roles/app",
+                    "maxTtl": 15552000,
+                    "name": "app",
+                    "renewStatements": [],
+                    "revocationStatements": [
+                        "REVOKE \"ocw_studio\" FROM \"{{name}}\";\n          GRANT \"{{name}}\" TO ocw_studio WITH ADMIN OPTION;\n          SET ROLE ocw_studio;\n          REASSIGN OWNED BY \"{{name}}\" TO \"ocw_studio\";\n          RESET ROLE;\n          DROP OWNED BY \"{{name}}\";\n          REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";\n          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";\n          REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";\n          DROP USER \"{{name}}\";"
+                    ],
+                    "rollbackStatements": []
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount$vault:database/secretBackendConnection:SecretBackendConnection::ocw_studio-database-connection",
+                "dependencies": [
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount::ocw_studio-mount-point"
+                ],
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:vault::vault-provider::7cde6325-984b-4a8a-aa28-2a6e98d83a91",
+                "propertyDependencies": {
+                    "backend": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount::ocw_studio-mount-point"
+                    ],
+                    "creationStatements": null,
+                    "dbName": null,
+                    "defaultTtl": null,
+                    "maxTtl": null,
+                    "name": null,
+                    "revocationStatements": null
+                }
+            },
+            {
+                "urn": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount$vault:database/secretBackendConnection:SecretBackendConnection$vault:database/secretBackendRole:SecretBackendRole::ocw_studio-database-role-readonly",
+                "custom": true,
+                "id": "postgres-ocw-studio-applications-qa/roles/readonly",
+                "type": "vault:database/secretBackendRole:SecretBackendRole",
+                "inputs": {
+                    "backend": "postgres-ocw-studio-applications-qa",
+                    "creationStatements": [
+                        "CREATE USER \"{{name}}\" WITH PASSWORD '{{password}}'\n             VALID UNTIL '{{expiration}}';\n          GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";\n          GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";\n          SET ROLE \"{{name}}\";\n          ALTER DEFAULT PRIVILEGES FOR USER \"{{name}}\" IN SCHEMA public GRANT SELECT\n             ON TABLES TO \"{{name}}\";\n          ALTER DEFAULT PRIVILEGES FOR USER \"{{name}}\" IN SCHEMA public GRANT SELECT\n             ON SEQUENCES TO \"{{name}}\";\n          RESET ROLE;"
+                    ],
+                    "dbName": "ocw_studio",
+                    "defaultTtl": 15552000,
+                    "maxTtl": 15552000,
+                    "name": "readonly",
+                    "revocationStatements": [
+                        "REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";\n          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";\n          REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";\n          DROP USER \"{{name}}\";"
+                    ]
+                },
+                "outputs": {
+                    "backend": "postgres-ocw-studio-applications-qa",
+                    "creationStatements": [
+                        "CREATE USER \"{{name}}\" WITH PASSWORD '{{password}}'\n             VALID UNTIL '{{expiration}}';\n          GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";\n          GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";\n          SET ROLE \"{{name}}\";\n          ALTER DEFAULT PRIVILEGES FOR USER \"{{name}}\" IN SCHEMA public GRANT SELECT\n             ON TABLES TO \"{{name}}\";\n          ALTER DEFAULT PRIVILEGES FOR USER \"{{name}}\" IN SCHEMA public GRANT SELECT\n             ON SEQUENCES TO \"{{name}}\";\n          RESET ROLE;"
+                    ],
+                    "dbName": "ocw_studio",
+                    "defaultTtl": 15552000,
+                    "id": "postgres-ocw-studio-applications-qa/roles/readonly",
+                    "maxTtl": 15552000,
+                    "name": "readonly",
+                    "renewStatements": [],
+                    "revocationStatements": [
+                        "REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";\n          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";\n          REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";\n          DROP USER \"{{name}}\";"
+                    ],
+                    "rollbackStatements": []
+                },
+                "parent": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount$vault:database/secretBackendConnection:SecretBackendConnection::ocw_studio-database-connection",
+                "dependencies": [
+                    "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount::ocw_studio-mount-point"
+                ],
+                "provider": "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::pulumi:providers:vault::vault-provider::7cde6325-984b-4a8a-aa28-2a6e98d83a91",
+                "propertyDependencies": {
+                    "backend": [
+                        "urn:pulumi:applications.ocw_studio.QA::ol-infrastructure-ocw-studio-application::ol:services:Vault:DatabaseBackend:postgresql$vault:index/mount:Mount::ocw_studio-mount-point"
+                    ],
+                    "creationStatements": null,
+                    "dbName": null,
+                    "defaultTtl": null,
+                    "maxTtl": null,
+                    "name": null,
+                    "revocationStatements": null
+                }
+            }
+        ]
+    }
+}
