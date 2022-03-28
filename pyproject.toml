@@ -37,7 +37,7 @@ pyyaml = "^6.0"
 salt-pepper = "^0.7.6"
 pulumi-mongodbatlas = "^3.3.0"
 bcrypt = "^3.2.0"
-markupsafe = "<2.1.0" # Avoiding 2.1 update until PyInfra updates accordingly due to https://github.com/pallets/markupsafe/pull/261
+markupsafe = "<2.1.2" # Avoiding 2.1 update until PyInfra updates accordingly due to https://github.com/pallets/markupsafe/pull/261
 
 [tool.poetry.dev-dependencies]
 black = "*"
