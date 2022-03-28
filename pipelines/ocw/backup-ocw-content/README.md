@@ -2,6 +2,12 @@
 
 Once a day we will copy the content from the real ocw s3 buckets to a backup bucket. In the event that something goes wrong with a release/mass publish we can update the fastly configs to point to the backup bucket and all will be magically well again.
 
+### Determining when to Break-Glass
+
+This type of rollback / failover should only happen if there is a large scale issue, for example a mass publish that damaged more than 10 courses. Otherwise, it would be faster and safer to revert individual courses.
+
+This descision should be made by at least one one representative from product and one representative from engineering.
+
 ### Runbook for DR of ocw-content
 
 - Confirm the last execution of the relevant `backup-ocw-content` job in concourse.
