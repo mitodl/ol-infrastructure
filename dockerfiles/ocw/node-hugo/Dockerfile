@@ -1,4 +1,4 @@
-FROM  node:14-buster-slim
+FROM  node:17-buster-slim
 LABEL maintainer="MIT Open Learning (odl-devops@mit.edu)"
 LABEL description="Node and Hugo, used for building OCW website"
 LABEL version="0.1"
