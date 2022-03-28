@@ -239,7 +239,7 @@ vault_secrets = read_yaml_secrets(
 vault.generic.Secret(
     "ocw-studio-vault-secrets",
     path=ocw_studio_secrets.path.apply("{}/app-config".format),
-    data_json=vault_secrets['ocw_secrets'],
+    data_json=vault_secrets["ocw_secrets"],
 )
 gh_repo = github.get_repository(full_name="mitodl/ocw-hugo-projects")
 ocw_starter_webhook = github.RepositoryWebhook(
@@ -252,7 +252,7 @@ ocw_starter_webhook = github.RepositoryWebhook(
             ocw_studio_config.require("app_domain")
         ),
         content_type="application/json",
-        secret=json.loads(vault_secrets['ocw_secrets'])['github_shared_secret'],
+        secret=json.loads(vault_secrets["ocw_secrets"])["github_shared_secret"],
     ),
 )
 
