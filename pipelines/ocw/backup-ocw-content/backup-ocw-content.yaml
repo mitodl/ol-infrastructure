@@ -4,9 +4,7 @@ resources:
   type: time
   icon: clock
   source:
-    interval: 24h
-    start: 12:00 AM
-    stop: 1:00 AM
+    interval: 6h
     initial_version: true
 
 jobs:

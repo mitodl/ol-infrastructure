@@ -73,6 +73,15 @@ draft_backup_bucket = s3.Bucket(
         }
     ),
     cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
+    versioning=s3.BucketVersioningArgs(enabled=True),
+    lifecycle_rules=[
+        s3.BucketLifecycleRuleArgs(
+            enabled=True,
+            noncurrent_version_expiration=s3.BucketLifecycleRuleNoncurrentVersionExpirationArgs(
+                days=90,
+            ),
+        )
+    ],
 )
 
 live_bucket = s3.Bucket(
@@ -116,6 +125,15 @@ live_backup_bucket = s3.Bucket(
         }
     ),
     cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
+    versioning=s3.BucketVersioningArgs(enabled=True),
+    lifecycle_rules=[
+        s3.BucketLifecycleRuleArgs(
+            enabled=True,
+            noncurrent_version_expiration=s3.BucketLifecycleRuleNoncurrentVersionExpirationArgs(
+                days=90,
+            ),
+        )
+    ],
 )
 
 policy_description = (
