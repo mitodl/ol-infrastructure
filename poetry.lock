@@ -949,7 +949,7 @@ six = ">=1.12.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "4.38.1"
+version = "5.1.0"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 category = "main"
 optional = false
@@ -1530,7 +1530,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "d0503bd5d9038fdb864e68a471dda0b59f9cc3114e5c1f0e6e9821b11f8278dc"
+content-hash = "e536eec7b813a484ede9ea02ed761745b3b74a84c307276e573410cae92b97cc"
 
 [metadata.files]
 anyio = [
@@ -2172,7 +2172,7 @@ pulumi = [
     {file = "pulumi-3.27.0-py2.py3-none-any.whl", hash = "sha256:d1ced38a17f8be3a0731699a8d4319d4561316df0325ab1195186b289a34b981"},
 ]
 pulumi-aws = [
-    {file = "pulumi_aws-4.38.1.tar.gz", hash = "sha256:0cd807241e574c726bc8355c545ed2f04bf8c84c1f6c4d5f13afd715a599bf8d"},
+    {file = "pulumi_aws-5.1.0.tar.gz", hash = "sha256:c61f8596ea3e5db2f50dc59a15c08f0243ab71064f94836d452703ab60544ade"},
 ]
 pulumi-consul = [
     {file = "pulumi_consul-3.5.0.tar.gz", hash = "sha256:5cb8a6e4ee64edf7a55377518ef16a37d3d2b619700e8def19f743776d10eb81"},
