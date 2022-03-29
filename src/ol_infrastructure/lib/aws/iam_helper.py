@@ -27,7 +27,7 @@ def _is_parliament_finding_filtered(
             )
             action_matches.append(any(matches))
     else:
-        action_matches.append("all")
+        action_matches.append("all")  # type: ignore[arg-type]
     return any(action_matches)
 
 

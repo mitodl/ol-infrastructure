@@ -3,3 +3,7 @@ secretsprovider: awskms://alias/infrastructure-secrets-production  # pragma: all
 encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgGPbSz7qllaLKSxEZcmDRxmAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMiW0X4xHd5cZ68j1uAgEQgDtqOisD1vkDetSKsy4Q4aHqZt4ZoWiScmYMkFGsRXTOCpzP2bU1U20TVIiN+hQrSWe60lqWycNfePaPtA==  # pragma: allowlist-secret
 config:
   aws:region: us-east-1
+  ocw_site:domains:
+  - draft.ocw.mit.edu
+  - live.ocw.mit.edu
+  - ocw.mit.edu

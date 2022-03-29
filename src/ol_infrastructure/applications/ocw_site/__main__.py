@@ -1,8 +1,10 @@
 import json
 
-from pulumi import Config, export
-from pulumi_aws import iam, s3
+from pulumi import Config, StackReference, export
+from pulumi_aws import iam, route53, s3
 
+from bridge.lib.constants import FASTLY_A_TLS_1_3, FASTLY_CNAME_TLS_1_3
+from bridge.lib.magic_numbers import FIVE_MINUTES
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -16,6 +18,8 @@ aws_config = AWSBase(
     }
 )
 
+dns_stack = StackReference("infrastructure.aws.dns")
+ocw_zone = dns_stack.require_output("ocw")
 # Create S3 buckets
 # There are two buckets for each environment (QA, Production):
 # One for the that environment's draft site (where authors test content
@@ -171,6 +175,25 @@ s3_bucket_iam_policy = iam.Policy(
         stringify=True,
     ),
 )
+
+# NOTE (TMM 2022-03-28): Once we integrate Fastly into this project code we'll likely
+# want to turn this domain object into a dictionary of draft and live domains to be
+# templated into the Fastly distribution as well.
+for domain in ocw_site_config.get_object("domains") or []:
+    # If it's a 3 level domain then it's rooted at MIT.edu which means that we are
+    # creating an Apex record in Route53. This means that we have to use an A record. If
+    # it's deeper than 3 levels then it's a subdomain of ocw.mit.edu and we can use a
+    # CNAME.
+    record_type = "A" if len(domain.split(".")) == 3 else "CNAME"
+    record_value = FASTLY_A_TLS_1_3 if record_type == "A" else [FASTLY_CNAME_TLS_1_3]  # type: ignore[list-item]
+    route53.Record(
+        f"ocw-site-dns-record-{domain}",
+        name=domain,
+        type=record_type,
+        ttl=FIVE_MINUTES,
+        records=record_value,
+        zone_id=ocw_zone["id"],
+    )
 
 export(
     "ocw_site_buckets",

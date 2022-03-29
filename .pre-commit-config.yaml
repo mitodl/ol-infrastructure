@@ -52,9 +52,12 @@ repos:
   hooks:
   - id: detect-secrets
     args:
-    - --exclude-lines (^encryptedkey:|^secure:|^secretsprovider:)
-    - --exclude-files src/bridge/secrets/
-    - --exclude-files poetry.lock
+    - --exclude-lines
+    - '(^encryptedkey:|^secure:|^secretsprovider:)'
+    - --exclude-files
+    - src/bridge/secrets/
+    - --exclude-files
+    - poetry.lock
 - repo: https://github.com/PyCQA/isort
   rev: 5.10.1
   hooks:
