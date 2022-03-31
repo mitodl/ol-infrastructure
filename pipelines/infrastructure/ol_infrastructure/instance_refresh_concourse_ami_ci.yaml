@@ -34,7 +34,7 @@ resources:
 - icon: github
   name: pulumi_files
   source:
-    branch: issue_679
+    branch: main
     paths:
     - src/ol_infrastructure/infrastructure/concourse
     uri: https://github.com/mitodl/ol-infrastructure

@@ -23,7 +23,7 @@ resources:
 - icon: github
   name: pulumi_files
   source:
-    branch: master
+    branch: main
     paths:
     - src/ol_infrastructure/infrastructure/vault
     uri: https://github.com/mitodl/ol-infrastructure
