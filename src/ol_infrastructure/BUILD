@@ -1,6 +1,4 @@
-python_sources(
-    sources=["**/*.py"],
-    name="ol-infrastructure-source")
+python_sources(sources=["**/*.py"], name="ol-infrastructure-source")
 
 python_distribution(
     name="ol-infrastructure-package",
@@ -9,5 +7,5 @@ python_distribution(
     provides=python_artifact(
         name="ol_infrastructure",
         version="0.1.0",
-    )
+    ),
 )

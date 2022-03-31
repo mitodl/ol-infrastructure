@@ -11,5 +11,5 @@ python_distribution(
     provides=python_artifact(
         name="bridge",
         version="0.1.0",
-    )
+    ),
 )

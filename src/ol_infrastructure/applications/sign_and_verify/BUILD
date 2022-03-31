@@ -5,5 +5,5 @@ python_distribution(
     provides=python_artifact(
         name="sign_and_verify",
         version="0.0.1",
-    )
+    ),
 )
