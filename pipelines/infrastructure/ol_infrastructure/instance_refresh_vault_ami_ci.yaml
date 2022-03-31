@@ -1,0 +1,84 @@
+resource_types:
+- name: ami
+  type: docker-image
+  source:
+    repository: jdub/ami-resource
+- name: pulumi
+  source:
+    repository: mitodl/concourse-pulumi-resource-provisioner
+  type: docker-image
+
+resources:
+- name: vault-ami
+  type: ami
+  check_every: 1m
+  source:
+    region: us-east-1
+    filters:
+      owner-id: 610119931565
+      is-public: false
+      state: available
+      name: vault-server-*
+
+- icon: github
+  name: pulumi_files
+  source:
+    branch: master
+    paths:
+    - src/ol_infrastructure/infrastructure/vault
+    uri: https://github.com/mitodl/ol-infrastructure
+  type: git
+
+- name: pulumi-infra
+  source: null
+  type: pulumi
+
+jobs:
+- name: vault-ami-build
+  plan:
+  - task: set-aws-creds
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: amazon/aws-cli
+          tag: 'latest'
+      params:
+        AWS_ROLE: arn:aws:iam::610119931565:role/ol-applications/concourse/role/concourse-instance-role-worker-infra-qa-4c8b313
+      outputs:
+      - name: aws_creds
+      run:
+        path: sh
+        args:
+        - -exc
+        - |
+          export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" \
+          $(aws sts assume-role \
+          --role-arn $AWS_ROLE \
+          --role-session-name MySessionName \
+          --query "Credentials.[AccessKeyId,SecretAccessKey,SessionToken]" \
+          --output text))
+          cd aws_creds
+          echo "[default]" > credentials
+          echo "aws_access_key_id=$AWS_ACCESS_KEY_ID" >> credentials
+          echo "aws_secret_access_key=$AWS_SECRET_ACCESS_KEY" >> credentials
+          echo "aws_session_token=$AWS_SESSION_TOKEN" >> credentials
+  - get: vault-ami
+  - get: pulumi_files
+  - put: pulumi-infra
+    inputs:
+      - aws_creds
+      - pulumi_files
+    get_params:
+      skip_implicit_get: True
+    params:
+      env_pulumi:
+        AWS_SHARED_CREDENTIALS_FILE: aws_creds/credentials
+      action: update
+      env_os:
+        AWS_DEFAULT_REGION: us-east-1
+        PYTHONPATH: /usr/lib/:/tmp/build/put/pulumi_files/src/
+      project_name: ol-infrastructure-vault-server
+      source_dir: pulumi_files/src/ol_infrastructure/infrastructure/vault
+      stack_name: infrastructure.vault.operations.CI
