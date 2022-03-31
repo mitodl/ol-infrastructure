@@ -93,6 +93,6 @@ jobs:
       env_os:
         AWS_DEFAULT_REGION: us-east-1
         PYTHONPATH: /usr/lib/:/tmp/build/put/pulumi_files/src/
-      project_name: ol-infrastructure-concourse-server
-      source_dir: pulumi_files/src/ol_infrastructure/infrastructure/concourse
-      stack_name: infrastructure.concourse.operations.CI
+      project_name: ol-infrastructure-concourse-application
+      source_dir: pulumi_files/src/ol_infrastructure/applications/concourse
+      stack_name: applications.concourse.CI
