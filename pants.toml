@@ -1,7 +1,7 @@
 [GLOBAL]
 pants_version = "2.10.0"
 backend_packages = [
-  'pants.backend.experimental.docker.lint.hadolint',
+  'pants.backend.docker.lint.hadolint',
   'pants.backend.python',
   'pants.backend.python.lint.black',
   'pants.backend.python.lint.flake8',

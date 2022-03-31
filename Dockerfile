@@ -7,10 +7,10 @@ ENV PATH /bin:/usr/bin/:/usr/local/bin:/home/app/.local/bin
 RUN pip install --no-cache-dir poetry
 COPY --chown=app:app ./ /home/app/workspace/
 RUN poetry export --without-hashes -o requirements.txt &&\
-    pip install --no-cache-dir -r requirements.txt &&\
     ./pants package src/bridge:bridge-package &&\
     ./pants package src/ol_infrastructure:ol-infrastructure-package &&\
-    pip install --force-reinstall dist/*.whl
+    pip install --force-reinstall dist/*.whl &&\
+    pip install --no-cache-dir -r requirements.txt
 
 FROM python:3.9-slim
 RUN useradd -m app
