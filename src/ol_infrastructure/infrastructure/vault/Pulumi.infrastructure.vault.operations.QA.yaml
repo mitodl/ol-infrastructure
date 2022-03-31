@@ -2,8 +2,6 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QF6uii6Y6aWd4jo7JKZHE8jAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM8ywhkGTj/dFstJalAgEQgDu/+LN5zq4j2vx5r0Y5uwOobbJdONosywIQx8f7FqIwG/Mgp8dsLnW8k7ovu0I8qmwphnus7rc+K8Fo2g==
 config:
-  aws:skip_metadata_api_check: false
-  aws:skip_credentials_validation: false
   aws:region: us-east-1
   vault:business_unit: operations
   vault:cluster_size: '5'
