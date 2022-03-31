@@ -65,6 +65,7 @@ jobs:
           echo "aws_secret_access_key=$AWS_SECRET_ACCESS_KEY" >> credentials
           echo "aws_session_token=$AWS_SESSION_TOKEN" >> credentials
   - get: consul-ami
+    trigger: true
   - get: pulumi_files
   - put: pulumi-infra
     inputs:

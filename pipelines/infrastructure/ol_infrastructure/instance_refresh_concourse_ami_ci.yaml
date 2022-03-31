@@ -9,7 +9,7 @@ resource_types:
   type: docker-image
 
 resources:
-- name: vault-ami
+- name: concourse-worker-ami
   type: ami
   check_every: 1m
   source:
@@ -18,14 +18,25 @@ resources:
       owner-id: 610119931565
       is-public: false
       state: available
-      name: vault-server-*
+      name: concourse-worker-*
+
+- name: concourse-web-ami
+  type: ami
+  check_every: 1m
+  source:
+    region: us-east-1
+    filters:
+      owner-id: 610119931565
+      is-public: false
+      state: available
+      name: concourse-web-*
 
 - icon: github
   name: pulumi_files
   source:
-    branch: master
+    branch: issue_679
     paths:
-    - src/ol_infrastructure/infrastructure/vault
+    - src/ol_infrastructure/infrastructure/concourse
     uri: https://github.com/mitodl/ol-infrastructure
   type: git
 
@@ -34,7 +45,7 @@ resources:
   type: pulumi
 
 jobs:
-- name: vault-ami-build
+- name: concourse-ami-build
   plan:
   - task: set-aws-creds
     config:
@@ -64,7 +75,9 @@ jobs:
           echo "aws_access_key_id=$AWS_ACCESS_KEY_ID" >> credentials
           echo "aws_secret_access_key=$AWS_SECRET_ACCESS_KEY" >> credentials
           echo "aws_session_token=$AWS_SESSION_TOKEN" >> credentials
-  - get: vault-ami
+  - get: concourse-web-ami
+    trigger: true
+  - get: concourse-worker-ami
     trigger: true
   - get: pulumi_files
   - put: pulumi-infra
@@ -80,6 +93,6 @@ jobs:
       env_os:
         AWS_DEFAULT_REGION: us-east-1
         PYTHONPATH: /usr/lib/:/tmp/build/put/pulumi_files/src/
-      project_name: ol-infrastructure-vault-server
-      source_dir: pulumi_files/src/ol_infrastructure/infrastructure/vault
-      stack_name: infrastructure.vault.operations.CI
+      project_name: ol-infrastructure-concourse-server
+      source_dir: pulumi_files/src/ol_infrastructure/infrastructure/concourse
+      stack_name: infrastructure.concourse.operations.CI
