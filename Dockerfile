@@ -1,4 +1,4 @@
-FROM python:3.10-slim as build
+FROM python:3.9-slim as build
 RUN apt-get update -yqq && apt-get install -yqq curl  && useradd -m app
 USER app
 RUN mkdir /home/app/workspace && chown app:app /home/app/workspace
@@ -11,7 +11,7 @@ RUN poetry install --no-dev &&\
     ./pants package src/ol_infrastructure:ol-infrastructure-package &&\
     .venv/bin/pip install --force-reinstall dist/*.whl
 
-FROM python:3.10-slim
+FROM python:3.9-slim
 RUN useradd -m app
 USER app
 WORKDIR /home/app/workspace
