@@ -13,7 +13,7 @@ repos:
   - id: check-toml
   - id: debug-statements
 - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
-  rev: 0.1.0
+  rev: 0.1.1
   hooks:
   - id: yamlfmt
     args:
@@ -69,7 +69,7 @@ repos:
     additional_dependencies:
     - wemake-python-styleguide
 - repo: https://github.com/psf/black
-  rev: 22.1.0
+  rev: 22.3.0
   hooks:
   - id: black
 - repo: https://github.com/PyCQA/flake8
