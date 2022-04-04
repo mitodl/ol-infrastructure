@@ -57,6 +57,19 @@ ocw_storage_bucket = s3.Bucket(
     versioning=s3.BucketVersioningArgs(
         enabled=True,
     ),
+    policy=json.dumps(
+        {
+            "Version": "2008-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": "*"},
+                    "Action": "s3:GetObject",
+                    "Resource": f"arn:aws:s3:::{ocw_storage_bucket_name}/courses/*",
+                }
+            ],
+        }
+    ),
     tags=aws_config.tags,
 )
 
