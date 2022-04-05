@@ -1,0 +1,104 @@
+---
+resource_types:
+- name: packer
+  source:
+    repository: mitodl/concourse-packer-resource
+    tag: latest
+  type: docker-image
+- name: packer-builder
+  source:
+    repository: mitodl/concourse-packer-resource-builder
+    tag: latest
+  type: docker-image
+
+resources:
+- check_every: 1h
+  name: edx-platform
+  source:
+    branch: ((edx_base_branch))
+    uri: https://github.com/openedx/edx-platform
+  type: git
+  icon: github
+- icon: github
+  name: packer_templates
+  source:
+    branch: main
+    paths:
+    - src/bilder/images/edxapp/edxapp_base.pkr.hcl
+    - src/bilder/images/edxapp/packer_vars/((edx_release)).pkrvars.hcl
+    uri: https://github.com/mitodl/ol-infrastructure
+  type: git
+- name: packer-validate
+  type: packer
+- name: packer-build
+  type: packer-builder
+
+jobs:
+- name: validate-base-packer-template
+  plan:
+  - get: edx-platform
+    params:
+      depth: 1
+    trigger: true
+  - get: packer_templates
+    trigger: true
+  - in_parallel:
+    - put: packer-validate
+      params:
+        objective: validate
+        only:
+        - amazon-ebs.third-party
+        template: packer_templates/src/bilder/images/edxapp/edxapp_base.pkr.hcl
+        var_files:
+        - packer_templates/src/bilder/images/edxapp/packer_vars/((edx_release)).pkrvars.hcl
+        vars:
+          node_type: web
+    - put: packer-validate
+      params:
+        objective: validate
+        only:
+        - amazon-ebs.third-party
+        template: packer_templates/src/bilder/images/edxapp/edxapp_base.pkr.hcl
+        var_files:
+        - packer_templates/src/bilder/images/edxapp/packer_vars/((edx_release)).pkrvars.hcl
+        vars:
+          node_type: worker
+
+- name: build-base-packer-template
+  plan:
+  - get: edx-platform
+    params:
+      depth: 1
+    trigger: true
+  - get: packer_templates
+    passed: [validate-base-packer-template]
+    params:
+      depth: 1
+    trigger: true
+  - in_parallel:
+    - put: packer-build
+      params:
+        env_vars:
+          AWS_REGION: us-east-1
+          PYTHONPATH: ${PYTHONPATH}:packer_templates/src
+        objective: build
+        only:
+        - amazon-ebs.edxapp
+        template: packer_templates/src/bilder/images/edxapp/edxapp_base.pkr.hcl
+        var_files:
+        - packer_templates/src/bilder/images/edxapp/packer_vars/((edx_release)).pkrvars.hcl
+        vars:
+          node_type: web
+    - put: packer-build
+      params:
+        env_vars:
+          AWS_REGION: us-east-1
+          PYTHONPATH: ${PYTHONPATH}:packer_templates/src
+        objective: build
+        only:
+        - amazon-ebs.edxapp
+        template: packer_templates/src/bilder/images/edxapp/edxapp_base.pkr.hcl
+        var_files:
+        - packer_templates/src/bilder/images/edxapp/packer_vars/((edx_release)).pkrvars.hcl
+        vars:
+          node_type: worker
