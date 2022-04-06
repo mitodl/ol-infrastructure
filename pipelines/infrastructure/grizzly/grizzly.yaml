@@ -14,6 +14,8 @@ resources:
     private_key: ((grafana-dashboards-private-key))
 jobs:
 - name: commit-managed-dashboards-from-ci
+  build_log_retention:
+    days: 2
   plan:
   - get: build-schedule
     trigger: true
@@ -77,6 +79,8 @@ jobs:
     params:
       repository: changed-repo
 - name: apply-managed-dashboards-to-qa
+  build_log_retention:
+    days: 2
   plan:
   - get: gitrepo
     trigger: true
@@ -100,6 +104,8 @@ jobs:
           export GRAFANA_URL="((grafana-qa-url))"
           grr apply -d gitrepo/((grafana-folder-name)) -t '*'
 - name: apply-managed-dashboards-to-production
+  build_log_retention:
+    days: 2
   plan:
   - get: gitrepo
     trigger: true
