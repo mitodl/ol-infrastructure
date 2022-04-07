@@ -40,6 +40,7 @@ read_write_role = {
             "allowed_actions": [
                 "crud",
                 "create_index",
+                "indices_all",
             ],  # TODO: Confirm this is all that is needed
         }
     ],
