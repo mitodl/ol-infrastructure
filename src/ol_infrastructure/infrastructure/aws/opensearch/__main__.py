@@ -3,7 +3,6 @@ from pathlib import Path
 import pulumi
 import pulumi_aws as aws
 import pulumi_consul as consul
-from pulumi_aws import iam
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
@@ -39,6 +38,7 @@ cluster_size = search_config.get_int("cluster_size") or 3
 cluster_instance_type = search_config.get("instance_type") or "t3.medium.elasticsearch"
 disk_size = search_config.get_int("disk_size_gb") or 30  # noqa: WPS432
 is_public_web = search_config.get_bool("public_web") or False
+is_secured_cluster = search_config.get_bool("secured_cluster") or False
 consul_service_name = (
     search_config.get("consul_service_name") or "elasticsearch"
 )  # Default is for legacy compatability
@@ -78,14 +78,29 @@ search_security_group = aws.ec2.SecurityGroup(
 
 # OpenSearch Domain
 conditional_kwargs = {}
-if not search_config.get_bool("public_web"):
+if is_public_web:
+    master_user_password = read_yaml_secrets(
+        Path(
+            f"opensearch/opensearch.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"
+        )
+    )["master_user_password"]
+    conditional_kwargs[
+        "advanced_security_options"
+    ] = aws.elasticsearch.DomainAdvancedSecurityOptionsArgs(
+        enabled=True,
+        internal_user_database_enabled=True,
+        master_user_options=aws.elasticsearch.DomainAdvancedSecurityOptionsMasterUserOptionsArgs(
+            master_user_name="opensearch",
+            master_user_password=master_user_password,
+        ),
+    )
+else:
     conditional_kwargs["vpc_options"] = aws.elasticsearch.DomainVpcOptionsArgs(
         subnet_ids=target_vpc["subnet_ids"][:3],
         security_group_ids=[search_security_group.id],
     )
 
-if search_config.get_bool("secured_cluster"):
-    ## TODO 20220307 MAD, look at encryption @ rest and other options
+if is_secured_cluster:
     conditional_kwargs[
         "domain_endpoint_options"
     ] = aws.elasticsearch.DomainDomainEndpointOptionsArgs(
@@ -95,6 +110,9 @@ if search_config.get_bool("secured_cluster"):
     conditional_kwargs[
         "node_to_node_encryption"
     ] = aws.elasticsearch.DomainNodeToNodeEncryptionArgs(
+        enabled=True,
+    )
+    conditional_kwargs["encrypt_at_rest"] = aws.elasticsearch.DomainEncryptAtRestArgs(
         enabled=True,
     )
 
@@ -119,67 +137,27 @@ search_domain = aws.elasticsearch.Domain(
     **conditional_kwargs,
 )
 
-# IAM / Access Control
-if is_public_web:
-    read_only_policy = iam.Policy(
-        f"opensearch-read-only-policy-{environment_name}",
-        policy=search_domain.arn.apply(
-            lambda arn: lint_iam_policy(
-                {
-                    "Version": IAM_POLICY_VERSION,
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Action": "es:ESHttpGet",
-                            "Resource": f"{arn}/*",
-                        }
-                    ],
-                },
-                stringify=True,
-            )
-        ),
-    )
-    read_write_policy = iam.Policy(
-        f"opensearch-read-write-policy-{environment_name}",
-        policy=search_domain.arn.apply(
-            lambda arn: lint_iam_policy(
-                {
-                    "Version": IAM_POLICY_VERSION,
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Action": "es:ESHttp*",
-                            "Resource": f"{arn}/*",
-                        }
-                    ],
-                },
-                stringify=True,
-            )
-        ),
-    )
+search_domain_policy = aws.elasticsearch.DomainPolicy(
+    "opensearch-domain-cluster-access-policy",
+    domain_name=search_domain.domain_name,
+    access_policies=search_domain.arn.apply(
+        lambda arn: lint_iam_policy(
+            {
+                "Version": IAM_POLICY_VERSION,
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"AWS": "*"},
+                        "Action": "es:ESHttp*",
+                        "Resource": f"{arn}/*",
+                    }
+                ],
+            },
+            stringify=True,
+        )
+    ),
+)
 
-else:
-    # Private clusters just get a simple domain policy rather than IAM users
-    search_domain_policy = aws.elasticsearch.DomainPolicy(
-        "opensearch-domain-cluster-access-policy",
-        domain_name=search_domain.domain_name,
-        access_policies=search_domain.arn.apply(
-            lambda arn: lint_iam_policy(
-                {
-                    "Version": IAM_POLICY_VERSION,
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Principal": {"AWS": "*"},
-                            "Action": "es:ESHttp*",
-                            "Resource": f"{arn}/*",
-                        }
-                    ],
-                },
-                stringify=True,
-            )
-        ),
-    )
 
 # Consul Service
 consul_config = pulumi.Config("consul")
@@ -222,6 +200,7 @@ opensearch_service = consul.Service(
     opts=pulumi.ResourceOptions(provider=consul_provider),
 )
 
+
 # Export Resources for shared use
 pulumi.export(
     "cluster",
@@ -234,11 +213,3 @@ pulumi.export(
     },
 )
 pulumi.export("security_group", search_security_group.id)
-if is_public_web:
-    pulumi.export(
-        "iam_policies",
-        {
-            "read_only_policy_arn": read_only_policy.arn,
-            "read_write_policy_arn": read_write_policy.arn,
-        },
-    )

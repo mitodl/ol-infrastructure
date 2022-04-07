@@ -89,3 +89,4 @@ repos:
     additional_dependencies:
     - pydantic
     - types-PyYAML
+    - types-requests
