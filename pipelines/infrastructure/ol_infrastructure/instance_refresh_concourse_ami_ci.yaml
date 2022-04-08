@@ -34,9 +34,9 @@ resources:
 - icon: github
   name: pulumi_files
   source:
-    branch: main
+    branch: issue_679
     paths:
-    - src/ol_infrastructure/infrastructure/concourse
+    - src/ol_infrastructure/applications/concourse/
     uri: https://github.com/mitodl/ol-infrastructure
   type: git
 
@@ -55,8 +55,6 @@ jobs:
         source:
           repository: amazon/aws-cli
           tag: 'latest'
-      params:
-        AWS_ROLE: arn:aws:iam::610119931565:role/ol-applications/concourse/role/concourse-instance-role-worker-infra-qa-4c8b313
       outputs:
       - name: aws_creds
       run:
@@ -64,6 +62,7 @@ jobs:
         args:
         - -exc
         - |
+          AWS_ROLE=$(aws sts get-caller-identity | grep 'arn' |  perl -ne 'print $1 if  /(arn.*)\//')
           export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" \
           $(aws sts assume-role \
           --role-arn $AWS_ROLE \
@@ -76,9 +75,7 @@ jobs:
           echo "aws_secret_access_key=$AWS_SECRET_ACCESS_KEY" >> credentials
           echo "aws_session_token=$AWS_SESSION_TOKEN" >> credentials
   - get: concourse-web-ami
-    trigger: true
   - get: concourse-worker-ami
-    trigger: true
   - get: pulumi_files
   - put: pulumi-infra
     inputs:
