@@ -38,8 +38,8 @@ jobs:
         args:
         - -exc
         - |
-          export GRAFANA_TOKEN="((grafana-ci-token))"
-          export GRAFANA_URL="((grafana-ci-url))"
+          export GRAFANA_TOKEN="((grizzly.ci_token))"
+          export GRAFANA_URL="((grizzly.ci_url))"
           grr pull -d ((grafana-folder-name)) -t 'DashboardFolder/((grafana-folder-uid))'
           grr pull -d ((grafana-folder-name)) -t 'Dashboard/*'
           cp -Rv gitrepo/. changed-repo
@@ -100,8 +100,8 @@ jobs:
         args:
         - -exc
         - |
-          export GRAFANA_TOKEN="((grafana-qa-token))"
-          export GRAFANA_URL="((grafana-qa-url))"
+          export GRAFANA_TOKEN="((grizzly.qa_token))"
+          export GRAFANA_URL="((grizzly.qa_url))"
           grr apply -d gitrepo/((grafana-folder-name)) -t '*'
 - name: apply-managed-dashboards-to-production
   build_log_retention:
@@ -125,6 +125,6 @@ jobs:
         args:
         - -exc
         - |
-          export GRAFANA_TOKEN="((grafana-production-token))"
-          export GRAFANA_URL="((grafana-production-url))"
+          export GRAFANA_TOKEN="((grizzly.production_token))"
+          export GRAFANA_URL="((grizzly.production_url))"
           grr apply -d gitrepo/((grafana-folder-name)) -t '*'

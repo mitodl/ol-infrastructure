@@ -31,7 +31,7 @@ fly -t pr -sp -p grizzly-core-folder -c grizzly.yaml -l core_vars.yaml
 * The secrets in vault contain an `admin` API token for each Grafana environment.
 * Right now, the process will only synchronize one DashboardFolder and the dashboards it contains. No other resources are copied from one environment to another.
 * Don't ever put secrets in your dashboards, like in a description or comment, because the entire definition will be stored in a [public git repo](https://github.com/mitodl/grafana-dashboards).
-* After a dashboard is sync'd to QA or Production, you can certinally edit the dashboard there but it will be overwritten by this process the next time it runs (every hour right now). So, make your changes in the CI definition of the dashboard too.
+* After a dashboard is sync'd to QA or Production, you can certainly edit the dashboard there but it will be overwritten by this process the next time it runs (every hour right now). So, make your changes in the CI definition of the dashboard too.
 
 ## For best results
 
