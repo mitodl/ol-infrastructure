@@ -20,7 +20,7 @@ edx_themes = {
     },
 }
 
-edx_plugins = {
+edx_plugins_added = {
     "mitxonline": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "django-redis",  # Support for Redis caching in Django
@@ -69,6 +69,12 @@ edx_plugins = {
         "rapid-response-xblock==0.6.0",
         "ol-openedx-canvas-integration",
         "ol-openedx-rapid-response-reports",
+    ],
+}
+
+edx_plugins_removed = {
+    "mitxonline": [
+        "edx-name-affirmation",
     ],
 }
 
