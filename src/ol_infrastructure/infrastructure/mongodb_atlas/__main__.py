@@ -39,6 +39,15 @@ max_disk_size = atlas_config.get_int("disk_autoscale_max_gb")
 max_instance_type = atlas_config.get("cluster_autoscale_max_size")
 min_instance_type = atlas_config.get("cluster_autoscale_min_size")
 num_instances = atlas_config.get_int("cluster_instance_count") or 3
+if enable_cloud_backup := atlas_config.get_bool("enable_cloud_backup") is None:
+    enable_cloud_backup = True
+if (
+    enable_point_in_time_recovery := atlas_config.get_bool(
+        "enable_point_in_time_recovery"
+    )
+    is None
+):
+    enable_point_in_time_recovery = True
 atlas_creds = read_yaml_secrets(Path("pulumi/mongodb_atlas.yaml"))
 atlas_provider = pulumi.ResourceOptions(
     provider=atlas.Provider(
@@ -65,11 +74,11 @@ atlas_cluster = atlas.Cluster(
     auto_scaling_compute_scale_down_enabled=bool(min_instance_type),
     auto_scaling_disk_gb_enabled=bool(max_disk_size),
     provider_name="AWS",
-    cloud_backup=True,
+    cloud_backup=enable_cloud_backup,
     cluster_type="REPLICASET",
     disk_size_gb=atlas_config.get_int("disk_size_gb"),
     mongo_db_major_version=atlas_config.get("version") or "4.4",
-    pit_enabled=True,
+    pit_enabled=enable_point_in_time_recovery,
     project_id=atlas_project.id,
     provider_instance_size_name=atlas_config.get("instance_size") or "M10",
     provider_region_name=atlas_config.get("cloud_region") or "US_EAST_1",
