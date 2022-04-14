@@ -84,7 +84,7 @@ git.config(
     name="Set safe git directories",
     key="safe.directory",
     value=edx_platform_path,
-    user=EDX_USER,
+    sudo_user=EDX_USER,
 )
 server.shell(
     name="Ensure the edx-platform git origin is configured",
