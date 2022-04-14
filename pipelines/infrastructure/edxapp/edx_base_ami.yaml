@@ -24,6 +24,7 @@ resources:
   source:
     branch: main
     paths:
+    - src/bilder/images/edxapp/prebuild.py
     - src/bilder/images/edxapp/edxapp_base.pkr.hcl
     - src/bilder/images/edxapp/packer_vars/((edx_release)).pkrvars.hcl
     uri: https://github.com/mitodl/ol-infrastructure

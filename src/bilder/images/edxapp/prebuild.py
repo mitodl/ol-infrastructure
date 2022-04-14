@@ -31,16 +31,10 @@ install_baseline_packages(
 
 # Addresses change in latest git due to recent CVE
 # https://github.blog/2022-04-12-git-security-vulnerability-announced/
-with tempfile.NamedTemporaryFile(mode="wt", delete=False) as gitconfig:
-    gitconfig.write(
-        """[safe]
-    directory = *"""
-    )
-    files.put(
-        name="Disable git safe directory checking on immutable machines",
-        src=gitconfig.name,
-        dest="/etc/gitconfig",
-    )
+server.shell(
+    name="Disable git safe directory checking on immutable machines",
+    commands=["git config --global --add safe.directory *"],
+)
 
 if node_type == WEB_NODE_TYPE:
     server.user(
