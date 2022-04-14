@@ -1,23 +1,43 @@
 ---
 resources:
-- name: gitrepo
+- name: gitrepo-cortex-rules
   type: git
   icon: github
   source:
     branch: main
     uri: git@github.com:mitodl/grafana-alerts.git
     private_key: ((cortextool.ssh-key))
+    paths:
+    - cortex-rules/*
+- name: gitrepo-loki-rules
+  type: git
+  icon: github
+  source:
+    branch: main
+    uri: git@github.com:mitodl/grafana-alerts.git
+    private_key: ((cortextool.ssh-key))
+    paths:
+    - loki-rules/*
+- name: gitrepo-alertmanager-config
+  type: git
+  icon: github
+  source:
+    branch: main
+    uri: git@github.com:mitodl/grafana-alerts.git
+    private_key: ((cortextool.ssh-key))
+    paths:
+    - alertmanager.yaml
 jobs:
-- name: lint-managed-rules
+- name: lint-managed-cortex-rules
   build_log_retention:
     days: 90
   plan:
-  - get: gitrepo
+  - get: gitrepo-cortex-rules
     trigger: true
   - task: lint-rules
     config:
       inputs:
-      - name: gitrepo
+      - name: gitrepo-cortex-rules
       outputs:
       - name: changed-repo
       platform: linux
@@ -31,9 +51,9 @@ jobs:
         args:
         - -exc
         - |
-          cortextool rules lint gitrepo/rules/*.yaml
-          cp -Rv gitrepo/. changed-repo
-  - task: commit-linted-alerts
+          cortextool rules lint gitrepo-cortex-rules/cortex-rules/*.yaml
+          cp -Rv gitrepo-cortex-rules/. changed-repo
+  - task: commit-linted-cortex-rules
     config:
       inputs:
       - name: changed-repo
@@ -61,19 +81,20 @@ jobs:
           else
             echo "Nothing to commit."
           fi
-  - put: gitrepo
+  - put: gitrepo-cortex-rules
     params:
       repository: changed-repo
-- name: sync-alertmanager-config-to-ci
+- name: sync-managed-cortex-rules-to-ci
   build_log_retention:
     days: 90
   plan:
-  - get: gitrepo
+  - get: gitrepo-cortex-rules
     trigger: true
-  - task: push-alertmanager-config
+    passed: [lint-managed-cortex-rules]
+  - task: push-rules
     config:
       inputs:
-      - name: gitrepo
+      - name: gitrepo-cortex-rules
       platform: linux
       image_resource:
         type: registry-image
@@ -85,23 +106,240 @@ jobs:
         args:
         - -exc
         - |
-          export CORTEX_ADDRESS="((cortextool.cortext-amconfig-api-address))"
-          export CORTEX_API_USER="((cortextool.cortext-amconfig-api-user-ci))"
-          export CORTEX_API_KEY="((cortextool.cortext-api-key-ci))"
-          export CORTEX_TENANT_ID="((cortextool.cortext-amconfig-api-user-ci))"
-          sed -i -e 's/%% OPS_TEAM_OPS_GENIE_API_KEY %%/((cortextool.ops-team-ops-genie-api-key))/' gitrepo/alertmanager.yaml
-          cortextool alertmanager load gitrepo/alertmanager.yaml
+          export CORTEX_ADDRESS="((cortextool.cortex-rules-api-address))"
+          export CORTEX_API_USER="((cortextool.cortex-rules-api-user-ci))"
+          export CORTEX_API_KEY="((cortextool.cortex-api-key-ci))"
+          export CORTEX_TENANT_ID="((cortextool.cortex-rules-api-user-ci))"
+          cortextool rules sync gitrepo-cortex-rules/cortex-rules/*
+- name: sync-managed-cortex-rules-to-qa
+  build_log_retention:
+    days: 90
+  plan:
+  - get: gitrepo-cortex-rules
+    trigger: true
+    passed: [sync-managed-cortex-rules-to-ci]
+  - task: push-rules
+    config:
+      inputs:
+      - name: gitrepo-cortex-rules
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: grafana/cortex-tools
+          tag: v0.10.7
+      run:
+        path: sh
+        args:
+        - -exc
+        - |
+          export CORTEX_ADDRESS="((cortextool.cortex-rules-api-address))"
+          export CORTEX_API_USER="((cortextool.cortex-rules-api-user-qa))"
+          export CORTEX_API_KEY="((cortextool.cortex-api-key-qa))"
+          export CORTEX_TENANT_ID="((cortextool.cortex-rules-api-user-qa))"
+          cortextool rules sync gitrepo-cortex-rules/cortex-rules/*
+- name: sync-managed-cortex-rules-to-production
+  build_log_retention:
+    days: 90
+  plan:
+  - get: gitrepo-cortex-rules
+    trigger: true
+    passed: [sync-managed-cortex-rules-to-qa]
+  - task: push-rules
+    config:
+      inputs:
+      - name: gitrepo-cortex-rules
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: grafana/cortex-tools
+          tag: v0.10.7
+      run:
+        path: sh
+        args:
+        - -exc
+        - |
+          export CORTEX_ADDRESS="((cortextool.cortex-rules-api-address))"
+          export CORTEX_API_USER="((cortextool.cortex-rules-api-user-production))"
+          export CORTEX_API_KEY="((cortextool.cortex-api-key-production))"
+          export CORTEX_TENANT_ID="((cortextool.cortex-rules-api-user-production))"
+          cortextool rules sync gitrepo-cortex-rules/cortex-rules/*
+- name: lint-managed-loki-rules
+  build_log_retention:
+    days: 90
+  plan:
+  - get: gitrepo-loki-rules
+    trigger: true
+  - task: lint-rules
+    config:
+      inputs:
+      - name: gitrepo-loki-rules
+      outputs:
+      - name: changed-repo
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: grafana/cortex-tools
+          tag: v0.10.7
+      run:
+        path: sh
+        args:
+        - -exc
+        - |
+          cortextool rules lint gitrepo-loki-rules/cortex-rules/*.yaml
+          cp -Rv gitrepo-loki-rules/. changed-repo
+  - task: commit-linted-cortex-rules
+    config:
+      inputs:
+      - name: changed-repo
+      outputs:
+      - name: changed-repo
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: bitnami/git
+          tag: 2.35.1
+      run:
+        path: bash
+        args:
+        - -xc
+        - |
+          cd changed-repo
+          git config user.name "concourse"
+          git config user.email "odl-devops@mit.edu"
+          UNTRACKED_FILES=`git ls-files --other --exclude-standard --directory`
+          git diff --exit-code
+          if [ $? != 0 ] || [ "$UNTRACKED_FILES" != "" ]; then
+            git add .
+            git commit -m "Automated linter commit"
+          else
+            echo "Nothing to commit."
+          fi
+  - put: gitrepo-loki-rules
+    params:
+      repository: changed-repo
+- name: sync-managed-loki-rules-to-ci
+  build_log_retention:
+    days: 90
+  plan:
+  - get: gitrepo-loki-rules
+    trigger: true
+    passed: [lint-managed-loki-rules]
+  - task: push-rules
+    config:
+      inputs:
+      - name: gitrepo-loki-rules
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: grafana/cortex-tools
+          tag: v0.10.7
+      run:
+        path: sh
+        args:
+        - -exc
+        - |
+          export CORTEX_ADDRESS="((cortextool.loki-rules-api-address))"
+          export CORTEX_API_USER="((cortextool.loki-rules-api-user-ci))"
+          export CORTEX_API_KEY="((cortextool.cortex-api-key-ci))"
+          export CORTEX_TENANT_ID="((cortextool.loki-rules-api-user-ci))"
+          cortextool rules sync --backend=loki gitrepo-loki-rules/loki-rules/*
+- name: sync-managed-loki-rules-to-qa
+  build_log_retention:
+    days: 90
+  plan:
+  - get: gitrepo-loki-rules
+    trigger: true
+    passed: [sync-managed-loki-rules-to-ci]
+  - task: push-rules
+    config:
+      inputs:
+      - name: gitrepo-loki-rules
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: grafana/cortex-tools
+          tag: v0.10.7
+      run:
+        path: sh
+        args:
+        - -exc
+        - |
+          export CORTEX_ADDRESS="((cortextool.loki-rules-api-address))"
+          export CORTEX_API_USER="((cortextool.loki-rules-api-user-qa))"
+          export CORTEX_API_KEY="((cortextool.cortex-api-key-qa))"
+          export CORTEX_TENANT_ID="((cortextool.loki-rules-api-user-qa))"
+          cortextool rules sync --backend=loki gitrepo-loki-rules/loki-rules/*
+- name: sync-managed-loki-rules-to-production
+  build_log_retention:
+    days: 90
+  plan:
+  - get: gitrepo-loki-rules
+    trigger: true
+    passed: [sync-managed-loki-rules-to-qa]
+  - task: push-rules
+    config:
+      inputs:
+      - name: gitrepo-loki-rules
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: grafana/cortex-tools
+          tag: v0.10.7
+      run:
+        path: sh
+        args:
+        - -exc
+        - |
+          export CORTEX_ADDRESS="((cortextool.loki-rules-api-address))"
+          export CORTEX_API_USER="((cortextool.loki-rules-api-user-production))"
+          export CORTEX_API_KEY="((cortextool.cortex-api-key-production))"
+          export CORTEX_TENANT_ID="((cortextool.loki-rules-api-user-production))"
+          cortextool rules sync --backend=loki gitrepo-loki-rules/loki-rules/*
+- name: sync-alertmanager-config-to-ci
+  build_log_retention:
+    days: 90
+  plan:
+  - get: gitrepo-alertmanager-config
+    trigger: true
+  - task: push-alertmanager-config
+    config:
+      inputs:
+      - name: gitrepo-alertmanager-config
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: grafana/cortex-tools
+          tag: v0.10.7
+      run:
+        path: sh
+        args:
+        - -exc
+        - |
+          export CORTEX_ADDRESS="((cortextool.cortex-amconfig-api-address))"
+          export CORTEX_API_USER="((cortextool.cortex-amconfig-api-user-ci))"
+          export CORTEX_API_KEY="((cortextool.cortex-api-key-ci))"
+          export CORTEX_TENANT_ID="((cortextool.cortex-amconfig-api-user-ci))"
+          sed -i -e 's/%% OPS_TEAM_OPS_GENIE_API_KEY %%/((cortextool.ops-team-ops-genie-api-key))/' gitrepo-alertmanager-config/alertmanager.yaml
+          cortextool alertmanager load gitrepo-alertmanager-config/alertmanager.yaml
 - name: sync-alertmanager-config-to-qa
   build_log_retention:
     days: 90
   plan:
-  - get: gitrepo
+  - get: gitrepo-alertmanager-config
     trigger: true
     passed: [sync-alertmanager-config-to-ci]
   - task: push-alertmanager-config
     config:
       inputs:
-      - name: gitrepo
+      - name: gitrepo-alertmanager-config
       platform: linux
       image_resource:
         type: registry-image
@@ -113,23 +351,23 @@ jobs:
         args:
         - -exc
         - |
-          export CORTEX_ADDRESS="((cortextool.cortext-amconfig-api-address))"
-          export CORTEX_API_USER="((cortextool.cortext-amconfig-api-user-qa))"
-          export CORTEX_API_KEY="((cortextool.cortext-api-key-qa))"
-          export CORTEX_TENANT_ID="((cortextool.cortext-amconfig-api-user-qa))"
-          sed -i -e 's/%% OPS_TEAM_OPS_GENIE_API_KEY %%/((cortextool.ops-team-ops-genie-api-key))/' gitrepo/alertmanager.yaml
-          cortextool alertmanager load gitrepo/alertmanager.yaml
+          export CORTEX_ADDRESS="((cortextool.cortex-amconfig-api-address))"
+          export CORTEX_API_USER="((cortextool.cortex-amconfig-api-user-qa))"
+          export CORTEX_API_KEY="((cortextool.cortex-api-key-qa))"
+          export CORTEX_TENANT_ID="((cortextool.cortex-amconfig-api-user-qa))"
+          sed -i -e 's/%% OPS_TEAM_OPS_GENIE_API_KEY %%/((cortextool.ops-team-ops-genie-api-key))/' gitrepo-alertmanager-config/alertmanager.yaml
+          cortextool alertmanager load gitrepo-alertmanager-config/alertmanager.yaml
 - name: sync-alertmanager-config-to-production
   build_log_retention:
     days: 90
   plan:
-  - get: gitrepo
+  - get: gitrepo-alertmanager-config
     trigger: true
     passed: [sync-alertmanager-config-to-qa]
   - task: push-alertmanager-config
     config:
       inputs:
-      - name: gitrepo
+      - name: gitrepo-alertmanager-config
       platform: linux
       image_resource:
         type: registry-image
@@ -141,90 +379,9 @@ jobs:
         args:
         - -exc
         - |
-          export CORTEX_ADDRESS="((cortextool.cortext-amconfig-api-address))"
-          export CORTEX_API_USER="((cortextool.cortext-amconfig-api-user-production))"
-          export CORTEX_API_KEY="((cortextool.cortext-api-key-qa))"
-          export CORTEX_TENANT_ID="((cortextool.cortext-amconfig-api-user-production))"
-          sed -i -e 's/%% OPS_TEAM_OPS_GENIE_API_KEY %%/((cortextool.ops-team-ops-genie-api-key))/' gitrepo/alertmanager.yaml
-          cortextool alertmanager load gitrepo/alertmanager.yaml
-- name: sync-managed-rules-to-ci
-  build_log_retention:
-    days: 90
-  plan:
-  - get: gitrepo
-    trigger: true
-    passed: [lint-managed-rules]
-  - task: push-rules
-    config:
-      inputs:
-      - name: gitrepo
-      platform: linux
-      image_resource:
-        type: registry-image
-        source:
-          repository: grafana/cortex-tools
-          tag: v0.10.7
-      run:
-        path: sh
-        args:
-        - -exc
-        - |
-          export CORTEX_ADDRESS="((cortextool.cortext-rules-api-address))"
-          export CORTEX_API_USER="((cortextool.cortext-rules-api-user-ci))"
-          export CORTEX_API_KEY="((cortextool.cortext-api-key-ci))"
-          export CORTEX_TENANT_ID="((cortextool.cortext-rules-api-user-ci))"
-          cortextool rules sync gitrepo/rules/*
-- name: sync-managed-rules-to-qa
-  build_log_retention:
-    days: 90
-  plan:
-  - get: gitrepo
-    trigger: true
-    passed: [sync-managed-rules-to-ci]
-  - task: push-rules
-    config:
-      inputs:
-      - name: gitrepo
-      platform: linux
-      image_resource:
-        type: registry-image
-        source:
-          repository: grafana/cortex-tools
-          tag: v0.10.7
-      run:
-        path: sh
-        args:
-        - -exc
-        - |
-          export CORTEX_ADDRESS="((cortextool.cortext-rules-api-address))"
-          export CORTEX_API_USER="((cortextool.cortext-rules-api-user-qa))"
-          export CORTEX_API_KEY="((cortextool.cortext-api-key-qa))"
-          export CORTEX_TENANT_ID="((cortextool.cortext-rules-api-user-qa))"
-          cortextool rules sync gitrepo/rules/*
-- name: sync-managed-rules-to-production
-  build_log_retention:
-    days: 90
-  plan:
-  - get: gitrepo
-    trigger: true
-    passed: [sync-managed-rules-to-qa]
-  - task: push-rules
-    config:
-      inputs:
-      - name: gitrepo
-      platform: linux
-      image_resource:
-        type: registry-image
-        source:
-          repository: grafana/cortex-tools
-          tag: v0.10.7
-      run:
-        path: sh
-        args:
-        - -exc
-        - |
-          export CORTEX_ADDRESS="((cortextool.cortext-rules-api-address))"
-          export CORTEX_API_USER="((cortextool.cortext-rules-api-user-production))"
-          export CORTEX_API_KEY="((cortextool.cortext-api-key-production))"
-          export CORTEX_TENANT_ID="((cortextool.cortext-rules-api-user-production))"
-          cortextool rules sync gitrepo/rules/*
+          export CORTEX_ADDRESS="((cortextool.cortex-amconfig-api-address))"
+          export CORTEX_API_USER="((cortextool.cortex-amconfig-api-user-production))"
+          export CORTEX_API_KEY="((cortextool.cortex-api-key-qa))"
+          export CORTEX_TENANT_ID="((cortextool.cortex-amconfig-api-user-production))"
+          sed -i -e 's/%% OPS_TEAM_OPS_GENIE_API_KEY %%/((cortextool.ops-team-ops-genie-api-key))/' gitrepo-alertmanager-config/alertmanager.yaml
+          cortextool alertmanager load gitrepo-alertmanager-config/alertmanager.yaml
