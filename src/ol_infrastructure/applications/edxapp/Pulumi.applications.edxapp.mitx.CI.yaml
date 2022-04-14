@@ -18,6 +18,7 @@ config:
     secure: v1:ovK3uwt1RjhV81YB:Uw63YPpyTVNXV4jX9LnlMf/TqtnNjk+Ro0rynUf+ulEaZzot+bOCAqMlDyn5Xu7/nUx3iGwJEHVTrOnrMNlXiHCqOiYFpfFv8NIqc/x6+Q8+eJFGjcLxhqYidyQkUAZIfz9mRVCVgEjC423yfAMi+tMee05xKI6ylAy4aO7AjjfE0s8RMt1/toGhW6DF1MIDZw==
   edxapp:elb_healthcheck_interval: "30"
   edxapp:google_analytics_id: ""
+  edxapp:edxapp_release: open-release/nutmeg.master
   edxapp:gradebook_url: /gradebook
   edxapp:mail_domain: edxapp-mail-ci.mitx.mit.edu
   edxapp:min_web_nodes: "1"
