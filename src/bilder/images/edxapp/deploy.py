@@ -79,13 +79,6 @@ apt.packages(
 git_remote = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["origin"]
 git_branch = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["branch"]
 edx_platform_path = "/edx/app/edxapp/edx-platform/"
-# Addresses change in latest git due to recent CVE
-git.config(
-    name="Set safe git directories",
-    key="safe.directory",
-    value=edx_platform_path,
-    sudo_user=EDX_USER,
-)
 server.shell(
     name="Ensure the edx-platform git origin is configured",
     commands=[f"git remote add custom {git_remote}", "git fetch --all --prune --tags"],

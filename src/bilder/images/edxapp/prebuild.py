@@ -29,6 +29,19 @@ install_baseline_packages(
     upgrade_system=True,
 )
 
+# Addresses change in latest git due to recent CVE
+# https://github.blog/2022-04-12-git-security-vulnerability-announced/
+with tempfile.NamedTemporaryFile(mode="wt", delete=False) as gitconfig:
+    gitconfig.write(
+        """[safe]
+    directory = *"""
+    )
+    files.put(
+        name="Disable git safe directory checking on immutable machines",
+        src=gitconfig.name,
+        dest="/etc/gitconfig",
+    )
+
 if node_type == WEB_NODE_TYPE:
     server.user(
         name="Proactively create edxapp user for setting permissions on theme repo",
