@@ -107,6 +107,13 @@ build {
       ]
     }
   }
+  
+  provisioner "shell-local" {
+    inline = [
+      "git config --global --add safe.directory /edx/app/edxapp/edx-platform",
+    ]
+  }
+  
   dynamic "provisioner" {
     for_each = ((var.installation_target == "mitx" || var.installation_target == "mitx-staging") && var.node_type == "web") ? ["this"] : []
     labels   = ["ansible-local"]
