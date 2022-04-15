@@ -84,7 +84,7 @@ edx_platform_path = "/edx/app/edxapp/edx-platform/"
 # https://github.blog/2022-04-12-git-security-vulnerability-announced/
 server.shell(
     name="Disable git safe directory checking on immutable machines",
-    commands=["git config --global --add safe.directory *"],
+    commands=["git config --global --add safe.directory /edx/app/edxapp/edx-platform"],
 )
 
 server.shell(
