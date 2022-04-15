@@ -81,18 +81,18 @@ edx_plugins_removed = {
 edx_platform_repository = {
     "mitxonline": {
         "origin": "https://github.com/openedx/edx-platform",
-        "BRANCH": "release",
+        BRANCH: "release",
     },
     "xpro": {
         "origin": "https://github.com/openedx/edx-platform",
-        "BRANCH": "open-release/maple.master",
+        BRANCH: "open-release/maple.master",
     },
     "mitx": {
         "origin": "https://github.com/mitodl/edx-platform",
-        "BRANCH": "mitx/maple",
+        BRANCH: "mitx/maple",
     },
     "mitx-staging": {
         "origin": "https://github.com/mitodl/edx-platform",
-        "BRANCH": "mitx/maple",
+        BRANCH: "mitx/maple",
     },
 }
