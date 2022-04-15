@@ -89,7 +89,8 @@ build {
   provisioner "shell-local" {
     inline = [
       "echo '${build.SSHPrivateKey}' > /tmp/packer-${build.ID}.pem",
-      "chmod 600 /tmp/packer-${build.ID}.pem"
+      "chmod 600 /tmp/packer-${build.ID}.pem",
+      "git config --global --add safe.directory /edx/app/edxapp/edx-platform"
     ]
   }
 
@@ -107,13 +108,6 @@ build {
       ]
     }
   }
-  
-  provisioner "shell-local" {
-    inline = [
-      "git config --global --add safe.directory /edx/app/edxapp/edx-platform",
-    ]
-  }
-  
   dynamic "provisioner" {
     for_each = ((var.installation_target == "mitx" || var.installation_target == "mitx-staging") && var.node_type == "web") ? ["this"] : []
     labels   = ["ansible-local"]
