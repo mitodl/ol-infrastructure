@@ -80,13 +80,6 @@ git_remote = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["origin"]
 git_branch = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["branch"]
 edx_platform_path = "/edx/app/edxapp/edx-platform/"
 
-# Addresses change in latest git due to recent CVE
-# https://github.blog/2022-04-12-git-security-vulnerability-announced/
-server.shell(
-    name="Disable git safe directory checking on immutable machines",
-    commands=["git config --global --add safe.directory /edx/app/edxapp/edx-platform"],
-)
-
 server.shell(
     name="Ensure the edx-platform git origin is configured",
     commands=[f"git remote add custom {git_remote}", "git fetch --all --prune --tags"],
