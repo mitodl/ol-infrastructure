@@ -90,7 +90,6 @@ build {
     inline = [
       "echo '${build.SSHPrivateKey}' > /tmp/packer-${build.ID}.pem",
       "chmod 600 /tmp/packer-${build.ID}.pem",
-      "git config --global --add safe.directory /edx/app/edxapp/edx-platform"
     ]
   }
 
@@ -105,6 +104,7 @@ build {
         "openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /tmp/edxapp.key -out /tmp/edxapp.cert -subj '/C=US/ST=MA/L=Cambridge/O=MIT Open Learning/OU=Engineering/CN=edxapp.example.com'",
         "cd /tmp && git clone https://github.com/edx/configuration --depth 1 --branch $EDX_ANSIBLE_BRANCH",
         "cd /tmp/configuration && python3 -m venv .venv && .venv/bin/pip install wheel && .venv/bin/pip install -r requirements.txt",
+        "git config --global --add safe.directory /edx/app/edxapp/edx-platform",
       ]
     }
   }
