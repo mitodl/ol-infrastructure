@@ -1117,7 +1117,7 @@ python-versions = "*"
 
 [[package]]
 name = "pyinfra"
-version = "1.4.4"
+version = "2.0.1"
 description = "pyinfra automates/provisions/manages/deploys infrastructure."
 category = "main"
 optional = false
@@ -1127,19 +1127,18 @@ python-versions = "*"
 click = ">2"
 colorama = "<1"
 configparser = "*"
-distro = "1.5.0"
+distro = ">=1.5,<2"
 gevent = ">=1.5"
-jinja2 = ">2,<3"
+jinja2 = ">2,<4"
 paramiko = ">=2.7,<3"
 python-dateutil = ">2,<3"
 pywinrm = "*"
-six = ">1,<2"
 
 [package.extras]
 ansible = ["pyyaml"]
-dev = ["pyyaml", "pytest (==4.6.6)", "pytest-cov (==2.8.1)", "coverage (==4.5.4)", "mock (==3.0.5)", "codecov (==2.1.8)", "flake8 (==3.8.3)", "flake8-commas (==2.0.0)", "flake8-quotes (==3.2.0)", "flake8-import-order (==0.18.1)", "pyinfra-guzzle-sphinx-theme (==0.10)", "recommonmark (==0.5.0)", "wheel", "twine", "ipython", "ipdb (==0.10.3)", "ipdbplugin (==1.4.5)", "sphinx (==2.2.1)", "flake8-spellcheck (==0.12.1)"]
-docs = ["pyinfra-guzzle-sphinx-theme (==0.10)", "recommonmark (==0.5.0)", "sphinx (==2.2.1)"]
-test = ["pyyaml", "pytest (==4.6.6)", "pytest-cov (==2.8.1)", "coverage (==4.5.4)", "mock (==3.0.5)", "codecov (==2.1.8)", "flake8 (==3.8.3)", "flake8-commas (==2.0.0)", "flake8-quotes (==3.2.0)", "flake8-import-order (==0.18.1)"]
+dev = ["pyyaml", "pytest (==7.0.1)", "pytest-cov (==3.0.0)", "coverage (==6.2)", "codecov (==2.1.12)", "flake8 (==4.0.1)", "flake8-commas (==2.1.0)", "flake8-quotes (==3.3.1)", "flake8-import-order (==0.18.1)", "pyinfra-guzzle-sphinx-theme (==0.14)", "recommonmark (==0.5.0)", "sphinx (==2.2.1)", "docutils (==0.17.1)", "wheel", "twine", "ipython", "ipdb", "ipdbplugin", "flake8-spellcheck (==0.12.1)"]
+docs = ["pyinfra-guzzle-sphinx-theme (==0.14)", "recommonmark (==0.5.0)", "sphinx (==2.2.1)", "docutils (==0.17.1)"]
+test = ["pyyaml", "pytest (==7.0.1)", "pytest-cov (==3.0.0)", "coverage (==6.2)", "codecov (==2.1.12)", "flake8 (==4.0.1)", "flake8-commas (==2.1.0)", "flake8-quotes (==3.3.1)", "flake8-import-order (==0.18.1)"]
 
 [[package]]
 name = "pynacl"
@@ -1530,7 +1529,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "1d9a1f9e2e9e5f9f4cad35c70ca9183af905e7f13f4debd20c230d8bd836f6ee"
+content-hash = "cef46fe8c635560c3a4d3543526bef33175e94d8b81c05a10b0f9c78b6046937"
 
 [metadata.files]
 anyio = [
@@ -2255,8 +2254,8 @@ pyhcl = [
     {file = "pyhcl-0.4.4.tar.gz", hash = "sha256:2d9b9dcdf1023d812bfed561ba72c99104c5b3f52e558d595130a44ce081b003"},
 ]
 pyinfra = [
-    {file = "pyinfra-1.4.4-py2.py3-none-any.whl", hash = "sha256:3756d732ac971235a467346e5d2067761e9c5f11faf8585769c723f550917e61"},
-    {file = "pyinfra-1.4.4.tar.gz", hash = "sha256:83abb88fe98cdb8d62a9ebd746cae6747a6629b06185ad61da5df27663644771"},
+    {file = "pyinfra-2.0.1-py2.py3-none-any.whl", hash = "sha256:8a65774c4e69340791944ccf1dbabb188d765dbd6102058427a3770e4444e3ab"},
+    {file = "pyinfra-2.0.1.tar.gz", hash = "sha256:d79ecdb6903ce454b6ecb9f55ecbeae7faae992b2bd164833a11b45303149d11"},
 ]
 pynacl = [
     {file = "PyNaCl-1.5.0-cp36-abi3-macosx_10_10_universal2.whl", hash = "sha256:401002a4aaa07c9414132aaed7f6836ff98f59277a234704ff66878c2ee4a0d1"},
