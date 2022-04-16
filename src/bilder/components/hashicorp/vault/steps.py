@@ -5,12 +5,10 @@ from bilder.components.hashicorp.vault.models import VaultAgentConfig
 
 
 @deploy("Manage Vault template destination permissions")
-def vault_template_permissions(vault_config: VaultAgentConfig, state=None, host=None):
+def vault_template_permissions(vault_config: VaultAgentConfig):
     apt.packages(
         name="Install ACL package for more granular file permissions",
         packages=["acl"],
-        state=state,
-        host=host,
     )
     for template in vault_config.template or []:
         filename = template.destination
@@ -20,6 +18,4 @@ def vault_template_permissions(vault_config: VaultAgentConfig, state=None, host=
                 f"setfacl -R -m u:vault:rwx {filename.parent}",
                 f"setfacl -R -d -m u:vault:rwx {filename.parent}",
             ],
-            state=state,
-            host=host,
         )

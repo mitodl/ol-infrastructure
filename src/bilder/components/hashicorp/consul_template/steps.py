@@ -9,13 +9,11 @@ from bilder.components.hashicorp.consul_template.models import ConsulTemplateCon
 
 @deploy("Manage consul-template template destination permissions")
 def consul_template_permissions(
-    consul_template_configs: Dict[Path, ConsulTemplateConfig], state=None, host=None
+    consul_template_configs: Dict[Path, ConsulTemplateConfig]
 ):
     apt.packages(
         name="Install ACL package for more granular file permissions",
         packages=["acl"],
-        state=state,
-        host=host,
     )
     templates = []
     for config in consul_template_configs.values():
@@ -29,6 +27,4 @@ def consul_template_permissions(
                 f"setfacl -R -m u:consul-template:rwx {filename.parent}",
                 f"setfacl -R -d -m u:consul-template:rwx {filename.parent}",
             ],
-            state=state,
-            host=host,
         )

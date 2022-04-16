@@ -9,27 +9,21 @@ from pyinfra.operations import apt, files, systemd
 def install_baseline_packages(
     packages: List[str] = None,
     upgrade_system: bool = False,
-    state=None,
-    host=None,
 ):
     apt.packages(
         name="Install baseline packages for Debian based hosts",
         packages=packages or ["curl"],
         update=True,
         upgrade=upgrade_system,
-        state=state,
-        host=host,
     )
 
 
 @deploy("Reload services on config change")
-def service_configuration_watches(  # noqa: WPS211
+def service_configuration_watches(
     service_name: str,
     watched_files: List[Path],
     onchange_command: Optional[str] = None,
     start_now: bool = True,
-    state=None,
-    host=None,
 ):
     onchange_command = (
         onchange_command or f"/usr/bin/systemctl restart {service_name}.service"
@@ -42,8 +36,6 @@ def service_configuration_watches(  # noqa: WPS211
         .parent.joinpath("templates", "service_restarter.service.j2"),
         service_name=service_name,
         onchange_command=onchange_command,
-        state=state,
-        host=host,
     )
     path_unit = files.template(
         name=f"Create {service_name} configuration file watcher",
@@ -53,8 +45,6 @@ def service_configuration_watches(  # noqa: WPS211
         .parent.joinpath("templates", "systemd_file_watcher.path.j2"),
         service_name=service_name,
         watched_files=watched_files,
-        state=state,
-        host=host,
     )
     systemd.service(
         name=f"Enable {service_name} configuration file watcher",
@@ -62,6 +52,4 @@ def service_configuration_watches(  # noqa: WPS211
         daemon_reload=path_unit.changed or restart_unit.changed,
         enabled=True,
         running=start_now,
-        state=state,
-        host=host,
     )

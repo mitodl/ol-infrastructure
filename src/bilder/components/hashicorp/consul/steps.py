@@ -1,6 +1,7 @@
 import tempfile
 from pathlib import Path
 
+from pyinfra import host
 from pyinfra.api import deploy
 from pyinfra.facts.systemd import SystemdEnabled
 from pyinfra.operations import apt, files, systemd
@@ -9,14 +10,12 @@ from bilder.facts.has_systemd import HasSystemd
 
 
 @deploy("Set up DNS proxy")
-def proxy_consul_dns(state=None, host=None):
+def proxy_consul_dns():
     apt.packages(
         name="Install Unbound for DNS proxying",
         packages=["unbound"],
         present=True,
         update=True,
-        state=state,
-        host=host,
     )
     files.line(
         name="Configure dhclient to always put 127.0.0.1 as the first DNS server.",
@@ -24,8 +23,6 @@ def proxy_consul_dns(state=None, host=None):
         line="#prepend domain-name-servers 127.0.0.1;",
         replace="prepend domain-name-servers 127.0.0.1;",
         present=True,
-        state=state,
-        host=host,
     )
 
     # Allow hosts that default to using systemd-resolved to properly resolve Consul
@@ -41,8 +38,6 @@ def proxy_consul_dns(state=None, host=None):
                 dest="/etc/systemd/resolved.conf.d/consul.conf",
                 src=resolved_conf.name,
                 create_remote_dir=True,
-                state=state,
-                host=host,
             )
         systemd.service(
             name="Enable systemd-resolved",
@@ -50,22 +45,16 @@ def proxy_consul_dns(state=None, host=None):
             enabled=True,
             running=True,
             restarted=consul_resolved_config.changed,
-            state=state,
-            host=host,
         )
     files.put(
         name="Configure Unbound to resolve .consul domains locally",
         dest="/etc/unbound/unbound.conf.d/consul.conf",
         src=Path(__file__).resolve().parent.joinpath("files", "unbound_config.conf"),
         create_remote_dir=True,
-        state=state,
-        host=host,
     )
     systemd.service(
         name="Enable Unbound DNS proxy",
         service="unbound",
         enabled=True,
         running=True,
-        state=state,
-        host=host,
     )
