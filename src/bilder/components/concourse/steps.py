@@ -4,6 +4,7 @@ from typing import Union
 
 import httpx
 from pyinfra.api import deploy
+from pyinfra.facts.files import Directory, File
 from pyinfra.operations import files, server, systemd
 
 from bilder.components.concourse.models import (
@@ -11,7 +12,6 @@ from bilder.components.concourse.models import (
     ConcourseWebConfig,
     ConcourseWorkerConfig,
 )
-from bilder.facts import has_systemd  # noqa: F401
 
 
 @deploy("Install Concourse")
@@ -31,7 +31,7 @@ def install_concourse(concourse_config: ConcourseBaseConfig, state=None, host=No
     installation_directory = (
         f"{concourse_config.deploy_directory}-{concourse_config.version}"
     )
-    if not host.fact.directory(installation_directory):
+    if not host.get_fact(Directory, installation_directory):
         # Download latest Concourse release from GitHub
         concourse_archive = f"https://github.com/concourse/concourse/releases/download/v{concourse_config.version}/concourse-{concourse_config.version}-linux-amd64.tgz"  # noqa: E501
         concourse_archive_hash = f"{concourse_archive}.sha1"
@@ -113,7 +113,7 @@ def _manage_web_node_keys(
             host=host,
             sudo=sudo,
         )
-    elif not host.fact.file(concourse_config.tsa_host_key_path):
+    elif not host.get_fact(File, concourse_config.tsa_host_key_path):
         server.shell(
             name="Generate a tsa host key",
             commands=[
@@ -138,7 +138,7 @@ def _manage_web_node_keys(
             host=host,
             sudo=sudo,
         )
-    elif not host.fact.file(concourse_config.session_signing_key_path):
+    elif not host.get_fact(File, concourse_config.session_signing_key_path):
         server.shell(
             name="Generate a session signing key",
             commands=[
@@ -180,7 +180,7 @@ def _manage_worker_node_keys(
             host=host,
             sudo=sudo,
         )
-    elif not host.fact.file(concourse_config.worker_private_key_path):
+    elif not host.get_fact(File, concourse_config.worker_private_key_path):
         server.shell(
             name="Generate a worker private key",
             commands=[

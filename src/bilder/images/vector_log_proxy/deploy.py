@@ -32,7 +32,7 @@ from bilder.components.vector.steps import (
     install_vector,
     vector_service,
 )
-from bilder.facts import has_systemd  # noqa: F401
+from bilder.facts.has_systemd import HasSystemd
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
@@ -64,8 +64,8 @@ vault_config = VaultAgentConfig(
     auto_auth=VaultAutoAuthConfig(
         method=VaultAutoAuthMethod(
             type="aws",
-            mount_path=f"auth/aws",
-            config=VaultAutoAuthAWS(role=f"vector-log-proxy"),
+            mount_path="auth/aws",
+            config=VaultAutoAuthAWS(role="vector-log-proxy"),
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),
@@ -109,7 +109,7 @@ vector_service(vector_config)
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 
-if host.fact.has_systemd:
+if host.get_fact(HasSystemd):
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
     watched_vector_files = [

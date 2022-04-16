@@ -4,10 +4,11 @@ from typing import List
 
 import httpx
 from pyinfra.api import deploy
+from pyinfra.facts.server import LinuxName
 from pyinfra.operations import apt, files, server, systemd
 
 from bilder.components.hashicorp.models import HashicorpProduct
-from bilder.facts import has_systemd, system  # noqa: F401
+from bilder.facts.system import DebianCpuArch, RedhatCpuArch
 from bilder.lib.linux_helpers import linux_family
 
 
@@ -31,10 +32,10 @@ def install_hashicorp_products(
             state=state,
             host=host,
         )
-        if linux_family(host.fact.linux_name).lower == "debian":
-            cpu_arch = host.fact.debian_cpu_arch
-        elif linux_family(host.fact.linux_name).lower == "redhat":
-            cpu_arch = host.fact.redhat_cpu_arch
+        if linux_family(host.get_fact(LinuxName)).lower == "debian":
+            cpu_arch = host.get_fact(DebianCpuArch)
+        elif linux_family(host.get_fact(LinuxName)).lower == "redhat":
+            cpu_arch = host.get_fact(RedhatCpuArch)
         else:
             cpu_arch = "amd64"
         file_download = f"{product.name}_{product.version}_linux_{cpu_arch}.zip"

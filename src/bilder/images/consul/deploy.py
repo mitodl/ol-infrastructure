@@ -27,7 +27,7 @@ from bilder.components.vector.steps import (
     install_vector,
     vector_service,
 )
-from bilder.facts import has_systemd  # noqa: F401
+from bilder.facts.has_systemd import HasSystemd
 from bridge.lib.versions import CONSUL_VERSION
 from bridge.secrets.sops import set_env_secrets
 
@@ -90,7 +90,7 @@ for product in hashicorp_products:
     configure_hashicorp_product(product)
 
 # Manage services
-if host.fact.has_systemd:
+if host.get_fact(HasSystemd):
     caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()

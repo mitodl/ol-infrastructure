@@ -34,7 +34,7 @@ from bilder.components.vector.steps import (
     install_vector,
     vector_service,
 )
-from bilder.facts import has_systemd  # noqa: F401
+from bilder.facts.has_systemd import HasSystemd
 from bridge.lib.magic_numbers import HOURS_IN_MONTH, VAULT_CLUSTER_PORT, VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
@@ -139,7 +139,7 @@ install_vector(vector_config)
 configure_vector(vector_config)
 
 # Manage services
-if host.fact.has_systemd:
+if host.get_fact(HasSystemd):
     caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()

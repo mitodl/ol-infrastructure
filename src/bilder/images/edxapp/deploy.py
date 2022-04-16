@@ -48,7 +48,7 @@ from bilder.components.vector.steps import (
     install_vector,
     vector_service,
 )
-from bilder.facts import has_systemd  # noqa: F401
+from bilder.facts.has_systemd import HasSystemd
 from bilder.images.edxapp.lib import WEB_NODE_TYPE, node_type
 from bilder.images.edxapp.plugins.git_export_import import git_auto_export
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
@@ -324,7 +324,7 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as forum_template:
     )
 
 # Manage services
-if host.fact.has_systemd:
+if host.get_fact(HasSystemd):
     supervisor_command = "signal HUP" if node_type == WEB_NODE_TYPE else "restart"
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()

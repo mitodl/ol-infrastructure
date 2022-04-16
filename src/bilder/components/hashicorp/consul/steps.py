@@ -2,9 +2,10 @@ import tempfile
 from pathlib import Path
 
 from pyinfra.api import deploy
+from pyinfra.facts.systemd import SystemdEnabled
 from pyinfra.operations import apt, files, systemd
 
-from bilder.facts import has_systemd  # noqa: F401
+from bilder.facts.has_systemd import HasSystemd
 
 
 @deploy("Set up DNS proxy")
@@ -29,7 +30,10 @@ def proxy_consul_dns(state=None, host=None):
 
     # Allow hosts that default to using systemd-resolved to properly resolve Consul
     # domains
-    if host.fact.has_systemd and host.fact.systemd_enabled["systemd-resolved.service"]:
+    if (
+        host.get_fact(HasSystemd)
+        and host.get_fact(SystemdEnabled)["systemd-resolved.service"]
+    ):
         with tempfile.NamedTemporaryFile(delete=False, mode="w") as resolved_conf:
             resolved_conf.write("[Resolve]\nDNS=127.0.0.1\nDomains=~consul")
             consul_resolved_config = files.put(
