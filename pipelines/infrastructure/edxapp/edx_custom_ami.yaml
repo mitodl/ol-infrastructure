@@ -45,6 +45,7 @@ resources:
   source:
     branch: main
     paths:
+    - src/bilder/components/
     - src/bilder/images/edxapp/
     uri: https://github.com/mitodl/ol-infrastructure
   type: git
