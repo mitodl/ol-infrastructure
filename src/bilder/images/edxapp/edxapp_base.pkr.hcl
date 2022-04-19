@@ -89,7 +89,7 @@ build {
   provisioner "shell" {
     # Addresses change in latest git due to recent CVE
     # https://github.blog/2022-04-12-git-security-vulnerability-announced/
-    inline = [      "sudo git config --global --add safe.directory /edx/app/edxapp/edx-platform"]
+    inline = ["sudo git config --global --add safe.directory /edx/app/edxapp/edx-platform"]
   }
   provisioner "shell-local" {
     environment_vars = [
