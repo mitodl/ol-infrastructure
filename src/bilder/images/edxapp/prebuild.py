@@ -29,8 +29,6 @@ install_baseline_packages(
     upgrade_system=True,
 )
 
-# Addresses change in latest git due to recent CVE
-# https://github.blog/2022-04-12-git-security-vulnerability-announced/
 server.shell(
     name="Disable git safe directory checking on immutable machines",
     commands=["git config --system safe.directory *"],

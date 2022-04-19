@@ -3,7 +3,6 @@ import tempfile
 from pathlib import Path
 
 from pyinfra import host
-from pyinfra.facts.files import Directory
 from pyinfra.operations import apt, files, git, pip, server
 
 from bilder.components.baseline.steps import service_configuration_watches
@@ -80,7 +79,6 @@ apt.packages(
 git_remote = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["origin"]
 git_branch = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["branch"]
 edx_platform_path = "/edx/app/edxapp/edx-platform/"
-edx_repo_fact = host.get_fact(Directory, edx_platform_path)
 server.shell(
     name="Fix git",
     commands=["git config --global --add safe.directory /edx/app/edxapp/edx-platform"],
@@ -98,8 +96,8 @@ git.repo(
     dest=edx_platform_path,
     branch=git_branch,
     pull=False,
-    user=edx_repo_fact["user"],
-    group=edx_repo_fact["group"],
+    user=EDX_USER,
+    group=EDX_USER,
 )
 
 git_auto_export()
