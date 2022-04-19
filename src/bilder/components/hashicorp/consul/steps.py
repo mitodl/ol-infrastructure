@@ -3,7 +3,7 @@ from pathlib import Path
 
 from pyinfra import host
 from pyinfra.api import deploy
-from pyinfra.facts.systemd import SystemdEnabled
+from pyinfra.facts.systemd import SystemdStatus
 from pyinfra.operations import apt, files, systemd
 
 from bilder.facts.has_systemd import HasSystemd
@@ -27,7 +27,7 @@ def proxy_consul_dns():
 
     # Allow hosts that default to using systemd-resolved to properly resolve Consul
     # domains
-    if host.get_fact(HasSystemd) and host.get_fact(SystemdEnabled).get(
+    if host.get_fact(HasSystemd) and host.get_fact(SystemdStatus).get(
         "systemd-resolved.service"
     ):
         with tempfile.NamedTemporaryFile(delete=False, mode="w") as resolved_conf:
