@@ -3,7 +3,6 @@ import tempfile
 from pathlib import Path
 
 from pyinfra import host
-from pyinfra.facts import files
 from pyinfra.operations import apt, files, git, pip, server
 
 from bilder.components.baseline.steps import service_configuration_watches
@@ -80,7 +79,6 @@ apt.packages(
 git_remote = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["origin"]
 git_branch = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["branch"]
 edx_platform_path = "/edx/app/edxapp/edx-platform/"
-edx_repo_fact = host.fact.files.Directory(edx_platform_path)
 server.shell(
     name="Ensure the edx-platform git origin is configured",
     commands=[f"git remote add custom {git_remote}", "git fetch --all --prune --tags"],
