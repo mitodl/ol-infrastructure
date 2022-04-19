@@ -120,6 +120,6 @@ build {
 
   provisioner "shell-local" {
     environment_vars = ["NODE_TYPE=${var.node_type}", "EDX_INSTALLATION=${var.installation_target}"]
-    inline           = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} ${path.root}/deploy.py"]
+    inline           = ["pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} ${path.root}/deploy.py"]
   }
 }

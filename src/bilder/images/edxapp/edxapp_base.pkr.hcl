@@ -92,7 +92,7 @@ build {
     ]
     inline = [
       "sleep 15",
-      "pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} ${path.root}/prebuild.py"
+      "pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} ${path.root}/prebuild.py"
     ]
   }
   provisioner "shell" {
