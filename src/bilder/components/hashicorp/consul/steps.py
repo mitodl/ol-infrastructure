@@ -27,9 +27,8 @@ def proxy_consul_dns():
 
     # Allow hosts that default to using systemd-resolved to properly resolve Consul
     # domains
-    if (
-        host.get_fact(HasSystemd)
-        and host.get_fact(SystemdEnabled)["systemd-resolved.service"]
+    if host.get_fact(HasSystemd) and host.get_fact(SystemdEnabled).get(
+        "systemd-resolved.service"
     ):
         with tempfile.NamedTemporaryFile(delete=False, mode="w") as resolved_conf:
             resolved_conf.write("[Resolve]\nDNS=127.0.0.1\nDomains=~consul")
