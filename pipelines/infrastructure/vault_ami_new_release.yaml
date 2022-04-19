@@ -26,6 +26,7 @@ resources:
   source:
     branch: main
     paths:
+    - src/bilder/components/
     - src/bilder/images/vault
     - src/bilder/images/packer.pkr.hcl
     - src/bilder/images/variables.pkr.hcl
@@ -45,7 +46,7 @@ jobs:
       regexp: linux_amd64
     trigger: true
   - get: packer_templates
-    trigger: false
+    trigger: true
   - put: packer-validate
     params:
       objective: validate

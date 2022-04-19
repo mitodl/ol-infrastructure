@@ -36,11 +36,11 @@ resources:
   source:
     branch: main
     paths:
+    - src/bilder/components/
     - src/bilder/images/concourse
     - src/bilder/images/packer.pkr.hcl
     - src/bilder/images/variables.pkr.hcl
     - src/bilder/images/config.pkr.hcl
-
     uri: https://github.com/mitodl/ol-infrastructure
     version:
       ref: refs/heads/master
@@ -52,6 +52,7 @@ jobs:
   - get: gh-release
     trigger: true
   - get: packer_templates
+    trigger: true
   - in_parallel:
     - put: packer
       params:

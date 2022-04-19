@@ -27,6 +27,7 @@ resources:
   source:
     branch: main
     paths:
+    - src/bilder/components/
     - src/bilder/images/consul
     - src/bilder/images/packer.pkr.hcl
     - src/bilder/images/variables.pkr.hcl
