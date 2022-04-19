@@ -18,7 +18,7 @@ def git_auto_export():
 
     files.directory(
         name="Create .ssh directory for www-data user to clone course repositories",
-        path=Path("/var/www/.ssh/"),
+        path=str(Path("/var/www/.ssh/")),
         present=True,
         mode="0700",
         user="www-data",

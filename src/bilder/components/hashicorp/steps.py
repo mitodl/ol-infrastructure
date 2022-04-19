@@ -62,7 +62,7 @@ def install_hashicorp_products(hashicorp_products: List[HashicorpProduct]):
         )
         files.file(
             name=f"Ensure {product.name} binary is executable",
-            path=Path(target_directory).joinpath(product.name),
+            path=str(Path(target_directory).joinpath(product.name)),
             assume_present=download_binary.changed,
             user=product.name,
             group=product.name,
@@ -70,7 +70,7 @@ def install_hashicorp_products(hashicorp_products: List[HashicorpProduct]):
         )
         files.directory(
             name=f"Ensure configuration directory for {product.name}",
-            path=(
+            path=str(
                 product.configuration_directory
                 or product.configuration_file.parent  # type: ignore
             ),
@@ -82,7 +82,7 @@ def install_hashicorp_products(hashicorp_products: List[HashicorpProduct]):
         if hasattr(product, "data_directory"):  # noqa: WPS421
             files.directory(
                 name=f"Create data directory for {product.name}",
-                path=product.data_directory,  # type: ignore
+                path=str(product.data_directory),  # type: ignore
                 present=True,
                 user=product.name,
                 group=product.name,
@@ -99,9 +99,11 @@ def register_services(
         systemd_unit = files.template(
             name=f"Create service definition for {product.name}",
             dest=f"/usr/lib/systemd/system/{product.name}.service",
-            src=Path(__file__)
-            .resolve()
-            .parent.joinpath("templates", f"{product.name}.service.j2"),
+            src=str(
+                Path(__file__)
+                .resolve()
+                .parent.joinpath("templates", f"{product.name}.service.j2")
+            ),
             context=product.systemd_template_context,
         )
         systemd.service(
@@ -126,7 +128,7 @@ def configure_hashicorp_product(product: HashicorpProduct):
                 create_remote_dir=True,
                 user=product.name,
                 group=product.name,
-                dest=fpath,
+                dest=str(fpath),
             )
         )
         temp_src.close()

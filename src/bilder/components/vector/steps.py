@@ -51,7 +51,7 @@ def install_vector(vector_config: VectorConfig):
     if vector_config.is_proxy:
         files.directory(
             name="Ensure TLS config directory exists",
-            path=vector_config.tls_config_directory,
+            path=str(vector_config.tls_config_directory),
             user=vector_config.user,
             present=True,
         )
@@ -62,9 +62,11 @@ def configure_vector(vector_config: VectorConfig):
     for fpath, context in vector_config.configuration_templates.items():
         files.template(
             name=f"Upload Vector configuration file {fpath}",
-            src=fpath,
-            dest=vector_config.configuration_directory.joinpath(
-                fpath.name.removesuffix(".j2")
+            src=str(fpath),
+            dest=str(
+                vector_config.configuration_directory.joinpath(
+                    fpath.name.removesuffix(".j2")
+                )
             ),
             user=vector_config.user,
             context=context,

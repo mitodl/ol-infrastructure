@@ -33,7 +33,7 @@ def install_caddy(caddy_config: CaddyConfig):
         )
         files.directory(
             name="Create Caddy data directory",
-            path=caddy_config.data_directory,
+            path=str(caddy_config.data_directory),
             user=caddy_user,
             group=caddy_user,
             present=True,
@@ -42,9 +42,11 @@ def install_caddy(caddy_config: CaddyConfig):
         files.template(
             name="Create SystemD service definition for Caddy",
             dest="/usr/lib/systemd/system/caddy.service",
-            src=Path(__file__)
-            .resolve()
-            .parent.joinpath("templates", "caddy.service.j2"),
+            src=str(
+                Path(__file__)
+                .resolve()
+                .parent.joinpath("templates", "caddy.service.j2")
+            ),
         )
     else:
         apt.packages(
@@ -71,14 +73,16 @@ def install_caddy(caddy_config: CaddyConfig):
     files.put(
         name="Configure systemd to load environment variables from file",
         dest="/etc/systemd/system/caddy.service.d/load_env.conf",
-        src=Path(__file__)
-        .resolve()
-        .parent.joinpath("templates", "caddy.service.override"),
+        src=str(
+            Path(__file__)
+            .resolve()
+            .parent.joinpath("templates", "caddy.service.override")
+        ),
     )
     if caddy_config.log_file:
         files.directory(
             name="Crate Caddy log directory",
-            path=caddy_config.log_file.parent,
+            path=str(caddy_config.log_file.parent),
             user=caddy_user,
             present=True,
         )
@@ -90,14 +94,14 @@ def configure_caddy(caddy_config: CaddyConfig):
     if caddy_config.caddyfile.suffix == ".j2":
         caddy_file = files.template(
             name="Create Caddyfile",
-            src=caddy_config.caddyfile,
+            src=str(caddy_config.caddyfile),
             dest="/etc/caddy/Caddyfile",
             context=caddy_config.template_context,
         )
     else:
         caddy_file = files.put(
             name="Upload Caddyfile",
-            src=caddy_config.caddyfile,
+            src=str(caddy_config.caddyfile),
             dest="/etc/caddy/Caddyfile",
         )
     return caddy_file.changed

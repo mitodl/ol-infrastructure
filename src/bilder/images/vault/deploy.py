@@ -118,7 +118,7 @@ install_hashicorp_products(hashicorp_products)
 raft_config = IntegratedRaftStorageBackend()
 files.directory(
     name="Ensure raft directory exists with proper permissions",
-    path=raft_config.path,
+    path=str(raft_config.path),
     present=True,
     mode="700",
     user=vault.name,

@@ -116,7 +116,7 @@ pip.packages(
 
 files.directory(
     name="Create edX log directory and set permissions",
-    path=Path("/var/log/edxapp/"),
+    path=str(Path("/var/log/edxapp/")),
     present=True,
     mode="0775",
     user="www-data",
@@ -176,8 +176,8 @@ consul_templates = [
 if node_type == WEB_NODE_TYPE:
     files.put(
         name="Set up Nginx status endpoint for metrics collection",
-        src=Path(__file__).resolve().parent.joinpath("files", "nginx_status.conf"),
-        dest=Path("/etc/nginx/sites-enabled/status_monitor"),
+        src=str(Path(__file__).resolve().parent.joinpath("files", "nginx_status.conf")),
+        dest=str(Path("/etc/nginx/sites-enabled/status_monitor")),
         user="www-data",
         group="www-data",
     )
@@ -297,7 +297,7 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as studio_template:
     files.put(
         name="Upload studio.yml template for Vault agent",
         src=studio_template.name,
-        dest=studio_intermediate_template,
+        dest=str(studio_intermediate_template),
         user=consul_template.name,
         group=consul_template.name,
         create_remote_dir=True,
@@ -308,7 +308,7 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as lms_template:
     files.put(
         name="Upload lms.yml template for consul-template agent",
         src=lms_template.name,
-        dest=lms_intermediate_template,
+        dest=str(lms_intermediate_template),
         user=consul_template.name,
         group=consul_template.name,
         create_remote_dir=True,
@@ -318,7 +318,7 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as forum_template:
     files.put(
         name="Upload forum_env template for consul-template agent",
         src=forum_template.name,
-        dest=forum_intermediate_template,
+        dest=str(forum_intermediate_template),
         user=consul_template.name,
         group=consul_template.name,
         create_remote_dir=True,
@@ -415,7 +415,7 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
         files.put(
             name="Upload xqueue config template for consul-template agent",
             src=xqueue_template.name,
-            dest=xqueue_template_path,
+            dest=str(xqueue_template_path),
             user=consul_template.name,
             group=consul_template.name,
             create_remote_dir=True,

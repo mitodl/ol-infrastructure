@@ -30,19 +30,25 @@ def service_configuration_watches(
     )
     restart_unit = files.template(
         name=f"Create {service_name} restarting service",
-        dest=Path("/etc/systemd/system/").joinpath(f"{service_name}-restarter.service"),
-        src=Path(__file__)
-        .resolve()
-        .parent.joinpath("templates", "service_restarter.service.j2"),
+        dest=str(
+            Path("/etc/systemd/system/").joinpath(f"{service_name}-restarter.service")
+        ),
+        src=str(
+            Path(__file__)
+            .resolve()
+            .parent.joinpath("templates", "service_restarter.service.j2")
+        ),
         service_name=service_name,
         onchange_command=onchange_command,
     )
     path_unit = files.template(
         name=f"Create {service_name} configuration file watcher",
-        dest=Path("/etc/systemd/system").joinpath(f"{service_name}.path"),
-        src=Path(__file__)
-        .resolve()
-        .parent.joinpath("templates", "systemd_file_watcher.path.j2"),
+        dest=str(Path("/etc/systemd/system").joinpath(f"{service_name}.path")),
+        src=str(
+            Path(__file__)
+            .resolve()
+            .parent.joinpath("templates", "systemd_file_watcher.path.j2")
+        ),
         service_name=service_name,
         watched_files=watched_files,
     )

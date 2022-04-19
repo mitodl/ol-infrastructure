@@ -39,8 +39,8 @@ def install_concourse(concourse_config: ConcourseBaseConfig):
         )
         files.download(
             name="Download the Concourse release archive",
-            src=concourse_archive,
-            dest=concourse_archive_path,
+            src=str(concourse_archive),
+            dest=str(concourse_archive_path),
             sha1sum=httpx.get(concourse_archive_hash, follow_redirects=True)
             .read()
             .decode("utf8")
@@ -57,13 +57,13 @@ def install_concourse(concourse_config: ConcourseBaseConfig):
         # Verify ownership of Concourse directory
         files.directory(
             name="Set ownership of Concourse directory",
-            path=installation_directory,
+            path=str(installation_directory),
             user=concourse_config.user,
         )
     # Link Concourse installation to target directory
     active_installation_path = files.link(
         name="Link Concourse installation to target directory",
-        path=concourse_config.deploy_directory,
+        path=str(concourse_config.deploy_directory),
         target=f"{installation_directory}",
         user=concourse_config.user,
         symbolic=True,
@@ -80,8 +80,10 @@ def _manage_web_node_keys(
     # Create authorized_keys file
     files.template(
         name="Create authorized_keys file to permit worker connections",
-        src=Path(__file__).resolve().parent.joinpath("templates", "authorized_keys.j2"),
-        dest=concourse_config.authorized_keys_file,
+        src=str(
+            Path(__file__).resolve().parent.joinpath("templates", "authorized_keys.j2")
+        ),
+        dest=str(concourse_config.authorized_keys_file),
         user=concourse_config.user,
         authorized_keys=concourse_config.authorized_worker_keys or [],
         state=state,
@@ -92,7 +94,7 @@ def _manage_web_node_keys(
         host_key_file.write(concourse_config.tsa_host_key.encode("utf8"))
         files.put(
             name="Write tsa_host_key file",
-            dest=concourse_config.tsa_host_key_path,
+            dest=str(concourse_config.tsa_host_key_path),
             user=concourse_config.user,
             mode="600",
             src=host_key_file.name,
@@ -113,7 +115,7 @@ def _manage_web_node_keys(
         )
         files.put(
             name="Write session_signing_host_key file",
-            dest=concourse_config.session_signing_key_path,
+            dest=str(concourse_config.session_signing_key_path),
             user=concourse_config.user,
             mode="600",
             src=session_signing_key_file.name,
@@ -136,7 +138,7 @@ def _manage_worker_node_keys(concourse_config: ConcourseWorkerConfig):
         tsa_key_file.write(concourse_config.tsa_public_key.encode("utf8"))
         files.put(
             name="Write TSA public key file",
-            dest=concourse_config.tsa_public_key_path,
+            dest=str(concourse_config.tsa_public_key_path),
             src=tsa_key_file.name,
             user=concourse_config.user,
             mode="600",
@@ -146,7 +148,7 @@ def _manage_worker_node_keys(concourse_config: ConcourseWorkerConfig):
         worker_key_file.write(concourse_config.worker_private_key.encode("utf8"))
         files.put(
             name="Write worker private key file",
-            dest=concourse_config.worker_private_key_path,
+            dest=str(concourse_config.worker_private_key_path),
             src=worker_key_file.name,
             user=concourse_config.user,
             mode="600",
@@ -196,14 +198,14 @@ def configure_concourse(
 ):
     concourse_env_file = files.template(
         name="Create Concourse environment file",
-        src=Path(__file__).resolve().parent.joinpath("templates/env_file.j2"),
-        dest=concourse_config.env_file_path,
+        src=str(Path(__file__).resolve().parent.joinpath("templates/env_file.j2")),
+        dest=str(concourse_config.env_file_path),
         concourse_config=concourse_config,
         user=concourse_config.user,
     )
     files.directory(
         name="Create Concourse configuration directory",
-        path=concourse_config.configuration_directory,
+        path=str(concourse_config.configuration_directory),
         user=concourse_config.user,
         recursive=True,
         present=True,
@@ -213,7 +215,7 @@ def configure_concourse(
     elif concourse_config._node_type == "worker":  # noqa: WPS437
         files.directory(
             name="Create Concourse worker state directory",
-            path=concourse_config.work_dir,
+            path=str(concourse_config.work_dir),
             present=True,
             user=concourse_config.user,
             recursive=True,
@@ -231,7 +233,9 @@ def register_concourse_service(
     # Create Systemd unit to manage Concourse service
     systemd_unit = files.template(
         name="Create concourse Systemd unit definition",
-        src=Path(__file__).resolve().parent.joinpath("templates/concourse.service.j2"),
+        src=str(
+            Path(__file__).resolve().parent.joinpath("templates/concourse.service.j2")
+        ),
         dest="/etc/systemd/system/concourse.service",
         concourse_config=concourse_config,
     )
