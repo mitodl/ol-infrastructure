@@ -81,6 +81,12 @@ git_branch = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["branch"]
 edx_platform_path = "/edx/app/edxapp/edx-platform/"
 
 server.shell(
+    name="Fix git",
+    commands=["git config --global --add safe.directory /edx/app/edxapp/edx-platform"],
+    chdir=edx_platform_path,
+)
+
+server.shell(
     name="Ensure the edx-platform git origin is configured",
     commands=[f"git remote add custom {git_remote}", "git fetch --all --prune --tags"],
     chdir=edx_platform_path,
