@@ -48,7 +48,7 @@ from bilder.components.vector.steps import (
     install_vector,
     vector_service,
 )
-from bilder.facts import has_systemd  # noqa: F401
+from bilder.facts.has_systemd import HasSystemd
 from bilder.images.edxapp.lib import WEB_NODE_TYPE, node_type
 from bilder.images.edxapp.plugins.git_export_import import git_auto_export
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
@@ -79,7 +79,6 @@ apt.packages(
 git_remote = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["origin"]
 git_branch = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["branch"]
 edx_platform_path = "/edx/app/edxapp/edx-platform/"
-
 server.shell(
     name="Fix git",
     commands=["git config --global --add safe.directory /edx/app/edxapp/edx-platform"],
@@ -121,7 +120,7 @@ pip.packages(
 
 files.directory(
     name="Create edX log directory and set permissions",
-    path=Path("/var/log/edxapp/"),
+    path=str(Path("/var/log/edxapp/")),
     present=True,
     mode="0775",
     user="www-data",
@@ -181,8 +180,8 @@ consul_templates = [
 if node_type == WEB_NODE_TYPE:
     files.put(
         name="Set up Nginx status endpoint for metrics collection",
-        src=Path(__file__).resolve().parent.joinpath("files", "nginx_status.conf"),
-        dest=Path("/etc/nginx/sites-enabled/status_monitor"),
+        src=str(Path(__file__).resolve().parent.joinpath("files", "nginx_status.conf")),
+        dest=str(Path("/etc/nginx/sites-enabled/status_monitor")),
         user="www-data",
         group="www-data",
     )
@@ -302,7 +301,7 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as studio_template:
     files.put(
         name="Upload studio.yml template for Vault agent",
         src=studio_template.name,
-        dest=studio_intermediate_template,
+        dest=str(studio_intermediate_template),
         user=consul_template.name,
         group=consul_template.name,
         create_remote_dir=True,
@@ -313,7 +312,7 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as lms_template:
     files.put(
         name="Upload lms.yml template for consul-template agent",
         src=lms_template.name,
-        dest=lms_intermediate_template,
+        dest=str(lms_intermediate_template),
         user=consul_template.name,
         group=consul_template.name,
         create_remote_dir=True,
@@ -323,14 +322,14 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as forum_template:
     files.put(
         name="Upload forum_env template for consul-template agent",
         src=forum_template.name,
-        dest=forum_intermediate_template,
+        dest=str(forum_intermediate_template),
         user=consul_template.name,
         group=consul_template.name,
         create_remote_dir=True,
     )
 
 # Manage services
-if host.fact.has_systemd:
+if host.get_fact(HasSystemd):
     supervisor_command = "signal HUP" if node_type == WEB_NODE_TYPE else "restart"
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
@@ -420,7 +419,7 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
         files.put(
             name="Upload xqueue config template for consul-template agent",
             src=xqueue_template.name,
-            dest=xqueue_template_path,
+            dest=str(xqueue_template_path),
             user=consul_template.name,
             group=consul_template.name,
             create_remote_dir=True,

@@ -3,24 +3,22 @@ from pathlib import Path
 from typing import List
 
 import httpx
+from pyinfra import host
 from pyinfra.api import deploy
+from pyinfra.facts.server import LinuxName
 from pyinfra.operations import apt, files, server, systemd
 
 from bilder.components.hashicorp.models import HashicorpProduct
-from bilder.facts import has_systemd, system  # noqa: F401
+from bilder.facts.system import DebianCpuArch, RedhatCpuArch
 from bilder.lib.linux_helpers import linux_family
 
 
 @deploy("Install Hashicorp Products")
-def install_hashicorp_products(
-    hashicorp_products: List[HashicorpProduct], state=None, host=None
-):
+def install_hashicorp_products(hashicorp_products: List[HashicorpProduct]):
     apt.packages(
         name="Ensure unzip is installed",
         packages=["unzip"],
         update=True,
-        state=state,
-        host=host,
     )
     for product in hashicorp_products:
         server.user(
@@ -28,13 +26,11 @@ def install_hashicorp_products(
             user=product.name,
             system=True,
             shell="/bin/false",  # noqa: S604
-            state=state,
-            host=host,
         )
-        if linux_family(host.fact.linux_name).lower == "debian":
-            cpu_arch = host.fact.debian_cpu_arch
-        elif linux_family(host.fact.linux_name).lower == "redhat":
-            cpu_arch = host.fact.redhat_cpu_arch
+        if linux_family(host.get_fact(LinuxName)).lower == "debian":
+            cpu_arch = host.get_fact(DebianCpuArch)
+        elif linux_family(host.get_fact(LinuxName)).lower == "redhat":
+            cpu_arch = host.get_fact(RedhatCpuArch)
         else:
             cpu_arch = "amd64"
         file_download = f"{product.name}_{product.version}_linux_{cpu_arch}.zip"
@@ -59,28 +55,22 @@ def install_hashicorp_products(
             src=f"https://releases.hashicorp.com/{product.name}/{product.version}/{file_download}",  # noqa: E501
             dest=download_destination,
             sha256sum=file_hash_map[file_download],
-            state=state,
-            host=host,
         )
         server.shell(
             name=f"Unzip {product.name}",
             commands=[f"unzip -o {download_destination} -d {target_directory}"],
-            state=state,
-            host=host,
         )
         files.file(
             name=f"Ensure {product.name} binary is executable",
-            path=Path(target_directory).joinpath(product.name),
+            path=str(Path(target_directory).joinpath(product.name)),
             assume_present=download_binary.changed,
             user=product.name,
             group=product.name,
             mode="755",
-            state=state,
-            host=host,
         )
         files.directory(
             name=f"Ensure configuration directory for {product.name}",
-            path=(
+            path=str(
                 product.configuration_directory
                 or product.configuration_file.parent  # type: ignore
             ),
@@ -88,19 +78,15 @@ def install_hashicorp_products(
             user=product.name,
             group=product.name,
             recursive=True,
-            state=state,
-            host=host,
         )
         if hasattr(product, "data_directory"):  # noqa: WPS421
             files.directory(
                 name=f"Create data directory for {product.name}",
-                path=product.data_directory,  # type: ignore
+                path=str(product.data_directory),  # type: ignore
                 present=True,
                 user=product.name,
                 group=product.name,
                 recursive=True,
-                state=state,
-                host=host,
             )
 
 
@@ -108,19 +94,17 @@ def install_hashicorp_products(
 def register_services(
     hashicorp_products: List[HashicorpProduct],
     start_services_immediately=True,
-    state=None,
-    host=None,
 ):
     for product in hashicorp_products:
         systemd_unit = files.template(
             name=f"Create service definition for {product.name}",
             dest=f"/usr/lib/systemd/system/{product.name}.service",
-            src=Path(__file__)
-            .resolve()
-            .parent.joinpath("templates", f"{product.name}.service.j2"),
+            src=str(
+                Path(__file__)
+                .resolve()
+                .parent.joinpath("templates", f"{product.name}.service.j2")
+            ),
             context=product.systemd_template_context,
-            state=state,
-            host=host,
         )
         systemd.service(
             name=f"Register service for {product.name}",
@@ -128,13 +112,11 @@ def register_services(
             running=start_services_immediately,
             enabled=True,
             daemon_reload=systemd_unit.changed,
-            state=state,
-            host=host,
         )
 
 
 @deploy("Configure Hashicorp Products")
-def configure_hashicorp_product(product: HashicorpProduct, state=None, host=None):
+def configure_hashicorp_product(product: HashicorpProduct):
     put_results = []
     for fpath, file_contents in product.render_configuration_files():
         temp_src = tempfile.NamedTemporaryFile(delete=False, mode="w")
@@ -146,9 +128,7 @@ def configure_hashicorp_product(product: HashicorpProduct, state=None, host=None
                 create_remote_dir=True,
                 user=product.name,
                 group=product.name,
-                dest=fpath,
-                state=state,
-                host=host,
+                dest=str(fpath),
             )
         )
         temp_src.close()

@@ -7,11 +7,11 @@ from bilder.components.vector.steps import (
     install_vector,
     vector_service,
 )
-from bilder.facts import has_systemd  # noqa: F401
+from bilder.facts.has_systemd import HasSystemd
 
 vector_config = VectorConfig()
 install_baseline_packages()
 install_vector(vector_config)
 configure_vector(vector_config)
-if host.fact.has_systemd:
+if host.get_fact(HasSystemd):
     vector_service(vector_config)
