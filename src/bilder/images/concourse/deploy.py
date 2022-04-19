@@ -74,7 +74,7 @@ VERSIONS = {  # noqa: WPS407
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 CONCOURSE_WEB_NODE_TYPE = "web"
 CONCOURSE_WORKER_NODE_TYPE = "worker"
-node_type = host.data.node_type or os.environ.get("NODE_TYPE", CONCOURSE_WEB_NODE_TYPE)
+node_type = os.environ.get("NODE_TYPE", CONCOURSE_WEB_NODE_TYPE)
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
 concourse_base_config = ConcourseBaseConfig(version=VERSIONS["concourse"])
