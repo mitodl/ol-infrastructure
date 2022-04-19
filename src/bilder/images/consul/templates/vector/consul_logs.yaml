@@ -75,6 +75,6 @@ sinks:
     labels:
       environment: ${ENVIRONMENT}
       application: consul
-      service: consul
+      service: operations
       hostname: ${HOSTNAME}
     out_of_order_action: rewrite_timestamp

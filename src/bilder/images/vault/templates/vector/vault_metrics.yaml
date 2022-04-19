@@ -23,8 +23,7 @@ transforms:
     source: |
       .tags.environment = "${ENVIRONMENT}"
       .tags.application = "vault"
-      .tags.service = "vault"
-      .tags.org_unit = "operations"
+      .tags.service = "operations"
 
 sinks:
   ship_vault_metrics_to_grafana_cloud:

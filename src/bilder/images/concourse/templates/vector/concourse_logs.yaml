@@ -39,5 +39,5 @@ sinks:
     labels:
       environment: ${ENVIRONMENT}
       application: concourse
-      service: concourse
+      service: operations
     out_of_order_action: rewrite_timestamp

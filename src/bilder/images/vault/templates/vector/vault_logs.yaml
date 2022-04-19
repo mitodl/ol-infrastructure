@@ -75,6 +75,6 @@ sinks:
     labels:
       environment: ${ENVIRONMENT}
       application: vault
-      service: vault
+      service: operations
       hostname: ${HOSTNAME}
     out_of_order_action: rewrite_timestamp

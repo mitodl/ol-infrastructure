@@ -40,7 +40,7 @@ transforms:
     source: |
       .tags.environment = "${ENVIRONMENT}"
       .tags.application = "concourse"
-      .tags.service = "concourse"
+      .tags.service = "operations"
 
 sinks:
   ship_concourse_metrics_to_cloudwatch:

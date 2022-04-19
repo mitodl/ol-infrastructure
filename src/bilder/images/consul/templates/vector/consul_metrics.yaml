@@ -15,7 +15,7 @@ transforms:
       .tags.job = "integrations/consul"
       .tags.environment = "${ENVIRONMENT}"
       .tags.application = "consul"
-      .tags.service = "consul"
+      .tags.service = "operations"
 
 sinks:
   ship_consul_metrics_to_grafana_cloud:
