@@ -11,7 +11,7 @@ resources:
   source:
     branch: main
     uri: git@github.com:mitodl/grafana-dashboards.git
-    private_key: ((grafana-dashboards-private-key))
+    private_key: ((grizzly.ssh_key))
 jobs:
 - name: commit-managed-dashboards-from-ci
   build_log_retention:
