@@ -19,7 +19,7 @@ install_baseline_packages(
     packages=[
         "build-essential",
         "curl",
-        "git=2.36.0",
+        "git",
         "libmariadbclient-dev",
         "python3-dev",
         "python3-pip",
