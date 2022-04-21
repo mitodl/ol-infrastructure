@@ -86,6 +86,12 @@ build {
       "chmod 600 /tmp/packer-${build.ID}.pem"
     ]
   }
+  
+  provisioner "shell" {
+    # Testing
+    inline = ["sudo apt-get install git=1:2.36.0-0ppa1~ubuntu20.04.1 -y "]
+  }
+  
   provisioner "shell" {
     # Addresses change in latest git due to recent CVE
     # https://github.blog/2022-04-12-git-security-vulnerability-announced/
