@@ -19,7 +19,7 @@ install_baseline_packages(
     packages=[
         "build-essential",
         "curl",
-        "git=1:2.36.0-0ppa1~ubuntu20.04.1",
+        "git=1:2.25.1-1ubuntu3.3",
         "libmariadbclient-dev",
         "python3-dev",
         "python3-pip",
