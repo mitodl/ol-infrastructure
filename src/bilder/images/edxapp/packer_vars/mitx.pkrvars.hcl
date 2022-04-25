@@ -1,5 +1,5 @@
 build_environment    = "mitx-ci"
-edx_platform_version = "open-release/maple.master"
-edx_ansible_branch   = "open-release/maple.master"
+edx_platform_version = "open-release/nutmeg.master"
+edx_ansible_branch   = "open-release/nutmeg.master"
 installation_target  = "mitx"
 business_unit        = "residential"

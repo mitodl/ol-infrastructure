@@ -90,10 +90,10 @@ edx_platform_repository = {
     },
     "mitx": {
         "origin": "https://github.com/mitodl/edx-platform",
-        BRANCH: "mitx/maple",
+        BRANCH: "mitx/nutmeg",
     },
     "mitx-staging": {
         "origin": "https://github.com/mitodl/edx-platform",
-        BRANCH: "mitx/maple",
+        BRANCH: "mitx/nutmeg",
     },
 }
