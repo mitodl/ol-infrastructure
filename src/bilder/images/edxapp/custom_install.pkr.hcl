@@ -53,6 +53,7 @@ source "amazon-ebs" "edxapp" {
     OU      = "${var.business_unit}"
     app     = "${local.app_name}"
     purpose = "${local.app_name}-${var.node_type}"
+    edxapp_release = "${var.edx_platform_version}"
   }
   # Base all builds off of the most recent Ubuntu 20.04 image built by the Canonical organization.
   source_ami_filter {
@@ -78,6 +79,7 @@ source "amazon-ebs" "edxapp" {
     app        = "${local.app_name}"
     deployment = "${var.installation_target}"
     purpose    = "${local.app_name}-${var.node_type}"
+    edxapp_release = "${var.edx_platform_version}"
   }
 }
 

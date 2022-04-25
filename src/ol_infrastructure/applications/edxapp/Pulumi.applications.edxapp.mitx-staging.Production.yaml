@@ -18,6 +18,7 @@ config:
   edxapp:edx_xqueue_secrets:
     secure: v1:jgBYHCVD4xbM2TGu:P0rmQmQm2SYH/pQh928vZq5C5ZRXWQsKvRijEitpVjsIo5YfzyYGM84GOIQQG2FTINUdINXCGkWXHNUsfYFGq1dKcOsrql9n5nUka8k/4bWcqEuyBy0dI0bCpoEf6Ui0hL1On/Or4/rV7itDycwjIsTe7Eq6pE2oLRw+64RV77e3ho9f1M/63BC00rzYynBkaw==
   edxapp:google_analytics_id: ""
+  edxapp:edxapp_release: open-release/maple.master
   edxapp:mail_domain: edxapp-mail-staging-production.mitx.mit.edu
   edxapp:min_web_nodes: "1"
   edxapp:min_worker_nodes: "1"

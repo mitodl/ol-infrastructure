@@ -102,6 +102,7 @@ aws_config = AWSBase(
 )
 consul_security_groups = consul_stack.require_output("security_groups")
 consul_provider = get_consul_provider(stack_info)
+edxapp_release = edxapp_config.require("edxapp_release")
 edxapp_domains = edxapp_config.require_object("domains")
 edxapp_mail_domain = edxapp_config.require("mail_domain")
 edxapp_vpc = network_stack.require_output(target_vpc)
@@ -112,6 +113,7 @@ edxapp_web_ami = ec2.get_ami(
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
         ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
+        ec2.GetAmiFilterArgs(name="tag:edxapp_release", values=[edxapp_release]),
     ],
     most_recent=True,
     owners=[aws_account.account_id],
