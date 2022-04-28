@@ -43,6 +43,7 @@ policies:
       days: 30
     - type: unused
       value: true
+    - "tag:custodian_cleanup": absent
   actions:
   - type: mark-for-op
     tag: custodian_cleanup
@@ -66,6 +67,7 @@ policies:
       key: Description
       op: regex-case
       value: '^.*CreateImage.*$'
+    - "tag:custodian_cleanup": absent
   actions:
   - type: mark-for-op
     tag: custodian_cleanup
@@ -86,6 +88,7 @@ policies:
         url: file:find-and-mark-mitodl-ami-snapshots/resources.json
         format: json
         expr: "[].VolumeId"
+    - "tag:custodian_cleanup": absent
   actions:
   - type: mark-for-op
     tag: custodian_cleanup
