@@ -5,11 +5,12 @@ policies:
   description: |
     Find all the running ec2 instances that were spawned by an asg, belong of mitodl, and do not belong to ike. Take no action. Output used for next filter.
   filters:
-  - State.Name: running
-  - "tag:OU": present
-  - "tag:aws:autoscaling:groupName": present
-  - not:
-    - "tag:OU": "ike"
+  - and:
+    - State.Name: running
+    - "tag:OU": present
+    - "tag:aws:autoscaling:groupName": present
+    - not:
+      - "tag:OU": "ike"
 
 - name: find-and-propagate-tags-mitodl-ebs-volumes
   resource: aws.ebs
