@@ -107,24 +107,25 @@ edxapp_domains = edxapp_config.require_object("domains")
 edxapp_mail_domain = edxapp_config.require("mail_domain")
 edxapp_vpc = network_stack.require_output(target_vpc)
 edxapp_vpc_id = edxapp_vpc["id"]
+ami_filters = [
+    ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
+    ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
+    ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
+    ec2.GetAmiFilterArgs(name="tag:edxapp_release", values=[edxapp_release]),
+]
 edxapp_web_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["edxapp-web-*"]),
-        ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
-        ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
-        ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
-        ec2.GetAmiFilterArgs(name="tag:edxapp_release", values=[edxapp_release]),
-    ],
+    ]
+    + ami_filters,
     most_recent=True,
     owners=[aws_account.account_id],
 )
 edxapp_worker_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["edxapp-worker-*"]),
-        ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
-        ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
-        ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
-    ],
+    ]
+    + ami_filters,
     most_recent=True,
     owners=[aws_account.account_id],
 )
