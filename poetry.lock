@@ -1014,7 +1014,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-tls"
-version = "4.2.2"
+version = "4.3.0"
 description = "A Pulumi package to create TLS resources in Pulumi programs."
 category = "main"
 optional = false
@@ -1529,7 +1529,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "1fd13270c0e87073a4047d8d08c674238d8fedad1344362b080ff607435c24e4"
+content-hash = "bffec7dc680029477386d77fcb9fa07be774a4c30fce297c1125d2c4601ffe91"
 
 [metadata.files]
 anyio = [
@@ -2195,7 +2195,7 @@ pulumi-mongodbatlas = [
     {file = "pulumi_mongodbatlas-3.3.0.tar.gz", hash = "sha256:6e5c9e671f10ae3e96fa254c996067d9066c9340ee13e407de48806ec200795e"},
 ]
 pulumi-tls = [
-    {file = "pulumi_tls-4.2.2.tar.gz", hash = "sha256:be3dca00ea7a65c00460fe94b3a125d8c39e661483c3ef5f884884b803608be0"},
+    {file = "pulumi_tls-4.3.0.tar.gz", hash = "sha256:2f21af5a3142239add1b3a3c416366b7c0520e48e47918d99c5f7606b0e49ecb"},
 ]
 pulumi-vault = [
     {file = "pulumi_vault-5.4.1.tar.gz", hash = "sha256:989e68d312abb36a168f2d3f648dfd65ef3fb4afb5180c6221b1844f3d622a6d"},
