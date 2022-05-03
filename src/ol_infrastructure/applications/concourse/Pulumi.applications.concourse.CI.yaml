@@ -34,7 +34,7 @@ config:
     iam_policies:
     - base
     - ocw
-    instance_type: m5a.xlarge
+    instance_type: t3a.medium
     name: ocw
   - auto_scale:
       desired: 1
