@@ -1527,7 +1527,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "1fd13270c0e87073a4047d8d08c674238d8fedad1344362b080ff607435c24e4"
+content-hash = "bbe843f18bd623483f80139383c392d875de3cfa2e060360c685df9051f05ce0"
 
 [metadata.files]
 anyio = [
