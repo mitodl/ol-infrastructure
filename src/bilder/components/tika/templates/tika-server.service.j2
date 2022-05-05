@@ -1,0 +1,16 @@
+[Unit]
+Description=The Apache Tika toolkit detects and extracts metadata and text
+After=network.target
+
+[Service]
+User={{ context.tika_user }}
+Group={{ context.tika_group }}
+WorkingDirectory={{ context.tika_path }}
+Type=exec
+ExecStart=/usr/bin/java -Dlog4j.configuration=file:{{ context.tika_log_config_file }} -jar {{ context.tika_path }}/tika-server.{{ context.tika_version }}.jar --host={{ context.tika_host }} --port={{ context.tika_port }} -spawnChild -JXmx{{ context.heap_max }}m -JDlog4j.configuration=file:{{ context.tika_log_config_file }}
+SuccessExitStatus=143
+Restart=always
+KillSignal=SIGQUIT
+
+[Install]
+WantedBy=multi-user.target
