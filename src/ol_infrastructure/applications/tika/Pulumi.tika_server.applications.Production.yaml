@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gFFfGbP/Lpm9oWTOI+LT/0ZAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMeE8zSJQxMf+hXivMAgEQgDtEFo/bfyGCJzviun+XYeMzuZ2pUZBBEnpSmXJmhKFx3PKrpxzFRzbfkabnoJjj56VjzyWaE7znPLRSHA==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-apps-production.odl.mit.edu
+  tika:auto_scale:
+    desired: 2
+    max: 3
+    min: 2
+  tika:business_unit: operations
+  tika:target_vpc: applications_vpc
+  tika:web_host_domain: tika-production.odl.mit.edu
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
