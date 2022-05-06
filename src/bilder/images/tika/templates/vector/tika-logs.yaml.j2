@@ -1,0 +1,51 @@
+---
+sources:
+  collect_tika_logs:
+    type: file
+    read_from: end
+    file_key: log_file
+    glob_minimum_cooldown_ms: 20000
+    include:
+    - /var/log/tika/tika.log
+    multiline:
+      start_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}?) (\w+)'
+      condition_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}?) (\w+)  (.*)$'
+      mode: 'halt_before'
+      timeout_ms: 5000
+
+transforms:
+  parse_tika_logs:
+    type: remap
+    inputs:
+    - 'collect_tika_logs'
+    source: |
+      parsed, err = parse_regex(.message, r'^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}?) (?P<level>\w+)  (?P<message>.*)')
+      if err != null {
+        .parse_error = err
+      }
+      . = merge(., parsed)
+      .environment = "${ENVIRONMENT}"
+
+  enrich_tika_logs:
+    type: aws_ec2_metadata
+    inputs:
+    - 'parse_tika_logs'
+    namespace: ec2
+
+sinks:
+  ship_tika_logs_to_grafana_cloud:
+    inputs:
+    - 'enrich_tika_logs'
+    type: loki
+    auth:
+      strategy: basic
+      password: ${GRAFANA_CLOUD_API_KEY}
+      user: "${GRAFANA_CLOUD_LOKI_API_USER}"
+    endpoint: https://logs-prod-us-central1.grafana.net
+    encoding:
+      codec: json
+    labels:
+      environment: ${ENVIRONMENT}
+      application: tika
+      service: tika
+    out_of_order_action: rewrite_timestamp

@@ -36,6 +36,11 @@ from bilder.components.hashicorp.vault.steps import vault_template_permissions
 from bilder.components.tika.models import TikaConfig
 from bilder.components.tika.steps import configure_tika, install_tika, tika_service
 from bilder.components.vector.models import VectorConfig
+from bilder.components.vector.steps import (
+    configure_vector,
+    install_vector,
+    vector_service,
+)
 from bilder.facts.has_systemd import HasSystemd
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
@@ -95,12 +100,11 @@ consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
 
-# Install and Configure Tika
+# Install and Configure Caddy and Tika
 tika_config = TikaConfig()
 install_tika(tika_config)
 configure_tika(tika_config)
 
-# Install and Configure Caddy
 caddy_config = CaddyConfig(
     caddyfile=Path(__file__).resolve().parent.joinpath("templates", "caddyfile.j2"),
 )
@@ -109,31 +113,29 @@ install_caddy(caddy_config)
 caddy_config_changed = configure_caddy(caddy_config)
 
 vault_template_permissions(vault_config)
-
 create_placeholder_tls_config(caddy_config)
 
 # Install vector
 vector_config.configuration_templates[
     TEMPLATES_DIRECTORY.joinpath("vector", "tika-logs.yaml.j2")
 ] = {}
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "caddy-logs.yaml.j2")
+] = {}
+install_vector(vector_config)
+configure_vector(vector_config)
 
+# Lay down final configuration for hashicorp products
 for product in hashicorp_products:
     configure_hashicorp_product(product)
 
+# Setup systemd daemons for everything
 if host.get_fact(HasSystemd):
     tika_service(tika_config)
+    vector_service(vector_config)
 
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
-
-    watched_vector_files = [
-        f"{vector_config.tls_config_directory}/odl_wildcard.cert",
-        f"{vector_config.tls_config_directory}/odl_wildcard.key",
-    ]
-    service_configuration_watches(
-        service_name="vector",
-        watched_files=watched_vector_files,
-    )
 
     watched_caddy_files = [
         "/etc/caddy/odl_wildcard.cert",
