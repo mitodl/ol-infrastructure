@@ -295,12 +295,16 @@ tika_server_launch_config = ec2.LaunchTemplate(
         ).decode("utf8")
     ),
 )
-
+auto_scale_config = tika_config.get_object("auto_scale") or {
+    "desired": 2,
+    "min": 1,
+    "max": 3,
+}
 autoscaling.Group(
     "tika-server-autoscaling-group",
-    desired_capacity=2,
-    min_size=1,
-    max_size=3,
+    desired_capacity=auto_scale_config["desired"] or 2,
+    min_size=auto_scale_config["min"] or 1,
+    max_size=auto_scale_config["max"] or 3,
     health_check_type="ELB",
     vpc_zone_identifiers=target_vpc["subnet_ids"],
     launch_template=autoscaling.GroupLaunchTemplateArgs(
