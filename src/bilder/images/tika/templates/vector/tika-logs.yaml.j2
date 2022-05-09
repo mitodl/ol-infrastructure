@@ -1,17 +1,10 @@
 ---
 sources:
-  collect_tika_logs:
-    type: file
-    read_from: end
-    file_key: log_file
-    glob_minimum_cooldown_ms: 20000
-    include:
-    - /var/log/tika/tika.log
-    multiline:
-      start_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}?) (\w+)'
-      condition_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}?) (\w+)  (.*)$'
-      mode: 'halt_before'
-      timeout_ms: 5000
+  collect_tika_logs::
+    type: journald
+    include_units:
+    - java
+    current_boot_only: true
 
 transforms:
   parse_tika_logs:
@@ -19,12 +12,11 @@ transforms:
     inputs:
     - 'collect_tika_logs'
     source: |
-      parsed, err = parse_regex(.message, r'^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}?) (?P<level>\w+)  (?P<message>.*)')
-      if err != null {
-        .parse_error = err
+      event, err = parse_json(.message)
+      if event != null {
+        .,err = merge(., event)
+        .environment = "${ENVIRONMENT}"
       }
-      . = merge(., parsed)
-      .environment = "${ENVIRONMENT}"
 
   enrich_tika_logs:
     type: aws_ec2_metadata
