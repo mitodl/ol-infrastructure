@@ -47,9 +47,17 @@ def install_tika(tika_config: TikaConfig):
 
 @deploy("Configure Tika")
 def configure_tika(tika_config: TikaConfig):
+    tika_config_file = files.template(
+        name="Create tika-config.xml file",
+        src=str(
+            Path(__file__).resolve().parent.joinpath("templates", "tika-config.xml")
+        ),
+        dest=tika_config.template_context["tika_config_file"],
+        context=tika_config.template_context,
+    )
     log_config_file = files.put(
         name="Create log4j configuration file",
-        src=str(Path(__file__).resolve().parent.joinpath("files", "log4j_tika.xml")),
+        src=str(Path(__file__).resolve().parent.joinpath("files", "log4j2_tika.xml")),
         dest=tika_config.template_context["tika_log_config_file"],
     )
     service_defintion = files.template(
