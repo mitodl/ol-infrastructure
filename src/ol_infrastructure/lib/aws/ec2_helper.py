@@ -13,9 +13,9 @@ from pulumi_aws import ec2
 from ol_infrastructure.providers.salt.minion import OLSaltStackMinion
 
 ec2_client = boto3.client("ec2")
-AWSFilterType = List[Dict[str, Union[str, List[str]]]]  # noqa: WPS221
+AWSFilterType = List[Dict[str, Union[str, List[str]]]]
 
-debian_10_ami = ec2.get_ami(  # noqa: WPS114
+debian_10_ami = ec2.get_ami(
     filters=[
         {"name": "image-id", "values": ["ami-0e0161137b4b30900"]},
         {"name": "virtualization-type", "values": ["hvm"]},
@@ -38,7 +38,7 @@ default_egress_args = [
 
 
 @unique
-class InstanceTypes(str, Enum):  # noqa: WPS600
+class InstanceTypes(str, Enum):
     burstable_small = "t3a.small"
     burstable_medium = "t3a.medium"
     burstable_large = "t3a.large"
@@ -53,7 +53,7 @@ class InstanceTypes(str, Enum):  # noqa: WPS600
 
 
 @unique
-class DiskTypes(str, Enum):  # noqa: WPS600
+class DiskTypes(str, Enum):
     ssd = "gp3"
     provisioned_iops = "io2"
 
@@ -297,7 +297,7 @@ def vpc_peer_opts(
     )
 
 
-def build_userdata(  # noqa: WPS211
+def build_userdata(
     instance_name: str,
     minion_keys: OLSaltStackMinion,
     minion_roles: List[str],
@@ -345,14 +345,14 @@ def build_userdata(  # noqa: WPS211
     :rtype: pulumi.Output[str]
     """
 
-    def _build_cloud_config_string(keys) -> str:  # noqa: WPS430
+    def _build_cloud_config_string(keys) -> str:
         cloud_config = additional_cloud_config or {}
         # TODO (TMM 2020-09-10): Once the upstream PR is merged move to using the
         # upstream bootstrap script.
         # https://github.com/saltstack/salt-bootstrap/pull/1498
         salt_config = {
             "bootcmd": [
-                "wget -O /tmp/salt_bootstrap.sh https://raw.githubusercontent.com/mitodl/salt-bootstrap/develop/bootstrap-salt.sh",  # noqa: E501
+                "wget -O /tmp/salt_bootstrap.sh https://raw.githubusercontent.com/mitodl/salt-bootstrap/develop/bootstrap-salt.sh",
                 "chmod +x /tmp/salt_bootstrap.sh",
                 "sh /tmp/salt_bootstrap.sh -N -z",
             ],

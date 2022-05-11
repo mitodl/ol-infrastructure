@@ -12,8 +12,8 @@ from ol_infrastructure.lib.ol_types import BusinessUnit
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import VaultPKIKeyTypeBits
 
-SIX_MONTHS = 60 * 60 * 24 * 30 * 6  # noqa: WPS432
-TWELVE_MONTHS = 60 * 60 * 24 * 30 * 12  # noqa: WPS432
+SIX_MONTHS = 60 * 60 * 24 * 30 * 6
+TWELVE_MONTHS = 60 * 60 * 24 * 30 * 12
 
 env_config = Config("environment")
 stack_info = parse_stack()

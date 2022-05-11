@@ -26,7 +26,7 @@ from ol_infrastructure.lib.ol_types import AWSBase
 MAX_BACKUP_DAYS = 35
 
 
-class StorageType(str, Enum):  # noqa: WPS600
+class StorageType(str, Enum):
     """Container for constraining available selection of storage types."""
 
     magnetic = "standard"
@@ -42,7 +42,7 @@ class OLReplicaDBConfig(BaseModel):
     public_access: bool = False
     security_groups: Optional[List[SecurityGroup]] = None
 
-    class Config:  # noqa: D106
+    class Config:
         arbitrary_types_allowed = True
 
 
@@ -53,7 +53,7 @@ class OLDBConfig(AWSBase):
     engine_version: str
     instance_name: str  # The name of the RDS instance
     password: SecretStr
-    parameter_overrides: List[Dict[str, Union[str, bool, int, float]]]  # noqa: WPS234
+    parameter_overrides: List[Dict[str, Union[str, bool, int, float]]]
     port: PositiveInt
     subnet_group_name: Union[str, pulumi.Output[str]]
     security_groups: List[SecurityGroup]
@@ -65,25 +65,23 @@ class OLDBConfig(AWSBase):
     prevent_delete: bool = True
     public_access: bool = False
     take_final_snapshot: bool = True
-    storage: PositiveInt = PositiveInt(50)  # noqa: WPS432
+    storage: PositiveInt = PositiveInt(50)
     storage_type: StorageType = StorageType.ssd
     username: str = "oldevops"
     read_replica: Optional[OLReplicaDBConfig] = None
 
-    class Config:  # noqa: D106
+    class Config:
         arbitrary_types_allowed = True
 
     @validator("engine")
-    def is_valid_engine(cls: "OLDBConfig", engine: str) -> str:  # noqa: D102, N805
+    def is_valid_engine(cls: "OLDBConfig", engine: str) -> str:
         valid_engines = db_engines()
         if engine not in valid_engines:
             raise ValueError("The specified DB engine is not a valid option in AWS.")
         return engine
 
     @validator("engine_version")
-    def is_valid_version(
-        cls: "OLDBConfig", engine_version: str, values: Dict  # noqa: N805, WPS110
-    ) -> str:
+    def is_valid_version(cls: "OLDBConfig", engine_version: str, values: Dict) -> str:
         engine: str = values.get("engine")  # type: ignore
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
@@ -98,7 +96,7 @@ class OLPostgresDBConfig(OLDBConfig):
 
     engine: str = "postgres"
     engine_version: str = "13.4"
-    port: PositiveInt = PositiveInt(5432)  # noqa: WPS432
+    port: PositiveInt = PositiveInt(5432)
     parameter_overrides: List[Dict[str, Union[str, bool, int, float]]] = [
         {"name": "client_encoding", "value": "UTF-8"},
         {"name": "timezone", "value": "UTC"},
@@ -112,7 +110,7 @@ class OLMariaDBConfig(OLDBConfig):
 
     engine: str = "mariadb"
     engine_version: str = "10.5.13"
-    port: PositiveInt = PositiveInt(3306)  # noqa: WPS432
+    port: PositiveInt = PositiveInt(3306)
     parameter_overrides: List[Dict[str, Union[str, bool, int, float]]] = [
         {"name": "character_set_client", "value": "utf8mb4"},
         {"name": "character_set_connection", "value": "utf8mb4"},

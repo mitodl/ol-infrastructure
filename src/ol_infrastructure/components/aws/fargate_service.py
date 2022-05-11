@@ -44,14 +44,14 @@ from ol_infrastructure.lib.ol_types import AWSBase
 
 
 @unique
-class DeploymentControllerTypes(str, Enum):  # noqa: WPS600
+class DeploymentControllerTypes(str, Enum):
     ecs = "ECS"
     code_deploy = "CODE_DEPLOY"
     external = "EXTERNAL"
 
 
 @unique
-class LaunchTypes(str, Enum):  # noqa: WPS600
+class LaunchTypes(str, Enum):
     fargate = "FARGATE"
     ec2 = "EC2"
     external = "EXTERNAL"
@@ -74,7 +74,7 @@ class OLFargateServiceConfig(AWSBase):
     deployment_max_percent: PositiveInt = PositiveInt(100)
     # Minimum amount, as percentage, of running and healthy tasks required during a
     # deployment
-    deployment_min_percent: PositiveInt = PositiveInt(50)  # noqa: WPS432
+    deployment_min_percent: PositiveInt = PositiveInt(50)
     # Seconds to ignore failing load balancer health checks on newly created tasks. Only
     # applies when LB exists
     health_check_grace_period_seconds: PositiveInt = PositiveInt(60)
@@ -121,7 +121,7 @@ class OLFargateServiceConfig(AWSBase):
             security_groups=[group.id for group in self.security_groups],
         )
 
-    def get_deployment_controller(  # noqa: WPS615
+    def get_deployment_controller(
         self,
     ) -> ServiceDeploymentControllerArgs:
         pulumi.log.debug(
@@ -130,7 +130,7 @@ class OLFargateServiceConfig(AWSBase):
 
         return ServiceDeploymentControllerArgs(type=self._deployment_controller)
 
-    class Config:  # noqa: D106
+    class Config:
         arbitrary_types_allowed = True
 
 
@@ -219,11 +219,11 @@ class OLFargateService(pulumi.ComponentResource):
             deployment_controller=config.get_deployment_controller(),
             deployment_circuit_breaker=circuit_breaker,
             health_check_grace_period_seconds=health_check_grace_period,
-            launch_type=config._launch_type,  # noqa: WPS437
+            launch_type=config._launch_type,
             network_configuration=config.get_service_network_configuration(),
             load_balancers=config.load_balancer_configuration,
             task_definition=self.task_definition.arn,
-            platform_version=config._fargate_platform_version,  # noqa: WPS437
+            platform_version=config._fargate_platform_version,
             force_new_deployment=config.force_new_deployment,
             enable_ecs_managed_tags=config.enable_ecs_managed_tags,
             tags=config.tags,
@@ -253,7 +253,7 @@ class OLFargateService(pulumi.ComponentResource):
 
         :rtype: str
         """
-        if (  # noqa: WPS337
+        if (
             not config.task_definition_config
             or not config.task_definition_config.container_definition_configs
         ):
@@ -325,7 +325,7 @@ class OLFargateService(pulumi.ComponentResource):
         )
 
         role = Role(
-            f"{config.task_definition_config.task_def_name}-role",  # noqa: WPS237
+            f"{config.task_definition_config.task_def_name}-role",
             assume_role_policy=json.dumps(
                 {
                     "Version": "2012-10-17",
@@ -344,7 +344,7 @@ class OLFargateService(pulumi.ComponentResource):
         )
 
         RolePolicyAttachment(
-            f"{config.task_definition_config.task_def_name}-policy-attachment",  # noqa: E501, WPS237
+            f"{config.task_definition_config.task_def_name}-policy-attachment",
             role=role.name,
             policy_arn=ManagedPolicy.AMAZON_ECS_TASK_EXECUTION_ROLE_POLICY,
             opts=self.resource_options,

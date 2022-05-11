@@ -396,8 +396,8 @@ def cloud_init_user_data(
                                             f"tag_value={vpc_id}"
                                         ),
                                         "auto_join_port": VAULT_HTTP_PORT,
-                                        "leader_tls_servername": "active.vault.service.consul",  # noqa: E501
-                                        "leader_ca_cert_file": "/etc/ssl/ol_root_ca.pem",  # noqa: E501
+                                        "leader_tls_servername": "active.vault.service.consul",
+                                        "leader_ca_cert_file": "/etc/ssl/ol_root_ca.pem",
                                     }
                                 ],
                                 "performance_multiplier": 5,
@@ -417,7 +417,7 @@ def cloud_init_user_data(
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                     """
-                ),  # noqa: WPS355
+                ),
                 "owner": "root:root",
             },
             # TODO: Move TLS key and cert injection to Packer build so that private key
@@ -526,7 +526,7 @@ vault_asg = autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=90,  # noqa: WPS432
+            min_healthy_percentage=90,
             instance_warmup=FIVE_MINUTES * 3,
         ),
         triggers=["tag"],

@@ -209,7 +209,7 @@ redash_ami = get_ami(
     most_recent=True,
     owners=[str(get_caller_identity().account_id)],
 )
-for count, subnet in zip(range(redash_config.get_int("instance_count") or 3), subnets):  # type: ignore # noqa: WPS221
+for count, subnet in zip(range(redash_config.get_int("instance_count") or 3), subnets):  # type: ignore
     instance_name = f"redash-{redash_environment}-{count}"
     salt_minion = OLSaltStackMinion(
         f"saltstack-minion-{instance_name}",

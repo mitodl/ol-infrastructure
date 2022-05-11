@@ -39,7 +39,7 @@ from bridge.lib.magic_numbers import HOURS_IN_MONTH, VAULT_CLUSTER_PORT, VAULT_H
 from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 
-VERSIONS = {  # noqa: WPS407
+VERSIONS = {
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "caddy_route53": "v1.1.2",

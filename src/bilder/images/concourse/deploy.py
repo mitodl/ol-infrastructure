@@ -66,7 +66,7 @@ from bridge.lib.magic_numbers import (
 from bridge.lib.versions import CONCOURSE_VERSION, CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 
-VERSIONS = {  # noqa: WPS407
+VERSIONS = {
     "concourse": os.environ.get("CONCOURSE_VERSION", CONCOURSE_VERSION),
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
@@ -79,7 +79,7 @@ node_type = os.environ.get("NODE_TYPE", CONCOURSE_WEB_NODE_TYPE)
 set_env_secrets(Path("consul/consul.env"))
 concourse_base_config = ConcourseBaseConfig(version=VERSIONS["concourse"])
 concourse_config_map = {
-    CONCOURSE_WEB_NODE_TYPE: partial(  # noqa: S106
+    CONCOURSE_WEB_NODE_TYPE: partial(
         ConcourseWebConfig,
         admin_user="oldevops",
         admin_password=(
@@ -232,7 +232,7 @@ consul_configuration = {Path("00-default.json"): ConsulConfig()}
 
 vector_config = VectorConfig()
 
-if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
+if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
     # Setting this attribute after instantiating the object to bypass validation
     concourse_config.encryption_key = SecretStr(
         '{{ with secret "secret-concourse/web" }}'
@@ -280,7 +280,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
 
 # Install Consul and Vault Agent
 vault_config = VaultAgentConfig(
-    cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
+    cache=VaultAgentCache(use_auto_auth_token="force"),
     listener=[
         VaultListener(
             tcp=VaultTCPListener(
@@ -296,9 +296,7 @@ vault_config = VaultAgentConfig(
         method=VaultAutoAuthMethod(
             type="aws",
             mount_path="auth/aws",
-            config=VaultAutoAuthAWS(
-                role=f"concourse-{concourse_config._node_type}"  # noqa: WPS437
-            ),
+            config=VaultAutoAuthAWS(role=f"concourse-{concourse_config._node_type}"),
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),

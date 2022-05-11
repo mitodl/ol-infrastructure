@@ -59,7 +59,7 @@ def install_caddy(caddy_config: CaddyConfig):
         )
         apt.repo(
             name="Set up Caddy APT repository",
-            src="deb https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main",  # noqa: E501
+            src="deb https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main",
             present=True,
             filename="caddy.list",
         )

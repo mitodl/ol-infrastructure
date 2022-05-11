@@ -31,7 +31,7 @@ from bilder.facts.has_systemd import HasSystemd
 from bridge.lib.versions import CONSUL_VERSION
 from bridge.secrets.sops import set_env_secrets
 
-VERSIONS = {  # noqa: WPS407
+VERSIONS = {
     "caddy_route53": "v1.1.2",
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
 }

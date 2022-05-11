@@ -15,10 +15,8 @@ def _is_parliament_finding_filtered(
     if not issue_match:
         return False
     action_matches = []
-    for location in parliament_config[finding.issue].get(  # noqa: WPS352, WPS426
-        "ignore_locations", []
-    ):
-        for action in location.get("actions", []):  # noqa: WPS426
+    for location in parliament_config[finding.issue].get("ignore_locations", []):
+        for action in location.get("actions", []):
             matches = map(
                 lambda finding_action: re.findall(
                     action, finding_action, re.IGNORECASE
@@ -71,9 +69,7 @@ def lint_iam_policy(
         if not _is_parliament_finding_filtered(finding, parliament_config or {})
     ]
     if findings:
-        raise Exception(  # noqa: WPS454
-            "Potential issues found with IAM policy document", findings
-        )
+        raise Exception("Potential issues found with IAM policy document", findings)
     return (
         stringified_document if stringify and stringified_document else policy_document
     )

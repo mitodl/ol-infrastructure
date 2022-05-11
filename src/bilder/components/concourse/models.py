@@ -16,7 +16,7 @@ from bridge.lib.magic_numbers import (
 CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH = 32
 
 
-class IframeOptions(str, Enum):  # noqa: WPS600
+class IframeOptions(str, Enum):
     deny = "deny"
     same_origin = "sameorigin"
 
@@ -1442,7 +1442,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         arbitrary_types_allowed = True
 
     @validator("encryption_key")
-    def validate_encryption_key_length(cls, encryption_key):  # noqa: N805
+    def validate_encryption_key_length(cls, encryption_key):
         if len(encryption_key) != CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH:
             raise ValueError(
                 "Encryption key is not the correct length. "

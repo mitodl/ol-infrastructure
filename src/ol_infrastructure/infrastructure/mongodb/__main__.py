@@ -72,8 +72,8 @@ mongodb_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
-            from_port=27017,  # noqa: WPS432
-            to_port=27017,  # noqa: WPS432
+            from_port=27017,
+            to_port=27017,
             cidr_blocks=[destination_vpc["cidr"]],
             description="Access to Mongodb cluster from VPC",
         ),
@@ -81,8 +81,8 @@ mongodb_security_group = ec2.SecurityGroup(
             cidr_blocks=[operations_vpc["cidr"]],
             ipv6_cidr_blocks=[operations_vpc["cidr_v6"]],
             protocol="tcp",
-            from_port=27017,  # noqa: WPS432
-            to_port=27017,  # noqa: WPS432
+            from_port=27017,
+            to_port=27017,
             description="Access to Mongodb cluster from operations VPC",
         ),
     ],
@@ -160,7 +160,7 @@ for instance_num in instance_nums:
         key_name=salt_config.require("key_name"),
         root_block_device=ec2.InstanceRootBlockDeviceArgs(
             volume_type=DiskTypes.ssd,
-            volume_size=20,  # noqa: WPS432
+            volume_size=20,
             encrypted=True,
         ),
         ebs_block_devices=[

@@ -355,7 +355,7 @@ def cloud_init_userdata(
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                     """
-                ),  # noqa: WPS355
+                ),
                 "owner": "root:root",
             },
         ]
@@ -454,7 +454,7 @@ consul_asg = autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=85,  # noqa: WPS432
+            min_healthy_percentage=85,
             instance_warmup=FIVE_MINUTES,
         ),
         triggers=["tag"],

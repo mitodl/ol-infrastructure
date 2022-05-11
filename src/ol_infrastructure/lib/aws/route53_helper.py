@@ -27,9 +27,7 @@ def zone_opts(domain: str) -> pulumi.ResourceOptions:
     tags = route53_client.list_tags_for_resource(
         ResourceType="hostedzone", ResourceId=zone_id
     )
-    if "pulumi_managed" in {  # noqa: WPS337
-        tag["Key"] for tag in tags["ResourceTagSet"]["Tags"]
-    }:
+    if "pulumi_managed" in {tag["Key"] for tag in tags["ResourceTagSet"]["Tags"]}:
         opts = pulumi.ResourceOptions()
     else:
         opts = pulumi.ResourceOptions(

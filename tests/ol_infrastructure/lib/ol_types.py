@@ -3,7 +3,7 @@ from pydantic import ValidationError
 
 from ol_infrastructure.lib.ol_types import AWSBase
 
-VALID_TAGS = {"OU": "operations", "Environment": "test"}  # noqa: WPS407
+VALID_TAGS = {"OU": "operations", "Environment": "test"}
 
 
 def test_tag_validation():

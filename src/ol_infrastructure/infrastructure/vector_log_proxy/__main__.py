@@ -301,7 +301,7 @@ vector_log_proxy_launch_config = ec2.LaunchTemplate(
                             HEROKU_PROXY_PASSWORD={heroku_proxy_credentials['password']}
                             HEROKU_PROXY_USERNAME={heroku_proxy_credentials['username']}
                             """
-                                ),  # noqa: WPS355
+                                ),
                                 "owner": "root:root",
                             },
                         ]

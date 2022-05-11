@@ -28,7 +28,7 @@ business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 consul_stack = StackReference(
-    "infrastructure.consul."  # noqa: WPS237
+    "infrastructure.consul."
     f"{stack_info.namespace.rsplit('.', 1)[1]}."
     f"{stack_info.name}"
 )
@@ -127,16 +127,16 @@ elasticsearch_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
-            from_port=9200,  # noqa: WPS432
-            to_port=9200,  # noqa: WPS432
+            from_port=9200,
+            to_port=9200,
             cidr_blocks=[destination_vpc["cidr"]],
             description="Access to Elasticsearch cluster from VPC",
         ),
         ec2.SecurityGroupIngressArgs(
             self=True,
             protocol="tcp",
-            from_port=9300,  # noqa: WPS432
-            to_port=9400,  # noqa: WPS432
+            from_port=9300,
+            to_port=9400,
             description="Elasticsearch cluster instances access",
         ),
     ],
@@ -216,7 +216,7 @@ for instance_num in instance_nums:
         key_name=salt_config.require("key_name"),
         root_block_device=ec2.InstanceRootBlockDeviceArgs(
             volume_type=DiskTypes.ssd,
-            volume_size=20,  # noqa: WPS432
+            volume_size=20,
             encrypted=True,
         ),
         ebs_block_devices=[

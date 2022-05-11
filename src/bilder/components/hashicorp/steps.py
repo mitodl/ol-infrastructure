@@ -25,7 +25,7 @@ def install_hashicorp_products(hashicorp_products: List[HashicorpProduct]):
             name=f"Create system user for {product.name}",
             user=product.name,
             system=True,
-            shell="/bin/false",  # noqa: S604
+            shell="/bin/false",
         )
         if linux_family(host.get_fact(LinuxName)).lower == "debian":
             cpu_arch = host.get_fact(DebianCpuArch)
@@ -36,7 +36,7 @@ def install_hashicorp_products(hashicorp_products: List[HashicorpProduct]):
         file_download = f"{product.name}_{product.version}_linux_{cpu_arch}.zip"
         file_hashes = (
             httpx.get(
-                "https://releases.hashicorp.com/{product_name}/{product_version}/{product_name}_{product_version}_SHA256SUMS".format(  # noqa: E501
+                "https://releases.hashicorp.com/{product_name}/{product_version}/{product_name}_{product_version}_SHA256SUMS".format(
                     product_name=product.name, product_version=product.version
                 )
             )
@@ -48,11 +48,11 @@ def install_hashicorp_products(hashicorp_products: List[HashicorpProduct]):
         file_hash_map = {
             file_hash.split()[1]: file_hash.split()[0] for file_hash in file_hashes
         }
-        download_destination = f"/tmp/{product.name}.zip"  # noqa: S108
+        download_destination = f"/tmp/{product.name}.zip"
         target_directory = product.install_directory or "/usr/local/bin/"
         download_binary = files.download(
             name=f"Download {product.name} archive",
-            src=f"https://releases.hashicorp.com/{product.name}/{product.version}/{file_download}",  # noqa: E501
+            src=f"https://releases.hashicorp.com/{product.name}/{product.version}/{file_download}",
             dest=download_destination,
             sha256sum=file_hash_map[file_download],
         )
@@ -79,7 +79,7 @@ def install_hashicorp_products(hashicorp_products: List[HashicorpProduct]):
             group=product.name,
             recursive=True,
         )
-        if hasattr(product, "data_directory"):  # noqa: WPS421
+        if hasattr(product, "data_directory"):
             files.directory(
                 name=f"Create data directory for {product.name}",
                 path=str(product.data_directory),  # type: ignore

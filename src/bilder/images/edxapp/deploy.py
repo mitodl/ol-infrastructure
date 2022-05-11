@@ -55,7 +55,7 @@ from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 
-VERSIONS = {  # noqa: WPS407
+VERSIONS = {
     "consul": CONSUL_VERSION,
     "vault": VAULT_VERSION,
     "consul-template": CONSUL_TEMPLATE_VERSION,
@@ -225,7 +225,7 @@ if node_type == WEB_NODE_TYPE:
         services=[
             ConsulService(
                 name="edxapp",
-                port=8000,  # noqa: WPS432
+                port=8000,
                 tags=["lms"],
                 check=ConsulServiceTCPCheck(
                     name="edxapp-lms",
@@ -235,7 +235,7 @@ if node_type == WEB_NODE_TYPE:
             ),
             ConsulService(
                 name="forum",
-                port=4567,  # noqa: WPS432
+                port=4567,
                 check=ConsulServiceTCPCheck(
                     name="edxapp-forum",
                     tcp="localhost:4567",
@@ -246,7 +246,7 @@ if node_type == WEB_NODE_TYPE:
     )
 
 vault_config = VaultAgentConfig(
-    cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
+    cache=VaultAgentCache(use_auto_auth_token="force"),
     listener=[
         VaultListener(
             tcp=VaultTCPListener(
@@ -345,7 +345,7 @@ if host.get_fact(HasSystemd):
         start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
-            f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} && "  # noqa: WPS237
+            f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} && "
             # Ensure that Vault can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {lms_config_path} && "
             f"setfacl -m u:edxapp:rwx {lms_config_path} && "
@@ -360,7 +360,7 @@ if host.get_fact(HasSystemd):
         start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
-            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} && "  # noqa: E501, WPS237
+            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} && "
             # Ensure that Vault can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {studio_config_path} && "
             f"setfacl -m u:edxapp:rwx {studio_config_path} && "
@@ -404,7 +404,7 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
         services=[
             ConsulService(
                 name="xqueue",
-                port=18040,  # noqa: WPS432
+                port=18040,
                 check=ConsulServiceTCPCheck(
                     name="edxapp-xqueue",
                     tcp="localhost:8040",

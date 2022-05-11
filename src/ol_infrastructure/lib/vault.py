@@ -145,7 +145,7 @@ mongodb_role_statements = {
 }
 
 
-class VaultPKIKeyTypeBits(int, Enum):  # noqa: WPS600
+class VaultPKIKeyTypeBits(int, Enum):
     rsa = 4096
     ec = 256
 
@@ -162,7 +162,7 @@ def get_vault_provider(
             f"vault.{vault_env_namespace}.yaml",
         )
     )
-    return pulumi_vault.Provider(  # noqa: S106
+    return pulumi_vault.Provider(
         provider_name or "vault-provider",
         address=vault_address,
         add_address_to_env=True,

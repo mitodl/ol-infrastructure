@@ -8,7 +8,7 @@
 - Provision an EC2 instance from a pre-built AMI with the pipeline code for Dagster
 """
 import json
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Union
 
 from pulumi import ResourceOptions, StackReference, export
 from pulumi.config import get_config
@@ -51,7 +51,7 @@ aws_config = AWSBase(
 consul_provider = get_consul_provider(stack_info)
 
 dagster_bucket_name = f"dagster-{dagster_environment}"
-dagster_s3_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
+dagster_s3_permissions: List[Dict[str, Union[str, List[str]]]] = [
     {
         "Effect": "Allow",
         "Action": "s3:ListAllMyBuckets",
@@ -122,7 +122,7 @@ dagster_s3_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS2
     },
 ]
 
-athena_permissions: List[Dict[str, Union[str, List[str]]]] = [  # noqa: WPS234
+athena_permissions: List[Dict[str, Union[str, List[str]]]] = [
     {
         "Effect": "Allow",
         "Action": [
@@ -219,7 +219,9 @@ dagster_iam_permissions = {
     "Statement": dagster_s3_permissions + athena_permissions,
 }
 
-parliament_config = {"RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []}}
+parliament_config: Dict[str, Any] = {
+    "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []}
+}
 
 dagster_runtime_bucket = s3.Bucket(
     dagster_bucket_name,
@@ -300,8 +302,8 @@ dagster_db_security_group = ec2.SecurityGroup(
             cidr_blocks=[data_vpc["cidr"], operations_vpc["cidr"]],
             ipv6_cidr_blocks=[data_vpc["cidr_v6"]],
             protocol="tcp",
-            from_port=5432,  # noqa: WPS432
-            to_port=5432,  # noqa: WPS432
+            from_port=5432,
+            to_port=5432,
         )
     ],
     tags=aws_config.tags,

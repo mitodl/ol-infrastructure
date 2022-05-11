@@ -120,8 +120,8 @@ mitxonline_db_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
-            from_port=5432,  # noqa: WPS432
-            to_port=5432,  # noqa: WPS432
+            from_port=5432,
+            to_port=5432,
             cidr_blocks=["0.0.0.0/0"],
             ipv6_cidr_blocks=["::/0"],
             description="Allow access over the public internet from Heroku",

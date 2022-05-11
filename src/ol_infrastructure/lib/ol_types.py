@@ -5,12 +5,12 @@ from pydantic import BaseModel, validator
 
 from ol_infrastructure.lib.aws.ec2_helper import aws_regions
 
-REQUIRED_TAGS = {"OU", "Environment"}  # noqa: WPS407
-RECOMMENDED_TAGS = {"Application", "Owner"}  # noqa: WPS407
+REQUIRED_TAGS = {"OU", "Environment"}
+RECOMMENDED_TAGS = {"Application", "Owner"}
 
 
 @unique
-class BusinessUnit(str, Enum):  # noqa: WPS600
+class BusinessUnit(str, Enum):
     """Canonical source of truth for defining valid OU tags.
 
     We rely on tagging AWS resources with a valid OU to allow for cost allocation to
@@ -18,7 +18,7 @@ class BusinessUnit(str, Enum):  # noqa: WPS600
     """
 
     bootcamps = "bootcamps"
-    data = "data"  # noqa: WPS110
+    data = "data"
     digital_credentials = "digital-credentials"
     micromasters = "micromasters"
     mit_open = "mit-open"
@@ -47,7 +47,7 @@ class Environment(str, Enum):
 
 
 @unique
-class Apps(str, Enum):  # noqa: WPS600
+class Apps(str, Enum):
     """Canonical source of truth for defining apps."""
 
     bootcamps = "bootcamps"
@@ -77,7 +77,7 @@ class AWSBase(BaseModel):
         self.tags.update({"pulumi_managed": "true"})
 
     @validator("tags")
-    def enforce_tags(cls, tags: Dict[str, str]) -> Dict[str, str]:  # noqa: N805
+    def enforce_tags(cls, tags: Dict[str, str]) -> Dict[str, str]:
         if not REQUIRED_TAGS.issubset(tags.keys()):
             raise ValueError(
                 "Not all required tags have been specified. Missing tags: {}".format(
@@ -91,7 +91,7 @@ class AWSBase(BaseModel):
         return tags
 
     @validator("region")
-    def check_region(cls, region: str) -> str:  # noqa: N805
+    def check_region(cls, region: str) -> str:
         if region not in aws_regions():
             raise ValueError("The specified region does not exist")
         return region

@@ -192,7 +192,7 @@ edxapp_storage_bucket = s3.Bucket(
                     "Effect": "Allow",
                     "Principal": "*",
                     "Action": "s3:GetObject",
-                    "Resource": f"arn:aws:s3:::{storage_bucket_name}/media/video-images/*",  # noqa: E501
+                    "Resource": f"arn:aws:s3:::{storage_bucket_name}/media/video-images/*",
                 }
             ],
         },
@@ -222,9 +222,9 @@ edxapp_tracking_bucket = s3.Bucket(
     bucket=tracking_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     acl="private",
-    server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(  # noqa: E501
+    server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
         rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
                 sse_algorithm="aws:kms",
                 kms_master_key_id=kms_s3_key["id"],
             ),
@@ -293,7 +293,7 @@ edxapp_policy_document = {
             "Action": ["ses:SendEmail", "ses:SendRawEmail"],
             "Resource": [
                 "arn:*:ses:*:*:identity/*mit.edu",
-                f"arn:aws:ses:*:*:configuration-set/edxapp-{stack_info.env_prefix}-{stack_info.env_suffix}",  # noqa: E501
+                f"arn:aws:ses:*:*:configuration-set/edxapp-{stack_info.env_prefix}-{stack_info.env_suffix}",
             ],
         },
         {
@@ -356,8 +356,8 @@ edxapp_security_group = ec2.SecurityGroup(
     name_prefix=f"{group_name}-",
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            from_port=18040,  # noqa: WPS432
-            to_port=18040,  # noqa: WPS432
+            from_port=18040,
+            to_port=18040,
             cidr_blocks=[
                 edxapp_vpc["cidr"],
             ],
@@ -402,7 +402,7 @@ edxapp_db_security_group = ec2.SecurityGroup(
 edxapp_vault_mount = vault.Mount(
     "edxapp-vault-generic-secrets-mount",
     path=f"secret-{stack_info.env_prefix}",
-    description="Static secrets storage for Open edX {stack_info.env_prefix} applications and services",  # noqa: E501
+    description="Static secrets storage for Open edX {stack_info.env_prefix} applications and services",
     type="kv",
 )
 edxapp_secrets = vault.generic.Secret(
@@ -484,7 +484,7 @@ edxapp_notes_iam_role = iam.Role(
         }
     ),
     name_prefix=f"edx-notes-role-{env_name}-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
-    path=f"/ol-applications/edx-notes-api/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
+    path=f"/ol-applications/edx-notes-api/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     tags=aws_config.merged_tags({"Name": f"{env_name}-edx-notes-api-role"}),
 )
 edxapp_notes_vault_auth_role = vault.aws.AuthBackendRole(
@@ -508,7 +508,7 @@ edxapp_db_config = OLMariaDBConfig(
     tags=aws_config.tags,
     db_name="edxapp",
     engine_version="10.5.12",
-    storage=edxapp_config.get("db_storage_gb") or 50,  # noqa: WPS432
+    storage=edxapp_config.get("db_storage_gb") or 50,
     **defaults(stack_info)["rds"],
 )
 edxapp_db = OLAmazonDB(edxapp_db_config)
@@ -1029,7 +1029,7 @@ def cloud_init_user_data_func(
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                     """
-                ),  # noqa: WPS355
+                ),
                 "owner": "root:root",
             },
             {
@@ -1073,7 +1073,7 @@ web_launch_config = ec2.LaunchTemplate(
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name=edxapp_web_ami.root_device_name,
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=25,  # noqa: WPS432
+                volume_size=25,
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
                 encrypted=True,
@@ -1110,7 +1110,7 @@ web_asg = autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50  # noqa: WPS432
+            min_healthy_percentage=50
         ),
         triggers=["tags"],
     ),
@@ -1211,8 +1211,7 @@ worker_launch_config = ec2.LaunchTemplate(
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name=edxapp_worker_ami.root_device_name,
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=edxapp_config.get_int("worker_disk_size")
-                or 25,  # noqa: WPS432
+                volume_size=edxapp_config.get_int("worker_disk_size") or 25,
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
                 encrypted=True,
@@ -1243,7 +1242,7 @@ worker_asg = autoscaling.Group(
     "edxapp-worker-autoscaling-group",
     desired_capacity=edxapp_config.get_int("worker_node_capacity") or 1,
     min_size=1,
-    max_size=50,  # noqa: WPS432
+    max_size=50,
     health_check_type="EC2",
     vpc_zone_identifiers=edxapp_vpc["subnet_ids"],
     launch_template=autoscaling.GroupLaunchTemplateArgs(
@@ -1252,7 +1251,7 @@ worker_asg = autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50  # noqa: WPS432
+            min_healthy_percentage=50
         ),
         triggers=["tag"],
     ),

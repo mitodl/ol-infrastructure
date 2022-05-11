@@ -9,7 +9,7 @@ from pulumi_aws import acm, cloudfront, s3
 from ol_infrastructure.lib.ol_types import AWSBase
 
 
-class CloudfrontPriceClass(str, Enum):  # noqa: WPS600
+class CloudfrontPriceClass(str, Enum):
     """Valid price classes for CloudFront to control tradeoffs of price vs. latency for global visitors."""
 
     # For more details on price class refer to below link and search for PriceClass

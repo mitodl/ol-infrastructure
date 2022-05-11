@@ -23,7 +23,7 @@ results_bucket = s3.Bucket(
     acl="private",
     server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
         rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
                 sse_algorithm="aws:kms",
                 kms_master_key_id=s3_kms_key["id"],
             ),
@@ -55,7 +55,7 @@ athena_warehouse_workgroup = athena.Workgroup(
     tags=aws_config.merged_tags({"Name": f"ol-warehouse-{stack_info.env_suffix}"}),
     configuration=athena.WorkgroupConfigurationArgs(
         result_configuration=athena.WorkgroupConfigurationResultConfigurationArgs(
-            encryption_configuration=athena.WorkgroupConfigurationResultConfigurationEncryptionConfigurationArgs(  # noqa: E501
+            encryption_configuration=athena.WorkgroupConfigurationResultConfigurationEncryptionConfigurationArgs(
                 encryption_option="SSE_KMS",
                 kms_key_arn=s3_kms_key["arn"],
             ),
@@ -74,9 +74,9 @@ for unit in BusinessUnit:
         f"ol_data_lake_s3_bucket_{unit.name}_{stack_info.env_suffix}",
         bucket=f"ol-data-lake-{unit.value}-{stack_info.env_suffix}",
         acl="private",
-        server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(  # noqa: E501
+        server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
             rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-                apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
+                apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
                     sse_algorithm="aws:kms",
                     kms_master_key_id=s3_kms_key["id"],
                 ),

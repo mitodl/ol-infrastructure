@@ -20,8 +20,8 @@ class ConsulACL(FlexibleBaseModel):
 
 
 class ConsulAddresses(FlexibleBaseModel):
-    dns: Optional[str] = "0.0.0.0"  # noqa: S104
-    http: Optional[str] = "0.0.0.0"  # noqa: S104
+    dns: Optional[str] = "0.0.0.0"
+    http: Optional[str] = "0.0.0.0"
     https: Optional[str]
     grpc: Optional[str]
 
@@ -106,7 +106,7 @@ class Consul(HashicorpProduct):
         return self
 
     def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
-        for fpath, config in self.configuration.items():  # noqa: WPS526
+        for fpath, config in self.configuration.items():
             yield self.configuration_directory.joinpath(fpath), config.json(
                 exclude_none=True, indent=2, by_alias=True
             )

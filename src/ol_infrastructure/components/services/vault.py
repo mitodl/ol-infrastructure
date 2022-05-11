@@ -28,11 +28,11 @@ from ol_infrastructure.lib.vault import (
     postgres_role_statements,
 )
 
-SIX_MONTHS = 60 * 60 * 24 * 30 * 6  # noqa: WPS432
-TWELVE_MONTHS = 60 * 60 * 24 * 30 * 12  # noqa: WPS432
+SIX_MONTHS = 60 * 60 * 24 * 30 * 6
+TWELVE_MONTHS = 60 * 60 * 24 * 30 * 12
 VAULT_API_URL = "https://active.vault.service.consul/v1"
 
-CERTIFICATE_CONFIG = {  # noqa: WPS407
+CERTIFICATE_CONFIG = {
     "country": "US",
     "state": "Massachusetts",
     "city": "Cambridge",
@@ -42,7 +42,7 @@ CERTIFICATE_CONFIG = {  # noqa: WPS407
 }
 
 
-class DBEngines(str, Enum):  # noqa: WPS600
+class DBEngines(str, Enum):
     """Constraints for valid engine types that are supported by this component."""
 
     postgres = "postgresql"
@@ -57,6 +57,8 @@ class OLVaultDatabaseConfig(BaseModel):
     """Configuration object for Vault database backend resource."""
 
     db_name: str
+    db_port: int
+    db_connection: str
     mount_point: str
     db_admin_username: str
     db_admin_password: str
@@ -66,7 +68,7 @@ class OLVaultDatabaseConfig(BaseModel):
     default_ttl: int = SIX_MONTHS
     connection_options: Optional[Dict[str, str]]
 
-    class Config:  # noqa: D106
+    class Config:
         arbitrary_types_allowed = True
 
 
@@ -101,16 +103,6 @@ class OLVaultMongoDatabaseConfig(OLVaultDatabaseConfig):
         "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
     )
     db_type: str = DBEngines.mongodb.value
-    role_statements: Dict[str, Dict[str, Template]] = mongodb_role_statements
-
-
-class OLVaultMongoAtlasDatabaseConfig(OLVaultDatabaseConfig):
-    """Configuration object for MongoDB instances to register with Vault."""
-
-    db_host: str = None
-    db_admin_username: str = None
-    db_admin_password: str = None
-    db_type: str = DBEngines.mongodb_atlas.value
     role_statements: Dict[str, Dict[str, Template]] = mongodb_role_statements
 
 
@@ -224,7 +216,7 @@ class OLVaultAWSSecretsEngineConfig(BaseModel):
 
     @validator("vault_backend_path")
     def is_valid_path(
-        cls: "OLVaultAWSSecretsEngineConfig", vault_backend_path: str  # noqa: N805
+        cls: "OLVaultAWSSecretsEngineConfig", vault_backend_path: str
     ) -> str:
         if vault_backend_path.startswith("/") or vault_backend_path.endswith("/"):
             raise ValueError(
@@ -447,7 +439,7 @@ class OLVaultPKIIntermediateRoleConfig(BaseModel):
 
     @validator("cert_type")
     def is_valid_cert_type(
-        cls: "OLVaultPKIIntermediateRoleConfig", cert_type: str  # noqa: N805
+        cls: "OLVaultPKIIntermediateRoleConfig", cert_type: str
     ) -> str:
         if cert_type not in {"server", "client"}:
             raise ValueError(

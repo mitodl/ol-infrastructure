@@ -50,7 +50,7 @@ class PulumiMocks(pulumi.runtime.Mocks):
 
 pulumi.runtime.set_mocks(PulumiMocks())
 
-exec_role_arn = "arn:aws:iam::542799376554:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS"  # noqa: E501
+exec_role_arn = "arn:aws:iam::542799376554:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS"
 
 aws_config = AWSBase(
     tags={"OU": "data", "Environment": "DEV"},
@@ -145,7 +145,7 @@ class TestClassBaseAlbFargateArguments:
     @pulumi.runtime.test
     def test_default_parameters(self):
         def check_defaults(args):
-            (  # noqa: WPS236
+            (
                 drop_invalid_header_fields,
                 enable_cross_zone_load_balancing,
                 enable_deletion_protection,
@@ -317,7 +317,7 @@ class TestClassBaseAlbFargateArguments:
             assert container["memory"] == 512
             assert container["command"] is None
             assert container["cpu"] is None
-            assert container["environment"] == []  # noqa: WPS520
+            assert container["environment"] == []
             assert not container["essential"]
             assert container["logConfiguration"] is None
 

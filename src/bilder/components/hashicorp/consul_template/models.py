@@ -78,10 +78,11 @@ class ConsulTemplateConsulConfig(FlexibleBaseModel):
     # This block specifies the basic authentication information to pass with the
     # request. For more information on authentication, please see the Consul
     # documentation.
-    auth: Optional[Dict]  #  {
+    auth: Optional[Dict]
+    #  {
     #   enabled  = true
     #   username = "test"
-    #   password = "test"
+    #   password = "test"  # pragma: allowlist secret
     # }
 
     # This is the address of the Consul agent. By default, this is
@@ -185,7 +186,7 @@ class ConsulTemplateTemplate(FlexibleBaseModel):
     # file rather then supplying the `source` path to the template file. This is
     # useful for short templates. This option is mutually exclusive with the
     # `source` option.
-    contents: Optional[str]  # noqa: WPS110
+    contents: Optional[str]
     # This is the optional command to run when the template is rendered. The
     # command will only run if the resulting template changes. The command must
     # return within 30s (configurable), and it must have a successful exit code.
@@ -235,7 +236,7 @@ class ConsulTemplateTemplate(FlexibleBaseModel):
 
 class ConsulTemplateConfig(HashicorpConfig):
     template: List[ConsulTemplateTemplate] = [
-        ConsulTemplateTemplate(destination=Path("/tmp/test.txt"))  # noqa: S108
+        ConsulTemplateTemplate(destination=Path("/tmp/test.txt"))
     ]
     vault_agent_token_file: Optional[Path]
     vault: Optional[ConsulTemplateVaultConfig]
@@ -258,7 +259,7 @@ class ConsulTemplate(HashicorpProduct):
         return self
 
     def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
-        for fpath, config in self.configuration.items():  # noqa: WPS526
+        for fpath, config in self.configuration.items():
             yield self.configuration_directory.joinpath(fpath), config.json(
                 exclude_none=True, indent=2
             )
