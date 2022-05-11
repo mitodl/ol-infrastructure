@@ -1,7 +1,7 @@
 FROM  node:14-buster-slim
 LABEL maintainer="MIT Open Learning (odl-devops@mit.edu)"
 LABEL description="Node and Hugo, used for building OCW website"
-LABEL version="0.1"
+LABEL version="0.2"
 WORKDIR /tmp
 ENV HUGO_VERSION='0.98.0'
 ENV HUGO_NAME="hugo_extended_${HUGO_VERSION}_Linux-64bit"
