@@ -37,6 +37,9 @@ resources:
 jobs:
 - name: vault-ami-build
   plan:
+  - get: vault-ami
+    trigger: true
+  - get: pulumi_files
   - task: set-aws-creds
     config:
       platform: linux
@@ -45,29 +48,12 @@ jobs:
         source:
           repository: amazon/aws-cli
           tag: 'latest'
-      params:
-        AWS_ROLE: arn:aws:iam::610119931565:role/ol-applications/concourse/role/concourse-instance-role-worker-infra-qa-4c8b313
+      inputs:
+      - name: pulumi_files
       outputs:
       - name: aws_creds
       run:
-        path: sh
-        args:
-        - -exc
-        - |
-          export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" \
-          $(aws sts assume-role \
-          --role-arn $AWS_ROLE \
-          --role-session-name MySessionName \
-          --query "Credentials.[AccessKeyId,SecretAccessKey,SessionToken]" \
-          --output text))
-          cd aws_creds
-          echo "[default]" > credentials
-          echo "aws_access_key_id=$AWS_ACCESS_KEY_ID" >> credentials
-          echo "aws_secret_access_key=$AWS_SECRET_ACCESS_KEY" >> credentials
-          echo "aws_session_token=$AWS_SESSION_TOKEN" >> credentials
-  - get: vault-ami
-    trigger: true
-  - get: pulumi_files
+        path: pulumi_files/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh
   - put: pulumi-infra
     inputs:
     - aws_creds
