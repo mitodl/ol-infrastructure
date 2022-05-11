@@ -3,9 +3,9 @@ LABEL maintainer="MIT Open Learning (odl-devops@mit.edu)"
 LABEL description="Node and Hugo, used for building OCW website"
 LABEL version="0.1"
 WORKDIR /tmp
-ENV HUGO_VERSION='0.80.0'
+ENV HUGO_VERSION='0.98.0'
 ENV HUGO_NAME="hugo_extended_${HUGO_VERSION}_Linux-64bit"
-ENV GO_FILE_NAME="go1.16.4.linux-amd64.tar.gz"
+ENV GO_FILE_NAME="go1.18.2.linux-amd64.tar.gz"
 ENV GO_URL="https://golang.org/dl/${GO_FILE_NAME}"
 ENV HUGO_URL="https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/${HUGO_NAME}.deb"
 ENV BUILD_DEPS="wget"
