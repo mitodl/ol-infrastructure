@@ -13,7 +13,7 @@ def git_auto_export():
         ],
         present=True,
         virtualenv="/edx/app/edxapp/venvs/edxapp/",
-        sudo_user="edxapp",
+        _sudo_user="edxapp",
     )
 
     files.directory(
@@ -28,5 +28,5 @@ def git_auto_export():
         ssh.keyscan(
             name=f"Add {git_host} public SSH fingerprint for course import/export",
             hostname=git_host,
-            sudo_user="www-data",
+            _sudo_user="www-data",
         )

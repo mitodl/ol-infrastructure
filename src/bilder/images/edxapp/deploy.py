@@ -82,13 +82,13 @@ edx_platform_path = "/edx/app/edxapp/edx-platform/"
 server.shell(
     name="Fix git",
     commands=["git config --global --add safe.directory /edx/app/edxapp/edx-platform"],
-    chdir=edx_platform_path,
+    _chdir=edx_platform_path,
 )
 
 server.shell(
     name="Ensure the edx-platform git origin is configured",
     commands=[f"git remote add custom {git_remote}", "git fetch --all --prune --tags"],
-    chdir=edx_platform_path,
+    _chdir=edx_platform_path,
 )
 git.repo(
     name="Check out the desired branch",
@@ -107,7 +107,7 @@ pip.packages(
     packages=host.data.edx_plugins_added[EDX_INSTALLATION_NAME],
     present=True,
     virtualenv="/edx/app/edxapp/venvs/edxapp/",
-    sudo_user=EDX_USER,
+    _sudo_user=EDX_USER,
 )
 
 pip.packages(
@@ -115,7 +115,7 @@ pip.packages(
     packages=host.data.edx_plugins_removed.get(EDX_INSTALLATION_NAME, []),
     present=False,
     virtualenv="/edx/app/edxapp/venvs/edxapp/",
-    sudo_user=EDX_USER,
+    _sudo_user=EDX_USER,
 )
 
 files.directory(

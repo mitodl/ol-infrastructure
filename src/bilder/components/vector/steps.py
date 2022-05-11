@@ -77,7 +77,7 @@ def configure_vector(vector_config: VectorConfig):
     server.shell(
         name="Run vector validate",
         commands=["/usr/bin/vector validate --no-environment"],
-        env={
+        _env={
             "VECTOR_CONFIG_DIR": "/etc/vector",
             "AWS_REGION": "us-east-1",
             "ENVIRONMENT": "placeholder",

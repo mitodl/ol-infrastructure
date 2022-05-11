@@ -86,11 +86,6 @@ build {
       "chmod 600 /tmp/packer-${build.ID}.pem"
     ]
   }
-  provisioner "shell" {
-    # Addresses change in latest git due to recent CVE
-    # https://github.blog/2022-04-12-git-security-vulnerability-announced/
-    inline = ["sudo git config --global --add safe.directory /edx/app/edxapp/edx-platform"]
-  }
   provisioner "shell-local" {
     environment_vars = [
       "DEBIAN_FRONTEND=noninteractive"
@@ -99,6 +94,11 @@ build {
       "sleep 15",
       "pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} --chdir ${path.root} prebuild.py"
     ]
+  }
+  provisioner "shell" {
+    # Addresses change in latest git due to recent CVE
+    # https://github.blog/2022-04-12-git-security-vulnerability-announced/
+    inline = ["sudo git config --global --add safe.directory *"]
   }
   provisioner "shell" {
     environment_vars = [
