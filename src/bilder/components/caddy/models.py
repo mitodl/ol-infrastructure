@@ -27,6 +27,9 @@ class CaddyConfig(OLBaseSettings):
     plugins: Optional[List[CaddyPlugin]]
     template_context: Optional[Dict[str, Any]]
     upstream_address: Optional[str]
+    tls_cert_path: Path = Path("/etc/caddy/odl_wildcard.cert")
+    tls_key_path: Path = Path("/etc/caddy/odl_wildcard.key")
+    caddy_user: Optional[str] = "caddy"
 
     class Config:
         env_prefix = "caddy_"

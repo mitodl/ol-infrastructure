@@ -1,3 +1,4 @@
+import io
 import os
 from functools import partial
 from ipaddress import IPv4Address
@@ -13,7 +14,12 @@ from bilder.components.baseline.steps import (
     service_configuration_watches,
 )
 from bilder.components.caddy.models import CaddyConfig
-from bilder.components.caddy.steps import caddy_service, configure_caddy, install_caddy
+from bilder.components.caddy.steps import (
+    caddy_service,
+    configure_caddy,
+    create_placeholder_tls_config,
+    install_caddy,
+)
 from bilder.components.concourse.models import (
     ConcourseBaseConfig,
     ConcourseWebConfig,
@@ -261,15 +267,8 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
     caddy_config.template_context = caddy_config.dict()
     install_caddy(caddy_config)
     caddy_config_changed = configure_caddy(caddy_config)
-    if host.get_fact(HasSystemd):
-        service_configuration_watches(
-            service_name="caddy",
-            watched_files=[
-                Path("/etc/caddy/odl_wildcard.cert"),
-                Path("/etc/caddy/odl_wildcard.key"),
-            ],
-        )
-        caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
+    # Completion of caddy install is below after vault is installed
+
     # Add vector configurations specific to concourse web nodes
     vector_config.configuration_templates[
         TEMPLATES_DIRECTORY.joinpath("vector", "concourse_logs.yaml")
@@ -304,9 +303,10 @@ vault_config = VaultAgentConfig(
     + [
         VaultTemplate(
             contents=get_template(
-                "{% for env_var, env_value in concourse_env.items() -%}\n"
-                "{{ env_var }}={{ env_value }}\n{% endfor -%}",
-                is_string=True,
+                io.StringIO(
+                    "{% for env_var, env_value in concourse_env.items() -%}\n"
+                    "{{ env_var }}={{ env_value }}\n{% endfor -%}"
+                )
             ).render(concourse_env=concourse_config.concourse_env()),
             destination=concourse_base_config.env_file_path,
         ),
@@ -319,6 +319,11 @@ vault = Vault(
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
+
+# Caddy and Vault are tightly coupled and this step cannot happen until vault is installed.
+if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
+    create_placeholder_tls_config(caddy_config)
+
 vault_template_permissions(vault_config)
 
 # Install vector
@@ -347,6 +352,14 @@ if host.get_fact(HasSystemd):
                 concourse_config.tsa_host_key_path,
             ]
         )
+        service_configuration_watches(
+            service_name="caddy",
+            watched_files=[
+                Path("/etc/caddy/odl_wildcard.cert"),
+                Path("/etc/caddy/odl_wildcard.key"),
+            ],
+        )
+        caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
     else:
         watched_concourse_files.extend(
             [
