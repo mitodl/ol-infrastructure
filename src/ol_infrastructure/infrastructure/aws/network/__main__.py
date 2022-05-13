@@ -67,7 +67,7 @@ k8s_vpc_config = OLVPCConfig(
         "Name": f"OL K8S {stack_info.name}",
     },
 )
-k8svpc = OLVPC(k8s_vpc_config)
+k8s_vpc = OLVPC(k8s_vpc_config)
 
 apps_config = Config("apps_vpc")
 applications_vpc_config = OLVPCConfig(
@@ -358,6 +358,11 @@ xpro_vpc_exports.update(
     }
 )
 export("xpro_vpc", xpro_vpc_exports)
+
+# TODO: MD 2022-05-13 This probably needs to be expanded upon once the k8s network is peered to others
+# when it gains some security groups.
+k8s_vpc_exports = vpc_exports(k8s_vpc)
+export("k8s_vpc", k8s_vpc_exports)
 
 applications_vpc_exports = vpc_exports(applications_vpc, ["data_vpc", "operations_vpc"])
 applications_vpc_exports.update(
