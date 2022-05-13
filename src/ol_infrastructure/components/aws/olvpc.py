@@ -101,7 +101,7 @@ class OLVPCConfig(AWSBase):
         """
         network = values.get("cidr_block")  # type: ignore
         assert network is not None
-        if k8s_service_subnet is not None and not network.overlaps(k8s_service_subnet):
+        if k8s_service_subnet is not None and not k8s_service_subnet.subnet_of(network):
             raise ValueError(f"{k8s_service_subnet} is not a subnet of {network}")
         return k8s_service_subnet
 
@@ -290,25 +290,15 @@ class OLVPC(ComponentResource):
             tags=vpc_config.tags,
             opts=ResourceOptions(parent=self),
         )
+        outputs = {
+            "olvpc": self.olvpc,
+            "subnets": self.olvpc_subnets,
+            "route_table": self.route_table,
+            "rds_subnet_group": self.db_subnet_group,
+        }
         if self.k8s_service_subnet:
-            self.register_outputs(
-                {
-                    "olvpc": self.olvpc,
-                    "subnets": self.olvpc_subnets,
-                    "route_table": self.route_table,
-                    "rds_subnet_group": self.db_subnet_group,
-                    "k8s_service_subnet": self.k8s_service_subnet,
-                }
-            )
-        else:
-            self.register_outputs(
-                {
-                    "olvpc": self.olvpc,
-                    "subnets": self.olvpc_subnets,
-                    "route_table": self.route_table,
-                    "rds_subnet_group": self.db_subnet_group,
-                }
-            )
+            outputs["k8s_service_subnet"] = self.k8s_service_subnet
+        self.register_outputs(outputs)
 
 
 class OLVPCPeeringConnection(ComponentResource):
