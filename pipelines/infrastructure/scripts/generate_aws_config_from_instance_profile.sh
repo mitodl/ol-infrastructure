@@ -1,6 +1,6 @@
 #!/bin/sh
 
-AWS_ROLE=$(aws sts get-caller-identity | grep 'arn' |  perl -ne 'print $1 if  /(arn.*)\//')
+AWS_ROLE=$(aws sts get-caller-identity | awk '/arn/ {print $2}')
 export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" \
 $(aws sts assume-role \
 --role-arn $AWS_ROLE \
