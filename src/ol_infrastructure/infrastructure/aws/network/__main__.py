@@ -37,7 +37,7 @@ def vpc_exports(vpc: OLVPC, peers: Optional[List[str]] = None) -> Dict[str, Any]
 
     :rtype: Dict[Text, Any]
     """
-    return {
+    return_value = {
         "cidr": vpc.olvpc.cidr_block,
         "cidr_v6": vpc.olvpc.ipv6_cidr_block,
         "id": vpc.olvpc.id,
@@ -50,6 +50,9 @@ def vpc_exports(vpc: OLVPC, peers: Optional[List[str]] = None) -> Dict[str, Any]
         "subnet_zones": [subnet.availability_zone for subnet in vpc.olvpc_subnets],
         "route_table_id": vpc.route_table.id,
     }
+    if vpc.k8s_service_subnet:
+        return_value["k8s_service_subnet"] = vpc.k8s_service_subnet.cidr_block
+    return return_value
 
 
 stack_info = parse_stack()
