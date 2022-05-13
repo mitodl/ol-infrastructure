@@ -52,13 +52,13 @@ def configure_tika(tika_config: TikaConfig):
         src=str(
             Path(__file__).resolve().parent.joinpath("templates", "tika-config.xml")
         ),
-        dest=tika_config.template_context["tika_config_file"],
-        context=tika_config.template_context,
+        dest=tika_config.tika_config_file,
+        context=tika_config,
     )
     log_config_file = files.put(
         name="Create log4j configuration file",
         src=str(Path(__file__).resolve().parent.joinpath("files", "log4j2_tika.xml")),
-        dest=tika_config.template_context["tika_log_config_file"],
+        dest=tika_config.tika_log_config_file,
     )
     service_defintion = files.template(
         name="Create Tika service definition",
@@ -68,7 +68,7 @@ def configure_tika(tika_config: TikaConfig):
             .resolve()
             .parent.joinpath("templates", "tika-server.service.j2")
         ),
-        context=tika_config.template_context,
+        context=tika_config,
     )
 
 
@@ -81,34 +81,3 @@ def tika_service(tika_config: TikaConfig):
         enabled=True,
         daemon_reload=True,
     )
-
-
-# @deploy("Configure Caddy")
-# def configure_caddy(caddy_config: CaddyConfig):
-#    if caddy_config.caddyfile.suffix == ".j2":
-#        caddy_file = files.template(
-#            name="Create Caddyfile",
-#            src=str(caddy_config.caddyfile),
-#            dest="/etc/caddy/Caddyfile",
-#            context=caddy_config.template_context,
-#        )
-#    else:
-#        caddy_file = files.put(
-#            name="Upload Caddyfile",
-#            src=str(caddy_config.caddyfile),
-#            dest="/etc/caddy/Caddyfile",
-#        )
-#    return caddy_file.changed
-#
-#
-# @deploy("Manage Caddy Service")
-# def caddy_service(caddy_config: CaddyConfig, do_restart=False, do_reload=False):
-#    systemd.service(
-#        name="Enable Caddy service",
-#        service="caddy",
-#        running=True,
-#        enabled=True,
-#        restarted=do_restart,
-#        reloaded=do_reload,
-#        daemon_reload=caddy_config.plugins is not None,
-#    )
