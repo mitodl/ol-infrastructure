@@ -27,6 +27,7 @@ resources:
     branch: main
     paths:
     - src/ol_infrastructure/infrastructure/vault
+    - pipelines/infrastructure/scripts/
     uri: https://github.com/mitodl/ol-infrastructure
   type: git
 
