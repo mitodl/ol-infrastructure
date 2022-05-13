@@ -14,7 +14,7 @@ This includes:
 from functools import partial
 from ipaddress import IPv4Network, IPv6Network
 from itertools import cycle
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import ec2, elasticache, rds
@@ -51,6 +51,7 @@ class OLVPCConfig(AWSBase):
 
     vpc_name: str
     cidr_block: IPv4Network
+    k8s_service_subnet: Optional[IPv4Network] = None
     num_subnets: PositiveInt = MIN_SUBNETS
     enable_ipv6: bool = True
     default_public_ip: bool = True
@@ -79,6 +80,30 @@ class OLVPCConfig(AWSBase):
                 "Please specify a network with a prefix length between /16 and /21"
             )
         return network
+
+    @validator("k8s_service_subnet")
+    def k8s_service_subnet_is_subnet(
+        cls: "OLVPCConfig", k8s_service_subnet: Optional[IPv4Network], values: Dict
+    ) -> Optional[IPv4Network]:
+        """Ensure that specified k8s subnet is actually a subnet of the cidr specified for the VPC.
+
+        :param k8s_service_subnet: The K8S service subnet to be created in the VPC.
+        :type k8s_service_subnet: IPv4Network
+
+        :param values: Dictonary containing the rest of the class values
+        :type values: Dict
+
+        :raises ValueError: Raise a ValueError if the specified subnet is not actually a subnet of the VPC cidr
+
+        :returns: The K8S service subnet
+
+        :rtype: IPv4Network
+        """
+        network = values.get("cidr_block")  # type: ignore
+        assert network is not None
+        if k8s_service_subnet is not None and not network.overlaps(k8s_service_subnet):
+            raise ValueError(f"{k8s_service_subnet} is not a subnet of {network}")
+        return k8s_service_subnet
 
     @validator("num_subnets")
     def min_subnets(cls: "OLVPCConfig", num_nets: PositiveInt) -> PositiveInt:
@@ -217,6 +242,28 @@ class OLVPC(ComponentResource):
                 opts=resource_options,
             )
             self.olvpc_subnets.append(ol_subnet)
+        self.k8s_service_subnet = None
+        if vpc_config.k8s_service_subnet:
+            third_octet = (
+                int(vpc_config.k8s_service_subnet.network_address) & 0xFF00
+            ) >> 8
+            self.k8s_service_subnet = ec2.Subnet(
+                f"{net_name}-k8s-service-subnet",
+                cidr_block=str(vpc_config.k8s_service_subnet),
+                ipv6_cidr_block=self.olvpc.ipv6_cidr_block.apply(
+                    partial(subnet_v6, third_octet)
+                ),
+                vpc_id=self.olvpc.id,
+                tags=vpc_config.merged_tags({"Name": net_name}),
+                assign_ipv6_address_on_creation=True,
+                opts=resource_options,
+            )
+            ec2.RouteTableAssociation(
+                f"{net_name}-k8s-service-subnet-route-table-association",
+                subnet_id=self.k8s_service_subnet.id,
+                route_table_id=self.route_table.id,
+                opts=resource_options,
+            )
 
         self.db_subnet_group = rds.SubnetGroup(
             f"{vpc_config.vpc_name}-db-subnet-group",
@@ -243,15 +290,25 @@ class OLVPC(ComponentResource):
             tags=vpc_config.tags,
             opts=ResourceOptions(parent=self),
         )
-
-        self.register_outputs(
-            {
-                "olvpc": self.olvpc,
-                "subnets": self.olvpc_subnets,
-                "route_table": self.route_table,
-                "rds_subnet_group": self.db_subnet_group,
-            }
-        )
+        if self.k8s_service_subnet:
+            self.register_outputs(
+                {
+                    "olvpc": self.olvpc,
+                    "subnets": self.olvpc_subnets,
+                    "route_table": self.route_table,
+                    "rds_subnet_group": self.db_subnet_group,
+                    "k8s_service_subnet": self.k8s_service_subnet,
+                }
+            )
+        else:
+            self.register_outputs(
+                {
+                    "olvpc": self.olvpc,
+                    "subnets": self.olvpc_subnets,
+                    "route_table": self.route_table,
+                    "rds_subnet_group": self.db_subnet_group,
+                }
+            )
 
 
 class OLVPCPeeringConnection(ComponentResource):

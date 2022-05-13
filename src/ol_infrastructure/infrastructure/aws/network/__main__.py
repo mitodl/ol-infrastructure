@@ -54,6 +54,21 @@ def vpc_exports(vpc: OLVPC, peers: Optional[List[str]] = None) -> Dict[str, Any]
 
 stack_info = parse_stack()
 
+k8s_config = Config("k8s_vpc")
+k8s_vpc_config = OLVPCConfig(
+    vpc_name=f"k8s-{stack_info.env_suffix}",
+    cidr_block=k8s_config.require("cidr_block"),
+    k8s_service_subnet=k8s_config.require("k8s_service_subnet"),
+    num_subnets=16,
+    tags={
+        "OU": "operations",
+        "Environment": f"k8s-{stack_info.env_suffix}",
+        "business_unit": "operations",
+        "Name": f"OL K8S {stack_info.name}",
+    },
+)
+k8svpc = OLVPC(k8s_vpc_config)
+
 apps_config = Config("apps_vpc")
 applications_vpc_config = OLVPCConfig(
     vpc_name=f"applications-{stack_info.env_suffix}",
