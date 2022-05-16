@@ -36,7 +36,7 @@ resources:
   type: pulumi
 
 jobs:
-- name: vault-ami-build
+- name: deploy-vault-ci
   plan:
   - get: vault-ami
     trigger: true
@@ -71,3 +71,73 @@ jobs:
       project_name: ol-infrastructure-vault-server
       source_dir: pulumi_files/src/ol_infrastructure/infrastructure/vault
       stack_name: infrastructure.vault.operations.CI
+- name: deploy-vault-qa
+  plan:
+  - get: vault-ami
+    trigger: false
+  - get: pulumi_files
+  - task: set-aws-creds
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: amazon/aws-cli
+          tag: 'latest'
+      inputs:
+      - name: pulumi_files
+      outputs:
+      - name: aws_creds
+      run:
+        path: pulumi_files/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh
+  - put: pulumi-infra
+    inputs:
+    - aws_creds
+    - pulumi_files
+    get_params:
+      skip_implicit_get: true
+    params:
+      env_pulumi:
+        AWS_SHARED_CREDENTIALS_FILE: aws_creds/credentials
+      action: update
+      env_os:
+        AWS_DEFAULT_REGION: us-east-1
+        PYTHONPATH: /usr/lib/:/tmp/build/put/pulumi_files/src/
+      project_name: ol-infrastructure-vault-server
+      source_dir: pulumi_files/src/ol_infrastructure/infrastructure/vault
+      stack_name: infrastructure.vault.operations.QA
+- name: deploy-vault-production
+  plan:
+  - get: vault-ami
+    trigger: false
+  - get: pulumi_files
+  - task: set-aws-creds
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: amazon/aws-cli
+          tag: 'latest'
+      inputs:
+      - name: pulumi_files
+      outputs:
+      - name: aws_creds
+      run:
+        path: pulumi_files/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh
+  - put: pulumi-infra
+    inputs:
+    - aws_creds
+    - pulumi_files
+    get_params:
+      skip_implicit_get: true
+    params:
+      env_pulumi:
+        AWS_SHARED_CREDENTIALS_FILE: aws_creds/credentials
+      action: update
+      env_os:
+        AWS_DEFAULT_REGION: us-east-1
+        PYTHONPATH: /usr/lib/:/tmp/build/put/pulumi_files/src/
+      project_name: ol-infrastructure-vault-server
+      source_dir: pulumi_files/src/ol_infrastructure/infrastructure/vault
+      stack_name: infrastructure.vault.operations.Production
