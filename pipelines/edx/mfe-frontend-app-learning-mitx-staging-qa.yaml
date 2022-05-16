@@ -11,7 +11,7 @@ resources:
   type: git
   source:
     uri: https://github.com/edx/frontend-app-learning.git
-    branch: open-release/maple.master
+    branch: open-release/nutmeg.master
 - name: mfe-app-learning-bucket
   type: rclone
   source:

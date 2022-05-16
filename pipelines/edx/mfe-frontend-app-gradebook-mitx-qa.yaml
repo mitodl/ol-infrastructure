@@ -11,7 +11,7 @@ resources:
   type: git
   source:
     uri: https://github.com/edx/frontend-app-gradebook.git
-    branch: open-release/maple.master
+    branch: open-release/nutmeg.master
 - name: mfe-app-bucket
   type: rclone
   source:
