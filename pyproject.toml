@@ -20,7 +20,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
-boto3 = "^1.22"
+boto3 = "^1.23"
 httpx = "^0.22.0"
 hvac = {extras = ["parser"], version = "^0.11.2"}
 parliament = "^1.5.0"
