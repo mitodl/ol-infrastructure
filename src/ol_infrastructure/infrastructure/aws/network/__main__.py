@@ -37,7 +37,7 @@ def vpc_exports(vpc: OLVPC, peers: Optional[List[str]] = None) -> Dict[str, Any]
 
     :rtype: Dict[Text, Any]
     """
-    return {
+    return_value = {
         "cidr": vpc.olvpc.cidr_block,
         "cidr_v6": vpc.olvpc.ipv6_cidr_block,
         "id": vpc.olvpc.id,
@@ -50,9 +50,27 @@ def vpc_exports(vpc: OLVPC, peers: Optional[List[str]] = None) -> Dict[str, Any]
         "subnet_zones": [subnet.availability_zone for subnet in vpc.olvpc_subnets],
         "route_table_id": vpc.route_table.id,
     }
+    if vpc.k8s_service_subnet:
+        return_value["k8s_service_subnet"] = vpc.k8s_service_subnet.cidr_block
+    return return_value
 
 
 stack_info = parse_stack()
+
+k8s_config = Config("k8s_vpc")
+k8s_vpc_config = OLVPCConfig(
+    vpc_name=f"k8s-{stack_info.env_suffix}",
+    cidr_block=k8s_config.require("cidr_block"),
+    k8s_service_subnet=k8s_config.require("k8s_service_subnet"),
+    num_subnets=16,
+    tags={
+        "OU": "operations",
+        "Environment": f"k8s-{stack_info.env_suffix}",
+        "business_unit": "operations",
+        "Name": f"OL K8S {stack_info.name}",
+    },
+)
+k8s_vpc = OLVPC(k8s_vpc_config)
 
 apps_config = Config("apps_vpc")
 applications_vpc_config = OLVPCConfig(
@@ -343,6 +361,11 @@ xpro_vpc_exports.update(
     }
 )
 export("xpro_vpc", xpro_vpc_exports)
+
+# TODO: MD 2022-05-13 This probably needs to be expanded upon once the k8s network is peered to others
+# when it gains some security groups.
+k8s_vpc_exports = vpc_exports(k8s_vpc)
+export("k8s_vpc", k8s_vpc_exports)
 
 applications_vpc_exports = vpc_exports(applications_vpc, ["data_vpc", "operations_vpc"])
 applications_vpc_exports.update(
