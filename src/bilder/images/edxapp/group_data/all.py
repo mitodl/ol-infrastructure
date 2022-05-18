@@ -30,6 +30,7 @@ edx_plugins_added = {
         "ol-openedx-logging",
         "ol-openedx-sentry",
         "ol-openedx-course-export",
+        "ol-openedx-checkout-external",
         "social-auth-mitxpro==0.6",
     ],
     "xpro": [
