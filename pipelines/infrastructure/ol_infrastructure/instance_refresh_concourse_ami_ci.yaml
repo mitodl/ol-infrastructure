@@ -12,7 +12,7 @@ resource_types:
 resources:
 - name: concourse-worker-ami
   type: ami
-  check_every: 1m
+  check_every: 30m
   source:
     region: us-east-1
     filters:
@@ -23,7 +23,7 @@ resources:
 
 - name: concourse-web-ami
   type: ami
-  check_every: 1m
+  check_every: 30m
   source:
     region: us-east-1
     filters:
@@ -47,7 +47,45 @@ resources:
   type: pulumi
 
 jobs:
-- name: concourse-ami-build
+- name: deploy-concourse-ci
+  plan:
+  - get: concourse-web-ami
+    trigger: true
+  - get: concourse-worker-ami
+    trigger: true
+  - get: pulumi_files
+    trigger: true
+  - task: set-aws-creds
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: amazon/aws-cli
+          tag: 'latest'
+      inputs:
+      - name: pulumi_files
+      outputs:
+      - name: aws_creds
+      run:
+        path: pulumi_files/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh
+  - put: pulumi-infra
+    inputs:
+    - aws_creds
+    - pulumi_files
+    get_params:
+      skip_implicit_get: true
+    params:
+      env_pulumi:
+        AWS_SHARED_CREDENTIALS_FILE: aws_creds/credentials
+      action: update
+      env_os:
+        AWS_DEFAULT_REGION: us-east-1
+        PYTHONPATH: /usr/lib/:/tmp/build/put/pulumi_files/src/
+      project_name: ol-infrastructure-concourse-application
+      source_dir: pulumi_files/src/ol_infrastructure/applications/concourse
+      stack_name: applications.concourse.CI
+- name: deploy-concourse-qa
   plan:
   - get: concourse-web-ami
   - get: concourse-worker-ami
@@ -81,4 +119,39 @@ jobs:
         PYTHONPATH: /usr/lib/:/tmp/build/put/pulumi_files/src/
       project_name: ol-infrastructure-concourse-application
       source_dir: pulumi_files/src/ol_infrastructure/applications/concourse
-      stack_name: applications.concourse.CI
+      stack_name: applications.concourse.QA
+- name: deploy-concourse-production
+  plan:
+  - get: concourse-web-ami
+  - get: concourse-worker-ami
+  - get: pulumi_files
+  - task: set-aws-creds
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: amazon/aws-cli
+          tag: 'latest'
+      inputs:
+      - name: pulumi_files
+      outputs:
+      - name: aws_creds
+      run:
+        path: pulumi_files/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh
+  - put: pulumi-infra
+    inputs:
+    - aws_creds
+    - pulumi_files
+    get_params:
+      skip_implicit_get: true
+    params:
+      env_pulumi:
+        AWS_SHARED_CREDENTIALS_FILE: aws_creds/credentials
+      action: update
+      env_os:
+        AWS_DEFAULT_REGION: us-east-1
+        PYTHONPATH: /usr/lib/:/tmp/build/put/pulumi_files/src/
+      project_name: ol-infrastructure-concourse-application
+      source_dir: pulumi_files/src/ol_infrastructure/applications/concourse
+      stack_name: applications.concourse.Production
