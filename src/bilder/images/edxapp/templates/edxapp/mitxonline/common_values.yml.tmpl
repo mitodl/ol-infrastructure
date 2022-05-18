@@ -334,6 +334,7 @@ LOGIN_REDIRECT_WHITELIST:  # MODIFIED
 LOG_DIR: /edx/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MARKETING_SITE_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support mitxonline-theme
+MARKETING_SITE_CHECKOUT_URL: https://{{ key "edxapp/marketing-domain" }}/cart/ # ADDED - to support mitxonline checkout
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
@@ -522,7 +523,7 @@ ZENDESK_USER: ''
 ##############################################
 # ECOMMERCE_API_SIGNING_KEY: SET-ME-PLEASE
 # ECOMMERCE_API_URL: http://localhost:8002/api/v2
-# ECOMMERCE_PUBLIC_URL_ROOT: http://localhost:8002
+ECOMMERCE_PUBLIC_URL_ROOT: {{ key "edxapp/lms-domain" }}  # MODIFIED
 
 #############################################
 # Deprecated settings that are no longer used #
