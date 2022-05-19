@@ -1,7 +1,7 @@
 locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
   business_unit = "operations"
-  app_name = "concourse"
+  app_name = "docker"
 }
 
 variable "build_environment" {
@@ -9,26 +9,20 @@ variable "build_environment" {
   default = "operations-qa"
 }
 
-# Available options are "web" or "worker". Used to determine which type of node to build an image for.
-variable "node_type" {
-  type = string
-}
-
-source "amazon-ebs" "concourse" {
-  ami_description         = "Deployment image for Concourse ${var.node_type} server generated at ${local.timestamp}"
-  ami_name                = "concourse-web"
+source "amazon-ebs" "docker" {
+  ami_description         = "Deployment image for docker"
+  ami_name                = "docker-web"
   ami_virtualization_type = "hvm"
   force_deregister        = true
   instance_type           = "t3a.medium"
   run_volume_tags = {
     OU      = "${local.business_unit}"
     app     = "${local.app_name}"
-    purpose = "concourse-${var.node_type}"
   }
   snapshot_tags = {
     OU      = "${local.business_unit}"
     app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.node_type}"
+    purpose = "${local.app_name}"
   }
   # Base all builds off of the most recent Debian 10 image built by the Debian organization.
   source_ami_filter {
@@ -48,27 +42,29 @@ source "amazon-ebs" "concourse" {
     random = true
   }
   tags = {
-    Name    = "${local.app_name}-${var.node_type}"
+    Name    = "${local.app_name}"
     OU      = "${local.business_unit}"
     app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.node_type}"
+    purpose = "${local.app_name}"
   }
 }
 
-source "docker" "concourse" {
-  image = "debian:buster"
-  commit = true
+source "docker" "docker" {
+  image = "debian:latest"
+  discard = true
+  privileged = true
   changes = [
-    "USER concourse",
-    "WORKDIR /opt/concourse",
-    "ENTRYPOINT /opt/concourse/bin/concourse ${var.node_type}"
+    "RUN apt update && apt install -y lsb-release && ulimit -n 65536",
+    "USER docker",
+    "WORKDIR /opt/docker",
+    "ENTRYPOINT /opt/docker/bin/docker"
   ]
 }
 
 build {
   sources = [
-    "source.amazon-ebs.concourse",
-    "source.docker.concourse",
+    "source.amazon-ebs.docker",
+    "source.docker.docker",
   ]
 
   provisioner "shell-local" {
@@ -81,19 +77,19 @@ build {
     ]
   }
   provisioner "shell-local" {
-    except = ["docker.concourse"]
+    except = ["docker.docker"]
     inline = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session.pem ${build.Host} ${path.root}/sample_deploy.py"]
   }
   provisioner "shell-local" {
-    except = ["docker.concourse"]
-    inline = ["py.test --ssh-identity-file=/tmp/packer-session.pem --hosts='ssh://${build.User}@${build.Host}:${build.Port}' ${path.root}/test_concourse_build.py"]
+    except = ["docker.docker"]
+    inline = ["py.test --ssh-identity-file=/tmp/packer-session.pem --hosts='ssh://${build.User}@${build.Host}:${build.Port}' ${path.root}/test_docker_build.py"]
   }
   provisioner "shell-local" {
-    only = ["docker.concourse"]
+    only = ["docker.docker"]
     inline = ["pyinfra @docker/${build.ID} ${path.root}/sample_deploy.py"]
   }
   provisioner "shell-local" {
-    only = ["docker.concourse"]
-    inline = ["py.test --hosts=docker://${build.ID} ${path.root}/test_concourse_build.py"]
+    only = ["docker.docker"]
+    inline = ["py.test --hosts=docker://${build.ID} ${path.root}/test_docker_build.py"]
   }
 }
