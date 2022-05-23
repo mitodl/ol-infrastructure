@@ -54,7 +54,10 @@ class InstanceTypes(str, Enum):
 
 @unique
 class DiskTypes(str, Enum):
+    magnetic = "standard"
+    legacy_ssd = "gp2"
     ssd = "gp3"
+    legacy_provisioned_iops = "io1"
     provisioned_iops = "io2"
 
 
