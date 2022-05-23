@@ -35,8 +35,9 @@ source "amazon-ebs" "edxapp" {
   ami_virtualization_type = "hvm"
   instance_type           = "m5.xlarge"
   launch_block_device_mappings {
-    device_name = "/dev/sda1"
-    volume_size = 25
+    device_name           = "/dev/sda1"
+    volume_size           = 25
+    delete_on_termination = true
   }
   run_tags = {
     Name    = "${local.app_name}-${var.node_type}-packer-builder"
@@ -45,11 +46,13 @@ source "amazon-ebs" "edxapp" {
     purpose = "${local.app_name}-${var.node_type}"
   }
   run_volume_tags = {
+    Name    = "${local.app_name}-${var.node_type}-packer-builder"
     OU      = "${var.business_unit}"
     app     = "${local.app_name}"
     purpose = "edx-${var.node_type}"
   }
   snapshot_tags = {
+    Name           = "${local.app_name}-${var.node_type}-ami"
     OU             = "${var.business_unit}"
     app            = "${local.app_name}"
     purpose        = "${local.app_name}-${var.node_type}"

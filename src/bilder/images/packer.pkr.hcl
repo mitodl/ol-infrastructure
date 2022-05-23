@@ -3,12 +3,19 @@ source "amazon-ebs" "third-party" {
   ami_name                = "${var.app_name}-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
+  launch_block_device_mappings {
+    device_name           = "/dev/sda1"
+    volume_size           = 25
+    delete_on_termination = true
+  }
   run_volume_tags = {
+    Name    = "${var.app_name}-${var.node_type}"
     OU      = var.business_unit
     app     = var.app_name
     purpose = "${var.app_name}-${var.node_type}"
   }
   snapshot_tags = {
+    Name    = "${var.app_name}-${var.node_type}-ami"
     OU      = var.business_unit
     app     = var.app_name
     purpose = "${var.app_name}-${var.node_type}"
