@@ -1,14 +1,13 @@
 import json
-from io import StringIO
+import tempfile
+from typing import Any, Dict, Optional
 
 from pyinfra import host
 from pyinfra.api.deploy import deploy
 from pyinfra.api.exceptions import DeployError
-from pyinfra.api.util import make_hash
 from pyinfra.facts.deb import DebPackages
 from pyinfra.facts.server import Command, LinuxDistribution
 from pyinfra.operations import apt, files
-from typing import Optional, Dict, Any
 
 
 def _apt_install():
@@ -36,7 +35,7 @@ def _apt_install():
 
     apt.key(
         name="Download the Docker apt key",
-        src="https://download.docker.com/linux/{0}/gpg".format(lsb_id),
+        src=f"https://download.docker.com/linux/{lsb_id}/gpg",
     )
 
     dpkg_arch = host.get_fact(Command, command="dpkg --print-architecture")
@@ -56,29 +55,22 @@ def _apt_install():
         update=add_apt_repo.changed,
     )
 
+
 @deploy("Deploy Docker")
-def deploy_docker(config=Optional[Dict[str, Any]]):
+def deploy_docker(config: Optional[Dict[str, Any]] = None):
 
     if host.get_fact(DebPackages):
         _apt_install()
     else:
         raise DeployError(
-            (
-                "Apt not found, pyinfra-docker cannot provision this machine!"
-            ),
+            ("Apt not found, pyinfra-docker cannot provision this machine!"),
         )
-
-    config_file = config
-
-    if isinstance(config, dict):
-        config_hash = make_hash(config)
-
-        config_file = StringIO(json.dumps(config, indent=4))
-        config_file.__name__ = config_hash
 
     if config:
-        files.put(
-            name="Upload the Docker daemon.json",
-            src=config_file,
-            dest="/etc/docker/daemon.json",
-        )
+        with tempfile.NamedTemporaryFile("wt", delete=False) as daemon:
+            daemon.write(json.dumps(config, indent=4))
+            files.put(
+                name="Upload the Docker daemon.json",
+                src=daemon.name,
+                dest="/etc/docker/daemon.json",
+            )

@@ -50,11 +50,11 @@ source "amazon-ebs" "docker" {
 }
 
 source "docker" "docker" {
-  image = "debian:latest"
+  image = "debian:buster"
   discard = true
   privileged = true
   changes = [
-    "RUN apt update && apt install -y lsb-release && ulimit -n 65536",
+    "RUN ulimit -n 65536",
     "USER docker",
     "WORKDIR /opt/docker",
     "ENTRYPOINT /opt/docker/bin/docker"
