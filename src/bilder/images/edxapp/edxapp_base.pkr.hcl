@@ -41,13 +41,13 @@ source "amazon-ebs" "edxapp" {
     purpose = "${local.app_name}-${var.node_type}"
   }
   run_volume_tags = {
-    Name    = "${var.app_name}-${var.node_type}"
+    Name    = "${local.app_name}-${var.node_type}"
     OU      = "${local.business_unit}"
     app     = "${local.app_name}"
     purpose = "edx-${var.node_type}"
   }
   snapshot_tags = {
-    Name    = "${var.app_name}-${var.node_type}-ami"
+    Name    = "${local.app_name}-${var.node_type}-ami"
     OU      = "${local.business_unit}"
     app     = "${local.app_name}"
     purpose = "${local.app_name}-${var.node_type}"
