@@ -187,7 +187,7 @@ class OLAutoScaling(pulumi.ComponentResource):
         self,
         asg_config: OLAutoScaleGroupConfig,
         lt_config: OLLaunchTemplateConfig,
-        tg_config: OLTargetGroupConfig,
+        tg_config: Optional[OLTargetGroupConfig],
         lb_config: Optional[OLLoadBalancerConfig],
         opts: pulumi.ResourceOptions = None,
     ):
@@ -199,34 +199,40 @@ class OLAutoScaling(pulumi.ComponentResource):
             opts,
         )
 
+        if bool(tg_config) != bool(lb_config):
+            raise ValueError(
+                "Both lb_config and tg_config must be provided if one is provided"
+            )
+
         # Shared attributes
         resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore
         resource_name_prefix = asg_config.asg_name + "-"
 
         # Create target group
-        target_group_healthcheck = None
-        if tg_config.health_check_enabled:
-            target_group_healthcheck = TargetGroupHealthCheckArgs(
-                enabled=tg_config.health_check_enabled,
-                healthy_threshold=tg_config.health_check_healthy_threshold,
-                interval=tg_config.health_check_interval,
-                matcher=tg_config.health_check_matcher,
-                path=tg_config.health_check_path,
-                protocol=tg_config.health_check_protocol,
-                port=tg_config.health_check_port,
-                timeout=tg_config.health_check_timeout,
-                unhealthy_threshold=tg_config.health_check_unhealthy_threshold,
-            )
+        if tg_config:
+            target_group_healthcheck = None
+            if tg_config.health_check_enabled:
+                target_group_healthcheck = TargetGroupHealthCheckArgs(
+                    enabled=tg_config.health_check_enabled,
+                    healthy_threshold=tg_config.health_check_healthy_threshold,
+                    interval=tg_config.health_check_interval,
+                    matcher=tg_config.health_check_matcher,
+                    path=tg_config.health_check_path,
+                    protocol=tg_config.health_check_protocol,
+                    port=tg_config.health_check_port,
+                    timeout=tg_config.health_check_timeout,
+                    unhealthy_threshold=tg_config.health_check_unhealthy_threshold,
+                )
 
-        self.target_group = TargetGroup(
-            resource_name_prefix + "target-group",
-            name=(resource_name_prefix + "tg")[:AWS_TARGET_GROUP_NAME_MAX_LENGTH],
-            vpc_id=tg_config.vpc_id,
-            port=tg_config.port,
-            protocol=tg_config.protocol,
-            health_check=target_group_healthcheck,
-            opts=resource_options,
-        )
+            self.target_group = TargetGroup(
+                resource_name_prefix + "target-group",
+                name=(resource_name_prefix + "tg")[:AWS_TARGET_GROUP_NAME_MAX_LENGTH],
+                vpc_id=tg_config.vpc_id,
+                port=tg_config.port,
+                protocol=tg_config.protocol,
+                health_check=target_group_healthcheck,
+                opts=resource_options,
+            )
 
         # Create Load Balancer
         if lb_config:
@@ -330,6 +336,9 @@ class OLAutoScaling(pulumi.ComponentResource):
             ).items()
         ]
 
+        auto_scale_group_kwargs = {}
+        if self.target_group:
+            auto_scale_group_kwargs["target_group_arns"] = [self.target_group.arn]
         self.auto_scale_group = Group(
             resource_name_prefix + "auto-scale-group",
             desired_capacity=asg_config.desired_size,
@@ -342,7 +351,7 @@ class OLAutoScaling(pulumi.ComponentResource):
             max_size=asg_config.max_size,
             min_size=asg_config.min_size,
             tags=asg_tags,
-            target_group_arns=[self.target_group.arn],
             vpc_zone_identifiers=asg_config.vpc_zone_identifiers,
             opts=resource_options,
+            **auto_scale_group_kwargs,
         )
