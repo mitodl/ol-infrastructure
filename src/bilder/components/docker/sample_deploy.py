@@ -1,11 +1,7 @@
-from pyinfra.operations import server, systemd
+from pyinfra.operations import server
 
-from bilder.components.docker.steps import (
-    deploy_docker,
-)
-from bilder.components.docker.docker_compose_steps import (
-    deploy_docker_compose,
-)
+from bilder.components.docker.docker_compose_steps import deploy_docker_compose
+from bilder.components.docker.steps import deploy_docker
 
 deploy_docker()
 server.service(

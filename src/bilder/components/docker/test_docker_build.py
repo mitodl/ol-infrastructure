@@ -1,6 +1,3 @@
-from pyinfra import host
-
-
 def test_docker_running_and_enabled(host):
     docker = host.service("docker")
     print(docker)
