@@ -9,15 +9,20 @@ from pathlib import Path
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, StackReference
-from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
+from pulumi_aws import ec2, get_caller_identity, iam, route53
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
-from ol_infrastructure.lib.aws.ec2_helper import (
-    DiskTypes,
-    InstanceTypes,
-    default_egress_args,
+from ol_infrastructure.components.aws.auto_scale_group import (
+    BlockDeviceMapping,
+    OLAutoScaleGroupConfig,
+    OLAutoScaling,
+    OLLaunchTemplateConfig,
+    OLLoadBalancerConfig,
+    OLTargetGroupConfig,
+    TagSpecification,
 )
+from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -145,106 +150,49 @@ tika_server_security_group = ec2.SecurityGroup(
 ###################################
 #     Web Node EC2 Deployment     #
 ###################################
-
-# Create load balancer for Concourse web nodes
-LOAD_BALANCER_NAME_MAX_LENGTH = 32
-tika_server_lb = lb.LoadBalancer(
-    "tika-server-load-balancer",
-    name=f"tika-server-alb-{stack_info.env_prefix[:3]}-{stack_info.env_suffix[:2]}"[
-        :LOAD_BALANCER_NAME_MAX_LENGTH
-    ],
-    ip_address_type="dualstack",
-    load_balancer_type="application",
-    enable_http2=True,
+lb_config = OLLoadBalancerConfig(
     subnets=target_vpc["subnet_ids"],
-    security_groups=[
-        tika_server_security_group.id,
-    ],
+    security_groups=[tika_server_security_group],
     tags=aws_config.merged_tags({"Name": tika_server_tag}),
 )
 
-TARGET_GROUP_NAME_MAX_LENGTH = 32
-tika_server_lb_target_group = lb.TargetGroup(
-    "tika-server-alb-target-group",
+tg_config = OLTargetGroupConfig(
     vpc_id=vpc_id,
-    target_type="instance",
-    port=DEFAULT_HTTPS_PORT,
-    protocol="HTTPS",
-    health_check=lb.TargetGroupHealthCheckArgs(
-        healthy_threshold=2,
-        interval=10,
-        path="/version",
-        port=str(DEFAULT_HTTPS_PORT),
-        protocol="HTTPS",
-        matcher="200",
-    ),
-    name=tika_server_tag[:TARGET_GROUP_NAME_MAX_LENGTH],
-    tags=aws_config.tags,
-)
-tika_server_acm_cert = acm.get_certificate(
-    domain="*.odl.mit.edu", most_recent=True, statuses=["ISSUED"]
-)
-tika_server_alb_listener = lb.Listener(
-    "tika-server-alb-listener",
-    certificate_arn=tika_server_acm_cert.arn,
-    load_balancer_arn=tika_server_lb.arn,
-    port=DEFAULT_HTTPS_PORT,
-    protocol="HTTPS",
-    default_actions=[
-        lb.ListenerDefaultActionArgs(
-            type="forward",
-            target_group_arn=tika_server_lb_target_group.arn,
-        )
-    ],
+    health_check_path="/version",
+    tags=aws_config.merged_tags({"Name": tika_server_tag}),
 )
 
-## Create auto scale group and launch configs for a tika server
-instance_type = tika_config.get("instance_type") or InstanceTypes.burstable_medium.name
 consul_datacenter = consul_stack.require_output("datacenter")
-
 grafana_credentials = read_yaml_secrets(
     Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
 )
-
 x_access_token = read_yaml_secrets(Path(f"tika/tika.{stack_info.env_suffix}.yaml"))[
     "x_access_token"
 ]
 
-tika_server_launch_config = ec2.LaunchTemplate(
-    "tika-server-launch-template",
-    name_prefix=f"tika-server-{env_name}-",
-    description="Launch template for deploying tika servers",
-    iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
-        arn=tika_server_instance_profile.arn,
+block_device_mappings = [BlockDeviceMapping()]
+tag_specs = [
+    TagSpecification(
+        resource_type="instance",
+        tags=aws_config.merged_tags({"Name": tika_server_tag}),
     ),
+    TagSpecification(
+        resource_type="volume",
+        tags=aws_config.merged_tags({"Name": tika_server_tag}),
+    ),
+]
+
+lt_config = OLLaunchTemplateConfig(
+    block_device_mappings=block_device_mappings,
     image_id=tika_server_ami.id,
-    block_device_mappings=[
-        ec2.LaunchTemplateBlockDeviceMappingArgs(
-            device_name="/dev/xvda",
-            ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=tika_config.get_int("disk_size") or 25,
-                volume_type=DiskTypes.ssd,
-                delete_on_termination=True,
-            ),
-        )
-    ],
-    vpc_security_group_ids=[
-        tika_server_security_group.id,
+    instance_type=tika_config.get("instance_type") or InstanceTypes.burstable_medium,
+    instance_profile_arn=tika_server_instance_profile.arn,
+    security_groups=[
+        tika_server_security_group,
         consul_security_groups["consul_agent"],
     ],
-    instance_type=InstanceTypes[instance_type].value,
-    key_name="oldevops",
-    tag_specifications=[
-        ec2.LaunchTemplateTagSpecificationArgs(
-            resource_type="instance",
-            tags=aws_config.merged_tags({"Name": tika_server_tag}),
-        ),
-        ec2.LaunchTemplateTagSpecificationArgs(
-            resource_type="volume",
-            tags=aws_config.merged_tags({"Name": tika_server_tag}),
-        ),
-    ],
-    tags=aws_config.tags,
+    tags=aws_config.merged_tags({"Name": tika_server_tag}),
+    tag_specifications=tag_specs,
     user_data=consul_datacenter.apply(
         lambda consul_dc: base64.b64encode(
             "#cloud-config\n{}".format(
@@ -295,41 +243,28 @@ tika_server_launch_config = ec2.LaunchTemplate(
         ).decode("utf8")
     ),
 )
+
 auto_scale_config = tika_config.get_object("auto_scale") or {
     "desired": 2,
     "min": 1,
     "max": 3,
 }
-autoscaling.Group(
-    "tika-server-autoscaling-group",
-    desired_capacity=auto_scale_config["desired"] or 2,
+asg_config = OLAutoScaleGroupConfig(
+    asg_name=f"tika-server-{env_name}",
+    aws_config=aws_config,
+    desired_size=auto_scale_config["desired"] or 2,
     min_size=auto_scale_config["min"] or 1,
     max_size=auto_scale_config["max"] or 3,
-    health_check_type="ELB",
     vpc_zone_identifiers=target_vpc["subnet_ids"],
-    launch_template=autoscaling.GroupLaunchTemplateArgs(
-        id=tika_server_launch_config.id, version="$Latest"
-    ),
-    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
-        strategy="Rolling",
-        preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50
-        ),
-        triggers=["tags"],
-    ),
-    target_group_arns=[tika_server_lb_target_group.arn],
-    tags=[
-        autoscaling.GroupTagArgs(
-            key=key_name,
-            value=key_value,
-            propagate_at_launch=True,
-        )
-        for key_name, key_value in aws_config.merged_tags(
-            {"ami_id": tika_server_ami.id}
-        ).items()
-    ],
+    tags=aws_config.merged_tags({"Name": tika_server_tag}),
 )
 
+as_setup = OLAutoScaling(
+    asg_config=asg_config,
+    lt_config=lt_config,
+    tg_config=tg_config,
+    lb_config=lb_config,
+)
 
 ## Create Route53 DNS records for tika nodes
 five_minutes = 60 * 5
@@ -338,6 +273,6 @@ route53.Record(
     name=tika_config.require("web_host_domain"),
     type="CNAME",
     ttl=five_minutes,
-    records=[tika_server_lb.dns_name],
+    records=[as_setup.load_balancer.dns_name],
     zone_id=mitodl_zone_id,
 )
