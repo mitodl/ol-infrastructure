@@ -42,7 +42,7 @@ class BlockDeviceMapping(BaseModel):
     delete_on_termination: bool = True
     device_name: str = "/dev/xvda"
     volume_size: PositiveInt = PositiveInt(25)
-    volume_type: DiskTypes = DiskTypes.legacy_ssd
+    volume_type: DiskTypes = DiskTypes.ssd
 
     class Config:
         arbitrary_types_allowed = True
@@ -177,14 +177,18 @@ class OLAutoScaleGroupConfig(AWSBase):
 class OLAutoScaling(pulumi.ComponentResource):
     """Component to create an autoscaling group with defaults as well as managed associated resources"""
 
-    lb_dns_name: str
+    load_balancer: LoadBalancer = None
+    listener: Listener = None
+    target_group: TargetGroup = None
+    auto_scale_group: Group = None
+    launch_template: LaunchTemplate = None
 
     def __init__(
         self,
         asg_config: OLAutoScaleGroupConfig,
         lt_config: OLLaunchTemplateConfig,
         tg_config: OLTargetGroupConfig,
-        lb_config: OLLoadBalancerConfig,
+        lb_config: Optional[OLLoadBalancerConfig],
         opts: pulumi.ResourceOptions = None,
     ):
 
@@ -198,21 +202,6 @@ class OLAutoScaling(pulumi.ComponentResource):
         # Shared attributes
         resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore
         resource_name_prefix = asg_config.asg_name + "-"
-
-        pulumi.error(msg=f"{lb_config.subnets.__type__}", resource=lb_config.subnets)
-        # Create Load Balancer
-        load_balancer = LoadBalancer(
-            resource_name_prefix + "load-balancer",
-            enable_http2=lb_config.enable_http2,
-            internal=lb_config.internal,
-            ip_address_type=lb_config.ip_address_type,
-            load_balancer_type=lb_config.load_balancer_type,
-            name=(resource_name_prefix + "lb")[:AWS_LOAD_BALANCER_NAME_MAX_LENGTH],
-            security_groups=[group.id for group in lb_config.security_groups],
-            subnets=lb_config.subnets,
-            opts=resource_options,
-        )
-        self.lb_dns_name = load_balancer.dns_name
 
         # Create target group
         target_group_healthcheck = None
@@ -229,39 +218,53 @@ class OLAutoScaling(pulumi.ComponentResource):
                 unhealthy_threshold=tg_config.health_check_unhealthy_threshold,
             )
 
-        target_group = TargetGroup(
+        self.target_group = TargetGroup(
             resource_name_prefix + "target-group",
             name=(resource_name_prefix + "tg")[:AWS_TARGET_GROUP_NAME_MAX_LENGTH],
             vpc_id=tg_config.vpc_id,
-            port=lb_config.port,
+            port=tg_config.port,
             protocol=tg_config.protocol,
             health_check=target_group_healthcheck,
             opts=resource_options,
         )
 
-        # Create Load Balancer Listener (requires load balancer + target group first)
-        listener_args = ListenerArgs(
-            load_balancer_arn=load_balancer.arn,
-            port=lb_config.port,
-            protocol=lb_config.listener_protocol,
-            default_actions=[
-                ListenerDefaultActionArgs(
-                    type=lb_config.listener_action_type,
-                    target_group_arn=target_group.arn,
-                )
-            ],
-        )
-        if lb_config.listener_use_acm:
-            listener_args.certificate_arn = get_certificate(
-                domain=lb_config.listener_cert_domain,
-                most_recent=True,
-                statuses=["ISSUED"],
-            ).arn
-        listener = Listener(
-            resource_name_prefix + "load-balancer-listener",
-            args=listener_args,
-            opts=resource_options,
-        )
+        # Create Load Balancer
+        if lb_config:
+            self.load_balancer = LoadBalancer(
+                resource_name_prefix + "load-balancer",
+                enable_http2=lb_config.enable_http2,
+                internal=lb_config.internal,
+                ip_address_type=lb_config.ip_address_type,
+                load_balancer_type=lb_config.load_balancer_type,
+                name=(resource_name_prefix + "lb")[:AWS_LOAD_BALANCER_NAME_MAX_LENGTH],
+                security_groups=[group.id for group in lb_config.security_groups],
+                subnets=lb_config.subnets,
+                opts=resource_options,
+            )
+
+            # Create Load Balancer Listener (requires load balancer + target group first)
+            listener_args = ListenerArgs(
+                load_balancer_arn=self.load_balancer.arn,
+                port=lb_config.port,
+                protocol=lb_config.listener_protocol,
+                default_actions=[
+                    ListenerDefaultActionArgs(
+                        type=lb_config.listener_action_type,
+                        target_group_arn=self.target_group.arn,
+                    )
+                ],
+            )
+            if lb_config.listener_use_acm:
+                listener_args.certificate_arn = get_certificate(
+                    domain=lb_config.listener_cert_domain,
+                    most_recent=True,
+                    statuses=["ISSUED"],
+                ).arn
+            self.listener = Listener(
+                resource_name_prefix + "load-balancer-listener",
+                args=listener_args,
+                opts=resource_options,
+            )
 
         # Build list of block devices for launch template
         block_device_mappings = []
@@ -298,7 +301,7 @@ class OLAutoScaling(pulumi.ComponentResource):
         )
 
         # Construct the launch template
-        launch_template = LaunchTemplate(
+        self.launch_template = LaunchTemplate(
             resource_name_prefix + "launch-template",
             name_prefix=resource_name_prefix,
             block_device_mappings=block_device_mappings,
@@ -327,19 +330,19 @@ class OLAutoScaling(pulumi.ComponentResource):
             ).items()
         ]
 
-        auto_scale_group = Group(
+        self.auto_scale_group = Group(
             resource_name_prefix + "auto-scale-group",
             desired_capacity=asg_config.desired_size,
             health_check_type=asg_config.health_check_type,
             instance_refresh=instance_refresh_policy,
             launch_template=GroupLaunchTemplateArgs(
-                id=launch_template.id,
+                id=self.launch_template.id,
                 version="$Latest",
             ),
             max_size=asg_config.max_size,
             min_size=asg_config.min_size,
             tags=asg_tags,
-            target_group_arns=[target_group.arn],
+            target_group_arns=[self.target_group.arn],
             vpc_zone_identifiers=asg_config.vpc_zone_identifiers,
             opts=resource_options,
         )

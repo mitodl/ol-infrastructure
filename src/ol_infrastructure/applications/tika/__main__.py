@@ -273,6 +273,6 @@ route53.Record(
     name=tika_config.require("web_host_domain"),
     type="CNAME",
     ttl=five_minutes,
-    records=[as_setup.lb_dns_name],
+    records=[as_setup.load_balancer.dns_name],
     zone_id=mitodl_zone_id,
 )
