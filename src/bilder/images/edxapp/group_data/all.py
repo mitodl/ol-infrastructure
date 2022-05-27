@@ -55,8 +55,8 @@ edx_plugins_added = {
         "ol-openedx-sentry",
         "ol-openedx-course-export",
         "rapid-response-xblock==0.6.0",
-        "ol-openedx-canvas-integration",
-        "ol-openedx-rapid-response-reports",
+        "ol-openedx-canvas-integration==0.1.1",  # TODO: Remove pin when upgrading to nutmeg
+        "ol-openedx-rapid-response-reports==0.1.0",  # TODO: Remove pin when upgrading to nutmeg
     ],
     "mitx-staging": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
@@ -68,8 +68,8 @@ edx_plugins_added = {
         "ol-openedx-sentry",
         "ol-openedx-course-export",
         "rapid-response-xblock==0.6.0",
-        "ol-openedx-canvas-integration",
-        "ol-openedx-rapid-response-reports",
+        "ol-openedx-canvas-integration==0.1.1",  # TODO: Remove pin when upgrading to nutmeg
+        "ol-openedx-rapid-response-reports==0.1.0",  # TODO:  Remove pin when upgrading to nutmeg
     ],
 }
 
