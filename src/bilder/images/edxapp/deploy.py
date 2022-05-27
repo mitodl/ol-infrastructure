@@ -128,6 +128,15 @@ files.directory(
     recursive=True,
 )
 
+# Ugly, hopefully short-term, fix for getting the beat scheduler working again in ODL edx deployments.
+files.line(
+    name="Fix beat_scheduler.sh to invoke RedBeat rather than the broken single-beat definition.",
+    path=str(Path("/edx/app/edxapp/beat_scheduler.sh")),
+    line="^exec.*$",
+    replace="exec /edx/app/edxapp/venvs/edxapp/bin/celery beat $@",
+    backup=True,
+)
+
 apt.packages(
     name="Install ACL package for more granular file permissions",
     packages=["acl"],
