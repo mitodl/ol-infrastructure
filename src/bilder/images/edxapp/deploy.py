@@ -137,6 +137,12 @@ files.line(
     backup=True,
 )
 
+files.put(
+    name="Setup the database migrations service definition",
+    src=str(Path(__file__).resolve().parent.joinpath("files", "migrations.service")),
+    dest=str(Path("/usr/lib/systemd/system/migrations.service")),
+)
+
 apt.packages(
     name="Install ACL package for more granular file permissions",
     packages=["acl"],
@@ -156,6 +162,9 @@ vector_config.configuration_templates[
 ] = {"edx_installation": EDX_INSTALLATION_NAME}
 vector_config.configuration_templates[
     TEMPLATES_DIRECTORY.joinpath("vector", "edxapp_metrics.yaml.j2")
+] = {"edx_installation": EDX_INSTALLATION_NAME}
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "edxapp_migrations_logs.yaml.j2")
 ] = {"edx_installation": EDX_INSTALLATION_NAME}
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
 
@@ -391,6 +400,11 @@ if host.get_fact(HasSystemd):
             # Restart the forum process to reload the configuration file
             "/edx/bin/supervisorctl restart forum'"
         ),
+    )
+    service_configuration_watches(
+        service_name="migrations",
+        watched_files=[lms_config_path, studio_config_path],
+        start_now=False,
     )
 
 if "mitodl" in git_remote and node_type == WEB_NODE_TYPE:
