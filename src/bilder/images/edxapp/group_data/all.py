@@ -48,28 +48,28 @@ edx_plugins_added = {
     "mitx": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "django-redis",  # Support for Redis caching in Django
-        "edx-sga==0.17.3",  # remove pin when upgrading to nutmeg
+        "edx-sga",
         "edx-sysadmin",
         "git+https://github.com/raccoongang/xblock-pdf.git@8d63047c53bc8fdd84fa7b0ec577bb0a729c215f#egg=xblock-pdf",
         "ol-openedx-logging",
         "ol-openedx-sentry",
         "ol-openedx-course-export",
         "rapid-response-xblock==0.6.0",
-        "ol-openedx-canvas-integration==0.1.1",  # TODO: Remove pin when upgrading to nutmeg
-        "ol-openedx-rapid-response-reports==0.1.0",  # TODO: Remove pin when upgrading to nutmeg
+        "ol-openedx-canvas-integration",
+        "ol-openedx-rapid-response-reports",
     ],
     "mitx-staging": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "django-redis",  # Support for Redis caching in Django
-        "edx-sga==0.17.3",  # remove pin when upgrading to nutmeg
+        "edx-sga",
         "edx-sysadmin",
         "git+https://github.com/raccoongang/xblock-pdf.git@8d63047c53bc8fdd84fa7b0ec577bb0a729c215f#egg=xblock-pdf",
         "ol-openedx-logging",
         "ol-openedx-sentry",
         "ol-openedx-course-export",
-        "rapid-response-xblock==0.6.0",
-        "ol-openedx-canvas-integration==0.1.1",  # TODO: Remove pin when upgrading to nutmeg
-        "ol-openedx-rapid-response-reports==0.1.0",  # TODO:  Remove pin when upgrading to nutmeg
+        "rapid-response-xblock",
+        "ol-openedx-canvas-integration",
+        "ol-openedx-rapid-response-reports",
     ],
 }
 
