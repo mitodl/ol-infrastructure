@@ -1,4 +1,5 @@
 from pathlib import Path
+from re import findall, sub
 from urllib.parse import parse_qs, urlparse
 
 import pulumi
@@ -11,6 +12,18 @@ from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+
+
+def privatize_mongo_uri(mongo_uri):
+    """Returns a mongodb uri that has '-pri' appended to each hostname. Intentionally verbose rather than clever."""
+    regex = r"(?:(?:mongodb\:\/\/)|,)([^.]+)"
+    matches = findall(regex, mongo_uri)
+    privatized_mongo_uri = mongo_uri
+    for hostname in matches:
+        new_hostname = hostname + "-pri"
+        privatized_mongo_uri = sub(hostname, new_hostname, privatized_mongo_uri)
+    return privatized_mongo_uri
+
 
 ###############
 # STACK SETUP #
@@ -156,6 +169,11 @@ aws.ec2.Route(
     vpc_peering_connection_id=atlas_aws_network_peer.connection_id,
 )
 
+privatized_mongo_uri = atlas_cluster.mongo_uri.apply(privatize_mongo_uri)
+privatized_mongo_uri_with_options = atlas_cluster.mongo_uri_with_options.apply(
+    privatize_mongo_uri
+)
+
 if atlas_config.get_bool("ready_for_traffic"):
     consul.Keys(
         "set-mongo-connection-info-in-consul",
@@ -163,19 +181,19 @@ if atlas_config.get_bool("ready_for_traffic"):
             consul.KeysKeyArgs(
                 path="mongodb/host",
                 delete=True,
-                value=atlas_cluster.mongo_uri.apply(lambda uri: urlparse(uri).netloc),
+                value=privatized_mongo_uri.apply(lambda uri: urlparse(uri).netloc),
             ),
             consul.KeysKeyArgs(
                 path="mongodb/use-ssl",
                 delete=True,
-                value=atlas_cluster.mongo_uri_with_options.apply(
+                value=privatized_mongo_uri_with_options.apply(
                     lambda uri: parse_qs(urlparse(uri).query)["ssl"][0]
                 ),
             ),
             consul.KeysKeyArgs(
                 path="mongodb/replica-set",
                 delete=True,
-                value=atlas_cluster.mongo_uri_with_options.apply(
+                value=privatized_mongo_uri_with_options.apply(
                     lambda uri: parse_qs(urlparse(uri).query)["replicaSet"][0]
                 ),
             ),
@@ -213,26 +231,26 @@ consul.Keys(
         consul.KeysKeyArgs(
             path=f"{stack_info.env_prefix}/mongodb/host",
             delete=True,
-            value=atlas_cluster.mongo_uri.apply(lambda uri: urlparse(uri).netloc),
+            value=privatized_mongo_uri.apply(lambda uri: urlparse(uri).netloc),
         ),
         consul.KeysKeyArgs(
             path=f"{stack_info.env_prefix}/mongodb/use-ssl",
             delete=True,
-            value=atlas_cluster.mongo_uri_with_options.apply(
+            value=privatized_mongo_uri_with_options.apply(
                 lambda uri: parse_qs(urlparse(uri).query)["ssl"][0]
             ),
         ),
         consul.KeysKeyArgs(
             path=f"{stack_info.env_prefix}/mongodb/replica-set",
             delete=True,
-            value=atlas_cluster.mongo_uri_with_options.apply(
+            value=privatized_mongo_uri_with_options.apply(
                 lambda uri: parse_qs(urlparse(uri).query)["replicaSet"][0]
             ),
         ),
         consul.KeysKeyArgs(
             path=f"{stack_info.env_prefix}/mongodb/connection-string",
             delete=True,
-            value=atlas_cluster.mongo_uri_with_options,
+            value=privatized_mongo_uri_with_options,
         ),
         consul.KeysKeyArgs(path="mongodb/auth-source", delete=True, value="admin"),
     ],
@@ -260,6 +278,8 @@ pulumi.export(
         "mongo_uri_with_options": atlas_cluster.mongo_uri_with_options,
         "connection_strings": atlas_cluster.connection_strings,
         "srv_record": atlas_cluster.srv_address,
+        "privatized_mongo_uri": privatized_mongo_uri,
+        "privatized_mongo_uri_with_options": privatized_mongo_uri_with_options,
     },
 )
 
