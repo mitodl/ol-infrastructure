@@ -1,0 +1,182 @@
+---
+resource_types:
+- name: hashicorp-release
+  source:
+    repository: starkandwayne/hashicorp-release-resource
+  type: docker-image
+
+- name: packer
+  source:
+    repository: mitodl/concourse-packer-resource
+    tag: latest
+  type: docker-image
+
+- name: packer-builder
+  source:
+    repository: mitodl/concourse-packer-resource-builder
+    tag: latest
+  type: docker-image
+
+- name: github-release
+  type: registry-image
+  source:
+    repository: concourse/github-release-resource
+
+resources:
+- check_every: 24h
+  name: vault
+  source:
+    project: vault
+  type: hashicorp-release
+
+- check_every: 24h
+  name: consul
+  source:
+    project: consul
+  type: hashicorp-release
+
+- check_every: 24h
+  name: consul-template
+  source:
+    project: consul-template
+  type: hashicorp-release
+
+- check_every: 24h
+  name: docker-compose-release
+  type: github-release
+  source:
+    owner: docker
+    repository: compose
+    branch: master
+    release: true
+
+- check_every: 24h
+  name: docker-ce-release
+  type: github-release
+  source:
+    owner: moby
+    repository: moby
+    branch: master
+    release: true
+
+- check_every: 24h
+  name: vector-release
+  type: github-release
+  source:
+    owner: vectordotdev
+    repository: vector
+    branch: master
+    release: true
+
+
+- icon: github
+  name: packer_templates
+  source:
+    paths:
+    - src/bilder/components/
+    - src/bilder/images/docker_baseline_ami
+    - src/bilder/images/packer.pkr.hcl
+    - src/bilder/images/variables.pkr.hcl
+    - src/bilder/images/config.pkr.hcl
+    uri: https://github.com/mitodl/ol-infrastructure
+    branch: main
+  type: git
+
+- name: packer-validate
+  type: packer
+
+- name: packer-build
+  type: packer-builder
+
+jobs:
+- name: packer-validate-workflow
+  plan:
+
+  - get: vault
+    params:
+      regexp: linux_amd64
+    trigger: true
+
+  - get: consul
+    params:
+      regexp: linux_amd64
+    trigger: true
+
+  - get: consul-template
+    params:
+      regexp: amd64
+    trigger: true
+
+  - get: packer_templates
+    trigger: true
+
+  - get: docker-compose-release
+    params:
+      regexp: linux_amd64
+    trigger: true
+
+  - get: docker-ce-release
+    trigger: true
+
+  - get: vector-release
+    params:
+      regexp: amd64
+    trigger: true
+
+  - put: packer-validate
+    params:
+      objective: validate
+      only:
+      - amazon-ebs.third-party
+      template: packer_templates/src/bilder/images/.
+      vars:
+        app_name: docker_baseline_ami
+
+- name: packer-build-workflow
+  plan:
+  - get: vault
+    params:
+      regexp: linux_amd64
+    trigger: true
+    passed: [packer-validate-workflow]
+
+  - get: consul
+    params:
+      regexp: linux_amd64
+    trigger: true
+    passed: [packer-validate-workflow]
+
+  - get: consul-template
+    params:
+      regexp: linux_amd64
+    trigger: true
+    passed: [packer-validate-workflow]
+
+  - get: docker-compose-release
+    params:
+      regexp: linux_amd64
+    trigger: true
+    passed: [packer-validate-workflow]
+
+  - get: packer_templates
+    passed: [packer-validate-workflow]
+    params:
+      depth: 1
+    trigger: true
+
+  - put: packer-build
+    params:
+      env_vars:
+        AWS_REGION: us-east-1
+        PYTHONPATH: ${PYTHONPATH}:packer_templates/src
+      env_vars_from_files:
+        VAULT_VERSION: vault/version
+        CONSUL_VERSION: consul/version
+        CONSUL_TEMPLATE_VERSION: consul-template/version
+        DOCKER_COMPOSE_VERSION: docker-compose-release/version
+      objective: build
+      only:
+      - amazon-ebs.third-party
+      template: packer_templates/src/bilder/images/.
+      vars:
+        app_name: docker_baseline_ami

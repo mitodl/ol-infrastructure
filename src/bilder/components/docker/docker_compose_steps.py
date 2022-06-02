@@ -1,15 +1,21 @@
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from pyinfra.api.deploy import deploy
 from pyinfra.operations import files, server
 
+from bridge.lib.versions import DOCKER_COMPOSE_VERSION
+
+DOCKER_COMPOSE_VERSION = os.environ.get(
+    "DOCKER_COMPOSE_VERSION", DOCKER_COMPOSE_VERSION
+)
+
 
 def download_docker_compose():
-
     files.download(
         name="Download the Docker repo file",
-        src="https://github.com/docker/compose/releases/download/1.29.2/docker-compose-linux-x86_64",
+        src=f"https://github.com/docker/compose/releases/download/v{DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64",
         dest="/usr/local/bin/docker-compose",
         mode="755",
     )
@@ -26,10 +32,8 @@ def create_enable_systemd_service():
         mode="755",
     )
 
-    server.service(
-        name="Enable Docker Compose",
-        service="docker-compose",
-        enabled=True,
+    server.shell(
+        "sudo systemctl enable docker-compose.service && systemctl is-enabled docker-compose.service"
     )
 
 

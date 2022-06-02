@@ -1,0 +1,63 @@
+---
+resource_types:
+- name: github-release
+  type: registry-image
+  source:
+    repository: concourse/github-release-resource
+
+resources:
+- check_every: 24h
+  name: forum-release
+  type: github-release
+  source:
+    owner: openedx
+    repository: cs_comments_service
+    branch: master
+    release: true
+
+- name: forum-image
+  type: registry-image
+  icon: docker
+  source:
+    repository: mitodl/forum
+    tag: latest
+    username: ((dockerhub.username))
+    password: ((dockerhub.password))
+
+- name: forum-dockerfile-repo
+  type: git
+  icon: github
+  source:
+    uri: https://github.com/mitodl/ol-infrastructure.git
+    branch: main
+    path: dockerfiles/openedx-forum/Dockerfile
+
+jobs:
+- name: build-and-push
+  plan:
+  - get: forum-dockerfile-repo
+  - get: forum-release
+    trigger: true
+
+  - task: build-forum-image
+    privileged: true
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: concourse/oci-build-task
+      inputs:
+      - name: forum-dockerfile-repo
+      - name: forum-release
+      outputs:
+      - name: image
+      params:
+        CONTEXT: forum-dockerfile-repo/dockerfiles/openedx-forum
+      run:
+        path: build
+        args:
+        - -t $(cat ./forum-release/commit_sha)
+  - put: forum-image
+    params:
+      image: image/image.tar
