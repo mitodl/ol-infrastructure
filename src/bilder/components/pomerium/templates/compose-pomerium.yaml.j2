@@ -1,0 +1,24 @@
+version: "3"
+services:
+  nginx:
+    image: nginx
+    restart: unless-stopped
+    ports:
+      - {{ context.listener_port }}:{{ context.listener_port }}
+    volumes:
+      - {{ context.configuration_directory }}/nginx_pomerium.conf:/etc/nginx/conf.d/pomerium.conf:ro
+      - {{ context.certificate_file }}:/etc/nginx/nginx.pem:ro
+      - {{ context.certificate_key_file }}:/etc/nginx/nginx-key.pem:ro
+      - {{ context.configuration_directory }}/nginx_proxy.conf:/etc/nginx/proxy.conf:ro
+      - {{ context.configuration_directory }}/nginx_htpasswd:/etc/nginx/htpasswd:ro
+  pomerium:
+    image: {{ context.docker_image }}:{{ context.docker_tag }}
+    volumes:
+      ## Mount your domain's certificates : https://www.pomerium.com/docs/reference/certificates
+      - {{ context.certificate_file }}:/pomerium/cert.pem:ro
+      - {{ context.certificate_key_file }}:/pomerium/privkey.pem:ro
+
+      ## Mount your config file : https://www.pomerium.com/docs/reference/
+      - {{ context.configuration_file }}:/pomerium/config.yaml:ro
+    ports:
+      - {{ context.listener_port }}

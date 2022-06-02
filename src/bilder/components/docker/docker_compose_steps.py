@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from pyinfra.api.deploy import deploy
-from pyinfra.operations import files, server
+from pyinfra.operations import files
 
 from bridge.lib.versions import DOCKER_COMPOSE_VERSION
 
@@ -22,22 +22,17 @@ def download_docker_compose():
     files.directory(path="/etc/docker/compose/")
 
 
-def create_enable_systemd_service():
-    files.template(
+def create_systemd_service():
+    files.put(
         name="Copy docker compose service file",
         src=str(
-            Path(__file__).resolve().parent.joinpath("templates/docker-compose.service")
+            Path(__file__).resolve().parent.joinpath("files", "docker-compose.service")
         ),
-        dest="/etc/systemd/system/docker-compose.service",
+        dest="/usr/lib/systemd/system/docker-compose.service",
         mode="755",
     )
-
-    server.shell(
-        "sudo systemctl enable docker-compose.service && systemctl is-enabled docker-compose.service"
-    )
-
 
 @deploy("Deploy Docker Compose")
 def deploy_docker_compose(config: Optional[Dict[str, Any]] = None):
     download_docker_compose()
-    create_enable_systemd_service()
+    create_systemd_service()
