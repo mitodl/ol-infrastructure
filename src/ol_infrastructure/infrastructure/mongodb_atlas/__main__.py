@@ -231,26 +231,26 @@ consul.Keys(
         consul.KeysKeyArgs(
             path=f"{stack_info.env_prefix}/mongodb/host",
             delete=True,
-            value=privatized_mongo_uri.apply(lambda uri: urlparse(uri).netloc),
+            value=atlas_cluster.mongo_uri.apply(lambda uri: urlparse(uri).netloc),
         ),
         consul.KeysKeyArgs(
             path=f"{stack_info.env_prefix}/mongodb/use-ssl",
             delete=True,
-            value=privatized_mongo_uri_with_options.apply(
+            value=atlas_cluster.mongo_uri_with_options.apply(
                 lambda uri: parse_qs(urlparse(uri).query)["ssl"][0]
             ),
         ),
         consul.KeysKeyArgs(
             path=f"{stack_info.env_prefix}/mongodb/replica-set",
             delete=True,
-            value=privatized_mongo_uri_with_options.apply(
+            value=atlas_cluster.mongo_uri_with_options.apply(
                 lambda uri: parse_qs(urlparse(uri).query)["replicaSet"][0]
             ),
         ),
         consul.KeysKeyArgs(
             path=f"{stack_info.env_prefix}/mongodb/connection-string",
             delete=True,
-            value=privatized_mongo_uri_with_options,
+            value=atlas_cluster.mongo_uri_with_options,
         ),
         consul.KeysKeyArgs(path="mongodb/auth-source", delete=True, value="admin"),
     ],
