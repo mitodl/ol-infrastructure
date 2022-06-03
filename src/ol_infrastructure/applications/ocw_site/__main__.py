@@ -985,16 +985,10 @@ for purpose in ["draft", "live"]:
         opts=ResourceOptions(protect=True),
     )
 
-    export(
-        "dictionary_info",
-        {
-            "dictionary_name": servicevcl_backend.dictionaries.name,
-            "dictionary_id": servicevcl_backend.dictionaries.id,
-        },
-    )
-
     items = fastly.ServiceDictionaryItems(
-        "items",
+        f"ocw-{purpose}-{stack_info.env_suffix}",
+        service_id=servicevcl_backend.id,
+        dictionary_id=servicevcl_backend.dictionaries.id,
         items={
             "/1-00F05": "307|keep|https://{{AK_HOSTHEADER}}/courses/civil-and-environmental-engineering/1-00-introduction-to-computers-and-engineering-problem-solving-spring-2012/",
             "/1-050F04": "307|keep|https://{{AK_HOSTHEADER}}/courses/civil-and-environmental-engineering/1-051-structural-engineering-design-fall-2003/",
