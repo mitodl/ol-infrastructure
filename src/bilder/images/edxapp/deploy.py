@@ -101,19 +101,19 @@ git.repo(
 )
 
 git_auto_export()
-# Install additional Python dependencies for use with edxapp
-pip.packages(
-    name="Install additional edX dependencies",
-    packages=host.data.edx_plugins_added[EDX_INSTALLATION_NAME],
-    present=True,
-    virtualenv="/edx/app/edxapp/venvs/edxapp/",
-    _sudo_user=EDX_USER,
-)
 
 pip.packages(
     name="Uninstall undesired edX dependencies",
     packages=host.data.edx_plugins_removed.get(EDX_INSTALLATION_NAME, []),
     present=False,
+    virtualenv="/edx/app/edxapp/venvs/edxapp/",
+    _sudo_user=EDX_USER,
+)
+# Install additional Python dependencies for use with edxapp
+pip.packages(
+    name="Install additional edX dependencies",
+    packages=host.data.edx_plugins_added[EDX_INSTALLATION_NAME],
+    present=True,
     virtualenv="/edx/app/edxapp/venvs/edxapp/",
     _sudo_user=EDX_USER,
 )
