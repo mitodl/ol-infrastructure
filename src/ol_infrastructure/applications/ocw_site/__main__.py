@@ -427,10 +427,10 @@ for purpose in ["draft", "live"]:
         opts=ResourceOptions(protect=True),
     )
 
-    # items = fastly.ServiceDictionaryItems(
-    #     f"ocw-{purpose}-{stack_info.env_suffix}",
-    #     service_id=servicevcl_backend.id,
-    #     dictionary_id=servicevcl_backend.dictionaries.id,
-    #     items={json.loads(open("redirect_dict").read())},
-    #     opts=ResourceOptions(protect=True),
-    # )
+    items = fastly.ServiceDictionaryItems(
+        f"ocw-{purpose}-{stack_info.env_suffix}",
+        service_id=servicevcl_backend.id,
+        dictionary_id=servicevcl_backend.dictionaries.id,
+        items=json.load(open("redirect_dict")),
+        opts=ResourceOptions(protect=True),
+    )
