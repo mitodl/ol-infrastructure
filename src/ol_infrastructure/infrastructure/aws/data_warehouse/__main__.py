@@ -207,7 +207,7 @@ query_engine_role = iam.Role(
             },
         }
     ),
-    name=f"data-lake-query-engine-policy-{stack_info.env_suffix}",
+    name=f"data-lake-query-engine-role-{stack_info.env_suffix}",
     path="/ol-data/etl-role/",
     tags=aws_config.tags,
 )
