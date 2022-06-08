@@ -196,7 +196,7 @@ query_engine_iam_policy = iam.Policy(
 )
 
 query_engine_role = iam.Role(
-    "query-engine-role",
+    "data-lake-query-engine-role",
     assume_role_policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -213,7 +213,7 @@ query_engine_role = iam.Role(
 )
 
 iam.RolePolicyAttachment(
-    f"query-engine-role-policy-{stack_info.env_suffix}",
+    f"data-lake-query-engine-role-policy-{stack_info.env_suffix}",
     policy_arn=query_engine_iam_policy.arn,
     role=query_engine_role.name,
 )
