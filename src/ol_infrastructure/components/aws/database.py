@@ -170,7 +170,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             instance_class=db_config.instance_size,
             max_allocated_storage=db_config.max_storage,
             multi_az=db_config.multi_az,
-            name=db_config.db_name,
+            db_name=db_config.db_name,
             opts=resource_options.merge(
                 pulumi.ResourceOptions(ignore_changes=["engine_version"])
             ),
