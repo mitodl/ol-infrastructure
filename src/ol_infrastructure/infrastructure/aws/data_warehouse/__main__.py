@@ -185,14 +185,14 @@ query_engine_iam_permissions = {
 # Create instance profile for granting access to S3 buckets
 query_engine_iam_policy = iam.Policy(
     f"data-lake-query-engine-policy-{stack_info.env_suffix}",
-    name=f"query-engine-policy-{stack_info.env_suffix}",
+    name=f"data-lake-query-engine-policy-{stack_info.env_suffix}",
     path=f"/ol-data/etl-policy-{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         query_engine_iam_permissions,
         stringify=True,
         parliament_config=parliament_config,
     ),
-    description="Policy for granting access to Glue and S3 to query engine",
+    description="Policy for granting access to Glue and S3 to data lake query engine",
 )
 
 query_engine_role = iam.Role(
