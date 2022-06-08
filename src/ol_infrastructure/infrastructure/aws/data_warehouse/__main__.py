@@ -184,7 +184,7 @@ query_engine_iam_permissions = {
 
 # Create instance profile for granting access to S3 buckets
 query_engine_iam_policy = iam.Policy(
-    f"query-engine-policy-{stack_info.env_suffix}",
+    f"data-lake-query-engine-policy-{stack_info.env_suffix}",
     name=f"query-engine-policy-{stack_info.env_suffix}",
     path=f"/ol-data/etl-policy-{stack_info.env_suffix}/",
     policy=lint_iam_policy(
@@ -207,7 +207,7 @@ query_engine_role = iam.Role(
             },
         }
     ),
-    name=f"query-engine-role-{stack_info.env_suffix}",
+    name=f"data-lake-query-engine-policy-{stack_info.env_suffix}",
     path="/ol-data/etl-role/",
     tags=aws_config.tags,
 )
