@@ -5,7 +5,7 @@ from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import iam, route53, s3
 
 from bridge.lib.constants import FASTLY_A_TLS_1_2, FASTLY_CNAME_TLS_1_3
-from bridge.lib.magic_numbers import DEFAULT_FASTLY_BACKEND_TTL, FIVE_MINUTES
+from bridge.lib.magic_numbers import FIVE_MINUTES, SECONDS_IN_ONE_DAY
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -278,7 +278,7 @@ for purpose in ["draft", "live"]:
                 type="REQUEST",
             ),
         ],
-        default_ttl=DEFAULT_FASTLY_BACKEND_TTL,
+        default_ttl=SECONDS_IN_ONE_DAY,
         dictionaries=[
             fastly.ServiceVclDictionaryArgs(
                 name="redirects",
