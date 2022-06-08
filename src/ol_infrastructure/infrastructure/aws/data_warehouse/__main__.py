@@ -1,6 +1,10 @@
-from pulumi import Config, StackReference, export
-from pulumi_aws import athena, glue, s3
+import json
+from typing import Any, Dict, List, Union
 
+from pulumi import Config, StackReference, export
+from pulumi_aws import athena, glue, iam, s3
+
+from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
@@ -113,4 +117,103 @@ export(
         "databases": [database.name for database in warehouse_dbs],
         "workgroup": athena_warehouse_workgroup.name,
     },
+)
+
+parliament_config: Dict[str, Any] = {
+    "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []}
+}
+
+query_engine_permissions: List[Dict[str, Union[str, List[str]]]] = [
+    {
+        "Effect": "Allow",
+        "Action": [
+            "glue:TagResource",
+            "glue:UnTagResource",
+        ],
+        "Resource": ["*"],
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "glue:BatchCreatePartition",
+            "glue:BatchDeletePartition",
+            "glue:BatchDeleteTable",
+            "glue:BatchGetPartition",
+            "glue:CreateTable",
+            "glue:CreatePartition",
+            "glue:DeletePartition",
+            "glue:DeleteTable",
+            "glue:GetDatabase",
+            "glue:GetDatabases",
+            "glue:GetPartition",
+            "glue:GetPartitions",
+            "glue:GetTable",
+            "glue:GetTables",
+            "glue:UpdateDatabase",
+            "glue:UpdatePartition",
+            "glue:UpdateTable",
+        ],
+        "Resource": [
+            "arn:aws:glue:*:*:catalog",
+            f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}",
+            f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}/*",
+        ],
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "s3:PutObject",
+            "s3:GetObject",
+            "s3:ListBucketMultipartUploads",
+            "s3:ListBucketVersions",
+            "s3:ListBucket",
+            "s3:DeleteObject",
+            "s3:GetObjectVersion",
+        ],
+        "Resource": [
+            f"arn:aws:s3:::ol-data-lake-data-{stack_info.env_suffix}",
+            f"arn:aws:s3:::ol-data-lake-data-{stack_info.env_suffix}/*",
+        ],
+    },
+]
+
+query_engine_iam_permissions = {
+    "Version": "2012-10-17",
+    "Statement": query_engine_permissions,
+}
+
+# Create instance profile for granting access to S3 buckets
+query_engine_iam_policy = iam.Policy(
+    f"query-engine-policy-{stack_info.env_suffix}",
+    name=f"query-engine-policy-{stack_info.env_suffix}",
+    path=f"/ol-data/etl-policy-{stack_info.env_suffix}/",
+    policy=lint_iam_policy(
+        query_engine_iam_permissions,
+        stringify=True,
+        parliament_config=parliament_config,
+    ),
+    description="Policy for granting access to Glue and S3 to query engine",
+)
+
+query_engine_role = iam.Role(
+    "query-engine-role",
+    assume_role_policy=json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": {
+                "Effect": "Allow",
+                "Action": "sts:AssumeRole",
+                "Principal": {"Service": "ec2.amazonaws.com"},
+            },
+        }
+    ),
+    name=f"query-engine-role-{stack_info.env_suffix}",
+    path="/ol-data/etl-role/",
+    tags=aws_config.tags,
+)
+
+iam.RolePolicyAttachment(
+    f"query-engine-role-policy-{stack_info.env_suffix}",
+    policy_arn=query_engine_iam_policy.arn,
+    role=query_engine_role.name,
 )
