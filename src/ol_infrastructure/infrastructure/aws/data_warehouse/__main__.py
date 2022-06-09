@@ -9,6 +9,7 @@ from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 data_warehouse_config = Config("data_warehouse")
+data_lake_query_engine_config = Config("data-lake-query-engine")
 stack_info = parse_stack()
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
 aws_config = AWSBase(
@@ -195,6 +196,9 @@ query_engine_iam_policy = iam.Policy(
     description="Policy for granting access to Glue and S3 to data lake query engine",
 )
 
+query_engine_aws_account_id = data_lake_query_engine_config.require("aws-account-id")
+query_engine_aws_external_id = data_lake_query_engine_config.require("aws-external-id")
+
 query_engine_role = iam.Role(
     "data-lake-query-engine-role",
     assume_role_policy=json.dumps(
@@ -203,7 +207,12 @@ query_engine_role = iam.Role(
             "Statement": {
                 "Effect": "Allow",
                 "Action": "sts:AssumeRole",
-                "Principal": {"Service": "ec2.amazonaws.com"},
+                "Principal": {
+                    "AWS": f"arn:aws:iam::{query_engine_aws_account_id}:root"
+                },
+                "Condition": {
+                    "StringEquals": {"sts:ExternalId": query_engine_aws_external_id}
+                },
             },
         }
     ),
