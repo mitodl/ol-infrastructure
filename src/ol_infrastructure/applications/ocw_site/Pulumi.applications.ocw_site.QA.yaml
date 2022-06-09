@@ -8,3 +8,4 @@ config:
     - draft-qa.ocw.mit.edu
     live:
     - live-qa.ocw.mit.edu
+    - ocwnext-rc.odl.mit.edu
