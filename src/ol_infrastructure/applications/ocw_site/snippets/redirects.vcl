@@ -49,8 +49,8 @@ if (req.url.path ~ "(/courses/)([\w-]+)/(.*)/") {
   }
 }
 
-# OCW Legacy /resources/ to /courses/ redirect
-if (req.url.path ~ "(^/resources/)") {
+# OCW Legacy /resources/res-* to /courses/ redirect
+if (req.url.path ~ "(^/resources/res-*)") {
   set req.http.courses_instead_resources = regsub(req.url.path, "/resources/", "/courses/");
   error 604 "redirect";
 }
