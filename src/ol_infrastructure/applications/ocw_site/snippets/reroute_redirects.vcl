@@ -32,3 +32,4 @@ if (obj.status == 301) {
 if (obj.status == 307) {
   set obj.http.Location = obj.response;
   return(deliver);
+ }
