@@ -2,10 +2,11 @@
 
 set -e
 
-AWS_ROLE=$(curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/)
-AWS_ACCESS_KEY_ID="$(curl http://169.254.169.254/latest/meta-data/iam/security-credentials/"$AWS_ROLE" | awk '/AccessKeyId/ {print $3}' | sed 's/[",]//g')"
-AWS_SECRET_ACCESS_KEY="$(curl http://169.254.169.254/latest/meta-data/iam/security-credentials/"$AWS_ROLE" | awk '/SecretAccessKey/ {print $3}' | sed 's/[",]//g')"
-AWS_SESSION_TOKEN="$(curl http://169.254.169.254/latest/meta-data/iam/security-credentials/"$AWS_ROLE" | awk '/Token/ {print $3}' | sed 's/[",]//g')"
+TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+AWS_ROLE=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/)
+AWS_ACCESS_KEY_ID="$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/security-credentials/"$AWS_ROLE" | awk '/AccessKeyId/ {print $3}' | sed 's/[",]//g')"
+AWS_SECRET_ACCESS_KEY="$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/security-credentials/"$AWS_ROLE" | awk '/SecretAccessKey/ {print $3}' | sed 's/[",]//g')"
+AWS_SESSION_TOKEN="$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/security-credentials/"$AWS_ROLE" | awk '/Token/ {print $3}' | sed 's/[",]//g')"
 export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
 export AWS_SESSION_TOKEN
