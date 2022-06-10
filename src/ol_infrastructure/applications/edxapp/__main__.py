@@ -85,7 +85,7 @@ consul_stack = StackReference(
     f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
 )
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
-vault_stack = StackReference(f"infrastructure.vault.{stack_info.name}")
+vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 
 #############
 # Variables #
