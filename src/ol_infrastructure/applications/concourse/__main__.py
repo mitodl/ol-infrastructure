@@ -98,7 +98,7 @@ def build_worker_user_data(
 
 
 ##################################
-##    Setup + Config Retrival   ##
+#     Setup + Config Retrival    #
 ##################################
 
 if Config("vault_server").get("env_namespace"):
@@ -109,6 +109,7 @@ network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
 consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
+vault_stack = StackReference(f"infrastructure.vault.{stack_info.name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
 target_vpc_name = concourse_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
@@ -143,7 +144,7 @@ concourse_web_tag = f"concourse-web-{stack_info.env_suffix}"
 consul_provider = get_consul_provider(stack_info)
 
 ###############################
-##     General Resources     ##
+#      General Resources      #
 ###############################
 
 # IAM and instance profile
@@ -192,7 +193,7 @@ for iam_policy in iam_policy_names or []:
     )
     iam_policy_objects[iam_policy] = iam_policy_object
 
-## Loop through the policy names hooked to web nodes and attach them
+# Loop through the policy names hooked to web nodes and attach them
 for iam_policy_name in concourse_config.get_object("web_iam_policies") or []:
     iam_policy_object = iam_policy_objects[iam_policy_name]
     iam.RolePolicyAttachment(
@@ -356,10 +357,8 @@ concourse_db_security_group = ec2.SecurityGroup(
             security_groups=[
                 concourse_web_security_group.id,
                 consul_security_groups["consul_server"],
+                vault_stack.require_output("security_group"),
             ],
-            # TODO: Create Vault security group to act as source of allowed
-            # traffic. (TMM 2021-05-04)
-            cidr_blocks=[target_vpc["cidr"]],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
@@ -566,7 +565,7 @@ web_launch_config = ec2.LaunchTemplate(
                                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                                     """
-                                ),
+                                ),  # noqa: WPS355
                                 "owner": "root:root",
                             },
                         ]
@@ -592,7 +591,7 @@ web_asg = autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50
+            min_healthy_percentage=50  # noqa: WPS432
         ),
         triggers=["tags"],
     ),
@@ -763,7 +762,7 @@ for worker_def in concourse_config.get_object("workers") or []:
         f"concourse-worker-{worker_class_name}-autoscaling-group",
         desired_capacity=auto_scale_config["desired"] or 1,
         min_size=auto_scale_config["min"] or 1,
-        max_size=auto_scale_config["max"] or 50,
+        max_size=auto_scale_config["max"] or 50,  # noqa: WPS432
         health_check_type="ELB",
         vpc_zone_identifiers=target_vpc["subnet_ids"],
         launch_template=autoscaling.GroupLaunchTemplateArgs(
@@ -772,7 +771,7 @@ for worker_def in concourse_config.get_object("workers") or []:
         instance_refresh=autoscaling.GroupInstanceRefreshArgs(
             strategy="Rolling",
             preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-                min_healthy_percentage=50,
+                min_healthy_percentage=50,  # noqa: WPS432
             ),
             triggers=["tags"],
         ),
@@ -790,7 +789,7 @@ for worker_def in concourse_config.get_object("workers") or []:
     )
 
 vault.aws.AuthBackendRole(
-    f"concourse-worker-ami-ec2-vault-auth",
+    "concourse-worker-ami-ec2-vault-auth",
     backend="aws",
     auth_type="iam",
     inferred_entity_type="ec2_instance",
@@ -799,7 +798,7 @@ vault.aws.AuthBackendRole(
         iam_instance_profile.arn
         for iam_instance_profile in concourse_worker_instance_profiles
     ],
-    role=f"concourse-worker",
+    role="concourse-worker",
     bound_ami_ids=[concourse_worker_ami.id],
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[ops_vpc_id],

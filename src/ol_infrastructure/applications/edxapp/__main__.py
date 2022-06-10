@@ -85,6 +85,7 @@ consul_stack = StackReference(
     f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
 )
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
+vault_stack = StackReference(f"infrastructure.vault.{stack_info.name}")
 
 #############
 # Variables #
@@ -378,13 +379,16 @@ edxapp_db_security_group = ec2.SecurityGroup(
     description="Access from Edxapp instances to the associated MariaDB database",
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            security_groups=[edxapp_security_group.id],
+            security_groups=[
+                edxapp_security_group.id,
+                data_vpc["security_groups"]["orchestrator"],
+                data_vpc["security_groups"]["integrator"],
+                vault_stack.require_output("security_group"),
+            ],
             # TODO: Create Vault security group to act as source of allowed
             # traffic. (TMM 2021-05-04)
             cidr_blocks=[
                 edxapp_vpc["cidr"],
-                operations_vpc["cidr"],
-                data_vpc["cidr"],
             ],
             protocol="tcp",
             from_port=DEFAULT_MYSQL_PORT,

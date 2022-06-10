@@ -15,6 +15,7 @@ from pulumi.config import get_config
 from pulumi_aws import ec2, iam, route53, s3
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
+from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -40,6 +41,7 @@ data_warehouse_stack = StackReference(
 dns_stack = StackReference("infrastructure.aws.dns")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
+vault_stack = StackReference(f"infrastructure.vault.{stack_info.name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
@@ -299,11 +301,13 @@ dagster_db_security_group = ec2.SecurityGroup(
     description="Access from the data VPC to the Dagster database",
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            cidr_blocks=[data_vpc["cidr"], operations_vpc["cidr"]],
-            ipv6_cidr_blocks=[data_vpc["cidr_v6"]],
+            security_groups=[
+                data_vpc["security_groups"]["orchestrator"],
+                vault_stack.require_output("security_group"),
+            ],
             protocol="tcp",
-            from_port=5432,
-            to_port=5432,
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
         )
     ],
     tags=aws_config.tags,

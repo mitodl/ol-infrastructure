@@ -215,6 +215,26 @@ data_vpc_exports.update(
                 ),
                 name=f"ol-data-{stack_info.env_suffix}-salt-minion",
             ).id,
+            "orchestrator": ec2.SecurityGroup(
+                f"{data_vpc_config.vpc_name}-data-orchestrator",
+                description="Security group used by the data orchestration engine",
+                vpc_id=data_vpc.olvpc.id,
+                ingress=[],
+                egress=[],
+                tags=data_vpc_config.merged_tags(
+                    {"Name": f"ol-data-{stack_info.env_suffix}-data-orchestrator"}
+                ),
+            ).id,
+            "integrator": ec2.SecurityGroup(
+                f"{data_vpc_config.vpc_name}-data-integrator",
+                description="Security group used by the data integration engine",
+                vpc_id=data_vpc.olvpc.id,
+                ingress=[],
+                egress=[],
+                tags=data_vpc_config.merged_tags(
+                    {"Name": f"ol-data-{stack_info.env_suffix}-data-integrator"}
+                ),
+            ).id,
         }
     }
 )

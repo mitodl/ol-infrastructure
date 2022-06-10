@@ -11,6 +11,7 @@ import pulumi_vault as vault
 from pulumi import Config, StackReference, export
 from pulumi_aws import ec2, iam, s3
 
+from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -120,8 +121,8 @@ mitxonline_db_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
-            from_port=5432,
-            to_port=5432,
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
             cidr_blocks=["0.0.0.0/0"],
             ipv6_cidr_blocks=["::/0"],
             description="Allow access over the public internet from Heroku",
