@@ -383,7 +383,7 @@ edxapp_db_security_group = ec2.SecurityGroup(
                 edxapp_security_group.id,
                 data_vpc["security_groups"]["orchestrator"],
                 data_vpc["security_groups"]["integrator"],
-                vault_stack.require_output("security_group"),
+                vault_stack.require_output("vault_server")["security_group"],
             ],
             # TODO: Create Vault security group to act as source of allowed
             # traffic. (TMM 2021-05-04)

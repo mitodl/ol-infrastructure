@@ -303,7 +303,7 @@ dagster_db_security_group = ec2.SecurityGroup(
         ec2.SecurityGroupIngressArgs(
             security_groups=[
                 data_vpc["security_groups"]["orchestrator"],
-                vault_stack.require_output("security_group"),
+                vault_stack.require_output("vault_server")["security_group"],
             ],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,

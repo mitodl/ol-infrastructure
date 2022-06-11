@@ -357,7 +357,7 @@ concourse_db_security_group = ec2.SecurityGroup(
             security_groups=[
                 concourse_web_security_group.id,
                 consul_security_groups["consul_server"],
-                vault_stack.require_output("security_group"),
+                vault_stack.require_output("vault_server")["security_group"],
             ],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
