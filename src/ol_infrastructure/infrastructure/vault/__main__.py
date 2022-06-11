@@ -322,16 +322,14 @@ vault_listener_csr = tls.CertRequest(
     ],
     key_algorithm=vault_listener_key.algorithm,
     private_key_pem=vault_listener_key.private_key_pem,
-    subjects=[
-        tls.CertRequestSubjectArgs(
-            country="US",
-            province="Massachusetts",
-            locality="Cambridge",
-            organization="Massachusetts Institute of Technology",
-            organizational_unit="Open Learning",
-            common_name=vault_domain,
-        )
-    ],
+    subject=tls.CertRequestSubjectArgs(
+        country="US",
+        province="Massachusetts",
+        locality="Cambridge",
+        organization="Massachusetts Institute of Technology",
+        organizational_unit="Open Learning",
+        common_name=vault_domain,
+    ),
 )
 vault_listener_cert = acmpca.Certificate(
     "vault-server-listener-tls-certificate",
