@@ -14,6 +14,7 @@ from pulumi_aws.ec2 import (
     LaunchTemplateBlockDeviceMappingArgs,
     LaunchTemplateBlockDeviceMappingEbsArgs,
     LaunchTemplateIamInstanceProfileArgs,
+    LaunchTemplateMetadataOptionsArgs,
     LaunchTemplateTagSpecificationArgs,
     SecurityGroup,
 )
@@ -308,7 +309,7 @@ class OLAutoScaling(pulumi.ComponentResource):
 
         # Construct the launch template
         self.launch_template = LaunchTemplate(
-            resource_name_prefix + "launch-template",
+            f"{resource_name_prefix}-launch-template",
             name_prefix=resource_name_prefix,
             block_device_mappings=block_device_mappings,
             iam_instance_profile=LaunchTemplateIamInstanceProfileArgs(
@@ -321,6 +322,12 @@ class OLAutoScaling(pulumi.ComponentResource):
             tags=lt_config.tags,
             user_data=lt_config.user_data,
             vpc_security_group_ids=lt_config.security_groups,
+            metadata_options=LaunchTemplateMetadataOptionsArgs(
+                http_endpoint="enabled",
+                http_tokens="optional",
+                http_put_response_hop_limit=5,
+                instance_metadata_tags="enabled",
+            ),
             opts=resource_options,
         )
 
