@@ -64,6 +64,7 @@ class ConsulTelemetry(FlexibleBaseModel):
 class ConsulConfig(HashicorpConfig):
     acl: Optional[ConsulACL]
     addresses: Optional[ConsulAddresses] = ConsulAddresses()
+    advertise_addr: Optional[str]
     bootstrap_expect: Optional[int]
     client_addr: Optional[str]
     data_dir: Optional[Path] = Path("/var/lib/consul/")
