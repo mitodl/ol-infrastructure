@@ -1,6 +1,7 @@
 import pulumi_vault as vault
 from pulumi import Config
 
+from bridge.lib.magic_numbers import ONE_MONTH, SIX_MONTHS
 from ol_infrastructure.lib.ol_types import Environment
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -10,10 +11,6 @@ stack_info = parse_stack()
 
 if Config("vault_server").get("env_namespace"):
     setup_vault_provider()
-
-# TODO:
-# - Mount AWS auth backend
-# - Mount GitHub auth backend
 
 # Generic AWS backend
 vault_aws_auth = vault.AuthBackend(
@@ -40,3 +37,13 @@ for env in Environment:
         f"vault-aws-auth-backend-client-configuration-{env.value}",
         backend=vault_aws_auth.path,
     )
+
+# GitHub auth backend
+vault_github_auth = vault.github.AuthBackend(
+    "vault-github-auth-backend",
+    organization="mitodl",
+    description="GitHub Auth mount in a Vault server",
+    path=f"github-{env.value}",
+    token_ttl=ONE_MONTH,
+    token_max_ttl=SIX_MONTHS,
+)
