@@ -1,7 +1,7 @@
 import pulumi_vault as vault
 from pulumi import Config
 
-from bridge.lib.magic_numbers import ONE_MONTH, SIX_MONTHS
+from bridge.lib.magic_numbers import ONE_MONTH_SECONDS, SIX_MONTHS
 from ol_infrastructure.lib.ol_types import Environment
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -43,7 +43,6 @@ vault_github_auth = vault.github.AuthBackend(
     "vault-github-auth-backend",
     organization="mitodl",
     description="GitHub Auth mount in a Vault server",
-    path=f"github-{env.value}",
-    token_ttl=ONE_MONTH,
+    token_ttl=ONE_MONTH_SECONDS,
     token_max_ttl=SIX_MONTHS,
 )
