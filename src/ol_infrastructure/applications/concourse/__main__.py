@@ -684,6 +684,12 @@ for worker_def in concourse_config.get_object("workers") or []:
         ],
         instance_type=worker_instance_type,
         key_name="oldevops",
+        metadata_options=ec2.LaunchTemplateMetadataOptionsArgs(
+            http_endpoint="enabled",
+            http_tokens="optional",
+            http_put_response_hop_limit=5,
+            instance_metadata_tags="enabled",
+        ),
         tag_specifications=[
             ec2.LaunchTemplateTagSpecificationArgs(
                 resource_type="instance",
