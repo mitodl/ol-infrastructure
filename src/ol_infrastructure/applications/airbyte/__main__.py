@@ -34,6 +34,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -93,16 +94,60 @@ airbyte_server_instance_role = iam.Role(
     assume_role_policy=json.dumps(
         {
             "Version": "2012-10-17",
-            "Statement": {
-                "Effect": "Allow",
-                "Action": "sts:AssumeRole",
-                "Principal": {"Service": "ec2.amazonaws.com"},
-            },
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": "sts:AssumeRole",
+                    "Principal": {"Service": "ec2.amazonaws.com"},
+                },
+            ],
         }
     ),
     path="/ol-infrastructure/airbyte-server/role/",
     tags=aws_config.tags,
 )
+
+parliament_config = {
+    "PERMISSIONS_MANAGEMENT_ACTIONS": {
+        "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
+    }
+}
+data_lake_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "s3:ListAllMyBuckets",
+            "Resource": "*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject*",
+                "s3:PutObject",
+                "s3:PutObjectAcl",
+                "s3:DeleteObject",
+                "s3:ListBucket*",
+            ],
+            "Resource": [
+                f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}",
+                f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}/*",
+            ],
+        },
+    ],
+}
+data_lake_policy = iam.Policy(
+    "data-lake-access-policy",
+    name_prefix="airbyte-datalake-policy-",
+    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    policy=lint_iam_policy(
+        data_lake_policy_document,
+        stringify=True,
+        parliament_config=parliament_config,
+    ),
+    description="AWS access permissions to allow airbyte to use ol-data-lake-* buckets",
+)
+
 iam.RolePolicyAttachment(
     f"airbyte-server-describe-instance-role-policy-{env_name}",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
@@ -113,6 +158,12 @@ iam.RolePolicyAttachment(
     policy_arn=policy_stack.require_output("iam_policies")["route53_odl_zone_records"],
     role=airbyte_server_instance_role.name,
 )
+iam.RolePolicyAttachment(
+    f"airbyte-server-data-lake-access-policy-{env_name}",
+    policy_arn=data_lake_policy.arn,
+    role=airbyte_server_instance_role.name,
+)
+
 airbyte_server_instance_profile = iam.InstanceProfile(
     f"airbyte-server-instance-profile-{env_name}",
     role=airbyte_server_instance_role.name,
