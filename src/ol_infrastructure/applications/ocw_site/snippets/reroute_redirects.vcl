@@ -23,6 +23,12 @@ if (obj.status == 605 && obj.response == "redirect") {
   return(deliver);
 }
 
+if (obj.status == 606 && obj.response == "redirect") {
+  set obj.status = 302;
+  set obj.http.location = req.http.high_school_to_article;
+  return(deliver);
+}
+
 if (obj.status == 301) {
   set obj.status = 302;
   set obj.http.Location = req.protocol + "://" + req.http.host + req.http.slash_header;
