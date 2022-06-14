@@ -1,0 +1,5 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gG9mY/HCFgcfcfPaqalMx8dAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM7O1s8XDb2Pm1q3GtAgEQgDvOV8cQySFs6uGxRnoWUR8WjwIzVlrmaLLgqBXPzeVoGE+rcmN85JZkCJjA2jyCcSycXq96ZDysAVJytA==
+config:
+  consul:address: https://consul-data-production.odl.mit.edu
