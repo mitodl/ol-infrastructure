@@ -4,16 +4,15 @@ locals {
 }
 
 variable "build_environment" {
-  type        = string
-  default     = "operations-ci"
+  type    = string
+  default = "operations-ci"
 }
 
 variable "business_unit" {
-  type        = string
-  default     = "operations"
+  type    = string
+  default = "operations"
 }
 
-# Available options are "web" or "worker". Used to determine which type of node to build an image for.
 variable "node_type" {
   type    = string
   default = "server"
@@ -42,12 +41,13 @@ source "amazon-ebs" "airbyte" {
     purpose = "${local.app_name}-${var.node_type}"
   }
   snapshot_tags = {
-    Name           = "${local.app_name}-${var.node_type}-ami"
-    OU             = "${var.business_unit}"
-    app            = "${local.app_name}"
-    purpose        = "${local.app_name}-${var.node_type}"
+    Name    = "${local.app_name}-${var.node_type}-ami"
+    OU      = "${var.business_unit}"
+    app     = "${local.app_name}"
+    purpose = "${local.app_name}-${var.node_type}"
   }
   # Base all builds off of the most recent docker_baseline_ami built by us, based of Debian 11
+
   source_ami_filter {
     filters = {
       name                = "docker_baseline_ami-${var.node_type}-*"
@@ -57,6 +57,7 @@ source "amazon-ebs" "airbyte" {
     most_recent = true
     owners      = ["610119931565"]
   }
+
   ssh_username  = "admin"
   ssh_interface = "public_ip"
   subnet_filter {
