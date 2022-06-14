@@ -32,6 +32,7 @@ def create_systemd_service():
         mode="755",
     )
 
+
 @deploy("Deploy Docker Compose")
 def deploy_docker_compose(config: Optional[Dict[str, Any]] = None):
     download_docker_compose()
