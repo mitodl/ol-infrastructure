@@ -19,11 +19,15 @@ variable "node_type" {
   default = "server"
 }
 
+variable "deployment" {
+  type    = string
+}
+
 source "amazon-ebs" "forum" {
   ami_description         = "Deployment image for Forum server generated at ${local.timestamp}"
   ami_name                = "forum-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
-  instance_type           = "t3a.2xlarge"
+  instance_type           = "t3a.medium"
   launch_block_device_mappings {
     device_name           = "/dev/sda1"
     volume_size           = 25
@@ -70,6 +74,7 @@ source "amazon-ebs" "forum" {
     OU      = var.business_unit
     app     = local.app_name
     purpose = "${local.app_name}-${var.node_type}"
+    deployment = "${var.node_type}"
   }
 }
 
@@ -86,7 +91,7 @@ build {
   }
 
   provisioner "shell-local" {
-    environment_vars = ["NODE_TYPE=${var.node_type}"]
+    environment_vars = ["NODE_TYPE=${var.node_type}", "DEPLOYMENT=${var.node_type}"]
     inline           = ["pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"]
   }
 }
