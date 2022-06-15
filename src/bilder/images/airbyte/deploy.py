@@ -75,47 +75,47 @@ files.put(
 
 env_template_file = Path("/etc/consul-template/.env.tmpl")
 nginx_pomerium_conf_template_file = Path(
-    str(pomerium_config.configuration_template_directory) + "/nginx_pomerium.conf.tmpl"
+    pomerium_config.configuration_template_directory.joinpath(
+        "/nginx_pomerium.conf.tmpl"
+    )
 )
 nginx_pomerium_conf_file = Path(
-    str(pomerium_config.configuration_directory) + "/nginx_pomerium.conf"
+    pomerium_config.configuration_directory.joinpath("/nginx_pomerium.conf")
 )
 nginx_htpasswd_template_file = Path(
-    str(pomerium_config.configuration_template_directory) + "/nginx_htpasswd.tmpl"
+    pomerium_config.configuration_template_directory.joinpath("/nginx_htpasswd.tmpl")
 )
 nginx_htpasswd_file = Path(
-    str(pomerium_config.configuration_directory) + "/nginx_htpasswd"
+    pomerium_config.configuration_directory.joinpath("/nginx_htpasswd")
 )
 nginx_proxy_conf_file = Path(
-    str(pomerium_config.configuration_directory) + "/nginx_proxy.conf"
+    pomerium_config.configuration_directory.joinpath("/nginx_proxy.conf")
 )
 
 files.put(
     name="Create the .env template file in docker-compose directory.",
-    src=str(Path(__file__).resolve().parent.joinpath("templates", ".env.tmpl")),
+    src=str(TEMPLATES_DIRECTORY.joinpath(".env.tmpl")),
     dest=str(env_template_file),
     mode="0664",
 )
 
 files.put(
     name="Create the pomerium nginx configuration file template",
-    src=str(
-        Path(__file__).resolve().parent.joinpath("files", "nginx_pomerium.conf.tmpl")
-    ),
+    src=str(FILES_DIRECTORY.joinpath("nginx_pomerium.conf.tmpl")),
     dest=str(nginx_pomerium_conf_template_file),
     mode="0664",
 )
 
 files.put(
     name="Create the nginx htpasswd file template for nginx basic auth on the dagster bypass.",
-    src=str(Path(__file__).resolve().parent.joinpath("files", "nginx_htpasswd.tmpl")),
+    src=str(FILES_DIRECTORY.joinpath("nginx_htpasswd.tmpl")),
     dest=str(nginx_htpasswd_template_file),
     mode="0664",
 )
 
 files.put(
     name="Create the the proxy nginx configuration file in the pomerium etc directory.",
-    src=str(Path(__file__).resolve().parent.joinpath("files", "nginx_proxy.conf")),
+    src=str(FILES_DIRECTORY.joinpath("nginx_proxy.conf")),
     dest=str(nginx_proxy_conf_file),
     mode="0664",
 )

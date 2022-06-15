@@ -1,8 +1,5 @@
 ---
 ##
-# This one does not check for new upstream releases. Will need to manually update
-# the python code in src/bilder when a tika upgrade is needed.
-#
 # Application docker compose file is configured to use the :latest, therefore to upgrade,
 # simpley initiate an instance resfresh
 #

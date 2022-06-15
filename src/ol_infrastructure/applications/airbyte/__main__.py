@@ -14,7 +14,7 @@ from pulumi_aws import ec2, get_caller_identity, iam, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
-    AWS_RDS_MIN_DATABASE_CAPACITY,
+    AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
 )
@@ -247,7 +247,7 @@ rds_password = airbyte_config.require("rds_password")
 airbyte_db_config = OLPostgresDBConfig(
     instance_name=f"airbyte-db-{stack_info.env_suffix}",
     password=rds_password,
-    storage=airbyte_config.get("db_capacity") or str(AWS_RDS_MIN_DATABASE_CAPACITY),
+    storage=airbyte_config.get("db_capacity") or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
     subnet_group_name=target_vpc["rds_subnet"],
     security_groups=[airbyte_db_security_group],
     parameter_overrides=[{"name": "rds.force_ssl", "value": 0}],
