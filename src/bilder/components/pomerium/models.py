@@ -14,6 +14,7 @@ class PomeriumConfig(OLBaseSettings):
     )
 
     listener_port: str = "443"
+    insecure_listener_port: str = "80"
     docker_image: str = "pomerium/pomerium"
     docker_tag: str = "latest"
 
