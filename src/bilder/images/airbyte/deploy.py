@@ -48,7 +48,12 @@ from bilder.components.vector.models import VectorConfig
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
+from bridge.lib.versions import (
+    AIRBYTE_VERSION,
+    CONSUL_TEMPLATE_VERSION,
+    CONSUL_VERSION,
+    VAULT_VERSION,
+)
 from bridge.secrets.sops import set_env_secrets
 
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
@@ -59,6 +64,7 @@ VERSIONS = {
         "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION
     ),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
+    "airbyte": os.environ.get("AIRBYTE_VERSION", AIRBYTE_VERSION),
 }
 
 set_env_secrets(Path("consul/consul.env"))
@@ -76,20 +82,20 @@ files.put(
 env_template_file = Path("/etc/consul-template/.env.tmpl")
 nginx_pomerium_conf_template_file = Path(
     pomerium_config.configuration_template_directory.joinpath(
-        "/nginx_pomerium.conf.tmpl"
+        "nginx_pomerium.conf.tmpl"
     )
 )
 nginx_pomerium_conf_file = Path(
-    pomerium_config.configuration_directory.joinpath("/nginx_pomerium.conf")
+    pomerium_config.configuration_directory.joinpath("nginx_pomerium.conf")
 )
 nginx_htpasswd_template_file = Path(
-    pomerium_config.configuration_template_directory.joinpath("/nginx_htpasswd.tmpl")
+    pomerium_config.configuration_template_directory.joinpath("nginx_htpasswd.tmpl")
 )
 nginx_htpasswd_file = Path(
-    pomerium_config.configuration_directory.joinpath("/nginx_htpasswd")
+    pomerium_config.configuration_directory.joinpath("nginx_htpasswd")
 )
 nginx_proxy_conf_file = Path(
-    pomerium_config.configuration_directory.joinpath("/nginx_proxy.conf")
+    pomerium_config.configuration_directory.joinpath("nginx_proxy.conf")
 )
 
 files.put(
