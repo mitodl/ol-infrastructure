@@ -7,13 +7,8 @@ from pyinfra.operations import server
 from bilder.components.docker.docker_compose_steps import deploy_docker_compose
 from bilder.components.docker.steps import deploy_docker
 from bilder.components.hashicorp.consul.models import Consul, ConsulConfig
-from bilder.components.hashicorp.consul.steps import proxy_consul_dns
 from bilder.components.hashicorp.consul_template.models import ConsulTemplate
-from bilder.components.hashicorp.steps import (
-    configure_hashicorp_product,
-    install_hashicorp_products,
-    register_services,
-)
+from bilder.components.hashicorp.steps import install_hashicorp_products
 from bilder.components.hashicorp.vault.models import (
     Vault,
     VaultAgentCache,
@@ -85,25 +80,13 @@ vault_template_permissions(vault_config)
 configure_vector(vector_config)
 vector_service(vector_config)
 
-for product in hashicorp_products:
-    configure_hashicorp_product(product)
-
-
 deploy_docker()
 deploy_docker_compose()
 
 if host.get_fact(HasSystemd):
-    register_services(hashicorp_products, start_services_immediately=False)
-    proxy_consul_dns()
     server.service(
         name="Ensure docker service is running",
         service="docker",
         running=True,
-        enabled=True,
-    )
-    server.service(
-        name="Ensure docker compose service is enabled",
-        service="docker-compose",
-        running=False,
         enabled=True,
     )

@@ -1,0 +1,63 @@
+---
+##
+# Application docker compose file is configured to use the :latest, therefore to upgrade,
+# simpley initiate an instance resfresh
+#
+resource_types:
+- name: packer
+  source:
+    repository: mitodl/concourse-packer-resource
+    tag: latest
+  type: docker-image
+- name: packer-builder
+  source:
+    repository: mitodl/concourse-packer-resource-builder
+    tag: latest
+  type: docker-image
+
+resources:
+- icon: github
+  name: packer_templates
+  source:
+    branch: md/issue_828
+    paths:
+    - src/bilder/images/airbyte
+    uri: https://github.com/mitodl/ol-infrastructure
+  type: git
+- name: packer-validate
+  type: packer
+- name: packer-build
+  type: packer-builder
+
+jobs:
+- name: packer-validate-workflow
+  plan:
+  - get: packer_templates
+    trigger: false
+  - put: packer-validate
+    params:
+      objective: validate
+      only:
+      - amazon-ebs.airbyte
+      template: packer_templates/src/bilder/images/airbyte
+      vars:
+        node_type: server
+
+- name: packer-build-workflow
+  plan:
+  - get: packer_templates
+    passed: [packer-validate-workflow]
+    params:
+      depth: 1
+    trigger: true
+  - put: packer-build
+    params:
+      env_vars:
+        AWS_REGION: us-east-1
+        PYTHONPATH: ${PYTHONPATH}:packer_templates/src
+      objective: build
+      only:
+      - amazon-ebs.airbyte
+      template: packer_templates/src/bilder/images/airbyte/.
+      vars:
+        node_type: server

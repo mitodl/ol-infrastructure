@@ -2,13 +2,25 @@
 Description=Docker Compose Service
 PartOf=docker.service
 After=docker.service
+Wants=vault.service
+After=vault.service
+Wants=consul.service
+After=consul.service
+Wants=consul-template.service
+After=consul-template.service
 
 [Service]
-Type=oneshot
+Type=simple
+Restart=on-failure
+RestartSec=30
 RemainAfterExit=true
+
 WorkingDirectory=/etc/docker/compose/
+EnvironmentFile=-/etc/default/docker-compose
+
 ExecStop=/usr/local/bin/docker-compose down
 ExecStartPre=/usr/local/bin/docker-compose pull --quiet --parallel
+
 ExecStart=/usr/local/bin/docker-compose up -d
 
 ExecStop=/usr/local/bin/docker-compose down

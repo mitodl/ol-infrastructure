@@ -3,6 +3,8 @@ DEBIAN = "Debian"
 
 DEFAULT_DIRECTORY_MODE = 755
 
+DOCKER_COMPOSE_DIRECTORY = "/etc/docker/compose"
+
 
 def normalize_cpu_arch(arch_specifier: str) -> str:
     """Normalize the string used for the CPU kernel architecture.
