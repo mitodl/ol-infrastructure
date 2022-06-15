@@ -115,14 +115,14 @@ uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
 name = "boto3"
-version = "1.24.7"
+version = "1.24.8"
 description = "The AWS SDK for Python"
 category = "main"
 optional = false
 python-versions = ">= 3.7"
 
 [package.dependencies]
-botocore = ">=1.27.7,<1.28.0"
+botocore = ">=1.27.8,<1.28.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.6.0,<0.7.0"
 
@@ -131,7 +131,7 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.27.7"
+version = "1.27.8"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
 optional = false
@@ -216,7 +216,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 
 [[package]]
 name = "copier"
-version = "6.0.0"
+version = "6.1.0"
 description = "A library for rendering project templates."
 category = "dev"
 optional = false
@@ -238,7 +238,7 @@ pyyaml-include = ">=1.2"
 questionary = ">=1.8.1"
 
 [package.extras]
-docs = ["mkdocs-material (>=8.2,<9.0.0)", "mkdocstrings (>=0.16.2,<0.19.0)"]
+docs = ["mkdocs-material (>=8.2,<9.0.0)", "mkdocstrings[python] (>=0.19.0)"]
 
 [[package]]
 name = "cryptography"
@@ -1631,7 +1631,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "4e8ee4b481db788f69f38049c64ab90a35d593a2c2f067661c3c240ff2791bc7"
+content-hash = "b9d9ddd9e9197d3931fc47d075d9b65c596a135810aded5ec5730e03269964cb"
 
 [metadata.files]
 anyio = [
@@ -1697,12 +1697,12 @@ black = [
     {file = "black-22.3.0.tar.gz", hash = "sha256:35020b8886c022ced9282b51b5a875b6d1ab0c387b31a065b84db7c33085ca79"},
 ]
 boto3 = [
-    {file = "boto3-1.24.7-py3-none-any.whl", hash = "sha256:925a34a55257219f4601e803951fd4d61ed6eac2208dc834a04fe150b03f265e"},
-    {file = "boto3-1.24.7.tar.gz", hash = "sha256:6e243e28c804dccd2015935acfac0567e1861b20fdd96aa47f232b47aa214a69"},
+    {file = "boto3-1.24.8-py3-none-any.whl", hash = "sha256:28ab0947c49a6fb2409004d4a10b2828aec231cb95ca1d800cb1411e191cc201"},
+    {file = "boto3-1.24.8.tar.gz", hash = "sha256:833e67edfb73f2cc22ff27a1c33728686dc90a9e81ba2551f9462ea2d1b04f41"},
 ]
 botocore = [
-    {file = "botocore-1.27.7-py3-none-any.whl", hash = "sha256:3e0cbe26f08fe9a3f6df5de4dcc3bef686e01ba5f79ad03ffbe79d92f51ecea5"},
-    {file = "botocore-1.27.7.tar.gz", hash = "sha256:dc83ef991c730ab0f06b51fcefda74f493b990903b882452aff78c123e3040e2"},
+    {file = "botocore-1.27.8-py3-none-any.whl", hash = "sha256:ad92702930d6cb7b587fc2f619672feb74d5218f8de387a28c2905820db79027"},
+    {file = "botocore-1.27.8.tar.gz", hash = "sha256:db6667b8dfd175d16187653942cd91dd1f0cf36adc0ea9d7a0805ba4d2a3321f"},
 ]
 certifi = [
     {file = "certifi-2022.5.18.1-py3-none-any.whl", hash = "sha256:f1d53542ee8cbedbe2118b5686372fb33c297fcd6379b050cca0ef13a597382a"},
@@ -1781,8 +1781,8 @@ configparser = [
     {file = "configparser-5.2.0.tar.gz", hash = "sha256:1b35798fdf1713f1c3139016cfcbc461f09edbf099d1fb658d4b7479fcaa3daa"},
 ]
 copier = [
-    {file = "copier-6.0.0-py3-none-any.whl", hash = "sha256:4772d31b5f135fbaa7c0d95e37600b644cfc83fba5120bfac53e21129e7388fd"},
-    {file = "copier-6.0.0.tar.gz", hash = "sha256:e85c91e54ee9e9c3cf39f36516f32fc57fe840f702bde7a627a5831890c17232"},
+    {file = "copier-6.1.0-py3-none-any.whl", hash = "sha256:fadfa06468ac873e9f2f255ca901352b8b28af261d574af12019b33cb29f3526"},
+    {file = "copier-6.1.0.tar.gz", hash = "sha256:d3b399285763e97a1c3c49cbc7e0d3b3cea2f05b680f652ff58d59a5b59f3a3c"},
 ]
 cryptography = [
     {file = "cryptography-37.0.2-cp36-abi3-macosx_10_10_universal2.whl", hash = "sha256:ef15c2df7656763b4ff20a9bc4381d8352e6640cfeb95c2972c38ef508e75181"},

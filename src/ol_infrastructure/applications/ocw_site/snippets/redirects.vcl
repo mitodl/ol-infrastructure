@@ -63,6 +63,6 @@ if (req.url.path ~ "/index.htm$") {
 
 # OCW Legacy /high-school/ to zendesk article
 if (req.url.path ~ "(^/high-school*)") {
-  set req.http.high_school_to_article = "https://mitocw.zendesk.com/hc/en-us/articles/5332864282907");
+  set req.http.high_school_to_article = "https://mitocw.zendesk.com/hc/en-us/articles/5332864282907";
   error 606 "redirect";
 }
