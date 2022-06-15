@@ -80,7 +80,7 @@ files.put(
 )
 
 env_template_file = Path("/etc/consul-template/.env.tmpl")
-nginx_pomerium_conf_template_file = Path(
+nginx_pomerium_conf_template_file = (
     pomerium_config.configuration_template_directory.joinpath(
         "nginx_pomerium.conf.tmpl"
     )
