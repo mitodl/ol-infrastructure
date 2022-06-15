@@ -1,0 +1,9 @@
+---
+open_edx_lms_domain: staging.mitx.mit.edu
+open_edx_studio_domain: studio-staging.mitx.mit.edu
+marketing_site_domain: staging.mitx.mit.edu
+site_name: MITx Residential Staging
+support_url: odl.zendesk.com/hc/en-us/requests/new
+environment: mitx-staging-production
+release_name: open-release/maple.master
+concourse_team: mitx

@@ -1,0 +1,9 @@
+---
+open_edx_lms_domain: courses-ci.xpro.mit.edu
+open_edx_studio_domain: studio-ci.xpro.mit.edu
+marketing_site_domain: ci.xpro.mit.edu
+site_name: MIT xPRO
+support_url: xpro.zendesk.com/hc
+environment: xpro-ci
+release_name: open-release/maple.master
+concourse_team: xpro

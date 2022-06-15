@@ -1,0 +1,9 @@
+---
+open_edx_lms_domain: courses.mitxonline.mit.edu
+open_edx_studio_domain: studio.mitxonline.mit.edu
+marketing_site_domain: mitxonline.mit.edu
+site_name: MITx Online
+support_url: mitx-micromasters.zendesk.com/hc/
+environment: mitxonline-production
+release_name: master
+concourse_team: mitxonline

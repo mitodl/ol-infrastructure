@@ -1,0 +1,9 @@
+---
+open_edx_lms_domain: staging-ci.mitx.mit.edu
+open_edx_studio_domain: studio-staging-ci.mitx.mit.edu
+marketing_site_domain: staging-ci.mitx.mit.edu
+site_name: MITx Residential Staging CI
+support_url: odl.zendesk.com/hc/en-us/requests/new
+environment: mitx-staging-ci
+release_name: open-release/nutmeg.master
+concourse_team: mitx

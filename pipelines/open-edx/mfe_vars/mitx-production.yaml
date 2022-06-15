@@ -1,0 +1,9 @@
+---
+open_edx_lms_domain: lms.mitx.mit.edu
+open_edx_studio_domain: studio.mitx.mit.edu
+marketing_site_domain: lms.mitx.mit.edu
+site_name: MITx Residential
+support_url: odl.zendesk.com/hc/en-us/requests/new
+environment: mitx-production
+release_name: open-release/maple.master
+concourse_team: mitx

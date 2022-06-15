@@ -1,0 +1,9 @@
+---
+open_edx_lms_domain: courses-qa.mitxonline.mit.edu
+open_edx_studio_domain: studio-qa.mitxonline.mit.edu
+marketing_site_domain: rc.mitxonline.mit.edu
+site_name: MITx Online QA
+support_url: mitx-micromasters.zendesk.com/hc/
+environment: mitxonline-qa
+release_name: master
+concourse_team: mitxonline

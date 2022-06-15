@@ -1,0 +1,4 @@
+---
+mfe_path: authoring
+mfe_repository: https://github.com/edx/frontend-app-library-authoring.git
+mfe_node_version: 16
