@@ -1,9 +1,9 @@
 ---
-open_edx_lms_domain: lms-ci.mitx.mit.edu
-open_edx_studio_domain: studio-ci.mitx.mit.edu
-marketing_site_domain: lms-ci.mitx.mit.edu
-site_name: MITx Residential CI
-support_url: odl.zendesk.com/hc/en-us/requests/new
-environment: mitx-ci
-release_name: open-release/nutmeg.master
 concourse_team: mitx
+marketing_site_domain: lms-ci.mitx.mit.edu
+open_edx_environment: mitx-ci
+open_edx_lms_domain: lms-ci.mitx.mit.edu
+open_edx_release_name: open-release/nutmeg.master
+open_edx_site_name: MITx Residential CI
+open_edx_studio_domain: studio-ci.mitx.mit.edu
+support_url: odl.zendesk.com/hc/en-us/requests/new

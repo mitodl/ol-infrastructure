@@ -1,9 +1,9 @@
 ---
-open_edx_lms_domain: mitx-qa-draft.mitx.mit.edu
-open_edx_studio_domain: studio-mitx-qa-draft.mitx.mit.edu
-marketing_site_domain: mitx-qa-draft.mitx.mit.edu
-site_name: MITx Residential Staging QA
-support_url: odl.zendesk.com/hc/en-us/requests/new
-environment: mitx-staging-qa
-release_name: open-release/nutmeg.master
 concourse_team: mitx
+marketing_site_domain: mitx-qa-draft.mitx.mit.edu
+open_edx_environment: mitx-staging-qa
+open_edx_lms_domain: mitx-qa-draft.mitx.mit.edu
+open_edx_release_name: open-release/nutmeg.master
+open_edx_site_name: MITx Residential Staging QA
+open_edx_studio_domain: studio-mitx-qa-draft.mitx.mit.edu
+support_url: odl.zendesk.com/hc/en-us/requests/new

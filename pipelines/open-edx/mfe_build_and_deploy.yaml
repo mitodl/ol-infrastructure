@@ -7,11 +7,11 @@ resource_types:
     tag: latest
 
 resources:
-- name: mfe-app-(( vars.mfe_path ))
+- name: mfe-app-(( mfe_path ))
   type: git
   source:
-    uri: (( vars.mfe_repository ))
-    branch: (( vars.release_name ))
+    uri: (( mfe_repository ))
+    branch: (( open_edx_release_name ))
 - name: mfe-app-bucket
   type: rclone
   source:
@@ -23,46 +23,46 @@ resources:
       region = us-east-1
 
 jobs:
-- name: build
+- name: compile-and-deploy-mfe-(( mfe_path ))-to-(( open_edx_environment ))
   plan:
-  - get: mfe-app-(( vars.mfe_path ))
+  - get: mfe-app-(( mfe_path ))
     trigger: true
-  - task: npm-install-and-build
+  - task: compile-and-deploy-mfe
     config:
       platform: linux
       image_resource:
         type: registry-image
         source:
           repository: node
-          tag: (( vars.mfe_node_version ))-bullseye-slim
+          tag: (( mfe_node_version ))-bullseye-slim
       inputs:
-      - name: mfe-app-(( vars.mfe_path ))
+      - name: mfe-app-(( mfe_path ))
       outputs:
-      - name: mfe-app-(( vars.mfe_path ))/dist
+      - name: mfe-app-(( mfe_path ))/dist
       params:
-        ACCESS_TOKEN_COOKIE_NAME: (( vars.environment ))-edx-jwt-cookie-header-payload
-        BASE_URL: https://(( vars.lms_domain ))
+        ACCESS_TOKEN_COOKIE_NAME: (( open_edx_environment ))-edx-jwt-cookie-header-payload
+        BASE_URL: https://(( open_edx_lms_domain ))
         CSRF_TOKEN_API_PATH: /csrf/api/v1/token
         FAVICON_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico
-        LMS_BASE_URL: https://(( vars.open_edx_lms_domain ))
-        LOGIN_URL: https://(( vars.open_edx_lms_domain ))/login
-        LOGOUT_URL: https://(( vars.open_edx_lms_domain ))/logout
+        LMS_BASE_URL: https://(( open_edx_lms_domain ))
+        LOGIN_URL: https://(( open_edx_lms_domain ))/login
+        LOGOUT_URL: https://(( open_edx_lms_domain ))/logout
         LOGO_TRADEMARK_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png
-        LOGO_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png
+        LOGO_URL: (( logo_url ))
         LOGO_WHITE_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png
-        MARKETING_SITE_BASE_URL: https://(( vars.marketing_site_domain ))
+        MARKETING_SITE_BASE_URL: https://(( marketing_site_domain ))
         ORDER_HISTORY_URL:
-        PUBLIC_PATH: /(( vars.mfe_path ))/
-        REFRESH_ACCESS_TOKEN_ENDPOINT: https://(( vars.open_edx_lms_domain ))/login_refresh
-        SEARCH_CATALOG_URL: https://(( vars.open_edx_lms_domain ))/courses
-        SESSION_COOKIE_DOMAIN: (( vars.open_edx_lms_domain ))
-        SITE_NAME: (( vars.site_name ))
-        STUDIO_BASE_URL: https://(( vars.open_edx_studio_domain ))
-        SUPPORT_URL: https://(( vars.support_url ))
-        USER_INFO_COOKIE_NAME: (( vars.environment ))-edx-user-info
+        PUBLIC_PATH: /(( mfe_path ))/
+        REFRESH_ACCESS_TOKEN_ENDPOINT: https://(( open_edx_lms_domain ))/login_refresh
+        SEARCH_CATALOG_URL: https://(( open_edx_lms_domain ))/courses
+        SESSION_COOKIE_DOMAIN: (( open_edx_lms_domain ))
+        SITE_NAME: (( open_edx_site_name ))
+        STUDIO_BASE_URL: https://(( open_edx_studio_domain ))
+        SUPPORT_URL: https://(( support_url ))
+        USER_INFO_COOKIE_NAME: (( open_edx_environment ))-edx-user-info
       run:
         path: sh
-        dir: mfe-app-(( vars.mfe_path ))
+        dir: mfe-app-(( mfe_path ))
         args:
         - -exc
         - |
@@ -74,7 +74,7 @@ jobs:
           NODE_ENV=production npm run build
   - put: mfe-app-bucket
     params:
-      source: mfe-app-(( vars.mfe_path ))/dist
+      source: mfe-app-(( mfe_path ))/dist
       destination:
       - command: sync
-        dir: s3-remote:(( vars.environment ))-edxapp-mfe/(( vars.mfe_path ))/
+        dir: s3-remote:(( open_edx_environment ))-edxapp-mfe/(( mfe_path ))/
