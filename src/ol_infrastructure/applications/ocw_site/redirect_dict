@@ -459,5 +459,6 @@
   "/index.htm": "301|keep|https://ocw.mit.edu/",
   "/subscribe": "301|keep|https://{{AK_HOSTHEADER}}/newsletter/",
   "/terms": "307|keep|https://{{AK_HOSTHEADER}}/pages/privacy-and-terms-of-use/",
-  "/terms/index.htm": "307|keep|https://{{AK_HOSTHEADER}}/pages/privacy-and-terms-of-use/"
+  "/terms/index.htm": "307|keep|https://{{AK_HOSTHEADER}}/pages/privacy-and-terms-of-use/",
+  "/terms/comments/": "307|discard|https://mitocw.zendesk.com/hc/en-us/articles/6636015233051-Comments-Policy-for-YouTube-and-Social-Media"
 }
