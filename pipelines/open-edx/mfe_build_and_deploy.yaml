@@ -40,25 +40,41 @@ jobs:
       outputs:
       - name: mfe-app-(( mfe_path ))/dist
       params:
+        ABOUT_US_URL:
         ACCESS_TOKEN_COOKIE_NAME: (( open_edx_environment ))-edx-jwt-cookie-header-payload
         BASE_URL: https://(( open_edx_lms_domain ))
+        CREDENTIALS_BASE_URL:
         CSRF_TOKEN_API_PATH: /csrf/api/v1/token
+        Contact:
+        DISCOVERY_API_BASE_URL:
+        ECOMMERCE_BASE_URL:
         FAVICON_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico
+        HONOR_CODE_URL:
+        LANGUAGE_PREFERENCE_COOKIE_NAME:
+        LEARNING_BASE_URL:
         LMS_BASE_URL: https://(( open_edx_lms_domain ))
         LOGIN_URL: https://(( open_edx_lms_domain ))/login
         LOGOUT_URL: https://(( open_edx_lms_domain ))/logout
+        LOGO_ALT_TEXT:
         LOGO_TRADEMARK_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png
         LOGO_URL: (( logo_url ))
         LOGO_WHITE_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png
         MARKETING_SITE_BASE_URL: https://(( marketing_site_domain ))
         ORDER_HISTORY_URL:
+        PRIVACY_POLICY_URL:
         PUBLIC_PATH: /(( mfe_path ))/
         REFRESH_ACCESS_TOKEN_ENDPOINT: https://(( open_edx_lms_domain ))/login_refresh
         SEARCH_CATALOG_URL: https://(( open_edx_lms_domain ))/courses
         SESSION_COOKIE_DOMAIN: (( open_edx_lms_domain ))
+        SHOW_FULLNAME:
         SITE_NAME: (( open_edx_site_name ))
+        SITE_URL:
         STUDIO_BASE_URL: https://(( open_edx_studio_domain ))
+        SUPPORT_CENTER_TEXT:
+        SUPPORT_CENTER_URL:
         SUPPORT_URL: https://(( support_url ))
+        TERMS_OF_SERVICE_URL:
+        TRADEMARK_TEXT:
         USER_INFO_COOKIE_NAME: (( open_edx_environment ))-edx-user-info
       run:
         path: sh
