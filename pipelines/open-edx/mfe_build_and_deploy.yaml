@@ -7,11 +7,11 @@ resource_types:
     tag: latest
 
 resources:
-- name: mfe-app-(( mfe_path ))
+- name: mfe-app-((mfe_path))
   type: git
   source:
-    uri: (( mfe_repository ))
-    branch: (( open_edx_release_name ))
+    uri: ((mfe_repository))
+    branch: ((open_edx_release_name))
 - name: mfe-app-bucket
   type: rclone
   source:
@@ -23,9 +23,9 @@ resources:
       region = us-east-1
 
 jobs:
-- name: compile-and-deploy-mfe-(( mfe_path ))-to-(( open_edx_environment ))
+- name: compile-and-deploy-mfe-((mfe_path))-to-((open_edx_environment))
   plan:
-  - get: mfe-app-(( mfe_path ))
+  - get: mfe-app-((mfe_path))
     trigger: true
   - task: compile-and-deploy-mfe
     config:
@@ -34,51 +34,50 @@ jobs:
         type: registry-image
         source:
           repository: node
-          tag: (( mfe_node_version ))-bullseye-slim
+          tag: ((mfe_node_version))-bullseye-slim
       inputs:
-      - name: mfe-app-(( mfe_path ))
+      - name: mfe-app-((mfe_path))
       outputs:
-      - name: mfe-app-(( mfe_path ))/dist
+      - name: mfe-app-((mfe_path))/dist
       params:
         ABOUT_US_URL:
-        ACCESS_TOKEN_COOKIE_NAME: (( open_edx_environment ))-edx-jwt-cookie-header-payload
-        BASE_URL: https://(( open_edx_lms_domain ))
+        ACCESS_TOKEN_COOKIE_NAME: ((open_edx_environment))-edx-jwt-cookie-header-payload
+        BASE_URL: https://((open_edx_lms_domain))
         CREDENTIALS_BASE_URL:
         CSRF_TOKEN_API_PATH: /csrf/api/v1/token
         Contact:
         DISCOVERY_API_BASE_URL:
         ECOMMERCE_BASE_URL:
-        FAVICON_URL: (( open_edx_favicon_url ))
+        FAVICON_URL: ((open_edx_favicon_url))
         HONOR_CODE_URL:
-        LANGUAGE_PREFERENCE_COOKIE_NAME:
+        LANGUAGE_PREFERENCE_COOKIE_NAME: ((open_edx_environment))-open-edx-language-preference
         LEARNING_BASE_URL:
-        LMS_BASE_URL: https://(( open_edx_lms_domain ))
-        LOGIN_URL: https://(( open_edx_lms_domain ))/login
-        LOGOUT_URL: https://(( open_edx_lms_domain ))/logout
+        LMS_BASE_URL: https://((open_edx_lms_domain))
+        LOGIN_URL: https://((open_edx_lms_domain))/login
+        LOGOUT_URL: https://((open_edx_lms_domain))/logout
         LOGO_ALT_TEXT:
-        LOGO_TRADEMARK_URL: (( open_edx_logo_url ))
-        LOGO_URL: (( open_edx_logo_url ))
-        LOGO_WHITE_URL: (( open_edx_logo_url ))
-        MARKETING_SITE_BASE_URL: https://(( marketing_site_domain ))
-        ORDER_HISTORY_URL:
+        LOGO_TRADEMARK_URL: ((open_edx_logo_url))
+        LOGO_URL: ((open_edx_logo_url))
+        LOGO_WHITE_URL: ((open_edx_logo_url))
+        MARKETING_SITE_BASE_URL: https://((marketing_site_domain))
+        ORDER_HISTORY_URL:  # Intentionally left blank to turn off a menu entry
         PRIVACY_POLICY_URL:
-        PUBLIC_PATH: /(( mfe_path ))/
-        REFRESH_ACCESS_TOKEN_ENDPOINT: https://(( open_edx_lms_domain ))/login_refresh
-        SEARCH_CATALOG_URL: https://(( open_edx_lms_domain ))/courses
-        SESSION_COOKIE_DOMAIN: (( open_edx_lms_domain ))
+        PUBLIC_PATH: /((mfe_path))/
+        REFRESH_ACCESS_TOKEN_ENDPOINT: https://((open_edx_lms_domain))/login_refresh
+        SEARCH_CATALOG_URL: https://((open_edx_lms_domain))/courses
+        SESSION_COOKIE_DOMAIN: ((open_edx_lms_domain))
         SHOW_FULLNAME:
-        SITE_NAME: (( open_edx_site_name ))
-        SITE_URL:
-        STUDIO_BASE_URL: https://(( open_edx_studio_domain ))
+        SITE_NAME: ((open_edx_site_name))
+        STUDIO_BASE_URL: https://((open_edx_studio_domain))
         SUPPORT_CENTER_TEXT:
         SUPPORT_CENTER_URL:
-        SUPPORT_URL: https://(( support_url ))
+        SUPPORT_URL: https://((support_url))
         TERMS_OF_SERVICE_URL:
         TRADEMARK_TEXT:
-        USER_INFO_COOKIE_NAME: (( open_edx_environment ))-edx-user-info
+        USER_INFO_COOKIE_NAME: ((open_edx_environment))-edx-user-info
       run:
         path: sh
-        dir: mfe-app-(( mfe_path ))
+        dir: mfe-app-((mfe_path))
         args:
         - -exc
         - |
@@ -90,7 +89,7 @@ jobs:
           NODE_ENV=production npm run build
   - put: mfe-app-bucket
     params:
-      source: mfe-app-(( mfe_path ))/dist
+      source: mfe-app-((mfe_path))/dist
       destination:
       - command: sync
-        dir: s3-remote:(( open_edx_environment ))-edxapp-mfe/(( mfe_path ))/
+        dir: s3-remote:((open_edx_environment))-edxapp-mfe/((mfe_path))/

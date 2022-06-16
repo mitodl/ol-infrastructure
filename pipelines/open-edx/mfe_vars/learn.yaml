@@ -1,4 +1,4 @@
 ---
 mfe_path: learn
 mfe_repository: https://github.com/edx/frontend-app-learning.git
-mfe_node_version: 16
+mfe_node_version: '16'
