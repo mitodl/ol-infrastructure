@@ -1,9 +1,10 @@
 ---
 concourse_team: mitxonline
-logo_url: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png
 marketing_site_domain: mitxonline.mit.edu
 open_edx_environment: mitxonline-production
+open_edx_favicon_url: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico
 open_edx_lms_domain: courses.mitxonline.mit.edu
+open_edx_logo_url: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png
 open_edx_release_name: master
 open_edx_site_name: MITx Online
 open_edx_studio_domain: studio.mitxonline.mit.edu

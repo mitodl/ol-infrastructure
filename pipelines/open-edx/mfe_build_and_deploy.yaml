@@ -48,7 +48,7 @@ jobs:
         Contact:
         DISCOVERY_API_BASE_URL:
         ECOMMERCE_BASE_URL:
-        FAVICON_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico
+        FAVICON_URL: (( open_edx_favicon_url ))
         HONOR_CODE_URL:
         LANGUAGE_PREFERENCE_COOKIE_NAME:
         LEARNING_BASE_URL:
@@ -56,9 +56,9 @@ jobs:
         LOGIN_URL: https://(( open_edx_lms_domain ))/login
         LOGOUT_URL: https://(( open_edx_lms_domain ))/logout
         LOGO_ALT_TEXT:
-        LOGO_TRADEMARK_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png
-        LOGO_URL: (( logo_url ))
-        LOGO_WHITE_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png
+        LOGO_TRADEMARK_URL: (( open_edx_logo_url ))
+        LOGO_URL: (( open_edx_logo_url ))
+        LOGO_WHITE_URL: (( open_edx_logo_url ))
         MARKETING_SITE_BASE_URL: https://(( marketing_site_domain ))
         ORDER_HISTORY_URL:
         PRIVACY_POLICY_URL:

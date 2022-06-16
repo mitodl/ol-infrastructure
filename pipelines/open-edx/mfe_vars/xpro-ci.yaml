@@ -2,7 +2,9 @@
 concourse_team: xpro
 marketing_site_domain: ci.xpro.mit.edu
 open_edx_environment: xpro-ci
+open_edx_favicon_url: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico
 open_edx_lms_domain: courses-ci.xpro.mit.edu
+open_edx_logo_url: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png
 open_edx_release_name: open-release/maple.master
 open_edx_site_name: MIT xPRO
 open_edx_studio_domain: studio-ci.xpro.mit.edu
