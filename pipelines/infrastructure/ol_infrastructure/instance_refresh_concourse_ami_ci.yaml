@@ -88,7 +88,9 @@ jobs:
 - name: deploy-concourse-qa
   plan:
   - get: concourse-web-ami
+    passed: [deploy-concourse-ci]
   - get: concourse-worker-ami
+    passed: [deploy-concourse-ci]
   - get: pulumi_files
   - task: set-aws-creds
     config:
@@ -123,7 +125,9 @@ jobs:
 - name: deploy-concourse-production
   plan:
   - get: concourse-web-ami
+    passed: [deploy-concourse-qa]
   - get: concourse-worker-ami
+    passed: [deploy-concourse-qa]
   - get: pulumi_files
   - task: set-aws-creds
     config:
