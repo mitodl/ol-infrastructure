@@ -188,6 +188,7 @@ data_vpc_exports = vpc_exports(
         "mitxonline_vpc",
         "operations_vpc",
         "residential_mitx_vpc",
+        "residential_mitx_staging_vpc",
         "xpro_vpc",
     ],
 )
@@ -474,6 +475,13 @@ data_to_mitx_peer = OLVPCPeeringConnection(
     "ol-data-{0}-to-residential-mitx-{0}-vpc-peer".format(stack_info.env_suffix),
     data_vpc,
     residential_mitx_vpc,
+)
+data_to_mitx_staging_peer = OLVPCPeeringConnection(
+    "ol-data-{0}-to-residential-mitx-staging-{0}-vpc-peer".format(
+        stack_info.env_suffix
+    ),
+    data_vpc,
+    residential_mitx_staging_vpc,
 )
 data_to_applications_peer = OLVPCPeeringConnection(
     "ol-data-{0}-to-applications-{0}-vpc-peer".format(stack_info.env_suffix),
