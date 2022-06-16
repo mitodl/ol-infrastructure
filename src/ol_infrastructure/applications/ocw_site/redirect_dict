@@ -347,6 +347,7 @@
   "/STS-081S17": "307|keep|https://{{AK_HOSTHEADER}}/courses/science-technology-and-society/sts-081-innovation-systems-for-science-technology-energy-manufacturing-and-health-spring-2017/",
   "/about/contactus": "301|keep|https://{{AK_HOSTHEADER}}/contact/",
   "/ans7870/21f/21f.027/home/index.html": "307|discard|https://visualizingcultures.mit.edu/",
+  "/comments": "307|discard|https://mitocw.zendesk.com/hc/en-us/articles/6636015233051-Comments-Policy-for-YouTube-and-Social-Media"
   "/courses": "307|keep|https://{{AK_HOSTHEADER}}/search/?s=department_course_numbers.sort_coursenum",
   "/courses/12-003-atmosphere-ocean-and-climate-dynamics-fall-2008/resources/lab11/experiment-xi-baroclinic-instability-of-the-thermal-wind/": "301|discard|https://ocw.mit.edu/courses/12-003-atmosphere-ocean-and-climate-dynamics-fall-2008/resources/experiment-xi-baroclinic-instability-of-the-thermal-wind/",
   "/courses/6-002x-related-curriculum": "307|keep|https://{{AK_HOSTHEADER}}/courses/mitx-related-courseware/index.htm",
@@ -459,6 +460,5 @@
   "/index.htm": "301|keep|https://ocw.mit.edu/",
   "/subscribe": "301|keep|https://{{AK_HOSTHEADER}}/newsletter/",
   "/terms": "307|keep|https://{{AK_HOSTHEADER}}/pages/privacy-and-terms-of-use/",
-  "/terms/index.htm": "307|keep|https://{{AK_HOSTHEADER}}/pages/privacy-and-terms-of-use/",
-  "/terms/comments/": "307|discard|https://mitocw.zendesk.com/hc/en-us/articles/6636015233051-Comments-Policy-for-YouTube-and-Social-Media"
+  "/terms/index.htm": "307|keep|https://{{AK_HOSTHEADER}}/pages/privacy-and-terms-of-use/"
 }
