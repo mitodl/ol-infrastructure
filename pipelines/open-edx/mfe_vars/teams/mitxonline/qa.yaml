@@ -1,5 +1,4 @@
 ---
-concourse_team: mitxonline
 marketing_site_domain: rc.mitxonline.mit.edu
 open_edx_environment: mitxonline-qa
 open_edx_lms_domain: courses-qa.mitxonline.mit.edu

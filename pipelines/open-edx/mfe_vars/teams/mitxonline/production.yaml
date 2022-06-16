@@ -1,5 +1,4 @@
 ---
-concourse_team: mitxonline
 marketing_site_domain: mitxonline.mit.edu
 open_edx_environment: mitxonline-production
 open_edx_favicon_url: https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico

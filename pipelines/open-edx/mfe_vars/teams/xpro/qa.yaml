@@ -1,5 +1,4 @@
 ---
-concourse_team: xpro
 marketing_site_domain: rc.xpro.mit.edu
 open_edx_environment: xpro-qa
 open_edx_lms_domain: courses-rc.xpro.mit.edu
