@@ -17,16 +17,16 @@ config:
     secure: v1:abC4Zew/4Q9nzIm8:ntKKmUgT7z8jIEgKV2EkTbSJ6zcckEH2YHHInsBo8WOGqPNydNkxidhKYZ/bXy8y8E3iBOFF0uRROTyuHhrmzcbGygu01zYGFIBe+v8=
   edxapp:edx_xqueue_secrets:
     secure: v1:MSer6cBbKNVi/Pas:v5XAeVblUaT5pyxdhhk9wn9cVjadZcHscOWhN1nlPHBsCD8/HgEtsvAjtTOWnW/yVMYaMzlIjOxoKvEw0/qNESQj0M7bFKC7/dtfU+qlrWyI0PJEVVmiz9QPLAOvl4rA8In2hJTAmN+BAREDqSRFM9YiOKmdOuoDssTGv+fD1+oC5EcFz4BKPUnbZDQ1
-  edxapp:google_analytics_id: UA-5145472-4
   edxapp:edxapp_release: open-release/maple.master
+  edxapp:google_analytics_id: UA-5145472-4
   edxapp:mail_domain: edxapp-mail-production.mitx.mit.edu
   edxapp:min_web_nodes: "5"
   edxapp:min_worker_nodes: "2"
-  edxapp:worker_disk_size: "50"
   edxapp:sender_email_address: mitx-support@mit.edu
   edxapp:target_vpc: residential_mitx_vpc
   edxapp:web_instance_type: general_purpose_xlarge
   edxapp:web_node_capacity: "5"
+  edxapp:worker_disk_size: "50"
   edxapp:worker_node_capacity: "2"
   mongodb:atlas_project_id: 61b728704656cb4747e589a0
   vault:address: https://vault-production.odl.mit.edu

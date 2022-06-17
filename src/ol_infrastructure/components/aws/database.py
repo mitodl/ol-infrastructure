@@ -118,6 +118,8 @@ class OLMariaDBConfig(OLDBConfig):
         {"name": "character_set_filesystem", "value": "utf8mb4"},
         {"name": "character_set_results", "value": "utf8mb4"},
         {"name": "character_set_server", "value": "utf8mb4"},
+        {"name": "collation_server", "value": "utf8mb4_unicode_ci"},
+        {"name": "collation_connection", "value": "utf8mb4_unicode_ci"},
         {"name": "time_zone", "value": "UTC"},
     ]
 
