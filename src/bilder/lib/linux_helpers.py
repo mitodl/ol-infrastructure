@@ -1,6 +1,7 @@
 RED_HAT = "RedHat"
 DEBIAN = "Debian"
 
+DOCKER_COMPOSE_DIRECTORY = "/etc/docker/compose"
 DEFAULT_DIRECTORY_MODE = 755
 
 DOCKER_COMPOSE_DIRECTORY = "/etc/docker/compose"
