@@ -1,352 +1,148 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="{{ $.Site.Language.Lang }}">
   <head>
-
-
-<link href="/static/css/www.93a2f.css" rel="stylesheet">
-<link
-href="//cdn-images.mailchimp.com/embedcode/classic-10_7.css"
-rel="stylesheet"
-type="text/css"
-/>
-
-
-
-    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-NMQZ25T');</script>
-
-
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-
-  <meta name="description" content="MIT OpenCourseWare is a web-based publication of virtually all MIT course content. OCW is open and available to the world and is a permanent MIT activity">
-  <meta name="keywords" content="opencourseware,MIT OCW,courseware,MIT opencourseware,Free Courses,class notes,class syllabus,class materials,tutorials,online courses,MIT courses">
-
-  <script type="application/ld+json">
-      {
-        "@context": "http://schema.org/",
-        "@type" : "WebPage",
-        "name": "MIT OpenCourseWare",
-        "description": "MIT OpenCourseWare is a web-based publication of virtually all MIT course content. OCW is open and available to the world and is a permanent MIT activity",
-        "license": "http://creativecommons.org/licenses/by-nc-sa/4.0/",
-        "publisher": {
-          "@type": "CollegeOrUniversity",
-          "name": "MIT OpenCourseWare"
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">  
+    <style>
+      body {
+        font-family: "Helvetica";
+        font-size: 16px;
+        margin: 0;
+        text-align: left;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #212529;
+        background-color: #ffff;
+      }
+    
+      .page-single {
+        max-width: 100%;
+        margin: 0 auto;
+      }
+    
+      .title-text {
+        width: 100%;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+    
+      .message-container {
+        max-width: 1280px;
+        padding-left: 15px;
+        padding-right: 15px;
+        margin-left: 4rem;
+        margin-right: 4rem;
+        margin-top: 2rem;
+      }
+    
+      .container {
+        display: flex;
+        flex-flow: column;
+        justify-content: space-between;
+        margin-right: 10px;
+      }
+    
+      h3 {
+        margin-top: 0;
+        font-size: 1.5rem;
+        margin-bottom: 8px;
+      }
+    
+      p {
+        margin-top: 0;
+      }
+    
+      a {
+        color: black;
+      }
+    
+      @media (min-width: 1200px) {
+        .title-text {
+          max-width: 100%;
+          font-size: 3rem;
         }
       }
-  </script>
-
-  <title>Page Not Found | MIT OpenCourseWare | Free Online Course Materials</title>
-
-
-  <link href="/static/css/main.93a2f.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css?family=Roboto:400,500&display=swap" rel="stylesheet">
-  <style>
-  @font-face {
-    font-family: 'Material Icons';
-    font-style: normal;
-    font-weight: 400;
-    src: local('Material Icons'),
-      local('MaterialIcons-Regular'),
-      url(/static/fonts/MaterialIcons-Regular.woff2) format('woff2'),
-      url(/static/fonts/MaterialIcons-Regular.woff) format('woff'),
-      url(/static/fonts/MaterialIcons-Regular.ttf) format('truetype');
-  }
-  @font-face {
-    font-family: 'Material Icons Round';
-    font-style: normal;
-    font-weight: 400;
-    src: local("MaterialIcons-Round"),
-    url(/static/fonts/MaterialIconsRound-Regular.woff2) format('woff2');
-  }
-  @font-face {
-    font-family: 'Cardo Bold';
-    font-style: normal;
-    font-weight: bold;
-    src: local('Cardo'),
-      local('Cardo-Bold'),
-      url(/static/fonts/Cardo-Bold.ttf) format('truetype');
-  }
-  @font-face {
-    font-family: 'Cardo Italic';
-    font-style: italic;
-    font-weight: 400;
-    src: local('Cardo'),
-      local('Cardo-Italic'),
-      url(/static/fonts/Cardo-Italic.ttf) format('truetype');
-  }
-  @font-face {
-    font-family: 'Helvetica Light';
-    font-style: normal`;
-    font-weight: 400;
-    src: local('Helvetica Light'),
-      local('Helvetica-Light'),
-      url(/static/fonts/Helvetica-Light.ttf) format('truetype');
-  }
-  </style>
-</head>
-
+    
+      @media (min-width: 992px) {
+        .page-title {
+          padding: 3.5rem 5rem;
+        }
+    
+        .title-text {
+          max-width: 1447px;
+          font-size: 3rem;
+        }
+      }
+    
+      @media (max-width: 1200px) {
+        .title-text {
+          font-size: calc(1.375rem + 1.5vw)
+        }
+    
+        .page-title {
+          padding: 1rem;
+        }
+    
+        .message-container {
+          margin:0;
+          padding: 1rem;
+    
+        }
+    
+      }
+    
+      ol,
+      ul,
+      dl {
+        margin: 2rem 0;
+      }
+    
+      .h-100v {
+        height: 100vh;
+      }
+    
+      h2 {
+        margin-top: 5rem;
+      }
+    
+      .page-title {
+        color: #ffff;
+        background-color: #126f9a;
+      }
+    
+      .max-content-width {
+        padding: 0 3rem;
+        max-width: 100%;
+      }
+    
+      .navbar-nav.max-content-width {
+        padding: 0 1rem 0 0;
+      }
+    </style>
+  </head>
   <body>
-
-
-      <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NMQZ25T"
-      height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-
-
-    <div>
-      <div id="notification_dfd74bfc-ec71-4b4e-b226-a185bd364905" class="notification d-none">
-  <div class="notification-message">
-    <p><strong>Welcome to NextGen OCW!  Help us improve this site.</strong> <a href="/pages/welcome-to-the-nextgen-ocw-beta-site"><strong>Learn more</strong></a><strong>.</strong></p>
-
-  </div>
-  <div class="notification-close">
-    <i class="material-icons">close</i>
-  </div>
-</div>
-
-<div class="page-single">
-
-
-<div
-  id="mobile-header"
-  class="position-relative bg-black medium-and-below-only"
->
-  <nav class="navbar navbar-expand-lg navbar-dark bg-black">
-    <button
-      class="navbar-toggler"
-      type="button"
-      data-toggle="collapse"
-      data-target="#navbarSupportedContent"
-      aria-controls="navbarSupportedContent"
-      aria-expanded="false"
-      aria-label="Toggle navigation"
+    <div
+      class="page-single"
+      style="height: 100vh; display:flex; flex-direction:column"
     >
-      <i class="material-icons display-4 text-white align-bottom">menu</i>
-    </button>
-    <div class="mx-auto">
-      <a href="/">
-        <img
-          width="250"
-          src="/images/ocw_logo_white.png"
-          alt="MIT OpenCourseWare"
-        />
-      </a>
-    </div>
-    <div class="collapse navbar-collapse" id="navbarSupportedContent">
-      <ul class="navbar-nav mr-auto pl-2 pt-2">
-        <li class="nav-item">
-
-
-    <a class="nav-link search-icon pr-6" href="/search">
-      <i class="material-icons">search</i>
-    </a>
-
-</li>
-        <li class="nav-item">
-          <a
-            class="nav-link"
-            href="https://giving.mit.edu/give/to/ocw/?utm_source=ocw&utm_medium=homepage_banner&utm_campaign=nextgen_home"
-            >Give Now</a
-          >
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/about">About OCW</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="https://mitocw.zendesk.com/hc/en-us" target="_blank">Help & Faqs</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/contact">
-            Contact Us
-          </a>
-        </li>
-      </ul>
-    </div>
-  </nav>
-</div>
-
-
-<div id="desktop-header">
-  <div class="contents px-6">
-    <div class="left">
-      <div class="ocw-logo mr-6">
-        <a href="/">
-          <img src="/images/ocw_logo_white.png" alt="MIT OpenCourseWare" />
-        </a>
+      <div class="page-title">
+        <div class="title-text m-auto h1 m-0">
+          Page Not Found
+        </div>
+      </div>
+      <div
+        class="container"
+        style="height: 100vh"
+      >
+        <div class="message-container">
+          <h3>Sorry, the page you requested was not found.</h3>
+          <br />
+          <p>
+            You might want to try <a href="/search/">searching</a> for another
+            page, or you can <a href="/contact/">contact us</a> and let us know
+          </p>
+        </div>
       </div>
     </div>
-    <div class="right">
-
-
-
-    <a class="nav-link search-icon pr-6" href="/search">
-      <i class="material-icons">search</i>
-    </a>
-
-
-      <a
-        class="d-flex give-button-header py-2 px-3"
-        href="https://giving.mit.edu/give/to/ocw/?utm_source=ocw&utm_medium=homepage_banner&utm_campaign=nextgen_home"
-      >
-        <span class="font-weight-bold w-100">Give now</span>
-      </a>
-      <a href="/about">
-        <div class="text-white font-weight-bold w-100 px-3 pl-5 py-2">
-          About OCW
-        </div>
-      </a>
-      <a href="https://mitocw.zendesk.com/hc/en-us" target="_blank">
-        <div class="text-white font-weight-bold w-100 px-3 py-2">
-          help & faqs
-        </div>
-      </a>
-      <a href="/contact">
-        <div class="text-white font-weight-bold w-100 px-3 py-2">
-          contact us
-        </div>
-      </a>
-    </div>
-  </div>
-</div>
-
-  <div class="page-title">
-  <div class="title-text m-auto h1 m-0">
-  Page Not Found
-  </div>
-</div>
-
-  <div class="container standard-width mx-auto mt-5">
-    <h3 id="sorry-the-page-you-requested-was-not-found">Sorry, the page you requested was not found. </h3>
-<p> </p>
-<p>You might want to try <a href="https://ocwnext-rc.odl.mit.edu/search/">searching</a> for another page, or you can <a href="https://ocwnext-rc.odl.mit.edu/contact/">contact us</a> and let us know.</p>
-
-  </div>
-   <footer id="footer-container">
-  <div class="row pb-4 mx-0 justify-content-between">
-    <div>
-      <a
-        id="open-learning-logo"
-        href="https://openlearning.mit.edu/"
-        target="_blank"
-      >
-        <img src="/images/mit-ol.png" alt="MIT Open Learning" />
-      </a>
-    </div>
-    <div
-      class="d-flex md-and-above-only align-items-center support-link-container"
-    >
-      <a href="https://accessibility.mit.edu">Accessibility</a>
-      <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/"
-        >Creative Commons License</a
-      >
-      <a href="/pages/privacy-and-terms-of-use/">Terms and Conditions</a>
-    </div>
-  </div>
-  <div class="row pb-4 mx-0 justify-content-between row-gap-20">
-    <div class="about-courseware">
-      <p>
-        MIT OpenCourseWare is an online publication of materials from over 2,500
-        MIT courses, freely sharing knowledge with learners and educators around
-        the world. <a href="/about">Learn more</a>
-      </p>
-    </div>
-    <div
-      class="d-flex sm-and-below-only align-items-start support-link-column flex-column row-gap-20"
-    >
-      <a href="https://accessibility.mit.edu">Accessibility</a>
-      <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/"
-        >Creative Commons License</a
-      >
-      <a href="/pages/privacy-and-terms-of-use/">Terms and Conditions</a>
-    </div>
-    <div class="row mx-0 align-items-center">
-      <p class="font-weight-bold">
-        PROUD MEMBER OF :
-        <a href="https://www.oeglobal.org/" target="_blank"
-          ><img class="oeg-logo" src="/images/oeg_logo.png" alt="Open Education Global"
-        /></a>
-      </p>
-    </div>
-  </div>
-  <div class="row mx-0 justify-content-between flex-wrap-reverse row-gap-20">
-    <div class="d-flex align-items-end mr-3">
-      <p>
-        © 2001–2022 Massachusetts Institute of Technology
-      </p>
-    </div>
-    <div class="horizontal-list">
-      <ul class="p-0">
-        <li>
-          <a
-            class="img-link"
-            href="https://www.facebook.com/MITOCW"
-            target="_blank"
-          >
-            <img
-              class="footer-social-icon"
-              src="/images/Facebook.png"
-              alt="facebook"
-            />
-          </a>
-        </li>
-        <li>
-          <a
-            class="img-link"
-            href="https://www.instagram.com/mitocw"
-            target="_blank"
-          >
-            <img
-              class="footer-social-icon"
-              src="/images/Instagram.png"
-              alt="instagram"
-            />
-          </a>
-        </li>
-        <li>
-          <a class="img-link" href="https://twitter.com/MITOCW" target="_blank">
-            <img class="footer-social-icon" src="/images/Twitter.png" alt="twitter" />
-          </a>
-        </li>
-        <li>
-          <a
-            class="img-link"
-            href="https://www.youtube.com/mitocw"
-            target="_blank"
-          >
-            <img class="footer-social-icon" src="/images/Youtube.png" alt="youtube" />
-          </a>
-        </li>
-        <li>
-          <a
-            class="img-link"
-            href="https://www.linkedin.com/company/mit-opencourseware/"
-            target="_blank"
-          >
-            <img
-              class="footer-social-icon"
-              src="/images/LinkedIn.png"
-              alt="LinkedIn"
-            />
-          </a>
-        </li>
-      </ul>
-    </div>
-  </div>
-</footer>
-
-</div>
-
-    </div>
-
-    <script src="/static/js/www.93a2f.js"></script>
-    <script src="/static/js/main.93a2f.js"></script>
-
-
-    <script async src="https://w.appzi.io/w.js?token=Tgs1d"></script>
-
-
   </body>
 </html>
