@@ -67,7 +67,7 @@ files.put(
 files.put(
     name="Place the forum .env file",
     src=str(Path(__file__).resolve().parent.joinpath("files", "forum.env.j2")),
-    dest="/etc/consul-template/templates.d/",
+    dest="/etc/consul-template/templates.d/forum.env.j2",
     mode="0660",
 )
 # Acceptable values mitxonline, mitx, xpro, mitx-staging
