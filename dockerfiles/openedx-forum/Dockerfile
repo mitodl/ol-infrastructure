@@ -33,16 +33,15 @@ RUN git clone https://github.com/edx/cs_comments_service.git --branch $OPENEDX_C
 WORKDIR /app/cs_comments_service
 RUN bundle install --deployment
 
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["/app/bin/docker-entrypoint.sh"]
 
 ENV SINATRA_ENV staging
 ENV NEW_RELIC_ENABLE false
 ENV API_KEY forumapikey
 ENV SEARCH_SERVER "http://elasticsearch:9200"
 ENV MONGODB_AUTH ""
-ENV MONGOID_AUTH_MECH ""
-ENV MONGODB_HOST "mongodb"
+ENV MONGOID_AUTH_MECH ":scram"
 ENV MONGODB_PORT "27017"
-ENV MONGODB_DATABASE "cs_comments_service"
+ENV MONGODB_DATABASE "forum"
 EXPOSE 4567
 CMD ./bin/unicorn -c config/unicorn_tcp.rb -I '.'
