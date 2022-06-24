@@ -74,7 +74,7 @@ source "amazon-ebs" "forum" {
     OU      = var.business_unit
     app     = local.app_name
     purpose = "${local.app_name}-${var.node_type}"
-    deployment = "${var.node_type}"
+    deployment = "${var.deployment}"
   }
 }
 
@@ -91,7 +91,7 @@ build {
   }
 
   provisioner "shell-local" {
-    environment_vars = ["NODE_TYPE=${var.node_type}", "DEPLOYMENT=${var.node_type}"]
+    environment_vars = ["NODE_TYPE=${var.node_type}", "DEPLOYMENT=${var.deployment}"]
     inline           = ["pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"]
   }
 }
