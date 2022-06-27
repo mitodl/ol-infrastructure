@@ -17,7 +17,7 @@ config:
     secure: v1:abC4Zew/4Q9nzIm8:ntKKmUgT7z8jIEgKV2EkTbSJ6zcckEH2YHHInsBo8WOGqPNydNkxidhKYZ/bXy8y8E3iBOFF0uRROTyuHhrmzcbGygu01zYGFIBe+v8=
   edxapp:edx_xqueue_secrets:
     secure: v1:MSer6cBbKNVi/Pas:v5XAeVblUaT5pyxdhhk9wn9cVjadZcHscOWhN1nlPHBsCD8/HgEtsvAjtTOWnW/yVMYaMzlIjOxoKvEw0/qNESQj0M7bFKC7/dtfU+qlrWyI0PJEVVmiz9QPLAOvl4rA8In2hJTAmN+BAREDqSRFM9YiOKmdOuoDssTGv+fD1+oC5EcFz4BKPUnbZDQ1
-  edxapp:edxapp_release: open-release/maple.master
+  edxapp:edxapp_release: open-release/nutmeg.master
   edxapp:google_analytics_id: UA-5145472-4
   edxapp:mail_domain: edxapp-mail-production.mitx.mit.edu
   edxapp:min_web_nodes: "5"

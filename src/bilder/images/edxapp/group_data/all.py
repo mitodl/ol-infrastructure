@@ -12,11 +12,11 @@ edx_themes = {
     },
     "mitx": {
         REPOSITORY: "https://github.com/mitodl/mitx-theme",
-        BRANCH: "maple",
+        BRANCH: "nutmeg",
     },
     "mitx-staging": {
         REPOSITORY: "https://github.com/mitodl/mitx-theme",
-        BRANCH: "maple",
+        BRANCH: "nutmeg",
     },
 }
 
