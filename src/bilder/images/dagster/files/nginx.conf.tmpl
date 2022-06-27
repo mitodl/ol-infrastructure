@@ -1,0 +1,18 @@
+# Pomerium endpoint
+server {
+    listen 443 ssl;
+    server_name  {{ keyOrDefault "dagster/server-address" "dagster.odl.mit.edu" }};
+    ssl_certificate /etc/nginx/nginx.pem;
+    ssl_certificate_key /etc/nginx/nginx-key.pem;
+
+    auth_basic "Dagster Login";
+    auth_basic_user_file /etc/nginx/htpasswd;
+
+    location / {
+      proxy_pass http://dagster;
+    }
+}
+
+upstream dagster {
+    server dagit:3000;
+}

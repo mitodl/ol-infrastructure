@@ -1,0 +1,16 @@
+dagster:
+  pipeline_configs:
+    micromasters:
+      resources:
+        postgres_db:
+          config:
+            postgres_db_name: {{ keyOrDefault "edx-pipeline/micromasters/postgres-db/name" "micromasters" }}
+            postgres_hostname: {{ keyOrDefault "edx-pipeline/micromasters/postgres-db/hostname" "missing-value-postgres-db-hostname"}}
+            postgres_username: {{ with secret "postgresql-micromasters/creds/readonly" }}{{ .Data.username }}
+            postgres_password: {{ .Data.password }}{{ end }}
+            postgres_port: 5432
+      ops:
+        download_user_data:
+          config:
+            last_modified_days: 5
+            outputs_dir: s3://{{ keyOrDefault "edx-pipeline/micromasters/bucket-name" "missing-value-bucket-name" }}/bigquery-mitx-data/user-info-combo/

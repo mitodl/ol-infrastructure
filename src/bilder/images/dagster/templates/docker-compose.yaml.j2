@@ -1,0 +1,38 @@
+version: "3.7"
+
+services:
+  dagit:
+    image: mitodl/data-platform-dagit:{{ context.dagster_version }}
+    container_name: dagit
+    restart: unless-stopped
+    ports:
+    - "3000:3000"
+    env_file:
+      - .env
+  dagster-daemon:
+    image: mitodl/data-platform-dagster-daemon:{{ context.dagster_version }}
+    container_name: dagster-daemon
+    restart: unless-stopped
+    env_file:
+      - .env
+  edx-pipeline:
+    image: mitodl/data-platform-edx-pipeline:{{ context.dagster_version }}
+    container_name: edx-pipeline
+    restart: unless-stopped
+    ports:
+    - "4000"
+    command: ["--package-name", "ol_orchestrate.repositories.open_edx"]
+    volumes:
+    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
+    env_file:
+      - .env
+  nginx:
+    image: nginx
+    restart: unless-stopped
+    ports:
+    - {{ context.listener_port }}:{{ context.listener_port }}
+    volumes:
+    - {{ context.certificate_file }}:/etc/nginx/nginx.pem:ro
+    - {{ context.certificate_key_file }}:/etc/nginx/nginx-key.pem:ro
+    - {{ context.nginx_directory }}/nginx.conf:/etc/nginx/conf.d/dagster.conf:ro
+    - {{ context.nginx_directory }}/htpasswd:/etc/nginx/htpasswd:ro
