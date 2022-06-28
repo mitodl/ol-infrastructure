@@ -1273,13 +1273,14 @@ worker_asg = autoscaling.Group(
 
 # Create Route53 DNS records for Edxapp web nodes
 for domain_key, domain_value in edxapp_domains.items():
+    dns_override = edxapp_config.get("maintenance_page_dns")
     if domain_key == "lms":
         route53.Record(
             f"edxapp-web-{domain_key}-dns-record",
             name=domain_value,
             type="CNAME",
             ttl=FIVE_MINUTES,
-            records=["j.sni.global.fastly.net"],
+            records=[dns_override or "j.sni.global.fastly.net"],
             zone_id=edxapp_zone_id,
         )
     else:
@@ -1288,7 +1289,7 @@ for domain_key, domain_value in edxapp_domains.items():
             name=domain_value,
             type="CNAME",
             ttl=FIVE_MINUTES,
-            records=[web_lb.dns_name],
+            records=[dns_override or web_lb.dns_name],
             zone_id=edxapp_zone_id,
         )
 

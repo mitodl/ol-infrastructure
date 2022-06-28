@@ -20,6 +20,7 @@ config:
   edxapp:edxapp_release: open-release/nutmeg.master
   edxapp:google_analytics_id: UA-5145472-4
   edxapp:mail_domain: edxapp-mail-production.mitx.mit.edu
+  edxapp:maintenance_page_dns: d18vms1k4mfvhk.cloudfront.net
   edxapp:min_web_nodes: "5"
   edxapp:min_worker_nodes: "2"
   edxapp:sender_email_address: mitx-support@mit.edu
