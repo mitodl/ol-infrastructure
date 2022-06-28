@@ -1,8 +1,8 @@
-path "secret-DEPLOYMENT/mongodb-forum/*" {
+path "secret-DEPLOYMENT/mongodb-forum" {
   capabilities = ["read"]
 }
 
-path "secret-DEPLOYMENT/edxapp-forum" {
+path "secret-DEPLOYMENT/edx-forum" {
   capabilities = ["read"]
 }
 

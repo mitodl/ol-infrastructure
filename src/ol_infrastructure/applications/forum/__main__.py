@@ -8,17 +8,15 @@ from pathlib import Path
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, StackReference
-from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_aws import ec2, get_caller_identity, iam
 
-from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
+from bridge.lib.magic_numbers import FORUM_SERVICE_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
     OLAutoScaling,
     OLLaunchTemplateConfig,
-    OLLoadBalancerConfig,
-    OLTargetGroupConfig,
     TagSpecification,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
@@ -39,6 +37,10 @@ consul_stack = StackReference(
 )
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+edxapp = StackReference(
+    f"applications.edxapp.{stack_info.env_prefix}.{stack_info.name}"
+)
+
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc_name = forum_config.get("target_vpc")
@@ -66,11 +68,6 @@ aws_config = AWSBase(
 forum_server_tag = f"forum-server-{env_name}"
 consul_security_groups = consul_stack.require_output("security_groups")
 consul_provider = get_consul_provider(stack_info)
-# edxapp_release = forum_config.require("edxapp_release")
-# edxapp_domains = forum_config.require_object("domains")
-# edxapp_mail_domain = forum_config.require("mail_domain")
-# edxapp_vpc = network_stack.require_output(target_vpc)
-# edxapp_vpc_id = edxapp_vpc["id"]
 
 forum_server_ami = ec2.get_ami(
     filters=[
@@ -83,11 +80,6 @@ forum_server_ami = ec2.get_ami(
 )
 
 # edxapp_zone = dns_stack.require_output(forum_config.require("dns_zone"))
-# edxapp_zone_id = edxapp_zone["id"]
-kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
-kms_s3_key = kms_stack.require_output("kms_s3_data_analytics_key")
-operations_vpc = network_stack.require_output("operations_vpc")
-data_vpc = network_stack.require_output("data_vpc")
 # IAM and instance profile
 forum_server_instance_role = iam.Role(
     f"forum-server-instance-role-{env_name}",
@@ -120,18 +112,13 @@ iam.RolePolicyAttachment(
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
     role=forum_server_instance_role.name,
 )
-iam.RolePolicyAttachment(
-    f"forum-server-route53-role-policy-{env_name}",
-    policy_arn=policy_stack.require_output("iam_policies")["route53_odl_zone_records"],
-    role=forum_server_instance_role.name,
-)
 forum_server_instance_profile = iam.InstanceProfile(
     f"forum-server-instance-profile-{env_name}",
     role=forum_server_instance_role.name,
     path="/ol-infrastructure/forum-server/profile/",
 )
 # aws = vault.AuthBackend("aws", type="aws")
-edxapp_web_vault_auth_role = vault.aws.AuthBackendRole(
+forum_app_vault_auth_role = vault.aws.AuthBackendRole(
     "forum-web-ami-ec2-vault-auth",
     backend="aws",
     auth_type="iam",
@@ -166,10 +153,10 @@ forum_server_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
-            from_port=DEFAULT_HTTPS_PORT,
-            to_port=DEFAULT_HTTPS_PORT,
-            cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the forum server on port {DEFAULT_HTTPS_PORT}",
+            from_port=FORUM_SERVICE_PORT,
+            to_port=FORUM_SERVICE_PORT,
+            security_groups=[edxapp.get_output("edxapp_security_group")],
+            description=f"Allow traffic to the forum server on port {FORUM_SERVICE_PORT}",
         ),
     ],
     egress=default_egress_args,
@@ -241,30 +228,7 @@ asg_config = OLAutoScaleGroupConfig(
     vpc_zone_identifiers=target_vpc["subnet_ids"],
     tags=aws_config.merged_tags({"Name": forum_server_tag}),
 )
-lb_config = OLLoadBalancerConfig(
-    subnets=target_vpc["subnet_ids"],
-    security_groups=[forum_server_security_group],
-    tags=aws_config.merged_tags({"Name": forum_server_tag}),
-)
-tg_config = OLTargetGroupConfig(
-    vpc_id=vpc_id,
-    health_check_interval=60,
-    health_check_matcher="200-399",
-    health_check_path="/",
-    tags=aws_config.merged_tags({"Name": forum_server_tag}),
-)
 as_setup = OLAutoScaling(
     asg_config=asg_config,
     lt_config=lt_config,
-    tg_config=tg_config,
-    lb_config=lb_config,
-)
-five_minutes = 60 * 5
-route53.Record(
-    "forum-server-dns-record",
-    name=forum_config.require("web_host_domain"),
-    type="CNAME",
-    ttl=five_minutes,
-    records=[as_setup.load_balancer.dns_name],
-    zone_id=mitodl_zone_id,
 )

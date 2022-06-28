@@ -1306,3 +1306,5 @@ export(
         "security_group": edxapp_security_group.id,
     },
 )
+
+export("edxapp_security_group", edxapp_security_group.id)
