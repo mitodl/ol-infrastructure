@@ -90,13 +90,6 @@ build {
     ]
   }
 
-  provisioner "shell" {
-    inline = [
-      "sudo touch /etc/rc.local && sudo chmod 0755 /etc/rc.local",
-      "sudo bash -c 'echo -e \\#\\!/bin/sh -e\\\\n chmod 0600 -R /etc/ssh/*host* >> /etc/rc.local'"
-    ]
-  }
-
   provisioner "shell-local" {
     environment_vars = ["NODE_TYPE=${var.node_type}", "DEPLOYMENT=${var.deployment}"]
     inline           = ["pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"]
