@@ -56,7 +56,6 @@ VERSIONS = {
     ),
 }
 
-
 files.put(
     name="Place the forum docker-compose.yaml file",
     src=str(Path(__file__).resolve().parent.joinpath("files", "docker-compose.yaml")),
@@ -69,6 +68,8 @@ files.put(
     src=str(Path(__file__).resolve().parent.joinpath("files", "forum.env.j2")),
     dest="/etc/consul-template/templates.d/forum.env.j2",
     mode="0660",
+    user="consul-template",
+    group="consul-template",
 )
 # Acceptable values mitxonline, mitx, xpro, mitx-staging
 DEPLOYMENT = os.environ["DEPLOYMENT"]
@@ -80,7 +81,8 @@ if DEPLOYMENT not in ["mitxonline", "mitx", "xpro", "mitx-staging"]:
 server.shell(
     name="Update Vault Mount Point",
     commands=[
-        f"sed -i -e 's/DEPLOYMENT/{DEPLOYMENT}/g' /etc/consul-template/templates.d/forum.env.j2"
+        "mkdir /etc/forum/",
+        f"sed -i -e 's/DEPLOYMENT/{DEPLOYMENT}/g' /etc/consul-template/templates.d/forum.env.j2",
     ],
 )
 
@@ -134,7 +136,7 @@ vault = Vault(
     configuration={Path("vault.json"): vault_config},
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
-forum_config_path = Path("/etc/forum.env")
+forum_config_path = Path("/etc/forum/forum.env")
 
 consul_templates = [
     ConsulTemplateTemplate(
