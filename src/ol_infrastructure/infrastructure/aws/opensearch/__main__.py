@@ -200,6 +200,18 @@ opensearch_service = consul.Service(
     opts=pulumi.ResourceOptions(provider=consul_provider),
 )
 
+consul.Keys(
+    "elasticsearch",
+    keys=[
+        consul.KeysKeyArgs(
+            path="elasticsearch/host",
+            delete=True,
+            value=search_domain.endpoint,
+        ),
+    ],
+    opts=pulumi.ResourceOptions(provider=consul_provider),
+)
+
 
 # Export Resources for shared use
 pulumi.export(
