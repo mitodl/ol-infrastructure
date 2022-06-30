@@ -19,7 +19,7 @@ resources:
 - icon: github
   name: packer_templates
   source:
-    branch: md/issue_828
+    branch: main
     paths:
     - src/bilder/images/airbyte
     uri: https://github.com/mitodl/ol-infrastructure
