@@ -460,5 +460,6 @@
   "/index.htm": "301|keep|https://ocw.mit.edu/",
   "/subscribe": "301|keep|https://{{AK_HOSTHEADER}}/newsletter/",
   "/terms": "307|keep|https://{{AK_HOSTHEADER}}/pages/privacy-and-terms-of-use/",
-  "/terms/index.htm": "307|keep|https://{{AK_HOSTHEADER}}/pages/privacy-and-terms-of-use/"
+  "/terms/index.htm": "307|keep|https://{{AK_HOSTHEADER}}/pages/privacy-and-terms-of-use/",
+  "/fairuse": "301|keep|https://mitocw.zendesk.com/hc/en-us/articles/4414756181403-How-is-all-rights-reserved-content-different-from-the-rest-of-OCW-content/"
 }
