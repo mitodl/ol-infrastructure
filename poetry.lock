@@ -1196,7 +1196,7 @@ python-versions = "*"
 
 [[package]]
 name = "pyinfra"
-version = "2.2"
+version = "2.3"
 description = "pyinfra automates/provisions/manages/deploys infrastructure."
 category = "main"
 optional = false
@@ -1631,7 +1631,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "e7e9c021da76fc7da9f38d3864fd3ceb45906442c9c6c70b4b2fc6a2763b3fba"
+content-hash = "add7d53b60ebbb59a86606d09c2e9c241ee0239a775a68488991e067b6b87724"
 
 [metadata.files]
 anyio = [
@@ -2415,8 +2415,8 @@ pyhcl = [
     {file = "pyhcl-0.4.4.tar.gz", hash = "sha256:2d9b9dcdf1023d812bfed561ba72c99104c5b3f52e558d595130a44ce081b003"},
 ]
 pyinfra = [
-    {file = "pyinfra-2.2-py2.py3-none-any.whl", hash = "sha256:0c44dff8ccaa1a064227f308b700e5b643be92ba3a1cf91ae4088407c323b969"},
-    {file = "pyinfra-2.2.tar.gz", hash = "sha256:be4e48ce61ceb3925c3420ecd953bcc8f7f03f91b63336aef0a0b69e79428d03"},
+    {file = "pyinfra-2.3-py2.py3-none-any.whl", hash = "sha256:3b9697541b1692bb30e0e934bce66f9cab6b6428d3d48a1c50d35aadaee2154d"},
+    {file = "pyinfra-2.3.tar.gz", hash = "sha256:352ed9234dbcbb4588e4a64b0efcfe9fe22da140e21d6f2bafe49c2058416a36"},
 ]
 pynacl = [
     {file = "PyNaCl-1.5.0-cp36-abi3-macosx_10_10_universal2.whl", hash = "sha256:401002a4aaa07c9414132aaed7f6836ff98f59277a234704ff66878c2ee4a0d1"},
