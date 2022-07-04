@@ -1067,7 +1067,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "4.12.0"
+version = "4.13.0"
 description = "A Pulumi package for creating and managing github cloud resources."
 category = "main"
 optional = false
@@ -1631,7 +1631,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "e7e9c021da76fc7da9f38d3864fd3ceb45906442c9c6c70b4b2fc6a2763b3fba"
+content-hash = "c650cfe32ef9e8fe4a3717a39669c6162eb5219524f0ee8fe348b8f191aa7bcf"
 
 [metadata.files]
 anyio = [
@@ -2339,7 +2339,7 @@ pulumi-fastly = [
     {file = "pulumi_fastly-4.0.4.tar.gz", hash = "sha256:283eab002e17d68190251b7f55f702eeeec81073d8e62c55a3c55dfb7ee927c5"},
 ]
 pulumi-github = [
-    {file = "pulumi_github-4.12.0.tar.gz", hash = "sha256:8794f3b2162fcb53f542d6a0b17d78c45d8100a531701bdb08734e509be2e5de"},
+    {file = "pulumi_github-4.13.0.tar.gz", hash = "sha256:ff9a89fd7772cd7f202541f239cb6beab3cb571bc7e69e416359843ffdb8fc38"},
 ]
 pulumi-mongodbatlas = [
     {file = "pulumi_mongodbatlas-3.3.0.tar.gz", hash = "sha256:6e5c9e671f10ae3e96fa254c996067d9066c9340ee13e407de48806ec200795e"},
