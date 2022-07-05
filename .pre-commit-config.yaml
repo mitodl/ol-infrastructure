@@ -58,6 +58,8 @@ repos:
     - src/bridge/secrets/
     - --exclude-files
     - poetry.lock
+    - --exclude-files
+    - src/ol_infrastructure/applications/ocw_site/redirect_dict
 - repo: https://github.com/PyCQA/isort
   rev: 5.10.1
   hooks:
