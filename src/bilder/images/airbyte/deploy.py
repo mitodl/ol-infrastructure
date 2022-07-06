@@ -1,3 +1,4 @@
+import io
 import os
 from pathlib import Path
 
@@ -77,6 +78,12 @@ files.put(
     src=str(Path(__file__).resolve().parent.joinpath("files", "docker-compose.yaml")),
     dest=DOCKER_COMPOSE_DIRECTORY,
     mode="0664",
+)
+
+files.put(
+    name="Set the Airbyte version",
+    src=io.StringIO(VERSIONS["airbyte"]),
+    dest="/etc/defaults/consul-template",
 )
 
 env_template_file = Path("/etc/consul-template/.env.tmpl")
