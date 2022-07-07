@@ -37,6 +37,7 @@ consul_stack = StackReference(
 )
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+print(f"applications.edxapp.{stack_info.env_prefix}.{stack_info.name}")
 edxapp = StackReference(
     f"applications.edxapp.{stack_info.env_prefix}.{stack_info.name}"
 )
