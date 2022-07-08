@@ -1,3 +1,4 @@
+{{- $env := ( key "edx-pipeline/shared/env-suffix" ) -}}
 resources:
   io_manager:
     config:
@@ -8,7 +9,11 @@ resources:
       outputs_directory_date_format: '%Y%m%d'
   healthchecks:
     config:
+      {{- if eq $env "qa" }}
       check_id: {{ with secret "secret-data/data-qa/pipelines/edx/mitxonline/healthchecks-io-check-id" }}{{ .Data.value }}{{ end }}
+      {{- end }}{{ if eq $env "production" }}
+      check_id: {{ with secret "secret-data/data-production/pipelines/edx/mitxonline/healthchecks-io-check-id" }}{{ .Data.value }}{{ end }}
+      {{- end }}
   sqldb:
     config:
       mysql_db_name: edxapp
@@ -28,13 +33,26 @@ ops:
       edx_etl_results_bucket: {{ keyOrDefault "edx-pipeline/mitxonline/purpose" "missing-value-purpose" }}-{{ keyOrDefault "edx-pipeline/shared/env-suffix" "missing-value-env-suffix" }}
   list_edx_courses:
     config:
+      {{- if eq $env "qa" }}
+      edx_base_url: {{ with secret "secret-data/data-qa/pipelines/edx/mitxonline/edx-oauth-client" }}{{ .Data.url }}
+      edx_client_id: {{ .Data.id }}
+      edx_client_secret: {{ .Data.secret }}{{ end }}
+      {{- end }}{{ if eq $env "production" }}
+      edx_base_url: {{ with secret "secret-data/data-production/pipelines/edx/mitxonline/edx-oauth-client" }}{{ .Data.url }}
+      edx_client_id: {{ .Data.id }}
+      edx_client_secret: {{ .Data.secret }}{{ end }}
+      {{- end }}
+  edx_export_courses:
+    config:
+      {{- if eq $env "qa" }}
       edx_base_url: {{ with secret "secret-data/data-qa/pipelines/edx/mitxonline/edx-oauth-client" }}{{ .Data.url }}
       edx_client_id: {{ .Data.id }}
       edx_client_secret: {{ .Data.secret }}
-  edx_export_courses:
-    config:
-      edx_base_url: {{ .Data.url }}
+      edx_studio_base_url: {{ .Data.studio_url }}{{ end }}
+      {{- end }}{{ if eq $env "production" }}
+      edx_base_url: {{ with secret "secret-data/data-production/pipelines/edx/mitxonline/edx-oauth-client" }}{{ .Data.url }}
       edx_client_id: {{ .Data.id }}
       edx_client_secret: {{ .Data.secret }}
       edx_studio_base_url: {{ .Data.studio_url }}{{ end }}
+      {{- end }}
       edx_course_bucket: {{ keyOrDefault "edx-pipeline/mitxonline/edx-course-bucket-name" "missing-value-edx-course-bucket-name" }}
