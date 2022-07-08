@@ -1,3 +1,4 @@
+{{- $env := ( key "edx-pipeline/shared/env-suffix" ) -}}
 resources:
   athena_db:
     config:
@@ -7,8 +8,13 @@ resources:
     config:
       postgres_db_name: opendiscussions
       postgres_hostname: {{ keyOrDefault "edx-pipeline/mit-open/postgres-db/hostname" "missing-value-postgres-db-hostname" }}
+      {{- if eq $env "qa" }}
       postgres_username: {{ with secret "postgres-rc-apps-opendiscussions/creds/opendiscussions" }}{{ .Data.username }}
       postgres_password: {{ .Data.password }}{{ end }}
+      {{- end }}{{ if eq $env "production" }}
+      postgres_username: {{ with secret "postgres-production-apps-opendiscussions/creds/opendiscussions" }}{{ .Data.username }}
+      postgres_password: {{ .Data.password }}{{ end }}
+      {{- end }}
       postgres_port: 5432
 ops:
   fetch_open_run_data:

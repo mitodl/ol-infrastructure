@@ -14,7 +14,7 @@ config:
   dagster:edx_pipeline_mit_open_postgres_db_hostname: production-apps-rds-postgresql-opendiscussions.cbnm7ajau6mi.us-east-1.rds.amazonaws.com
   dagster:edx_pipeline_mitx_enrollments_bucket_name: dagster-data-production
   dagster:edx_pipeline_mitx_online_edx_course_bucket: mitx-production-edxapp-courses
-  dagster:edx_pipeline_mitx_online_purpose: current-residential-live-mitx
+  dagster:edx_pipeline_mitx_online_purpose: residential-live-mitx
   dagster:edx_pipeline_mitxonline_edx_course_bucket_name: mitxonline-production-edxapp-courses
   dagster:edx_pipeline_mitxonline_purpose: mitxonline
   dagster:edx_pipeline_residential_mysql_db_hostname: edxapp-db-mitx-production.cbnm7ajau6mi.us-east-1.rds.amazonaws.com

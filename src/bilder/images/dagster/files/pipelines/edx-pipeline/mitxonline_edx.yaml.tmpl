@@ -30,7 +30,7 @@ ops:
       edx_mongodb_auth_db: admin
   edx_upload_daily_extracts:
     config:
-      edx_etl_results_bucket: {{ keyOrDefault "edx-pipeline/mitxonline/purpose" "missing-value-purpose" }}-{{ keyOrDefault "edx-pipeline/shared/env-suffix" "missing-value-env-suffix" }}
+      edx_etl_results_bucket: mitx-etl-mitxonline-{{ keyOrDefault "edx-pipeline/shared/env-suffix" "missing-value-env-suffix" }}
   list_edx_courses:
     config:
       {{- if eq $env "qa" }}
