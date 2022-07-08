@@ -34,6 +34,12 @@ path "postgres-dagster-data-qa/creds/app/*" {
 path "postgres-dagster-data-qa/creds/app" {
   capabilities = ["read"]
 }
+path "postgres-dagster-data-production/creds/app/*" {
+  capabilities = ["read"]
+}
+path "postgres-dagster-data-production/creds/app" {
+  capabilities = ["read"]
+}
 
 
 path "postgresql-micromasters/creds/readonly/*" {
@@ -119,6 +125,13 @@ path "secret-data/data-qa/pipelines/edx/residential/healthchecks-io.check-id/*" 
 path "secret-data/data-qa/pipelines/edx/residential/healthchecks-io.check-id" {
   capabilities = ["read"]
 }
+path "secret-data/data-production/pipelines/edx/residential/healthchecks-io.check-id/*" {
+  capabilities = ["read"]
+}
+path "secret-data/data-production/pipelines/edx/residential/healthchecks-io.check-id" {
+  capabilities = ["read"]
+}
+
 path "sys/leases/renew" {
   capabilities = ["update"]
 }
