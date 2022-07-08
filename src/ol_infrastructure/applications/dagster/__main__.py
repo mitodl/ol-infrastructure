@@ -522,7 +522,9 @@ grafana_credentials = read_yaml_secrets(
     Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
 )
 consul_datacenter = consul_stack.require_output("datacenter")
-instance_tags = aws_config.merged_tags({"Name": "dagster-instance-0"})
+instance_tags = aws_config.merged_tags(
+    {"Name": f"dagster-instance-{stack_info.env_suffix}"}
+)
 dagster_instance = ec2.Instance(
     f"dagster-instance-{stack_info.env_suffix}",
     ami=dagster_image.id,
