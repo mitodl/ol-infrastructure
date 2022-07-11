@@ -977,7 +977,7 @@ ssh = ["paramiko"]
 
 [[package]]
 name = "pre-commit"
-version = "2.19.0"
+version = "2.20.0"
 description = "A framework for managing and maintaining multi-language pre-commit hooks."
 category = "dev"
 optional = false
@@ -1631,7 +1631,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "07a2e6374360a81ed2fa03db5d872f13170c7943adf9295af7249057ac10493a"
+content-hash = "0da0de8461f70a979ca7d0a863c14fe51462a9106d989f1536805b23b73e3a73"
 
 [metadata.files]
 anyio = []
