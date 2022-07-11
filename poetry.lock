@@ -1080,7 +1080,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-mongodbatlas"
-version = "3.3.0"
+version = "3.4.0"
 description = "A Pulumi package for creating and managing mongodbatlas cloud resources."
 category = "main"
 optional = false
@@ -1631,7 +1631,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "07a2e6374360a81ed2fa03db5d872f13170c7943adf9295af7249057ac10493a"
+content-hash = "cd9e69342727e06b8f90dc2c8ca7eeb79c0afe1d11b923c093dfc81ef78e061d"
 
 [metadata.files]
 anyio = []
