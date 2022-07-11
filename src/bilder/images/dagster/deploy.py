@@ -81,11 +81,7 @@ consul_templates = []
 ##################################################
 # Put down EDX pipeline consul templates
 edx_pipeline_files = [
-    "micromasters.yaml",
-    "mitx_bigquery.yaml",
     "mitxonline_edx.yaml",
-    "open-discussions-enrollment-update.yaml",
-    "open-discussions.yaml",
     "residential_edx.yaml",
     "xpro_edx.yaml",
 ]
