@@ -55,10 +55,16 @@ path "postgres-micromasters/creds/readonly" {
   capabilities = ["read"]
 }
 
-path "secret-data/*" {
+path "secret-data/pipelines/*" {
   capabilities = ["read"]
 }
-path "secret-data" {
+path "secret-data/pipelines" {
+  capabilities = ["read"]
+}
+path "secret-data/dagster-http-auth-password/*" {
+  capabilities = ["read"]
+}
+path "secret-data/dagster-http-auth-password" {
   capabilities = ["read"]
 }
 

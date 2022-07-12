@@ -1,18 +1,10 @@
-{{- $env := ( key "edx-pipeline/shared/env-suffix" ) -}}
 ops:
   edx_export_courses:
     config:
-      {{- if eq $env "qa" }}
-      edx_base_url: {{ with secret "secret-data/data/pipelines/edx/residential/edx-oauth-client" }}{{ .Data.url }}
+      edx_base_url: {{ with secret "secret-data/pipelines/edx/residential/edx-oauth-client" }}{{ .Data.url }}
       edx_client_id: {{ .Data.id }}
       edx_client_secret: {{ .Data.secret }}
       edx_studio_base_url: {{ .Data.studio_url }}{{ end }}
-      {{- end }}{{ if eq $env "production" }}
-      edx_base_url: {{ with secret "secret-data/data-production/pipelines/edx/residential/edx-oauth-client" }}{{ .Data.url }}
-      edx_client_id: {{ .Data.id }}
-      edx_client_secret: {{ .Data.secret }}
-      edx_studio_base_url: {{ .Data.studio_url }}{{ end }}
-      {{- end }}
       edx_course_bucket: {{ keyOrDefault "edx-pipeline-mitx-online/edx-course-bucket" "missing-value-edx-course-bucket" }}
   edx_upload_daily_extracts:
     config:
@@ -26,23 +18,13 @@ ops:
       edx_mongodb_auth_db: admin
   list_edx_courses:
     config:
-      {{- if eq $env "qa" }}
-      edx_base_url: {{ with secret "secret-data/data/pipelines/edx/residential/edx-oauth-client" }}{{ .Data.url }}
+      edx_base_url: {{ with secret "secret-data/pipelines/edx/residential/edx-oauth-client" }}{{ .Data.url }}
       edx_client_id: {{ .Data.id }}
       edx_client_secret: {{ .Data.secret }}{{ end }}
-      {{- end }}{{ if eq $env "production" }}
-      edx_base_url: {{ with secret "secret-data/data-production/pipelines/edx/residential/edx-oauth-client" }}{{ .Data.url }}
-      edx_client_id: {{ .Data.id }}
-      edx_client_secret: {{ .Data.secret }}{{ end }}
-      {{- end }}
 resources:
   healthchecks:
     config:
-      {{- if eq $env "qa" }}
-      check_id: {{ with secret "secret-data/data/pipelines/edx/residential/healthchecks-io-check-id" }}{{ .Data.value }}{{ end }}
-      {{- end }}{{ if eq $env "production" }}
-      check_id: {{ with secret "secret-data/data-production/pipelines/edx/residential/healthchecks-io-check-id" }}{{ .Data.value }}{{ end }}
-      {{- end }}
+      check_id: {{ with secret "secret-data/pipelines/edx/residential/healthchecks-io-check-id" }}{{ .Data.value }}{{ end }}
   io_manager:
     config:
       s3_bucket: dagster-data-{{ keyOrDefault "edx-pipeline/shared/env-suffix" "missing-value-env-suffix" }}
