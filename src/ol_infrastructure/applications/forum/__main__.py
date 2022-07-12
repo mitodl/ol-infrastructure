@@ -35,7 +35,7 @@ dns_stack = StackReference("infrastructure.aws.dns")
 consul_stack = StackReference(
     f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
 )
-kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
+
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 print(f"applications.edxapp.{stack_info.env_prefix}.{stack_info.name}")
 edxapp = StackReference(
@@ -51,7 +51,7 @@ aws_account = get_caller_identity()
 vpc_id = target_vpc["id"]
 forum_server_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["forum-server-*"]),
+        ec2.GetAmiFilterArgs(name="name", values=["open-edx-forum-server-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
     ],
@@ -62,11 +62,11 @@ aws_config = AWSBase(
     tags={
         "OU": forum_config.require("business_unit"),
         "Environment": env_name,
-        "Application": "forum",
+        "Application": "open-edx-forum",
         "Owner": "platform-engineering",
     }
 )
-forum_server_tag = f"forum-server-{env_name}"
+forum_server_tag = f"open-edx-forum-server-{env_name}"
 consul_security_groups = consul_stack.require_output("security_groups")
 consul_provider = get_consul_provider(stack_info)
 
@@ -74,7 +74,7 @@ forum_server_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
-        ec2.GetAmiFilterArgs(name="name", values=["forum-server-*"]),
+        ec2.GetAmiFilterArgs(name="name", values=["open-edx-forum-server-*"]),
     ],
     most_recent=True,
     owners=[aws_account.account_id],
@@ -94,13 +94,13 @@ forum_server_instance_role = iam.Role(
             },
         }
     ),
-    path="/ol-infrastructure/forum-server/role/",
+    path=f"/ol-applications/open-edx-forum/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     tags=aws_config.tags,
 )
 # Vault policy definition
 forum_vault_policy = vault.Policy(
-    "forum-server-vault-policy",
-    name="forum-server",
+    "open-edx-forum-server-vault-policy",
+    name=f"forum-{stack_info.env_prefix}",
     policy=Path(__file__)
     .parent.joinpath("forum_policy.hcl")
     .read_text()
@@ -114,11 +114,10 @@ iam.RolePolicyAttachment(
     role=forum_server_instance_role.name,
 )
 forum_server_instance_profile = iam.InstanceProfile(
-    f"forum-server-instance-profile-{env_name}",
+    f"open-edx-forum-server-instance-profile-{env_name}",
     role=forum_server_instance_role.name,
-    path="/ol-infrastructure/forum-server/profile/",
+    path="/ol-infrastructure/open-edx-forum-server/profile/",
 )
-# aws = vault.AuthBackend("aws", type="aws")
 forum_app_vault_auth_role = vault.aws.AuthBackendRole(
     "forum-web-ami-ec2-vault-auth",
     backend="aws",
@@ -221,7 +220,7 @@ auto_scale_config = forum_config.get_object("auto_scale") or {
     "max": 2,
 }
 asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"forum-server-{env_name}",
+    asg_name=f"open-edx-forum-server-{env_name}",
     aws_config=aws_config,
     desired_size=auto_scale_config["desired"],
     min_size=auto_scale_config["min"],
