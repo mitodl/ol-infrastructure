@@ -135,10 +135,17 @@ class OLVaultDatabaseBackend(ComponentResource):
         )
 
         db_option_dict = {}
+        credentials_dict = {
+            "username": db_config.db_admin_username,
+            "password": db_config.db_admin_password,
+        }
 
         if hasattr(db_config, "db_connection"):
             db_option_dict.update(
-                {"connection_url": self.format_connection_string(db_config)}
+                {
+                    "connection_url": self.format_connection_string(db_config),
+                    **credentials_dict,
+                }
             )
 
         db_option_dict.update(db_config.connection_options or {})
@@ -151,10 +158,7 @@ class OLVaultDatabaseBackend(ComponentResource):
             verify_connection=db_config.verify_connection,
             allowed_roles=sorted(db_config.role_statements.keys()),
             name=db_config.db_name,
-            data={
-                "username": db_config.db_admin_username,
-                "password": db_config.db_admin_password,
-            },
+            data=credentials_dict,
             **{db_config.db_type: db_option_dict},
         )
 
