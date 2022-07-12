@@ -338,7 +338,7 @@ dagster_db = OLAmazonDB(dagster_db_config)
 
 dagster_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=dagster_db_config.db_name,
-    mount_point=f"{dagster_db_config.engine}-dagster-{dagster_environment}",
+    mount_point=f"{dagster_db_config.engine}-dagster",
     db_admin_username=dagster_db_config.username,
     db_admin_password=get_config("dagster:db_password"),
     db_host=dagster_db.db_instance.address,
