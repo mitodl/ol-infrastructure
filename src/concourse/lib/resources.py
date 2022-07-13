@@ -1,4 +1,4 @@
-from concourse.models import Identifier, Resource
+from concourse.lib.models import Identifier, Resource
 
 
 def git_repo(name: str, uri: str, branch: str = "main"):

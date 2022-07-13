@@ -1,4 +1,4 @@
-from concourse.models import Identifier, ResourceType
+from concourse.lib.models import Identifier, ResourceType
 
 
 def rclone() -> ResourceType:
