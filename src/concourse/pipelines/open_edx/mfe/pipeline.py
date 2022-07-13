@@ -3,9 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from concourse.lib.resource_types import rclone
-from concourse.lib.resources import git_repo
-from concourse.models import (
+from concourse.lib.models import (
     AnonymousResource,
     Command,
     GetStep,
@@ -20,6 +18,8 @@ from concourse.models import (
     TaskConfig,
     TaskStep,
 )
+from concourse.lib.resource_types import rclone
+from concourse.lib.resources import git_repo
 
 
 class MFEAppVars(BaseModel):
@@ -29,8 +29,10 @@ class MFEAppVars(BaseModel):
 
 
 class OpenEdxVars(BaseModel):
+    contact_url: Optional[str]
     environment: str
     favicon_url: str
+    honor_code_url: Optional[str]
     lms_domain: str
     logo_url: str
     marketing_site_domain: str
@@ -38,6 +40,8 @@ class OpenEdxVars(BaseModel):
     site_name: str
     studio_domain: str
     support_url: str
+    terms_of_service_url: str
+    trademark_text: Optional[str]
 
 
 def mfe_params(open_edx: OpenEdxVars, mfe: MFEAppVars) -> dict[str, Optional[str]]:
@@ -47,11 +51,11 @@ def mfe_params(open_edx: OpenEdxVars, mfe: MFEAppVars) -> dict[str, Optional[str
         "BASE_URL": f"https://{open_edx.lms_domain}",
         "CREDENTIALS_BASE_URL": None,
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
-        "Contact": None,
+        "CONTACT_URL": open_edx.contact_url,
         "DISCOVERY_API_BASE_URL": None,
         "ECOMMERCE_BASE_URL": None,
         "FAVICON_URL": open_edx.favicon_url,
-        "HONOR_CODE_URL": None,
+        "HONOR_CODE_URL": open_edx.honor_code_url,
         "LANGUAGE_PREFERENCE_COOKIE_NAME": f"{open_edx.environment}-open-edx-language-preference",
         "LEARNING_BASE_URL": None,
         "LMS_BASE_URL": f"https://{open_edx.lms_domain}",
@@ -75,7 +79,7 @@ def mfe_params(open_edx: OpenEdxVars, mfe: MFEAppVars) -> dict[str, Optional[str
         "SUPPORT_CENTER_URL": None,
         "SUPPORT_URL": f"https://{open_edx.support_url}",
         "TERMS_OF_SERVICE_URL": None,
-        "TRADEMARK_TEXT": None,
+        "TRADEMARK_TEXT": open_edx.trademark_text,
         "USER_INFO_COOKIE_NAME": f"{open_edx.environment}-edx-user-info",
     }
 

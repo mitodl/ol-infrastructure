@@ -1,11 +1,11 @@
 import itertools
 
-from concourse.lib.resources import git_repo
-from concourse.models import (
+from concourse.lib.models import (
     AnonymousResource,
     Command,
     GetStep,
     Identifier,
+    Input,
     Job,
     Output,
     Pipeline,
@@ -14,8 +14,9 @@ from concourse.models import (
     TaskConfig,
     TaskStep,
 )
-from concourse.open_edx.mfe.pipeline import MFEAppVars, OpenEdxVars
-from concourse.open_edx.mfe.values import apps, deployments
+from concourse.lib.resources import git_repo
+from concourse.pipelines.open_edx.mfe.pipeline import MFEAppVars, OpenEdxVars
+from concourse.pipelines.open_edx.mfe.values import apps, deployments
 
 
 def meta_job(
@@ -40,16 +41,17 @@ def meta_job(
                     image_resource=AnonymousResource(
                         type="registry-image",
                         source={
-                            "repository": "mitodl",
-                            "tag": "ol-infrastructure",
+                            "repository": "mitodl/ol-infrastructure",
+                            "tag": "latest",
                         },
                     ),
+                    inputs=[Input(name=Identifier("mfe-pipeline-definitions"))],
                     outputs=[Output(name=Identifier("pipeline"))],
                     run=Command(
                         path="python",
                         dir="pipeline",
                         args=[
-                            "src/concourse/open_edx/mfe/pipeline.py",
+                            "../mfe-pipeline-definitions/src/concourse/pipelines/open_edx/mfe/pipeline.py",
                             open_edx_deployment,
                             mfe_app_name,
                         ],
@@ -72,7 +74,7 @@ def meta_pipeline() -> Pipeline:
     mfe_definitions = git_repo(
         name=Identifier("mfe-pipeline-definitions"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="main",
+        branch="mfe_pipeline_consolidation",
     )
     mfe_definitions.source["paths"] = [
         "src/concourse/open_edx/mfe/",
@@ -97,16 +99,17 @@ def meta_pipeline() -> Pipeline:
                         image_resource=AnonymousResource(
                             type="registry-image",
                             source={
-                                "repository": "mitodl",
-                                "tag": "ol-infrastructure",
+                                "repository": "mitodl/ol-infrastructure",
+                                "tag": "latest",
                             },
                         ),
+                        inputs=[Input(name=Identifier("mfe-pipeline-definitions"))],
                         outputs=[Output(name=Identifier("pipeline"))],
                         run=Command(
                             path="python",
                             dir="pipeline",
                             args=[
-                                "src/concourse/open_edx/mfe/meta.py",
+                                "../mfe-pipeline-definitions/src/concourse/pipelines/open_edx/mfe/meta.py",
                             ],
                         ),
                     ),
