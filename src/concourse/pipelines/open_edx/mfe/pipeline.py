@@ -46,18 +46,13 @@ class OpenEdxVars(BaseModel):
 
 def mfe_params(open_edx: OpenEdxVars, mfe: MFEAppVars) -> dict[str, Optional[str]]:
     return {
-        "ABOUT_US_URL": None,
         "ACCESS_TOKEN_COOKIE_NAME": f"{open_edx.environment}-edx-jwt-cookie-header-payload",
         "BASE_URL": f"https://{open_edx.lms_domain}",
-        "CREDENTIALS_BASE_URL": None,
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "CONTACT_URL": open_edx.contact_url,
-        "DISCOVERY_API_BASE_URL": None,
-        "ECOMMERCE_BASE_URL": None,
         "FAVICON_URL": open_edx.favicon_url,
         "HONOR_CODE_URL": open_edx.honor_code_url,
         "LANGUAGE_PREFERENCE_COOKIE_NAME": f"{open_edx.environment}-open-edx-language-preference",
-        "LEARNING_BASE_URL": None,
         "LMS_BASE_URL": f"https://{open_edx.lms_domain}",
         "LOGIN_URL": f"https://{open_edx.lms_domain}/login",
         "LOGOUT_URL": f"https://{open_edx.lms_domain}/logout",
@@ -67,18 +62,14 @@ def mfe_params(open_edx: OpenEdxVars, mfe: MFEAppVars) -> dict[str, Optional[str
         "LOGO_WHITE_URL": open_edx.logo_url,
         "MARKETING_SITE_BASE_URL": f"https://{open_edx.marketing_site_domain}",
         "ORDER_HISTORY_URL": None,  # Intentionally left blank to turn off a menu entry
-        "PRIVACY_POLICY_URL": None,
         "PUBLIC_PATH": f"/{mfe.path}/",
         "REFRESH_ACCESS_TOKEN_ENDPOINT": f"https://{open_edx.lms_domain}/login_refresh",
         "SEARCH_CATALOG_URL": f"https://{open_edx.lms_domain}/courses",
         "SESSION_COOKIE_DOMAIN": open_edx.lms_domain,
-        "SHOW_FULLNAME": None,
         "SITE_NAME": open_edx.site_name,
         "STUDIO_BASE_URL": f"https://{open_edx.studio_domain}",
-        "SUPPORT_CENTER_TEXT": None,
-        "SUPPORT_CENTER_URL": None,
         "SUPPORT_URL": f"https://{open_edx.support_url}",
-        "TERMS_OF_SERVICE_URL": None,
+        "TERMS_OF_SERVICE_URL": open_edx.terms_of_service_url,
         "TRADEMARK_TEXT": open_edx.trademark_text,
         "USER_INFO_COOKIE_NAME": f"{open_edx.environment}-edx-user-info",
     }
