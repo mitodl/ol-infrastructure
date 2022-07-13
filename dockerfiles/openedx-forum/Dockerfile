@@ -17,7 +17,7 @@ RUN useradd --home-dir /app --create-home --shell /bin/bash --uid 1000 app
 
 # Copy custom scripts
 COPY ./bin /app/bin
-RUN chmod a+x /app/bin/*
+RUN chmod a+x /app/bin/* && mkdir -p /opt/forum && chmod a+x /opt/forum && chown app:app /opt/forum
 ENV PATH :${PATH}
 
 # From then on, run as unprivileged app user
