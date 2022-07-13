@@ -1,4 +1,0 @@
----
-mfe_path: gradebook
-mfe_repository: https://github.com/edx/frontend-app-gradebook.git
-mfe_node_version: '16'
