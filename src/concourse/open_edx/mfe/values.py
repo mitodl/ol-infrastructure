@@ -1,18 +1,12 @@
-from pydantic import HttpUrl
-
 from concourse.open_edx.mfe.pipeline import MFEAppVars, OpenEdxVars
 
 mitx = [
     OpenEdxVars(
         marketing_site_domain="lms-ci.mitx.mit.edu",
         environment="mitx-ci",
-        favicon_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/favicon.ico"
-        ),
+        favicon_url="https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/favicon.ico",
         lms_domain="lms-ci.mitx.mit.edu",
-        logo_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png"
-        ),
+        logo_url="https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png",
         release_name="open-release/nutmeg.master",
         site_name="MITx Residential CI",
         studio_domain="studio-ci.mitx.mit.edu",
@@ -21,13 +15,9 @@ mitx = [
     OpenEdxVars(
         marketing_site_domain="mitx-qa.mitx.mit.edu",
         environment="mitx-qa",
-        favicon_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/favicon.ico"
-        ),
+        favicon_url="https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/favicon.ico",
         lms_domain="mitx-qa.mitx.mit.edu",
-        logo_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png"
-        ),
+        logo_url="https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png",
         release_name="open-release/nutmeg.master",
         site_name="MITx Residential QA",
         studio_domain="studio-mitx-qa.mitx.mit.edu",
@@ -36,13 +26,9 @@ mitx = [
     OpenEdxVars(
         marketing_site_domain="lms.mitx.mit.edu",
         environment="mitx-production",
-        favicon_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/favicon.ico"
-        ),
+        favicon_url="https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/favicon.ico",
         lms_domain="lms.mitx.mit.edu",
-        logo_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png"
-        ),
+        logo_url="https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png",
         release_name="open-release/nutmeg.master",
         site_name="MITx Residential",
         studio_domain="studio.mitx.mit.edu",
@@ -53,13 +39,9 @@ mitx = [
 mitx_staging = [
     OpenEdxVars(
         environment="mitx-staging-ci",
-        favicon_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/favicon.ico"
-        ),
+        favicon_url="https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/favicon.ico",
         lms_domain="staging-ci.mitx.mit.edu",
-        logo_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png"
-        ),
+        logo_url="https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png",
         marketing_site_domain="staging-ci.mitx.mit.edu",
         release_name="open-release/nutmeg.master",
         site_name="MITx Residential Staging CI",
@@ -68,13 +50,9 @@ mitx_staging = [
     ),
     OpenEdxVars(
         environment="mitx-staging-qa",
-        favicon_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/favicon.ico"
-        ),
+        favicon_url="https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/favicon.ico",
         lms_domain="mitx-qa-draft.mitx.mit.edu",
-        logo_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png"
-        ),
+        logo_url="https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png",
         marketing_site_domain="mitx-qa-draft.mitx.mit.edu",
         release_name="open-release/nutmeg.master",
         site_name="MITx Residential Staging QA",
@@ -83,13 +61,9 @@ mitx_staging = [
     ),
     OpenEdxVars(
         environment="mitx-staging-production",
-        favicon_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/favicon.ico"
-        ),
+        favicon_url="https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/favicon.ico",
         lms_domain="staging.mitx.mit.edu",
-        logo_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png"
-        ),
+        logo_url="https://raw.githubusercontent.com/mitodl/mitx-theme/master/lms/static/images/logo.png",
         marketing_site_domain="staging.mitx.mit.edu",
         release_name="open-release/nutmeg.master",
         site_name="MITx Residential Staging",
@@ -101,13 +75,9 @@ mitx_staging = [
 mitxonline = [
     OpenEdxVars(
         environment="mitxonline-qa",
-        favicon_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico"
-        ),
+        favicon_url="https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico",
         lms_domain="courses-qa.mitxonline.mit.edu",
-        logo_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png"
-        ),
+        logo_url="https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png",
         marketing_site_domain="rc.mitxonline.mit.edu",
         release_name="master",
         site_name="MITx Online QA",
@@ -116,13 +86,9 @@ mitxonline = [
     ),
     OpenEdxVars(
         environment="mitxonline-production",
-        favicon_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico"
-        ),
+        favicon_url="https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico",
         lms_domain="lms-production.mitx.mit.edu",
-        logo_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png"
-        ),
+        logo_url="https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png",
         marketing_site_domain="courses.mitxonline.mit.edu",
         release_name="master",
         site_name="MITx Online",
@@ -134,13 +100,9 @@ mitxonline = [
 xpro = [
     OpenEdxVars(
         environment="xpro-ci",
-        favicon_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico"
-        ),
+        favicon_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico",
         lms_domain="courses-ci.xpro.mit.edu",
-        logo_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png"
-        ),
+        logo_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png",
         marketing_site_domain="ci.xpro.mit.edu",
         release_name="open-release/maple.master",
         site_name="MIT xPRO CI",
@@ -149,13 +111,9 @@ xpro = [
     ),
     OpenEdxVars(
         environment="xpro-qa",
-        favicon_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico"
-        ),
+        favicon_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico",
         lms_domain="courses-rc.xpro.mit.edu",
-        logo_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png"
-        ),
+        logo_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png",
         marketing_site_domain="rc.xpro.mit.edu",
         release_name="open-release/maple.master",
         site_name="MIT xPRO RC",
@@ -164,13 +122,9 @@ xpro = [
     ),
     OpenEdxVars(
         environment="xpro-production",
-        favicon_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico"
-        ),
+        favicon_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico",
         lms_domain="courses.xpro.mit.edu",
-        logo_url=HttpUrl(
-            "https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png"
-        ),
+        logo_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png",
         marketing_site_domain="xpro.mit.edu",
         release_name="open-release/maple.master",
         site_name="MIT xPRO",

@@ -1,7 +1,7 @@
 import textwrap
 from typing import Optional
 
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 
 from concourse.lib.resource_types import rclone
 from concourse.lib.resources import git_repo
@@ -30,9 +30,9 @@ class MFEAppVars(BaseModel):
 
 class OpenEdxVars(BaseModel):
     environment: str
-    favicon_url: HttpUrl
+    favicon_url: str
     lms_domain: str
-    logo_url: HttpUrl
+    logo_url: str
     marketing_site_domain: str
     release_name: str
     site_name: str
