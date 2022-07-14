@@ -1,5 +1,4 @@
 from enum import Enum, unique
-from typing import Dict
 
 from pydantic import BaseModel, validator
 
@@ -69,7 +68,7 @@ class Apps(str, Enum):
 class AWSBase(BaseModel):
     """Base class for configuration objects to pass to AWS component resources."""
 
-    tags: Dict[str, str]
+    tags: dict[str, str]
     region: str = "us-east-1"
 
     def __init__(self, **kwargs):
@@ -77,7 +76,7 @@ class AWSBase(BaseModel):
         self.tags.update({"pulumi_managed": "true"})
 
     @validator("tags")
-    def enforce_tags(cls, tags: Dict[str, str]) -> Dict[str, str]:
+    def enforce_tags(cls, tags: dict[str, str]) -> dict[str, str]:
         if not REQUIRED_TAGS.issubset(tags.keys()):
             raise ValueError(
                 "Not all required tags have been specified. Missing tags: {}".format(
@@ -96,7 +95,7 @@ class AWSBase(BaseModel):
             raise ValueError("The specified region does not exist")
         return region
 
-    def merged_tags(self, *new_tags: Dict[str, str]) -> Dict[str, str]:
+    def merged_tags(self, *new_tags: dict[str, str]) -> dict[str, str]:
         """Return a dictionary of existing tags with the ones passed in.
 
         This generates a new dictionary of tags in order to allow for a broadly

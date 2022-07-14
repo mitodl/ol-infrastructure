@@ -21,7 +21,7 @@ Required On Input:
 """
 import json
 from enum import Enum, unique
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import pulumi
 from pulumi_aws.ec2 import SecurityGroup, get_subnet_ids
@@ -87,7 +87,7 @@ class OLFargateServiceConfig(AWSBase):
     # subnets, from this VPC
     vpc_id: Union[pulumi.Output[str], str]
     # Security groups associated with the service and tasks
-    security_groups: List[SecurityGroup]
+    security_groups: list[SecurityGroup]
     # Force a new task deploymennt of the service
     force_new_deployment: bool = False
     # Task Definition(s) to be used with ECS Service
@@ -100,7 +100,7 @@ class OLFargateServiceConfig(AWSBase):
     _launch_type: LaunchTypes = LaunchTypes.fargate
     # Load balancer configuration that will be used to attach containers to target
     # groups
-    load_balancer_configuration: Optional[List[ServiceLoadBalancerArgs]] = None
+    load_balancer_configuration: Optional[list[ServiceLoadBalancerArgs]] = None
 
     # Retrieve all subnets from the provided VPC (vpc id). NOTE: No filtering is made
     # upon subnets

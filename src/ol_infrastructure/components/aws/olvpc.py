@@ -14,7 +14,7 @@ This includes:
 from functools import partial
 from ipaddress import IPv4Network, IPv6Network
 from itertools import cycle
-from typing import Dict, List, Optional
+from typing import Optional
 
 from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import ec2, elasticache, rds
@@ -83,7 +83,7 @@ class OLVPCConfig(AWSBase):
 
     @validator("k8s_service_subnet")
     def k8s_service_subnet_is_subnet(
-        cls: "OLVPCConfig", k8s_service_subnet: Optional[IPv4Network], values: Dict
+        cls: "OLVPCConfig", k8s_service_subnet: Optional[IPv4Network], values: dict
     ) -> Optional[IPv4Network]:
         """Ensure that specified k8s subnet is actually a subnet of the cidr specified for the VPC.
 
@@ -206,8 +206,8 @@ class OLVPC(ComponentResource):
             egress_only_gateway_id=self.egress_gateway.id,
         )
 
-        self.olvpc_subnets: List[ec2.Subnet] = []
-        zones: List[str] = availability_zones(vpc_config.region)
+        self.olvpc_subnets: list[ec2.Subnet] = []
+        zones: list[str] = availability_zones(vpc_config.region)
         subnet_iterator = zip(
             range(vpc_config.num_subnets),
             cycle(zones),

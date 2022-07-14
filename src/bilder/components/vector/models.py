@@ -1,6 +1,6 @@
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from bilder.lib.model_helpers import OLBaseSettings
 
@@ -12,7 +12,7 @@ class VectorInstallMethod(str, Enum):
 class VectorConfig(OLBaseSettings):
     install_method: VectorInstallMethod = VectorInstallMethod.package
     user: str = "vector"
-    configuration_templates: Dict[Path, Dict[str, Any]] = {
+    configuration_templates: dict[Path, dict[str, Any]] = {
         Path(__file__).resolve().parent.joinpath("templates", "vector.toml"): {},
         Path(__file__).resolve().parent.joinpath("templates", "host_metrics.yaml"): {},
     }

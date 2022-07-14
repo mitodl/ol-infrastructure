@@ -1,6 +1,7 @@
 import abc
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -21,7 +22,7 @@ class HashicorpProduct(BaseModel, abc.ABC):
     _name: str
     version: str
     install_directory: Optional[Path] = None
-    configuration: Dict[Path, HashicorpConfig]
+    configuration: dict[Path, HashicorpConfig]
     configuration_directory: Optional[Path]
     configuration_file: Optional[Path]
 
@@ -30,7 +31,7 @@ class HashicorpProduct(BaseModel, abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
+    def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
         raise NotImplementedError("This method has not been implemented")
 
     @property

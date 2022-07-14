@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.pulumi_helper import StackInfo
@@ -37,7 +37,7 @@ ci_defaults = {
 env_dict = {"ci": ci_defaults, "qa": qa_defaults, "production": production_defaults}
 
 
-def defaults(stack_info: StackInfo) -> Dict[str, Any]:
+def defaults(stack_info: StackInfo) -> dict[str, Any]:
     """Provide a single location to dispatch infrastructure defaults based on env.
 
     :param stack_info: The stack_info object that has been parsed from the Pulumi stack.

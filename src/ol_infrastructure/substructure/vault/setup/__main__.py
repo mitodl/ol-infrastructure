@@ -1,6 +1,5 @@
 import time
 from pathlib import Path
-from typing import List
 
 import hvac
 import pulumi
@@ -22,7 +21,7 @@ vault_dns = vault_cluster.outputs["vault_server"]["public_dns"]
 vault_address = vault_cluster.outputs["vault_server"]["cluster_address"]
 key_shares = vault_config.get_int("key_shares") or 3
 recovery_threshold = vault_config.get_int("recovery_threshold") or 2
-pgp_public_keys: List[str] = vault_config.get_object("pgp_keys")
+pgp_public_keys: list[str] = vault_config.get_object("pgp_keys")
 
 if pgp_public_keys and len(pgp_public_keys) != key_shares:
     raise ValueError("The number of PGP keys needs to match the number of key shares.")

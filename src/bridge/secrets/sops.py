@@ -3,7 +3,7 @@ import os
 import subprocess
 from pathlib import Path
 from platform import system
-from typing import Any, Dict
+from typing import Any
 
 import yaml
 
@@ -13,7 +13,7 @@ else:
     SOPS_BINARY = Path(__file__).parent.joinpath("bin", "sops")
 
 
-def read_yaml_secrets(sops_file: Path) -> Dict[str, Any]:
+def read_yaml_secrets(sops_file: Path) -> dict[str, Any]:
     yaml_data = subprocess.run(
         [SOPS_BINARY, "--decrypt", Path(__file__).parent.joinpath(sops_file)],
         capture_output=True,
@@ -21,7 +21,7 @@ def read_yaml_secrets(sops_file: Path) -> Dict[str, Any]:
     return yaml.safe_load(yaml_data.stdout)
 
 
-def read_json_secrets(sops_file: Path) -> Dict[str, Any]:
+def read_json_secrets(sops_file: Path) -> dict[str, Any]:
     json_data = subprocess.run(
         [SOPS_BINARY, "--decrypt", Path(__file__).parent.joinpath(sops_file)],
         capture_output=True,

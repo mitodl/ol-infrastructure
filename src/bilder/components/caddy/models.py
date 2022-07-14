@@ -1,6 +1,6 @@
 from itertools import chain
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from pydantic.main import BaseModel
@@ -22,10 +22,10 @@ class CaddyPlugin(BaseModel):
 class CaddyConfig(OLBaseSettings):
     caddyfile: Path = Path(__file__).resolve().parent.joinpath("templates/Caddyfile.j2")
     data_directory: Path = Path("/var/lib/caddy/")
-    domains: Optional[List[str]]
+    domains: Optional[list[str]]
     log_file: Optional[Path] = Path("/var/log/caddy/caddy.log")
-    plugins: Optional[List[CaddyPlugin]]
-    template_context: Optional[Dict[str, Any]]
+    plugins: Optional[list[CaddyPlugin]]
+    template_context: Optional[dict[str, Any]]
     upstream_address: Optional[str]
     tls_cert_path: Path = Path("/etc/caddy/odl_wildcard.cert")
     tls_key_path: Path = Path("/etc/caddy/odl_wildcard.key")

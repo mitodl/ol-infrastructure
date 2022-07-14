@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Any, Dict, Union
+from typing import Any, Union
 
 from parliament import analyze_policy_string
 from parliament.finding import Finding
@@ -9,7 +9,7 @@ IAM_POLICY_VERSION = "2012-10-17"
 
 
 def _is_parliament_finding_filtered(
-    finding: Finding, parliament_config: Dict[str, Any]
+    finding: Finding, parliament_config: dict[str, Any]
 ) -> bool:
     issue_match = finding.issue in parliament_config.keys()
     if not issue_match:
@@ -30,10 +30,10 @@ def _is_parliament_finding_filtered(
 
 
 def lint_iam_policy(
-    policy_document: Union[str, Dict[str, Any]],
+    policy_document: Union[str, dict[str, Any]],
     stringify: bool = False,
-    parliament_config: Dict = None,
-) -> Union[str, Dict[str, Any]]:
+    parliament_config: dict = None,
+) -> Union[str, dict[str, Any]]:
     """Lint the contents of an IAM policy and abort execution if issues are found.
 
     :param policy_document: An IAM policy document represented as a JSON encoded string
@@ -75,7 +75,7 @@ def lint_iam_policy(
     )
 
 
-def route53_policy_template(zone_id: str) -> Dict[str, Any]:
+def route53_policy_template(zone_id: str) -> dict[str, Any]:
     """Policy definition to allow Caddy to use Route 53 to resolve DNS challenges.
 
     This provides the permissions necessary to modify Route53 records, for example in a

@@ -1,5 +1,5 @@
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable, Tuple
 
 from pydantic import SecretStr
 
@@ -11,7 +11,7 @@ class ConsulExternalServicesMonitorConfig(HashicorpConfig):
     consul_service: str = "consul-esm"
     consul_service_tag: str = "consul-esm"
     consul_kv_path: str = "consul-esm/"
-    external_node_meta: Dict[str, str] = {"external-node": "true"}
+    external_node_meta: dict[str, str] = {"external-node": "true"}
     node_reconnect_timeout: str = "72h"
     node_probe_interval: str = "30s"
     http_addr: str = "localhost:8500"
@@ -34,7 +34,7 @@ class ConsulExternalServicesMonitor(HashicorpProduct):
     def systemd_template_context(self):
         return self
 
-    def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
+    def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
         for fpath, config in self.configuration.items():
             yield self.configuration_directory.joinpath(fpath), config.json(
                 exclude_none=True, indent=2

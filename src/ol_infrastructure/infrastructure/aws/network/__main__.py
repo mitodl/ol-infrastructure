@@ -10,7 +10,7 @@ network being created, while also importing the remaining 3 subnets.  If only 3 
 were specified then one of the existing networks would not be managed with Pulumi.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from pulumi import Config, export
 from pulumi_aws import ec2
@@ -24,7 +24,7 @@ from ol_infrastructure.components.aws.olvpc import (
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
-def vpc_exports(vpc: OLVPC, peers: Optional[List[str]] = None) -> Dict[str, Any]:
+def vpc_exports(vpc: OLVPC, peers: Optional[list[str]] = None) -> dict[str, Any]:
     """Create a consistent structure for VPC stack exports.
 
     :param vpc: The VPC whose data you would like to export

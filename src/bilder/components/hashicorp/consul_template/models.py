@@ -1,5 +1,6 @@
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Optional
 
 from bilder.components.hashicorp.models import (
     FlexibleBaseModel,
@@ -66,19 +67,19 @@ class ConsulTemplateVaultConfig(FlexibleBaseModel):
     # This section details the retry options for connecting to Vault. Please see
     # the retry options in the Consul section for more information (they are the
     # same).
-    retry: Optional[Dict]
+    retry: Optional[dict]
 
     # This section details the SSL options for connecting to the Vault server.
     # Please see the SSL options in the Consul section for more information (they
     # are the same).
-    ssl: Optional[Dict]
+    ssl: Optional[dict]
 
 
 class ConsulTemplateConsulConfig(FlexibleBaseModel):
     # This block specifies the basic authentication information to pass with the
     # request. For more information on authentication, please see the Consul
     # documentation.
-    auth: Optional[Dict]
+    auth: Optional[dict]
     #  {
     #   enabled  = true
     #   username = "test"
@@ -113,7 +114,7 @@ class ConsulTemplateConsulConfig(FlexibleBaseModel):
     # face of failure. Instead, it uses exponential back-off and retry functions
     # to wait for the cluster to become available, as is customary in distributed
     # systems.
-    retry: Optional[Dict]  # {
+    retry: Optional[dict]  # {
     # This enabled retries. Retries are enabled by default, so this is
     # redundant.
     # enabled = true
@@ -137,7 +138,7 @@ class ConsulTemplateConsulConfig(FlexibleBaseModel):
     # }
 
     # This block configures the SSL options for connecting to the Consul server.
-    ssl: Optional[Dict]  # {
+    ssl: Optional[dict]  # {
     # This enables SSL. Specifying any option for SSL will also enable it.
     # enabled = true
 
@@ -220,7 +221,7 @@ class ConsulTemplateTemplate(FlexibleBaseModel):
     right_delimiter: str = "}}"
     # These are functions that are not permitted in the template. If a template
     # includes one of these functions, it will exit with an error.
-    function_blacklist: Optional[List[str]] = []
+    function_blacklist: Optional[list[str]] = []
     # If a sandbox path is provided, any path provided to the `file` function is
     # checked that it falls within the sandbox path. Relative paths that try to
     # traverse outside the sandbox path will exit with an error.
@@ -235,7 +236,7 @@ class ConsulTemplateTemplate(FlexibleBaseModel):
 
 
 class ConsulTemplateConfig(HashicorpConfig):
-    template: List[ConsulTemplateTemplate] = [
+    template: list[ConsulTemplateTemplate] = [
         ConsulTemplateTemplate(destination=Path("/tmp/test.txt"))
     ]
     vault_agent_token_file: Optional[Path]
@@ -249,7 +250,7 @@ class ConsulTemplateConfig(HashicorpConfig):
 class ConsulTemplate(HashicorpProduct):
     _name: str = "consul-template"
     version: str = "0.26.0"
-    configuration: Dict[Path, ConsulTemplateConfig] = {
+    configuration: dict[Path, ConsulTemplateConfig] = {
         Path("00-default.json"): ConsulTemplateConfig()
     }
     configuration_directory: Path = Path("/etc/consul-template/conf.d/")
@@ -258,7 +259,7 @@ class ConsulTemplate(HashicorpProduct):
     def systemd_template_context(self):
         return self
 
-    def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
+    def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
         for fpath, config in self.configuration.items():
             yield self.configuration_directory.joinpath(fpath), config.json(
                 exclude_none=True, indent=2

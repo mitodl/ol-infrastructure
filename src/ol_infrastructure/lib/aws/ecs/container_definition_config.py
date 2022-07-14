@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Optional
 
 from pulumi_aws.secretsmanager import Secret
 from pydantic import BaseModel, PositiveInt
@@ -12,8 +12,8 @@ class OLContainerLogConfig(BaseModel):
     # "logentries", "splunk", "syslog", "awsfirelens"
     log_driver: str
     # Options to pass to log config
-    options: Optional[Dict[str, str]] = None
-    secret_options: Optional[List[Secret]] = None
+    options: Optional[dict[str, str]] = None
+    secret_options: Optional[list[Secret]] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -32,16 +32,16 @@ class OLFargateContainerDefinitionConfig(BaseModel):
     # What port will be assigned to container.
     container_port: PositiveInt = PositiveInt(DEFAULT_HTTP_PORT)
     # The command that is passed to the container
-    command: Optional[List[str]] = None
+    command: Optional[list[str]] = None
     # Number of cpu units reserved for container
     cpu: Optional[PositiveInt]
     # Enabling this flag means if this container stops or fails, all other containers
     # that are part of the task are stopped
     is_essential: bool = False
     # Environment variables to pass to container
-    environment: Optional[Dict[str, str]] = None
+    environment: Optional[dict[str, str]] = None
     # Secrets that will be exposed to your container
-    secrets: Optional[List[Secret]] = None
+    secrets: Optional[list[Secret]] = None
     log_configuration: Optional[OLContainerLogConfig] = None
     # If enabled, container is given elevated privileges, similar to 'root' user
     privileged: bool = False

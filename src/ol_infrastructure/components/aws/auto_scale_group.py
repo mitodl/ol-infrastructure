@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Optional, Union
 
 import pulumi
 from pulumi_aws.acm import get_certificate
@@ -53,7 +53,7 @@ class TagSpecification(BaseModel):
     """Container for describing a tag specification for an EC2 launch template"""
 
     resource_type: str
-    tags: Dict[str, str]
+    tags: dict[str, str]
 
     class Config:
         arbitrary_types_allowed = True
@@ -88,7 +88,7 @@ class OLLoadBalancerConfig(AWSBase):
     ip_address_type: str = "dualstack"
     load_balancer_type: str = "application"
     port: PositiveInt = PositiveInt(DEFAULT_HTTPS_PORT)
-    security_groups: List[SecurityGroup]
+    security_groups: list[SecurityGroup]
     subnets: pulumi.Output[str]
 
     listener_use_acm: bool = True
@@ -123,13 +123,13 @@ class OLLoadBalancerConfig(AWSBase):
 class OLLaunchTemplateConfig(AWSBase):
     """Configuration Object for defining configuration needed to create a launch template."""
 
-    block_device_mappings: List[BlockDeviceMapping]
+    block_device_mappings: list[BlockDeviceMapping]
     image_id: str
     instance_profile_arn: Union[str, pulumi.Output[str]]
     instance_type: InstanceTypes = InstanceTypes.burstable_medium
     key_name: str = "oldevops"
-    security_groups: List[Union[SecurityGroup, pulumi.Output]]
-    tag_specifications: List[TagSpecification]
+    security_groups: list[Union[SecurityGroup, pulumi.Output]]
+    tag_specifications: list[TagSpecification]
     user_data: Optional[Union[str, pulumi.Output[str]]]
 
     class Config:
@@ -149,11 +149,11 @@ class OLAutoScaleGroupConfig(AWSBase):
     vpc_zone_identifiers: pulumi.Output[str]
 
     instance_refresh_checkpoint_delay: PositiveInt = PositiveInt(3600)
-    instance_refresh_checkpoint_percentages: List[NonNegativeInt] = []
+    instance_refresh_checkpoint_percentages: list[NonNegativeInt] = []
     instance_refresh_warmup: PositiveInt = PositiveInt(health_check_grace_period)
     instance_refresh_min_healthy_percentage: NonNegativeInt = NonNegativeInt(50)
     instance_refresh_strategy: str = "Rolling"
-    instance_refresh_triggers: List[str] = ["tags"]
+    instance_refresh_triggers: list[str] = ["tags"]
 
     class Config:
         arbitrary_types_allowed = True

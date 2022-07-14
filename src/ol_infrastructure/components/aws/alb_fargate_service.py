@@ -17,7 +17,7 @@ Required On Input:
 - Subnets (Implicit)
 """
 from enum import Enum, unique
-from typing import List, Optional, Tuple
+from typing import Optional
 
 import pulumi
 from pulumi.resource import ResourceOptions
@@ -124,14 +124,14 @@ class OLApplicationLoadBalancedFargateConfig(AWSBase):
     # Type of IP address used by subnets, for the load balancer
     ip_address_type: str = "ipv4"
     # Security groups associated with the service and tasks
-    security_groups: List[SecurityGroup]
+    security_groups: list[SecurityGroup]
     # List of subnet ids to attach to load balancer
-    subnets: Optional[List[str]]
+    subnets: Optional[list[str]]
     # VPC service will be deployed into. Service and tasks will be deployed into public
     # subnets, from this VPC
     vpc_id: pulumi.Output[str]
     # List of action blocks for listener
-    default_actions: Optional[List[ListenerDefaultActionArgs]] = None
+    default_actions: Optional[list[ListenerDefaultActionArgs]] = None
     # Type of Deployment Controller used for service and tasks. Only ECS supported
     _deployment_controller: DeploymentControllerTypes = DeploymentControllerTypes.ecs
     # Lastest Fargate version will always be used
@@ -306,7 +306,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
 
     def build_protocol_details(
         self, config: OLApplicationLoadBalancedFargateConfig
-    ) -> Tuple[str, str, ListenerDefaultActionArgs]:
+    ) -> tuple[str, str, ListenerDefaultActionArgs]:
         """Build the protocol related data for an ALB Listener.
 
         :param config: Configuration object for parameterizing deployment of Fargate
@@ -381,7 +381,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
 
     def attach_containers_to_target_group(
         self, config: OLApplicationLoadBalancedFargateConfig, target_group: TargetGroup
-    ) -> List[ServiceLoadBalancerArgs]:
+    ) -> list[ServiceLoadBalancerArgs]:
         """Iterate through all container definitions and attach to LB.
 
         :param config: Configuration object for parameterizing deployment of Fargate
@@ -422,7 +422,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
         config: OLApplicationLoadBalancedFargateConfig,
         load_balancer: LoadBalancer,
         opts: ResourceOptions,
-    ) -> Tuple[Record, str]:
+    ) -> tuple[Record, str]:
 
         zone = get_zone(config.zone_name)
         cert = get_certificate(config.zone_name, most_recent=True, statuses=["ISSUED"])

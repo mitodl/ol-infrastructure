@@ -1,9 +1,10 @@
 import secrets
+from collections.abc import Generator
 from enum import Enum
 from functools import partial
 from ipaddress import IPv4Address, IPv6Address
 from pathlib import Path
-from typing import Dict, Generator, List, Optional, Union
+from typing import Optional, Union
 
 from pydantic import Field, PositiveInt, SecretStr, validator
 
@@ -42,7 +43,7 @@ class ConcourseBaseConfig(OLBaseSettings):
             if field.type_ == Path and field_value:
                 yield field_value
 
-    def concourse_env(self) -> Dict[str, str]:
+    def concourse_env(self) -> dict[str, str]:
         """Create a mapping of concourse environment variables to the concrete values.
 
         :returns: A dictionary of concourse env vars and their values
@@ -77,7 +78,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         Path("/etc/concourse/authorized_keys"),
         concourse_env_var="CONCOURSE_TSA_AUTHORIZED_KEYS",
     )
-    authorized_worker_keys: Optional[List[str]] = None
+    authorized_worker_keys: Optional[list[str]] = None
     aws_secretsmanager_access_key: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_AWS_SECRETSMANAGER_ACCESS_KEY",
@@ -1455,7 +1456,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         password_value = self.admin_password.get_secret_value()
         return f"{self.admin_user}:{password_value}"
 
-    def concourse_env(self) -> Dict[str, str]:
+    def concourse_env(self) -> dict[str, str]:
         concourse_env_dict = super().concourse_env()
         concourse_env_dict["CONCOURSE_ADD_LOCAL_USER"] = self.local_user
         return concourse_env_dict
@@ -1473,7 +1474,7 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
         None,
         description="Address and path of s3 bucket to find additional concourse resource types.",
     )
-    additional_resource_types: Optional[List[str]] = Field(
+    additional_resource_types: Optional[list[str]] = Field(
         None,
         description="A list of resource names to pull from s3",
     )
@@ -1757,7 +1758,7 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
         description="Interval on which containers and volumes will be garbage "
         "collected from the worker. (default: 30s)",
     )
-    tags: Optional[List[str]] = Field(
+    tags: Optional[list[str]] = Field(
         None,
         concourse_env_var="CONCOURSE_TAG",
         env_transform=lambda _: ",".join(_),

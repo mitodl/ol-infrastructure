@@ -9,7 +9,7 @@ This includes:
 - Create DB instance
 """
 from enum import Enum
-from typing import Dict, List, Optional, Union
+from typing import Optional, Union
 
 import pulumi
 from pulumi_aws import rds
@@ -40,7 +40,7 @@ class OLReplicaDBConfig(BaseModel):
     instance_size: str = "db.t3.small"
     storage_type: StorageType = StorageType.ssd
     public_access: bool = False
-    security_groups: Optional[List[SecurityGroup]] = None
+    security_groups: Optional[list[SecurityGroup]] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -53,10 +53,10 @@ class OLDBConfig(AWSBase):
     engine_version: str
     instance_name: str  # The name of the RDS instance
     password: SecretStr
-    parameter_overrides: List[Dict[str, Union[str, bool, int, float]]]
+    parameter_overrides: list[dict[str, Union[str, bool, int, float]]]
     port: PositiveInt
     subnet_group_name: Union[str, pulumi.Output[str]]
-    security_groups: List[SecurityGroup]
+    security_groups: list[SecurityGroup]
     backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore
     db_name: Optional[str] = None  # The name of the database schema to create
     instance_size: str = DBInstanceTypes.general_purpose_large.value
@@ -81,7 +81,7 @@ class OLDBConfig(AWSBase):
         return engine
 
     @validator("engine_version")
-    def is_valid_version(cls: "OLDBConfig", engine_version: str, values: Dict) -> str:
+    def is_valid_version(cls: "OLDBConfig", engine_version: str, values: dict) -> str:
         engine: str = values.get("engine")  # type: ignore
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
@@ -97,7 +97,7 @@ class OLPostgresDBConfig(OLDBConfig):
     engine: str = "postgres"
     engine_version: str = "13.4"
     port: PositiveInt = PositiveInt(5432)
-    parameter_overrides: List[Dict[str, Union[str, bool, int, float]]] = [
+    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [
         {"name": "client_encoding", "value": "UTF-8"},
         {"name": "timezone", "value": "UTC"},
         {"name": "rds.force_ssl", "value": 1},
@@ -111,7 +111,7 @@ class OLMariaDBConfig(OLDBConfig):
     engine: str = "mariadb"
     engine_version: str = "10.5.13"
     port: PositiveInt = PositiveInt(3306)
-    parameter_overrides: List[Dict[str, Union[str, bool, int, float]]] = [
+    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [
         {"name": "character_set_client", "value": "utf8mb4"},
         {"name": "character_set_connection", "value": "utf8mb4"},
         {"name": "character_set_database", "value": "utf8mb4"},

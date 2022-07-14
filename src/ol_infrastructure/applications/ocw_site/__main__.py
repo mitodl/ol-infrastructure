@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from typing import Dict
 
 import pulumi_fastly as fastly
 from pulumi import Config, ResourceOptions, StackReference, export
@@ -194,7 +193,7 @@ site_domains = ocw_site_config.get_object("domains") or {"draft": [], "live": []
 website_storage_bucket_fqdn = "ocw-website-storage.s3.us-east-1.amazonaws.com"
 project_dir = Path(__file__).resolve().parent
 snippets_dir = project_dir.joinpath("snippets")
-fastly_distributions: Dict[str, fastly.ServiceVcl] = {}
+fastly_distributions: dict[str, fastly.ServiceVcl] = {}
 for purpose in ("draft", "live"):
     if stack_info.env_suffix == "production" and purpose == "live":
         robots_file = "robots.production.txt"

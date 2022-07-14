@@ -5,7 +5,7 @@ This includes:
 - Create a clustered deployment of Redis or Memcached
 """
 import re
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 import pulumi
 from pulumi_aws import elasticache
@@ -37,9 +37,9 @@ class OLAmazonCacheConfig(AWSBase):
     engine_version: str
     instance_type: str
     num_instances: PositiveInt = PositiveInt(3)
-    parameter_overrides: Optional[Dict[str, Any]] = None
+    parameter_overrides: Optional[dict[str, Any]] = None
     port: int
-    security_groups: List[PulumiString]
+    security_groups: list[PulumiString]
     subnet_group: Union[
         str, pulumi.Output[str]
     ]  # the name of the subnet group created in the OLVPC component
@@ -58,7 +58,7 @@ class OLAmazonCacheConfig(AWSBase):
     def is_valid_version(
         cls: "OLAmazonCacheConfig",
         engine_version: str,
-        values: Dict,
+        values: dict,
     ) -> str:
         engine: str = str(values.get("engine"))
         engines_map = cache_engines()
@@ -86,7 +86,7 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
     def is_auth_token_valid(
         cls: "OLAmazonRedisConfig",
         auth_token: Optional[str],
-        values: Dict,
+        values: dict,
     ) -> Optional[str]:
         min_token_length = 16
         max_token_length = 128

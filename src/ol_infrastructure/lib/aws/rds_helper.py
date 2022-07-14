@@ -1,7 +1,6 @@
 from collections import defaultdict
 from enum import Enum, unique
 from functools import lru_cache
-from typing import Dict, List
 
 import boto3
 
@@ -20,7 +19,7 @@ class DBInstanceTypes(str, Enum):
 
 
 @lru_cache
-def db_engines() -> Dict[str, List[str]]:
+def db_engines() -> dict[str, list[str]]:
     """Generate a list of database engines and their currently available versions on RDS.
 
     :returns: Dictionary of engine names and the list of available versions

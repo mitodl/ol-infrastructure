@@ -11,7 +11,7 @@ import base64
 import json
 import textwrap
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Union
 
 import pulumi_consul as consul
 import pulumi_vault as vault
@@ -72,7 +72,7 @@ xpro_mongodb_stack = StackReference(
 )
 
 dagster_bucket_name = f"dagster-{dagster_environment}"
-dagster_s3_permissions: List[Dict[str, Union[str, List[str]]]] = [
+dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [
     {
         "Effect": "Allow",
         "Action": "s3:ListAllMyBuckets",
@@ -143,7 +143,7 @@ dagster_s3_permissions: List[Dict[str, Union[str, List[str]]]] = [
     },
 ]
 
-athena_permissions: List[Dict[str, Union[str, List[str]]]] = [
+athena_permissions: list[dict[str, Union[str, list[str]]]] = [
     {
         "Effect": "Allow",
         "Action": [
@@ -240,7 +240,7 @@ dagster_iam_permissions = {
     "Statement": dagster_s3_permissions + athena_permissions,
 }
 
-parliament_config: Dict[str, Any] = {
+parliament_config: dict[str, Any] = {
     "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []}
 }
 

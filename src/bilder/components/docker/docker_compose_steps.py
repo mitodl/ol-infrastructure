@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from pyinfra.api.deploy import deploy
 from pyinfra.operations import files
@@ -34,6 +34,6 @@ def create_systemd_service():
 
 
 @deploy("Deploy Docker Compose")
-def deploy_docker_compose(config: Optional[Dict[str, Any]] = None):
+def deploy_docker_compose(config: Optional[dict[str, Any]] = None):
     download_docker_compose()
     create_systemd_service()

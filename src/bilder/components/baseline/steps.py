@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from pyinfra.api import deploy
 from pyinfra.operations import apt, files, systemd
@@ -7,7 +7,7 @@ from pyinfra.operations import apt, files, systemd
 
 @deploy("Install baseline requirements")
 def install_baseline_packages(
-    packages: List[str] = None,
+    packages: list[str] = None,
     upgrade_system: bool = False,
 ):
     apt.packages(
@@ -21,7 +21,7 @@ def install_baseline_packages(
 @deploy("Reload services on config change")
 def service_configuration_watches(
     service_name: str,
-    watched_files: List[Path],
+    watched_files: list[Path],
     onchange_command: Optional[str] = None,
     start_now: bool = True,
 ):

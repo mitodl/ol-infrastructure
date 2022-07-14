@@ -3,7 +3,7 @@ from enum import Enum, unique
 from functools import lru_cache
 from ipaddress import IPv4Network
 from types import FunctionType
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 import boto3
 import pulumi
@@ -13,7 +13,7 @@ from pulumi_aws import ec2
 from ol_infrastructure.providers.salt.minion import OLSaltStackMinion
 
 ec2_client = boto3.client("ec2")
-AWSFilterType = List[Dict[str, Union[str, List[str]]]]
+AWSFilterType = list[dict[str, Union[str, list[str]]]]
 
 debian_10_ami = ec2.get_ami(
     filters=[
@@ -62,7 +62,7 @@ class DiskTypes(str, Enum):
 
 
 @lru_cache
-def aws_regions() -> List[str]:
+def aws_regions() -> list[str]:
     """Generate the list of regions available in AWS.
 
     :returns: List of AWS regions
@@ -73,7 +73,7 @@ def aws_regions() -> List[str]:
 
 
 @lru_cache
-def availability_zones(region: str = "us-east-1") -> List[str]:
+def availability_zones(region: str = "us-east-1") -> list[str]:
     """Generate a list of availability zones for a given AWS region.
 
     :param region: The region to be queried
@@ -95,8 +95,8 @@ def _conditional_import(
     filters: AWSFilterType,
     attributes_key: str,
     attribute_id_key: str,
-    change_attributes_ignored: Optional[List[str]] = None,
-) -> Tuple[pulumi.ResourceOptions, str]:
+    change_attributes_ignored: Optional[list[str]] = None,
+) -> tuple[pulumi.ResourceOptions, str]:
     """Determine whether to import an existing AWS resource into Pulumi.
 
     :param discover_func: A function object to be used for looking up AWS resources.
@@ -161,8 +161,8 @@ def _conditional_import(
 
 
 def vpc_opts(
-    vpc_cidr: IPv4Network, vpc_tags: Dict[str, str]
-) -> Tuple[pulumi.ResourceOptions, str]:
+    vpc_cidr: IPv4Network, vpc_tags: dict[str, str]
+) -> tuple[pulumi.ResourceOptions, str]:
     """Look up and conditionally import an existing VPC.
 
     :param vpc_cidr: The IPv4 CIDR block of the target VPC to be imported if it exists.
@@ -190,7 +190,7 @@ def vpc_opts(
     )
 
 
-def internet_gateway_opts(attached_vpc_id: str) -> Tuple[pulumi.ResourceOptions, str]:
+def internet_gateway_opts(attached_vpc_id: str) -> tuple[pulumi.ResourceOptions, str]:
     """Look up existing internet gateways to conditionally import when building a VPC.
 
     :param attached_vpc_id: The ID of the VPC where the target gateway will be attached
@@ -212,7 +212,7 @@ def internet_gateway_opts(attached_vpc_id: str) -> Tuple[pulumi.ResourceOptions,
 
 def subnet_opts(
     cidr_block: IPv4Network, vpc_id: str
-) -> Tuple[pulumi.ResourceOptions, str]:
+) -> tuple[pulumi.ResourceOptions, str]:
     """Look up existing EC2 subnets to conditionally import.
 
     :param cidr_block: The CIDR block assigned to the subnet being defined.
@@ -243,7 +243,7 @@ def subnet_opts(
     )
 
 
-def route_table_opts(internet_gateway_id: str) -> Tuple[pulumi.ResourceOptions, str]:
+def route_table_opts(internet_gateway_id: str) -> tuple[pulumi.ResourceOptions, str]:
     """Look up an existing route table and conditionally import it.
 
     :param internet_gateway_id: The ID of the internet gateway associated with the
@@ -266,7 +266,7 @@ def route_table_opts(internet_gateway_id: str) -> Tuple[pulumi.ResourceOptions, 
 
 def vpc_peer_opts(
     source_vpc_cidr: str, destination_vpc_cidr: str
-) -> Tuple[pulumi.ResourceOptions, str]:
+) -> tuple[pulumi.ResourceOptions, str]:
     """Look up an existing route table and conditionally import it.
 
     :param source_vpc_cidr: The CIDR block of the VPC that is initiating the peer
@@ -303,12 +303,12 @@ def vpc_peer_opts(
 def build_userdata(
     instance_name: str,
     minion_keys: OLSaltStackMinion,
-    minion_roles: List[str],
+    minion_roles: list[str],
     minion_environment: str,
     salt_host: str,
-    additional_cloud_config: Optional[Dict[str, Any]] = None,
-    additional_salt_config: Optional[Dict[str, str]] = None,
-    additional_salt_grains: Optional[Dict[str, str]] = None,
+    additional_cloud_config: Optional[dict[str, Any]] = None,
+    additional_salt_config: Optional[dict[str, str]] = None,
+    additional_salt_grains: Optional[dict[str, str]] = None,
 ) -> pulumi.Output[str]:
     """Construct a user data dictionary for use with EC2 instances.
 
