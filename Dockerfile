@@ -9,6 +9,7 @@ COPY --chown=app:app ./ /home/app/workspace/
 RUN poetry export --without-hashes -o requirements.txt &&\
     ./pants package src/bridge:bridge-package &&\
     ./pants package src/ol_infrastructure:ol-infrastructure-package &&\
+    ./pants package src/concourse:ol-concourse &&\
     pip install --force-reinstall dist/*.whl &&\
     pip install --no-cache-dir -r requirements.txt
 
