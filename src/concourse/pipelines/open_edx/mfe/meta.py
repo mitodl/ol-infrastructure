@@ -75,7 +75,7 @@ def meta_pipeline() -> Pipeline:
     mfe_definitions = git_repo(
         name=Identifier("mfe-pipeline-definitions"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="mfe_pipeline_consolidation",
+        branch="main",
     )
     mfe_definitions.source["paths"] = [
         "src/concourse/open_edx/mfe/",
