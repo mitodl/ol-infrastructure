@@ -5,6 +5,7 @@ python_distribution(
     dependencies=[
         "src/concourse:concourse",
         "src/concourse/lib:concourse-libs",
+        "src/concourse/pipelines/open_edx/mfe"
     ],
     description="A Pythonic way to manage your Concourse pipelines",
     provides=python_artifact(
