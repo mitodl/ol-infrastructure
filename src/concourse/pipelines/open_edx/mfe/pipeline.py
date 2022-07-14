@@ -99,7 +99,9 @@ def mfe_job(open_edx: OpenEdxVars, mfe: MFEAppVars, previous_job: str = None) ->
                         },
                     ),
                     inputs=[Input(name=Identifier(mfe_dir))],
-                    outputs=[Output(name=Identifier(f"{mfe_dir}/dist"))],
+                    outputs=[
+                        Output(name=Identifier("compiled-mfe"), path=f"{mfe_dir}/dist")
+                    ],
                     params=mfe_params(open_edx, mfe),
                     run=Command(
                         path="sh",
@@ -175,7 +177,7 @@ def mfe_pipeline(open_edx_envs: list[OpenEdxVars], mfe: MFEAppVars) -> Pipeline:
 if __name__ == "__main__":
     import sys
 
-    from concourse.open_edx.mfe.values import apps, deployments
+    from concourse.pipelines.open_edx.mfe.values import apps, deployments
 
     deployment = sys.argv[1]
     app = sys.argv[2]

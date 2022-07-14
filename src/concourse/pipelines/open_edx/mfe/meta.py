@@ -64,7 +64,7 @@ def meta_job(
                 set_pipeline=Identifier(
                     f"{open_edx_deployment}-{mfe_app_name}-mfe-pipeline"
                 ),
-                file="pipeline/mfe_pipeline.json",
+                file="pipeline/definition.json",
             ),
         ],
     )
@@ -78,7 +78,7 @@ def meta_pipeline() -> Pipeline:
         branch="main",
     )
     mfe_definitions.source["paths"] = [
-        "src/concourse/open_edx/mfe/",
+        "src/concourse/pipelines/open_edx/mfe/",
         "src/concourse/lib/",
     ]
     pipeline_jobs = [
