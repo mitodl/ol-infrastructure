@@ -50,6 +50,7 @@ def meta_job(
                     run=Command(
                         path="python",
                         dir="pipeline",
+                        user="root",
                         args=[
                             "../mfe-pipeline-definitions/src/concourse/pipelines/open_edx/mfe/pipeline.py",
                             open_edx_deployment,
@@ -108,6 +109,7 @@ def meta_pipeline() -> Pipeline:
                         run=Command(
                             path="python",
                             dir="pipeline",
+                            user="root",
                             args=[
                                 "../mfe-pipeline-definitions/src/concourse/pipelines/open_edx/mfe/meta.py",
                             ],
