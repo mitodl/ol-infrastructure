@@ -193,6 +193,8 @@ if __name__ == "__main__":
     if app == "authoring":
         for edx_var in open_edx_vars:  # noqa: WPS440
             edx_var.release_name = "master"
+    if "maple" in open_edx_vars[0].release_name:
+        mfe_vars.node_major_version = 12
     pipeline = mfe_pipeline(open_edx_vars, mfe_vars)
     with open("definition.json", "wt") as definition:
         definition.write(pipeline.json(indent=2))
