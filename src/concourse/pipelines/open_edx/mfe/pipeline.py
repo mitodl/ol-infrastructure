@@ -175,9 +175,12 @@ def mfe_pipeline(open_edx_envs: list[OpenEdxVars], mfe: MFEAppVars) -> Pipeline:
 
 
 if __name__ == "__main__":
-    import sys
+    import sys  # noqa: WPS433
 
-    from concourse.pipelines.open_edx.mfe.values import apps, deployments
+    from concourse.pipelines.open_edx.mfe.values import (  # noqa: WPS433
+        apps,
+        deployments,
+    )
 
     deployment = sys.argv[1]
     app = sys.argv[2]
@@ -187,6 +190,9 @@ if __name__ == "__main__":
         mfe_vars.repository = "https://github.com/mitodl/frontend-app-learning.git"
         for edx_var in open_edx_vars:
             edx_var.release_name = "open-learning"
+    if app == "authoring":
+        for edx_var in open_edx_vars:  # noqa: WPS440
+            edx_var.release_name = "master"
     pipeline = mfe_pipeline(open_edx_vars, mfe_vars)
     with open("definition.json", "wt") as definition:
         definition.write(pipeline.json(indent=2))

@@ -167,7 +167,7 @@ courseware = MFEAppVars(
 
 library_authoring = MFEAppVars(
     path="authoring",
-    repository="https://github.com/openedx/frontend-app-library_authoring.git",
+    repository="https://github.com/openedx/frontend-app-library-authoring.git",
     node_major_version=16,
 )
 
