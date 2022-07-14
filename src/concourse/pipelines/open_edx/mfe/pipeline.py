@@ -125,7 +125,7 @@ def mfe_job(open_edx: OpenEdxVars, mfe: MFEAppVars, previous_job: str = None) ->
             PutStep(
                 put="mfe-app-bucket",
                 params={
-                    "source": f"{mfe_dir}/dist",
+                    "source": "compiled-mfe",
                     "destination": [
                         {
                             "command": "sync",
