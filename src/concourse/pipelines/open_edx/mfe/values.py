@@ -155,19 +155,19 @@ xpro = [
 
 gradebook = MFEAppVars(
     path="gradebook",
-    repository="https://github.com/edx/frontend-app-gradebook.git",
+    repository="https://github.com/openedx/frontend-app-gradebook.git",
     node_major_version=16,
 )
 
 courseware = MFEAppVars(
     path="learn",
-    repository="https://github.com/edx/frontend-app-learning.git",
+    repository="https://github.com/openedx/frontend-app-learning.git",
     node_major_version=16,
 )
 
 library_authoring = MFEAppVars(
     path="authoring",
-    repository="https://github.com/edx/frontend-app-library_authoring.git",
+    repository="https://github.com/openedx/frontend-app-library_authoring.git",
     node_major_version=16,
 )
 

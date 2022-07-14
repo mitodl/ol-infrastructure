@@ -181,7 +181,13 @@ if __name__ == "__main__":
 
     deployment = sys.argv[1]
     app = sys.argv[2]
-    pipeline = mfe_pipeline(deployments[deployment], apps[app])
+    open_edx_vars = deployments[deployment]
+    mfe_vars = apps[app]
+    if app == "learn" and deployment == "mitxonline":
+        mfe_vars.repository = "https://github.com/mitodl/frontend-app-learning.git"
+        for edx_var in open_edx_vars:
+            edx_var.release_name = "open-learning"
+    pipeline = mfe_pipeline(open_edx_vars, mfe_vars)
     with open("definition.json", "wt") as definition:
         definition.write(pipeline.json(indent=2))
     sys.stdout.write(pipeline.json(indent=2))
