@@ -94,11 +94,12 @@ def vector_service(
     vector_config: VectorConfig,
     do_restart=False,
     do_reload=False,
+    start_immediately=False,
 ):
     systemd.service(
         name="Enable vector service",
         service="vector",
-        running=True,
+        running=start_immediately,
         enabled=True,
         restarted=do_restart,
         reloaded=do_reload,
