@@ -1,6 +1,6 @@
 import itertools
 
-from concourse.lib.models import (
+from concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
     GetStep,

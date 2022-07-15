@@ -31,6 +31,11 @@ class Duration(BaseModel):
     __root__: str
 
 
+class RegistryImage(BaseModel):
+    repository: str
+    tag: str = "latest"
+
+
 class DisplayConfig(BaseModel):
     class Config:
         extra = Extra.forbid
