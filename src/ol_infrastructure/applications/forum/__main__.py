@@ -37,12 +37,10 @@ consul_stack = StackReference(
 )
 
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-print(f"applications.edxapp.{stack_info.env_prefix}.{stack_info.name}")
 edxapp = StackReference(
     f"applications.edxapp.{stack_info.env_prefix}.{stack_info.name}"
 )
 
-mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc_name = forum_config.get("target_vpc")
 target_vpc = network_stack.require_output(target_vpc_name)
@@ -70,17 +68,6 @@ forum_server_tag = f"open-edx-forum-server-{env_name}"
 consul_security_groups = consul_stack.require_output("security_groups")
 consul_provider = get_consul_provider(stack_info)
 
-forum_server_ami = ec2.get_ami(
-    filters=[
-        ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
-        ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
-        ec2.GetAmiFilterArgs(name="name", values=["open-edx-forum-server-*"]),
-    ],
-    most_recent=True,
-    owners=[aws_account.account_id],
-)
-
-# edxapp_zone = dns_stack.require_output(forum_config.require("dns_zone"))
 # IAM and instance profile
 forum_server_instance_role = iam.Role(
     f"forum-server-instance-role-{env_name}",
