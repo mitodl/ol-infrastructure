@@ -834,8 +834,6 @@ consul_kv_data = {
     "session-cookie-domain": ".{}".format(edxapp_domains["lms"].split(".", 1)[-1]),
     "studio-domain": edxapp_domains["studio"],
 }
-if gradebook_url := edxapp_config.get("gradebook_url"):
-    consul_kv_data["gradebook-url"] = gradebook_url
 consul.Keys(
     "edxapp-consul-template-data",
     keys=[
