@@ -91,6 +91,9 @@ repos:
   rev: v0.961
   hooks:
   - id: mypy
+    args:
+    - --explicit-package-bases
+    - --namespace-packages
     additional_dependencies:
     - pydantic
     - types-PyYAML
