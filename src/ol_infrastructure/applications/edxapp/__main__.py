@@ -1213,7 +1213,7 @@ worker_launch_config = ec2.LaunchTemplate(
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name=edxapp_worker_ami.root_device_name,
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=edxapp_config.get_int("worker_disk_size") or 25,
+                volume_size=edxapp_config.get_int("worker_disk_size") or 50,
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
                 encrypted=True,
