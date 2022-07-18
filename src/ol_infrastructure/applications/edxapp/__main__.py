@@ -1301,6 +1301,7 @@ export(
         "load_balancer": {"dns_name": web_lb.dns_name, "arn": web_lb.arn},
         "ses_configuration_set": edxapp_ses_configuration_set.name,
         "edx_notes_iam_role": edxapp_notes_iam_role.arn,
-        "security_group": edxapp_security_group.id,
     },
 )
+
+export("edxapp_security_group", edxapp_security_group.id)

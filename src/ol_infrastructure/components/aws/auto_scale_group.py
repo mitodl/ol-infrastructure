@@ -188,8 +188,8 @@ class OLAutoScaling(pulumi.ComponentResource):
         self,
         asg_config: OLAutoScaleGroupConfig,
         lt_config: OLLaunchTemplateConfig,
-        tg_config: Optional[OLTargetGroupConfig],
-        lb_config: Optional[OLLoadBalancerConfig],
+        tg_config: Optional[OLTargetGroupConfig] = None,
+        lb_config: Optional[OLLoadBalancerConfig] = None,
         opts: pulumi.ResourceOptions = None,
     ):
 
