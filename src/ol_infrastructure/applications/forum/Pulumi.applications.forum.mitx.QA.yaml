@@ -9,7 +9,6 @@ config:
     max: 2
     min: 1
   forum:business_unit: operations
-  forum:instance_type: m5a.2xlarge
   forum:target_vpc: residential_mitx_vpc
   forum:web_host_domain: forum-qa.odl.mit.edu
   vault:address: https://vault-qa.odl.mit.edu
