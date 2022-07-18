@@ -51,10 +51,12 @@ def amazon_ami(
     )
 
 
-def pulumi(name: Identifier, project_name: str, project_path: str) -> Resource:
+def pulumi_provisioner(
+    name: Identifier, project_name: str, project_path: str
+) -> Resource:
     return Resource(
         name=name,
-        type="pulumi",
+        type="pulumi-provisioner",
         icon="cloud-braces",
         source={
             "env_pulumi": {"AWS_SHARED_CREDENTIALS_FILE": "aws_creds/credentials"},

@@ -17,20 +17,18 @@ from concourse.lib.models.pipeline import (
     TaskStep,
 )
 from concourse.lib.resource_types import (
-    ami_resource,
     packer_build,
     packer_validate,
-    pulumi_resource,
+    pulumi_provisioner_resource,
 )
-from concourse.lib.resources import git_repo, github_release, pulumi
+from concourse.lib.resources import git_repo, github_release, pulumi_provisioner
 
 #########################
 # CUSTOM RESOURCE TYPES #
 #########################
-ami_resource_type = ami_resource()
 packer_validate_type = packer_validate()
 packer_build_type = packer_build()
-pulumi_resource_type = pulumi_resource()
+pulumi_provisioner_resource_type = pulumi_provisioner_resource()
 
 #############
 # RESOURCES #
@@ -65,30 +63,11 @@ packer_validate_resource = Resource(
 
 packer_build_resource = Resource(name="packer-build", type=packer_build_type.name)
 
-pulumi_deploy = pulumi(
+pulumi_deploy = pulumi_provisioner(
     name=Identifier("pulumi-concourse"),
     project_name="ol-infrastructure-concourse-application",
     project_path=f"{concourse_pulumi_code.name}/src/ol_infrastructure/applications/concourse",
 )
-
-# concourse_worker_ami = amazon_ami(
-#     name=Identifier("concourse-worker-ami"),
-#     filters={
-#         "owner-id": 610119931565,
-#         "is-public": False,
-#         "state": "available",
-#         "name": "concourse-worker-*",
-#     },
-# )
-# concourse_web_ami = amazon_ami(
-#     name=Identifier("concourse-web-ami"),
-#     filters={
-#         "owner-id": 610119931565,
-#         "is-public": False,
-#         "state": "available",
-#         "name": "concourse-web-*",
-#     },
-# )
 
 
 def ami_jobs() -> list[Job]:
@@ -190,16 +169,13 @@ def pulumi_job(env_stage: str, previous_env_stage: str = None) -> Job:
             ),
             PutStep(
                 put=pulumi_deploy.name,
-                inputs=[
-                    Input(name=aws_creds_path.name),
-                    Input(name=concourse_pulumi_code.name),
-                ],
+                get_params={"skip_implicit_get": True},
                 params={
-                    "get_params": {"skip_implicit_get": True},
                     "env_os": {
                         "AWS_DEFAULT_REGION": "us-east-1",
                         "PYTHONPATH": f"/usr/lib/:/tmp/build/put/{concourse_pulumi_code.name}/src/",
                     },
+                    "stack_name": f"applications.concourse.{env_stage}",
                 },
             ),
         ],
@@ -209,14 +185,12 @@ def pulumi_job(env_stage: str, previous_env_stage: str = None) -> Job:
 def concourse_pipeline() -> Pipeline:
     return Pipeline(
         resource_types=[
-            ami_resource_type,
             packer_validate_type,
             packer_build_type,
+            pulumi_provisioner_resource_type,
         ],
         resources=[
             concourse_release,
-            # concourse_worker_ami,
-            # concourse_web_ami,
             concourse_image_code,
             packer_validate_resource,
             packer_build_resource,

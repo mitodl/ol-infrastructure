@@ -42,9 +42,9 @@ def s3_sync() -> ResourceType:
     )
 
 
-def pulumi_resource() -> ResourceType:
+def pulumi_provisioner_resource() -> ResourceType:
     return ResourceType(
-        name=Identifier("pulumi"),
+        name=Identifier("pulumi-provisioner"),
         type=REGISTRY_IMAGE,
-        source=RegistryImage(repository="mitodl/concourse-pulumi-resource"),
+        source=RegistryImage(repository="mitodl/concourse-pulumi-resource-provisioner"),
     )
