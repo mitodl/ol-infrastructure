@@ -1,7 +1,7 @@
 ---
 version: "3.7"
 services:
-  forums:
+  xqueue:
     container_name: xqueue
     image: mitodl/xqueue:latest
     ports:

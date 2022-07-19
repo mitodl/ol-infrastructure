@@ -57,16 +57,16 @@ VERSIONS = {
 }
 
 files.put(
-    name="Place the forum docker-compose.yaml file",
+    name="Place the xqueue docker-compose.yaml file",
     src=str(Path(__file__).resolve().parent.joinpath("files", "docker-compose.yaml")),
     dest=DOCKER_COMPOSE_DIRECTORY,
     mode="0660",
 )
 
 files.put(
-    name="Place the forum .env file",
-    src=str(Path(__file__).resolve().parent.joinpath("files", "forum.env.j2")),
-    dest="/etc/consul-template/templates.d/forum.env.j2",
+    name="Place the xqueue .env file",
+    src=str(Path(__file__).resolve().parent.joinpath("files", "xqueue.env.j2")),
+    dest="/etc/consul-template/templates.d/xqueue.env.j2",
     mode="0660",
     user="consul-template",
     group="consul-template",
@@ -81,8 +81,8 @@ if DEPLOYMENT not in ["mitxonline", "mitx", "xpro", "mitx-staging"]:
 server.shell(
     name="Update Vault Mount Point",
     commands=[
-        "mkdir /etc/forum/",
-        f"sed -i -e 's/DEPLOYMENT/{DEPLOYMENT}/g' /etc/consul-template/templates.d/forum.env.j2",
+        "mkdir /etc/xqueue/",
+        f"sed -i -e 's/DEPLOYMENT/{DEPLOYMENT}/g' /etc/consul-template/templates.d/xqueue.env.j2",
     ],
 )
 
@@ -94,14 +94,14 @@ consul_configuration = {
     )
 }
 
-consul_configuration[Path("01-forum.json")] = ConsulConfig(
+consul_configuration[Path("01-xqueue.json")] = ConsulConfig(
     services=[
         ConsulService(
-            name="forum",
-            port=4567,
+            name="xqueue",
+            port=8040,
             check=ConsulServiceTCPCheck(
-                name="edxapp-forum",
-                tcp="localhost:4567",
+                name="edxapp-xqueue",
+                tcp="localhost:8040",
                 interval="10s",
             ),
         ),
@@ -125,7 +125,7 @@ vault_config = VaultAgentConfig(
         method=VaultAutoAuthMethod(
             type="aws",
             mount_path="auth/aws",
-            config=VaultAutoAuthAWS(role="forum-server"),
+            config=VaultAutoAuthAWS(role="xqueue-server"),
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),
@@ -136,12 +136,12 @@ vault = Vault(
     configuration={Path("vault.json"): vault_config},
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
-forum_config_path = Path("/etc/forum/forum.env")
+xqueue_config_path = Path("/etc/xqueue/xqueue.env")
 
 consul_templates = [
     ConsulTemplateTemplate(
-        source=Path("/etc/consul-template/templates.d/forum.env.j2"),
-        destination=forum_config_path,
+        source=Path("/etc/consul-template/templates.d/xqueue.env.j2"),
+        destination=xqueue_config_path,
     ),
 ]
 

@@ -1,6 +1,6 @@
 locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
-  app_name  = "open-edx-forum-server"
+  app_name  = "open-edx-xqueue-server"
 }
 
 variable "build_environment" {
@@ -23,9 +23,9 @@ variable "deployment" {
   type    = string
 }
 
-source "amazon-ebs" "forum" {
-  ami_description         = "Deployment image for Forum server generated at ${local.timestamp}"
-  ami_name                = "open-edx-forum-${var.node_type}-${local.timestamp}"
+source "amazon-ebs" "xqueue" {
+  ami_description         = "Deployment image for Xqueue server generated at ${local.timestamp}"
+  ami_name                = "open-edx-xqueue-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
   launch_block_device_mappings {
@@ -80,7 +80,7 @@ source "amazon-ebs" "forum" {
 
 build {
   sources = [
-    "source.amazon-ebs.forum",
+    "source.amazon-ebs.xqueue",
   ]
 
   provisioner "shell-local" {
