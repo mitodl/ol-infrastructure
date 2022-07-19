@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from concourse.lib.models import (
+from concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
     GetStep,
