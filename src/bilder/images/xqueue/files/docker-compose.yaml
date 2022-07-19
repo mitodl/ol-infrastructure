@@ -1,0 +1,10 @@
+---
+version: "3.7"
+services:
+  forums:
+    container_name: xqueue
+    image: mitodl/xqueue:latest
+    ports:
+    - 8040:8040
+    env_file:
+    - /etc/xqueue/xqueue.env
