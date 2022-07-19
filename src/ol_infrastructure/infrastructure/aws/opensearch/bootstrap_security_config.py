@@ -41,6 +41,7 @@ read_write_role = {
                 "crud",
                 "create_index",
                 "indices_all",
+                "indices:data/read/scroll/clear",
             ],  # TODO: Confirm this is all that is needed
         }
     ],
