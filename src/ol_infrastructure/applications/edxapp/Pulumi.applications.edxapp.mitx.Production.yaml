@@ -13,6 +13,9 @@ config:
     lms: lms.mitx.mit.edu
     preview: preview.mitx.mit.edu
     studio: studio.mitx.mit.edu
+  edxapp:enabled_mfes:
+    learning: learn
+    gradebook: gradebook
   edxapp:edx_forum_secrets:
     secure: v1:abC4Zew/4Q9nzIm8:ntKKmUgT7z8jIEgKV2EkTbSJ6zcckEH2YHHInsBo8WOGqPNydNkxidhKYZ/bXy8y8E3iBOFF0uRROTyuHhrmzcbGygu01zYGFIBe+v8=
   edxapp:edx_xqueue_secrets:

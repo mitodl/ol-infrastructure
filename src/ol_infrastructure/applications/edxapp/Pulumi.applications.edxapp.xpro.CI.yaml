@@ -12,6 +12,9 @@ config:
     lms: courses-ci.xpro.mit.edu
     preview: preview-ci.xpro.mit.edu
     studio: studio-ci.xpro.mit.edu
+  edxapp:enabled_mfes:
+    learning: learn
+    gradebook: gradebook
   edxapp:edx_forum_secrets:
     secure: v1:QSW6gq7cQ6t65Glo:OGJ5X4YYEi2ZdyrpnML25p10mQrodNNLaF5zyV1242ZcQz1TkRsTdpmv9HghIhgHxykYd2NK7kyRkvphd5pfI56xAg/de/8PuHNuPx5kg3IZCrFktYuE2Nyzjxhg7aGHNhA6JQEf95925WPwAG3V
   edxapp:edxapp_release: open-release/maple.master

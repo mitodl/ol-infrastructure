@@ -12,6 +12,10 @@ config:
     lms: mitx-qa-draft.mitx.mit.edu
     preview: preview-mitx-qa-draft.mitx.mit.edu
     studio: studio-mitx-qa-draft.mitx.mit.edu
+  edxapp:enabled_mfes:
+    learning: learn
+    gradebook: gradebook
+    library_authoring: authoring
   edxapp:edx_forum_secrets:
     secure: v1:KMWZXKBsEvC8Uaue:1Q6pU2/TB/Y6yzu1f/tjCSeA0Qmy7csbV5JxlbhyB0CBlE3fO6+hJJEnzeKJxmNIlpPMUtptddiQsgV4wl2XEFIvDAEflMWjqV51VGA=
   edxapp:edx_xqueue_secrets:

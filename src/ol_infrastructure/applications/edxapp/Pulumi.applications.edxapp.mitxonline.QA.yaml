@@ -15,6 +15,9 @@ config:
     lms: courses-qa.mitxonline.mit.edu
     preview: preview-qa.mitxonline.mit.edu
     studio: studio-qa.mitxonline.mit.edu
+  edxapp:enabled_mfes:
+    learning: learn
+    gradebook: gradebook
   edxapp:edx_forum_secrets:
     secure: v1:IqXRArQveCV+9lkE:cRaraFuN2dDmI29PD4QifOU7MrRFdszOoaUb7o3pDJordt4TSjw8fIxldWfMzNhZRLC+NS291DorO1IuN6ASdCbt5d53aMvHVt+3hA6wyuI11OFjk7U=
   edxapp:edxapp_release: release

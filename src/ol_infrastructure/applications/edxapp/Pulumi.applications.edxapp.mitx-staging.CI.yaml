@@ -12,6 +12,10 @@ config:
     lms: staging-ci.mitx.mit.edu
     preview: preview-staging-ci.mitx.mit.edu
     studio: studio-staging-ci.mitx.mit.edu
+  edxapp:enabled_mfes:
+    learning: learn
+    gradebook: gradebook
+    library_authoring: authoring
   edxapp:edx_forum_secrets:
     secure: v1:TMUUvuM6tlFYbT3r:Zmp7UuIteRPHVNghhms3+xqHZT+1DZjoJU1tEjsZiny0XCTIJJXY4E+OKNEDMoblo3FR4FtQEFdU719imPMdR9zk+Kb7oh3rZzf74QmMcMlSL2P743T98MchMvM3Fa1RyBf4PgebMSNZJ9GdDg==
   edxapp:edx_xqueue_secrets:
