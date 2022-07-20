@@ -41,6 +41,7 @@ read_write_role = {
                 "crud",
                 "create_index",
                 "indices_all",
+                "indices:data/read/scroll",
                 "indices:data/read/scroll/clear",
             ],  # TODO: Confirm this is all that is needed
         }
@@ -72,6 +73,21 @@ users = {
     "read_write_user": read_write_user,
 }
 
+role_mappings = {
+    "read_only_role": {
+        "hosts": [],
+        "users": ["read_only_user"],
+        "backend_roles": [],
+        "and_backend_roles": [],
+    },
+    "read_write_role": {
+        "hosts": [],
+        "users": ["read_write_user"],
+        "backend_roles": [],
+        "and_backend_roles": [],
+    },
+}
+
 for r_name, r_def in roles.items():
     url = f"https://{cluster['endpoint']}/_plugins/_security/api/roles/{r_name}"
     response = requests.put(url, headers=headers, auth=auth, data=json.dumps(r_def))
@@ -80,4 +96,9 @@ for r_name, r_def in roles.items():
 for u_name, u_def in users.items():
     url = f"https://{cluster['endpoint']}/_plugins/_security/api/internalusers/{u_name}"
     response = requests.put(url, headers=headers, auth=auth, data=json.dumps(u_def))
+    print(response.text)
+
+for r_name, rm in role_mappings.items():
+    url = f"https://{cluster['endpoint']}/_plugins/_security/api/rolesmapping/{r_name}"
+    response = requests.put(url, headers=headers, auth=auth, data=json.dumps(rm))
     print(response.text)
