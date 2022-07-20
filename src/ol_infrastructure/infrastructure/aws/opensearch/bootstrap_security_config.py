@@ -85,7 +85,7 @@ role_mappings = {
         "users": ["read_write_user"],
         "backend_roles": [],
         "and_backend_roles": [],
-    }
+    },
 }
 
 for r_name, r_def in roles.items():
