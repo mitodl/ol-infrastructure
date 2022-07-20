@@ -1,7 +1,6 @@
 import io
 import os
 from pathlib import Path
-from typing import List
 
 from pyinfra import host
 from pyinfra.operations import files, server
@@ -62,8 +61,8 @@ def place_consul_template_file(
     repo_path: Path,
     template_path: Path,
     destination_path: Path,
-    consul_templates: List[ConsulTemplateTemplate],
-    watched_files: List[Path],
+    consul_templates: list[ConsulTemplateTemplate],
+    watched_files: list[Path],
     mode: str = "0664",
 ):
     files.put(
@@ -99,8 +98,8 @@ files.put(
     src=io.StringIO(VERSIONS["redash"]),
     dest="/etc/defaults/consul-template",
 )
-consul_templates: List[ConsulTemplateTemplate] = []
-watched_files: List[Path] = []
+consul_templates: list[ConsulTemplateTemplate] = []
+watched_files: list[Path] = []
 
 # Basic NGINX configuration stuff
 nginx_conf_directory = Path("/etc/nginx")
