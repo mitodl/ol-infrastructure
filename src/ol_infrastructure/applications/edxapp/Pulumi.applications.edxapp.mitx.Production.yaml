@@ -18,9 +18,11 @@ config:
   edxapp:edx_xqueue_secrets:
     secure: v1:MSer6cBbKNVi/Pas:v5XAeVblUaT5pyxdhhk9wn9cVjadZcHscOWhN1nlPHBsCD8/HgEtsvAjtTOWnW/yVMYaMzlIjOxoKvEw0/qNESQj0M7bFKC7/dtfU+qlrWyI0PJEVVmiz9QPLAOvl4rA8In2hJTAmN+BAREDqSRFM9YiOKmdOuoDssTGv+fD1+oC5EcFz4BKPUnbZDQ1
   edxapp:edxapp_release: open-release/nutmeg.master
+  edxapp:enabled_mfes:
+    gradebook: gradebook
+    learning: learn
   edxapp:google_analytics_id: UA-5145472-4
   edxapp:mail_domain: edxapp-mail-production.mitx.mit.edu
-  edxapp:maintenance_page_dns: # d18vms1k4mfvhk.cloudfront.net
   edxapp:min_web_nodes: "5"
   edxapp:min_worker_nodes: "2"
   edxapp:sender_email_address: mitx-support@mit.edu

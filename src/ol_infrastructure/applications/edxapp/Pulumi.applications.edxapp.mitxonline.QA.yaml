@@ -19,6 +19,9 @@ config:
     secure: v1:IqXRArQveCV+9lkE:cRaraFuN2dDmI29PD4QifOU7MrRFdszOoaUb7o3pDJordt4TSjw8fIxldWfMzNhZRLC+NS291DorO1IuN6ASdCbt5d53aMvHVt+3hA6wyuI11OFjk7U=
   edxapp:edxapp_release: release
   edxapp:elb_healthcheck_interval: "30"
+  edxapp:enabled_mfes:
+    gradebook: gradebook
+    learning: learn
   edxapp:google_analytics_id: UA-5145472-46
   edxapp:mail_domain: edxapp-mail-qa.mitxonline.mit.edu
   edxapp:sender_email_address: support@edxapp-mail-qa.mitxonline.mit.edu
