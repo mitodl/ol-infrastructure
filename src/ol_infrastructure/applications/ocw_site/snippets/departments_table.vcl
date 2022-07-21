@@ -3,6 +3,7 @@ table departments BOOL {
   "biological-engineering": true,
   "aeronautics-and-astronautics": true,
   "global-studies-and-languages": true,
+  "global-languages": true,
   "mathematics": true,
   "health-sciences-and-technology": true,
   "edgerton-center": true,
