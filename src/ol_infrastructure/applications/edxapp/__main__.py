@@ -57,6 +57,7 @@ from ol_infrastructure.lib.aws.ec2_helper import (
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
 from ol_infrastructure.lib.consul import get_consul_provider
+from ol_infrastructure.lib.fastly import get_fastly_provider
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
@@ -104,6 +105,7 @@ aws_config = AWSBase(
 )
 consul_security_groups = consul_stack.require_output("security_groups")
 consul_provider = get_consul_provider(stack_info)
+fastly_provider = get_fastly_provider()
 edxapp_release = edxapp_config.require("edxapp_release")
 edxapp_domains = edxapp_config.require_object("domains")
 edxapp_mfes = edxapp_config.require_object("enabled_mfes")
@@ -1277,24 +1279,10 @@ worker_asg = autoscaling.Group(
 ########################
 
 mfe_regex = "^/({})/".format("|".join(edxapp_mfe_paths))
-fastly_resource_options = {}
-if fastly_service_id := edxapp_config.get("fastly_service_id"):
-    fastly_resource_options = {
-        "protect": True,
-        "import_": fastly_service_id,
-        "ignore_changes": [
-            "backends",
-            "cache_settings",
-            "conditions",
-            "dictionaries",
-            "domains",
-            "name",
-            "snippets",
-        ],
-    }
 edxapp_fastly_service = fastly.ServiceVcl(
     f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
     name=f"{stack_info.env_prefix} {stack_info.env_suffix} edX",
+    comment="Managed by Pulumi",
     backends=[
         fastly.ServiceVclBackendArgs(
             address=edxapp_mfe_bucket.bucket_domain_name,
@@ -1420,7 +1408,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
             type="error",
         ),
     ],
-    opts=ResourceOptions(**fastly_resource_options),
+    opts=fastly_provider,
 )
 
 

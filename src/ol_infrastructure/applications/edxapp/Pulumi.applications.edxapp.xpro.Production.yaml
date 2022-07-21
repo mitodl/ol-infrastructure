@@ -12,13 +12,13 @@ config:
     lms: courses.xpro.mit.edu
     preview: preview.xpro.mit.edu
     studio: studio.xpro.mit.edu
-  edxapp:enabled_mfes:
-    learning: learn
-    gradebook: gradebook
   edxapp:edx_forum_secrets:
     secure: v1:YHqAWSdn7TNUn7d+:IBgiGsl4r8vymID8NV43rnfJy+qsJSXm/jXaWWALUfF9zXqRO4zJZhLS0d+etijGVwaZnF8v5zXlo+EczFrCe7ICHpS85zHgifbfDcw=
-  edxapp:google_analytics_id: UA-5145472-38
   edxapp:edxapp_release: open-release/maple.master
+  edxapp:enabled_mfes:
+    gradebook: gradebook
+    learning: learn
+  edxapp:google_analytics_id: UA-5145472-38
   edxapp:mail_domain: edxapp-mail-production.xpro.mit.edu
   edxapp:min_web_nodes: "3"
   edxapp:min_worker_nodes: "2"
