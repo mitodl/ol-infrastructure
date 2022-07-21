@@ -33,7 +33,11 @@ read_only_role = {
     ],
 }
 read_write_role = {
-    "cluster_permissions": ["cluster_composite_ops", "indices:data/read/scroll", "indices:data/read/scroll/clear"],
+    "cluster_permissions": [
+        "cluster_composite_ops",
+        "indices:data/read/scroll",
+        "indices:data/read/scroll/clear",
+    ],
     "index_permissions": [
         {
             "index_patterns": ["*"],  # TODO: Define actual indices
