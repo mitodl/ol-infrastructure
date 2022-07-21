@@ -106,7 +106,6 @@ watched_files: List[Path] = []
 nginx_conf_directory = Path("/etc/nginx")
 certificate_file = nginx_conf_directory.joinpath("star.odl.mit.edu.crt")
 certificate_key_file = nginx_conf_directory.joinpath("star.odl.mit.edu.key")
-htpasswd_file = nginx_conf_directory.joinpath("htpasswd")
 nginx_conf_file = nginx_conf_directory.joinpath("nginx.conf")
 
 files.directory(
@@ -115,14 +114,6 @@ files.directory(
     user="root",
     group="root",
     present=True,
-)
-place_consul_template_file(
-    name="htpasswd",
-    repo_path=FILES_DIRECTORY,
-    template_path=Path("/etc/consul-template"),
-    destination_path=nginx_conf_directory,
-    consul_templates=consul_templates,
-    watched_files=watched_files,
 )
 place_consul_template_file(
     name="nginx.conf",

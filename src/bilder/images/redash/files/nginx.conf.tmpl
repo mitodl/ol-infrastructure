@@ -27,9 +27,6 @@ server {
   ssl_certificate /etc/nginx/nginx.pem;
   ssl_certificate_key /etc/nginx/nginx-key.pem;
 
-  auth_basic "Redash Login";
-  auth_basic_user_file /etc/nginx/htpasswd;
-
   # Specifies that we don't want to use SSLv2 (insecure) or SSLv3 (exploitable)
   ssl_protocols TLSv1.2;
   # Uses the server's ciphers rather than the client's
