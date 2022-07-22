@@ -213,7 +213,7 @@ redis_config = Config("redis")
 # it from in the .env file found in bilder
 vault.generic.Secret(
     "redis-auth-token-secret",
-    path="secret-operations/operations/redash/redis-auth-token/",
+    path="secret-data/redash/redis-auth-token/",
     data_json=json.dumps({"value": redis_config.require("auth_token")}),
 )
 
@@ -326,6 +326,7 @@ web_lt_config = OLLaunchTemplateConfig(
     security_groups=[
         data_vpc["security_groups"]["default"],
         data_vpc["security_groups"]["web"],
+        data_vpc["security_groups"]["integrator"],
         redash_instance_security_group.id,
     ],
     tags=aws_config.merged_tags({"Name": web_tag}),
@@ -421,6 +422,7 @@ worker_lt_config = OLLaunchTemplateConfig(
     instance_profile_arn=redash_instance_profile.arn,
     security_groups=[
         data_vpc["security_groups"]["default"],
+        data_vpc["security_groups"]["integrator"],
         redash_instance_security_group.id,
     ],
     tags=aws_config.merged_tags({"Name": worker_tag}),
