@@ -81,6 +81,15 @@ def mfe_job(open_edx: OpenEdxVars, mfe: MFEAppVars, previous_job: str = None) ->
         get=f"mfe-app-{mfe.path}",
         trigger=previous_job is None,
     )
+    branding_overrides = textwrap.dedent(
+        """\
+        npm install @edx/frontend-component-footer@npm:@mitodl/frontend-component-footer-mitol@latest --legacy-peer-deps
+        npm install @edx/frontend-component-header@npm:@mitodl/frontend-component-header-mitol@latest --legacy-peer-deps"""
+    )
+    # The library authoring MFE has a version conflict with the React dependency. It
+    # uses v17 and our override plugins use v16
+    if mfe.path == "authoring":
+        branding_overrides = ""
     if previous_job:
         clone_git_repo.passed = [previous_job]
     return Job(
@@ -109,12 +118,11 @@ def mfe_job(open_edx: OpenEdxVars, mfe: MFEAppVars, previous_job: str = None) ->
                         args=[
                             "-exc",
                             textwrap.dedent(
-                                """\
+                                f"""\
                                 apt-get update
                                 apt-get install -q -y python build-essential
                                 npm install
-                                npm install @edx/frontend-component-footer@npm:@mitodl/frontend-component-footer-mitol@latest --legacy-peer-deps
-                                npm install @edx/frontend-component-header@npm:@mitodl/frontend-component-header-mitol@latest --legacy-peer-deps
+                                {branding_overrides}
                                 NODE_ENV=production npm run build
                                 """
                             ),
