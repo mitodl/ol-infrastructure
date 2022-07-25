@@ -1,6 +1,6 @@
 ---
-name: ol-infrastructure-forum-server
+name: ol-infrastructure-xqueue-server
 runtime: python
-description: Manage deployment of an forum server
+description: Manage deployment of a xqueue server
 backend:
   url: s3://mitol-pulumi-state/

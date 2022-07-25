@@ -23,7 +23,7 @@ RUN chown app:app /edx/app/log/edx.log
 WORKDIR /edx/app/xqueue
 COPY requirements /edx/app/xqueue/requirements
 COPY requirements.txt /edx/app/xqueue/requirements.txt
-RUN pip install -r requirements.txt && pip install wheel
+RUN pip install wheel && pip install -r requirements.txt
 
 USER app
 

@@ -13,7 +13,7 @@ resources:
   icon: docker
   source:
     repository: mitodl/xqueue
-    tag: latest
+    tag: ((xqueue_release_tag))
     username: ((dockerhub.username))
     password: ((dockerhub.password))
 
