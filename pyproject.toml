@@ -35,7 +35,7 @@ pydantic = "^1"
 pyinfra = "^2.3"
 pyyaml = "^6.0"
 salt-pepper = "^0.7.6"
-pulumi-mongodbatlas = "^3.3.0"
+pulumi-mongodbatlas = "^3.5.0"
 bcrypt = "^3.2.0"
 markupsafe = "<2.1.0" # Avoiding 2.1 update until PyInfra updates accordingly due to https://github.com/pallets/markupsafe/pull/261
 
