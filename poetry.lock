@@ -712,9 +712,9 @@ optional = false
 python-versions = ">=3.5"
 
 [package.extras]
-all = ["pytest", "sphinx", "numpydoc"]
-doc = ["sphinx", "numpydoc"]
 test = ["pytest"]
+doc = ["numpydoc", "sphinx"]
+all = ["numpydoc", "sphinx", "pytest"]
 
 [[package]]
 name = "jinja2"
@@ -831,7 +831,7 @@ optional = false
 python-versions = ">=2.6,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*"
 
 [package.extras]
-cryptography = ["cryptography (<2.2)", "cryptography"]
+cryptography = ["cryptography", "cryptography (<2.2)"]
 
 [[package]]
 name = "packaging"
@@ -895,9 +895,9 @@ attrs = ">=19.2"
 six = ">=1.13,<2.0"
 
 [package.extras]
-docstest = ["doc8", "sphinx", "sphinx-rtd-theme"]
-pep8test = ["flake8", "pep8-naming"]
-test = ["pytest", "hypothesis", "pretend"]
+test = ["pretend", "hypothesis", "pytest"]
+pep8test = ["pep8-naming", "flake8"]
+docstest = ["sphinx-rtd-theme", "sphinx", "doc8"]
 
 [[package]]
 name = "pathspec"
@@ -948,8 +948,8 @@ optional = false
 python-versions = ">=3.6"
 
 [package.extras]
-dev = ["pre-commit", "tox"]
-testing = ["pytest", "pytest-benchmark"]
+testing = ["pytest-benchmark", "pytest"]
+dev = ["tox", "pre-commit"]
 
 [[package]]
 name = "plumbum"
@@ -1059,7 +1059,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "4.13.0"
+version = "4.14.0"
 description = "A Pulumi package for creating and managing github cloud resources."
 category = "main"
 optional = false
@@ -1206,10 +1206,10 @@ python-dateutil = ">2,<3"
 pywinrm = "*"
 
 [package.extras]
+test = ["flake8-isort (==4.1.1)", "flake8-black (==0.3.0)", "flake8-commas (==2.1.0)", "flake8 (==4.0.1)", "isort (==5.10.1)", "black (==22.3.0)", "codecov (==2.1.12)", "coverage (==6.2)", "pytest-cov (==3.0.0)", "pytest (==7.0.1)", "pyyaml"]
+docs = ["docutils (==0.17.1)", "sphinx (==2.2.1)", "recommonmark (==0.5.0)", "pyinfra-guzzle-sphinx-theme (==0.14)"]
+dev = ["redbaron", "flake8-spellcheck (==0.12.1)", "ipdbplugin", "ipdb", "ipython", "twine", "wheel", "docutils (==0.17.1)", "sphinx (==2.2.1)", "recommonmark (==0.5.0)", "pyinfra-guzzle-sphinx-theme (==0.14)", "flake8-isort (==4.1.1)", "flake8-black (==0.3.0)", "flake8-commas (==2.1.0)", "flake8 (==4.0.1)", "isort (==5.10.1)", "black (==22.3.0)", "codecov (==2.1.12)", "coverage (==6.2)", "pytest-cov (==3.0.0)", "pytest (==7.0.1)", "pyyaml"]
 ansible = ["pyyaml"]
-dev = ["pyyaml", "pytest (==7.0.1)", "pytest-cov (==3.0.0)", "coverage (==6.2)", "codecov (==2.1.12)", "black (==22.3.0)", "isort (==5.10.1)", "flake8 (==4.0.1)", "flake8-commas (==2.1.0)", "flake8-black (==0.3.0)", "flake8-isort (==4.1.1)", "pyinfra-guzzle-sphinx-theme (==0.14)", "recommonmark (==0.5.0)", "sphinx (==2.2.1)", "docutils (==0.17.1)", "wheel", "twine", "ipython", "ipdb", "ipdbplugin", "flake8-spellcheck (==0.12.1)", "redbaron"]
-docs = ["pyinfra-guzzle-sphinx-theme (==0.14)", "recommonmark (==0.5.0)", "sphinx (==2.2.1)", "docutils (==0.17.1)"]
-test = ["pyyaml", "pytest (==7.0.1)", "pytest-cov (==3.0.0)", "coverage (==6.2)", "codecov (==2.1.12)", "black (==22.3.0)", "isort (==5.10.1)", "flake8 (==4.0.1)", "flake8-commas (==2.1.0)", "flake8-black (==0.3.0)", "flake8-isort (==4.1.1)"]
 
 [[package]]
 name = "pynacl"
@@ -1320,8 +1320,8 @@ six = "*"
 xmltodict = "*"
 
 [package.extras]
+kerberos = ["winkerberos (>=0.5.0)", "pykerberos (>=1.2.1,<2.0.0)"]
 credssp = ["requests-credssp (>=1.0.0)"]
-kerberos = ["pykerberos (>=1.2.1,<2.0.0)", "winkerberos (>=0.5.0)"]
 
 [[package]]
 name = "pyyaml"
@@ -1343,8 +1343,8 @@ python-versions = ">=3.5"
 PyYAML = ">=5.1,<7.0"
 
 [package.extras]
-all = ["toml"]
 toml = ["toml"]
+all = ["toml"]
 
 [[package]]
 name = "questionary"
@@ -1641,7 +1641,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "dea5a2c78cce82fe6e2184acb308953f3af1602c6ede6c4bc520b402c1aeff03"
+content-hash = "558fbf24b83b79838fe970848e36c9a847beaaa3a2861b332862fbd9d9e5d8eb"
 
 [metadata.files]
 anyio = [
@@ -2350,7 +2350,7 @@ pulumi-fastly = [
     {file = "pulumi_fastly-5.0.0.tar.gz", hash = "sha256:89cae71bc19e4b98d2ae3a7f3ab90b41e46e0cb74cdaae53d8c806b0aaeaa97a"},
 ]
 pulumi-github = [
-    {file = "pulumi_github-4.13.0.tar.gz", hash = "sha256:ff9a89fd7772cd7f202541f239cb6beab3cb571bc7e69e416359843ffdb8fc38"},
+    {file = "pulumi_github-4.14.0.tar.gz", hash = "sha256:6ae5f7049664e23d5c4de66bfd38d5ff375ff0b0e204eabd93699bf16006bd53"},
 ]
 pulumi-mongodbatlas = [
     {file = "pulumi_mongodbatlas-3.4.0.tar.gz", hash = "sha256:7571b145790e14412543ba3cd851858c9f68c3926d88bdee548471e9f6c0cc29"},
