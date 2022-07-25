@@ -115,14 +115,14 @@ uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
 name = "boto3"
-version = "1.24.31"
+version = "1.24.36"
 description = "The AWS SDK for Python"
 category = "main"
 optional = false
 python-versions = ">= 3.7"
 
 [package.dependencies]
-botocore = ">=1.27.31,<1.28.0"
+botocore = ">=1.27.36,<1.28.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.6.0,<0.7.0"
 
@@ -131,7 +131,7 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.27.31"
+version = "1.27.36"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
 optional = false
@@ -712,9 +712,9 @@ optional = false
 python-versions = ">=3.5"
 
 [package.extras]
-all = ["pytest", "sphinx", "numpydoc"]
-doc = ["sphinx", "numpydoc"]
 test = ["pytest"]
+doc = ["numpydoc", "sphinx"]
+all = ["numpydoc", "sphinx", "pytest"]
 
 [[package]]
 name = "jinja2"
@@ -831,7 +831,7 @@ optional = false
 python-versions = ">=2.6,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*"
 
 [package.extras]
-cryptography = ["cryptography (<2.2)", "cryptography"]
+cryptography = ["cryptography", "cryptography (<2.2)"]
 
 [[package]]
 name = "packaging"
@@ -895,9 +895,9 @@ attrs = ">=19.2"
 six = ">=1.13,<2.0"
 
 [package.extras]
-docstest = ["doc8", "sphinx", "sphinx-rtd-theme"]
-pep8test = ["flake8", "pep8-naming"]
-test = ["pytest", "hypothesis", "pretend"]
+test = ["pretend", "hypothesis", "pytest"]
+pep8test = ["pep8-naming", "flake8"]
+docstest = ["sphinx-rtd-theme", "sphinx", "doc8"]
 
 [[package]]
 name = "pathspec"
@@ -948,8 +948,8 @@ optional = false
 python-versions = ">=3.6"
 
 [package.extras]
-dev = ["pre-commit", "tox"]
-testing = ["pytest", "pytest-benchmark"]
+testing = ["pytest-benchmark", "pytest"]
+dev = ["tox", "pre-commit"]
 
 [[package]]
 name = "plumbum"
@@ -1206,10 +1206,10 @@ python-dateutil = ">2,<3"
 pywinrm = "*"
 
 [package.extras]
+test = ["flake8-isort (==4.1.1)", "flake8-black (==0.3.0)", "flake8-commas (==2.1.0)", "flake8 (==4.0.1)", "isort (==5.10.1)", "black (==22.3.0)", "codecov (==2.1.12)", "coverage (==6.2)", "pytest-cov (==3.0.0)", "pytest (==7.0.1)", "pyyaml"]
+docs = ["docutils (==0.17.1)", "sphinx (==2.2.1)", "recommonmark (==0.5.0)", "pyinfra-guzzle-sphinx-theme (==0.14)"]
+dev = ["redbaron", "flake8-spellcheck (==0.12.1)", "ipdbplugin", "ipdb", "ipython", "twine", "wheel", "docutils (==0.17.1)", "sphinx (==2.2.1)", "recommonmark (==0.5.0)", "pyinfra-guzzle-sphinx-theme (==0.14)", "flake8-isort (==4.1.1)", "flake8-black (==0.3.0)", "flake8-commas (==2.1.0)", "flake8 (==4.0.1)", "isort (==5.10.1)", "black (==22.3.0)", "codecov (==2.1.12)", "coverage (==6.2)", "pytest-cov (==3.0.0)", "pytest (==7.0.1)", "pyyaml"]
 ansible = ["pyyaml"]
-dev = ["pyyaml", "pytest (==7.0.1)", "pytest-cov (==3.0.0)", "coverage (==6.2)", "codecov (==2.1.12)", "black (==22.3.0)", "isort (==5.10.1)", "flake8 (==4.0.1)", "flake8-commas (==2.1.0)", "flake8-black (==0.3.0)", "flake8-isort (==4.1.1)", "pyinfra-guzzle-sphinx-theme (==0.14)", "recommonmark (==0.5.0)", "sphinx (==2.2.1)", "docutils (==0.17.1)", "wheel", "twine", "ipython", "ipdb", "ipdbplugin", "flake8-spellcheck (==0.12.1)", "redbaron"]
-docs = ["pyinfra-guzzle-sphinx-theme (==0.14)", "recommonmark (==0.5.0)", "sphinx (==2.2.1)", "docutils (==0.17.1)"]
-test = ["pyyaml", "pytest (==7.0.1)", "pytest-cov (==3.0.0)", "coverage (==6.2)", "codecov (==2.1.12)", "black (==22.3.0)", "isort (==5.10.1)", "flake8 (==4.0.1)", "flake8-commas (==2.1.0)", "flake8-black (==0.3.0)", "flake8-isort (==4.1.1)"]
 
 [[package]]
 name = "pynacl"
@@ -1320,8 +1320,8 @@ six = "*"
 xmltodict = "*"
 
 [package.extras]
+kerberos = ["winkerberos (>=0.5.0)", "pykerberos (>=1.2.1,<2.0.0)"]
 credssp = ["requests-credssp (>=1.0.0)"]
-kerberos = ["pykerberos (>=1.2.1,<2.0.0)", "winkerberos (>=0.5.0)"]
 
 [[package]]
 name = "pyyaml"
@@ -1343,8 +1343,8 @@ python-versions = ">=3.5"
 PyYAML = ">=5.1,<7.0"
 
 [package.extras]
-all = ["toml"]
 toml = ["toml"]
+all = ["toml"]
 
 [[package]]
 name = "questionary"
@@ -1706,12 +1706,12 @@ black = [
     {file = "black-22.6.0.tar.gz", hash = "sha256:6c6d39e28aed379aec40da1c65434c77d75e65bb59a1e1c283de545fb4e7c6c9"},
 ]
 boto3 = [
-    {file = "boto3-1.24.31-py3-none-any.whl", hash = "sha256:d4685e2fe2c436e558a94c7f68f1a6d4a6c7519d2b25a88fdf855d9a928889ad"},
-    {file = "boto3-1.24.31.tar.gz", hash = "sha256:de067346942c6d1730b513783385620519b8b2935f5b0ee2e66d565ffb57ce12"},
+    {file = "boto3-1.24.36-py3-none-any.whl", hash = "sha256:8844bbcb69ac0afc68225b58abe105852231cf1b562e6c8c9eb6b2b97fd4757a"},
+    {file = "boto3-1.24.36.tar.gz", hash = "sha256:b1855ede59e725b968d6336908ffc864b65985ca441d730625b09c43ccd6413b"},
 ]
 botocore = [
-    {file = "botocore-1.27.31-py3-none-any.whl", hash = "sha256:cbe87fa791aa4e8c3da64b1ccbaca7f809f6d1fba8d0b1855de2989815ef8736"},
-    {file = "botocore-1.27.31.tar.gz", hash = "sha256:b0cc79fb5a37a0e2b6befe86efd027b92101d819f1fdc56cfff39f2eb239f232"},
+    {file = "botocore-1.27.36-py3-none-any.whl", hash = "sha256:3119ce186053b9bf6bd0bd0ad19a8cedeb626b205ce6ad26ea0894634f702cd5"},
+    {file = "botocore-1.27.36.tar.gz", hash = "sha256:8109526f55742539d2311d742b40c89e65781ad18966e577dda360cd55c9d047"},
 ]
 certifi = [
     {file = "certifi-2022.6.15-py3-none-any.whl", hash = "sha256:fe86415d55e84719d75f8b69414f6438ac3547d2078ab91b67e779ef69378412"},
