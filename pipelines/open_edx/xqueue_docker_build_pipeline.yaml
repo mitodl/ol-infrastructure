@@ -1,19 +1,12 @@
 ---
-resource_types:
-- name: github-release
-  type: registry-image
-  source:
-    repository: concourse/github-release-resource
-
 resources:
-- check_every: 24h
-  name: xqueue-release
-  type: github-release
+- name: xqueue-git-resource
+  check_every: 24h
+  icon: github
+  type: git
   source:
-    owner: openedx
-    repository: xqueue
-    branch: master
-    release: true
+    uri: https://github.com/openedx/xqueue
+    tag: ((xqueue_release_tag))
 
 - name: xqueue-image
   type: registry-image
@@ -36,8 +29,10 @@ jobs:
 - name: build-and-push
   plan:
   - get: xqueue-dockerfile-repo
-  - get: xqueue-release
+  - get: xqueue-git-resource
     trigger: true
+    params:
+      include_source_zip: true
 
   - task: build-xqueue-image
     privileged: true
@@ -49,15 +44,16 @@ jobs:
           repository: concourse/oci-build-task
       inputs:
       - name: xqueue-dockerfile-repo
-      - name: xqueue-release
+      - name: xqueue-git-resource
       outputs:
       - name: image
       params:
-        CONTEXT: xqueue-dockerfile-repo/dockerfiles/openedx-xqueue
+        CONTEXT: xqueue-git-resource
       run:
         path: build
         args:
-        - -t $(cat ./xqueue-release/commit_sha)
+        - -t $(cat ./xqueue-git-resource/commit_sha)
   - put: xqueue-image
     params:
       image: image/image.tar
+      version: ((xqueue_release_tag))
