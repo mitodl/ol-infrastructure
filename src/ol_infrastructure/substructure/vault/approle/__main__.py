@@ -23,7 +23,9 @@ approle_backend = AuthBackend(
 )
 
 policy_folder = sorted(
-    (Path(__file__).resolve().parent).parent.joinpath("policies/").rglob("*.hcl")
+    (Path(__file__).resolve().parent)
+    .parent.joinpath("policies/approle/")
+    .rglob("*.hcl")
 )
 for hcl_file in policy_folder:
     constituent_name = PurePath(hcl_file).stem

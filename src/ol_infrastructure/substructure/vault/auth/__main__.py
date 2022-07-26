@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pulumi_vault as vault
 from pulumi import Config
 
@@ -43,6 +45,17 @@ vault_github_auth = vault.github.AuthBackend(
     "vault-github-auth-backend",
     organization="mitodl",
     description="GitHub Auth mount in a Vault server",
+    token_no_default_policy=True,
     token_ttl=ONE_MONTH_SECONDS,
     token_max_ttl=SIX_MONTHS,
 )
+
+policy_folder = sorted(
+    (Path(__file__).resolve().parent).parent.joinpath("policies/github/").rglob("*.hcl")
+)
+
+if "ci" or "qa" in stack_info.env_suffix:
+    for team in ["odl-engineering", "arbisoft-contractors"]:
+        vault_github_auth_team = vault.github.Team(
+            f"vault-github-auth-{team}", team=team, policies=["software-engineer"]
+        )
