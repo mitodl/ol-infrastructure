@@ -1,12 +1,14 @@
 ---
-secretsprovider: awskms://alias/PulumiSecrets
-encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEHumXiM+6KVFVBQvSpaYghAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMpAtsYnBqw7yxT5aKAgEQgDvYpSPSxANlKBfMsJ2Jr8QMUSNx+nYBYsZA+wNn59wYKYs2jyzW+8tED3Jsfsg2L9Nq5COeRtv9Wc7OVA==
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gEHdDDBAuz/HQf5vKvq4DvlAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM2ABrX9XSqfZRfGOvAgEQgDsOLERVPhzZao/GXKGOsZD/LPicaeGXPHRVJYyuciZ62BTZfHdKX1CU+AtzTrO9q0cdHcRmFY1dRmnJLA==
 config:
   aws:region: us-east-1
-  redash:domain: bi.odl.mit.edu
-  redash:instance_type: high_mem_regular
+  consul:address: https://consul-data-production.odl.mit.edu
   redash:db_password:
-    secure: v1:cj9j7XyMAGY1OKbq:EnB9a3A83D4DxPNZj1b7pcO+4AJE8oGjU1y9cojaElkd5MVAr948ow+9lkCPdM145FI9PimBipMSHRF4eQeQ7YvAnErKYtDatPIVqrjIDzKFdAtDlZU/PA==
+    secure: v1:SJO39Gf7npOo2aOg:GvBxTGcXeF4ef6II6cegWWdsaXBFU1uQoSsI8RqsDmLIXHE4Ov/mjScE2lp5k7Yjb7csiUYdMR9yCQyBxg2F8UbVUTgpF5GNweikZR+XlX6nVzxVx1BwrIAHyogD4YEokG/m
+  redash:domain: redash-production.odl.mit.edu
+  redash:instance_type: burstable_medium
   redis:auth_token:
-    secure: v1:/n7FUHThbxtHRmC2:PzixAyTQ4gqW+pRbAzdW2BpWwL1cxy7uaZQFAmuJkicDtsDKbQn1CW/8en+tCD1TQnM49EcumUvqfv/ponehFxaX+ODnVn4zq/vfuNQowdDToQ89FRiOMZgn
-  saltstack:key_name: salt-qa
+    secure: v1:/kVVH8iAK5byo/ba:6SOi4Ujt3GUGgaJgwftWAdc5Tkfb0JVxPDQKUlxVzcQwtv2n1f6Zzw+o5jTPIMGi/et4+EJS+Z4coIuzwboO/zqM3w3SDJROB++w+YdsHrkQFQVDkzLSz2WYEos/XA==
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

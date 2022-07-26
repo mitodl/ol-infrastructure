@@ -50,9 +50,6 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-# TODO:
-# - create load balancer for web nodes
-
 redash_config = Config("redash")
 salt_config = Config("saltstack")
 stack_info = parse_stack()
