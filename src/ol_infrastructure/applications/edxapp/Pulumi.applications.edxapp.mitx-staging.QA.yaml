@@ -16,8 +16,12 @@ config:
     secure: v1:KMWZXKBsEvC8Uaue:1Q6pU2/TB/Y6yzu1f/tjCSeA0Qmy7csbV5JxlbhyB0CBlE3fO6+hJJEnzeKJxmNIlpPMUtptddiQsgV4wl2XEFIvDAEflMWjqV51VGA=
   edxapp:edx_xqueue_secrets:
     secure: v1:qsM/S7Cb8+UOLRdj:Gv5E/h+AjiKQ2HiTNykPh35nw5ApGOVKvwwi6BMBmaHs5g4O8FtzJKe9qxvw2NLdk0wYS80Mftc66tf82Ps//38s/9q2YijplczowzYP3AinvhnFkVy1bQMHDFeiwfWP+owGT0ktv+QIfwT0D4uq1Z4K5S1sdfBQA09Hl7y6RrkxWgYMxYz/C+/w1HlMymkgsw==
-  edxapp:elb_healthcheck_interval: "30"
   edxapp:edxapp_release: open-release/nutmeg.master
+  edxapp:elb_healthcheck_interval: "30"
+  edxapp:enabled_mfes:
+    gradebook: gradebook
+    learning: learn
+    library_authoring: authoring
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-staging-qa.mitx.mit.edu
   edxapp:min_web_nodes: "1"

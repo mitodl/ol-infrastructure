@@ -11,7 +11,6 @@ import json
 import textwrap
 from functools import partial
 from pathlib import Path
-from typing import List
 
 import pulumi_vault as vault
 import yaml
@@ -45,7 +44,7 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 
 
 def build_worker_user_data(
-    concourse_team: str, concourse_tags: List[str], consul_dc: str
+    concourse_team: str, concourse_tags: list[str], consul_dc: str
 ) -> str:
     yaml_contents = {
         "write_files": [
@@ -166,7 +165,7 @@ concourse_web_instance_role = iam.Role(
 
 # Dynamically load IAM policies from the IAM policies module and set them aside
 # First deduplicate all policy names into 'iam_policy_names' list.
-all_iam_policy_names: List[str] = []
+all_iam_policy_names: list[str] = []
 for worker_def in concourse_config.get_object("workers") or {}:
     all_iam_policy_names = all_iam_policy_names + (worker_def["iam_policies"] or [])
 iam_policy_names = set(

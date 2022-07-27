@@ -1,0 +1,31 @@
+---
+resources:
+- name: gitrepo
+  icon: github
+  type: git
+  source:
+    uri: https://github.com/mitodl/redash.git
+    branch: master
+
+- name: redash-docker
+  icon: docker
+  check_every: never
+  type: docker-image
+  source:
+    username: ((dockerhub.username))
+    password: ((dockerhub.password))
+    repository: mitodl/redash
+    tag: latest
+
+jobs:
+- name: build-and-publish-redash-image
+  public: false
+  serial: true
+  plan:
+  - get: gitrepo
+    trigger: true
+  - put: redash-docker
+    params:
+      build: gitrepo
+      tag_file: gitrepo/.git/short_ref
+      tag_as_latest: true

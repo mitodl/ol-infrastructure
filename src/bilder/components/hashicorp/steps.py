@@ -1,6 +1,5 @@
 import tempfile
 from pathlib import Path
-from typing import List
 
 import httpx
 from pyinfra import host
@@ -14,7 +13,7 @@ from bilder.lib.linux_helpers import linux_family
 
 
 @deploy("Install Hashicorp Products")
-def install_hashicorp_products(hashicorp_products: List[HashicorpProduct]):
+def install_hashicorp_products(hashicorp_products: list[HashicorpProduct]):
     apt.packages(
         name="Ensure unzip is installed",
         packages=["unzip"],
@@ -92,7 +91,7 @@ def install_hashicorp_products(hashicorp_products: List[HashicorpProduct]):
 
 @deploy("Register Hashicorp Service")
 def register_services(
-    hashicorp_products: List[HashicorpProduct],
+    hashicorp_products: list[HashicorpProduct],
     start_services_immediately=True,
 ):
     for product in hashicorp_products:

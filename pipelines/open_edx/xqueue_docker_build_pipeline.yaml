@@ -1,0 +1,63 @@
+---
+resource_types:
+- name: github-release
+  type: registry-image
+  source:
+    repository: concourse/github-release-resource
+
+resources:
+- check_every: 24h
+  name: xqueue-release
+  type: github-release
+  source:
+    owner: openedx
+    repository: xqueue
+    branch: master
+    release: true
+
+- name: xqueue-image
+  type: registry-image
+  icon: docker
+  source:
+    repository: mitodl/xqueue
+    tag: latest
+    username: ((dockerhub.username))
+    password: ((dockerhub.password))
+
+- name: xqueue-dockerfile-repo
+  type: git
+  icon: github
+  source:
+    uri: https://github.com/mitodl/ol-infrastructure.git
+    branch: main
+    path: dockerfiles/openedx-xqueue/Dockerfile
+
+jobs:
+- name: build-and-push
+  plan:
+  - get: xqueue-dockerfile-repo
+  - get: xqueue-release
+    trigger: true
+
+  - task: build-xqueue-image
+    privileged: true
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: concourse/oci-build-task
+      inputs:
+      - name: xqueue-dockerfile-repo
+      - name: xqueue-release
+      outputs:
+      - name: image
+      params:
+        CONTEXT: xqueue-dockerfile-repo/dockerfiles/openedx-xqueue
+      run:
+        path: build
+        args:
+        - -t $(cat ./xqueue-release/commit_sha)
+  - put: xqueue-image
+    params:
+      image: image/image.tar

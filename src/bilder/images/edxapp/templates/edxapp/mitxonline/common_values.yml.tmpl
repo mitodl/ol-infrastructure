@@ -65,12 +65,14 @@ DATABASES:
     ATOMIC_REQUESTS: true
     CONN_MAX_AGE: 0
     NAME: edxapp
-    OPTIONS: {}
+    OPTIONS:
+      charset: utf8mb4
     <<: *mysql_creds
   read_replica:
     CONN_MAX_AGE: 0
     NAME: edxapp
-    OPTIONS: {}
+    OPTIONS:
+      charset: utf8mb4
     <<: *mysql_creds
   student_module_history:
     CONN_MAX_AGE: 0
@@ -78,7 +80,8 @@ DATABASES:
     PORT: 3306
     HOST: {{ keyOrDefault "edxapp/rds-host" "edxapp-db.service.consul" }}
     NAME: edxapp_csmh
-    OPTIONS: {}
+    OPTIONS:
+      charset: utf8mb4
     {{ with secret "mariadb-mitxonline/creds/edxapp-csmh"}}
     PASSWORD: {{ .Data.password }}
     USER: {{ .Data.username }}
@@ -334,7 +337,7 @@ LOGIN_REDIRECT_WHITELIST:  # MODIFIED
 LOG_DIR: /edx/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MARKETING_SITE_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support mitxonline-theme
-MARKETING_SITE_CHECKOUT_URL: https://{{ key "edxapp/marketing-domain" }}/cart/ # ADDED - to support mitxonline checkout
+MARKETING_SITE_CHECKOUT_URL: https://{{ key "edxapp/marketing-domain" }}/cart/add/ # ADDED - to support mitxonline checkout
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}

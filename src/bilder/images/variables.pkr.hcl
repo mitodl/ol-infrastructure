@@ -27,7 +27,7 @@ variable "business_unit" {
 variable "node_type" {
   type        = string
   default     = "server"
-  description = "The node type for the image. Available options are 'web' or 'worker' for Concourse and 'server' for Consul, Tika, Vault and vector_logr_proxy."
+  description = "The node type for the image. Available options are 'web' or 'worker' for Concourse and 'server' for Consul, Docker_baseline_ami, Tika, Vault and vector_log_proxy."
 
   validation {
     condition     = contains(["web", "worker", "server"], var.node_type)

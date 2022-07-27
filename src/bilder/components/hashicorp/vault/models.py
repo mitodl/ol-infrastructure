@@ -1,6 +1,7 @@
 import abc
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import Optional, Union
 
 from pydantic import validator
 from pydantic.types import conint
@@ -63,7 +64,7 @@ class VaultAutoAuthSink(FlexibleBaseModel):
     derive_key: bool = False
     aad: Optional[str]
     aad_env_var: Optional[str]
-    config: List[VaultAutoAuthSinkConfig]
+    config: list[VaultAutoAuthSinkConfig]
 
 
 class VaultAgentCache(FlexibleBaseModel):
@@ -131,7 +132,7 @@ class IntegratedRaftStorageBackend(FlexibleBaseModel):
     node_id: Optional[str]
     trailing_logs: Optional[int]
     snapshot_threshold: Optional[int]
-    retry_join: Optional[List[VaultRetryJoin]]
+    retry_join: Optional[list[VaultRetryJoin]]
     max_entry_size: Optional[int]
     autopilot_reconcile_interval: Optional[str]
 
@@ -154,7 +155,7 @@ class VaultStorageBackend(FlexibleBaseModel):
 
 class VaultAutoAuthConfig(FlexibleBaseModel):
     method: VaultAutoAuthMethod
-    sink: Optional[List[VaultAutoAuthSink]]
+    sink: Optional[list[VaultAutoAuthSink]]
 
 
 class VaultConnectionConfig(FlexibleBaseModel):
@@ -205,7 +206,7 @@ class ConsulServiceRegistration(FlexibleBaseModel):
     disable_registration: str = "false"
     scheme: Optional[str] = "http"
     service: Optional[str] = "vault"
-    service_tags: Optional[List[str]]
+    service_tags: Optional[list[str]]
     service_address: Optional[str] = ""
     token: Optional[str]  # Consul ACL token to authorize setting the service definition
     tls_ca_file: Optional[Path]
@@ -225,8 +226,8 @@ class VaultAgentConfig(HashicorpConfig):
     cache: Optional[VaultAgentCache] = VaultAgentCache()
     pid_file: Optional[Path]
     exit_after_auth: bool = False
-    template: Optional[List[VaultTemplate]]
-    listener: Optional[List[VaultListener]]
+    template: Optional[list[VaultTemplate]]
+    listener: Optional[list[VaultListener]]
 
     class Config:
         env_prefix = "vault_agent_"
@@ -242,13 +243,13 @@ class VaultServerConfig(HashicorpConfig):
     disable_cache: bool = False
     disable_clustering: bool = False
     disable_mlock: bool = False
-    ha_storage: Optional[List[VaultStorageBackend]]
-    listener: Optional[List[VaultListener]]
+    ha_storage: Optional[list[VaultStorageBackend]]
+    listener: Optional[list[VaultListener]]
     log_format: str = "json"
     log_level: str = "Warn"
     max_lease_ttl: Optional[str]
     plugin_directory: Optional[Path]
-    seal: Optional[List[VaultSealConfig]]
+    seal: Optional[list[VaultSealConfig]]
     service_registration: Optional[VaultServiceRegistration]
     # Set storage as optional to allow for splitting into a separate config file
     storage: Optional[VaultStorageBackend]
@@ -262,7 +263,7 @@ class VaultServerConfig(HashicorpConfig):
 class Vault(HashicorpProduct):
     _name: str = "vault"
     version: str = "1.8.0"
-    configuration: Dict[Path, HashicorpConfig] = {
+    configuration: dict[Path, HashicorpConfig] = {
         Path("vault.json"): VaultAgentConfig()
     }
     configuration_directory: Path = Path("/etc/vault/")
@@ -289,7 +290,7 @@ class Vault(HashicorpProduct):
             context_dict["configuration_file"] = list(self.configuration.keys())[0]
         return context_dict
 
-    def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
+    def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
         for fpath, config in self.configuration.items():
             yield self.configuration_directory.joinpath(fpath), config.json(
                 exclude_none=True, indent=2

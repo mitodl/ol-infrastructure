@@ -24,7 +24,7 @@ API Authentication Method:
 """
 import os
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Optional
 
 from pepper import Pepper
 from pulumi import Config, Input, Output, ResourceOptions
@@ -63,7 +63,7 @@ class OLSaltStackMinionInputs:
 
 
 class OLSaltStackMinionProvider(ResourceProvider):
-    def create(self, inputs: Dict[str, str]) -> CreateResult:
+    def create(self, inputs: dict[str, str]) -> CreateResult:
         """Register a salt minion and generate a keypair to be returned via Outputs.
 
         :param inputs: A salt client and minion ID to interact with the Salt API
@@ -88,7 +88,7 @@ class OLSaltStackMinionProvider(ResourceProvider):
         )
         return CreateResult(id_=inputs["minion_id"], outs=output)
 
-    def read(self, id_: str, properties: Dict[str, str]) -> ReadResult:
+    def read(self, id_: str, properties: dict[str, str]) -> ReadResult:
         """Retrieve the ID and public key of the target minion from the Salt API.
 
         :param id_: The minion ID
@@ -114,7 +114,7 @@ class OLSaltStackMinionProvider(ResourceProvider):
         output.update({"minion_public_key": keyinfo.get("minions", {}).get(id_)})
         return ReadResult(id_=id_, outs=output)
 
-    def delete(self, id_: str, properties: Dict[str, str]):
+    def delete(self, id_: str, properties: dict[str, str]):
         """Delete the salt minion key from the master.
 
         :param id_: The ID of the target minion

@@ -1,6 +1,7 @@
 import abc
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Optional
 
 from pydantic.fields import Field
 
@@ -16,7 +17,7 @@ class ConsulACLToken(FlexibleBaseModel):
 
 
 class ConsulACL(FlexibleBaseModel):
-    tokens: Optional[List[ConsulACLToken]]
+    tokens: Optional[list[ConsulACLToken]]
 
 
 class ConsulAddresses(FlexibleBaseModel):
@@ -29,7 +30,7 @@ class ConsulAddresses(FlexibleBaseModel):
 class ConsulDNSConfig(FlexibleBaseModel):
     allow_stale: bool = True
     node_ttl: str = "30s"
-    service_ttl: Dict[str, str] = {"*": "30s"}
+    service_ttl: dict[str, str] = {"*": "30s"}
 
 
 class ConsulServiceCheck(FlexibleBaseModel, abc.ABC):
@@ -46,8 +47,8 @@ class ConsulServiceTCPCheck(ConsulServiceCheck):
 
 class ConsulService(FlexibleBaseModel):
     id: Optional[str]
-    tags: Optional[List[str]]
-    meta: Optional[Dict[str, str]]
+    tags: Optional[list[str]]
+    meta: Optional[dict[str, str]]
     name: str
     port: Optional[int]
     address: Optional[str]
@@ -64,6 +65,7 @@ class ConsulTelemetry(FlexibleBaseModel):
 class ConsulConfig(HashicorpConfig):
     acl: Optional[ConsulACL]
     addresses: Optional[ConsulAddresses] = ConsulAddresses()
+    advertise_addr: Optional[str]
     bootstrap_expect: Optional[int]
     client_addr: Optional[str]
     data_dir: Optional[Path] = Path("/var/lib/consul/")
@@ -76,16 +78,16 @@ class ConsulConfig(HashicorpConfig):
     log_level: Optional[str] = "WARN"
     log_json: bool = True
     primary_datacenter: Optional[str]
-    recursors: Optional[List[str]] = Field(
+    recursors: Optional[list[str]] = Field(
         None,
         description="List of DNS servers to use for resolving non-consul addresses",
     )
     rejoin_after_leave: bool = True
-    retry_join: Optional[List[str]]
-    retry_join_wan: Optional[List[str]]
+    retry_join: Optional[list[str]]
+    retry_join_wan: Optional[list[str]]
     server: bool = False
     service: Optional[ConsulService]
-    services: Optional[List[ConsulService]]
+    services: Optional[list[ConsulService]]
     skip_leave_on_interrupt: bool = True
     telemetry: Optional[ConsulTelemetry]
     ui: bool = False
@@ -97,7 +99,7 @@ class ConsulConfig(HashicorpConfig):
 class Consul(HashicorpProduct):
     _name: str = "consul"
     version: str = "1.10.0"
-    configuration: Dict[Path, ConsulConfig] = {Path("00-default.json"): ConsulConfig()}
+    configuration: dict[Path, ConsulConfig] = {Path("00-default.json"): ConsulConfig()}
     configuration_directory: Path = Path("/etc/consul.d/")
     systemd_execution_type: str = "notify"
 
@@ -105,7 +107,7 @@ class Consul(HashicorpProduct):
     def systemd_template_context(self):
         return self
 
-    def render_configuration_files(self) -> Iterable[Tuple[Path, str]]:
+    def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
         for fpath, config in self.configuration.items():
             yield self.configuration_directory.joinpath(fpath), config.json(
                 exclude_none=True, indent=2, by_alias=True

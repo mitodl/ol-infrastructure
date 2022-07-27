@@ -10,7 +10,7 @@ This includes:
 import json
 from enum import Enum
 from string import Template
-from typing import Dict, List, Optional, Union
+from typing import Optional, Union
 
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_vault import Mount, aws, database, pkisecret
@@ -66,7 +66,7 @@ class OLVaultDatabaseConfig(BaseModel):
     db_host: Union[str, Output[str]]
     max_ttl: int = SIX_MONTHS
     default_ttl: int = SIX_MONTHS
-    connection_options: Optional[Dict[str, str]]
+    connection_options: Optional[dict[str, str]]
 
     class Config:
         arbitrary_types_allowed = True
@@ -83,7 +83,7 @@ class OLVaultPostgresDatabaseConfig(OLVaultDatabaseConfig):
         "postgresql://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/{db_name}"
     )
     db_type: str = DBEngines.postgres.value
-    role_statements: Dict[str, Dict[str, Template]] = postgres_role_statements
+    role_statements: dict[str, dict[str, Template]] = postgres_role_statements
 
 
 class OLVaultMysqlDatabaseConfig(OLVaultDatabaseConfig):
@@ -92,7 +92,7 @@ class OLVaultMysqlDatabaseConfig(OLVaultDatabaseConfig):
     db_port: int = DEFAULT_MYSQL_PORT
     db_connection: str = "{{{{username}}}}:{{{{password}}}}@tcp({db_host}:{db_port})/"
     db_type: str = DBEngines.mysql_rds.value
-    role_statements: Dict[str, Dict[str, Template]] = mysql_role_statements
+    role_statements: dict[str, dict[str, Template]] = mysql_role_statements
 
 
 class OLVaultMongoDatabaseConfig(OLVaultDatabaseConfig):
@@ -103,7 +103,7 @@ class OLVaultMongoDatabaseConfig(OLVaultDatabaseConfig):
         "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
     )
     db_type: str = DBEngines.mongodb.value
-    role_statements: Dict[str, Dict[str, Template]] = mongodb_role_statements
+    role_statements: dict[str, dict[str, Template]] = mongodb_role_statements
 
 
 class OLVaultDatabaseBackend(ComponentResource):
@@ -135,10 +135,17 @@ class OLVaultDatabaseBackend(ComponentResource):
         )
 
         db_option_dict = {}
+        credentials_dict = {
+            "username": db_config.db_admin_username,
+            "password": db_config.db_admin_password,
+        }
 
         if hasattr(db_config, "db_connection"):
             db_option_dict.update(
-                {"connection_url": self.format_connection_string(db_config)}
+                {
+                    "connection_url": self.format_connection_string(db_config),
+                    **credentials_dict,
+                }
             )
 
         db_option_dict.update(db_config.connection_options or {})
@@ -151,10 +158,7 @@ class OLVaultDatabaseBackend(ComponentResource):
             verify_connection=db_config.verify_connection,
             allowed_roles=sorted(db_config.role_statements.keys()),
             name=db_config.db_name,
-            data={
-                "username": db_config.db_admin_username,
-                "password": db_config.db_admin_password,
-            },
+            data=credentials_dict,
             **{db_config.db_type: db_option_dict},
         )
 
@@ -211,7 +215,7 @@ class OLVaultAWSSecretsEngineConfig(BaseModel):
     description: str
     aws_secret_key: str
     vault_backend_path: str
-    policy_documents: Dict[str, str]
+    policy_documents: dict[str, str]
     credential_type: str = "iam_user"
 
     @validator("vault_backend_path")
@@ -433,8 +437,8 @@ class OLVaultPKIIntermediateRoleConfig(BaseModel):
     key_config: VaultPKIKeyTypeBits
     max_ttl: int = SIX_MONTHS
     default_ttl: int = SIX_MONTHS
-    key_usages: List[str] = ["DigitalSignature", "KeyAgreement", "KeyEncipherment"]
-    allowed_domains: List[str]
+    key_usages: list[str] = ["DigitalSignature", "KeyAgreement", "KeyEncipherment"]
+    allowed_domains: list[str]
     cert_type: str  # Should be client or server
 
     @validator("cert_type")

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 
 from pulumi import Output
 from pydantic import BaseModel, PositiveInt
@@ -29,7 +29,7 @@ class OLFargateTaskDefinitionConfig(BaseModel):
     # Memory allotment for task definition
     memory_mib: PositiveInt = PositiveInt(HALF_GIGABYTE_MB)
     # List of container definitions that will be attached to task
-    container_definition_configs: List[OLFargateContainerDefinitionConfig]
+    container_definition_configs: list[OLFargateContainerDefinitionConfig]
 
     class Config:
         arbitrary_types_allowed = True

@@ -71,12 +71,14 @@ DATABASES:
     ATOMIC_REQUESTS: true
     CONN_MAX_AGE: 0
     NAME: edxapp
-    OPTIONS: {}
+    OPTIONS:
+      charset: utf8mb4
     <<: *mysql_creds
   read_replica:
     CONN_MAX_AGE: 0
     NAME: edxapp
-    OPTIONS: {}
+    OPTIONS:
+      charset: utf8mb4
     <<: *mysql_creds
   student_module_history:
     CONN_MAX_AGE: 0
@@ -84,7 +86,8 @@ DATABASES:
     PORT: 3306
     HOST: {{ keyOrDefault "edxapp/rds-host" "edxapp-db.service.consul" }}
     NAME: edxapp_csmh
-    OPTIONS: {}
+    OPTIONS:
+      charset: utf8mb4
     {{ with secret "mariadb-mitx/creds/edxapp-csmh"}}
     PASSWORD: {{ .Data.password }}
     USER: {{ .Data.username }}
@@ -285,7 +288,7 @@ FEATURES:
     ENABLE_GIT_AUTO_EXPORT: true  # ADDED KEY
     ENABLE_GRADE_DOWNLOADS: true
     ENABLE_INSTRUCTOR_ANALYTICS: false
-    ENABLE_LTI_PROVIDER: false
+    ENABLE_LTI_PROVIDER: true  # MODIFIED
     ENABLE_MKTG_SITE: false
     ENABLE_MOBILE_REST_API: true
     ENABLE_OAUTH2_PROVIDER: true

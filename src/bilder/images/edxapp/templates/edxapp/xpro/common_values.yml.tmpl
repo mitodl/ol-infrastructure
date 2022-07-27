@@ -68,12 +68,14 @@ DATABASES:
     ATOMIC_REQUESTS: true
     CONN_MAX_AGE: 0
     NAME: edxapp
-    OPTIONS: {}
+    OPTIONS:
+      charset: utf8mb4
     <<: *mysql_creds
   read_replica:
     CONN_MAX_AGE: 0
     NAME: edxapp
-    OPTIONS: {}
+    OPTIONS:
+      charset: utf8mb4
     <<: *mysql_creds
   student_module_history:
     CONN_MAX_AGE: 0
@@ -81,7 +83,8 @@ DATABASES:
     PORT: 3306
     HOST: {{ keyOrDefault "edxapp/rds-host" "edxapp-db.service.consul" }}
     NAME: edxapp_csmh
-    OPTIONS: {}
+    OPTIONS:
+      charset: utf8mb4
     {{ with secret "mariadb-xpro/creds/edxapp-csmh"}}
     PASSWORD: {{ .Data.password }}
     USER: {{ .Data.username }}

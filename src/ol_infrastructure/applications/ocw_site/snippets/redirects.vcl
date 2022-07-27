@@ -60,3 +60,9 @@ if (req.url.path ~ "/index.htm$") {
   set req.http.remove_index_htm = regsub(req.url.path, "/index.htm", "/");
   error 605 "redirect";
 }
+
+# OCW Legacy /high-school/ to zendesk article
+if (req.url.path ~ "(^/high-school*)") {
+  set req.http.high_school_to_article = "https://mitocw.zendesk.com/hc/en-us/articles/5332864282907";
+  error 606 "redirect";
+}

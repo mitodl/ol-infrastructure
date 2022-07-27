@@ -75,6 +75,7 @@ jobs:
   plan:
   - get: vault-ami
     trigger: false
+    passed: [deploy-vault-ci]
   - get: pulumi_files
   - task: set-aws-creds
     config:
@@ -110,6 +111,7 @@ jobs:
   plan:
   - get: vault-ami
     trigger: false
+    passed: [deploy-vault-qa]
   - get: pulumi_files
   - task: set-aws-creds
     config:

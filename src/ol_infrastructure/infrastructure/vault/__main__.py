@@ -15,7 +15,7 @@ import base64
 import json
 import textwrap
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import pulumi_tls as tls
 import yaml
@@ -93,7 +93,7 @@ vault_ami = ec2.get_ami(
 #######################
 
 
-def vault_policy_document(vault_key_arn) -> Dict[str, Any]:
+def vault_policy_document(vault_key_arn) -> dict[str, Any]:
     return {
         "Version": IAM_POLICY_VERSION,
         "Statement": [

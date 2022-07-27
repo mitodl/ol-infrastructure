@@ -1,6 +1,5 @@
 from collections import defaultdict
 from functools import lru_cache
-from typing import Dict, List
 
 import boto3
 
@@ -8,7 +7,7 @@ cache_client = boto3.client("elasticache")
 
 
 @lru_cache
-def cache_engines() -> Dict[str, List[str]]:
+def cache_engines() -> dict[str, list[str]]:
     """Generate a list of cache engines and their currently available versions on Elasticache.
 
     :returns: Dictionary of engine names and the list of available versions

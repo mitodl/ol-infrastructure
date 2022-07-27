@@ -22,7 +22,7 @@ transforms:
     - 'add_hostname_to_concourse_metrics'
     source: |
       ## Any metrics that match these prefixes or names will be dropped entirely
-      abort_name_match, err = match_any(.name, [r'^prom.*', r'^process.*', r'go_.*', r'concourse_builds_duration_seconds', r'concourse_http_responses_duration_seconds', r'concourse_steps_wait_duration'])
+      abort_name_match, err = match_any(.name, [r'^prom.*', r'^process.*', r'go_.*', r'concourse_builds_duration_seconds', r'concourse_http_responses_duration_seconds', r'concourse_steps_wait_duration', r'concourse_jobs_schedulingDuration.*'])
       if abort_name_match {
         abort
       }

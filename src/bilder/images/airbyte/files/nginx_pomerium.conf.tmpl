@@ -1,0 +1,42 @@
+{{with secret "secret-airbyte/pomerium" }}
+# Pomerium endpoint
+server {
+    listen 443 ssl;
+    server_name  {{ .Data.authenticate_server_address }} {{ .Data.application_address }};
+    ssl_certificate /etc/nginx/nginx.pem;
+    ssl_certificate_key /etc/nginx/nginx-key.pem;
+
+    location / {
+      proxy_pass https://pomerium;
+      include /etc/nginx/proxy.conf;
+    }
+}
+
+# Define an upstream so that we don't need resolvers when we use variables in proxy_pass directives
+# https://stackoverflow.com/questions/17685674/nginx-proxy-pass-with-remote-addr
+upstream pomerium {
+    server pomerium:443;
+}
+
+# This is a VPC local bypass of the pomerium authentication that goes directly to the airbyte app.
+# This is for Dagster since dagster can't login with github ...
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name airbyte.service.consul;
+    ssl_certificate /etc/nginx/nginx.pem;
+    ssl_certificate_key /etc/nginx/nginx-key.pem;
+
+    auth_basic "Dagster bypass";
+    auth_basic_user_file /etc/nginx/htpasswd;
+
+    location / {
+      proxy_pass http://webapp;
+      include /etc/nginx/proxy.conf;
+    }
+}
+
+upstream webapp {
+    server webapp:80;
+}
+{{ end }}
