@@ -1,6 +1,0 @@
----
-name: ol-infrastructure-mongodb
-runtime: python
-description: Manage deployment of Mongodb clusters
-backend:
-  url: s3://mitol-pulumi-state/
