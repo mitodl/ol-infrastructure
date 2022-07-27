@@ -34,7 +34,7 @@ path "secret-odl-video/*" {
 # Mainly a safe way to share secrets with others
 
 path "secret/mitodl/*" {
-  capabilities = ["read", "write", "update", "delete", "list"]
+  capabilities = ["create", "read", "update", "delete", "list"]
 }
 
 # Read AWS iAM creds
