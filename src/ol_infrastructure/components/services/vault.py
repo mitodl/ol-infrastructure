@@ -1,8 +1,8 @@
 """
-This module controls mounting and configuration of database secret backends in Vault.
+This module controls mounting and configuration of secret backends in Vault.
 
 This includes:
-- Mount a database backend at the configured mount point
+- Mount a backend at the configured mount point
 - Set the configuration according to the requirements of the backend type
 - Control the lease TTL settings
 - Define the base set of roles according to our established best practices
@@ -20,6 +20,8 @@ from bridge.lib.magic_numbers import (
     DEFAULT_MONGODB_PORT,
     DEFAULT_MYSQL_PORT,
     DEFAULT_POSTGRES_PORT,
+    SIX_MONTHS,
+    TWELVE_MONTHS,
 )
 from ol_infrastructure.lib.vault import (
     VaultPKIKeyTypeBits,
@@ -28,8 +30,6 @@ from ol_infrastructure.lib.vault import (
     postgres_role_statements,
 )
 
-SIX_MONTHS = 60 * 60 * 24 * 30 * 6
-TWELVE_MONTHS = 60 * 60 * 24 * 30 * 12
 VAULT_API_URL = "https://active.vault.service.consul/v1"
 
 CERTIFICATE_CONFIG = {
