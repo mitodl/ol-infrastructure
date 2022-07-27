@@ -3,7 +3,7 @@ from pathlib import Path
 from pulumi import Config
 from pulumi_vault import AuthBackend, AuthBackendTuneArgs, Policy, aws, github
 
-from bridge.lib.magic_numbers import ONE_MONTH_SECONDS, SIX_MONTHS
+from bridge.lib.magic_numbers import ONE_MONTH_SECONDS
 from ol_infrastructure.lib.ol_types import Environment
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -47,7 +47,7 @@ vault_github_auth = github.AuthBackend(
     description="GitHub Auth mount in a Vault server",
     token_no_default_policy=True,
     token_ttl=ONE_MONTH_SECONDS,
-    token_max_ttl=SIX_MONTHS,
+    token_max_ttl=ONE_MONTH_SECONDS * 6,
 )
 
 if stack_info.env_suffix != "production":
