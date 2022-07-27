@@ -1,12 +1,12 @@
 ---
 secretsprovider: awskms://alias/PulumiSecrets
-encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQE2j0ywVkTLd2TWR1urE93aAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMUFOr0DE+ZcuZaKBUAgEQgDu9MjEbeZf+K8MTgA70lODRexLnDxPJpo2ekf5J4N+7ymOdW4S5aoPgT68VH3nm7CgPoB+vaME3zb9Sdg==  # pragma: allowlist secret
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQE2j0ywVkTLd2TWR1urE93aAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMUFOr0DE+ZcuZaKBUAgEQgDu9MjEbeZf+K8MTgA70lODRexLnDxPJpo2ekf5J4N+7ymOdW4S5aoPgT68VH3nm7CgPoB+vaME3zb9Sdg==
 config:
   aws:region: us-east-1
   elasticsearch:ami_id: ami-0e0161137b4b30900
-  elasticsearch:public_web: 'true'
+  elasticsearch:disk_size: "100"
   elasticsearch:instance_type: general_purpose_large
-  elasticsearch:disk_size: 100
+  elasticsearch:public_web: "true"
   environment:business_unit: operations
   environment:vpc_reference: applications_vpc
   saltstack:environment_name: production-apps

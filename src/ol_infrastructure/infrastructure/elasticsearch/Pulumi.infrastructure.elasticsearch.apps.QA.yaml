@@ -1,11 +1,11 @@
 ---
 secretsprovider: awskms://alias/PulumiSecrets
-encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEu7beEzqLpChx5wk9wJpB7AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMqrYirXPsIRbMicMKAgEQgDsX2PIk95/I9rIh25m03ITmTfxDOfpd7pHlJDnsCOCMqsO2iCMi/NPqxNCQIhh8b//yB1+drZRSyLj1Cg==  # pragma: allowlist secret
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEu7beEzqLpChx5wk9wJpB7AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMqrYirXPsIRbMicMKAgEQgDsX2PIk95/I9rIh25m03ITmTfxDOfpd7pHlJDnsCOCMqsO2iCMi/NPqxNCQIhh8b//yB1+drZRSyLj1Cg==
 config:
   aws:region: us-east-1
   elasticsearch:ami_id: ami-0adb6517915458bdb
-  elasticsearch:disk_size: '100'
-  elasticsearch:public_web: 'true'
+  elasticsearch:disk_size: "100"
+  elasticsearch:public_web: "true"
   environment:business_unit: operations
   environment:vpc_reference: applications_vpc
   saltstack:environment_name: rc-apps
