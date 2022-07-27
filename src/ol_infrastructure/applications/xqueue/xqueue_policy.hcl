@@ -1,4 +1,4 @@
-path "secret-DEPLOYMENT/creds/xqueue" {
+path "mariadb-DEPLOYMENT/creds/xqueue" {
   capabilities = ["read"]
 }
 

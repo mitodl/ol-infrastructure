@@ -94,6 +94,7 @@ xqueue_vault_policy = vault.Policy(
     .read_text()
     .replace("DEPLOYMENT", f"{stack_info.env_prefix}"),
 )
+
 # Register edX Platform AMI for Vault AWS auth
 aws_vault_backend = f"aws-{stack_info.env_prefix}"
 iam.RolePolicyAttachment(
