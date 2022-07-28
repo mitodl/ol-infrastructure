@@ -15,7 +15,7 @@ DOCKER_COMPOSE_VERSION = os.environ.get(
 def download_docker_compose():
     files.download(
         name="Download the Docker repo file",
-        src=f"https://github.com/docker/compose/releases/download/v{DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64",
+        src=f"https://github.com/docker/compose/releases/download/{DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64",
         dest="/usr/local/bin/docker-compose",
         mode="755",
     )

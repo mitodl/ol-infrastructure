@@ -37,13 +37,12 @@ VERSIONS = {
     ),
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
-VECTOR_INSTALL_NAME = "vector-log"
 
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
 
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
-vector_config = VectorConfig(is_proxy=False)
+vector_config = VectorConfig(is_proxy=False, is_docker=True)
 
 vault_config = VaultAgentConfig(
     cache=VaultAgentCache(use_auto_auth_token="force"),
@@ -69,19 +68,18 @@ consul_template_config = ConsulTemplate()
 hashicorp_products = [vault, consul, consul_template_config]
 install_hashicorp_products(hashicorp_products)
 
+deploy_docker()
+deploy_docker_compose()
 
-# # Install vector
-# vector_config.configuration_templates[
-#     TEMPLATES_DIRECTORY.joinpath("vector", "vector-log-proxy.yaml.j2")
-# ] = {}
+# Install vector
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "docker_logs.yaml.j2")
+] = {}
 
 install_vector(vector_config)
 vault_template_permissions(vault_config)
 configure_vector(vector_config)
 vector_service(vector_config)
-
-deploy_docker()
-deploy_docker_compose()
 
 if host.get_fact(HasSystemd):
     server.service(

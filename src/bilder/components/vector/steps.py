@@ -55,6 +55,12 @@ def install_vector(vector_config: VectorConfig):
             user=vector_config.user,
             present=True,
         )
+    # Make sure you install vector AFTER installing docker when applicable.
+    if vector_config.is_docker:
+        server.shell(
+            name="Add vector user to docker group",
+            commands=[f"/usr/bin/gpasswd -a {vector_config.user} docker"],
+        )
 
 
 @deploy("Configure Vector")
@@ -85,6 +91,7 @@ def configure_vector(vector_config: VectorConfig):
             "HOSTNAME": "placeholder",
             "HEROKU_PROXY_PASSWORD": "placeholder",  # pragma: allowlist secret
             "HEROKU_PROXY_USERNAME": "placeholder",
+            "APPLICATION": "placeholder",
         },
     )
 
