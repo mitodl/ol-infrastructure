@@ -1,0 +1,48 @@
+---
+sources:
+  collect_docker_logs:
+    type: docker_logs
+
+transforms:
+  parse_docker_logs:
+    type: remap
+    inputs:
+    - 'collect_docker_logs'
+    source: |
+      event, err = parse_json(.message)
+      if event != null {
+        del(.message)
+        .,err = merge(., event)
+        .@timestamp = .time
+      }
+      event2, err = parse_json(.label)
+      if event2 != null {
+        del(.label)
+        .,err = merge(., event2)
+      }
+      .environment = "${ENVIRONMENT}"
+
+  enrich_docker_logs:
+    type: aws_ec2_metadata
+    inputs:
+    - 'parse_docker_logs'
+    namespace: ec2
+
+
+sinks:
+  ship_docker_logs_to_grafana_cloud:
+    inputs:
+    - 'enrich_docker_logs'
+    type: loki
+    auth:
+      strategy: basic
+      password: ${GRAFANA_CLOUD_API_KEY}
+      user: "${GRAFANA_CLOUD_LOKI_API_USER}"
+    endpoint: https://logs-prod-us-central1.grafana.net
+    encoding:
+      codec: json
+    labels:
+      environment: ${ENVIRONMENT}
+      application: ${APPLICATION}
+      service: docker
+    out_of_order_action: rewrite_timestamp
