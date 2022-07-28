@@ -1,5 +1,16 @@
 # Github MITODL org developer permissions on QA environment
 
+path "sys/capabilities-self"
+{
+  capabilities = ["read", "update"]
+}
+
+# List
+path "secret-*/*"
+{
+  capabilities = ["list"]
+}
+
 # Read app secrets
 path "secret-bootcamps/*"
 {
@@ -33,31 +44,39 @@ path "secret-odl-video/*" {
 # Read/Write/Delete/List generic secrets
 # Mainly a safe way to share secrets with others
 
+path "secret/*" {
+  capabilities = ["list"]
+}
+
 path "secret/mitodl/*" {
   capabilities = ["create", "read", "update", "delete", "list"]
 }
 
 # Read AWS iAM creds
-path "aws-mitx/mit-open-application-*" {
-  capabilities = ["read"]
+path "aws-mitx/*" {
+  capabilities = ["list"]
 }
 
-path "aws-mitx/mitxonline*" {
-  capabilities = ["read"]
+path "aws-mitx/creds/mit-open-application-*" {
+  capabilities = ["read", "list"]
 }
 
-path "aws-mitx/ocw-studio-app-*" {
-  capabilities = ["read"]
+path "aws-mitx/creds/mitxonline*" {
+  capabilities = ["read", "list"]
 }
 
-path "aws-mitx/odl-video-service-*" {
-  capabilities = ["read"]
+path "aws-mitx/creds/ocw-studio-app-*" {
+  capabilities = ["read", "list"]
 }
 
-path "aws-mitx/read-write-delete-ol-bootcamps-app-*" {
-  capabilities = ["read"]
+path "aws-mitx/creds/odl-video-service-*" {
+  capabilities = ["read", "list"]
 }
 
-path "aws-mitx/read-write-delete-xpro-app-*" {
-  capabilities = ["read"]
+path "aws-mitx/creds/read-write-delete-ol-bootcamps-app-*" {
+  capabilities = ["read", "list"]
+}
+
+path "aws-mitx/creds/read-write-delete-xpro-app-*" {
+  capabilities = ["read", "list"]
 }

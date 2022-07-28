@@ -60,16 +60,16 @@ if stack_info.env_suffix != "production":
             software_engineer_policy = Policy(
                 "github-auth-software-engineer", policy=software_engineer_policy_file
             )
-            for team in ["odl-engineering", "arbisoft-contractors"]:
+            for team in ["vault-developer-access"]:
                 vault_github_auth_team = github.Team(
                     f"vault-github-auth-{team}",
                     team=team,
-                    policies=["software-engineer"],
+                    policies=[software_engineer_policy],
                 )
         if "admin.hcl" in hcl_file.name:
             devops_policy_file = open(hcl_file).read()
             devops_policy = Policy("github-auth-devops", policy=devops_policy_file)
-            for team in ["devops"]:
+            for team in ["vault-devops-access"]:
                 vault_github_auth_team = github.Team(
-                    f"vault-github-auth-{team}", team=team, policies=["admin"]
+                    f"vault-github-auth-{team}", team=team, policies=[devops_policy]
                 )
