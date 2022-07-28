@@ -42,22 +42,6 @@ services:
     - DATABASE_USER=${DATABASE_USER}
     - LOG_LEVEL=${LOG_LEVEL}
     - RUN_DATABASE_MIGRATION_ON_STARTUP=${RUN_DATABASE_MIGRATION_ON_STARTUP}
-  db:
-    image: airbyte/db:${VERSION}
-    logging: *default-logging
-    container_name: airbyte-db
-    restart: unless-stopped
-    environment:
-    - CONFIG_DATABASE_PASSWORD=${CONFIG_DATABASE_PASSWORD:-}
-    - CONFIG_DATABASE_URL=${CONFIG_DATABASE_URL:-}
-    - CONFIG_DATABASE_USER=${CONFIG_DATABASE_USER:-}
-    - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-    - DATABASE_URL=${DATABASE_URL}
-    - DATABASE_USER=${DATABASE_USER}
-    - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
-    - POSTGRES_USER=${DATABASE_USER}
-    volumes:
-    - db:/var/lib/postgresql/data
   worker:
     image: airbyte/worker:${VERSION}
     logging: *default-logging
