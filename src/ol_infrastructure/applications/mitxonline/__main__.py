@@ -21,7 +21,9 @@ from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
+from ol_infrastructure.lib.vault import setup_vault_provider
 
+setup_vault_provider()
 mitxonline_config = Config("mitxonline")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")

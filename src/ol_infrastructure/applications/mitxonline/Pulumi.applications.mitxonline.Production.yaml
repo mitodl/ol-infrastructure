@@ -11,3 +11,5 @@ config:
     secure: v1:1SGxkH66kKNXMVc0:P9FztYdyzfxIrapGHU3pD5gz9ZkW6Of/zTqhaZf4O+L+Y8yAbcissYxogKfyDMxSJYSSUxI12K0=
   mitxonline:domain: mitxonline.mit.edu
   mitxonline:proctortrack_url: https://testing.verificient.com
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
