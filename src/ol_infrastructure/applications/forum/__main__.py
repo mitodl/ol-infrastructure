@@ -107,7 +107,7 @@ forum_server_instance_profile = iam.InstanceProfile(
 )
 forum_app_vault_auth_role = vault.aws.AuthBackendRole(
     "forum-web-ami-ec2-vault-auth",
-    backend="aws",
+    backend=aws_vault_backend,
     auth_type="iam",
     role="forum-server",
     inferred_entity_type="ec2_instance",

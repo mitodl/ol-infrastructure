@@ -124,7 +124,7 @@ vault_config = VaultAgentConfig(
     auto_auth=VaultAutoAuthConfig(
         method=VaultAutoAuthMethod(
             type="aws",
-            mount_path="auth/aws",
+            mount_path=f"auth/aws-{DEPLOYMENT}",
             config=VaultAutoAuthAWS(role="forum-server"),
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
