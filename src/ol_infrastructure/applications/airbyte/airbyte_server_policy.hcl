@@ -11,13 +11,17 @@ path "postgres-airbyte/creds/admin" {
 }
 
 path "secret-airbyte/" {
-  capabilities = ["read"]
+  capabilities = ["read", "create", "patch", "delete", "list", "update"]
 }
 
 path "secret-airbyte/*" {
-  capabilities = ["read"]
+  capabilities = ["read", "create", "patch", "delete", "list", "update"]
 }
 
 path "sys/leases/renew" {
+  capabilities = ["update"]
+}
+
+path "auth/token/create" {
   capabilities = ["update"]
 }
