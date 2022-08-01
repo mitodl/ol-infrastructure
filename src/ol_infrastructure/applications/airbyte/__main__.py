@@ -313,11 +313,14 @@ connection_string = Output.all(address=db_address, port=db_port, name=db_name).a
 consul.Keys(
     "airbyte-consul-template-data",
     keys=[
-        consul.KeysKeyArgs(path=f"airbyte/database-host", value=db_address),
-        consul.KeysKeyArgs(path=f"airbyte/database-port", value=db_port),
-        consul.KeysKeyArgs(path=f"airbyte/database-name", value=db_name),
+        consul.KeysKeyArgs(path="airbyte/database-host", value=db_address),
+        consul.KeysKeyArgs(path="airbyte/database-port", value=db_port),
+        consul.KeysKeyArgs(path="airbyte/database-name", value=db_name),
         consul.KeysKeyArgs(
             path=f"airbyte/database-connection-string", value=connection_string
+        ),
+        consul.KeysKeyArgs(
+            path="airbyte/vault-address", value=f"{Config('vault').get('address')}/"
         ),
     ],
     opts=consul_provider,

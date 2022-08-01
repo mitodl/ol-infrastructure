@@ -23,6 +23,8 @@ services:
     container_name: init
     command: /bin/sh -c "./scripts/create_mount_directories.sh /local_parent ${HACK_LOCAL_ROOT_PARENT}
       ${LOCAL_ROOT}"
+    env_file:
+    - ./.env
     environment:
     - LOCAL_ROOT=${LOCAL_ROOT}
     - HACK_LOCAL_ROOT_PARENT=${HACK_LOCAL_ROOT_PARENT}
@@ -32,6 +34,8 @@ services:
     image: airbyte/bootloader:${VERSION}
     logging: *default-logging
     container_name: airbyte-bootloader
+    env_file:
+    - ./.env
     environment:
     - AIRBYTE_VERSION=${VERSION}
     - CONFIG_DATABASE_PASSWORD=${CONFIG_DATABASE_PASSWORD:-}
@@ -47,6 +51,8 @@ services:
     logging: *default-logging
     container_name: airbyte-worker
     restart: unless-stopped
+    env_file:
+    - ./.env
     environment:
     - AIRBYTE_VERSION=${VERSION}
     - AUTO_DISABLE_FAILING_CONNECTIONS=${AUTO_DISABLE_FAILING_CONNECTIONS}
@@ -97,6 +103,8 @@ services:
     logging: *default-logging
     container_name: airbyte-server
     restart: unless-stopped
+    env_file:
+    - ./.env
     environment:
     - AIRBYTE_ROLE=${AIRBYTE_ROLE:-}
     - AIRBYTE_VERSION=${VERSION}
@@ -134,6 +142,8 @@ services:
     restart: unless-stopped
     ports:
     - 8000:80
+    env_file:
+    - ./.env
     environment:
     - AIRBYTE_ROLE=${AIRBYTE_ROLE:-}
     - AIRBYTE_VERSION=${VERSION}
@@ -151,6 +161,8 @@ services:
     restart: unless-stopped
     ports:
     - 7233:7233
+    env_file:
+    - ./.env
     environment:
     - DB=postgresql
     - DB_PORT=${DATABASE_PORT}
