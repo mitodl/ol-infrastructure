@@ -1301,6 +1301,9 @@ edxapp_fastly_service = fastly.ServiceVcl(
             ssl_cert_hostname=edxapp_domains["lms"],
             ssl_sni_hostname=edxapp_domains["lms"],
             use_ssl=True,
+            # Increase the timeout to account for slow API responses
+            first_byte_timeout=60000,  # noqa: WPS432
+            between_bytes_timeout=15000,  # noqa: WPS432
         ),
     ],
     cache_settings=[
