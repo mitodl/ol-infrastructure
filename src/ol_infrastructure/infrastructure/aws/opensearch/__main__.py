@@ -19,10 +19,16 @@ SEARCH_DOMAIN_NAME_MAX_LENGTH = 28
 search_config = pulumi.Config("opensearch")
 env_config = pulumi.Config("environment")
 stack_info = parse_stack()
+
+if stack_info.env_prefix == "open":
+    consul_stack = pulumi.StackReference(
+        f"infrastructure.consul.apps.{stack_info.name}"
+    )
+else:
+    consul_stack = pulumi.StackReference(
+        f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
+    )
 network_stack = pulumi.StackReference(f"infrastructure.aws.network.{stack_info.name}")
-consul_stack = pulumi.StackReference(
-    f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
-)
 vault_stack = pulumi.StackReference(
     f"infrastructure.vault.operations.{stack_info.name}"
 )
