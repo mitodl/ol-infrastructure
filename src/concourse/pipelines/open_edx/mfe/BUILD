@@ -3,8 +3,6 @@ pex_binary(
     entry_point="meta.py",
 )
 
-python_sources()
-
 pex_binary(
     name="pipeline",
     entry_point="pipeline.py",

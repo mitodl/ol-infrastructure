@@ -11,7 +11,7 @@ backend_packages = [
   'pants.backend.shell.lint.shellcheck',
   'pants.backend.shell.lint.shfmt',
 ]
-pants_ignore = ['copier_templates/*', 'edx_configs/*',]
+pants_ignore = ['copier_templates/*']
 
 [source]
 root_patterns = ['src/', 'tests/']
