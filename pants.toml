@@ -2,6 +2,7 @@
 pants_version = "2.12.0"
 backend_packages = [
   'pants.backend.docker.lint.hadolint',
+  'pants.backend.experimental.python',
   'pants.backend.python',
   'pants.backend.python.lint.black',
   'pants.backend.python.lint.flake8',
@@ -26,3 +27,6 @@ config = 'setup.cfg'
 [anonymous-telemetry]
 enabled = true
 repo_id = 'e270ade3-30ce-4252-b559-259daf6042b4'
+
+[twine]
+args = '--skip-existing'

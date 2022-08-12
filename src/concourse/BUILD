@@ -13,4 +13,5 @@ python_distribution(
         name="ol-concourse",
         version="0.1.0",
     ),
+    repositories=["@pypi"]
 )
