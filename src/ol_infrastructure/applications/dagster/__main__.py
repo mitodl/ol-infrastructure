@@ -445,7 +445,7 @@ consul.Keys(
         ),
         consul.KeysKeyArgs(
             path="edx-pipeline/xpro-edx/mysql-db/hostname",
-            value=xpro_stack.require_output("xpro_edxapp")["mariadb"],
+            value=xpro_stack.require_output("edxapp")["mariadb"],
         ),
         consul.KeysKeyArgs(
             path="edx-pipeline/xpro-edx/mongodb-forum/uri",
