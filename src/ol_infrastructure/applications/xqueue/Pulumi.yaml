@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-xqueue-server
+runtime: python
+description: Manage deployment of a xqueue server
+backend:
+  url: s3://mitol-pulumi-state/

@@ -1,4 +1,4 @@
-"""Create the resources needed to run a forum server.
+"""Create the resources needed to run a xqueue server.
 """
 import base64
 import json
@@ -10,7 +10,7 @@ import yaml
 from pulumi import Config, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam
 
-from bridge.lib.magic_numbers import FORUM_SERVICE_PORT
+from bridge.lib.magic_numbers import XQUEUE_SERVICE_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
@@ -26,9 +26,10 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
-forum_config = Config("forum")
+xqueue_config = Config("xqueue")
 if Config("vault").get("address"):
     setup_vault_provider()
+
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
@@ -42,14 +43,14 @@ edxapp = StackReference(
 )
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
-target_vpc_name = forum_config.get("target_vpc")
+target_vpc_name = xqueue_config.get("target_vpc")
 target_vpc = network_stack.require_output(target_vpc_name)
 
 aws_account = get_caller_identity()
 vpc_id = target_vpc["id"]
-forum_server_ami = ec2.get_ami(
+xqueue_server_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["open-edx-forum-server-*"]),
+        ec2.GetAmiFilterArgs(name="name", values=["open-edx-xqueue-server-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
     ],
@@ -58,19 +59,19 @@ forum_server_ami = ec2.get_ami(
 )
 aws_config = AWSBase(
     tags={
-        "OU": forum_config.require("business_unit"),
+        "OU": xqueue_config.require("business_unit"),
         "Environment": env_name,
-        "Application": "open-edx-forum",
+        "Application": "open-edx-xqueue",
         "Owner": "platform-engineering",
     }
 )
-forum_server_tag = f"open-edx-forum-server-{env_name}"
+xqueue_server_tag = f"open-edx-xqueue-server-{env_name}"
 consul_security_groups = consul_stack.require_output("security_groups")
 consul_provider = get_consul_provider(stack_info)
 
 # IAM and instance profile
-forum_server_instance_role = iam.Role(
-    f"forum-server-instance-role-{env_name}",
+xqueue_server_instance_role = iam.Role(
+    f"xqueue-server-instance-role-{env_name}",
     assume_role_policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -81,42 +82,43 @@ forum_server_instance_role = iam.Role(
             },
         }
     ),
-    path=f"/ol-applications/open-edx-forum/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    path=f"/ol-applications/open-edx-xqueue/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     tags=aws_config.tags,
 )
 # Vault policy definition
-forum_vault_policy = vault.Policy(
-    "open-edx-forum-server-vault-policy",
-    name=f"forum-{stack_info.env_prefix}",
+xqueue_vault_policy = vault.Policy(
+    "open-edx-xqueue-server-vault-policy",
+    name=f"xqueue-{stack_info.env_prefix}",
     policy=Path(__file__)
-    .parent.joinpath("forum_policy.hcl")
+    .parent.joinpath("xqueue_policy.hcl")
     .read_text()
     .replace("DEPLOYMENT", f"{stack_info.env_prefix}"),
 )
+
 # Register edX Platform AMI for Vault AWS auth
 aws_vault_backend = f"aws-{stack_info.env_prefix}"
 iam.RolePolicyAttachment(
-    f"forum-server-describe-instance-role-policy-{env_name}",
+    f"xqueue-server-describe-instance-role-policy-{env_name}",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
-    role=forum_server_instance_role.name,
+    role=xqueue_server_instance_role.name,
 )
-forum_server_instance_profile = iam.InstanceProfile(
-    f"open-edx-forum-server-instance-profile-{env_name}",
-    role=forum_server_instance_role.name,
-    path="/ol-infrastructure/open-edx-forum-server/profile/",
+xqueue_server_instance_profile = iam.InstanceProfile(
+    f"open-edx-xqueue-server-instance-profile-{env_name}",
+    role=xqueue_server_instance_role.name,
+    path="/ol-infrastructure/open-edx-xqueue-server/profile/",
 )
-forum_app_vault_auth_role = vault.aws.AuthBackendRole(
-    "forum-web-ami-ec2-vault-auth",
+xqueue_app_vault_auth_role = vault.aws.AuthBackendRole(
+    "xqueue-web-ami-ec2-vault-auth",
     backend=aws_vault_backend,
     auth_type="iam",
-    role="forum-server",
+    role="xqueue-server",
     inferred_entity_type="ec2_instance",
     inferred_aws_region=aws_config.region,
-    bound_iam_instance_profile_arns=[forum_server_instance_profile.arn],
-    bound_ami_ids=[forum_server_ami.id],
+    bound_iam_instance_profile_arns=[xqueue_server_instance_profile.arn],
+    bound_ami_ids=[xqueue_server_ami.id],
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[vpc_id],
-    token_policies=[forum_vault_policy.name],
+    token_policies=[xqueue_vault_policy.name],
 )
 consul_datacenter = consul_stack.require_output("datacenter")
 grafana_credentials = read_yaml_secrets(
@@ -126,24 +128,24 @@ block_device_mappings = [BlockDeviceMapping()]
 tag_specs = [
     TagSpecification(
         resource_type="instance",
-        tags=aws_config.merged_tags({"Name": forum_server_tag}),
+        tags=aws_config.merged_tags({"Name": xqueue_server_tag}),
     ),
     TagSpecification(
         resource_type="volume",
-        tags=aws_config.merged_tags({"Name": forum_server_tag}),
+        tags=aws_config.merged_tags({"Name": xqueue_server_tag}),
     ),
 ]
-forum_server_security_group = ec2.SecurityGroup(
-    f"forum-server-security-group-{env_name}",
-    name=f"forum-server-{target_vpc_name}-{env_name}",
-    description="Access control for forum servers",
+xqueue_server_security_group = ec2.SecurityGroup(
+    f"xqueue-server-security-group-{env_name}",
+    name=f"xqueue-server-{target_vpc_name}-{env_name}",
+    description="Access control for xqueue servers",
     ingress=[
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
-            from_port=FORUM_SERVICE_PORT,
-            to_port=FORUM_SERVICE_PORT,
+            from_port=XQUEUE_SERVICE_PORT,
+            to_port=XQUEUE_SERVICE_PORT,
             security_groups=[edxapp.get_output("edxapp_security_group")],
-            description=f"Allow traffic to the forum server on port {FORUM_SERVICE_PORT}",
+            description=f"Allow traffic to the xqueue server on port {XQUEUE_SERVICE_PORT}",
         ),
     ],
     egress=default_egress_args,
@@ -151,14 +153,14 @@ forum_server_security_group = ec2.SecurityGroup(
 )
 lt_config = OLLaunchTemplateConfig(
     block_device_mappings=block_device_mappings,
-    image_id=forum_server_ami.id,
-    instance_type=forum_config.get("instance_type") or InstanceTypes.burstable_medium,
-    instance_profile_arn=forum_server_instance_profile.arn,
+    image_id=xqueue_server_ami.id,
+    instance_type=xqueue_config.get("instance_type") or InstanceTypes.burstable_medium,
+    instance_profile_arn=xqueue_server_instance_profile.arn,
     security_groups=[
-        forum_server_security_group,
+        xqueue_server_security_group,
         consul_security_groups["consul_agent"],
     ],
-    tags=aws_config.merged_tags({"Name": forum_server_tag}),
+    tags=aws_config.merged_tags({"Name": xqueue_server_tag}),
     tag_specifications=tag_specs,
     user_data=consul_datacenter.apply(
         lambda consul_dc: base64.b64encode(
@@ -184,7 +186,6 @@ lt_config = OLLaunchTemplateConfig(
                                 "content": textwrap.dedent(
                                     f"""\
                             ENVIRONMENT={consul_dc}
-                            APPLICATION=forum
                             VECTOR_CONFIG_DIR=/etc/vector/
                             AWS_REGION={aws_config.region}
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
@@ -202,19 +203,19 @@ lt_config = OLLaunchTemplateConfig(
         ).decode("utf8")
     ),
 )
-auto_scale_config = forum_config.get_object("auto_scale") or {
+auto_scale_config = xqueue_config.get_object("auto_scale") or {
     "desired": 1,
     "min": 1,
     "max": 2,
 }
 asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"open-edx-forum-server-{env_name}",
+    asg_name=f"open-edx-xqueue-server-{env_name}",
     aws_config=aws_config,
     desired_size=auto_scale_config["desired"],
     min_size=auto_scale_config["min"],
     max_size=auto_scale_config["max"],
     vpc_zone_identifiers=target_vpc["subnet_ids"],
-    tags=aws_config.merged_tags({"Name": forum_server_tag}),
+    tags=aws_config.merged_tags({"Name": xqueue_server_tag}),
 )
 as_setup = OLAutoScaling(
     asg_config=asg_config,
