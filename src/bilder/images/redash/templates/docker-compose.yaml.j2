@@ -83,7 +83,7 @@ services:
       QUEUES: "queries"
       WORKERS_COUNT: {{ context.adhoc_worker_count }}
   nginx:
-    image: nginx
+    image: pennlabs/shibboleth-sp-nginx:latest
     restart: unless-stopped
     depends_on:
     - server

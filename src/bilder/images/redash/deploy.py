@@ -221,23 +221,23 @@ consul_templates.extend(
             destination=Path(certificate_file),
         ),
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-redash/sp-certificate-data" }}'
-            "{{ printf .Data.sp-signing-cert }}{{ end }}",
+            contents='{{ with secret "secret-data/redash/sp-certificate-data" }}'
+            "{{ printf .Data.sp_signing_cert }}{{ end }}",
             destination=Path(sp_signing_cert_file),
         ),
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-redash/sp-certificate-data" }}'
-            "{{ printf .Data.sp-signing-key }}{{ end }}",
+            contents='{{ with secret "secret-data/redash/sp-certificate-data" }}'
+            "{{ printf .Data.sp_signing_key }}{{ end }}",
             destination=Path(sp_signing_key_file),
         ),
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-redash/sp-certificate-data" }}'
-            "{{ printf .Data.sp-encrypting-cert }}{{ end }}",
+            contents='{{ with secret "secret-data/redash/sp-certificate-data" }}'
+            "{{ printf .Data.sp_encrypting_cert }}{{ end }}",
             destination=Path(sp_encrypting_cert_file),
         ),
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-redash/sp-certificate-data" }}'
-            "{{ printf .Data.sp-encrypting-key }}{{ end }}",
+            contents='{{ with secret "secret-data/redash/sp-certificate-data" }}'
+            "{{ printf .Data.sp_encrypting_key }}{{ end }}",
             destination=Path(sp_encrypting_key_file),
         ),
     ]

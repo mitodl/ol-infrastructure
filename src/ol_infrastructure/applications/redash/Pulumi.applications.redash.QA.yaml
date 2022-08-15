@@ -6,7 +6,7 @@ config:
   consul:address: https://consul-data-qa.odl.mit.edu
   redash:db_password:
     secure: v1:b44G6KmdW/E+8N+s:ULodKrq6k7fZxlJPmzcLuUhMSfgs5DhT8gqPH1Yk/qU7OyJNzOSTs3Xumr4N4box1M0n1/EApSHgeHWerGDfflSZV6trAsp1mMiO1IEcy7hU0C1AZT09cbqd
-  redash:domain: redash-qa.odl.mit.edu
+  redash:domain: bi-qa.odl.mit.edu
   redash:instance_type: burstable_medium
   redis:auth_token:
     secure: v1:DETMhJf83zA9ZcE3:O7kAn1GQTR7ygADCPGa1bYGv28LWO8rdlgQP0pUR+0i9kso7X+UgnuDsgwG4hlCzeheIuTSJy/SEmKaXDvhNYQu4k9aYHZfs0qN5qUy/Y0UUTfI6+gUreWwvnA==
