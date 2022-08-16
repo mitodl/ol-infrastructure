@@ -20,7 +20,7 @@ resources:
   icon: docker
   source:
     repository: mitodl/forum
-    tag: latest
+    tag: ((openedx_branch_tag))
     username: ((dockerhub.username))
     password: ((dockerhub.password))
 
@@ -54,10 +54,12 @@ jobs:
       - name: image
       params:
         CONTEXT: forum-dockerfile-repo/dockerfiles/openedx-forum
+        BUILD_ARG_OPENEDX_COMMON_VERSION: ((openedx_branch))
       run:
         path: build
         args:
         - -t $(cat ./forum-release/commit_sha)
+        - -t ((openedx_branch_tag))
   - put: forum-image
     params:
       image: image/image.tar

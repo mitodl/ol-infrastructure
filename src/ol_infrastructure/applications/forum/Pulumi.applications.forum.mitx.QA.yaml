@@ -11,5 +11,6 @@ config:
   forum:business_unit: operations
   forum:target_vpc: residential_mitx_vpc
   forum:web_host_domain: forum-qa.odl.mit.edu
+  forum:openedx_version_tag: nutmeg.master
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
