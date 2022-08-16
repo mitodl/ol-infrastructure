@@ -4,8 +4,7 @@ from pathlib import Path
 from pyinfra import host
 from pyinfra.operations import server
 
-from bilder.components.docker.docker_compose_steps import deploy_docker_compose
-from bilder.components.docker.steps import deploy_docker
+from bilder.components.docker.steps import create_systemd_service, deploy_docker
 from bilder.components.hashicorp.consul.models import Consul, ConsulConfig
 from bilder.components.hashicorp.consul_template.models import ConsulTemplate
 from bilder.components.hashicorp.steps import install_hashicorp_products
@@ -69,7 +68,6 @@ hashicorp_products = [vault, consul, consul_template_config]
 install_hashicorp_products(hashicorp_products)
 
 deploy_docker()
-deploy_docker_compose()
 
 # Install vector
 vector_config.configuration_templates[
@@ -88,3 +86,4 @@ if host.get_fact(HasSystemd):
         running=True,
         enabled=True,
     )
+    create_systemd_service()

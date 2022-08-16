@@ -1,5 +1,6 @@
 import json
 import tempfile
+from pathlib import Path
 from typing import Any, Optional
 
 from pyinfra import host
@@ -51,7 +52,12 @@ def _apt_install():
 
     apt.packages(
         name="Install Docker via apt",
-        packages="docker-ce",
+        packages=[
+            "docker-ce",
+            "docker-ce-cli",
+            "containerd.io",
+            "docker-compose-plugin",
+        ],
         update=add_apt_repo.changed,
     )
 
@@ -74,3 +80,15 @@ def deploy_docker(config: Optional[dict[str, Any]] = None):
                 src=daemon.name,
                 dest="/etc/docker/daemon.json",
             )
+
+
+@deploy("Register docker-compose service")
+def create_systemd_service():
+    files.put(
+        name="Copy docker compose service file",
+        src=str(
+            Path(__file__).resolve().parent.joinpath("files", "docker-compose.service")
+        ),
+        dest="/usr/lib/systemd/system/docker-compose.service",
+        mode="755",
+    )
