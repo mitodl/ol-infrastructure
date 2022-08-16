@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pulumi_github as github
 import pulumi_vault as vault
-from pulumi import Config, StackReference, export
+from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
 from pulumi_aws import cloudwatch, ec2, iam, mediaconvert, s3, sns
 
 from bridge.secrets.sops import read_yaml_secrets
@@ -25,6 +25,12 @@ from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
+github_provider = github.Provider(
+    "github-provider",
+    owner=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))["owner"],
+    token=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))["token"],
+)
+github_options = ResourceOptions(provider=github_provider)
 ocw_studio_config = Config("ocw_studio")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -254,7 +260,9 @@ vault.generic.Secret(
     path=ocw_studio_secrets.path.apply("{}/app-config".format),
     data_json=json.dumps(vault_secrets),
 )
-gh_repo = github.get_repository(full_name="mitodl/ocw-hugo-projects")
+gh_repo = github.get_repository(
+    full_name="mitodl/ocw-hugo-projects", opts=InvokeOptions(provider=github_provider)
+)
 ocw_starter_webhook = github.RepositoryWebhook(
     "ocw-hugo-project-sync-with-ocw-studio-webhook",
     repository=gh_repo.name,
@@ -267,6 +275,7 @@ ocw_starter_webhook = github.RepositoryWebhook(
         content_type="application/json",
         secret=vault_secrets["github_shared_secret"],
     ),
+    opts=github_options,
 )
 
 # Setup AWS MediaConvert Queue
