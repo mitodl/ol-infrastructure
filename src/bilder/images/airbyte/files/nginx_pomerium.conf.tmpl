@@ -2,7 +2,7 @@
 # Pomerium endpoint
 server {
     listen 443 ssl;
-    server_name  {{ .Data.authenticate_server_address }} {{ .Data.application_address }};
+    server_name  {{ .Data.data.authenticate_server_address }} {{ .Data.data.application_address }};
     ssl_certificate /etc/nginx/nginx.pem;
     ssl_certificate_key /etc/nginx/nginx-key.pem;
 

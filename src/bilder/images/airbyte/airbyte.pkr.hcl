@@ -50,7 +50,7 @@ source "amazon-ebs" "airbyte" {
 
   source_ami_filter {
     filters = {
-      name                = "docker_baseline_ami-${var.node_type}-*"
+      name                = "docker_baseline_ami-*"
       root-device-type    = "ebs"
       virtualization-type = "hvm"
     }

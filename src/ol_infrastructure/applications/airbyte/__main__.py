@@ -191,6 +191,13 @@ vault.aws.AuthBackendRole(
     token_policies=[airbyte_server_vault_policy.name],
 )
 
+# Create the secret mount used for storing configuration secrets
+vault.Mount(
+    "airbyte-server-configuration-secrets-mount",
+    path="secret-airbyte",
+    type="kv-v2",
+    description="Storage of configuration credentials used in Airbyte connections.",
+)
 ##################################
 #     Network Access Control     #
 ##################################
