@@ -46,7 +46,7 @@ VERSIONS = {
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 
-install_baseline_packages(packages=["curl", "gnupg"])
+install_baseline_packages(packages=["curl", "gnupg", "jq"])
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
 # Install Caddy
