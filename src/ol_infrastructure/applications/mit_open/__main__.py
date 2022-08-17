@@ -78,6 +78,8 @@ s3_bucket_permissions = [
         "Resource": [
             "arn:aws:s3:::mitx-etl-xpro-production-mitxpro-production",
             "arn:aws:s3:::mitx-etl-xpro-production-mitxpro-production/*",
+            "arn:aws:s3:::mitx-etl-mitxonline-production",
+            "arn:aws:s3:::mitx-etl-mitxonline-production/*",
             "arn:aws:s3:::ol-olx-course-exports",
             "arn:aws:s3:::ol-olx-course-exports/*",
             "arn:aws:s3:::ocw-content-storage",
