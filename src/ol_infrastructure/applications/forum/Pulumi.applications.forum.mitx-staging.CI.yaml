@@ -1,6 +1,6 @@
 ---
-secretsprovider: awskms://alias/infrastructure-secrets-qa
-encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgFqyheTEwQhQwt19Cm5Z2wyAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMUHRADb5VO/Osd+QMAgEQgDthoUItjofWZZROiCvTVCFgPdVM1f3tWDvxoezDTWseixH0X/RXXDnIDnOXDiC9dHp/ZRoXORovMifXGg==
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQFdtdIjrHnLIoWB/UbBuGhnAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMZhxvEbwZGsYEUJc9AgEQgDtJ2M237n4bkl9H5Uukso2pOKhAPbv2EwI/p/k4Ru5AUEXPgkqP+K43hBH1jmASwuVhne5vuzGvMd/lLw==
 config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-staging-ci.odl.mit.edu
