@@ -5,11 +5,11 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-mitxonline-production.odl.mit.edu
   forum:auto_scale:
-    desired: 1
-    max: 2
-    min: 1
+    desired: 3
+    max: 5
+    min: 3
   forum:business_unit: mitxonline
-  forum:target_vpc: residential_mitx_vpc
+  forum:target_vpc: mitxonline_vpc
   forum:web_host_domain: forum-mitxonline.odl.mit.edu
   forum:openedx_version_tag: master
   vault:address: https://vault-production.odl.mit.edu

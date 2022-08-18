@@ -6,14 +6,14 @@ resources:
   type: git
   source:
     uri: https://github.com/openedx/xqueue
-    tag: ((xqueue_release_tag))
+    branch: ((openedx_branch))
 
 - name: xqueue-image
   type: registry-image
   icon: docker
   source:
     repository: mitodl/xqueue
-    tag: ((xqueue_release_tag))
+    tag: ((openedx_branch_tag))
     username: ((dockerhub.username))
     password: ((dockerhub.password))
 
@@ -49,10 +49,12 @@ jobs:
       - name: image
       params:
         CONTEXT: xqueue-git-resource
+        BUILD_ARG_OPENEDX_COMMON_VERSION: ((openedx_branch))
       run:
         path: build
         args:
         - -t $(cat ./xqueue-git-resource/commit_sha)
+        - -t ((openedx_branch_tag))
   - put: xqueue-image
     params:
       image: image/image.tar

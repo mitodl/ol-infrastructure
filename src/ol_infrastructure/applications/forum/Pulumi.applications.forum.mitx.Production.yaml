@@ -3,11 +3,11 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gHaXdOgJQNVZipYBEMrjnq2AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMveJ6nv2z4uQIWZBVAgEQgDuZfkB3otCyaR5Z5Lz1KbFObdVmXafnFEJ2Fn91n/bGIDMrIk6INxAS5tg05t30zyu5YfnroXzP1Ib3Uw==
 config:
   forum:auto_scale:
-    desired: 1
-    max: 2
-    min: 1
+    desired: 3
+    max: 5
+    min: 3
   forum:business_unit: residential
-  forum:target_vpc: data_vpc
+  forum:target_vpc: residential_mitx_vpc
   forum:instance_type: t3a.medium
   forum:web_host_domain: forum.odl.mit.edu
   aws:region: us-east-1
