@@ -233,6 +233,26 @@ athena_permissions: list[dict[str, Union[str, list[str]]]] = [
             f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}/*",
         ],
     },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "lakeformation:StartTransaction",
+            "lakeformation:CommitTransaction",
+            "lakeformation:CancelTransaction",
+            "lakeformation:ExtendTransaction",
+            "lakeformation:DescribeTransaction",
+            "lakeformation:ListTransactions",
+            "lakeformation:StartQueryPlanning",
+            "lakeformation:GetQueryState",
+            "lakeformation:GetWorkUnitResults",
+            "lakeformation:GetWorkUnits",
+            "lakeformation:GetQueryStatistics",
+            "lakeformation:GetTableObjects",
+            "lakeformation:UpdateTableObjects",
+            "lakeformation:DeleteObjectsOnCancel",
+        ],
+        "Resource": "*",
+    },
 ]
 
 dagster_iam_permissions = {
