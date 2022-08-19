@@ -2,9 +2,9 @@
 
 - [ ] Deploy the latest AMI and other pulumi changes to Production. As of right now this is still configured as `redash.odl.mit.edu`.
 ```
-poetry run pulumi up --refresh -C src/ol_infrastructure/applications/redash -s applications.redash.Production 
+poetry run pulumi up --refresh -C src/ol_infrastructure/applications/redash -s applications.redash.Production
 ```
-- [ ] Prepare the production database by dropping everything currently there. Password found in pulumi config. Should be able to run this from the old redash instance. Peering and network config should be in place. 
+- [ ] Prepare the production database by dropping everything currently there. Password found in pulumi config. Should be able to run this from the old redash instance. Peering and network config should be in place.
 ```
 poetry run pulumi config --show-secrets -C src/ol_infrastructure/applications/redash -s applications.redash.Production
 ```
@@ -25,11 +25,11 @@ pg_dump -h <old RDS endpoint> -p 5432 -d redash -U odldevops -Z1 -Fc -s > schema
 # The data
 pg_dump -h <old RBS endpoint> -p 5432 -d redash -U odldevops -Z1 -Fc -a --file=data.redash.dump
 ```
-- [ ] Restore the back up to the new redash production environment. Same password from when you prepped the db earlier. Should be able to run this from the old redash instance. Peering and network config should be in place. 
+- [ ] Restore the back up to the new redash production environment. Same password from when you prepped the db earlier. Should be able to run this from the old redash instance. Peering and network config should be in place.
 ```
 pg_restore -h <new RDS endpoint> -d redash -U oldevops -C -Fc schema.redash.dmp
 pg_restore -h <new RDS endpoint> -d redash -U oldevops -a  -Fc data.redash.dump
-``` 
+```
 - [ ] Run the database upgrade (because the old instance was at v8 and the new instance is at v10...). Run this from a web or worker node from the new stack. It will look something like this:
 ```
 root@ip-10-3-0-182:/etc/docker/compose# docker-compose run --rm server manage db upgrade
@@ -42,5 +42,5 @@ Creating compose_server_run ... done
 [2022-07-26 17:04:54,698][PID:1][INFO][alembic.runtime.migration] Running upgrade 89bc7873a3e0 -> fd4fc850d7ea, Convert user details to jsonb and move user profile image url into details column
 ```
 - [ ] Verify the new site at redash.odl.mit.edu. SSO will NOT work, use a password login.
-- [ ] Remove Route-53 entry for `bi.odl.mit.edu`. 
+- [ ] Remove Route-53 entry for `bi.odl.mit.edu`.
 - [ ] Redeploy the stack after changing the url in the pulumi config to `bi.odl.mit.edu`.
