@@ -320,8 +320,9 @@ web_lb_config = OLLoadBalancerConfig(
 web_tg_config = OLTargetGroupConfig(
     vpc_id=data_vpc["id"],
     health_check_interval=60,
-    health_check_matcher="200-499",
+    health_check_matcher="200",
     health_check_path="/ping",
+    stickiness="lb_cookie",
     tags=aws_config.merged_tags({"Name": web_tag}),
 )
 

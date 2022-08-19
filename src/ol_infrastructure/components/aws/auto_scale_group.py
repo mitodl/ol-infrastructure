@@ -25,6 +25,7 @@ from pulumi_aws.lb import (
     LoadBalancer,
     TargetGroup,
     TargetGroupHealthCheckArgs,
+    TargetGroupStickinessArgs,
 )
 from pydantic import BaseModel, NonNegativeInt, PositiveInt, validator
 
@@ -65,6 +66,7 @@ class OLTargetGroupConfig(AWSBase):
     vpc_id: Union[str, pulumi.Output[str]]
     port: NonNegativeInt = NonNegativeInt(443)
     protocol: str = "HTTPS"
+    stickiness: Optional[str] = None
 
     health_check_enabled: bool = True
     health_check_healthy_threshold: PositiveInt = PositiveInt(2)
@@ -78,6 +80,14 @@ class OLTargetGroupConfig(AWSBase):
 
     class Config:
         arbitrary_types_allowed = True
+
+    @validator("stickiness")
+    def is_valid_stickiness(cls: "OLTargetGroupConfig", stickiness: str) -> str:
+        if stickiness and stickiness not in ["lb_cookie"]:
+            raise ValueError(
+                f"stickiness: {stickiness} is not valid. Only 'lb_cookie' is supported at this time."
+            )
+        return stickiness
 
 
 class OLLoadBalancerConfig(AWSBase):
@@ -225,6 +235,13 @@ class OLAutoScaling(pulumi.ComponentResource):
                     unhealthy_threshold=tg_config.health_check_unhealthy_threshold,
                 )
 
+            target_group_stickiness = None
+            if tg_config.stickiness:
+                target_group_stickiness = TargetGroupStickinessArgs(
+                    type=tg_config.stickiness,
+                    enabled=True,
+                )
+
             self.target_group = TargetGroup(
                 resource_name_prefix + "target-group",
                 name=(resource_name_prefix + "tg")[:AWS_TARGET_GROUP_NAME_MAX_LENGTH],
@@ -232,6 +249,7 @@ class OLAutoScaling(pulumi.ComponentResource):
                 port=tg_config.port,
                 protocol=tg_config.protocol,
                 health_check=target_group_healthcheck,
+                stickiness=target_group_stickiness,
                 opts=resource_options,
             )
 
