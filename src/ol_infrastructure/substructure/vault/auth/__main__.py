@@ -50,26 +50,26 @@ vault_github_auth = github.AuthBackend(
     token_max_ttl=ONE_MONTH_SECONDS * 6,
 )
 
-if stack_info.env_suffix != "production":
-    policy_folder = (Path(__file__).resolve()).parent.parent.joinpath(
-        "policies/github/"
-    )
-    for hcl_file in policy_folder.iterdir():
-        if "software_engineer.hcl" in hcl_file.name:
-            software_engineer_policy_file = open(hcl_file).read()
-            software_engineer_policy = Policy(
-                "github-auth-software-engineer", policy=software_engineer_policy_file
+policy_folder = (Path(__file__).resolve()).parent.parent.joinpath("policies/github/")
+for hcl_file in policy_folder.iterdir():
+    if (
+        "software_engineer.hcl" in hcl_file.name
+        and stack_info.env_suffix != "production"
+    ):
+        software_engineer_policy_file = open(hcl_file).read()
+        software_engineer_policy = Policy(
+            "github-auth-software-engineer", policy=software_engineer_policy_file
+        )
+        for team in ["vault-developer-access"]:
+            vault_github_auth_team = github.Team(
+                f"vault-github-auth-{team}",
+                team=team,
+                policies=[software_engineer_policy],
             )
-            for team in ["vault-developer-access"]:
-                vault_github_auth_team = github.Team(
-                    f"vault-github-auth-{team}",
-                    team=team,
-                    policies=[software_engineer_policy],
-                )
-        if "admin.hcl" in hcl_file.name:
-            devops_policy_file = open(hcl_file).read()
-            devops_policy = Policy("github-auth-devops", policy=devops_policy_file)
-            for team in ["vault-devops-access"]:
-                vault_github_auth_team = github.Team(
-                    f"vault-github-auth-{team}", team=team, policies=[devops_policy]
-                )
+    if "admin.hcl" in hcl_file.name:
+        devops_policy_file = open(hcl_file).read()
+        devops_policy = Policy("github-auth-devops", policy=devops_policy_file)
+        for team in ["vault-devops-access"]:
+            vault_github_auth_team = github.Team(
+                f"vault-github-auth-{team}", team=team, policies=[devops_policy]
+            )
