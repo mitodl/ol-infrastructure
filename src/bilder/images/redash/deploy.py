@@ -154,6 +154,7 @@ untemplated_files = {
     "fastcgi.conf": nginx_conf_directory,
     "shib_clear_headers": nginx_conf_directory,
     "attribute-map.xml": shib_conf_directory,
+    "mit-md-cert.pem": shib_conf_directory,
 }
 for filename, dest_dir in untemplated_files.items():
     files.put(

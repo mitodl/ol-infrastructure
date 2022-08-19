@@ -108,3 +108,4 @@ services:
     - {{ context.shib_directory }}/sp-signing-cert.pem:/etc/shibboleth/sp-signing-cert.pem:ro
     - {{ context.shib_directory }}/sp-encrypting-key.pem:/etc/shibboleth/sp-encrypting-key.pem:ro
     - {{ context.shib_directory }}/sp-encrypting-cert.pem:/etc/shibboleth/sp-encrypting-cert.pem:ro
+    - {{ context.shib_directory }}/mit-md-cert.pem:/etc/shibboleth/mit-md-cert.pem:ro

@@ -49,6 +49,7 @@
 
         <MetadataProvider type="XML" validate="true" url="http://touchstone.mit.edu/metadata/MIT-metadata.xml" backingFilePath="MIT-metadata.xml" maxRefreshDelay="7200">
           <MetadataFilter type="RequireValidUntil" maxValidityInterval="5184000"/>
+		      <MetadataFilter type="Signature" certificate="mit-md-cert.pem" verifyBackup="false"/>
         </MetadataProvider>
 
         <!-- InCommon Per-Entity Metadata Distribution Service -->

@@ -15,7 +15,7 @@ server {
 }
 
 server {
-    listen 443 ssl;
+    listen 443 ssl default_server;
     server_name  {{ keyOrDefault "redash/frontend_host" "redash.odl.mit.edu" }};
     ssl_certificate /etc/nginx/nginx.pem;
     ssl_certificate_key /etc/nginx/nginx-key.pem;
