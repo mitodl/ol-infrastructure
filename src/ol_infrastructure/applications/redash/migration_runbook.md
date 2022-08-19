@@ -44,3 +44,5 @@ Creating compose_server_run ... done
 - [ ] Verify the new site at redash.odl.mit.edu. SSO will NOT work, use a password login.
 - [ ] Remove Route-53 entry for `bi.odl.mit.edu`.
 - [ ] Redeploy the stack after changing the url in the pulumi config to `bi.odl.mit.edu`.
+- [ ] Verify taht SSO works after updating the URL
+- [ ] Turn off password login in SSO works. 
