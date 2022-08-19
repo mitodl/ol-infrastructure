@@ -45,4 +45,4 @@ Creating compose_server_run ... done
 - [ ] Remove Route-53 entry for `bi.odl.mit.edu`.
 - [ ] Redeploy the stack after changing the url in the pulumi config to `bi.odl.mit.edu`.
 - [ ] Verify taht SSO works after updating the URL
-- [ ] Turn off password login in SSO works. 
+- [ ] Turn off password login in SSO works.
