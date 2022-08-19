@@ -56,6 +56,24 @@ from bridge.lib.versions import (
 from bridge.secrets.sops import set_env_secrets
 
 
+def place_jinja_template_file(
+    name: str,
+    repo_path: Path,
+    destination_path: Path,
+    context: dict,
+    watched_files: list[Path],
+    mode: str = "0644",
+):
+    files.template(
+        name=f"Place and interpolate {name} jinja template file",
+        src=str(repo_path.joinpath(name + ".j2")),
+        dest=str(destination_path.joinpath(name)),
+        context=context,
+        mode="0664",
+    )
+    watched_files.append(Path(DOCKER_COMPOSE_DIRECTORY).joinpath("docker-compose.yaml"))
+
+
 def place_consul_template_file(
     name: str,
     repo_path: Path,
@@ -101,12 +119,18 @@ files.put(
 consul_templates: list[ConsulTemplateTemplate] = []
 watched_files: list[Path] = []
 
-# Basic NGINX configuration stuff
 nginx_conf_directory = Path("/etc/nginx")
+shib_conf_directory = Path("/etc/shibboleth")
+
 certificate_file = nginx_conf_directory.joinpath("star.odl.mit.edu.crt")
 certificate_key_file = nginx_conf_directory.joinpath("star.odl.mit.edu.key")
-nginx_conf_file = nginx_conf_directory.joinpath("nginx.conf")
 
+sp_signing_cert_file = shib_conf_directory.joinpath("sp-signing-cert.pem")
+sp_signing_key_file = shib_conf_directory.joinpath("sp-signing-key.pem")
+sp_encrypting_cert_file = shib_conf_directory.joinpath("sp-encrypting-cert.pem")
+sp_encrypting_key_file = shib_conf_directory.joinpath("sp-encrypting-key.pem")
+
+# Zeroly Create needed etc directories
 files.directory(
     name="Create NGINX directory",
     path=str(nginx_conf_directory),
@@ -114,17 +138,38 @@ files.directory(
     group="root",
     present=True,
 )
-place_consul_template_file(
-    name="nginx.conf",
-    repo_path=FILES_DIRECTORY,
-    template_path=Path("/etc/consul-template"),
-    destination_path=nginx_conf_directory,
-    consul_templates=consul_templates,
-    watched_files=watched_files,
+files.directory(
+    name="Create Shibboleth directory",
+    path=str(shib_conf_directory),
+    user="root",
+    group="root",
+    present=True,
 )
 
-# Place and configure the docker compose file
-docker_compose_context = {
+# Firstly place down normal files requiring no templating
+# Assumes no file special file extension
+untemplated_files = {
+    "shib_fastcgi_params": nginx_conf_directory,
+    "fastcgi_params": nginx_conf_directory,
+    "fastcgi.conf": nginx_conf_directory,
+    "shib_clear_headers": nginx_conf_directory,
+    "attribute-map.xml": shib_conf_directory,
+    "mit-md-cert.pem": shib_conf_directory,
+}
+for filename, dest_dir in untemplated_files.items():
+    files.put(
+        name=f"Place {filename} file.",
+        src=str(FILES_DIRECTORY.joinpath(filename)),
+        dest=str(dest_dir.joinpath(filename)),
+        mode="0664",
+    )
+
+# Secondly place down jinja2 templates rendered at AMI bake time
+# assumes .j2 file extension that will be stripped
+jinja_templated_files = {
+    "docker-compose.yaml": Path(DOCKER_COMPOSE_DIRECTORY),
+}
+jinja_context = {
     "redash_version": VERSIONS["redash"],
     "web_worker_count": 4,
     "rq_worker_count": 1,
@@ -135,27 +180,35 @@ docker_compose_context = {
     "certificate_file": certificate_file,
     "certificate_key_file": certificate_key_file,
     "nginx_directory": nginx_conf_directory,
+    "shib_directory": shib_conf_directory,
 }
-files.template(
-    name="Place the redash docker-compose.yaml file",
-    src=str(TEMPLATES_DIRECTORY.joinpath("docker-compose.yaml.j2")),
-    dest=str(Path(DOCKER_COMPOSE_DIRECTORY).joinpath("docker-compose.yaml")),
-    context=docker_compose_context,
-    mode="0664",
-)
-watched_files.append(Path(DOCKER_COMPOSE_DIRECTORY).joinpath("docker-compose.yaml"))
+for filename, dest_dir in jinja_templated_files.items():
+    place_jinja_template_file(
+        name=filename,
+        repo_path=TEMPLATES_DIRECTORY,
+        destination_path=dest_dir,
+        context=jinja_context,
+        watched_files=watched_files,
+    )
 
-# Place and configure the consul-template for the .env file
-place_consul_template_file(
-    name=".env",
-    repo_path=FILES_DIRECTORY,
-    template_path=Path("/etc/consul-template"),
-    destination_path=Path(DOCKER_COMPOSE_DIRECTORY),
-    consul_templates=consul_templates,
-    watched_files=watched_files,
-)
+# Thirdly, place down consul-template files
+# assume .tmpl file extension that will be retained
+consul_templated_files = {
+    "nginx.conf": nginx_conf_directory,
+    ".env": Path(DOCKER_COMPOSE_DIRECTORY),
+    "shibboleth2.xml": shib_conf_directory,
+}
+for filename, dest_dir in consul_templated_files.items():
+    place_consul_template_file(
+        name=filename,
+        repo_path=FILES_DIRECTORY,
+        template_path=Path("/etc/consul-template"),
+        destination_path=dest_dir,
+        consul_templates=consul_templates,
+        watched_files=watched_files,
+    )
 
-# Add consul template confgs for ODL wildcard certs out of vault.
+# Add consul template confgs for files that are just populated straight from vault.
 consul_templates.extend(
     [
         ConsulTemplateTemplate(
@@ -168,9 +221,38 @@ consul_templates.extend(
             "{{ printf .Data.value }}{{ end }}",
             destination=Path(certificate_file),
         ),
+        ConsulTemplateTemplate(
+            contents='{{ with secret "secret-data/redash/sp-certificate-data" }}'
+            "{{ printf .Data.sp_signing_cert }}{{ end }}",
+            destination=Path(sp_signing_cert_file),
+        ),
+        ConsulTemplateTemplate(
+            contents='{{ with secret "secret-data/redash/sp-certificate-data" }}'
+            "{{ printf .Data.sp_signing_key }}{{ end }}",
+            destination=Path(sp_signing_key_file),
+        ),
+        ConsulTemplateTemplate(
+            contents='{{ with secret "secret-data/redash/sp-certificate-data" }}'
+            "{{ printf .Data.sp_encrypting_cert }}{{ end }}",
+            destination=Path(sp_encrypting_cert_file),
+        ),
+        ConsulTemplateTemplate(
+            contents='{{ with secret "secret-data/redash/sp-certificate-data" }}'
+            "{{ printf .Data.sp_encrypting_key }}{{ end }}",
+            destination=Path(sp_encrypting_key_file),
+        ),
     ]
 )
-watched_files.extend([certificate_key_file, certificate_file])
+watched_files.extend(
+    [
+        certificate_key_file,
+        certificate_file,
+        sp_signing_cert_file,
+        sp_signing_key_file,
+        sp_encrypting_cert_file,
+        sp_encrypting_key_file,
+    ]
+)
 
 # Install and configure vector ???
 # TODO

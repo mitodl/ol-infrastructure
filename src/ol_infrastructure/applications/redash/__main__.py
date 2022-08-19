@@ -298,6 +298,16 @@ consul.Keys(
     opts=consul_provider,
 )
 
+# Put a few things into vault taht will be needed to configure shibboleth
+sp_certificate_data = read_yaml_secrets(
+    Path(f"redash/redash.{stack_info.env_suffix}.yaml")
+)
+vault.generic.Secret(
+    "redash-sp-certificate-data",
+    path="secret-data/redash/sp-certificate-data",
+    data_json=json.dumps(sp_certificate_data),
+)
+
 block_device_mappings = [BlockDeviceMapping()]
 
 # Setup the web ASG
@@ -310,8 +320,9 @@ web_lb_config = OLLoadBalancerConfig(
 web_tg_config = OLTargetGroupConfig(
     vpc_id=data_vpc["id"],
     health_check_interval=60,
-    health_check_matcher="200-499",
+    health_check_matcher="200",
     health_check_path="/ping",
+    stickiness="lb_cookie",
     tags=aws_config.merged_tags({"Name": web_tag}),
 )
 
