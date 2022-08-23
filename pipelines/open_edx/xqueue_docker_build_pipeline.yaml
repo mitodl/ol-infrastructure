@@ -17,6 +17,7 @@ resources:
     username: ((dockerhub.username))
     password: ((dockerhub.password))
 
+
 - name: xqueue-dockerfile-repo
   type: git
   icon: github
@@ -48,7 +49,7 @@ jobs:
       outputs:
       - name: image
       params:
-        CONTEXT: xqueue-git-resource
+        CONTEXT: xqueue-dockerfile-repo/dockerfiles/openedx-xqueue
         BUILD_ARG_OPENEDX_COMMON_VERSION: ((openedx_branch))
       run:
         path: build
@@ -58,4 +59,3 @@ jobs:
   - put: xqueue-image
     params:
       image: image/image.tar
-      version: ((xqueue_release_tag))

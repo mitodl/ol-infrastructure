@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgHIK0f93qkgiDT4t4AJeCpqAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbGpylU/cwE7dJa/yAgEQgDtjlLFqWC+BOuhpbF5DGiLBdJbPExmCSfqlziNPqFrCoVjwCOJu8RS1qM1C4pAHlSY3fHfDSvy5pJAIOg==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-xpro-qa.odl.mit.edu
+  xqueue:auto_scale:
+    desired: 1
+    max: 2
+    min: 1
+  xqueue:business_unit: mitxpro
+  xqueue:target_vpc: xpro_vpc
+  xqueue:openedx_version_tag: maple.master
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa
