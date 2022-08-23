@@ -8,3 +8,5 @@ config:
   vault:domain: vault-production.odl.mit.edu
   vault:storage_disk_capacity: "200"
   vault:target_vpc: operations
+  vault:backup_bucket: ol-infra-production-vault-backups
+  vault:backup_cron: "10 0,3,6,9,12,15,18,21 * * *"
