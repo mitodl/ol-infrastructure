@@ -1,26 +1,19 @@
 ---
-resource_types:
-- name: github-release
-  type: registry-image
-  source:
-    repository: concourse/github-release-resource
 
 resources:
 - check_every: 24h
   name: forum-release
-  type: github-release
+  type: git
   source:
-    owner: openedx
-    repository: cs_comments_service
-    branch: master
-    release: true
+    uri: https://github.com/openedx/cs_comments_service.git
+    branch: ((openedx_branch))
 
 - name: forum-image
   type: registry-image
   icon: docker
   source:
     repository: mitodl/forum
-    tag: latest
+    tag: ((openedx_branch_tag))
     username: ((dockerhub.username))
     password: ((dockerhub.password))
 
@@ -54,10 +47,12 @@ jobs:
       - name: image
       params:
         CONTEXT: forum-dockerfile-repo/dockerfiles/openedx-forum
+        BUILD_ARG_OPENEDX_COMMON_VERSION: ((openedx_branch))
       run:
         path: build
         args:
         - -t $(cat ./forum-release/commit_sha)
+        - -t ((openedx_branch_tag))
   - put: forum-image
     params:
       image: image/image.tar

@@ -6,6 +6,7 @@ RUN apt update && \
   apt-get install git-core language-pack-en python3-pip libmysqlclient-dev ntp libssl-dev python3.8-dev python3.8-venv -qy && \
   rm -rf /var/lib/apt/lists/*
 
+ARG OPENEDX_COMMON_VERSION=open-release/maple.3
 ENV VIRTUAL_ENV=/venv
 RUN python3.8 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
@@ -20,9 +21,8 @@ RUN mkdir -p /edx/app/log/
 RUN touch /edx/app/log/edx.log
 RUN chown app:app /edx/app/log/edx.log
 
+RUN git clone https://github.com/openedx/xqueue.git --branch $OPENEDX_COMMON_VERSION --depth 1 /edx/app/xqueue
 WORKDIR /edx/app/xqueue
-COPY requirements /edx/app/xqueue/requirements
-COPY requirements.txt /edx/app/xqueue/requirements.txt
 RUN pip install wheel && pip install -r requirements.txt
 
 USER app
