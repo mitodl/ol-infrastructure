@@ -9,8 +9,8 @@ config:
     max: 2
     min: 1
   forum:business_unit: residential-staging
+  forum:openedx_version_tag: nutmeg.master
   forum:target_vpc: residential_mitx_staging_vpc
   forum:web_host_domain: forum-staging-ci.odl.mit.edu
-  forum:openedx_version_tag: nutmeg.master
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
