@@ -5,8 +5,8 @@ export VAULT_SKIP_VERIFY="true"
 raft_backup_dir='/tmp/backup/raft'
 current_time=$(date "+%Y.%m.%d-%H.%M.%S")
 
-VAULT_BIN="/usr/local/bin/vault"
-AWS_BIN="/usr/bin/aws"
+VAULT_BIN=$(which vault)
+AWS_BIN=$(which aws)
 
 log_message() {
   logger -t 'raft_backup' "$1"
