@@ -16,6 +16,7 @@ sources:
     include_units:
     - vault
     - caddy
+    - raft_backup
 
 transforms:
   parse_vault_journald_logs:
