@@ -59,7 +59,6 @@ class ConsulTelemetry(FlexibleBaseModel):
     dogstatsd_addr: Optional[str]
     disable_hostname: Optional[bool] = True
     prometheus_retention_time: Optional[str] = "60s"
-    disable_compat_19: bool = Field(default=True, alias="disable_compat_1.9")
 
 
 class ConsulConfig(HashicorpConfig):
