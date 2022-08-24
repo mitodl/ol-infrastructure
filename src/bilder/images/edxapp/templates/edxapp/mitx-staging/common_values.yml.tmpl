@@ -60,7 +60,7 @@ XQUEUE_INTERFACE:
     django_auth:
         password: {{ .Data.edxapp_password }}
         username: edxapp
-    url: http://xqueue.service.consul:18040  # MODIFIED
+    url: http://xqueue.service.consul:8040  # MODIFIED
 {{ end }}
 {{ with secret "secret-mitx-staging/edx-forum" }}
 COMMENTS_SERVICE_KEY: {{ .Data.forum_api_key }}
@@ -200,7 +200,7 @@ CODE_JAIL:
         VMEM: 536870912
     python_bin: /edx/app/edxapp/venvs/edxapp-sandbox/bin/python
     user: sandbox
-COMMENTS_SERVICE_URL: http://localhost:4567  # MODIFIED
+COMMENTS_SERVICE_URL: http://forum.service.consul:4567 # MODIFIED
 COMPREHENSIVE_THEME_DIRS:
 - /edx/app/edxapp/themes/  # MODIFIED
 COMPREHENSIVE_THEME_LOCALE_PATHS: []
