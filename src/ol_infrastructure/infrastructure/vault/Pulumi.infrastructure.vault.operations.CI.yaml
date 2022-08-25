@@ -5,6 +5,8 @@ config:
   aws:region: us-east-1
   vault:backup_bucket: ol-infra-ci-vault-backups
   vault:backup_cron: 30 18 * * *
+  vault:backup_healthcheck_id:
+    secure: v1:0cyymYz0O3i+ec+O:fCq0vtPpTCxZB/bNEu9nJlcpDgRc0pr9DdFr1cEP+wCdkw7OjXMQC8oSoWtxph36USwtmA==
   vault:business_unit: operations
   vault:cluster_size: "3"
   vault:domain: vault-ci.odl.mit.edu

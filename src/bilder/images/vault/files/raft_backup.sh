@@ -7,6 +7,7 @@ current_time=$(date "+%Y.%m.%d-%H.%M.%S")
 
 VAULT_BIN=$(which vault)
 AWS_BIN=$(which aws)
+CURL_BIN=$(which curl)
 
 log_message() {
   logger -t 'raft_backup' "$1"
@@ -24,6 +25,10 @@ if [ "$($VAULT_BIN status --format json | jq --raw-output 'select(.is_self==true
 
   if [ -z "$BUCKET_NAME" ]; then
     log_message "ERROR: Bucket name not provided."
+    exit 1
+  fi
+  if [ -z "$HEALTH_CHECK_ID" ]; then
+    log_message "ERROR: Healthchecks.io ID not provided."
     exit 1
   fi
 
@@ -50,6 +55,13 @@ if [ "$($VAULT_BIN status --format json | jq --raw-output 'select(.is_self==true
     exit 1
   fi
   log_message "INFO: snapshot $current_time.snapshot uploaded to s3 successfully."
+
+  log_message "INFO: updating healthchecks.io"
+  if ! $CURL_BIN -fsS -m 10 --retry 5 -o /dev/null "https://hc-ping.com/$HEALTH_CHECK_ID"; then
+     log_message "ERROR: Could not update healthchecks.io"
+     clean_up
+     exit 1
+  fi
 
   log_message "INFO: Revoking vault token."
   if ! $VAULT_BIN token revoke -self; then

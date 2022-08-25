@@ -80,6 +80,7 @@ target_vpc = network_stack.require_output(f"{target_network}_vpc")
 vault_domain = vault_config.require("domain")
 vault_backup_bucket = vault_config.require("backup_bucket")
 vault_backup_cron = vault_config.require("backup_cron")
+vault_backup_healthcheck_id = vault_config.require_secret("backup_healthcheck_id")
 vault_unseal_key = kms_stack.require_output("vault_auto_unseal_key")
 vault_ami = ec2.get_ami(
     filters=[
@@ -426,7 +427,7 @@ def cloud_init_user_data(
             {
                 "path": "/etc/cron.d/raft_backup",
                 "content": (
-                    f"{vault_backup_cron} root BUCKET_NAME={vault_backup_bucket} /usr/sbin/raft_backup.sh\n"
+                    f"{vault_backup_cron} root HEALTH_CHECK_ID={vault_backup_healthcheck_id} BUCKET_NAME={vault_backup_bucket} /usr/sbin/raft_backup.sh\n"
                 ),
             },
             {
