@@ -29,6 +29,7 @@ from pulumi_aws import (
     iam,
     lb,
     route53,
+    s3,
 )
 
 from bridge.lib.magic_numbers import (
@@ -77,6 +78,9 @@ odl_zone_id = dns_stack.require_output("odl_zone_id")
 root_ca = ca_stack.require_output("root_ca")
 target_vpc = network_stack.require_output(f"{target_network}_vpc")
 vault_domain = vault_config.require("domain")
+vault_backup_bucket = vault_config.require("backup_bucket")
+vault_backup_cron = vault_config.require("backup_cron")
+vault_backup_healthcheck_id = vault_config.require_secret("backup_healthcheck_id")
 vault_unseal_key = kms_stack.require_output("vault_auto_unseal_key")
 vault_ami = ec2.get_ami(
     filters=[
@@ -103,6 +107,7 @@ def vault_policy_document(vault_key_arn) -> dict[str, Any]:
                     "kms:Encrypt",
                     "kms:Decrypt",
                     "kms:DescribeKey",
+                    "kms:GenerateDataKey",
                 ],
                 "Resource": vault_key_arn,
             },
@@ -132,6 +137,18 @@ def vault_policy_document(vault_key_arn) -> dict[str, Any]:
                     "iam:GetRole",
                 ],
                 "Resource": ["arn:*:iam::*:role/*"],
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "s3:GetObject*",
+                    "s3:PutObject",
+                    "s3:ListBucket*",
+                ],
+                "Resource": [
+                    f"arn:aws:s3:::{vault_backup_bucket}",
+                    f"arn:aws:s3:::{vault_backup_bucket}/*",
+                ],
             },
         ],
     }
@@ -224,6 +241,34 @@ vault_instance_profile = iam.InstanceProfile(
     name_prefix=f"{env_name}-vault-server-",
     role=vault_iam_role.name,
     path=f"/ol-applications/vault/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+)
+
+# Backup Bucket
+backup_bucket = s3.Bucket(
+    "vault-backup-bucket",
+    bucket=vault_backup_bucket,
+    acl="private",
+    lifecycle_rules=[
+        s3.BucketLifecycleRuleArgs(
+            enabled=True,
+            id="reduce_storage_costs",
+            transitions=[
+                s3.BucketLifecycleRuleTransitionArgs(
+                    days=30, storage_class="INTELLIGENT_TIERING"
+                ),
+            ],
+        ),
+    ],
+    versioning=s3.BucketVersioningArgs(enabled=False),
+    server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
+        rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
+                sse_algorithm="aws:kms",
+                kms_master_key_id=vault_unseal_key["id"],
+            ),
+        )
+    ),
+    tags=aws_config.merged_tags(),
 )
 
 # Security Group
@@ -356,6 +401,9 @@ def cloud_init_user_data(
     grafana_credentials = read_yaml_secrets(
         Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
     )
+    vault_creds = read_yaml_secrets(
+        Path(f"pulumi/vault.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
+    )
     cloud_config_contents = {
         ""
         "write_files": [
@@ -375,6 +423,12 @@ def cloud_init_user_data(
             {
                 "path": "/etc/default/caddy",
                 "content": (f"DOMAIN={vault_dns_name}\n"),
+            },
+            {
+                "path": "/etc/cron.d/raft_backup",
+                "content": (
+                    f"{vault_backup_cron} root HEALTH_CHECK_ID={vault_backup_healthcheck_id} BUCKET_NAME={vault_backup_bucket} /usr/sbin/raft_backup.sh\n"
+                ),
             },
             {
                 "path": "/var/opt/kms_key_id",
@@ -463,7 +517,7 @@ cloud_init_param = Output.all(
 )
 
 vault_instance_type = (
-    vault_config.get("instance_type") or InstanceTypes.general_purpose_intel_xlarge.name
+    vault_config.get("instance_type") or InstanceTypes.general_prupose_intel_large.name
 )
 vault_launch_config = ec2.LaunchTemplate(
     "vault-server-launch-template",
@@ -556,9 +610,12 @@ vault_public_dns = route53.Record(
 export(
     "vault_server",
     {
-        "security_group": vault_security_group.id,
-        "public_dns": vault_public_dns.fqdn,
+        "backup_bucket": backup_bucket.bucket,
         "cluster_address": vault_public_dns.fqdn.apply("https://{}".format),
         "environment_namespace": f"{stack_info.env_prefix}.{stack_info.env_suffix}",
+        "instance_profile_arn": vault_instance_profile.arn,
+        "public_dns": vault_public_dns.fqdn,
+        "security_group": vault_security_group.id,
+        "vpc_id": target_vpc["id"],
     },
 )

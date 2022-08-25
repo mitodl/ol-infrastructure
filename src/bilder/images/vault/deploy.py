@@ -45,8 +45,9 @@ VERSIONS = {
     "caddy_route53": "v1.1.2",
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
+FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
 
-install_baseline_packages(packages=["curl", "gnupg"])
+install_baseline_packages(packages=["curl", "gnupg", "jq"])
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
 # Install Caddy
@@ -126,6 +127,14 @@ files.directory(
 )
 for product in hashicorp_products:
     configure_hashicorp_product(product)
+
+# Put down the basic raft_backup.sh
+files.put(
+    name="Place raft_backup.sh script.",
+    src=str(FILES_DIRECTORY.joinpath("raft_backup.sh")),
+    dest="/usr/sbin/raft_backup.sh",
+    mode="0700",
+)
 
 # Install vector
 vector_config = VectorConfig()

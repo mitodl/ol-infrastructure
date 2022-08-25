@@ -1,15 +1,20 @@
 from pathlib import Path
 
-from pulumi import Config
+from pulumi import Config, ResourceOptions, StackReference
+from pulumi_aws import get_caller_identity
 from pulumi_vault import AuthBackend, AuthBackendTuneArgs, Policy, aws, github
 
 from bridge.lib.magic_numbers import ONE_MONTH_SECONDS
-from ol_infrastructure.lib.ol_types import Environment
+from ol_infrastructure.lib.ol_types import AWSBase, Environment
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 vault_config = Config("vault")
 stack_info = parse_stack()
+
+vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+aws_config = AWSBase(tags={"OU": "operations", "Environment": stack_info.name})
+aws_account = get_caller_identity()
 
 if Config("vault_server").get("env_namespace"):
     setup_vault_provider()
@@ -73,3 +78,26 @@ for hcl_file in policy_folder.iterdir():
             vault_github_auth_team = github.Team(
                 f"vault-github-auth-{team}", team=team, policies=[devops_policy]
             )
+
+# Raft Backup policy definition
+raft_backup_policy = Policy(
+    "raft-backup-policy",
+    name="raft-backup",
+    policy=Path(__file__).parent.joinpath("raft_backup_policy.hcl").read_text(),
+)
+# Register Vault Instance Profice + VPC for Vault AWS auth
+aws.AuthBackendRole(
+    "vault-raft-backup-ec2-vault-auth",
+    backend="aws",
+    auth_type="iam",
+    role="raft-backup",
+    inferred_entity_type="ec2_instance",
+    inferred_aws_region=aws_config.region,
+    bound_iam_instance_profile_arns=[
+        vault_stack.require_output("vault_server")["instance_profile_arn"]
+    ],
+    bound_account_ids=[aws_account.account_id],
+    bound_vpc_ids=[vault_stack.require_output("vault_server")["vpc_id"]],
+    token_policies=[raft_backup_policy.name],
+    opts=ResourceOptions(delete_before_replace=True),
+)

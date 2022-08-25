@@ -4,7 +4,7 @@ encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQFDoFmf0q8DG9cyoR
 config:
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
-  vault_setup:key_shares: '2'
+  vault_setup:key_shares: "2"
   vault_setup:pgp_keys:
   - |
     mQINBFVGE70BEADY8VICDkCNfH+sFWhm7VE2LgQgFlGZjFPb5ccK2kDFKXAsn+qx
@@ -204,4 +204,4 @@ config:
     pFbO4NAxwgIanuFK8TTn7QN3gdDlEAdozQ/oj5prTHWRs4Z0GvZSNSj48zSFkiAJ
     c700JSGCpCewmBM5ipJbPJCXGzmqY+pkC+pS8XiC6iOivo8m8lvRHexKUfIFQEOK
     pRe6Rc4wuNFiP21DoNkQ
-  vault_setup:recovery_threshold: '2'
+  vault_setup:recovery_threshold: "2"
