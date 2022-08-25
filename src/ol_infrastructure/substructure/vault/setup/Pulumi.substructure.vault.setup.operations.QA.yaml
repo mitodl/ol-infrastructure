@@ -2,7 +2,7 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QHhz0xnN+wDezPJei/xvnnAAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMRH44dcjjn++7miXvAgEQgDuKeVpuhxJyyuLtmvqsxrSzYPR4AkQ7Q7Yrnt664nG0SsRuJHsjIrrcJiqiZbPar5g0e2mOe+amTWCZPg==
 config:
-  vault_setup:key_shares: '2'
+  vault_setup:key_shares: "2"
   vault_setup:pgp_keys:
   - |
     mQINBFVGE70BEADY8VICDkCNfH+sFWhm7VE2LgQgFlGZjFPb5ccK2kDFKXAsn+qx
@@ -202,4 +202,4 @@ config:
     pFbO4NAxwgIanuFK8TTn7QN3gdDlEAdozQ/oj5prTHWRs4Z0GvZSNSj48zSFkiAJ
     c700JSGCpCewmBM5ipJbPJCXGzmqY+pkC+pS8XiC6iOivo8m8lvRHexKUfIFQEOK
     pRe6Rc4wuNFiP21DoNkQ
-  vault_setup:recovery_threshold: '2'
+  vault_setup:recovery_threshold: "2"

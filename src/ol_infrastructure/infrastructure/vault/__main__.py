@@ -424,21 +424,9 @@ def cloud_init_user_data(
                 "content": (f"DOMAIN={vault_dns_name}\n"),
             },
             {
-                "path": "/etc/default/raft_backup",
-                "content": textwrap.dedent(
-                    f"""\
-                    export BUCKET_NAME={vault_backup_bucket}
-                    export RAFT_BACKUP_USERNAME="{vault_creds['raft_backup_username']}"
-                    export RAFT_BACKUP_PASSWORD="{vault_creds['raft_backup_password']}"
-                    """
-                ),
-                "owner": "root:root",
-                "permissions": "0600",
-            },
-            {
                 "path": "/etc/cron.d/raft_backup",
                 "content": (
-                    f"{vault_backup_cron} root . /etc/default/raft_backup; /usr/sbin/raft_backup.sh\n"
+                    f"{vault_backup_cron} root BUCKET_NAME={vault_backup_bucket} /usr/sbin/raft_backup.sh\n"
                 ),
             },
             {
@@ -621,10 +609,12 @@ vault_public_dns = route53.Record(
 export(
     "vault_server",
     {
-        "security_group": vault_security_group.id,
-        "public_dns": vault_public_dns.fqdn,
+        "backup_bucket": backup_bucket.bucket,
         "cluster_address": vault_public_dns.fqdn.apply("https://{}".format),
         "environment_namespace": f"{stack_info.env_prefix}.{stack_info.env_suffix}",
-        "backup_bucket": backup_bucket.bucket,
+        "instance_profile_arn": vault_instance_profile.arn,
+        "public_dns": vault_public_dns.fqdn,
+        "security_group": vault_security_group.id,
+        "vpc_id": target_vpc["id"],
     },
 )

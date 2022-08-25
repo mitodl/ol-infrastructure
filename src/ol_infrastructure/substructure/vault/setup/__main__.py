@@ -33,36 +33,7 @@ pulumi_vault_creds = read_yaml_secrets(
     )
 )
 
-# This is a dirty function that doesn't record anything to the pulumi state but it is the cleanest way I have to
-# directly interact with the 'pulumi' userpass auth method and create a new user entry. There is nothing native
-# to pulumi that can do that.
-#
-# Any time the substructure stack is run, this code will execute and reset the backup user + password + role.
-def init_backup_config(vault_addr):
-    vault_client = hvac.Client(url=f"https://{vault_addr}")
-    vault_client.auth_userpass(
-        pulumi_vault_creds["auth_username"], pulumi_vault_creds["auth_password"], PULUMI
-    )
-    if vault_client.is_authenticated():
-        vault_client.sys.create_or_update_policy(
-            name="raft-backup",
-            policy=Path(__file__)
-            .resolve()
-            .parent.joinpath("raft_backup_policy.hcl")
-            .read_text(),
-        )
 
-        user_pass = hvac.api.auth_methods.userpass.Userpass(vault_client.adapter)
-        user_pass.create_or_update_user(
-            username=pulumi_vault_creds["raft_backup_username"],
-            password=pulumi_vault_creds["raft_backup_password"],
-            mount_point=PULUMI,
-            policies=["raft-backup"],
-        )
-        vault_client.revoke_self_token()
-
-
-# This initialzes the cluster using hvac, entirely outside of pulumi.
 def init_vault_cluster(vault_addr):
     vault_client = hvac.Client(url=f"https://{vault_addr}")
     recovery_keys = []
@@ -99,7 +70,7 @@ def init_vault_cluster(vault_addr):
                     vault_client.sys.enable_auth_method(
                         method_type="userpass",
                         description="Allow authentication for Pulumi using the "
-                        "user/pass method. Also allow the `raft_backup` user to use user/pass as well.",
+                        "user/pass method",
                         path=PULUMI,
                     )
 
@@ -110,10 +81,10 @@ def init_vault_cluster(vault_addr):
                     .parent.joinpath("pulumi_policy.hcl")
                     .read_text(),
                 )
+
                 user_pass = hvac.api.auth_methods.userpass.Userpass(
                     vault_client.adapter
                 )
-
                 user_pass.create_or_update_user(
                     username=pulumi_vault_creds["auth_username"],
                     password=pulumi_vault_creds["auth_password"],
@@ -126,12 +97,10 @@ def init_vault_cluster(vault_addr):
             except (hvac.exceptions.VaultDown, hvac.exceptions.InternalServerError):
                 pulumi.log.info("Vault isn't ready yet. Waiting and trying again.")
                 time.sleep(1)
-
     return recovery_keys
 
 
 vault_dns.apply(init_vault_cluster)
-vault_dns.apply(init_backup_config)
 
 vault_provider = pulumi.ResourceOptions(
     provider=get_vault_provider(
