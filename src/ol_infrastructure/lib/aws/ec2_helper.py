@@ -45,6 +45,7 @@ class InstanceTypes(str, Enum):
     general_purpose_large = "m5a.large"
     general_purpose_xlarge = "m5a.xlarge"
     general_purpose_2xlarge = "m5a.2xlarge"
+    general_prupose_intel_large = "m5.large"
     general_purpose_intel_xlarge = "m5.xlarge"
     general_purpose_intel_2xlarge = "m5.2xlarge"
     high_mem_regular = "r5a.large"
