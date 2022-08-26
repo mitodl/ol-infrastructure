@@ -35,7 +35,27 @@ def packer_jobs(
     node_types: Optional[Iterable[str]] = None,
     packer_vars: Optional[dict[str, str]] = None,
     env_vars_from_files: Optional[dict[str, str]] = None,
+    extra_packer_params: Optional[dict[str, str]] = None,
 ) -> PipelineFragment:
+    """Generate a pipeline fragment for building EC2 AMIs with Packer.
+
+    :param dependencies: The list of `Get` steps that should be run at the start of the
+        pipeline.  This is used for setting up inputs to the build, as well as for
+        triggering on upstream changes (e.g. GitHub releases).
+    :param image_code: The Git resource definition that specifies the repository that
+        holds the code for building the image, including the Packer template.
+    :param packer_template_path: The path in the image_code resource that points to the
+        Packer template that you would like to build.
+    :param node_types: The node types that should be built for the template and passed
+        as vars during the build (e.g. web and worker)
+    :param packer_vars: A dictionary of var inputs for the Packer template.
+    :param env_vars_from_files: The list of environment variables that should be set
+        during the build and the files to load for populating the values (e.g. the
+        `version` file from a GitHub resource)
+
+    :returns: A `PipelineFragment` object that can be composed with other fragments to
+              build a complete pipeline definition.
+    """
     packer_validate_type = packer_validate()
     packer_build_type = packer_build()
     packer_build_resource = Resource(name="packer-build", type=packer_build_type.name)
@@ -55,9 +75,10 @@ def packer_jobs(
                     PutStep(
                         put=packer_validate_resource.name,
                         params={
-                            "template": f"{image_code.name}/src/bilder/images/.",
+                            "template": f"{image_code.name}/{packer_template_path}",
                             "objective": "validate",
                             "vars": {**(packer_vars or {}), **{"node_type": node_type}},
+                            **(extra_packer_params or {}),
                         },
                     )
                     for node_type in (node_types or ["server"])
@@ -87,7 +108,7 @@ def packer_jobs(
                                 "PYTHONPATH": f"${{PYTHONPATH}}:{image_code.name}/src",
                             },
                             "env_vars_from_files": env_vars_from_files or {},
-                            "only": ["amazon-ebs.third-party"],
+                            **(extra_packer_params or {}),
                         },
                     )
                     for node_type in (node_types or ["server"])
@@ -109,6 +130,21 @@ def pulumi_jobs_chain(
     project_source_path: Path,
     dependencies: Optional[list[GetStep]] = None,
 ) -> PipelineFragment:
+    """Create a chained sequence of jobs for running Pulumi tasks.
+
+    :param pulumi_code: A git resource that represents the repository for the code being
+        executed
+    :param stack_names: The list of stack names in sequence that should be chained
+        together
+    :param project_name: The name of the Pulumi project being executed
+    :param project_source_path: The path within the `pulumi_code` resource where the
+        code being executed is located
+    :param dependencies: A list of `Get` step definitions that are used as inputs or
+        triggers for the jobs in the chain
+
+    :returns: A `PipelineFragment` object that can be composed with other fragments to
+              build a full pipeline.
+    """
     chain_fragment = PipelineFragment()
     previous_job = None
     for index, stack_name in enumerate(stack_names):
@@ -138,6 +174,22 @@ def pulumi_job(
     dependencies: Optional[list[GetStep]] = None,
     previous_job: Optional[Job] = None,
 ) -> PipelineFragment:
+    """Create a job definition for running a Pulumi task.
+
+    :param pulumi_code: A git resource that represents the repository for the code being
+        executed
+    :param stack_name: The stack name to use while executing the Pulumi task
+    :param project_name: The name of the Pulumi project being executed
+    :param project_source_path: The path within the `pulumi_code` resource where the
+        code being executed is located
+    :param dependencies: A list of `Get` step definitions that are used as inputs or
+        triggers for the jobs in the chain
+    :param previous_job: The job object that should be added as a `passed` dependency
+        for the `get` step input for this job definition.
+
+    :returns: A `PipelineFragment` object that can be composed with other fragments to
+              build a full pipeline.
+    """
     pulumi_provisioner_resource_type = pulumi_provisioner_resource()
     packer_build_type = packer_build()
     packer_build_resource = Resource(name="packer-build", type=packer_build_type.name)
