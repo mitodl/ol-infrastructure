@@ -53,6 +53,7 @@ forum_server_ami = ec2.get_ami(
         ec2.GetAmiFilterArgs(name="name", values=["open-edx-forum-server-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
+        ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_suffix]),
     ],
     most_recent=True,
     owners=[aws_account.account_id],
@@ -197,7 +198,7 @@ lt_config = OLLaunchTemplateConfig(
                             },
                         ],
                         "bootcmd": [
-                            "sed -i -e 's/latest/{openedx_version_tag}/' /etc/docker/compose/docker-compose.yaml"
+                            f"sed -i -e 's/latest/{openedx_version_tag}/' /etc/docker/compose/docker-compose.yaml"
                         ],
                     },
                     sort_keys=True,
