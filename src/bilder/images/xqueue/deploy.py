@@ -64,9 +64,9 @@ files.put(
 )
 
 files.put(
-    name="Place the xqueue .env file",
-    src=str(Path(__file__).resolve().parent.joinpath("files", "xqueue.env.j2")),
-    dest="/etc/consul-template/templates.d/xqueue.env.j2",
+    name="Place the xqueue .yaml file",
+    src=str(Path(__file__).resolve().parent.joinpath("files", "xqueue.yaml.j2")),
+    dest="/etc/consul-template/templates.d/xqueue.yaml.j2",
     mode="0660",
     user="consul-template",
     group="consul-template",
@@ -82,7 +82,7 @@ server.shell(
     name="Update Vault Mount Point",
     commands=[
         "mkdir /etc/xqueue/",
-        f"sed -i -e 's/DEPLOYMENT/{DEPLOYMENT}/g' /etc/consul-template/templates.d/xqueue.env.j2",
+        f"sed -i -e 's/DEPLOYMENT/{DEPLOYMENT}/g' /etc/consul-template/templates.d/xqueue.yaml.j2",
     ],
 )
 
@@ -136,11 +136,11 @@ vault = Vault(
     configuration={Path("vault.json"): vault_config},
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
-xqueue_config_path = Path("/etc/xqueue/xqueue.env")
+xqueue_config_path = Path("/etc/xqueue/xqueue.yaml")
 
 consul_templates = [
     ConsulTemplateTemplate(
-        source=Path("/etc/consul-template/templates.d/xqueue.env.j2"),
+        source=Path("/etc/consul-template/templates.d/xqueue.yaml.j2"),
         destination=xqueue_config_path,
     ),
 ]
