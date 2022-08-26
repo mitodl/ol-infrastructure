@@ -9,7 +9,7 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, StackReference
+from pulumi import Config, Output, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -110,7 +110,8 @@ airbyte_server_instance_role = iam.Role(
 parliament_config = {
     "PERMISSIONS_MANAGEMENT_ACTIONS": {
         "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
-    }
+    },
+    "UNKNOWN_ACTION": {"ignore_locations": []},
 }
 data_lake_policy_document = {
     "Version": IAM_POLICY_VERSION,
@@ -133,6 +134,61 @@ data_lake_policy_document = {
                 f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}",
                 f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}/*",
             ],
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "glue:TagResource",
+                "glue:UnTagResource",
+            ],
+            "Resource": ["*"],
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "glue:BatchCreatePartition",
+                "glue:BatchDeletePartition",
+                "glue:BatchDeleteTable",
+                "glue:BatchGetPartition",
+                "glue:CreateTable",
+                "glue:CreatePartition",
+                "glue:DeletePartition",
+                "glue:DeleteTable",
+                "glue:GetDatabase",
+                "glue:GetDatabases",
+                "glue:GetPartition",
+                "glue:GetPartitions",
+                "glue:GetTable",
+                "glue:GetTables",
+                "glue:UpdateDatabase",
+                "glue:UpdatePartition",
+                "glue:UpdateTable",
+            ],
+            "Resource": [
+                "arn:aws:glue:*:*:catalog",
+                f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}",
+                f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}/*",
+            ],
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "lakeformation:StartTransaction",
+                "lakeformation:CommitTransaction",
+                "lakeformation:CancelTransaction",
+                "lakeformation:ExtendTransaction",
+                "lakeformation:DescribeTransaction",
+                "lakeformation:ListTransactions",
+                "lakeformation:StartQueryPlanning",
+                "lakeformation:GetQueryState",
+                "lakeformation:GetWorkUnitResults",
+                "lakeformation:GetWorkUnits",
+                "lakeformation:GetQueryStatistics",
+                "lakeformation:GetTableObjects",
+                "lakeformation:UpdateTableObjects",
+                "lakeformation:DeleteObjectsOnCancel",
+            ],
+            "Resource": "*",
         },
     ],
 }
@@ -170,6 +226,33 @@ airbyte_server_instance_profile = iam.InstanceProfile(
     path="/ol-infrastructure/airbyte-server/profile/",
 )
 
+airbyte_lakeformation_role = iam.Role(
+    "airbyte-lakeformation-role",
+    assume_role_policy=airbyte_server_instance_role.arn.apply(
+        lambda instance_role_arn: json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "sts:AssumeRole",
+                        "Principal": {"AWS": instance_role_arn},
+                    },
+                ],
+            }
+        )
+    ),
+    name=f"airbyte-lakeformation-role-{stack_info.env_suffix}",
+    path="/ol-infrastructure/airbyte-app/role/",
+    tags=aws_config.tags,
+)
+
+iam.RolePolicyAttachment(
+    f"airbyte-application-lakeformation-access-policy-{env_name}",
+    policy_arn=data_lake_policy.arn,
+    role=airbyte_lakeformation_role.name,
+)
+
 # Vault policy definition
 airbyte_server_vault_policy = vault.Policy(
     "airbyte-server-vault-policy",
@@ -191,6 +274,14 @@ vault.aws.AuthBackendRole(
     token_policies=[airbyte_server_vault_policy.name],
 )
 
+# Create the secret mount used for storing configuration secrets
+vault.Mount(
+    "airbyte-server-configuration-secrets-mount",
+    path="secret-airbyte",
+    type="kv",
+    options={"version": 1},
+    description="Storage of configuration credentials used in Airbyte connections.",
+)
 ##################################
 #     Network Access Control     #
 ##################################
@@ -455,3 +546,5 @@ route53.Record(
     records=[as_setup.load_balancer.dns_name],
     zone_id=mitodl_zone_id,
 )
+
+export("lakeformation_role_arn", airbyte_lakeformation_role.arn)

@@ -137,7 +137,7 @@ files.put(
 vault_templates = [
     VaultTemplate(
         source=pomerium_config.configuration_template_file,
-        destination=Path(pomerium_config.configuration_file),
+        destination=pomerium_config.configuration_file,
     ),
     VaultTemplate(
         source=nginx_pomerium_conf_template_file,
@@ -150,12 +150,12 @@ vault_templates = [
     VaultTemplate(
         contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
         "{{ printf .Data.key }}{{ end }}",
-        destination=Path(f"{pomerium_config.certificate_key_file}"),
+        destination=pomerium_config.certificate_key_file,
     ),
     VaultTemplate(
         contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
         "{{ printf .Data.value }}{{ end }}",
-        destination=Path(f"{pomerium_config.certificate_file}"),
+        destination=pomerium_config.certificate_file,
     ),
 ]
 consul_configuration = {
