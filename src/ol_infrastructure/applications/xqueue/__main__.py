@@ -53,7 +53,7 @@ xqueue_server_ami = ec2.get_ami(
         ec2.GetAmiFilterArgs(name="name", values=["open-edx-xqueue-server-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
-        ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
+        ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_suffix]),
     ],
     most_recent=True,
     owners=[aws_account.account_id],
