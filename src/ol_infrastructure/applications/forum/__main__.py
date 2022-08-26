@@ -198,7 +198,7 @@ lt_config = OLLaunchTemplateConfig(
                             },
                         ],
                         "bootcmd": [
-                            "sed -i -e 's/latest/{openedx_version_tag}/' /etc/docker/compose/docker-compose.yaml"
+                            f"sed -i -e 's/latest/{openedx_version_tag}/' /etc/docker/compose/docker-compose.yaml"
                         ],
                     },
                     sort_keys=True,
