@@ -4,7 +4,11 @@ services:
   xqueue:
     container_name: xqueue
     image: mitodl/xqueue:latest
+    environment:
+    - XQUEUE_CFG=/etc/xqueue/xqueue.yaml
     ports:
     - 8040:8040
-    env_file:
-    - /etc/xqueue/xqueue.env
+    volumes:
+    - /etc/xqueue/xqueue.yaml:/etc/xqueue/xqueue.yaml
+volumes:
+  /etc/xqueue/xqueue.yaml:
