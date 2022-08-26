@@ -30,6 +30,7 @@ xqueue_config = Config("xqueue")
 if Config("vault").get("address"):
     setup_vault_provider()
 
+openedx_version_tag = xqueue_config.get("openedx_version_tag")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
@@ -196,7 +197,10 @@ lt_config = OLLaunchTemplateConfig(
                                 ),
                                 "owner": "root:root",
                             },
-                        ]
+                        ],
+                        "bootcmd": [
+                            f"sed -i -e 's/latest/{openedx_version_tag}/' /etc/docker/compose/docker-compose.yaml"
+                        ],
                     },
                     sort_keys=True,
                 )
