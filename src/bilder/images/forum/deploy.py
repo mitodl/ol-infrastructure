@@ -59,7 +59,7 @@ VERSIONS = {
 files.put(
     name="Place the forum docker-compose.yaml file",
     src=str(Path(__file__).resolve().parent.joinpath("files", "docker-compose.yaml")),
-    dest=DOCKER_COMPOSE_DIRECTORY,
+    dest=str(Path(DOCKER_COMPOSE_DIRECTORY).joinpath("docker-compose.yaml")),
     mode="0660",
 )
 
