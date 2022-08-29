@@ -427,7 +427,7 @@ def cloud_init_user_data(
             {
                 "path": "/etc/cron.d/raft_backup",
                 "content": (
-                    f"{vault_backup_cron} root HEALTH_CHECK_ID={vault_backup_healthcheck_id} BUCKET_NAME={vault_backup_bucket} /usr/sbin/raft_backup.sh\n"
+                    f"{vault_backup_cron} root PATH=/usr/local/bin:/usr/bin HEALTH_CHECK_ID={vault_backup_healthcheck_id} BUCKET_NAME={vault_backup_bucket} /usr/sbin/raft_backup.sh\n"
                 ),
             },
             {
