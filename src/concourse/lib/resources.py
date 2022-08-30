@@ -36,6 +36,23 @@ def github_release(name: Identifier, owner: str, repository: str) -> Resource:
     )
 
 
+def hashicorp_release(name: Identifier, project: str) -> Resource:
+    """Generate a hashicorp-release resource for the given application.
+
+    :param name: The name of the resourc. This will get used across subsequent pipeline steps taht reference this resource.
+    :type name: Identifier
+    :param project: The name of the hashicorp project to check for a release of.
+    :type project: str
+    """
+    return Resource(
+        name=name,
+        type="hashicorp-release",
+        icon="lock-check",
+        check_every="24h",
+        source={"project": project},
+    )
+
+
 def amazon_ami(
     name: Identifier, filters: dict[str, Union[str, bool]], region: str = "us-east-1"
 ) -> Resource:

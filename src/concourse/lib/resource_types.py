@@ -2,6 +2,14 @@ from concourse.lib.constants import REGISTRY_IMAGE
 from concourse.lib.models.pipeline import Identifier, RegistryImage, ResourceType
 
 
+def hashicorp_resource() -> ResourceType:
+    return ResourceType(
+        name=Identifier("hashicorp-release"),
+        type=REGISTRY_IMAGE,
+        source=RegistryImage(repository="starkandwayne/hashicorp-release-resource"),
+    )
+
+
 def rclone() -> ResourceType:
     return ResourceType(
         name=Identifier("rclone"),
