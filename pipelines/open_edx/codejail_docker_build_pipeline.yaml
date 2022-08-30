@@ -1,0 +1,84 @@
+---
+
+resources:
+- check_every: 24h
+  name: codejail-release
+  type: github-release
+  source:
+    owner: eduNEXT
+    repository: codejailservice
+    branch: main
+    release: true
+
+# - check_every: 24h
+#   name: codejail-release
+#   type: git
+#   source:
+#     uri: https://github.com/openedx/cs_comments_service.git
+#     branch: ((openedx_branch))
+
+
+- name: codejail-image
+  type: registry-image
+  icon: docker
+  source:
+    repository: mitodl/codejail
+    username: ((dockerhub.username))
+    password: ((dockerhub.password))
+
+- name: codejail-dockerfile-repo
+  type: git
+  icon: github
+  source:
+    uri: https://github.com/mitodl/ol-infrastructure.git
+    branch: codejail_concourse_pipeline
+    path: dockerfiles/openedx-codejail/Dockerfile
+
+jobs:
+- name: build-and-push
+  plan:
+  - get: codejail-dockerfile-repo
+  - get: codejail-release
+    trigger: true
+
+  - task: generate-git-tag
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: ubuntu
+      outputs:
+      - name: tag-file
+      inputs:
+      - name: codejail-release
+      run:
+        path: /bin/bash
+        args:
+        - -c
+        - |
+          cat ./codejail-release/tag > tag-file/tag.txt
+
+  - task: build-codejail-image
+    privileged: true
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: concourse/oci-build-task
+      inputs:
+      - name: codejail-dockerfile-repo
+      - name: codejail-release
+      outputs:
+      - name: image
+      params:
+        CONTEXT: codejail-dockerfile-repo/dockerfiles/openedx-codejail
+      run:
+        path: build
+        args:
+        - -t $(cat ./codejail-release/commit_sha)
+  - put: codejail-image
+    params:
+      image: image/image.tar
+      additional_tags: tag-file/tag.txt
