@@ -15,6 +15,21 @@ def git_repo(
     )
 
 
+def ssh_git_repo(
+    name: Identifier,
+    uri: str,
+    private_key: str,
+    branch: str = "main",
+    paths: list[str] = None,
+) -> Resource:
+    return Resource(
+        name=name,
+        type="git",
+        icon="git",
+        source=Git(uri=uri, branch=branch, paths=paths, private_key=private_key),
+    )
+
+
 def github_release(name: Identifier, owner: str, repository: str) -> Resource:
     """Generate a github-release resource for the given owner/repository.
 
@@ -81,4 +96,13 @@ def pulumi_provisioner(
             "project_name": project_name,
             "source_dir": project_path,
         },
+    )
+
+
+def schedule(name: Identifier, interval: str) -> Resource:
+    return Resource(
+        name=name,
+        type="time",
+        icon="clock",
+        source={"interval": interval},
     )
