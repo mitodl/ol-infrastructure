@@ -83,7 +83,7 @@ files.put(
 files.put(
     name="Set the Airbyte version",
     src=io.StringIO(VERSIONS["airbyte"]),
-    dest="/etc/default/consul-template",
+    dest="/etc/default/airbyte-version",
 )
 
 env_template_file = Path("/etc/consul-template/.env.tmpl")
