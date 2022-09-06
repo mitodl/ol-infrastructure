@@ -9,8 +9,7 @@ config:
     max: 2
     min: 1
   forum:business_unit: residential
+  forum:openedx_version_tag: nutmeg.master
   forum:target_vpc: residential_mitx_vpc
-  forum:web_host_domain: forum-xpro-ci.odl.mit.edu
-  forum:openedx_version_tag: maple.master
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

@@ -9,8 +9,7 @@ config:
     max: 2
     min: 1
   forum:business_unit: mitxpro
-  forum:target_vpc: xpro_vpc
-  forum:web_host_domain: forum-xpro-ci.odl.mit.edu
   forum:openedx_version_tag: maple.master
+  forum:target_vpc: xpro_vpc
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
