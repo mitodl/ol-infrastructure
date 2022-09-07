@@ -12,6 +12,7 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
 from pulumi_aws import cloudwatch, ec2, iam, mediaconvert, s3, sns
 
+from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -35,6 +36,7 @@ ocw_studio_config = Config("ocw_studio")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
+data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 aws_config = AWSBase(
     tags={
@@ -199,12 +201,18 @@ ocw_studio_db_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
-            from_port=5432,
-            to_port=5432,
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
             cidr_blocks=["0.0.0.0/0"],
             ipv6_cidr_blocks=["::/0"],
             description="Allow access over the public internet from Heroku",
-        )
+        ),
+        ec2.SecurityGroupIngressArgs(
+            protocol="tcp",
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+            security_groups=[data_vpc["security_groups"]["integrator"]],
+        ),
     ],
     egress=[
         ec2.SecurityGroupEgressArgs(
