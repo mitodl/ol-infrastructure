@@ -8,6 +8,7 @@ class Git(BaseModel):
     uri: str
     branch: str = "main"
     paths: Optional[list[Path]]
+    private_key: Optional[str]
     ignore_paths: Optional[list[Path]]
 
     class Config:
