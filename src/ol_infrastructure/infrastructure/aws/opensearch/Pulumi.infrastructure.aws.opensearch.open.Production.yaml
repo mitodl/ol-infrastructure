@@ -5,10 +5,10 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-apps-production.odl.mit.edu
   consul:scheme: https
-  environment:business_unit: operations
+  environment:business_unit: 'mit-open'
   environment:target_vpc: applications_vpc
   opensearch:cluster_size: "3"
-  opensearch:consul_service_name: opensearch-open
+  opensearch:consul_service_name: 'mitopen-search'
   opensearch:disk_size_gb: "60"
   opensearch:engine_version: "6.8"
   opensearch:instance_type: t3.medium.elasticsearch
