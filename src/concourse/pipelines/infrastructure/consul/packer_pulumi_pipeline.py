@@ -111,3 +111,5 @@ if __name__ == "__main__":
     with open("definition.json", "wt") as definition:
         definition.write(consul_pipeline.json(indent=2))
     sys.stdout.write(consul_pipeline.json(indent=2))
+    print()
+    print("fly -t pr-inf sp -p packer-pulumi-consul -c definition.json")

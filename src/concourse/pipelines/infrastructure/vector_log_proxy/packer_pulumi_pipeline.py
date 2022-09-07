@@ -73,3 +73,5 @@ if __name__ == "__main__":
     with open("definition.json", "wt") as definition:
         definition.write(vector_log_proxy_pipeline.json(indent=2))
     sys.stdout.write(vector_log_proxy_pipeline.json(indent=2))
+    print()
+    print("fly -t pr-inf sp -p packer-pulumi-vector-log-proxy -c definition.json")

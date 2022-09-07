@@ -98,3 +98,5 @@ if __name__ == "__main__":
     with open("definition.json", "wt") as definition:
         definition.write(aws_pipeline.json(indent=2))
     sys.stdout.write(aws_pipeline.json(indent=2))
+    print()
+    print("fly -t pr-inf sp -p pulumi-aws -c definition.json")

@@ -69,3 +69,5 @@ if __name__ == "__main__":
     with open("definition.json", "wt") as definition:
         definition.write(airbyte_pipeline.json(indent=2))
     sys.stdout.write(airbyte_pipeline.json(indent=2))
+    print()
+    print("fly -t pr-inf sp -p packer-pulumi-airbyte -c definition.json")

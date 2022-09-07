@@ -78,3 +78,5 @@ if __name__ == "__main__":
     with open("definition.json", "wt") as definition:
         definition.write(vault_pipeline.json(indent=2))
     sys.stdout.write(vault_pipeline.json(indent=2))
+    print()
+    print("fly -t pr-inf sp -p packer-pulumi-vault -c definition.json")
