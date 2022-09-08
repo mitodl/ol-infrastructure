@@ -1,4 +1,4 @@
-FROM docker.io/ruby:2.5.7-slim-stretch
+FROM docker.io/ruby:2.6.8-slim-stretch
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update && \
   apt upgrade -y && \
