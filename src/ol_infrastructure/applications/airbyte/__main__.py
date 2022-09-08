@@ -9,7 +9,7 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, StackReference, export
+from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -275,12 +275,28 @@ vault.aws.AuthBackendRole(
 )
 
 # Create the secret mount used for storing configuration secrets
-vault.Mount(
+airbyte_vault_mount = vault.Mount(
     "airbyte-server-configuration-secrets-mount",
     path="secret-airbyte",
-    type="kv",
-    options={"version": 1},
+    type="kv-v2",
+    options={"version": 2},
     description="Storage of configuration credentials used in Airbyte connections.",
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+airbyte_vault_secrets = read_yaml_secrets(
+    Path(f"airbyte/data.{stack_info.env_suffix}.yaml")
+)
+
+vault.generic.Secret(
+    "airbyte-server-configuration-pomerium-secrets",
+    path=airbyte_vault_mount.path.apply("{}/pomerium".format),
+    data_json=json.dumps(airbyte_vault_secrets["pomerium"]),
+)
+vault.generic.Secret(
+    "airbyte-server-configuration-sentry-secrets",
+    path=airbyte_vault_mount.path.apply("{}/sentry-dsn".format),
+    data_json=json.dumps(airbyte_vault_secrets["sentry-dsn"]),
 )
 ##################################
 #     Network Access Control     #
