@@ -1,10 +1,21 @@
 {
   "extends": [
-    "config:base"
+    // automatically merge minor and patch updates
+    ":automergeMinor",
+    ":rebaseStalePrs",
+    // major version bumps
+    ":separateMajorReleases",
+    "config:base",
+  ],
+  "group": [
+    "group:allNonMajor",
+    "group:python",
+    "group:docker"
   ],
   "schedule": [
     "every weekend"
   ],
+  "timezone": "US/Eastern",
   "lockFileMaintenance": {
     "enabled": true
   }
