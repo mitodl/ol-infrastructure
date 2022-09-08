@@ -7,11 +7,6 @@
     ":separateMajorReleases",
     "config:base",
   ],
-  "group": [
-    "group:allNonMajor",
-    "group:python",
-    "group:docker"
-  ],
   "schedule": [
     "every weekend"
   ],
