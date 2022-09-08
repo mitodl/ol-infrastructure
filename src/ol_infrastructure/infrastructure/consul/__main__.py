@@ -176,22 +176,6 @@ consul_agent_security_group = ec2.SecurityGroup(
             self=True,
             description="LAN gossip protocol from servers",
         ),
-        ec2.SecurityGroupIngressArgs(
-            security_groups=[consul_server_security_group.id],
-            protocol="tcp",
-            from_port=CONSUL_RPC_PORT,
-            to_port=CONSUL_RPC_PORT,
-            self=True,
-            description="LAN gossip protocol from servers",
-        ),
-        ec2.SecurityGroupIngressArgs(
-            security_groups=[consul_server_security_group.id],
-            protocol="udp",
-            from_port=CONSUL_RPC_PORT,
-            to_port=CONSUL_RPC_PORT,
-            self=True,
-            description="LAN gossip protocol from servers",
-        ),
     ],
 )
 
