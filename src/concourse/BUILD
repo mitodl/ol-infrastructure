@@ -11,7 +11,7 @@ python_distribution(
     description="A Pythonic way to manage your Concourse pipelines",
     provides=python_artifact(
         name="ol-concourse",
-        version="0.1.0",
+        version="0.2.0",
     ),
     repositories=["@pypi"]
 )

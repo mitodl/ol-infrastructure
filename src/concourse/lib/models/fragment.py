@@ -11,7 +11,7 @@ class PipelineFragment(BaseModel):
     @validator("resource_types")
     def deduplicate_resource_types(
         cls: "PipelineFragment", resource_types: list[ResourceType]
-    ):
+    ) -> list[ResourceType]:
         """Ensure that there are no duplicate resource type definitions.
 
         Concourse pipelines don't support duplicate definitions of resource types, where
@@ -19,13 +19,19 @@ class PipelineFragment(BaseModel):
         `PipelineFragment` objects can be composed together without violating that
         requirement.
 
+        NOTE: This validator is only triggered on new assignments to the attribute, not
+        mutations of existing instances of the attribute.  In other words, if you
+        `.append` or `.extend` this list the validator will *not* trigger.  See
+        `Pydantic #496 <https://github.com/pydantic/pydantic/issues/496>`_ for more
+        details
+
         :param cls: The class object
         :param resource_types: The list of resource types defined in the class instance.
 
         :returns: A list of resource types that have been deduplicated
         """
-        unique_resource_types = []
-        resource_type_identifiers = set()
+        unique_resource_types: list[ResourceType] = []
+        resource_type_identifiers: set[str] = set()
         for resource_type in resource_types or []:
             if resource_type.name not in resource_type_identifiers:
                 resource_type_identifiers.add(resource_type.name)
@@ -33,21 +39,29 @@ class PipelineFragment(BaseModel):
         return unique_resource_types
 
     @validator("resources")
-    def deduplicate_resources(cls: "PipelineFragment", resources: list[Resource]):
+    def deduplicate_resources(
+        cls: "PipelineFragment", resources: list[Resource]
+    ) -> list[Resource]:
         """Ensure that there are no duplicate resource definitions.
 
-        Concourse pipelines don't support duplicate definitions of resources, where
-        the `name` identifier is used to determine uniqueness.  This ensurs that
+        Concourse pipelines don't support duplicate definitions of resources, where the
+        `name` identifier is used to determine uniqueness.  This ensurs that
         `PipelineFragment` objects can be composed together without violating that
         requirement.
 
+        NOTE: This validator is only triggered on new assignments to the attribute, not
+        mutations of existing instances of the attribute.  In other words, if you
+        `.append` or `.extend` this list the validator will *not* trigger.  See
+        `Pydantic #496 <https://github.com/pydantic/pydantic/issues/496>`_ for more
+        details
+
         :param cls: The class object
         :param resources: The list of resources defined on the class instance
-        :returns: A list of resources that has been deduplicated.
 
+        :returns: A list of resources that has been deduplicated.
         """
-        unique_resources = []
-        resource_identifiers = set()
+        unique_resources: list[Resource] = []
+        resource_identifiers: set[str] = set()
         for resource in resources or []:
             if resource.name not in resource_identifiers:
                 resource_identifiers.add(resource.name)

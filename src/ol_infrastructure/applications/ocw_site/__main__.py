@@ -15,6 +15,7 @@ from bridge.lib.magic_numbers import (
     SECONDS_IN_ONE_DAY,
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.fastly import get_fastly_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
@@ -26,6 +27,7 @@ aws_config = AWSBase(
         "Environment": f"applications_{stack_info.env_suffix}",
     }
 )
+fastly_provider = get_fastly_provider()
 
 dns_stack = StackReference("infrastructure.aws.dns")
 ocw_zone = dns_stack.require_output("ocw")
@@ -404,7 +406,7 @@ for purpose in ("draft", "live"):
         stale_if_error=True,
         opts=ResourceOptions(
             protect=True,
-        ),
+        ).merge(fastly_provider),
     )
 
     fastly.ServiceDictionaryItems(
@@ -413,7 +415,7 @@ for purpose in ("draft", "live"):
         dictionary_id=servicevcl_backend.dictionaries[0].dictionary_id,
         items=json.load(open("redirect_dict")),
         manage_items=True,
-        opts=ResourceOptions(protect=True),
+        opts=ResourceOptions(protect=True).merge(fastly_provider),
     )
 
     fastly_distributions[purpose] = servicevcl_backend
