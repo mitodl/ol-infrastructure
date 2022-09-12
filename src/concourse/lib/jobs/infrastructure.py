@@ -160,8 +160,10 @@ def pulumi_jobs_chain(
             dependencies,
             previous_job,
         )
-        chain_fragment.resource_types.extend(step_fragment.resource_types)
-        chain_fragment.resources.extend(step_fragment.resources)
+        chain_fragment.resource_types = (
+            chain_fragment.resource_types + step_fragment.resource_types
+        )
+        chain_fragment.resources = chain_fragment.resources + step_fragment.resources
         chain_fragment.jobs.extend(step_fragment.jobs)
     return chain_fragment
 
@@ -191,8 +193,6 @@ def pulumi_job(
               build a full pipeline.
     """
     pulumi_provisioner_resource_type = pulumi_provisioner_resource()
-    packer_build_type = packer_build()
-    packer_build_resource = Resource(name="packer-build", type=packer_build_type.name)
     pulumi_resource = pulumi_provisioner(
         name=Identifier("pulumi-project"),
         project_name=project_name,
@@ -223,7 +223,7 @@ def pulumi_job(
                     inputs=[Input(name=pulumi_code.name)],
                     outputs=[aws_creds_path],
                     run=Command(
-                        path=f"{pulumi_code.name}/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"
+                        path=f"{pulumi_code.name}/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"  # noqa: E501
                     ),
                 ),
             ),
