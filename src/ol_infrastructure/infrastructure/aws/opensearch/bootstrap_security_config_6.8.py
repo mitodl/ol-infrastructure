@@ -27,7 +27,7 @@ cluster_output = stream.read()
 cluster = json.loads(cluster_output)
 
 read_only_role = {
-    "cluster": ["cluster_composite_ops_ro"],
+    "cluster": ["CLUSTER_COMPOSITE_OPS_RO"],
     "indices": {
         "*": {
             "*": ["READ"],
@@ -38,20 +38,23 @@ read_only_role = {
 
 read_write_role = {
     "cluster": [
-        "cluster_composite_ops",
+        "CLUSTER_COMPOSITE_OPS",
         "indices:data/read/scroll",
         "indices:data/read/scroll/clear",
+        "indices:data/write/bulk",
+        "indices:admin/get",
+        "indices:admin/exists",
+        "indices:admin/refresh*",
     ],
     "indices": {
         "*": {
             "*": [
-                "crud",
-                "create_index",
-                "indices_all",
-                "indices:data/read/scroll",
-                "indices:data/read/scroll/clear",
-                "indices:data/read/scroll*",
-                "indices:data/read/scroll/clear*",
+                "CRUD",
+                "GET",
+                "CREATE_INDEX",
+                "SEARCH",
+                "MANAGE_ALIASES",
+                "indices:*",
             ],
         }
     },
