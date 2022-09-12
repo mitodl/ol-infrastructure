@@ -8,7 +8,7 @@ ENV HUGO_NAME="hugo_extended_${HUGO_VERSION}_Linux-64bit"
 ENV GO_FILE_NAME="go1.18.2.linux-amd64.tar.gz"
 ENV GO_URL="https://golang.org/dl/${GO_FILE_NAME}"
 ENV HUGO_URL="https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/${HUGO_NAME}.deb"
-ENV BUILD_DEPS="wget"
+ENV BUILD_DEPS="wget zip unzip"
 RUN apt update && \
     apt install -y curl awscli jq git "${BUILD_DEPS}" && \
     wget "${HUGO_URL}" && \
