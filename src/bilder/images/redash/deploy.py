@@ -71,7 +71,7 @@ def place_jinja_template_file(
         context=context,
         mode="0664",
     )
-    watched_files.append(Path(DOCKER_COMPOSE_DIRECTORY).joinpath("docker-compose.yaml"))
+    watched_files.append(destination_path.joinpath(name))
 
 
 def place_consul_template_file(
