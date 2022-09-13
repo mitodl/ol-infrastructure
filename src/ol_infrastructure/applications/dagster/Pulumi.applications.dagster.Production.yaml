@@ -22,8 +22,5 @@ config:
   dagster:edx_pipeline_xpro_edx_course_bucket_name: xpro-production-edxapp-courses
   dagster:edx_pipeline_xpro_edx_xpro_purpose: mitx-etl-xpro-production
   dagster:instance_type: m5a.large
-  saltstack:api_url: https://salt-production.odl.mit.edu
-  saltstack:api_user: pulumi
-  saltstack:key_name: salt-production
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

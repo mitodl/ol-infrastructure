@@ -50,7 +50,6 @@ from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 redash_config = Config("redash")
-salt_config = Config("saltstack")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")

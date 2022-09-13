@@ -3,14 +3,11 @@ from enum import Enum, unique
 from functools import lru_cache
 from ipaddress import IPv4Network
 from types import FunctionType
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 import boto3
 import pulumi
-import yaml
 from pulumi_aws import ec2
-
-from ol_infrastructure.providers.salt.minion import OLSaltStackMinion
 
 ec2_client = boto3.client("ec2")
 AWSFilterType = list[dict[str, Union[str, list[str]]]]
@@ -299,97 +296,3 @@ def vpc_peer_opts(
         "VpcPeeringConnectionId",
         ["tags", "vpc_id", "peer_vpc_id", "id", "auto_accept"],
     )
-
-
-def build_userdata(
-    instance_name: str,
-    minion_keys: OLSaltStackMinion,
-    minion_roles: list[str],
-    minion_environment: str,
-    salt_host: str,
-    additional_cloud_config: Optional[dict[str, Any]] = None,
-    additional_salt_config: Optional[dict[str, str]] = None,
-    additional_salt_grains: Optional[dict[str, str]] = None,
-) -> pulumi.Output[str]:
-    """Construct a user data dictionary for use with EC2 instances.
-
-    :param instance_name: The value for the `Name` tag
-    :type instance_name: str
-
-    :param minion_keys: The minion keys generated from the SaltStack minion dynamic
-        provider
-    :type minion_keys: OLSaltStackMinion
-
-    :param minion_roles: The list of values to assign to the `roles` grain on the minion
-    :type minion_roles: List[str]
-
-    :param minion_environment: The value to set for the `environment` grain on the
-        minion
-    :type minion_environment: str
-
-    :param salt_host: The resolvable address of the host for the Salt master that the
-        instance will be communicating with.
-    :type salt_host: str
-
-    :param additional_cloud_config: Additional settings to pass through to cloud-init.
-        It will be merged in with the YAML document that sets the Saltstack
-        configuration.
-    :type additional_cloud_config: Optional[Dict[str, Any]]
-
-    :param additional_salt_config: Additional settings to set in the salt_minion module
-        of cloud-init
-    :type additional_salt_config: Optional[Dict[str, str]]
-
-    :param additional_salt_grains: Additional settings to set in the salt grains
-    :type additional_salt_grains: Optional[Dict[str, str]]
-
-    :returns: A YAML rendering of the cloud-init userdata wrapped in a Pulumi output to
-              create a dependency link.
-
-    :rtype: pulumi.Output[str]
-    """
-
-    def _build_cloud_config_string(keys) -> str:
-        cloud_config = additional_cloud_config or {}
-        # TODO (TMM 2020-09-10): Once the upstream PR is merged move to using the
-        # upstream bootstrap script.
-        # https://github.com/saltstack/salt-bootstrap/pull/1498
-        salt_config = {
-            "bootcmd": [
-                "wget -O /tmp/salt_bootstrap.sh https://raw.githubusercontent.com/mitodl/salt-bootstrap/develop/bootstrap-salt.sh",
-                "chmod +x /tmp/salt_bootstrap.sh",
-                "sh /tmp/salt_bootstrap.sh -N -z",
-            ],
-            "package_update": True,
-            "salt_minion": {
-                "pkg_name": "salt-minion",
-                "service_name": "salt-minion",
-                "config_dir": "/etc/salt",
-                "conf": {
-                    "id": instance_name,
-                    "master": salt_host,
-                    "startup_states": "highstate",
-                },
-                "grains": {
-                    "roles": minion_roles,
-                    "context": "pulumi",
-                    "environment": minion_environment,
-                },
-                "public_key": keys[0],
-                "private_key": keys[1],
-            },
-        }
-        salt_config["salt_minion"]["conf"].update(  # type: ignore
-            additional_salt_config or {}
-        )
-        salt_config["salt_minion"]["grains"].update(  # type: ignore
-            additional_salt_grains or {}
-        )
-        cloud_config.update(salt_config)
-        return "#cloud-config\n{yaml_data}".format(
-            yaml_data=yaml.dump(cloud_config, sort_keys=True)
-        )
-
-    return pulumi.Output.all(
-        minion_keys.minion_public_key, minion_keys.minion_private_key
-    ).apply(_build_cloud_config_string)
