@@ -1,1 +1,4 @@
-python_sources(name="concourse-libs")
+python_sources(
+    name="concourse-libs",
+    sources=["**/*.py"],
+)

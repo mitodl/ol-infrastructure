@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.13.0"
+pants_version = "2.14.0rc0"
 backend_packages = [
   'pants.backend.docker.lint.hadolint',
   'pants.backend.experimental.python',
@@ -13,9 +13,6 @@ backend_packages = [
   'pants.backend.shell.lint.shfmt',
 ]
 pants_ignore = ['copier_templates/*']
-
-[source]
-root_patterns = ['src/', 'tests/']
 
 [python]
 enable_resolves = true
