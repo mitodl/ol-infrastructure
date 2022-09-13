@@ -4,12 +4,12 @@ encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gGZqkri3+8SOk9DIV
 config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-production.odl.mit.edu
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
   xqueue:auto_scale:
     desired: 3
     max: 5
     min: 2
-  vault:address: https://vault-production.odl.mit.edu
-  vault_server:env_namespace: operations.production
   xqueue:business_unit: residential
   xqueue:instance_type: t3a.medium
   xqueue:target_vpc: residential_mitx_vpc
