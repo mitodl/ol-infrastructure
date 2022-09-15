@@ -46,7 +46,7 @@ dagster_ami_fragment = packer_jobs(
     dependencies=container_dependencies,
     image_code=dagster_image_code,
     packer_template_path="src/bilder/images/dagster/dagster.pkr.hcl",
-    env_vars_from_files={"DAGSTER_VERSION": "dagit/tag"},
+    env_vars_from_files={"DAGSTER_VERSION": "dagit-container/tag"},
 )
 
 dagster_pulumi_fragment = pulumi_jobs_chain(

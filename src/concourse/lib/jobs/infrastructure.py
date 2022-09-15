@@ -151,13 +151,16 @@ def pulumi_jobs_chain(
         if index != 0:
             previous_job = chain_fragment.jobs[-1]
             for dependency in dependencies or []:
+                # These mutations apply globally if the dependencies aren't copied below
                 dependency.trigger = False
+                dependency.passed = [previous_job.name]
         step_fragment = pulumi_job(
             pulumi_code,
             stack_name,
             project_name,
             project_source_path,
-            dependencies,
+            # Need to copy the dependencies because otherwise they are globally mutated
+            [dependency_step.copy() for dependency_step in (dependencies or [])],
             previous_job,
         )
         chain_fragment.resource_types = (
