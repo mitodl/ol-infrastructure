@@ -1,6 +1,6 @@
-from typing import Union
+from typing import Optional, Union
 
-from concourse.lib.models.pipeline import Identifier, Resource
+from concourse.lib.models.pipeline import Identifier, RegistryImage, Resource
 from concourse.lib.models.resource import Git
 
 
@@ -105,4 +105,14 @@ def schedule(name: Identifier, interval: str) -> Resource:
         type="time",
         icon="clock",
         source={"interval": interval},
+    )
+
+
+def registry_image(
+    name: Identifier, image_repository: str, image_tag: Optional[str] = None
+) -> Resource:
+    return Resource(
+        name=name,
+        type="registry-image",
+        source=RegistryImage(repository=image_repository, tag=image_tag or "latest"),
     )
