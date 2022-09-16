@@ -2,7 +2,7 @@ import json
 from typing import Any, Union
 
 from pulumi import Config, StackReference, export
-from pulumi_aws import athena, glue, iam, s3
+from pulumi_aws import athena, glue, iam, lakeformation, s3
 
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit
@@ -21,6 +21,8 @@ aws_config = AWSBase(
     },
 )
 s3_kms_key = kms_stack.require_output("kms_s3_data_analytics_key")
+
+data_stages = ("raw", "cleaned", "modeled")
 
 results_bucket = s3.Bucket(
     f"ol_warehouse_results_bucket_{stack_info.env_suffix}",
@@ -110,6 +112,46 @@ for unit in BusinessUnit:
         )
     )
 
+for data_stage in data_stages:
+    lake_storage_bucket = s3.Bucket(
+        f"ol_data_lake_s3_bucket_{data_stage}",
+        bucket=f"ol-data-lake-{data_stage}-{stack_info.env_suffix}",
+        acl="private",
+        server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(  # noqa: E501
+            rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
+                apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
+                    sse_algorithm="aws:kms",
+                    kms_master_key_id=s3_kms_key["id"],
+                ),
+                bucket_key_enabled=True,
+            )
+        ),
+        versioning=s3.BucketVersioningArgs(enabled=True),
+        tags=aws_config.merged_tags({"OU": "data"}),
+    )
+    lakeformation.Resource(
+        f"lakeformation_s3_bucket_{data_stage}",
+        arn=lake_storage_bucket.arn,
+    )
+    warehouse_buckets.append(lake_storage_bucket)
+    s3.BucketPublicAccessBlock(
+        f"ol_data_lake_s3_bucket_{data_stage}_block_public_access",
+        bucket=lake_storage_bucket.bucket,
+        block_public_acls=True,
+        block_public_policy=True,
+    )
+    warehouse_db = glue.CatalogDatabase(
+        f"ol_warehouse_database_{data_stage}",
+        name=f"ol_warehouse_{data_stage}_{stack_info.env_suffix}",
+        description=f"Data mart for data in {data_stage} format in the {stack_info.env_suffix} environment.",  # noqa: E501
+        location_uri=lake_storage_bucket.bucket.apply(lambda bucket: f"s3://{bucket}/"),
+    )
+    lakeformation.Resource(
+        f"lakeformation_warehouse_db_{data_stage}",
+        arn=warehouse_db.arn,
+    )
+    warehouse_dbs.append(warehouse_db)
+
 export(
     "athena_data_warehouse",
     {
@@ -172,8 +214,12 @@ query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
             "s3:GetObjectVersion",
         ],
         "Resource": [
-            f"arn:aws:s3:::ol-data-lake-data-{stack_info.env_suffix}",
-            f"arn:aws:s3:::ol-data-lake-data-{stack_info.env_suffix}/*",
+            f"arn:aws:s3:::ol-data-lake-{stage}-{stack_info.env_suffix}"
+            for stage in data_stages
+        ]
+        + [
+            f"arn:aws:s3:::ol-data-lake-{stage}-{stack_info.env_suffix}/*"
+            for stage in data_stages
         ],
     },
 ]
