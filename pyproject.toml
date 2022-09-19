@@ -22,7 +22,7 @@ packages = [
 python = "^3.9"
 boto3 = "^1.24"
 httpx = "^0.23.0"
-hvac = {extras = ["parser"], version = "^0.11.2"}
+hvac = {extras = ["parser"], version = "^1.0.2"}
 parliament = "^1.6.0"
 pulumi = "^3.39.1"
 pulumi-aws = "^5.13.0"
