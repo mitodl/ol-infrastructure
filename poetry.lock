@@ -104,14 +104,14 @@ uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
 name = "boto3"
-version = "1.24.70"
+version = "1.24.75"
 description = "The AWS SDK for Python"
 category = "main"
 optional = false
 python-versions = ">= 3.7"
 
 [package.dependencies]
-botocore = ">=1.27.70,<1.28.0"
+botocore = ">=1.27.75,<1.28.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.6.0,<0.7.0"
 
@@ -120,7 +120,7 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.27.70"
+version = "1.27.75"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
 optional = false
@@ -136,7 +136,7 @@ crt = ["awscrt (==0.14.0)"]
 
 [[package]]
 name = "certifi"
-version = "2022.6.15.1"
+version = "2022.9.14"
 description = "Python package for providing Mozilla's CA Bundle."
 category = "main"
 optional = false
@@ -205,7 +205,7 @@ testing = ["flake8 (<5)", "pytest (>=6)", "pytest-black (>=0.3.7)", "pytest-chec
 
 [[package]]
 name = "copier"
-version = "6.1.0"
+version = "6.2.0"
 description = "A library for rendering project templates."
 category = "dev"
 optional = false
@@ -215,14 +215,14 @@ python-versions = ">=3.7,<4.0"
 colorama = ">=0.4.3"
 dunamai = ">=1.7.0"
 iteration_utilities = ">=0.11.0"
-Jinja2 = ">=3.1.1"
+jinja2 = ">=3.1.1"
 jinja2-ansible-filters = ">=1.3.1"
 packaging = ">=21.0"
 pathspec = ">=0.9.0"
 plumbum = ">=1.6.9"
-pydantic = ">=1.9.0"
-Pygments = ">=2.7.1"
-PyYAML = ">=5.3.1"
+pydantic = ">=1.10.2"
+pygments = ">=2.7.1"
+pyyaml = ">=5.3.1"
 pyyaml-include = ">=1.2"
 questionary = ">=1.8.1"
 
@@ -258,7 +258,7 @@ python-versions = ">=3.6,<4.0"
 
 [[package]]
 name = "diagrams"
-version = "0.21.1"
+version = "0.22.0"
 description = "Diagram as Code"
 category = "dev"
 optional = false
@@ -665,7 +665,7 @@ license = ["ukkonen"]
 
 [[package]]
 name = "idna"
-version = "3.3"
+version = "3.4"
 description = "Internationalized Domain Names in Applications (IDNA)"
 category = "main"
 optional = false
@@ -989,7 +989,7 @@ wcwidth = "*"
 
 [[package]]
 name = "protobuf"
-version = "4.21.5"
+version = "4.21.6"
 description = ""
 category = "main"
 optional = false
@@ -997,7 +997,7 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "pulumi"
-version = "3.39.3"
+version = "3.40.0"
 description = "Pulumi's Python SDK"
 category = "main"
 optional = false
@@ -1013,7 +1013,7 @@ six = ">=1.12,<2.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "5.13.0"
+version = "5.14.0"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 category = "main"
 optional = false
@@ -1065,7 +1065,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-mongodbatlas"
-version = "3.5.0"
+version = "3.5.1"
 description = "A Pulumi package for creating and managing mongodbatlas cloud resources."
 category = "main"
 optional = false
@@ -1284,7 +1284,7 @@ six = ">=1.5"
 
 [[package]]
 name = "pyupgrade"
-version = "2.37.3"
+version = "2.38.0"
 description = "A tool to automatically upgrade syntax for newer versions."
 category = "dev"
 optional = false
@@ -1705,16 +1705,16 @@ black = [
     {file = "black-22.8.0.tar.gz", hash = "sha256:792f7eb540ba9a17e8656538701d3eb1afcb134e3b45b71f20b25c77a8db7e6e"},
 ]
 boto3 = [
-    {file = "boto3-1.24.70-py3-none-any.whl", hash = "sha256:bb69ebe7c484305568b1aaed664db3d09716dc93235e41f23538f99ea4f3addc"},
-    {file = "boto3-1.24.70.tar.gz", hash = "sha256:abac9c7e54212ee68c2a311812a498ece2c43f98d1302f099128a9fe45cf37c5"},
+    {file = "boto3-1.24.75-py3-none-any.whl", hash = "sha256:e0757717091f7014683e69a31d88d41f960f24eddaf338c1949e63fd67ee2b5c"},
+    {file = "boto3-1.24.75.tar.gz", hash = "sha256:7bfa2242df9b1fa73e17f4d7f79f6b22560f55d5da2e27e578e585ef6e4b14a7"},
 ]
 botocore = [
-    {file = "botocore-1.27.70-py3-none-any.whl", hash = "sha256:c0a014b4dfd7ffe739393034aa6e70e73f3a1b22c7667a59858259b341bf5082"},
-    {file = "botocore-1.27.70.tar.gz", hash = "sha256:2ad5be6ca322a549f858d245237358ed300f7347096caacbb29c013e10663d34"},
+    {file = "botocore-1.27.75-py3-none-any.whl", hash = "sha256:a6229f9b31f7fe372475c0ee60483b3ec827e4b76275d5239fbfd590cd0b217f"},
+    {file = "botocore-1.27.75.tar.gz", hash = "sha256:f8b1da2b41e88c58db51db0c6eff6ca564258948ce4a5ac7e96ac35a469b0d4f"},
 ]
 certifi = [
-    {file = "certifi-2022.6.15.1-py3-none-any.whl", hash = "sha256:43dadad18a7f168740e66944e4fa82c6611848ff9056ad910f8f7a3e46ab89e0"},
-    {file = "certifi-2022.6.15.1.tar.gz", hash = "sha256:cffdcd380919da6137f76633531a5817e3a9f268575c128249fb637e4f9e73fb"},
+    {file = "certifi-2022.9.14-py3-none-any.whl", hash = "sha256:e232343de1ab72c2aa521b625c80f699e356830fd0e2c620b465b304b17b0516"},
+    {file = "certifi-2022.9.14.tar.gz", hash = "sha256:36973885b9542e6bd01dea287b2b4b3b21236307c56324fcc3f1160f2d655ed5"},
 ]
 cffi = [
     {file = "cffi-1.15.1-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:a66d3508133af6e8548451b25058d5812812ec3798c886bf38ed24a98216fab2"},
@@ -1803,8 +1803,8 @@ configparser = [
     {file = "configparser-5.3.0.tar.gz", hash = "sha256:8be267824b541c09b08db124917f48ab525a6c3e837011f3130781a224c57090"},
 ]
 copier = [
-    {file = "copier-6.1.0-py3-none-any.whl", hash = "sha256:fadfa06468ac873e9f2f255ca901352b8b28af261d574af12019b33cb29f3526"},
-    {file = "copier-6.1.0.tar.gz", hash = "sha256:d3b399285763e97a1c3c49cbc7e0d3b3cea2f05b680f652ff58d59a5b59f3a3c"},
+    {file = "copier-6.2.0-py3-none-any.whl", hash = "sha256:ae8aeb7a060035d56fe05ebdc4bce85d3516ceb7e97408437e869451e619d679"},
+    {file = "copier-6.2.0.tar.gz", hash = "sha256:792c66ed1a6eddd85690ba12035fdbf087a65b18c8b07c2527e3581296e29649"},
 ]
 cryptography = [
     {file = "cryptography-38.0.1-cp36-abi3-macosx_10_10_universal2.whl", hash = "sha256:10d1f29d6292fc95acb597bacefd5b9e812099d75a6469004fd38ba5471a977f"},
@@ -1839,8 +1839,8 @@ darglint = [
     {file = "darglint-1.8.1.tar.gz", hash = "sha256:080d5106df149b199822e7ee7deb9c012b49891538f14a11be681044f0bb20da"},
 ]
 diagrams = [
-    {file = "diagrams-0.21.1-py3-none-any.whl", hash = "sha256:1d0fea187ed76136dadccf943da914dd9974ebdd3cbb993f4283ec8f51cf90f2"},
-    {file = "diagrams-0.21.1.tar.gz", hash = "sha256:732caa4e61113a06b9a80965be6171c4c5858f3570b5b1f5ba52304a6eeade60"},
+    {file = "diagrams-0.22.0-py3-none-any.whl", hash = "sha256:b61bac4a0afe6072d37ee21a08d46868fc9a251878035adf9097a4842bc86472"},
+    {file = "diagrams-0.22.0.tar.gz", hash = "sha256:39c183fab1705d4eae1213131d8eba377a55519e11b37d4c7dbe528aa447bcb5"},
 ]
 dill = [
     {file = "dill-0.3.5.1-py2.py3-none-any.whl", hash = "sha256:33501d03270bbe410c72639b350e941882a8b0fd55357580fbc873fba0c59302"},
@@ -2097,8 +2097,8 @@ identify = [
     {file = "identify-2.5.5.tar.gz", hash = "sha256:322a5699daecf7c6fd60e68852f36f2ecbb6a36ff6e6e973e0d2bb6fca203ee6"},
 ]
 idna = [
-    {file = "idna-3.3-py3-none-any.whl", hash = "sha256:84d9dd047ffa80596e0f246e2eab0b391788b0503584e8945f2368256d2735ff"},
-    {file = "idna-3.3.tar.gz", hash = "sha256:9d643ff0a55b762d5cdb124b8eaa99c66322e2157b69160bc32796e824360e6d"},
+    {file = "idna-3.4-py3-none-any.whl", hash = "sha256:90b77e79eaa3eba6de819a0c442c0b4ceefc341a7a2ab77d7562bf49f425c5c2"},
+    {file = "idna-3.4.tar.gz", hash = "sha256:814f528e8dead7d329833b91c5faa87d60bf71824cd12a7530b5526063d02cb4"},
 ]
 iniconfig = [
     {file = "iniconfig-1.1.1-py2.py3-none-any.whl", hash = "sha256:011e24c64b7f47f6ebd835bb12a743f2fbe9a26d4cecaa7f53bc4f35ee9da8b3"},
@@ -2324,26 +2324,26 @@ prompt-toolkit = [
     {file = "prompt_toolkit-3.0.31.tar.gz", hash = "sha256:9ada952c9d1787f52ff6d5f3484d0b4df8952787c087edf6a1f7c2cb1ea88148"},
 ]
 protobuf = [
-    {file = "protobuf-4.21.5-cp310-abi3-win32.whl", hash = "sha256:5310cbe761e87f0c1decce019d23f2101521d4dfff46034f8a12a53546036ec7"},
-    {file = "protobuf-4.21.5-cp310-abi3-win_amd64.whl", hash = "sha256:e5c5a2886ae48d22a9d32fbb9b6636a089af3cd26b706750258ce1ca96cc0116"},
-    {file = "protobuf-4.21.5-cp37-abi3-macosx_10_9_universal2.whl", hash = "sha256:ee04f5823ed98bb9a8c3b1dc503c49515e0172650875c3f76e225b223793a1f2"},
-    {file = "protobuf-4.21.5-cp37-abi3-manylinux2014_aarch64.whl", hash = "sha256:b04484d6f42f48c57dd2737a72692f4c6987529cdd148fb5b8e5f616862a2e37"},
-    {file = "protobuf-4.21.5-cp37-abi3-manylinux2014_x86_64.whl", hash = "sha256:5e0b272217aad8971763960238c1a1e6a65d50ef7824e23300da97569a251c55"},
-    {file = "protobuf-4.21.5-cp37-cp37m-win32.whl", hash = "sha256:5eb0724615e90075f1d763983e708e1cef08e66b1891d8b8b6c33bc3b2f1a02b"},
-    {file = "protobuf-4.21.5-cp37-cp37m-win_amd64.whl", hash = "sha256:011c0f267e85f5d73750b6c25f0155d5db1e9443cd3590ab669a6221dd8fcdb0"},
-    {file = "protobuf-4.21.5-cp38-cp38-win32.whl", hash = "sha256:7b6f22463e2d1053d03058b7b4ceca6e4ed4c14f8c286c32824df751137bf8e7"},
-    {file = "protobuf-4.21.5-cp38-cp38-win_amd64.whl", hash = "sha256:b52e7a522911a40445a5f588bd5b5e584291bfc5545e09b7060685e4b2ff814f"},
-    {file = "protobuf-4.21.5-cp39-cp39-win32.whl", hash = "sha256:a7faa62b183d6a928e3daffd06af843b4287d16ef6e40f331575ecd236a7974d"},
-    {file = "protobuf-4.21.5-cp39-cp39-win_amd64.whl", hash = "sha256:5e0ce02418ef03d7657a420ae8fd6fec4995ac713a3cb09164e95f694dbcf085"},
-    {file = "protobuf-4.21.5-py2.py3-none-any.whl", hash = "sha256:bf711b451212dc5b0fa45ae7dada07d8e71a4b0ff0bc8e4783ee145f47ac4f82"},
-    {file = "protobuf-4.21.5-py3-none-any.whl", hash = "sha256:3ec6f5b37935406bb9df9b277e79f8ed81d697146e07ef2ba8a5a272fb24b2c9"},
-    {file = "protobuf-4.21.5.tar.gz", hash = "sha256:eb1106e87e095628e96884a877a51cdb90087106ee693925ec0a300468a9be3a"},
+    {file = "protobuf-4.21.6-cp310-abi3-win32.whl", hash = "sha256:49f88d56a9180dbb7f6199c920f5bb5c1dd0172f672983bb281298d57c2ac8eb"},
+    {file = "protobuf-4.21.6-cp310-abi3-win_amd64.whl", hash = "sha256:7a6cc8842257265bdfd6b74d088b829e44bcac3cca234c5fdd6052730017b9ea"},
+    {file = "protobuf-4.21.6-cp37-abi3-macosx_10_9_universal2.whl", hash = "sha256:ba596b9ffb85c909fcfe1b1a23136224ed678af3faf9912d3fa483d5f9813c4e"},
+    {file = "protobuf-4.21.6-cp37-abi3-manylinux2014_aarch64.whl", hash = "sha256:4143513c766db85b9d7c18dbf8339673c8a290131b2a0fe73855ab20770f72b0"},
+    {file = "protobuf-4.21.6-cp37-abi3-manylinux2014_x86_64.whl", hash = "sha256:b6cea204865595a92a7b240e4b65bcaaca3ad5d2ce25d9db3756eba06041138e"},
+    {file = "protobuf-4.21.6-cp37-cp37m-win32.whl", hash = "sha256:9666da97129138585b26afcb63ad4887f602e169cafe754a8258541c553b8b5d"},
+    {file = "protobuf-4.21.6-cp37-cp37m-win_amd64.whl", hash = "sha256:308173d3e5a3528787bb8c93abea81d5a950bdce62840d9760effc84127fb39c"},
+    {file = "protobuf-4.21.6-cp38-cp38-win32.whl", hash = "sha256:aa29113ec901281f29d9d27b01193407a98aa9658b8a777b0325e6d97149f5ce"},
+    {file = "protobuf-4.21.6-cp38-cp38-win_amd64.whl", hash = "sha256:8f9e60f7d44592c66e7b332b6a7b4b6e8d8b889393c79dbc3a91f815118f8eac"},
+    {file = "protobuf-4.21.6-cp39-cp39-win32.whl", hash = "sha256:80e6540381080715fddac12690ee42d087d0d17395f8d0078dfd6f1181e7be4c"},
+    {file = "protobuf-4.21.6-cp39-cp39-win_amd64.whl", hash = "sha256:77b355c8604fe285536155286b28b0c4cbc57cf81b08d8357bf34829ea982860"},
+    {file = "protobuf-4.21.6-py2.py3-none-any.whl", hash = "sha256:07a0bb9cc6114f16a39c866dc28b6e3d96fa4ffb9cc1033057412547e6e75cb9"},
+    {file = "protobuf-4.21.6-py3-none-any.whl", hash = "sha256:c7c864148a237f058c739ae7a05a2b403c0dfa4ce7d1f3e5213f352ad52d57c6"},
+    {file = "protobuf-4.21.6.tar.gz", hash = "sha256:6b1040a5661cd5f6e610cbca9cfaa2a17d60e2bb545309bc1b278bb05be44bdd"},
 ]
 pulumi = [
-    {file = "pulumi-3.39.3-py2.py3-none-any.whl", hash = "sha256:c58c744cf72d4bd285a185e7e5ea8be80e211a67572522c29ebdaa4cc6605b9f"},
+    {file = "pulumi-3.40.0-py3-none-any.whl", hash = "sha256:03d57d5cb551b2243203a8a7575c3357d0a356a8bb9e2b51f43a7845729c1340"},
 ]
 pulumi-aws = [
-    {file = "pulumi_aws-5.13.0.tar.gz", hash = "sha256:88a8a88b801098717077cd40d14b4ec1690507ac634ac24059533ab3364af1fa"},
+    {file = "pulumi_aws-5.14.0.tar.gz", hash = "sha256:439e99043bb252e9fa1b41cae4b133559376cceb4ed430b50d814e32e2fa010f"},
 ]
 pulumi-consul = [
     {file = "pulumi_consul-3.6.0.tar.gz", hash = "sha256:07464a8425b1899c84f0b71b146b3b01d548fb2e2de23cc6703543abd59b2fd9"},
@@ -2355,7 +2355,7 @@ pulumi-github = [
     {file = "pulumi_github-4.17.0.tar.gz", hash = "sha256:35b307f06853db7038e26b0309c52606f239e60bc767b1608bbe36d14e155420"},
 ]
 pulumi-mongodbatlas = [
-    {file = "pulumi_mongodbatlas-3.5.0.tar.gz", hash = "sha256:627be2825c4d9674d406e17f01536ffca8aa3c68c944749ccd1d1e9b5ca66ba4"},
+    {file = "pulumi_mongodbatlas-3.5.1.tar.gz", hash = "sha256:3f15df08b5d0171401a08bec5825876ab9c08428bd1f8780b491150e3a637be2"},
 ]
 pulumi-tls = [
     {file = "pulumi_tls-4.6.1.tar.gz", hash = "sha256:ee4387b77ba51992fdee298ca8eec121865ab469fb1c451d8925a2bdd4a21253"},
@@ -2461,8 +2461,8 @@ python-dateutil = [
     {file = "python_dateutil-2.8.2-py2.py3-none-any.whl", hash = "sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9"},
 ]
 pyupgrade = [
-    {file = "pyupgrade-2.37.3-py2.py3-none-any.whl", hash = "sha256:9746efd064dbf53d7f86d6f88a1d48120f58dbfc378f517768634740ea2225e2"},
-    {file = "pyupgrade-2.37.3.tar.gz", hash = "sha256:1414c7a7c558004cf610e6180716b876814b639b5a5789c3da023c5cdaebcd49"},
+    {file = "pyupgrade-2.38.0-py2.py3-none-any.whl", hash = "sha256:e68e033603de3b4b675c7bd733723fb2bb7930a1898b6da61fb503643322e2f9"},
+    {file = "pyupgrade-2.38.0.tar.gz", hash = "sha256:7d03766fb5d68e9b0ec86b7d48c3cc29462b0031ff48ceece34bd224708553c0"},
 ]
 pywin32 = [
     {file = "pywin32-304-cp310-cp310-win32.whl", hash = "sha256:3c7bacf5e24298c86314f03fa20e16558a4e4138fc34615d7de4070c23e65af3"},
@@ -2492,6 +2492,13 @@ PyYAML = [
     {file = "PyYAML-6.0-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:f84fbc98b019fef2ee9a1cb3ce93e3187a6df0b2538a651bfb890254ba9f90b5"},
     {file = "PyYAML-6.0-cp310-cp310-win32.whl", hash = "sha256:2cd5df3de48857ed0544b34e2d40e9fac445930039f3cfe4bcc592a1f836d513"},
     {file = "PyYAML-6.0-cp310-cp310-win_amd64.whl", hash = "sha256:daf496c58a8c52083df09b80c860005194014c3698698d1a57cbcfa182142a3a"},
+    {file = "PyYAML-6.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:d4b0ba9512519522b118090257be113b9468d804b19d63c71dbcf4a48fa32358"},
+    {file = "PyYAML-6.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:81957921f441d50af23654aa6c5e5eaf9b06aba7f0a19c18a538dc7ef291c5a1"},
+    {file = "PyYAML-6.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:afa17f5bc4d1b10afd4466fd3a44dc0e245382deca5b3c353d8b757f9e3ecb8d"},
+    {file = "PyYAML-6.0-cp311-cp311-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:dbad0e9d368bb989f4515da330b88a057617d16b6a8245084f1b05400f24609f"},
+    {file = "PyYAML-6.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:432557aa2c09802be39460360ddffd48156e30721f5e8d917f01d31694216782"},
+    {file = "PyYAML-6.0-cp311-cp311-win32.whl", hash = "sha256:bfaef573a63ba8923503d27530362590ff4f576c626d86a9fed95822a8255fd7"},
+    {file = "PyYAML-6.0-cp311-cp311-win_amd64.whl", hash = "sha256:01b45c0191e6d66c470b6cf1b9531a771a83c1c4208272ead47a3ae4f2f603bf"},
     {file = "PyYAML-6.0-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:897b80890765f037df3403d22bab41627ca8811ae55e9a722fd0392850ec4d86"},
     {file = "PyYAML-6.0-cp36-cp36m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:50602afada6d6cbfad699b0c7bb50d5ccffa7e46a3d738092afddc1f9758427f"},
     {file = "PyYAML-6.0-cp36-cp36m-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:48c346915c114f5fdb3ead70312bd042a953a8ce5c7106d5bfb1a5254e47da92"},
