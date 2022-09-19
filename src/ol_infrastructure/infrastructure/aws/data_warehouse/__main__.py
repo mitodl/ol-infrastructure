@@ -22,7 +22,7 @@ aws_config = AWSBase(
 )
 s3_kms_key = kms_stack.require_output("kms_s3_data_analytics_key")
 
-data_stages = ("raw", "cleaned", "modeled")
+data_stages = ("raw", "staging", "intermediate", "mart")
 
 results_bucket = s3.Bucket(
     f"ol_warehouse_results_bucket_{stack_info.env_suffix}",
@@ -220,6 +220,10 @@ query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
         + [
             f"arn:aws:s3:::ol-data-lake-{stage}-{stack_info.env_suffix}/*"
             for stage in data_stages
+        ]
+        + [
+            f"arn:aws:s3:::ol-data-lake-data-{stack_info.env_suffix}",
+            f"arn:aws:s3:::ol-data-lake-data-{stack_info.env_suffix}/*",
         ],
     },
 ]
