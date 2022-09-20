@@ -37,7 +37,7 @@ consul_stack = StackReference(
 )
 
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-edxapp = StackReference(
+edxapp_stack = StackReference(
     f"applications.edxapp.{stack_info.env_prefix}.{stack_info.name}"
 )
 
@@ -144,7 +144,7 @@ codejail_server_security_group = ec2.SecurityGroup(
             protocol="tcp",
             from_port=CODEJAIL_SERVICE_PORT,
             to_port=CODEJAIL_SERVICE_PORT,
-            security_groups=[edxapp.get_output("edxapp_security_group")],
+            security_groups=[edxapp_stack.get_output("edxapp_security_group")],
             description=f"Allow traffic to the codejail server on port {CODEJAIL_SERVICE_PORT}",
         ),
     ],
