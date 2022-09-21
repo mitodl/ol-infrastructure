@@ -22,10 +22,5 @@ config:
   dagster:edx_pipeline_xpro_edx_course_bucket_name: xpro-qa-edxapp-courses
   dagster:edx_pipeline_xpro_edx_xpro_purpose: mitx-etl-xpro-qa
   dagster:instance_type: t3a.medium
-  saltstack:api_password:
-    secure: v1:jcxzqwIOoxQ2261K:PsHmBDKsQetmclqZPtQmAD43OgsnLlDu9NAVVVP9iNtNzPmFNb1fj7QeBANm1uxyhY1cMN7spWYR2w==
-  saltstack:api_url: https://salt-qa.odl.mit.edu
-  saltstack:api_user: pulumi
-  saltstack:key_name: salt-qa
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

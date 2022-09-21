@@ -7,7 +7,6 @@
 - Create an IAM role for Redash instances to allow access to S3 and other AWS
   resources
 - Create a Redis cluster in Elasticache
-- Register a minion ID and key pair with the appropriate SaltStack master instance
 - Provision a set of EC2 instances from a pre-built AMI with the configuration
   and code for Redash
 - Provision an AWS load balancer and connect the deployed EC2 instances
@@ -51,7 +50,6 @@ from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 redash_config = Config("redash")
-salt_config = Config("saltstack")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")

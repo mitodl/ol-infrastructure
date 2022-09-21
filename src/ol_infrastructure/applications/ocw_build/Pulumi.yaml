@@ -1,7 +1,0 @@
----
-name: ol-infrastructure-ocw-build-application
-runtime: python
-description: Pulumi project for deploying the stack of services needed by the OCW
-  Build server
-backend:
-  url: s3://mitol-pulumi-state/
