@@ -5,13 +5,12 @@ import json
 import textwrap
 from pathlib import Path
 
-import pulumi_vault as vault
 import yaml
 from pulumi import Config, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import CODEJAIL_SERVICE_PORT
-from bridge.secrets.sops import read_yaml_secrets
+from bridge.secrets import sops
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
@@ -23,12 +22,9 @@ from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_a
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
-from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
 codejail_config = Config("codejail")
-if Config("vault").get("address"):
-    setup_vault_provider()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
@@ -36,7 +32,6 @@ consul_stack = StackReference(
     f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
 )
 
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 edxapp_stack = StackReference(
     f"applications.edxapp.{stack_info.env_prefix}.{stack_info.name}"
 )
@@ -86,15 +81,6 @@ codejail_server_instance_role = iam.Role(
     path=f"/ol-applications/open-edx-codejail/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     tags=aws_config.tags,
 )
-# Vault policy definition
-codejail_vault_policy = vault.Policy(
-    "open-edx-codejail-server-vault-policy",
-    name=f"codejail-{stack_info.env_prefix}",
-    policy=Path(__file__)
-    .parent.joinpath("codejail_policy.hcl")
-    .read_text()
-    .replace("DEPLOYMENT", f"{stack_info.env_prefix}"),
-)
 # Register edX Platform AMI for Vault AWS auth
 aws_vault_backend = f"aws-{stack_info.env_prefix}"
 iam.RolePolicyAttachment(
@@ -107,21 +93,8 @@ codejail_server_instance_profile = iam.InstanceProfile(
     role=codejail_server_instance_role.name,
     path="/ol-infrastructure/open-edx-codejail-server/profile/",
 )
-codejail_app_vault_auth_role = vault.aws.AuthBackendRole(
-    "codejail-web-ami-ec2-vault-auth",
-    backend=aws_vault_backend,
-    auth_type="iam",
-    role="codejail-server",
-    inferred_entity_type="ec2_instance",
-    inferred_aws_region=aws_config.region,
-    bound_iam_instance_profile_arns=[codejail_server_instance_profile.arn],
-    bound_ami_ids=[codejail_server_ami.id],
-    bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[vpc_id],
-    token_policies=[codejail_vault_policy.name],
-)
 consul_datacenter = consul_stack.require_output("datacenter")
-grafana_credentials = read_yaml_secrets(
+grafana_credentials = sops.read_yaml_secrets(
     Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
 )
 block_device_mappings = [BlockDeviceMapping()]
