@@ -1,3 +1,4 @@
+---
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgFqyheTEwQhQwt19Cm5Z2wyAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMUHRADb5VO/Osd+QMAgEQgDthoUItjofWZZROiCvTVCFgPdVM1f3tWDvxoezDTWseixH0X/RXXDnIDnOXDiC9dHp/ZRoXORovMifXGg==
 config:
@@ -7,6 +8,6 @@ config:
     max: 2
     min: 1
   codejail:business_unit: operations
-  codejail:codejail_version_tag: latest
-  codejail:target_vpc: residential_mitx_vpc
+  codejail:codejail_version_tag: 14.0.0
+  codejail:target_vpc: residential_mitx_staging_vpc
   consul:address: https://consul-mitx-qa.odl.mit.edu
