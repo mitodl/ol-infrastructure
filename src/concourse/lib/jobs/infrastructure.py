@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from copy import deepcopy
 from pathlib import Path
 from typing import Optional
 
@@ -86,9 +87,14 @@ def packer_jobs(
             ),
         ],
     )
+    # Make sure that all of the dependencies have passed the validate step before
+    # triggering the image build.
+    build_deps = [deepcopy(dep) for dep in dependencies]
+    for dep in build_deps:
+        dep.passed = [validate_job.name]
     build_job = Job(
         name=Identifier("build-packer-template"),
-        plan=dependencies
+        plan=build_deps
         + [
             GetStep(
                 get=image_code.name,
