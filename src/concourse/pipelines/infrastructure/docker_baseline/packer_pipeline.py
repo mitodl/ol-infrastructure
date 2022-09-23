@@ -37,9 +37,14 @@ docker_baseline_ami_fragment = packer_jobs(
     dependencies=ami_dependencies,
     image_code=docker_baseline_image_code,
     packer_template_path="src/bilder/images/",
-    packer_vars={"app_name": "docker_baseline"},
+    packer_vars={"app_name": "docker_baseline_ami"},
     node_types=["server"],
     extra_packer_params={"only": ["amazon-ebs.third-party"]},
+    env_vars_from_files={
+        "CONSUL_VERSION": f"{consul_agent_release.name}/version",
+        "VAULT_VERSION": f"{vault_agent_release.name}/version",
+        "CONSUL_TEMPLATE_VERSION": f"{consul_template_release.name}/version",
+    },
 )
 
 combined_fragment = PipelineFragment(
