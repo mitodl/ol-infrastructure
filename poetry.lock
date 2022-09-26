@@ -1009,7 +1009,7 @@ six = ">=1.12,<2.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "5.14.0"
+version = "5.15.0"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 category = "main"
 optional = false
@@ -1423,17 +1423,6 @@ botocore = ">=1.12.36,<2.0a.0"
 crt = ["botocore[crt] (>=1.20.29,<2.0a.0)"]
 
 [[package]]
-name = "salt-pepper"
-version = "0.7.6"
-description = "A CLI front-end to a running salt-api system"
-category = "main"
-optional = false
-python-versions = "*"
-
-[package.extras]
-kerberos = ["requests-gssapi (>=1.1.0)"]
-
-[[package]]
 name = "semver"
 version = "2.13.0"
 description = "Python helper for Semantic Versioning (http://semver.org/)"
@@ -1638,7 +1627,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "e833cb1120b4d87c6889acd5a227483707c2e0e59c82294eac5cd8490721029c"
+content-hash = "8f7194338d712b2e391ef4b71a0e0eb3b7ae7a92554469c546fe7b72fda9fb36"
 
 [metadata.files]
 anyio = [
@@ -2339,7 +2328,7 @@ pulumi = [
     {file = "pulumi-3.40.0-py3-none-any.whl", hash = "sha256:03d57d5cb551b2243203a8a7575c3357d0a356a8bb9e2b51f43a7845729c1340"},
 ]
 pulumi-aws = [
-    {file = "pulumi_aws-5.14.0.tar.gz", hash = "sha256:439e99043bb252e9fa1b41cae4b133559376cceb4ed430b50d814e32e2fa010f"},
+    {file = "pulumi_aws-5.15.0.tar.gz", hash = "sha256:d16304b918168dd7ab8c48b643cebd95119b581de125729470152a3071a07250"},
 ]
 pulumi-consul = [
     {file = "pulumi_consul-3.6.0.tar.gz", hash = "sha256:07464a8425b1899c84f0b71b146b3b01d548fb2e2de23cc6703543abd59b2fd9"},
@@ -2548,10 +2537,6 @@ rfc3986 = [
 s3transfer = [
     {file = "s3transfer-0.6.0-py3-none-any.whl", hash = "sha256:06176b74f3a15f61f1b4f25a1fc29a4429040b7647133a463da8fa5bd28d5ecd"},
     {file = "s3transfer-0.6.0.tar.gz", hash = "sha256:2ed07d3866f523cc561bf4a00fc5535827981b117dd7876f036b0c1aca42c947"},
-]
-salt-pepper = [
-    {file = "salt-pepper-0.7.6.tar.gz", hash = "sha256:b75a641d4fd96663ae44fc7ce4aadb7e4c87b8ff30f7ac35479a282b99894749"},
-    {file = "salt_pepper-0.7.6-py3-none-any.whl", hash = "sha256:c1db37710b7b0b2f9868a8ca8ddffa8039829aaedf928b50bea70564f72bf614"},
 ]
 semver = [
     {file = "semver-2.13.0-py2.py3-none-any.whl", hash = "sha256:ced8b23dceb22134307c1b8abfa523da14198793d9787ac838e70e29e77458d4"},
