@@ -605,6 +605,30 @@ edxapp_db_consul_service = Service(
     ],
     opts=consul_provider,
 )
+if edxapp_db_config.read_replica:
+    edxapp_db_replica_consul_service = Service(
+        "edxapp-instance-db-replica-service",
+        node=edxapp_db_consul_node.name,
+        name="edxapp-db-replica",
+        port=edxapp_db_config.port,
+        meta={
+            "external-node": True,
+            "external-probe": True,
+        },
+        checks=[
+            ServiceCheckArgs(
+                check_id="edxapp-db",
+                interval="10s",
+                name="edxapp-db",
+                timeout="1m0s",
+                status="passing",
+                tcp=Output.all(
+                    address=edxapp_db.db_replica.address, port=edxapp_db_config.port
+                ).apply(lambda db: "{address}:{port}".format(**db)),
+            )
+        ],
+        opts=consul_provider,
+    )
 
 #######################
 # MongoDB Vault Setup #
