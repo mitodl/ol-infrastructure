@@ -10,7 +10,7 @@ class PomeriumConfig(OLBaseSettings):
     configuration_template_directory: Path = Path("/etc/vault-templates.d")
 
     docker_compose_file: Path = Path(
-        DOCKER_COMPOSE_DIRECTORY + "/pomerium-compose.yaml"
+        DOCKER_COMPOSE_DIRECTORY + "/pomerium-compose.yaml"  # noqa: WPS336
     )
 
     listener_port: str = "443"

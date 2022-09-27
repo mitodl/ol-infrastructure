@@ -58,7 +58,7 @@ def install_caddy(caddy_config: CaddyConfig):
         )
         apt.repo(
             name="Set up Caddy APT repository",
-            src="deb https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main",
+            src="deb https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main",  # noqa: E501
             present=True,
             filename="caddy.list",
         )
@@ -113,22 +113,22 @@ def create_placeholder_tls_config(caddy_config: CaddyConfig):
         packages=["acl"],
     )
     server.shell(
-        name=f"Generate TLS certificate + key",
+        name=f"Generate TLS certificate + key",  # noqa: F541, WPS237
         commands=[
-            f'openssl req -newkey rsa:4098 -x509 -sha256 -days 365 -nodes -out {caddy_config.tls_cert_path} -keyout {caddy_config.tls_key_path} -subj "/C=US/ST=Massachusetts/L=Cambridge/O=MIT/OU=ODL/CN=this.is.not.a.valid.certificate.odl.mit.edu"',
+            f'openssl req -newkey rsa:4098 -x509 -sha256 -days 365 -nodes -out {caddy_config.tls_cert_path} -keyout {caddy_config.tls_key_path} -subj "/C=US/ST=Massachusetts/L=Cambridge/O=MIT/OU=ODL/CN=this.is.not.a.valid.certificate.odl.mit.edu"',  # noqa: E501
         ],
     )
-    # This is a workaround for a bahavior quirk of vault-template when it is running as a non-root user.
+    # This is a workaround for a bahavior quirk of vault-template when it is running as a non-root user.  # noqa: E501
     # A simple chown caddy:caddy /etc/caddy/odl* will not suffice here.
     #
-    # vault-template doesn't actually modify the existing file, but rather creates a new one and attempts to
-    # overwrite the existing file and then restore the ownerships. When it runs as non-root, it cannot chown
-    # so it fails. The new cert files end up with vault:vault and 660 permissions so caddy cannot open them.
+    # vault-template doesn't actually modify the existing file, but rather creates a new one and attempts to  # noqa: E501
+    # overwrite the existing file and then restore the ownerships. When it runs as non-root, it cannot chown  # noqa: E501
+    # so it fails. The new cert files end up with vault:vault and 660 permissions so caddy cannot open them.  # noqa: E501
     #
-    # After much futzing about with setfacl, chmod, chgrp, etc ... the easiest thing is to just add vault
-    # as a secondary group to the caddy user and set the ownership on the TLS files to vault:vault
+    # After much futzing about with setfacl, chmod, chgrp, etc ... the easiest thing is to just add vault  # noqa: E501
+    # as a secondary group to the caddy user and set the ownership on the TLS files to vault:vault  # noqa: E501
     server.shell(
-        name=f"Set ownership of the TLS cert and key",
+        name=f"Set ownership of the TLS cert and key",  # noqa: F541, WPS237
         commands=[
             f"chown caddy:vault {caddy_config.tls_cert_path}",
             f"chown caddy:vault {caddy_config.tls_key_path}",
@@ -136,7 +136,7 @@ def create_placeholder_tls_config(caddy_config: CaddyConfig):
         ],
     )
     server.shell(
-        name=f"Add vault group to caddy user",
+        name=f"Add vault group to caddy user",  # noqa: F541, WPS237
         commands=[
             f"usermod -a -G vault {caddy_config.caddy_user}",
         ],

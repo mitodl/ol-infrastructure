@@ -1,6 +1,6 @@
 import json
 import os
-import subprocess
+import subprocess  # noqa: S404
 from pathlib import Path
 from platform import system
 from typing import Any
@@ -14,7 +14,7 @@ else:
 
 
 def read_yaml_secrets(sops_file: Path) -> dict[str, Any]:
-    yaml_data = subprocess.run(
+    yaml_data = subprocess.run(  # noqa: S603
         [SOPS_BINARY, "--decrypt", Path(__file__).parent.joinpath(sops_file)],
         capture_output=True,
     )
@@ -22,7 +22,7 @@ def read_yaml_secrets(sops_file: Path) -> dict[str, Any]:
 
 
 def read_json_secrets(sops_file: Path) -> dict[str, Any]:
-    json_data = subprocess.run(
+    json_data = subprocess.run(  # noqa: S603
         [SOPS_BINARY, "--decrypt", Path(__file__).parent.joinpath(sops_file)],
         capture_output=True,
     )
@@ -30,7 +30,7 @@ def read_json_secrets(sops_file: Path) -> dict[str, Any]:
 
 
 def set_env_secrets(sops_file: Path) -> None:
-    env_data = subprocess.run(
+    env_data = subprocess.run(  # noqa: S603
         [SOPS_BINARY, "--decrypt", Path(__file__).parent.joinpath(sops_file)],
         capture_output=True,
     )

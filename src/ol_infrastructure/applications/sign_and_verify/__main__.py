@@ -116,7 +116,7 @@ unlocked_did_secret_value = secretsmanager.SecretVersion(
             json.dumps(
                 read_json_secrets(
                     Path(
-                        f"digital_credentials/sign_and_verify.{stack_info.env_suffix}.json"
+                        f"digital_credentials/sign_and_verify.{stack_info.env_suffix}.json"  # noqa: E501
                     )
                 )["secretKeySeed"]
             ).encode("utf8")
@@ -232,7 +232,7 @@ sign_and_verify_task = ecs.TaskDefinition(
                         {"name": "DIGEST_CHECK", "value": "true"},
                         {
                             "name": "ISSUER_MEMBERSHIP_REGISTRY_URL",
-                            "value": "https://digitalcredentials.github.io/issuer-registry/registry.json",
+                            "value": "https://digitalcredentials.github.io/issuer-registry/registry.json",  # noqa: E501
                         },
                         {
                             "name": "OIDC_ISSUER_URL",
@@ -249,9 +249,9 @@ sign_and_verify_task = ecs.TaskDefinition(
                     "logConfiguration": {
                         "logDriver": "awslogs",
                         "options": {
-                            "awslogs-group": f"digital-credentials-sign-and-verify-{stack_info.env_suffix}",
+                            "awslogs-group": f"digital-credentials-sign-and-verify-{stack_info.env_suffix}",  # noqa: E501
                             "awslogs-region": "us-east-1",
-                            "awslogs-stream-prefix": f"sign-and-verify-{stack_info.env_suffix}",
+                            "awslogs-stream-prefix": f"sign-and-verify-{stack_info.env_suffix}",  # noqa: E501
                             "awslogs-create-group": "true",
                         },
                     },
@@ -265,7 +265,7 @@ sign_and_verify_service = ecs.Service(
     f"sign-and-verify-service-{stack_info.env_suffix}",
     cluster=sign_and_verify_cluster.arn,
     desired_count=2,
-    health_check_grace_period_seconds=30,
+    health_check_grace_period_seconds=30,  # noqa: WPS432
     platform_version="LATEST",
     launch_type="FARGATE",
     name=f"sign-and-verify-service-{stack_info.env_suffix}",

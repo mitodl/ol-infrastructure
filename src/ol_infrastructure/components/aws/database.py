@@ -1,4 +1,4 @@
-"""This module defines a Pulumi component resource for encapsulating our best practices for building RDS instances.
+"""This module defines a Pulumi component resource for encapsulating our best practices for building RDS instances.  # noqa: E501
 
 This includes:
 
@@ -26,7 +26,7 @@ from ol_infrastructure.lib.ol_types import AWSBase
 MAX_BACKUP_DAYS = 35
 
 
-class StorageType(str, Enum):
+class StorageType(str, Enum):  # noqa: WPS600
     """Container for constraining available selection of storage types."""
 
     magnetic = "standard"
@@ -35,7 +35,7 @@ class StorageType(str, Enum):
 
 
 class OLReplicaDBConfig(BaseModel):
-    """Configuration object for defining configuration needed to create a read replica."""
+    """Configuration object for defining configuration needed to create a read replica."""  # noqa: E501
 
     instance_size: str = "db.t3.small"
     storage_type: StorageType = StorageType.ssd
@@ -47,13 +47,13 @@ class OLReplicaDBConfig(BaseModel):
 
 
 class OLDBConfig(AWSBase):
-    """Configuration object for defining the interface to create an RDS instance with sane defaults."""
+    """Configuration object for defining the interface to create an RDS instance with sane defaults."""  # noqa: E501
 
     engine: str
     engine_version: str
     instance_name: str  # The name of the RDS instance
     password: SecretStr
-    parameter_overrides: list[dict[str, Union[str, bool, int, float]]]
+    parameter_overrides: list[dict[str, Union[str, bool, int, float]]]  # noqa: WPS234
     port: PositiveInt
     subnet_group_name: Union[str, pulumi.Output[str]]
     security_groups: list[SecurityGroup]
@@ -65,7 +65,7 @@ class OLDBConfig(AWSBase):
     prevent_delete: bool = True
     public_access: bool = False
     take_final_snapshot: bool = True
-    storage: PositiveInt = PositiveInt(50)
+    storage: PositiveInt = PositiveInt(50)  # noqa: WPS432
     storage_type: StorageType = StorageType.ssd
     username: str = "oldevops"
     read_replica: Optional[OLReplicaDBConfig] = None
@@ -74,14 +74,16 @@ class OLDBConfig(AWSBase):
         arbitrary_types_allowed = True
 
     @validator("engine")
-    def is_valid_engine(cls: "OLDBConfig", engine: str) -> str:
+    def is_valid_engine(cls: "OLDBConfig", engine: str) -> str:  # noqa: N805
         valid_engines = db_engines()
         if engine not in valid_engines:
             raise ValueError("The specified DB engine is not a valid option in AWS.")
         return engine
 
     @validator("engine_version")
-    def is_valid_version(cls: "OLDBConfig", engine_version: str, values: dict) -> str:
+    def is_valid_version(
+        cls: "OLDBConfig", engine_version: str, values: dict  # noqa: N805, WPS110
+    ) -> str:
         engine: str = values.get("engine")  # type: ignore
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
@@ -96,8 +98,10 @@ class OLPostgresDBConfig(OLDBConfig):
 
     engine: str = "postgres"
     engine_version: str = "13.4"
-    port: PositiveInt = PositiveInt(5432)
-    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [
+    port: PositiveInt = PositiveInt(5432)  # noqa: WPS432
+    parameter_overrides: list[  # noqa: WPS234
+        dict[str, Union[str, bool, int, float]]
+    ] = [
         {"name": "client_encoding", "value": "UTF-8"},
         {"name": "timezone", "value": "UTC"},
         {"name": "rds.force_ssl", "value": 1},
@@ -110,8 +114,10 @@ class OLMariaDBConfig(OLDBConfig):
 
     engine: str = "mariadb"
     engine_version: str = "10.5.13"
-    port: PositiveInt = PositiveInt(3306)
-    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [
+    port: PositiveInt = PositiveInt(3306)  # noqa: WPS432
+    parameter_overrides: list[  # noqa: WPS234
+        dict[str, Union[str, bool, int, float]]
+    ] = [
         {"name": "character_set_client", "value": "utf8mb4"},
         {"name": "character_set_connection", "value": "utf8mb4"},
         {"name": "character_set_database", "value": "utf8mb4"},
@@ -125,7 +131,7 @@ class OLMariaDBConfig(OLDBConfig):
 
 
 class OLAmazonDB(pulumi.ComponentResource):
-    """Component to create an RDS instance with sane defaults and manage associated resources."""
+    """Component to create an RDS instance with sane defaults and manage associated resources."""  # noqa: E501
 
     def __init__(self, db_config: OLDBConfig, opts: pulumi.ResourceOptions = None):
         """Create an RDS instance, parameter group, and optionally read replica.
@@ -144,7 +150,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             opts,
         )
 
-        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore
+        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore  # noqa: E501
 
         self.parameter_group = rds.ParameterGroup(
             f"{db_config.instance_name}-{db_config.engine}-parameter-group",
@@ -167,7 +173,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             deletion_protection=db_config.prevent_delete,
             engine=db_config.engine,
             engine_version=db_config.engine_version,
-            final_snapshot_identifier=f"{db_config.instance_name}-{db_config.engine}-final-snapshot",
+            final_snapshot_identifier=f"{db_config.instance_name}-{db_config.engine}-final-snapshot",  # noqa: E501
             identifier=db_config.instance_name,
             instance_class=db_config.instance_size,
             max_allocated_storage=db_config.max_storage,

@@ -33,7 +33,7 @@ def ssh_git_repo(
 def github_release(name: Identifier, owner: str, repository: str) -> Resource:
     """Generate a github-release resource for the given owner/repository.
 
-    :param name: The name of the resource. This will get used across subsequent pipeline steps that reference this resource.
+    :param name: The name of the resource. This will get used across subsequent pipeline steps that reference this resource.  # noqa: E501
     :type name: Identifier
     :param owner: The owner of the repository (e.g. the GitHub user or organization)
     :type owner: str
@@ -52,9 +52,9 @@ def github_release(name: Identifier, owner: str, repository: str) -> Resource:
 
 
 def hashicorp_release(name: Identifier, project: str) -> Resource:
-    """Generate a hashicorp-release resource for the given application.
+    """Generate a hashicorp-release resource for the given application.  # noqa: DAR201
 
-    :param name: The name of the resourc. This will get used across subsequent pipeline steps taht reference this resource.
+    :param name: The name of the resourc. This will get used across subsequent pipeline steps taht reference this resource.  # noqa: E501
     :type name: Identifier
     :param project: The name of the hashicorp project to check for a release of.
     :type project: str
@@ -69,7 +69,9 @@ def hashicorp_release(name: Identifier, project: str) -> Resource:
 
 
 def amazon_ami(
-    name: Identifier, filters: dict[str, Union[str, bool]], region: str = "us-east-1"
+    name: Identifier,
+    filters: dict[str, Union[str, bool]],
+    region: str = "us-east-1",
 ) -> Resource:
     return Resource(
         name=name,

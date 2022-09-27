@@ -5,7 +5,7 @@ from typing import Any
 from bilder.lib.model_helpers import OLBaseSettings
 
 
-class VectorInstallMethod(str, Enum):
+class VectorInstallMethod(str, Enum):  # noqa: WPS600
     package = "package"
 
 

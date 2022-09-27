@@ -10,7 +10,7 @@ class PipelineFragment(BaseModel):
 
     @validator("resource_types")
     def deduplicate_resource_types(
-        cls, resource_types: list[ResourceType]
+        cls, resource_types: list[ResourceType]  # noqa: N805
     ) -> list[ResourceType]:
         """Ensure that there are no duplicate resource type definitions.
 
@@ -25,7 +25,7 @@ class PipelineFragment(BaseModel):
         `Pydantic #496 <https://github.com/pydantic/pydantic/issues/496>`_ for more
         details
 
-        :param cls: The class object
+        :param cls: The class object  # noqa: DAR102
         :param resource_types: The list of resource types defined in the class instance.
 
         :returns: A list of resource types that have been deduplicated
@@ -39,7 +39,9 @@ class PipelineFragment(BaseModel):
         return unique_resource_types
 
     @validator("resources")
-    def deduplicate_resources(cls, resources: list[Resource]) -> list[Resource]:
+    def deduplicate_resources(
+        cls, resources: list[Resource]  # noqa: N805
+    ) -> list[Resource]:
         """Ensure that there are no duplicate resource definitions.
 
         Concourse pipelines don't support duplicate definitions of resources, where the
@@ -54,7 +56,7 @@ class PipelineFragment(BaseModel):
         details
 
         :param cls: The class object
-        :param resources: The list of resources defined on the class instance
+        :param resources: The list of resources defined on the class instance  # noqa: DAR102
 
         :returns: A list of resources that has been deduplicated.
         """

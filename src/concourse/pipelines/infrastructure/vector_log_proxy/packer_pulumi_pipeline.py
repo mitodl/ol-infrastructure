@@ -68,10 +68,12 @@ vector_log_proxy_pipeline = Pipeline(
 
 
 if __name__ == "__main__":
-    import sys
+    import sys  # noqa: WPS433
 
     with open("definition.json", "wt") as definition:
         definition.write(vector_log_proxy_pipeline.json(indent=2))
     sys.stdout.write(vector_log_proxy_pipeline.json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p packer-pulumi-vector-log-proxy -c definition.json")
+    print()  # noqa: WPS421
+    print(  # noqa: WPS421
+        "fly -t pr-inf sp -p packer-pulumi-vector-log-proxy -c definition.json"  # noqa: C813
+    )

@@ -70,20 +70,20 @@ repos:
   hooks:
   - id: yesqa
     additional_dependencies:
-    - wemake-python-styleguide
+    - wemake-python-styleguide==0.17.0
 - repo: https://github.com/psf/black
   rev: 22.8.0
   hooks:
   - id: black
 - repo: https://github.com/PyCQA/flake8
-  rev: 5.0.4
+  rev: 4.0.1
   hooks:
   - id: flake8
     additional_dependencies:
-    - wemake-python-styleguide
+    - wemake-python-styleguide==0.17.0
     args:
     - --config=setup.cfg
-    - --extend-ignore=D1
+    - --extend-ignore=D1,D4,E501
 - repo: https://github.com/pre-commit/mirrors-mypy
   rev: v0.981
   hooks:

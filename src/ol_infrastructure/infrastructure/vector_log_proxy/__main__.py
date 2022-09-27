@@ -1,4 +1,4 @@
-"""Create the resources needed to run a vector-log-proxy server.
+"""Create the resources needed to run a vector-log-proxy server.  # noqa: D200
 
 """
 import base64
@@ -23,7 +23,7 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 ##################################
-##    Setup + Config Retrival   ##
+##    Setup + Config Retrival   ##  # noqa: E266
 ##################################
 
 if Config("vault_server").get("env_namespace"):
@@ -43,7 +43,9 @@ target_vpc_name = (
 )
 target_vpc = network_stack.require_output(target_vpc_name)
 
-VECTOR_LOG_PROXY_PORT = vector_log_proxy_config.get("listener_port") or 9000
+VECTOR_LOG_PROXY_PORT = (
+    vector_log_proxy_config.get("listener_port") or 9000  # noqa: WPS432
+)
 
 consul_security_groups = consul_stack.require_output("security_groups")
 aws_config = AWSBase(
@@ -68,7 +70,7 @@ vector_log_proxy_tag = f"vector-server-{env_name}"
 consul_provider = get_consul_provider(stack_info)
 
 ###############################
-##     General Resources     ##
+##     General Resources     ##  # noqa: E266
 ###############################
 
 # IAM and instance profile
@@ -161,7 +163,7 @@ vector_log_proxy_security_group = ec2.SecurityGroup(
             from_port=VECTOR_LOG_PROXY_PORT,
             to_port=VECTOR_LOG_PROXY_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the vector-log-proxy server on port {VECTOR_LOG_PROXY_PORT}",
+            description=f"Allow traffic to the vector-log-proxy server on port {VECTOR_LOG_PROXY_PORT}",  # noqa: E501
         ),
     ],
     egress=default_egress_args,
@@ -176,7 +178,7 @@ vector_log_proxy_security_group = ec2.SecurityGroup(
 LOAD_BALANCER_NAME_MAX_LENGTH = 32
 vector_log_proxy_lb = lb.LoadBalancer(
     "vector-log-proxy-load-balancer",
-    name=f"vector-log-proxy-alb-{stack_info.env_prefix[:3]}-{stack_info.env_suffix[:2]}"[
+    name=f"vector-log-proxy-alb-{stack_info.env_prefix[:3]}-{stack_info.env_suffix[:2]}"[  # noqa: E501, WPS221, WPS237
         :LOAD_BALANCER_NAME_MAX_LENGTH
     ],
     ip_address_type="dualstack",
@@ -198,7 +200,7 @@ vector_log_proxy_lb_target_group = lb.TargetGroup(
     protocol="HTTPS",
     health_check=lb.TargetGroupHealthCheckArgs(
         healthy_threshold=2,
-        interval=120,
+        interval=120,  # noqa: WPS432
         path="/events",
         port=str(VECTOR_LOG_PROXY_PORT),
         protocol="HTTPS",
@@ -224,7 +226,7 @@ vector_log_proxy_alb_listener = lb.Listener(
     ],
 )
 
-## Create auto scale group and launch configs for vector-log-proxy
+## Create auto scale group and launch configs for vector-log-proxy  # noqa: E266
 instance_type = (
     vector_log_proxy_config.get("instance_type") or InstanceTypes.burstable_small.name
 )
@@ -246,7 +248,8 @@ vector_log_proxy_launch_config = ec2.LaunchTemplate(
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name="/dev/xvda",
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=vector_log_proxy_config.get_int("disk_size") or 25,
+                volume_size=vector_log_proxy_config.get_int("disk_size")
+                or 25,  # noqa: WPS432
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
             ),
@@ -301,7 +304,7 @@ vector_log_proxy_launch_config = ec2.LaunchTemplate(
                             HEROKU_PROXY_PASSWORD={heroku_proxy_credentials['password']}
                             HEROKU_PROXY_USERNAME={heroku_proxy_credentials['username']}
                             """
-                                ),
+                                ),  # noqa: WPS355
                                 "owner": "root:root",
                             },
                         ]
@@ -326,7 +329,7 @@ autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50
+            min_healthy_percentage=50  # noqa: WPS432
         ),
         triggers=["tags"],
     ),
@@ -344,7 +347,7 @@ autoscaling.Group(
 )
 
 
-## Create Route53 DNS records for vector-log-proxy nodes
+## Create Route53 DNS records for vector-log-proxy nodes  # noqa: E266
 five_minutes = 60 * 5
 route53.Record(
     "vector-log-proxy-dns-record",

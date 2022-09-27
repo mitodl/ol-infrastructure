@@ -62,7 +62,7 @@ k8s_vpc_config = OLVPCConfig(
     vpc_name=f"k8s-{stack_info.env_suffix}",
     cidr_block=k8s_config.require("cidr_block"),
     k8s_service_subnet=k8s_config.require("k8s_service_subnet"),
-    num_subnets=16,
+    num_subnets=16,  # noqa: WPS432
     tags={
         "OU": "operations",
         "Environment": f"k8s-{stack_info.env_suffix}",
@@ -372,7 +372,7 @@ xpro_vpc_exports.update(
 )
 export("xpro_vpc", xpro_vpc_exports)
 
-# TODO: MD 2022-05-13 This probably needs to be expanded upon once the k8s network is peered to others
+# TODO: MD 2022-05-13 This probably needs to be expanded upon once the k8s network is peered to others  # noqa: E501
 # when it gains some security groups.
 k8s_vpc_exports = vpc_exports(k8s_vpc)
 export("k8s_vpc", k8s_vpc_exports)

@@ -30,7 +30,7 @@ results_bucket = s3.Bucket(
     acl="private",
     server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
         rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
                 sse_algorithm="aws:kms",
                 kms_master_key_id=s3_kms_key["id"],
             ),
@@ -41,7 +41,7 @@ results_bucket = s3.Bucket(
     lifecycle_rules=[
         s3.BucketLifecycleRuleArgs(
             enabled=True,
-            expiration=s3.BucketLifecycleRuleExpirationArgs(days=30),
+            expiration=s3.BucketLifecycleRuleExpirationArgs(days=30),  # noqa: WPS432
             id="expire_old_query_results",
         )
     ],
@@ -62,7 +62,7 @@ athena_warehouse_workgroup = athena.Workgroup(
     tags=aws_config.merged_tags({"Name": f"ol-warehouse-{stack_info.env_suffix}"}),
     configuration=athena.WorkgroupConfigurationArgs(
         result_configuration=athena.WorkgroupConfigurationResultConfigurationArgs(
-            encryption_configuration=athena.WorkgroupConfigurationResultConfigurationEncryptionConfigurationArgs(
+            encryption_configuration=athena.WorkgroupConfigurationResultConfigurationEncryptionConfigurationArgs(  # noqa: E501
                 encryption_option="SSE_KMS",
                 kms_key_arn=s3_kms_key["arn"],
             ),
@@ -130,7 +130,7 @@ parliament_config: dict[str, Any] = {
     "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []}
 }
 
-query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
+query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [  # noqa: WPS234
     {
         "Effect": "Allow",
         "Action": [

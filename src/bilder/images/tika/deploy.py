@@ -46,7 +46,7 @@ from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 
-VERSIONS = {
+VERSIONS = {  # noqa: WPS407
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
 }
@@ -58,7 +58,7 @@ set_env_secrets(Path("consul/consul.env"))
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
 vector_config = VectorConfig(is_proxy=False)
 vault_config = VaultAgentConfig(
-    cache=VaultAgentCache(use_auto_auth_token="force"),
+    cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
     listener=[
         VaultListener(
             tcp=VaultTCPListener(

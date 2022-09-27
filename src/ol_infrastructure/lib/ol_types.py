@@ -4,12 +4,12 @@ from pydantic import BaseModel, validator
 
 from ol_infrastructure.lib.aws.ec2_helper import aws_regions
 
-REQUIRED_TAGS = {"OU", "Environment"}
-RECOMMENDED_TAGS = {"Application", "Owner"}
+REQUIRED_TAGS = {"OU", "Environment"}  # noqa: WPS407
+RECOMMENDED_TAGS = {"Application", "Owner"}  # noqa: WPS407
 
 
 @unique
-class BusinessUnit(str, Enum):
+class BusinessUnit(str, Enum):  # noqa: WPS600
     """Canonical source of truth for defining valid OU tags.
 
     We rely on tagging AWS resources with a valid OU to allow for cost allocation to
@@ -17,7 +17,7 @@ class BusinessUnit(str, Enum):
     """
 
     bootcamps = "bootcamps"
-    data = "data"
+    data = "data"  # noqa: WPS110
     digital_credentials = "digital-credentials"
     micromasters = "micromasters"
     mit_open = "mit-open"
@@ -33,7 +33,7 @@ class BusinessUnit(str, Enum):
 
 
 @unique
-class Environment(str, Enum):
+class Environment(str, Enum):  # noqa: WPS600
     """Canonical reference for valid environment names."""
 
     xpro = "xpro"
@@ -41,12 +41,12 @@ class Environment(str, Enum):
     mitx = "mitx"
     mitx_online = "mitxonline"
     applications = "applications"
-    data = "data"
+    data = "data"  # noqa: WPS110
     operations = "operations"
 
 
 @unique
-class Apps(str, Enum):
+class Apps(str, Enum):  # noqa: WPS600
     """Canonical source of truth for defining apps."""
 
     bootcamps = "bootcamps"
@@ -76,7 +76,7 @@ class AWSBase(BaseModel):
         self.tags.update({"pulumi_managed": "true"})
 
     @validator("tags")
-    def enforce_tags(cls, tags: dict[str, str]) -> dict[str, str]:
+    def enforce_tags(cls, tags: dict[str, str]) -> dict[str, str]:  # noqa: N805
         if not REQUIRED_TAGS.issubset(tags.keys()):
             raise ValueError(
                 "Not all required tags have been specified. Missing tags: {}".format(
@@ -90,7 +90,7 @@ class AWSBase(BaseModel):
         return tags
 
     @validator("region")
-    def check_region(cls, region: str) -> str:
+    def check_region(cls, region: str) -> str:  # noqa: N805
         if region not in aws_regions():
             raise ValueError("The specified region does not exist")
         return region
@@ -102,8 +102,8 @@ class AWSBase(BaseModel):
         applicable set of tags to then be updated with specific tags to be set on child
         resources in a ComponentResource class.
 
-        :param *new_tags: One or more dictionaries of specific tags to be set on
-                                                                        a child resource.
+        :param *new_tags: One or more dictionaries of specific tags to be set on  # noqa: RST213
+                                                                        a child resource.  # noqa: E501
         :type new_tags: Dict[Text, Text]
 
         :returns: Merged dictionary of base tags and specific tags to be set on a child

@@ -1,4 +1,4 @@
-"""Create the resources needed to run a xqueue server.
+"""Create the resources needed to run a xqueue server.  # noqa: D200
 """
 import base64
 import json
@@ -84,7 +84,7 @@ xqueue_server_instance_role = iam.Role(
             },
         }
     ),
-    path=f"/ol-applications/open-edx-xqueue/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    path=f"/ol-applications/open-edx-xqueue/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
     tags=aws_config.tags,
 )
 # Vault policy definition
@@ -147,7 +147,7 @@ xqueue_server_security_group = ec2.SecurityGroup(
             from_port=XQUEUE_SERVICE_PORT,
             to_port=XQUEUE_SERVICE_PORT,
             security_groups=[edxapp.get_output("edxapp_security_group")],
-            description=f"Allow traffic to the xqueue server on port {XQUEUE_SERVICE_PORT}",
+            description=f"Allow traffic to the xqueue server on port {XQUEUE_SERVICE_PORT}",  # noqa: E501
         ),
     ],
     egress=default_egress_args,
@@ -194,12 +194,12 @@ lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             """
-                                ),
+                                ),  # noqa: WPS355
                                 "owner": "root:root",
                             },
                         ],
                         "bootcmd": [
-                            f"sed -i -e 's/latest/{openedx_version_tag}/' /etc/docker/compose/docker-compose.yaml"
+                            f"sed -i -e 's/latest/{openedx_version_tag}/' /etc/docker/compose/docker-compose.yaml"  # noqa: E501
                         ],
                     },
                     sort_keys=True,

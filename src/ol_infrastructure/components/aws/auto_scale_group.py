@@ -39,11 +39,11 @@ from ol_infrastructure.lib.ol_types import AWSBase
 
 
 class BlockDeviceMapping(BaseModel):
-    """Container for describing a block device mapping for an EC2 instance/launch template"""
+    """Container for describing a block device mapping for an EC2 instance/launch template"""  # noqa: D400, E501
 
     delete_on_termination: bool = True
     device_name: str = "/dev/xvda"
-    volume_size: PositiveInt = PositiveInt(25)
+    volume_size: PositiveInt = PositiveInt(25)  # noqa: WPS432
     volume_type: DiskTypes = DiskTypes.ssd
 
     class Config:
@@ -51,7 +51,7 @@ class BlockDeviceMapping(BaseModel):
 
 
 class TagSpecification(BaseModel):
-    """Container for describing a tag specification for an EC2 launch template"""
+    """Container for describing a tag specification for an EC2 launch template"""  # noqa: D400
 
     resource_type: str
     tags: dict[str, str]
@@ -64,7 +64,7 @@ class OLTargetGroupConfig(AWSBase):
     """Configuration object for defining a target group for use with a loadbalancer."""
 
     vpc_id: Union[str, pulumi.Output[str]]
-    port: NonNegativeInt = NonNegativeInt(443)
+    port: NonNegativeInt = NonNegativeInt(443)  # noqa: WPS432
     protocol: str = "HTTPS"
     stickiness: Optional[str] = None
 
@@ -82,16 +82,18 @@ class OLTargetGroupConfig(AWSBase):
         arbitrary_types_allowed = True
 
     @validator("stickiness")
-    def is_valid_stickiness(cls: "OLTargetGroupConfig", stickiness: str) -> str:
-        if stickiness and stickiness not in ["lb_cookie"]:
+    def is_valid_stickiness(
+        cls: "OLTargetGroupConfig", stickiness: str  # noqa: N805
+    ) -> str:
+        if stickiness and stickiness not in ["lb_cookie"]:  # noqa: WPS510, WPS525
             raise ValueError(
-                f"stickiness: {stickiness} is not valid. Only 'lb_cookie' is supported at this time."
+                f"stickiness: {stickiness} is not valid. Only 'lb_cookie' is supported at this time."  # noqa: E501
             )
         return stickiness
 
 
 class OLLoadBalancerConfig(AWSBase):
-    """Configuration object for defining a load balancer object for use with an autoscale group"""
+    """Configuration object for defining a load balancer object for use with an autoscale group"""  # noqa: D400, E501
 
     enable_http2: bool = True
     internal: bool = False
@@ -111,27 +113,31 @@ class OLLoadBalancerConfig(AWSBase):
 
     @validator("ip_address_type")
     def is_valid_ip_address_type(
-        cls: "OLLoadBalancerConfig", ip_address_type: str
+        cls: "OLLoadBalancerConfig", ip_address_type: str  # noqa: N805
     ) -> str:
-        if ip_address_type not in ["dualstack", "ipv4"]:
+        if ip_address_type not in ["dualstack", "ipv4"]:  # noqa: WPS510
             raise ValueError(
-                f"ip_address_type: {ip_address_type} is not valid. Only 'dualstack' and 'ipv4 are accepted'"
+                f"ip_address_type: {ip_address_type} is not valid. Only 'dualstack' and 'ipv4 are accepted'"  # noqa: E501
             )
         return ip_address_type
 
     @validator("load_balancer_type")
     def is_valid_load_balancer_type(
-        cls: "OLLoadBalancerConfig", load_balancer_type: str
+        cls: "OLLoadBalancerConfig", load_balancer_type: str  # noqa: N805
     ) -> str:
-        if load_balancer_type not in ["application", "gateway", "network"]:
+        if load_balancer_type not in [  # noqa: WPS337, WPS510
+            "application",
+            "gateway",
+            "network",
+        ]:
             raise ValueError(
-                f"load_balancer_type: {load_balancer_type} is not valid. Only 'application', 'gateway', or 'network' are accepted"
+                f"load_balancer_type: {load_balancer_type} is not valid. Only 'application', 'gateway', or 'network' are accepted"  # noqa: E501
             )
         return load_balancer_type
 
 
 class OLLaunchTemplateConfig(AWSBase):
-    """Configuration Object for defining configuration needed to create a launch template."""
+    """Configuration Object for defining configuration needed to create a launch template."""  # noqa: E501
 
     block_device_mappings: list[BlockDeviceMapping]
     image_id: str
@@ -140,14 +146,14 @@ class OLLaunchTemplateConfig(AWSBase):
     key_name: str = "oldevops"
     security_groups: list[Union[SecurityGroup, pulumi.Output]]
     tag_specifications: list[TagSpecification]
-    user_data: Optional[Union[str, pulumi.Output[str]]]
+    user_data: Optional[Union[str, pulumi.Output[str]]]  # noqa: WPS234
 
     class Config:
         arbitrary_types_allowed = True
 
 
 class OLAutoScaleGroupConfig(AWSBase):
-    """Configuration Object for defining configuration needed to create an autoscale group."""
+    """Configuration Object for defining configuration needed to create an autoscale group."""  # noqa: E501
 
     asg_name: str
     aws_config: AWSBase
@@ -158,10 +164,12 @@ class OLAutoScaleGroupConfig(AWSBase):
     min_size: PositiveInt = PositiveInt(1)
     vpc_zone_identifiers: pulumi.Output[str]
 
-    instance_refresh_checkpoint_delay: PositiveInt = PositiveInt(3600)
+    instance_refresh_checkpoint_delay: PositiveInt = PositiveInt(3600)  # noqa: WPS432
     instance_refresh_checkpoint_percentages: list[NonNegativeInt] = []
     instance_refresh_warmup: PositiveInt = PositiveInt(health_check_grace_period)
-    instance_refresh_min_healthy_percentage: NonNegativeInt = NonNegativeInt(50)
+    instance_refresh_min_healthy_percentage: NonNegativeInt = NonNegativeInt(
+        50  # noqa: WPS432
+    )
     instance_refresh_strategy: str = "Rolling"
     instance_refresh_triggers: list[str] = ["tags"]
 
@@ -169,24 +177,26 @@ class OLAutoScaleGroupConfig(AWSBase):
         arbitrary_types_allowed = True
 
     @validator("instance_refresh_strategy")
-    def is_valid_strategy(cls: "OLAutoScaleGroupConfig", strategy: str) -> str:
+    def is_valid_strategy(
+        cls: "OLAutoScaleGroupConfig", strategy: str  # noqa: N805
+    ) -> str:
         if strategy != "Rolling":
             raise ValueError("The only vaild instance refresh strategy is 'Rolling'")
         return strategy
 
     @validator("health_check_type")
     def is_valid_healthcheck(
-        cls: "OLAutoScaleGroupConfig", health_check_type: str
+        cls: "OLAutoScaleGroupConfig", health_check_type: str  # noqa: N805
     ) -> str:
-        if health_check_type not in ["ELB", "EC2"]:
+        if health_check_type not in ["ELB", "EC2"]:  # noqa: WPS510
             raise ValueError(
-                f"health_check_type: {health_check_type} is not valid. Only 'ELB' or 'EC2' are accepted."
+                f"health_check_type: {health_check_type} is not valid. Only 'ELB' or 'EC2' are accepted."  # noqa: E501
             )
         return health_check_type
 
 
 class OLAutoScaling(pulumi.ComponentResource):
-    """Component to create an autoscaling group with defaults as well as managed associated resources"""
+    """Component to create an autoscaling group with defaults as well as managed associated resources"""  # noqa: D400, E501
 
     load_balancer: LoadBalancer = None
     listener: Listener = None
@@ -194,7 +204,7 @@ class OLAutoScaling(pulumi.ComponentResource):
     auto_scale_group: Group = None
     launch_template: LaunchTemplate = None
 
-    def __init__(
+    def __init__(  # noqa: WPS210, WPS211, WPS231
         self,
         asg_config: OLAutoScaleGroupConfig,
         lt_config: OLLaunchTemplateConfig,
@@ -216,8 +226,8 @@ class OLAutoScaling(pulumi.ComponentResource):
             )
 
         # Shared attributes
-        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore
-        resource_name_prefix = asg_config.asg_name + "-"
+        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore  # noqa: E501
+        resource_name_prefix = asg_config.asg_name + "-"  # noqa: WPS336
 
         # Create target group
         if tg_config:
@@ -242,9 +252,11 @@ class OLAutoScaling(pulumi.ComponentResource):
                     enabled=True,
                 )
 
-            self.target_group = TargetGroup(
-                resource_name_prefix + "target-group",
-                name=(resource_name_prefix + "tg")[:AWS_TARGET_GROUP_NAME_MAX_LENGTH],
+            self.target_group = TargetGroup(  # noqa: WPS601
+                resource_name_prefix + "target-group",  # noqa: WPS336
+                name=(resource_name_prefix + "tg")[  # noqa: WPS336
+                    :AWS_TARGET_GROUP_NAME_MAX_LENGTH
+                ],
                 vpc_id=tg_config.vpc_id,
                 port=tg_config.port,
                 protocol=tg_config.protocol,
@@ -255,19 +267,21 @@ class OLAutoScaling(pulumi.ComponentResource):
 
         # Create Load Balancer
         if lb_config:
-            self.load_balancer = LoadBalancer(
-                resource_name_prefix + "load-balancer",
+            self.load_balancer = LoadBalancer(  # noqa: WPS601
+                resource_name_prefix + "load-balancer",  # noqa: WPS336
                 enable_http2=lb_config.enable_http2,
                 internal=lb_config.internal,
                 ip_address_type=lb_config.ip_address_type,
                 load_balancer_type=lb_config.load_balancer_type,
-                name=(resource_name_prefix + "lb")[:AWS_LOAD_BALANCER_NAME_MAX_LENGTH],
+                name=(resource_name_prefix + "lb")[  # noqa: WPS336
+                    :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
+                ],
                 security_groups=[group.id for group in lb_config.security_groups],
                 subnets=lb_config.subnets,
                 opts=resource_options,
             )
 
-            # Create Load Balancer Listener (requires load balancer + target group first)
+            # Create Load Balancer Listener (requires load balancer + target group first)  # noqa: E501
             listener_args = ListenerArgs(
                 load_balancer_arn=self.load_balancer.arn,
                 port=lb_config.port,
@@ -285,8 +299,8 @@ class OLAutoScaling(pulumi.ComponentResource):
                     most_recent=True,
                     statuses=["ISSUED"],
                 ).arn
-            self.listener = Listener(
-                resource_name_prefix + "load-balancer-listener",
+            self.listener = Listener(  # noqa: WPS601
+                resource_name_prefix + "load-balancer-listener",  # noqa: WPS336
                 args=listener_args,
                 opts=resource_options,
             )
@@ -319,14 +333,14 @@ class OLAutoScaling(pulumi.ComponentResource):
             triggers=asg_config.instance_refresh_triggers,
             preferences=GroupInstanceRefreshPreferencesArgs(
                 checkpoint_delay=asg_config.instance_refresh_checkpoint_delay,
-                checkpoint_percentages=asg_config.instance_refresh_checkpoint_percentages,
+                checkpoint_percentages=asg_config.instance_refresh_checkpoint_percentages,  # noqa: E501
                 instance_warmup=asg_config.instance_refresh_warmup,
-                min_healthy_percentage=asg_config.instance_refresh_min_healthy_percentage,
+                min_healthy_percentage=asg_config.instance_refresh_min_healthy_percentage,  # noqa: E501
             ),
         )
 
         # Construct the launch template
-        self.launch_template = LaunchTemplate(
+        self.launch_template = LaunchTemplate(  # noqa: WPS601
             f"{resource_name_prefix}-launch-template",
             name_prefix=resource_name_prefix,
             block_device_mappings=block_device_mappings,
@@ -364,8 +378,8 @@ class OLAutoScaling(pulumi.ComponentResource):
         auto_scale_group_kwargs = {}
         if self.target_group:
             auto_scale_group_kwargs["target_group_arns"] = [self.target_group.arn]
-        self.auto_scale_group = Group(
-            resource_name_prefix + "auto-scale-group",
+        self.auto_scale_group = Group(  # noqa: WPS601
+            resource_name_prefix + "auto-scale-group",  # noqa: WPS336
             desired_capacity=asg_config.desired_size,
             health_check_type=asg_config.health_check_type,
             instance_refresh=instance_refresh_policy,
