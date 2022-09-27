@@ -33,7 +33,7 @@ pulumi-vault = "^5.5.0"
 pulumi_consul = "^3.5.0"
 pydantic = "^1"
 pyinfra = "^2.3"
-pulumi-mongodbatlas = "^3.3.0"
+pulumi-mongodbatlas = "^3.5.2"
 bcrypt = "^4.0.0"
 markupsafe = "<2.1.0" # Avoiding 2.1 update until PyInfra updates accordingly due to https://github.com/pallets/markupsafe/pull/261
 
