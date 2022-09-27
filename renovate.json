@@ -1,11 +1,9 @@
 {
   "extends": [
-    // automatically merge minor and patch updates
     ":automergeMinor",
     ":rebaseStalePrs",
-    // major version bumps
     ":separateMajorReleases",
-    "config:base",
+    "config:base"
   ],
   "schedule": [
     "every weekend"
