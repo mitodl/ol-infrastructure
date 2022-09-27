@@ -113,6 +113,8 @@ edxapp_mfe_paths = list(edxapp_mfes.values())
 edxapp_mail_domain = edxapp_config.require("mail_domain")
 edxapp_vpc = network_stack.require_output(target_vpc)
 edxapp_vpc_id = edxapp_vpc["id"]
+data_vpc = network_stack.require_output("data_vpc")
+data_integrator_secgroup = data_vpc["security_groups"]["integrator"]
 ami_filters = [
     ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
     ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
@@ -1396,8 +1398,8 @@ edxapp_fastly_service = fastly.ServiceVcl(
                   set var.mfe_path = regsub(req.url.path, "{mfe_regex}.*", "\\1");
                   set req.url = "/" + var.mfe_path + "/index.html";
                   restart;
-                }}"""
-            ),  # noqa: WPS355
+                }}"""  # noqa: WPS342
+            ),
             name="Fetch site index for MFE custom error",
             priority=120,  # noqa: WPS432
             type="error",
@@ -1455,3 +1457,6 @@ export(
 )
 
 export("edxapp_security_group", edxapp_security_group.id)
+
+if edxapp_db_config.read_replica:
+    export("edxapp_read_replica", edxapp_db.db_replica.address)
