@@ -10,7 +10,7 @@ class PipelineFragment(BaseModel):
 
     @validator("resource_types")
     def deduplicate_resource_types(
-        cls: "PipelineFragment", resource_types: list[ResourceType]
+        cls, resource_types: list[ResourceType]
     ) -> list[ResourceType]:
         """Ensure that there are no duplicate resource type definitions.
 
@@ -39,9 +39,7 @@ class PipelineFragment(BaseModel):
         return unique_resource_types
 
     @validator("resources")
-    def deduplicate_resources(
-        cls: "PipelineFragment", resources: list[Resource]
-    ) -> list[Resource]:
+    def deduplicate_resources(cls, resources: list[Resource]) -> list[Resource]:
         """Ensure that there are no duplicate resource definitions.
 
         Concourse pipelines don't support duplicate definitions of resources, where the

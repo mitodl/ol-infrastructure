@@ -218,9 +218,7 @@ class OLVaultAWSSecretsEngineConfig(BaseModel):
     credential_type: str = "iam_user"
 
     @validator("vault_backend_path")
-    def is_valid_path(
-        cls: "OLVaultAWSSecretsEngineConfig", vault_backend_path: str
-    ) -> str:
+    def is_valid_path(cls, vault_backend_path: str) -> str:
         if vault_backend_path.startswith("/") or vault_backend_path.endswith("/"):
             raise ValueError(
                 f"The specified path value {vault_backend_path} can not start or "
@@ -441,9 +439,7 @@ class OLVaultPKIIntermediateRoleConfig(BaseModel):
     cert_type: str  # Should be client or server
 
     @validator("cert_type")
-    def is_valid_cert_type(
-        cls: "OLVaultPKIIntermediateRoleConfig", cert_type: str
-    ) -> str:
+    def is_valid_cert_type(cls, cert_type: str) -> str:
         if cert_type not in {"server", "client"}:
             raise ValueError(
                 f"The specified certificate type {cert_type} has to be either client "
