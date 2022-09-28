@@ -117,7 +117,7 @@ for data_stage in data_stages:
     warehouse_dbs.append(warehouse_db)
 
 export(
-    "athena_data_warehouse",
+    "data_warehouse",
     {
         "source_buckets": [bucket.bucket for bucket in warehouse_buckets],
         "results_bucket": results_bucket.bucket,
@@ -186,6 +186,7 @@ query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [  # noqa: WP
             for stage in data_stages
         ],
     },
+    {"Effect": "Allow", "Action": ["s3:ListAllMyBuckets"], "Resource": "*"},
 ]
 
 query_engine_iam_permissions = {
@@ -236,3 +237,5 @@ iam.RolePolicyAttachment(
     policy_arn=query_engine_iam_policy.arn,
     role=query_engine_role.name,
 )
+
+export("sql_engine_role_arn", query_engine_role.arn)
