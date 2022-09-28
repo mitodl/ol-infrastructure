@@ -42,7 +42,7 @@ from bridge.secrets.sops import set_env_secrets
 VERSIONS = {  # noqa: WPS407
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
-    "caddy_route53": "v1.1.2",
+    "caddy_route53": "v1.2.1",
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
