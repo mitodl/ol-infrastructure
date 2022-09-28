@@ -9,7 +9,7 @@ RUN apt-get install -y vim python3-virtualenv python3-pip git sudo
 ENV CODEJAIL_GROUP=sandbox
 ENV CODEJAIL_SANDBOX_CALLER=ubuntu
 ENV CODEJAIL_USER=sandbox
-ENV CODEJAIL_VENV=/home/sandbox/codejail_sandbox-python3.8
+ENV CODEJAIL_VENV=/sandbox/venv/
 
 # Create Virtualenv for sandbox user
 RUN virtualenv -p python3.8 --always-copy $CODEJAIL_VENV
@@ -32,7 +32,7 @@ RUN git clone https://github.com/eduNEXT/codejailservice/ --branch main --depth 
 
 # Install dependencies
 RUN source $CODEJAIL_VENV/bin/activate && pip install -r requirements/base.txt -r requirements/dev.txt && \
-    pip install gunicorn && deactivate
+    pip install gunicorn random2 && deactivate
 
 # Setup sudoers file
 ADD sudoers-file/01-sandbox /etc/sudoers.d/01-sandbox
