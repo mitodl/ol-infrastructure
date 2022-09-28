@@ -106,7 +106,7 @@ for data_stage in data_stages:
     )
     warehouse_db = glue.CatalogDatabase(
         f"ol_warehouse_database_{data_stage}",
-        name=f"ol_warehouse_{data_stage}_{stack_info.env_suffix}",
+        name=f"ol_warehouse_{stack_info.env_suffix}_{data_stage}",
         description=f"Data mart for data in {data_stage} format in the {stack_info.env_suffix} environment.",  # noqa: E501
         location_uri=lake_storage_bucket.bucket.apply(lambda bucket: f"s3://{bucket}/"),
     )
@@ -162,8 +162,8 @@ query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [  # noqa: WP
         ],
         "Resource": [
             "arn:aws:glue:*:*:catalog",
-            f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}",
-            f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}/*",
+            f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
+            f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
         ],
     },
     {
