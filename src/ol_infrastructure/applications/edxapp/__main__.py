@@ -113,6 +113,8 @@ edxapp_mfe_paths = list(edxapp_mfes.values())
 edxapp_mail_domain = edxapp_config.require("mail_domain")
 edxapp_vpc = network_stack.require_output(target_vpc)
 edxapp_vpc_id = edxapp_vpc["id"]
+data_vpc = network_stack.require_output("data_vpc")
+data_integrator_secgroup = data_vpc["security_groups"]["integrator"]
 ami_filters = [
     ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
     ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
@@ -603,6 +605,30 @@ edxapp_db_consul_service = Service(
     ],
     opts=consul_provider,
 )
+if edxapp_db_config.read_replica:
+    edxapp_db_replica_consul_service = Service(
+        "edxapp-instance-db-replica-service",
+        node=edxapp_db_consul_node.name,
+        name="edxapp-db-replica",
+        port=edxapp_db_config.port,
+        meta={
+            "external-node": True,
+            "external-probe": True,
+        },
+        checks=[
+            ServiceCheckArgs(
+                check_id="edxapp-db",
+                interval="10s",
+                name="edxapp-db",
+                timeout="1m0s",
+                status="passing",
+                tcp=Output.all(
+                    address=edxapp_db.db_replica.address, port=edxapp_db_config.port
+                ).apply(lambda db: "{address}:{port}".format(**db)),
+            )
+        ],
+        opts=consul_provider,
+    )
 
 #######################
 # MongoDB Vault Setup #
@@ -1396,8 +1422,8 @@ edxapp_fastly_service = fastly.ServiceVcl(
                   set var.mfe_path = regsub(req.url.path, "{mfe_regex}.*", "\\1");
                   set req.url = "/" + var.mfe_path + "/index.html";
                   restart;
-                }}"""
-            ),  # noqa: WPS355
+                }}"""  # noqa: WPS342
+            ),
             name="Fetch site index for MFE custom error",
             priority=120,  # noqa: WPS432
             type="error",
@@ -1455,3 +1481,6 @@ export(
 )
 
 export("edxapp_security_group", edxapp_security_group.id)
+
+if edxapp_db_config.read_replica:
+    export("edxapp_read_replica", edxapp_db.db_replica.address)

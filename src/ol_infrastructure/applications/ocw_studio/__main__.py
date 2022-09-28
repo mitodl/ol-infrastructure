@@ -251,6 +251,7 @@ ocw_studio_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_admin_username=ocw_studio_db_config.username,
     db_admin_password=ocw_studio_db_config.password.get_secret_value(),
     db_host=ocw_studio_db.db_instance.address,
+    **defaults(stack_info)["rds"],
 )
 ocw_studio_vault_backend = OLVaultDatabaseBackend(ocw_studio_vault_backend_config)
 
