@@ -1433,7 +1433,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
                 """\
                 if (obj.status == 618 && obj.response == "redirect") {
                   set obj.status = 302;
-                  set obj.http.Location = table.lookup(marketing_redirects, req.url.path) + if (req.url.qs, "?" req.url.qs, "");  # noqa: E501
+                  set obj.http.Location = table.lookup(marketing_redirects, req.url.path) + if (req.url.qs, "?" req.url.qs, "");
                   return (deliver);
                 }"""
             ),  # noqa: WPS355
