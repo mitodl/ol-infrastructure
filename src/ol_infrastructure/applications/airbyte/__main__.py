@@ -166,8 +166,8 @@ data_lake_policy_document = {
             ],
             "Resource": [
                 "arn:aws:glue:*:*:catalog",
-                f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}",
-                f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}/*",
+                f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
+                f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
             ],
         },
         {
