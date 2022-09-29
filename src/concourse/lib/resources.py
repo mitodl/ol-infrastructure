@@ -5,13 +5,18 @@ from concourse.lib.models.resource import Git
 
 
 def git_repo(
-    name: Identifier, uri: str, branch: str = "main", paths: list[str] = None
+    name: Identifier,
+    uri: str,
+    branch: str = "main",
+    paths: list[str] = None,
+    **kwargs,
 ) -> Resource:
     return Resource(
         name=name,
         type="git",
         icon="git",
         source=Git(uri=uri, branch=branch, paths=paths),
+        **kwargs,
     )
 
 
