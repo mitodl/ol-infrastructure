@@ -1,0 +1,3 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQH+6+5vJN0oRL26AlGpZxeZAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMk5PG2rZHL4/ftd1wAgEQgDtjxxfTYkCIIoqCW+BquaGmShSp5bNk0fo2zvujw7eVo1Jkm5qWBxp4F6n3YYFPMpk04QW8L0s7CHyxRA==
