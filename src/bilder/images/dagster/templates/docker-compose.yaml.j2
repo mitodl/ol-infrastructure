@@ -26,6 +26,17 @@ services:
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     env_file:
       - .env
+  asset-materialization-pipeline:
+    image: mitodl/data-platform-asset-materialization-pipeline:{{ context.dagster_version }}
+    container_name: asset-materialization-pipeline
+    restart: unless-stopped
+    ports:
+    - "4001"
+    command: ["--package-name", "ol_orchestrate.repositories.asset_materialization"]
+    volumes:
+    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
+    env_file:
+      - .env
   nginx:
     image: nginx
     restart: unless-stopped
