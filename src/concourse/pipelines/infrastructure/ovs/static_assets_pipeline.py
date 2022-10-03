@@ -17,7 +17,7 @@ from concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from concourse.lib.resource_types import rclone
+from concourse.lib.resource_types import s3_sync
 from concourse.lib.resources import git_repo
 
 ovs_release = git_repo(
@@ -27,20 +27,27 @@ ovs_release = git_repo(
     check_every="60m",
 )
 
-rclone_resource = Resource(
-    name=Identifier(f"rclone-static-assets"),
+s3_sync_static_to_ci_resouce = Resource(
+    name=Identifier("s3-sync-static-to-ci"),
     icon="cloud-outline",
-    type="rclone",
+    type="s3-sync",
     source={
-        "config": textwrap.dedent(
-            """\
-        [s3-remote]
-        type = s3
-        provider = AWS
-        env_auth = true
-        region = us-east-1
-        """
-        )
+        "path": "static",
+        "bucket": "ovs-static-assets-ci",
+        "directory": "static",
+        "options": ["--exclude '*.crt'", "--exclude '*.key'"],
+    },
+)
+
+s3_sync_staticfiles_to_ci_resouce = Resource(
+    name=Identifier("s3-sync-statifiles-to-ci"),
+    icon="cloud-outline",
+    type="s3-sync",
+    source={
+        "path": "staticfiles",
+        "bucket": "ovs-static-assets-ci",
+        "directory": "staticfiles",
+        "options": ["--exclude '*/mit_x509.cert'", "--exclude '*/mit_x509.key'"],
     },
 )
 
@@ -113,12 +120,12 @@ def static_assets_pipeline() -> Pipeline:
                                  chmod 777 .
                                  env > .env
                                  docker-compose build
-                                 whoami
                                  docker-compose run -u root watch yarn install --frozen-lockfile --ignore-engines --prefer-offline
                                  docker-compose run -u root watch node node_modules/webpack/bin/webpack.js --config webpack.config.prod.js --bail
                                  docker-compose run web python manage.py collectstatic --no-input
                                  WEBPACK_SUFFIX="$(cat .git/describe_ref)"
                                  cp webpack-stats.json static/webpack-stats.json.${WEBPACK_SUFFIX}
+                                 rm -rf staticfiles/mit_x509*
                                  cp -r static ../
                                  cp -r staticfiles ../"""
                             ),
@@ -127,36 +134,22 @@ def static_assets_pipeline() -> Pipeline:
                 ),
             ),
             PutStep(
-                put=rclone_resource.name,
+                put=s3_sync_static_to_ci_resouce.name,
                 get_params={"skip_implicit_get": True},
-                params={
-                    "source": "static",
-                    "destination": [
-                        {
-                            "command": "sync",
-                            "dir": "s3-remote:ovs-static-assets-ci/mike-testing/static/",  # TODO Revisit
-                        }
-                    ],
-                },
             ),
             PutStep(
-                put=rclone_resource.name,
+                put=s3_sync_staticfiles_to_ci_resouce.name,
                 get_params={"skip_implicit_get": True},
-                params={
-                    "source": "staticfiles",
-                    "destination": [
-                        {
-                            "command": "sync",
-                            "dir": "s3-remote:ovs-static-assets-ci/mike-testing/staticfiles/",  # TODO Revisit
-                        }
-                    ],
-                },
             ),
         ],
     )
     return Pipeline(
-        resource_types=[rclone()],
-        resources=[ovs_release, rclone_resource],
+        resource_types=[s3_sync()],
+        resources=[
+            ovs_release,
+            s3_sync_static_to_ci_resouce,
+            s3_sync_staticfiles_to_ci_resouce,
+        ],
         jobs=[build_static_assets_job],
     )
 

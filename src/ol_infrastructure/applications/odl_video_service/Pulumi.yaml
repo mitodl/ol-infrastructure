@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-odl-video-service-env
+runtime: python
+description: Manage deployment of an odl-video-service environment
+backend:
+  url: s3://mitol-pulumi-state/
