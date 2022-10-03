@@ -1,6 +1,0 @@
----
-name: ol-infrastructure-ovs-env
-runtime: python
-description: Manage deployment of an ovs environment
-backend:
-  url: s3://mitol-pulumi-state/
