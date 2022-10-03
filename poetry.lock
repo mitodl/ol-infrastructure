@@ -104,14 +104,14 @@ uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
 name = "boto3"
-version = "1.24.81"
+version = "1.24.84"
 description = "The AWS SDK for Python"
 category = "main"
 optional = false
 python-versions = ">= 3.7"
 
 [package.dependencies]
-botocore = ">=1.27.81,<1.28.0"
+botocore = ">=1.27.84,<1.28.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.6.0,<0.7.0"
 
@@ -120,7 +120,7 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.27.81"
+version = "1.27.84"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
 optional = false
@@ -1625,7 +1625,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "b241f883ac7d0d917381336b29fd99a75f4ab7487d311a085b217529bf7bd6ec"
+content-hash = "936d08f1b8925c2ceae32049572e9abd5b135cab06084f8f2077723c1eb333d9"
 
 [metadata.files]
 anyio = [
@@ -1688,12 +1688,12 @@ black = [
     {file = "black-22.8.0.tar.gz", hash = "sha256:792f7eb540ba9a17e8656538701d3eb1afcb134e3b45b71f20b25c77a8db7e6e"},
 ]
 boto3 = [
-    {file = "boto3-1.24.81-py3-none-any.whl", hash = "sha256:a84f11ba5d369ee4bb3e6d4c9595fe05c8c804ab9b817e578f87d956b803dcfc"},
-    {file = "boto3-1.24.81.tar.gz", hash = "sha256:75defbacdeb48b7fb321c2e283bc57b270595467e873c401b7914a79efd372c7"},
+    {file = "boto3-1.24.84-py3-none-any.whl", hash = "sha256:be151711bbb4db53e85dd5bbe506002ce6f2f21fc4e45fcf6d2cf356d32cc4c6"},
+    {file = "boto3-1.24.84.tar.gz", hash = "sha256:6194763348545bb1669ce8d03ba104be1ba822daa184613aa10b9303a6a79017"},
 ]
 botocore = [
-    {file = "botocore-1.27.81-py3-none-any.whl", hash = "sha256:ad789bfc36ade270671c6846e314193c1968cc3523828aec1e12d012c900652f"},
-    {file = "botocore-1.27.81.tar.gz", hash = "sha256:b6b54560b110666e6f0248c0d39e0588589410186c35f4cee44be847d83fec07"},
+    {file = "botocore-1.27.84-py3-none-any.whl", hash = "sha256:da15026329706caf83323d84996f5ff5c527837347633fca9b3b1be0efa60841"},
+    {file = "botocore-1.27.84.tar.gz", hash = "sha256:11f05d2acdf9a5f722856704b7b951b180647fb4340e1b5048b27273dc323909"},
 ]
 certifi = [
     {file = "certifi-2022.9.24-py3-none-any.whl", hash = "sha256:90c1a32f1d68f940488354e36370f6cca89f0f106db09518524c88d6ed83f382"},
