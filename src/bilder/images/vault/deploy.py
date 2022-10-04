@@ -42,6 +42,7 @@ from bridge.secrets.sops import set_env_secrets
 VERSIONS = {  # noqa: WPS407
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
+    "caddy_route53": "v1.3.0",
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
@@ -54,6 +55,7 @@ caddy_config = CaddyConfig(
     plugins=[
         CaddyPlugin(
             repository="github.com/caddy-dns/route53",
+            version=VERSIONS["caddy_route53"],
         )
     ],
     caddyfile=Path(__file__).resolve().parent.joinpath("templates", "caddyfile.j2"),

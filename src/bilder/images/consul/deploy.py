@@ -32,7 +32,7 @@ from bridge.lib.versions import CONSUL_VERSION
 from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {  # noqa: WPS407
-    "caddy_route53": "v1.2.1",
+    "caddy_route53": "v1.3.0",
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
