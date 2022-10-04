@@ -117,11 +117,14 @@ def mfe_job(open_edx: OpenEdxVars, mfe: MFEAppVars, previous_job: str = None) ->
                         dir=mfe_dir,
                         args=[
                             "-exc",
+                            # This uses the --legacy-peer-deps flag to allow for
+                            # mismatched versions of react defined in tertiary
+                            # dependencies https://stackoverflow.com/a/66620869
                             textwrap.dedent(
                                 f"""\
                                 apt-get update
                                 apt-get install -q -y python build-essential
-                                npm install
+                                npm install --legacy-peer-deps
                                 {branding_overrides}
                                 NODE_ENV=production npm run build
                                 """
