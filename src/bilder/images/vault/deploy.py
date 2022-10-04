@@ -53,7 +53,7 @@ set_env_secrets(Path("consul/consul.env"))
 caddy_config = CaddyConfig(
     plugins=[
         CaddyPlugin(
-            repository="github.com/caddy-dns/lego-deprecated",
+            repository="github.com/caddy-dns/route53",
         )
     ],
     caddyfile=Path(__file__).resolve().parent.joinpath("templates", "caddyfile.j2"),
