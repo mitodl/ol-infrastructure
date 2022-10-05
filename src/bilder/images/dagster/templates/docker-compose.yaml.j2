@@ -33,8 +33,6 @@ services:
     ports:
     - "4001"
     command: ["--package-name", "ol_orchestrate.repositories.asset_materialization"]
-    volumes:
-    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     env_file:
       - .env
   nginx:
