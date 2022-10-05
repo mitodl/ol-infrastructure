@@ -1,0 +1,38 @@
+from pyinfra.api import deploy
+from pyinfra.operations import files, server, systemd
+from pathlib import Path
+from bilder.components.{{ _copier_answers.component_name }}.models import {{ _copier_answers.component_name|capitalize }}Config
+
+
+@deploy("Install {{ _copier_answers.component_name }}")
+def install_{{ _copier_answers.component_name }}(state=None, host=None):
+    server.shell(
+        name="Sample operation",
+        commands=[
+            "echo 'foobar'"
+        ]
+    )
+
+
+@deploy("Configure {{_copier_answers.component_name }}")
+def configure_{{_copier_answers.component_name }}({{_copier_answers.component_name }}_config: {{_copier_answers.component_name|capitalize }}Config, state=None, host=None):
+    files.template(
+        name="Write a configuration file",
+        src=Path(__file__).parent.joinpath("templates/conf.ini.j2"),
+        dest="/etc/{{_copier_answers.component_name }}/{{_copier_answers.component_name }}.conf",
+        settings={{_copier_answers.component_name }}
+    )
+
+
+@deploy("Manage {{_copier_answers.component_name }} service")
+def {{_copier_answers.component_name }}_service({{_copier_answers.component_name }}_config: {{_copier_answers.component_name|capitalize }}Config, state=None, host=None, do_restart=False, do_reload=False):
+    systemd.service(
+        name="Enable {{_copier_answers.component_name }} service",
+        service="{{_copier_answers.component_name }}",
+        running=True,
+        enabled=True,
+        restarted=do_restart,
+        reloaded=do_reload,
+        state=state,
+        host=host,
+    )
