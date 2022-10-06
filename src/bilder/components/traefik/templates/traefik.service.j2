@@ -19,17 +19,17 @@ EnvironmentFile=-/etc/default/traefik
 
 # lock down system access
 # prohibit any operating system and configuration modification
-ProtectSystem=strict
+#ProtectSystem=strict
 # create separate, new (and empty) /tmp and /var/tmp filesystems
-PrivateTmp=true
+#PrivateTmp=true
 # make /home directories inaccessible
-ProtectHome=true
+#ProtectHome=true
 # turns off access to physical devices (/dev/...)
-PrivateDevices=true
+#PrivateDevices=true
 # make kernel settings (procfs and sysfs) read-only
-ProtectKernelTunables=true
+#ProtectKernelTunables=true
 # make cgroups /sys/fs/cgroup read-only
-ProtectControlGroups=true
+#ProtectControlGroups=true
 
 # allow writing of acme.json
 ReadWritePaths=/etc/traefik/acme.json

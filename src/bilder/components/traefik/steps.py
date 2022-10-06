@@ -78,7 +78,11 @@ def configure_traefik(traefik_config: TraefikConfig):
     files.put(
         name="Write Traefik static configuration file",
         src=StringIO(
-            yaml.safe_dump(traefik_config.static_configuration.dict(exclude_unset=True))
+            yaml.safe_dump(
+                traefik_config.static_configuration.dict(
+                    exclude_unset=True, by_alias=True
+                )
+            )
         ),
         dest=str(
             traefik_config.configuration_directory.joinpath(
@@ -91,7 +95,9 @@ def configure_traefik(traefik_config: TraefikConfig):
         files.put(
             name=f"Write Traefik dynamic configuration file {fpath}",
             dest=str(traefik_config.configuration_directory.joinpath(fpath)),
-            src=StringIO(yaml.safe_dump(file_config.dict(exclude_unset=True))),
+            src=StringIO(
+                yaml.safe_dump(file_config.dict(exclude_unset=True, by_alias=True))
+            ),
             user=traefik_config.user,
         )
 
