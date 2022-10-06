@@ -13,12 +13,12 @@ from bilder.components.hashicorp.models import (
 )
 
 
-class VaultAutoAuthMethodConfig(FlexibleBaseModel, abc.ABC):
-    pass
+class VaultAutoAuthMethodConfig(FlexibleBaseModel, abc.ABC):  # noqa: B024
+    pass  # noqa: WPS420, WPS604
 
 
-class VaultAutoAuthSinkConfig(FlexibleBaseModel, abc.ABC):
-    pass
+class VaultAutoAuthSinkConfig(FlexibleBaseModel, abc.ABC):  # noqa: B024
+    pass  # noqa: WPS420, WPS604
 
 
 class VaultAutoAuthFileSink(VaultAutoAuthSinkConfig):
@@ -170,7 +170,7 @@ class VaultConnectionConfig(FlexibleBaseModel):
 
 class VaultTemplate(FlexibleBaseModel):
     source: Optional[Path]
-    contents: Optional[str]
+    contents: Optional[str]  # noqa: WPS110
     destination: Path
     create_dest_dirs: bool = True
     command: Optional[str]
@@ -270,7 +270,7 @@ class Vault(HashicorpProduct):
     data_directory: Path = Path("/var/lib/vault/")
 
     @validator("configuration")
-    def validate_consistent_config_types(cls, configuration):
+    def validate_consistent_config_types(cls, configuration):  # noqa: N805
         type_set = {type(config_obj) for config_obj in configuration.values()}
         if len(type_set) > 1:
             raise ValueError("There are server and agent configuration objects present")
@@ -291,7 +291,7 @@ class Vault(HashicorpProduct):
         return context_dict
 
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
-        for fpath, config in self.configuration.items():
+        for fpath, config in self.configuration.items():  # noqa: WPS526
             yield self.configuration_directory.joinpath(fpath), config.json(
                 exclude_none=True, indent=2
             )

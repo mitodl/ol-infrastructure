@@ -1,6 +1,6 @@
 import itertools
 
-from concourse.lib.models.pipeline import (
+from concourse.lib.models.pipeline import (  # noqa: WPS235
     AnonymousResource,
     Command,
     GetStep,
@@ -52,7 +52,7 @@ def meta_job(
                         dir="pipeline",
                         user="root",
                         args=[
-                            "../mfe-pipeline-definitions/src/concourse/pipelines/open_edx/mfe/pipeline.py",
+                            "../mfe-pipeline-definitions/src/concourse/pipelines/open_edx/mfe/pipeline.py",  # noqa: E501
                             open_edx_deployment,
                             mfe_app_name,
                         ],
@@ -94,7 +94,9 @@ def meta_pipeline() -> Pipeline:
                     trigger=True,
                 ),
                 TaskStep(
-                    task=Identifier(f"generate-mfe-meta-pipeline-file"),
+                    task=Identifier(
+                        f"generate-mfe-meta-pipeline-file"  # noqa: F541, WPS237
+                    ),
                     config=TaskConfig(
                         platform=Platform.linux,
                         image_resource=AnonymousResource(
@@ -111,7 +113,7 @@ def meta_pipeline() -> Pipeline:
                             dir="pipeline",
                             user="root",
                             args=[
-                                "../mfe-pipeline-definitions/src/concourse/pipelines/open_edx/mfe/meta.py",
+                                "../mfe-pipeline-definitions/src/concourse/pipelines/open_edx/mfe/meta.py",  # noqa: E501
                             ],
                         ),
                     ),
@@ -130,7 +132,7 @@ def meta_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    import sys
+    import sys  # noqa: WPS433
 
     with open("definition.json", "wt") as definition:
         definition.write(meta_pipeline().json(indent=2))

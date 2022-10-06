@@ -20,7 +20,7 @@ import pulumi_mongodbatlas as atlas
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import (
+from pulumi_aws import (  # noqa: WPS235
     acm,
     autoscaling,
     cloudwatch,
@@ -113,6 +113,8 @@ edxapp_mfe_paths = list(edxapp_mfes.values())
 edxapp_mail_domain = edxapp_config.require("mail_domain")
 edxapp_vpc = network_stack.require_output(target_vpc)
 edxapp_vpc_id = edxapp_vpc["id"]
+data_vpc = network_stack.require_output("data_vpc")
+data_integrator_secgroup = data_vpc["security_groups"]["integrator"]
 ami_filters = [
     ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
     ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
@@ -187,7 +189,7 @@ edxapp_storage_bucket = s3.Bucket(
             ],
             allowed_origins=[f"https://{domain}" for domain in edxapp_domains.values()],
             expose_headers=["ETag"],
-            max_age_seconds=3000,
+            max_age_seconds=3000,  # noqa: WPS432
         )
     ],
     policy=lint_iam_policy(
@@ -198,7 +200,7 @@ edxapp_storage_bucket = s3.Bucket(
                     "Effect": "Allow",
                     "Principal": "*",
                     "Action": "s3:GetObject",
-                    "Resource": f"arn:aws:s3:::{storage_bucket_name}/media/video-images/*",
+                    "Resource": f"arn:aws:s3:::{storage_bucket_name}/media/video-images/*",  # noqa: E501
                 }
             ],
         },
@@ -230,7 +232,7 @@ edxapp_tracking_bucket = s3.Bucket(
     acl="private",
     server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
         rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
                 sse_algorithm="aws:kms",
                 kms_master_key_id=kms_s3_key["id"],
             ),
@@ -299,7 +301,7 @@ edxapp_policy_document = {
             "Action": ["ses:SendEmail", "ses:SendRawEmail"],
             "Resource": [
                 "arn:*:ses:*:*:identity/*mit.edu",
-                f"arn:aws:ses:*:*:configuration-set/edxapp-{stack_info.env_prefix}-{stack_info.env_suffix}",
+                f"arn:aws:ses:*:*:configuration-set/edxapp-{stack_info.env_prefix}-{stack_info.env_suffix}",  # noqa: E501
             ],
         },
         {
@@ -333,7 +335,7 @@ edxapp_iam_role = iam.Role(
             },
         }
     ),
-    name_prefix=f"edxapp-role-{env_name}-"[:32],
+    name_prefix=f"edxapp-role-{env_name}-"[:32],  # noqa: WPS432
     path=f"/ol-applications/edxapp/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     tags=aws_config.merged_tags({"Name": f"{env_name}-edxapp-role"}),
 )
@@ -362,8 +364,8 @@ edxapp_security_group = ec2.SecurityGroup(
     name_prefix=f"{group_name}-",
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            from_port=18040,
-            to_port=18040,
+            from_port=18040,  # noqa: WPS432
+            to_port=18040,  # noqa: WPS432
             cidr_blocks=[
                 edxapp_vpc["cidr"],
             ],
@@ -411,7 +413,7 @@ edxapp_db_security_group = ec2.SecurityGroup(
 edxapp_vault_mount = vault.Mount(
     "edxapp-vault-generic-secrets-mount",
     path=f"secret-{stack_info.env_prefix}",
-    description="Static secrets storage for Open edX {stack_info.env_prefix} applications and services",
+    description="Static secrets storage for Open edX {stack_info.env_prefix} applications and services",  # noqa: E501
     type="kv",
 )
 edxapp_secrets = vault.generic.Secret(
@@ -430,7 +432,9 @@ forum_secrets = vault.generic.Secret(
         json.dumps
     ),
 )
-if xqueue_secret := edxapp_config.get_secret_object("edx_xqueue_secrets"):
+if xqueue_secret := edxapp_config.get_secret_object(  # noqa: WPS332, WPS337
+    "edx_xqueue_secrets"
+):
     xqueue_secrets = vault.generic.Secret(
         "edx-xqueue-static-secrets",
         path=edxapp_vault_mount.path.apply("{}/edx-xqueue".format),
@@ -493,7 +497,7 @@ edxapp_notes_iam_role = iam.Role(
         }
     ),
     name_prefix=f"edx-notes-role-{env_name}-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
-    path=f"/ol-applications/edx-notes-api/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    path=f"/ol-applications/edx-notes-api/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
     tags=aws_config.merged_tags({"Name": f"{env_name}-edx-notes-api-role"}),
 )
 edxapp_notes_vault_auth_role = vault.aws.AuthBackendRole(
@@ -517,7 +521,7 @@ edxapp_db_config = OLMariaDBConfig(
     tags=aws_config.tags,
     db_name="edxapp",
     engine_version="10.5.12",
-    storage=edxapp_config.get("db_storage_gb") or 50,
+    storage=edxapp_config.get("db_storage_gb") or 50,  # noqa: WPS432
     **defaults(stack_info)["rds"],
 )
 edxapp_db = OLAmazonDB(edxapp_db_config)
@@ -601,6 +605,30 @@ edxapp_db_consul_service = Service(
     ],
     opts=consul_provider,
 )
+if edxapp_db_config.read_replica:
+    edxapp_db_replica_consul_service = Service(
+        "edxapp-instance-db-replica-service",
+        node=edxapp_db_consul_node.name,
+        name="edxapp-db-replica",
+        port=edxapp_db_config.port,
+        meta={
+            "external-node": True,
+            "external-probe": True,
+        },
+        checks=[
+            ServiceCheckArgs(
+                check_id="edxapp-db",
+                interval="10s",
+                name="edxapp-db",
+                timeout="1m0s",
+                status="passing",
+                tcp=Output.all(
+                    address=edxapp_db.db_replica.address, port=edxapp_db_config.port
+                ).apply(lambda db: "{address}:{port}".format(**db)),
+            )
+        ],
+        opts=consul_provider,
+    )
 
 #######################
 # MongoDB Vault Setup #
@@ -778,7 +806,7 @@ ses_domain_mail_from_txt = route53.Record(
 edxapp_ses_domain_dkim = ses.DomainDkim(
     "edxapp-ses-domain-dkim", domain=edxapp_ses_domain_identity.domain
 )
-for loop_counter in range(0, 3):
+for loop_counter in range(0, 3):  # noqa: WPS426
     route53.Record(
         f"edxapp-ses-domain-dkim-record-{loop_counter}",
         zone_id=edxapp_zone_id,
@@ -878,7 +906,8 @@ lms_web_lb_target_group = lb.TargetGroup(
     health_check=lb.TargetGroupHealthCheckArgs(
         healthy_threshold=3,
         timeout=10,
-        interval=edxapp_config.get_int("elb_healthcheck_interval") or 30,
+        interval=edxapp_config.get_int("elb_healthcheck_interval")
+        or 30,  # noqa: WPS432
         path="/user_api/v1/account/login_session/",
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",
@@ -900,7 +929,7 @@ studio_web_lb_target_group = lb.TargetGroup(
     health_check=lb.TargetGroupHealthCheckArgs(
         healthy_threshold=3,
         timeout=10,
-        interval=30,
+        interval=30,  # noqa: WPS432
         path="/heartbeat",
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",
@@ -1036,7 +1065,7 @@ def cloud_init_user_data_func(
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                     """
-                ),
+                ),  # noqa: WPS355
                 "owner": "root:root",
             },
             {
@@ -1080,7 +1109,7 @@ web_launch_config = ec2.LaunchTemplate(
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name=edxapp_web_ami.root_device_name,
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=25,
+                volume_size=25,  # noqa: WPS432
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
                 encrypted=True,
@@ -1117,7 +1146,7 @@ web_asg = autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50
+            min_healthy_percentage=50  # noqa: WPS432
         ),
         triggers=["tags"],
     ),
@@ -1137,7 +1166,7 @@ web_asg = autoscaling.Group(
 web_asg_scale_up_policy = autoscaling.Policy(
     "edxapp-web-scale-up-policy",
     adjustment_type="PercentChangeInCapacity",
-    estimated_instance_warmup=300,
+    estimated_instance_warmup=300,  # noqa: WPS432
     policy_type="StepScaling",
     step_adjustments=[
         autoscaling.PolicyStepAdjustmentArgs(
@@ -1148,11 +1177,11 @@ web_asg_scale_up_policy = autoscaling.Policy(
         autoscaling.PolicyStepAdjustmentArgs(
             scaling_adjustment=10,
             metric_interval_lower_bound=10,
-            metric_interval_upper_bound=20,
+            metric_interval_upper_bound=20,  # noqa: WPS432
         ),
         autoscaling.PolicyStepAdjustmentArgs(
-            scaling_adjustment=30,
-            metric_interval_lower_bound=20,
+            scaling_adjustment=30,  # noqa: WPS432
+            metric_interval_lower_bound=20,  # noqa: WPS432
         ),
     ],
     autoscaling_group_name=web_asg.name,
@@ -1161,7 +1190,7 @@ web_asg_scale_up_policy = autoscaling.Policy(
 web_asg_scale_down_policy = autoscaling.Policy(
     "edxapp-web-scale-down-policy",
     adjustment_type="PercentChangeInCapacity",
-    estimated_instance_warmup=300,
+    estimated_instance_warmup=300,  # noqa: WPS432
     policy_type="StepScaling",
     step_adjustments=[
         autoscaling.PolicyStepAdjustmentArgs(
@@ -1171,12 +1200,12 @@ web_asg_scale_down_policy = autoscaling.Policy(
         ),
         autoscaling.PolicyStepAdjustmentArgs(
             scaling_adjustment=-10,
-            metric_interval_lower_bound=-20,
+            metric_interval_lower_bound=-20,  # noqa: WPS432
             metric_interval_upper_bound=-10,
         ),
         autoscaling.PolicyStepAdjustmentArgs(
-            scaling_adjustment=-30,
-            metric_interval_upper_bound=-20,
+            scaling_adjustment=-30,  # noqa: WPS432
+            metric_interval_upper_bound=-20,  # noqa: WPS432
         ),
     ],
     autoscaling_group_name=web_asg.name,
@@ -1188,7 +1217,7 @@ web_alb_metric_alarm = cloudwatch.MetricAlarm(
     evaluation_periods=5,
     metric_name="TargetResponseTime",
     namespace="AWS/ApplicationELB",
-    period=120,
+    period=120,  # noqa: WPS432
     statistic="Average",
     threshold=1,
     dimensions={
@@ -1197,7 +1226,7 @@ web_alb_metric_alarm = cloudwatch.MetricAlarm(
         ),
     },
     datapoints_to_alarm=5,
-    alarm_description="Time elapsed after the request leaves the load balancer until a response from the target is received",
+    alarm_description="Time elapsed after the request leaves the load balancer until a response from the target is received",  # noqa: E501
     alarm_actions=[web_asg_scale_up_policy.arn],
     ok_actions=[web_asg_scale_down_policy.arn],
     tags=aws_config.tags,
@@ -1218,7 +1247,8 @@ worker_launch_config = ec2.LaunchTemplate(
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name=edxapp_worker_ami.root_device_name,
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=edxapp_config.get_int("worker_disk_size") or 50,
+                volume_size=edxapp_config.get_int("worker_disk_size")
+                or 50,  # noqa: WPS432
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
                 encrypted=True,
@@ -1249,7 +1279,7 @@ worker_asg = autoscaling.Group(
     "edxapp-worker-autoscaling-group",
     desired_capacity=edxapp_config.get_int("worker_node_capacity") or 1,
     min_size=1,
-    max_size=50,
+    max_size=50,  # noqa: WPS432
     health_check_type="EC2",
     vpc_zone_identifiers=edxapp_vpc["subnet_ids"],
     launch_template=autoscaling.GroupLaunchTemplateArgs(
@@ -1258,7 +1288,7 @@ worker_asg = autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50
+            min_healthy_percentage=50  # noqa: WPS432
         ),
         triggers=["tag"],
     ),
@@ -1354,12 +1384,12 @@ edxapp_fastly_service = fastly.ServiceVcl(
     ],
     snippets=[
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(
+            content=textwrap.dedent(  # noqa: WPS462
                 """\
                 if (table.contains(marketing_redirects, req.url.path)) {
                   error 618 "redirect";
                 }"""
-            ),
+            ),  # noqa: WPS355
             name="Interrupt Redirected Requests",
             type="recv",
         ),
@@ -1370,7 +1400,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
                   set req.url = req.url.path;
                   unset req.http.Cookie;
                 }}"""
-            ),
+            ),  # noqa: WPS355
             name="Strip headers to S3 backend",
             type="recv",
         ),
@@ -1380,7 +1410,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
                 if (beresp.status == 404 && req.url.path ~ "{mfe_regex}") {{
                   error 600 "### Custom Response";
                 }}"""
-            ),
+            ),  # noqa: WPS355
             name="Manage 404 On S3 Origin for MFE",
             type="fetch",
         ),
@@ -1392,21 +1422,21 @@ edxapp_fastly_service = fastly.ServiceVcl(
                   set var.mfe_path = regsub(req.url.path, "{mfe_regex}.*", "\\1");
                   set req.url = "/" + var.mfe_path + "/index.html";
                   restart;
-                }}"""
+                }}"""  # noqa: WPS342
             ),
             name="Fetch site index for MFE custom error",
-            priority=120,
+            priority=120,  # noqa: WPS432
             type="error",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(
+            content=textwrap.dedent(  # noqa: WPS462
                 """\
                 if (obj.status == 618 && obj.response == "redirect") {
                   set obj.status = 302;
                   set obj.http.Location = table.lookup(marketing_redirects, req.url.path) + if (req.url.qs, "?" req.url.qs, "");
                   return (deliver);
                 }"""
-            ),
+            ),  # noqa: WPS355
             name="Route Redirect Requests",
             type="error",
         ),
@@ -1451,3 +1481,6 @@ export(
 )
 
 export("edxapp_security_group", edxapp_security_group.id)
+
+if edxapp_db_config.read_replica:
+    export("edxapp_read_replica", edxapp_db.db_replica.address)

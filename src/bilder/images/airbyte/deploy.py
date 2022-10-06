@@ -59,7 +59,7 @@ from bridge.secrets.sops import set_env_secrets
 
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
-VERSIONS = {
+VERSIONS = {  # noqa: WPS407
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "consul-template": os.environ.get(
         "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION
@@ -120,7 +120,7 @@ files.put(
 )
 
 files.put(
-    name="Create the nginx htpasswd file template for nginx basic auth on the dagster bypass.",
+    name="Create the nginx htpasswd file template for nginx basic auth on the dagster bypass.",  # noqa: E501
     src=str(FILES_DIRECTORY.joinpath("nginx_htpasswd.tmpl")),
     dest=str(nginx_htpasswd_template_file),
     mode="0664",
@@ -179,7 +179,7 @@ consul_configuration = {
 vector_config = VectorConfig(is_proxy=False)
 
 vault_config = VaultAgentConfig(
-    cache=VaultAgentCache(use_auto_auth_token="force"),
+    cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
     listener=[
         VaultListener(
             tcp=VaultTCPListener(
@@ -210,7 +210,7 @@ consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 consul_templates = [
     ConsulTemplateTemplate(
         source=env_template_file,
-        destination=DOCKER_COMPOSE_DIRECTORY + "/.env",
+        destination=DOCKER_COMPOSE_DIRECTORY + "/.env",  # noqa: WPS336
     )
 ]
 consul_template = ConsulTemplate(
@@ -244,7 +244,7 @@ if host.get_fact(HasSystemd):
     )
 
     watched_docker_compose_files = [
-        DOCKER_COMPOSE_DIRECTORY + "/.env",
+        DOCKER_COMPOSE_DIRECTORY + "/.env",  # noqa: WPS336
         pomerium_config.certificate_file,
         pomerium_config.certificate_key_file,
         nginx_htpasswd_file,

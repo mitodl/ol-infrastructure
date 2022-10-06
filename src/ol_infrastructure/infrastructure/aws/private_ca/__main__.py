@@ -7,7 +7,7 @@ aws_config = AWSBase(tags={"OU": "operations", "Environment": "global"})
 
 ol_root_ca = acmpca.CertificateAuthority(
     "mitol-root-certificate-authority",
-    certificate_authority_configuration=acmpca.CertificateAuthorityCertificateAuthorityConfigurationArgs(
+    certificate_authority_configuration=acmpca.CertificateAuthorityCertificateAuthorityConfigurationArgs(  # noqa: E501
         key_algorithm="RSA_4096",
         signing_algorithm="SHA512WITHRSA",
         subject=acmpca.CertificateAuthorityCertificateAuthorityConfigurationSubjectArgs(

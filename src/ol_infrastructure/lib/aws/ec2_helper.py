@@ -10,9 +10,9 @@ import pulumi
 from pulumi_aws import ec2
 
 ec2_client = boto3.client("ec2")
-AWSFilterType = list[dict[str, Union[str, list[str]]]]
+AWSFilterType = list[dict[str, Union[str, list[str]]]]  # noqa: WPS221
 
-debian_10_ami = ec2.get_ami(
+debian_10_ami = ec2.get_ami(  # noqa: WPS114
     filters=[
         {"name": "image-id", "values": ["ami-0e0161137b4b30900"]},
         {"name": "virtualization-type", "values": ["hvm"]},
@@ -35,23 +35,23 @@ default_egress_args = [
 
 
 @unique
-class InstanceTypes(str, Enum):
+class InstanceTypes(str, Enum):  # noqa: WPS600
     burstable_small = "t3a.small"
     burstable_medium = "t3a.medium"
     burstable_large = "t3a.large"
     general_purpose_large = "m5a.large"
     general_purpose_xlarge = "m5a.xlarge"
-    general_purpose_2xlarge = "m5a.2xlarge"
+    general_purpose_2xlarge = "m5a.2xlarge"  # noqa: WPS114
     general_prupose_intel_large = "m5.large"
     general_purpose_intel_xlarge = "m5.xlarge"
-    general_purpose_intel_2xlarge = "m5.2xlarge"
+    general_purpose_intel_2xlarge = "m5.2xlarge"  # noqa: WPS114
     high_mem_regular = "r5a.large"
     high_mem_xlarge = "r5a.xlarge"
-    high_mem_2xlarge = "r5a.2xlarge"
+    high_mem_2xlarge = "r5a.2xlarge"  # noqa: WPS114
 
 
 @unique
-class DiskTypes(str, Enum):
+class DiskTypes(str, Enum):  # noqa: WPS600
     magnetic = "standard"
     legacy_ssd = "gp2"
     ssd = "gp3"

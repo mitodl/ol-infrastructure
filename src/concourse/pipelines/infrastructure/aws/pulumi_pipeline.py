@@ -8,7 +8,7 @@ from concourse.lib.resources import git_repo
 simple_resource_types = []
 simple_resources = []
 simple_jobs = []
-for service in ["kms", "network"]:
+for service in ["kms", "network"]:  # noqa: WPS335
     simple_pulumi_code = git_repo(
         name=Identifier(f"ol-infrastructure-pulumi-{service}"),
         uri="https://github.com/mitodl/ol-infrastructure",
@@ -46,7 +46,7 @@ simple_services_combined_fragment = PipelineFragment(
 oneoff_resource_types = []
 oneoff_resources = []
 oneoff_jobs = []
-for service in ["dns", "policies"]:
+for service in ["dns", "policies"]:  # noqa: WPS335, WPS440
     oneoff_pulumi_code = git_repo(
         name=Identifier(f"ol-infrastructure-pulumi-{service}"),
         uri="https://github.com/mitodl/ol-infrastructure",
@@ -93,10 +93,10 @@ aws_pipeline = Pipeline(
 
 
 if __name__ == "__main__":
-    import sys
+    import sys  # noqa: WPS433
 
     with open("definition.json", "wt") as definition:
         definition.write(aws_pipeline.json(indent=2))
     sys.stdout.write(aws_pipeline.json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p pulumi-aws -c definition.json")
+    print()  # noqa: WPS421
+    print("fly -t pr-inf sp -p pulumi-aws -c definition.json")  # noqa: WPS421

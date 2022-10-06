@@ -55,7 +55,7 @@ from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 
-VERSIONS = {
+VERSIONS = {  # noqa: WPS407
     "consul": CONSUL_VERSION,
     "vault": VAULT_VERSION,
     "consul-template": CONSUL_TEMPLATE_VERSION,
@@ -128,9 +128,9 @@ files.directory(
     recursive=True,
 )
 
-# Ugly, hopefully short-term, fix for getting the beat scheduler working again in ODL edx deployments.
+# Ugly, hopefully short-term, fix for getting the beat scheduler working again in ODL edx deployments.  # noqa: E501
 files.line(
-    name="Fix beat_scheduler.sh to invoke RedBeat rather than the broken single-beat definition.",
+    name="Fix beat_scheduler.sh to invoke RedBeat rather than the broken single-beat definition.",  # noqa: E501
     path=str(Path("/edx/app/edxapp/beat_scheduler.sh")),
     line="^exec.*$",
     replace="exec /edx/app/edxapp/venvs/edxapp/bin/celery beat $@",
@@ -243,7 +243,7 @@ if node_type == WEB_NODE_TYPE:
         services=[
             ConsulService(
                 name="edxapp",
-                port=8000,
+                port=8000,  # noqa: WPS432
                 tags=["lms"],
                 check=ConsulServiceTCPCheck(
                     name="edxapp-lms",
@@ -253,7 +253,7 @@ if node_type == WEB_NODE_TYPE:
             ),
             ConsulService(
                 name="forum",
-                port=4567,
+                port=4567,  # noqa: WPS432
                 check=ConsulServiceTCPCheck(
                     name="edxapp-forum",
                     tcp="localhost:4567",
@@ -264,7 +264,7 @@ if node_type == WEB_NODE_TYPE:
     )
 
 vault_config = VaultAgentConfig(
-    cache=VaultAgentCache(use_auto_auth_token="force"),
+    cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
     listener=[
         VaultListener(
             tcp=VaultTCPListener(
@@ -363,7 +363,7 @@ if host.get_fact(HasSystemd):
         start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
-            f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} && "
+            f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} && "  # noqa: WPS237
             # Ensure that Vault can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {lms_config_path} && "
             f"setfacl -m u:edxapp:rwx {lms_config_path} && "
@@ -378,7 +378,7 @@ if host.get_fact(HasSystemd):
         start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
-            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} && "
+            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} && "  # noqa: WPS237
             # Ensure that Vault can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {studio_config_path} && "
             f"setfacl -m u:edxapp:rwx {studio_config_path} && "
@@ -427,7 +427,7 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
         services=[
             ConsulService(
                 name="xqueue",
-                port=18040,
+                port=18040,  # noqa: WPS432
                 check=ConsulServiceTCPCheck(
                     name="edxapp-xqueue",
                     tcp="localhost:8040",

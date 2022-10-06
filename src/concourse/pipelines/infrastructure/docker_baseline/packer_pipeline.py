@@ -70,10 +70,12 @@ docker_baseline_pipeline = Pipeline(
 
 
 if __name__ == "__main__":
-    import sys
+    import sys  # noqa: WPS433
 
     with open("definition.json", "wt") as definition:
         definition.write(docker_baseline_pipeline.json(indent=2))
     sys.stdout.write(docker_baseline_pipeline.json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p packer-docker-baseline -c definition.json")
+    print()  # noqa: WPS421
+    print(  # noqa: WPS421
+        "fly -t pr-inf sp -p packer-docker-baseline -c definition.json"  # noqa: C813
+    )

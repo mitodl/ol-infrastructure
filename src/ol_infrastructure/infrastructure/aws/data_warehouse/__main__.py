@@ -30,7 +30,7 @@ results_bucket = s3.Bucket(
     acl="private",
     server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
         rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
                 sse_algorithm="aws:kms",
                 kms_master_key_id=s3_kms_key["id"],
             ),
@@ -41,7 +41,7 @@ results_bucket = s3.Bucket(
     lifecycle_rules=[
         s3.BucketLifecycleRuleArgs(
             enabled=True,
-            expiration=s3.BucketLifecycleRuleExpirationArgs(days=30),
+            expiration=s3.BucketLifecycleRuleExpirationArgs(days=30),  # noqa: WPS432
             id="expire_old_query_results",
         )
     ],
@@ -62,7 +62,7 @@ athena_warehouse_workgroup = athena.Workgroup(
     tags=aws_config.merged_tags({"Name": f"ol-warehouse-{stack_info.env_suffix}"}),
     configuration=athena.WorkgroupConfigurationArgs(
         result_configuration=athena.WorkgroupConfigurationResultConfigurationArgs(
-            encryption_configuration=athena.WorkgroupConfigurationResultConfigurationEncryptionConfigurationArgs(
+            encryption_configuration=athena.WorkgroupConfigurationResultConfigurationEncryptionConfigurationArgs(  # noqa: E501
                 encryption_option="SSE_KMS",
                 kms_key_arn=s3_kms_key["arn"],
             ),
@@ -106,7 +106,7 @@ for data_stage in data_stages:
     )
     warehouse_db = glue.CatalogDatabase(
         f"ol_warehouse_database_{data_stage}",
-        name=f"ol_warehouse_{data_stage}_{stack_info.env_suffix}",
+        name=f"ol_warehouse_{stack_info.env_suffix}_{data_stage}",
         description=f"Data mart for data in {data_stage} format in the {stack_info.env_suffix} environment.",  # noqa: E501
         location_uri=lake_storage_bucket.bucket.apply(lambda bucket: f"s3://{bucket}/"),
     )
@@ -117,7 +117,7 @@ for data_stage in data_stages:
     warehouse_dbs.append(warehouse_db)
 
 export(
-    "athena_data_warehouse",
+    "data_warehouse",
     {
         "source_buckets": [bucket.bucket for bucket in warehouse_buckets],
         "results_bucket": results_bucket.bucket,
@@ -130,7 +130,7 @@ parliament_config: dict[str, Any] = {
     "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []}
 }
 
-query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
+query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [  # noqa: WPS234
     {
         "Effect": "Allow",
         "Action": [
@@ -162,8 +162,8 @@ query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
         ],
         "Resource": [
             "arn:aws:glue:*:*:catalog",
-            f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}",
-            f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}/*",
+            f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
+            f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
         ],
     },
     {
@@ -186,6 +186,7 @@ query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
             for stage in data_stages
         ],
     },
+    {"Effect": "Allow", "Action": ["s3:ListAllMyBuckets"], "Resource": "*"},
 ]
 
 query_engine_iam_permissions = {
@@ -236,3 +237,5 @@ iam.RolePolicyAttachment(
     policy_arn=query_engine_iam_policy.arn,
     role=query_engine_role.name,
 )
+
+export("sql_engine_role_arn", query_engine_role.arn)

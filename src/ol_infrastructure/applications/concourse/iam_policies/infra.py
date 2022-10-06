@@ -1,8 +1,8 @@
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 
-## TODO: MAD 2022-01-21
-## There is something wrong with this one at the moment.
-## Pulumi throws an error if you try to use it.
+## TODO: MAD 2022-01-21  # noqa: E266
+## There is something wrong with this one at the moment.  # noqa: E266
+## Pulumi throws an error if you try to use it.  # noqa: E266
 
 # AWS Permissions Document
 # Allow infrastructure workers elevated permissions needed for running packer

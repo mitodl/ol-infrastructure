@@ -8,7 +8,7 @@ cache_client = boto3.client("elasticache")
 
 @lru_cache
 def cache_engines() -> dict[str, list[str]]:
-    """Generate a list of cache engines and their currently available versions on Elasticache.
+    """Generate a list of cache engines and their currently available versions on Elasticache.  # noqa: E501
 
     :returns: Dictionary of engine names and the list of available versions
 
@@ -32,7 +32,7 @@ def parameter_group_family(engine: str, engine_version: str) -> str:
     :param engine_version: Version of the cache engine being used (e.g. 3.1)
     :type engine_version: str
 
-    :returns: The name of the parameter group family for the specified engine and version
+    :returns: The name of the parameter group family for the specified engine and version  # noqa: E501
 
     :rtype: str
     """

@@ -43,7 +43,7 @@ consul_ami_fragment = packer_jobs(
 )
 
 consul_pulumi_fragments = []
-for network in [
+for network in [  # noqa: WPS335, WPS352
     "mitx",
     "mitx-staging",
     "mitxonline",
@@ -53,7 +53,7 @@ for network in [
     "xpro",
 ]:
     # Missing a few stacks for some apps
-    if network in ["apps", "data"]:
+    if network in ["apps", "data"]:  # noqa: WPS510
         stages = ("QA", "Production")
     else:
         stages = ("CI", "QA", "Production")  # type: ignore
@@ -106,10 +106,10 @@ consul_pipeline = Pipeline(
 
 
 if __name__ == "__main__":
-    import sys
+    import sys  # noqa: WPS433
 
     with open("definition.json", "wt") as definition:
         definition.write(consul_pipeline.json(indent=2))
     sys.stdout.write(consul_pipeline.json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p packer-pulumi-consul -c definition.json")
+    print()  # noqa: WPS421
+    print("fly -t pr-inf sp -p packer-pulumi-consul -c definition.json")  # noqa: WPS421

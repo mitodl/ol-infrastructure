@@ -1,5 +1,6 @@
 from typing import Any
 
+from ol_infrastructure.components.aws.database import OLReplicaDBConfig
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -7,6 +8,7 @@ production_defaults = {
     "rds": {
         "multi_az": True,
         "instance_size": DBInstanceTypes.general_purpose_large.value,
+        "read_replica": OLReplicaDBConfig(),
     },
     "redis": {"instance_type": "cache.m6g.large"},
 }

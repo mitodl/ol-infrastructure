@@ -72,7 +72,7 @@ from bridge.lib.magic_numbers import (
 from bridge.lib.versions import CONCOURSE_VERSION, CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 
-VERSIONS = {
+VERSIONS = {  # noqa: WPS407
     "concourse": os.environ.get("CONCOURSE_VERSION", CONCOURSE_VERSION),
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
@@ -85,7 +85,7 @@ node_type = os.environ.get("NODE_TYPE", CONCOURSE_WEB_NODE_TYPE)
 set_env_secrets(Path("consul/consul.env"))
 concourse_base_config = ConcourseBaseConfig(version=VERSIONS["concourse"])
 concourse_config_map = {
-    CONCOURSE_WEB_NODE_TYPE: partial(
+    CONCOURSE_WEB_NODE_TYPE: partial(  # noqa: S106
         ConcourseWebConfig,
         admin_user="oldevops",
         admin_password=(
@@ -149,12 +149,12 @@ concourse_config_map = {
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
         additional_resource_types=["rclone", "s3-sync"],
-        additional_resource_types_s3_location="ol-eng-artifacts.s3.amazonaws.com/bundled-concourse-resources",
-        baggageclaim_bind_ip="0.0.0.0",
+        additional_resource_types_s3_location="ol-eng-artifacts.s3.amazonaws.com/bundled-concourse-resources",  # noqa: E501
+        baggageclaim_bind_ip="0.0.0.0",  # noqa: S104
         baggageclaim_driver="overlay",
         baggageclaim_p2p_interface_family="4",
         baggageclaim_p2p_interface_name_pattern="ens5",
-        bind_ip="0.0.0.0",
+        bind_ip="0.0.0.0",  # noqa: S104
         container_runtime="containerd",
         containerd_dns_server="8.8.8.8",
         containerd_max_containers=0,  # Don't set a limit on the number of containers
@@ -238,7 +238,7 @@ consul_configuration = {Path("00-default.json"): ConsulConfig()}
 
 vector_config = VectorConfig()
 
-if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
+if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
     # Setting this attribute after instantiating the object to bypass validation
     concourse_config.encryption_key = SecretStr(
         '{{ with secret "secret-concourse/web" }}'
@@ -279,7 +279,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
 
 # Install Consul and Vault Agent
 vault_config = VaultAgentConfig(
-    cache=VaultAgentCache(use_auto_auth_token="force"),
+    cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
     listener=[
         VaultListener(
             tcp=VaultTCPListener(
@@ -295,7 +295,9 @@ vault_config = VaultAgentConfig(
         method=VaultAutoAuthMethod(
             type="aws",
             mount_path="auth/aws",
-            config=VaultAutoAuthAWS(role=f"concourse-{concourse_config._node_type}"),
+            config=VaultAutoAuthAWS(
+                role=f"concourse-{concourse_config._node_type}"  # noqa: WPS437
+            ),
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),
@@ -320,8 +322,8 @@ consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
 
-# Caddy and Vault are tightly coupled and this step cannot happen until vault is installed.
-if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
+# Caddy and Vault are tightly coupled and this step cannot happen until vault is installed.  # noqa: E501
+if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
     create_placeholder_tls_config(caddy_config)
 
 vault_template_permissions(vault_config)

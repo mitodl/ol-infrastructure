@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from bilder.lib.model_helpers import OLBaseSettings
 
 
-class HashicorpConfig(OLBaseSettings, abc.ABC):
+class HashicorpConfig(OLBaseSettings, abc.ABC):  # noqa: B024
     class Config:
         extra = "allow"
 

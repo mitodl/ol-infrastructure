@@ -24,7 +24,7 @@ def public_web(vpc_name: str, vpc: ec2.Vpc) -> partial:
     :param vpc: The VPC instance that the security group is being created in.
     :type vpc: ec2.Vpc
 
-    :returns: A partial SecurityGroup object that can be finalized in the importing module
+    :returns: A partial SecurityGroup object that can be finalized in the importing module  # noqa: E501
 
     :rtype: partial
     """
@@ -35,16 +35,16 @@ def public_web(vpc_name: str, vpc: ec2.Vpc) -> partial:
         vpc_id=vpc.id,
         ingress=[
             ec2.SecurityGroupIngressArgs(
-                from_port=80,
-                to_port=80,
+                from_port=80,  # noqa: WPS432
+                to_port=80,  # noqa: WPS432
                 protocol="tcp",
                 cidr_blocks=["0.0.0.0/0"],
                 ipv6_cidr_blocks=["::/0"],
                 description="HTTP access from the public internet",
             ),
             ec2.SecurityGroupIngressArgs(
-                from_port=443,
-                to_port=443,
+                from_port=443,  # noqa: WPS432
+                to_port=443,  # noqa: WPS432
                 protocol="tcp",
                 cidr_blocks=["0.0.0.0/0"],
                 ipv6_cidr_blocks=["::/0"],
@@ -64,7 +64,7 @@ def public_ssh(vpc_name: str, vpc: ec2.Vpc) -> partial:
     :param vpc: The VPC instance that the security group is being created in.
     :type vpc: ec2.Vpc
 
-    :returns: A partial SecurityGroup object that can be finalized in the importing module
+    :returns: A partial SecurityGroup object that can be finalized in the importing module  # noqa: E501
 
     :rtype: partial
     """
@@ -75,8 +75,8 @@ def public_ssh(vpc_name: str, vpc: ec2.Vpc) -> partial:
         vpc_id=vpc.id,
         ingress=[
             ec2.SecurityGroupIngressArgs(
-                from_port=22,
-                to_port=22,
+                from_port=22,  # noqa: WPS432
+                to_port=22,  # noqa: WPS432
                 protocol="tcp",
                 cidr_blocks=["0.0.0.0/0"],
                 ipv6_cidr_blocks=["::/0"],
@@ -88,7 +88,7 @@ def public_ssh(vpc_name: str, vpc: ec2.Vpc) -> partial:
 
 
 def salt_minion(vpc_name: str, vpc: ec2.Vpc, ops_vpc: ec2.Vpc) -> partial:
-    """Create a security group to allow access to Salt minions from the appropriate Salt master.
+    """Create a security group to allow access to Salt minions from the appropriate Salt master.  # noqa: E501
 
     :param vpc_name: The name of the VPC that the security group is being created in.
     :type vpc_name: str
@@ -99,7 +99,7 @@ def salt_minion(vpc_name: str, vpc: ec2.Vpc, ops_vpc: ec2.Vpc) -> partial:
     :param ops_vpc: The VPC instance that the target Salt master is located in.
     :type ops_vpc: ec2.Vpc
 
-    :returns: A partial SecurityGroup object that can be finalized in the importing module
+    :returns: A partial SecurityGroup object that can be finalized in the importing module  # noqa: E501
 
     :rtype: partial
     """
@@ -110,15 +110,15 @@ def salt_minion(vpc_name: str, vpc: ec2.Vpc, ops_vpc: ec2.Vpc) -> partial:
         vpc_id=vpc.id,
         ingress=[
             ec2.SecurityGroupIngressArgs(
-                from_port=22,
-                to_port=22,
+                from_port=22,  # noqa: WPS432
+                to_port=22,  # noqa: WPS432
                 protocol="tcp",
                 cidr_blocks=[ops_vpc.cidr_block],
                 description="SSH access from the salt master",
             ),
             ec2.SecurityGroupIngressArgs(
-                from_port=19999,
-                to_port=19999,
+                from_port=19999,  # noqa: WPS432
+                to_port=19999,  # noqa: WPS432
                 protocol="tcp",
                 cidr_blocks=[ops_vpc.cidr_block],
                 description="Access to the Netdata HTTP interface from the salt master",

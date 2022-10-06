@@ -1,5 +1,5 @@
 def test_docker_running_and_enabled(host):
     docker = host.service("docker")
-    print(docker)
-    assert docker.is_running
-    assert docker.is_enabled
+    print(docker)  # noqa: WPS421
+    assert docker.is_running  # noqa: S101
+    assert docker.is_enabled  # noqa: S101

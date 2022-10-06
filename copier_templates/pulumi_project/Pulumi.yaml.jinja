@@ -1,0 +1,5 @@
+name: ol-infrastructure-{% if _copier_answers.project_type == 'substructure' %}substructure-{% endif %}{{ _copier_answers.project_name }}{% if _copier_answers.project_type == 'application' %}-application{% endif %}
+runtime: python
+description: {{ _copier_answers.project_description }}
+backend:
+  url: s3://mitol-pulumi-state/

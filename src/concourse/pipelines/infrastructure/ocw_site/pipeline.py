@@ -31,7 +31,7 @@ ocw_site_pipeline = Pipeline(
 )
 
 if __name__ == "__main__":
-    import sys
+    import sys  # noqa: WPS433
 
     with open("definition.json", "wt") as definition:
         definition.write(ocw_site_pipeline.json(indent=2))

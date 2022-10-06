@@ -50,48 +50,48 @@ mitxpro_edxapp_security_group = ec2.SecurityGroup(
             cidr_blocks=[xpro_vpc["cidr"]],
             ipv6_cidr_blocks=[xpro_vpc["cidr_v6"]],
             protocol="tcp",
-            from_port=22,
-            to_port=22,
+            from_port=22,  # noqa: WPS432
+            to_port=22,  # noqa: WPS432
             description="mitxpro_vpc ssh access",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=[operations_vpc["cidr"]],
             ipv6_cidr_blocks=[operations_vpc["cidr_v6"]],
             protocol="tcp",
-            from_port=22,
-            to_port=22,
+            from_port=22,  # noqa: WPS432
+            to_port=22,  # noqa: WPS432
             description="operations_vpc ssh access",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=["0.0.0.0/0"],
             ipv6_cidr_blocks=["::/0"],
             protocol="tcp",
-            from_port=80,
-            to_port=80,
+            from_port=80,  # noqa: WPS432
+            to_port=80,  # noqa: WPS432
             description="HTTP access",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=["0.0.0.0/0"],
             ipv6_cidr_blocks=["::/0"],
             protocol="tcp",
-            from_port=443,
-            to_port=443,
+            from_port=443,  # noqa: WPS432
+            to_port=443,  # noqa: WPS432
             description="HTTPS access",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=[xpro_vpc["cidr"]],
             ipv6_cidr_blocks=[xpro_vpc["cidr_v6"]],
             protocol="tcp",
-            from_port=4567,
-            to_port=4567,
+            from_port=4567,  # noqa: WPS432
+            to_port=4567,  # noqa: WPS432
             description="Forum access",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=[xpro_vpc["cidr"]],
             ipv6_cidr_blocks=[xpro_vpc["cidr_v6"]],
             protocol="tcp",
-            from_port=18040,
-            to_port=18040,
+            from_port=18040,  # noqa: WPS432
+            to_port=18040,  # noqa: WPS432
             description="Xqueue access",
         ),
     ],
@@ -110,7 +110,7 @@ mitxpro_edx_worker_security_group = ec2.SecurityGroup(
 mitxpro_edxapp_db_security_group = ec2.SecurityGroup(
     f"mitxpro-edxapp-db-access-{stack_info.env_suffix}",
     name=f"mitxpro-edxapp-db-access-{stack_info.env_suffix}",
-    description="Access from the mitxpro and operations VPC to the mitxpro edxapp database",
+    description="Access from the mitxpro and operations VPC to the mitxpro edxapp database",  # noqa: E501
     ingress=[
         ec2.SecurityGroupIngressArgs(
             security_groups=[
@@ -119,15 +119,15 @@ mitxpro_edxapp_db_security_group = ec2.SecurityGroup(
                 dagster_app.require_output("dagster_app")["security_group"],
             ],
             protocol="tcp",
-            from_port=3306,
-            to_port=3306,
+            from_port=3306,  # noqa: WPS432
+            to_port=3306,  # noqa: WPS432
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=[operations_vpc["cidr"]],
             ipv6_cidr_blocks=[operations_vpc["cidr_v6"]],
             protocol="tcp",
-            from_port=3306,
-            to_port=3306,
+            from_port=3306,  # noqa: WPS432
+            to_port=3306,  # noqa: WPS432
         ),
     ],
     tags=aws_config.tags,
@@ -154,7 +154,7 @@ edx_role_statments = mysql_role_statements.update(
             "create": Template(
                 "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
                 "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "
-                f"CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh_{xpro_db_purpose}.* "
+                f"CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh_{xpro_db_purpose}.* "  # noqa: E501
                 "TO '{{name}}'@'%';"
                 f"GRANT REFERENCES ON edxapp_csmh_{xpro_db_purpose}.* "
                 "TO '{{name}}'@'%';"
@@ -188,7 +188,7 @@ edx_role_statments = mysql_role_statements.update(
 
 mitxpro_edxapp_db_vault_backend_config = OLVaultMysqlDatabaseConfig(
     db_name=mitxpro_edxapp_db_config.db_name,
-    mount_point=f"{mitxpro_edxapp_db_config.engine}-mitxpro-edxapp-{mitxpro_environment}",
+    mount_point=f"{mitxpro_edxapp_db_config.engine}-mitxpro-edxapp-{mitxpro_environment}",  # noqa: E501
     db_admin_username=mitxpro_edxapp_db_config.username,
     db_admin_password=mitxpro_edxapp_db_config.password.get_secret_value(),
     db_host=mitxpro_edxapp_db.db_instance.address,
@@ -209,7 +209,7 @@ mitxpro_edxapp_db_consul_service = Service(
     "edxapp-mysql",
     node=mitxpro_edxapp_db_consul_node.name,
     name="edxapp-mysql",
-    port=3306,
+    port=3306,  # noqa: WPS432
     meta={
         "external-node": True,
         "external-probe": True,
@@ -222,7 +222,7 @@ mitxpro_edxapp_db_consul_service = Service(
             "name": "mitxpro_edxapp_db",
             "timeout": "60s",
             "status": "passing",
-            "tcp": f"{mitxpro_edxapp_db.db_instance.address}:3306",
+            "tcp": f"{mitxpro_edxapp_db.db_instance.address}:3306",  # noqa: WPS237
         }
     ],
     tags=["rds", "mitxpro", "mitxpro_edxapp", mitxpro_environment],

@@ -39,10 +39,10 @@ from bridge.lib.magic_numbers import HOURS_IN_MONTH, VAULT_CLUSTER_PORT, VAULT_H
 from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 
-VERSIONS = {
+VERSIONS = {  # noqa: WPS407
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
-    "caddy_route53": "v1.1.2",
+    "caddy_route53": "v1.3.0",
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
@@ -81,8 +81,8 @@ vault = Vault(
                 ),
                 VaultListener(
                     tcp=VaultTCPListener(
-                        address=f"127.0.0.1:{VAULT_HTTP_PORT + 2}",
-                        cluster_address=f"127.0.0.1:{VAULT_CLUSTER_PORT + 2}",
+                        address=f"127.0.0.1:{VAULT_HTTP_PORT + 2}",  # noqa: WPS237
+                        cluster_address=f"127.0.0.1:{VAULT_CLUSTER_PORT + 2}",  # noqa: WPS237
                         tls_cert_file=Path("/etc/vault/ssl/vault.cert"),
                         tls_key_file=Path("/etc/vault/ssl/vault.key"),
                         telemetry=VaultTelemetryListener(

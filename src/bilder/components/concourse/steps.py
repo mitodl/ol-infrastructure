@@ -24,7 +24,7 @@ def install_concourse(concourse_config: ConcourseBaseConfig):
         present=True,
         home=concourse_config.deploy_directory,
         ensure_home=False,
-        shell="/bin/false",
+        shell="/bin/false",  # noqa: S604
         system=True,
     )
     installation_directory = (
@@ -32,9 +32,11 @@ def install_concourse(concourse_config: ConcourseBaseConfig):
     )
     if not host.get_fact(Directory, installation_directory):
         # Download latest Concourse release from GitHub
-        concourse_archive = f"https://github.com/concourse/concourse/releases/download/v{concourse_config.version}/concourse-{concourse_config.version}-linux-amd64.tgz"
+        concourse_archive = f"https://github.com/concourse/concourse/releases/download/v{concourse_config.version}/concourse-{concourse_config.version}-linux-amd64.tgz"  # noqa: E501
         concourse_archive_hash = f"{concourse_archive}.sha1"
-        concourse_archive_path = f"/tmp/concourse-{concourse_config.version}.tgz"
+        concourse_archive_path = (
+            f"/tmp/concourse-{concourse_config.version}.tgz"  # noqa: S108
+        )
         files.download(
             name="Download the Concourse release archive",
             src=str(concourse_archive),
@@ -102,7 +104,7 @@ def _manage_web_node_keys(
         server.shell(
             name="Generate a tsa host key",
             commands=[
-                f"{concourse_config.deploy_directory}/bin/concourse generate-key -t ssh -f {concourse_config.tsa_host_key_path}"
+                f"{concourse_config.deploy_directory}/bin/concourse generate-key -t ssh -f {concourse_config.tsa_host_key_path}"  # noqa: E501
             ],
             state=state,
         )
@@ -123,7 +125,7 @@ def _manage_web_node_keys(
         server.shell(
             name="Generate a session signing key",
             commands=[
-                f"{concourse_config.deploy_directory}/bin/concourse generate-key -t rsa -f {concourse_config.session_signing_key_path}"
+                f"{concourse_config.deploy_directory}/bin/concourse generate-key -t rsa -f {concourse_config.session_signing_key_path}"  # noqa: E501
             ],
             state=state,
         )
@@ -155,7 +157,7 @@ def _manage_worker_node_keys(concourse_config: ConcourseWorkerConfig):
         server.shell(
             name="Generate a worker private key",
             commands=[
-                f"{concourse_config.deploy_directory}/bin/concourse generate-key -t ssh -f {concourse_config.worker_private_key_path}"
+                f"{concourse_config.deploy_directory}/bin/concourse generate-key -t ssh -f {concourse_config.worker_private_key_path}"  # noqa: E501
             ],
         )
 
@@ -163,8 +165,8 @@ def _manage_worker_node_keys(concourse_config: ConcourseWorkerConfig):
 @deploy("Pull down pre-bundled resource types")
 def _install_resource_types(concourse_config: ConcourseWorkerConfig):
     for resource in concourse_config.additional_resource_types or []:
-        resource_archive = f"https://{concourse_config.additional_resource_types_s3_location}/{resource}.tgz"
-        resource_path = f"/tmp/{resource}"
+        resource_archive = f"https://{concourse_config.additional_resource_types_s3_location}/{resource}.tgz"  # noqa: E501
+        resource_path = f"/tmp/{resource}"  # noqa: S108
         resource_archive_path = f"{resource_path}/{resource}.tgz"
         server.shell(
             name=f"Setup directory structure for resource_type {resource}",
@@ -180,7 +182,7 @@ def _install_resource_types(concourse_config: ConcourseWorkerConfig):
             commands=[
                 f"tar -xvzf {resource_archive_path} -C {resource_path}",
                 f"rm -f {resource_archive_path}",
-                f"mv {resource_path} {concourse_config.additional_resource_types_directory}/",
+                f"mv {resource_path} {concourse_config.additional_resource_types_directory}/",  # noqa: E501
             ],
         )
         files.directory(
@@ -208,9 +210,9 @@ def configure_concourse(
         recursive=True,
         present=True,
     )
-    if concourse_config._node_type == "web":
+    if concourse_config._node_type == "web":  # noqa: WPS437
         _manage_web_node_keys(concourse_config)
-    elif concourse_config._node_type == "worker":
+    elif concourse_config._node_type == "worker":  # noqa: WPS437
         files.directory(
             name="Create Concourse worker state directory",
             path=str(concourse_config.work_dir),

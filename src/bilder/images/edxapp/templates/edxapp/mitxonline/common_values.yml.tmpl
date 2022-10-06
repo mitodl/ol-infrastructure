@@ -21,6 +21,7 @@ mysql_creds: &mysql_creds
 
 {{ with secret "secret-mitxonline/edxapp" }}
 CELERY_BROKER_PASSWORD: {{ .Data.redis_auth_token }}
+FERNET_KEYS: {{ .Data.fernet_keys }}
 redis_cache_config: &redis_cache_config
   BACKEND: django_redis.cache.RedisCache
   LOCATION: rediss://default@edxapp-redis.service.consul:6379/0
@@ -45,6 +46,8 @@ JWT_AUTH:  # NEEDS ATTENTION
       - ISSUER: https://{{ key "edxapp/lms-domain" }}/oauth2
         AUDIENCE: mitxonline
         SECRET_KEY: {{ .Data.django_secret_key }}
+RETIRED_USER_SALTS: {{ .Data.user_retirement_salts }}
+SENTRY_DSN: {{ .Data.sentry_dsn }}
 XQUEUE_INTERFACE:
     basic_auth:
     - edx
@@ -53,7 +56,6 @@ XQUEUE_INTERFACE:
         password: {{ .Data.xqueue_edxapp_password }}
         username: edxapp
     url: http://xqueue.service.consul:8040  # MODIFIED
-SENTRY_DSN: {{ .Data.sentry_dsn }}
 {{ end }}
 
 {{ with secret "secret-mitxonline/edx-forum" }}
@@ -259,6 +261,7 @@ FEATURES:
     CUSTOM_COURSES_EDX: false
     EMBARGO: true  # ADDED KEY
     ENABLE_BULK_ENROLLMENT_VIEW: false
+    ENABLE_BULK_USER_RETIREMENT: true
     ENABLE_COMBINED_LOGIN_REGISTRATION: true
     ENABLE_CORS_HEADERS: true  # MODIFIED
     ENABLE_COUNTRY_ACCESS: false
@@ -291,8 +294,6 @@ FEATURES:
     SHOW_HEADER_LANGUAGE_SELECTOR: false
     SKIP_EMAIL_VALIDATION: true # ADDED KEY
 FEEDBACK_SUBMISSION_EMAIL: ''
-FERNET_KEYS:
-- DUMMY KEY CHANGE BEFORE GOING TO PRODUCTION
 FILE_UPLOAD_STORAGE_BUCKET_NAME: {{ key "edxapp/s3-storage-bucket" }}
 FILE_UPLOAD_STORAGE_PREFIX: submissions_attachments
 FINANCIAL_REPORTS:
@@ -409,17 +410,24 @@ REGISTRATION_EXTRA_FIELDS:
     terms_of_service: hidden
     year_of_birth: optional
 RETIRED_EMAIL_DOMAIN: retired.invalid
-RETIRED_EMAIL_PREFIX: retired__user_
-RETIRED_USERNAME_PREFIX: retired__user_
-RETIRED_USER_SALTS:
-- OVERRIDE ME WITH A RANDOM VALUE
-- ROTATE SALTS BY APPENDING NEW VALUES
+RETIRED_EMAIL_PREFIX: retired__user__
+RETIRED_USERNAME_PREFIX: retired__user__
 RETIREMENT_SERVICE_WORKER_USERNAME: retirement_worker
 RETIREMENT_STATES:
-- PENDING
-- ERRORED
-- ABORTED
-- COMPLETE
+    - PENDING
+    - LOCKING_ACCOUNT
+    - LOCKING_COMPLETE
+    - RETIRING_FORUMS
+    - FORUMS_COMPLETE
+    - RETIRING_EMAIL_LISTS
+    - EMAIL_LISTS_COMPLETE
+    - RETIRING_ENROLLMENTS
+    - ENROLLMENTS_COMPLETE
+    - RETIRING_LMS
+    - LMS_COMPLETE
+    - ERRORED
+    - ABORTED
+    - COMPLETE
 SEGMENT_KEY: null
 SENTRY_ENVIRONMENT: {{ env "ENVIRONMENT" }}
 SERVER_EMAIL: odl-devops@mit.edu # MODIFIED

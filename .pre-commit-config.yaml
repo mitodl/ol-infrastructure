@@ -32,14 +32,14 @@ repos:
   - id: yamllint
     args: [--format, parsable, -d, relaxed]
 - repo: https://github.com/asottile/pyupgrade
-  rev: v2.38.0
+  rev: v2.38.2
   hooks:
   - id: pyupgrade
     args:
     - --py39-plus
     - --keep-runtime-typing
 - repo: https://github.com/PyCQA/autoflake
-  rev: v1.6.0
+  rev: v1.6.1
   hooks:
   - id: autoflake
     args:
@@ -70,25 +70,22 @@ repos:
   hooks:
   - id: yesqa
     additional_dependencies:
-    - wemake-python-styleguide
-    - bandit==1.7.2 # Need to pin due to existing bug
+    - wemake-python-styleguide==0.17.0
 - repo: https://github.com/psf/black
   rev: 22.8.0
   hooks:
   - id: black
 - repo: https://github.com/PyCQA/flake8
-  rev: 5.0.4
+  rev: 4.0.1
   hooks:
   - id: flake8
     additional_dependencies:
-    - wemake-python-styleguide
-    - bandit==1.7.2 # Need to pin due to existing bug
+    - wemake-python-styleguide==0.17.0
     args:
     - --config=setup.cfg
-    - --extend-ignore=D1
-    - --diff
+    - --extend-ignore=D1,D4,E501
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v0.971
+  rev: v0.981
   hooks:
   - id: mypy
     args:

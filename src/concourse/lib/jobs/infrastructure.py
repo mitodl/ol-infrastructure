@@ -5,7 +5,7 @@ from typing import Optional
 
 from concourse.lib.constants import REGISTRY_IMAGE
 from concourse.lib.models.fragment import PipelineFragment
-from concourse.lib.models.pipeline import (
+from concourse.lib.models.pipeline import (  # noqa: WPS235
     AnonymousResource,
     Command,
     GetStep,
@@ -29,7 +29,7 @@ from concourse.lib.resource_types import (
 from concourse.lib.resources import pulumi_provisioner
 
 
-def packer_jobs(
+def packer_jobs(  # noqa: WPS211
     dependencies: list[GetStep],
     image_code: Resource,
     packer_template_path: str = "src/bilder/images/.",
@@ -38,24 +38,24 @@ def packer_jobs(
     env_vars_from_files: Optional[dict[str, str]] = None,
     extra_packer_params: Optional[dict[str, str]] = None,
 ) -> PipelineFragment:
-    """Generate a pipeline fragment for building EC2 AMIs with Packer.
+    """Generate a pipeline fragment for building EC2 AMIs with Packer.  # noqa: D205
+    # noqa: DAR101
+      :param dependencies: The list of `Get` steps that should be run at the start of the  # noqa: RST301, E501
+          pipeline.  This is used for setting up inputs to the build, as well as for
+          triggering on upstream changes (e.g. GitHub releases).
+      :param image_code: The Git resource definition that specifies the repository that
+          holds the code for building the image, including the Packer template.
+      :param packer_template_path: The path in the image_code resource that points to the  # noqa: E501
+          Packer template that you would like to build.
+      :param node_types: The node types that should be built for the template and passed
+          as vars during the build (e.g. web and worker)
+      :param packer_vars: A dictionary of var inputs for the Packer template.
+      :param env_vars_from_files: The list of environment variables that should be set
+          during the build and the files to load for populating the values (e.g. the
+          `version` file from a GitHub resource)
 
-    :param dependencies: The list of `Get` steps that should be run at the start of the
-        pipeline.  This is used for setting up inputs to the build, as well as for
-        triggering on upstream changes (e.g. GitHub releases).
-    :param image_code: The Git resource definition that specifies the repository that
-        holds the code for building the image, including the Packer template.
-    :param packer_template_path: The path in the image_code resource that points to the
-        Packer template that you would like to build.
-    :param node_types: The node types that should be built for the template and passed
-        as vars during the build (e.g. web and worker)
-    :param packer_vars: A dictionary of var inputs for the Packer template.
-    :param env_vars_from_files: The list of environment variables that should be set
-        during the build and the files to load for populating the values (e.g. the
-        `version` file from a GitHub resource)
-
-    :returns: A `PipelineFragment` object that can be composed with other fragments to
-              build a complete pipeline definition.
+      :returns: A `PipelineFragment` object that can be composed with other fragments to
+                build a complete pipeline definition.
     """
     packer_validate_type = packer_validate()
     packer_build_type = packer_build()
@@ -177,7 +177,7 @@ def pulumi_jobs_chain(
     return chain_fragment
 
 
-def pulumi_job(
+def pulumi_job(  # noqa: WPS211
     pulumi_code: Resource,
     stack_name: str,
     project_name: str,
@@ -242,7 +242,7 @@ def pulumi_job(
                 params={
                     "env_os": {
                         "AWS_DEFAULT_REGION": "us-east-1",
-                        "PYTHONPATH": f"/usr/lib/:/tmp/build/put/{pulumi_code.name}/src/",
+                        "PYTHONPATH": f"/usr/lib/:/tmp/build/put/{pulumi_code.name}/src/",  # noqa: E501
                     },
                     "stack_name": stack_name,
                 },

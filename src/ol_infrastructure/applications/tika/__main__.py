@@ -1,4 +1,4 @@
-"""Create the resources needed to run a tika server.
+"""Create the resources needed to run a tika server.  # noqa: D200
 
 """
 import base64
@@ -29,7 +29,7 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 ##################################
-##    Setup + Config Retrival   ##
+##    Setup + Config Retrival   ##  # noqa: E266
 ##################################
 
 if Config("vault_server").get("env_namespace"):
@@ -70,7 +70,7 @@ tika_server_tag = f"tika-server-{env_name}"
 consul_provider = get_consul_provider(stack_info)
 
 ###############################
-##     General Resources     ##
+##     General Resources     ##  # noqa: E266
 ###############################
 
 # IAM and instance profile
@@ -140,7 +140,7 @@ tika_server_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_HTTPS_PORT,
             to_port=DEFAULT_HTTPS_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the tika server on port {DEFAULT_HTTPS_PORT}",
+            description=f"Allow traffic to the tika server on port {DEFAULT_HTTPS_PORT}",  # noqa: E501
         ),
     ],
     egress=default_egress_args,
@@ -223,7 +223,7 @@ lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             """
-                                ),
+                                ),  # noqa: WPS355
                                 "owner": "root:root",
                             },
                             {
@@ -233,7 +233,7 @@ lt_config = OLLaunchTemplateConfig(
                             DOMAIN={tika_config.require("web_host_domain")}
                             X_ACCESS_TOKEN={x_access_token}
                             """
-                                ),
+                                ),  # noqa: WPS355
                             },
                         ]
                     },
@@ -266,7 +266,7 @@ as_setup = OLAutoScaling(
     lb_config=lb_config,
 )
 
-## Create Route53 DNS records for tika nodes
+## Create Route53 DNS records for tika nodes  # noqa: E266
 five_minutes = 60 * 5
 route53.Record(
     "tika-server-dns-record",

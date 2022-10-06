@@ -31,8 +31,8 @@ from bilder.facts.has_systemd import HasSystemd
 from bridge.lib.versions import CONSUL_VERSION
 from bridge.secrets.sops import set_env_secrets
 
-VERSIONS = {
-    "caddy_route53": "v1.1.2",
+VERSIONS = {  # noqa: WPS407
+    "caddy_route53": "v1.3.0",
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
@@ -51,7 +51,9 @@ consul_configuration = {
 
 # TODO ACL token
 consul_esm_configuration = {
-    Path("00-default.json"): ConsulExternalServicesMonitorConfig(token=""),
+    Path("00-default.json"): ConsulExternalServicesMonitorConfig(  # noqa: S106
+        token=""
+    ),
 }
 
 
