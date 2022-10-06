@@ -12,7 +12,7 @@ AmbientCapabilities=CAP_NET_BIND_SERVICE
 
 # configure service behavior
 Type=notify
-ExecStart=/usr/local/bin/traefik --configFile={{ context.static_configuration_file }}
+ExecStart=/usr/local/bin/traefik --configFile={{ context.configuration_directory }}/{{ context.static_configuration_file }}
 Restart=always
 WatchdogSec=1s
 EnvironmentFile=-/etc/default/traefik
