@@ -83,7 +83,7 @@ repos:
     - wemake-python-styleguide==0.17.0
     args:
     - --config=setup.cfg
-    - --extend-ignore=D1,D4,E501
+    - --extend-ignore=D1,D2,D4,E501
 - repo: https://github.com/pre-commit/mirrors-mypy
   rev: v0.981
   hooks:
