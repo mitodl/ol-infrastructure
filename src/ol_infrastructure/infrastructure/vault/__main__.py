@@ -421,7 +421,7 @@ def cloud_init_user_data(  # noqa: WPS211
                 "owner": "consul:consul",
             },
             {
-                "path": "/etc/default/caddy",
+                "path": "/etc/default/traefik",
                 "content": (f"DOMAIN={vault_dns_name}\n"),
             },
             {
