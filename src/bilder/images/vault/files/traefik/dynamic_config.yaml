@@ -17,6 +17,3 @@ http:
         serversTransport: vault-transport
         servers:
         - url: https://localhost:8200
-  serversTransports:
-    vault-transport:
-      insecureSkipVerify: true

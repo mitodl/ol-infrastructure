@@ -19,3 +19,6 @@ certificatesResolvers:
       storage: /etc/traefik/acme.json
       dnsChallenge:
         provider: route53
+serversTransport:
+  vault-transport:
+    insecureSkipVerify: true
