@@ -597,7 +597,10 @@ dagster_instance = ec2.Instance(
                                 ),  # noqa: WPS355
                                 "owner": "root:root",
                             },
-                            {"content": f"DAGSTER_ENVIRONMENT={stack_info.env_suffix}"},
+                            {
+                                "path": "/etc/default/consul-template",
+                                "content": f"DAGSTER_ENVIRONMENT={stack_info.env_suffix}",
+                            },
                         ]
                     },
                     sort_keys=True,
