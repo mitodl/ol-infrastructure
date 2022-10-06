@@ -15,6 +15,7 @@ Type=notify
 ExecStart=/usr/local/bin/traefik --configFile={{ context.static_configuration_file }}
 Restart=always
 WatchdogSec=1s
+EnvironmentFile=-/etc/default/traefik
 
 # lock down system access
 # prohibit any operating system and configuration modification
