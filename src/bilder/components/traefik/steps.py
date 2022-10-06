@@ -2,6 +2,7 @@ from io import StringIO
 from pathlib import Path
 
 import httpx
+import yaml
 from pyinfra import host
 from pyinfra.api import deploy
 from pyinfra.facts.server import LinuxName
@@ -77,7 +78,7 @@ def configure_traefik(traefik_config: TraefikConfig):
     files.put(
         name="Write Traefik static configuration file",
         src=StringIO(
-            traefik_config.static_configuration.json(exclude_unset=True, indent=2)
+            yaml.safe_dump(traefik_config.static_configuration.dict(exclude_unset=True))
         ),
         dest=str(
             traefik_config.configuration_directory.joinpath(
@@ -90,7 +91,7 @@ def configure_traefik(traefik_config: TraefikConfig):
         files.put(
             name=f"Write Traefik dynamic configuration file {fpath}",
             dest=str(traefik_config.configuration_directory.joinpath(fpath)),
-            src=StringIO(file_config.json(exclude_unset=True, indent=2)),
+            src=StringIO(yaml.safe_dump(file_config.dict(exclude_unset=True))),
             user=traefik_config.user,
         )
 
