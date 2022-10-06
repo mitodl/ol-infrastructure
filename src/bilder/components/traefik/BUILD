@@ -1,13 +1,3 @@
-python_library(
-    dependencies=[":templates"]
-)
+python_sources(name="traefik-component", dependencies=[":templates"])
 
-resources(
-    name="templates",
-    sources=["templates/*.j2"]
-)
-
-python_distribution(
-    dependencies=[":templates"],
-    setup_py_commands=["sdist", "bdist_wheel"]
-)
+resources(name="templates", sources=["templates/*.j2"])
