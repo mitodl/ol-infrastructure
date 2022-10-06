@@ -10,6 +10,8 @@ from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Extra, Field
 
+from bilder.components.traefik.models.traefik_static import ServersTransport
+
 
 class Certificate(BaseModel):
     cert_file: Optional[str] = Field(None, alias="certFile")
@@ -2263,6 +2265,9 @@ class UdpService(BaseModel):
 class Http(BaseModel):
     routers: Optional[dict[str, HttpRouter]] = None
     services: Optional[dict[str, HttpService]] = None
+    servers_transports: Optional[dict[str, ServersTransport]] = Field(
+        None, alias="serversTransports"
+    )
     middlewares: Optional[dict[str, HttpMiddleware]] = Field(
         None,
         description=(
