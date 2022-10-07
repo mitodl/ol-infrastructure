@@ -316,7 +316,6 @@ def cloud_init_userdata(
     grafana_credentials = read_yaml_secrets(
         Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
     )
-    b64_password_hash = base64.b64encode(hashed_password).decode("utf8")
     cloud_config_contents = {
         "write_files": [
             {
@@ -342,10 +341,10 @@ def cloud_init_userdata(
                 "owner": "consul:consul",
             },
             {
-                "path": "/etc/default/caddy",
+                "path": "/etc/default/traefik",
                 "content": (
                     f"DOMAIN={domain_name}\n"
-                    f"PULUMI_BASIC_AUTH_PASSWORD={b64_password_hash}\n"
+                    f"PULUMI_BASIC_AUTH_PASSWORD={hashed_password}\n"
                 ),
             },
             {

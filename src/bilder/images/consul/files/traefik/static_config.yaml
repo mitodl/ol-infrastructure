@@ -1,0 +1,21 @@
+---
+entryPoints:
+  http:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: "consul"
+          scheme: "https"
+  consul:
+    address: ":443"
+providers:
+  file:
+    filename: /etc/traefik/consul.yaml
+certificatesResolvers:
+  letsencrypt_resolver:
+    acme:
+      email: odl-devops@mit.edu
+      storage: /etc/traefik/acme.json
+      dnsChallenge:
+        provider: route53

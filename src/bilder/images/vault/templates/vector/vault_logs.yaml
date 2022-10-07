@@ -15,7 +15,7 @@ sources:
     current_boot_only: true
     include_units:
     - vault
-    - caddy
+    - traefik
     - raft_backup
 
 transforms:
