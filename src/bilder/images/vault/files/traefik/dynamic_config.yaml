@@ -2,7 +2,7 @@
 http:
   routers:
     vault-router:
-      rule: Host('{{ env "DOMAIN"}}')
+      rule: Host("{{ env "DOMAIN"}}")
       service: vault-service
       tls:
         certResolver: letsencrypt_resolver
