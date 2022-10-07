@@ -31,7 +31,7 @@ resources:
   icon: github
   source:
     uri: https://github.com/mitodl/ol-infrastructure.git
-    branch: codejail_concourse_pipeline
+    branch: main
     path: dockerfiles/openedx-codejail/Dockerfile
 
 jobs:
