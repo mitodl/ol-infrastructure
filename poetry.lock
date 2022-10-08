@@ -1488,14 +1488,14 @@ six = ">=1.5"
 
 [[package]]
 name = "pyupgrade"
-version = "2.38.4"
+version = "3.0.0"
 description = "A tool to automatically upgrade syntax for newer versions."
 category = "dev"
 optional = false
 python-versions = ">=3.7"
 
 [package.dependencies]
-tokenize-rt = "<5"
+tokenize-rt = ">=3.2.0"
 
 [[package]]
 name = "pywin32"
@@ -1866,7 +1866,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "0137ccd3f8e7ec3f6f7fecb50861509ccc36ef423705be0364288cb9edb237fc"
+content-hash = "712c95bf10a17aac20b7852c6adeb0f03dcd2e9623cd14e650c90d13a09254c6"
 
 [metadata.files]
 anyio = [
@@ -2712,8 +2712,8 @@ python-dateutil = [
     {file = "python_dateutil-2.8.2-py2.py3-none-any.whl", hash = "sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9"},
 ]
 pyupgrade = [
-    {file = "pyupgrade-2.38.4-py2.py3-none-any.whl", hash = "sha256:944ff993c396ddc2b9012eb3de4cda138eb4c149b22c6c560d4c8bfd0e180982"},
-    {file = "pyupgrade-2.38.4.tar.gz", hash = "sha256:1eb43a49f416752929741ba4d706bf3f33593d3cac9bdc217fc1ef55c047c1f4"},
+    {file = "pyupgrade-3.0.0-py2.py3-none-any.whl", hash = "sha256:f9ba6cb58713e7249f4f0486e425969618e953062a5fc805da9d21602a2d1441"},
+    {file = "pyupgrade-3.0.0.tar.gz", hash = "sha256:6ec1e2762d887cab94a5714b2ea7e944843d8c2de36c449d443e52ffac8ab14f"},
 ]
 pywin32 = [
     {file = "pywin32-304-cp310-cp310-win32.whl", hash = "sha256:3c7bacf5e24298c86314f03fa20e16558a4e4138fc34615d7de4070c23e65af3"},
