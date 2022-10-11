@@ -342,10 +342,13 @@ def cloud_init_userdata(
             },
             {
                 "path": "/etc/default/traefik",
-                "content": (
-                    f"DOMAIN={domain_name}\n"
-                    f"PULUMI_BASIC_AUTH_PASSWORD={hashed_password}\n"
-                ),
+                "content": f"DOMAIN={domain_name}\n",
+            },
+            {
+                "path": "/etc/traefik/.htpasswd",
+                "content": f"pulumi:{hashed_password.decode('utf-8')}\n",
+                "owner": "traefik:traefik",
+                "permissions": "0600"
             },
             {
                 "path": "/etc/default/vector",

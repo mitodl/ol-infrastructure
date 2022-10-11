@@ -3,14 +3,15 @@ http:
   middlewares:
     pulumi-auth:
       basicAuth:
-        users:
-        - pulumi:Host("{{ env "PULUMI_BASIC_AUTH_PASSWORD" }}")
+        usersFile: /etc/traefik/.htpasswd
   routers:
     consul-router:
       rule: Host("{{ env "DOMAIN" }}")
       service: consul-service
       tls:
         certResolver: letsencrypt_resolver
+      middlewares:
+      - pulumi-auth
     consul-healthcheck:
       rule: PathPrefix("/v1/agent/host")
       service: consul-service
