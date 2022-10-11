@@ -157,7 +157,7 @@ def static_assets_pipeline() -> Pipeline:
 if __name__ == "__main__":
     import sys
 
-    with open("definition.json", "wt") as definition:
+    with open("definition.json", "w") as definition:
         definition.write(static_assets_pipeline().json(indent=2))
     sys.stdout.write(static_assets_pipeline().json(indent=2))
     print()
