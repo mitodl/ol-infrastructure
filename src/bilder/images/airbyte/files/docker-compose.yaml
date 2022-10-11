@@ -188,6 +188,8 @@ services:
     logging: *default-logging
     container_name: airbyte-cron
     restart: unless-stopped
+    env_file:
+    - ./.env
     environment:
     - AIRBYTE_VERSION=${VERSION}
     - TEMPORAL_HISTORY_RETENTION_IN_DAYS=${TEMPORAL_HISTORY_RETENTION_IN_DAYS}
