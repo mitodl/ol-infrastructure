@@ -47,7 +47,8 @@ pre-commit = "^2.20.0"
 pytest = "^7.1.1"
 pytest-testinfra = "^6.6.0"
 pyupgrade = "^3.0.0"
-wemake-python-styleguide = "^0.17"
+wemake-python-styleguide = {git = "https://github.com/wemake-services/wemake-python-styleguide"}
+
 
 [tool.black]
 target-version = ["py38"]

@@ -70,7 +70,7 @@ repos:
   hooks:
   - id: yesqa
     additional_dependencies:
-    - wemake-python-styleguide==0.17.0
+    - git+https://github.com/wemake-services/wemake-python-styleguide#egg=wemake-python-styleguide
 - repo: https://github.com/psf/black
   rev: 22.10.0
   hooks:
@@ -80,7 +80,7 @@ repos:
   hooks:
   - id: flake8
     additional_dependencies:
-    - wemake-python-styleguide==0.17.0
+    - git+https://github.com/wemake-services/wemake-python-styleguide#egg=wemake-python-styleguide
     args:
     - --config=setup.cfg
     - --extend-ignore=D1,D2,D4,E501
