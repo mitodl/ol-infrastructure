@@ -3,7 +3,8 @@ http:
   middlewares:
     pulumi-auth:
       basicAuth:
-        users: pulumi:Host("{{ env "PULUMI_BASIC_AUTH_PASSWORD" }}")
+        users:
+        - pulumi:Host("{{ env "PULUMI_BASIC_AUTH_PASSWORD" }}")
   routers:
     consul-router:
       rule: Host("{{ env "DOMAIN" }}")
