@@ -348,7 +348,7 @@ def cloud_init_userdata(
                 "path": "/etc/traefik/.htpasswd",
                 "content": f"pulumi:{hashed_password.decode('utf-8')}\n",
                 "owner": "traefik:traefik",
-                "permissions": "0600"
+                "permissions": "0600",
             },
             {
                 "path": "/etc/default/vector",
