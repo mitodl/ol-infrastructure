@@ -108,7 +108,7 @@ consul_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys  # noqa: WPS433
 
-    with open("definition.json", "wt") as definition:
+    with open("definition.json", "w") as definition:
         definition.write(consul_pipeline.json(indent=2))
     sys.stdout.write(consul_pipeline.json(indent=2))
     print()  # noqa: WPS421

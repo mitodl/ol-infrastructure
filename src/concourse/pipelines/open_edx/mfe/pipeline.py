@@ -207,6 +207,6 @@ if __name__ == "__main__":
     if "maple" in open_edx_vars[0].release_name:
         mfe_vars.node_major_version = 12
     pipeline = mfe_pipeline(open_edx_vars, mfe_vars)
-    with open("definition.json", "wt") as definition:
+    with open("definition.json", "w") as definition:
         definition.write(pipeline.json(indent=2))
     sys.stdout.write(pipeline.json(indent=2))
