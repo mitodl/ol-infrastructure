@@ -4,7 +4,7 @@ LABEL description="Node and Hugo, used for building OCW website"
 LABEL version="0.3"
 WORKDIR /tmp
 ENV HUGO_VERSION='0.104.3'
-ENV HUGO_NAME="hugo_extended_${HUGO_VERSION}_linux-amd64.deb"
+ENV HUGO_NAME="hugo_extended_${HUGO_VERSION}_linux-amd64"
 ENV GO_FILE_NAME="go1.18.2.linux-amd64.tar.gz"
 ENV GO_URL="https://golang.org/dl/${GO_FILE_NAME}"
 ENV HUGO_URL="https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/${HUGO_NAME}.deb"
