@@ -1,0 +1,25 @@
+---
+version: '2.1'
+services:
+  app:
+    image: mitodl/ovs-app:${VERSION}
+    env_file: .env
+    ports:
+    - "8087:8087"
+    command: >
+      /bin/bash -c '
+      sleep 3 &&
+      python3 manage.py migrate --noinput &&
+      uwsgi uswgi.ini'
+    volumes:
+    - /var/log:/var/log:rw
+
+  celery:
+    image: mitodl/ovs-app:${VERSION}
+    env_file: .env
+    command: >
+      /bin/bash -c '
+      sleep 3 &&
+      celery -A odl_video worker -B -l {{ keyOrDefault "ovs/log_level" "INFO" }}'
+    volumes:
+    - /var/log:/var/log:rw
