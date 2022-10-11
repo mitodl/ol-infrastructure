@@ -31,7 +31,7 @@ services:
     container_name: asset-materialization-pipeline
     restart: unless-stopped
     ports:
-    - "4001"
+    - "4000"
     command: ["--package-name", "ol_orchestrate.repositories.asset_materialization"]
     env_file:
       - .env
