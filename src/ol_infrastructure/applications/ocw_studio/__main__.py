@@ -28,8 +28,12 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 setup_vault_provider()
 github_provider = github.Provider(
     "github-provider",
-    owner=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))["owner"],
-    token=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))["token"],
+    owner=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))[  # noqa: F541, WPS237
+        "owner"
+    ],
+    token=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))[  # noqa: F541, WPS237
+        "token"
+    ],
 )
 github_options = ResourceOptions(provider=github_provider)
 ocw_studio_config = Config("ocw_studio")
@@ -150,7 +154,7 @@ ocw_studio_iam_policy = iam.Policy(
                 {
                     "Effect": "Allow",
                     "Action": "iam:PassRole",
-                    "Resource": f"arn:aws:iam::610119931565:role/service-role-mediaconvert-ocw-studio-{stack_info.env_suffix}",
+                    "Resource": f"arn:aws:iam::610119931565:role/service-role-mediaconvert-ocw-studio-{stack_info.env_suffix}",  # noqa: E501
                 },
             ],
         },
@@ -243,10 +247,11 @@ ocw_studio_db = OLAmazonDB(ocw_studio_db_config)
 
 ocw_studio_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=ocw_studio_db_config.db_name,
-    mount_point=f"{ocw_studio_db_config.engine}-ocw-studio-applications-{stack_info.env_suffix}",
+    mount_point=f"{ocw_studio_db_config.engine}-ocw-studio-applications-{stack_info.env_suffix}",  # noqa: E501
     db_admin_username=ocw_studio_db_config.username,
     db_admin_password=ocw_studio_db_config.password.get_secret_value(),
     db_host=ocw_studio_db.db_instance.address,
+    **defaults(stack_info)["rds"],
 )
 ocw_studio_vault_backend = OLVaultDatabaseBackend(ocw_studio_vault_backend_config)
 

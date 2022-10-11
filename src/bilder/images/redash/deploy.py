@@ -56,7 +56,7 @@ from bridge.lib.versions import (
 from bridge.secrets.sops import set_env_secrets
 
 
-def place_jinja_template_file(
+def place_jinja_template_file(  # noqa: WPS211
     name: str,
     repo_path: Path,
     destination_path: Path,
@@ -66,7 +66,7 @@ def place_jinja_template_file(
 ):
     files.template(
         name=f"Place and interpolate {name} jinja template file",
-        src=str(repo_path.joinpath(name + ".j2")),
+        src=str(repo_path.joinpath(name + ".j2")),  # noqa: WPS336
         dest=str(destination_path.joinpath(name)),
         context=context,
         mode="0664",
@@ -74,7 +74,7 @@ def place_jinja_template_file(
     watched_files.append(destination_path.joinpath(name))
 
 
-def place_consul_template_file(
+def place_consul_template_file(  # noqa: WPS211
     name: str,
     repo_path: Path,
     template_path: Path,
@@ -85,13 +85,13 @@ def place_consul_template_file(
 ):
     files.put(
         name=f"Place {name} template file.",
-        src=str(repo_path.joinpath(name + ".tmpl")),
-        dest=str(template_path.joinpath(name + ".tmpl")),
+        src=str(repo_path.joinpath(name + ".tmpl")),  # noqa: WPS336
+        dest=str(template_path.joinpath(name + ".tmpl")),  # noqa: WPS336
         mode=mode,
     )
     consul_templates.append(
         ConsulTemplateTemplate(
-            source=template_path.joinpath(name + ".tmpl"),
+            source=template_path.joinpath(name + ".tmpl"),  # noqa: WPS336
             destination=destination_path.joinpath(name),
         )
     )
@@ -100,7 +100,7 @@ def place_consul_template_file(
 
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
-VERSIONS = {
+VERSIONS = {  # noqa: WPS407
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "consul-template": os.environ.get(
         "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION
@@ -182,7 +182,7 @@ jinja_context = {
     "nginx_directory": nginx_conf_directory,
     "shib_directory": shib_conf_directory,
 }
-for filename, dest_dir in jinja_templated_files.items():
+for filename, dest_dir in jinja_templated_files.items():  # noqa: WPS440
     place_jinja_template_file(
         name=filename,
         repo_path=TEMPLATES_DIRECTORY,
@@ -198,7 +198,7 @@ consul_templated_files = {
     ".env": Path(DOCKER_COMPOSE_DIRECTORY),
     "shibboleth2.xml": shib_conf_directory,
 }
-for filename, dest_dir in consul_templated_files.items():
+for filename, dest_dir in consul_templated_files.items():  # noqa: WPS440
     place_consul_template_file(
         name=filename,
         repo_path=FILES_DIRECTORY,
@@ -269,7 +269,7 @@ consul_configuration = {
 
 # Install vault, consul, and consul-template
 vault_config = VaultAgentConfig(
-    cache=VaultAgentCache(use_auto_auth_token="force"),
+    cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
     listener=[
         VaultListener(
             tcp=VaultTCPListener(

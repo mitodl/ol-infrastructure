@@ -2,7 +2,7 @@
 
 - Create an S3 bucket for managing Dagster's intermediate states
 - Create an RDS PostgreSQL instance for storing Dagster's schedule and run state
-- Mount a Vault database backend and provision role definitions for the Dagster RDS database
+- Mount a Vault database backend and provision role definitions for the Dagster RDS database  # noqa: E501
 - Create an IAM role for Dagster instances to allow access to S3 and other AWS resources
 - Setup consul keys needed by various pipelines.
 - Provision an EC2 instance from a pre-built AMI with the pipeline code for Dagster
@@ -72,7 +72,7 @@ xpro_mongodb_stack = StackReference(
 )
 
 dagster_bucket_name = f"dagster-{dagster_environment}"
-dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [
+dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [  # noqa: WPS234
     {
         "Effect": "Allow",
         "Action": "s3:ListAllMyBuckets",
@@ -143,7 +143,7 @@ dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [
     },
 ]
 
-athena_permissions: list[dict[str, Union[str, list[str]]]] = [
+athena_permissions: list[dict[str, Union[str, list[str]]]] = [  # noqa: WPS234
     {
         "Effect": "Allow",
         "Action": [
@@ -594,8 +594,12 @@ dagster_instance = ec2.Instance(
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             """
-                                ),
+                                ),  # noqa: WPS355
                                 "owner": "root:root",
+                            },
+                            {
+                                "path": "/etc/default/consul-template",
+                                "content": f"DAGSTER_ENVIRONMENT={stack_info.env_suffix}",
                             },
                         ]
                     },
@@ -612,7 +616,7 @@ dagster_elastic_ip = ec2.Eip(
     vpc=True,
 )
 
-fifteen_minutes = 60 * 15
+fifteen_minutes = 60 * 15  # noqa: WPS432
 dagster_domain = route53.Record(
     f"dagster-{stack_info.env_suffix}-service-domain",
     name=get_config("dagster:domain"),

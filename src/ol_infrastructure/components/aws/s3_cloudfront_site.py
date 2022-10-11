@@ -1,4 +1,4 @@
-"""Module for creating and managing static websites hosted in S3 and delivered through Cloudfront."""
+"""Module for creating and managing static websites hosted in S3 and delivered through Cloudfront."""  # noqa: E501
 import json
 from enum import Enum
 from typing import Optional
@@ -9,19 +9,19 @@ from pulumi_aws import acm, cloudfront, s3
 from ol_infrastructure.lib.ol_types import AWSBase
 
 
-class CloudfrontPriceClass(str, Enum):
-    """Valid price classes for CloudFront to control tradeoffs of price vs. latency for global visitors."""
+class CloudfrontPriceClass(str, Enum):  # noqa: WPS600
+    """Valid price classes for CloudFront to control tradeoffs of price vs. latency for global visitors."""  # noqa: E501
 
     # For more details on price class refer to below link and search for PriceClass
     # https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_DistributionConfig.html
     # NB: POP == Points Of Presence which is where CDN edge servers are located
     us_eu = "PriceClass_100"  # POPs in US, Canada, Europe, and Israel
-    exclude_au_sa = "PriceClass_200"  # POPs in all supported geos except South America and Australia
+    exclude_au_sa = "PriceClass_200"  # POPs in all supported geos except South America and Australia  # noqa: E501
     all_geos = "PriceClass_All"  # POPs in all supoprted geos
 
 
 class S3ServerlessSiteConfig(AWSBase):
-    """Configuration object for customizing a static site hosted with S3 and Cloudfront."""
+    """Configuration object for customizing a static site hosted with S3 and Cloudfront."""  # noqa: E501
 
     site_name: str
     domains: list[str]
@@ -31,14 +31,14 @@ class S3ServerlessSiteConfig(AWSBase):
 
 
 class S3ServerlessSite(ComponentResource):
-    """A Pulumi component for constructing the resources to host a static website using S3 and Cloudfront."""
+    """A Pulumi component for constructing the resources to host a static website using S3 and Cloudfront."""  # noqa: E501
 
     def __init__(
         self,
         site_config: S3ServerlessSiteConfig,
         opts: Optional[ResourceOptions] = None,
     ):
-        """Create an S3 bucket, ACM certificate, and Cloudfront distribution for hosting a static site.
+        """Create an S3 bucket, ACM certificate, and Cloudfront distribution for hosting a static site.  # noqa: E501
 
         :param site_config: Configuration object for customizing the component
         :type site_config: S3ServerlessSiteConfig

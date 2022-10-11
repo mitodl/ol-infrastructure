@@ -57,7 +57,9 @@ class OLVPCConfig(AWSBase):
     default_public_ip: bool = True
 
     @validator("cidr_block")
-    def is_private_net(cls: "OLVPCConfig", network: IPv4Network) -> IPv4Network:
+    def is_private_net(
+        cls: "OLVPCConfig", network: IPv4Network  # noqa: N805
+    ) -> IPv4Network:
         """Ensure that only private subnets are assigned to VPC.
 
         :param network: CIDR block configured for the VPC to be created
@@ -83,30 +85,34 @@ class OLVPCConfig(AWSBase):
 
     @validator("k8s_service_subnet")
     def k8s_service_subnet_is_subnet(
-        cls: "OLVPCConfig", k8s_service_subnet: Optional[IPv4Network], values: dict
+        cls: "OLVPCConfig",  # noqa: N805
+        k8s_service_subnet: Optional[IPv4Network],
+        values: dict,  # noqa: WPS110
     ) -> Optional[IPv4Network]:
-        """Ensure that specified k8s subnet is actually a subnet of the cidr specified for the VPC.
+        """Ensure that specified k8s subnet is actually a subnet of the cidr specified for the VPC.  # noqa: E501
 
-        :param k8s_service_subnet: The K8S service subnet to be created in the VPC.
+        :param k8s_service_subnet: The K8S service subnet to be created in the VPC.  # noqa: DAR103
         :type k8s_service_subnet: IPv4Network
 
         :param values: Dictonary containing the rest of the class values
         :type values: Dict
 
-        :raises ValueError: Raise a ValueError if the specified subnet is not actually a subnet of the VPC cidr
+        :raises ValueError: Raise a ValueError if the specified subnet is not actually a subnet of the VPC cidr  # noqa: E501
 
         :returns: The K8S service subnet
 
         :rtype: IPv4Network
         """
         network = values.get("cidr_block")  # type: ignore
-        assert network is not None
+        assert network is not None  # noqa: S101
         if k8s_service_subnet is not None and not k8s_service_subnet.subnet_of(network):
             raise ValueError(f"{k8s_service_subnet} is not a subnet of {network}")
         return k8s_service_subnet
 
     @validator("num_subnets")
-    def min_subnets(cls: "OLVPCConfig", num_nets: PositiveInt) -> PositiveInt:
+    def min_subnets(
+        cls: "OLVPCConfig", num_nets: PositiveInt  # noqa: N805
+    ) -> PositiveInt:
         """Enforce that no fewer than the minimum number of subnets are created.
 
         :param num_nets: Number of subnets to be created in the VPC
@@ -127,14 +133,16 @@ class OLVPCConfig(AWSBase):
         return num_nets
 
 
-class OLVPC(ComponentResource):
+class OLVPC(ComponentResource):  # noqa: WPS230
     """Pulumi component for building all of the necessary pieces of an AWS VPC.
 
     A component resource that encapsulates all of the standard practices of how the Open
     Learning Platform Engineering team constructs and organizes VPC environments in AWS.
     """
 
-    def __init__(self, vpc_config: OLVPCConfig, opts: Optional[ResourceOptions] = None):
+    def __init__(  # noqa: WPS210
+        self, vpc_config: OLVPCConfig, opts: Optional[ResourceOptions] = None
+    ):
         """Build an AWS VPC with subnets, internet gateway, and routing table.
 
         :param vpc_config: Configuration object for customizing the created VPC and
@@ -215,13 +223,13 @@ class OLVPC(ComponentResource):
         )
 
         for index, zone, subnet_v4 in subnet_iterator:
-            net_name = f"{vpc_config.vpc_name}-subnet-{index + 1}"
+            net_name = f"{vpc_config.vpc_name}-subnet-{index + 1}"  # noqa: WPS237
             subnet_resource_opts, imported_subnet_id = subnet_opts(
                 subnet_v4, imported_vpc_id
             )
             if imported_subnet_id:
                 subnet = ec2.get_subnet(id=imported_subnet_id)
-                zone = subnet.availability_zone
+                zone = subnet.availability_zone  # noqa: WPS440
             ol_subnet = ec2.Subnet(
                 net_name,
                 cidr_block=str(subnet_v4),
@@ -245,7 +253,8 @@ class OLVPC(ComponentResource):
         self.k8s_service_subnet = None
         if vpc_config.k8s_service_subnet:
             third_octet = (
-                int(vpc_config.k8s_service_subnet.network_address) & 0xFF00
+                int(vpc_config.k8s_service_subnet.network_address)
+                & 0xFF00  # noqa: WPS432
             ) >> 8
             self.k8s_service_subnet = ec2.Subnet(
                 f"{net_name}-k8s-service-subnet",
@@ -339,26 +348,26 @@ class OLVPCPeeringConnection(ComponentResource):
             str(destination_vpc.vpc_config.cidr_block),
         )
         self.peering_connection = ec2.VpcPeeringConnection(
-            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-vpc-peer",
+            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-vpc-peer",  # noqa: E501, WPS237
             auto_accept=True,
             vpc_id=source_vpc.olvpc.id,
             peer_vpc_id=destination_vpc.olvpc.id,
             tags=source_vpc.vpc_config.merged_tags(
                 {
-                    "Name": f"{source_vpc.vpc_config.vpc_name} to {destination_vpc.vpc_config.vpc_name} peer"
+                    "Name": f"{source_vpc.vpc_config.vpc_name} to {destination_vpc.vpc_config.vpc_name} peer"  # noqa: E501, WPS237
                 }
             ),
             opts=resource_options.merge(vpc_peer_resource_opts),  # type: ignore
         )
         self.source_to_dest_route = ec2.Route(
-            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-route",
+            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-route",  # noqa: E501, WPS237
             route_table_id=source_vpc.route_table.id,
             destination_cidr_block=destination_vpc.olvpc.cidr_block,
             vpc_peering_connection_id=self.peering_connection.id,
             opts=resource_options,
         )
         self.dest_to_source_route = ec2.Route(
-            f"{destination_vpc.vpc_config.vpc_name}-to-{source_vpc.vpc_config.vpc_name}-route",
+            f"{destination_vpc.vpc_config.vpc_name}-to-{source_vpc.vpc_config.vpc_name}-route",  # noqa: E501, WPS237
             route_table_id=destination_vpc.route_table.id,
             destination_cidr_block=source_vpc.olvpc.cidr_block,
             vpc_peering_connection_id=self.peering_connection.id,

@@ -29,7 +29,7 @@ def _apt_install():
         present=True,
         packages=["apt-transport-https", "ca-certificates"],
         update=True,
-        cache_time=3600,
+        cache_time=3600,  # noqa: WPS432
     )
     lsb_release = host.get_fact(LinuxDistribution)
     lsb_id = lsb_release["name"].lower()
@@ -44,7 +44,7 @@ def _apt_install():
     add_apt_repo = apt.repo(
         name="Add the Docker apt repo",
         src=(
-            f"deb [arch={dpkg_arch}] https://download.docker.com/linux/{lsb_id}"
+            f"deb [arch={dpkg_arch}] https://download.docker.com/linux/{lsb_id}"  # noqa: WPS237
             f" {lsb_release['release_meta']['CODENAME']} stable"
         ),
         filename="docker-ce-stable",

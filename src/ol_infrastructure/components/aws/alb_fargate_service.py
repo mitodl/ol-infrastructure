@@ -54,13 +54,13 @@ from ol_infrastructure.lib.ol_types import AWSBase
 
 
 @unique
-class Protocol(str, Enum):
+class Protocol(str, Enum):  # noqa: WPS600
     http = "HTTP"
     https = "HTTPS"
 
 
 @unique
-class Route53RecordType(str, Enum):
+class Route53RecordType(str, Enum):  # noqa: WPS600
     alias = "ALIAS"
     cname = "CNAME"
     none = "NONE"
@@ -99,7 +99,7 @@ class OLApplicationLoadBalancedFargateConfig(AWSBase):
     deployment_max_percent: PositiveInt = PositiveInt(100)
     # Minimum amount, as percentage, of running and healthy tasks required during a
     # deployment
-    deployment_min_percent: PositiveInt = PositiveInt(50)
+    deployment_min_percent: PositiveInt = PositiveInt(50)  # noqa: WPS432
     # If true, load balancer will be internal; not public
     internal: bool = False
     # Whether or not listener will accept requests from all IP addresses
@@ -146,7 +146,7 @@ class OLApplicationLoadBalancedFargateConfig(AWSBase):
 
 
 class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
-    def __init__(
+    def __init__(  # noqa: WPS231
         self,
         config: OLApplicationLoadBalancedFargateConfig,
         opts: pulumi.ResourceOptions = None,
@@ -225,7 +225,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
                 ip_address_type=config.ip_address_type,
                 name=config.load_balancer_name,
                 subnets=subnets.ids,
-                load_balancer_type=config._load_balancer_type,
+                load_balancer_type=config._load_balancer_type,  # noqa: WPS437
                 security_groups=[lb_security_group],
                 opts=resource_options,
                 tags=config.tags,
@@ -283,7 +283,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
             task_definition_config=config.task_definition_config,
             security_groups=config.security_groups,
             load_balancer_configuration=load_balancer_configuration,
-            deployment_circuit_breaker_enabled=config.deployment_circuit_breaker_enabled,
+            deployment_circuit_breaker_enabled=config.deployment_circuit_breaker_enabled,  # noqa: E501
             health_check_grace_period_seconds=config.health_check_grace_period_seconds,
             deployment_max_percent=config.deployment_max_percent,
             deployment_min_percent=config.deployment_min_percent,

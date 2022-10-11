@@ -17,7 +17,7 @@ from bridge.lib.magic_numbers import (
 CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH = 32
 
 
-class IframeOptions(str, Enum):
+class IframeOptions(str, Enum):  # noqa: WPS600
     deny = "deny"
     same_origin = "sameorigin"
 
@@ -72,7 +72,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     auth_duration: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_AUTH_DURATION",
-        description="Length of time for which tokens are valid. Afterwards, users will have to log back in. (default: 24h)",
+        description="Length of time for which tokens are valid. Afterwards, users will have to log back in. (default: 24h)",  # noqa: E501
     )
     authorized_keys_file: Path = Field(
         Path("/etc/concourse/authorized_keys"),
@@ -87,7 +87,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     aws_secretsmanager_pipeline_secret_template: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_AWS_SECRETSMANAGER_PIPELINE_SECRET_TEMPLATE",
-        description="AWS Secrets Manager secret identifier template used for pipeline specific parameter (default: /concourse/{{.Team}}/{{.Pipeline}}/{{.Secret}})",
+        description="AWS Secrets Manager secret identifier template used for pipeline specific parameter (default: /concourse/{{.Team}}/{{.Pipeline}}/{{.Secret}})",  # noqa: E501
     )
     aws_secretsmanager_region: Optional[str] = Field(
         None,
@@ -107,7 +107,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     aws_secretsmanager_team_secret_template: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_AWS_SECRETSMANAGER_TEAM_SECRET_TEMPLATE",
-        description="AWS Secrets Manager secret identifier  template used for team specific parameter (default: /concourse/{{.Team}}/{{.Secret}})",
+        description="AWS Secrets Manager secret identifier  template used for team specific parameter (default: /concourse/{{.Team}}/{{.Secret}})",  # noqa: E501
     )
     aws_ssm_access_key: Optional[str] = Field(
         None,
@@ -117,7 +117,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     aws_ssm_pipeline_secret_template: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_AWS_SSM_PIPELINE_SECRET_TEMPLATE",
-        description="AWS SSM parameter name template used for pipeline specific parameter (default: /concourse/{{.Team}}/{{.Pipeline}}/{{.Secret}})",
+        description="AWS SSM parameter name template used for pipeline specific parameter (default: /concourse/{{.Team}}/{{.Pipeline}}/{{.Secret}})",  # noqa: E501
     )
     aws_ssm_region: Optional[str] = Field(
         None,
@@ -137,12 +137,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     aws_ssm_team_secret_template: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_AWS_SSM_TEAM_SECRET_TEMPLATE",
-        description="AWS SSM parameter name template used for team specific parameter (default: /concourse/{{.Team}}/{{.Secret}})",
+        description="AWS SSM parameter name template used for team specific parameter (default: /concourse/{{.Team}}/{{.Secret}})",  # noqa: E501
     )
     baggageclaim_response_header_timeout: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_BAGGAGECLAIM_RESPONSE_HEADER_TIMEOUT",
-        description="How long to wait for Baggageclaim to send the response header. (default: 1m)",
+        description="How long to wait for Baggageclaim to send the response header. (default: 1m)",  # noqa: E501
     )
     base_resource_type_defaults: Optional[str] = Field(
         None,
@@ -187,17 +187,17 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     cluster_name: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_CLUSTER_NAME",
-        description="A name for this Concourse cluster, to be displayed on the dashboard page.",
+        description="A name for this Concourse cluster, to be displayed on the dashboard page.",  # noqa: E501
     )
     component_runner_interval: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_COMPONENT_RUNNER_INTERVAL",
-        description="Interval on which runners are kicked off for builds, locks, scans, and checks (default: 10s)",
+        description="Interval on which runners are kicked off for builds, locks, scans, and checks (default: 10s)",  # noqa: E501
     )
     concurrent_request_limit: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_CONCURRENT_REQUEST_LIMIT",
-        description="Limit the number of concurrent requests to an API endpoint (Example: ListAllJobs:5)",
+        description="Limit the number of concurrent requests to an API endpoint (Example: ListAllJobs:5)",  # noqa: E501
     )
     config_rbac: Optional[str] = Field(
         None,
@@ -207,7 +207,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     container_placement_strategy: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_CONTAINER_PLACEMENT_STRATEGY",
-        description="Method by which a worker is selected during container placement. If multiple methods are specified, they will be applied in order. Random strategy should only be used alone. (default: volume_locality)",
+        description="Method by which a worker is selected during container placement. If multiple methods are specified, they will be applied in order. Random strategy should only be used alone. (default: volume_locality)",  # noqa: E501
     )
     cookie_secure: Optional[bool] = Field(
         None,
@@ -284,22 +284,22 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     db_max_conns_api: PositiveInt = Field(
         PositiveInt(10),
         concourse_env_var="CONCOURSE_API_MAX_CONNS",
-        description="The maximum number of open connections for the api connection pool. (default: 10)",
+        description="The maximum number of open connections for the api connection pool. (default: 10)",  # noqa: E501
     )
     db_max_conns_backend: PositiveInt = Field(
-        PositiveInt(50),
+        PositiveInt(50),  # noqa: WPS432
         concourse_env_var="CONCOURSE_BACKEND_MAX_CONNS",
-        description="The maximum number of open connections for the backend connection pool. (default: 50)",
+        description="The maximum number of open connections for the backend connection pool. (default: 50)",  # noqa: E501
     )
     debug_bind_ip: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_DEBUG_BIND_IP",
-        description="IP address on which to listen for the pprof debugger endpoints. (default: 127.0.0.1)",
+        description="IP address on which to listen for the pprof debugger endpoints. (default: 127.0.0.1)",  # noqa: E501
     )
     debug_bind_port: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_DEBUG_BIND_PORT",
-        description="Port on which to listen for the pprof debugger endpoints. (default: 8079)",
+        description="Port on which to listen for the pprof debugger endpoints. (default: 8079)",  # noqa: E501
     )
     default_build_logs_to_retain: Optional[str] = Field(
         None,
@@ -324,7 +324,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     display_user_id_per_connector: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_DISPLAY_USER_ID_PER_CONNECTOR",
-        description="Define how to display user ID for each authentication connector. Format is <connector>:<fieldname>. Valid field names are user_id, name, username and email, where name maps to claims field username, and username maps to claims field preferred username",
+        description="Define how to display user ID for each authentication connector. Format is <connector>:<fieldname>. Valid field names are user_id, name, username and email, where name maps to claims field username, and username maps to claims field preferred username",  # noqa: E501
     )
     emit_to_logs: Optional[bool] = Field(
         None,
@@ -334,7 +334,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     enable_across_step: Optional[bool] = Field(
         None,
         concourse_env_var="CONCOURSE_ENABLE_ACROSS_STEP",
-        description="Enable the experimental across step to be used in jobs. The API is subject to change.",
+        description="Enable the experimental across step to be used in jobs. The API is subject to change.",  # noqa: E501
     )
     enable_build_auditing: Optional[bool] = Field(
         default=True,
@@ -349,7 +349,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     enable_global_resources: Optional[bool] = Field(
         default=True,
         concourse_env_var="CONCOURSE_ENABLE_GLOBAL_RESOURCES",
-        description="Enable equivalent resources across pipelines and teams to share a single version history.",
+        description="Enable equivalent resources across pipelines and teams to share a single version history.",  # noqa: E501
     )
     enable_job_auditing: Optional[bool] = Field(
         default=True,
@@ -385,7 +385,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     enable_rerun_when_worker_disappears: Optional[bool] = Field(
         None,
         concourse_env_var="CONCOURSE_ENABLE_RERUN_WHEN_WORKER_DISAPPEARS",
-        description="Enable automatically build rerun when worker disappears or a network error occurs",
+        description="Enable automatically build rerun when worker disappears or a network error occurs",  # noqa: E501
     )
     enable_resource_auditing: Optional[bool] = Field(
         default=True,
@@ -400,7 +400,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     enable_system_auditing: Optional[bool] = Field(
         default=True,
         concourse_env_var="CONCOURSE_ENABLE_SYSTEM_AUDITING",
-        description="Enable auditing for all api requests connected to system transactions.",
+        description="Enable auditing for all api requests connected to system transactions.",  # noqa: E501
     )
     enable_team_auditing: Optional[bool] = Field(
         default=True,
@@ -425,27 +425,27 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         ),
         concourse_env_var="CONCOURSE_ENCRYPTION_KEY",
         env_transform=lambda _: _.get_secret_value(),
-        description="A 16 or 32 length key used to encrypt sensitive information before storing it in the database.",
+        description="A 16 or 32 length key used to encrypt sensitive information before storing it in the database.",  # noqa: E501
     )
     garden_request_timeout: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_GARDEN_REQUEST_TIMEOUT",
-        description="How long to wait for requests to Garden to complete. 0 means no timeout. (default: 5m)",
+        description="How long to wait for requests to Garden to complete. 0 means no timeout. (default: 5m)",  # noqa: E501
     )
     gc_check_recycle_period: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_GC_CHECK_RECYCLE_PERIOD",
-        description="Period after which to reap checks that are completed. (default: 1m)",
+        description="Period after which to reap checks that are completed. (default: 1m)",  # noqa: E501
     )
     gc_failed_grace_period: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_GC_FAILED_GRACE_PERIOD",
-        description="Period after which failed containers will be garbage collected (default: 120h)",
+        description="Period after which failed containers will be garbage collected (default: 120h)",  # noqa: E501
     )
     gc_hijack_grace_period: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_GC_HIJACK_GRACE_PERIOD",
-        description="Period after which hijacked containers will be garbage collected (default: 5m)",
+        description="Period after which hijacked containers will be garbage collected (default: 5m)",  # noqa: E501
     )
     gc_interval: Optional[str] = Field(
         None,
@@ -455,17 +455,17 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     gc_missing_grace_period: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_GC_MISSING_GRACE_PERIOD",
-        description="Period after which to reap containers and volumes that were created but went missing from the worker. (default: 5m)",
+        description="Period after which to reap containers and volumes that were created but went missing from the worker. (default: 5m)",  # noqa: E501
     )
     gc_one_off_grace_period: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_GC_ONE_OFF_GRACE_PERIOD",
-        description="Period after which one_off build containers will be garbage_collected. (default: 5m)",
+        description="Period after which one_off build containers will be garbage_collected. (default: 5m)",  # noqa: E501
     )
     gc_var_source_recycle_period: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_GC_VAR_SOURCE_RECYCLE_PERIOD",
-        description="Period after which to reap var_sources that are not used. (default: 5m)",
+        description="Period after which to reap var_sources that are not used. (default: 5m)",  # noqa: E501
     )
     github_ca_cert: Optional[str] = Field(
         None,
@@ -485,7 +485,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     github_host: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_GITHUB_HOST",
-        description="Hostname of GitHub Enterprise deployment (No scheme, No trailing slash)",
+        description="Hostname of GitHub Enterprise deployment (No scheme, No trailing slash)",  # noqa: E501
     )
     github_main_team_concourse_team: Optional[str] = Field(
         "mitodl:odl-engineering", concourse_env_var="CONCOURSE_MAIN_TEAM_GITHUB_TEAM"
@@ -509,12 +509,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     gitlab_host: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_GITLAB_HOST",
-        description="Hostname of Gitlab Enterprise deployment (Include scheme, No trailing slash)",
+        description="Hostname of Gitlab Enterprise deployment (Include scheme, No trailing slash)",  # noqa: E501
     )
     global_resource_check_timeout: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_GLOBAL_RESOURCE_CHECK_TIMEOUT",
-        description="Time limit on checking for new versions of resources. (default: 1h)",
+        description="Time limit on checking for new versions of resources. (default: 1h)",  # noqa: E501
     )
     iframe_options: IframeOptions = Field(
         IframeOptions.deny,
@@ -524,12 +524,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     influxdb_batch_duration: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_INFLUXDB_BATCH_DURATION",
-        description="The duration to wait before emitting a batch of points to InfluxDB, disregarding influxdb_batch_size. (default: 300s)",
+        description="The duration to wait before emitting a batch of points to InfluxDB, disregarding influxdb_batch_size. (default: 300s)",  # noqa: E501
     )
     influxdb_batch_size: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_INFLUXDB_BATCH_SIZE",
-        description="Number of points to batch together when emitting to InfluxDB. (default: 5000)",
+        description="Number of points to batch together when emitting to InfluxDB. (default: 5000)",  # noqa: E501
     )
     influxdb_database: Optional[str] = Field(
         None,
@@ -559,17 +559,17 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     intercept_idle_timeout: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_INTERCEPT_IDLE_TIMEOUT",
-        description="Length of time for a intercepted session to be idle before terminating. (default: 0m)",
+        description="Length of time for a intercepted session to be idle before terminating. (default: 0m)",  # noqa: E501
     )
     job_scheduling_max_in_flight: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_JOB_SCHEDULING_MAX_IN_FLIGHT",
-        description="Maximum number of jobs to be scheduling at the same time (default: 32)",
+        description="Maximum number of jobs to be scheduling at the same time (default: 32)",  # noqa: E501
     )
     ldap_bind_dn: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LDAP_BIND_DN",
-        description="(Required) Bind DN for searching LDAP users and groups. Typically this is a read_only user.",
+        description="(Required) Bind DN for searching LDAP users and groups. Typically this is a read_only user.",  # noqa: E501
     )
     ldap_bind_pw: Optional[str] = Field(
         None,
@@ -587,17 +587,17 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     ldap_group_search_base_dn: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LDAP_GROUP_SEARCH_BASE_DN",
-        description="BaseDN to start the search from. For example 'cn=groups,dc=example,dc=com'",
+        description="BaseDN to start the search from. For example 'cn=groups,dc=example,dc=com'",  # noqa: E501
     )
     ldap_group_search_filter: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LDAP_GROUP_SEARCH_FILTER",
-        description="Optional filter to apply when searching the directory. For example '(objectClass=posixGroup)'",
+        description="Optional filter to apply when searching the directory. For example '(objectClass=posixGroup)'",  # noqa: E501
     )
     ldap_group_search_group_attr: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LDAP_GROUP_SEARCH_GROUP_ATTR",
-        description="Adds an additional requirement to the filter that an attribute in the group match the user's attribute value. The exact filter being added is: (<groupAttr>=<userAttr value>)",
+        description="Adds an additional requirement to the filter that an attribute in the group match the user's attribute value. The exact filter being added is: (<groupAttr>=<userAttr value>)",  # noqa: E501
     )
     ldap_group_search_name_attr: Optional[str] = Field(
         None,
@@ -607,17 +607,17 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     ldap_group_search_scope: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LDAP_GROUP_SEARCH_SCOPE",
-        description="Can either be: 'sub' _ search the whole sub tree or 'one' _ only search one level. Defaults to 'sub'.",
+        description="Can either be: 'sub' _ search the whole sub tree or 'one' _ only search one level. Defaults to 'sub'.",  # noqa: E501
     )
     ldap_group_search_user_attr: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LDAP_GROUP_SEARCH_USER_ATTR",
-        description="Adds an additional requirement to the filter that an attribute in the group match the user's attribute value. The exact filter being added is: (<groupAttr>=<userAttr value>)",
+        description="Adds an additional requirement to the filter that an attribute in the group match the user's attribute value. The exact filter being added is: (<groupAttr>=<userAttr value>)",  # noqa: E501
     )
     ldap_host: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LDAP_HOST",
-        description="(Required) The host and optional port of the LDAP server. If port isn't supplied, it will be guessed based on the TLS configuration. 389 or 636.",
+        description="(Required) The host and optional port of the LDAP server. If port isn't supplied, it will be guessed based on the TLS configuration. 389 or 636.",  # noqa: E501
     )
     ldap_insecure_no_ssl: Optional[bool] = Field(
         None,
@@ -637,22 +637,22 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     ldap_user_search_base_dn: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LDAP_USER_SEARCH_BASE_DN",
-        description="BaseDN to start the search from. For example 'cn=users,dc=example,dc=com'",
+        description="BaseDN to start the search from. For example 'cn=users,dc=example,dc=com'",  # noqa: E501
     )
     ldap_user_search_email_attr: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LDAP_USER_SEARCH_EMAIL_ATTR",
-        description="A mapping of attributes on the user entry to claims. Defaults to 'mail'.",
+        description="A mapping of attributes on the user entry to claims. Defaults to 'mail'.",  # noqa: E501
     )
     ldap_user_search_filter: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LDAP_USER_SEARCH_FILTER",
-        description="Optional filter to apply when searching the directory. For example '(objectClass=person)'",
+        description="Optional filter to apply when searching the directory. For example '(objectClass=person)'",  # noqa: E501
     )
     ldap_user_search_id_attr: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LDAP_USER_SEARCH_ID_ATTR",
-        description="A mapping of attributes on the user entry to claims. Defaults to 'uid'.",
+        description="A mapping of attributes on the user entry to claims. Defaults to 'uid'.",  # noqa: E501
     )
     ldap_user_search_name_attr: Optional[str] = Field(
         None,
@@ -662,27 +662,27 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     ldap_user_search_scope: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LDAP_USER_SEARCH_SCOPE",
-        description="Can either be: 'sub' _ search the whole sub tree or 'one' _ only search one level. Defaults to 'sub'.",
+        description="Can either be: 'sub' _ search the whole sub tree or 'one' _ only search one level. Defaults to 'sub'.",  # noqa: E501
     )
     ldap_user_search_username: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LDAP_USER_SEARCH_USERNAME",
-        description="Attribute to match against the inputted username. This will be translated and combined with the other filter as '(<attr>=<username>)'.",
+        description="Attribute to match against the inputted username. This will be translated and combined with the other filter as '(<attr>=<username>)'.",  # noqa: E501
     )
     ldap_username_prompt: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LDAP_USERNAME_PROMPT",
-        description="The prompt when logging in through the UI when __password_connector=ldap. Defaults to 'Username'.",
+        description="The prompt when logging in through the UI when __password_connector=ldap. Defaults to 'Username'.",  # noqa: E501
     )
     lets_encrypt_acme_url: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LETS_ENCRYPT_ACME_URL",
-        description="URL of the ACME CA directory endpoint. (default: https://acme_v02.api.letsencrypt.org/directory)",
+        description="URL of the ACME CA directory endpoint. (default: https://acme_v02.api.letsencrypt.org/directory)",  # noqa: E501
     )
     lidar_scanner_interval: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_LIDAR_SCANNER_INTERVAL",
-        description="Interval on which the resource scanner will run to see if new checks need to be scheduled (default: 10s)",
+        description="Interval on which the resource scanner will run to see if new checks need to be scheduled (default: 10s)",  # noqa: E501
     )
     log_cluster_name: Optional[bool] = Field(
         None,
@@ -732,7 +732,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     main_team_local_user: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_MAIN_TEAM_LOCAL_USER",
-        description="A whitelisted local concourse user. These are the users you've added at web startup with the __add_local_user flag.",
+        description="A whitelisted local concourse user. These are the users you've added at web startup with the __add_local_user flag.",  # noqa: E501
     )
     main_team_oauth_group: Optional[str] = Field(
         None,
@@ -767,42 +767,42 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     max_active_containers_per_worker: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_MAX_ACTIVE_CONTAINERS_PER_WORKER",
-        description="Maximum allowed number of active containers per worker. Has effect only when used with limit_active_containers placement strategy. 0 means no limit. (default: 0)",
+        description="Maximum allowed number of active containers per worker. Has effect only when used with limit_active_containers placement strategy. 0 means no limit. (default: 0)",  # noqa: E501
     )
     max_active_tasks_per_worker: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_MAX_ACTIVE_TASKS_PER_WORKER",
-        description="Maximum allowed number of active build tasks per worker. Has effect only when used with limit_active_tasks placement strategy. 0 means no limit. (default: 0)",
+        description="Maximum allowed number of active build tasks per worker. Has effect only when used with limit_active_tasks placement strategy. 0 means no limit. (default: 0)",  # noqa: E501
     )
     max_active_volumes_per_worker: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_MAX_ACTIVE_VOLUMES_PER_WORKER",
-        description="Maximum allowed number of active volumes per worker. Has effect only when used with limit_active_volumes placement strategy. 0 means no limit. (default: 0)",
+        description="Maximum allowed number of active volumes per worker. Has effect only when used with limit_active_volumes placement strategy. 0 means no limit. (default: 0)",  # noqa: E501
     )
     max_build_logs_to_retain: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_MAX_BUILD_LOGS_TO_RETAIN",
-        description="Maximum build logs to retain, 0 means not specified. Will override values configured in jobs",
+        description="Maximum build logs to retain, 0 means not specified. Will override values configured in jobs",  # noqa: E501
     )
     max_checks_per_second: Optional[int] = Field(
         None,
         concourse_env_var="CONCOURSE_MAX_CHECKS_PER_SECOND",
-        description="Maximum number of checks that can be started per second. If not specified, this will be calculated as (# of resources)/(resource checking interval). -1 value will remove this maximum limit of checks per second.",
+        description="Maximum number of checks that can be started per second. If not specified, this will be calculated as (# of resources)/(resource checking interval). -1 value will remove this maximum limit of checks per second.",  # noqa: E501
     )
     max_days_to_retain_build_logs: Optional[int] = Field(
         None,
         concourse_env_var="CONCOURSE_MAX_DAYS_TO_RETAIN_BUILD_LOGS",
-        description="Maximum days to retain build logs, 0 means not specified. Will override values configured in jobs",
+        description="Maximum days to retain build logs, 0 means not specified. Will override values configured in jobs",  # noqa: E501
     )
     metrics_attribute: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_METRICS_ATTRIBUTE",
-        description="A key_value attribute to attach to emitted metrics. Can be specified multiple times.",
+        description="A key_value attribute to attach to emitted metrics. Can be specified multiple times.",  # noqa: E501
     )
     metrics_buffer_size: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_METRICS_BUFFER_SIZE",
-        description="The size of the buffer used in emitting event metrics. (default: 1000)",
+        description="The size of the buffer used in emitting event metrics. (default: 1000)",  # noqa: E501
     )
     metrics_host_name: Optional[str] = Field(
         None,
@@ -827,17 +827,17 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     newrelic_batch_duration: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_NEWRELIC_BATCH_DURATION",
-        description="Length of time to wait between emitting until all currently batched events are emitted (default: 60s)",
+        description="Length of time to wait between emitting until all currently batched events are emitted (default: 60s)",  # noqa: E501
     )
     newrelic_batch_size: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_NEWRELIC_BATCH_SIZE",
-        description="Number of events to batch together before emitting (default: 2000)",
+        description="Number of events to batch together before emitting (default: 2000)",  # noqa: E501
     )
     newrelic_insights_api_url: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_NEWRELIC_INSIGHTS_API_URL",
-        description="Base Url for insights Insert API (default: https://insights_collector.newrelic.com)",
+        description="Base Url for insights Insert API (default: https://insights_collector.newrelic.com)",  # noqa: E501
     )
     newrelic_service_prefix: Optional[str] = Field(
         None,
@@ -870,12 +870,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     oauth_groups_key: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_OAUTH_GROUPS_KEY",
-        description="The groups key indicates which claim to use to map external groups to Concourse teams. (default: groups)",
+        description="The groups key indicates which claim to use to map external groups to Concourse teams. (default: groups)",  # noqa: E501
     )
     oauth_scope: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_OAUTH_SCOPE",
-        description="Any additional scopes that need to be requested during authorization",
+        description="Any additional scopes that need to be requested during authorization",  # noqa: E501
     )
     oauth_skip_ssl_validation: Optional[bool] = Field(
         None,
@@ -890,12 +890,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     oauth_user_id_key: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_OAUTH_USER_ID_KEY",
-        description="The user id key indicates which claim to use to map an external user id to a Concourse user id. (default: user_id)",
+        description="The user id key indicates which claim to use to map an external user id to a Concourse user id. (default: user_id)",  # noqa: E501
     )
     oauth_user_name_key: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_OAUTH_USER_NAME_KEY",
-        description="The user name key indicates which claim to use to map an external user name to a Concourse user name. (default: user_name)",
+        description="The user name key indicates which claim to use to map an external user name to a Concourse user name. (default: user_name)",  # noqa: E501
     )
     oauth_userinfo_url: Optional[str] = Field(
         None,
@@ -928,27 +928,27 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     oidc_groups_key: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_OIDC_GROUPS_KEY",
-        description="The groups key indicates which claim to use to map external groups to Concourse teams. (default: groups)",
+        description="The groups key indicates which claim to use to map external groups to Concourse teams. (default: groups)",  # noqa: E501
     )
     oidc_hosted_domains: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_OIDC_HOSTED_DOMAINS",
-        description="List of whitelisted domains when using Google, only users from a listed domain will be allowed to log in",
+        description="List of whitelisted domains when using Google, only users from a listed domain will be allowed to log in",  # noqa: E501
     )
     oidc_issuer: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_OIDC_ISSUER",
-        description="(Required) An OIDC issuer URL that will be used to discover provider configuration using the .well_known/openid_configuration",
+        description="(Required) An OIDC issuer URL that will be used to discover provider configuration using the .well_known/openid_configuration",  # noqa: E501
     )
     oidc_scope: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_OIDC_SCOPE",
-        description="Any additional scopes of [openid] that need to be requested during authorization. Default to [openid, profile, email].",
+        description="Any additional scopes of [openid] that need to be requested during authorization. Default to [openid, profile, email].",  # noqa: E501
     )
     oidc_skip_email_verified_validation: Optional[bool] = Field(
         None,
         concourse_env_var="CONCOURSE_OIDC_SKIP_EMAIL_VERIFIED_VALIDATION",
-        description="Ignore the email_verified claim from the upstream provider, treating all users as if email_verified were true.",
+        description="Ignore the email_verified claim from the upstream provider, treating all users as if email_verified were true.",  # noqa: E501
     )
     oidc_skip_ssl_validation: Optional[bool] = Field(
         None,
@@ -958,12 +958,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     oidc_user_name_key: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_OIDC_USER_NAME_KEY",
-        description="The user name key indicates which claim to use to map an external user name to a Concourse user name. (default: username)",
+        description="The user name key indicates which claim to use to map an external user name to a Concourse user name. (default: username)",  # noqa: E501
     )
     old_encryption_key: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_OLD_ENCRYPTION_KEY",
-        description="Encryption key previously used for encrypting sensitive information. If provided without a new key, data is encrypted. If provided with a new key, data is re_encrypted.",
+        description="Encryption key previously used for encrypting sensitive information. If provided without a new key, data is encrypted. If provided with a new key, data is re_encrypted.",  # noqa: E501
     )
     opa_timeout: Optional[str] = Field(
         None,
@@ -983,12 +983,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     password_connector: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_PASSWORD_CONNECTOR",
-        description="Connector to use when authenticating via 'fly login -u ... -p ...' (default: local)",
+        description="Connector to use when authenticating via 'fly login -u ... -p ...' (default: local)",  # noqa: E501
     )
     peer_address: Optional[str] = Field(
         "web.concourse.service.consul",
         concourse_env_var="CONCOURSE_PEER_ADDRESS",
-        description="Network address of this web node, reachable by other web nodes. Used for forwarded worker addresses. (default: 127.0.0.1)",
+        description="Network address of this web node, reachable by other web nodes. Used for forwarded worker addresses. (default: 127.0.0.1)",  # noqa: E501
     )
     policy_check_filter_action: Optional[str] = Field(
         None,
@@ -1023,12 +1023,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     resource_checking_interval: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_RESOURCE_CHECKING_INTERVAL",
-        description="Interval on which to check for new versions of resources. (default: 1m)",
+        description="Interval on which to check for new versions of resources. (default: 1m)",  # noqa: E501
     )
     resource_with_webhook_checking_interval: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_RESOURCE_WITH_WEBHOOK_CHECKING_INTERVAL",
-        description="Interval on which to check for new versions of resources that has webhook defined. (default: 1m)",
+        description="Interval on which to check for new versions of resources that has webhook defined. (default: 1m)",  # noqa: E501
     )
     saml_ca_cert: Optional[str] = Field(
         None,
@@ -1043,7 +1043,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     saml_email_attr: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SAML_EMAIL_ATTR",
-        description="The email indicates which claim to use to map an external user email to a Concourse user email. (default: email)",
+        description="The email indicates which claim to use to map an external user email to a Concourse user email. (default: email)",  # noqa: E501
     )
     saml_entity_issuer: Optional[str] = Field(
         None,
@@ -1053,17 +1053,17 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     saml_groups_attr: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SAML_GROUPS_ATTR",
-        description="The groups key indicates which attribute to use to map external groups to Concourse teams. (default: groups)",
+        description="The groups key indicates which attribute to use to map external groups to Concourse teams. (default: groups)",  # noqa: E501
     )
     saml_groups_delim: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SAML_GROUPS_DELIM",
-        description="If specified, groups are returned as string, this delimiter will be used to split the group string.",
+        description="If specified, groups are returned as string, this delimiter will be used to split the group string.",  # noqa: E501
     )
     saml_name_id_policy_format: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SAML_NAME_ID_POLICY_FORMAT",
-        description="Requested format of the NameID. The NameID value is is mapped to the ID Token 'sub' claim.",
+        description="Requested format of the NameID. The NameID value is is mapped to the ID Token 'sub' claim.",  # noqa: E501
     )
     saml_skip_ssl_validation: Optional[bool] = Field(
         None,
@@ -1083,17 +1083,17 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     saml_username_attr: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SAML_USERNAME_ATTR",
-        description="The user name indicates which claim to use to map an external user name to a Concourse user name. (default: name)",
+        description="The user name indicates which claim to use to map an external user name to a Concourse user name. (default: name)",  # noqa: E501
     )
     secret_cache_duration: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SECRET_CACHE_DURATION",
-        description="If the cache is enabled, secret values will be cached for not longer than this duration (it can be less, if underlying secret lease time is smaller) (default: 1m)",
+        description="If the cache is enabled, secret values will be cached for not longer than this duration (it can be less, if underlying secret lease time is smaller) (default: 1m)",  # noqa: E501
     )
     secret_cache_duration_notfound: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SECRET_CACHE_DURATION_NOTFOUND",
-        description="If the cache is enabled, secret not found responses will be cached for this duration (default: 10s)",
+        description="If the cache is enabled, secret not found responses will be cached for this duration (default: 10s)",  # noqa: E501
     )
     secret_cache_enabled: Optional[bool] = Field(
         None,
@@ -1103,17 +1103,17 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     secret_cache_purge_interval: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SECRET_CACHE_PURGE_INTERVAL",
-        description="If the cache is enabled, expired items will be removed on this interval (default: 10m)",
+        description="If the cache is enabled, expired items will be removed on this interval (default: 10m)",  # noqa: E501
     )
     secret_retry_attempts: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SECRET_RETRY_ATTEMPTS",
-        description="The number of attempts secret will be retried to be fetched, in case a retryable error happens. (default: 5)",
+        description="The number of attempts secret will be retried to be fetched, in case a retryable error happens. (default: 5)",  # noqa: E501
     )
     secret_retry_interval: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SECRET_RETRY_INTERVAL",
-        description="The interval between secret retry retrieval attempts. (default: 1s)",
+        description="The interval between secret retry retrieval attempts. (default: 1s)",  # noqa: E501
     )
     session_signing_key: Optional[str] = None
     session_signing_key_path: Path = Field(
@@ -1134,32 +1134,32 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     syslog_ca_cert: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SYSLOG_CA_CERT",
-        description="Paths to PEM_encoded CA cert files to use to verify the Syslog server SSL cert.",
+        description="Paths to PEM_encoded CA cert files to use to verify the Syslog server SSL cert.",  # noqa: E501
     )
     syslog_drain_interval: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SYSLOG_DRAIN_INTERVAL",
-        description="Interval over which checking is done for new build logs to send to syslog server (duration measurement units are s/m/h; eg. 30s/30m/1h) (default: 30s)",
+        description="Interval over which checking is done for new build logs to send to syslog server (duration measurement units are s/m/h; eg. 30s/30m/1h) (default: 30s)",  # noqa: E501
     )
     syslog_hostname: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SYSLOG_HOSTNAME",
-        description="Client hostname with which the build logs will be sent to the syslog server. (default: atc_syslog_drainer)",
+        description="Client hostname with which the build logs will be sent to the syslog server. (default: atc_syslog_drainer)",  # noqa: E501
     )
     syslog_transport: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SYSLOG_TRANSPORT",
-        description="Transport protocol for syslog messages (Currently supporting tcp, udp & tls).",
+        description="Transport protocol for syslog messages (Currently supporting tcp, udp & tls).",  # noqa: E501
     )
     system_claim_key: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SYSTEM_CLAIM_KEY",
-        description="The token claim key to use when matching system_claim_values (default: aud)",
+        description="The token claim key to use when matching system_claim_values (default: aud)",  # noqa: E501
     )
     system_claim_value: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_SYSTEM_CLAIM_VALUE",
-        description="Configure which token requests should be considered 'system' requests. (default: concourse_worker)",
+        description="Configure which token requests should be considered 'system' requests. (default: concourse_worker)",  # noqa: E501
     )
     tls_bind_port: Optional[str] = Field(
         None,
@@ -1179,7 +1179,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     tls_key: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_TLS_KEY",
-        description="File containing an RSA private key, used to encrypt HTTPS traffic.",
+        description="File containing an RSA private key, used to encrypt HTTPS traffic.",  # noqa: E501
     )
     tracing_attribute: Optional[str] = Field(
         None,
@@ -1234,7 +1234,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     tracing_service_name: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_TRACING_SERVICE_NAME",
-        description="service name to attach to traces as metadata (default: concourse_web)",
+        description="service name to attach to traces as metadata (default: concourse_web)",  # noqa: E501
     )
     tracing_stackdriver_projectid: Optional[str] = Field(
         None,
@@ -1249,7 +1249,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     tsa_authorized_keys: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_TSA_AUTHORIZED_KEYS",
-        description="Path to file containing keys to authorize, in SSH authorized_keys format (one public key per line).",
+        description="Path to file containing keys to authorize, in SSH authorized_keys format (one public key per line).",  # noqa: E501
     )
     tsa_bind_ip: Optional[str] = Field(
         None,
@@ -1264,7 +1264,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     tsa_client_id: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_TSA_CLIENT_ID",
-        description="Client used to fetch a token from the auth server. NOTE: if you change this value you will also need to change the __system_claim_value flag so the atc knows to allow requests from this client. (default: concourse_worker)",
+        description="Client used to fetch a token from the auth server. NOTE: if you change this value you will also need to change the __system_claim_value flag so the atc knows to allow requests from this client. (default: concourse_worker)",  # noqa: E501
     )
     tsa_client_secret: Optional[str] = Field(
         None,
@@ -1274,22 +1274,22 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     tsa_cluster_name: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_TSA_CLUSTER_NAME",
-        description="A name for this Concourse cluster, to be displayed on the dashboard page.",
+        description="A name for this Concourse cluster, to be displayed on the dashboard page.",  # noqa: E501
     )
     tsa_debug_bind_ip: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_TSA_DEBUG_BIND_IP",
-        description="IP address on which to listen for the pprof debugger endpoints. (default: 127.0.0.1)",
+        description="IP address on which to listen for the pprof debugger endpoints. (default: 127.0.0.1)",  # noqa: E501
     )
     tsa_debug_bind_port: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_TSA_DEBUG_BIND_PORT",
-        description="Port on which to listen for the pprof debugger endpoints. (default: 2221)",
+        description="Port on which to listen for the pprof debugger endpoints. (default: 2221)",  # noqa: E501
     )
     tsa_garden_request_timeout: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_TSA_GARDEN_REQUEST_TIMEOUT",
-        description="How long to wait for requests to Garden to complete. 0 means no timeout. (default: 5m)",
+        description="How long to wait for requests to Garden to complete. 0 means no timeout. (default: 5m)",  # noqa: E501
     )
     tsa_heartbeat_interval: Optional[str] = Field(
         None,
@@ -1315,7 +1315,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     tsa_peer_address: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_TSA_PEER_ADDRESS",
-        description="Network address of this web node, reachable by other web nodes. Used for forwarded worker addresses. (default: 127.0.0.1)",
+        description="Network address of this web node, reachable by other web nodes. Used for forwarded worker addresses. (default: 127.0.0.1)",  # noqa: E501
     )
     tsa_scope: Optional[str] = Field(
         None,
@@ -1325,12 +1325,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     tsa_team_authorized_keys: Optional[Path] = Field(
         None,
         concourse_env_var="CONCOURSE_TSA_TEAM_AUTHORIZED_KEYS",
-        description="Path to file containing keys to authorize, in SSH authorized_keys format (one public key per line).",
+        description="Path to file containing keys to authorize, in SSH authorized_keys format (one public key per line).",  # noqa: E501
     )
     tsa_team_authorized_keys_file: Optional[Path] = Field(
         None,
         concourse_env_var="CONCOURSE_TSA_TEAM_AUTHORIZED_KEYS_FILE",
-        description="Path to file containing a YAML array of teams and their authorized SSH keys, e.g. [{team:foo,ssh_keys:[key1,key2]}].",
+        description="Path to file containing a YAML array of teams and their authorized SSH keys, e.g. [{team:foo,ssh_keys:[key1,key2]}].",  # noqa: E501
     )
     tsa_token_url: Optional[str] = Field(
         None,
@@ -1345,22 +1345,22 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     vault_auth_backend_max_ttl: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_VAULT_AUTH_BACKEND_MAX_TTL",
-        description="Time after which to force a re_login. If not set, the token will just be continuously renewed.",
+        description="Time after which to force a re_login. If not set, the token will just be continuously renewed.",  # noqa: E501
     )
     vault_auth_param: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_VAULT_AUTH_PARAM",
-        description="Paramter to pass when logging in via the backend. Can be specified multiple times.",
+        description="Paramter to pass when logging in via the backend. Can be specified multiple times.",  # noqa: E501
     )
     vault_ca_cert: Optional[Path] = Field(
         None,
         concourse_env_var="CONCOURSE_VAULT_CA_CERT",
-        description="Path to a PEM_encoded CA cert file to use to verify the vault server SSL cert.",
+        description="Path to a PEM_encoded CA cert file to use to verify the vault server SSL cert.",  # noqa: E501
     )
     vault_ca_path: Optional[Path] = Field(
         None,
         concourse_env_var="CONCOURSE_VAULT_CA_PATH",
-        description="Path to a directory of PEM_encoded CA cert files to verify the vault server SSL cert.",
+        description="Path to a directory of PEM_encoded CA cert files to verify the vault server SSL cert.",  # noqa: E501
     )
     vault_client_cert: Optional[Path] = Field(
         None,
@@ -1390,7 +1390,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     vault_lookup_templates: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_VAULT_LOOKUP_TEMPLATES",
-        description="Path templates for credential lookup (default: /{{.Team}}/{{.Pipeline}}/{{.Secret}}, /{{.Team}}/{{.Secret}})",
+        description="Path templates for credential lookup (default: /{{.Team}}/{{.Pipeline}}/{{.Secret}}, /{{.Team}}/{{.Secret}})",  # noqa: E501
     )
     vault_namespace: Optional[str] = Field(
         None,
@@ -1400,7 +1400,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     vault_path_prefix: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_VAULT_PATH_PREFIX",
-        description="Path under which to namespace credential lookup. (default: /concourse)",
+        description="Path under which to namespace credential lookup. (default: /concourse)",  # noqa: E501
     )
     vault_query_timeout: Optional[str] = Field(
         None,
@@ -1410,12 +1410,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     vault_retry_initial: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_VAULT_RETRY_INITIAL",
-        description="The initial time between retries when logging in or re_authing a secret. (default: 1s)",
+        description="The initial time between retries when logging in or re_authing a secret. (default: 1s)",  # noqa: E501
     )
     vault_retry_max: Optional[str] = Field(
         None,
         concourse_env_var="CONCOURSE_VAULT_RETRY_MAX",
-        description="The maximum time between retries when logging in or re_authing a secret. (default: 5m)",
+        description="The maximum time between retries when logging in or re_authing a secret. (default: 5m)",  # noqa: E501
     )
     vault_server_name: Optional[str] = Field(
         None,
@@ -1443,7 +1443,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         arbitrary_types_allowed = True
 
     @validator("encryption_key")
-    def validate_encryption_key_length(cls, encryption_key):
+    def validate_encryption_key_length(cls, encryption_key):  # noqa: N805
         if len(encryption_key) != CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH:
             raise ValueError(
                 "Encryption key is not the correct length. "
@@ -1472,7 +1472,7 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     )
     additional_resource_types_s3_location: Optional[str] = Field(
         None,
-        description="Address and path of s3 bucket to find additional concourse resource types.",
+        description="Address and path of s3 bucket to find additional concourse resource types.",  # noqa: E501
     )
     additional_resource_types: Optional[list[str]] = Field(
         None,
@@ -1808,11 +1808,11 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     class Config:
         env_prefix = "concourse_worker_"
 
-    # TODO MAD 20220217 : Create validators around the additional_resource_types* atrributes
+    # TODO MAD 20220217 : Create validators around the additional_resource_types* atrributes  # noqa: E501
 
     @validator("additional_resource_types_directory")
     def validate_additional_resource_types_directory(
-        cls, additional_resource_types_directory, values
+        cls, additional_resource_types_directory, values  # noqa: N805, WPS110
     ):
-        """Ensure that the resource types directory is always beneath the deploy_directory"""
+        """Ensure that the resource types directory is always beneath the deploy_directory"""  # noqa: D400, DAR101, DAR201, E501
         return values["deploy_directory"] / additional_resource_types_directory

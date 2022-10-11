@@ -2,12 +2,11 @@
 import os
 from pathlib import Path
 
+import yaml
 from pyinfra import host
 from pyinfra.operations import files
 
 from bilder.components.baseline.steps import install_baseline_packages
-from bilder.components.caddy.models import CaddyConfig, CaddyPlugin
-from bilder.components.caddy.steps import caddy_service, configure_caddy, install_caddy
 from bilder.components.hashicorp.consul.models import Consul, ConsulConfig
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
 from bilder.components.hashicorp.steps import (
@@ -28,6 +27,13 @@ from bilder.components.hashicorp.vault.models import (
     VaultTelemetryConfig,
     VaultTelemetryListener,
 )
+from bilder.components.traefik.models import traefik_file_provider, traefik_static
+from bilder.components.traefik.models.component import TraefikConfig
+from bilder.components.traefik.steps import (
+    configure_traefik,
+    install_traefik_binary,
+    traefik_service,
+)
 from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import (
     configure_vector,
@@ -36,13 +42,13 @@ from bilder.components.vector.steps import (
 )
 from bilder.facts.has_systemd import HasSystemd
 from bridge.lib.magic_numbers import HOURS_IN_MONTH, VAULT_CLUSTER_PORT, VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
+from bridge.lib.versions import CONSUL_VERSION, TRAEFIK_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 
-VERSIONS = {
+VERSIONS = {  # noqa: WPS407
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
-    "caddy_route53": "v1.1.2",
+    "traefik": os.environ.get("TRAEFIK_VERSION", TRAEFIK_VERSION),
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
@@ -50,19 +56,23 @@ FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
 install_baseline_packages(packages=["curl", "gnupg", "jq"])
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
-# Install Caddy
-caddy_config = CaddyConfig(
-    plugins=[
-        CaddyPlugin(
-            repository="github.com/caddy-dns/route53",
-            version=VERSIONS["caddy_route53"],
+# Install Traefik
+traefik_config = TraefikConfig(
+    static_configuration=traefik_static.TraefikStaticConfig.parse_obj(
+        yaml.safe_load(
+            FILES_DIRECTORY.joinpath("traefik", "static_config.yaml").read_text()
         )
-    ],
-    caddyfile=Path(__file__).resolve().parent.joinpath("templates", "caddyfile.j2"),
+    ),
+    file_configurations={
+        Path("vault.yaml"): traefik_file_provider.TraefikFileConfig.parse_obj(
+            yaml.safe_load(
+                FILES_DIRECTORY.joinpath("traefik", "dynamic_config.yaml").read_text()
+            )
+        )
+    },
 )
-caddy_config.template_context = caddy_config.dict()
-install_caddy(caddy_config)
-caddy_config_changed = configure_caddy(caddy_config)
+install_traefik_binary(traefik_config)
+traefik_config_changed = configure_traefik(traefik_config)
 
 # Install Consul agent and Vault server
 hours_in_six_months = HOURS_IN_MONTH * 6
@@ -81,8 +91,8 @@ vault = Vault(
                 ),
                 VaultListener(
                     tcp=VaultTCPListener(
-                        address=f"127.0.0.1:{VAULT_HTTP_PORT + 2}",
-                        cluster_address=f"127.0.0.1:{VAULT_CLUSTER_PORT + 2}",
+                        address=f"127.0.0.1:{VAULT_HTTP_PORT + 2}",  # noqa: WPS237
+                        cluster_address=f"127.0.0.1:{VAULT_CLUSTER_PORT + 2}",  # noqa: WPS237
                         tls_cert_file=Path("/etc/vault/ssl/vault.cert"),
                         tls_key_file=Path("/etc/vault/ssl/vault.key"),
                         telemetry=VaultTelemetryListener(
@@ -149,7 +159,7 @@ configure_vector(vector_config)
 
 # Manage services
 if host.get_fact(HasSystemd):
-    caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
+    traefik_service(traefik_config=traefik_config, start_immediately=False)
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
     vector_service(vector_config)

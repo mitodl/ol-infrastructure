@@ -15,11 +15,13 @@ def _is_parliament_finding_filtered(
     if not issue_match:
         return False
     action_matches = []
-    for location in parliament_config[finding.issue].get("ignore_locations", []):
-        for action in location.get("actions", []):
-            matches = map(
+    for location in parliament_config[  # noqa: WPS352, WPS426, WPS500
+        finding.issue
+    ].get("ignore_locations", []):
+        for action in location.get("actions", []):  # noqa: WPS426
+            matches = map(  # noqa: C417
                 lambda finding_action: re.findall(
-                    action, finding_action, re.IGNORECASE
+                    action, finding_action, re.IGNORECASE  # noqa: B023
                 ),
                 finding.location["actions"],
             )
@@ -34,26 +36,26 @@ def lint_iam_policy(
     stringify: bool = False,
     parliament_config: dict = None,
 ) -> Union[str, dict[str, Any]]:
-    """Lint the contents of an IAM policy and abort execution if issues are found.
+    """Lint the contents of an IAM policy and abort execution if issues are found.  # noqa: D205
+    # noqa: DAR103
+      :param policy_document: An IAM policy document represented as a JSON encoded string  # noqa: RST301, E501
+          or a dictionary
+      :type policy_document: Union[Text, Dict[Text, Any]]
 
-    :param policy_document: An IAM policy document represented as a JSON encoded string
-        or a dictionary
-    :type policy_document: Union[Text, Dict[Text, Any]]
+      :param stringify: If set to true then the dictionary of the policy document will be  # noqa: E501
+          returned as a JSON string.
+      :type stringify: bool
 
-    :param stringify: If set to true then the dictionary of the policy document will be
-        returned as a JSON string.
-    :type stringify: bool
+      :param parliament_config: A configuration object to customize the strictness and
+          error checking of the Parliament library.
+      :type parliament_config: Dict
 
-    :param parliament_config: A configuration object to customize the strictness and
-        error checking of the Parliament library.
-    :type parliament_config: Dict
+      :raises Exception: If there are linting violations detected then a bare exception is  # noqa: E501
+          raised with the findings.
 
-    :raises Exception: If there are linting violations detected then a bare exception is
-        raised with the findings.
+      :returns: The contents of the policy document that is passed to the function.
 
-    :returns: The contents of the policy document that is passed to the function.
-
-    :rtype: Union[Text, Dict[Text, Any]]
+      :rtype: Union[Text, Dict[Text, Any]]
     """
     stringified_document = None
     if not isinstance(policy_document, str):
@@ -69,7 +71,9 @@ def lint_iam_policy(
         if not _is_parliament_finding_filtered(finding, parliament_config or {})
     ]
     if findings:
-        raise Exception("Potential issues found with IAM policy document", findings)
+        raise Exception(  # noqa: WPS454
+            "Potential issues found with IAM policy document", findings
+        )
     return (
         stringified_document if stringify and stringified_document else policy_document
     )

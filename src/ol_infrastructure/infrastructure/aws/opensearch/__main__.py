@@ -42,7 +42,7 @@ business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
 cluster_size = search_config.get_int("cluster_size") or 3
 cluster_instance_type = search_config.get("instance_type") or "t3.medium.elasticsearch"
-disk_size = search_config.get_int("disk_size_gb") or 30
+disk_size = search_config.get_int("disk_size_gb") or 30  # noqa: WPS432
 is_public_web = search_config.get_bool("public_web") or False
 is_secured_cluster = search_config.get_bool("secured_cluster") or False
 consul_service_name = (
@@ -87,7 +87,7 @@ conditional_kwargs = {}
 if is_public_web:
     master_user_password = read_yaml_secrets(
         Path(
-            f"opensearch/opensearch.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"
+            f"opensearch/opensearch.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"  # noqa: E501
         )
     )["master_user_password"]
     conditional_kwargs[
@@ -95,7 +95,7 @@ if is_public_web:
     ] = aws.elasticsearch.DomainAdvancedSecurityOptionsArgs(
         enabled=True,
         internal_user_database_enabled=True,
-        master_user_options=aws.elasticsearch.DomainAdvancedSecurityOptionsMasterUserOptionsArgs(
+        master_user_options=aws.elasticsearch.DomainAdvancedSecurityOptionsMasterUserOptionsArgs(  # noqa: E501
             master_user_name="opensearch",
             master_user_password=master_user_password,
         ),
@@ -128,7 +128,7 @@ search_domain = aws.elasticsearch.Domain(
     elasticsearch_version=search_config.get("engine_version") or "7.10",
     cluster_config=aws.elasticsearch.DomainClusterConfigArgs(
         zone_awareness_enabled=True,
-        zone_awareness_config=aws.elasticsearch.DomainClusterConfigZoneAwarenessConfigArgs(
+        zone_awareness_config=aws.elasticsearch.DomainClusterConfigZoneAwarenessConfigArgs(  # noqa: E501
             availability_zone_count=3
         ),
         instance_count=cluster_size,

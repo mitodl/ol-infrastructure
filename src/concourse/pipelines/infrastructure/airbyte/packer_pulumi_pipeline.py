@@ -34,7 +34,7 @@ airbyte_ami_fragment = packer_jobs(
 
 airbyte_pulumi_fragment = pulumi_jobs_chain(
     airbyte_pulumi_code,
-    # stack_name="applications.airbyte.QA",
+    # stack_name="applications.airbyte.QA",  # noqa: E800
     stack_names=[f"applications.airbyte.{stage}" for stage in ("QA", "Production")],
     project_name="ol-infrastructure-airbyte-server",
     project_source_path=PULUMI_CODE_PATH.joinpath("applications/airbyte/"),
@@ -64,10 +64,12 @@ airbyte_pipeline = Pipeline(
 
 
 if __name__ == "__main__":
-    import sys
+    import sys  # noqa: WPS433
 
-    with open("definition.json", "wt") as definition:
+    with open("definition.json", "w") as definition:
         definition.write(airbyte_pipeline.json(indent=2))
     sys.stdout.write(airbyte_pipeline.json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p packer-pulumi-airbyte -c definition.json")
+    print()  # noqa: WPS421
+    print(  # noqa: WPS421
+        "fly -t pr-inf sp -p packer-pulumi-airbyte -c definition.json"  # noqa: C813
+    )

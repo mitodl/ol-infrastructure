@@ -12,7 +12,7 @@ from bridge.secrets.sops import read_yaml_secrets
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-s", "--stack", help="pulumi stack name", required=True)
-args = vars(parser.parse_args())
+args = vars(parser.parse_args())  # noqa: WPS421
 
 env_prefix = args["stack"].split(".")[-2]
 env_suffix = args["stack"].split(".")[-1]
@@ -22,7 +22,7 @@ master_password = read_yaml_secrets(
     Path(f"opensearch/opensearch.{env_prefix}.{env_suffix}.yaml")
 )["master_user_password"]
 
-stream = os.popen(f"pulumi stack output -s {args['stack']} 'cluster'")
+stream = os.popen(f"pulumi stack output -s {args['stack']} 'cluster'")  # noqa: S605
 cluster_output = stream.read()
 cluster = json.loads(cluster_output)
 
@@ -73,7 +73,7 @@ read_write_user = {
     "roles": ["read_write_role"],
 }
 
-# headers = {"Content-Type": "application/json", "Connection": "close"}
+# headers = {"Content-Type": "application/json", "Connection": "close"}  # noqa: E800
 headers = {"Content-Type": "application/json"}
 auth = requests.auth.HTTPBasicAuth(master_username, master_password)
 
@@ -100,16 +100,16 @@ role_mappings = {
 for r_name, r_def in roles.items():
     url = f"https://{cluster['endpoint']}/_opendistro/_security/api/roles/{r_name}"
     response = requests.put(url, headers=headers, auth=auth, data=json.dumps(r_def))
-    print(response.text)
+    print(response.text)  # noqa: WPS421
 
 for u_name, u_def in users.items():
-    url = f"https://{cluster['endpoint']}/_opendistro/_security/api/internalusers/{u_name}"
+    url = f"https://{cluster['endpoint']}/_opendistro/_security/api/internalusers/{u_name}"  # noqa: E501
     response = requests.put(url, headers=headers, auth=auth, data=json.dumps(u_def))
-    print(response.text)
+    print(response.text)  # noqa: WPS421
 
-for r_name, rm in role_mappings.items():
+for r_name, rm in role_mappings.items():  # noqa: WPS440
     url = (
         f"https://{cluster['endpoint']}/_opendistro/_security/api/rolesmapping/{r_name}"
     )
     response = requests.put(url, headers=headers, auth=auth, data=json.dumps(rm))
-    print(response.text)
+    print(response.text)  # noqa: WPS421

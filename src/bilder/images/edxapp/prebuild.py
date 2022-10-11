@@ -39,7 +39,7 @@ if node_type == WEB_NODE_TYPE:
         name="Proactively create edxapp user for setting permissions on theme repo",
         user=EDX_USER,
         present=True,
-        shell="/bin/false",
+        shell="/bin/false",  # noqa: S604
     )
     files.directory(
         name="Ensure themes directory is present",
@@ -64,7 +64,7 @@ if node_type == WEB_NODE_TYPE:
                 {
                     "edx-proctoring-proctortrack": [
                         "babel-polyfill",
-                        "/edx/app/edxapp/edx-platform/node_modules/edx-proctoring-proctortrack/edx_proctoring_proctortrack/static/proctortrack_custom.js",
+                        "/edx/app/edxapp/edx-platform/node_modules/edx-proctoring-proctortrack/edx_proctoring_proctortrack/static/proctortrack_custom.js",  # noqa: E501
                     ]
                 }
             )

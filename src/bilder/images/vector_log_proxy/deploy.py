@@ -37,7 +37,7 @@ from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 
-VERSIONS = {
+VERSIONS = {  # noqa: WPS407
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
 }
@@ -49,7 +49,7 @@ set_env_secrets(Path("consul/consul.env"))
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
 vector_config = VectorConfig(is_proxy=True)
 vault_config = VaultAgentConfig(
-    cache=VaultAgentCache(use_auto_auth_token="force"),
+    cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
     listener=[
         VaultListener(
             tcp=VaultTCPListener(
@@ -99,7 +99,7 @@ vector_config.configuration_templates[
 
 # The unusual order below is important
 # Install vector (will ensure TLS config dir exists)
-# Set vault template permissions (will ensure acl tools are installed, sets acl permissions needed by vault user)
+# Set vault template permissions (will ensure acl tools are installed, sets acl permissions needed by vault user)  # noqa: E501
 # Configure vector (will set the acl permissions needed by vector user)
 install_vector(vector_config)
 vault_template_permissions(vault_config)

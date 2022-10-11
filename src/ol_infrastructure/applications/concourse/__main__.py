@@ -70,7 +70,7 @@ def build_worker_user_data(
                     f"""\
                      CONCOURSE_TEAM={concourse_team}
                      """
-                ),
+                ),  # noqa: WPS355
                 "owner": "root:root",
             }
         )
@@ -82,7 +82,7 @@ def build_worker_user_data(
                     f"""\
                  CONCOURSE_TAG={",".join(concourse_tags)}
                 """
-                ),
+                ),  # noqa: WPS355
                 "owner": "root:root",
             }
         )
@@ -196,7 +196,7 @@ for iam_policy in iam_policy_names or []:
 for iam_policy_name in concourse_config.get_object("web_iam_policies") or []:
     iam_policy_object = iam_policy_objects[iam_policy_name]
     iam.RolePolicyAttachment(
-        f"concourse-instance-policy-web-policy-{iam_policy_name}-{stack_info.env_suffix}",
+        f"concourse-instance-policy-web-policy-{iam_policy_name}-{stack_info.env_suffix}",  # noqa: E501
         policy_arn=iam_policy_object.arn,
         role=concourse_web_instance_role.name,
     )
@@ -309,7 +309,7 @@ concourse_worker_security_group = ec2.SecurityGroup(
             from_port=0,
             to_port=MAXIMUM_PORT_NUMBER,
             protocol="tcp",
-            description="Allow Concourse workers to connect to all other concourse workers for p2p streaming.",
+            description="Allow Concourse workers to connect to all other concourse workers for p2p streaming.",  # noqa: E501
         )
     ],
     egress=default_egress_args,
@@ -504,7 +504,8 @@ web_launch_config = ec2.LaunchTemplate(
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name="/dev/xvda",
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=concourse_config.get_int("web_disk_size") or 25,
+                volume_size=concourse_config.get_int("web_disk_size")
+                or 25,  # noqa: WPS432
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
             ),
@@ -613,7 +614,7 @@ web_asg = autoscaling.Group(
 ############################################
 concourse_worker_instance_profiles = []
 
-for worker_def in concourse_config.get_object("workers") or []:
+for worker_def in concourse_config.get_object("workers") or []:  # noqa: WPS440
     worker_class_name = worker_def["name"]
 
     # Create IAM role + attach policies to it
@@ -633,16 +634,16 @@ for worker_def in concourse_config.get_object("workers") or []:
         tags=aws_config.tags,  # We will leave all the IAM resources with default tags.
     )
 
-    for iam_policy_name in worker_def["iam_policies"] or []:
+    for iam_policy_name in worker_def["iam_policies"] or []:  # noqa: WPS440
         iam_policy_object = iam_policy_objects[iam_policy_name]
         iam.RolePolicyAttachment(
-            f"concourse-instance-policy-worker-{worker_class_name}-policy-{iam_policy_name}-{stack_info.env_suffix}",
+            f"concourse-instance-policy-worker-{worker_class_name}-policy-{iam_policy_name}-{stack_info.env_suffix}",  # noqa: E501
             policy_arn=iam_policy_object.arn,
             role=concourse_worker_instance_role.name,
         )
 
     concourse_worker_instance_profile = iam.InstanceProfile(
-        f"concourse-instance-profile-worker-{worker_class_name}-{stack_info.env_suffix}",
+        f"concourse-instance-profile-worker-{worker_class_name}-{stack_info.env_suffix}",  # noqa: E501
         role=concourse_worker_instance_role.name,
         path="/ol-applications/concourse/profile/",
     )
@@ -662,7 +663,7 @@ for worker_def in concourse_config.get_object("workers") or []:
     worker_launch_config = ec2.LaunchTemplate(
         f"concourse-worker-{worker_class_name}-launch-template",
         name_prefix=f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}-",
-        description=f"Launch template for deploying concourse worker-{worker_class_name} nodes.",
+        description=f"Launch template for deploying concourse worker-{worker_class_name} nodes.",  # noqa: E501
         iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
             arn=concourse_worker_instance_profile.arn,
         ),
@@ -671,7 +672,7 @@ for worker_def in concourse_config.get_object("workers") or []:
             ec2.LaunchTemplateBlockDeviceMappingArgs(
                 device_name="/dev/xvda",
                 ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                    volume_size=worker_def["disk_size_gb"] or 25,
+                    volume_size=worker_def["disk_size_gb"] or 25,  # noqa: WPS432
                     volume_type=DiskTypes.ssd,
                     delete_on_termination=True,
                 ),
@@ -694,7 +695,7 @@ for worker_def in concourse_config.get_object("workers") or []:
                 resource_type="instance",
                 tags=aws_config.merged_tags(
                     {
-                        "Name": f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}"
+                        "Name": f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}"  # noqa: E501
                     },
                     worker_def["aws_tags"],
                 ),
@@ -703,7 +704,7 @@ for worker_def in concourse_config.get_object("workers") or []:
                 resource_type="volume",
                 tags=aws_config.merged_tags(
                     {
-                        "Name": f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}"
+                        "Name": f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}"  # noqa: E501
                     },
                     worker_def["aws_tags"],
                 ),
@@ -722,7 +723,7 @@ for worker_def in concourse_config.get_object("workers") or []:
         internal=True,
         ip_address_type="dualstack",
         load_balancer_type="application",
-        name=f"concourse-worker-alb-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}",
+        name=f"concourse-worker-alb-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}",  # noqa: E501, WPS221, WPS237
         security_groups=[concourse_worker_security_group.id],
         subnets=target_vpc["subnet_ids"],
         tags=aws_config.merged_tags({}),
@@ -740,10 +741,10 @@ for worker_def in concourse_config.get_object("workers") or []:
             path="/",
             port=CONCOURSE_WORKER_HEALTHCHECK_PORT,
             protocol="HTTP",
-            timeout=20,
+            timeout=20,  # noqa: WPS432
             unhealthy_threshold=5,
         ),
-        name=f"concourse-worker-tg-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}"[
+        name=f"concourse-worker-tg-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}"[  # noqa: WPS221, WPS237
             :TARGET_GROUP_NAME_MAX_LENGTH
         ],
         tags=aws_config.merged_tags(worker_def["aws_tags"]),

@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from concourse.lib.models.pipeline import (
+from concourse.lib.models.pipeline import (  # noqa: WPS235
     AnonymousResource,
     Command,
     GetStep,
@@ -46,13 +46,13 @@ class OpenEdxVars(BaseModel):
 
 def mfe_params(open_edx: OpenEdxVars, mfe: MFEAppVars) -> dict[str, Optional[str]]:
     return {
-        "ACCESS_TOKEN_COOKIE_NAME": f"{open_edx.environment}-edx-jwt-cookie-header-payload",
+        "ACCESS_TOKEN_COOKIE_NAME": f"{open_edx.environment}-edx-jwt-cookie-header-payload",  # noqa: E501
         "BASE_URL": f"https://{open_edx.lms_domain}",
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "CONTACT_URL": open_edx.contact_url,
         "FAVICON_URL": open_edx.favicon_url,
         "HONOR_CODE_URL": open_edx.honor_code_url,
-        "LANGUAGE_PREFERENCE_COOKIE_NAME": f"{open_edx.environment}-open-edx-language-preference",
+        "LANGUAGE_PREFERENCE_COOKIE_NAME": f"{open_edx.environment}-open-edx-language-preference",  # noqa: E501
         "LMS_BASE_URL": f"https://{open_edx.lms_domain}",
         "LOGIN_URL": f"https://{open_edx.lms_domain}/login",
         "LOGOUT_URL": f"https://{open_edx.lms_domain}/logout",
@@ -81,11 +81,11 @@ def mfe_job(open_edx: OpenEdxVars, mfe: MFEAppVars, previous_job: str = None) ->
         get=f"mfe-app-{mfe.path}",
         trigger=previous_job is None,
     )
-    branding_overrides = textwrap.dedent(
+    branding_overrides = textwrap.dedent(  # noqa: WPS462
         """\
-        npm install @edx/frontend-component-footer@npm:@mitodl/frontend-component-footer-mitol@latest --legacy-peer-deps
+        npm install @edx/frontend-component-footer@npm:@mitodl/frontend-component-footer-mitol@latest --legacy-peer-deps  # noqa: E501
         npm install @edx/frontend-component-header@npm:@mitodl/frontend-component-header-mitol@latest --legacy-peer-deps"""
-    )
+    )  # noqa: WPS355
     # The library authoring MFE has a version conflict with the React dependency. It
     # uses v17 and our override plugins use v16
     if mfe.path == "authoring":
@@ -117,15 +117,18 @@ def mfe_job(open_edx: OpenEdxVars, mfe: MFEAppVars, previous_job: str = None) ->
                         dir=mfe_dir,
                         args=[
                             "-exc",
+                            # This uses the --legacy-peer-deps flag to allow for
+                            # mismatched versions of react defined in tertiary
+                            # dependencies https://stackoverflow.com/a/66620869
                             textwrap.dedent(
                                 f"""\
                                 apt-get update
                                 apt-get install -q -y python build-essential
-                                npm install
+                                npm install --legacy-peer-deps
                                 {branding_overrides}
                                 NODE_ENV=production npm run build
                                 """
-                            ),
+                            ),  # noqa: WPS355
                         ],
                     ),
                 ),
@@ -137,7 +140,7 @@ def mfe_job(open_edx: OpenEdxVars, mfe: MFEAppVars, previous_job: str = None) ->
                     "destination": [
                         {
                             "command": "sync",
-                            "dir": f"s3-remote:{open_edx.environment}-edxapp-mfe/{mfe.path}/",
+                            "dir": f"s3-remote:{open_edx.environment}-edxapp-mfe/{mfe.path}/",  # noqa: E501
                         }
                     ],
                 },
@@ -166,7 +169,7 @@ def mfe_pipeline(open_edx_envs: list[OpenEdxVars], mfe: MFEAppVars) -> Pipeline:
                 name=Identifier("mfe-app-bucket"),
                 type="rclone",
                 source={
-                    "config": textwrap.dedent(
+                    "config": textwrap.dedent(  # noqa: WPS462
                         """\
                     [s3-remote]
                     type = s3
@@ -174,7 +177,7 @@ def mfe_pipeline(open_edx_envs: list[OpenEdxVars], mfe: MFEAppVars) -> Pipeline:
                     env_auth = true
                     region = us-east-1
                     """
-                    )
+                    )  # noqa: WPS355
                 },
             ),
         ],
@@ -204,6 +207,6 @@ if __name__ == "__main__":
     if "maple" in open_edx_vars[0].release_name:
         mfe_vars.node_major_version = 12
     pipeline = mfe_pipeline(open_edx_vars, mfe_vars)
-    with open("definition.json", "wt") as definition:
+    with open("definition.json", "w") as definition:
         definition.write(pipeline.json(indent=2))
     sys.stdout.write(pipeline.json(indent=2))

@@ -21,8 +21,8 @@ class ConsulACL(FlexibleBaseModel):
 
 
 class ConsulAddresses(FlexibleBaseModel):
-    dns: Optional[str] = "0.0.0.0"
-    http: Optional[str] = "0.0.0.0"
+    dns: Optional[str] = "0.0.0.0"  # noqa: S104
+    http: Optional[str] = "0.0.0.0"  # noqa: S104
     https: Optional[str]
     grpc: Optional[str]
 
@@ -33,7 +33,7 @@ class ConsulDNSConfig(FlexibleBaseModel):
     service_ttl: dict[str, str] = {"*": "30s"}
 
 
-class ConsulServiceCheck(FlexibleBaseModel, abc.ABC):
+class ConsulServiceCheck(FlexibleBaseModel, abc.ABC):  # noqa: B024
     id: Optional[str]
 
 
@@ -107,7 +107,7 @@ class Consul(HashicorpProduct):
         return self
 
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
-        for fpath, config in self.configuration.items():
+        for fpath, config in self.configuration.items():  # noqa: WPS526
             yield self.configuration_directory.joinpath(fpath), config.json(
                 exclude_none=True, indent=2, by_alias=True
             )
@@ -116,7 +116,10 @@ class Consul(HashicorpProduct):
     def data_directory(self) -> Path:
         data_dir = list(
             filter(
-                None, map(lambda config: config.data_dir, self.configuration.values())
+                None,
+                map(  # noqa: C417
+                    lambda config: config.data_dir, self.configuration.values()
+                ),
             )
         )[0]
         return data_dir or Path("/var/lib/consul/")

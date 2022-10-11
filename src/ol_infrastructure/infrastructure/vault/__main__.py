@@ -20,7 +20,7 @@ from typing import Any
 import pulumi_tls as tls
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import (
+from pulumi_aws import (  # noqa: WPS235
     acm,
     acmpca,
     autoscaling,
@@ -254,7 +254,7 @@ backup_bucket = s3.Bucket(
             id="reduce_storage_costs",
             transitions=[
                 s3.BucketLifecycleRuleTransitionArgs(
-                    days=30, storage_class="INTELLIGENT_TIERING"
+                    days=30, storage_class="INTELLIGENT_TIERING"  # noqa: WPS432
                 ),
             ],
         ),
@@ -262,7 +262,7 @@ backup_bucket = s3.Bucket(
     versioning=s3.BucketVersioningArgs(enabled=False),
     server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
         rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
                 sse_algorithm="aws:kms",
                 kms_master_key_id=vault_unseal_key["id"],
             ),
@@ -389,7 +389,7 @@ vault_listener_cert = acmpca.Certificate(
 ###################
 
 
-def cloud_init_user_data(
+def cloud_init_user_data(  # noqa: WPS211
     kms_key_id,
     vpc_id,
     consul_env_name,
@@ -401,7 +401,7 @@ def cloud_init_user_data(
     grafana_credentials = read_yaml_secrets(
         Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
     )
-    vault_creds = read_yaml_secrets(
+    vault_creds = read_yaml_secrets(  # noqa: F841
         Path(f"pulumi/vault.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
     )
     cloud_config_contents = {
@@ -421,13 +421,13 @@ def cloud_init_user_data(
                 "owner": "consul:consul",
             },
             {
-                "path": "/etc/default/caddy",
+                "path": "/etc/default/traefik",
                 "content": (f"DOMAIN={vault_dns_name}\n"),
             },
             {
                 "path": "/etc/cron.d/raft_backup",
                 "content": (
-                    f"{vault_backup_cron} root PATH=/usr/local/bin:/usr/bin HEALTH_CHECK_ID={vault_backup_healthcheck_id} BUCKET_NAME={vault_backup_bucket} /usr/sbin/raft_backup.sh\n"
+                    f"{vault_backup_cron} root PATH=/usr/local/bin:/usr/bin HEALTH_CHECK_ID={vault_backup_healthcheck_id} BUCKET_NAME={vault_backup_bucket} /usr/sbin/raft_backup.sh\n"  # noqa: E501
                 ),
             },
             {
@@ -448,8 +448,8 @@ def cloud_init_user_data(
                                             f"tag_value={vpc_id}"
                                         ),
                                         "auto_join_port": VAULT_HTTP_PORT,
-                                        "leader_tls_servername": "active.vault.service.consul",
-                                        "leader_ca_cert_file": "/etc/ssl/ol_root_ca.pem",
+                                        "leader_tls_servername": "active.vault.service.consul",  # noqa: E501
+                                        "leader_ca_cert_file": "/etc/ssl/ol_root_ca.pem",  # noqa: E501
                                     }
                                 ],
                                 "performance_multiplier": 5,
@@ -469,7 +469,7 @@ def cloud_init_user_data(
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                     """
-                ),
+                ),  # noqa: WPS355
                 "owner": "root:root",
             },
             # TODO: Move TLS key and cert injection to Packer build so that private key
@@ -578,7 +578,7 @@ vault_asg = autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=90,
+            min_healthy_percentage=90,  # noqa: WPS432
             instance_warmup=FIVE_MINUTES * 3,
         ),
         triggers=["tag"],

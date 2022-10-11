@@ -141,7 +141,7 @@ redash_instance_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_HTTPS_PORT,
             to_port=DEFAULT_HTTPS_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the redash webserver on port {DEFAULT_HTTPS_PORT}",
+            description=f"Allow traffic to the redash webserver on port {DEFAULT_HTTPS_PORT}",  # noqa: E501
         ),
     ],
     egress=default_egress_args,  # This is important!
@@ -283,15 +283,20 @@ consul.Keys(
     "redash-consul-template-data",
     keys=[
         consul.KeysKeyArgs(
-            path=f"redash/rds_endpoint", value=redash_db.db_instance.address
+            path=f"redash/rds_endpoint",  # noqa: F541, WPS237
+            value=redash_db.db_instance.address,
         ),
         consul.KeysKeyArgs(
-            path=f"redash/frontend_host", value=redash_config.require("domain")
+            path=f"redash/frontend_host",  # noqa: F541, WPS237
+            value=redash_config.require("domain"),
         ),
         consul.KeysKeyArgs(
-            path=f"redash/cache_endpoint_address", value=redash_redis_cluster.address
+            path=f"redash/cache_endpoint_address",  # noqa: F541, WPS237
+            value=redash_redis_cluster.address,
         ),
-        consul.KeysKeyArgs(path=f"redash/app_name", value="app_name"),
+        consul.KeysKeyArgs(
+            path=f"redash/app_name", value="app_name"  # noqa: F541, WPS237
+        ),
     ],
     opts=consul_provider,
 )
@@ -354,11 +359,11 @@ web_lt_config = OLLaunchTemplateConfig(
                         "write_files": [
                             {
                                 "path": "/etc/default/docker-compose",
-                                "content": textwrap.dedent(
+                                "content": textwrap.dedent(  # noqa: WPS462
                                     """\
                             COMPOSE_PROFILES=web
                                     """
-                                ),
+                                ),  # noqa: WPS355
                                 "owner": "root:root",
                             },
                             {
@@ -386,7 +391,7 @@ web_lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             """
-                                ),
+                                ),  # noqa: WPS355
                                 "owner": "root:root",
                             },
                         ]
@@ -451,11 +456,11 @@ worker_lt_config = OLLaunchTemplateConfig(
                         "write_files": [
                             {
                                 "path": "/etc/default/docker-compose",
-                                "content": textwrap.dedent(
+                                "content": textwrap.dedent(  # noqa: WPS462
                                     """\
                             COMPOSE_PROFILES=worker
                                     """
-                                ),
+                                ),  # noqa: WPS355
                                 "owner": "root:root",
                             },
                             {
@@ -482,7 +487,7 @@ worker_lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             """
-                                ),
+                                ),  # noqa: WPS355
                                 "owner": "root:root",
                             },
                         ]
@@ -516,7 +521,7 @@ worker_as_setup = OLAutoScaling(
     lb_config=None,
 )
 
-fifteen_minutes = 60 * 15
+fifteen_minutes = 60 * 15  # noqa: WPS432
 redash_domain = route53.Record(
     f"redash-{stack_info.env_suffix}-service-domain",
     name=redash_config.require("domain"),
@@ -525,21 +530,11 @@ redash_domain = route53.Record(
     records=[web_as_setup.load_balancer.dns_name],
     zone_id=mitodl_zone_id,
 )
-# redash_domain_v6 = route53.Record(
-#     f"redash-{stack_info.env_suffix}-service-domain-v6",
-#     name=redash_config.require("domain"),
-#     type="AAAA",
-#     ttl=fifteen_minutes,
-#     records=[instance["ipv6_address"][0] for instance in redash_export.values()],
-#     zone_id=mitodl_zone_id,
-#     opts=ResourceOptions(depends_on=[redash_instance]),
-# )
 
 export(
     "redash_app",
     {
         "rds_host": redash_db.db_instance.address,
         "redis_cluster": redash_redis_cluster.address,
-        #         "instances": redash_export,
     },
 )

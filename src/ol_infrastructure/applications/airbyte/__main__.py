@@ -1,4 +1,4 @@
-"""Create the resources needed to run a airbyte server.
+"""Create the resources needed to run a airbyte server.  # noqa: D200
 
 """
 import base64
@@ -42,7 +42,7 @@ from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 ##################################
-##    Setup + Config Retrival   ##
+##    Setup + Config Retrival   ##  # noqa: E266
 ##################################
 
 if Config("vault_server").get("env_namespace"):
@@ -85,7 +85,7 @@ airbyte_server_tag = f"airbyte-server-{env_name}"
 consul_provider = get_consul_provider(stack_info)
 
 ###############################
-##     General Resources     ##
+##     General Resources     ##  # noqa: E266
 ###############################
 
 # IAM and instance profile
@@ -166,8 +166,8 @@ data_lake_policy_document = {
             ],
             "Resource": [
                 "arn:aws:glue:*:*:catalog",
-                f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}",
-                f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}/*",
+                f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
+                f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
             ],
         },
         {
@@ -195,7 +195,7 @@ data_lake_policy_document = {
 data_lake_policy = iam.Policy(
     "data-lake-access-policy",
     name_prefix="airbyte-datalake-policy-",
-    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
     policy=lint_iam_policy(
         data_lake_policy_document,
         stringify=True,
@@ -312,7 +312,7 @@ airbyte_server_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_HTTPS_PORT,
             to_port=DEFAULT_HTTPS_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the airbyte server on port {DEFAULT_HTTPS_PORT}",
+            description=f"Allow traffic to the airbyte server on port {DEFAULT_HTTPS_PORT}",  # noqa: E501
         ),
     ],
     egress=default_egress_args,
@@ -412,8 +412,8 @@ airbyte_db_consul_service = Service(
 )
 
 connection_string = Output.all(address=db_address, port=db_port, name=db_name).apply(
-    lambda db: "jdbc:postgresql://{address}:{port}/{name}?ssl=true&sslmode=require".format(
-        **db
+    lambda db: "jdbc:postgresql://{address}:{port}/{name}?ssl=true&sslmode=require".format(  # noqa: E501
+        **db  # noqa: C815
     )
 )
 
@@ -424,10 +424,12 @@ consul.Keys(
         consul.KeysKeyArgs(path="airbyte/database-port", value=db_port),
         consul.KeysKeyArgs(path="airbyte/database-name", value=db_name),
         consul.KeysKeyArgs(
-            path=f"airbyte/database-connection-string", value=connection_string
+            path=f"airbyte/database-connection-string",  # noqa: F541, WPS237
+            value=connection_string,
         ),
         consul.KeysKeyArgs(
-            path="airbyte/vault-address", value=f"{Config('vault').get('address')}/"
+            path="airbyte/vault-address",
+            value=f"{Config('vault').get('address')}/",  # noqa: WPS237
         ),
     ],
     opts=consul_provider,
@@ -510,7 +512,7 @@ lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             """
-                                ),
+                                ),  # noqa: WPS355
                                 "owner": "root:root",
                             },
                         ]
@@ -544,7 +546,7 @@ as_setup = OLAutoScaling(
     lb_config=lb_config,
 )
 
-## Create Route53 DNS records for airbyte
+## Create Route53 DNS records for airbyte  # noqa: E266
 five_minutes = 60 * 5
 route53.Record(
     "airbyte-server-dns-record",

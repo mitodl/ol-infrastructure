@@ -1,5 +1,5 @@
 from concourse.lib.constants import REGISTRY_IMAGE
-from concourse.lib.models.pipeline import (
+from concourse.lib.models.pipeline import (  # noqa: WPS235
     AnonymousResource,
     Command,
     GetStep,
@@ -66,7 +66,7 @@ packer_build_resource = Resource(name="packer-build", type=packer_build_type.nam
 pulumi_deploy = pulumi_provisioner(
     name=Identifier("pulumi-concourse"),
     project_name="ol-infrastructure-concourse-application",
-    project_path=f"{concourse_pulumi_code.name}/src/ol_infrastructure/applications/concourse",
+    project_path=f"{concourse_pulumi_code.name}/src/ol_infrastructure/applications/concourse",  # noqa: E501
 )
 
 
@@ -84,12 +84,12 @@ def ami_jobs() -> list[Job]:
                     PutStep(
                         put=packer_validate_resource.name,
                         params={
-                            "template": f"{concourse_image_code.name}/src/bilder/images/.",
+                            "template": f"{concourse_image_code.name}/src/bilder/images/.",  # noqa: E501
                             "objective": "validate",
                             "vars": {"app_name": "concourse", "node_type": node_type},
                         },
                     )
-                    for node_type in {"web", "worker"}
+                    for node_type in {"web", "worker"}  # noqa: WPS335
                 ]
             ),
         ],
@@ -111,12 +111,12 @@ def ami_jobs() -> list[Job]:
                     PutStep(
                         put=packer_build_resource.name,
                         params={
-                            "template": f"{concourse_image_code.name}/src/bilder/images/.",
+                            "template": f"{concourse_image_code.name}/src/bilder/images/.",  # noqa: E501
                             "objective": "build",
                             "vars": {"app_name": "concourse", "node_type": node_type},
                             "env_vars": {
                                 "AWS_REGION": "us-east-1",
-                                "PYTHONPATH": f"${{PYTHONPATH}}:{concourse_image_code.name}/src",
+                                "PYTHONPATH": f"${{PYTHONPATH}}:{concourse_image_code.name}/src",  # noqa: E501
                             },
                             "env_vars_from_files": {
                                 "CONCOURSE_VERSION": f"{concourse_release.name}/version"
@@ -124,7 +124,7 @@ def ami_jobs() -> list[Job]:
                             "only": ["amazon-ebs.third-party"],
                         },
                     )
-                    for node_type in {"web", "worker"}
+                    for node_type in {"web", "worker"}  # noqa: WPS335
                 ]
             ),
         ],
@@ -163,7 +163,7 @@ def pulumi_job(env_stage: str, previous_env_stage: str = None) -> Job:
                     inputs=[Input(name=concourse_pulumi_code.name)],
                     outputs=[aws_creds_path],
                     run=Command(
-                        path=f"{concourse_pulumi_code.name}/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"
+                        path=f"{concourse_pulumi_code.name}/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"  # noqa: E501
                     ),
                 ),
             ),
@@ -173,7 +173,7 @@ def pulumi_job(env_stage: str, previous_env_stage: str = None) -> Job:
                 params={
                     "env_os": {
                         "AWS_DEFAULT_REGION": "us-east-1",
-                        "PYTHONPATH": f"/usr/lib/:/tmp/build/put/{concourse_pulumi_code.name}/src/",
+                        "PYTHONPATH": f"/usr/lib/:/tmp/build/put/{concourse_pulumi_code.name}/src/",  # noqa: E501
                     },
                     "stack_name": f"applications.concourse.{env_stage}",
                 },
@@ -199,7 +199,7 @@ def concourse_pipeline() -> Pipeline:
         jobs=ami_jobs()
         + [
             pulumi_job(env_stage, previous_env_stage=previous_env)
-            for env_stage, previous_env in [
+            for env_stage, previous_env in [  # noqa: WPS335
                 ("CI", None),
                 ("QA", "CI"),
                 ("Production", "QA"),
@@ -209,10 +209,12 @@ def concourse_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    import sys
+    import sys  # noqa: WPS433
 
-    with open("definition.json", "wt") as definition:
+    with open("definition.json", "w") as definition:
         definition.write(concourse_pipeline().json(indent=2))
     sys.stdout.write(concourse_pipeline().json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p packer-pulumi-concourse -c definition.json")
+    print()  # noqa: WPS421
+    print(  # noqa: WPS421
+        "fly -t pr-inf sp -p packer-pulumi-concourse -c definition.json"  # noqa: C813
+    )

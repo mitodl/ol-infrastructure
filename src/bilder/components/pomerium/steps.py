@@ -15,7 +15,7 @@ def configure_pomerium(pomerium_config: PomeriumConfig):
         group="root",
         present=True,
     )
-    pomerium_docker_compose_file = files.template(
+    pomerium_docker_compose_file = files.template(  # noqa: F841
         name="Create the docker compose file for pomerium",
         src=str(
             Path(__file__)
@@ -25,7 +25,7 @@ def configure_pomerium(pomerium_config: PomeriumConfig):
         dest=str(pomerium_config.docker_compose_file),
         context=pomerium_config,
     )
-    vault_template_directory = files.directory(
+    vault_template_directory = files.directory(  # noqa: F841
         name="Create the vault templates directory if it doesn't already exist.",
         path=pomerium_config.configuration_template_directory,
         user="vault",

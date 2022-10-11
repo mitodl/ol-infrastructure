@@ -8,7 +8,7 @@ rds_client = boto3.client("rds")
 
 
 @unique
-class DBInstanceTypes(str, Enum):
+class DBInstanceTypes(str, Enum):  # noqa: WPS600
     small = "db.t3.small"
     medium = "db.t3.medium"
     large = "db.t3.large"
@@ -43,7 +43,7 @@ def parameter_group_family(engine: str, engine_version: str) -> str:
     :param engine_version: Version of the RDS database engine being used (e.g. 12.2)
     :type engine_version: str
 
-    :returns: The name of the parameter group family for the specified engine and version
+    :returns: The name of the parameter group family for the specified engine and version  # noqa: E501
 
     :rtype: str
     """

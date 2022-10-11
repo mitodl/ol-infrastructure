@@ -68,10 +68,10 @@ redash_pipeline = Pipeline(
 
 
 if __name__ == "__main__":
-    import sys
+    import sys  # noqa: WPS433
 
-    with open("definition.json", "wt") as definition:
+    with open("definition.json", "w") as definition:
         definition.write(redash_pipeline.json(indent=2))
     sys.stdout.write(redash_pipeline.json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p packer-pulumi-redash -c definition.json")
+    print()  # noqa: WPS421
+    print("fly -t pr-inf sp -p packer-pulumi-redash -c definition.json")  # noqa: WPS421

@@ -82,6 +82,7 @@ resources:
     branch: main
     paths:
     - src/ol_infrastructure/applications/edxapp/
+    - src/ol_infrastructure/lib/
     uri: https://github.com/mitodl/ol-infrastructure
   type: git
 

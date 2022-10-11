@@ -28,7 +28,7 @@ def install_tika(tika_config: TikaConfig):
         present=True,
         recursive=True,
     )
-    tika_download = files.download(
+    tika_download = files.download(  # noqa: F841
         name="Download Tika Server jar file",
         dest=str(tika_config.install_directory)
         + f"/tika-server.{tika_config.version}.jar",
@@ -47,7 +47,7 @@ def install_tika(tika_config: TikaConfig):
 
 @deploy("Configure Tika")
 def configure_tika(tika_config: TikaConfig):
-    tika_config_file = files.template(
+    tika_config_file = files.template(  # noqa: F841
         name="Create tika-config.xml file",
         src=str(
             Path(__file__).resolve().parent.joinpath("templates", "tika-config.xml")
@@ -55,12 +55,12 @@ def configure_tika(tika_config: TikaConfig):
         dest=tika_config.tika_config_file,
         context=tika_config,
     )
-    log_config_file = files.put(
+    log_config_file = files.put(  # noqa: F841
         name="Create log4j configuration file",
         src=str(Path(__file__).resolve().parent.joinpath("files", "log4j2_tika.xml")),
         dest=tika_config.tika_log_config_file,
     )
-    service_defintion = files.template(
+    service_defintion = files.template(  # noqa: F841
         name="Create Tika service definition",
         dest="/usr/lib/systemd/system/tika-server.service",
         src=str(

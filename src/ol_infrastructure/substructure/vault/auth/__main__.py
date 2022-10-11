@@ -37,7 +37,7 @@ for env in Environment:
         type="aws",
         path=f"aws-{env.value}",
         description="AWS authentication via EC2 IAM",
-        tune=AuthBackendTuneArgs(token_type="default-service"),
+        tune=AuthBackendTuneArgs(token_type="default-service"),  # noqa: S106
     )
 
     vault_aws_auth_client = aws.AuthBackendClient(
@@ -57,7 +57,7 @@ vault_github_auth = github.AuthBackend(
 
 policy_folder = (Path(__file__).resolve()).parent.parent.joinpath("policies/github/")
 for hcl_file in policy_folder.iterdir():
-    if (
+    if (  # noqa: WPS337
         "software_engineer.hcl" in hcl_file.name
         and stack_info.env_suffix != "production"
     ):
@@ -65,7 +65,7 @@ for hcl_file in policy_folder.iterdir():
         software_engineer_policy = Policy(
             "github-auth-software-engineer", policy=software_engineer_policy_file
         )
-        for team in ["vault-developer-access"]:
+        for team in ["vault-developer-access"]:  # noqa: WPS335
             vault_github_auth_team = github.Team(
                 f"vault-github-auth-{team}",
                 team=team,
@@ -74,7 +74,7 @@ for hcl_file in policy_folder.iterdir():
     if "admin.hcl" in hcl_file.name:
         devops_policy_file = open(hcl_file).read()
         devops_policy = Policy("github-auth-devops", policy=devops_policy_file)
-        for team in ["vault-devops-access"]:
+        for team in ["vault-devops-access"]:  # noqa: WPS335, WPS440
             vault_github_auth_team = github.Team(
                 f"vault-github-auth-{team}", team=team, policies=[devops_policy]
             )

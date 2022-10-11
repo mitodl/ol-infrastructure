@@ -48,7 +48,7 @@ class OLAmazonCacheConfig(AWSBase):
         arbitrary_types_allowed = True
 
     @validator("engine")
-    def is_valid_engine(cls: "OLAmazonCacheConfig", engine: str) -> str:
+    def is_valid_engine(cls: "OLAmazonCacheConfig", engine: str) -> str:  # noqa: N805
         valid_engines = cache_engines()
         if engine not in valid_engines:
             raise ValueError("The specified cache engine is not a valid option in AWS.")
@@ -56,9 +56,9 @@ class OLAmazonCacheConfig(AWSBase):
 
     @validator("engine_version")
     def is_valid_version(
-        cls: "OLAmazonCacheConfig",
+        cls: "OLAmazonCacheConfig",  # noqa: N805
         engine_version: str,
-        values: dict,
+        values: dict,  # noqa: WPS110
     ) -> str:
         engine: str = str(values.get("engine"))
         engines_map = cache_engines()
@@ -84,9 +84,9 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
 
     @validator("auth_token")
     def is_auth_token_valid(
-        cls: "OLAmazonRedisConfig",
+        cls: "OLAmazonRedisConfig",  # noqa: N805
         auth_token: Optional[str],
-        values: dict,
+        values: dict,  # noqa: WPS110
     ) -> Optional[str]:
         min_token_length = 16
         max_token_length = 128
@@ -105,7 +105,9 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
         return auth_token
 
     @validator("cluster_name")
-    def is_valid_cluster_name(cls: "OLAmazonRedisConfig", cluster_name: str) -> str:
+    def is_valid_cluster_name(
+        cls: "OLAmazonRedisConfig", cluster_name: str  # noqa: N805
+    ) -> str:
         cluster_name_max_length = 41
         is_valid: bool = True
         is_valid = 1 < len(cluster_name) < cluster_name_max_length
@@ -125,7 +127,9 @@ class OLAmazonMemcachedConfig(OLAmazonCacheConfig):
     num_instances: conint(ge=1, le=MAX_MEMCACHED_CLUSTER_SIZE) = 3  # type: ignore
 
     @validator("cluster_name")
-    def is_valid_cluster_name(cls: "OLAmazonMemcachedConfig", cluster_name: str) -> str:
+    def is_valid_cluster_name(
+        cls: "OLAmazonMemcachedConfig", cluster_name: str  # noqa: N805
+    ) -> str:
         max_cluster_name_length = 51
         is_valid: bool = True
         is_valid = 1 < len(cluster_name) < max_cluster_name_length
@@ -154,7 +158,7 @@ class OLAmazonCache(pulumi.ComponentResource):
             opts
         )  # type: ignore
 
-        clustered_redis = cache_config.engine == "redis" and getattr(
+        clustered_redis = cache_config.engine == "redis" and getattr(  # noqa: B009
             cache_config, "cluster_mode_enabled"
         )
 
@@ -170,9 +174,9 @@ class OLAmazonCache(pulumi.ComponentResource):
             )
 
         self.parameter_group = elasticache.ParameterGroup(
-            f"{cache_config.cluster_name}-{cache_config.engine}-{cache_config.engine_version}-parameter-group",
+            f"{cache_config.cluster_name}-{cache_config.engine}-{cache_config.engine_version}-parameter-group",  # noqa: E501
             name=(
-                f"{cache_config.cluster_name}-{cache_config.engine_version.replace('.', '')}-parameter-group"
+                f"{cache_config.cluster_name}-{cache_config.engine_version.replace('.', '')}-parameter-group"  # noqa: E501, WPS237
             ),
             family=parameter_group_family(
                 cache_config.engine, cache_config.engine_version
@@ -195,7 +199,7 @@ class OLAmazonCache(pulumi.ComponentResource):
                 cache_options,
             )
         else:
-            cache_cluster, address = self.memcached(cache_config, resource_options)  # type: ignore
+            cache_cluster, address = self.memcached(cache_config, resource_options)  # type: ignore  # noqa: E501
 
         self.cache_cluster = cache_cluster
         self.address = address

@@ -41,7 +41,7 @@ class Nomad(HashicorpProduct):
         return self
 
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
-        for fpath, config in self.configuration.items():
+        for fpath, config in self.configuration.items():  # noqa: WPS526
             yield fpath, config.json(exclude_none=True, indent=2)
 
     @property
