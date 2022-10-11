@@ -79,7 +79,7 @@ def docker_pipeline() -> Pipeline:
 if __name__ == "__main__":
     import sys
 
-    with open("definition.json", "wt") as definition:
+    with open("definition.json", "w") as definition:
         definition.write(docker_pipeline().json(indent=2))
     sys.stdout.write(docker_pipeline().json(indent=2))
     print()

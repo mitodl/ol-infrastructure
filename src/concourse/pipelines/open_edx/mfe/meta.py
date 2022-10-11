@@ -134,6 +134,6 @@ def meta_pipeline() -> Pipeline:
 if __name__ == "__main__":
     import sys  # noqa: WPS433
 
-    with open("definition.json", "wt") as definition:
+    with open("definition.json", "w") as definition:
         definition.write(meta_pipeline().json(indent=2))
     sys.stdout.write(meta_pipeline().json(indent=2))
