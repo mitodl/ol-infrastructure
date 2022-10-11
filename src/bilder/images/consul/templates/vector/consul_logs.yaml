@@ -15,7 +15,7 @@ sources:
     current_boot_only: true
     include_units:
     - consul
-    - caddy
+    - traefik
 
 transforms:
   parse_consul_journald_logs:
