@@ -9,10 +9,10 @@ path "postgres-rc-odlvideo/creds/odlvideo" {
   capabilities = ["read"]
 }
 
-path "secret-ovs/" {
+path "secret-odl-video-service/" {
   capabilities = ["read"]
 }
-path "secret-ovs/*" {
+path "secret-odl-video-service/*" {
   capabilities = ["read"]
 }
 
