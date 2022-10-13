@@ -74,6 +74,4 @@ if __name__ == "__main__":
         definition.write(codejail_pipeline.json(indent=2))
     sys.stdout.write(codejail_pipeline.json(indent=2))
     print()  # noqa: WPS421
-    print(
-        "fly -t pr-inf sp -p packer-pulumi-codejail -c definition.json"
-    )  # noqa: WPS421
+    print("fly -t pr-inf sp -p packer-pulumi-codejail -c definition.json")
