@@ -36,19 +36,23 @@ codejail_ami_fragment = packer_jobs(
     env_vars_from_files={"CODEJAIL_VERSION": "codejail-container/tag"},
 )
 
-codejail_pulumi_fragment = pulumi_jobs_chain(
-    codejail_pulumi_code,
-    stack_names=[f"applications.codejail.{stage}" for stage in ("QA", "Production")],
-    project_name="ol-infrastructure-codejail-application",
-    project_source_path=PULUMI_CODE_PATH.joinpath("applications/codejail/"),
-    dependencies=[
-        GetStep(
-            get=codejail_ami_fragment.resources[-1].name,
-            trigger=True,
-            passed=[codejail_ami_fragment.jobs[-1].name],
-        )
-    ],
-)
+for network in ["mitx", "mitx-staging", "mitxonline"]:
+    codejail_pulumi_fragment = pulumi_jobs_chain(
+        codejail_pulumi_code,
+        stack_names=[
+            f"applications.codejail.{network}.{stage}"
+            for stage in ("QA", "Production", "CI")
+        ],
+        project_name="ol-infrastructure-codejail-application",
+        project_source_path=PULUMI_CODE_PATH.joinpath("applications/codejail/"),
+        dependencies=[
+            GetStep(
+                get=codejail_ami_fragment.resources[-1].name,
+                trigger=True,
+                passed=[codejail_ami_fragment.jobs[-1].name],
+            )
+        ],
+    )
 
 combined_fragment = PipelineFragment(
     resource_types=codejail_ami_fragment.resource_types
