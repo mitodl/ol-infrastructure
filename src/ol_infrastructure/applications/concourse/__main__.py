@@ -78,11 +78,7 @@ def build_worker_user_data(
         yaml_contents["write_files"].append(
             {
                 "path": "/etc/default/concourse-tags",
-                "content": textwrap.dedent(
-                    f"""\
-                 CONCOURSE_TAG={",".join(concourse_tags)}
-                """
-                ),  # noqa: WPS355
+                "content": f"CONCOURSE_TAG={','.join(concourse_tags)}",  # noqa: WPS237
                 "owner": "root:root",
             }
         )
@@ -231,18 +227,18 @@ vault.generic.Secret(
     "concourse-web-secret-values",
     path=concourse_secrets_mount.path.apply(lambda mount_path: f"{mount_path}/web"),
     data_json=Output.secret(
-        read_yaml_secrets(
-            Path(f"pulumi/concourse.operations.{stack_info.env_suffix}.yaml")
-        )["web"]
+        read_yaml_secrets(Path(f"concourse/operations.{stack_info.env_suffix}.yaml"))[
+            "web"
+        ]
     ).apply(json.dumps),
 )
 vault.generic.Secret(
     "concourse-worker-secret-values",
     path=concourse_secrets_mount.path.apply(lambda mount_path: f"{mount_path}/worker"),
     data_json=Output.secret(
-        read_yaml_secrets(
-            Path(f"pulumi/concourse.operations.{stack_info.env_suffix}.yaml")
-        )["worker"]
+        read_yaml_secrets(Path(f"concourse/operations.{stack_info.env_suffix}.yaml"))[
+            "worker"
+        ]
     ).apply(json.dumps),
 )
 vault.generic.Secret(

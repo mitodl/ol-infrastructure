@@ -30,6 +30,7 @@ concourse_pulumi_code = git_repo(
     paths=[
         "src/ol_infrastructure/applications/concourse/",
         "pipelines/infrastructure/scripts/",
+        "src/bridge/secrets/concourse/",
     ],
 )
 
