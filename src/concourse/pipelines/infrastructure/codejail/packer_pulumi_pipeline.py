@@ -33,7 +33,7 @@ codejail_ami_fragment = packer_jobs(
     dependencies=container_dependencies,
     image_code=codejail_image_code,
     packer_template_path="src/bilder/images/codejail/codejail.pkr.hcl",
-    env_vars_from_files={"codejail_VERSION": "codejail-container/tag"},
+    env_vars_from_files={"CODEJAIL_VERSION": "codejail-container/tag"},
 )
 
 codejail_pulumi_fragment = pulumi_jobs_chain(
