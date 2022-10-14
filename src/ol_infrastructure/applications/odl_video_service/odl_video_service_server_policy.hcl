@@ -1,11 +1,12 @@
-path "secret-operations/global/cloudfront-private-key" {
-  capabilities = ["read"]
-}
-path "secret_operations/global/mailgun-api-key" {
+path "secret-operations/*" {
   capabilities = ["read"]
 }
 
-path "postgres-rc-odlvideo/creds/odlvideo" {
+path "secret-operations" {
+  capabilities = ["read"]
+}
+
+path "postgres-odl-video-service/creds/app" {
   capabilities = ["read"]
 }
 
@@ -19,6 +20,7 @@ path "secret-odl-video-service/*" {
 path "sys/leases/renew" {
   capabilities = ["update"]
 }
+
 path "auth/token/create" {
   capabilities = ["update"]
 }

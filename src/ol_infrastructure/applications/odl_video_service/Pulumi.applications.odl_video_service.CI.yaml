@@ -3,6 +3,10 @@ secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQH+6+5vJN0oRL26AlGpZxeZAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMk5PG2rZHL4/ftd1wAgEQgDtjxxfTYkCIIoqCW+BquaGmShSp5bNk0fo2zvujw7eVo1Jkm5qWBxp4F6n3YYFPMpk04QW8L0s7CHyxRA==
 config:
   consul:address: https://consul-apps-ci.odl.mit.edu
+  ovs:auto_scale:
+    desired: 1
+    max: 2
+    min: 1
   ovs:domain: old-video-service.odl.mit.edu
   ovs:edx_base_url: https://courses-rc.xpro/mit.edu
   ovs:log_level: INFO
@@ -14,5 +18,6 @@ config:
   ovs:s3_transcode_bucket_name: odl-video-service-transcode-rc
   ovs:s3_watch_bucket_name: odl-video-service-watch-rc
   ovs:target_vpc: applications_vpc
+  redis:max_connections: "30"
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
