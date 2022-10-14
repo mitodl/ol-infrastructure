@@ -3,8 +3,9 @@ import os
 from pathlib import Path
 
 from pyinfra import host
-from pyinfra.operations import files
+from pyinfra.operations import files, server
 
+from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models import (
     Consul,
     ConsulAddresses,
@@ -23,6 +24,7 @@ from bilder.components.hashicorp.consul_template.steps import (
 from bilder.components.hashicorp.steps import (
     configure_hashicorp_product,
     install_hashicorp_products,
+    register_services,
 )
 from bilder.components.hashicorp.vault.models import (
     Vault,
@@ -55,7 +57,7 @@ from bridge.secrets.sops import set_env_secrets
 
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
-VERSIONS = {
+VERSIONS = {  # noqa: WPS407
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "consul-template": os.environ.get(
         "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION
@@ -122,7 +124,7 @@ consul_configuration = {
 
 # Install vault, consul, and consul-template
 vault_config = VaultAgentConfig(
-    cache=VaultAgentCache(use_auto_auth_token="force"),
+    cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
     listener=[
         VaultListener(
             tcp=VaultTCPListener(
@@ -171,19 +173,18 @@ for product in hashicorp_products:
 consul_template_permissions(consul_template.configuration)
 
 if host.get_fact(HasSystemd):
-    # TODO MD 20221011 revisit this, Need to start most of these services by default
-    # register_services(hashicorp_products, start_services_immediately=False)
+    register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
-    # server.service(
-    #    name="Ensure docker compose service is enabled",
-    #    service="docker-compose",
-    #    running=False,
-    #    enabled=True,
-    # )
+    server.service(
+        name="Ensure docker compose service is enabled",
+        service="docker-compose",
+        running=False,
+        enabled=True,
+    )
 
     watched_docker_compose_files = [
-        DOCKER_COMPOSE_DIRECTORY + "/.env",
+        DOCKER_COMPOSE_DIRECTORY + "/.env",  # noqa: WPS336
     ]
-    # service_configuration_watches(
-    #    service_name="docker-compose", watched_files=watched_docker_compose_files
-    # )
+    service_configuration_watches(
+        service_name="docker-compose", watched_files=watched_docker_compose_files
+    )

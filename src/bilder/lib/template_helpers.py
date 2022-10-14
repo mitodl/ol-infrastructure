@@ -7,16 +7,18 @@ from bilder.components.hashicorp.consul_template.models import ConsulTemplateTem
 CONSUL_TEMPLATE_DIRECTORY = "/etc/consul-template"
 
 
-def place_jinja_template_file(
+def place_jinja_template_file(  # noqa: WPS211
     name: str,
     repo_path: Path,
     destination_path: Path,
     context: dict,
     watched_files: list[Path],
     mode: str = "0644",
+    user: str = "root",
+    group: str = "root",
 ):
-    """Interpolate and place a file on the destination at AMI bake time.
 
+    """Interpolate and place a file on the destination at AMI bake time.
     Predicate function that side effects multiple arguments and has no return.
 
     :param name: The name the file will ultimately have on the destination system.
@@ -26,35 +28,41 @@ def place_jinja_template_file(
     :type repo_path: Path
 
     :param destination_path: The path on the destination system for the file to be placed at.
-    This does NOT include the filename, just the directory.
+        This does NOT include the filename, just the directory.
     :type destination_path: Path
 
     :param context: A dictionary containing the values to interpolate into the tempalte.
     :type context: dict
 
     :param watched_files: A list of files that will be watched on the system and used to
-    trigger service restarts when changed. This function will append the combined
-    destination_path + name to the list.
+        trigger service restarts when changed. This function will append the combined
+        destination_path + name to the list.
     :type watched_files: list[Path]
 
     :param mode: The permissions specifier for the file on the destination system. Numerical form.
     :type mode: str
 
-    :returns: Nothing
-    :rtype: None
+    :param user: The file user of the rendered template on the system.
+    :type user: str
 
+    :param group: The group of the rendered template on the system.
+    :type group: str
+
+    :rtype: None
     """
     files.template(
         name=f"Place and interpolate {name} jinja template file",
-        src=str(repo_path.joinpath(name + ".j2")),
+        src=str(repo_path.joinpath(name + ".j2")),  # noqa: WPS336
         dest=str(destination_path.joinpath(name)),
         context=context,
         mode="0664",
+        user=user,
+        group=group,
     )
     watched_files.append(destination_path.joinpath(name))
 
 
-def place_consul_template_file(
+def place_consul_template_file(  # noqa: WPS211
     name: str,
     repo_path: Path,
     template_path: Path,
@@ -62,6 +70,8 @@ def place_consul_template_file(
     consul_templates: list[ConsulTemplateTemplate],
     watched_files: list[Path],
     mode: str = "0664",
+    user: str = "consul-template",
+    group: str = "consul-template",
 ):
     """Places a consul template file on a destination system. Interpolation
     happens at startup based on values from consul + vault. A list of
@@ -78,35 +88,44 @@ def place_consul_template_file(
     :type template_path: Path
 
     :param destination_path: The path on the destination system for the file to be placed at.
-    This does NOT include the filename, just the directory.
+        This does NOT include the filename, just the directory.
     :type destination_path: Path
 
     :param consul_templates: A list of ConsulTemplateTemplate objects for tracking / creating the consul
-    configuration. This function will sideffect this list and appaned a new ConsulTemplateTemplate
-    object to the list.
+        configuration. This function will sideffect this list and appaned a new ConsulTemplateTemplate
+        object to the list.
     :type consul_templates: List[ConsulTemplateTemplate]
 
     :param watched_files: A list of files that will be watched on the system and used to
-    trigger service restarts when changed. This function will append the combined
-    destination_path + name to the list.
+        trigger service restarts when changed. This function will append the combined
+        destination_path + name to the list.
     :type watched_files: list[Path]
 
     :param mode: The permissions specifier for the file on the destination system. Numerical form.
-    both the unrendered template AND the rendered file will have the same permissions.
+        both the unrendered template AND the rendered file will have the same permissions.
     :type mode: str
 
-    :returns: Nothing
+    :param user: The file user for the the unrendered template only. The rendered file will
+        always have consul-template:consul-template usership. Set the mode accordingly.
+    :type user: str
+
+    :param group: The group for the unrendered template only. The rendered file will
+        always have consul-template:consul-template usership. Set the mode accordingly.
+    :type group: str
+
     :rtype: None
     """
     files.put(
         name=f"Place {name} template file.",
-        src=str(repo_path.joinpath(name + ".tmpl")),
-        dest=str(template_path.joinpath(name + ".tmpl")),
+        src=str(repo_path.joinpath(name + ".tmpl")),  # noqa: WPS336
+        dest=str(template_path.joinpath(name + ".tmpl")),  # noqa: WPS336
         mode=mode,
+        user=user,
+        group=group,
     )
     consul_templates.append(
         ConsulTemplateTemplate(
-            source=template_path.joinpath(name + ".tmpl"),
+            source=template_path.joinpath(name + ".tmpl"),  # noqa: WPS336
             destination=destination_path.joinpath(name),
             perms=mode,
         )
