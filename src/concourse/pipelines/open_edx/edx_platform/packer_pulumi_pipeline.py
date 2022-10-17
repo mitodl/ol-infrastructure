@@ -8,13 +8,12 @@ from concourse.lib.resources import git_repo
 from concourse.pipelines.open_edx.edx_platform.pipeline_vars import (
     RELEASE_MAP,
     DeploymentEnvRelease,
-    EdxSupportedRelease,
     ol_edx_deployments,
 )
 
 
 def filter_deployments_by_release(
-    release: EdxSupportedRelease, env_deployments: list[DeploymentEnvRelease]
+    release: str, env_deployments: list[DeploymentEnvRelease]
 ) -> list[DeploymentEnvRelease]:
     filtered_deployments = []
     for deployment in env_deployments:
@@ -28,7 +27,7 @@ def filter_deployments_by_release(
 
 
 def build_edx_pipeline(
-    release_name: EdxSupportedRelease, edx_deployments: list[DeploymentEnvRelease]
+    release_name: str, edx_deployments: list[DeploymentEnvRelease]
 ) -> Pipeline:
     edx_platform_code = git_repo(
         name=Identifier("edx-platform"),

@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 DeploymentName = Literal["mitx", "mitx-staging", "mitxonline", "xpro"]
-EdxSupportedRelease = Literal["maple", "nutmeg", "olive", "master"]
+SUPPORTED_RELEASES = ("maple", "nutmeg", "olive", "master")
 EnvName = Literal["CI", "QA", "Production"]
 EnvRelease = namedtuple("EnvRelease", ("environment", "edx_release"))
 RELEASE_MAP = {  # noqa: WPS407
