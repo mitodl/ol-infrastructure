@@ -1,6 +1,3 @@
-from calendar import timegm
-from datetime import datetime
-
 from concourse.lib.constants import REGISTRY_IMAGE
 from concourse.lib.models.pipeline import (
     AnonymousResource,
