@@ -1,5 +1,4 @@
 import sys
-from itertools import takewhile
 
 from concourse.lib.constants import PULUMI_CODE_PATH
 from concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
@@ -18,14 +17,12 @@ def filter_deployments_by_release(
     release: EdxSupportedRelease, env_deployments: list[DeploymentEnvRelease]
 ) -> list[DeploymentEnvRelease]:
     filtered_deployments = []
-    for deployment in env_deployments:  # noqa: WPS426
-        release_matches = list(
-            takewhile(
-                lambda env_map: env_map.edx_release == release,
-                deployment.env_release_map,
-            )
-        )
-        if release_matches:
+    for deployment in env_deployments:
+        release_match = False
+        for env_tuple in deployment.env_release_map:
+            if release == env_tuple.edx_release:
+                release_match = True
+        if release_match:
             filtered_deployments.append(deployment)
     return filtered_deployments
 
