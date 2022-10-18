@@ -64,7 +64,7 @@ def build_edx_pipeline(
         extra_packer_params={
             "only": ["amazon-ebs.edxapp"],
             "var_files": [
-                f"{edx_platform_code.name}/src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl"  # noqa: E501
+                f"{edx_base_image_code.name}/src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl"  # noqa: E501
             ],
         },
         job_name_suffix="base",
@@ -102,7 +102,7 @@ def build_edx_pipeline(
             extra_packer_params={
                 "only": ["amazon-ebs.edxapp"],
                 "var_files": [
-                    f"{edx_platform_code.name}/src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl"  # noqa: E501
+                    f"{custom_image_code.name}/src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl"  # noqa: E501
                 ],
             },
             job_name_suffix=deployment.deployment_name,
