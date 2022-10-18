@@ -914,6 +914,8 @@ lms_web_lb_target_group = lb.TargetGroup(
     ),
     name_prefix=f"lms-{stack_info.env_suffix}-"[:6],
     tags=aws_config.tags,
+    preserve_client_ip=True,
+    load_balancing_algorithm_type="least_outstanding_requests",
 )
 # Studio has some workflows that are stateful, such as importing and exporting courses
 # which requires files to be written and read from the same EC2 instance. This adds
@@ -940,6 +942,7 @@ studio_web_lb_target_group = lb.TargetGroup(
     ),
     name_prefix=f"studio-{stack_info.env_suffix}-"[:6],
     tags=aws_config.tags,
+    preserve_client_ip=True,
 )
 edxapp_web_acm_cert = acm.Certificate(
     "edxapp-load-balancer-acm-certificate",
