@@ -942,7 +942,6 @@ studio_web_lb_target_group = lb.TargetGroup(
     ),
     name_prefix=f"studio-{stack_info.env_suffix}-"[:6],
     tags=aws_config.tags,
-    preserve_client_ip="true",
 )
 edxapp_web_acm_cert = acm.Certificate(
     "edxapp-load-balancer-acm-certificate",
