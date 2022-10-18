@@ -37,25 +37,32 @@ def packer_jobs(  # noqa: WPS211
     packer_vars: Optional[dict[str, str]] = None,
     env_vars_from_files: Optional[dict[str, str]] = None,
     extra_packer_params: Optional[dict[str, str]] = None,
+    job_name_suffix: str = "",
 ) -> PipelineFragment:
-    """Generate a pipeline fragment for building EC2 AMIs with Packer.  # noqa: D205
-    # noqa: DAR101
-      :param dependencies: The list of `Get` steps that should be run at the start of the  # noqa: RST301, E501
-          pipeline.  This is used for setting up inputs to the build, as well as for
-          triggering on upstream changes (e.g. GitHub releases).
-      :param image_code: The Git resource definition that specifies the repository that
-          holds the code for building the image, including the Packer template.
-      :param packer_template_path: The path in the image_code resource that points to the  # noqa: E501
-          Packer template that you would like to build.
-      :param node_types: The node types that should be built for the template and passed
-          as vars during the build (e.g. web and worker)
-      :param packer_vars: A dictionary of var inputs for the Packer template.
-      :param env_vars_from_files: The list of environment variables that should be set
-          during the build and the files to load for populating the values (e.g. the
-          `version` file from a GitHub resource)
+    """Generate a pipeline fragment for building EC2 AMIs with Packer.
 
-      :returns: A `PipelineFragment` object that can be composed with other fragments to
-                build a complete pipeline definition.
+    :param dependencies: The list of `Get` steps that should be run at the start of the
+        pipeline.  This is used for setting up inputs to the build, as well as for
+        triggering on upstream changes (e.g. GitHub releases).
+    :param image_code: The Git resource definition that specifies the repository that
+        holds the code for building the image, including the Packer template.
+    :param packer_template_path: The path in the image_code resource that points to the
+        Packer template that you would like to build.
+    :param node_types: The node types that should be built for the template and passed
+        as vars during the build (e.g. web and worker)
+    :param packer_vars: A dictionary of var inputs for the Packer template.
+    :param env_vars_from_files: The list of environment variables that should be set
+        during the build and the files to load for populating the values (e.g. the
+        `version` file from a GitHub resource)
+    :param extra_packer_params: A dictionary of parameters to pass to the `packer`
+        command line (e.g. `-only` or `-except` when you want to specify a particular
+        build target)
+    :param job_name_suffix: A string to append to the name of the validate and build
+        jobs to allow for ensuring unique names when multiple Packer builds happen in a
+        single pipeline.
+
+    :returns: A `PipelineFragment` object that can be composed with other fragments to
+              build a complete pipeline definition.
     """
     packer_validate_type = packer_validate()
     packer_build_type = packer_build()
@@ -64,7 +71,7 @@ def packer_jobs(  # noqa: WPS211
         name="packer-validate", type=packer_validate_type.name
     )
     validate_job = Job(
-        name=Identifier("validate-packer-template"),
+        name=Identifier(f"validate-packer-template-{job_name_suffix}".strip("-")),
         plan=dependencies
         + [
             GetStep(
@@ -93,7 +100,7 @@ def packer_jobs(  # noqa: WPS211
     for dep in build_deps:
         dep.passed = [validate_job.name]
     build_job = Job(
-        name=Identifier("build-packer-template"),
+        name=Identifier(f"build-packer-template-{job_name_suffix}".strip("-")),
         plan=build_deps
         + [
             GetStep(
