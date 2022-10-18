@@ -76,8 +76,14 @@ apt.packages(
 ###########
 # Check out desired repository and branch for edx-platform. This lets us manage our
 # custom code without having to bake it into the base image.
-git_remote = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["origin"]
-git_branch = host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["branch"]
+git_remote = os.environ.get(
+    "EDXAPP_RELEASE_REPO",
+    host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["origin"],
+)
+git_branch = os.environ.get(
+    "EDXAPP_RELEASE_BRANCH",
+    host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["branch"],
+)
 edx_platform_path = "/edx/app/edxapp/edx-platform/"
 server.shell(
     name="Fix git",

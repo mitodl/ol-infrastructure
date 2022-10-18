@@ -58,7 +58,6 @@ source "amazon-ebs" "edxapp" {
     purpose        = "${local.app_name}-${var.node_type}"
     edxapp_release = "${var.edx_platform_version}"
   }
-  # Base all builds off of the most recent Ubuntu 20.04 image built by the Canonical organization.
   source_ami_filter {
     filters = {
       name                = "edxapp-${var.node_type}-${var.edx_platform_version}-*"
@@ -130,7 +129,11 @@ build {
   }
 
   provisioner "shell-local" {
-    environment_vars = ["NODE_TYPE=${var.node_type}", "EDX_INSTALLATION=${var.installation_target}"]
+    environment_vars = [
+      "NODE_TYPE=${var.node_type}",
+      "EDX_INSTALLATION=${var.installation_target}",
+      "EDXAPP_RELEASE_BRANCH=${var.edx_platform_version}"
+    ]
     inline = [
       "pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"
     ]
