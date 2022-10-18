@@ -97,7 +97,7 @@ def build_edx_pipeline(
                 ),
             ],
             image_code=custom_image_code,
-            packer_template_path="src/bilder/images/edxapp/edxapp_custom_install.pkr.hcl",  # noqa: E501
+            packer_template_path="src/bilder/images/edxapp/custom_install.pkr.hcl",  # noqa: E501
             node_types=["web", "worker"],
             extra_packer_params={
                 "only": ["amazon-ebs.edxapp"],
