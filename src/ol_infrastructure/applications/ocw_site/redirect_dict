@@ -92,7 +92,10 @@
   "/20-020S9": "307|keep|https://{{AK_HOSTHEADER}}/courses/biological-engineering/20-020-introduction-to-biological-engineering-design-spring-2009/",
   "/20-219IAP15": "307|discard|https://{{AK_HOSTHEADER}}/courses/biological-engineering/20-219-becoming-the-next-bill-nye-writing-and-hosting-the-educational-show-january-iap-2015/",
   "/20-309F06": "307|keep|https://{{AK_HOSTHEADER}}/courses/biological-engineering/20-309-biological-engineering-ii-instrumentation-and-measurement-fall-2006/",
+  "/2018-matrix-methods": "307|keep|https://{{AK_HOSTHEADER}}/courses/mathematics/18-065-matrix-methods-in-data-analysis-signal-processing-and-machine-learning-spring-2018/"
+  "/2018-matrix-methods-videos": "307|keep|https://www.youtube.com/playlist?list=PLUl4u3cNGP63oMNUHXqIUcrkS2PivhN3k"
   "/2020-vision": "307|keep|https://{{AK_HOSTHEADER}}/resources/res-18-010-a-2020-vision-of-linear-algebra-spring-2020/",
+  "/2020-vision-videos": "307|keep|https://www.youtube.com/playlist?list=PLUl4u3cNGP61iQEFiWLE21EJCxwmWvvek"
   "/21A-453S04": "307|keep|https://{{AK_HOSTHEADER}}/courses/anthropology/21a-453-anthropology-of-the-middle-east-spring-2004/",
   "/21A.550JS11": "307|keep|https://{{AK_HOSTHEADER}}/courses/anthropology/21a-550j-dv-lab-documenting-science-through-video-and-new-media-fall-2012/",
   "/21F-223F04": "307|keep|https://{{AK_HOSTHEADER}}/courses/global-studies-and-languages/21g-223-listening-speaking-and-pronunciation-fall-2004/",
