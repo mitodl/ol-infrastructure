@@ -132,7 +132,6 @@ build {
     environment_vars = [
       "NODE_TYPE=${var.node_type}",
       "EDX_INSTALLATION=${var.installation_target}",
-      "EDXAPP_RELEASE_BRANCH=${var.edx_platform_version}"
     ]
     inline = [
       "pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"
