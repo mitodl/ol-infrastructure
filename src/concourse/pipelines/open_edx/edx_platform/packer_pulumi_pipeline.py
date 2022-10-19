@@ -82,7 +82,7 @@ def build_edx_pipeline(
                 "src/bilder/images/edxapp/group_data/",
                 "src/bilder/images/edxapp/templates/vector/",
                 f"src/bilder/images/edxapp/templates/edxapp/{deployment.deployment_name}/",  # noqa: E501
-                "src/bilder/images/edxapp/edxapp_custom_install.pkr.hcl",
+                "src/bilder/images/edxapp/custom_install.pkr.hcl",
                 f"src/bilder/images/edxapp/packer_vars/{deployment.deployment_name}.pkrvars.hcl",  # noqa: E501
             ],
         )
