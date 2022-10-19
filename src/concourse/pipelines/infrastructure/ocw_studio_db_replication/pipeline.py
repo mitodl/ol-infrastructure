@@ -2,7 +2,6 @@ from concourse.lib.constants import REGISTRY_IMAGE
 from concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
-    GetStep,
     Identifier,
     Input,
     Job,
@@ -13,97 +12,64 @@ from concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from concourse.lib.resources import git_repo
-
-ocw_studio = git_repo(
-    Identifier("ocw-studio"),
-    uri="https://github.com/mitodl/ocw-studio",
-    branch="cg/replibyte-config",
-    check_every="60m",
-)
-
-alpine_resource = AnonymousResource(
-    type=REGISTRY_IMAGE,
-    source=RegistryImage(repository="marsblockchain/curl-git-jq-wget"),
-)
 
 postgres_resource = AnonymousResource(
-    type=REGISTRY_IMAGE, source=RegistryImage(repository="postgres", tag="latest")
+    type=REGISTRY_IMAGE, source=RegistryImage(repository="postgres", tag="12")
 )
 
 
 def db_replication_pipeline() -> Pipeline:
     db_replication_job = Job(
-        name="ocw-studio-db-replication",
+        name="restore-db",
         build_log_retention={"builds": 10},
         plan=[
-            GetStep(get=ocw_studio.name, trigger=False),
             TaskStep(
-                task=Identifier("install-replibyte"),
-                privileged=False,
-                config=TaskConfig(
-                    platform=Platform.linux,
-                    image_resource=alpine_resource,
-                    inputs=[Input(name=ocw_studio.name)],
-                    outputs=[Output(name=ocw_studio.name)],
-                    run=Command(
-                        path="/bin/sh",
-                        dir="./ocw-studio/replibyte",
-                        args=["./install.sh"],
-                    ),
-                ),
-            ),
-            TaskStep(
-                task=Identifier("replibyte-dump-create"),
+                task=Identifier("run-pg-dump"),
                 privileged=False,
                 config=TaskConfig(
                     platform=Platform.linux,
                     image_resource=postgres_resource,
-                    inputs=[Input(name=ocw_studio.name)],
                     outputs=[Output(name="dump")],
                     params={
-                        "SOURCE_DB_URI": "((ocw-studio-production-database-uri))",
-                        "DESTINATION_DB_URI": "((ocw-studio-qa-database-uri))",
+                        "PGHOST": "((source.host))",
+                        "PGPORT": "((source.port))",
+                        "PGUSER": "((source.username))",
+                        "PGPASSWORD": "((source.password))",
                     },
                     run=Command(
-                        path="./ocw-studio/replibyte/replibyte",
+                        path="/bin/sh",
                         args=[
-                            "--config",
-                            "./ocw-studio/replibyte/replibyte.config",
-                            "dump",
-                            "create",
+                            "-c",
+                            "pg_dump -Fc -d ((source.database)) > ./dump/db.dump",
                         ],
                     ),
                 ),
             ),
             TaskStep(
-                task=Identifier("replibyte-dump-restore"),
+                task=Identifier("run-pg-restore"),
                 privileged=False,
                 config=TaskConfig(
                     platform=Platform.linux,
                     image_resource=postgres_resource,
-                    inputs=[Input(name=ocw_studio.name), Input(name="dump")],
+                    inputs=[Input(name="dump")],
                     params={
-                        "SOURCE_DB_URI": "((ocw-studio-production-database-uri))",
-                        "DESTINATION_DB_URI": "((ocw-studio-qa-database-uri))",
+                        "PGHOST": "((destination.host))",
+                        "PGPORT": "((destination.port))",
+                        "PGUSER": "((destination.username))",
+                        "PGPASSWORD": "((destination.password))",
                     },
                     run=Command(
-                        path="./ocw-studio/replibyte/replibyte",
+                        path="/bin/sh",
                         args=[
-                            "--config",
-                            "./ocw-studio/replibyte/replibyte.config",
-                            "dump",
-                            "restore",
-                            "remote",
-                            "-v",
-                            "latest",
+                            "-c",
+                            "pg_restore --clean --no-privileges --no-owner -d ((destination.database)) ./dump/db.dump",
                         ],
                     ),
                 ),
             ),
         ],
     )
-    return Pipeline(resources=[ocw_studio], jobs=[db_replication_job])
+    return Pipeline(jobs=[db_replication_job])
 
 
 if __name__ == "__main__":
@@ -114,5 +80,5 @@ if __name__ == "__main__":
     sys.stdout.write(db_replication_pipeline().json(indent=2))
     sys.stdout.write("\n")
     sys.stdout.write(
-        "fly -t local set-pipeline -p ocw-studio-db-replication -c definition.json"
+        "fly -t local set-pipeline -p ocw-studio-db-replication -c definition.json\n"
     )
