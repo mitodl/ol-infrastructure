@@ -8,12 +8,16 @@ sources:
     type: file
     file_key: log_file
     include:
-    - /edx/var/log/nginx/access.log
+    - /edx/var/log/nginx/access.log*
+    exclude:
+    - /edx/var/log/nginx/access*.gz
   collect_edxapp_nginx_error_logs:
     type: file
     file_key: log_file
     include:
-    - /edx/var/log/nginx/error.log
+    - /edx/var/log/nginx/error.log*
+    exclude:
+    - /edx/var/log/nginx/error*.gz
 
   collect_edxapp_logs:
     type: file
