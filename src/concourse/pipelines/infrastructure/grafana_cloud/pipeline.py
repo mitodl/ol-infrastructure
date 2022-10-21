@@ -15,9 +15,9 @@ from concourse.lib.models.pipeline import (  # noqa: WPS235
     TaskConfig,
     TaskStep,
 )
-from concourse.lib.resource_types import slack_notification_resource as snr_type
-from concourse.lib.resources import schedule, ssh_git_repo, slack_notification
 from concourse.lib.notifications import notification
+from concourse.lib.resource_types import slack_notification_resource as snr_type
+from concourse.lib.resources import schedule, slack_notification, ssh_git_repo
 
 build_schedule = schedule(Identifier("build-schedule"), "1h")
 
@@ -37,7 +37,9 @@ loki_alert_rules = ssh_git_repo(
     ],
 )
 
-slack_notification_resource = slack_notification(Identifier("slack-notification"), url="(( grizzly.slack_url ))")
+slack_notification_resource = slack_notification(
+    Identifier("slack-notification"), url="(( grizzly.slack_url ))"
+)
 
 cortex_alert_rules = ssh_git_repo(
     Identifier("cortex-alert-rules"),
@@ -133,10 +135,30 @@ commit_managed_dashboards_job = Job(
             put=grafana_dashboards.name, params={"repository": grafana_dashboards.name}
         ),
     ],
-    on_error=notification(slack_notification_resource, "Grafana Pipeline Error", "Error commiting managed dashboards to GitHub", alert_type="errored"),
-    on_failure=notification(slack_notification_resource, "Grafana Pipeline Failure", "Failure commiting managed dashboards to GitHub", alert_type="failed"),
-    on_abort=notification(slack_notification_resource, "Grafana Pipeline Aborted", "User Aborted Pipeline during commiting managed dashboards to GitHub", alert_type="aborted"),
-    on_success=notification(slack_notification_resource, "Grafana Pipeline Activity", "Managed dashboards successfully committed to GitHub.", alert_type="success"),
+    on_error=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Error",
+        "Error commiting managed dashboards to GitHub",
+        alert_type="errored",
+    ),
+    on_failure=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Failure",
+        "Failure commiting managed dashboards to GitHub",
+        alert_type="failed",
+    ),
+    on_abort=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Aborted",
+        "User Aborted Pipeline during commiting managed dashboards to GitHub",
+        alert_type="aborted",
+    ),
+    on_success=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Activity",
+        "Managed dashboards successfully committed to GitHub.",
+        alert_type="success",
+    ),
 )
 
 apply_dashboards_to_qa_job = Job(
@@ -166,10 +188,30 @@ apply_dashboards_to_qa_job = Job(
             ),
         ),
     ],
-    on_error=notification(slack_notification_resource, "Grafana Pipeline Error", "Error applying managed dashboards to QA", alert_type="errored"),
-    on_failure=notification(slack_notification_resource, "Grafana Pipeline Failure", "Failure applying managed dashboards to QA", alert_type="failed"),
-    on_abort=notification(slack_notification_resource, "Grafana Pipeline Aborted", "User Aborted Pipeline during applying managed dashboards to QA", alert_type="aborted"),
-    on_success=notification(slack_notification_resource, "Grafana Pipeline Activity", "Managed dashboards successfully applied to QA", alert_type="success"),
+    on_error=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Error",
+        "Error applying managed dashboards to QA",
+        alert_type="errored",
+    ),
+    on_failure=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Failure",
+        "Failure applying managed dashboards to QA",
+        alert_type="failed",
+    ),
+    on_abort=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Aborted",
+        "User Aborted Pipeline during applying managed dashboards to QA",
+        alert_type="aborted",
+    ),
+    on_success=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Activity",
+        "Managed dashboards successfully applied to QA",
+        alert_type="success",
+    ),
 )
 
 apply_dashboards_to_production_job = Job(
@@ -199,10 +241,30 @@ apply_dashboards_to_production_job = Job(
             ),
         ),
     ],
-    on_error=notification(slack_notification_resource, "Grafana Pipeline Error", "Error applying managed dashboards to Production", alert_type="errored"),
-    on_failure=notification(slack_notification_resource, "Grafana Pipeline Failure", "Failure applying managed dashboards to Production", alert_type="failed"),
-    on_abort=notification(slack_notification_resource, "Grafana Pipeline Aborted", "User Aborted Pipeline during applying managed dashboards to Production", alert_type="aborted"),
-    on_success=notification(slack_notification_resource, "Grafana Pipeline Activity", "Managed dashboards successfully applied to Production", alert_type="success"),
+    on_error=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Error",
+        "Error applying managed dashboards to Production",
+        alert_type="errored",
+    ),
+    on_failure=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Failure",
+        "Failure applying managed dashboards to Production",
+        alert_type="failed",
+    ),
+    on_abort=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Aborted",
+        "User Aborted Pipeline during applying managed dashboards to Production",
+        alert_type="aborted",
+    ),
+    on_success=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Activity",
+        "Managed dashboards successfully applied to Production",
+        alert_type="success",
+    ),
 )
 
 dashboards_combined_fragment = PipelineFragment(
@@ -270,9 +332,24 @@ for tool in ["loki", "cortex", "alertmanager"]:  # noqa: WPS335
                     ),
                 ),
             ],
-            on_error=notification(slack_notification_resource, "Grafana Pipeline Error", f"Error linting {tool} configs", alert_type="errored"),
-            on_failure=notification(slack_notification_resource, "Grafana Pipeline Failure", f"Failure linting {tool} configs", alert_type="failed"),
-            on_abort=notification(slack_notification_resource, "Grafana Pipeline Aborted", f"User Aborted Pipeline during linting {tool} configs", alert_type="aborted"),
+            on_error=notification(
+                slack_notification_resource,
+                "Grafana Pipeline Error",
+                f"Error linting {tool} configs",
+                alert_type="errored",
+            ),
+            on_failure=notification(
+                slack_notification_resource,
+                "Grafana Pipeline Failure",
+                f"Failure linting {tool} configs",
+                alert_type="failed",
+            ),
+            on_abort=notification(
+                slack_notification_resource,
+                "Grafana Pipeline Aborted",
+                f"User Aborted Pipeline during linting {tool} configs",
+                alert_type="aborted",
+            ),
         )
         alerting_jobs.append(linter_job)
     else:
@@ -336,15 +413,35 @@ for tool in ["loki", "cortex", "alertmanager"]:  # noqa: WPS335
                     ),
                 ),
             ],
-            on_error=notification(slack_notification_resource, "Grafana Pipeline Error", f"Error syncing {tool} configs in {stage}", alert_type="errored"),
-            on_failure=notification(slack_notification_resource, "Grafana Pipeline Failure", f"Failure syncing {tool} configs {stage}", alert_type="failed"),
-            on_abort=notification(slack_notification_resource, "Grafana Pipeline Aborted", f"User Aborted Pipeline during syncing {tool} configs in {stage}", alert_type="aborted"),
+            on_error=notification(
+                slack_notification_resource,
+                "Grafana Pipeline Error",
+                f"Error syncing {tool} configs in {stage}",
+                alert_type="errored",
+            ),
+            on_failure=notification(
+                slack_notification_resource,
+                "Grafana Pipeline Failure",
+                f"Failure syncing {tool} configs {stage}",
+                alert_type="failed",
+            ),
+            on_abort=notification(
+                slack_notification_resource,
+                "Grafana Pipeline Aborted",
+                f"User Aborted Pipeline during syncing {tool} configs in {stage}",
+                alert_type="aborted",
+            ),
         )
         alerting_jobs.append(sync_job)
 
 alerting_combined_fragment = PipelineFragment(
     resource_types=[snr_type()],
-    resources=[cortex_alert_rules, loki_alert_rules, alertmanager_config, slack_notification_resource],
+    resources=[
+        cortex_alert_rules,
+        loki_alert_rules,
+        alertmanager_config,
+        slack_notification_resource,
+    ],
     jobs=alerting_jobs,
 )
 
