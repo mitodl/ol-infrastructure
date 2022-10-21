@@ -134,6 +134,7 @@
   "/24-262S04": "307|keep|https://{{AK_HOSTHEADER}}/courses/linguistics-and-philosophy/24-262-feeling-and-imagination-in-art-science-and-technology-spring-2004/",
   "/24-264F05": "307|keep|https://{{AK_HOSTHEADER}}/courses/linguistics-and-philosophy/24-264-film-as-visual-and-literary-mythmaking-fall-2005/",
   "/24-729F05": "307|keep|https://{{AK_HOSTHEADER}}/courses/linguistics-and-philosophy/24-729-topics-in-philosophy-of-language-vagueness-fall-2005/",
+  "/24-908S17": "307|keep|https://{{AK_HOSTHEADER}}/courses/24-908-creole-languages-and-caribbean-identities-spring-2017/",
   "/24-912S17": "307|discard|https://{{AK_HOSTHEADER}}/courses/linguistics-and-philosophy/24-912-black-matters-introduction-to-black-studies-spring-2017/",
   "/3-021JS12": "307|keep|https://{{AK_HOSTHEADER}}/courses/materials-science-and-engineering/3-021j-introduction-to-modeling-and-simulation-spring-2012/",
   "/3-054S14": "307|discard|https://{{AK_HOSTHEADER}}/courses/materials-science-and-engineering/3-054-cellular-solids-structure-properties-and-applications-spring-2015/",
@@ -469,5 +470,5 @@
   "/courses/environment-courses": "307|keep|https://{{AK_HOSTHEADER}}/collections/environment/",
   "/courses/intro-programming": "307|keep|https://{{AK_HOSTHEADER}}/collections/introductory-programming/",
   "/courses/transportation-courses": "307|keep|https://{{AK_HOSTHEADER}}/collections/transportation/",
-  "/fairuse": "301|keep|https://mitocw.zendesk.com/hc/en-us/articles/4414756181403-How-is-all-rights-reserved-content-different-from-the-rest-of-OCW-content/"
+  "/fairuse": "301|keep|https://mitocw.zendesk.com/hc/en-us/articles/4414756181403-How-is-all-rights-reserved-content-different-from-the-rest-of-OCW-content/",
 }
