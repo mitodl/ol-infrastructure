@@ -56,3 +56,12 @@ def pulumi_provisioner_resource() -> ResourceType:
         type=REGISTRY_IMAGE,
         source=RegistryImage(repository="mitodl/concourse-pulumi-resource-provisioner"),
     )
+
+# https://github.com/arbourd/concourse-slack-alert-resource
+# We use only a very basic implementation of this notification framework
+def slack_notification_resource() -> ResourceType:
+    return ResourceType(
+        name=Identifier("slack-notification"),
+        type=REGISTRY_IMAGE,
+        source=RegistryImage(repository="arbourd/concourse-slack-alert-resource", tag="v0.15.0")
+    )
