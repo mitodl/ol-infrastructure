@@ -292,6 +292,7 @@
   "/ESD-290S05": "307|keep|https://{{AK_HOSTHEADER}}/courses/engineering-systems-division/esd-290-special-topics-in-supply-chain-management-spring-2005/",
   "/ESD-932S06": "307|keep|https://{{AK_HOSTHEADER}}/courses/engineering-systems-division/esd-932-engineering-ethics-spring-2006/",
   "/ESD-S43S14": "307|keep|https://{{AK_HOSTHEADER}}/courses/engineering-systems-division/esd-s43-green-supply-chain-management-spring-2014/",
+  "/highlights-of-calculus": "307|keep|https://{{AK_HOSTHEADER}}/courses/res-18-005-highlights-of-calculus-spring-2010/",
   "/HST-725S04": "307|keep|https://{{AK_HOSTHEADER}}/courses/health-sciences-and-technology/hst-725-music-perception-and-cognition-spring-2009/",
   "/HST-931S09": "302|keep|https://{{AK_HOSTHEADER}}/courses/health-sciences-and-technology/hst-921-information-technology-in-the-health-care-system-of-the-future-spring-2009/",
   "/HST-S14S12": "307|keep|https://{{AK_HOSTHEADER}}/courses/health-sciences-and-technology/hst-s14-health-information-systems-to-improve-quality-of-care-in-resource-poor-settings-spring-2012/",
