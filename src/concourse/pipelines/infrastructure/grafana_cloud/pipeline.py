@@ -38,7 +38,7 @@ loki_alert_rules = ssh_git_repo(
 )
 
 slack_notification_resource = slack_notification(
-    Identifier("slack-notification"), url="(( grizzly.slack_url ))"
+    Identifier("slack-notification"), url="((grizzly.slack_url))"
 )
 
 cortex_alert_rules = ssh_git_repo(
@@ -152,12 +152,6 @@ commit_managed_dashboards_job = Job(
         "Grafana Pipeline Aborted",
         "User Aborted Pipeline during commiting managed dashboards to GitHub",
         alert_type="aborted",
-    ),
-    on_success=notification(
-        slack_notification_resource,
-        "Grafana Pipeline Activity",
-        "Managed dashboards successfully committed to GitHub.",
-        alert_type="success",
     ),
 )
 
@@ -430,6 +424,12 @@ for tool in ["loki", "cortex", "alertmanager"]:  # noqa: WPS335
                 "Grafana Pipeline Aborted",
                 f"User Aborted Pipeline during syncing {tool} configs in {stage}",
                 alert_type="aborted",
+            ),
+            on_success=notification(
+                slack_notification_resource,
+                "Grafana Pipeline Activity",
+                f"Sync complete for {tool} configs to {stage}.",
+                alert_type="success",
             ),
         )
         alerting_jobs.append(sync_job)
