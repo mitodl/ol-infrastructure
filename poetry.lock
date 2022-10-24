@@ -1204,7 +1204,7 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-fastly"
-version = "5.0.1"
+version = "5.1.0"
 description = "A Pulumi package for creating and managing fastly cloud resources."
 category = "main"
 optional = false
@@ -1813,7 +1813,7 @@ typing_extensions = ">=4.0,<5.0"
 type = "git"
 url = "https://github.com/wemake-services/wemake-python-styleguide"
 reference = "HEAD"
-resolved_reference = "44339d67b89faa2c5ae94226e19b50187f47075f"
+resolved_reference = "f2fd9bb5e882aa9c778080579fe3085219e918ed"
 
 [[package]]
 name = "xmltodict"
@@ -1857,7 +1857,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "c83cf9ac216905a7996f161d69d4b204a0edbf85569e19e17850bd0971ac9630"
+content-hash = "12b0bd108b80502e333defeaf5625ca99a91551e70f18c4ec2eeab1a67cc25ca"
 
 [metadata.files]
 anyio = [
@@ -2603,7 +2603,7 @@ pulumi-consul = [
     {file = "pulumi_consul-3.7.0.tar.gz", hash = "sha256:e8c5453f1a8be544f610a154401c910daebd9a87d664a34cc7defe0851f9ffd6"},
 ]
 pulumi-fastly = [
-    {file = "pulumi_fastly-5.0.1.tar.gz", hash = "sha256:cdd7e3ca8419d9e58b5bc52e2594a7e230c09e83a1e14ed26a98804969affe91"},
+    {file = "pulumi_fastly-5.1.0.tar.gz", hash = "sha256:4903a564152000fc9f7cdb0b2308f63f3ca89b2829fd17beecf936e496e5c681"},
 ]
 pulumi-github = [
     {file = "pulumi_github-5.0.0.tar.gz", hash = "sha256:2aa12442c713ee5339280af0ece00b928f6923bf3c19c0a5961252791585be75"},
