@@ -40,7 +40,7 @@ def db_replication_pipeline() -> Pipeline:
                         path="/bin/sh",
                         args=[
                             "-c",
-                            "pg_dump -Fc -d ((source.database)) > ./dump/db.dump",
+                            "pg_dump -v -Fc -d ((source.database)) > ./dump/db.dump",
                         ],
                     ),
                 ),
@@ -62,7 +62,7 @@ def db_replication_pipeline() -> Pipeline:
                         path="/bin/sh",
                         args=[
                             "-c",
-                            "pg_restore --clean --no-privileges --no-owner -d ((destination.database)) ./dump/db.dump",
+                            "pg_restore -v --clean --no-privileges --no-owner -d ((destination.database)) ./dump/db.dump",
                         ],
                     ),
                 ),
