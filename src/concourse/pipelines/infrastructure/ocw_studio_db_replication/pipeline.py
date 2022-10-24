@@ -80,5 +80,5 @@ if __name__ == "__main__":
     sys.stdout.write(db_replication_pipeline().json(indent=2))
     sys.stdout.write("\n")
     sys.stdout.write(
-        "fly -t local set-pipeline -p ocw-studio-db-replication -c definition.json\n"
+        "fly -t qa-ocw set-pipeline -p ocw-studio-db-replication -c definition.json\n"
     )
