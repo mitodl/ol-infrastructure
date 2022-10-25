@@ -4,26 +4,13 @@ from bridge.settings.openedx.version_matrix import (
     DeploymentEnvRelease,
     OpenEdxBranchMap,
     OpenLearningOpenEdxDeployment,
+    filter_deployments_by_release,
 )
 from concourse.lib.constants import PULUMI_CODE_PATH
 from concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from concourse.lib.models.fragment import PipelineFragment
 from concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from concourse.lib.resources import git_repo
-
-
-def filter_deployments_by_release(
-    release: str, env_deployments: list[DeploymentEnvRelease]
-) -> list[DeploymentEnvRelease]:
-    filtered_deployments = []
-    for deployment in env_deployments:
-        release_match = False
-        for env_tuple in deployment.value.env_release_map:
-            if release == env_tuple.edx_release:
-                release_match = True
-        if release_match:
-            filtered_deployments.append(deployment)
-    return filtered_deployments
 
 
 def build_edx_pipeline(
@@ -43,6 +30,7 @@ def build_edx_pipeline(
             "pipelines/infrastructure/scripts/",
             "src/ol_infrastructure/components/",
             "src/bridge/secrets/edx/",
+            "src/bridge/settings/openedx/",
         ],
     )
 
@@ -50,6 +38,7 @@ def build_edx_pipeline(
         name=Identifier("edxapp-base-code"),
         uri="https://github.com/mitodl/ol-infrastructure",
         paths=[
+            "src/bridge/settings/openedx/",
             "src/bilder/images/edxapp/prebuild.py",
             "src/bilder/images/edxapp/edxapp_base.pkr.hcl",
             f"src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl",  # noqa: E501
@@ -79,6 +68,7 @@ def build_edx_pipeline(
             ),
             uri="https://github.com/mitodl/ol-infrastructure",
             paths=[
+                "src/bridge/settings/openedx/",
                 "src/bilder/components/",
                 "src/bilder/images/edxapp/deploy.py",
                 "src/bilder/images/edxapp/group_data/",

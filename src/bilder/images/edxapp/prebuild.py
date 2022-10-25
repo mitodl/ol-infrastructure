@@ -1,12 +1,15 @@
 import json
-import os
 import tempfile
 
-from pyinfra import host
 from pyinfra.operations import apt, files, git, server
 
 from bilder.components.baseline.steps import install_baseline_packages
-from bilder.images.edxapp.lib import WEB_NODE_TYPE, node_type
+from bilder.images.edxapp.lib import EDX_RELEASE, WEB_NODE_TYPE, node_type
+from bridge.settings.openedx.version_matrix import (
+    OpenEdxApplication,
+    fetch_application_version,
+    filter_deployments_by_release,
+)
 
 EDX_USER = "edxapp"
 
@@ -49,18 +52,16 @@ if node_type == WEB_NODE_TYPE:
         group=EDX_USER,
         present=True,
     )
-    for deployment, config in host.data.edx_themes.items():
-        theme_branch = os.environ.get("EDX_RELEASE_NAME", config["branch"])
-        if theme_branch == "master":
-            # We need to remap the branch name because we use `main` as the name of our
-            # default branches.
-            theme_branch = "main"
+    for deployment in filter_deployments_by_release(EDX_RELEASE):
+        theme = fetch_application_version(
+            EDX_RELEASE, deployment, OpenEdxApplication.theme
+        )
         git.repo(
             name="Load theme repository",
-            src=config["repository"],
+            src=theme.git_origin,
             # Using a generic directory to simplify usage across deployments
             dest=f"/edx/app/edxapp/themes/{deployment}",
-            branch=theme_branch,
+            branch=theme.release_branch,
             user=EDX_USER,
             group=EDX_USER,
         )

@@ -12,6 +12,7 @@ class OpenEdxApplication(Enum):
     notes = "notes-api"
     xqueue = "xqueue"
     xqueue_watcher = "xqueue-watcher"
+    theme = "edxapp_theme"
 
 
 class OpenEdxMicroFrontend(Enum):
@@ -136,6 +137,13 @@ ReleaseMap: dict[  # noqa: WPS234
                 release_name="olive",
             ),
             OpenEdxApplicationVersion(
+                application_name="edxapp_theme",  # type: ignore
+                application_type="IDA",
+                release_name="olive",
+                branch_override="olive",
+                origin_override="https://github.com/mitodl/mitx-theme",
+            ),
+            OpenEdxApplicationVersion(
                 application_name="forum",  # type: ignore
                 application_type="IDA",
                 release_name="olive",
@@ -168,6 +176,13 @@ ReleaseMap: dict[  # noqa: WPS234
                 release_name="olive",
             ),
             OpenEdxApplicationVersion(
+                application_name="edxapp_theme",  # type: ignore
+                application_type="IDA",
+                release_name="olive",
+                branch_override="olive",
+                origin_override="https://github.com/mitodl/mitx-theme",
+            ),
+            OpenEdxApplicationVersion(
                 application_name="forum",  # type: ignore
                 application_type="IDA",
                 release_name="olive",
@@ -193,19 +208,21 @@ ReleaseMap: dict[  # noqa: WPS234
                 release_name="olive",
             ),
         ],
-        OpenLearningOpenEdxDeployment.mitx: [
+        OpenLearningOpenEdxDeployment.xpro: [
             OpenEdxApplicationVersion(
                 application_name="edx-platform",  # type: ignore
                 application_type="IDA",
                 release_name="olive",
             ),
             OpenEdxApplicationVersion(
-                application_name="forum",  # type: ignore
+                application_name="edxapp_theme",  # type: ignore
                 application_type="IDA",
                 release_name="olive",
+                branch_override="olive",
+                origin_override="https://github.com/mitodl/mitxpro-theme",
             ),
             OpenEdxApplicationVersion(
-                application_name="xqueue",  # type: ignore
+                application_name="forum",  # type: ignore
                 application_type="IDA",
                 release_name="olive",
             ),
@@ -219,18 +236,137 @@ ReleaseMap: dict[  # noqa: WPS234
                 application_type="MFE",
                 release_name="olive",
             ),
+        ],
+    },
+    "nutmeg": {
+        OpenLearningOpenEdxDeployment.mitx: [
+            OpenEdxApplicationVersion(
+                application_name="edx-platform",  # type: ignore
+                application_type="IDA",
+                release_name="nutmeg",
+                branch_override="mitx/nutmeg",
+                origin_override="https://github.com/mitodl/edx-platform",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="edxapp_theme",  # type: ignore
+                application_type="IDA",
+                release_name="nutmeg",
+                branch_override="nutmeg",
+                origin_override="https://github.com/mitodl/mitx-theme",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="forum",  # type: ignore
+                application_type="IDA",
+                release_name="nutmeg",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="xqueue",  # type: ignore
+                application_type="IDA",
+                release_name="nutmeg",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="learn",  # type: ignore
+                application_type="MFE",
+                release_name="nutmeg",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="gradebook",  # type: ignore
+                application_type="MFE",
+                release_name="nutmeg",
+            ),
             OpenEdxApplicationVersion(
                 application_name="course-authoring",  # type: ignore
                 application_type="MFE",
-                release_name="olive",
+                release_name="nutmeg",
             ),
         ],
+        OpenLearningOpenEdxDeployment.mitx_staging: [
+            OpenEdxApplicationVersion(
+                application_name="edx-platform",  # type: ignore
+                application_type="IDA",
+                release_name="nutmeg",
+                branch_override="mitx/nutmeg",
+                origin_override="https://github.com/mitodl/edx-platform",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="edxapp_theme",  # type: ignore
+                application_type="IDA",
+                release_name="nutmeg",
+                branch_override="nutmeg",
+                origin_override="https://github.com/mitodl/mitx-theme",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="forum",  # type: ignore
+                application_type="IDA",
+                release_name="nutmeg",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="xqueue",  # type: ignore
+                application_type="IDA",
+                release_name="nutmeg",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="learn",  # type: ignore
+                application_type="MFE",
+                release_name="nutmeg",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="gradebook",  # type: ignore
+                application_type="MFE",
+                release_name="nutmeg",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="course-authoring",  # type: ignore
+                application_type="MFE",
+                release_name="nutmeg",
+            ),
+        ],
+    },
+    "maple": {
+        OpenLearningOpenEdxDeployment.xpro: [
+            OpenEdxApplicationVersion(
+                application_name="edx-platform",  # type: ignore
+                application_type="IDA",
+                release_name="maple",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="edxapp_theme",  # type: ignore
+                application_type="IDA",
+                release_name="maple",
+                branch_override="maple",
+                origin_override="https://github.com/mitodl/mitxpro-theme",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="forum",  # type: ignore
+                application_type="IDA",
+                release_name="maple",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="learn",  # type: ignore
+                application_type="MFE",
+                release_name="maple",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="gradebook",  # type: ignore
+                application_type="MFE",
+                release_name="maple",
+            ),
+        ],
+    },
+    "master": {
         OpenLearningOpenEdxDeployment.mitxonline: [
             OpenEdxApplicationVersion(
                 application_name="edx-platform",  # type: ignore
                 application_type="IDA",
                 release_name="master",
                 branch_override="release",
+            ),
+            OpenEdxApplicationVersion(
+                application_name="edxapp_theme",  # type: ignore
+                application_type="IDA",
+                release_name="master",
+                branch_override="main",
+                origin_override="https://github.com/mitodl/mitxonline-theme",
             ),
             OpenEdxApplicationVersion(
                 application_name="forum",  # type: ignore
@@ -250,27 +386,30 @@ ReleaseMap: dict[  # noqa: WPS234
                 release_name="master",
             ),
         ],
-        OpenLearningOpenEdxDeployment.xpro: [
-            OpenEdxApplicationVersion(
-                application_name="edx-platform",  # type: ignore
-                application_type="IDA",
-                release_name="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application_name="forum",  # type: ignore
-                application_type="IDA",
-                release_name="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application_name="learn",  # type: ignore
-                application_type="MFE",
-                release_name="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application_name="gradebook",  # type: ignore
-                application_type="MFE",
-                release_name="olive",
-            ),
-        ],
-    }
+    },
 }
+
+
+def fetch_application_version(
+    release_name: OpenEdxSupportedRelease,
+    deployment: OpenLearningOpenEdxDeployment,
+    application_name: Union[OpenEdxApplication, OpenEdxMicroFrontend],
+) -> Optional[OpenEdxApplicationVersion]:
+    app_versions = ReleaseMap[release_name][deployment]
+    fetched_app_version = None
+    for app_version in app_versions:
+        if app_version.application_name == application_name:
+            fetched_app_version = app_version
+    return fetched_app_version
+
+
+def filter_deployments_by_release(release: str) -> list[DeploymentEnvRelease]:
+    filtered_deployments = []
+    for deployment in OpenLearningOpenEdxDeployment:
+        release_match = False
+        for env_tuple in deployment.value.env_release_map:
+            if release == env_tuple.edx_release:
+                release_match = True
+        if release_match:
+            filtered_deployments.append(deployment.value)
+    return filtered_deployments
