@@ -371,7 +371,7 @@
   "/courses/chemistry/5-72-statistical-mechanics-spring-2012": "307|keep|https://{{AK_HOSTHEADER}}/courses/chemistry/5-72-non-equilibrium-statistical-mechanics-spring-2012/",
   "/courses/civil-and-environmental-engineering": "307|discard|https://{{AK_HOSTHEADER}}/search/?d=Civil%20and%20Environmental%20Engineering&s=department_course_numbers.sort_coursenum",
   "/courses/civil-and-environmental-engineering/1-203j-logistical-and-transportation-planning-methods-fall-2004": "307|discard|https://{{AK_HOSTHEADER}}/courses/civil-and-environmental-engineering/1-203j-logistical-and-transportation-planning-methods-fall-2006/",
-  "/courses/comparative-media-studies-writing/": "307|discard|https://{{AK_HOSTHEADER}}/search/?d=Comparative%20Media%20Studies%2FWriting&s=department_course_numbers.sort_coursenum",
+  "/courses/comparative-media-studies-writing": "307|keep|https://{{AK_HOSTHEADER}}/search/?d=Comparative%20Media%20Studies%2FWriting",
   "/courses/comparative-media-studies-writing/21w-749-documentary-photography-and-photojournalism-still-images-of-a-world-in-motion-spring-2009": "307|discard|https://{{AK_HOSTHEADER}}/courses/comparative-media-studies-writing/21w-749-documentary-photography-and-photojournalism-still-images-of-a-world-in-motion-spring-2016/",
   "/courses/concourse": "307|discard|https://{{AK_HOSTHEADER}}/search/?d=Concourse&s=department_course_numbers.sort_coursenum",
   "/courses/curriculum-map": "307|keep|https://{{AK_HOSTHEADER}}/courses/mit-curriculum-guide/",
@@ -471,6 +471,5 @@
   "/courses/environment-courses": "307|keep|https://{{AK_HOSTHEADER}}/collections/environment/",
   "/courses/intro-programming": "307|keep|https://{{AK_HOSTHEADER}}/collections/introductory-programming/",
   "/courses/transportation-courses": "307|keep|https://{{AK_HOSTHEADER}}/collections/transportation/",
-  "/courses/comparative-media-studies-writing/": "301|keep|https://mitocw.zendesk.com/hc/en-us/articles/4414756181403-How-is-all-rights-reserved-content-different-from-the-rest-of-OCW-content/",
-  "/fairuse": "301|keep|https://mitocw.zendesk.com/hc/en-us/articles/4414756181403-How-is-all-rights-reserved-content-different-from-the-rest-of-OCW-content/",
+  "/fairuse": "301|keep|https://mitocw.zendesk.com/hc/en-us/articles/4414756181403-How-is-all-rights-reserved-content-different-from-the-rest-of-OCW-content/"
 }
