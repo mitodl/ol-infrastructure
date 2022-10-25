@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 
 from pyinfra import host
@@ -49,12 +50,17 @@ if node_type == WEB_NODE_TYPE:
         present=True,
     )
     for deployment, config in host.data.edx_themes.items():
+        theme_branch = os.environ.get("EDX_RELEASE_NAME", config["branch"])
+        if theme_branch == "master":
+            # We need to remap the branch name because we use `main` as the name of our
+            # default branches.
+            theme_branch = "main"
         git.repo(
             name="Load theme repository",
             src=config["repository"],
             # Using a generic directory to simplify usage across deployments
             dest=f"/edx/app/edxapp/themes/{deployment}",
-            branch=config["branch"],
+            branch=theme_branch,
             user=EDX_USER,
             group=EDX_USER,
         )
