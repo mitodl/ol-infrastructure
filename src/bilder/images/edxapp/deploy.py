@@ -49,11 +49,15 @@ from bilder.components.vector.steps import (
     vector_service,
 )
 from bilder.facts.has_systemd import HasSystemd
-from bilder.images.edxapp.lib import WEB_NODE_TYPE, node_type
+from bilder.images.edxapp.lib import EDX_RELEASE, WEB_NODE_TYPE, node_type
 from bilder.images.edxapp.plugins.git_export_import import git_auto_export
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
+from bridge.settings.openedx.version_matrix import (
+    OpenEdxApplication,
+    fetch_application_version,
+)
 
 VERSIONS = {  # noqa: WPS407
     "consul": CONSUL_VERSION,
@@ -76,13 +80,8 @@ apt.packages(
 ###########
 # Check out desired repository and branch for edx-platform. This lets us manage our
 # custom code without having to bake it into the base image.
-git_remote = os.environ.get(
-    "EDXAPP_RELEASE_REPO",
-    host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["origin"],
-)
-git_branch = os.environ.get(
-    "EDXAPP_RELEASE_BRANCH",
-    host.data.edx_platform_repository[EDX_INSTALLATION_NAME]["branch"],
+edx_version = fetch_application_version(
+    EDX_RELEASE, EDX_INSTALLATION_NAME, OpenEdxApplication.edxapp
 )
 edx_platform_path = "/edx/app/edxapp/edx-platform/"
 server.shell(
@@ -93,14 +92,17 @@ server.shell(
 
 server.shell(
     name="Ensure the edx-platform git origin is configured",
-    commands=[f"git remote add custom {git_remote}", "git fetch --all --prune --tags"],
+    commands=[
+        f"git remote add custom {edx_version.git_origin}",
+        "git fetch --all --prune --tags",
+    ],
     _chdir=edx_platform_path,
 )
 git.repo(
     name="Check out the desired branch",
-    src=git_remote,
+    src=edx_version.git_origin,
     dest=edx_platform_path,
-    branch=git_branch,
+    branch=edx_version.release_branch,
     pull=False,
     user=EDX_USER,
     group=EDX_USER,
@@ -413,7 +415,7 @@ if host.get_fact(HasSystemd):
         start_now=False,
     )
 
-if "mitodl" in git_remote and node_type == WEB_NODE_TYPE:
+if "mitodl" in edx_version.git_origin and node_type == WEB_NODE_TYPE:
     # Recompile static assets to ensure that any JS tweaks are rendered at runtime.
     server.shell(
         name="Compile static assets for Canvas integration",
