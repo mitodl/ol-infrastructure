@@ -346,7 +346,7 @@ def cloud_init_userdata(
             },
             {
                 "path": "/etc/traefik/.htpasswd",
-                "content": f"pulumi:{hashed_password.decode('utf-8')}\n",
+                "content": f"pulumi:{hashed_password.decode('utf-8')}\n",  # noqa: WPS237
                 "owner": "traefik:traefik",
                 "permissions": "0600",
             },

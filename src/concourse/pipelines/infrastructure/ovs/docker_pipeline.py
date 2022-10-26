@@ -1,5 +1,7 @@
+import sys
+
 from concourse.lib.constants import REGISTRY_IMAGE
-from concourse.lib.models.pipeline import (
+from concourse.lib.models.pipeline import (  # noqa: WPS235
     AnonymousResource,
     Command,
     GetStep,
@@ -77,10 +79,9 @@ def docker_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    import sys
-
     with open("definition.json", "w") as definition:
         definition.write(docker_pipeline().json(indent=2))
     sys.stdout.write(docker_pipeline().json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p docker-ovs-image -c definition.json")
+    sys.stdout.writelines(
+        ("\n", "fly -t pr-inf sp -p docker-ovs-image -c definition.json")
+    )

@@ -1,5 +1,5 @@
 from concourse.lib.constants import REGISTRY_IMAGE
-from concourse.lib.models.pipeline import (
+from concourse.lib.models.pipeline import (  # noqa: WPS235
     AnonymousResource,
     Command,
     Identifier,
@@ -62,7 +62,7 @@ def db_replication_pipeline() -> Pipeline:
                         path="/bin/sh",
                         args=[
                             "-c",
-                            "pg_restore -v --clean --no-privileges --no-owner -d ((destination.database)) ./dump/db.dump",
+                            "pg_restore -v --clean --no-privileges --no-owner -d ((destination.database)) ./dump/db.dump",  # noqa: E501
                         ],
                     ),
                 ),

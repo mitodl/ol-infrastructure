@@ -1,3 +1,5 @@
+import sys
+
 from concourse.lib.constants import PULUMI_CODE_PATH
 from concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from concourse.lib.models.fragment import PipelineFragment
@@ -76,10 +78,9 @@ codejail_pipeline = Pipeline(
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
-
     with open("definition.json", "w") as definition:
         definition.write(codejail_pipeline.json(indent=2))
     sys.stdout.write(codejail_pipeline.json(indent=2))
-    print()  # noqa: WPS421
-    print("fly -t pr-inf sp -p packer-pulumi-codejail -c definition.json")
+    sys.stdout.writelines(
+        ("\n", "fly -t pr-inf sp -p packer-pulumi-codejail -c definition.json")
+    )
