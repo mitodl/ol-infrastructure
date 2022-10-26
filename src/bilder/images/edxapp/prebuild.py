@@ -54,13 +54,13 @@ if node_type == WEB_NODE_TYPE:
     )
     for deployment in filter_deployments_by_release(EDX_RELEASE):
         theme = fetch_application_version(
-            EDX_RELEASE, deployment, OpenEdxApplication.theme
+            EDX_RELEASE, deployment.deployment_name, OpenEdxApplication.theme
         )
         git.repo(
             name="Load theme repository",
             src=theme.git_origin,
             # Using a generic directory to simplify usage across deployments
-            dest=f"/edx/app/edxapp/themes/{deployment}",
+            dest=f"/edx/app/edxapp/themes/{deployment.deployment_name}",
             branch=theme.release_branch,
             user=EDX_USER,
             group=EDX_USER,

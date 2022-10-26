@@ -127,10 +127,10 @@ class OpenEdxApplicationVersion(BaseModel):
 
 ReleaseMap: dict[  # noqa: WPS234
     OpenEdxSupportedRelease,
-    dict[OpenLearningOpenEdxDeployment, list[OpenEdxApplicationVersion]],
+    dict[DeploymentName, list[OpenEdxApplicationVersion]],
 ] = {
     "olive": {
-        OpenLearningOpenEdxDeployment.mitx: [
+        "mitx": [
             OpenEdxApplicationVersion(
                 application_name="edx-platform",  # type: ignore
                 application_type="IDA",
@@ -169,7 +169,7 @@ ReleaseMap: dict[  # noqa: WPS234
                 release_name="olive",
             ),
         ],
-        OpenLearningOpenEdxDeployment.mitx_staging: [
+        "mitx-staging": [
             OpenEdxApplicationVersion(
                 application_name="edx-platform",  # type: ignore
                 application_type="IDA",
@@ -208,7 +208,7 @@ ReleaseMap: dict[  # noqa: WPS234
                 release_name="olive",
             ),
         ],
-        OpenLearningOpenEdxDeployment.xpro: [
+        "xpro": [
             OpenEdxApplicationVersion(
                 application_name="edx-platform",  # type: ignore
                 application_type="IDA",
@@ -239,7 +239,7 @@ ReleaseMap: dict[  # noqa: WPS234
         ],
     },
     "nutmeg": {
-        OpenLearningOpenEdxDeployment.mitx: [
+        "mitx": [
             OpenEdxApplicationVersion(
                 application_name="edx-platform",  # type: ignore
                 application_type="IDA",
@@ -280,7 +280,7 @@ ReleaseMap: dict[  # noqa: WPS234
                 release_name="nutmeg",
             ),
         ],
-        OpenLearningOpenEdxDeployment.mitx_staging: [
+        "mitx-staging": [
             OpenEdxApplicationVersion(
                 application_name="edx-platform",  # type: ignore
                 application_type="IDA",
@@ -323,7 +323,7 @@ ReleaseMap: dict[  # noqa: WPS234
         ],
     },
     "maple": {
-        OpenLearningOpenEdxDeployment.xpro: [
+        "xpro": [
             OpenEdxApplicationVersion(
                 application_name="edx-platform",  # type: ignore
                 application_type="IDA",
@@ -354,7 +354,7 @@ ReleaseMap: dict[  # noqa: WPS234
         ],
     },
     "master": {
-        OpenLearningOpenEdxDeployment.mitxonline: [
+        "mitxonline": [
             OpenEdxApplicationVersion(
                 application_name="edx-platform",  # type: ignore
                 application_type="IDA",
@@ -395,7 +395,7 @@ def fetch_application_version(
     deployment: OpenLearningOpenEdxDeployment,
     application_name: Union[OpenEdxApplication, OpenEdxMicroFrontend],
 ) -> Optional[OpenEdxApplicationVersion]:
-    app_versions = ReleaseMap[release_name][deployment]
+    app_versions = ReleaseMap[release_name][deployment.value.deployment_name]
     fetched_app_version = None
     for app_version in app_versions:
         if app_version.application_name == application_name:
