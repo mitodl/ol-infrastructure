@@ -20,7 +20,7 @@ variable "edx_ansible_branch" {
 }
 
 variable "edx_release_name" {
-  type = string
+  type    = string
   default = "master"
 }
 
