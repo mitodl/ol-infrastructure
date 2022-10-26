@@ -131,6 +131,7 @@ build {
   provisioner "shell-local" {
     environment_vars = [
       "NODE_TYPE=${var.node_type}",
+      "EDX_RELEASE_NAME=${var.edx_platform_version}",
       "EDX_INSTALLATION=${var.installation_target}",
     ]
     inline = [
