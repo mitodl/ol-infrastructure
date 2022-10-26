@@ -63,9 +63,7 @@ def build_edx_pipeline(
     loop_fragments = []
     for deployment in filter_deployments_by_release(release_name):
         custom_image_code = git_repo(
-            name=Identifier(
-                f"edxapp-custom-image-{deployment.value.deployment_name}"  # noqa: E501, WPS237
-            ),
+            name=Identifier(f"edxapp-custom-image-{deployment.deployment_name}"),
             uri="https://github.com/mitodl/ol-infrastructure",
             paths=[
                 "src/bridge/settings/openedx/",
@@ -73,9 +71,9 @@ def build_edx_pipeline(
                 "src/bilder/images/edxapp/deploy.py",
                 "src/bilder/images/edxapp/group_data/",
                 "src/bilder/images/edxapp/templates/vector/",
-                f"src/bilder/images/edxapp/templates/edxapp/{deployment.value.deployment_name}/",  # noqa: E501, WPS237
+                f"src/bilder/images/edxapp/templates/edxapp/{deployment.deployment_name}/",  # noqa: E501
                 "src/bilder/images/edxapp/custom_install.pkr.hcl",
-                f"src/bilder/images/edxapp/packer_vars/{deployment.value.deployment_name}.pkrvars.hcl",  # noqa: E501, WPS237
+                f"src/bilder/images/edxapp/packer_vars/{deployment.deployment_name}.pkrvars.hcl",  # noqa: E501
             ],
         )
         loop_resources.append(custom_image_code)
@@ -95,18 +93,18 @@ def build_edx_pipeline(
                 "only": ["amazon-ebs.edxapp"],
                 "var_files": [
                     f"{custom_image_code.name}/src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl",  # noqa: E501
-                    f"{custom_image_code.name}/src/bilder/images/edxapp/packer_vars/{deployment.value.deployment_name}.pkrvars.hcl",  # noqa: E501, WPS237
+                    f"{custom_image_code.name}/src/bilder/images/edxapp/packer_vars/{deployment.deployment_name}.pkrvars.hcl",  # noqa: E501
                 ],
             },
-            job_name_suffix=deployment.value.deployment_name,
+            job_name_suffix=deployment.deployment_name,
         )
         loop_fragments.append(custom_ami_fragment)
 
         edx_pulumi_fragment = pulumi_jobs_chain(
             edx_pulumi_code,
             stack_names=[
-                f"applications.edxapp.{deployment.value.deployment_name}.{stage}"  # noqa: E501, WPS237
-                for stage in deployment.value.envs_by_release(release_name)
+                f"applications.edxapp.{deployment.deployment_name}.{stage}"  # noqa: E501
+                for stage in deployment.envs_by_release(release_name)
             ],
             project_name="ol-infrastructure-edxapp-application",
             project_source_path=PULUMI_CODE_PATH.joinpath("applications/edxapp/"),
@@ -151,6 +149,9 @@ if __name__ == "__main__":
     with open("definition.json", "w") as definition:
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)
-    sys.stdout.write(
-        f"fly -t <target> set-pipeline -p packer-pulumi-edxapp-{release_name} -c definition.json"  # noqa: E501
+    sys.stdout.writelines(
+        (
+            "\n",
+            f"fly -t <target> set-pipeline -p packer-pulumi-edxapp-{release_name} -c definition.json",
+        )
     )
