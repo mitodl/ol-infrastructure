@@ -292,9 +292,9 @@ for tool in ["loki", "cortex", "alertmanager"]:  # noqa: WPS335
             ] = f"((cortextool.cortex-amconfig-api-user-{stage}))"
             params["ENVIRONMENT_NAME"] = stage
         params["RULE_DIRECTORY"] = directory
-        passed_value = (
-            [] if tool == "alertmanager" and stage == "ci" else [alerting_jobs[-1].name]
-        )
+        passed_value = [alerting_jobs[-1].name]
+        if tool == "alertmanager" and stage == "ci":
+            passed_value = []
         sync_job = Job(
             name=job_name,
             plan=[

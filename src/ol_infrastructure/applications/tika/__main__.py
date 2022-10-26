@@ -232,8 +232,8 @@ lt_config = OLLaunchTemplateConfig(
                                     f"""\
                             DOMAIN={tika_config.require("web_host_domain")}
                             X_ACCESS_TOKEN={x_access_token}
-                            """
-                                ),  # noqa: WPS355
+                            """  # noqa: WPS237
+                                ),
                             },
                         ]
                     },

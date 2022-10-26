@@ -3,7 +3,7 @@ from pydantic import ValidationError
 
 from ol_infrastructure.lib.ol_types import AWSBase
 
-VALID_TAGS = {"OU": "operations", "Environment": "test"}
+VALID_TAGS = {"OU": "operations", "Environment": "test"}  # noqa: WPS407
 
 
 def test_tag_validation():
@@ -23,9 +23,13 @@ def test_region_validation():
 def test_merged_tags():
     base_config = AWSBase(tags=VALID_TAGS)
     new_tags = base_config.merged_tags({"Foo": "bar"})
-    assert new_tags == {"OU": "operations", "Environment": "test", "Foo": "bar"}
+    assert new_tags == {  # noqa: S101
+        "OU": "operations",
+        "Environment": "test",
+        "Foo": "bar",
+    }
 
 
 def test_pulumi_managed_tag():
     base_config = AWSBase(tags=VALID_TAGS)
-    assert base_config.tags.pop("pulumi_managed") == "true"
+    assert base_config.tags.pop("pulumi_managed") == "true"  # noqa: S101

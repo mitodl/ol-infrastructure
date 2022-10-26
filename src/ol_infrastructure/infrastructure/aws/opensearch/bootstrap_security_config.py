@@ -96,15 +96,30 @@ role_mappings = {
 
 for r_name, r_def in roles.items():
     url = f"https://{cluster['endpoint']}/_plugins/_security/api/roles/{r_name}"
-    response = requests.put(url, headers=headers, auth=auth, data=json.dumps(r_def))
+    response = requests.put(
+        url,
+        headers=headers,
+        auth=auth,
+        data=json.dumps(r_def),
+    )
     print(response.text)  # noqa: WPS421
 
 for u_name, u_def in users.items():
     url = f"https://{cluster['endpoint']}/_plugins/_security/api/internalusers/{u_name}"
-    response = requests.put(url, headers=headers, auth=auth, data=json.dumps(u_def))
+    response = requests.put(
+        url,
+        headers=headers,
+        auth=auth,
+        data=json.dumps(u_def),
+    )
     print(response.text)  # noqa: WPS421
 
 for r_name, rm in role_mappings.items():  # noqa: WPS440
     url = f"https://{cluster['endpoint']}/_plugins/_security/api/rolesmapping/{r_name}"
-    response = requests.put(url, headers=headers, auth=auth, data=json.dumps(rm))
+    response = requests.put(
+        url,
+        headers=headers,
+        auth=auth,
+        data=json.dumps(rm),
+    )
     print(response.text)  # noqa: WPS421
