@@ -392,10 +392,10 @@ ReleaseMap: dict[  # noqa: WPS234
 
 def fetch_application_version(
     release_name: OpenEdxSupportedRelease,
-    deployment: OpenLearningOpenEdxDeployment,
+    deployment: DeploymentName,
     application_name: Union[OpenEdxApplication, OpenEdxMicroFrontend],
 ) -> Optional[OpenEdxApplicationVersion]:
-    app_versions = ReleaseMap[release_name][deployment.value.deployment_name]
+    app_versions = ReleaseMap[release_name][deployment]
     fetched_app_version = None
     for app_version in app_versions:
         if app_version.application_name == application_name:
