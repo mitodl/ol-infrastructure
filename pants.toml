@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.14.0rc0"
+pants_version = "2.14.0"
 backend_packages = [
   'pants.backend.docker.lint.hadolint',
   'pants.backend.experimental.python',
