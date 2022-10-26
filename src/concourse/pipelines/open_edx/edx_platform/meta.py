@@ -1,5 +1,6 @@
 import sys
 
+from bridge.settings.openedx.version_matrix import OpenEdxBranchMap
 from concourse.lib.models.pipeline import (  # noqa: WPS235
     AnonymousResource,
     Command,
@@ -15,7 +16,6 @@ from concourse.lib.models.pipeline import (  # noqa: WPS235
     TaskStep,
 )
 from concourse.lib.resources import git_repo
-from concourse.pipelines.open_edx.edx_platform.pipeline_vars import SUPPORTED_RELEASES
 
 pipeline_code = git_repo(
     name=Identifier("edxapp-pipeline-code"),
@@ -76,7 +76,8 @@ def build_meta_job(release_name):
 
 
 meta_jobs = [
-    build_meta_job(release_name) for release_name in list(SUPPORTED_RELEASES) + ["meta"]
+    build_meta_job(release_name)
+    for release_name in list(OpenEdxBranchMap.keys()) + ["meta"]
 ]
 
 meta_pipeline = Pipeline(resources=[pipeline_code], jobs=meta_jobs)
