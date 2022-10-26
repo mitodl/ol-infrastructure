@@ -61,7 +61,7 @@ def build_edx_pipeline(
 
     loop_resources = []
     loop_fragments = []
-    for deployment in filter_deployments_by_release(release_name, edx_deployments):
+    for deployment in filter_deployments_by_release(release_name):
         custom_image_code = git_repo(
             name=Identifier(
                 f"edxapp-custom-image-{deployment.value.deployment_name}"  # noqa: E501, WPS237
