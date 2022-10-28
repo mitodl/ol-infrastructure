@@ -67,6 +67,9 @@ path "secret-data/dagster-http-auth-password/*" {
 path "secret-data/dagster-http-auth-password" {
   capabilities = ["read"]
 }
+path "secret-data/dagster-dbt-creds" {
+  capabilities = ["read"]
+}
 
 path "secret-mitx/mongodb-forum/*" {
   capabilities = ["read"]
