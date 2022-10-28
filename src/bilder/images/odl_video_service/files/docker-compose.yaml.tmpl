@@ -1,6 +1,26 @@
 ---
 version: '2.1'
 services:
+  nginx:
+    image: pennlabs/shibboleth-sp-nginx:latest
+    volumes:
+    - ${NGINX_CONFIG_FILE_PATH}:/etc/nginx/conf.d/odl-video.conf:ro
+    - /etc/nginx/shib_fastcgi_params:/etc/nginx/shib_fastcgi_params:ro
+    - /etc/nginx/fastcgi_params:/etc/nginx/fastcgi_params:ro
+    - /etc/nginx/shib_clear_headers:/etc/nginx/shib_clear_headers:ro
+    - /etc/nginx/uwsgi_params:/etc/nginx/uwsgi_params:ro
+    - /etc/nginx/logging.conf:/etc/nginx/loggings.conf:ro
+    - /etc/nginx/star.odl.mit.edu.crt:/etc/nginx/ssl/ovs_web_cert.crt:ro
+    - /etc/nginx/star.odl.mit.edu.key:/etc/nginx/ssl/ovs_web_cert.key:ro
+    - /etc/shibboleth/attribute-map.xml:/etc/shibboleth/attribute-map.xml:ro
+    - /etc/shibboleth/shibboleth2.xml:/etc/shibboleth/shibboleth2.xml:ro
+    - /etc/shibboleth/sp-cert.pem:/etc/shibboleth/sp-cert.pem:ro
+    - /etc/shibboleth/sp-key.pem:/etc/shibboleth/sp-key.pem:ro
+    ports:
+    - "443:443"
+    - "80:80"
+    links:
+    - app
   app:
     image: mitodl/ovs-app:${VERSION}
     env_file: .env
@@ -10,16 +30,16 @@ services:
       /bin/bash -c '
       sleep 3 &&
       python3 manage.py migrate --noinput &&
-      uwsgi uswgi.ini'
+      uwsgi uwsgi.ini'
     volumes:
     - /var/log:/var/log:rw
 
-  celery:
-    image: mitodl/ovs-app:${VERSION}
-    env_file: .env
-    command: >
-      /bin/bash -c '
-      sleep 3 &&
-      celery -A odl_video worker -B -l {{ keyOrDefault "ovs/log_level" "INFO" }}'
-    volumes:
-    - /var/log:/var/log:rw
+#  celery:
+#    image: mitodl/ovs-app:${VERSION}
+#    env_file: .env
+#    command: >
+#      /bin/bash -c '
+#      sleep 3 &&
+#      celery -A odl_video worker -B -l {{ keyOrDefault "ovs/log_level" "INFO" }}'
+#    volumes:
+#    - /var/log:/var/log:rw

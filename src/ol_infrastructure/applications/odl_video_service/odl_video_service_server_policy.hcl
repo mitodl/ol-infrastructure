@@ -10,7 +10,11 @@ path "postgres-odl-video-service/creds/app" {
   capabilities = ["read"]
 }
 
-path "secret-odl-video-service/" {
+path "aws-mitx/creds/ovs-server" {
+  capabilities = ["read"]
+}
+
+path "secret-odl-video-service" {
   capabilities = ["read"]
 }
 path "secret-odl-video-service/*" {

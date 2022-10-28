@@ -90,28 +90,85 @@ files.directory(
     mode="777",
 )
 
+nginx_conf_directory = Path("/etc/nginx")
+shib_conf_directory = Path("/etc/shibboleth")
+
+certificate_file = nginx_conf_directory.joinpath("star.odl.mit.edu.crt")
+certificate_key_file = nginx_conf_directory.joinpath("star.odl.mit.edu.key")
+
+files.directory(
+    name="Create NGINX directory.",
+    path=str(nginx_conf_directory),
+    user="root",
+    group="root",
+    present=True,
+)
+files.directory(
+    name="Create Shibboleth directory",
+    path=str(shib_conf_directory),
+    user="root",
+    group="root",
+    present=True,
+)
+
 watched_files: list[Path] = []
 consul_templates: list[ConsulTemplateTemplate] = []
 
-place_consul_template_file(
-    name=".env",
-    repo_path=FILES_DIRECTORY,
-    template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
-    destination_path=Path(DOCKER_COMPOSE_DIRECTORY),
-    consul_templates=consul_templates,
-    watched_files=watched_files,
-    mode="0660",
-)
+# Firstly play down normal files requiring no special templating
+untemplated_files = {
+    "fastcgi_params": nginx_conf_directory,
+    "shib_clear_headers": nginx_conf_directory,
+    "shib_fastcgi_params": nginx_conf_directory,
+    "uwsgi_params": nginx_conf_directory,
+    "logging.conf": nginx_conf_directory,
+    "attribute-map.xml": shib_conf_directory,
+    #    "mit-md-cert.pem": shib_conf_directory,
+}
+for ut_filename, dest_dir in untemplated_files.items():
+    files.put(
+        name=f"Place {ut_filename} file.",
+        src=str(FILES_DIRECTORY.joinpath(ut_filename)),
+        dest=str(dest_dir.joinpath(ut_filename)),
+        mode="0664",
+    )
+    watched_files.append(dest_dir.joinpath(ut_filename))
 
-place_consul_template_file(
-    name="docker-compose.yaml",
-    repo_path=FILES_DIRECTORY,
-    template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
-    destination_path=Path(DOCKER_COMPOSE_DIRECTORY),
-    consul_templates=consul_templates,
-    watched_files=watched_files,
-    mode="0660",
+# Place down consul-template files
+# Assume a .tmpl file extension that will be retained
+consul_templated_files = {
+    "nginx_with_shib.conf": (nginx_conf_directory, "0660"),
+    "nginx_wo_shib.conf": (nginx_conf_directory, "0660"),
+    ".env": (Path(DOCKER_COMPOSE_DIRECTORY), "0660"),
+    "docker-compose.yaml": (Path(DOCKER_COMPOSE_DIRECTORY), "0660"),
+    "shibboleth2.xml": (shib_conf_directory, "0664"),
+}
+for ct_filename, dest_tuple in consul_templated_files.items():
+    place_consul_template_file(
+        name=ct_filename,
+        repo_path=FILES_DIRECTORY,
+        template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
+        destination_path=dest_tuple[0],
+        consul_templates=consul_templates,
+        watched_files=watched_files,
+        mode=dest_tuple[1],
+    )
+
+# Create a few in-line consul templates for the wildcard certificate + key
+consul_templates.extend(
+    [
+        ConsulTemplateTemplate(
+            contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+            "{{ printf .Data.key }}{{ end }}",
+            destination=Path(certificate_key_file),
+        ),
+        ConsulTemplateTemplate(
+            contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+            "{{ printf .Data.value }}{{ end }}",
+            destination=Path(certificate_file),
+        ),
+    ]
 )
+watched_files.extend([certificate_file, certificate_key_file])
 
 # Install and Configure Consul and Vault
 consul_configuration = {
