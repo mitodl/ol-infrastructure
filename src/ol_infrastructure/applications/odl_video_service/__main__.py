@@ -4,7 +4,6 @@
 import base64
 import json
 import textwrap
-from functools import partial
 from itertools import chain
 from pathlib import Path
 
@@ -12,7 +11,7 @@ import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_ami, get_caller_identity, iam, s3
+from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53, s3
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
@@ -77,6 +76,8 @@ target_vpc_name = ovs_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
 target_vpc = network_stack.require_output(target_vpc_name)
 target_vpc_id = target_vpc["id"]
 
+mitodl_zone_id = dns_stack.require_output("odl_zone_id")
+
 # We will take the entire secret structure and load it into Vault as is under the root mount
 # further down in the file
 secrets = read_yaml_secrets(
@@ -117,16 +118,22 @@ iam.RolePolicyAttachment(
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
     role=ovs_server_instance_role.name,
 )
-iam.RolePolicyAttachment(
-    f"odl-video-service-server-route53-role-policy-{env_name}",
-    policy_arn=policy_stack.require_output("iam_policies")["route53_odl_zone_records"],
-    role=ovs_server_instance_role.name,
-)
 
 ovs_server_instance_profile = iam.InstanceProfile(
     f"odl-video-service-server-instance-profile-{env_name}",
     role=ovs_server_instance_role.name,
     path="/ol-infrastructure/odl-video-service-server/profile/",
+)
+
+# Need to pin the same policy that the instance profile will use to the aws auth
+# backend because the app still needs an AWS Key
+ocw_studio_vault_backend_role = vault.aws.SecretBackendRole(
+    f"ovs-server-{stack_info.env_suffix}",
+    name="ovs-server",
+    backend="aws-mitx",
+    credential_type="iam_user",
+    policy_arns=[policy_stack.require_output("iam_policies")["describe_instances"]],
+    opts=ResourceOptions(delete_before_replace=True),
 )
 
 # Network Access Control
@@ -322,7 +329,7 @@ ovs_tg_config = OLTargetGroupConfig(
     vpc_id=target_vpc["id"],
     target_group_healthcheck=False,
     health_check_interval=60,
-    health_check_matcher="200",
+    health_check_matcher="404",  # TODO Figure out a real endpoint for this
     health_check_path="/ping",
     tags=instance_tags,
 )
@@ -334,9 +341,7 @@ ovs_lt_config = OLLaunchTemplateConfig(
     instance_profile_arn=ovs_server_instance_profile.arn,
     security_groups=[
         target_vpc["security_groups"]["default"],
-        target_vpc["security_groups"]["web"],
-        ovs_database_security_group,
-        ovs_redis_security_group,
+        ovs_server_security_group,
     ],
     tags=instance_tags,
     tag_specifications=[
@@ -445,44 +450,38 @@ ovs_server_vault_mount = vault.Mount(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-secret_paths = [
-    "cloudfront",
-    "dropbox",
-    "google",
-    "mailgun",
-    "misc",
-    "openedx",
-    "redis",
-    "sentry",
-    "youtube",
-]
-for secret_path in secret_paths:
-    short_lived_partial = partial(
-        "{1}/{0}".format,
-        secret_path,
-    )
-    vault.generic.Secret(
-        f"ovs-server-configuration-{secret_path}-secrets",
-        path=ovs_server_vault_mount.path.apply(short_lived_partial),
-        data_json=json.dumps(secrets[secret_path]),
-    )
 
+ovs_server_secrets = vault.generic.Secret(
+    "ovs-server-configuration-secrets",
+    path=ovs_server_vault_mount.path.apply("{}/ovs-secrets".format),
+    data_json=json.dumps(secrets),
+)
+
+use_shibboleth = ovs_config.get_bool("use_shibboleth")
+if use_shibboleth:
+    nginx_config_file_path = "/etc/nginx/nginx_with_shib.conf"
+else:
+    nginx_config_file_path = "/etc/nginx/nginx_wo_shib.conf"
+
+domains_string = ",".join(ovs_config.get_object("domains"))
 
 consul_keys = {
     "ovs/database_endpoint": db_address,
-    "ovs/redis_cluster_address": ovs_server_redis_cluster.address,
-    "ovs/log_level": ovs_config.get("log_level"),
+    "ovs/default_domain": ovs_config.get("default_domain"),
+    "ovs/domains": domains_string,
     "ovs/edx_base_url": ovs_config.get("edx_base_url"),
-    "ovs/domain": ovs_config.get("domain"),
     "ovs/environment": stack_info.env_suffix,
+    "ovs/log_level": ovs_config.get("log_level"),
+    "ovs/nginx_config_file_path": nginx_config_file_path,
+    "ovs/redis_cluster_address": ovs_server_redis_cluster.address,
     "ovs/redis_max_connections": redis_config.get("max_connections")
     or 65000,  # noqa: WPS432
-    "ovs/use_shibboleth": True,
     "ovs/s3_bucket_name": ovs_config.get("s3_bucket_name"),
     "ovs/s3_subtitle_bucket_name": ovs_config.get("s3_subtitle_bucket_name"),
     "ovs/s3_thumbnail_bucket_name": ovs_config.get("s3_thumbnail_bucket_name"),
     "ovs/s3_transcode_bucket_name": ovs_config.get("s3_transcode_bucket_name"),
     "ovs/s3_watch_bucket_name": ovs_config.get("s3_watch_bucket_name"),
+    "ovs/use_shibboleth": "True" if use_shibboleth else "False",  # Yes, quoted booleans
 }
 consul_key_helper(consul_keys)
 
@@ -512,6 +511,17 @@ static_assets_bucket = s3.Bucket(
     cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
 )
 
+# Create Route53 DNS records
+five_minutes = 60 * 5
+for domain in ovs_config.get_object("domains"):
+    route53.Record(
+        f"ovs-server-dns-record-{domain}",
+        name=domain,
+        type="CNAME",
+        ttl=five_minutes,
+        records=[autoscale_setup.load_balancer.dns_name],
+        zone_id=mitodl_zone_id,
+    )
 
 # TODO MD 20221011 revisit this, probably need to export more things
 export(

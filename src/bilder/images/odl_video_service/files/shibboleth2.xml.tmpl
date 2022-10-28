@@ -1,0 +1,46 @@
+<?xml version="1.0" ?>
+<SPConfig xmlns="urn:mace:shibboleth:2.0:native:sp:config"
+          xmlns:conf="urn:mace:shibboleth:2.0:native:sp:config"
+          xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+          xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+          xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+          clockSkew="180">
+  <RequestMapper type="Native">
+    <RequestMap>
+    {{- range ls "ovs/domains" }}
+      <Host authType="shibboleth" name="{{ .Value }}" requireSession="true"/>
+    {{- end }}
+    </RequestMap>
+  </RequestMapper>
+  <ApplicationDefaults entityID="https://{{ keyOrDefault "ovs/default_domain" "video.odl.mit.edu" }}/shibboleth"
+                       REMOTE_USER="eppn persistent-id targeted-id">
+    <Sessions lifetime="28800" timeout="3600" relayState="ss:mem"
+              checkAddress="false" handlerSSL="true" cookieProps="https">
+      <SSO discoveryProtocol="SAMLDS" discoveryURL="https://wayf.mit.edu/DS">
+        SAML2 SAML1
+      </SSO>
+      <Logout>SAML2 Local</Logout>
+      <Handler type="MetadataGenerator" Location="/Metadata" signing="false"/>
+      <Handler type="Status" Location="/Status" acl="127.0.0.1 ::1"/>
+      <Handler type="Session" Location="/Session" showAttributeValues="false"/>
+      <Handler type="DiscoveryFeed" Location="/DiscoFeed"/>
+    </Sessions>
+    <Errors supportContact="odl-devops@mit.edu"
+            helpLocation="/about.html"
+            styleSheet="/shibboleth-sp/main.css"/>
+    <MetadataProvider type="XML" uri="http://web.mit.edu/touchstone/shibboleth/config/metadata/MIT-metadata.xml"
+                      backingFilePath="MIT-metadata.xml" reloadInterval="7200">
+      <MetadataFilter type="EntityRoleWhiteList">
+        <RetainedRole>md:IDPSSODescriptor</RetainedRole>
+        <RetainedRole>md:AttributeAuthorityDescriptor</RetainedRole>
+      </MetadataFilter>
+    </MetadataProvider>
+    <TrustEngine type="ExplicitKey" />
+    <AttributeExtractor type="XML" validate="true" reloadChanges="false" path="attribute-map.xml"/>
+    <AttributeResolver type="Query" subjectMatch="true"/>
+    <AttributeFilter type="XML" validate="true" path="attribute-policy.xml"/>
+    <CredentialResolver type="File" key="sp-key.pem" certificate="sp-cert.pem"/>
+  </ApplicationDefaults>
+  <SecurityPolicyProvider type="XML" validate="true" path="security-policy.xml"/>
+  <ProtocolProvider type="XML" validate="true" reloadChanges="false" path="protocols.xml"/>
+</SPConfig>
