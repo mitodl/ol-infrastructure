@@ -115,14 +115,14 @@ uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
 name = "boto3"
-version = "1.25.0"
+version = "1.25.4"
 description = "The AWS SDK for Python"
 category = "main"
 optional = false
 python-versions = ">= 3.7"
 
 [package.dependencies]
-botocore = ">=1.28.0,<1.29.0"
+botocore = ">=1.28.4,<1.29.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.6.0,<0.7.0"
 
@@ -131,7 +131,7 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.28.0"
+version = "1.28.4"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
 optional = false
@@ -1816,7 +1816,7 @@ typing_extensions = ">=4.0,<5.0"
 type = "git"
 url = "https://github.com/wemake-services/wemake-python-styleguide"
 reference = "HEAD"
-resolved_reference = "bbaac2fb2f47829fdfdc1c904de869c8f8c1fca4"
+resolved_reference = "80db2405965234efede6558010758dfe5bfea46d"
 
 [[package]]
 name = "xmltodict"
@@ -1860,7 +1860,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "a0b3c4e7124caac382f672525265247667da358e293c3250d87fa8ca0b34ca90"
+content-hash = "5625e6473bb17509cc1d3f6411bb5ef9c3aebba636765289c1a7a921a5847632"
 
 [metadata.files]
 anyio = [
@@ -1934,12 +1934,12 @@ black = [
     {file = "black-22.10.0.tar.gz", hash = "sha256:f513588da599943e0cde4e32cc9879e825d58720d6557062d1098c5ad80080e1"},
 ]
 boto3 = [
-    {file = "boto3-1.25.0-py3-none-any.whl", hash = "sha256:81139cc9da154a1672c7dd92da1678cae0ea1601a3e1f0394c6cd010eab1acb6"},
-    {file = "boto3-1.25.0.tar.gz", hash = "sha256:170eab4a87592741933b6f8a02c3a6a8664162ef33bb12a2c2b4d431490d9ac2"},
+    {file = "boto3-1.25.4-py3-none-any.whl", hash = "sha256:4bbfe9540673940f5a3dea505c5469f48708a56fb588640adb8b6ab7d5f425be"},
+    {file = "boto3-1.25.4.tar.gz", hash = "sha256:03e5055d64a596f7a95ed0ca9fda1b67b7aed00d428e4ccef97f2f82b72ec875"},
 ]
 botocore = [
-    {file = "botocore-1.28.0-py3-none-any.whl", hash = "sha256:5bc426647da9f7739b73b1ffb5fce37fb3691c3c66dd772bf541dc19f8da2f43"},
-    {file = "botocore-1.28.0.tar.gz", hash = "sha256:75a4082543e2c1b005ccde90af87d0969003db06c3fcbe8a7854ddaa8d68fafb"},
+    {file = "botocore-1.28.4-py3-none-any.whl", hash = "sha256:09387978a75e7108aa15e8d67bfeb7938cce3d7043339c971daf4277dc4db804"},
+    {file = "botocore-1.28.4.tar.gz", hash = "sha256:ade670506c9e837f61d590873a11c5d06ab9a8492b8d5b853d6c4059ecddc03d"},
 ]
 certifi = [
     {file = "certifi-2022.9.24-py3-none-any.whl", hash = "sha256:90c1a32f1d68f940488354e36370f6cca89f0f106db09518524c88d6ed83f382"},
@@ -2183,6 +2183,7 @@ gevent = [
     {file = "gevent-22.10.1-cp310-cp310-win_amd64.whl", hash = "sha256:d2ea4ce36c09355379bc038be2bd50118f97d2eb6381b7096de4d05aa4c3e241"},
     {file = "gevent-22.10.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3e73c9f71aa2a6795ecbec9b57282b002375e863e283558feb87b62840c8c1ac"},
     {file = "gevent-22.10.1-cp311-cp311-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:5bc3758f0dc95007c1780d28a9fd2150416a79c50f308f62a674d78a845ea1b9"},
+    {file = "gevent-22.10.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:03c10ca0beeab0c6be516030471ea630447ddd1f649d3335e5b162097cd4130a"},
     {file = "gevent-22.10.1-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:fe2c0ff095171c49f78f1d4e6dc89fa58253783c7b6dccab9f1d76e2ee391f10"},
     {file = "gevent-22.10.1-cp36-cp36m-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:d18fcc324f39a3b21795022eb47c7752d6e4f4ed89d8cca41f1cc604553265b3"},
     {file = "gevent-22.10.1-cp36-cp36m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:06ea39c70ce166c4a1d4386c7fae96cb8d84ad799527b3378406051104d15443"},
