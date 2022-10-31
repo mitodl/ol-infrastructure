@@ -1173,7 +1173,7 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "pulumi"
-version = "3.44.3"
+version = "3.45.0"
 description = "Pulumi's Python SDK"
 category = "main"
 optional = false
@@ -1816,7 +1816,7 @@ typing_extensions = ">=4.0,<5.0"
 type = "git"
 url = "https://github.com/wemake-services/wemake-python-styleguide"
 reference = "HEAD"
-resolved_reference = "89a621e0b55ddc8ec7d666d24e91f90d1d91a012"
+resolved_reference = "80db2405965234efede6558010758dfe5bfea46d"
 
 [[package]]
 name = "xmltodict"
@@ -1860,7 +1860,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "a0b3c4e7124caac382f672525265247667da358e293c3250d87fa8ca0b34ca90"
+content-hash = "7936ca90ecb3300542fe99e1618d3b5dc39fadbf2a4ecbbc01f54765cb47dbb9"
 
 [metadata.files]
 anyio = [
@@ -2602,7 +2602,7 @@ protobuf = [
     {file = "protobuf-4.21.9.tar.gz", hash = "sha256:61f21493d96d2a77f9ca84fefa105872550ab5ef71d21c458eb80edcf4885a99"},
 ]
 pulumi = [
-    {file = "pulumi-3.44.3-py3-none-any.whl", hash = "sha256:8835181f7c5e3d41b49852f4442ca94b1ef35536f3e9e45a03ef926c705d73f1"},
+    {file = "pulumi-3.45.0-py3-none-any.whl", hash = "sha256:63e3e8a8feffe0216ea3760a2a94f13b34225ec45c819ae84972d9e3568d8fb1"},
 ]
 pulumi-aws = [
     {file = "pulumi_aws-5.19.0.tar.gz", hash = "sha256:b02781b9aff97fbc6dc876df489e1cd1250ec5a8aa07ec341e1a7bdf6c587ebd"},
