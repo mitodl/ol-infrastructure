@@ -115,14 +115,14 @@ uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
 name = "boto3"
-version = "1.25.0"
+version = "1.25.4"
 description = "The AWS SDK for Python"
 category = "main"
 optional = false
 python-versions = ">= 3.7"
 
 [package.dependencies]
-botocore = ">=1.28.0,<1.29.0"
+botocore = ">=1.28.4,<1.29.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.6.0,<0.7.0"
 
@@ -131,7 +131,7 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.28.0"
+version = "1.28.4"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
 optional = false
@@ -274,7 +274,7 @@ python-versions = ">=3.6,<4.0"
 
 [[package]]
 name = "datamodel-code-generator"
-version = "0.13.2"
+version = "0.13.3"
 description = "Datamodel Code Generator"
 category = "dev"
 optional = false
@@ -399,7 +399,7 @@ python-versions = "*"
 
 [[package]]
 name = "exceptiongroup"
-version = "1.0.0rc9"
+version = "1.0.0"
 description = "Backport of PEP 654 (exception groups)"
 category = "dev"
 optional = false
@@ -458,7 +458,7 @@ flake8 = ">=3.5,<6"
 
 [[package]]
 name = "flake8-bugbear"
-version = "22.10.25"
+version = "22.10.27"
 description = "A plugin for flake8 finding likely bugs and design problems in your program. Contains warnings that don't belong in pyflakes and pycodestyle."
 category = "dev"
 optional = false
@@ -484,7 +484,7 @@ flake8 = ">=2"
 
 [[package]]
 name = "flake8-comprehensions"
-version = "3.10.0"
+version = "3.10.1"
 description = "A flake8 plugin to help you write better list/set/dict comprehensions."
 category = "dev"
 optional = false
@@ -730,7 +730,7 @@ requests = ">=2.27.1,<3.0.0"
 
 [[package]]
 name = "identify"
-version = "2.5.7"
+version = "2.5.8"
 description = "File identification library for Python"
 category = "dev"
 optional = false
@@ -1165,7 +1165,7 @@ wcwidth = "*"
 
 [[package]]
 name = "protobuf"
-version = "4.21.8"
+version = "4.21.9"
 description = ""
 category = "main"
 optional = false
@@ -1173,7 +1173,7 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "pulumi"
-version = "3.44.1"
+version = "3.44.3"
 description = "Pulumi's Python SDK"
 category = "main"
 optional = false
@@ -1189,7 +1189,7 @@ six = ">=1.12,<2.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "5.18.0"
+version = "5.19.0"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 category = "main"
 optional = false
@@ -1475,7 +1475,7 @@ six = ">=1.5"
 
 [[package]]
 name = "pyupgrade"
-version = "3.1.0"
+version = "3.2.0"
 description = "A tool to automatically upgrade syntax for newer versions."
 category = "dev"
 optional = false
@@ -1759,19 +1759,19 @@ socks = ["PySocks (>=1.5.6,!=1.5.7,<2.0)"]
 
 [[package]]
 name = "virtualenv"
-version = "20.16.5"
+version = "20.16.6"
 description = "Virtual Python Environment builder"
 category = "dev"
 optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
-distlib = ">=0.3.5,<1"
+distlib = ">=0.3.6,<1"
 filelock = ">=3.4.1,<4"
 platformdirs = ">=2.4,<3"
 
 [package.extras]
-docs = ["proselint (>=0.13)", "sphinx (>=5.1.1)", "sphinx-argparse (>=0.3.1)", "sphinx-rtd-theme (>=1)", "towncrier (>=21.9)"]
+docs = ["proselint (>=0.13)", "sphinx (>=5.3)", "sphinx-argparse (>=0.3.2)", "sphinx-rtd-theme (>=1)", "towncrier (>=22.8)"]
 testing = ["coverage (>=6.2)", "coverage-enable-subprocess (>=1)", "flaky (>=3.7)", "packaging (>=21.3)", "pytest (>=7.0.1)", "pytest-env (>=0.6.2)", "pytest-freezegun (>=0.4.2)", "pytest-mock (>=3.6.1)", "pytest-randomly (>=3.10.3)", "pytest-timeout (>=2.1)"]
 
 [[package]]
@@ -1816,7 +1816,7 @@ typing_extensions = ">=4.0,<5.0"
 type = "git"
 url = "https://github.com/wemake-services/wemake-python-styleguide"
 reference = "HEAD"
-resolved_reference = "bbaac2fb2f47829fdfdc1c904de869c8f8c1fca4"
+resolved_reference = "89a621e0b55ddc8ec7d666d24e91f90d1d91a012"
 
 [[package]]
 name = "xmltodict"
@@ -1934,12 +1934,12 @@ black = [
     {file = "black-22.10.0.tar.gz", hash = "sha256:f513588da599943e0cde4e32cc9879e825d58720d6557062d1098c5ad80080e1"},
 ]
 boto3 = [
-    {file = "boto3-1.25.0-py3-none-any.whl", hash = "sha256:81139cc9da154a1672c7dd92da1678cae0ea1601a3e1f0394c6cd010eab1acb6"},
-    {file = "boto3-1.25.0.tar.gz", hash = "sha256:170eab4a87592741933b6f8a02c3a6a8664162ef33bb12a2c2b4d431490d9ac2"},
+    {file = "boto3-1.25.4-py3-none-any.whl", hash = "sha256:4bbfe9540673940f5a3dea505c5469f48708a56fb588640adb8b6ab7d5f425be"},
+    {file = "boto3-1.25.4.tar.gz", hash = "sha256:03e5055d64a596f7a95ed0ca9fda1b67b7aed00d428e4ccef97f2f82b72ec875"},
 ]
 botocore = [
-    {file = "botocore-1.28.0-py3-none-any.whl", hash = "sha256:5bc426647da9f7739b73b1ffb5fce37fb3691c3c66dd772bf541dc19f8da2f43"},
-    {file = "botocore-1.28.0.tar.gz", hash = "sha256:75a4082543e2c1b005ccde90af87d0969003db06c3fcbe8a7854ddaa8d68fafb"},
+    {file = "botocore-1.28.4-py3-none-any.whl", hash = "sha256:09387978a75e7108aa15e8d67bfeb7938cce3d7043339c971daf4277dc4db804"},
+    {file = "botocore-1.28.4.tar.gz", hash = "sha256:ade670506c9e837f61d590873a11c5d06ab9a8492b8d5b853d6c4059ecddc03d"},
 ]
 certifi = [
     {file = "certifi-2022.9.24-py3-none-any.whl", hash = "sha256:90c1a32f1d68f940488354e36370f6cca89f0f106db09518524c88d6ed83f382"},
@@ -2072,8 +2072,8 @@ darglint = [
     {file = "darglint-1.8.1.tar.gz", hash = "sha256:080d5106df149b199822e7ee7deb9c012b49891538f14a11be681044f0bb20da"},
 ]
 datamodel-code-generator = [
-    {file = "datamodel_code_generator-0.13.2-py3-none-any.whl", hash = "sha256:7188ff4af301b807f7fe128559e6c2b938196675050b1adf3c54432fb64b5415"},
-    {file = "datamodel_code_generator-0.13.2.tar.gz", hash = "sha256:046cdc7cf908958794c8c4e0f99ad4a1a785eb1cf92ec0f2d9ad917fab80dfa5"},
+    {file = "datamodel_code_generator-0.13.3-py3-none-any.whl", hash = "sha256:d5ad2721acde419aaa6e88fb0a331072d6b73fef31cea7ed66df0e655dba3397"},
+    {file = "datamodel_code_generator-0.13.3.tar.gz", hash = "sha256:ebbe3505e8b5e11e7ffe84f20591781c40683cfa01e8c2c07682e46e4881f016"},
 ]
 diagrams = [
     {file = "diagrams-0.22.0-py3-none-any.whl", hash = "sha256:b61bac4a0afe6072d37ee21a08d46868fc9a251878035adf9097a4842bc86472"},
@@ -2112,8 +2112,8 @@ eradicate = [
     {file = "eradicate-2.1.0.tar.gz", hash = "sha256:aac7384ab25b1bf21c4c012de9b4bf8398945a14c98c911545b2ea50ab558014"},
 ]
 exceptiongroup = [
-    {file = "exceptiongroup-1.0.0rc9-py3-none-any.whl", hash = "sha256:2e3c3fc1538a094aab74fad52d6c33fc94de3dfee3ee01f187c0e0c72aec5337"},
-    {file = "exceptiongroup-1.0.0rc9.tar.gz", hash = "sha256:9086a4a21ef9b31c72181c77c040a074ba0889ee56a7b289ff0afb0d97655f96"},
+    {file = "exceptiongroup-1.0.0-py3-none-any.whl", hash = "sha256:2ac84b496be68464a2da60da518af3785fff8b7ec0d090a581604bc870bdee41"},
+    {file = "exceptiongroup-1.0.0.tar.gz", hash = "sha256:affbabf13fb6e98988c38d9c5650e701569fe3c1de3233cfb61c5f33774690ad"},
 ]
 filelock = [
     {file = "filelock-3.8.0-py3-none-any.whl", hash = "sha256:617eb4e5eedc82fc5f47b6d61e4d11cb837c56cb4544e39081099fa17ad109d4"},
@@ -2132,16 +2132,16 @@ flake8-broken-line = [
     {file = "flake8_broken_line-0.6.0-py3-none-any.whl", hash = "sha256:c0ab336ff7de228dbffbe56d67b3615bb21fb15f3ed0604fa7bdf9feb72d7d88"},
 ]
 flake8-bugbear = [
-    {file = "flake8-bugbear-22.10.25.tar.gz", hash = "sha256:89e51284eb929fbb7f23fbd428491e7427f7cdc8b45a77248daffe86a039d696"},
-    {file = "flake8_bugbear-22.10.25-py3-none-any.whl", hash = "sha256:584631b608dc0d7d3f9201046d5840a45502da4732d5e8df6c7ac1694a91cb9e"},
+    {file = "flake8-bugbear-22.10.27.tar.gz", hash = "sha256:a6708608965c9e0de5fff13904fed82e0ba21ac929fe4896459226a797e11cd5"},
+    {file = "flake8_bugbear-22.10.27-py3-none-any.whl", hash = "sha256:6ad0ab754507319060695e2f2be80e6d8977cfcea082293089a9226276bd825d"},
 ]
 flake8-commas = [
     {file = "flake8-commas-2.1.0.tar.gz", hash = "sha256:940441ab8ee544df564ae3b3f49f20462d75d5c7cac2463e0b27436e2050f263"},
     {file = "flake8_commas-2.1.0-py2.py3-none-any.whl", hash = "sha256:ebb96c31e01d0ef1d0685a21f3f0e2f8153a0381430e748bf0bbbb5d5b453d54"},
 ]
 flake8-comprehensions = [
-    {file = "flake8-comprehensions-3.10.0.tar.gz", hash = "sha256:181158f7e7aa26a63a0a38e6017cef28c6adee71278ce56ce11f6ec9c4905058"},
-    {file = "flake8_comprehensions-3.10.0-py3-none-any.whl", hash = "sha256:dad454fd3d525039121e98fa1dd90c46bc138708196a4ebbc949ad3c859adedb"},
+    {file = "flake8-comprehensions-3.10.1.tar.gz", hash = "sha256:412052ac4a947f36b891143430fef4859705af11b2572fbb689f90d372cf26ab"},
+    {file = "flake8_comprehensions-3.10.1-py3-none-any.whl", hash = "sha256:d763de3c74bc18a79c039a7ec732e0a1985b0c79309ceb51e56401ad0a2cd44e"},
 ]
 flake8-debugger = [
     {file = "flake8-debugger-4.1.2.tar.gz", hash = "sha256:52b002560941e36d9bf806fca2523dc7fb8560a295d5f1a6e15ac2ded7a73840"},
@@ -2183,6 +2183,7 @@ gevent = [
     {file = "gevent-22.10.1-cp310-cp310-win_amd64.whl", hash = "sha256:d2ea4ce36c09355379bc038be2bd50118f97d2eb6381b7096de4d05aa4c3e241"},
     {file = "gevent-22.10.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3e73c9f71aa2a6795ecbec9b57282b002375e863e283558feb87b62840c8c1ac"},
     {file = "gevent-22.10.1-cp311-cp311-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:5bc3758f0dc95007c1780d28a9fd2150416a79c50f308f62a674d78a845ea1b9"},
+    {file = "gevent-22.10.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:03c10ca0beeab0c6be516030471ea630447ddd1f649d3335e5b162097cd4130a"},
     {file = "gevent-22.10.1-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:fe2c0ff095171c49f78f1d4e6dc89fa58253783c7b6dccab9f1d76e2ee391f10"},
     {file = "gevent-22.10.1-cp36-cp36m-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:d18fcc324f39a3b21795022eb47c7752d6e4f4ed89d8cca41f1cc604553265b3"},
     {file = "gevent-22.10.1-cp36-cp36m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:06ea39c70ce166c4a1d4386c7fae96cb8d84ad799527b3378406051104d15443"},
@@ -2357,8 +2358,8 @@ hvac = [
     {file = "hvac-1.0.2.tar.gz", hash = "sha256:e4028c5c0ecc7b7fcf6a54d290f99240e5abcdb9ffe442d1c14f061310d4c61c"},
 ]
 identify = [
-    {file = "identify-2.5.7-py2.py3-none-any.whl", hash = "sha256:7a67b2a6208d390fd86fd04fb3def94a3a8b7f0bcbd1d1fcd6736f4defe26390"},
-    {file = "identify-2.5.7.tar.gz", hash = "sha256:5b8fd1e843a6d4bf10685dd31f4520a7f1c7d0e14e9bc5d34b1d6f111cabc011"},
+    {file = "identify-2.5.8-py2.py3-none-any.whl", hash = "sha256:48b7925fe122720088aeb7a6c34f17b27e706b72c61070f27fe3789094233440"},
+    {file = "identify-2.5.8.tar.gz", hash = "sha256:7a214a10313b9489a0d61467db2856ae8d0b8306fc923e03a9effa53d8aedc58"},
 ]
 idna = [
     {file = "idna-3.4-py3-none-any.whl", hash = "sha256:90b77e79eaa3eba6de819a0c442c0b4ceefc341a7a2ab77d7562bf49f425c5c2"},
@@ -2585,26 +2586,26 @@ prompt-toolkit = [
     {file = "prompt_toolkit-3.0.31.tar.gz", hash = "sha256:9ada952c9d1787f52ff6d5f3484d0b4df8952787c087edf6a1f7c2cb1ea88148"},
 ]
 protobuf = [
-    {file = "protobuf-4.21.8-cp310-abi3-win32.whl", hash = "sha256:c252c55ee15175aa1b21b7b9896e6add5162d066d5202e75c39f96136f08cce3"},
-    {file = "protobuf-4.21.8-cp310-abi3-win_amd64.whl", hash = "sha256:809ca0b225d3df42655a12f311dd0f4148a943c51f1ad63c38343e457492b689"},
-    {file = "protobuf-4.21.8-cp37-abi3-macosx_10_9_universal2.whl", hash = "sha256:bbececaf3cfea9ea65ebb7974e6242d310d2a7772a6f015477e0d79993af4511"},
-    {file = "protobuf-4.21.8-cp37-abi3-manylinux2014_aarch64.whl", hash = "sha256:b02eabb9ebb1a089ed20626a90ad7a69cee6bcd62c227692466054b19c38dd1f"},
-    {file = "protobuf-4.21.8-cp37-abi3-manylinux2014_x86_64.whl", hash = "sha256:4761201b93e024bb70ee3a6a6425d61f3152ca851f403ba946fb0cde88872661"},
-    {file = "protobuf-4.21.8-cp37-cp37m-win32.whl", hash = "sha256:f2d55ff22ec300c4d954d3b0d1eeb185681ec8ad4fbecff8a5aee6a1cdd345ba"},
-    {file = "protobuf-4.21.8-cp37-cp37m-win_amd64.whl", hash = "sha256:c5f94911dd8feb3cd3786fc90f7565c9aba7ce45d0f254afd625b9628f578c3f"},
-    {file = "protobuf-4.21.8-cp38-cp38-win32.whl", hash = "sha256:b37b76efe84d539f16cba55ee0036a11ad91300333abd213849cbbbb284b878e"},
-    {file = "protobuf-4.21.8-cp38-cp38-win_amd64.whl", hash = "sha256:2c92a7bfcf4ae76a8ac72e545e99a7407e96ffe52934d690eb29a8809ee44d7b"},
-    {file = "protobuf-4.21.8-cp39-cp39-win32.whl", hash = "sha256:89d641be4b5061823fa0e463c50a2607a97833e9f8cfb36c2f91ef5ccfcc3861"},
-    {file = "protobuf-4.21.8-cp39-cp39-win_amd64.whl", hash = "sha256:bc471cf70a0f53892fdd62f8cd4215f0af8b3f132eeee002c34302dff9edd9b6"},
-    {file = "protobuf-4.21.8-py2.py3-none-any.whl", hash = "sha256:a55545ce9eec4030cf100fcb93e861c622d927ef94070c1a3c01922902464278"},
-    {file = "protobuf-4.21.8-py3-none-any.whl", hash = "sha256:0f236ce5016becd989bf39bd20761593e6d8298eccd2d878eda33012645dc369"},
-    {file = "protobuf-4.21.8.tar.gz", hash = "sha256:427426593b55ff106c84e4a88cac855175330cb6eb7e889e85aaa7b5652b686d"},
+    {file = "protobuf-4.21.9-cp310-abi3-win32.whl", hash = "sha256:6e0be9f09bf9b6cf497b27425487706fa48c6d1632ddd94dab1a5fe11a422392"},
+    {file = "protobuf-4.21.9-cp310-abi3-win_amd64.whl", hash = "sha256:a7d0ea43949d45b836234f4ebb5ba0b22e7432d065394b532cdca8f98415e3cf"},
+    {file = "protobuf-4.21.9-cp37-abi3-macosx_10_9_universal2.whl", hash = "sha256:b5ab0b8918c136345ff045d4b3d5f719b505b7c8af45092d7f45e304f55e50a1"},
+    {file = "protobuf-4.21.9-cp37-abi3-manylinux2014_aarch64.whl", hash = "sha256:2c9c2ed7466ad565f18668aa4731c535511c5d9a40c6da39524bccf43e441719"},
+    {file = "protobuf-4.21.9-cp37-abi3-manylinux2014_x86_64.whl", hash = "sha256:e575c57dc8b5b2b2caa436c16d44ef6981f2235eb7179bfc847557886376d740"},
+    {file = "protobuf-4.21.9-cp37-cp37m-win32.whl", hash = "sha256:9227c14010acd9ae7702d6467b4625b6fe853175a6b150e539b21d2b2f2b409c"},
+    {file = "protobuf-4.21.9-cp37-cp37m-win_amd64.whl", hash = "sha256:a419cc95fca8694804709b8c4f2326266d29659b126a93befe210f5bbc772536"},
+    {file = "protobuf-4.21.9-cp38-cp38-win32.whl", hash = "sha256:5b0834e61fb38f34ba8840d7dcb2e5a2f03de0c714e0293b3963b79db26de8ce"},
+    {file = "protobuf-4.21.9-cp38-cp38-win_amd64.whl", hash = "sha256:84ea107016244dfc1eecae7684f7ce13c788b9a644cd3fca5b77871366556444"},
+    {file = "protobuf-4.21.9-cp39-cp39-win32.whl", hash = "sha256:f9eae277dd240ae19bb06ff4e2346e771252b0e619421965504bd1b1bba7c5fa"},
+    {file = "protobuf-4.21.9-cp39-cp39-win_amd64.whl", hash = "sha256:6e312e280fbe3c74ea9e080d9e6080b636798b5e3939242298b591064470b06b"},
+    {file = "protobuf-4.21.9-py2.py3-none-any.whl", hash = "sha256:7eb8f2cc41a34e9c956c256e3ac766cf4e1a4c9c925dc757a41a01be3e852965"},
+    {file = "protobuf-4.21.9-py3-none-any.whl", hash = "sha256:48e2cd6b88c6ed3d5877a3ea40df79d08374088e89bedc32557348848dff250b"},
+    {file = "protobuf-4.21.9.tar.gz", hash = "sha256:61f21493d96d2a77f9ca84fefa105872550ab5ef71d21c458eb80edcf4885a99"},
 ]
 pulumi = [
-    {file = "pulumi-3.44.1-py3-none-any.whl", hash = "sha256:71b8b75455e6b84d32c0cd8d1d7c27176d7b913a4ab6ae026fdfcd07bf3319d9"},
+    {file = "pulumi-3.44.3-py3-none-any.whl", hash = "sha256:8835181f7c5e3d41b49852f4442ca94b1ef35536f3e9e45a03ef926c705d73f1"},
 ]
 pulumi-aws = [
-    {file = "pulumi_aws-5.18.0.tar.gz", hash = "sha256:8eb3e1e67b54dfbed5ec463dfde13c1d175dc1b3afdd24cbbac29ce1f98c99ad"},
+    {file = "pulumi_aws-5.19.0.tar.gz", hash = "sha256:b02781b9aff97fbc6dc876df489e1cd1250ec5a8aa07ec341e1a7bdf6c587ebd"},
 ]
 pulumi-consul = [
     {file = "pulumi_consul-3.7.0.tar.gz", hash = "sha256:e8c5453f1a8be544f610a154401c910daebd9a87d664a34cc7defe0851f9ffd6"},
@@ -2725,8 +2726,8 @@ python-dateutil = [
     {file = "python_dateutil-2.8.2-py2.py3-none-any.whl", hash = "sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9"},
 ]
 pyupgrade = [
-    {file = "pyupgrade-3.1.0-py2.py3-none-any.whl", hash = "sha256:77c6101a710be3e24804891e43388cedbee617258e93b09c8c5e58de08617758"},
-    {file = "pyupgrade-3.1.0.tar.gz", hash = "sha256:7a8d393d85e15e0e2753e90b7b2e173b9d29dfd71e61f93d93e985b242627ed3"},
+    {file = "pyupgrade-3.2.0-py2.py3-none-any.whl", hash = "sha256:2aa6c40e49ea5a350e6e45b8c7847b1741aef274a35d4f0b2bf91731ec8ab796"},
+    {file = "pyupgrade-3.2.0.tar.gz", hash = "sha256:70e1ac1e6b34a90fb21f5cada1907ef035b12dfc1d9f13cefd367acf3b530310"},
 ]
 pywin32 = [
     {file = "pywin32-304-cp310-cp310-win32.whl", hash = "sha256:3c7bacf5e24298c86314f03fa20e16558a4e4138fc34615d7de4070c23e65af3"},
@@ -2931,8 +2932,8 @@ urllib3 = [
     {file = "urllib3-1.26.12.tar.gz", hash = "sha256:3fa96cf423e6987997fc326ae8df396db2a8b7c667747d47ddd8ecba91f4a74e"},
 ]
 virtualenv = [
-    {file = "virtualenv-20.16.5-py3-none-any.whl", hash = "sha256:d07dfc5df5e4e0dbc92862350ad87a36ed505b978f6c39609dc489eadd5b0d27"},
-    {file = "virtualenv-20.16.5.tar.gz", hash = "sha256:227ea1b9994fdc5ea31977ba3383ef296d7472ea85be9d6732e42a91c04e80da"},
+    {file = "virtualenv-20.16.6-py3-none-any.whl", hash = "sha256:186ca84254abcbde98180fd17092f9628c5fe742273c02724972a1d8a2035108"},
+    {file = "virtualenv-20.16.6.tar.gz", hash = "sha256:530b850b523c6449406dfba859d6345e48ef19b8439606c5d74d7d3c9e14d76e"},
 ]
 wcwidth = [
     {file = "wcwidth-0.2.5-py2.py3-none-any.whl", hash = "sha256:beb4802a9cebb9144e99086eff703a642a13d6a0052920003a230f3294bbe784"},
