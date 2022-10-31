@@ -21,7 +21,7 @@ def _is_parliament_finding_filtered(
         for action in location.get("actions", []):  # noqa: WPS426
             matches = map(  # noqa: C417
                 lambda finding_action: re.findall(
-                    action, finding_action, re.IGNORECASE  # noqa: B023
+                    action, finding_action, re.IGNORECASE
                 ),
                 finding.location["actions"],
             )
