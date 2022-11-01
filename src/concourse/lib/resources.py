@@ -123,3 +123,11 @@ def registry_image(
         type="registry-image",
         source=RegistryImage(repository=image_repository, tag=image_tag or "latest"),
     )
+
+
+# https://github.com/arbourd/concourse-slack-alert-resource
+# We use only a very basic implementation of this notification framework
+def slack_notification(name: Identifier, url: str) -> Resource:
+    return Resource(
+        name=name, type="slack-notification", source={"url": url, "disabled": False}
+    )
