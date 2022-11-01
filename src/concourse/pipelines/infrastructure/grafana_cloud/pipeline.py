@@ -115,10 +115,10 @@ commit_managed_dashboards_job = Job(
                 run=Command(
                     path="bash",
                     args=[
-                        "-exc",  # noqa: WPS462
+                        "-xc",  # noqa: WPS462
                         """  cd changed_repo;
                                 git config user.name "concourse";
-                                git config user.email "odl-devops@mit.edu":
+                                git config user.email "odl-devops@mit.edu";
                                 UNTRACKED_FILES=`git ls-files --other --exclude-standard --directory`;  # noqa: E501
                                 git diff --exit-code;
                                 if [ $? != 0 ] || [ "$UNTRACKED_FILES" != "" ]; then
@@ -131,9 +131,7 @@ commit_managed_dashboards_job = Job(
                 ),
             ),
         ),
-        PutStep(
-            put=grafana_dashboards.name, params={"repository": grafana_dashboards.name}
-        ),
+        PutStep(put=grafana_dashboards.name, params={"repository": "changed_repo"}),
     ],
     on_error=notification(
         slack_notification_resource,
@@ -176,7 +174,7 @@ apply_dashboards_to_qa_job = Job(
                         "-exc",
                         f""" export GRAFANA_TOKEN="((grizzly.qa_token))";  # noqa: WPS237, F541
                               export GRAFANA_URL="((grizzly.qa_url))";
-                              grr apply -d {{grafana_dashboards.name}}/managed -t '*';""",  # noqa: E501
+                              grr apply -d {grafana_dashboards.name}/managed -t '*';""",  # noqa: E501
                     ],
                 ),
             ),
@@ -229,7 +227,7 @@ apply_dashboards_to_production_job = Job(
                         "-exc",
                         f""" export GRAFANA_TOKEN="((grizzly.production_token))";  # noqa: WPS237, F541
                               export GRAFANA_URL="((grizzly.production_url))";
-                              grr apply -d {{grafana_dashboards.name}}/managed -t '*';""",  # noqa: E501
+                              grr apply -d {grafana_dashboards.name}/managed -t '*';""",  # noqa: E501
                     ],
                 ),
             ),
