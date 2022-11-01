@@ -1,17 +1,16 @@
 import pulumi
 import pulumi_aws as aws
 from pulumi_aws import Provider
+
+from bridge.lib.magic_numbers import AWS_RDS_DEFAULT_DATABASE_CAPACITY
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
-from ol_infrastructure.lib.pulumi_helper import parse_stack
-from pulumi import Config, Output, ResourceOptions, StackReference
-from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
-from bridge.lib.magic_numbers import (
-    AWS_RDS_DEFAULT_DATABASE_CAPACITY,
-)
+from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.stack_defaults import defaults
+
 stack_info = parse_stack()
 config = pulumi.Config("ol-infrastructure-bootcamps")
 region = config.get("region")
