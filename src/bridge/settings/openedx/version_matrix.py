@@ -186,6 +186,12 @@ ReleaseMap: dict[  # noqa: WPS234
                 release="olive",
                 branch_override="master",
             ),
+            OpenEdxApplicationVersion(
+                application="course-authoring",  # type: ignore
+                application_type="MFE",
+                release="olive",
+                branch_override="master",
+            ),
         ],
     },
     "nutmeg": {
