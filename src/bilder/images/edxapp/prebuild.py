@@ -5,11 +5,11 @@ from pyinfra.operations import apt, files, git, server
 
 from bilder.components.baseline.steps import install_baseline_packages
 from bilder.images.edxapp.lib import EDX_RELEASE, WEB_NODE_TYPE, node_type
-from bridge.settings.openedx.version_matrix import (
-    OpenEdxApplication,
+from bridge.settings.openedx.accessors import (
     fetch_application_version,
     filter_deployments_by_release,
 )
+from bridge.settings.openedx.types import OpenEdxApplication
 
 EDX_USER = "edxapp"
 

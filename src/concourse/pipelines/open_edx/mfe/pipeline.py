@@ -1,8 +1,20 @@
+import sys
 import textwrap
+from collections import defaultdict
+from itertools import chain, product
 from typing import Optional
 
 from pydantic import BaseModel
 
+from bridge.settings.openedx.accessors import fetch_applications_by_type
+from bridge.settings.openedx.types import (
+    EnvStage,
+    OpenEdxApplicationVersion,
+    OpenEdxDeploymentName,
+    OpenEdxSupportedRelease,
+)
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
+from concourse.lib.models.fragment import PipelineFragment
 from concourse.lib.models.pipeline import (  # noqa: WPS235
     AnonymousResource,
     Command,
@@ -22,29 +34,32 @@ from concourse.lib.resource_types import rclone
 from concourse.lib.resources import git_repo
 
 
-class MFEAppVars(BaseModel):
-    node_major_version: int
-    path: str
-    repository: str
-
-
 class OpenEdxVars(BaseModel):
     contact_url: Optional[str]
+    deployment_name: OpenEdxDeploymentName
     environment: str
+    environment_stage: EnvStage
     favicon_url: str
     honor_code_url: Optional[str]
     lms_domain: str
     logo_url: str
     marketing_site_domain: str
-    release_name: str
     site_name: str
     studio_domain: str
     support_url: str
     terms_of_service_url: str
     trademark_text: Optional[str]
 
+    @property
+    def release_name(self) -> OpenEdxSupportedRelease:
+        return OpenLearningOpenEdxDeployment.get_item(
+            self.deployment_name
+        ).release_by_env(self.environment_stage)
 
-def mfe_params(open_edx: OpenEdxVars, mfe: MFEAppVars) -> dict[str, Optional[str]]:
+
+def mfe_params(
+    open_edx: OpenEdxVars, mfe: OpenEdxApplicationVersion
+) -> dict[str, Optional[str]]:
     return {
         "ACCESS_TOKEN_COOKIE_NAME": f"{open_edx.environment}-edx-jwt-cookie-header-payload",  # noqa: E501
         "BASE_URL": f"https://{open_edx.lms_domain}",
@@ -62,7 +77,7 @@ def mfe_params(open_edx: OpenEdxVars, mfe: MFEAppVars) -> dict[str, Optional[str
         "LOGO_WHITE_URL": open_edx.logo_url,
         "MARKETING_SITE_BASE_URL": f"https://{open_edx.marketing_site_domain}",
         "ORDER_HISTORY_URL": None,  # Intentionally left blank to turn off a menu entry
-        "PUBLIC_PATH": f"/{mfe.path}/",
+        "PUBLIC_PATH": f"/{mfe.application.path}/",  # noqa: WPS237
         "REFRESH_ACCESS_TOKEN_ENDPOINT": f"https://{open_edx.lms_domain}/login_refresh",
         "SEARCH_CATALOG_URL": f"https://{open_edx.lms_domain}/courses",
         "SESSION_COOKIE_DOMAIN": open_edx.lms_domain,
@@ -75,25 +90,29 @@ def mfe_params(open_edx: OpenEdxVars, mfe: MFEAppVars) -> dict[str, Optional[str
     }
 
 
-def mfe_job(open_edx: OpenEdxVars, mfe: MFEAppVars, previous_job: str = None) -> Job:
-    mfe_dir = f"mfe-app-{mfe.path}"
+def mfe_job(
+    open_edx: OpenEdxVars, mfe: OpenEdxApplicationVersion, previous_job: Job = None
+) -> PipelineFragment:
+    mfe_name = mfe.application.value
+    mfe_repo = git_repo(
+        name=Identifier(f"mfe-app-{mfe_name}"),
+        uri=mfe.git_origin,
+        branch=mfe.release_branch,
+    )
+
     clone_git_repo = GetStep(
-        get=f"mfe-app-{mfe.path}",
-        trigger=previous_job is None,
+        get=mfe_repo.name,
+        trigger=previous_job is None and open_edx.environment_stage != "production",
     )
     branding_overrides = textwrap.dedent(  # noqa: WPS462
         """\
         npm install @edx/frontend-component-footer@npm:@mitodl/frontend-component-footer-mitol@latest --legacy-peer-deps  # noqa: E501
         npm install @edx/frontend-component-header@npm:@mitodl/frontend-component-header-mitol@latest --legacy-peer-deps"""
     )  # noqa: WPS355
-    # The library authoring MFE has a version conflict with the React dependency. It
-    # uses v17 and our override plugins use v16
-    if mfe.path == "authoring":
-        branding_overrides = ""
-    if previous_job:
-        clone_git_repo.passed = [previous_job]
-    return Job(
-        name=Identifier(f"compile-and-deploy-mfe-{mfe.path}-to-{open_edx.environment}"),
+    if previous_job and mfe_repo.name == previous_job.plan[0].get:
+        clone_git_repo.passed = [previous_job.name]
+    mfe_job_definition = Job(
+        name=Identifier(f"compile-and-deploy-mfe-{mfe_name}-to-{open_edx.environment}"),
         plan=[
             clone_git_repo,
             TaskStep(
@@ -104,17 +123,20 @@ def mfe_job(open_edx: OpenEdxVars, mfe: MFEAppVars, previous_job: str = None) ->
                         type="registry-image",
                         source={
                             "repository": "node",
-                            "tag": f"{mfe.node_major_version}-bullseye-slim",
+                            "tag": f"{mfe.runtime_version}-bullseye-slim",
                         },
                     ),
-                    inputs=[Input(name=Identifier(mfe_dir))],
+                    inputs=[Input(name=mfe_repo.name)],
                     outputs=[
-                        Output(name=Identifier("compiled-mfe"), path=f"{mfe_dir}/dist")
+                        Output(
+                            name=Identifier("compiled-mfe"),
+                            path=f"{mfe_repo.name}/dist",
+                        )
                     ],
                     params=mfe_params(open_edx, mfe),
                     run=Command(
                         path="sh",
-                        dir=mfe_dir,
+                        dir=mfe_repo.name,
                         args=[
                             "-exc",
                             # This uses the --legacy-peer-deps flag to allow for
@@ -140,73 +162,68 @@ def mfe_job(open_edx: OpenEdxVars, mfe: MFEAppVars, previous_job: str = None) ->
                     "destination": [
                         {
                             "command": "sync",
-                            "dir": f"s3-remote:{open_edx.environment}-edxapp-mfe/{mfe.path}/",  # noqa: E501
+                            "dir": f"s3-remote:{open_edx.environment}-edxapp-mfe/{mfe.application}/",  # noqa: E501
                         }
                     ],
                 },
             ),
         ],
     )
+    return PipelineFragment(resources=[mfe_repo], jobs=[mfe_job_definition])
 
 
-def mfe_pipeline(open_edx_envs: list[OpenEdxVars], mfe: MFEAppVars) -> Pipeline:
-    jobs_list: list[Job] = []
-    for edx_env in open_edx_envs:
+def mfe_pipeline(
+    deployment_name: OpenEdxDeploymentName, release_name: OpenEdxSupportedRelease
+) -> Pipeline:
+    deployment = OpenLearningOpenEdxDeployment.get_item(deployment_name)
+    mfes = fetch_applications_by_type(release_name, deployment_name, "MFE")
+    fragments: dict[str, list[PipelineFragment]] = defaultdict(list)
+    deploy_envs = deployment.envs_by_release(release_name)
+    edx_vars = [
+        edx_var
+        for edx_var in deployments[deployment_name]
+        if edx_var.environment_stage in deploy_envs
+    ]
+    for edx_var, mfe in product(edx_vars, mfes):
         try:
-            prev_job = jobs_list[-1].name
+            prev_job = fragments.get(mfe.application, [])[-1].jobs[0]
         except IndexError:
             prev_job = None
-        jobs_list.append(mfe_job(edx_env, mfe, prev_job))
+        mfe_fragment = mfe_job(edx_var, mfe, prev_job)
+        fragments[mfe.application].append(mfe_fragment)
+    combined_fragments = PipelineFragment.combine_fragments(
+        *chain.from_iterable(fragments.values()),
+    )
     return Pipeline(
-        resource_types=[rclone()],
+        resource_types=[rclone()] + combined_fragments.resource_types,
         resources=[
-            git_repo(
-                name=Identifier(f"mfe-app-{mfe.path}"),
-                uri=mfe.repository,
-                branch=open_edx_envs[0].release_name,
-            ),
             Resource(
                 name=Identifier("mfe-app-bucket"),
                 type="rclone",
                 source={
                     "config": textwrap.dedent(  # noqa: WPS462
                         """\
-                    [s3-remote]
-                    type = s3
-                    provider = AWS
-                    env_auth = true
-                    region = us-east-1
-                    """
+                        [s3-remote]
+                        type = s3
+                        provider = AWS
+                        env_auth = true
+                        region = us-east-1
+                        """
                     )  # noqa: WPS355
                 },
             ),
-        ],
-        jobs=jobs_list,
+        ]
+        + combined_fragments.resources,
+        jobs=combined_fragments.jobs,
     )
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    from concourse.pipelines.open_edx.mfe.values import deployments  # noqa: WPS433
 
-    from concourse.pipelines.open_edx.mfe.values import (  # noqa: WPS433
-        apps,
-        deployments,
-    )
-
-    deployment = sys.argv[1]
-    app = sys.argv[2]
-    open_edx_vars = deployments[deployment]
-    mfe_vars = apps[app]
-    if app == "learn" and deployment == "mitxonline":
-        mfe_vars.repository = "https://github.com/mitodl/frontend-app-learning.git"
-        for edx_var in open_edx_vars:
-            edx_var.release_name = "open-learning"
-    if app == "authoring":
-        for edx_var in open_edx_vars:  # noqa: WPS440
-            edx_var.release_name = "master"
-    if "maple" in open_edx_vars[0].release_name:
-        mfe_vars.node_major_version = 12
-    pipeline = mfe_pipeline(open_edx_vars, mfe_vars)
+    deployment: OpenEdxDeploymentName = sys.argv[1]
+    release_name: OpenEdxSupportedRelease = sys.argv[2]
+    pipeline = mfe_pipeline(deployment, release_name)
     with open("definition.json", "w") as definition:
         definition.write(pipeline.json(indent=2))
     sys.stdout.write(pipeline.json(indent=2))

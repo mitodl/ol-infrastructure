@@ -1,5 +1,5 @@
-import itertools
-
+from bridge.settings.openedx.types import OpenEdxSupportedRelease
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from concourse.lib.models.pipeline import (  # noqa: WPS235
     AnonymousResource,
     Command,
@@ -15,18 +15,17 @@ from concourse.lib.models.pipeline import (  # noqa: WPS235
     TaskStep,
 )
 from concourse.lib.resources import git_repo
-from concourse.pipelines.open_edx.mfe.pipeline import MFEAppVars, OpenEdxVars
-from concourse.pipelines.open_edx.mfe.values import apps, deployments
+from concourse.pipelines.open_edx.mfe.values import deployments
 
 
 def meta_job(
-    open_edx_deployment: str,
-    mfe_app_name: str,
-    open_edx_environments: list[OpenEdxVars],
-    mfe_vars: MFEAppVars,
+    open_edx_deployment: OpenLearningOpenEdxDeployment,
+    open_edx_release: OpenEdxSupportedRelease,
 ) -> Job:
     return Job(
-        name=Identifier(f"create-{open_edx_deployment}-{mfe_app_name}-mfe-pipeline"),
+        name=Identifier(
+            f"create-{open_edx_deployment}-{open_edx_release}-mfe-pipeline"
+        ),
         plan=[
             GetStep(
                 get="mfe-pipeline-definitions",
@@ -34,7 +33,7 @@ def meta_job(
             ),
             TaskStep(
                 task=Identifier(
-                    f"generate-{open_edx_deployment}-{mfe_app_name}-mfe-pipeline-file"
+                    f"generate-{open_edx_deployment}-{open_edx_release}-mfe-pipeline-file"
                 ),
                 config=TaskConfig(
                     platform=Platform.linux,
@@ -54,7 +53,7 @@ def meta_job(
                         args=[
                             "../mfe-pipeline-definitions/src/concourse/pipelines/open_edx/mfe/pipeline.py",  # noqa: E501
                             open_edx_deployment,
-                            mfe_app_name,
+                            open_edx_release,
                         ],
                     ),
                 ),
@@ -62,7 +61,7 @@ def meta_job(
             SetPipelineStep(
                 team=Identifier(open_edx_deployment),
                 set_pipeline=Identifier(
-                    f"{open_edx_deployment}-{mfe_app_name}-mfe-pipeline"
+                    f"{open_edx_deployment}-{open_edx_release}-mfe-pipeline"
                 ),
                 file="pipeline/definition.json",
             ),
@@ -71,19 +70,21 @@ def meta_job(
 
 
 def meta_pipeline() -> Pipeline:
-    combinations = itertools.product(deployments.keys(), apps.keys())
+    pipeline_jobs = []
     mfe_definitions = git_repo(
         name=Identifier("mfe-pipeline-definitions"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
+        paths=[
+            "src/concourse/pipelines/open_edx/mfe/",
+            "src/concourse/lib/",
+            "src/bridge/settings/openedx/",
+        ],
     )
-    mfe_definitions.source["paths"] = [
-        "src/concourse/pipelines/open_edx/mfe/",
-        "src/concourse/lib/",
-    ]
     pipeline_jobs = [
-        meta_job(deployment, app, deployments[deployment], apps[app])
-        for deployment, app in combinations
+        meta_job(deployment, release)
+        for deployment in deployments
+        for release in OpenLearningOpenEdxDeployment.get_item(deployment).releases
     ]
     pipeline_jobs.append(
         Job(
