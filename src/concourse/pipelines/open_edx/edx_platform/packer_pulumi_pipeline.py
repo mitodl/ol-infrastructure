@@ -117,7 +117,10 @@ def build_edx_pipeline(
         )
         loop_fragments.append(edx_pulumi_fragment)
 
-    combined_fragments = PipelineFragment.combine_fragments(*loop_fragments)
+    combined_fragments = PipelineFragment.combine_fragments(
+        base_ami_fragment,
+        *loop_fragments,
+    )
 
     return Pipeline(
         resource_types=combined_fragments.resource_types,
