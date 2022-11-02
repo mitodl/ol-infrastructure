@@ -54,10 +54,8 @@ from bilder.images.edxapp.plugins.git_export_import import git_auto_export
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
-from bridge.settings.openedx.version_matrix import (
-    OpenEdxApplication,
-    fetch_application_version,
-)
+from bridge.settings.openedx.accessors import fetch_application_version
+from bridge.settings.openedx.types import OpenEdxApplication
 
 VERSIONS = {  # noqa: WPS407
     "consul": CONSUL_VERSION,

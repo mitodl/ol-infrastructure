@@ -67,3 +67,17 @@ class PipelineFragment(BaseModel):
                 resource_identifiers.add(resource.name)
                 unique_resources.append(resource)
         return unique_resources
+
+    @classmethod
+    def combine_fragments(cls, *fragments: "PipelineFragment") -> "PipelineFragment":
+        return cls(
+            resource_types=[
+                resource_type
+                for fragment in fragments
+                for resource_type in fragment.resource_types
+            ],
+            resources=[
+                resource for fragment in fragments for resource in fragment.resources
+            ],
+            jobs=[job for fragment in fragments for job in fragment.jobs],
+        )

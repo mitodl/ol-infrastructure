@@ -1,11 +1,8 @@
 import sys
 
-from bridge.settings.openedx.version_matrix import (
-    DeploymentEnvRelease,
-    OpenEdxBranchMap,
-    OpenLearningOpenEdxDeployment,
-    filter_deployments_by_release,
-)
+from bridge.settings.openedx.accessors import filter_deployments_by_release
+from bridge.settings.openedx.types import DeploymentEnvRelease, OpenEdxSupportedRelease
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from concourse.lib.constants import PULUMI_CODE_PATH
 from concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from concourse.lib.models.fragment import PipelineFragment
@@ -21,7 +18,7 @@ def build_edx_pipeline(
         uri="https://github.com/openedx/edx-platform",
         branch="release"
         if release_name == "master"
-        else OpenEdxBranchMap[release_name],
+        else OpenEdxSupportedRelease[release_name].branch,
     )
 
     edx_pulumi_code = git_repo(
@@ -120,18 +117,7 @@ def build_edx_pipeline(
         )
         loop_fragments.append(edx_pulumi_fragment)
 
-    combined_fragments = PipelineFragment(
-        resource_types=base_ami_fragment.resource_types
-        + [
-            resource_type
-            for fragment in loop_fragments
-            for resource_type in fragment.resource_types
-        ],
-        resources=base_ami_fragment.resources
-        + [resource for fragment in loop_fragments for resource in fragment.resources],
-        jobs=base_ami_fragment.jobs
-        + [job for fragment in loop_fragments for job in fragment.jobs],
-    )
+    combined_fragments = PipelineFragment.combine_fragments(*loop_fragments)
 
     return Pipeline(
         resource_types=combined_fragments.resource_types,
@@ -154,6 +140,6 @@ if __name__ == "__main__":
     sys.stdout.writelines(
         (
             "\n",
-            f"fly -t <target> set-pipeline -p packer-pulumi-edxapp-{release_name} -c definition.json",
+            f"fly -t <target> set-pipeline -p packer-pulumi-edxapp-{release_name} -c definition.json",  # noqa: E501
         )
     )

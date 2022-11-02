@@ -1,0 +1,131 @@
+from enum import Enum
+from typing import Literal, NamedTuple, Optional, Union
+
+from pydantic import BaseModel
+
+
+class OpenEdxApplication(str, Enum):  # noqa: WPS600
+    repository: str
+
+    def __new__(cls, app: str, repository: str):
+        enum_element = str.__new__(cls, app)
+        enum_element._value_ = app  # noqa: WPS437
+        enum_element.repository = repository
+        return enum_element
+
+    codejail = ("codejail", "https://github.com/eduNEXT/codejailservice/")
+    edxapp = ("edx-platform", "https://github.com/openedx/edx-platform")
+    forum = ("forum", "https://github.com/openedx/cs_comments_service")
+    notes = ("notes-api", "https://github.com/openedx/edx-notes-api")
+    theme = ("edxapp_theme", "")
+    xqueue = ("xqueue", "https://github.com/openedx/xqueue")
+    xqueue_watcher = ("xqueue-watcher", "https://github.com/openedx/xqueue-watcher")
+
+
+class OpenEdxMicroFrontend(str, Enum):  # noqa: WPS600
+    repository: str
+    path: str
+
+    def __new__(cls, app: str, repository: str, path: str):
+        enum_element = str.__new__(cls, app)
+        enum_element._value_ = app  # noqa: WPS437
+        enum_element.repository = repository
+        enum_element.path = path
+        return enum_element
+
+    course_authoring = (
+        "course-authoring",
+        "https://github.com/openedx/frontend-app-course-authoring",
+        "course-authoring",
+    )
+    gradebook = (
+        "gradebook",
+        "https://github.com/openedx/frontend-app-gradebook",
+        "gradebook",
+    )
+    learn = ("learning", "https://github.com/openedx/frontend-app-learning", "learn")
+    library_authoring = (
+        "library-authoring",
+        "https://github.com/openedx/frontend-app-library-authoring",
+        "lib-authoring",
+    )
+
+
+EnvStage = Literal["CI", "QA", "Production"]
+# IDA == Independently Deployable Application
+# MFE == Micro Front-End
+OpenEdxApplicationType = Literal["MFE", "IDA"]
+OpenEdxDeploymentName = Literal["mitx", "mitx-staging", "mitxonline", "xpro"]
+
+
+class OpenEdxSupportedRelease(str, Enum):  # noqa: WPS600
+    branch: str
+
+    def __new__(cls, release_name: str, release_branch: str):
+        enum_element = str.__new__(cls, release_name)
+        enum_element._value_ = release_name  # noqa: WPS437
+        enum_element.branch = release_branch
+        return enum_element
+
+    master = ("master", "master")
+    maple = ("maple", "open-release/maple.master")
+    nutmeg = ("nutmeg", "open-release/nutmeg.master")
+    olive = ("olive", "open-release/olive.master")
+
+
+class EnvRelease(NamedTuple):
+    environment: EnvStage
+    edx_release: OpenEdxSupportedRelease
+
+
+class DeploymentEnvRelease(BaseModel):
+    deployment_name: OpenEdxDeploymentName
+    env_release_map: list[EnvRelease]
+
+    def envs_by_release(self, release_name: OpenEdxSupportedRelease) -> list[EnvStage]:
+        return [
+            env_release.environment
+            for env_release in self.env_release_map
+            if env_release.edx_release == release_name
+        ]
+
+    def release_by_env(self, env_stage: EnvStage) -> Optional[OpenEdxSupportedRelease]:
+        for env_release in self.env_release_map:
+            if env_release.environment == env_stage:
+                return env_release.edx_release
+        return None
+
+    @property
+    def environments(self) -> list[EnvStage]:
+        return [env_release.environment for env_release in self.env_release_map]
+
+    @property
+    def releases(self) -> set[OpenEdxSupportedRelease]:
+        return {env_release.edx_release for env_release in self.env_release_map}
+
+
+class OpenEdxApplicationVersion(BaseModel):
+    application: Union[OpenEdxApplication, OpenEdxMicroFrontend]
+    release: OpenEdxSupportedRelease
+    application_type: OpenEdxApplicationType
+    branch_override: Optional[str]
+    origin_override: Optional[str]
+    runtime_version_override: Optional[str]
+
+    @property
+    def runtime_version(self) -> str:
+        # Default to Python 3.8 for IDAs and Node 16 for MFEs
+        app_type_runtime = "3.8" if self.application_type == "IDA" else "16"
+        return self.runtime_version_override or app_type_runtime
+
+    @property
+    def release_branch(self) -> str:
+        if self.branch_override:
+            return self.branch_override
+        if self.application == "edx-platform" and self.release == "master":
+            return "release"
+        return self.release.branch
+
+    @property
+    def git_origin(self) -> str:
+        return self.origin_override or self.application.repository
