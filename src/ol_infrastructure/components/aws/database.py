@@ -152,6 +152,13 @@ class OLAmazonDB(pulumi.ComponentResource):
 
         resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore  # noqa: E501
 
+        if db_config.read_replica and db_config.engine == "postgres":
+            # Necessary to allow for long-running sync queries from the replica
+            # https://docs.airbyte.com/integrations/sources/postgres/#sync-data-from-postgres-hot-standby-server
+            # (TMM 2022-11-02)
+            db_config.parameter_overrides.append(
+                {"name": "hot_standby_feedback", "value": 1}
+            )
         self.parameter_group = rds.ParameterGroup(
             f"{db_config.instance_name}-{db_config.engine}-parameter-group",
             family=parameter_group_family(db_config.engine, db_config.engine_version),
