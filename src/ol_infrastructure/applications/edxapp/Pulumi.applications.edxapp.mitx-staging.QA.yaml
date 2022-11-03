@@ -19,6 +19,7 @@ config:
   edxapp:edxapp_release: open-release/nutmeg.master
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enabled_mfes:
+    course_authoring: course-authoring
     gradebook: gradebook
     learning: learn
     library_authoring: authoring

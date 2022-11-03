@@ -19,9 +19,10 @@ config:
   edxapp:edxapp_release: open-release/olive.master
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enabled_mfes:
+    course_authoring: course-authoring
     gradebook: gradebook
     learning: learn
-    library_authoring: authoring
+    library_authoring: library-authoring
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-staging-ci.mitx.mit.edu
   edxapp:min_web_nodes: "1"
