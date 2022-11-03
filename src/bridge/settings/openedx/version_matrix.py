@@ -346,8 +346,12 @@ ReleaseMap: dict[  # noqa: WPS234
             OpenEdxApplicationVersion(
                 application="library-authoring",  # type: ignore
                 application_type="MFE",
-                release="olive",
-                branch_override="master",
+                release="master",
+            ),
+            OpenEdxApplicationVersion(
+                application="course-authoring",  # type: ignore
+                application_type="MFE",
+                release="master",
             ),
         ],
     },
