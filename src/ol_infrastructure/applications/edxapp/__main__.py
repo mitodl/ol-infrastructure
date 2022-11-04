@@ -1338,6 +1338,17 @@ edxapp_fastly_service = fastly.ServiceVcl(
             first_byte_timeout=60000,  # noqa: WPS432
             between_bytes_timeout=15000,  # noqa: WPS432
         ),
+        fastly.ServiceVclBackendArgs(
+            address=web_lb.dns_name,
+            name="AWS ALB for edX Studio",
+            port=DEFAULT_HTTPS_PORT,
+            ssl_cert_hostname=edxapp_domains["studio"],
+            ssl_sni_hostname=edxapp_domains["studio"],
+            use_ssl=True,
+            # Increase the timeout to account for slow API responses
+            first_byte_timeout=60000,  # noqa: WPS432
+            between_bytes_timeout=15000,  # noqa: WPS432
+        ),
     ],
     cache_settings=[
         fastly.ServiceVclCacheSettingArgs(
@@ -1367,7 +1378,11 @@ edxapp_fastly_service = fastly.ServiceVcl(
         fastly.ServiceVclDomainArgs(
             comment=f"{stack_info.env_prefix} {stack_info.env_suffix} edX Application",
             name=edxapp_domains["lms"],
-        )
+        ),
+        fastly.ServiceVclDomainArgs(
+            comment=f"{stack_info.env_prefix} {stack_info.env_suffix} edX Studio",
+            name=edxapp_domains["studio"],
+        ),
     ],
     headers=[
         fastly.ServiceVclHeaderArgs(
@@ -1451,7 +1466,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
 # Create Route53 DNS records for Edxapp web nodes
 for domain_key, domain_value in edxapp_domains.items():
     dns_override = edxapp_config.get("maintenance_page_dns")
-    if domain_key == "lms":
+    if domain_key in {"studio", "lms"}:
         route53.Record(
             f"edxapp-web-{domain_key}-dns-record",
             name=domain_value,
