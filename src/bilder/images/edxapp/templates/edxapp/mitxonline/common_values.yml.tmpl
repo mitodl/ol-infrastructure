@@ -238,9 +238,10 @@ DJFS:
 EDXMKTG_USER_INFO_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-user-info
 EDX_PLATFORM_REVISION: release
 ELASTIC_SEARCH_CONFIG:
--   host: elasticsearch.service.consul
-    port: 9200
-    use_ssl: false
+ELASTIC_SEARCH_CONFIG:
+- host: {{ keyOrDefault "elasticsearch/host" "elasticsearch.service.consul" }}
+  port: 443
+  use_ssl: true
 EMAIL_BACKEND: django_ses.SESBackend  # MODIFIED
 # EMAIL_HOST: localhost
 # EMAIL_HOST_PASSWORD: ''
