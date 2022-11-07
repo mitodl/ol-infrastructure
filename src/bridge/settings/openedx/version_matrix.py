@@ -106,6 +106,11 @@ ReleaseMap: dict[  # noqa: WPS234
                 release="olive",
                 branch_override="master",
             ),
+            OpenEdxApplicationVersion(
+                application="ora-grading",  # type: ignore
+                application_type="MFE",
+                release="olive",
+            ),
         ],
         "mitx-staging": [
             OpenEdxApplicationVersion(
@@ -151,6 +156,11 @@ ReleaseMap: dict[  # noqa: WPS234
                 release="olive",
                 branch_override="master",
             ),
+            OpenEdxApplicationVersion(
+                application="ora-grading",  # type: ignore
+                application_type="MFE",
+                release="olive",
+            ),
         ],
         "xpro": [
             OpenEdxApplicationVersion(
@@ -191,6 +201,11 @@ ReleaseMap: dict[  # noqa: WPS234
                 application_type="MFE",
                 release="olive",
                 branch_override="master",
+            ),
+            OpenEdxApplicationVersion(
+                application="ora-grading",  # type: ignore
+                application_type="MFE",
+                release="olive",
             ),
         ],
     },

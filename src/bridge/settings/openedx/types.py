@@ -49,6 +49,11 @@ class OpenEdxMicroFrontend(str, Enum):  # noqa: WPS600
         "https://github.com/openedx/frontend-app-library-authoring",
         "lib-authoring",
     )
+    ora_grading = (
+        "ora-grading",
+        "https://github.com/edx/frontend-app-ora-grading",
+        "ora-grading",
+    )
 
 
 EnvStage = Literal["CI", "QA", "Production"]
