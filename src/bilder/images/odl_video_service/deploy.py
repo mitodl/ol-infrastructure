@@ -93,9 +93,6 @@ files.directory(
 nginx_conf_directory = Path("/etc/nginx")
 shib_conf_directory = Path("/etc/shibboleth")
 
-certificate_file = nginx_conf_directory.joinpath("star.odl.mit.edu.crt")
-certificate_key_file = nginx_conf_directory.joinpath("star.odl.mit.edu.key")
-
 files.directory(
     name="Create NGINX directory.",
     path=str(nginx_conf_directory),
@@ -117,10 +114,11 @@ consul_templates: list[ConsulTemplateTemplate] = []
 # Firstly play down normal files requiring no special templating
 untemplated_files = {
     "fastcgi_params": nginx_conf_directory,
+    "logging.conf": nginx_conf_directory,
     "shib_clear_headers": nginx_conf_directory,
     "shib_fastcgi_params": nginx_conf_directory,
+    "shib_params": nginx_conf_directory,
     "uwsgi_params": nginx_conf_directory,
-    "logging.conf": nginx_conf_directory,
     "attribute-map.xml": shib_conf_directory,
     #    "mit-md-cert.pem": shib_conf_directory,
 }
@@ -154,6 +152,12 @@ for ct_filename, dest_tuple in consul_templated_files.items():
     )
 
 # Create a few in-line consul templates for the wildcard certificate + key
+certificate_file = nginx_conf_directory.joinpath("star.odl.mit.edu.crt")
+certificate_key_file = nginx_conf_directory.joinpath("star.odl.mit.edu.key")
+sp_certificate_file = shib_conf_directory.joinpath("sp-cert.pem")
+sp_key_file = shib_conf_directory.joinpath("sp-key.pem")
+mit_md_certificate_file = shib_conf_directory.joinpath("mit-md-cert.pem")
+
 consul_templates.extend(
     [
         ConsulTemplateTemplate(
@@ -165,6 +169,21 @@ consul_templates.extend(
             contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
             "{{ printf .Data.value }}{{ end }}",
             destination=Path(certificate_file),
+        ),
+        ConsulTemplateTemplate(
+            contents='{{ with secret "secret-odl-video-service/ovs-secrets" }}'
+            "{{ printf .Data.data.shibboleth.sp_cert }}{{ end }}",
+            destination=Path(sp_certificate_file),
+        ),
+        ConsulTemplateTemplate(
+            contents='{{ with secret "secret-odl-video-service/ovs-secrets" }}'
+            "{{ printf .Data.data.shibboleth.sp_key }}{{ end }}",
+            destination=Path(sp_key_file),
+        ),
+        ConsulTemplateTemplate(
+            contents='{{ with secret "secret-odl-video-service/ovs-secrets" }}'
+            "{{ printf .Data.data.shibboleth.mit_md_cert }}{{ end }}",
+            destination=Path(mit_md_certificate_file),
         ),
     ]
 )

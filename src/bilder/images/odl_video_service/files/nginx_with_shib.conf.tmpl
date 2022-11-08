@@ -33,20 +33,20 @@ server {
         internal ;
         include fastcgi_params;
         include shib_fastcgi_params;
-        fastcgi_pass unix:/run/shibauthorizer.sock;
+        fastcgi_pass unix:/opt/shibboleth/shibauthorizer.sock;
     }
 
     location /Shibboleth.sso {
         include fastcgi_params;
         include shib_fastcgi_params;
-        fastcgi_pass unix:/run/shibresponder.sock;
+        fastcgi_pass unix:/opt/shibboleth/shibresponder.sock;
     }
 
     location /login {
         include shib_clear_headers;
         shib_request /shibauthorizer;
         shib_request_use_headers on;
-        include shib_params.conf;
+        include shib_params;
         include uwsgi_params;
         uwsgi_ignore_client_abort on;
         uwsgi_pass app:8087;
@@ -61,11 +61,6 @@ server {
         include uwsgi_params;
         uwsgi_ignore_client_abort on;
         uwsgi_pass app:8087;
-    }
-
-    location ~* /static/(.*$) {
-        proxy_set_header Host ovs-static-assets-ci.s3.amazonaws.com;
-        proxy_pass $scheme://ovs-static-assets-ci.s3.amazonaws.com/staticfiles/$1;
     }
 
     location /collections/letterlocking {

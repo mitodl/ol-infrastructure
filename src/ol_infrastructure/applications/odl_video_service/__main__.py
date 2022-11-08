@@ -11,7 +11,7 @@ import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53, s3
+from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
@@ -484,32 +484,6 @@ consul_keys = {
     "ovs/use_shibboleth": "True" if use_shibboleth else "False",  # Yes, quoted booleans
 }
 consul_key_helper(consul_keys)
-
-# Create a S3 bucket for hosting the static assets
-static_assets_bucket_name = f"ovs-static-assets-{stack_info.env_suffix}"
-static_assets_bucket_arn = f"arn:aws:s3:::{static_assets_bucket_name}"
-
-static_assets_bucket = s3.Bucket(
-    "ovs-server-static-assets-bucket",
-    bucket=static_assets_bucket_name,
-    tags=aws_config.tags,
-    acl="public-read",
-    policy=json.dumps(
-        {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Sid": "PublicRead",
-                    "Effect": "Allow",
-                    "Principal": "*",
-                    "Action": ["s3:GetObject"],
-                    "Resource": [f"{static_assets_bucket_arn}/*"],
-                }
-            ],
-        }
-    ),
-    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
-)
 
 # Create Route53 DNS records
 five_minutes = 60 * 5

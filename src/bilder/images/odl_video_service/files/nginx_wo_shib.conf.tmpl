@@ -40,11 +40,6 @@ server {
         uwsgi_pass app:8087;
     }
 
-    location ~* /static/(.*$) {
-	proxy_set_header Host ovs-static-assets-ci.s3.amazonaws.com;
-	proxy_pass $scheme://ovs-static-assets-ci.s3.amazonaws.com/staticfiles/$1;
-    }
-
     location /collections/letterlocking {
         return 301 https://www.youtube.com/c/Letterlocking/videos;
     }

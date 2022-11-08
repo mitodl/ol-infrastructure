@@ -9,6 +9,7 @@ services:
     - /etc/nginx/fastcgi_params:/etc/nginx/fastcgi_params:ro
     - /etc/nginx/shib_clear_headers:/etc/nginx/shib_clear_headers:ro
     - /etc/nginx/uwsgi_params:/etc/nginx/uwsgi_params:ro
+    - /etc/nginx/shib_params:/etc/nginx/shib_params:ro
     - /etc/nginx/logging.conf:/etc/nginx/loggings.conf:ro
     - /etc/nginx/star.odl.mit.edu.crt:/etc/nginx/ssl/ovs_web_cert.crt:ro
     - /etc/nginx/star.odl.mit.edu.key:/etc/nginx/ssl/ovs_web_cert.key:ro
@@ -16,6 +17,7 @@ services:
     - /etc/shibboleth/shibboleth2.xml:/etc/shibboleth/shibboleth2.xml:ro
     - /etc/shibboleth/sp-cert.pem:/etc/shibboleth/sp-cert.pem:ro
     - /etc/shibboleth/sp-key.pem:/etc/shibboleth/sp-key.pem:ro
+    - /etc/shibboleth/mit-md-cert.pem:/etc/shibboleth/mit-md-cert.pem:ro
     ports:
     - "443:443"
     - "80:80"
@@ -30,6 +32,7 @@ services:
       /bin/bash -c '
       sleep 3 &&
       python3 manage.py migrate --noinput &&
+      python3 manage.py collectstatic --no-input &&
       uwsgi uwsgi.ini'
     volumes:
     - /var/log:/var/log:rw
