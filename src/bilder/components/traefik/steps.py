@@ -13,14 +13,18 @@ from bilder.facts.system import DebianCpuArch, RedhatCpuArch
 from bilder.lib.linux_helpers import linux_family
 
 
-@deploy("Install traefik")
-def install_traefik_binary(traefik_config: TraefikConfig):
+def _ensure_traefik_user(traefik_config: TraefikConfig):
     server.user(
         name="Create system user for Traefik",
         user=traefik_config.user,
         system=True,
         shell="/bin/false",  # noqa: S604
     )
+
+
+@deploy("Install traefik")
+def install_traefik_binary(traefik_config: TraefikConfig):
+    _ensure_traefik_user(traefik_config)
     if linux_family(host.get_fact(LinuxName)).lower == "debian":
         cpu_arch = host.get_fact(DebianCpuArch)
     elif linux_family(host.get_fact(LinuxName)).lower == "redhat":
@@ -75,6 +79,7 @@ def install_traefik_binary(traefik_config: TraefikConfig):
 
 @deploy("Configure traefik")
 def configure_traefik(traefik_config: TraefikConfig):
+    _ensure_traefik_user(traefik_config)
     files.put(
         name="Write Traefik static configuration file",
         src=StringIO(
