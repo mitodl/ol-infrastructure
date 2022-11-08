@@ -107,6 +107,7 @@ class DefaultCertificate(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     cert_file: Optional[str] = Field(None, alias="certFile")
@@ -126,6 +127,7 @@ class DefaultGeneratedCert(BaseModel):
     """GeneratedCert defines the default generated certificate configuration."""
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     resolver: Optional[str] = Field(
@@ -142,6 +144,7 @@ class DefaultGeneratedCert(BaseModel):
 
 class Stores(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     default_certificate: Optional[DefaultCertificate] = Field(
@@ -166,6 +169,7 @@ class Tls(BaseModel):
     """Configures the TLS connection, TLS options, and certificate stores."""
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     certificates: Optional[list[Certificate]] = None
@@ -236,6 +240,7 @@ class HttpRouter(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     entry_points: Optional[list[str]] = Field(
@@ -434,6 +439,7 @@ class HttpLoadBalancerService(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     servers: list[Server] = Field(
@@ -522,6 +528,7 @@ class HttpWeightedService(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     services: Optional[list[Service]] = None
@@ -550,6 +557,7 @@ class HttpMirroringService(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     service: Optional[str] = None
@@ -568,6 +576,7 @@ class HttpMirroringService(BaseModel):
 
 class HttpFailoverService(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     service: Optional[str] = None
@@ -577,6 +586,7 @@ class HttpFailoverService(BaseModel):
 
 class HttpServiceItem(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     load_balancer: Optional[HttpLoadBalancerService] = Field(None, alias="loadBalancer")
@@ -584,6 +594,7 @@ class HttpServiceItem(BaseModel):
 
 class HttpServiceItem1(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     weighted: Optional[HttpWeightedService] = None
@@ -591,6 +602,7 @@ class HttpServiceItem1(BaseModel):
 
 class HttpServiceItem2(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     mirroring: Optional[HttpMirroringService] = None
@@ -598,6 +610,7 @@ class HttpServiceItem2(BaseModel):
 
 class HttpServiceItem3(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     failover: Optional[HttpFailoverService] = None
@@ -619,6 +632,7 @@ class AddPrefixMiddleware(BaseModel):
     """AddPrefix middleware updates the URL Path of the request before forwarding."""
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     prefix: Optional[str] = Field(
@@ -691,6 +705,7 @@ class BufferingMiddleware(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     max_request_body_bytes: Optional[int] = Field(
@@ -748,6 +763,7 @@ class ChainMiddleware(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     middlewares: Optional[list[str]] = Field(None, min_items=1)
@@ -767,6 +783,7 @@ class CircuitBreakerMiddleware(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     expression: Optional[str] = Field(
@@ -807,6 +824,7 @@ class CompressMiddleware(BaseModel):
     """The Compress middleware enables the gzip compression."""
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     excluded_content_types: Optional[list[str]] = Field(
@@ -845,6 +863,7 @@ class ContentTypeMiddleware(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     auto_detect: Optional[bool] = Field(
@@ -866,6 +885,7 @@ class DigestAuthMiddleware(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     users: Optional[list[str]] = Field(
@@ -917,6 +937,7 @@ class ErrorsMiddleware(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     status: Optional[list[str]] = Field(
@@ -991,6 +1012,7 @@ class ForwardAuthMiddleware(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     address: Optional[str] = Field(
@@ -1044,6 +1066,7 @@ class HeadersMiddleware(BaseModel):
     """The Headers middleware can manage the requests/responses headers."""
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     custom_request_headers: Optional[dict[str, str]] = Field(
@@ -1310,6 +1333,7 @@ class IpStrategy(BaseModel):
     """Defines parameters that set how Traefik will determine the client IP."""
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     depth: Optional[int] = Field(
@@ -1336,6 +1360,7 @@ class IpWhiteListMiddleware(BaseModel):
     """IPWhitelist accepts / refuses requests based on the client IP."""
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     source_range: Optional[list[str]] = Field(
@@ -1357,6 +1382,7 @@ class SourceCriterion(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     ip_strategy: Optional[IpStrategy] = Field(None, alias="ipStrategy")
@@ -1382,6 +1408,7 @@ class InFlightReqMiddleware(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     amount: Optional[int] = Field(
@@ -1566,6 +1593,7 @@ class PassTLSClientCertMiddleware(BaseModel):
     """Adds in header the selected data from the passed client tls certificate."""
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     pem: Optional[bool] = Field(
@@ -1590,6 +1618,7 @@ class PluginMiddleware(BaseModel):
     """Some plugins will need to be configured by adding a dynamic configuration."""
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.allow
 
 
@@ -1600,6 +1629,7 @@ class RateLimitMiddleware(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     average: Optional[Union[str, float]] = Field(
@@ -1633,6 +1663,7 @@ class RedirectRegexMiddleware(BaseModel):
     """Redirect a request from an url to another with regex matching and replacement."""
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     permanent: Optional[bool] = Field(
@@ -1663,6 +1694,7 @@ class RedirectSchemeMiddleware(BaseModel):
     """RedirectScheme redirect request from a scheme to another."""
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     permanent: Optional[bool] = Field(
@@ -1690,6 +1722,7 @@ class ReplacePathMiddleware(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     path: Optional[str] = Field(
@@ -1708,6 +1741,7 @@ class ReplacePathRegexMiddleware(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     regex: Optional[str] = Field(
@@ -1736,6 +1770,7 @@ class RetryMiddleware(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     attempts: int = Field(
@@ -1761,6 +1796,7 @@ class StripPrefixMiddleware(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     prefixes: Optional[list[str]] = Field(
@@ -1789,6 +1825,7 @@ class StripPrefixRegexMiddleware(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     regex: Optional[list[str]] = Field(
@@ -1802,6 +1839,7 @@ class StripPrefixRegexMiddleware(BaseModel):
 
 class HttpMiddlewareItem(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     add_prefix: Optional[AddPrefixMiddleware] = Field(None, alias="addPrefix")
@@ -1809,6 +1847,7 @@ class HttpMiddlewareItem(BaseModel):
 
 class HttpMiddlewareItem1(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     basic_auth: Optional[BasicAuthMiddleware] = Field(None, alias="basicAuth")
@@ -1816,6 +1855,7 @@ class HttpMiddlewareItem1(BaseModel):
 
 class HttpMiddlewareItem2(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     buffering: Optional[BufferingMiddleware] = None
@@ -1823,6 +1863,7 @@ class HttpMiddlewareItem2(BaseModel):
 
 class HttpMiddlewareItem3(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     chain: Optional[ChainMiddleware] = None
@@ -1830,6 +1871,7 @@ class HttpMiddlewareItem3(BaseModel):
 
 class HttpMiddlewareItem4(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     circuit_breaker: Optional[CircuitBreakerMiddleware] = Field(
@@ -1839,6 +1881,7 @@ class HttpMiddlewareItem4(BaseModel):
 
 class HttpMiddlewareItem5(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     compress: Optional[CompressMiddleware] = None
@@ -1846,6 +1889,7 @@ class HttpMiddlewareItem5(BaseModel):
 
 class HttpMiddlewareItem6(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     content_type: Optional[ContentTypeMiddleware] = Field(None, alias="contentType")
@@ -1853,6 +1897,7 @@ class HttpMiddlewareItem6(BaseModel):
 
 class HttpMiddlewareItem7(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     digest_auth: Optional[DigestAuthMiddleware] = Field(None, alias="digestAuth")
@@ -1860,6 +1905,7 @@ class HttpMiddlewareItem7(BaseModel):
 
 class HttpMiddlewareItem8(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     errors: Optional[ErrorsMiddleware] = None
@@ -1867,6 +1913,7 @@ class HttpMiddlewareItem8(BaseModel):
 
 class HttpMiddlewareItem9(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     forward_auth: Optional[ForwardAuthMiddleware] = Field(None, alias="forwardAuth")
@@ -1874,6 +1921,7 @@ class HttpMiddlewareItem9(BaseModel):
 
 class HttpMiddlewareItem10(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     headers: Optional[HeadersMiddleware] = None
@@ -1881,6 +1929,7 @@ class HttpMiddlewareItem10(BaseModel):
 
 class HttpMiddlewareItem11(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     ip_white_list: Optional[IpWhiteListMiddleware] = Field(None, alias="ipWhiteList")
@@ -1888,6 +1937,7 @@ class HttpMiddlewareItem11(BaseModel):
 
 class HttpMiddlewareItem12(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     in_flight_req: Optional[InFlightReqMiddleware] = Field(None, alias="inFlightReq")
@@ -1895,6 +1945,7 @@ class HttpMiddlewareItem12(BaseModel):
 
 class HttpMiddlewareItem13(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     pass_tls_client_cert: Optional[PassTLSClientCertMiddleware] = Field(
@@ -1904,6 +1955,7 @@ class HttpMiddlewareItem13(BaseModel):
 
 class HttpMiddlewareItem14(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     plugin: Optional[PluginMiddleware] = None
@@ -1911,6 +1963,7 @@ class HttpMiddlewareItem14(BaseModel):
 
 class HttpMiddlewareItem15(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     rate_limit: Optional[RateLimitMiddleware] = Field(None, alias="rateLimit")
@@ -1918,6 +1971,7 @@ class HttpMiddlewareItem15(BaseModel):
 
 class HttpMiddlewareItem16(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     redirect_regex: Optional[RedirectRegexMiddleware] = Field(
@@ -1927,6 +1981,7 @@ class HttpMiddlewareItem16(BaseModel):
 
 class HttpMiddlewareItem17(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     redirect_scheme: Optional[RedirectSchemeMiddleware] = Field(
@@ -1936,6 +1991,7 @@ class HttpMiddlewareItem17(BaseModel):
 
 class HttpMiddlewareItem18(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     replace_path: Optional[ReplacePathMiddleware] = Field(None, alias="replacePath")
@@ -1943,6 +1999,7 @@ class HttpMiddlewareItem18(BaseModel):
 
 class HttpMiddlewareItem19(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     replace_path_regex: Optional[ReplacePathRegexMiddleware] = Field(
@@ -1952,6 +2009,7 @@ class HttpMiddlewareItem19(BaseModel):
 
 class HttpMiddlewareItem20(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     retry: Optional[RetryMiddleware] = None
@@ -1959,6 +2017,7 @@ class HttpMiddlewareItem20(BaseModel):
 
 class HttpMiddlewareItem21(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     strip_prefix: Optional[StripPrefixMiddleware] = Field(None, alias="stripPrefix")
@@ -1966,6 +2025,7 @@ class HttpMiddlewareItem21(BaseModel):
 
 class HttpMiddlewareItem22(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     strip_prefix_regex: Optional[StripPrefixRegexMiddleware] = Field(
@@ -2059,6 +2119,7 @@ class TcpRouter(BaseModel):
     """
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     entry_points: Optional[list[str]] = Field(
@@ -2123,6 +2184,7 @@ class ProxyProtocol(BaseModel):
 
 class TcpLoadBalancerService(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     servers: list[Server1] = Field(
@@ -2155,6 +2217,7 @@ class TcpLoadBalancerService(BaseModel):
 
 class Service1(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     name: str
@@ -2163,6 +2226,7 @@ class Service1(BaseModel):
 
 class TcpWeightedService(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     services: list[Service1] = Field(..., min_items=1)
@@ -2170,6 +2234,7 @@ class TcpWeightedService(BaseModel):
 
 class TcpServiceItem(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     load_balancer: Optional[TcpLoadBalancerService] = Field(None, alias="loadBalancer")
@@ -2177,6 +2242,7 @@ class TcpServiceItem(BaseModel):
 
 class TcpServiceItem1(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     weighted: Optional[TcpWeightedService] = None
@@ -2188,6 +2254,7 @@ class TcpService(BaseModel):
 
 class UdpRouter(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     entry_points: Optional[list[str]] = Field(
@@ -2216,6 +2283,7 @@ class UdpLoadBalancerService(BaseModel):
     """In charge of balancing the requests between the servers of the same service."""
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     servers: list[Server2] = Field(
@@ -2231,6 +2299,7 @@ class UdpLoadBalancerService(BaseModel):
 
 class Service2(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     name: str
@@ -2239,6 +2308,7 @@ class Service2(BaseModel):
 
 class UdpWeightedService(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     services: list[Service2] = Field(..., min_items=1)
@@ -2246,6 +2316,7 @@ class UdpWeightedService(BaseModel):
 
 class UdpServiceItem(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     load_balancer: Optional[UdpLoadBalancerService] = Field(None, alias="loadBalancer")
@@ -2253,6 +2324,7 @@ class UdpServiceItem(BaseModel):
 
 class UdpServiceItem1(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     weighted: Optional[UdpWeightedService] = None
@@ -2296,6 +2368,7 @@ class Tcp(BaseModel):
 
 class Udp(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     routers: Optional[dict[str, UdpRouter]] = Field(
@@ -2325,6 +2398,7 @@ class TraefikFileConfig(BaseModel):
     """Traefik v2 Dynamic Configuration File Provider"""
 
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     http: Optional[Http] = None

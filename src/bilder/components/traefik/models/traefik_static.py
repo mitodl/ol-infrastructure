@@ -30,6 +30,7 @@ class Fields(BaseModel):
 
 class AccessLog(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     file_path: Optional[str] = Field(None, alias="filePath")
@@ -41,6 +42,7 @@ class AccessLog(BaseModel):
 
 class Api(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     insecure: Optional[bool] = None
@@ -81,6 +83,7 @@ class Acme(BaseModel):
 
 class CertificatesResolvers(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     acme: Optional[Acme] = None
@@ -158,6 +161,7 @@ class Udp(BaseModel):
 
 class EntryPoints(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     address: Optional[str] = None
@@ -174,6 +178,7 @@ class EntryPoints(BaseModel):
 
 class Plugins(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     module_name: Optional[str] = Field(None, alias="moduleName")
@@ -182,6 +187,7 @@ class Plugins(BaseModel):
 
 class LocalPlugins(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     module_name: Optional[str] = Field(None, alias="moduleName")
@@ -189,6 +195,7 @@ class LocalPlugins(BaseModel):
 
 class Experimental(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     kubernetes_gateway: Optional[bool] = Field(None, alias="kubernetesGateway")
@@ -200,6 +207,7 @@ class Experimental(BaseModel):
 
 class Global(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     check_new_version: Optional[bool] = Field(None, alias="checkNewVersion")
@@ -208,6 +216,7 @@ class Global(BaseModel):
 
 class HostResolver(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     cname_flattening: Optional[bool] = Field(None, alias="cnameFlattening")
@@ -224,6 +233,7 @@ class Tls1(BaseModel):
 
 class Hub(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     tls: Optional[Tls1] = None
@@ -231,6 +241,7 @@ class Hub(BaseModel):
 
 class Log(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     level: Optional[str] = None
@@ -240,6 +251,7 @@ class Log(BaseModel):
 
 class Prometheus(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     buckets: Optional[list[float]] = None
@@ -252,6 +264,7 @@ class Prometheus(BaseModel):
 
 class Datadog(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     address: Optional[str] = None
@@ -264,6 +277,7 @@ class Datadog(BaseModel):
 
 class StatsD(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     address: Optional[str] = None
@@ -276,6 +290,7 @@ class StatsD(BaseModel):
 
 class InfluxDb(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     address: Optional[str] = None
@@ -293,6 +308,7 @@ class InfluxDb(BaseModel):
 
 class InfluxDb2(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     address: Optional[str] = None
@@ -308,6 +324,7 @@ class InfluxDb2(BaseModel):
 
 class Metrics(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     prometheus: Optional[Prometheus] = None
@@ -319,6 +336,7 @@ class Metrics(BaseModel):
 
 class Pilot(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     token: Optional[str] = None
@@ -327,6 +345,7 @@ class Pilot(BaseModel):
 
 class Ping(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     entry_point: Optional[str] = Field(None, alias="entryPoint")
@@ -336,6 +355,7 @@ class Ping(BaseModel):
 
 class Tls2(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     ca: Optional[str] = None
@@ -347,6 +367,7 @@ class Tls2(BaseModel):
 
 class Docker(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     allow_empty_services: Optional[bool] = Field(None, alias="allowEmptyServices")
@@ -367,6 +388,7 @@ class Docker(BaseModel):
 
 class FileProvider(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     directory: Optional[str] = None
@@ -379,6 +401,7 @@ class FileProvider(BaseModel):
 
 class Tls3(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     ca: Optional[str] = None
@@ -390,6 +413,7 @@ class Tls3(BaseModel):
 
 class Basic(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     http_basic_auth_user: Optional[str] = Field(None, alias="httpBasicAuthUser")
@@ -398,6 +422,7 @@ class Basic(BaseModel):
 
 class Marathon(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     constraints: Optional[str] = None
@@ -421,6 +446,7 @@ class Marathon(BaseModel):
 
 class IngressEndpoint(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     ip: Optional[str] = None
@@ -430,6 +456,7 @@ class IngressEndpoint(BaseModel):
 
 class KubernetesIngress(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     endpoint: Optional[str] = None
@@ -448,6 +475,7 @@ class KubernetesIngress(BaseModel):
 
 class KubernetesCrd(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     endpoint: Optional[str] = None
@@ -466,6 +494,7 @@ class KubernetesCrd(BaseModel):
 
 class KubernetesGateway(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     endpoint: Optional[str] = None
@@ -478,6 +507,7 @@ class KubernetesGateway(BaseModel):
 
 class Rest(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     insecure: Optional[bool] = None
@@ -485,6 +515,7 @@ class Rest(BaseModel):
 
 class Rancher(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     constraints: Optional[str] = None
@@ -501,6 +532,7 @@ class Rancher(BaseModel):
 
 class Tls4(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     ca: Optional[str] = None
@@ -512,6 +544,7 @@ class Tls4(BaseModel):
 
 class HttpAuth(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     username: Optional[str] = None
@@ -520,6 +553,7 @@ class HttpAuth(BaseModel):
 
 class Endpoint(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     address: Optional[str] = None
@@ -551,6 +585,7 @@ class ConsulCatalog(BaseModel):
 
 class Tls5(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     ca: Optional[str] = None
@@ -562,6 +597,7 @@ class Tls5(BaseModel):
 
 class Endpoint1(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     address: Optional[str] = None
@@ -573,6 +609,7 @@ class Endpoint1(BaseModel):
 
 class Nomad(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     constraints: Optional[str] = None
@@ -587,6 +624,7 @@ class Nomad(BaseModel):
 
 class Ecs(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     constraints: Optional[str] = None
@@ -603,6 +641,7 @@ class Ecs(BaseModel):
 
 class Tls6(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     ca: Optional[str] = None
@@ -614,6 +653,7 @@ class Tls6(BaseModel):
 
 class Consul(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     root_key: Optional[str] = Field(None, alias="rootKey")
@@ -626,6 +666,7 @@ class Consul(BaseModel):
 
 class Tls7(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     ca: Optional[str] = None
@@ -637,6 +678,7 @@ class Tls7(BaseModel):
 
 class Etcd(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     root_key: Optional[str] = Field(None, alias="rootKey")
@@ -648,6 +690,7 @@ class Etcd(BaseModel):
 
 class ZooKeeper(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     root_key: Optional[str] = Field(None, alias="rootKey")
@@ -658,6 +701,7 @@ class ZooKeeper(BaseModel):
 
 class Tls8(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     ca: Optional[str] = None
@@ -669,6 +713,7 @@ class Tls8(BaseModel):
 
 class Redis(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     root_key: Optional[str] = Field(None, alias="rootKey")
@@ -681,6 +726,7 @@ class Redis(BaseModel):
 
 class Tls9(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     ca: Optional[str] = None
@@ -692,6 +738,7 @@ class Tls9(BaseModel):
 
 class Http1(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     endpoint: Optional[str] = None
@@ -729,6 +776,7 @@ class Providers(BaseModel):
 
 class ForwardingTimeouts(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     dial_timeout: Optional[str] = Field(None, alias="dialTimeout")
@@ -738,6 +786,7 @@ class ForwardingTimeouts(BaseModel):
 
 class ServersTransport(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     insecure_skip_verify: Optional[bool] = Field(None, alias="insecureSkipVerify")
@@ -750,6 +799,7 @@ class ServersTransport(BaseModel):
 
 class Collector(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     endpoint: Optional[str] = None
@@ -759,6 +809,7 @@ class Collector(BaseModel):
 
 class Jaeger(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     sampling_server_url: Optional[str] = Field(None, alias="samplingServerURL")
@@ -778,6 +829,7 @@ class Jaeger(BaseModel):
 
 class Zipkin(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     http_endpoint: Optional[str] = Field(None, alias="httpEndpoint")
@@ -788,6 +840,7 @@ class Zipkin(BaseModel):
 
 class Datadog1(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     local_agent_host_port: Optional[str] = Field(None, alias="localAgentHostPort")
@@ -811,6 +864,7 @@ class Datadog1(BaseModel):
 
 class Instana(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     local_agent_host: Optional[str] = Field(None, alias="localAgentHost")
@@ -821,6 +875,7 @@ class Instana(BaseModel):
 
 class Haystack(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     local_agent_host: Optional[str] = Field(None, alias="localAgentHost")
@@ -836,6 +891,7 @@ class Haystack(BaseModel):
 
 class Elastic(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     server_url: Optional[str] = Field(None, alias="serverURL")
@@ -845,6 +901,7 @@ class Elastic(BaseModel):
 
 class Tracing(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     service_name: Optional[str] = Field(None, alias="serviceName")
@@ -859,6 +916,7 @@ class Tracing(BaseModel):
 
 class TraefikStaticConfig(BaseModel):
     class Config:
+        allow_population_by_field_name = True
         extra = Extra.forbid
 
     access_log: Optional[AccessLog] = Field(None, alias="accessLog")
