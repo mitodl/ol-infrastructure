@@ -32,7 +32,7 @@ pulumi-tls = "^4.1.0"
 pulumi-vault = "^5.5.0, !=5.7.0"
 pulumi_consul = "^3.5.0"
 pydantic = "^1"
-pyinfra = "^2.3"
+pyinfra = "^2.5"
 pulumi-mongodbatlas = "^3.3.0"
 bcrypt = "^4.0.0"
 
