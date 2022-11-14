@@ -67,6 +67,8 @@ ReleaseMap: dict[  # noqa: WPS234
                 application="edx-platform",  # type: ignore
                 application_type="IDA",
                 release="olive",
+                branch_override="mitx/olive",
+                origin_override="https://github.com/mitodl/edx-platform",
             ),
             OpenEdxApplicationVersion(
                 application="edxapp_theme",  # type: ignore
@@ -117,6 +119,8 @@ ReleaseMap: dict[  # noqa: WPS234
                 application="edx-platform",  # type: ignore
                 application_type="IDA",
                 release="olive",
+                branch_override="mitx/olive",
+                origin_override="https://github.com/mitodl/edx-platform",
             ),
             OpenEdxApplicationVersion(
                 application="edxapp_theme",  # type: ignore
