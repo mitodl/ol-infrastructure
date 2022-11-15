@@ -8,7 +8,7 @@ class OpenEdxApplication(str, Enum):  # noqa: WPS600
     repository: str
 
     def __new__(cls, app: str, repository: str):
-        enum_element = str.__new__(cls, app)
+        enum_element = str.__new__(cls, app)  # noqa: WPS609
         enum_element._value_ = app  # noqa: WPS437
         enum_element.repository = repository
         return enum_element
@@ -27,7 +27,7 @@ class OpenEdxMicroFrontend(str, Enum):  # noqa: WPS600
     path: str
 
     def __new__(cls, app: str, repository: str, path: str):
-        enum_element = str.__new__(cls, app)
+        enum_element = str.__new__(cls, app)  # noqa: WPS609
         enum_element._value_ = app  # noqa: WPS437
         enum_element.repository = repository
         enum_element.path = path
@@ -47,7 +47,7 @@ class OpenEdxMicroFrontend(str, Enum):  # noqa: WPS600
     library_authoring = (
         "library-authoring",
         "https://github.com/openedx/frontend-app-library-authoring",
-        "lib-authoring",
+        "library-authoring",
     )
     ora_grading = (
         "ora-grading",
@@ -67,7 +67,7 @@ class OpenEdxSupportedRelease(str, Enum):  # noqa: WPS600
     branch: str
 
     def __new__(cls, release_name: str, release_branch: str):
-        enum_element = str.__new__(cls, release_name)
+        enum_element = str.__new__(cls, release_name)  # noqa: WPS609
         enum_element._value_ = release_name  # noqa: WPS437
         enum_element.branch = release_branch
         return enum_element
