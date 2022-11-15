@@ -1,6 +1,6 @@
 import sys
 
-from concourse.lib.constants import PULUMI_CODE_PATH
+from concourse.lib.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from concourse.lib.models.fragment import PipelineFragment
 from concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
@@ -23,9 +23,9 @@ codejail_image_code = git_repo(
 codejail_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
     uri="https://github.com/mitodl/ol-infrastructure",
-    paths=[
+    paths=PULUMI_WATCHED_PATHS
+    + [
         "src/ol_infrastructure/applications/codejail/",
-        "pipelines/infrastructure/scripts/",
     ],
 )
 

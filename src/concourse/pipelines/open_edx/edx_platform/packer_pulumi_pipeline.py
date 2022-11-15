@@ -3,7 +3,7 @@ import sys
 from bridge.settings.openedx.accessors import filter_deployments_by_release
 from bridge.settings.openedx.types import DeploymentEnvRelease, OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
-from concourse.lib.constants import PULUMI_CODE_PATH
+from concourse.lib.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from concourse.lib.models.fragment import PipelineFragment
 from concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
@@ -24,10 +24,9 @@ def build_edx_pipeline(
     edx_pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        paths=[
+        paths=PULUMI_WATCHED_PATHS
+        + [
             "src/ol_infrastructure/applications/edxapp/",
-            "pipelines/infrastructure/scripts/",
-            "src/ol_infrastructure/components/",
             "src/bridge/secrets/edx/",
             "src/bridge/settings/openedx/",
         ],
