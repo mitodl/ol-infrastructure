@@ -167,17 +167,11 @@ def get_vault_provider(
         address=vault_address,
         add_address_to_env=True,
         token="",
-        auth_logins=[
-            pulumi_vault.ProviderAuthLoginArgs(
-                path=f"auth/pulumi/login/{pulumi_vault_creds['auth_username']}",
-                method="userpass",
-                parameters={
-                    "password": pulumi.Output.secret(
-                        pulumi_vault_creds["auth_password"]
-                    )
-                },
-            )
-        ],
+        auth_login_userpass=pulumi_vault.ProviderAuthLoginUserpassArgs(
+            mount="pulumi",
+            username=pulumi_vault_creds["auth_username"],
+            password=pulumi.Output.secret(pulumi_vault_creds["auth_password"]),
+        ),
     )
 
 
