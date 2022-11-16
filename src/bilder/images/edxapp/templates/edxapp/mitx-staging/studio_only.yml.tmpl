@@ -1,11 +1,12 @@
 # ALTERNATE_WORKER_QUEUES: lms  # Already has a sane default in the code
 ADDL_INSTALLED_APPS:  # ADDED KEY
   - git_auto_export
-COURSE_AUTHORING_MICROFRONTEND_URL:
+COURSE_AUTHORING_MICROFRONTEND_URL: /course-authoring
 GIT_REPO_EXPORT_DIR: /edx/var/edxapp/export_course_repos
 GIT_EXPORT_DEFAULT_IDENT:
   name: MITx Residential
   email: mitx-devops@mit.edu
+LIBRARY_AUTHORING_MICROFRONTEND_URL: /library-authoring/
 PARSE_KEYS: {}
 SITE_NAME: {{ key "edxapp/studio-domain" }}  # MODIFIED
 # Configuration for logging into studio via OAuth with LMS

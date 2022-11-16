@@ -6,4 +6,5 @@ VAULT_CLUSTER_ADDR="https://$PRIVATE_IPV4:8201"
 VAULT_KMS_KEY_ID=$(cat /var/opt/kms_key_id)
 echo "VAULT_CLUSTER_ADDR=$VAULT_CLUSTER_ADDR" | tee /etc/default/vault
 echo "VAULT_AWSKMS_SEAL_KEY_ID=$VAULT_KMS_KEY_ID" | tee -a /etc/default/vault
+echo "VAULT_ALLOW_PENDING_REMOVAL_MOUNTS=True" | tee -a /etc/default/vault
 systemctl restart vault

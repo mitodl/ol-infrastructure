@@ -133,8 +133,7 @@ AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
 AWS_SES_REGION_NAME: us-east-1
 AWS_STORAGE_BUCKET_NAME: {{ key "edxapp/s3-storage-bucket" }}  # MODIFIED
 BASE_COOKIE_DOMAIN: {{ key "edxapp/lms-domain" }} # MODIFIED
-BLOCKSTORE_API_URL: http://localhost:18250/api/v1
-BLOCKSTORE_PUBLIC_URL_ROOT: http://localhost:18250
+BLOCKSTORE_USE_BLOCKSTORE_APP_API: true
 BLOCK_STRUCTURES_SETTINGS:
     COURSE_PUBLISH_TASK_DELAY: 30
     PRUNING_ACTIVE: true  # MODIFIED
@@ -210,6 +209,7 @@ CORS_ORIGIN_ALLOW_ALL: false
 CORS_ORIGIN_WHITELIST:
   - https://{{ key "edxapp/lms-domain" }}
   - https://{{ key "edxapp/studio-domain" }}
+  - https://idp.mit.edu
 COURSES_WITH_UNSAFE_CODE: []
 COURSE_ABOUT_VISIBILITY_PERMISSION: see_exists
 COURSE_CATALOG_API_URL: http://localhost:8008/api/v1
@@ -251,9 +251,13 @@ DJFS:
 EDXMKTG_USER_INFO_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-user-info
 EDX_PLATFORM_REVISION: release
 ELASTIC_SEARCH_CONFIG:
--   host: elasticsearch.service.consul
-    port: 9200
-    use_ssl: false
+- host: {{ keyOrDefault "elasticsearch/host" "elasticsearch.service.consul" }}
+  port: 443
+  use_ssl: true
+ELASTIC_SEARCH_CONFIG_ES7:
+- host: {{ keyOrDefault "elasticsearch/host" "elasticsearch.service.consul" }}
+  port: 443
+  use_ssl: true
 EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend  # MODIFIED
 # EMAIL_HOST: localhost
 # EMAIL_HOST_PASSWORD: ''
@@ -267,6 +271,7 @@ FACEBOOK_API_VERSION: v2.1
 FACEBOOK_APP_ID: FACEBOOK_APP_ID
 FACEBOOK_APP_SECRET: FACEBOOK_APP_SECRET
 FEATURES:
+    ASSUME_ZERO_GRADE_IF_ABSENT_FOR_ALL_TESTS: true
     AUTH_USE_OPENID_PROVIDER: true
     AUTOMATIC_AUTH_FOR_TESTING: false
     CUSTOM_COURSES_EDX: false
@@ -278,6 +283,11 @@ FEATURES:
     ENABLE_CREDIT_API: false
     ENABLE_CREDIT_ELIGIBILITY: false
     ENABLE_CROSS_DOMAIN_CSRF_COOKIE: true  # MODIFIED
+    ENABLE_COURSEWARE_INDEX: true
+    ENABLE_COURSEWARE_SEARCH: true
+    ENABLE_CONTENT_LIBRARY_INDEX: true
+    ENABLE_LIBRARY_AUTHORING_MICROFRONTEND: true
+    ENABLE_LIBRARY_INDEX: true
     ENABLE_CSMH_EXTENDED: true
     ENABLE_DISCUSSION_HOME_PANEL: true
     ENABLE_DISCUSSION_SERVICE: true

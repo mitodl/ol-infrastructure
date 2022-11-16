@@ -48,7 +48,7 @@ docker_pipeline = Pipeline(
                     put=tubular_image.name,
                     params={
                         "image": "image/image.tar",
-                        "additional_tags": f"./{tubular_repository.name}/.git/describe_ref",
+                        "additional_tags": f"./{tubular_repository.name}/.git/describe_ref",  # noqa: E501
                     },
                 ),
             ],
@@ -61,5 +61,5 @@ if __name__ == "__main__":
         definition.write(docker_pipeline.json(indent=2))
     sys.stdout.write(docker_pipeline.json(indent=2))
     sys.stdout.write(
-        "fly -t <prod_target> set-pipeline -p docker-openedx-tubular-image -c definition.json"
+        "fly -t <prod_target> set-pipeline -p docker-openedx-tubular-image -c definition.json"  # noqa: E501
     )

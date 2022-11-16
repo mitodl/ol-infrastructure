@@ -1,3 +1,4 @@
+import sys
 import textwrap
 
 from concourse.lib.constants import REGISTRY_IMAGE
@@ -143,10 +144,9 @@ def build_docker_image_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
-
     with open("definition.json", "w") as definition:
-        definition.write(build_docker_image_pipeline().json(indent=2))
-    sys.stdout.write(build_docker_image_pipeline().json(indent=2))
-    print()  # noqa: WPS421
-    print("fly -t pr-inf sp -p docker-ovs-image -c definition.json")  # noqa: WPS421
+        definition.write(docker_pipeline().json(indent=2))
+    sys.stdout.write(docker_pipeline().json(indent=2))
+    sys.stdout.writelines(
+        ("\n", "fly -t pr-inf sp -p docker-ovs-image -c definition.json")
+    )

@@ -16,12 +16,14 @@ config:
     secure: v1:Cv6WRoXTzc4X0Mt/:JfUayMiJ3oXbRcmhCWfCLJqVvMAx3c8M0z4e5fXVj9L2fLMHfRVUhhQEn1O5lrbwnewNkzGIci1ArchaMiC9BpbVRYqfihQhT5/KH2UkaoVS6kvbgbL/M489Wa7AYpLxK47F/BPaBGLGkIZMesuo
   edxapp:edx_xqueue_secrets:
     secure: v1:ovK3uwt1RjhV81YB:Uw63YPpyTVNXV4jX9LnlMf/TqtnNjk+Ro0rynUf+ulEaZzot+bOCAqMlDyn5Xu7/nUx3iGwJEHVTrOnrMNlXiHCqOiYFpfFv8NIqc/x6+Q8+eJFGjcLxhqYidyQkUAZIfz9mRVCVgEjC423yfAMi+tMee05xKI6ylAy4aO7AjjfE0s8RMt1/toGhW6DF1MIDZw==
-  edxapp:edxapp_release: open-release/nutmeg.master
+  edxapp:edxapp_release: open-release/olive.master
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enabled_mfes:
+    course_authoring: course-authoring
     gradebook: gradebook
     learning: learn
-    library_authoring: authoring
+    library_authoring: library-authoring
+    ora_grading: ora-grading
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-ci.mitx.mit.edu
   edxapp:min_web_nodes: "1"

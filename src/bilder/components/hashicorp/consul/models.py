@@ -33,7 +33,7 @@ class ConsulDNSConfig(FlexibleBaseModel):
     service_ttl: dict[str, str] = {"*": "30s"}
 
 
-class ConsulServiceCheck(FlexibleBaseModel, abc.ABC):  # noqa: B024
+class ConsulServiceCheck(FlexibleBaseModel, abc.ABC):
     id: Optional[str]
 
 

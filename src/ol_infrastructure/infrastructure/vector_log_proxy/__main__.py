@@ -303,8 +303,8 @@ vector_log_proxy_launch_config = ec2.LaunchTemplate(
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             HEROKU_PROXY_PASSWORD={heroku_proxy_credentials['password']}
                             HEROKU_PROXY_USERNAME={heroku_proxy_credentials['username']}
-                            """
-                                ),  # noqa: WPS355
+                            """  # noqa: WPS221
+                                ),
                                 "owner": "root:root",
                             },
                         ]

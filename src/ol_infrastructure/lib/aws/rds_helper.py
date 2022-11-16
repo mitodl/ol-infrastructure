@@ -20,7 +20,7 @@ class DBInstanceTypes(str, Enum):  # noqa: WPS600
 
 @lru_cache
 def db_engines() -> dict[str, list[str]]:
-    """Generate a list of database engines and their currently available versions on RDS.
+    """Generate a list of database engines and their currently available versions on RDS.  # noqa: E501
 
     :returns: Dictionary of engine names and the list of available versions
     :rtype: Dict[str, List[str]]

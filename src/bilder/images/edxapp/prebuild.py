@@ -1,11 +1,15 @@
 import json
 import tempfile
 
-from pyinfra import host
 from pyinfra.operations import apt, files, git, server
 
 from bilder.components.baseline.steps import install_baseline_packages
-from bilder.images.edxapp.lib import WEB_NODE_TYPE, node_type
+from bilder.images.edxapp.lib import EDX_RELEASE, WEB_NODE_TYPE, node_type
+from bridge.settings.openedx.accessors import (
+    fetch_application_version,
+    filter_deployments_by_release,
+)
+from bridge.settings.openedx.types import OpenEdxApplication
 
 EDX_USER = "edxapp"
 
@@ -48,13 +52,16 @@ if node_type == WEB_NODE_TYPE:
         group=EDX_USER,
         present=True,
     )
-    for deployment, config in host.data.edx_themes.items():
+    for deployment in filter_deployments_by_release(EDX_RELEASE):
+        theme = fetch_application_version(
+            EDX_RELEASE, deployment.deployment_name, OpenEdxApplication.theme
+        )
         git.repo(
             name="Load theme repository",
-            src=config["repository"],
+            src=theme.git_origin,
             # Using a generic directory to simplify usage across deployments
-            dest=f"/edx/app/edxapp/themes/{deployment}",
-            branch=config["branch"],
+            dest=f"/edx/app/edxapp/themes/{deployment.deployment_name}",
+            branch=theme.release_branch,
             user=EDX_USER,
             group=EDX_USER,
         )

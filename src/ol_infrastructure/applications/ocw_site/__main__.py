@@ -413,7 +413,7 @@ for purpose in ("draft", "live"):
         f"ocw-{purpose}-{stack_info.env_suffix}",
         service_id=servicevcl_backend.id,
         dictionary_id=servicevcl_backend.dictionaries[0].dictionary_id,
-        items=json.load(open("redirect_dict")),
+        items=json.load(open("redirect_dict.json")),
         manage_items=True,
         opts=ResourceOptions(protect=True).merge(fastly_provider),
     )

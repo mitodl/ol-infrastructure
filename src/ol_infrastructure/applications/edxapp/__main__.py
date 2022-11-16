@@ -521,7 +521,8 @@ edxapp_db_config = OLMariaDBConfig(
     tags=aws_config.tags,
     db_name="edxapp",
     engine_version="10.5.12",
-    storage=edxapp_config.get("db_storage_gb") or 50,  # noqa: WPS432
+    storage=edxapp_config.get_int("db_storage_gb") or 50,  # noqa: WPS432
+    max_storage=edxapp_config.get_int("db_max_storage_gb") or 500,  # noqa: WPS432
     **defaults(stack_info)["rds"],
 )
 edxapp_db = OLAmazonDB(edxapp_db_config)
@@ -914,6 +915,8 @@ lms_web_lb_target_group = lb.TargetGroup(
     ),
     name_prefix=f"lms-{stack_info.env_suffix}-"[:6],
     tags=aws_config.tags,
+    preserve_client_ip=True,
+    load_balancing_algorithm_type="least_outstanding_requests",
 )
 # Studio has some workflows that are stateful, such as importing and exporting courses
 # which requires files to be written and read from the same EC2 instance. This adds
@@ -1335,6 +1338,17 @@ edxapp_fastly_service = fastly.ServiceVcl(
             first_byte_timeout=60000,  # noqa: WPS432
             between_bytes_timeout=15000,  # noqa: WPS432
         ),
+        fastly.ServiceVclBackendArgs(
+            address=web_lb.dns_name,
+            name="AWS ALB for edX Studio",
+            port=DEFAULT_HTTPS_PORT,
+            ssl_cert_hostname=edxapp_domains["studio"],
+            ssl_sni_hostname=edxapp_domains["studio"],
+            use_ssl=True,
+            # Increase the timeout to account for slow API responses
+            first_byte_timeout=60000,  # noqa: WPS432
+            between_bytes_timeout=15000,  # noqa: WPS432
+        ),
     ],
     cache_settings=[
         fastly.ServiceVclCacheSettingArgs(
@@ -1364,7 +1378,11 @@ edxapp_fastly_service = fastly.ServiceVcl(
         fastly.ServiceVclDomainArgs(
             comment=f"{stack_info.env_prefix} {stack_info.env_suffix} edX Application",
             name=edxapp_domains["lms"],
-        )
+        ),
+        fastly.ServiceVclDomainArgs(
+            comment=f"{stack_info.env_prefix} {stack_info.env_suffix} edX Studio",
+            name=edxapp_domains["studio"],
+        ),
     ],
     headers=[
         fastly.ServiceVclHeaderArgs(
@@ -1433,7 +1451,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
                 """\
                 if (obj.status == 618 && obj.response == "redirect") {
                   set obj.status = 302;
-                  set obj.http.Location = table.lookup(marketing_redirects, req.url.path) + if (req.url.qs, "?" req.url.qs, "");
+                  set obj.http.Location = table.lookup(marketing_redirects, req.url.path) + if (req.url.qs, "?" req.url.qs, "");  # noqa: E501
                   return (deliver);
                 }"""
             ),  # noqa: WPS355
@@ -1448,7 +1466,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
 # Create Route53 DNS records for Edxapp web nodes
 for domain_key, domain_value in edxapp_domains.items():
     dns_override = edxapp_config.get("maintenance_page_dns")
-    if domain_key == "lms":
+    if domain_key in {"studio", "lms"}:
         route53.Record(
             f"edxapp-web-{domain_key}-dns-record",
             name=domain_value,

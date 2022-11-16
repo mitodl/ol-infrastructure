@@ -19,6 +19,11 @@ variable "edx_ansible_branch" {
   default = "master"
 }
 
+variable "edx_release_name" {
+  type    = string
+  default = "master"
+}
+
 # Available options are "web" or "worker". Used to determine which type of node to build an image for.
 variable "node_type" {
   type = string
@@ -91,7 +96,8 @@ build {
   }
   provisioner "shell-local" {
     environment_vars = [
-      "DEBIAN_FRONTEND=noninteractive"
+      "DEBIAN_FRONTEND=noninteractive",
+      "EDX_RELEASE_NAME=${var.edx_release_name}"
     ]
     inline = [
       "sleep 15",
