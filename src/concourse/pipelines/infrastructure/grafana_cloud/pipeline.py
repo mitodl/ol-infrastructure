@@ -351,8 +351,9 @@ for tool in ["loki", "cortex", "alertmanager"]:  # noqa: WPS335
             "CORTEX_API_KEY": f"((cortextool.cortex-api-key-{stage}))",
             "CORTEX_API_USER": f"((cortextool.{tool}-rules-api-user-{stage}))",
             "CORTEX_TENANT_ID": f"((cortextool.{tool}-rules-api-user-{stage}))",
-            "OPS_TEAM_OPS_GENIE_API_KEY": f"((cortextool.ops-team-ops-genie-api-key))",  # noqa: F541, WPS237
-            "TESTING_OPS_GENIE_API_KEY": f"((cortextool.testing-ops-genie-api-key))",  # noqa: F541, WPS237
+            "OPS_TEAM_OPS_GENIE_API_KEY": "((cortextool.ops-team-ops-genie-api-key))",
+            "TESTING_OPS_GENIE_API_KEY": "((cortextool.testing-ops-genie-api-key))",
+            "SLACK_NOTIFICATIONS_OCW_MISC_API_URL": "((cortextool.slack-notifications-ocw-misc-api-url))",
             "ENVIRONMENT_NAME": stage.upper(),
             "RESOURCE_NAME": resource_name,
         }
