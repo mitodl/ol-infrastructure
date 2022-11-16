@@ -259,6 +259,13 @@ backup_bucket = s3.Bucket(
                 ),
             ],
         ),
+        s3.BucketLifecycleRuleArgs(
+            enabled=True,
+            id="delete_older_than_one_year",
+            expiration=s3.BucketLifecycleRuleExpirationArgs(
+                days=365,  # noqa: WPS432
+            ),
+        ),
     ],
     versioning=s3.BucketVersioningArgs(enabled=False),
     server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
