@@ -599,7 +599,7 @@ dagster_instance = ec2.Instance(
                             },
                             {
                                 "path": "/etc/default/consul-template",
-                                "content": f"DAGSTER_ENVIRONMENT={stack_info.env_suffix}",
+                                "content": f"DAGSTER_ENVIRONMENT={stack_info.env_suffix}",  # noqa: E501
                             },
                         ]
                     },

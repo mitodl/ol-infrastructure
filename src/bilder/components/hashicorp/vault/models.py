@@ -13,11 +13,11 @@ from bilder.components.hashicorp.models import (
 )
 
 
-class VaultAutoAuthMethodConfig(FlexibleBaseModel, abc.ABC):  # noqa: B024
+class VaultAutoAuthMethodConfig(FlexibleBaseModel, abc.ABC):
     pass  # noqa: WPS420, WPS604
 
 
-class VaultAutoAuthSinkConfig(FlexibleBaseModel, abc.ABC):  # noqa: B024
+class VaultAutoAuthSinkConfig(FlexibleBaseModel, abc.ABC):
     pass  # noqa: WPS420, WPS604
 
 

@@ -1,5 +1,3 @@
-build_environment    = "mitx-staging-ci"
-edx_platform_version = "open-release/nutmeg.master"
-edx_ansible_branch   = "open-release/nutmeg.master"
-installation_target  = "mitx-staging"
-business_unit        = "residential-staging"
+build_environment   = "mitx-staging-ci"
+installation_target = "mitx-staging"
+business_unit       = "residential-staging"

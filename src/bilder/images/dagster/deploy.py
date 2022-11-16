@@ -192,12 +192,12 @@ docker_compose_context = {
 files.template(
     name="Place the dagster docker-compose.yaml file",
     src=str(TEMPLATES_DIRECTORY.joinpath("docker-compose.yaml.j2")),
-    dest=str(Path(DOCKER_COMPOSE_DIRECTORY).joinpath("docker-compose.yaml")),
+    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
     context=docker_compose_context,
     mode="0664",
 )
 watched_docker_compose_files.append(
-    str(Path(DOCKER_COMPOSE_DIRECTORY).joinpath("docker-compose.yaml"))
+    str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml"))
 )
 
 files.put(
@@ -211,12 +211,10 @@ consul_templates.append(
         source=str(
             consul_templates_directory.joinpath(f".env.tmpl")  # noqa: F541, WPS237
         ),
-        destination=str(Path(DOCKER_COMPOSE_DIRECTORY).joinpath(".env")),
+        destination=str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env")),
     )
 )
-watched_docker_compose_files.append(
-    str(Path(DOCKER_COMPOSE_DIRECTORY).joinpath(".env"))
-)
+watched_docker_compose_files.append(str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env")))
 
 ##################################################
 # Configure Consul and Vault

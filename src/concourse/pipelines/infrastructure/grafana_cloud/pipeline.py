@@ -15,7 +15,9 @@ from concourse.lib.models.pipeline import (  # noqa: WPS235
     TaskConfig,
     TaskStep,
 )
-from concourse.lib.resources import schedule, ssh_git_repo
+from concourse.lib.notifications import notification
+from concourse.lib.resource_types import slack_notification_resource as snr_type
+from concourse.lib.resources import schedule, slack_notification, ssh_git_repo
 
 build_schedule = schedule(Identifier("build-schedule"), "1h")
 
@@ -33,6 +35,10 @@ loki_alert_rules = ssh_git_repo(
         "ci/*",
         "loki-rules/*",
     ],
+)
+
+slack_notification_resource = slack_notification(
+    Identifier("slack-notification"), url="((grizzly.slack_url))"
 )
 
 cortex_alert_rules = ssh_git_repo(
@@ -109,10 +115,10 @@ commit_managed_dashboards_job = Job(
                 run=Command(
                     path="bash",
                     args=[
-                        "-exc",  # noqa: WPS462
+                        "-xc",  # noqa: WPS462
                         """  cd changed_repo;
                                 git config user.name "concourse";
-                                git config user.email "odl-devops@mit.edu":
+                                git config user.email "odl-devops@mit.edu";
                                 UNTRACKED_FILES=`git ls-files --other --exclude-standard --directory`;  # noqa: E501
                                 git diff --exit-code;
                                 if [ $? != 0 ] || [ "$UNTRACKED_FILES" != "" ]; then
@@ -125,10 +131,26 @@ commit_managed_dashboards_job = Job(
                 ),
             ),
         ),
-        PutStep(
-            put=grafana_dashboards.name, params={"repository": grafana_dashboards.name}
-        ),
+        PutStep(put=grafana_dashboards.name, params={"repository": "changed_repo"}),
     ],
+    on_error=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Error",
+        "Error commiting managed dashboards to GitHub",
+        alert_type="errored",
+    ),
+    on_failure=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Failure",
+        "Failure commiting managed dashboards to GitHub",
+        alert_type="failed",
+    ),
+    on_abort=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Aborted",
+        "User Aborted Pipeline during commiting managed dashboards to GitHub",
+        alert_type="aborted",
+    ),
 )
 
 apply_dashboards_to_qa_job = Job(
@@ -152,12 +174,36 @@ apply_dashboards_to_qa_job = Job(
                         "-exc",
                         f""" export GRAFANA_TOKEN="((grizzly.qa_token))";  # noqa: WPS237, F541
                               export GRAFANA_URL="((grizzly.qa_url))";
-                              grr apply -d {{grafana_dashboards.name}}/managed -t '*';""",  # noqa: E501
+                              grr apply -d {grafana_dashboards.name}/managed -t '*';""",  # noqa: E501
                     ],
                 ),
             ),
         ),
     ],
+    on_error=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Error",
+        "Error applying managed dashboards to QA",
+        alert_type="errored",
+    ),
+    on_failure=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Failure",
+        "Failure applying managed dashboards to QA",
+        alert_type="failed",
+    ),
+    on_abort=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Aborted",
+        "User Aborted Pipeline during applying managed dashboards to QA",
+        alert_type="aborted",
+    ),
+    on_success=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Activity",
+        "Managed dashboards successfully applied to QA",
+        alert_type="success",
+    ),
 )
 
 apply_dashboards_to_production_job = Job(
@@ -181,12 +227,36 @@ apply_dashboards_to_production_job = Job(
                         "-exc",
                         f""" export GRAFANA_TOKEN="((grizzly.production_token))";  # noqa: WPS237, F541
                               export GRAFANA_URL="((grizzly.production_url))";
-                              grr apply -d {{grafana_dashboards.name}}/managed -t '*';""",  # noqa: E501
+                              grr apply -d {grafana_dashboards.name}/managed -t '*';""",  # noqa: E501
                     ],
                 ),
             ),
         ),
     ],
+    on_error=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Error",
+        "Error applying managed dashboards to Production",
+        alert_type="errored",
+    ),
+    on_failure=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Failure",
+        "Failure applying managed dashboards to Production",
+        alert_type="failed",
+    ),
+    on_abort=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Aborted",
+        "User Aborted Pipeline during applying managed dashboards to Production",
+        alert_type="aborted",
+    ),
+    on_success=notification(
+        slack_notification_resource,
+        "Grafana Pipeline Activity",
+        "Managed dashboards successfully applied to Production",
+        alert_type="success",
+    ),
 )
 
 dashboards_combined_fragment = PipelineFragment(
@@ -254,6 +324,24 @@ for tool in ["loki", "cortex", "alertmanager"]:  # noqa: WPS335
                     ),
                 ),
             ],
+            on_error=notification(
+                slack_notification_resource,
+                "Grafana Pipeline Error",
+                f"Error linting {tool} configs",
+                alert_type="errored",
+            ),
+            on_failure=notification(
+                slack_notification_resource,
+                "Grafana Pipeline Failure",
+                f"Failure linting {tool} configs",
+                alert_type="failed",
+            ),
+            on_abort=notification(
+                slack_notification_resource,
+                "Grafana Pipeline Aborted",
+                f"User Aborted Pipeline during linting {tool} configs",
+                alert_type="aborted",
+            ),
         )
         alerting_jobs.append(linter_job)
     else:
@@ -292,9 +380,9 @@ for tool in ["loki", "cortex", "alertmanager"]:  # noqa: WPS335
             ] = f"((cortextool.cortex-amconfig-api-user-{stage}))"
             params["ENVIRONMENT_NAME"] = stage
         params["RULE_DIRECTORY"] = directory
-        passed_value = (
-            [] if tool == "alertmanager" and stage == "ci" else [alerting_jobs[-1].name]
-        )
+        passed_value = [alerting_jobs[-1].name]
+        if tool == "alertmanager" and stage == "ci":
+            passed_value = []
         sync_job = Job(
             name=job_name,
             plan=[
@@ -317,11 +405,41 @@ for tool in ["loki", "cortex", "alertmanager"]:  # noqa: WPS335
                     ),
                 ),
             ],
+            on_error=notification(
+                slack_notification_resource,
+                "Grafana Pipeline Error",
+                f"Error syncing {tool} configs in {stage}",
+                alert_type="errored",
+            ),
+            on_failure=notification(
+                slack_notification_resource,
+                "Grafana Pipeline Failure",
+                f"Failure syncing {tool} configs {stage}",
+                alert_type="failed",
+            ),
+            on_abort=notification(
+                slack_notification_resource,
+                "Grafana Pipeline Aborted",
+                f"User Aborted Pipeline during syncing {tool} configs in {stage}",
+                alert_type="aborted",
+            ),
+            on_success=notification(
+                slack_notification_resource,
+                "Grafana Pipeline Activity",
+                f"Sync complete for {tool} configs to {stage}.",
+                alert_type="success",
+            ),
         )
         alerting_jobs.append(sync_job)
 
 alerting_combined_fragment = PipelineFragment(
-    resources=[cortex_alert_rules, loki_alert_rules, alertmanager_config],
+    resource_types=[snr_type()],
+    resources=[
+        cortex_alert_rules,
+        loki_alert_rules,
+        alertmanager_config,
+        slack_notification_resource,
+    ],
     jobs=alerting_jobs,
 )
 

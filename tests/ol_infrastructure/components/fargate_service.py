@@ -43,7 +43,7 @@ class PulumiMocks(pulumi.runtime.Mocks):
         for key in args.args.keys():
             print(f"Key - {key}, Value - {args.args[key]}")
 
-        if args.token == "aws:ec2/getSubnetIds:getSubnetIds":
+        if args.token == "aws:ec2/getSubnetIds:getSubnetIds":  # noqa: S105
             vpc_id = args.args["vpcId"]
             output = {"id": vpc_id, "ids": subnet_ids, "vpc_id": vpc_id}
 
@@ -52,7 +52,7 @@ class PulumiMocks(pulumi.runtime.Mocks):
 
 pulumi.runtime.set_mocks(PulumiMocks())
 
-exec_role_arn = "arn:aws:iam::542799376554:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS"
+exec_role_arn = "arn:aws:iam::542799376554:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS"  # noqa: E501
 
 aws_config = AWSBase(
     tags={"OU": "data", "Environment": "DEV"},
@@ -271,7 +271,7 @@ class TestClassBaseFargateArguments:
             assert container["memory"] == 512
             assert container["command"] is None
             assert container["cpu"] is None
-            assert container["environment"] == []
+            assert container["environment"] == []  # noqa: WPS520
             assert not container["essential"]
             assert container["logConfiguration"] is None
 
@@ -374,7 +374,7 @@ class TestClassAllFargateArguments:
 
             security_groups = network_configuration["security_groups"]
 
-            for key in security_groups:
+            for key in security_groups:  # noqa: WPS440
                 assert key == "ecs-task-sec-group_id"
 
         return self.service.network_configuration.apply(check_network_configuration)
@@ -384,7 +384,7 @@ class TestClassAllFargateArguments:
         def check_circuit_breaker_is_enabled(args):
             deployment_circuit_breaker = args
 
-            assert deployment_circuit_breaker != None
+            assert deployment_circuit_breaker != None  # noqa: E711
             assert deployment_circuit_breaker["enable"]
             assert deployment_circuit_breaker["rollback"]
 
@@ -411,7 +411,7 @@ class TestClassAllFargateArguments:
         return self.service.force_new_deployment.apply(check_force_deployment)
 
     @pulumi.runtime.test
-    def test_cpu_memory_for_task_containers(self):
+    def test_cpu_memory_for_task_containers(self):  # noqa: WPS231
         def check_cpu_mem(args):
             cpu, memory, container_definitions = args
             containers = json.loads(container_definitions)
@@ -423,11 +423,12 @@ class TestClassAllFargateArguments:
             total_mem = 0
 
             for container in containers:
+                port_mapping = container["portMappings"][0]
                 image = container["image"]
-                assert image == "nginx" or image == "otel"
+                assert image == "nginx" or image == "otel"  # noqa: WPS514
 
                 name = container["name"]
-                assert name == "nginx" or name == "otel"
+                assert name == "nginx" or name == "otel"  # noqa: WPS514
 
                 assert container["logConfiguration"]["logDriver"] == "awslogs"
 
@@ -437,7 +438,7 @@ class TestClassAllFargateArguments:
                 total_cpu += container["cpu"]
                 total_mem += container["memory"]
 
-                assert container["command"] == None
+                assert container["command"] == None  # noqa: E711
                 if image == "nginx":
                     assert (
                         container["logConfiguration"]["options"]["awslogs-group"]
@@ -446,9 +447,9 @@ class TestClassAllFargateArguments:
                     assert container["essential"]
                     assert container["environment"][0]["name"] == "var"
                     assert container["environment"][0]["value"] == "nginx"
-                    assert container["portMappings"][0]["containerPort"] == 80
-                    assert container["portMappings"][0]["containerName"] == "nginx"
-                    assert container["portMappings"][0]["protocol"] == "tcp"
+                    assert port_mapping["containerPort"] == 80
+                    assert port_mapping["containerName"] == "nginx"
+                    assert port_mapping["protocol"] == "tcp"
                 elif image == "otel":
                     assert (
                         container["logConfiguration"]["options"]["awslogs-group"]
@@ -457,9 +458,9 @@ class TestClassAllFargateArguments:
                     assert not container["essential"]
                     assert container["environment"][0]["name"] == "var"
                     assert container["environment"][0]["value"] == "otel"
-                    assert container["portMappings"][0]["containerPort"] == 4317
-                    assert container["portMappings"][0]["containerName"] == "otel"
-                    assert container["portMappings"][0]["protocol"] == "tcp"
+                    assert port_mapping["containerPort"] == 4317
+                    assert port_mapping["containerName"] == "otel"
+                    assert port_mapping["protocol"] == "tcp"
 
             assert int(cpu) == total_cpu
             assert int(memory) == total_mem

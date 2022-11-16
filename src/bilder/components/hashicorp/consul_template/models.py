@@ -109,7 +109,7 @@ class ConsulTemplateConsulConfig(FlexibleBaseModel):
     # face of failure. Instead, it uses exponential back-off and retry functions
     # to wait for the cluster to become available, as is customary in distributed
     # systems.
-    retry: Optional[dict]  # {
+    retry: Optional[dict]
     # This enabled retries. Retries are enabled by default, so this is
     # redundant.
     # enabled = true  # noqa: E800
@@ -130,10 +130,9 @@ class ConsulTemplateConsulConfig(FlexibleBaseModel):
     # If max_backoff is set to 10s and backoff is set to 1s, sleep times
     # would be: 1s, 2s, 4s, 8s, 10s, 10s, ...
     # max_backoff = "1m"  # noqa: E800
-    # }
 
     # This block configures the SSL options for connecting to the Consul server.
-    ssl: Optional[dict]  # {
+    ssl: Optional[dict]
     # This enables SSL. Specifying any option for SSL will also enable it.
     # enabled = true  # noqa: E800
 
@@ -163,7 +162,6 @@ class ConsulTemplateConsulConfig(FlexibleBaseModel):
 
     # This sets the SNI server name to use for validation.
     # server_name = "my-server.com"  # noqa: E800
-    # }
 
 
 class ConsulTemplateTemplate(FlexibleBaseModel):

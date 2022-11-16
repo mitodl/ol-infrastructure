@@ -70,13 +70,13 @@ VERSIONS = {  # noqa: WPS407
 
 set_env_secrets(Path("consul/consul.env"))
 
-pomerium_config = PomeriumConfig()
+pomerium_config = PomeriumConfig(docker_tag="v0.16.4")
 configure_pomerium(pomerium_config)
 
 files.put(
     name="Place the airbyte docker-compose.yaml file",
     src=str(Path(__file__).resolve().parent.joinpath("files", "docker-compose.yaml")),
-    dest=DOCKER_COMPOSE_DIRECTORY,
+    dest=str(DOCKER_COMPOSE_DIRECTORY),
     mode="0664",
 )
 
@@ -210,7 +210,7 @@ consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 consul_templates = [
     ConsulTemplateTemplate(
         source=env_template_file,
-        destination=DOCKER_COMPOSE_DIRECTORY + "/.env",  # noqa: WPS336
+        destination=str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env")),
     )
 ]
 consul_template = ConsulTemplate(
@@ -244,7 +244,7 @@ if host.get_fact(HasSystemd):
     )
 
     watched_docker_compose_files = [
-        DOCKER_COMPOSE_DIRECTORY + "/.env",  # noqa: WPS336
+        DOCKER_COMPOSE_DIRECTORY.joinpath(".env"),
         pomerium_config.certificate_file,
         pomerium_config.certificate_key_file,
         nginx_htpasswd_file,

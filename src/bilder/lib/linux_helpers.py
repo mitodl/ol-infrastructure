@@ -1,7 +1,9 @@
+from pathlib import Path
+
 RED_HAT = "RedHat"
 DEBIAN = "Debian"
 
-DOCKER_COMPOSE_DIRECTORY = "/etc/docker/compose"
+DOCKER_COMPOSE_DIRECTORY = Path("/etc/docker/compose")
 DEFAULT_DIRECTORY_MODE = 755
 
 

@@ -14,6 +14,7 @@
 import base64
 import json
 import textwrap
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -377,7 +378,7 @@ vault_listener_csr = tls.CertRequest(
     ),
 )
 vault_listener_cert = acmpca.Certificate(
-    "vault-server-listener-tls-certificate",
+    f"vault-server-listener-tls-certificate-{datetime.utcnow().year}",  # noqa: WPS237
     certificate_authority_arn=root_ca["arn"],
     certificate_signing_request=vault_listener_csr.cert_request_pem,
     signing_algorithm="SHA512WITHRSA",

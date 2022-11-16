@@ -33,7 +33,7 @@ edx_plugins_added = {
         "ol-openedx-sentry",
         "ol-openedx-course-export",
         "ol-openedx-checkout-external",
-        "social-auth-mitxpro==0.6",
+        "social-auth-mitxpro==0.6.1",
         "git+https://github.com/arslanashraf7/super-csv@740b7c76cff72f0bbe6b1f3dde3a1086cf8e1cc3#egg=super-csv",  # noqa: E501
     ],
     "xpro": [
@@ -45,7 +45,7 @@ edx_plugins_added = {
         "ol-openedx-logging",
         "ol-openedx-sentry",
         "ol-openedx-course-export",
-        "social-auth-mitxpro==0.6",
+        "social-auth-mitxpro==0.6.1",
         "git+https://github.com/ubc/ubcpi.git@1.0.0#egg=ubcpi-xblock",
         "git+https://github.com/arslanashraf7/super-csv@740b7c76cff72f0bbe6b1f3dde3a1086cf8e1cc3#egg=super-csv",  # noqa: E501
     ],
