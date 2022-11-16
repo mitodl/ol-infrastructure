@@ -15,7 +15,6 @@ def git_repo(
         name=name,
         type="git",
         icon="git",
-        check_every=check_every,
         source=Git(uri=uri, branch=branch, paths=paths),
         **kwargs,
     )
