@@ -1,5 +1,5 @@
-import textwrap
 import sys
+import textwrap
 
 from concourse.lib.constants import REGISTRY_IMAGE
 from concourse.lib.models.pipeline import (  # noqa: WPS235
