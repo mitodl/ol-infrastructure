@@ -10,17 +10,17 @@ config:
   ovs:default_domain: video-rc.odl.mit.edu
   ovs:domains:
   - video-rc.odl.mit.edu
-  - techtv-dev.mit.edu;
-  - ttv-dev.mit.edu;
+  - techtv.mit.edu
+  - ttv-dev.mit.edu
   ovs:edx_base_url: https://courses-rc.xpro/mit.edu
   ovs:log_level: INFO
   ovs:rds_password:
     secure: v1:/n8kQRfM6Od/xUKw:wwUBWVPgtmgRrN9jOA5djHdkizHjPYsUI9UDZFf5eYeOGUjZXTqSYStSK8lizXRyujf5SLfKiWqXYUeQP97QumhPuTuNbDyw+6ByeKT49P8=
   ovs:s3_bucket_name: odl-video-service-rc
   ovs:s3_subtitle_bucket_name: odl-video-service-subtitles-rc
-  ovs:s3_thumbnail_bucket_name: odl-video-service-thumbnail-rc
-  ovs:s3_transcode_bucket_name: odl-video-service-transcode-rc
-  ovs:s3_watch_bucket_name: odl-video-service-watch-rc
+  ovs:s3_thumbnail_bucket_name: odl-video-service-thumbnails-rc
+  ovs:s3_transcode_bucket_name: odl-video-service-transcoded-rc
+  ovs:s3_watch_bucket_name: odl-video-service-uploaded-rc
   ovs:target_vpc: applications_vpc
   ovs:use_shibboleth: "True"
   redis:max_connections: "30"

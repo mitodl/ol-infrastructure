@@ -37,12 +37,12 @@ services:
     volumes:
     - /var/log:/var/log:rw
 
-#  celery:
-#    image: mitodl/ovs-app:${VERSION}
-#    env_file: .env
-#    command: >
-#      /bin/bash -c '
-#      sleep 3 &&
-#      celery -A odl_video worker -B -l {{ keyOrDefault "ovs/log_level" "INFO" }}'
-#    volumes:
-#    - /var/log:/var/log:rw
+  celery:
+    image: mitodl/ovs-app:${VERSION}
+    env_file: .env
+    command: >
+      /bin/bash -c '
+      sleep 3 &&
+      celery -A odl_video worker -B -l {{ keyOrDefault "ovs/log_level" "INFO" }}'
+    volumes:
+    - /var/log:/var/log:rw
