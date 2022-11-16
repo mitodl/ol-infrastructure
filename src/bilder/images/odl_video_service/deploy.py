@@ -136,20 +136,20 @@ for ut_filename, dest_dir in untemplated_files.items():
 consul_templated_files = {
     "nginx_with_shib.conf": (nginx_conf_directory, "0660"),
     "nginx_wo_shib.conf": (nginx_conf_directory, "0660"),
-    ".env": (Path(DOCKER_COMPOSE_DIRECTORY), "0660"),
-    "docker-compose.yaml": (Path(DOCKER_COMPOSE_DIRECTORY), "0660"),
+    ".env": (DOCKER_COMPOSE_DIRECTORY, "0660"),
+    "docker-compose.yaml": (DOCKER_COMPOSE_DIRECTORY, "0660"),
     "shibboleth2.xml": (shib_conf_directory, "0664"),
 }
 for ct_filename, dest_tuple in consul_templated_files.items():
-    place_consul_template_file(
+    template = place_consul_template_file(
         name=ct_filename,
         repo_path=FILES_DIRECTORY,
         template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
         destination_path=dest_tuple[0],
-        consul_templates=consul_templates,
-        watched_files=watched_files,
         mode=dest_tuple[1],
     )
+    consul_templates.append(template)
+    watched_files.append(template.destination)
 
 # Create a few in-line consul templates for the wildcard certificate + key
 certificate_file = nginx_conf_directory.joinpath("star.odl.mit.edu.crt")
@@ -258,9 +258,7 @@ if host.get_fact(HasSystemd):
         enabled=True,
     )
 
-    watched_docker_compose_files = [
-        DOCKER_COMPOSE_DIRECTORY + "/.env",  # noqa: WPS336
-    ]
+    watched_docker_compose_files = [DOCKER_COMPOSE_DIRECTORY.joinpath("/.env")]
     service_configuration_watches(
         service_name="docker-compose", watched_files=watched_docker_compose_files
     )
