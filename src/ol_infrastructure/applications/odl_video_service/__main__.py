@@ -37,6 +37,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -95,6 +96,163 @@ consul_provider = get_consul_provider(stack_info)
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
 # IAM and instance profile
+
+parliament_config = {
+    "PERMISSIONS_MANAGEMENT_ACTIONS": {
+        "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
+    },
+    "UNKNOWN_ACTION": {"ignore_locations": []},
+}
+
+ovs_server_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Action": ["s3:ListBucket", "s3:HeadObject", "s3:GetObject"],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:s3:::ttv_videos",
+                "arn:aws:s3:::ttv_videos/*",
+                "arn:aws:s3:::ttv_static",
+                "arn:aws:s3:::ttv_static/*",
+            ],
+        },
+        {
+            "Action": [
+                "elastictranscoder:CancelJob",
+                "elastictranscoder:ReadJob",
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:job/*"
+            ],
+        },
+        {
+            "Action": [
+                "elastictranscoder:ListJobsByPipeline",
+                "elastictranscoder:ReadPipeline",
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:pipeline/{secrets['misc']['et_pipeline_id']}"  # noqa: WPS221, WPS237
+            ],
+        },
+        {
+            "Action": [
+                "elastictranscoder:CreateJob",
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:preset/*",
+                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:pipeline/{secrets['misc']['et_pipeline_id']}",  # noqa: WPS221, WPS237
+            ],
+        },
+        {
+            "Action": [
+                "elastictranscoder:ReadPreset",
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:preset/*",
+            ],
+        },
+        # This block against odl-video-service* buckets is REQUIRED
+        # App does not work without it?????
+        # TODO MAD 20221115 Why is it required?
+        # The S3 permissions block following this SHOULD cover what this provides
+        # but the app must be making some kind of call to bucket that isn't qualified
+        # by the environment (CI,RC,Production)
+        # There are 21 odl-video-service* buckets at the moment.
+        {
+            "Action": [
+                "s3:HeadObject",
+                "s3:GetObject",
+                "s3:ListAllMyBuckets",
+                "s3:ListBucket",
+                "s3:ListObjects",
+                "s3:PutObject",
+                "s3:DeleteObject",
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:s3:::odl-video-service*",
+                "arn:aws:s3:::odl-video-service*/*",
+            ],
+        },
+        {
+            "Action": ["sns:ListSubscriptionsByTopic", "sns:Publish"],
+            "Effect": "Allow",
+            "Resource": [
+                # This sns topic isn't managed by pulumi - MAD 20221115
+                f"arn:aws:sns:{aws_config.region}:{aws_account.id}:odl-video-service"
+            ],
+        },
+        {
+            "Action": [
+                "s3:DeleteObject",
+                "s3:DeleteObjectVersion",
+                "s3:GetAccelerateConfiguration",
+                "s3:GetBucketAcl",
+                "s3:GetBucketCORS",
+                "s3:GetBucketLocation",
+                "s3:GetBucketLogging",
+                "s3:GetBucketNotification",
+                "s3:GetBucketPolicy",
+                "s3:GetBucketTagging",
+                "s3:GetBucketVersioning",
+                "s3:GetBucketWebsite",
+                "s3:GetLifecycleConfiguration",
+                "s3:GetObject",
+                "s3:GetObjectAcl",
+                "s3:GetObjectTagging",
+                "s3:GetObjectTorrent",
+                "s3:GetObjectVersion",
+                "s3:GetObjectVersionAcl",
+                "s3:GetObjectVersionTagging",
+                "s3:GetObjectVersionTorrent",
+                "s3:GetReplicationConfiguration",
+                "s3:HeadObject",
+                "s3:ListAllMyBuckets",
+                "s3:ListObjects",
+                "s3:ListBucket",
+                "s3:ListBucketMultipartUploads",
+                "s3:ListBucketVersions",
+                "s3:ListMultipartUploadParts",
+                "s3:PutBucketWebsite",
+                "s3:PutObject",
+                "s3:PutObjectTagging",
+                "s3:ReplicateDelete",
+                "s3:ReplicateObject",
+                "s3:RestoreObject",
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                f"arn:aws:s3:::{ovs_config.get('s3_bucket_name')}/",  # noqa: WPS237
+                f"arn:aws:s3:::{ovs_config.get('s3_subtitle_bucket_name')}/",  # noqa: WPS237
+                f"arn:aws:s3:::{ovs_config.get('s3_thumbnail_bucket_name')}/",  # noqa: WPS237
+                f"arn:aws:s3:::{ovs_config.get('s3_transcode_bucket_name')}/",  # noqa: WPS237
+                f"arn:aws:s3:::{ovs_config.get('s3_watch_bucket_name')}/",  # noqa: WPS237
+                f"arn:aws:s3:::{ovs_config.get('s3_bucket_name')}/*",  # noqa: WPS237
+                f"arn:aws:s3:::{ovs_config.get('s3_subtitle_bucket_name')}/*",  # noqa: WPS237
+                f"arn:aws:s3:::{ovs_config.get('s3_thumbnail_bucket_name')}/*",  # noqa: WPS237
+                f"arn:aws:s3:::{ovs_config.get('s3_transcode_bucket_name')}/*",  # noqa: WPS237
+                f"arn:aws:s3:::{ovs_config.get('s3_watch_bucket_name')}/*",  # noqa: WPS237
+            ],
+        },
+    ],
+}
+ovs_server_policy = iam.Policy(
+    "odl-video-service-server-policy",
+    name_prefix="odl-video-service-server-policy-",
+    path=f"/ol-applications/odl-video-service-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
+    policy=lint_iam_policy(
+        ovs_server_policy_document,
+        stringify=True,
+        parliament_config=parliament_config,
+    ),
+    description="AWS access permissions to allow odl-video-service to s3 buckets and transcode services.",
+)
+
 ovs_server_instance_role = iam.Role(
     f"odl-video-service-server-instance-role-{stack_info.env_suffix}",
     assume_role_policy=json.dumps(
@@ -119,6 +277,12 @@ iam.RolePolicyAttachment(
     role=ovs_server_instance_role.name,
 )
 
+iam.RolePolicyAttachment(
+    f"odl-video-service-server-s3-transcode-role-policy-{env_name}",
+    policy_arn=ovs_server_policy.arn,
+    role=ovs_server_instance_role.name,
+)
+
 ovs_server_instance_profile = iam.InstanceProfile(
     f"odl-video-service-server-instance-profile-{env_name}",
     role=ovs_server_instance_role.name,
@@ -132,7 +296,10 @@ ocw_studio_vault_backend_role = vault.aws.SecretBackendRole(
     name="ovs-server",
     backend="aws-mitx",
     credential_type="iam_user",
-    policy_arns=[policy_stack.require_output("iam_policies")["describe_instances"]],
+    policy_arns=[
+        policy_stack.require_output("iam_policies")["describe_instances"],
+        ovs_server_policy.arn,
+    ],
     opts=ResourceOptions(delete_before_replace=True),
 )
 
