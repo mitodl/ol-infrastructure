@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 from parliament import analyze_policy_string
 from parliament.finding import Finding
@@ -15,16 +15,14 @@ def _is_parliament_finding_filtered(
     if not issue_match:
         return False
     action_matches = []
-    for location in parliament_config[  # noqa: WPS352, WPS426, WPS500
-        finding.issue
-    ].get("ignore_locations", []):
-        for action in location.get("actions", []):  # noqa: WPS426
-            matches = map(  # noqa: C417
-                lambda finding_action: re.findall(
-                    action, finding_action, re.IGNORECASE
-                ),
-                finding.location["actions"],
-            )
+    for location in parliament_config[finding.issue].get(  # noqa: WPS352, WPS500
+        "ignore_locations", []
+    ):
+        for action in location.get("actions", []):
+            matches = [
+                re.findall(action, finding_action, re.IGNORECASE)
+                for finding_action in finding.location["actions"]
+            ]
             action_matches.append(any(matches))
     else:
         action_matches.append("all")  # type: ignore[arg-type]
@@ -34,7 +32,7 @@ def _is_parliament_finding_filtered(
 def lint_iam_policy(
     policy_document: Union[str, dict[str, Any]],
     stringify: bool = False,
-    parliament_config: dict = None,
+    parliament_config: Optional[dict] = None,
 ) -> Union[str, dict[str, Any]]:
     """Lint the contents of an IAM policy and abort execution if issues are found.
 

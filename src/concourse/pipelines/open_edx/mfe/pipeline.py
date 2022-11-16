@@ -91,7 +91,9 @@ def mfe_params(
 
 
 def mfe_job(
-    open_edx: OpenEdxVars, mfe: OpenEdxApplicationVersion, previous_job: Job = None
+    open_edx: OpenEdxVars,
+    mfe: OpenEdxApplicationVersion,
+    previous_job: Optional[Job] = None,
 ) -> PipelineFragment:
     mfe_name = mfe.application.value
     mfe_repo = git_repo(

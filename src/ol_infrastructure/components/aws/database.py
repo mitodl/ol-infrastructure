@@ -133,7 +133,9 @@ class OLMariaDBConfig(OLDBConfig):
 class OLAmazonDB(pulumi.ComponentResource):
     """Component to create an RDS instance with sane defaults and manage associated resources."""  # noqa: E501
 
-    def __init__(self, db_config: OLDBConfig, opts: pulumi.ResourceOptions = None):
+    def __init__(
+        self, db_config: OLDBConfig, opts: Optional[pulumi.ResourceOptions] = None
+    ):
         """Create an RDS instance, parameter group, and optionally read replica.
 
         :param db_config: Configuration object for customizing the deployed database

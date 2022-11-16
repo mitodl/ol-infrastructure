@@ -7,7 +7,7 @@ from pyinfra.operations import apt, files, systemd
 
 @deploy("Install baseline requirements")
 def install_baseline_packages(
-    packages: list[str] = None,
+    packages: Optional[list[str]] = None,
     upgrade_system: bool = False,
 ):
     apt.packages(

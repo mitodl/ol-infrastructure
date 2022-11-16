@@ -8,7 +8,7 @@ def git_repo(
     name: Identifier,
     uri: str,
     branch: str = "main",
-    paths: list[str] = None,
+    paths: Optional[list[str]] = None,
     **kwargs,
 ) -> Resource:
     return Resource(
@@ -25,7 +25,7 @@ def ssh_git_repo(
     uri: str,
     private_key: str,
     branch: str = "main",
-    paths: list[str] = None,
+    paths: Optional[list[str]] = None,
 ) -> Resource:
     return Resource(
         name=name,
