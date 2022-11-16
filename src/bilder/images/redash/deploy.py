@@ -167,7 +167,7 @@ for filename, dest_dir in untemplated_files.items():
 # Secondly place down jinja2 templates rendered at AMI bake time
 # assumes .j2 file extension that will be stripped
 jinja_templated_files = {
-    "docker-compose.yaml": Path(DOCKER_COMPOSE_DIRECTORY),
+    "docker-compose.yaml": DOCKER_COMPOSE_DIRECTORY,
 }
 jinja_context = {
     "redash_version": VERSIONS["redash"],
@@ -195,7 +195,7 @@ for filename, dest_dir in jinja_templated_files.items():  # noqa: WPS440
 # assume .tmpl file extension that will be retained
 consul_templated_files = {
     "nginx.conf": nginx_conf_directory,
-    ".env": Path(DOCKER_COMPOSE_DIRECTORY),
+    ".env": DOCKER_COMPOSE_DIRECTORY,
     "shibboleth2.xml": shib_conf_directory,
 }
 for filename, dest_dir in consul_templated_files.items():  # noqa: WPS440

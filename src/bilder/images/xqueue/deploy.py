@@ -59,7 +59,7 @@ VERSIONS = {  # noqa: WPS407
 files.put(
     name="Place the xqueue docker-compose.yaml file",
     src=str(Path(__file__).resolve().parent.joinpath("files", "docker-compose.yaml")),
-    dest=str(Path(DOCKER_COMPOSE_DIRECTORY).joinpath("docker-compose.yaml")),
+    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
     mode="0660",
 )
 
