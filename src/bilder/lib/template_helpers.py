@@ -48,18 +48,20 @@ def place_jinja_template_file(  # noqa: WPS211
     :param group: The group of the rendered template on the system.
     :type group: str
 
-    :rtype: None
+    :rtype: Path
+    :returns: A Path object representing the path of the ultimate file (not the template file).
     """
+    dest = destination_path.joinpath(name)
     files.template(
         name=f"Place and interpolate {name} jinja template file",
         src=str(repo_path.joinpath(name + ".j2")),  # noqa: WPS336
-        dest=str(destination_path.joinpath(name)),
+        dest=dest,
         context=context,
         mode="0664",
         user=user,
         group=group,
     )
-    watched_files.append(destination_path.joinpath(name))
+    return dest
 
 
 def place_consul_template_file(  # noqa: WPS211
@@ -67,8 +69,6 @@ def place_consul_template_file(  # noqa: WPS211
     repo_path: Path,
     template_path: Path,
     destination_path: Path,
-    consul_templates: list[ConsulTemplateTemplate],
-    watched_files: list[Path],
     mode: str = "0664",
     user: str = "consul-template",
     group: str = "consul-template",
@@ -91,16 +91,6 @@ def place_consul_template_file(  # noqa: WPS211
         This does NOT include the filename, just the directory.
     :type destination_path: Path
 
-    :param consul_templates: A list of ConsulTemplateTemplate objects for tracking / creating the consul
-        configuration. This function will sideffect this list and appaned a new ConsulTemplateTemplate
-        object to the list.
-    :type consul_templates: List[ConsulTemplateTemplate]
-
-    :param watched_files: A list of files that will be watched on the system and used to
-        trigger service restarts when changed. This function will append the combined
-        destination_path + name to the list.
-    :type watched_files: list[Path]
-
     :param mode: The permissions specifier for the file on the destination system. Numerical form.
         both the unrendered template AND the rendered file will have the same permissions.
     :type mode: str
@@ -113,7 +103,9 @@ def place_consul_template_file(  # noqa: WPS211
         always have consul-template:consul-template usership. Set the mode accordingly.
     :type group: str
 
-    :rtype: None
+    :rtype: ConsulTemplateTemplate
+    :returns: A ConsulTemplateTemplate object that can be appended to the master list of consul
+        templates.
     """
     files.put(
         name=f"Place {name} template file.",
@@ -123,11 +115,8 @@ def place_consul_template_file(  # noqa: WPS211
         user=user,
         group=group,
     )
-    consul_templates.append(
-        ConsulTemplateTemplate(
-            source=template_path.joinpath(name + ".tmpl"),  # noqa: WPS336
-            destination=destination_path.joinpath(name),
-            perms=mode,
-        )
+    return ConsulTemplateTemplate(
+        source=template_path.joinpath(name + ".tmpl"),  # noqa: WPS336
+        destination=destination_path.joinpath(name),
+        perms=mode,
     )
-    watched_files.append(destination_path.joinpath(name))
