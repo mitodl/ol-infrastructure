@@ -498,6 +498,7 @@ ovs_tg_config = OLTargetGroupConfig(
     health_check_interval=60,
     health_check_matcher="404",  # TODO Figure out a real endpoint for this
     health_check_path="/ping",
+    stickiness="lb_cookie",
     tags=instance_tags,
 )
 
@@ -654,7 +655,7 @@ consul_key_helper(consul_keys)
 
 # Create Route53 DNS records
 five_minutes = 60 * 5
-for domain in ovs_config.get_object("domains"):
+for domain in ovs_config.get_object("route53_managed_domains"):
     route53.Record(
         f"ovs-server-dns-record-{domain}",
         name=domain,
