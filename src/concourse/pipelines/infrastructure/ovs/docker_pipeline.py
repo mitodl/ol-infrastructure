@@ -145,8 +145,8 @@ def build_docker_image_pipeline() -> Pipeline:
 
 if __name__ == "__main__":
     with open("definition.json", "w") as definition:
-        definition.write(docker_pipeline().json(indent=2))
-    sys.stdout.write(docker_pipeline().json(indent=2))
+        definition.write(build_docker_image_pipeline().json(indent=2))
+    sys.stdout.write(build_docker_image_pipeline().json(indent=2))
     sys.stdout.writelines(
         ("\n", "fly -t pr-inf sp -p docker-ovs-image -c definition.json")
     )

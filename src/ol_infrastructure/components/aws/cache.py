@@ -146,7 +146,7 @@ class OLAmazonCache(pulumi.ComponentResource):
     def __init__(
         self,
         cache_config: Union[OLAmazonRedisConfig, OLAmazonMemcachedConfig],
-        opts: pulumi.ResourceOptions = None,
+        opts: Optional[pulumi.ResourceOptions] = None,
     ):
         super().__init__(
             "ol:infrastructure:aws:elasticache:OLAmazonCache",

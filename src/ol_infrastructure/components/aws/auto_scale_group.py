@@ -210,7 +210,7 @@ class OLAutoScaling(pulumi.ComponentResource):
         lt_config: OLLaunchTemplateConfig,
         tg_config: Optional[OLTargetGroupConfig] = None,
         lb_config: Optional[OLLoadBalancerConfig] = None,
-        opts: pulumi.ResourceOptions = None,
+        opts: Optional[pulumi.ResourceOptions] = None,
     ):
 
         super().__init__(

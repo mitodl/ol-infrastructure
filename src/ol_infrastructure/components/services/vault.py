@@ -111,7 +111,7 @@ class OLVaultDatabaseBackend(ComponentResource):
     def __init__(
         self,
         db_config: Union[OLVaultMysqlDatabaseConfig, OLVaultPostgresDatabaseConfig],
-        opts: ResourceOptions = None,
+        opts: Optional[ResourceOptions] = None,
     ):
         super().__init__(
             f"ol:services:Vault:DatabaseBackend:{db_config.db_type}",
@@ -229,7 +229,9 @@ class OLVaultAWSSecretsEngineConfig(BaseModel):
 
 class OLVaultAWSSecretsEngine(ComponentResource):
     def __init__(
-        self, engine_config: OLVaultAWSSecretsEngineConfig, opts: ResourceOptions = None
+        self,
+        engine_config: OLVaultAWSSecretsEngineConfig,
+        opts: Optional[ResourceOptions] = None,
     ):
         super().__init__(
             "ol:services:Vault:AWSSecretsEngine", engine_config.app_name, None, opts
@@ -285,7 +287,7 @@ class OLVaultPKIIntermediateCABackend(ComponentResource):
     def __init__(
         self,
         backend_config: OLVaultPKIIntermediateCABackendConfig,
-        opts: ResourceOptions = None,
+        opts: Optional[ResourceOptions] = None,
     ):
         super().__init__(
             "ol:services:Vault:PKI:IntermediateCABackend",
@@ -354,7 +356,7 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
     def __init__(
         self,
         backend_config: OLVaultPKIIntermediateEnvBackendConfig,
-        opts: ResourceOptions = None,
+        opts: Optional[ResourceOptions] = None,
     ):
         super().__init__(
             "ol:services:Vault:PKI:IntermediateEnvBackendConfig",
@@ -452,7 +454,7 @@ class OLVaultPKIIntermediateRole(ComponentResource):
     def __init__(
         self,
         role_config: OLVaultPKIIntermediateRoleConfig,
-        opts: ResourceOptions = None,
+        opts: Optional[ResourceOptions] = None,
     ):
         super().__init__(
             "ol:services:Vault:PKI:IntermediateRoleConfig",

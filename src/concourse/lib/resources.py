@@ -4,12 +4,12 @@ from concourse.lib.models.pipeline import Identifier, RegistryImage, Resource
 from concourse.lib.models.resource import Git
 
 
-def git_repo(
+def git_repo(  # noqa: WPS211
     name: Identifier,
     uri: str,
     branch: str = "main",
     check_every: str = "60s",
-    paths: list[str] = None,
+    paths: Optional[list[str]] = None,
     **kwargs,
 ) -> Resource:
     return Resource(
@@ -27,7 +27,7 @@ def ssh_git_repo(
     uri: str,
     private_key: str,
     branch: str = "main",
-    paths: list[str] = None,
+    paths: Optional[list[str]] = None,
 ) -> Resource:
     return Resource(
         name=name,

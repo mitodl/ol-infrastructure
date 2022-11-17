@@ -136,7 +136,9 @@ class OLFargateServiceConfig(AWSBase):
 
 class OLFargateService(pulumi.ComponentResource):
     def __init__(
-        self, config: OLFargateServiceConfig, opts: pulumi.ResourceOptions = None
+        self,
+        config: OLFargateServiceConfig,
+        opts: Optional[pulumi.ResourceOptions] = None,
     ):
 
         super().__init__(

@@ -8,6 +8,7 @@ from enum import Enum
 from functools import lru_cache, partial
 from pathlib import Path
 from string import Template
+from typing import Optional
 
 import pulumi
 import pulumi_vault
@@ -152,7 +153,7 @@ class VaultPKIKeyTypeBits(int, Enum):  # noqa: WPS600
 
 @lru_cache
 def get_vault_provider(
-    vault_address: str, vault_env_namespace: str, provider_name: str = None
+    vault_address: str, vault_env_namespace: str, provider_name: Optional[str] = None
 ) -> pulumi.ResourceTransformationResult:
     pulumi_vault_creds = read_yaml_secrets(
         Path().joinpath(

@@ -149,7 +149,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
     def __init__(  # noqa: WPS231
         self,
         config: OLApplicationLoadBalancedFargateConfig,
-        opts: pulumi.ResourceOptions = None,
+        opts: Optional[pulumi.ResourceOptions] = None,
     ):
 
         super().__init__(
