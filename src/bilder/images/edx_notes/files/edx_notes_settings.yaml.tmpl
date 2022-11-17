@@ -2,8 +2,8 @@
 {{ with $deployment := key "edx/deployment" }}
 {{ with secret (printf "secret-%s/edx-notes" $deployment) }}
 SECRET_KEY: {{ .Data.data.django_secret_key }}
-# ID and Secret used for authenticating JWT Auth Tokens
-# should match those configured for `edx-notes` Client in EdX's /admin/oauth2/client/
+# ID and Secret used for authenticating JWT Auth Tokens should match those
+# configured for `edx-notes` Client in EdX's /admin/oauth2/client/
 CLIENT_ID: {{ .Data.data.oauth_client_id }}
 CLIENT_SECRET: {{ .Data.data.oauth_client_secret }}
 {{ end }}
