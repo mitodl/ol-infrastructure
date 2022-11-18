@@ -20,8 +20,6 @@ edx_themes = {
     },
 }
 
-# TODO: Remove references to super-csv once this PR is merged:
-# https://github.com/openedx/super-csv/pull/100 (TMM 2022-06-07)
 edx_plugins_added = {
     "mitxonline": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
@@ -34,7 +32,6 @@ edx_plugins_added = {
         "ol-openedx-course-export",
         "ol-openedx-checkout-external",
         "social-auth-mitxpro==0.6.1",
-        "git+https://github.com/arslanashraf7/super-csv@740b7c76cff72f0bbe6b1f3dde3a1086cf8e1cc3#egg=super-csv",  # noqa: E501
     ],
     "xpro": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
@@ -47,7 +44,6 @@ edx_plugins_added = {
         "ol-openedx-course-export",
         "social-auth-mitxpro==0.6.1",
         "git+https://github.com/ubc/ubcpi.git@1.0.0#egg=ubcpi-xblock",
-        "git+https://github.com/arslanashraf7/super-csv@740b7c76cff72f0bbe6b1f3dde3a1086cf8e1cc3#egg=super-csv",  # noqa: E501
     ],
     "mitx": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
@@ -61,7 +57,6 @@ edx_plugins_added = {
         "rapid-response-xblock==0.6.0",
         "ol-openedx-canvas-integration",
         "ol-openedx-rapid-response-reports",
-        "git+https://github.com/arslanashraf7/super-csv@740b7c76cff72f0bbe6b1f3dde3a1086cf8e1cc3#egg=super-csv",  # noqa: E501
     ],
     "mitx-staging": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
@@ -75,18 +70,16 @@ edx_plugins_added = {
         "rapid-response-xblock",
         "ol-openedx-canvas-integration",
         "ol-openedx-rapid-response-reports",
-        "git+https://github.com/arslanashraf7/super-csv@740b7c76cff72f0bbe6b1f3dde3a1086cf8e1cc3#egg=super-csv",  # noqa: E501
     ],
 }
 
 edx_plugins_removed = {
     "mitxonline": [
         "edx-name-affirmation",
-        "super-csv",
     ],
-    "xpro": ["super-csv"],
-    "mitx": ["super-csv"],
-    "mitx-staging": ["super-csv"],
+    "xpro": [],
+    "mitx": [],
+    "mitx-staging": [],
 }
 
 edx_platform_repository = {
