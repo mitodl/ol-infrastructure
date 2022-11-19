@@ -39,7 +39,7 @@ bcrypt = "^4.0.0"
 [tool.poetry.group.dev.dependencies]
 black = "*"
 copier = "*"
-datamodel-code-generator = "^0.13.1"
+datamodel-code-generator = "^0.14.0"
 diagrams = "*"
 isort = "*"
 mypy = "<1.0"
