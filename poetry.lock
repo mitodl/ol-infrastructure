@@ -274,11 +274,11 @@ python-versions = ">=3.6,<4.0"
 
 [[package]]
 name = "datamodel-code-generator"
-version = "0.13.5"
+version = "0.14.0"
 description = "Datamodel Code Generator"
 category = "dev"
 optional = false
-python-versions = ">=3.6.1,<4.0.0"
+python-versions = ">=3.7,<4.0"
 
 [package.dependencies]
 argcomplete = ">=1.10,<3.0"
@@ -290,14 +290,15 @@ jinja2 = ">=2.10.1,<4.0"
 openapi-spec-validator = ">=0.2.8,<0.4"
 prance = ">=0.18.2,<1.0"
 pydantic = [
+    {version = ">=1.10.0,<2.0", extras = ["email"], markers = "python_version >= \"3.11\""},
     {version = ">=1.5.1,<2.0", extras = ["email"], markers = "python_version < \"3.10\""},
-    {version = ">=1.9.0,<2.0", extras = ["email"], markers = "python_version >= \"3.10\""},
+    {version = ">=1.9.0,<2.0", extras = ["email"], markers = "python_version >= \"3.10\" and python_version < \"3.11\""},
 ]
 PySnooper = ">=0.4.1,<2.0.0"
 toml = ">=0.10.0,<1.0.0"
 typed-ast = [
-    {version = ">=1.4.2", markers = "python_full_version < \"3.9.8\""},
     {version = ">=1.5.0", markers = "python_full_version >= \"3.9.8\""},
+    {version = ">=1.4.2", markers = "python_full_version < \"3.9.8\""},
 ]
 
 [package.extras]
@@ -1810,7 +1811,7 @@ flake8-docstrings = "^1.3"
 flake8-eradicate = "^1.0"
 flake8-isort = ">=4,<6"
 flake8-quotes = "^3.0"
-flake8-rst-docstrings = "^0.2"
+flake8-rst-docstrings = ">=0.2,<0.4"
 flake8-string-format = "^0.3"
 pep8-naming = "^0.13"
 pygments = "^2.4"
@@ -1820,7 +1821,7 @@ typing_extensions = ">=4.0,<5.0"
 type = "git"
 url = "https://github.com/wemake-services/wemake-python-styleguide"
 reference = "HEAD"
-resolved_reference = "80db2405965234efede6558010758dfe5bfea46d"
+resolved_reference = "3adbdbe3c1aa75ffdd2585fc1af5685b69acceec"
 
 [[package]]
 name = "xmltodict"
@@ -1864,7 +1865,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "a0b3c4e7124caac382f672525265247667da358e293c3250d87fa8ca0b34ca90"
+content-hash = "94f93a44e791a1d33e4b03a67390e3ed8703406fb993760154e30439c9cb791c"
 
 [metadata.files]
 anyio = [
@@ -2076,8 +2077,8 @@ darglint = [
     {file = "darglint-1.8.1.tar.gz", hash = "sha256:080d5106df149b199822e7ee7deb9c012b49891538f14a11be681044f0bb20da"},
 ]
 datamodel-code-generator = [
-    {file = "datamodel_code_generator-0.13.5-py3-none-any.whl", hash = "sha256:32d50923f3e1f7e35c52a960c3bc828c6e96e832a871102dbe5d2099bfbf8c4b"},
-    {file = "datamodel_code_generator-0.13.5.tar.gz", hash = "sha256:6987e2383adf12221a9de9b55914e81b0a5cae052e2a00f2c7f0c0d7c91de37b"},
+    {file = "datamodel_code_generator-0.14.0-py3-none-any.whl", hash = "sha256:0a92afc78aff6ed6b7bc23401bdd376d9af765997af013b2c013ba735f3a6a4f"},
+    {file = "datamodel_code_generator-0.14.0.tar.gz", hash = "sha256:d54e07fdf4650ba63f2379a0c95932bb71a4d279cec79252ada581294c4747f7"},
 ]
 diagrams = [
     {file = "diagrams-0.23.1-py3-none-any.whl", hash = "sha256:64558979974a8a12aefbb8757c9118120b942c0e2a6c37862a250887eed301f1"},
@@ -2184,7 +2185,6 @@ gevent = [
     {file = "gevent-22.10.2-cp27-cp27m-win_amd64.whl", hash = "sha256:1d543c9407a1e4bca11a8932916988cfb16de00366de5bf7bc9e7a3f61e60b18"},
     {file = "gevent-22.10.2-cp27-cp27mu-manylinux2010_x86_64.whl", hash = "sha256:4e2f008c82dc54ec94f4de12ca6feea60e419babb48ec145456907ae61625aa4"},
     {file = "gevent-22.10.2-cp310-cp310-macosx_10_15_x86_64.whl", hash = "sha256:990d7069f14dc40674e0d5cb43c68fd3bad8337048613b9bb94a0c4180ffc176"},
-    {file = "gevent-22.10.2-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:526ff5b6fc7e9de686859ae1b0f0ddf60a65cead2241ddc9c9b074185f0e2e9c"},
     {file = "gevent-22.10.2-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f23d0997149a816a2a9045af29c66f67f405a221745b34cefeac5769ed451db8"},
     {file = "gevent-22.10.2-cp310-cp310-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:b43d500d7d3c0e03070dee813335bb5315215aa1cf6a04c61093dfdd718640b3"},
     {file = "gevent-22.10.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:17b68f4c9e20e47ad49fe797f37f91d5bbeace8765ce2707f979a8d4ec197e4d"},
