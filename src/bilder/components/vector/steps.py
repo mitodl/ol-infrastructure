@@ -25,15 +25,9 @@ def _install_from_package():
         present=True,
     )
     _debian_pkg_repo()
-    # TODO: MAD 20221102
-    # Temp pin vector to 0.24.2-1 while we wait for a fatal bug in 0.25.0 to be resolved
-    # https://github.com/vectordotdev/vector/issues/15071
-    # Version pinning can be accomplished with server.packages simply by putting =<version> after the package name.
-    # (only validated and tested for apt backend)
-    # https://github.com/Fizzadar/pyinfra/blob/fb5edc89af863677c326bfc5264dd7ec7164f531/pyinfra/operations/apt.py#L409
     server.packages(
         name="Install Vector package",
-        packages=["vector=0.24.2-1"],
+        packages=["vector"],
         present=True,
     )
     files.directory(
