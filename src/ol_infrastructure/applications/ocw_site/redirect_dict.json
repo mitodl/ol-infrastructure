@@ -427,7 +427,7 @@
   "/courses/mechanical-engineering/2-094-finite-element-analysis-of-solids-and-fluids-spring-2008": "307|keep|https://{{AK_HOSTHEADER}}/courses/mechanical-engineering/2-094-finite-element-analysis-of-solids-and-fluids-ii-spring-2011/",
   "/courses/mechanical-engineering/2-29-numerical-fluid-dynamics-spring-2015": "307|keep|https://{{AK_HOSTHEADER}}/courses/mechanical-engineering/2-29-numerical-fluid-mechanics-spring-2015/",
   "/courses/media-arts-and-sciences": "307|discard|https://{{AK_HOSTHEADER}}/search/?d=Media%20Arts%20and%20Sciences&s=department_course_numbers.sort_coursenum",
-  "/courses/msthematics/18-02-multivariable-fall-2007/video-lectures/lecture-28-divergence-theorem": "307|keep|https://{{AK_HOSTHEADER}}/courses/mathematics/18-02-multivariable-calculus-fall-2007/video-lectures/lecture-28-divergence-theorem/",
+  "/courses/mathematics/18-02-multivariable-fall-2007/video-lectures/lecture-28-divergence-theorem": "307|keep|https://{{AK_HOSTHEADER}}/courses/mathematics/18-02-multivariable-calculus-fall-2007/video-lectures/lecture-28-divergence-theorem/",
   "/courses/music-and-theater-Arts": "307|discard|https://{{AK_HOSTHEADER}}/search/?d=Music%20and%20Theater%20Arts&s=department_course_numbers.sort_coursenum",
   "/courses/nuclear-science-and-Engineering": "307|discard|https://{{AK_HOSTHEADER}}/search/?d=Nuclear%20Science%20and%20Engineering&s=department_course_numbers.sort_coursenum",
   "/courses/ocean-engineering": "307|keep|https://dspace.mit.edu/handle/1721.1/34000",
