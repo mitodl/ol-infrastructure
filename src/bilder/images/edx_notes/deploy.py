@@ -2,11 +2,19 @@ import os
 from pathlib import Path
 
 from pyinfra import host
-from pyinfra.operations.server import files
+from pyinfra.operations.server import files, server
 
+from bilder.components.baseline.steps import service_configuration_watches
+from bilder.components.hashicorp.consul.models import (
+    Consul,
+    ConsulAddresses,
+    ConsulConfig,
+)
 from bilder.components.hashicorp.consul_template.models import (
+    ConsulTemplate,
     ConsulTemplateConfig,
     ConsulTemplateTemplate,
+    ConsulTemplateVaultConfig,
 )
 from bilder.components.hashicorp.consul_template.steps import (
     consul_template_permissions,
@@ -16,6 +24,7 @@ from bilder.components.hashicorp.steps import (
     register_services,
 )
 from bilder.components.hashicorp.vault.models import (
+    Vault,
     VaultAgentCache,
     VaultAgentConfig,
     VaultAutoAuthAWS,
@@ -27,18 +36,34 @@ from bilder.components.hashicorp.vault.models import (
     VaultListener,
     VaultTCPListener,
 )
+from bilder.components.hashicrop.consul.steps import proxy_consul_dns
 from bilder.components.traefik.models import traefik_static
 from bilder.components.traefik.models.component import TraefikConfig
 from bilder.components.traefik.steps import configure_traefik
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
+from bilder.lib.template_helpers import (
+    CONSUL_TEMPLATE_DIRECTORY,
+    place_consul_template_file,
+)
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
 
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
-CONSUL_TEMPLATE_DIRECTORY = Path("/etc/consul-template/")
 DEPLOYMENT = os.environ.get("DEPLOYMENT")
+VERSIONS = {  # noqa: WPS407
+    "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
+    "consul-template": os.environ.get(
+        "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION
+    ),
+    "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
+}
 
+watched_files: list[Path] = []
+consul_templates: list[ConsulTemplateTemplate] = []
+
+# Configure and install traefik
 traefik_static_config = traefik_static.TraefikStaticConfig(
     log=traefik_static.Log(format="json"),
     providers=traefik_static.Providers(docker=traefik_static.Docker()),
@@ -68,18 +93,18 @@ traefik_static_config = traefik_static.TraefikStaticConfig(
     },
 )
 traefik_config = TraefikConfig(static_configuration=traefik_static_config)
-
 configure_traefik(traefik_config)
 
-consul_template = ConsulTemplateConfig(
-    template=[
-        ConsulTemplateTemplate(
-            source=CONSUL_TEMPLATE_DIRECTORY.joinpath("env.tmpl"),
-            destination=DOCKER_COMPOSE_DIRECTORY.joinpath(".env"),
-        )
-    ]
+
+# Place static files
+files.put(
+    name="Upload env file for docker-compose",
+    src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml")),
+    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
+    mode="0664",
 )
 
+# Install vault, consul, consul-template
 vault_config = VaultAgentConfig(
     cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
     listener=[
@@ -102,30 +127,66 @@ vault_config = VaultAgentConfig(
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),
 )
-
-files.put(
-    name="Upload docker compose file",
-    src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml")),
-    dest=str(CONSUL_TEMPLATE_DIRECTORY.joinpath("docker-compose.yaml.tmpl")),
-    mode="0664",
+vault = Vault(
+    versions=VERSIONS["vault"],
+    configuration={Path("vault.json"): vault_config},
 )
 
-files.put(
-    name="Upload env file for docker-compose",
-    src=str(FILES_DIRECTORY.joinpath("env.tmpl")),
-    dest=str(CONSUL_TEMPLATE_DIRECTORY.joinpath(".env.tmpl")),
-    mode="0664",
+consul_config = {
+    Path("00-default.json"): ConsulConfig(
+        addresses=ConsulAddresses(dns="127.0.0.1", http="127.0.0.1"),
+        advertise_addr='{{ GetInterfaceIP "ens5" }}',
+        service=[],
+    )
+}
+consul = (Consul(version=VERSIONS["consul"], configuration=consul_config),)
+
+# Place consul templates, setup consul-template
+dot_env_template = place_consul_template_file(
+    name=".env",
+    src=FILES_DIRECTORY,
+    template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
+    destination_path=DOCKER_COMPOSE_DIRECTORY,
+)
+consul_templates.append(dot_env_template)
+watched_files.append(dot_env_template.destination)
+
+config_file_template = place_consul_template_file(
+    name="edx_notes_settings.yaml",
+    src=FILES_DIRECTORY,
+    template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
+    destination_path=DOCKER_COMPOSE_DIRECTORY,
+)
+consul_templates.append(config_file_template)
+watched_files.append(config_file_template.destination)
+
+consul_template = ConsulTemplate(
+    version=VERSIONS["consul-template"],
+    configuration={
+        Path("00-default.json"): ConsulTemplateConfig(
+            vault=ConsulTemplateVaultConfig(),
+            template=consul_templates,
+        )
+    },
 )
 
-files.put(
-    name="Upload env file for docker-compose",
-    src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml")),
-    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
-    mode="0664",
-)
+hashicorp_products = [vault, consul, consul_template]
+for product in hashicorp_products:
+    configure_hashicorp_product(product)
 
-configure_hashicorp_product(vault_config)
-configure_hashicorp_product(consul_template)
 consul_template_permissions(consul_template.configuration)
+
 if host.get_fact(HasSystemd):
-    register_services((vault_config, consul_template), start_services_immediately=False)
+    register_services(hashicorp_products, start_services_immediately=False)
+    proxy_consul_dns()
+    server.service(
+        name="Ensure docker compose service is enabled",
+        service="docker-compose",
+        running=False,
+        enabled=True,
+    )
+
+    service_configuration_watches(
+        service_name="docker-compose",
+        watched_files=watched_files,
+    )
