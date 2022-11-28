@@ -70,7 +70,7 @@ VERSIONS = {  # noqa: WPS407
 
 set_env_secrets(Path("consul/consul.env"))
 
-pomerium_config = PomeriumConfig(docker_tag="v0.16.4")
+pomerium_config = PomeriumConfig(docker_tag="v0.19.1")
 configure_pomerium(pomerium_config)
 
 files.put(
