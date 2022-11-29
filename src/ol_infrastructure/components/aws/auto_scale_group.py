@@ -32,6 +32,7 @@ from pydantic import BaseModel, NonNegativeInt, PositiveInt, validator
 from bridge.lib.magic_numbers import (
     AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
     AWS_TARGET_GROUP_NAME_MAX_LENGTH,
+    DEFAULT_HTTP_PORT,
     DEFAULT_HTTPS_PORT,
 )
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, InstanceTypes
@@ -96,6 +97,7 @@ class OLLoadBalancerConfig(AWSBase):
     """Configuration object for defining a load balancer object for use with an autoscale group"""  # noqa: D400, E501
 
     enable_http2: bool = True
+    enable_insecure_http: bool = False
     internal: bool = False
     ip_address_type: str = "dualstack"
     load_balancer_type: str = "application"
@@ -227,7 +229,7 @@ class OLAutoScaling(pulumi.ComponentResource):
 
         # Shared attributes
         resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore  # noqa: E501
-        resource_name_prefix = asg_config.asg_name + "-"  # noqa: WPS336
+        resource_name_prefix = f"{asg_config.asg_name}-"
 
         # Create target group
         if tg_config:
@@ -253,10 +255,8 @@ class OLAutoScaling(pulumi.ComponentResource):
                 )
 
             self.target_group = TargetGroup(  # noqa: WPS601
-                resource_name_prefix + "target-group",  # noqa: WPS336
-                name=(resource_name_prefix + "tg")[  # noqa: WPS336
-                    :AWS_TARGET_GROUP_NAME_MAX_LENGTH
-                ],
+                f"{resource_name_prefix}target-group",
+                name=(f"{resource_name_prefix}tg")[:AWS_TARGET_GROUP_NAME_MAX_LENGTH],
                 vpc_id=tg_config.vpc_id,
                 port=tg_config.port,
                 protocol=tg_config.protocol,
@@ -268,14 +268,12 @@ class OLAutoScaling(pulumi.ComponentResource):
         # Create Load Balancer
         if lb_config:
             self.load_balancer = LoadBalancer(  # noqa: WPS601
-                resource_name_prefix + "load-balancer",  # noqa: WPS336
+                f"{resource_name_prefix}load-balancer",
                 enable_http2=lb_config.enable_http2,
                 internal=lb_config.internal,
                 ip_address_type=lb_config.ip_address_type,
                 load_balancer_type=lb_config.load_balancer_type,
-                name=(resource_name_prefix + "lb")[  # noqa: WPS336
-                    :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
-                ],
+                name=(f"{resource_name_prefix}lb")[:AWS_LOAD_BALANCER_NAME_MAX_LENGTH],
                 security_groups=[group.id for group in lb_config.security_groups],
                 subnets=lb_config.subnets,
                 opts=resource_options,
@@ -300,10 +298,27 @@ class OLAutoScaling(pulumi.ComponentResource):
                     statuses=["ISSUED"],
                 ).arn
             self.listener = Listener(  # noqa: WPS601
-                resource_name_prefix + "load-balancer-listener",  # noqa: WPS336
+                f"{resource_name_prefix}load-balancer-listener",
                 args=listener_args,
                 opts=resource_options,
             )
+
+            if lb_config.enable_insecure_http:
+                Listener(
+                    f"{resource_name_prefix}load-balanancer-http-listener",
+                    args=ListenerArgs(
+                        load_balancer_arn=self.load_balancer.arn,
+                        port=DEFAULT_HTTP_PORT,
+                        protocol="HTTP",
+                        default_actions=[
+                            ListenerDefaultActionArgs(
+                                type=lb_config.listener_action_type,
+                                target_group_arn=self.target_group.arn,
+                            )
+                        ],
+                    ),
+                    opts=resource_options,
+                )
 
         # Build list of block devices for launch template
         block_device_mappings = []
@@ -379,7 +394,7 @@ class OLAutoScaling(pulumi.ComponentResource):
         if self.target_group:
             auto_scale_group_kwargs["target_group_arns"] = [self.target_group.arn]
         self.auto_scale_group = Group(  # noqa: WPS601
-            resource_name_prefix + "auto-scale-group",  # noqa: WPS336
+            f"{resource_name_prefix}auto-scale-group",
             desired_capacity=asg_config.desired_size,
             health_check_type=asg_config.health_check_type,
             instance_refresh=instance_refresh_policy,
