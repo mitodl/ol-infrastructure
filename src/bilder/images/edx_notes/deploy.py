@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from pyinfra import host
-from pyinfra.operations.server import files, server
+from pyinfra.operations import files, server
 
 from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models import (
@@ -10,6 +10,7 @@ from bilder.components.hashicorp.consul.models import (
     ConsulAddresses,
     ConsulConfig,
 )
+from bilder.components.hashicorp.consul.steps import proxy_consul_dns
 from bilder.components.hashicorp.consul_template.models import (
     ConsulTemplate,
     ConsulTemplateConfig,
@@ -36,7 +37,6 @@ from bilder.components.hashicorp.vault.models import (
     VaultListener,
     VaultTCPListener,
 )
-from bilder.components.hashicrop.consul.steps import proxy_consul_dns
 from bilder.components.traefik.models import traefik_static
 from bilder.components.traefik.models.component import TraefikConfig
 from bilder.components.traefik.steps import configure_traefik
@@ -136,15 +136,15 @@ consul_config = {
     Path("00-default.json"): ConsulConfig(
         addresses=ConsulAddresses(dns="127.0.0.1", http="127.0.0.1"),
         advertise_addr='{{ GetInterfaceIP "ens5" }}',
-        service=[],
+        services=[],
     )
 }
-consul = (Consul(version=VERSIONS["consul"], configuration=consul_config),)
+consul = Consul(version=VERSIONS["consul"], configuration=consul_config)
 
 # Place consul templates, setup consul-template
 dot_env_template = place_consul_template_file(
     name=".env",
-    src=FILES_DIRECTORY,
+    repo_path=FILES_DIRECTORY,
     template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
     destination_path=DOCKER_COMPOSE_DIRECTORY,
 )
@@ -153,7 +153,7 @@ watched_files.append(dot_env_template.destination)
 
 config_file_template = place_consul_template_file(
     name="edx_notes_settings.yaml",
-    src=FILES_DIRECTORY,
+    repo_path=FILES_DIRECTORY,
     template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
     destination_path=DOCKER_COMPOSE_DIRECTORY,
 )
