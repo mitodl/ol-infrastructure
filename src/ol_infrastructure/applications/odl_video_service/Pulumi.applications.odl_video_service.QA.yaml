@@ -12,7 +12,7 @@ config:
   - video-rc.odl.mit.edu
   - techtv-dev.mit.edu
   - ttv-dev.mit.edu
-  ovs:edx_base_url: https://courses-rc.xpro/mit.edu
+  ovs:edx_base_url: https://courses-rc.xpro.mit.edu
   ovs:log_level: INFO
   ovs:rds_password:
     secure: v1:/n8kQRfM6Od/xUKw:wwUBWVPgtmgRrN9jOA5djHdkizHjPYsUI9UDZFf5eYeOGUjZXTqSYStSK8lizXRyujf5SLfKiWqXYUeQP97QumhPuTuNbDyw+6ByeKT49P8=
