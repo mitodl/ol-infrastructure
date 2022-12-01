@@ -258,7 +258,6 @@ if host.get_fact(HasSystemd):
         enabled=True,
     )
 
-    watched_docker_compose_files = [DOCKER_COMPOSE_DIRECTORY.joinpath("/.env")]
     service_configuration_watches(
-        service_name="docker-compose", watched_files=watched_docker_compose_files
+        service_name="docker-compose", watched_files=watched_files
     )
