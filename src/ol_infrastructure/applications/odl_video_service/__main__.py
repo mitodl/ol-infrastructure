@@ -38,26 +38,11 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.consul import get_consul_provider
+from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
-
-
-# A little helper to make populating the 9000 consul keys needed
-# by this application a bit less painful
-def consul_key_helper(key_value_mapping):
-    keys = []
-    for key, val in key_value_mapping.items():  # noqa: WPS110
-        keys.append(
-            consul.KeysKeyArgs(
-                path=key,
-                value=val,
-            )
-        )
-    consul.Keys("ovs-server-configuration-data", keys=keys, opts=consul_provider)
-
 
 # Configuration items and initialziations
 if Config("vault_server").get("env_namespace"):
@@ -651,7 +636,11 @@ consul_keys = {
     "ovs/s3_watch_bucket_name": ovs_config.get("s3_watch_bucket_name"),
     "ovs/use_shibboleth": "True" if use_shibboleth else "False",  # Yes, quoted booleans
 }
-consul_key_helper(consul_keys)
+consul.Keys(
+    "ovs-server-configuration-data",
+    keys=consul_key_helper(consul_keys),
+    opts=consul_provider,
+)
 
 # Create Route53 DNS records
 five_minutes = 60 * 5
