@@ -57,6 +57,21 @@ edx_plugins_added = {
         "rapid-response-xblock==0.6.0",
         "ol-openedx-canvas-integration",
         "ol-openedx-rapid-response-reports",
+        # TODO: Identify source of failures in SAML integration when using Requests
+        # 2.28.1 Relevant errors message looks like: [2022-12-01 21:03:09 +0000] [79762]
+        # [INFO] POST /auth/complete/tpa-saml/
+        # func=xmlSecOpenSSLX509StoreVerify:file=x509vfy.c:
+        # line=350:obj=x509-store:subj=unknown:error=71:certificate verification
+        # failed:X509_verify_cert:
+        # subject=/C=US/ST=Massachusetts/L=Cambridge/O=Massachusetts Institute of
+        # Technology/OU=Open
+        # Learning/CN=lms-ci.mitx.mit.edu/emailAddress=mitx-devops@mit.edu;
+        # issuer=/C=US/ST=Massachusetts/L=Cambridge/O=Massachusetts Institute of
+        # Technology/OU=Open
+        # Learning/CN=lms-ci.mitx.mit.edu/emailAddress=mitx-devops@mit.edu; err=18;
+        # msg=self signed certificate
+        # (TMM 2022-12-01)
+        "requests==2.27.1",  # Downgrade due to conflicts with SAML implementation
     ],
     "mitx-staging": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
@@ -70,6 +85,21 @@ edx_plugins_added = {
         "rapid-response-xblock",
         "ol-openedx-canvas-integration",
         "ol-openedx-rapid-response-reports",
+        # TODO: Identify source of failures in SAML integration when using Requests
+        # 2.28.1 Relevant errors message looks like: [2022-12-01 21:03:09 +0000] [79762]
+        # [INFO] POST /auth/complete/tpa-saml/
+        # func=xmlSecOpenSSLX509StoreVerify:file=x509vfy.c:
+        # line=350:obj=x509-store:subj=unknown:error=71:certificate verification
+        # failed:X509_verify_cert:
+        # subject=/C=US/ST=Massachusetts/L=Cambridge/O=Massachusetts Institute of
+        # Technology/OU=Open
+        # Learning/CN=lms-ci.mitx.mit.edu/emailAddress=mitx-devops@mit.edu;
+        # issuer=/C=US/ST=Massachusetts/L=Cambridge/O=Massachusetts Institute of
+        # Technology/OU=Open
+        # Learning/CN=lms-ci.mitx.mit.edu/emailAddress=mitx-devops@mit.edu; err=18;
+        # msg=self signed certificate
+        # (TMM 2022-12-01)
+        "requests==2.27.1",  # Downgrade due to conflicts with SAML implementation
     ],
 }
 

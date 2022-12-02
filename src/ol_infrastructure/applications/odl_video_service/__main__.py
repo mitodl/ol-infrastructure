@@ -16,6 +16,7 @@ from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
+    DEFAULT_HTTP_PORT,
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
@@ -303,6 +304,13 @@ ovs_server_security_group = ec2.SecurityGroup(
             cidr_blocks=["0.0.0.0/0"],
             description=f"Allow traffic to the odl-video-service server on port {DEFAULT_HTTPS_PORT}",
         ),
+        ec2.SecurityGroupIngressArgs(
+            protocol="tcp",
+            from_port=DEFAULT_HTTP_PORT,
+            to_port=DEFAULT_HTTP_PORT,
+            cidr_blocks=["0.0.0.0/0"],
+            description=f"Allow traffic to the odl-video-service server on port {DEFAULT_HTTP_PORT}",
+        ),
     ],
     egress=default_egress_args,
     vpc_id=target_vpc_id,
@@ -474,6 +482,7 @@ block_device_mappings = [BlockDeviceMapping()]
 ovs_lb_config = OLLoadBalancerConfig(
     subnets=subnets,
     security_groups=[ovs_server_security_group],
+    enable_insecure_http=True,
     tags=instance_tags,
 )
 

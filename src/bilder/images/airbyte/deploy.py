@@ -70,13 +70,13 @@ VERSIONS = {  # noqa: WPS407
 
 set_env_secrets(Path("consul/consul.env"))
 
-pomerium_config = PomeriumConfig(docker_tag="v0.16.4")
+pomerium_config = PomeriumConfig(docker_tag="v0.19.1")
 configure_pomerium(pomerium_config)
 
 files.put(
     name="Place the airbyte docker-compose.yaml file",
     src=str(Path(__file__).resolve().parent.joinpath("files", "docker-compose.yaml")),
-    dest=str(DOCKER_COMPOSE_DIRECTORY),
+    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
     mode="0664",
 )
 

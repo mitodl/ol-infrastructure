@@ -1,19 +1,21 @@
 # Github MITODL org developer permissions on QA environment
 
-path "sys/capabilities-self"
-{
+path "sys/capabilities-self" {
   capabilities = ["read", "update"]
 }
 
 # List
-path "secret-*/*"
-{
+path "secret-*/*" {
   capabilities = ["list"]
 }
 
+# Read Concourse secrets
+path "secret-concourse/*" {
+  capabilities = ["read", "list"]
+}
+
 # Read app secrets
-path "secret-bootcamps/*"
-{
+path "secret-bootcamps/*" {
   capabilities = ["read", "list"]
 }
 
