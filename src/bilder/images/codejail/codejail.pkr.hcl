@@ -13,10 +13,6 @@ variable "business_unit" {
   default = "operations"
 }
 
-variable "openedx_release" {
-  type = string
-}
-
 # Available options are "web" or "worker". Used to determine which type of node to build an image for.
 variable "node_type" {
   type    = string
