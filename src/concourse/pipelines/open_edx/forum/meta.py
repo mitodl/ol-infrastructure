@@ -18,11 +18,11 @@ from concourse.lib.models.pipeline import (  # noqa: WPS235
 from concourse.lib.resources import git_repo
 
 pipeline_code = git_repo(
-    name=Identifier("edxapp-pipeline-code"),
+    name=Identifier("forum-pipeline-code"),
     uri="https://github.com/mitodl/ol-infrastructure",
     paths=[
         "src/concourse/lib/",
-        "src/concourse/pipelines/open_edx/edx_platform",
+        "src/concourse/pipelines/open_edx/forum/",
     ],
 )
 
@@ -35,7 +35,7 @@ def build_meta_job(release_name):
     else:
         pipeline_definition_path = "src/concourse/pipelines/open_edx/forum/docker_packer_pulumi_pipeline.py"  # noqa: E501
         pipeline_team = "infrastructure"
-        pipeline_id = f"docker-packer-pulumi-edxapp-{release_name}"
+        pipeline_id = f"docker-packer-pulumi-forum-{release_name}"
     return Job(
         name=Identifier(f"create-forum-{release_name}-pipeline"),
         plan=[
