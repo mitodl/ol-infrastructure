@@ -48,9 +48,7 @@ def build_forum_pipeline(
         uri="https://github.com/mitodl/ol-infrastructure",
         paths=[
             "src/bridge/settings/openedx/",
-            "src/bilder/images/edxapp/prebuild.py",
-            "src/bilder/images/edxapp/edxapp_base.pkr.hcl",
-            f"src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl",  # noqa: E501
+            "src/bilder/images/forum/",
         ],
     )
 
