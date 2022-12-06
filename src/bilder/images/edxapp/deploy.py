@@ -49,7 +49,7 @@ from bilder.components.vector.steps import (
     vector_service,
 )
 from bilder.facts.has_systemd import HasSystemd
-from bilder.images.edxapp.lib import EDX_RELEASE, WEB_NODE_TYPE, node_type
+from bilder.images.edxapp.lib import OPENEDX_RELEASE, WEB_NODE_TYPE, node_type
 from bilder.images.edxapp.plugins.git_export_import import git_auto_export
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
@@ -79,7 +79,7 @@ apt.packages(
 # Check out desired repository and branch for edx-platform. This lets us manage our
 # custom code without having to bake it into the base image.
 edx_version = fetch_application_version(
-    EDX_RELEASE, EDX_INSTALLATION_NAME, OpenEdxApplication.edxapp
+    OPENEDX_RELEASE, EDX_INSTALLATION_NAME, OpenEdxApplication.edxapp
 )
 edx_platform_path = "/edx/app/edxapp/edx-platform/"
 server.shell(

@@ -4,7 +4,7 @@ import tempfile
 from pyinfra.operations import apt, files, git, server
 
 from bilder.components.baseline.steps import install_baseline_packages
-from bilder.images.edxapp.lib import EDX_RELEASE, WEB_NODE_TYPE, node_type
+from bilder.images.edxapp.lib import OPENEDX_RELEASE, WEB_NODE_TYPE, node_type
 from bridge.settings.openedx.accessors import (
     fetch_application_version,
     filter_deployments_by_release,
@@ -52,9 +52,9 @@ if node_type == WEB_NODE_TYPE:
         group=EDX_USER,
         present=True,
     )
-    for deployment in filter_deployments_by_release(EDX_RELEASE):
+    for deployment in filter_deployments_by_release(OPENEDX_RELEASE):
         theme = fetch_application_version(
-            EDX_RELEASE, deployment.deployment_name, OpenEdxApplication.theme
+            OPENEDX_RELEASE, deployment.deployment_name, OpenEdxApplication.theme
         )
         git.repo(
             name="Load theme repository",

@@ -43,6 +43,7 @@ from bridge.lib.magic_numbers import (
     IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
 )
 from bridge.secrets.sops import read_yaml_secrets
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -106,7 +107,11 @@ aws_config = AWSBase(
 consul_security_groups = consul_stack.require_output("security_groups")
 consul_provider = get_consul_provider(stack_info)
 fastly_provider = get_fastly_provider()
-edxapp_release = edxapp_config.require("edxapp_release")
+openedx_release = (
+    OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
+    .release_by_env(stack_info.name)
+    .value
+)
 edxapp_domains = edxapp_config.require_object("domains")
 edxapp_mfes = edxapp_config.require_object("enabled_mfes")
 edxapp_mfe_paths = list(edxapp_mfes.values())
@@ -119,7 +124,7 @@ ami_filters = [
     ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
     ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
     ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
-    ec2.GetAmiFilterArgs(name="tag:edxapp_release", values=[edxapp_release]),
+    ec2.GetAmiFilterArgs(name="tag:openedx_release", values=[openedx_release]),
 ]
 edxapp_web_ami = ec2.get_ami(
     filters=[
