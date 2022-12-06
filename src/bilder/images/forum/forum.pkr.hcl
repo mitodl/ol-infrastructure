@@ -23,6 +23,10 @@ variable "deployment" {
   type = string
 }
 
+variable "openedx_release" {
+  type = string
+}
+
 source "amazon-ebs" "forum" {
   ami_description         = "Deployment image for Forum server generated at ${local.timestamp}"
   ami_name                = "open-edx-forum-${var.node_type}-${local.timestamp}"
