@@ -50,10 +50,11 @@ source "amazon-ebs" "forum" {
     purpose = "${local.app_name}-${var.deployment}-${var.openedx_release}"
   }
   snapshot_tags = {
-    Name    = "${local.app_name}-${var.deployment}-${var.openedx_release}-ami"
-    OU      = "${var.business_unit}"
-    app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.deployment}-${var.openedx_release}"
+    Name            = "${local.app_name}-${var.deployment}-${var.openedx_release}-ami"
+    OU              = "${var.business_unit}"
+    app             = "${local.app_name}"
+    purpose         = "${local.app_name}-${var.deployment}-${var.openedx_release}"
+    openedx_release = var.openedx_release
   }
   # Base all builds off of the most recent docker_baseline_ami built by us, based of Debian 11
   source_ami_filter {
@@ -74,11 +75,12 @@ source "amazon-ebs" "forum" {
     random = true
   }
   tags = {
-    Name       = "${local.app_name}-${var.deployment}-${var.openedx_release}"
-    OU         = var.business_unit
-    app        = local.app_name
-    purpose    = "${local.app_name}-${var.deployment}-${var.openedx_release}"
-    deployment = "${var.deployment}"
+    Name            = "${local.app_name}-${var.deployment}-${var.openedx_release}"
+    OU              = var.business_unit
+    app             = local.app_name
+    purpose         = "${local.app_name}-${var.deployment}-${var.openedx_release}"
+    deployment      = "${var.deployment}"
+    openedx_release = var.openedx_release
   }
 }
 
