@@ -31,7 +31,7 @@ def build_forum_pipeline(
     forum_registry_image = registry_image(  # noqa: S106
         name=Identifier("openedx-forum-container"),
         image_repository="mitodl/forum",
-        image_tag=forum_branch,
+        image_tag=release_name,
         username="((dockerhub.username))",
         password="((dockerhub.password))",
     )
@@ -105,7 +105,10 @@ def build_forum_pipeline(
             ],
             image_code=forum_packer_code,
             packer_template_path="src/bilder/images/forum/forum.pkr.hcl",
-            packer_vars={"deployment": deployment.deployment_name},
+            packer_vars={
+                "deployment": deployment.deployment_name,
+                "openedx_release": release_name,
+            },
             job_name_suffix=deployment.deployment_name,
         )
         loop_fragments.append(ami_fragment)
