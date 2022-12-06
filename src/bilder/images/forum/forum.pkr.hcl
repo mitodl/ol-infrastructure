@@ -100,6 +100,6 @@ build {
       "DEPLOYMENT=${var.deployment}",
       "OPENEDX_RELEASE=${var.openedx_release}"
     ]
-    inline           = ["pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"]
+    inline = ["pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"]
   }
 }
