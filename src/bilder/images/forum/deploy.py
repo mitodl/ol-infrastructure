@@ -1,4 +1,5 @@
 import os
+from io import StringIO
 from pathlib import Path
 
 from pyinfra import host
@@ -40,7 +41,6 @@ from bilder.components.hashicorp.vault.models import (
 )
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
-from bilder.lib.openedx_helpers import set_openedx_release_env
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
@@ -73,7 +73,13 @@ files.put(
     group="consul-template",
 )
 
-set_openedx_release_env()
+OPENEDX_RELEASE = os.environ["OPENEDX_RELEASE"]
+files.put(
+    name="Create env file for codejail",
+    src=StringIO(OPENEDX_RELEASE),
+    dest="/etc/default/openedx",
+)
+
 # Acceptable values mitxonline, mitx, xpro, mitx-staging
 DEPLOYMENT = os.environ["DEPLOYMENT"]
 if DEPLOYMENT not in ["mitxonline", "mitx", "xpro", "mitx-staging"]:  # noqa: WPS510
@@ -139,7 +145,7 @@ vault = Vault(
     configuration={Path("vault.json"): vault_config},
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
-forum_config_path = Path("/etc/forum/forum.env")
+forum_config_path = DOCKER_COMPOSE_DIRECTORY.joinpath(".env")
 
 consul_templates = [
     ConsulTemplateTemplate(

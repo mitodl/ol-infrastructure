@@ -21,12 +21,6 @@
     EDXAPP_LMS_NGINX_PORT: 80
     EDXAPP_LMS_PREVIEW_NGINX_PORT: 80
     EDXAPP_LMS_SSL_NGINX_PORT: 443
-    # Set to empty values so that the tests don't fail since we are managing the
-    # config file directly
-    forum_source_repo: https://github.com/mitodl/cs_comments_service.git
-    FORUM_MONGO_HOSTS: []
-    forum_services: []
-    FORUM_USE_TCP: true
     NGINX_ENABLE_SSL: true
     NGINX_HTTPS_REDIRECT_STRATEGY: forward_for_proto
     NGINX_LOG_FORMAT_NAME: json_analytics
@@ -35,14 +29,12 @@
     NGINX_SSL_KEY: /tmp/edxapp.key
   serial: '{{ serial_count }}'
   roles:
-  - forum
   - role: automated
     AUTOMATED_USERS: '{{ EDXAPP_AUTOMATED_USERS | default({}) }}'
   - role: nginx
     nginx_sites:
     - lms
     - cms
-    - forum
     nginx_default_sites: '{{ EDXAPP_NGINX_DEFAULT_SITES }}'
     nginx_extra_sites: '{{ NGINX_EDXAPP_EXTRA_SITES }}'
     nginx_extra_configs: '{{ NGINX_EDXAPP_EXTRA_CONFIGS }}'

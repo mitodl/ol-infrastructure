@@ -9,5 +9,3 @@ services:
       FLASK_CODEJAILSERVICE_PORT: "8000"
     ports:
     - 8000:8000
-    env_file:
-    - /etc/defaults/openedx
