@@ -128,8 +128,8 @@ def registry_image(
         repository=image_repository, tag=image_tag or "latest"
     ).dict()
     if username and password:
-        image_source[username] = username
-        image_source[password] = password
+        image_source["username"] = username
+        image_source["password"] = password
     return Resource(
         name=name,
         type="registry-image",
