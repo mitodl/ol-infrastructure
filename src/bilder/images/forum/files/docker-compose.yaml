@@ -1,10 +1,11 @@
 ---
 version: "3.7"
 services:
-  forums:
-    container_name: forums
-    image: mitodl/forum:latest
+  forum:
+    container_name: forum
+    image: mitodl/forum:${OPENEDX_RELEASE}
     ports:
     - 4567:4567
     env_file:
     - /etc/forum/forum.env
+    - /etc/defaults/openedx
