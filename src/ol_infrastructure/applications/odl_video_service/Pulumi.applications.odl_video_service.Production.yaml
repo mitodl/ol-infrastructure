@@ -13,13 +13,12 @@ config:
   - techtv.mit.edu
   - ttv.mit.edu
   ovs:edx_base_url: https://courses.xpro.mit.edu
+  ovs:feature_annotations: "False"
   ovs:log_level: INFO
   ovs:rds_password:
     secure: v1:ZuLd0v6/Z6KPbt70:d6d57OUpQy6Mxk4GAEowidVhkN8tXSDRvNG9MXu4hCwMbJfvY7QmvmOie0ElGjWDh354ssuERYFOEoqWDCPD2N2yNLtcA9BB1q2UVlUyuGM=
   ovs:route53_managed_domains:
   - video.odl.mit.edu
-  - techtv.mit.edu
-  - ttv.mit.edu
   ovs:s3_bucket_name: odl-video-service
   ovs:s3_subtitle_bucket_name: odl-video-service-subtitles
   ovs:s3_thumbnail_bucket_name: odl-video-service-thumbnails
