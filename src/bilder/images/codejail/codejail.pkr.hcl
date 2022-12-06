@@ -33,7 +33,7 @@ variable "openedx_release" {
 
 source "amazon-ebs" "codejail" {
   ami_description         = "Deployment image for codejail server generated at ${local.timestamp}"
-  ami_name                = "open-edx-codejail-${var.node_type}-${local.timestamp}"
+  ami_name                = "open-edx-codejail-${var.deployment}-${var.openedx_release}-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
   launch_block_device_mappings {
@@ -42,22 +42,22 @@ source "amazon-ebs" "codejail" {
     delete_on_termination = true
   }
   run_tags = {
-    Name    = "${local.app_name}-${var.node_type}-packer-builder"
+    Name    = "${local.app_name}-${var.deployment}-${var.openedx_release}-packer-builder"
     OU      = "${var.business_unit}"
     app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.node_type}"
+    purpose = "${local.app_name}-${var.deployment}-${var.openedx_release}"
   }
   run_volume_tags = {
-    Name    = "${local.app_name}-${var.node_type}-packer-builder"
+    Name    = "${local.app_name}-${var.deployment}-${var.openedx_release}-packer-builder"
     OU      = "${var.business_unit}"
     app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.node_type}"
+    purpose = "${local.app_name}-${var.deployment}-${var.openedx_release}"
   }
   snapshot_tags = {
-    Name    = "${local.app_name}-${var.node_type}-ami"
+    Name    = "${local.app_name}-${var.deployment}-${var.openedx_release}-ami"
     OU      = "${var.business_unit}"
     app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.node_type}"
+    purpose = "${local.app_name}-${var.deployment}-${var.openedx_release}"
   }
   # Base all builds off of the most recent docker_baseline_ami built by us, based of Debian 11
   source_ami_filter {
@@ -78,10 +78,10 @@ source "amazon-ebs" "codejail" {
     random = true
   }
   tags = {
-    Name       = "${local.app_name}-${var.node_type}"
+    Name       = "${local.app_name}-${var.deployment}-${var.openedx_release}"
     OU         = var.business_unit
     app        = local.app_name
-    purpose    = "${local.app_name}-${var.node_type}"
+    purpose    = "${local.app_name}-${var.deployment}-${var.openedx_release}"
     deployment = "${var.deployment}"
   }
 }

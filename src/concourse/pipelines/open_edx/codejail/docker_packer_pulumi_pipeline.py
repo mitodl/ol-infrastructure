@@ -72,7 +72,7 @@ def build_codejail_pipeline(
                 ],
                 build_parameters={
                     "CONTEXT": f"{codejail_dockerfile_repo.name}/dockerfiles/openedx-codejail/",
-                    "BUILD_ARG_OPENEDX_COMMON_VERSION": openedx_branch,
+                    "BUILD_ARG_OPENEDX_BRANCH": openedx_branch,
                 },
                 build_args=[
                     "-t $(cat ./codejail-release/commit_sha)",
