@@ -71,7 +71,7 @@ def build_codejail_pipeline(
                     Input(name=codejail_dockerfile_repo.name),
                 ],
                 build_parameters={
-                    "CONTEXT": f"{codejail_dockerfile_repo.name}/dockerfiles/openedx-codejail",
+                    "CONTEXT": f"{codejail_dockerfile_repo.name}/dockerfiles/openedx-codejail/",
                     "BUILD_ARG_OPENEDX_COMMON_VERSION": openedx_branch,
                 },
                 build_args=[
