@@ -11,6 +11,7 @@ ENV CODEJAIL_GROUP=sandbox
 ENV CODEJAIL_SANDBOX_CALLER=ubuntu
 ENV CODEJAIL_USER=sandbox
 ENV CODEJAIL_VENV=/sandbox/venv/
+ARG OPEN_EDX_BRANCH=master
 
 RUN virtualenv -p python3.8 --always-copy $CODEJAIL_VENV
 ENV PATH="$CODEJAIL_VENV/bin:$PATH"
@@ -32,7 +33,7 @@ ADD requirements.txt requirements.txt
 
 # Install dependencies
 RUN source $CODEJAIL_VENV/bin/activate && pip install --no-cache-dir --no-cache-dir -r requirements/base.txt  && \
-    pip install --no-cache-dir -r  https://github.com/openedx/edx-platform/blob/master/requirements/edx-sandbox/py38.txt && deactivate
+    pip install --no-cache-dir -r  https://github.com/openedx/edx-platform/blob/$OPEN_EDX_BRANCH/requirements/edx-sandbox/py38.txt && deactivate
 
 # Setup sudoers file
 ADD sudoers-file/01-sandbox /etc/sudoers.d/01-sandbox
