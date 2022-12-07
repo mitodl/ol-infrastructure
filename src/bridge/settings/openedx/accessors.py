@@ -77,7 +77,7 @@ def _filter_deployments_by_application(  # noqa: WPS231, WPS234
             if release_name == env_tuple.edx_release:
                 release_match = True
         if release_match:
-            app_versions = release_map[release_name][deployment]
+            app_versions = release_map[release_name][deployment.value.deployment_name]
             for app_version in app_versions:
                 if app_version.application == application_name:
                     filtered_deployments.append(deployment.value)
