@@ -1,6 +1,6 @@
 import sys
 
-from bridge.settings.openedx.accessors import filter_deployments_by_release
+from bridge.settings.openedx.accessors import filter_deployments_by_application
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from concourse.lib.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from concourse.lib.containers import container_build_task
@@ -92,7 +92,7 @@ def build_xqueue_pipeline(release_name: str):
     )
 
     loop_fragments = []
-    for deployment in filter_deployments_by_release(release_name):
+    for deployment in filter_deployments_by_application(release_name, "xqueue"):
         ami_fragment = packer_jobs(
             dependencies=[
                 GetStep(
