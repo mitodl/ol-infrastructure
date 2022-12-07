@@ -55,10 +55,10 @@ source "amazon-ebs" "edxapp" {
     purpose = "edx-${var.node_type}"
   }
   snapshot_tags = {
-    Name           = "${local.app_name}-${var.node_type}-ami"
-    OU             = "${var.business_unit}"
-    app            = "${local.app_name}"
-    purpose        = "${local.app_name}-${var.node_type}"
+    Name            = "${local.app_name}-${var.node_type}-ami"
+    OU              = "${var.business_unit}"
+    app             = "${local.app_name}"
+    purpose         = "${local.app_name}-${var.node_type}"
     openedx_release = "${var.edx_platform_version}"
   }
   source_ami_filter {
@@ -79,11 +79,11 @@ source "amazon-ebs" "edxapp" {
     random = true
   }
   tags = {
-    Name           = "${local.app_name}-${var.node_type}-${var.openedx_release}"
-    OU             = "${var.business_unit}"
-    app            = "${local.app_name}"
-    deployment     = "${var.installation_target}"
-    purpose        = "${local.app_name}-${var.node_type}"
+    Name            = "${local.app_name}-${var.node_type}-${var.openedx_release}"
+    OU              = "${var.business_unit}"
+    app             = "${local.app_name}"
+    deployment      = "${var.installation_target}"
+    purpose         = "${local.app_name}-${var.node_type}"
     openedx_release = "${var.edx_platform_version}"
   }
 }

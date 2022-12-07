@@ -51,10 +51,10 @@ source "amazon-ebs" "edxapp" {
     purpose = "edx-${var.node_type}"
   }
   snapshot_tags = {
-    Name    = "${local.app_name}-${var.node_type}-ami"
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.node_type}"
+    Name            = "${local.app_name}-${var.node_type}-ami"
+    OU              = "${local.business_unit}"
+    app             = "${local.app_name}"
+    purpose         = "${local.app_name}-${var.node_type}"
     openedx_release = var.openedx_release
   }
   # Base all builds off of the most recent Ubuntu 20.04 image built by the Canonical organization.
@@ -76,10 +76,10 @@ source "amazon-ebs" "edxapp" {
     random = true
   }
   tags = {
-    Name    = "${local.app_name}-${var.node_type}"
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.node_type}"
+    Name            = "${local.app_name}-${var.node_type}"
+    OU              = "${local.business_unit}"
+    app             = "${local.app_name}"
+    purpose         = "${local.app_name}-${var.node_type}"
     openedx_release = var.openedx_release
   }
 }
