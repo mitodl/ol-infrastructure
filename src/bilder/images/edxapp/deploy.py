@@ -188,10 +188,8 @@ vault_templates = [
 # Set up Consul templates
 lms_config_path = Path("/edx/etc/lms.yml")
 studio_config_path = Path("/edx/etc/studio.yml")
-forum_config_path = Path("/edx/app/forum/forum_env")
 lms_intermediate_template = Path("/etc/consul-template/templates/edxapp-lms.tmpl")
 studio_intermediate_template = Path("/etc/consul-template/templates/edxapp-studio.tmpl")
-forum_intermediate_template = Path("/etc/consul-template/templates/edx-forum.tmpl")
 consul_templates = [
     ConsulTemplateTemplate(
         source=studio_intermediate_template,
@@ -238,13 +236,6 @@ if node_type == WEB_NODE_TYPE:
             ),
         ]
     )
-    consul_templates.extend(
-        [
-            ConsulTemplateTemplate(
-                source=forum_intermediate_template, destination=forum_config_path
-            ),
-        ]
-    )
     consul_configuration[Path("01-edxapp.json")] = ConsulConfig(
         services=[
             ConsulService(
@@ -254,15 +245,6 @@ if node_type == WEB_NODE_TYPE:
                 check=ConsulServiceTCPCheck(
                     name="edxapp-lms",
                     tcp="localhost:8000",
-                    interval="10s",
-                ),
-            ),
-            ConsulService(
-                name="forum",
-                port=4567,  # noqa: WPS432
-                check=ConsulServiceTCPCheck(
-                    name="edxapp-forum",
-                    tcp="localhost:4567",
                     interval="10s",
                 ),
             ),
@@ -312,12 +294,10 @@ install_hashicorp_products(hashicorp_products)
 # Install Vector log agent
 install_vector(vector_config)
 
-# Upload templates for consul-template agent
 EDX_TEMPLATES_DIRECTORY = TEMPLATES_DIRECTORY.joinpath("edxapp", EDX_INSTALLATION_NAME)
 common_config = EDX_TEMPLATES_DIRECTORY.joinpath("common_values.yml.tmpl")
 studio_config = EDX_TEMPLATES_DIRECTORY.joinpath("studio_only.yml.tmpl")
 lms_config = EDX_TEMPLATES_DIRECTORY.joinpath("lms_only.yml.tmpl")
-forum_config = EDX_TEMPLATES_DIRECTORY.joinpath("forum.env")
 
 with tempfile.NamedTemporaryFile("wt", delete=False) as studio_template:
     studio_template.write(common_config.read_text())
@@ -337,16 +317,6 @@ with tempfile.NamedTemporaryFile("wt", delete=False) as lms_template:
         name="Upload lms.yml template for consul-template agent",
         src=lms_template.name,
         dest=str(lms_intermediate_template),
-        user=consul_template.name,
-        group=consul_template.name,
-        create_remote_dir=True,
-    )
-with tempfile.NamedTemporaryFile("wt", delete=False) as forum_template:
-    forum_template.write(forum_config.read_text())
-    files.put(
-        name="Upload forum_env template for consul-template agent",
-        src=forum_template.name,
-        dest=str(forum_intermediate_template),
         user=consul_template.name,
         group=consul_template.name,
         create_remote_dir=True,
@@ -391,20 +361,6 @@ if host.get_fact(HasSystemd):
             # Restart the edxapp process to reload the configuration file
             f"/edx/bin/supervisorctl {supervisor_command} "
             f"{'cms' if node_type == WEB_NODE_TYPE else 'all'}'"
-        ),
-    )
-    service_configuration_watches(
-        service_name="edxapp-forum",
-        watched_files=[forum_config_path],
-        start_now=False,
-        onchange_command=(
-            # Let forum read the rendered config file
-            f"/bin/bash -c 'chown forum:www-data {forum_config_path} && "
-            # Ensure that consul-template can update the file when credentials refresh
-            f"setfacl -m u:consul-template:rwx {forum_config_path} && "
-            f"setfacl -m u:forum:rwx {forum_config_path} && "
-            # Restart the forum process to reload the configuration file
-            "/edx/bin/supervisorctl restart forum'"
         ),
     )
     service_configuration_watches(
@@ -465,7 +421,7 @@ if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-stagin
         watched_files=[xqueue_config_path],
         start_now=False,
         onchange_command=(
-            # Let forum read the rendered config file
+            # Let xqueue read the rendered config file
             f"/bin/bash -c 'chown xqueue:www-data {xqueue_config_path} && "
             # Ensure that consul-template can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {xqueue_config_path} && "
