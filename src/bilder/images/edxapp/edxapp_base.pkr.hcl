@@ -14,12 +14,11 @@ variable "edx_platform_version" {
   default = "release"
 }
 
-variable "edx_ansible_branch" {
-  type    = string
-  default = "master"
+variable "openedx_release" {
+  type = string
 }
 
-variable "edx_release_name" {
+variable "edx_ansible_branch" {
   type    = string
   default = "master"
 }
@@ -56,6 +55,7 @@ source "amazon-ebs" "edxapp" {
     OU      = "${local.business_unit}"
     app     = "${local.app_name}"
     purpose = "${local.app_name}-${var.node_type}"
+    openedx_release = var.openedx_release
   }
   # Base all builds off of the most recent Ubuntu 20.04 image built by the Canonical organization.
   source_ami_filter {
@@ -80,6 +80,7 @@ source "amazon-ebs" "edxapp" {
     OU      = "${local.business_unit}"
     app     = "${local.app_name}"
     purpose = "${local.app_name}-${var.node_type}"
+    openedx_release = var.openedx_release
   }
 }
 
@@ -97,7 +98,7 @@ build {
   provisioner "shell-local" {
     environment_vars = [
       "DEBIAN_FRONTEND=noninteractive",
-      "EDX_RELEASE_NAME=${var.edx_release_name}"
+      "OPENEDX_RELEASE=${var.openedx_release}"
     ]
     inline = [
       "sleep 15",
