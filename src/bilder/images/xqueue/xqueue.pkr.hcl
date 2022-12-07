@@ -4,13 +4,13 @@ locals {
 }
 
 variable "build_environment" {
-  type        = string
-  default     = "operations-ci"
+  type    = string
+  default = "operations-ci"
 }
 
 variable "business_unit" {
-  type        = string
-  default     = "operations"
+  type    = string
+  default = "operations"
 }
 
 # Available options are "web" or "worker". Used to determine which type of node to build an image for.
@@ -20,7 +20,7 @@ variable "node_type" {
 }
 
 variable "deployment" {
-  type    = string
+  type = string
 }
 
 variable "openedx_release" {
@@ -102,6 +102,6 @@ build {
       "DEPLOYMENT=${var.deployment}",
       "OPENEDX_RELEASE=${var.openedx_release}"
     ]
-    inline           = ["pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"]
+    inline = ["pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"]
   }
 }

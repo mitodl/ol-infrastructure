@@ -1,11 +1,11 @@
 locals {
-  timestamp = regex_replace(timestamp(), "[- TZ:]", "")
+  timestamp     = regex_replace(timestamp(), "[- TZ:]", "")
   business_unit = "operations"
-  app_name = "docker"
+  app_name      = "docker"
 }
 
 variable "build_environment" {
-  type = string
+  type    = string
   default = "operations-qa"
 }
 
@@ -16,8 +16,8 @@ source "amazon-ebs" "docker" {
   force_deregister        = true
   instance_type           = "t3a.medium"
   run_volume_tags = {
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
+    OU  = "${local.business_unit}"
+    app = "${local.app_name}"
   }
   snapshot_tags = {
     OU      = "${local.business_unit}"
@@ -37,7 +37,7 @@ source "amazon-ebs" "docker" {
   ssh_username = "admin"
   subnet_filter {
     filters = {
-          "tag:Environment": var.build_environment
+      "tag:Environment" : var.build_environment
     }
     random = true
   }
@@ -50,8 +50,8 @@ source "amazon-ebs" "docker" {
 }
 
 source "docker" "docker" {
-  image = "debian:buster"
-  discard = true
+  image      = "debian:buster"
+  discard    = true
   privileged = true
   changes = [
     "RUN ulimit -n 65536",
@@ -85,11 +85,11 @@ build {
     inline = ["py.test --ssh-identity-file=/tmp/packer-session.pem --hosts='ssh://${build.User}@${build.Host}:${build.Port}' ${path.root}/test_docker_build.py"]
   }
   provisioner "shell-local" {
-    only = ["docker.docker"]
+    only   = ["docker.docker"]
     inline = ["pyinfra @docker/${build.ID} ${path.root}/sample_deploy.py"]
   }
   provisioner "shell-local" {
-    only = ["docker.docker"]
+    only   = ["docker.docker"]
     inline = ["py.test --hosts=docker://${build.ID} ${path.root}/test_docker_build.py"]
   }
 }

@@ -1,11 +1,11 @@
 locals {
-  timestamp = regex_replace(timestamp(), "[- TZ:]", "")
+  timestamp     = regex_replace(timestamp(), "[- TZ:]", "")
   business_unit = "operations"
-  app_name = "concourse"
+  app_name      = "concourse"
 }
 
 variable "build_environment" {
-  type = string
+  type    = string
   default = "operations-qa"
 }
 
@@ -43,7 +43,7 @@ source "amazon-ebs" "concourse" {
   ssh_username = "admin"
   subnet_filter {
     filters = {
-          "tag:Environment": var.build_environment
+      "tag:Environment" : var.build_environment
     }
     random = true
   }
@@ -56,7 +56,7 @@ source "amazon-ebs" "concourse" {
 }
 
 source "docker" "concourse" {
-  image = "debian:buster"
+  image  = "debian:buster"
   commit = true
   changes = [
     "USER concourse",
@@ -89,11 +89,11 @@ build {
     inline = ["py.test --ssh-identity-file=/tmp/packer-session.pem --hosts='ssh://${build.User}@${build.Host}:${build.Port}' ${path.root}/test_concourse_build.py"]
   }
   provisioner "shell-local" {
-    only = ["docker.concourse"]
+    only   = ["docker.concourse"]
     inline = ["pyinfra @docker/${build.ID} ${path.root}/sample_deploy.py"]
   }
   provisioner "shell-local" {
-    only = ["docker.concourse"]
+    only   = ["docker.concourse"]
     inline = ["py.test --hosts=docker://${build.ID} ${path.root}/test_concourse_build.py"]
   }
 }

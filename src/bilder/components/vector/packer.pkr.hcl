@@ -1,11 +1,11 @@
 locals {
-  timestamp = regex_replace(timestamp(), "[- TZ:]", "")
+  timestamp     = regex_replace(timestamp(), "[- TZ:]", "")
   business_unit = "operations"
-  app_name = "vector"
+  app_name      = "vector"
 }
 
 variable "build_environment" {
-  type = string
+  type    = string
   default = "operations-qa"
 }
 
@@ -38,7 +38,7 @@ source "amazon-ebs" "vector" {
   ssh_username = "admin"
   subnet_filter {
     filters = {
-          "tag:Environment": var.build_environment
+      "tag:Environment" : var.build_environment
     }
     random = true
   }
@@ -51,7 +51,7 @@ source "amazon-ebs" "vector" {
 }
 
 source "docker" "vector" {
-  image = "debian:buster"
+  image  = "debian:buster"
   commit = true
 }
 
@@ -79,11 +79,11 @@ build {
     inline = ["py.test --ssh-identity-file=/tmp/packer-session.pem --hosts='ssh://${build.User}@${build.Host}:${build.Port}' ${path.root}/test_vector_build.py"]
   }
   provisioner "shell-local" {
-    only = ["docker.vector"]
+    only   = ["docker.vector"]
     inline = ["pyinfra @docker/${build.ID} ${path.root}/sample_deploy.py"]
   }
   provisioner "shell-local" {
-    only = ["docker.vector"]
+    only   = ["docker.vector"]
     inline = ["py.test --hosts=docker://${build.ID} ${path.root}/test_vector_build.py"]
   }
 }
