@@ -48,10 +48,19 @@ from bilder.lib.template_helpers import (
 )
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
+from bridge.secrets.sops import set_env_secrets
+
+set_env_secrets(Path("consul/consul.env"))
 
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
-DEPLOYMENT = os.environ.get("DEPLOYMENT")
+
+DEPLOYMENT = os.environ["DEPLOYMENT"] or os.environ["PKR_VAR_business_unit"]
+if DEPLOYMENT not in ["mitxonline", "mitx", "xpro", "mitx-staging"]:  # noqa: WPS510
+    raise ValueError(
+        "DEPLOYMENT should be on these values 'mitxonline', 'mitx', 'xpro', 'mitx-staging' "  # noqa: E501
+    )
+
 VERSIONS = {  # noqa: WPS407
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "consul-template": os.environ.get(

@@ -7,13 +7,18 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, StackReference
+from pulumi import Config, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam
 
-from bridge.lib.magic_numbers import NOTES_SERVICE_PORT
+from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
+    OLAutoScaleGroupConfig,
+    OLAutoScaling,
     OLLaunchTemplateConfig,
+    OLLoadBalancerConfig,
+    OLTargetGroupConfig,
     TagSpecification,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
@@ -26,7 +31,7 @@ stack_info = parse_stack()
 notes_config = Config("edxnotes")
 if Config("vault").get("address"):
     setup_vault_provider()
-consul_provider = get_consul_provider()
+consul_provider = get_consul_provider(stack_info)
 
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
@@ -45,11 +50,14 @@ openedx_version_tag = notes_config.get("openedx_version_tag")
 notes_server_tag = f"open-edx-notes-server-{env_name}"
 target_vpc = network_stack.require_output(target_vpc_name)
 
+secrets = read_yaml_secrets(Path(f"edx_notes/{env_name}.yaml"))
+
 aws_account = get_caller_identity()
 vpc_id = target_vpc["id"]
 notes_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["edx-notes-*"]),
+        ec2.GetAmiFilterArgs(name="tag:OU", values=[f"{stack_info.env_prefix}"]),
+        ec2.GetAmiFilterArgs(name="name", values=["edx_notes-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
     ],
@@ -92,7 +100,7 @@ notes_vault_policy = vault.Policy(
     .replace("DEPLOYMENT", f"{stack_info.env_prefix}"),
 )
 aws_vault_backend = f"aws-{stack_info.env_prefix}"
-iam.RolePolicyAttachement(
+iam.RolePolicyAttachment(
     f"edx-notes-describe-instance-role-policy-{env_name}",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
     role=notes_instance_role.name,
@@ -103,9 +111,9 @@ notes_instance_profile = iam.InstanceProfile(
     path="/ol-infrastructure/open-edx-notes-server/profile/",
 )
 notes_vault_auth_role = vault.aws.AuthBackendRole(
-    "notes-web-ami-ec2-vault-auth",
+    "notes-ami-ec2-vault-auth",
     backend=aws_vault_backend,
-    role="notes-server",
+    role="edx-notes-server",
     inferred_entity_type="ec2_instance",
     inferred_aws_region=aws_config.region,
     bound_iam_instance_profile_arns=[notes_instance_profile.arn],
@@ -113,6 +121,13 @@ notes_vault_auth_role = vault.aws.AuthBackendRole(
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[vpc_id],
     token_policies=[notes_vault_policy.name],
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+notes_server_secrets = vault.generic.Secret(
+    "notes-server-configuration-secrets",
+    path=f"secret-{stack_info.env_prefix}/edx-notes",
+    data_json=json.dumps(secrets),
 )
 
 consul_datacenter = consul_stack.require_output("datacenter")
@@ -124,14 +139,27 @@ notes_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
-            from_port=NOTES_SERVICE_PORT,
-            to_port=NOTES_SERVICE_PORT,
+            from_port=DEFAULT_HTTPS_PORT,
+            to_port=DEFAULT_HTTPS_PORT,
             security_groups=[edxapp_stack.get_output("edxapp_security_group")],
-            description=f"Allow traffice to the notes server on port {NOTES_SERVICE_PORT}",  # noqa: E501
+            description=f"Allow traffice to the notes server on port {DEFAULT_HTTPS_PORT}",  # noqa: E501
         ),
     ],
     egress=default_egress_args,
     vpc_id=vpc_id,
+    tags=aws_config.merged_tags({"Name": notes_server_tag}),
+)
+
+lb_config = OLLoadBalancerConfig(
+    subnets=target_vpc["subnet_ids"],
+    security_groups=[notes_security_group],
+    tags=aws_config.merged_tags({"Name": notes_server_tag}),
+)
+
+tg_config = OLTargetGroupConfig(
+    vpc_id=vpc_id,
+    target_group_healthcheck=False,
+    tags=aws_config.merged_tags({"Name": notes_server_tag}),
 )
 
 consul_datacenter = consul_stack.require_output("datacenter")
@@ -156,6 +184,7 @@ lt_config = OLLaunchTemplateConfig(
         notes_security_group,
         consul_stack.require_output("security_groups")["consul_agent"],
     ],
+    tag_specifications=tag_specs,
     tags=aws_config.merged_tags({"Name": notes_server_tag}),
     user_data=consul_datacenter.apply(
         lambda consul_dc: base64.b64encode(
@@ -190,10 +219,28 @@ auto_scale_config = notes_config.get_object("auto_scale") or {
     "min": 1,
     "max": 2,
 }
-# asg_config = OLAutoScaleGroupConfig()  # noqa: E800
-# as_setup = OLAutoScaling()  # noqa: E800
+asg_config = OLAutoScaleGroupConfig(
+    asg_name=f"notes-server-{env_name}",
+    aws_config=aws_config,
+    desired_size=auto_scale_config["desired"],
+    min_size=auto_scale_config["min"],
+    max_size=auto_scale_config["max"],
+    vpc_zone_identifiers=target_vpc["subnet_ids"],
+    tags=aws_config.merged_tags({"Name": notes_server_tag}),
+)
+as_setup = OLAutoScaling(
+    asg_config=asg_config,
+    lt_config=lt_config,
+    tg_config=tg_config,
+    lb_config=lb_config,
+)
 
-consul_keys = {"edx/release": openedx_version_tag, "edx/notes-api-host": ""}  # TODO
+consul_keys = {
+    "edx/release": openedx_version_tag,
+    "edx/notes-api-host": "dummy-notes-api-host",
+    "edx/deployment": f"{stack_info.env_prefix}",
+    "elasticsearch/host": "dummy-elasticsearch-host",
+}
 consul.Keys(
     "notes-server-configuration-data",
     keys=consul_key_helper(consul_keys),
