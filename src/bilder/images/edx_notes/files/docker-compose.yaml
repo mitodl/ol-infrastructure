@@ -14,7 +14,7 @@ services:
     volumes:
     # Ref: CONFIG_ROOT
     # https://github.com/openedx/edx-notes-api/blob/master/notesserver/settings/yaml_config.py
-    - /etc/docker/compose/edx_notes_settings.yaml:/app/edx-notes-api/config.yaml:ro
+    - /etc/docker/compose/edx_notes_settings.yaml:/app/edx-notes-api/edx_notes_api.yml:ro
   traefik:
     image: traefik:v2.9
     command:

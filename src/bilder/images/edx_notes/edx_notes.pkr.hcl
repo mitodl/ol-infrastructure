@@ -10,7 +10,11 @@ variable "build_environment" {
 
 variable "business_unit" {
   type    = string
-  default = "ovs"
+  default = "missing"
+  validation {
+    condition     = contains(["mitx", "mitx-staging", "mitxonline", "xpro"], var.business_unit)
+    error_message = "Valid business_unit inputs are 'mitx', 'mitx-staging', 'mitxonline', or 'xpro'."
+  }
 }
 
 variable "node_type" {
