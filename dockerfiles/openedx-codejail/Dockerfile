@@ -31,7 +31,9 @@ WORKDIR /codejail
 RUN git clone https://github.com/eduNEXT/codejailservice/ --branch main --depth 1 /codejail
 
 # Install dependencies
-RUN source $CODEJAIL_VENV/bin/activate && pip install --no-cache-dir -r requirements/base.txt  && \
+RUN pip install --no-cache-dir -r requirements/base.txt  && \
+    pip install --no-cache-dir gunicorn && \
+    source $CODEJAIL_VENV/bin/activate && \
     pip install --no-cache-dir -r https://raw.githubusercontent.com/openedx/edx-platform/$OPEN_EDX_BRANCH/requirements/edx-sandbox/py38.txt  && \
     deactivate
 
