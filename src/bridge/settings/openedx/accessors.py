@@ -62,5 +62,30 @@ def filter_deployments_by_release(release: str) -> list[DeploymentEnvRelease]:
     return filtered_deployments
 
 
+def _filter_deployments_by_application(  # noqa: WPS231, WPS234
+    release_map: dict[  # noqa: WPS320
+        OpenEdxSupportedRelease,
+        dict[OpenEdxDeploymentName, list[OpenEdxApplicationVersion]],
+    ],
+    release_name: OpenEdxSupportedRelease,
+    application_name: OpenEdxApplication,
+) -> list[DeploymentEnvRelease]:
+    filtered_deployments = []
+    for deployment in OpenLearningOpenEdxDeployment:
+        release_match = False
+        for env_tuple in deployment.value.env_release_map:
+            if release_name == env_tuple.edx_release:
+                release_match = True
+        if release_match:
+            app_versions = release_map[release_name][deployment]
+            for app_version in app_versions:
+                if app_version.application == application_name:
+                    filtered_deployments.append(deployment.value)
+    return filtered_deployments
+
+
 fetch_application_version = partial(_fetch_application_version, ReleaseMap)
 fetch_applications_by_type = partial(_fetch_applications_by_type, ReleaseMap)
+filter_deployments_by_application = partial(
+    _filter_deployments_by_application, ReleaseMap
+)

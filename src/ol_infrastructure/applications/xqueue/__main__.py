@@ -12,6 +12,7 @@ from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import XQUEUE_SERVICE_PORT
 from bridge.secrets.sops import read_yaml_secrets
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
@@ -49,12 +50,18 @@ target_vpc = network_stack.require_output(target_vpc_name)
 
 aws_account = get_caller_identity()
 vpc_id = target_vpc["id"]
+openedx_release = (
+    OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
+    .release_by_env(stack_info.name)
+    .value
+)
 xqueue_server_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["open-edx-xqueue-server-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
         ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
+        ec2.GetAmiFilterArgs(name="tag:openedx_release", values=[openedx_release]),
     ],
     most_recent=True,
     owners=[aws_account.account_id],
