@@ -10,5 +10,3 @@ services:
     - 8040:8040
     volumes:
     - /etc/xqueue/xqueue.yaml:/etc/xqueue/xqueue.yaml
-volumes:
-  /etc/xqueue/xqueue.yaml:
