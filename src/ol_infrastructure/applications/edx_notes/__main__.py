@@ -8,7 +8,7 @@ import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, ResourceOptions, StackReference
-from pulumi_aws import ec2, get_caller_identity, iam
+from pulumi_aws import ec2, get_caller_identity, iam, route53
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
@@ -54,6 +54,9 @@ openedx_release = (
 )
 notes_server_tag = f"open-edx-notes-server-{env_name}"
 target_vpc = network_stack.require_output(target_vpc_name)
+
+dns_zone = dns_stack.require_output(notes_config.require("dns_zone"))
+dns_zone_id = dns_zone["id"]
 
 secrets = read_yaml_secrets(Path(f"edx_notes/{env_name}.yaml"))
 
@@ -111,6 +114,14 @@ iam.RolePolicyAttachment(
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
     role=notes_instance_role.name,
 )
+iam.RolePolicyAttachment(
+    "edx-notes-traefik-route53-records-permission",
+    policy_arn=policy_stack.require_output("iam_policies")[
+        f"route53_{notes_config.require('dns_zone')}_zone_records"  # noqa: WPS237
+    ],
+    role=notes_instance_role.name,
+)
+
 notes_instance_profile = iam.InstanceProfile(
     f"edx-notes-instance-profile-{env_name}",
     role=notes_instance_role.name,
@@ -147,16 +158,17 @@ notes_security_group = ec2.SecurityGroup(
             protocol="tcp",
             from_port=DEFAULT_HTTPS_PORT,
             to_port=DEFAULT_HTTPS_PORT,
-            security_groups=[edxapp_stack.get_output("edxapp_security_group")],
-            description=f"Allow traffice to the notes server on port {DEFAULT_HTTPS_PORT}",  # noqa: E501
+            cidr_blocks=["0.0.0.0/0"],
+            description=f"Allow traffic to the notes server on port {DEFAULT_HTTPS_PORT}",  # noqa: E501
         ),
     ],
     egress=default_egress_args,
     vpc_id=vpc_id,
     tags=aws_config.merged_tags({"Name": notes_server_tag}),
 )
-
 lb_config = OLLoadBalancerConfig(
+    listener_user_acm=True,
+    listener_cert_domain=notes_config.require("acm_cert_domain"),
     subnets=target_vpc["subnet_ids"],
     security_groups=[notes_security_group],
     tags=aws_config.merged_tags({"Name": notes_server_tag}),
@@ -164,7 +176,9 @@ lb_config = OLLoadBalancerConfig(
 
 tg_config = OLTargetGroupConfig(
     vpc_id=vpc_id,
-    target_group_healthcheck=False,
+    health_check_interval=60,
+    health_check_matcher="404",  # TODO 20221208 MAD need to revisit health checks + traefik
+    health_check_path="/",
     tags=aws_config.merged_tags({"Name": notes_server_tag}),
 )
 
@@ -241,14 +255,27 @@ as_setup = OLAutoScaling(
     lb_config=lb_config,
 )
 
+dns_name = notes_config.get("domain")
+
 consul_keys = {
     "edx/release": openedx_release,
-    "edx/notes-api-host": "dummy-notes-api-host",
+    "edx/notes-api-host": dns_name,
     "edx/deployment": f"{stack_info.env_prefix}",
-    "elasticsearch/host": "dummy-elasticsearch-host",
+    "elasticsearch/host": "elasticsearch.service.consul",
 }
 consul.Keys(
     "notes-server-configuration-data",
     keys=consul_key_helper(consul_keys),
     opts=consul_provider,
+)
+
+five_minutes = 60 * 5
+
+route53.Record(
+    f"notes-server-dns-records-{dns_name}",
+    name=dns_name,
+    type="CNAME",
+    ttl=five_minutes,
+    records=[as_setup.load_balancer.dns_name],
+    zone_id=dns_zone_id,
 )

@@ -97,7 +97,7 @@ traefik_static_config = traefik_static.TraefikStaticConfig(
         "http": traefik_static.EntryPoints(
             address=":80",
             http=traefik_static.Http(
-                redirectrions=traefik_static.Redirections(
+                redirections=traefik_static.Redirections(
                     entry_point=traefik_static.EntryPoint(
                         to="https",
                         scheme="https",

@@ -24,6 +24,10 @@ describe_instance_policy = iam.Policy(
     "cloud auto-join systems.",
 )
 
+# TODO MAD 20221208
+# Leave this to not break compatibility with other stacks importing this
+# Could probably be intergated with app_route_53 zone loop with a tweak
+# the output of the infrastructure.aws.dns stack
 odl_zone_route53_policy = iam.Policy(
     "mitodl-zone-route53-records-policy",
     name="route53-odl-zone-records-policy",
@@ -35,6 +39,22 @@ odl_zone_route53_policy = iam.Policy(
     ),
     description="Grant permissions to create Route53 records in the odl zone",
 )
+
+app_route53_zones = ["mitx", "mitxonline", "xpro", "ocw"]
+app_route53_policies = {}
+for zone in app_route53_zones:  # noqa: WPS426
+    zone_id = dns_stack.require_output(zone)["id"]
+    policy = iam.Policy(
+        f"{zone}-zone-route53-records-policy",
+        name=f"route53-{zone}-zone-records-policy",
+        path=f"/ol-infrastructure/route53-{zone}-zone-records-policy/",
+        policy=zone_id.apply(
+            lambda z_id: lint_iam_policy(route53_policy_template(z_id), stringify=True)
+        ),
+        description=f"Grant permissions to create Route53 records in the {zone} zone",
+    )
+    app_route53_policies[f"route53_{zone}_zone_records"] = policy.arn
+
 
 cloudwatch_logs_policy = {
     "Version": "2012-10-17",
@@ -58,11 +78,11 @@ create_cloudwatch_logs_policy = iam.Policy(
     policy=lint_iam_policy(cloudwatch_logs_policy, stringify=True),
 )
 
-export(
-    "iam_policies",
-    {
-        "describe_instances": describe_instance_policy.arn,
-        "cloudwatch_logging": create_cloudwatch_logs_policy.arn,
-        "route53_odl_zone_records": odl_zone_route53_policy.arn,
-    },
-)
+
+export_dict = {
+    "describe_instances": describe_instance_policy.arn,
+    "cloudwatch_logging": create_cloudwatch_logs_policy.arn,
+    "route53_odl_zone_records": odl_zone_route53_policy.arn,
+} | app_route53_policies
+
+export("iam_policies", export_dict)
