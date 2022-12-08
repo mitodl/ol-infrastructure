@@ -30,7 +30,7 @@ variable "node_type" {
 
 source "amazon-ebs" "edxapp" {
   ami_description         = "Deployment image for Open edX ${var.node_type} server generated at ${local.timestamp}"
-  ami_name                = "edxapp-${var.node_type}-${var.edx_platform_version}-${local.timestamp}"
+  ami_name                = "edxapp-${var.node_type}-${var.openedx_release}-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "m5.xlarge"
   launch_block_device_mappings {
