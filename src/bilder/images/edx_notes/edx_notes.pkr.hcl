@@ -22,6 +22,10 @@ variable "node_type" {
   default = "server"
 }
 
+variable "openedx_release" {
+  type = string
+}
+
 source "amazon-ebs" "edx_notes" {
   ami_description         = "Deployment image for edx-notes application generated at ${local.timestamp}"
   ami_name                = "edx_notes-${var.node_type}-${local.timestamp}"
@@ -33,22 +37,23 @@ source "amazon-ebs" "edx_notes" {
     delete_on_termination = true
   }
   run_tags = {
-    Name    = "${local.app_name}-${var.node_type}-packer-builder"
+    Name    = "${local.app_name}-${var.openedx_release}-packer-builder"
     OU      = "${var.business_unit}"
     app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.node_type}"
+    purpose = "${local.app_name}-${var.openedx_release}"
   }
   run_volume_tags = {
-    Name    = "${local.app_name}-${var.node_type}-packer-builder"
+    Name    = "${local.app_name}-${var.openedx_release}-packer-builder"
     OU      = "${var.business_unit}"
     app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.node_type}"
+    purpose = "${local.app_name}-${var.openedx_release}"
   }
   snapshot_tags = {
-    Name    = "${local.app_name}-${var.node_type}-ami"
+    Name    = "${local.app_name}-${var.openedx_release}-ami"
     OU      = "${var.business_unit}"
     app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.node_type}"
+    purpose = "${local.app_name}-${var.openedx_release}"
+    openedx_release = var.openedx_release
   }
   # Base all builds off of the most recent docker_baseline_ami built by us, based of Debian 11
 
@@ -71,10 +76,11 @@ source "amazon-ebs" "edx_notes" {
     random = true
   }
   tags = {
-    Name    = "${local.app_name}-${var.node_type}"
+    Name    = "${local.app_name}-${var.openedx_release}"
     OU      = var.business_unit
     app     = local.app_name
-    purpose = "${local.app_name}-${var.node_type}"
+    purpose = "${local.app_name}-${var.openedx_release}"
+    openedx_release = var.openedx_release
   }
 }
 
@@ -91,7 +97,10 @@ build {
   }
 
   provisioner "shell-local" {
-    environment_vars = ["NODE_TYPE=${var.node_type}"]
+    environment_vars = [
+      "NODE_TYPE=${var.node_type}",
+      "OPENEDX_RELEASE=${var.openedx_release}"
+    ]
     inline           = ["pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"]
   }
 }

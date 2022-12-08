@@ -1,7 +1,7 @@
 ---
 services:
   notes_api:
-    image: mitodl/edx-notes:${EDX_RELEASE}
+    image: mitodl/openedx-notes:${OPENEDX_RELEASE}
     ports:
     - 8000
     env_file:
