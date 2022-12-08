@@ -1,11 +1,11 @@
 locals {
-  timestamp = regex_replace(timestamp(), "[- TZ:]", "")
+  timestamp     = regex_replace(timestamp(), "[- TZ:]", "")
   business_unit = "operations"
-  app_name = "caddy"
+  app_name      = "caddy"
 }
 
 variable "build_environment" {
-  type = string
+  type    = string
   default = "operations-qa"
 }
 
@@ -38,7 +38,7 @@ source "amazon-ebs" "caddy" {
   ssh_username = "admin"
   subnet_filter {
     filters = {
-          "tag:Environment": var.build_environment
+      "tag:Environment" : var.build_environment
     }
     random = true
   }
@@ -51,7 +51,7 @@ source "amazon-ebs" "caddy" {
 }
 
 source "docker" "caddy" {
-  image = "debian:buster"
+  image  = "debian:buster"
   commit = true
 }
 
@@ -79,11 +79,11 @@ build {
     inline = ["py.test --ssh-identity-file=/tmp/packer-session.pem --hosts='ssh://${build.User}@${build.Host}:${build.Port}' ${path.root}/test_caddy_build.py"]
   }
   provisioner "shell-local" {
-    only = ["docker.${local.app_name}"]
+    only   = ["docker.${local.app_name}"]
     inline = ["pyinfra @docker/${build.ID} ${path.root}/sample_deploy.py"]
   }
   provisioner "shell-local" {
-    only = ["docker.${local.app_name}"]
+    only   = ["docker.${local.app_name}"]
     inline = ["py.test --hosts=docker://${build.ID} ${path.root}/test_sample_deploy.py"]
   }
 }

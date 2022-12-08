@@ -1,4 +1,5 @@
 import os
+from io import StringIO
 from pathlib import Path
 
 from pyinfra import host
@@ -49,6 +50,12 @@ files.put(
     mode="0660",
 )
 
+OPENEDX_RELEASE = os.environ["OPENEDX_RELEASE"]
+files.put(
+    name="Create env file for codejail",
+    src=StringIO(f"OPENEDX_RELEASE={OPENEDX_RELEASE}"),
+    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env")),
+)
 # Acceptable values mitxonline, mitx, xpro, mitx-staging
 DEPLOYMENT = os.environ["DEPLOYMENT"]
 if DEPLOYMENT not in ["mitxonline", "mitx", "xpro", "mitx-staging"]:  # noqa: WPS510

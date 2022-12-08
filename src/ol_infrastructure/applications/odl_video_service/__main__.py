@@ -618,7 +618,7 @@ ovs_server_secrets = vault.generic.Secret(
     path=ovs_server_vault_mount.path.apply("{}/ovs-secrets".format),
     data_json=json.dumps(secrets),
 )
-
+enabled_annotations = ovs_config.get_bool("feature_annotations")
 use_shibboleth = ovs_config.get_bool("use_shibboleth")
 if use_shibboleth:
     nginx_config_file_path = "/etc/nginx/nginx_with_shib.conf"
@@ -644,6 +644,9 @@ consul_keys = {
     "ovs/s3_transcode_bucket_name": ovs_config.get("s3_transcode_bucket_name"),
     "ovs/s3_watch_bucket_name": ovs_config.get("s3_watch_bucket_name"),
     "ovs/use_shibboleth": "True" if use_shibboleth else "False",  # Yes, quoted booleans
+    "ovs/feature_annotations": "True"
+    if enabled_annotations
+    else "False",  # Yes, quoted booleans
 }
 consul.Keys(
     "ovs-server-configuration-data",

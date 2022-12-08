@@ -15,6 +15,7 @@ psql -h <new RDS endpoint>  -p 5432 -d postgres -U oldevops
 # Kill all the active sessions to DB 'odlvideo'
 select pg_terminate_backend(pid) from pg_stat_activity where datname='odlvideo';
 # Drop the database
+ALTER DATABASE odlvideo owner TO oldevops;
 drop database "odlvideo";
 # Make a new one
 create database "odlvideo";

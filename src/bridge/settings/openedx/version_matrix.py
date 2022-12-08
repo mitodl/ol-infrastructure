@@ -88,6 +88,11 @@ ReleaseMap: dict[  # noqa: WPS234
                 release="olive",
             ),
             OpenEdxApplicationVersion(
+                application="notes-api",  # type: ignore
+                application_type="IDA",
+                release="olive",
+            ),
+            OpenEdxApplicationVersion(
                 application="learning",  # type: ignore
                 application_type="MFE",
                 release="olive",
@@ -140,6 +145,11 @@ ReleaseMap: dict[  # noqa: WPS234
                 release="olive",
             ),
             OpenEdxApplicationVersion(
+                application="notes-api",  # type: ignore
+                application_type="IDA",
+                release="olive",
+            ),
+            OpenEdxApplicationVersion(
                 application="learning",  # type: ignore
                 application_type="MFE",
                 release="olive",
@@ -181,6 +191,11 @@ ReleaseMap: dict[  # noqa: WPS234
             ),
             OpenEdxApplicationVersion(
                 application="forum",  # type: ignore
+                application_type="IDA",
+                release="olive",
+            ),
+            OpenEdxApplicationVersion(
+                application="notes-api",  # type: ignore
                 application_type="IDA",
                 release="olive",
             ),

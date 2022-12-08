@@ -13,11 +13,9 @@ variable "build_environment" {
   default = "mitxonline-qa"
 }
 
-variable "edx_release_name" {
-  type    = string
-  default = "master"
+variable "openedx_release" {
+  type = string
 }
-
 variable "edx_platform_version" {
   type    = string
   default = "release"
@@ -57,15 +55,15 @@ source "amazon-ebs" "edxapp" {
     purpose = "edx-${var.node_type}"
   }
   snapshot_tags = {
-    Name           = "${local.app_name}-${var.node_type}-ami"
-    OU             = "${var.business_unit}"
-    app            = "${local.app_name}"
-    purpose        = "${local.app_name}-${var.node_type}"
-    edxapp_release = "${var.edx_platform_version}"
+    Name            = "${local.app_name}-${var.node_type}-ami"
+    OU              = var.business_unit
+    app             = local.app_name
+    purpose         = "${local.app_name}-${var.node_type}"
+    openedx_release = var.openedx_release
   }
   source_ami_filter {
     filters = {
-      name                = "edxapp-${var.node_type}-${var.edx_platform_version}-*"
+      name                = "edxapp-${var.node_type}-${var.openedx_release}-*"
       root-device-type    = "ebs"
       virtualization-type = "hvm"
     }
@@ -81,12 +79,12 @@ source "amazon-ebs" "edxapp" {
     random = true
   }
   tags = {
-    Name           = "${local.app_name}-${var.node_type}-${var.edx_platform_version}"
-    OU             = "${var.business_unit}"
-    app            = "${local.app_name}"
-    deployment     = "${var.installation_target}"
-    purpose        = "${local.app_name}-${var.node_type}"
-    edxapp_release = "${var.edx_platform_version}"
+    Name            = "${local.app_name}-${var.node_type}-${var.openedx_release}"
+    OU              = var.business_unit
+    app             = local.app_name
+    deployment      = var.installation_target
+    purpose         = "${local.app_name}-${var.node_type}"
+    openedx_release = var.openedx_release
   }
 }
 
@@ -136,7 +134,7 @@ build {
   provisioner "shell-local" {
     environment_vars = [
       "NODE_TYPE=${var.node_type}",
-      "EDX_RELEASE_NAME=${var.edx_release_name}",
+      "OPENEDX_RELEASE=${var.openedx_release}",
       "EDX_INSTALLATION=${var.installation_target}",
     ]
     inline = [

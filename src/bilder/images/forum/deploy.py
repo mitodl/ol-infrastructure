@@ -1,4 +1,5 @@
 import os
+from io import StringIO
 from pathlib import Path
 
 from pyinfra import host
@@ -71,6 +72,14 @@ files.put(
     user="consul-template",
     group="consul-template",
 )
+
+OPENEDX_RELEASE = os.environ["OPENEDX_RELEASE"]
+files.put(
+    name="Create env file for codejail",
+    src=StringIO(OPENEDX_RELEASE),
+    dest="/etc/default/openedx",
+)
+
 # Acceptable values mitxonline, mitx, xpro, mitx-staging
 DEPLOYMENT = os.environ["DEPLOYMENT"]
 if DEPLOYMENT not in ["mitxonline", "mitx", "xpro", "mitx-staging"]:  # noqa: WPS510
@@ -136,7 +145,7 @@ vault = Vault(
     configuration={Path("vault.json"): vault_config},
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
-forum_config_path = Path("/etc/forum/forum.env")
+forum_config_path = DOCKER_COMPOSE_DIRECTORY.joinpath(".env")
 
 consul_templates = [
     ConsulTemplateTemplate(

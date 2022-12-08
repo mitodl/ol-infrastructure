@@ -12,6 +12,7 @@ from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
@@ -46,7 +47,11 @@ edxapp_stack = StackReference(
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc_name = notes_config.get("target_vpc")
-openedx_version_tag = notes_config.get("openedx_version_tag")
+openedx_release = (
+    OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
+    .release_by_env(stack_info.name)
+    .value
+)
 notes_server_tag = f"open-edx-notes-server-{env_name}"
 target_vpc = network_stack.require_output(target_vpc_name)
 
@@ -60,6 +65,7 @@ notes_ami = ec2.get_ami(
         ec2.GetAmiFilterArgs(name="name", values=["edx_notes-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
+        ec2.GetAmiFilterArgs(name="tag:openedx_release", values=[openedx_release]),
     ],
     most_recent=True,
     owners=[aws_account.account_id],
@@ -71,7 +77,7 @@ aws_config = AWSBase(
         "Environment": env_name,
         "Application": "open-edx-notes",
         "Owner": "platform-engineering",
-        "openedx_version": openedx_version_tag,
+        "openedx_release": openedx_release,
     }
 )
 
@@ -236,7 +242,7 @@ as_setup = OLAutoScaling(
 )
 
 consul_keys = {
-    "edx/release": openedx_version_tag,
+    "edx/release": openedx_release,
     "edx/notes-api-host": "dummy-notes-api-host",
     "edx/deployment": f"{stack_info.env_prefix}",
     "elasticsearch/host": "dummy-elasticsearch-host",

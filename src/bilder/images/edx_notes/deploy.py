@@ -1,4 +1,5 @@
 import os
+from io import StringIO
 from pathlib import Path
 
 from pyinfra import host
@@ -54,6 +55,13 @@ set_env_secrets(Path("consul/consul.env"))
 
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
+
+OPENEDX_RELEASE = os.environ["OPENEDX_RELEASE"]
+files.put(
+    name="Create env file for codejail",
+    src=StringIO(OPENEDX_RELEASE),
+    dest="/etc/default/openedx",
+)
 
 DEPLOYMENT = os.environ["DEPLOYMENT"] or os.environ["PKR_VAR_business_unit"]
 if DEPLOYMENT not in ["mitxonline", "mitx", "xpro", "mitx-staging"]:  # noqa: WPS510

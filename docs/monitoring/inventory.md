@@ -65,11 +65,11 @@
 | ODL Video production | video.odl.mit.edu | yes |  no |
 | Open Discussions production | open.mit.edu | yes |  no |
 | StarCellBio | starcellbio.mit.edu | yes |  no |
-| xPro CMS RC | studio-rc.xpro.mit.edu | yes |  no |
-| xPro CMS production | studio.xpro.mit.edu | yes |  no |
-| xPro LMS RC | courses-rc.xpro.mit.edu | yes |  no |
-| xPro LMS production | courses.xpro.mit.edu | yes |  no |
+| xPro CMS RC | studio-rc.xpro.mit.edu/heartbeat | yes |  no |
+| xPro CMS production | studio.xpro.mit.edu/heartbeat | yes |  no |
+| xPro LMS RC | courses-rc.xpro.mit.edu/heartbeat | yes |  no |
+| xPro LMS production | courses.xpro.mit.edu/heartbeat | yes |  no |
 | xPro RC | xpro-rc.odl.mit.edu | yes |  no |
-| xPro preview RC | preview-rc.xpro.mit.edu | yes |  no |
-| xPro preview production | preview.xpro.mit.edu | yes |  no |
+| xPro preview RC | preview-rc.xpro.mit.edu/heartbeat | yes |  no |
+| xPro preview production | preview.xpro.mit.edu/heartbeat | yes |  no |
 | xPro production | xpro.mit.edu | yes |  no |

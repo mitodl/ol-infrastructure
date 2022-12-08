@@ -118,12 +118,22 @@ def schedule(name: Identifier, interval: str) -> Resource:
 
 
 def registry_image(
-    name: Identifier, image_repository: str, image_tag: Optional[str] = None
+    name: Identifier,
+    image_repository: str,
+    image_tag: Optional[str] = None,
+    username=None,
+    password=None,
 ) -> Resource:
+    image_source = RegistryImage(
+        repository=image_repository, tag=image_tag or "latest"
+    ).dict()
+    if username and password:
+        image_source["username"] = username
+        image_source["password"] = password
     return Resource(
         name=name,
         type="registry-image",
-        source=RegistryImage(repository=image_repository, tag=image_tag or "latest"),
+        source=image_source,
     )
 
 

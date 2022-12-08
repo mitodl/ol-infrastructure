@@ -14,7 +14,6 @@ config:
     studio: studio-rc.xpro.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:Tpg1BEYCoSw2D6HQ:yGnhmeKYzo+EetdiUpY/7VzE9vq+OtX/O02d6ugQwMI3D57r3yvxtsY3u+lRYwr0R2yvvVr/Lhm9xXQ3EfycxNtpOUxviHCFsL5wXLA=
-  edxapp:edxapp_release: open-release/maple.master
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enabled_mfes:
     gradebook: gradebook

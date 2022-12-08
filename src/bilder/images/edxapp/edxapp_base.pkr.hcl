@@ -14,12 +14,11 @@ variable "edx_platform_version" {
   default = "release"
 }
 
-variable "edx_ansible_branch" {
-  type    = string
-  default = "master"
+variable "openedx_release" {
+  type = string
 }
 
-variable "edx_release_name" {
+variable "edx_ansible_branch" {
   type    = string
   default = "master"
 }
@@ -31,7 +30,7 @@ variable "node_type" {
 
 source "amazon-ebs" "edxapp" {
   ami_description         = "Deployment image for Open edX ${var.node_type} server generated at ${local.timestamp}"
-  ami_name                = "edxapp-${var.node_type}-${var.edx_platform_version}-${local.timestamp}"
+  ami_name                = "edxapp-${var.node_type}-${var.openedx_release}-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "m5.xlarge"
   launch_block_device_mappings {
@@ -52,10 +51,11 @@ source "amazon-ebs" "edxapp" {
     purpose = "edx-${var.node_type}"
   }
   snapshot_tags = {
-    Name    = "${local.app_name}-${var.node_type}-ami"
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.node_type}"
+    Name            = "${local.app_name}-${var.node_type}-ami"
+    OU              = "${local.business_unit}"
+    app             = "${local.app_name}"
+    purpose         = "${local.app_name}-${var.node_type}"
+    openedx_release = var.openedx_release
   }
   # Base all builds off of the most recent Ubuntu 20.04 image built by the Canonical organization.
   source_ami_filter {
@@ -76,10 +76,11 @@ source "amazon-ebs" "edxapp" {
     random = true
   }
   tags = {
-    Name    = "${local.app_name}-${var.node_type}"
-    OU      = "${local.business_unit}"
-    app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.node_type}"
+    Name            = "${local.app_name}-${var.node_type}"
+    OU              = "${local.business_unit}"
+    app             = "${local.app_name}"
+    purpose         = "${local.app_name}-${var.node_type}"
+    openedx_release = var.openedx_release
   }
 }
 
@@ -97,7 +98,7 @@ build {
   provisioner "shell-local" {
     environment_vars = [
       "DEBIAN_FRONTEND=noninteractive",
-      "EDX_RELEASE_NAME=${var.edx_release_name}"
+      "OPENEDX_RELEASE=${var.openedx_release}"
     ]
     inline = [
       "sleep 15",
