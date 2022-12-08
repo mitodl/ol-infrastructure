@@ -161,12 +161,15 @@ def pulumi_jobs_chain(
     chain_fragment = PipelineFragment()
     previous_job = None
     for index, stack_name in enumerate(stack_names):
+        production_stack = stack_name.lower().endswith("production")
+        passed_param = None
         if index != 0:
             previous_job = chain_fragment.jobs[-1]
-            for dependency in dependencies or []:
-                # These mutations apply globally if the dependencies aren't copied below
-                dependency.trigger = False
-                dependency.passed = [previous_job.name]
+            passed_param = [previous_job.name]
+        for dependency in dependencies or []:
+            # These mutations apply globally if the dependencies aren't copied below
+            dependency.trigger = not bool(previous_job or production_stack)
+            dependency.passed = passed_param  # type: ignore
         step_fragment = pulumi_job(
             pulumi_code,
             stack_name,
@@ -225,7 +228,8 @@ def pulumi_job(  # noqa: WPS211
         + [
             GetStep(
                 get=pulumi_code.name,
-                trigger=passed_job is None,
+                trigger=passed_job is None
+                and not stack_name.lower().endswith("production"),
                 passed=passed_job,
             ),
             TaskStep(
