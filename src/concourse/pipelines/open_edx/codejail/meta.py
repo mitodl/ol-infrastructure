@@ -21,6 +21,7 @@ pipeline_code = git_repo(
     name=Identifier("codejail-pipeline-code"),
     uri="https://github.com/mitodl/ol-infrastructure",
     paths=[
+        "src/bridge/settings/openedx/",
         "src/concourse/lib/",
         "src/concourse/pipelines/open_edx/codejail/",
     ],
