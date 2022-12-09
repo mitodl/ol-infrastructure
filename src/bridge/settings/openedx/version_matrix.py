@@ -14,7 +14,7 @@ class OpenLearningOpenEdxDeployment(Enum):
         deployment_name="mitx",
         env_release_map=[
             EnvRelease("CI", OpenEdxSupportedRelease["olive"]),
-            EnvRelease("QA", OpenEdxSupportedRelease["nutmeg"]),
+            EnvRelease("QA", OpenEdxSupportedRelease["olive"]),
             EnvRelease("Production", OpenEdxSupportedRelease["nutmeg"]),
         ],
     )
@@ -22,7 +22,7 @@ class OpenLearningOpenEdxDeployment(Enum):
         deployment_name="mitx-staging",
         env_release_map=[
             EnvRelease("CI", OpenEdxSupportedRelease["olive"]),
-            EnvRelease("QA", OpenEdxSupportedRelease["nutmeg"]),
+            EnvRelease("QA", OpenEdxSupportedRelease["olive"]),
             EnvRelease("Production", OpenEdxSupportedRelease["nutmeg"]),
         ],
     )
