@@ -169,7 +169,7 @@ def pulumi_jobs_chain(
         for dependency in dependencies or []:
             # These mutations apply globally if the dependencies aren't copied below
             dependency.trigger = not bool(previous_job or production_stack)
-            dependency.passed = passed_param  # type: ignore
+            dependency.passed = passed_param or dependency.passed  # type: ignore
         step_fragment = pulumi_job(
             pulumi_code,
             stack_name,
