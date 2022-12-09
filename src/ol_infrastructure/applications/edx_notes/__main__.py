@@ -52,7 +52,7 @@ openedx_release = (
     .release_by_env(stack_info.name)
     .value
 )
-notes_server_tag = f"open-edx-notes-server-{env_name}"
+notes_server_tag = f"edx-notes-server-{env_name}"
 target_vpc = network_stack.require_output(target_vpc_name)
 
 dns_zone = dns_stack.require_output(notes_config.require("dns_zone"))
@@ -85,7 +85,7 @@ aws_config = AWSBase(
 )
 
 notes_instance_role = iam.Role(
-    f"edx-notes-instance-role-{env_name}",
+    f"edx-notes-{env_name}-instance-role",
     assume_role_policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -101,7 +101,7 @@ notes_instance_role = iam.Role(
 )
 
 notes_vault_policy = vault.Policy(
-    "edx-notes-vault-policy",
+    f"edx-notes-{env_name}-vault-policy",
     name=f"edx-notes-{stack_info.env_prefix}",
     policy=Path(__file__)
     .parent.joinpath("edx_notes_policy.hcl")
@@ -110,12 +110,12 @@ notes_vault_policy = vault.Policy(
 )
 aws_vault_backend = f"aws-{stack_info.env_prefix}"
 iam.RolePolicyAttachment(
-    f"edx-notes-describe-instance-role-policy-{env_name}",
+    f"edx-notes-{env_name}-describe-instance-role-policy",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
     role=notes_instance_role.name,
 )
 iam.RolePolicyAttachment(
-    "edx-notes-traefik-route53-records-permission",
+    f"edx-notes-{env_name}-traefik-route53-records-permission",
     policy_arn=policy_stack.require_output("iam_policies")[
         f"route53_{notes_config.require('dns_zone')}_zone_records"  # noqa: WPS237
     ],
@@ -123,12 +123,12 @@ iam.RolePolicyAttachment(
 )
 
 notes_instance_profile = iam.InstanceProfile(
-    f"edx-notes-instance-profile-{env_name}",
+    f"edx-notes-{env_name}-instance-profile",
     role=notes_instance_role.name,
-    path="/ol-infrastructure/open-edx-notes-server/profile/",
+    path="/ol-infrastructure/edx-notes-server/profile/",
 )
 notes_vault_auth_role = vault.aws.AuthBackendRole(
-    "notes-ami-ec2-vault-auth",
+    f"edx-notes-{env_name}-ami-ec2-vault-auth",
     backend=aws_vault_backend,
     role="edx-notes-server",
     inferred_entity_type="ec2_instance",
@@ -141,8 +141,8 @@ notes_vault_auth_role = vault.aws.AuthBackendRole(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-notes_server_secrets = vault.generic.Secret(
-    "notes-server-configuration-secrets",
+vault.generic.Secret(
+    f"edx-notes-{env_name}-configuration-secrets",
     path=f"secret-{stack_info.env_prefix}/edx-notes",
     data_json=json.dumps(secrets),
 )
@@ -150,8 +150,8 @@ notes_server_secrets = vault.generic.Secret(
 consul_datacenter = consul_stack.require_output("datacenter")
 
 notes_security_group = ec2.SecurityGroup(
-    f"notes-server-security-group-{env_name}",
-    name=f"notes-server-{target_vpc_name}-{env_name}",
+    f"edx-notes-{env_name}-security-group",
+    name=f"edx-notes-{target_vpc_name}-{env_name}",
     description="Access control for notes severs.",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -198,7 +198,7 @@ tag_specs = [
 lt_config = OLLaunchTemplateConfig(
     block_device_mappings=block_device_mappings,
     image_id=notes_ami.id,
-    instance_type=notes_config.get("instance_type") or InstanceTypes.burstable_medium,
+    instance_type=notes_config.get("instance_type") or InstanceTypes.burstable_micro,
     instance_profile_arn=notes_instance_profile.arn,
     security_groups=[
         notes_security_group,
@@ -240,7 +240,7 @@ auto_scale_config = notes_config.get_object("auto_scale") or {
     "max": 2,
 }
 asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"notes-server-{env_name}",
+    asg_name=f"edx-notes-{env_name}",
     aws_config=aws_config,
     desired_size=auto_scale_config["desired"],
     min_size=auto_scale_config["min"],
@@ -264,7 +264,7 @@ consul_keys = {
     "elasticsearch/host": "elasticsearch.service.consul",
 }
 consul.Keys(
-    "notes-server-configuration-data",
+    f"edx-notes-{env_name}-configuration-data",
     keys=consul_key_helper(consul_keys),
     opts=consul_provider,
 )
@@ -272,7 +272,7 @@ consul.Keys(
 five_minutes = 60 * 5
 
 route53.Record(
-    f"notes-server-dns-records-{dns_name}",
+    f"edx-notes-{env_name}-dns-record",
     name=dns_name,
     type="CNAME",
     ttl=five_minutes,

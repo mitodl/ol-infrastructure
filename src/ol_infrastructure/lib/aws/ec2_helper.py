@@ -36,6 +36,7 @@ default_egress_args = [
 
 @unique
 class InstanceTypes(str, Enum):  # noqa: WPS600
+    burstable_micro = "t3a.micro"
     burstable_small = "t3a.small"
     burstable_medium = "t3a.medium"
     burstable_large = "t3a.large"
