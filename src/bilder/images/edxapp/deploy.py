@@ -376,62 +376,6 @@ if "mitodl" in edx_version.git_origin and node_type == WEB_NODE_TYPE:
         commands=["/edx/bin/edxapp-update-assets"],
     )
 
-if node_type == WEB_NODE_TYPE and EDX_INSTALLATION_NAME in {"mitx", "mitx-staging"}:
-    server.shell(
-        name="Allow xqueue user to always read config file",
-        commands=[
-            "setfacl -R -d -m u:xqueue:r /edx/etc/",
-        ],
-    )
-    xqueue_config_path = Path("/edx/etc/xqueue.yml")
-    xqueue_template_path = Path("/etc/consul-template/templates/xqueue.tmpl")
-    consul.configuration[Path("02-xqueue.json")] = ConsulConfig(
-        services=[
-            ConsulService(
-                name="xqueue",
-                port=18040,  # noqa: WPS432
-                check=ConsulServiceTCPCheck(
-                    name="edxapp-xqueue",
-                    tcp="localhost:8040",
-                    interval="10s",
-                ),
-            ),
-        ]
-    )
-    xqueue_config = EDX_TEMPLATES_DIRECTORY.joinpath("xqueue.yml.tmpl")
-    with tempfile.NamedTemporaryFile("wt", delete=False) as xqueue_template:
-        xqueue_template.write(xqueue_config.read_text())
-        files.put(
-            name="Upload xqueue config template for consul-template agent",
-            src=xqueue_template.name,
-            dest=str(xqueue_template_path),
-            user=consul_template.name,
-            group=consul_template.name,
-            create_remote_dir=True,
-        )
-    consul_template.configuration[Path("02-xqueue.json")] = ConsulTemplateConfig(
-        template=[
-            ConsulTemplateTemplate(
-                source=xqueue_template_path, destination=xqueue_config_path
-            ),
-        ]
-    )
-    service_configuration_watches(
-        service_name="edxapp-xqueue",
-        watched_files=[xqueue_config_path],
-        start_now=False,
-        onchange_command=(
-            # Let xqueue read the rendered config file
-            f"/bin/bash -c 'chown xqueue:www-data {xqueue_config_path} && "
-            # Ensure that consul-template can update the file when credentials refresh
-            f"setfacl -m u:consul-template:rwx {xqueue_config_path} && "
-            f"setfacl -m u:xqueue:rwx {xqueue_config_path} && "
-            # Restart the xqueue process to reload the configuration file
-            "/edx/bin/supervisorctl restart xqueue && "
-            "/edx/bin/supervisorctl restart xqueue_consumer'"
-        ),
-    )
-
 configure_vector(vector_config)
 for product in hashicorp_products:
     configure_hashicorp_product(product)

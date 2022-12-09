@@ -100,31 +100,6 @@ build {
     ]
   }
 
-  dynamic "provisioner" {
-    for_each = ((var.installation_target == "mitx" || var.installation_target == "mitx-staging") && var.node_type == "web") ? ["this"] : []
-    labels   = ["shell"]
-    content {
-      environment_vars = [
-        "EDX_ANSIBLE_BRANCH=${var.edx_platform_version}",
-      ]
-      inline = [
-        "openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /tmp/edxapp.key -out /tmp/edxapp.cert -subj '/C=US/ST=MA/L=Cambridge/O=MIT Open Learning/OU=Engineering/CN=edxapp.example.com'",
-        "cd /tmp && git clone https://github.com/edx/configuration --depth 1 --branch $EDX_ANSIBLE_BRANCH",
-        "cd /tmp/configuration && python3 -m venv .venv && .venv/bin/pip install wheel && .venv/bin/pip install -r requirements.txt",
-      ]
-    }
-  }
-  dynamic "provisioner" {
-    for_each = ((var.installation_target == "mitx" || var.installation_target == "mitx-staging") && var.node_type == "web") ? ["this"] : []
-    labels   = ["ansible-local"]
-
-    content {
-      playbook_file     = "${path.root}/files/edxapp_web_residential_playbook.yml"
-      command           = "/tmp/configuration/.venv/bin/ansible-playbook --extra-vars 'EDX_PLATFORM_VERSION=${var.edx_platform_version}' --skip-tags 'manage:app-users'"
-      staging_directory = "/tmp/configuration/playbooks/"
-    }
-  }
-
   provisioner "shell" {
     # Addresses change in latest git due to recent CVE
     # https://github.blog/2022-04-12-git-security-vulnerability-announced/
