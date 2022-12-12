@@ -164,7 +164,7 @@ def mfe_job(
                     "destination": [
                         {
                             "command": "sync",
-                            "dir": f"s3-remote:{open_edx.environment}-edxapp-mfe/{mfe.application}/",  # noqa: E501
+                            "dir": f"s3-remote:{open_edx.environment}-edxapp-mfe/{mfe.application.path}/",  # noqa: E501, WPS237
                         }
                     ],
                 },
