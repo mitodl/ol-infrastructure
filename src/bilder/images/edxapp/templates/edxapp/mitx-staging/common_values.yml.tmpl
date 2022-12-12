@@ -60,7 +60,7 @@ XQUEUE_INTERFACE:
     django_auth:
         password: {{ .Data.edxapp_password }}
         username: edxapp
-    url: http://xqueue.service.consul:18040  # MODIFIED
+    url: http://xqueue.service.consul:8040  # MODIFIED
 {{ end }}
 {{ with secret "secret-mitx-staging/edx-forum" }}
 COMMENTS_SERVICE_KEY: {{ .Data.forum_api_key }}

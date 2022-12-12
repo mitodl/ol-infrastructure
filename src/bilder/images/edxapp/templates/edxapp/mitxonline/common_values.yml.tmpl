@@ -49,9 +49,6 @@ JWT_AUTH:  # NEEDS ATTENTION
 RETIRED_USER_SALTS: {{ .Data.user_retirement_salts }}
 SENTRY_DSN: {{ .Data.sentry_dsn }}
 XQUEUE_INTERFACE:
-    basic_auth:
-    - edx
-    - edx
     django_auth:
         password: {{ .Data.xqueue_edxapp_password }}
         username: edxapp
