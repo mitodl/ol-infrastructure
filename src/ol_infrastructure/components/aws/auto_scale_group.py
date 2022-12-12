@@ -356,7 +356,7 @@ class OLAutoScaling(pulumi.ComponentResource):
 
         # Construct the launch template
         self.launch_template = LaunchTemplate(  # noqa: WPS601
-            f"{resource_name_prefix}-launch-template",
+            f"{resource_name_prefix}launch-template",
             name_prefix=resource_name_prefix,
             block_device_mappings=block_device_mappings,
             iam_instance_profile=LaunchTemplateIamInstanceProfileArgs(

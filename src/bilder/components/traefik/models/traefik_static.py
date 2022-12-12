@@ -11,27 +11,30 @@ from typing import Any, Optional
 from pydantic import BaseModel, Extra, Field
 
 
-class Filters(BaseModel):
+class FieldModel(BaseModel):
+    class Config:
+        allow_population_by_field_name = True
+        extra = Extra.forbid
+
+
+class Filters(FieldModel):
     status_codes: Optional[list[str]] = Field(None, alias="statusCodes")
     retry_attempts: Optional[bool] = Field(None, alias="retryAttempts")
     min_duration: Optional[str] = Field(None, alias="minDuration")
 
 
-class Headers(BaseModel):
+class Headers(FieldModel):
     default_mode: Optional[str] = Field(None, alias="defaultMode")
     names: Optional[dict[str, str]] = None
 
 
-class Fields(BaseModel):
+class Fields(FieldModel):
     default_mode: Optional[str] = Field(None, alias="defaultMode")
     names: Optional[dict[str, str]] = None
     headers: Optional[Headers] = None
 
 
-class AccessLog(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class AccessLog(FieldModel):
     file_path: Optional[str] = Field(None, alias="filePath")
     format: Optional[str] = None
     filters: Optional[Filters] = None
@@ -39,21 +42,18 @@ class AccessLog(BaseModel):
     buffering_size: Optional[int] = Field(None, alias="bufferingSize")
 
 
-class Api(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Api(FieldModel):
     insecure: Optional[bool] = None
     dashboard: Optional[bool] = None
     debug: Optional[bool] = None
 
 
-class Eab(BaseModel):
+class Eab(FieldModel):
     kid: Optional[str] = None
     hmac_encoded: Optional[str] = Field(None, alias="hmacEncoded")
 
 
-class DnsChallenge(BaseModel):
+class DnsChallenge(FieldModel):
     provider: Optional[str] = None
     delay_before_check: Optional[str] = Field(None, alias="delayBeforeCheck")
     resolvers: Optional[list[str]] = None
@@ -62,11 +62,11 @@ class DnsChallenge(BaseModel):
     )
 
 
-class HttpChallenge(BaseModel):
+class HttpChallenge(FieldModel):
     entry_point: Optional[str] = Field(None, alias="entryPoint")
 
 
-class Acme(BaseModel):
+class Acme(FieldModel):
     email: Optional[str] = None
     ca_server: Optional[str] = Field(None, alias="caServer")
     certificates_duration: Optional[int] = Field(None, alias="certificatesDuration")
@@ -79,87 +79,81 @@ class Acme(BaseModel):
     tls_challenge: Optional[dict[str, Any]] = Field(None, alias="tlsChallenge")
 
 
-class CertificatesResolvers(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class CertificatesResolvers(FieldModel):
     acme: Optional[Acme] = None
 
 
-class LifeCycle(BaseModel):
+class LifeCycle(FieldModel):
     request_accept_grace_timeout: Optional[str] = Field(
         None, alias="requestAcceptGraceTimeout"
     )
     grace_time_out: Optional[str] = Field(None, alias="graceTimeOut")
 
 
-class RespondingTimeouts(BaseModel):
+class RespondingTimeouts(FieldModel):
     read_timeout: Optional[str] = Field(None, alias="readTimeout")
     write_timeout: Optional[str] = Field(None, alias="writeTimeout")
     idle_timeout: Optional[str] = Field(None, alias="idleTimeout")
 
 
-class Transport(BaseModel):
+class Transport(FieldModel):
     life_cycle: Optional[LifeCycle] = Field(None, alias="lifeCycle")
     responding_timeouts: Optional[RespondingTimeouts] = Field(
         None, alias="respondingTimeouts"
     )
 
 
-class ProxyProtocol(BaseModel):
+class ProxyProtocol(FieldModel):
     insecure: Optional[bool] = None
     trusted_i_ps: Optional[list[str]] = Field(None, alias="trustedIPs")
 
 
-class ForwardedHeaders(BaseModel):
+class ForwardedHeaders(FieldModel):
     insecure: Optional[bool] = None
     trusted_i_ps: Optional[list[str]] = Field(None, alias="trustedIPs")
 
 
-class EntryPoint(BaseModel):
+class EntryPoint(FieldModel):
     to: Optional[str] = None
     scheme: Optional[str] = None
     permanent: Optional[bool] = None
     priority: Optional[int] = None
 
 
-class Redirections(BaseModel):
+class Redirections(FieldModel):
     entry_point: Optional[EntryPoint] = Field(None, alias="entryPoint")
 
 
-class Domain(BaseModel):
+class Domain(FieldModel):
     main: Optional[str] = None
     sans: Optional[list[str]] = None
 
 
-class Tls(BaseModel):
+class Tls(FieldModel):
     options: Optional[str] = None
     cert_resolver: Optional[str] = Field(None, alias="certResolver")
     domains: Optional[list[Domain]] = None
 
 
-class Http(BaseModel):
+class Http(FieldModel):
     redirections: Optional[Redirections] = None
     middlewares: Optional[list[str]] = None
     tls: Optional[Tls] = None
 
 
-class Http2(BaseModel):
+class Http2(FieldModel):
     max_concurrent_streams: Optional[int] = Field(None, alias="maxConcurrentStreams")
 
 
-class Http3(BaseModel):
+class Http3(FieldModel):
     advertised_port: Optional[int] = Field(None, alias="advertisedPort")
 
 
-class Udp(BaseModel):
+class Udp(FieldModel):
     timeout: Optional[str] = None
 
 
-class EntryPoints(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class EntryPoints(FieldModel):
     address: Optional[str] = None
     transport: Optional[Transport] = None
     proxy_protocol: Optional[ProxyProtocol] = Field(None, alias="proxyProtocol")
@@ -172,25 +166,16 @@ class EntryPoints(BaseModel):
     udp: Optional[Udp] = None
 
 
-class Plugins(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Plugins(FieldModel):
     module_name: Optional[str] = Field(None, alias="moduleName")
     version: Optional[str] = None
 
 
-class LocalPlugins(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class LocalPlugins(FieldModel):
     module_name: Optional[str] = Field(None, alias="moduleName")
 
 
-class Experimental(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Experimental(FieldModel):
     kubernetes_gateway: Optional[bool] = Field(None, alias="kubernetesGateway")
     http3: Optional[bool] = None
     hub: Optional[bool] = None
@@ -198,50 +183,35 @@ class Experimental(BaseModel):
     local_plugins: Optional[dict[str, LocalPlugins]] = Field(None, alias="localPlugins")
 
 
-class Global(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Global(FieldModel):
     check_new_version: Optional[bool] = Field(None, alias="checkNewVersion")
     send_anonymous_usage: Optional[bool] = Field(None, alias="sendAnonymousUsage")
 
 
-class HostResolver(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class HostResolver(FieldModel):
     cname_flattening: Optional[bool] = Field(None, alias="cnameFlattening")
     resolv_config: Optional[str] = Field(None, alias="resolvConfig")
     resolv_depth: Optional[int] = Field(None, alias="resolvDepth")
 
 
-class Tls1(BaseModel):
+class Tls1(FieldModel):
     insecure: Optional[bool] = None
     ca: Optional[str] = None
     cert: Optional[str] = None
     key: Optional[str] = None
 
 
-class Hub(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Hub(FieldModel):
     tls: Optional[Tls1] = None
 
 
-class Log(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Log(FieldModel):
     level: Optional[str] = None
     file_path: Optional[str] = Field(None, alias="filePath")
     format: Optional[str] = None
 
 
-class Prometheus(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Prometheus(FieldModel):
     buckets: Optional[list[float]] = None
     add_entry_points_labels: Optional[bool] = Field(None, alias="addEntryPointsLabels")
     add_routers_labels: Optional[bool] = Field(None, alias="addRoutersLabels")
@@ -250,10 +220,7 @@ class Prometheus(BaseModel):
     manual_routing: Optional[bool] = Field(None, alias="manualRouting")
 
 
-class Datadog(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Datadog(FieldModel):
     address: Optional[str] = None
     push_interval: Optional[str] = Field(None, alias="pushInterval")
     add_entry_points_labels: Optional[bool] = Field(None, alias="addEntryPointsLabels")
@@ -262,10 +229,7 @@ class Datadog(BaseModel):
     prefix: Optional[str] = None
 
 
-class StatsD(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class StatsD(FieldModel):
     address: Optional[str] = None
     push_interval: Optional[str] = Field(None, alias="pushInterval")
     add_entry_points_labels: Optional[bool] = Field(None, alias="addEntryPointsLabels")
@@ -274,10 +238,7 @@ class StatsD(BaseModel):
     prefix: Optional[str] = None
 
 
-class InfluxDb(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class InfluxDb(FieldModel):
     address: Optional[str] = None
     protocol: Optional[str] = None
     push_interval: Optional[str] = Field(None, alias="pushInterval")
@@ -291,10 +252,7 @@ class InfluxDb(BaseModel):
     additional_labels: Optional[dict[str, Any]] = Field(None, alias="additionalLabels")
 
 
-class InfluxDb2(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class InfluxDb2(FieldModel):
     address: Optional[str] = None
     token: Optional[str] = None
     push_interval: Optional[str] = Field(None, alias="pushInterval")
@@ -306,10 +264,7 @@ class InfluxDb2(BaseModel):
     additional_labels: Optional[dict[str, Any]] = Field(None, alias="additionalLabels")
 
 
-class Metrics(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Metrics(FieldModel):
     prometheus: Optional[Prometheus] = None
     datadog: Optional[Datadog] = None
     stats_d: Optional[StatsD] = Field(None, alias="statsD")
@@ -317,27 +272,18 @@ class Metrics(BaseModel):
     influx_db2: Optional[InfluxDb2] = Field(None, alias="influxDB2")
 
 
-class Pilot(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Pilot(FieldModel):
     token: Optional[str] = None
     dashboard: Optional[bool] = None
 
 
-class Ping(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Ping(FieldModel):
     entry_point: Optional[str] = Field(None, alias="entryPoint")
     manual_routing: Optional[bool] = Field(None, alias="manualRouting")
     terminating_status_code: Optional[int] = Field(None, alias="terminatingStatusCode")
 
 
-class Tls2(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Tls2(FieldModel):
     ca: Optional[str] = None
     ca_optional: Optional[bool] = Field(None, alias="caOptional")
     cert: Optional[str] = None
@@ -345,10 +291,7 @@ class Tls2(BaseModel):
     insecure_skip_verify: Optional[bool] = Field(None, alias="insecureSkipVerify")
 
 
-class Docker(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Docker(FieldModel):
     allow_empty_services: Optional[bool] = Field(None, alias="allowEmptyServices")
     constraints: Optional[str] = None
     default_rule: Optional[str] = Field(None, alias="defaultRule")
@@ -365,10 +308,7 @@ class Docker(BaseModel):
     watch: Optional[bool] = None
 
 
-class FileProvider(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class FileProvider(FieldModel):
     directory: Optional[str] = None
     watch: Optional[bool] = None
     filename: Optional[str] = None
@@ -377,10 +317,7 @@ class FileProvider(BaseModel):
     )
 
 
-class Tls3(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Tls3(FieldModel):
     ca: Optional[str] = None
     ca_optional: Optional[bool] = Field(None, alias="caOptional")
     cert: Optional[str] = None
@@ -388,18 +325,12 @@ class Tls3(BaseModel):
     insecure_skip_verify: Optional[bool] = Field(None, alias="insecureSkipVerify")
 
 
-class Basic(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Basic(FieldModel):
     http_basic_auth_user: Optional[str] = Field(None, alias="httpBasicAuthUser")
     http_basic_password: Optional[str] = Field(None, alias="httpBasicPassword")
 
 
-class Marathon(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Marathon(FieldModel):
     constraints: Optional[str] = None
     trace: Optional[bool] = None
     watch: Optional[bool] = None
@@ -419,19 +350,13 @@ class Marathon(BaseModel):
     )
 
 
-class IngressEndpoint(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class IngressEndpoint(FieldModel):
     ip: Optional[str] = None
     hostname: Optional[str] = None
     published_service: Optional[str] = Field(None, alias="publishedService")
 
 
-class KubernetesIngress(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class KubernetesIngress(FieldModel):
     endpoint: Optional[str] = None
     token: Optional[str] = None
     cert_auth_file_path: Optional[str] = Field(None, alias="certAuthFilePath")
@@ -446,10 +371,7 @@ class KubernetesIngress(BaseModel):
     ingress_endpoint: Optional[IngressEndpoint] = Field(None, alias="ingressEndpoint")
 
 
-class KubernetesCrd(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class KubernetesCrd(FieldModel):
     endpoint: Optional[str] = None
     token: Optional[str] = None
     cert_auth_file_path: Optional[str] = Field(None, alias="certAuthFilePath")
@@ -464,10 +386,7 @@ class KubernetesCrd(BaseModel):
     allow_empty_services: Optional[bool] = Field(None, alias="allowEmptyServices")
 
 
-class KubernetesGateway(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class KubernetesGateway(FieldModel):
     endpoint: Optional[str] = None
     token: Optional[str] = None
     cert_auth_file_path: Optional[str] = Field(None, alias="certAuthFilePath")
@@ -476,17 +395,11 @@ class KubernetesGateway(BaseModel):
     throttle_duration: Optional[str] = Field(None, alias="throttleDuration")
 
 
-class Rest(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Rest(FieldModel):
     insecure: Optional[bool] = None
 
 
-class Rancher(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Rancher(FieldModel):
     constraints: Optional[str] = None
     watch: Optional[bool] = None
     default_rule: Optional[str] = Field(None, alias="defaultRule")
@@ -499,10 +412,7 @@ class Rancher(BaseModel):
     prefix: Optional[str] = None
 
 
-class Tls4(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Tls4(FieldModel):
     ca: Optional[str] = None
     ca_optional: Optional[bool] = Field(None, alias="caOptional")
     cert: Optional[str] = None
@@ -510,18 +420,12 @@ class Tls4(BaseModel):
     insecure_skip_verify: Optional[bool] = Field(None, alias="insecureSkipVerify")
 
 
-class HttpAuth(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class HttpAuth(FieldModel):
     username: Optional[str] = None
     password: Optional[str] = None
 
 
-class Endpoint(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Endpoint(FieldModel):
     address: Optional[str] = None
     scheme: Optional[str] = None
     datacenter: Optional[str] = None
@@ -531,7 +435,7 @@ class Endpoint(BaseModel):
     http_auth: Optional[HttpAuth] = Field(None, alias="httpAuth")
 
 
-class ConsulCatalog(BaseModel):
+class ConsulCatalog(FieldModel):
     constraints: Optional[str] = None
     prefix: Optional[str] = None
     refresh_interval: Optional[str] = Field(None, alias="refreshInterval")
@@ -549,10 +453,7 @@ class ConsulCatalog(BaseModel):
     endpoint: Optional[Endpoint] = None
 
 
-class Tls5(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Tls5(FieldModel):
     ca: Optional[str] = None
     ca_optional: Optional[bool] = Field(None, alias="caOptional")
     cert: Optional[str] = None
@@ -560,10 +461,7 @@ class Tls5(BaseModel):
     insecure_skip_verify: Optional[bool] = Field(None, alias="insecureSkipVerify")
 
 
-class Endpoint1(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Endpoint1(FieldModel):
     address: Optional[str] = None
     region: Optional[str] = None
     token: Optional[str] = None
@@ -571,10 +469,7 @@ class Endpoint1(BaseModel):
     tls: Optional[Tls5] = None
 
 
-class Nomad(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Nomad(FieldModel):
     constraints: Optional[str] = None
     prefix: Optional[str] = None
     refresh_interval: Optional[str] = Field(None, alias="refreshInterval")
@@ -585,10 +480,7 @@ class Nomad(BaseModel):
     endpoint: Optional[Endpoint1] = None
 
 
-class Ecs(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Ecs(FieldModel):
     constraints: Optional[str] = None
     exposed_by_default: Optional[bool] = Field(None, alias="exposedByDefault")
     ecs_anywhere: Optional[bool] = Field(None, alias="ecsAnywhere")
@@ -601,10 +493,7 @@ class Ecs(BaseModel):
     secret_access_key: Optional[str] = Field(None, alias="secretAccessKey")
 
 
-class Tls6(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Tls6(FieldModel):
     ca: Optional[str] = None
     ca_optional: Optional[bool] = Field(None, alias="caOptional")
     cert: Optional[str] = None
@@ -612,10 +501,7 @@ class Tls6(BaseModel):
     insecure_skip_verify: Optional[bool] = Field(None, alias="insecureSkipVerify")
 
 
-class Consul(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Consul(FieldModel):
     root_key: Optional[str] = Field(None, alias="rootKey")
     endpoints: Optional[list[str]] = None
     token: Optional[str] = None
@@ -624,10 +510,7 @@ class Consul(BaseModel):
     tls: Optional[Tls6] = None
 
 
-class Tls7(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Tls7(FieldModel):
     ca: Optional[str] = None
     ca_optional: Optional[bool] = Field(None, alias="caOptional")
     cert: Optional[str] = None
@@ -635,10 +518,7 @@ class Tls7(BaseModel):
     insecure_skip_verify: Optional[bool] = Field(None, alias="insecureSkipVerify")
 
 
-class Etcd(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Etcd(FieldModel):
     root_key: Optional[str] = Field(None, alias="rootKey")
     endpoints: Optional[list[str]] = None
     username: Optional[str] = None
@@ -646,20 +526,14 @@ class Etcd(BaseModel):
     tls: Optional[Tls7] = None
 
 
-class ZooKeeper(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class ZooKeeper(FieldModel):
     root_key: Optional[str] = Field(None, alias="rootKey")
     endpoints: Optional[list[str]] = None
     username: Optional[str] = None
     password: Optional[str] = None
 
 
-class Tls8(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Tls8(FieldModel):
     ca: Optional[str] = None
     ca_optional: Optional[bool] = Field(None, alias="caOptional")
     cert: Optional[str] = None
@@ -667,10 +541,7 @@ class Tls8(BaseModel):
     insecure_skip_verify: Optional[bool] = Field(None, alias="insecureSkipVerify")
 
 
-class Redis(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Redis(FieldModel):
     root_key: Optional[str] = Field(None, alias="rootKey")
     endpoints: Optional[list[str]] = None
     username: Optional[str] = None
@@ -679,10 +550,7 @@ class Redis(BaseModel):
     tls: Optional[Tls8] = None
 
 
-class Tls9(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Tls9(FieldModel):
     ca: Optional[str] = None
     ca_optional: Optional[bool] = Field(None, alias="caOptional")
     cert: Optional[str] = None
@@ -690,17 +558,14 @@ class Tls9(BaseModel):
     insecure_skip_verify: Optional[bool] = Field(None, alias="insecureSkipVerify")
 
 
-class Http1(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Http1(FieldModel):
     endpoint: Optional[str] = None
     poll_interval: Optional[str] = Field(None, alias="pollInterval")
     poll_timeout: Optional[str] = Field(None, alias="pollTimeout")
     tls: Optional[Tls9] = None
 
 
-class Providers(BaseModel):
+class Providers(FieldModel):
     providers_throttle_duration: Optional[str] = Field(
         None, alias="providersThrottleDuration"
     )
@@ -727,19 +592,13 @@ class Providers(BaseModel):
     plugin: Optional[dict[str, dict[str, Any]]] = None  # noqa: WPS234
 
 
-class ForwardingTimeouts(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class ForwardingTimeouts(FieldModel):
     dial_timeout: Optional[str] = Field(None, alias="dialTimeout")
     response_header_timeout: Optional[str] = Field(None, alias="responseHeaderTimeout")
     idle_conn_timeout: Optional[str] = Field(None, alias="idleConnTimeout")
 
 
-class ServersTransport(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class ServersTransport(FieldModel):
     insecure_skip_verify: Optional[bool] = Field(None, alias="insecureSkipVerify")
     root_c_as: Optional[list[str]] = Field(None, alias="rootCAs")
     max_idle_conns_per_host: Optional[int] = Field(None, alias="maxIdleConnsPerHost")
@@ -748,19 +607,13 @@ class ServersTransport(BaseModel):
     )
 
 
-class Collector(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Collector(FieldModel):
     endpoint: Optional[str] = None
     user: Optional[str] = None
     password: Optional[str] = None
 
 
-class Jaeger(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Jaeger(FieldModel):
     sampling_server_url: Optional[str] = Field(None, alias="samplingServerURL")
     sampling_type: Optional[str] = Field(None, alias="samplingType")
     sampling_param: Optional[int] = Field(None, alias="samplingParam")
@@ -776,20 +629,14 @@ class Jaeger(BaseModel):
     collector: Optional[Collector] = None
 
 
-class Zipkin(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Zipkin(FieldModel):
     http_endpoint: Optional[str] = Field(None, alias="httpEndpoint")
     same_span: Optional[bool] = Field(None, alias="sameSpan")
     id128_bit: Optional[bool] = Field(None, alias="id128Bit")
     sample_rate: Optional[int] = Field(None, alias="sampleRate")
 
 
-class Datadog1(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Datadog1(FieldModel):
     local_agent_host_port: Optional[str] = Field(None, alias="localAgentHostPort")
     global_tag: Optional[str] = Field(None, alias="globalTag")
     global_tags: Optional[dict[str, str]] = Field(
@@ -809,20 +656,14 @@ class Datadog1(BaseModel):
     )
 
 
-class Instana(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Instana(FieldModel):
     local_agent_host: Optional[str] = Field(None, alias="localAgentHost")
     local_agent_port: Optional[int] = Field(None, alias="localAgentPort")
     log_level: Optional[str] = Field(None, alias="logLevel")
     enable_auto_profile: Optional[bool] = Field(None, alias="enableAutoProfile")
 
 
-class Haystack(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Haystack(FieldModel):
     local_agent_host: Optional[str] = Field(None, alias="localAgentHost")
     local_agent_port: Optional[int] = Field(None, alias="localAgentPort")
     global_tag: Optional[str] = Field(None, alias="globalTag")
@@ -834,19 +675,13 @@ class Haystack(BaseModel):
     )
 
 
-class Elastic(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Elastic(FieldModel):
     server_url: Optional[str] = Field(None, alias="serverURL")
     secret_token: Optional[str] = Field(None, alias="secretToken")
     service_environment: Optional[str] = Field(None, alias="serviceEnvironment")
 
 
-class Tracing(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class Tracing(FieldModel):
     service_name: Optional[str] = Field(None, alias="serviceName")
     span_name_limit: Optional[int] = Field(None, alias="spanNameLimit")
     jaeger: Optional[Jaeger] = None
@@ -857,10 +692,7 @@ class Tracing(BaseModel):
     elastic: Optional[Elastic] = None
 
 
-class TraefikStaticConfig(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
+class TraefikStaticConfig(FieldModel):
     access_log: Optional[AccessLog] = Field(None, alias="accessLog")
     api: Optional[Api] = None
     certificates_resolvers: Optional[dict[str, CertificatesResolvers]] = Field(
