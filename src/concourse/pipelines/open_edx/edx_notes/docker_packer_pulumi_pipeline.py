@@ -40,7 +40,7 @@ def build_notes_pipeline(
         name=Identifier("notes-dockerfile"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
-        paths=["dockerfiles/open_edx/Dockerfile.notes_api"],
+        paths=["dockerfiles/openedx-notes/Dockerfile"],
     )
 
     notes_packer_code = git_repo(
@@ -70,7 +70,7 @@ def build_notes_pipeline(
                     Input(name=notes_dockerfile_repo.name),
                 ],
                 build_parameters={
-                    "CONTEXT": f"{notes_dockerfile_repo.name}/dockerfiles/openedx-notes",
+                    "CONTEXT": f"{notes_dockerfile_repo.name}/dockerfiles/openedx-notes/",
                     "BUILD_ARG_OPENEDX_COMMON_VERSION": notes_branch,
                 },
                 build_args=[
