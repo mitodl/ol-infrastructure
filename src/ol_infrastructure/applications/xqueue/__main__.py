@@ -205,9 +205,6 @@ lt_config = OLLaunchTemplateConfig(
                                 "owner": "root:root",
                             },
                         ],
-                        "bootcmd": [
-                            f"sed -i -e 's/latest/{openedx_version_tag}/' /etc/docker/compose/docker-compose.yaml"  # noqa: E501
-                        ],
                     },
                     sort_keys=True,
                 )
