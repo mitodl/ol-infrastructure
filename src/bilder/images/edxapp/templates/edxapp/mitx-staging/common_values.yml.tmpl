@@ -252,8 +252,8 @@ DJFS:
 
 EDXMKTG_USER_INFO_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-user-info
 {{ if keyOrDefault "edxapp/enable_notes" "false" | parseBool }}
-EDXNOTES_INTERNAL_API: https://{{ key "edx/notes_api_host" }}/api/v1
-EDXNOTES_PUBLIC_API: https://{{ key "edx/notes_api_host" }}/api/v1
+EDXNOTES_INTERNAL_API: https://{{ key "edx/notes-api-host" }}/api/v1
+EDXNOTES_PUBLIC_API: https://{{ key "edx/notes-api-host" }}/api/v1
 {{ else }}
 EDXNOTES_INTERNAL_API: http://localhost:18120/api/v1
 EDXNOTES_PUBLIC_API: http://localhost:18120/api/v1
