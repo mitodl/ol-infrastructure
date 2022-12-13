@@ -53,10 +53,10 @@ source "amazon-ebs" "edx_notes" {
     purpose = "${local.app_name}-${var.openedx_release}"
   }
   snapshot_tags = {
-    Name    = "${local.app_name}-${var.openedx_release}-ami"
-    OU      = "${var.business_unit}"
-    app     = "${local.app_name}"
-    purpose = "${local.app_name}-${var.openedx_release}"
+    Name            = "${local.app_name}-${var.openedx_release}-ami"
+    OU              = "${var.business_unit}"
+    app             = "${local.app_name}"
+    purpose         = "${local.app_name}-${var.openedx_release}"
     openedx_release = var.openedx_release
   }
   # Base all builds off of the most recent docker_baseline_ami built by us, based of Debian 11
@@ -80,10 +80,10 @@ source "amazon-ebs" "edx_notes" {
     random = true
   }
   tags = {
-    Name    = "${local.app_name}-${var.openedx_release}"
-    OU      = var.business_unit
-    app     = local.app_name
-    purpose = "${local.app_name}-${var.openedx_release}"
+    Name            = "${local.app_name}-${var.openedx_release}"
+    OU              = var.business_unit
+    app             = local.app_name
+    purpose         = "${local.app_name}-${var.openedx_release}"
     openedx_release = var.openedx_release
   }
 }
@@ -105,6 +105,6 @@ build {
       "NODE_TYPE=${var.node_type}",
       "OPENEDX_RELEASE=${var.openedx_release}"
     ]
-    inline           = ["pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"]
+    inline = ["pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"]
   }
 }
