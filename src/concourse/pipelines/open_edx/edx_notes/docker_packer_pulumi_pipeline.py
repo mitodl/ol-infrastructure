@@ -56,7 +56,8 @@ def build_notes_pipeline(
         name=Identifier("ol-infrastructure-deploy"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
-        paths=PULUMI_WATCHED_PATHS + [PULUMI_CODE_PATH.joinpath("applications/notes/")],
+        paths=PULUMI_WATCHED_PATHS
+        + [PULUMI_CODE_PATH.joinpath("applications/edx_notes/")],
     )
 
     image_build_job = Job(
