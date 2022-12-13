@@ -32,7 +32,7 @@ variable "openedx_release" {
 
 source "amazon-ebs" "edx_notes" {
   ami_description         = "Deployment image for edx-notes application generated at ${local.timestamp}"
-  ami_name                = "edx_notes-${var.node_type}-${local.timestamp}"
+  ami_name                = "edx_notes-${var.business_unit}-${var.openedx_release}-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
   launch_block_device_mappings {
