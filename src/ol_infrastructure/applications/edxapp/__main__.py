@@ -860,6 +860,9 @@ edxapp_ses_event_destintations = ses.EventDestination(
 # Manage Consul Data #
 ######################
 consul_kv_data = {
+    "enable_notes": "true"
+    if edxapp_config.get_bool("enable_notes")
+    else "false",  # intended quoted boolean
     "google-analytics-id": edxapp_config.require("google_analytics_id"),
     "lms-domain": edxapp_domains["lms"],
     "preview-domain": edxapp_domains["preview"],
