@@ -22,6 +22,10 @@ variable "node_type" {
   default = "server"
 }
 
+variable "deployment" {
+  type = string
+}
+
 variable "openedx_release" {
   type = string
 }
