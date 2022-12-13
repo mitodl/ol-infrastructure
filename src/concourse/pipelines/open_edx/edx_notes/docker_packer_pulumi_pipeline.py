@@ -108,6 +108,7 @@ def build_notes_pipeline(
             packer_vars={
                 "deployment": deployment.deployment_name,
                 "openedx_release": release_name,
+                "business_unit": deployment.deployment_name,
             },
             job_name_suffix=deployment.deployment_name,
         )
