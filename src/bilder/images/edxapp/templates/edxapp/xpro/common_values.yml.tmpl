@@ -230,6 +230,13 @@ DJFS:
     url_root: /static/django-pyfs
 
 EDXMKTG_USER_INFO_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-user-info
+{{ if keyOrDefault "edxapp/enable_notes" "false" | parseBool }}
+EDXNOTES_INTERNAL_API: https://{{ key "edx/notes-api-host" }}/api/v1
+EDXNOTES_PUBLIC_API: https://{{ key "edx/notes-api-host" }}/api/v1
+{{ else }}
+EDXNOTES_INTERNAL_API: http://localhost:18120/api/v1
+EDXNOTES_PUBLIC_API: http://localhost:18120/api/v1
+{{ end }}
 EDX_PLATFORM_REVISION: release
 ELASTIC_SEARCH_CONFIG:
 - host: {{ keyOrDefault "elasticsearch/host" "elasticsearch.service.consul" }}
@@ -271,7 +278,7 @@ FEATURES:
     ENABLE_CSMH_EXTENDED: true
     ENABLE_DISCUSSION_HOME_PANEL: true
     ENABLE_DISCUSSION_SERVICE: true
-    ENABLE_EDXNOTES: false
+    ENABLE_EDXNOTES: {{ keyOrDefault "edxapp/enable_notes" "false" }}
     ENABLE_EDX_USERNAME_CHANGER: true  # ADDED KEY
     ENABLE_ENROLLMENT_RESET: false
     ENABLE_EXPORT_GIT: true  # MODIFIED
