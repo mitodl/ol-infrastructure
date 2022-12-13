@@ -146,7 +146,7 @@ tag_specs = [
 ]
 xqueue_server_security_group = ec2.SecurityGroup(
     f"xqueue-server-security-group-{env_name}",
-    name=f"xqueue-server-{target_vpc_name}-{env_name}",
+    name=f"xqueue-server-{env_name}",
     description="Access control for xqueue servers",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -154,6 +154,7 @@ xqueue_server_security_group = ec2.SecurityGroup(
             from_port=XQUEUE_SERVICE_PORT,
             to_port=XQUEUE_SERVICE_PORT,
             security_groups=[edxapp.get_output("edxapp_security_group")],
+            cidr_blocks=[target_vpc["cidr"]],
             description=f"Allow traffic to the xqueue server on port {XQUEUE_SERVICE_PORT}",  # noqa: E501
         ),
     ],
