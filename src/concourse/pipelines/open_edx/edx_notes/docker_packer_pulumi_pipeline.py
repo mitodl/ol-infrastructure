@@ -121,7 +121,7 @@ def build_notes_pipeline(
                 for stage in deployment.envs_by_release(release_name)
             ],
             project_name="ol-infrastructure-notes-server",
-            project_source_path=PULUMI_CODE_PATH.joinpath("applications/notes/"),
+            project_source_path=PULUMI_CODE_PATH.joinpath("applications/edx_notes/"),
             dependencies=[
                 GetStep(
                     get=ami_fragment.resources[-1].name,
