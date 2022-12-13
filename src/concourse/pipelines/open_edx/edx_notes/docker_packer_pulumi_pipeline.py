@@ -104,7 +104,7 @@ def build_notes_pipeline(
                 )
             ],
             image_code=notes_packer_code,
-            packer_template_path="src/bilder/images/edx_notes/notes.pkr.hcl",
+            packer_template_path="src/bilder/images/edx_notes/edx_notes.pkr.hcl",
             packer_vars={
                 "deployment": deployment.deployment_name,
                 "openedx_release": release_name,
