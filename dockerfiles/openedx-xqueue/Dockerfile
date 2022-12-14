@@ -6,8 +6,9 @@ RUN apt update && \
   apt-get install git-core language-pack-en python3-pip libmysqlclient-dev ntp libssl-dev python3.8-dev python3.8-venv -qy && \
   rm -rf /var/lib/apt/lists/*
 
-ARG OPENEDX_COMMON_VERSION=open-release/maple.3
+ARG OPENEDX_COMMON_VERSION=open-release/olive.master
 ENV VIRTUAL_ENV=/venv
+ENV DJANGO_SETTINGS_MODULE=xqueue.production
 RUN python3.8 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
