@@ -11,11 +11,11 @@ CLIENT_SECRET: {{ .Data.oauth_client_secret }}
 DATABASES:
   default:
     ENGINE: django.db.backends.mysql
-    HOST: edxapp_db.service.consul
+    HOST: edxapp-db.service.consul
     NAME: edx_notes_api
     PASSWORD: {{ .Data.password }}
     PORT: 3306
-    USER: {{ .Data.password }}
+    USER: {{ .Data.username }}
 {{ end }}
 {{ end }}
 
