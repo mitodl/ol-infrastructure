@@ -24,5 +24,6 @@ ALLOWED_HOSTS:
 
 DEFAULT_HASHING_ALGORITHM: sha256
 
-ELASTICSEARCH_URL:  https://{{ keyOrDefault "elasticsearch/host" "elasticsearch.service.consul" }}:443
-ELASTICSEARCH_INDEX: edx_notes
+ELASTICSEARCH_DSL: {'default': {'hosts': '{{ keyOrDefault "elasticsearch/host" "elasticsearch.service.consul" }}:443', 'use_ssl': True, 'verify_certs': False, 'ssl_show_warn': False } }
+ELASTICSEARCH_DSL_INDEX_SETTINGS: {'number_of_shards': 3, 'number_of_replicas': 1}
+LOG_SETTINGS_DEBUG: False
