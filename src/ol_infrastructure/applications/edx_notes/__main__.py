@@ -261,7 +261,6 @@ consul_keys = {
     "edx/release": openedx_release,
     "edx/notes-api-host": dns_name,
     "edx/deployment": f"{stack_info.env_prefix}",
-    "elasticsearch/host": "elasticsearch.service.consul",
 }
 consul.Keys(
     f"edx-notes-{env_name}-configuration-data",
