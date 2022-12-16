@@ -21,7 +21,7 @@ config:
     course_authoring: course-authoring
     gradebook: gradebook
     learning: learn
-    library_authoring: authoring
+    library_authoring: library-authoring
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-staging-qa.mitx.mit.edu
   edxapp:min_web_nodes: "1"

@@ -17,8 +17,10 @@ config:
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
+    course_authoring: course-authoring
     gradebook: gradebook
     learning: learn
+    library_authoring: library-authoring
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-qa.xpro.mit.edu
   edxapp:min_web_nodes: "1"
