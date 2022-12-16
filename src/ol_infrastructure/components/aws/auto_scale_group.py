@@ -254,9 +254,12 @@ class OLAutoScaling(pulumi.ComponentResource):
                     enabled=True,
                 )
 
+            target_group_name = f"{resource_name_prefix}tg"[
+                :AWS_TARGET_GROUP_NAME_MAX_LENGTH
+            ].rstrip("-")
             self.target_group = TargetGroup(  # noqa: WPS601
                 f"{resource_name_prefix}target-group",
-                name=(f"{resource_name_prefix}tg")[:AWS_TARGET_GROUP_NAME_MAX_LENGTH],
+                name=target_group_name,
                 vpc_id=tg_config.vpc_id,
                 port=tg_config.port,
                 protocol=tg_config.protocol,
@@ -267,13 +270,16 @@ class OLAutoScaling(pulumi.ComponentResource):
 
         # Create Load Balancer
         if lb_config:
+            load_balancer_name = f"{resource_name_prefix}lb"[
+                :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
+            ].rstrip("-")
             self.load_balancer = LoadBalancer(  # noqa: WPS601
                 f"{resource_name_prefix}load-balancer",
                 enable_http2=lb_config.enable_http2,
                 internal=lb_config.internal,
                 ip_address_type=lb_config.ip_address_type,
                 load_balancer_type=lb_config.load_balancer_type,
-                name=(f"{resource_name_prefix}lb")[:AWS_LOAD_BALANCER_NAME_MAX_LENGTH],
+                name=load_balancer_name,
                 security_groups=[group.id for group in lb_config.security_groups],
                 subnets=lb_config.subnets,
                 opts=resource_options,
