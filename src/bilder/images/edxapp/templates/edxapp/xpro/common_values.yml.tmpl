@@ -49,6 +49,14 @@ JWT_AUTH:  # NEEDS ATTENTION
         AUDIENCE: xpro
         SECRET_KEY: {{ .Data.django_secret_key }}
 SENTRY_DSN: {{ .Data.sentry_dsn }}
+XQUEUE_INTERFACE:
+    basic_auth:
+    - edx
+    - edx
+    django_auth:
+        password: edxapp
+        username: edxapp
+    url: http://xqueue.service.consul:8040  # MODIFIED
 {{ end }}
 
 {{ with secret "secret-xpro/edx-forum" }}
