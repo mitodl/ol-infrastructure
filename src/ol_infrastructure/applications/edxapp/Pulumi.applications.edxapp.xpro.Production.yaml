@@ -14,6 +14,7 @@ config:
     studio: studio.xpro.mit.edu
   edxapp:edx_forum_secrets:
     secure: v1:YHqAWSdn7TNUn7d+:IBgiGsl4r8vymID8NV43rnfJy+qsJSXm/jXaWWALUfF9zXqRO4zJZhLS0d+etijGVwaZnF8v5zXlo+EczFrCe7ICHpS85zHgifbfDcw=
+  edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     course_authoring: course-authoring
     gradebook: gradebook
