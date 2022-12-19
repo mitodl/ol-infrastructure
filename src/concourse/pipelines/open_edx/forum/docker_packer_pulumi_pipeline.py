@@ -56,7 +56,11 @@ def build_forum_pipeline(
         name=Identifier("ol-infrastructure-deploy"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
-        paths=PULUMI_WATCHED_PATHS + [PULUMI_CODE_PATH.joinpath("applications/forum/")],
+        paths=PULUMI_WATCHED_PATHS
+        + [
+            PULUMI_CODE_PATH.joinpath("applications/forum/"),
+            "src/bridge/settings/openedx/",
+        ],
     )
 
     image_build_job = Job(

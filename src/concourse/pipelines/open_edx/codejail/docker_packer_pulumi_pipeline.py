@@ -57,7 +57,10 @@ def build_codejail_pipeline(
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
         paths=PULUMI_WATCHED_PATHS
-        + [PULUMI_CODE_PATH.joinpath("applications/codejail/")],
+        + [
+            PULUMI_CODE_PATH.joinpath("applications/codejail/"),
+            "src/bridge/settings/openedx",
+        ],
     )
 
     image_build_job = Job(

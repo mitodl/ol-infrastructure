@@ -54,7 +54,10 @@ def build_xqueue_pipeline(release_name: str):
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
         paths=PULUMI_WATCHED_PATHS
-        + [PULUMI_CODE_PATH.joinpath("applications/xqueue/")],
+        + [
+            PULUMI_CODE_PATH.joinpath("applications/xqueue/"),
+            "src/bridge/settings/openedx/",
+        ],
     )
 
     image_build_job = Job(
