@@ -2,6 +2,7 @@
 
 import base64
 import json
+import textwrap
 from pathlib import Path
 
 import pulumi_consul as consul
@@ -195,6 +196,10 @@ tag_specs = [
     ),
 ]
 
+grafana_credentials = read_yaml_secrets(
+    Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
+)
+
 lt_config = OLLaunchTemplateConfig(
     block_device_mappings=block_device_mappings,
     image_id=notes_ami.id,
@@ -224,6 +229,21 @@ lt_config = OLLaunchTemplateConfig(
                                     }
                                 ),
                                 "owner": "consul:consul",
+                            },
+                            {
+                                "path": "/etc/default/vector",
+                                "content": textwrap.dedent(
+                                    f"""\
+                            ENVIRONMENT={consul_dc}
+                            APPLICATION=edx-notes
+                            VECTOR_CONFIG_DIR=/etc/vector/
+                            AWS_REGION={aws_config.region}
+                            GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
+                            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
+                            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
+                            """
+                                ),  # noqa: WPS355
+                                "owner": "root:root",
                             },
                         ],
                     },
