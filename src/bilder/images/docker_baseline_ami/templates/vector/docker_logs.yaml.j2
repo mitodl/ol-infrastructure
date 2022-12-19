@@ -22,10 +22,21 @@ transforms:
       }
       .environment = "${ENVIRONMENT}"
 
+  drop_unwanted_logs:
+    type: remap
+    inputs:
+    - "parse_docker_logs"
+    source: |
+      # Drop all messages regarding polling from the ELB
+      abort_match_elb, err = (match_any(.message, [r'ELB-HealthChecker.']))
+      if abort_match_elb {
+        abort
+      }
+
   enrich_docker_logs:
     type: aws_ec2_metadata
     inputs:
-    - 'parse_docker_logs'
+    - 'drop_unwanted_logs'
     namespace: ec2
 
 
