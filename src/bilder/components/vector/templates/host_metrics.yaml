@@ -19,12 +19,18 @@ sources:
 transforms:
   cleanup_host_metrics:
     type: remap
+    drop_on_abort: true
     inputs:
     - 'collect_host_metrics'
     source: |
       # Drop all the not-real filesystems metrics
       abort_match_filesystem, err = !(match_any(.tags.filesystem, [r'ext.', r'btrfs', r'xfs']))
       if abort_match_filesystem {
+        abort
+      }
+      # Drop metrics relating to the loopback network interface
+      abort_match_loopback_device, err = (match_any(.tags.device, [r'lo']))
+      if abort_match_loopback_device {
         abort
       }
 
