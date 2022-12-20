@@ -18,10 +18,22 @@ transforms:
         .labels = ["concourse", "${ENVIRONMENT}"]
         .environment = "${ENVIRONMENT}"
       }
+
+  drop_unwanted_logs:
+    type: remap
+    inputs:
+    - "parse_concourse_logs"
+    source: |
+      # Drop all 'INFO' level messages
+      abort_match_info, err = (match_any(.level, [r'info']))
+      if abort_match_info {
+        abort
+      }
+
   enrich_concourse_logs:
     type: aws_ec2_metadata
     inputs:
-    - 'parse_concourse_logs'
+    - 'drop_unwanted_logs'
     namespace: ec2
 
 sinks:
