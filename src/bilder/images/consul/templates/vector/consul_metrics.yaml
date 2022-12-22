@@ -7,10 +7,22 @@ sources:
     scrape_interval_secs: 60
 
 transforms:
+  cleanup_consul_metrics:
+    type: remap
+    drop_on_abort: true
+    inputs:
+    - 'collect_consul_metrics'
+    source: |
+      ## Any metrics that match these prefixes or names will be dropped entirely
+      abort_name_match, err = match_any(.name, [r'^consul_raft_replication_heartbeat_.*', r'^consul_raft_replication_appendEntries_rpc_.*', r'^consul_raft_replication_appendEntries_logs_.*', r'^consul_raft_replication_installSnapshot_.*'])
+      if abort_name_match {
+        abort
+      }
+
   add_labels_to_consul_metrics:
     type: remap
     inputs:
-    - 'collect_consul_metrics'
+    - 'cleanup_consul_metrics'
     source: |
       .tags.job = "integrations/consul"
       .tags.environment = "${ENVIRONMENT}"

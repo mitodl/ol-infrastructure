@@ -20,11 +20,22 @@ sources:
     - "app_name"
     - "environment"
     - "service"
-transforms: {}
+transforms:
+  drop_unwanted_logs:
+    type: remap
+    inputs:
+    - "heroku_log_proxy"
+    source: |
+      # Drop all messages from uninteresting heroku apps
+      abort_match_boring_apps, err = (match_any(.app_name, [r'ol-eng-library', '.*wiki.*']))
+      if abort_match_boring_apps {
+        abort
+      }
+
 sinks:
   ship_heroku_logs_to_grafana_cloud:
     inputs:
-    - 'heroku_log_proxy'
+    - 'drop_unwanted_logs'
     type: loki
     auth:
       strategy: basic
