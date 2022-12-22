@@ -50,7 +50,7 @@ config:
     - cloud_custodian
     - infra
     instance_type: t3a.medium
-    name: infrastructure
+    name: infra
   - auto_scale:
       desired: 1
       max: 2

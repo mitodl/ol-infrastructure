@@ -599,7 +599,7 @@ web_asg = autoscaling.Group(
             propagate_at_launch=True,
         )
         for key_name, key_value in aws_config.merged_tags(
-            {"ami_id": concourse_web_ami.id}
+            {"ami_id": concourse_web_ami.id, "concourse_type": "web"}
         ).items()
     ],
 )
@@ -784,7 +784,10 @@ for worker_def in concourse_config.get_object("workers") or []:  # noqa: WPS440
                 propagate_at_launch=True,
             )
             for key_name, key_value in aws_config.merged_tags(
-                {"ami_id": concourse_worker_ami.id}
+                {
+                    "ami_id": concourse_worker_ami.id,
+                    "concourse_type": f"worker-{worker_class_name}",
+                },
             ).items()
         ],
         target_group_arns=[worker_target_group.arn],
