@@ -16,11 +16,12 @@ sources:
     include_units:
     - vault
     - traefik
-    - raft_backup
+    - cron
 
 transforms:
   parse_vault_journald_logs:
     type: remap
+    drop_on_abort: true
     inputs:
     - 'collect_vault_journald_logs'
     source: |
@@ -29,6 +30,11 @@ transforms:
         ., err = merge(., event)
         .environment = "${ENVIRONMENT}"
       }
+      # Only want to hear about the raft_backup job from cron
+      if ._SYSTEMD_UNIT == "cron.service" && .SYSLOG_IDENTIFIER != "raft_backup" {
+        abort
+      }
+
 
   enrich_vault_journald_logs:
     type: aws_ec2_metadata
