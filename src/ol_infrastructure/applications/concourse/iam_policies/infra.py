@@ -1,9 +1,5 @@
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 
-## TODO: MAD 2022-01-21  # noqa: E266
-## There is something wrong with this one at the moment.  # noqa: E266
-## Pulumi throws an error if you try to use it.  # noqa: E266
-
 # AWS Permissions Document
 # Allow infrastructure workers elevated permissions needed for running packer
 policy_definition = {
@@ -48,6 +44,20 @@ policy_definition = {
                 "ec2:TerminateInstances",
             ],
             "Resource": "*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "autoscaling:StartInstanceRefresh",
+            ],
+            "Resource": "arn:aws:autoscaling:*:*:autoScalingGroup:*:autoScalingGroupName/concourse-*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "autoscaling:DescribeAutoScalingGroups",
+            ],
+            "Resource": "arn:aws:autoscaling:*:*:*:*:*",
         },
         {
             "Effect": "Allow",
