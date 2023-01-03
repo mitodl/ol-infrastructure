@@ -73,8 +73,6 @@ class OpenEdxSupportedRelease(str, Enum):  # noqa: WPS600
         return enum_element
 
     master = ("master", "master")
-    maple = ("maple", "open-release/maple.master")
-    nutmeg = ("nutmeg", "open-release/nutmeg.master")
     olive = ("olive", "open-release/olive.master")
 
 

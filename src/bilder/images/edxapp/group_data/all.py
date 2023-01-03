@@ -1,25 +1,6 @@
 REPOSITORY = "repository"
 BRANCH = "branch"
 
-edx_themes = {
-    "mitxonline": {
-        REPOSITORY: "https://github.com/mitodl/mitxonline-theme",
-        BRANCH: "main",
-    },
-    "xpro": {
-        REPOSITORY: "https://github.com/mitodl/mitxpro-theme",
-        BRANCH: "maple",
-    },
-    "mitx": {
-        REPOSITORY: "https://github.com/mitodl/mitx-theme",
-        BRANCH: "nutmeg",
-    },
-    "mitx-staging": {
-        REPOSITORY: "https://github.com/mitodl/mitx-theme",
-        BRANCH: "nutmeg",
-    },
-}
-
 edx_plugins_added = {
     "mitxonline": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
@@ -110,23 +91,4 @@ edx_plugins_removed = {
     "xpro": [],
     "mitx": [],
     "mitx-staging": [],
-}
-
-edx_platform_repository = {
-    "mitxonline": {
-        "origin": "https://github.com/openedx/edx-platform",
-        BRANCH: "release",
-    },
-    "xpro": {
-        "origin": "https://github.com/openedx/edx-platform",
-        BRANCH: "open-release/maple.master",
-    },
-    "mitx": {
-        "origin": "https://github.com/mitodl/edx-platform",
-        BRANCH: "mitx/nutmeg",
-    },
-    "mitx-staging": {
-        "origin": "https://github.com/mitodl/edx-platform",
-        BRANCH: "mitx/nutmeg",
-    },
 }

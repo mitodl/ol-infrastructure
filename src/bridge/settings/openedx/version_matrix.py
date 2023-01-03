@@ -15,7 +15,7 @@ class OpenLearningOpenEdxDeployment(Enum):
         env_release_map=[
             EnvRelease("CI", OpenEdxSupportedRelease["olive"]),
             EnvRelease("QA", OpenEdxSupportedRelease["olive"]),
-            EnvRelease("Production", OpenEdxSupportedRelease["nutmeg"]),
+            EnvRelease("Production", OpenEdxSupportedRelease["olive"]),
         ],
     )
     mitx_staging = DeploymentEnvRelease(
@@ -23,7 +23,7 @@ class OpenLearningOpenEdxDeployment(Enum):
         env_release_map=[
             EnvRelease("CI", OpenEdxSupportedRelease["olive"]),
             EnvRelease("QA", OpenEdxSupportedRelease["olive"]),
-            EnvRelease("Production", OpenEdxSupportedRelease["nutmeg"]),
+            EnvRelease("Production", OpenEdxSupportedRelease["olive"]),
         ],
     )
     mitxonline = DeploymentEnvRelease(
@@ -225,123 +225,6 @@ ReleaseMap: dict[  # noqa: WPS234
                 application="ora-grading",  # type: ignore
                 application_type="MFE",
                 release="olive",
-            ),
-        ],
-    },
-    "nutmeg": {
-        "mitx": [
-            OpenEdxApplicationVersion(
-                application="edx-platform",  # type: ignore
-                application_type="IDA",
-                release="nutmeg",
-                branch_override="mitx/nutmeg",
-                origin_override="https://github.com/mitodl/edx-platform",
-            ),
-            OpenEdxApplicationVersion(
-                application="edxapp_theme",  # type: ignore
-                application_type="IDA",
-                release="nutmeg",
-                branch_override="nutmeg",
-                origin_override="https://github.com/mitodl/mitx-theme",
-            ),
-            OpenEdxApplicationVersion(
-                application="forum",  # type: ignore
-                application_type="IDA",
-                release="nutmeg",
-            ),
-            OpenEdxApplicationVersion(
-                application="xqueue",  # type: ignore
-                application_type="IDA",
-                release="nutmeg",
-            ),
-            OpenEdxApplicationVersion(
-                application="learning",  # type: ignore
-                application_type="MFE",
-                release="nutmeg",
-            ),
-            OpenEdxApplicationVersion(
-                application="gradebook",  # type: ignore
-                application_type="MFE",
-                release="nutmeg",
-            ),
-            OpenEdxApplicationVersion(
-                application="course-authoring",  # type: ignore
-                application_type="MFE",
-                release="nutmeg",
-            ),
-        ],
-        "mitx-staging": [
-            OpenEdxApplicationVersion(
-                application="edx-platform",  # type: ignore
-                application_type="IDA",
-                release="nutmeg",
-                branch_override="mitx/nutmeg",
-                origin_override="https://github.com/mitodl/edx-platform",
-            ),
-            OpenEdxApplicationVersion(
-                application="edxapp_theme",  # type: ignore
-                application_type="IDA",
-                release="nutmeg",
-                branch_override="nutmeg",
-                origin_override="https://github.com/mitodl/mitx-theme",
-            ),
-            OpenEdxApplicationVersion(
-                application="forum",  # type: ignore
-                application_type="IDA",
-                release="nutmeg",
-            ),
-            OpenEdxApplicationVersion(
-                application="xqueue",  # type: ignore
-                application_type="IDA",
-                release="nutmeg",
-            ),
-            OpenEdxApplicationVersion(
-                application="learning",  # type: ignore
-                application_type="MFE",
-                release="nutmeg",
-            ),
-            OpenEdxApplicationVersion(
-                application="gradebook",  # type: ignore
-                application_type="MFE",
-                release="nutmeg",
-            ),
-            OpenEdxApplicationVersion(
-                application="course-authoring",  # type: ignore
-                application_type="MFE",
-                release="nutmeg",
-            ),
-        ],
-    },
-    "maple": {
-        "xpro": [
-            OpenEdxApplicationVersion(
-                application="edx-platform",  # type: ignore
-                application_type="IDA",
-                release="maple",
-            ),
-            OpenEdxApplicationVersion(
-                application="edxapp_theme",  # type: ignore
-                application_type="IDA",
-                release="maple",
-                branch_override="maple",
-                origin_override="https://github.com/mitodl/mitxpro-theme",
-            ),
-            OpenEdxApplicationVersion(
-                application="forum",  # type: ignore
-                application_type="IDA",
-                release="maple",
-            ),
-            OpenEdxApplicationVersion(
-                application="learning",  # type: ignore
-                application_type="MFE",
-                release="maple",
-                runtime_version_override="12",
-            ),
-            OpenEdxApplicationVersion(
-                application="gradebook",  # type: ignore
-                application_type="MFE",
-                release="maple",
-                runtime_version_override="12",
             ),
         ],
     },
