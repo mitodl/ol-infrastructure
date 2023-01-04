@@ -7,7 +7,7 @@ config:
     desired: 1
     max: 2
     min: 1
-  codejail:business_unit: operations
+  codejail:business_unit: residential-staging
   codejail:codejail_version_tag: 14.0.0
   codejail:target_vpc: residential_mitx_staging_vpc
   consul:address: https://consul-mitx-ci.odl.mit.edu
