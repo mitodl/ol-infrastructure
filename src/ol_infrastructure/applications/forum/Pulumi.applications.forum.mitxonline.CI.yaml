@@ -10,7 +10,5 @@ config:
     min: 1
   forum:business_unit: mitxonline
   forum:target_vpc: mitxonline_vpc
-  forum:web_host_domain: forum-mitxonline-ci.odl.mit.edu
-  forum:openedx_version_tag: master
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

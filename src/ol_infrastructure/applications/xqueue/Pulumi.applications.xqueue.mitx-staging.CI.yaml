@@ -11,6 +11,5 @@ config:
   xqueue:business_unit: residential-staging
   xqueue:target_vpc: residential_mitx_staging_vpc
   xqueue:web_host_domain: forum-staging-ci.odl.mit.edu
-  xqueue:openedx_version_tag: nutmeg.master
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

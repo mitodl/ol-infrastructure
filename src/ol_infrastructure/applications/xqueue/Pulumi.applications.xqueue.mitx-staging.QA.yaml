@@ -10,6 +10,5 @@ config:
     min: 1
   xqueue:business_unit: residential-staging
   xqueue:target_vpc: residential_mitx_staging_vpc
-  xqueue:openedx_version_tag: nutmeg.master
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
