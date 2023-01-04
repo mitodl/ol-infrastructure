@@ -9,17 +9,12 @@ transforms:
     inputs:
     - 'collect_docker_logs'
     source: |
-      event, err = parse_json(.message)
-      if event != null {
-        del(.message)
-        .,err = merge(., event)
-        .@timestamp = .time
-      }
-      event2, err = parse_json(.label)
-      if event2 != null {
-        del(.label)
-        .,err = merge(., event2)
-      }
+      . = map_keys(., recursive: true) -> |key| { replace(key, ".", "_") }
+      .docker_service = .label.com_docker_compose_service
+      del(.label)
+      del(.container_id)
+      del(.container_created_at)
+      del(.source_type)
       .environment = "${ENVIRONMENT}"
 
   drop_unwanted_logs:
@@ -28,7 +23,7 @@ transforms:
     - "parse_docker_logs"
     source: |
       # Drop all messages regarding polling from the ELB
-      abort_match_elb, err = (match_any(.message, [r'ELB-HealthChecker.']))
+      abort_match_elb, err = (match_any(.message, [r'ELB-HealthChecker.*', r'/ping.*']))
       if abort_match_elb {
         abort
       }
