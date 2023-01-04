@@ -42,6 +42,7 @@ policy_definition = {
                 "ec2:RunInstances",
                 "ec2:StopInstances",
                 "ec2:TerminateInstances",
+                "autoscaling:DescribeAutoScalingGroups",
             ],
             "Resource": "*",
         },
@@ -51,13 +52,6 @@ policy_definition = {
                 "autoscaling:StartInstanceRefresh",
             ],
             "Resource": "arn:aws:autoscaling:*:*:autoScalingGroup:*:autoScalingGroupName/concourse-*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "autoscaling:DescribeAutoScalingGroups",
-            ],
-            "Resource": "arn:aws:autoscaling:*:*:*:*:*",
         },
         {
             "Effect": "Allow",
