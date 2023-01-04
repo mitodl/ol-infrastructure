@@ -44,7 +44,6 @@ edxapp = StackReference(
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc_name = forum_config.get("target_vpc")
-openedx_version_tag = forum_config.get("openedx_version_tag")
 target_vpc = network_stack.require_output(target_vpc_name)
 
 aws_account = get_caller_identity()
@@ -203,9 +202,6 @@ lt_config = OLLaunchTemplateConfig(
                                 ),  # noqa: WPS355
                                 "owner": "root:root",
                             },
-                        ],
-                        "bootcmd": [
-                            f"sed -i -e 's/latest/{openedx_version_tag}/' /etc/docker/compose/docker-compose.yaml"  # noqa: E501
                         ],
                     },
                     sort_keys=True,

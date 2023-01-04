@@ -6,7 +6,7 @@ config:
   consul:address: https://consul-xpro-production.odl.mit.edu
   forum:auto_scale:
     desired: 3
-    max: 5
+    max: 10
     min: 3
   forum:business_unit: mitxpro
   forum:target_vpc: xpro_vpc

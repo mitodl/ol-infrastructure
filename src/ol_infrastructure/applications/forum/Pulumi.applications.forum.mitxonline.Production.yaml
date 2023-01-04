@@ -6,7 +6,7 @@ config:
   consul:address: https://consul-mitxonline-production.odl.mit.edu
   forum:auto_scale:
     desired: 3
-    max: 5
+    max: 10
     min: 3
   forum:business_unit: mitxonline
   forum:openedx_version_tag: master

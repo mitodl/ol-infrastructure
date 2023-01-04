@@ -4,7 +4,7 @@ encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gFIp45VyYwQaGk+qW
 config:
   aws:region: us-east-1
   codejail:auto_scale:
-    desired: 3
+    desired: 5
     max: 10
     min: 2
   codejail:business_unit: mitxpro

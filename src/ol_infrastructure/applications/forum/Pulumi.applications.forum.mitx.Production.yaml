@@ -6,7 +6,7 @@ config:
   consul:address: https://consul-mitx-production.odl.mit.edu
   forum:auto_scale:
     desired: 3
-    max: 5
+    max: 10
     min: 3
   forum:business_unit: residential
   forum:instance_type: t3a.medium

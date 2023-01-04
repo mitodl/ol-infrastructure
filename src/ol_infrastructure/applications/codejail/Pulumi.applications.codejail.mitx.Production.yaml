@@ -4,10 +4,9 @@ encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gFmLVxyy2hwwSaJxQ
 config:
   aws:region: us-east-1
   codejail:auto_scale:
-    desired: 3
-    max: 4
+    desired: 5
+    max: 10
     min: 2
   codejail:business_unit: residential
-  codejail:codejail_version_tag: 14.0.0
   codejail:target_vpc: residential_mitx_vpc
   consul:address: https://consul-mitx-production.odl.mit.edu
