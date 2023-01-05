@@ -22,7 +22,7 @@ policies:
   actions:
   - delete
 
-- name: delete-marked-ami
+- name: deregister-marked-ami
   resource: aws.ami
   description: |
     Delete AMIs that were previously marked for deletion.
