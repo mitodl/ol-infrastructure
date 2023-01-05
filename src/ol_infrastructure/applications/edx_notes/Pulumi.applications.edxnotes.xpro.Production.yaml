@@ -4,7 +4,7 @@ encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gF4g94MDlsx3nJ1Hy
 config:
   aws:region: us-east-1
   consul:address: https://consul-xpro-production.odl.mit.edu
-  edxnotes:acm_cert_domain: '*.mitx.mit.edu'
+  edxnotes:acm_cert_domain: '*.xpro.mit.edu'
   edxnotes:auto_scale:
     desired: 2
     max: 3

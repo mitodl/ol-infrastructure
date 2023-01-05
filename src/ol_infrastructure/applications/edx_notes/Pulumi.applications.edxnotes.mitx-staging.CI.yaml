@@ -12,7 +12,6 @@ config:
   edxnotes:business_unit: residential-staging
   edxnotes:dns_zone: mitx
   edxnotes:domain: staging-notes-ci.mitx.mit.edu
-  edxnotes:openedx_version_tag: nutmeg.master
   edxnotes:target_vpc: residential_mitx_staging_vpc
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
