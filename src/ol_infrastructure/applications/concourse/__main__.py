@@ -241,33 +241,15 @@ vault.generic.Secret(
         ]
     ).apply(json.dumps),
 )
-vault.generic.Secret(
-    "concourse-dockerhub-credentials",
-    path=concourse_secrets_mount.path.apply(
-        lambda mount_path: f"{mount_path}/main/dockerhub"
-    ),
-    data_json=concourse_config.require_secret_object("dockerhub_credentials").apply(
-        json.dumps
-    ),
-)
-vault.generic.Secret(
-    "concourse-pypi-credentials",
-    path=concourse_secrets_mount.path.apply(
-        lambda mount_path: f"{mount_path}/main/pypi_creds"
-    ),
-    data_json=concourse_config.require_secret_object("pypi_credentials").apply(
-        json.dumps
-    ),
-)
-vault.generic.Secret(
-    "concourse-consul-credentials",
-    path=concourse_secrets_mount.path.apply(
-        lambda mount_path: f"{mount_path}/main/consul"
-    ),
-    data_json=concourse_config.require_secret_object("consul_credentials").apply(
-        json.dumps
-    ),
-)
+for pipeline_var_path, secret_data in read_yaml_secrets(  # noqa: WPS352
+    Path(f"concourse/operations.{stack_info.env_suffix}.yaml")
+)["pipelines"].items():
+    secret_path = partial("{1}/{0}".format, pipeline_var_path)
+    vault.generic.Secret(
+        f"concourse-pipeline-credentials-{pipeline_var_path}",
+        path=concourse_secrets_mount.path.apply(secret_path),
+        data_json=json.dumps(secret_data),
+    )
 
 # Vault policy definition
 concourse_vault_policy = vault.Policy(
