@@ -1,16 +1,4 @@
 ---
-policies:
-- name: delete-marked-ebs-volumes
-  resource: aws.ebs
-  description: |
-    Delete ebs volumes that were previously marked for deletion.
-  filters:
-  - type: marked-for-op
-    tag: "custodian_cleanup"
-    op: delete
-  actions:
-  - delete
-
 - name: delete-marked-ebs-snapshots
   resource: aws.ebs-snapshot
   description: |
