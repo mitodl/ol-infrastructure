@@ -1,4 +1,4 @@
-FROM docker.io/ruby:2.5.7-slim-stretch
+FROM docker.io/ruby:3.0.4-slim-bullseye
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update && \
   apt upgrade -y && \
@@ -6,7 +6,7 @@ RUN apt update && \
 
 # Install dockerize to wait for mongodb/elasticsearch availability
 ARG DOCKERIZE_VERSION=v0.6.1
-ARG OPENEDX_COMMON_VERSION=open-release/maple.3
+ARG OPENEDX_COMMON_VERSION=open-release/olive.3
 
 RUN wget -O /tmp/dockerize.tar.gz https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
     && tar -C /usr/local/bin -xzvf /tmp/dockerize.tar.gz \
@@ -24,11 +24,12 @@ ENV PATH :${PATH}
 USER app
 
 # Install rake and bundler
-ENV PATH "/app/bin:/app/.gem/ruby/2.5.0/bin:$PATH"
+ENV PATH "/app/bin:/app/.gem/ruby/3.0.4/bin:$PATH"
 RUN gem install --user-install bundler --version 1.17.3
-RUN gem install --user-install rake --version 13.0.1
+RUN gem install --user-install rake --version 13.0.6
 
 # Install forum
+ENV BUNDLE_GEMFILE Gemfile3
 RUN git clone https://github.com/edx/cs_comments_service.git --branch $OPENEDX_COMMON_VERSION --depth 1 /app/cs_comments_service
 WORKDIR /app/cs_comments_service
 RUN bundle install --deployment
