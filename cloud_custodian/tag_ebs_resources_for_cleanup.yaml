@@ -1,5 +1,7 @@
 ---
 policies:
+  # The first set of policies finds ODL autoscale resources and identifies AMIs that were, at one point, ever used with them.
+  # It will then clean up the AMIs + snapshots
 - name: find-mitodl-asg
   resource: aws.asg
   description: |
@@ -7,9 +9,10 @@ policies:
   filters:
   - and:
     - "tag:pulumi_managed": present
-    - not:
-      - "tag:OU": "ike"
-
+    - type: value
+      key: 'tag:OU'
+      op: ne
+      value: 'ike'
 - name: find-mitodl-ltv
   resource: aws.launch-template-version
   description: |
@@ -24,7 +27,10 @@ policies:
         format: json
         expr: "[].Instances[].LaunchTemplate.LaunchTemplateId"
     - DefaultVersion: false
-
+    - type: value
+      key: 'tag:OU'
+      op: ne
+      value: 'ike'
 - name: find-and-mark-mitodl-ami
   resource: aws.ami
   description: |
@@ -43,14 +49,19 @@ policies:
       days: 30
     - type: unused
       value: true
-    - "tag:custodian_cleanup": absent
+    - type: value
+      key: 'tag:custodian_cleanup'
+      value: absent
+    - type: value
+      key: 'tag:OU'
+      op: ne
+      value: 'ike'
   actions:
   - type: mark-for-op
     tag: custodian_cleanup
     op: deregister
     days: 30
-
-- name: find-and-mark-mitodl-ami-snapshots
+- name: find-and-mark-associated-mitodl-snapshots
   resource: aws.ebs-snapshot
   description: |
     Find the snapshots associated with the unused AMIs from the previous policy. Tag them for deletion. Found snapshots will be used in the next policy to tmark the volumes for cleanup as well.
@@ -63,32 +74,82 @@ policies:
         url: file:find-and-mark-mitodl-ami/resources.json
         format: json
         expr: "[].BlockDeviceMappings[].Ebs.SnapshotId"
+    - type: age
+      op: gt
+      days: 30
     - type: value
       key: Description
-      op: regex-case
+      op: regex
       value: '^.*CreateImage.*$'
-    - "tag:custodian_cleanup": absent
+    - type: value
+      key: 'tag:custodian_cleanup'
+      value: absent
+    - type: value
+      key: 'tag:OU'
+      op: ne
+      value: 'ike'
   actions:
   - type: mark-for-op
     tag: custodian_cleanup
     op: delete
     days: 30
 
-- name: find-and-mark-mitodl-ami-volumes
-  resource: aws.ebs
+# This second chain of policies find the AMIs created by packer that were never associated with an autoscaling resource.
+# It will mark them for cleanup and then loop through their associated snapshots and mark those as well.
+- name: find-and-mark-unassociated-mitodl-ami
+  resource: aws.ami
   description: |
-    Find the volumes associated with inactive AMIs and tag them for deletion.
+    Find all inactive MITODL AMIs created by packer and mark them for cleanup. These AMIs were never associated with a launch template.
   filters:
   - and:
-    - Attachments: []
     - type: value
-      key: "VolumeId"
+      key: Description
+      op: regex
+      value: '^Deployment image for .* generated at \d{14}$'
+    - type: image-age
+      op: gt
+      days: 30
+    - type: unused
+      value: true
+    - type: value
+      key: 'tag:custodian_cleanup'
+      value: absent
+    - type: value
+      key: 'tag:OU'
+      op: ne
+      value: 'ike'
+  actions:
+  - type: mark-for-op
+    tag: custodian_cleanup
+    op: deregister
+    days: 30
+- name: find-and-mark-unassociated-mitodl-snapshots
+  resource: aws.ebs-snapshot
+  description: |
+    Find the snapshots associated with the unused AMIs from the previous policy. Tag them for deletion.
+  filters:
+  - and:
+    - type: value
+      key: SnapshotId
       op: in
       value_from:
-        url: file:find-and-mark-mitodl-ami-snapshots/resources.json
+        url: file:find-and-mark-unassociated-mitodl-ami/resources.json
         format: json
-        expr: "[].VolumeId"
-    - "tag:custodian_cleanup": absent
+        expr: "[].BlockDeviceMappings[].Ebs.SnapshotId"
+    - type: age
+      op: gt
+      days: 30
+    - type: value
+      key: Description
+      op: regex
+      value: '^.*CreateImage.*$'
+    - type: value
+      key: 'tag:custodian_cleanup'
+      value: absent
+    - type: value
+      key: 'tag:OU'
+      op: ne
+      value: 'ike'
   actions:
   - type: mark-for-op
     tag: custodian_cleanup
