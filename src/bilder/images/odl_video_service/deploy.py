@@ -69,7 +69,7 @@ VERSIONS = {  # noqa: WPS407
 set_env_secrets(Path("consul/consul.env"))
 
 files.put(
-    name="Set the odl-video-service version",
+    name=f"Set the odl-video-service version to {VERSIONS['ovs']}",
     src=io.StringIO(VERSIONS["ovs"]),
     dest="/etc/default/ovs-version",
 )
