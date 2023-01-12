@@ -437,7 +437,7 @@ forum_secrets = vault.generic.Secret(
         json.dumps
     ),
 )
-if xqueue_secret := edxapp_config.get_secret_object(  # noqa: WPS332, WPS337
+if xqueue_secret := edxapp_config.get_secret_object(  # noqa: WPS337
     "edx_xqueue_secrets"
 ):
     xqueue_secrets = vault.generic.Secret(

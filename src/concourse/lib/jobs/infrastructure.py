@@ -1,3 +1,4 @@
+#  noqa: WPS232
 from collections.abc import Iterable
 from copy import deepcopy
 from pathlib import Path
@@ -136,11 +137,12 @@ def packer_jobs(  # noqa: WPS211
     )
 
 
-def pulumi_jobs_chain(
+def pulumi_jobs_chain(  # noqa: WPS211, WPS231, WPS234
     pulumi_code: Resource,
     stack_names: list[str],
     project_name: str,
     project_source_path: Path,
+    custom_dependencies: Optional[dict[int, list[GetStep]]],
     dependencies: Optional[list[GetStep]] = None,
 ) -> PipelineFragment:
     """Create a chained sequence of jobs for running Pulumi tasks.
@@ -154,6 +156,9 @@ def pulumi_jobs_chain(
         code being executed is located
     :param dependencies: A list of `Get` step definitions that are used as inputs or
         triggers for the jobs in the chain
+    :param custom_dependencies: A dict of indices and `Get` step definitions that are
+        used as inputs or triggers for the jobs in the chain.
+    :type custom_dependencies: Dict[int, list[GetStep]]
 
     :returns: A `PipelineFragment` object that can be composed with other fragments to
               build a full pipeline.
@@ -170,13 +175,24 @@ def pulumi_jobs_chain(
             # These mutations apply globally if the dependencies aren't copied below
             dependency.trigger = not bool(previous_job or production_stack)
             dependency.passed = passed_param or dependency.passed  # type: ignore
+
+        # Need to copy the dependencies because otherwise they are globally mutated
+        local_dependencies = [
+            dependency_step.copy() for dependency_step in (dependencies or [])
+        ]
+        if custom_dependency := (custom_dependencies or {}).get(index):
+            local_custom_dependencies = [
+                custom_dependency_step.copy()
+                for custom_dependency_step in custom_dependency
+            ]
+            local_dependencies.extend(local_custom_dependencies)
+
         step_fragment = pulumi_job(
             pulumi_code,
             stack_name,
             project_name,
             project_source_path,
-            # Need to copy the dependencies because otherwise they are globally mutated
-            [dependency_step.copy() for dependency_step in (dependencies or [])],
+            local_dependencies,
             previous_job,
         )
         chain_fragment.resource_types = (
