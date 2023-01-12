@@ -180,10 +180,10 @@ def pulumi_jobs_chain(  # noqa: WPS211, WPS231, WPS234
         local_dependencies = [
             dependency_step.copy() for dependency_step in (dependencies or [])
         ]
-        if index in (custom_dependencies or {}):
+        if custom_dependency := (custom_dependencies or {}).get(index):
             local_custom_dependencies = [
                 custom_dependency_step.copy()
-                for custom_dependency_step in (custom_dependencies or {}).get(index, [])
+                for custom_dependency_step in custom_dependency
             ]
             local_dependencies.extend(local_custom_dependencies)
 

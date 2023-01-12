@@ -53,12 +53,11 @@ max_instance_type = atlas_config.get("cluster_autoscale_max_size")
 min_instance_type = atlas_config.get("cluster_autoscale_min_size")
 num_instances = atlas_config.get_int("cluster_instance_count") or 3
 if (  # noqa: WPS337
-    enable_cloud_backup := atlas_config.get_bool("enable_cloud_backup")  # noqa: WPS332
-    is None
+    enable_cloud_backup := atlas_config.get_bool("enable_cloud_backup") is None
 ):
     enable_cloud_backup = True
 if (  # noqa: WPS337
-    enable_point_in_time_recovery := atlas_config.get_bool(  # noqa: WPS332
+    enable_point_in_time_recovery := atlas_config.get_bool(
         "enable_point_in_time_recovery"
     )
     is None
