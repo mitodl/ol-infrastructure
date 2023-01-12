@@ -83,6 +83,14 @@ files.directory(
 )
 
 files.directory(
+    name="Create staticfiles directory",
+    path=str(DOCKER_COMPOSE_DIRECTORY.joinpath("staticfiles")),
+    user="1000",
+    group="1000",
+    present=True,
+)
+
+files.directory(
     name="Create /var/log/odl-video directory",
     path="/var/log/odl-video",
     user="root",
