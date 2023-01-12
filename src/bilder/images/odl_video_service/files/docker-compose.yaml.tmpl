@@ -23,6 +23,17 @@ services:
     - "80:80"
     links:
     - app
+  init-app:
+    image: mitodl/ovs-app:${VERSION}
+    env_file: .env
+    command: >
+      /bin/bash -c '
+      rm -rf /src/staticfiles/* &&
+      python3 manage.py migrate --noinput &&
+      python3 manage.py collectstatic --noinput'
+    volumes:
+    - /etc/docker/compose/staticfiles:/src/staticfiles:rw
+    - /var/log:/var/log:rw
   app:
     image: mitodl/ovs-app:${VERSION}
     env_file: .env
@@ -31,11 +42,13 @@ services:
     command: >
       /bin/bash -c '
       sleep 3 &&
-      python3 manage.py migrate --noinput &&
-      python3 manage.py collectstatic --no-input &&
       uwsgi uwsgi.ini'
+    depends_on:
+      init-app:
+        condition: service_completed_successfully
     volumes:
     - /var/log:/var/log:rw
+    - /etc/docker/compose/staticfiles:/src/staticfiles:rw
 
   celery:
     image: mitodl/ovs-app:${VERSION}
@@ -44,5 +57,9 @@ services:
       /bin/bash -c '
       sleep 3 &&
       celery -A odl_video worker -B -l {{ keyOrDefault "ovs/log_level" "INFO" }}'
+    depends_on:
+      init-app:
+        condition: service_completed_successfully
     volumes:
     - /var/log:/var/log:rw
+    - /etc/docker/compose/staticfiles:/src/staticfiles:rw
