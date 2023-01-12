@@ -28,7 +28,7 @@ from concourse.lib.resources import git_repo, registry_image
 
 
 def build_ovs_pipeline() -> Pipeline:
-    ovs_rc_branch = "release-canidate"
+    ovs_rc_branch = "release-candidate"
     ovs_r_branch = "release"
 
     ovs_rc_repo = git_repo(
