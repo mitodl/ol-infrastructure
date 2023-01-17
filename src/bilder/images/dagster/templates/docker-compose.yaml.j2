@@ -35,6 +35,15 @@ services:
     command: ["--package-name", "ol_orchestrate.repositories.asset_materialization"]
     env_file:
       - .env
+  edx-gcs-courses-pipeline:
+    image: mitodl/data-platform-edx-gcs-courses-pipeline:{{ context.dagster_version }}
+    container_name: edx-gcs-courses-pipeline
+    restart: unless-stopped
+    ports:
+    - "4000"
+    command: ["--package-name", "ol_orchestrate.jobs.edx_gcs_courses"]
+    env_file:
+      - .env
   nginx:
     image: nginx
     restart: unless-stopped
