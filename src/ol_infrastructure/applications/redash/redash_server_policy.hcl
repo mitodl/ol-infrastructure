@@ -16,3 +16,10 @@ path "postgres-redash/creds/app" {
 path "sys/leases/renew" {
   capabilities = ["update"]
 }
+
+path "postgres-mitxonline/creds/readonly" {
+  capabilities = ["read"]
+}
+path "postgres-mitxonline/creds/readonly/*" {
+  capabilities = ["read"]
+}

@@ -301,15 +301,46 @@ consul.Keys(
     opts=consul_provider,
 )
 
-# Put a few things into vault taht will be needed to configure shibboleth
-sp_certificate_data = read_yaml_secrets(
-    Path(f"redash/redash.{stack_info.env_suffix}.yaml")
-)
+# Put a few things into vault that will be needed to configure shibboleth
+redash_secrets = read_yaml_secrets(Path(f"redash/redash.{stack_info.env_suffix}.yaml"))
 vault.generic.Secret(
     "redash-sp-certificate-data",
     path="secret-data/redash/sp-certificate-data",
-    data_json=json.dumps(sp_certificate_data),
+    data_json=json.dumps(redash_secrets["sp_certificate_data"]),
 )
+
+# If we've specified that datsources will be managed, store some values in consul/vault for
+# that particular functionality
+if redash_config.get_bool("manage_datasources"):
+    vault.generic.Secret(
+        "redash-admin-api-token",
+        path="secret-data/redash/admin_api_token/",
+        data_json=json.dumps({"value": redash_secrets["admin_api_token"]}),
+    )
+    datasource_config_consul_keys = []
+    mitxonline_stack = StackReference(
+        f"applications.edxapp.mitxonline.{stack_info.name}"
+    )
+    if stack_info.name == "QA":
+        datasource_config_consul_keys.append(
+            consul.KeysKeyArgs(
+                path="redash/datasource_configs/mitxonline-rc/db_host",
+                value=mitxonline_stack.require_output("edxapp")["mariadb"],
+            )
+        )
+    elif stack_info.name == "Production":
+        datasource_config_consul_keys.append(
+            consul.KeysKeyArgs(
+                path="redash/datasouce_configs/mitxonline-production/db_host",
+                value=mitxonline_stack.require_output("edxapp")["mariadb"],
+            )
+        )
+    consul.Keys(
+        "redash-datasource-config-template-data",
+        keys=datasource_config_consul_keys,
+        opts=consul_provider,
+    )
+
 
 block_device_mappings = [BlockDeviceMapping()]
 
@@ -378,6 +409,10 @@ web_lt_config = OLLaunchTemplateConfig(
                                     }
                                 ),
                                 "owner": "consul:consul",
+                            },
+                            {
+                                "path": "/etc/default/consul-template",
+                                "content": f"ENVIRONMENT={consul_dc}",
                             },
                             {
                                 "path": "/etc/default/vector",
