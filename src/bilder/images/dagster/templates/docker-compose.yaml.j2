@@ -41,7 +41,7 @@ services:
     restart: unless-stopped
     ports:
     - "4000"
-    command: ["--package-name", "ol_orchestrate.jobs.edx_gcs_courses"]
+    command: ["--package-name", "ol_orchestrate.repositories.edx_gcs_courses"]
     env_file:
       - .env
   nginx:
