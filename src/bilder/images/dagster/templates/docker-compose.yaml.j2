@@ -35,6 +35,15 @@ services:
     command: ["--package-name", "ol_orchestrate.repositories.asset_materialization"]
     env_file:
       - .env
+  lakehouse-assets-graph:
+    image: mitodl/data-platform-lakehouse-assets-graph:{{ context.dagster_version }}
+    container_name: lakehouse-assets-graph
+    restart: unless-stopped
+    ports:
+    - "4000"
+    command: ["--package-name", "ol_orchestrate.definitions.elt"]
+    env_file:
+      - .env
   edx-gcs-courses-pipeline:
     image: mitodl/data-platform-edx-gcs-courses-pipeline:{{ context.dagster_version }}
     container_name: edx-gcs-courses-pipeline
