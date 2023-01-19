@@ -23,3 +23,38 @@ path "postgres-mitxonline/creds/readonly" {
 path "postgres-mitxonline/creds/readonly/*" {
   capabilities = ["read"]
 }
+
+path "postgres-production-apps-reddit/creds/readonly" {
+  capabilities = ["read"]
+}
+path "postgres-production-apps-reddit/creds/readonly/*" {
+  capabilities = ["read"]
+}
+
+path "postgres-production-apps-opendiscussions/creds/readonly" {
+  capabilities = ["read"]
+}
+path "postgres-production-apps-opendiscussions/creds/readonly/*" {
+  capabilities = ["read"]
+}
+
+path "postgres-odl-video-service/creds/readonly" {
+  capabilities = ["read"]
+}
+path "postgres-odl-video-service/creds/readonly/*" {
+  capabilities = ["read"]
+}
+
+path "postgres-ocw-studio-applications-production/creds/readonly" {
+  capabilities = ["read"]
+}
+path "postgres-ocw-studio-applications-production/creds/readonly/*" {
+  capabilities = ["read"]
+}
+
+path "postgres-production-apps-mitxpro/creds/readonly" {
+  capabilities = ["read"]
+}
+path "postgres-production-apps-mitxpro/creds/readonly/*" {
+  capabilities = ["read"]
+}
