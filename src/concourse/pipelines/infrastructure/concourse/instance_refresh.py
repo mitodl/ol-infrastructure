@@ -1,8 +1,8 @@
 import sys
 
-from concourse.lib.instance_refresh import instance_refresh_task
 from concourse.lib.models.fragment import PipelineFragment
 from concourse.lib.models.pipeline import GroupConfig, Job, Pipeline
+from concourse.lib.tasks import block_for_instance_refresh_task, instance_refresh_task
 
 environments = ["ci", "qa", "production"]
 node_classes = ["worker-infra", "worker-ocw", "worker-generic", "web"]
@@ -18,6 +18,9 @@ for env in environments:
             name=f"{env}-{node_class}-instance-refresh",
             plan=[
                 instance_refresh_task(filters=filter_template, queries=query),
+                block_for_instance_refresh_task(
+                    filters=filter_template, queries=query, check_freq=10
+                ),
             ],
         )
         jobs.append(refresh_job)
