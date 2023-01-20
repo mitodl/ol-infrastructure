@@ -240,6 +240,7 @@ def pulumi_job(  # noqa: WPS211
     aws_creds_path = Output(name=Identifier("aws_creds"))
     pulumi_job_object = Job(
         name=Identifier(f"deploy-{project_name}-{stack_name.lower()}"),
+        max_in_flight=1,  # Only allow 1 Pulumi task at a time since they lock anyway.
         plan=(dependencies or [])
         + [
             GetStep(
