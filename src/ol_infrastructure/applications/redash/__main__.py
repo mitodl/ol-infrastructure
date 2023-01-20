@@ -301,15 +301,67 @@ consul.Keys(
     opts=consul_provider,
 )
 
-# Put a few things into vault taht will be needed to configure shibboleth
-sp_certificate_data = read_yaml_secrets(
-    Path(f"redash/redash.{stack_info.env_suffix}.yaml")
-)
+# Put a few things into vault that will be needed to configure shibboleth
+redash_secrets = read_yaml_secrets(Path(f"redash/redash.{stack_info.env_suffix}.yaml"))
 vault.generic.Secret(
     "redash-sp-certificate-data",
     path="secret-data/redash/sp-certificate-data",
-    data_json=json.dumps(sp_certificate_data),
+    data_json=json.dumps(redash_secrets["sp_certificate_data"]),
 )
+
+# If we've specified that datsources will be managed, store some values in consul/vault for
+# that particular functionality
+# Refer to DATASOUCE_MANAGEMENT.md
+if redash_config.get_bool("manage_datasources"):
+    datasource_config_consul_keys = []
+    mitxonline_stack = StackReference(
+        f"applications.edxapp.mitxonline.{stack_info.name}"
+    )
+    odl_video_service_stack = StackReference(
+        f"applications.odl_video_service.{stack_info.name}"
+    )
+    ocw_studio_stack = StackReference(f"applications.ocw_studio.{stack_info.name}")
+    mitxpro_stack = StackReference(f"applications.mitxpro.{stack_info.name}")
+    if stack_info.name == "QA":
+        datasource_config_consul_keys.append(
+            consul.KeysKeyArgs(
+                path="redash/datasource_configs/mitxonline-rc/db_host",
+                value=mitxonline_stack.require_output("edxapp")["mariadb"],
+            )
+        )
+    elif stack_info.name == "Production":
+        datasource_config_consul_keys.append(
+            consul.KeysKeyArgs(
+                path="redash/datasouce_configs/mitxonline-production/db_host",
+                value=mitxonline_stack.require_output("edxapp")["mariadb"],
+            )
+        )
+        datasource_config_consul_keys.append(
+            consul.KeysKeyArgs(
+                path="redash/datasource_configs/odl-video-service-production/db_host",
+                value=odl_video_service_stack.require_output("odl_video_service")[
+                    "rds_host"
+                ],
+            )
+        )
+        datasource_config_consul_keys.append(
+            consul.KeysKeyArgs(
+                path="redash/datasource_configs/ocw-studio-production/db_host",
+                value=ocw_studio_stack.require_output("ocw_studio_app")["rds_host"],
+            )
+        )
+        datasource_config_consul_keys.append(
+            consul.KeysKeyArgs(
+                path="redash/datasource_configs/xpro-pg-production/db_host",
+                value=mitxpro_stack.require_output("mitxpro_edxapp")["rds_host"],
+            )
+        )
+    consul.Keys(
+        "redash-datasource-config-template-data",
+        keys=datasource_config_consul_keys,
+        opts=consul_provider,
+    )
+
 
 block_device_mappings = [BlockDeviceMapping()]
 
@@ -378,6 +430,10 @@ web_lt_config = OLLaunchTemplateConfig(
                                     }
                                 ),
                                 "owner": "consul:consul",
+                            },
+                            {
+                                "path": "/etc/default/consul-template",
+                                "content": f"ENVIRONMENT={consul_dc}",
                             },
                             {
                                 "path": "/etc/default/vector",

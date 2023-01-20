@@ -1,4 +1,3 @@
-import io
 import os
 from pathlib import Path
 
@@ -56,6 +55,7 @@ from bridge.lib.versions import (
 from bridge.secrets.sops import set_env_secrets
 
 
+# TODO MD 20231013 Switch over to the shared lib functions that do this
 def place_jinja_template_file(  # noqa: WPS211
     name: str,
     repo_path: Path,
@@ -74,6 +74,7 @@ def place_jinja_template_file(  # noqa: WPS211
     watched_files.append(destination_path.joinpath(name))
 
 
+# TODO MD 20231013 Switch over to the shared lib functions that do this
 def place_consul_template_file(  # noqa: WPS211
     name: str,
     repo_path: Path,
@@ -111,16 +112,12 @@ VERSIONS = {  # noqa: WPS407
 
 set_env_secrets(Path("consul/consul.env"))
 
-files.put(
-    name="Set the redash version",
-    src=io.StringIO(VERSIONS["redash"]),
-    dest="/etc/defaults/consul-template",
-)
 consul_templates: list[ConsulTemplateTemplate] = []
 watched_files: list[Path] = []
 
 nginx_conf_directory = Path("/etc/nginx")
 shib_conf_directory = Path("/etc/shibboleth")
+redash_conf_directory = Path("/etc/redash")
 
 certificate_file = nginx_conf_directory.joinpath("star.odl.mit.edu.crt")
 certificate_key_file = nginx_conf_directory.joinpath("star.odl.mit.edu.key")
@@ -145,6 +142,13 @@ files.directory(
     group="root",
     present=True,
 )
+files.directory(
+    name="Create Re:dash directory",
+    path=str(redash_conf_directory),
+    user="root",
+    group="root",
+    present=True,
+)
 
 # Firstly place down normal files requiring no templating
 # Assumes no file special file extension
@@ -155,6 +159,7 @@ untemplated_files = {
     "shib_clear_headers": nginx_conf_directory,
     "attribute-map.xml": shib_conf_directory,
     "mit-md-cert.pem": shib_conf_directory,
+    "update_datasources.py": redash_conf_directory,
 }
 for filename, dest_dir in untemplated_files.items():
     files.put(
@@ -208,6 +213,24 @@ for filename, dest_dir in consul_templated_files.items():  # noqa: WPS440
         watched_files=watched_files,
     )
 
+# Finally, datasources.yaml is a special snowflake and requires a command run after being updated.
+files.put(
+    name="Place datasources.yaml.tmpl template file.",
+    src=str(FILES_DIRECTORY.joinpath("datasources.yaml.tmpl")),
+    dest=str(Path("/etc/consul-template").joinpath("datasources.yaml.tmpl")),
+    mode="0664",
+)
+consul_templates.append(
+    ConsulTemplateTemplate(
+        source=str(Path("/etc/consul-template").joinpath("datasources.yaml.tmpl")),
+        destination=redash_conf_directory.joinpath("datasources.yaml"),
+        command="/usr/bin/python3 /etc/redash/update_datasources.py",
+        command_timeout="120s",
+    )
+)
+watched_files.append(redash_conf_directory.joinpath("datasources.yaml"))
+
+
 # Add consul template confgs for files that are just populated straight from vault.
 consul_templates.extend(
     [
@@ -254,8 +277,7 @@ watched_files.extend(
     ]
 )
 
-# Install and configure vector ???
-# TODO
+# TODO MD 20230113 Figure out what we can monitor in redash and setup vector configs
 vector_config = VectorConfig(is_proxy=False)
 
 # Install and Configure Consul and Vault
