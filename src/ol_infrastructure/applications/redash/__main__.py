@@ -23,7 +23,7 @@ import pulumi_vault as vault
 import yaml
 from pulumi import Config, StackReference, export
 from pulumi.config import get_config
-from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53
+from pulumi_aws import ec2, get_caller_identity, iam, route53
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, DEFAULT_POSTGRES_PORT
 from bridge.secrets.sops import read_yaml_secrets
@@ -68,7 +68,7 @@ setup_vault_provider()
 aws_account = get_caller_identity()
 
 # Look up the most recent redash ami
-redash_ami = get_ami(
+redash_ami = ec2.get_ami(
     filters=[
         {
             "name": "tag:Name",

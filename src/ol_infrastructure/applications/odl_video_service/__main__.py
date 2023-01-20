@@ -11,7 +11,7 @@ import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_ami, get_caller_identity, iam, route53
+from pulumi_aws import ec2, get_caller_identity, iam, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
@@ -462,7 +462,7 @@ instance_tags = aws_config.merged_tags(
     {"Name": f"odl-video-service-{stack_info.env_suffix}"}
 )
 
-ovs_server_ami = get_ami(
+ovs_server_ami = ec2.get_ami(
     filters=[
         {
             "name": "tag:Name",
