@@ -76,6 +76,8 @@ s3_bucket_permissions = [
         "Action": ["s3:GetObject*", "s3:ListBucket*"],
         "Effect": "Allow",
         "Resource": [
+            f"arn:aws:s3:::edxorg-{stack_info.env_suffix}-edxapp-courses",
+            f"arn:aws:s3:::edxorg-{stack_info.env_suffix}-edxapp-courses/*",
             "arn:aws:s3:::mitx-etl-xpro-production-mitxpro-production",
             "arn:aws:s3:::mitx-etl-xpro-production-mitxpro-production/*",
             "arn:aws:s3:::mitx-etl-mitxonline-production",
