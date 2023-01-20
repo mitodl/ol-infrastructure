@@ -142,7 +142,7 @@ def pulumi_jobs_chain(  # noqa: WPS211, WPS231, WPS234
     stack_names: list[str],
     project_name: str,
     project_source_path: Path,
-    custom_dependencies: Optional[dict[int, list[GetStep]]],
+    custom_dependencies: Optional[dict[int, list[GetStep]]] = None,
     dependencies: Optional[list[GetStep]] = None,
 ) -> PipelineFragment:
     """Create a chained sequence of jobs for running Pulumi tasks.
