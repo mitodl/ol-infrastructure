@@ -279,6 +279,23 @@ dagster_runtime_bucket = s3.Bucket(
     },
 )
 
+# Bucket to store gcs import of edxorg course tarballs
+edxorg_courses_bucket_name = f"edxorg-{stack_info.env_suffix}-edxapp-courses"
+edxorg_courses_bucket = s3.Bucket(
+    edxorg_courses_bucket_name,
+    bucket=edxorg_courses_bucket_name,
+    acl="private",
+    tags=aws_config.tags,
+    versioning={"enabled": True},
+    server_side_encryption_configuration={
+        "rule": {
+            "applyServerSideEncryptionByDefault": {
+                "sseAlgorithm": "aws:kms",
+            },
+        },
+    },
+)
+
 # Create instance profile for granting access to S3 buckets
 dagster_iam_policy = iam.Policy(
     f"dagster-policy-{stack_info.env_suffix}",
