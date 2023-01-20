@@ -1,4 +1,5 @@
 ---
+policies:
 - name: delete-marked-ebs-snapshots
   resource: aws.ebs-snapshot
   description: |
