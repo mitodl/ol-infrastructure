@@ -314,26 +314,23 @@ vault.generic.Secret(
 # Refer to DATASOUCE_MANAGEMENT.md
 if redash_config.get_bool("manage_datasources"):
     datasource_config_consul_keys = []
-    mitxonline_stack = StackReference(
-        f"applications.edxapp.mitxonline.{stack_info.name}"
-    )
+    mitxonline_stack = StackReference(f"applications.mitxonline.{stack_info.name}")
     odl_video_service_stack = StackReference(
         f"applications.odl_video_service.{stack_info.name}"
     )
     ocw_studio_stack = StackReference(f"applications.ocw_studio.{stack_info.name}")
-    mitxpro_stack = StackReference(f"applications.mitxpro.{stack_info.name}")
     if stack_info.name == "QA":
         datasource_config_consul_keys.append(
             consul.KeysKeyArgs(
                 path="redash/datasource_configs/mitxonline-rc/db_host",
-                value=mitxonline_stack.require_output("edxapp")["mariadb"],
+                value=mitxonline_stack.require_output("mitxonline_app")["rds_host"],
             )
         )
     elif stack_info.name == "Production":
         datasource_config_consul_keys.append(
             consul.KeysKeyArgs(
-                path="redash/datasouce_configs/mitxonline-production/db_host",
-                value=mitxonline_stack.require_output("edxapp")["mariadb"],
+                path="redash/datasource_configs/mitxonline-production/db_host",
+                value=mitxonline_stack.require_output("mitxonline_app")["rds_host"],
             )
         )
         datasource_config_consul_keys.append(
@@ -353,7 +350,8 @@ if redash_config.get_bool("manage_datasources"):
         datasource_config_consul_keys.append(
             consul.KeysKeyArgs(
                 path="redash/datasource_configs/xpro-pg-production/db_host",
-                value=mitxpro_stack.require_output("mitxpro_edxapp")["rds_host"],
+                # MD 20230123 Can't find the pulumi stack associated with this datasource.
+                value="production-apps-rds-postgres-mitxpro.cbnm7ajau6mi.us-east-1.rds.amazonaws.com",
             )
         )
     consul.Keys(
