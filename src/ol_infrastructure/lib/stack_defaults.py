@@ -1,6 +1,7 @@
 from typing import Any
 
 from ol_infrastructure.components.aws.database import OLReplicaDBConfig
+from ol_infrastructure.lib.aws.cache_helper import CacheInstanceTypes
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -10,7 +11,7 @@ production_defaults = {
         "instance_size": DBInstanceTypes.general_purpose_large.value,
         "read_replica": OLReplicaDBConfig(),
     },
-    "redis": {"instance_type": "cache.m6g.large"},
+    "redis": {"instance_type": CacheInstanceTypes.large},
 }
 
 qa_defaults = {
@@ -21,7 +22,7 @@ qa_defaults = {
         "take_final_snapshot": False,
         "backup_days": 7,
     },
-    "redis": {"instance_type": "cache.t3.small"},
+    "redis": {"instance_type": CacheInstanceTypes.small},
 }
 
 ci_defaults = {
@@ -32,7 +33,7 @@ ci_defaults = {
         "take_final_snapshot": False,
         "backup_days": 1,
     },
-    "redis": {"instance_type": "cache.t3.small"},
+    "redis": {"instance_type": CacheInstanceTypes.small},
 }
 
 
