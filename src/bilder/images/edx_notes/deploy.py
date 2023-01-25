@@ -41,6 +41,12 @@ from bilder.components.hashicorp.vault.models import (
 from bilder.components.traefik.models import traefik_static
 from bilder.components.traefik.models.component import TraefikConfig
 from bilder.components.traefik.steps import configure_traefik
+from bilder.components.vector.models import VectorConfig
+from bilder.components.vector.steps import (
+    configure_vector,
+    install_vector,
+    vector_service,
+)
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 from bilder.lib.template_helpers import (
@@ -190,6 +196,15 @@ consul_template = ConsulTemplate(
 hashicorp_products = [vault, consul, consul_template]
 for product in hashicorp_products:
     configure_hashicorp_product(product)
+
+# Install and configure vector
+vector_config = VectorConfig()
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "edx_notes_logs.yaml")
+] = {}
+install_vector(vector_config)
+configure_vector(vector_config)
+vector_service(vector_config)
 
 consul_template_permissions(consul_template.configuration)
 

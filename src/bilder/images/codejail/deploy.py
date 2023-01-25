@@ -25,10 +25,12 @@ from bilder.components.hashicorp.vault.models import (
     VaultListener,
     VaultTCPListener,
 )
+from bilder.components.vector.models import VectorConfig
+from bilder.components.vector.steps import configure_vector, install_vector
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
+from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 
 set_env_secrets(Path("consul/consul.env"))
@@ -38,9 +40,6 @@ FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
 VERSIONS = {  # noqa: WPS407
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
-    "consul-template": os.environ.get(
-        "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION
-    ),
 }
 
 files.put(
@@ -105,11 +104,18 @@ vault = Vault(
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 
+# Install and configure vector
+vector_config = VectorConfig()
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "codejail_logs.yaml")
+] = {}
+install_vector(vector_config)
+configure_vector(vector_config)
+
 hashicorp_products = [vault, consul]
-
-
 for product in hashicorp_products:
     configure_hashicorp_product(product)
+
 if host.get_fact(HasSystemd):
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()

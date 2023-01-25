@@ -40,6 +40,11 @@ from bilder.components.hashicorp.vault.models import (
     VaultTCPListener,
 )
 from bilder.components.vector.models import VectorConfig
+from bilder.components.vector.steps import (
+    configure_vector,
+    install_vector,
+    vector_service,
+)
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 from bilder.lib.template_helpers import (
@@ -245,7 +250,14 @@ consul_template = ConsulTemplate(
     },
 )
 
-vector_config = VectorConfig(is_proxy=False)
+# Install and configure vector
+vector_config = VectorConfig()
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "odl_video_service_logs.yaml")
+] = {}
+install_vector(vector_config)
+configure_vector(vector_config)
+vector_service(vector_config)
 
 # Install consul-template because the docker-baseline-ami doesn't come with it
 install_hashicorp_products([consul_template])

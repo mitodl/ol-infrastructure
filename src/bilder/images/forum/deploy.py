@@ -39,6 +39,12 @@ from bilder.components.hashicorp.vault.models import (
     VaultListener,
     VaultTCPListener,
 )
+from bilder.components.vector.models import VectorConfig
+from bilder.components.vector.steps import (
+    configure_vector,
+    install_vector,
+    vector_service,
+)
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
@@ -164,6 +170,15 @@ consul_template = ConsulTemplate(
     },
 )
 hashicorp_products = [vault, consul, consul_template]
+
+# Install and configure vector
+vector_config = VectorConfig()
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "forum_logs.yaml")
+] = {}
+install_vector(vector_config)
+configure_vector(vector_config)
+vector_service(vector_config)
 
 consul_template_permissions(consul_template.configuration)
 

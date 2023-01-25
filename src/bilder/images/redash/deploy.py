@@ -39,6 +39,11 @@ from bilder.components.hashicorp.vault.models import (
     VaultTCPListener,
 )
 from bilder.components.vector.models import VectorConfig
+from bilder.components.vector.steps import (
+    configure_vector,
+    install_vector,
+    vector_service,
+)
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 from bridge.lib.magic_numbers import (
@@ -277,9 +282,6 @@ watched_files.extend(
     ]
 )
 
-# TODO MD 20230113 Figure out what we can monitor in redash and setup vector configs
-vector_config = VectorConfig(is_proxy=False)
-
 # Install and Configure Consul and Vault
 consul_configuration = {
     Path("00-default.json"): ConsulConfig(
@@ -335,6 +337,15 @@ hashicorp_products = [vault, consul, consul_template]
 
 for product in hashicorp_products:
     configure_hashicorp_product(product)
+
+# Install and configure vector
+vector_config = VectorConfig()
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "redash_logs.yaml")
+] = {}
+install_vector(vector_config)
+configure_vector(vector_config)
+vector_service(vector_config)
 
 consul_template_permissions(consul_template.configuration)
 

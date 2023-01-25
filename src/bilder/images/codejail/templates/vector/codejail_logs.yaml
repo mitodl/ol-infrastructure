@@ -1,0 +1,46 @@
+---
+# This isn't actually a template but it is easier to follow the established pattern of storing
+# all vector configurations in <appname>/templates/vector/
+sources:
+  collect_codejail_docker_logs:
+    type: docker_logs
+
+transforms:
+  parse_codejail_docker_logs:
+    type: remap
+    inputs:
+    - 'collect_codejail_docker_logs'
+    source: |
+      # This will replace all '.' characters in field names with '_' characters
+      . = map_keys(., recursive: true) -> |key| { replace(key, ".", "_") }
+
+      .service = .label.com_docker_compose_service
+      del(.label)
+      del(.container_id)
+      del(.container_created_at)
+
+  enrich_logs:
+    type: aws_ec2_metadata
+    inputs:
+    - "parse_codejail_docker_logs"
+    namespace: ec2
+
+sinks:
+  ship_logs_to_grafana_cloud:
+    inputs:
+    - 'enrich_logs'
+    type: loki
+    auth:
+      strategy: basic
+      password: ${GRAFANA_CLOUD_API_KEY}
+      user: "${GRAFANA_CLOUD_LOKI_API_USER}"
+    endpoint: https://logs-prod-us-central1.grafana.net
+    encoding:
+      codec: json
+    labels:
+      # ENVIRONMENT is expected to be {mitxonline,mitx,mitx-staging,xpro}-{ci,qa,production}
+      # Refer to __main__.py
+      environment: ${ENVIRONMENT}
+      application: "codejail"
+      service: "{% raw %}{{ .service }}{% endraw %}"
+    out_of_order_action: rewrite_timestamp
