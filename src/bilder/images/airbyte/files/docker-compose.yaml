@@ -1,5 +1,5 @@
 ---
-version: "3.7"
+version: "3.8"
 #https://github.com/compose-spec/compose-spec/blob/master/spec.md#using-extensions-as-fragments
 x-logging: &default-logging
   options:
@@ -46,20 +46,19 @@ services:
     image: airbyte/bootloader:${VERSION}
     logging: *default-logging
     container_name: airbyte-bootloader
-    env_file:
-    - ./.env
     environment:
     - AIRBYTE_VERSION=${VERSION}
-    - CONFIG_DATABASE_PASSWORD=${CONFIG_DATABASE_PASSWORD:-}
-    - CONFIG_DATABASE_URL=${CONFIG_DATABASE_URL:-}
-    - CONFIG_DATABASE_USER=${CONFIG_DATABASE_USER:-}
     - DATABASE_PASSWORD=${DATABASE_PASSWORD}
     - DATABASE_URL=${DATABASE_URL}
     - DATABASE_USER=${DATABASE_USER}
     - LOG_LEVEL=${LOG_LEVEL}
-    - RUN_DATABASE_MIGRATION_ON_STARTUP=${RUN_DATABASE_MIGRATION_ON_STARTUP}
     networks:
     - airbyte_internal
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    env_file:
+    - ./.env
   worker:
     image: airbyte/worker:${VERSION}
     logging: *default-logging
@@ -118,6 +117,8 @@ services:
     - AUTO_DETECT_SCHEMA=${AUTO_DETECT_SCHEMA}
     - USE_STREAM_CAPABLE_STATE=${USE_STREAM_CAPABLE_STATE}
     - MICRONAUT_ENVIRONMENTS=${WORKERS_MICRONAUT_ENVIRONMENTS}
+    - APPLY_FIELD_SELECTION=${APPLY_FIELD_SELECTION}
+    - FIELD_SELECTION_WORKSPACES=${FIELD_SELECTION_WORKSPACES}
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - workspace:${WORKSPACE_ROOT}
@@ -126,13 +127,14 @@ services:
     - 9000
     networks:
     - airbyte_internal
+    depends_on:
+      bootloader:
+        condition: service_completed_successfully
   server:
     image: airbyte/server:${VERSION}
     logging: *default-logging
     container_name: airbyte-server
     restart: unless-stopped
-    env_file:
-    - ./.env
     environment:
     - AIRBYTE_ROLE=${AIRBYTE_ROLE:-}
     - AIRBYTE_VERSION=${VERSION}
@@ -160,6 +162,7 @@ services:
     - WORKER_ENVIRONMENT=${WORKER_ENVIRONMENT}
     - WORKSPACE_ROOT=${WORKSPACE_ROOT}
     - GITHUB_STORE_BRANCH=${GITHUB_STORE_BRANCH}
+    - MICRONAUT_ENVIRONMENTS=${WORKERS_MICRONAUT_ENVIRONMENTS}
     - AUTO_DETECT_SCHEMA=${AUTO_DETECT_SCHEMA}
     ports:
     - 8001
@@ -169,6 +172,11 @@ services:
     - ${LOCAL_ROOT}:${LOCAL_ROOT}
     networks:
     - airbyte_internal
+    depends_on:
+      bootloader:
+        condition: service_completed_successfully
+    env_file:
+    - ./.env
   webapp:
     image: airbyte/webapp:${VERSION}
     logging: *default-logging
@@ -176,8 +184,6 @@ services:
     restart: unless-stopped
     ports:
     - 80
-    env_file:
-    - ./.env
     environment:
     - AIRBYTE_ROLE=${AIRBYTE_ROLE:-}
     - AIRBYTE_VERSION=${VERSION}
@@ -190,13 +196,16 @@ services:
     - TRACKING_STRATEGY=${TRACKING_STRATEGY}
     networks:
     - airbyte_internal
+    depends_on:
+      bootloader:
+        condition: service_completed_successfully
+    env_file:
+    - ./.env
   airbyte-temporal:
     image: airbyte/temporal:${VERSION}
     logging: *default-logging
     container_name: airbyte-temporal
     restart: unless-stopped
-    env_file:
-    - ./.env
     environment:
     - DB=postgresql
     - DB_PORT=${DATABASE_PORT}
@@ -209,13 +218,13 @@ services:
     - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
     networks:
     - airbyte_internal
+    env_file:
+    - ./.env
   airbyte-cron:
     image: airbyte/cron:${VERSION}
     logging: *default-logging
     container_name: airbyte-cron
     restart: unless-stopped
-    env_file:
-    - ./.env
     environment:
     - AIRBYTE_VERSION=${VERSION}
     - CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION=${CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION}
@@ -233,6 +242,11 @@ services:
     - workspace:${WORKSPACE_ROOT}
     networks:
     - airbyte_internal
+    depends_on:
+      bootloader:
+        condition: service_completed_successfully
+    env_file:
+    - ./.env
   airbyte-connector-builder-server:
     image: airbyte/connector-builder-server:${VERSION}
     logging: *default-logging
@@ -244,6 +258,11 @@ services:
     - AIRBYTE_VERSION=${VERSION}
     networks:
     - airbyte_internal
+    depends_on:
+      bootloader:
+        condition: service_completed_successfully
+    env_file:
+    - ./.env
 volumes:
   workspace:
     name: ${WORKSPACE_DOCKER_MOUNT}
