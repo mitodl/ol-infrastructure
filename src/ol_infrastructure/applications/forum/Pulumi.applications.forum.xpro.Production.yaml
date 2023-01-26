@@ -9,6 +9,7 @@ config:
     max: 10
     min: 3
   forum:business_unit: mitxpro
+  forum:instance_type: t3a.medium
   forum:target_vpc: xpro_vpc
   forum:openedx_version_tag: maple.master
   vault:address: https://vault-production.odl.mit.edu

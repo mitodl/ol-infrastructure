@@ -9,6 +9,7 @@ config:
     max: 10
     min: 3
   forum:business_unit: mitxonline
+  forum:instance_type: t3a.medium
   forum:openedx_version_tag: master
   forum:target_vpc: mitxonline_vpc
   vault:address: https://vault-production.odl.mit.edu
