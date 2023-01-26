@@ -164,7 +164,7 @@ xqueue_server_security_group = ec2.SecurityGroup(
 lt_config = OLLaunchTemplateConfig(
     block_device_mappings=block_device_mappings,
     image_id=xqueue_server_ami.id,
-    instance_type=xqueue_config.get("instance_type") or InstanceTypes.burstable_medium,
+    instance_type=xqueue_config.get("instance_type") or InstanceTypes.burstable_micro,
     instance_profile_arn=xqueue_server_instance_profile.arn,
     security_groups=[
         xqueue_server_security_group,
