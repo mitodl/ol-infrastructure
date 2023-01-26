@@ -9,9 +9,9 @@ rds_client = boto3.client("rds")
 
 @unique
 class DBInstanceTypes(str, Enum):  # noqa: WPS600
-    small = "db.t3.small"
-    medium = "db.t3.medium"
-    large = "db.t3.large"
+    small = "db.t4g.small"
+    medium = "db.t4g.medium"
+    large = "db.t4g.large"
     general_purpose_large = "db.m6g.large"
     general_purpose_xlarge = "db.m6g.xlarge"
     high_mem_regular = "db.r6g.large"
