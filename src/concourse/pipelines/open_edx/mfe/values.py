@@ -113,7 +113,7 @@ mitxonline = [
         marketing_site_domain="mitxonline.mit.edu",
         site_name="MITx Online",
         studio_domain="studio.mitxonline.mit.edu",
-        support_url="mitx-micromasters.zendesk.com/hc/",
+        support_url="mitxonline.zendesk.com/hc/",
         terms_of_service_url="https://mitxonline.mit.edu/terms-of-service/",
         trademark_text="© MITxOnline. All rights reserved except where noted.",
     ),
