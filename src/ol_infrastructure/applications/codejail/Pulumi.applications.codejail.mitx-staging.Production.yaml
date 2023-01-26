@@ -4,8 +4,8 @@ encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gGPs5BM4bM02RE7ZR
 config:
   aws:region: us-east-1
   codejail:auto_scale:
-    desired: 3
-    max: 4
+    desired: 2
+    max: 3
     min: 2
   codejail:business_unit: residential-staging
   codejail:target_vpc: residential_mitx_staging_vpc

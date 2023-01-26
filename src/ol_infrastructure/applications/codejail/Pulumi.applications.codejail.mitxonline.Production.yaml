@@ -5,7 +5,7 @@ config:
   aws:region: us-east-1
   codejail:auto_scale:
     desired: 3
-    max: 10
+    max: 5
     min: 2
   codejail:business_unit: mitxonline
   codejail:target_vpc: mitxonline_vpc
