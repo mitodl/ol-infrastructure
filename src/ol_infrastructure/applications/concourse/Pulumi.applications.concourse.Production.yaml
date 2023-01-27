@@ -39,8 +39,8 @@ config:
     instance_type: m5a.xlarge
     name: ocw
   - auto_scale:
-      desired: 2
-      max: 2
+      desired: 3
+      max: 5
       min: 2
     aws_tags:
       OU: operations
