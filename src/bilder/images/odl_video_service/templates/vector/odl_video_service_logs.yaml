@@ -1,25 +1,11 @@
 ---
-# This isn't actually a template but it is easier to follow the established pattern of storing
-# all vector configurations in <appname>/templates/vector/
-sources:
-  collect_odl_video_service_docker_logs:
-    type: docker_logs
-
 transforms:
-  parse_odl_video_service_docker_logs:
+  parse_odl_video_service_logs:
     type: remap
     inputs:
-    - 'collect_odl_video_service_docker_logs'
+    - "parse_docker_stdout_stderr"
     source: |
-      # This will replace all '.' characters in field names with '_' characters
-      . = map_keys(., recursive: true) -> |key| { replace(key, ".", "_") }
-
-      .service = .label.com_docker_compose_service
       .application = "odl-video-service"
-      del(.label)
-      del(.container_id)
-      del(.container_created_at)
-
       # Remap some service names to make them more meaningful.
       if .service == "app" {
         .service = "odl-video-service"
@@ -30,14 +16,6 @@ transforms:
       if .service == "celery" {
         .service = "odl-video-service-celery"
       }
-      # The only other possible value for a service is 'nginx'
-      # refer to the docker-compose.yaml.tmpl file in bilder/images
-
-  drop_unwanted_odl_video_service_docker_logs:
-    type: remap
-    inputs:
-    - "parse_odl_video_service_docker_logs"
-    source: |
       # Drop all messages regarding polling from the ELB
       abort_match_elb, err = (match_any(.message, [r'ELB-HealthChecker.*', r'/ping.*']))
       if abort_match_elb {
@@ -47,5 +25,5 @@ transforms:
   enrich_logs_global_funnel:
     type: aws_ec2_metadata
     inputs:
-    - 'drop_unwanted_odl_video_service_docker_logs'
+    - "parse_odl_video_service_logs"
     namespace: ec2

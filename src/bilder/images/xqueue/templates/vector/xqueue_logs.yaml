@@ -1,30 +1,11 @@
 ---
-# This isn't actually a template but it is easier to follow the established pattern of storing
-# all vector configurations in <appname>/templates/vector/
-sources:
-  collect_xqueue_docker_logs:
-    type: docker_logs
-
 transforms:
-  parse_xqueue_docker_logs:
+  parse_xqueue_logs:
     type: remap
     inputs:
-    - 'collect_xqueue_docker_logs'
+    - "parse_docker_stdout_stderr"
     source: |
-      # This will replace all '.' characters in field names with '_' characters
-      . = map_keys(., recursive: true) -> |key| { replace(key, ".", "_") }
-
-      .service = .label.com_docker_compose_service
       .application = "xqueue"
-      del(.label)
-      del(.container_id)
-      del(.container_created_at)
-
-  drop_unwanted_xqueue_docker_logs:
-    type: remap
-    inputs:
-    - 'parse_xqueue_docker_logs'
-    source: |
       # Drop logging of calls to /xqueue/get_submissions/ that happen several times a second
       abort_match_get_submissions, err = (match_any(.message, [r'^\[.*\] \[\d+\] \[INFO\] GET \/xqueue/get_submission\/$']))
       if abort_match_get_submission {
@@ -34,5 +15,5 @@ transforms:
   enrich_logs_global_funnel:
     type: aws_ec2_metadata
     inputs:
-    - 'drop_unwanted_xqueue_docker_logs'
+    - "parse_xqueue_logs"
     namespace: ec2

@@ -46,10 +46,12 @@ def _install_from_package():
     )
 
 
-@deploy("Install vector")
+@deploy("Install vector and determine shared configuration items.")
 def install_vector(vector_config: VectorConfig):
     install_method_map = {"package": _install_from_package}
     install_method_map[vector_config.install_method]()
+
+    # Running a vector_log_proxy server is special
     if vector_config.is_proxy:
         files.directory(
             name="Ensure TLS config directory exists",
@@ -57,12 +59,19 @@ def install_vector(vector_config: VectorConfig):
             user=vector_config.user,
             present=True,
         )
+
+    # Special permissions and configuration for running with dockerized services.
     # Make sure you install vector AFTER installing docker when applicable.
     if vector_config.is_docker:
         server.shell(
             name="Add vector user to docker group",
             commands=[f"/usr/bin/gpasswd -a {vector_config.user} docker"],
         )
+        vector_config.configuration_templates[
+            Path(__file__).resolve().parent.joinpath("templates", "docker_source.yaml")
+        ] = {}
+
+    # Config flags to enable global sink configurations
     if vector_config.use_global_log_sink:
         vector_config.configuration_templates[
             Path(__file__)
@@ -94,6 +103,10 @@ def configure_vector(vector_config: VectorConfig):
 
     # Validate the vector configuration files that were laid down
     # and confirm that vector starts without issue.
+    #
+    # TODO MD 20230127 This won't work once we switch the sink config to be
+    # consul/vault templates. Need to come up with something else or remove
+    # this entirely. Vector now offers unit tests so perhaps we can use that.
     server.shell(
         name="Run vector validate",
         commands=["/usr/bin/vector validate --no-environment"],

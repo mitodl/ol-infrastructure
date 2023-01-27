@@ -1,27 +1,14 @@
 ---
-# This isn't actually a template but it is easier to follow the established pattern of storing
-# all vector configurations in <appname>/templates/vector/
-sources:
-  collect_forum_docker_logs:
-    type: docker_logs
-
 transforms:
-  parse_forum_docker_logs:
+  parse_forum_logs:
     type: remap
     inputs:
-    - 'collect_forum_docker_logs'
+    - 'collect_docker_stdout_stderr'
     source: |
-      # This will replace all '.' characters in field names with '_' characters
-      . = map_keys(., recursive: true) -> |key| { replace(key, ".", "_") }
-
-      .service = .label.com_docker_compose_service
       .application = "forum"
-      del(.label)
-      del(.container_id)
-      del(.container_created_at)
 
   enrich_logs_global_funnel:
     type: aws_ec2_metadata
     inputs:
-    - "parse_forum_docker_logs"
+    - "parse_forum_logs"
     namespace: ec2
