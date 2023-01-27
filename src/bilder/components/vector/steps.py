@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pyinfra.api import deploy
 from pyinfra.operations import files, server, systemd
 
@@ -61,6 +63,18 @@ def install_vector(vector_config: VectorConfig):
             name="Add vector user to docker group",
             commands=[f"/usr/bin/gpasswd -a {vector_config.user} docker"],
         )
+    if vector_config.use_global_log_sink:
+        vector_config.configuration_templates[
+            Path(__file__)
+            .resolve()
+            .parent.joinpath("templates", "global_log_sink.yaml")
+        ] = {}
+    if vector_config.use_global_metric_sink:
+        vector_config.configuration_templates[
+            Path(__file__)
+            .resolve()
+            .parent.joinpath("templates", "global_metric_sink.yaml")
+        ] = {}
 
 
 @deploy("Configure Vector")

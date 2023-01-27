@@ -105,7 +105,7 @@ vault = Vault(
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 
 # Install and configure vector
-vector_config = VectorConfig()
+vector_config = VectorConfig(is_docker=True, use_global_log_sink=True)
 vector_config.configuration_templates[
     TEMPLATES_DIRECTORY.joinpath("vector", "codejail_logs.yaml")
 ] = {}

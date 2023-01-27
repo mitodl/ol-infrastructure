@@ -15,32 +15,13 @@ transforms:
       . = map_keys(., recursive: true) -> |key| { replace(key, ".", "_") }
 
       .service = .label.com_docker_compose_service
+      .application = "redash"
       del(.label)
       del(.container_id)
       del(.container_created_at)
 
-  enrich_logs:
+  enrich_logs_global_funnel:
     type: aws_ec2_metadata
     inputs:
     - "parse_redash_docker_logs"
     namespace: ec2
-
-sinks:
-  ship_logs_to_grafana_cloud:
-    inputs:
-    - 'enrich_logs'
-    type: loki
-    auth:
-      strategy: basic
-      password: ${GRAFANA_CLOUD_API_KEY}
-      user: "${GRAFANA_CLOUD_LOKI_API_USER}"
-    endpoint: https://logs-prod-us-central1.grafana.net
-    encoding:
-      codec: json
-    labels:
-      # ENVIRONMENT is expected to be data-{ci,qa,production}
-      # Refer to __main__.py
-      environment: ${ENVIRONMENT}
-      application: "redash"
-      service: "{% raw %}{{ .service }}{% endraw %}"
-    out_of_order_action: rewrite_timestamp

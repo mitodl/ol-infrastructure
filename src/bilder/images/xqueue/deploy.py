@@ -173,7 +173,7 @@ for product in hashicorp_products:
     configure_hashicorp_product(product)
 
 # Install and configure vector
-vector_config = VectorConfig()
+vector_config = VectorConfig(is_docker=True, use_global_log_sink=True)
 vector_config.configuration_templates[
     TEMPLATES_DIRECTORY.joinpath("vector", "xqueue_logs.yaml")
 ] = {}

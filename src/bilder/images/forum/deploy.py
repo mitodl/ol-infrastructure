@@ -172,7 +172,7 @@ consul_template = ConsulTemplate(
 hashicorp_products = [vault, consul, consul_template]
 
 # Install and configure vector
-vector_config = VectorConfig()
+vector_config = VectorConfig(is_docker=True, use_global_log_sink=True)
 vector_config.configuration_templates[
     TEMPLATES_DIRECTORY.joinpath("vector", "forum_logs.yaml")
 ] = {}

@@ -15,6 +15,7 @@ transforms:
       . = map_keys(., recursive: true) -> |key| { replace(key, ".", "_") }
 
       .service = .label.com_docker_compose_service
+      .application = "odl-video-service"
       del(.label)
       del(.container_id)
       del(.container_created_at)
@@ -43,29 +44,8 @@ transforms:
         abort
       }
 
-  enrich_logs:
+  enrich_logs_global_funnel:
     type: aws_ec2_metadata
     inputs:
     - 'drop_unwanted_odl_video_service_docker_logs'
     namespace: ec2
-
-
-sinks:
-  ship_logs_to_grafana_cloud:
-    inputs:
-    - 'enrich_logs'
-    type: loki
-    auth:
-      strategy: basic
-      password: ${GRAFANA_CLOUD_API_KEY}
-      user: "${GRAFANA_CLOUD_LOKI_API_USER}"
-    endpoint: https://logs-prod-us-central1.grafana.net
-    encoding:
-      codec: json
-    labels:
-      # ENVIRONMENT is expected to be apps-{ci,qa,production}
-      # Refer to __main__.py
-      environment: ${ENVIRONMENT}
-      application: "odl-video-service"
-      service: "{% raw %}{{ .service }}{% endraw %}"
-    out_of_order_action: rewrite_timestamp
