@@ -11,8 +11,6 @@ config:
     secure: v1:cINWNdW8VXvoHANP:vYFipTry9pNokRsD9FnC0+8eurxu28iewwca52MXCyrVflWnaWWvi3FD3LP9O73KL/wznZCUSXk9lbsv6vySTSDR+1II7fNr1AnrjdQclygaFKBpb2EJgcwd1w==
   concourse:dockerhub_credentials:
     secure: v1:mTp3onp07/AT5WuS:iz87DQjylNjzuYMCyvpQohqo6nxBiAHGpt0OOUMRjVgAVekosjiXT7yabTTxXmQobnxwOuGcH/SOvwmu6wy+hmVlTLJjkO7Hd6O5SW5/KRADBzYLyrP/1Kl8LU5aU2qFZpc=
-  concourse:pypi_credentials:
-    secure: v1:LqP0Y/263bKeJDvo:2OOk40+MkkZvclKWn+l1lQer0DH6nG7FzGXHO2yjSmXG0KCBAdZldwjU+17+Yrj6hiQSZuDe7C/fUo+egWWKO9lRIR7zebOvywdXMlCOd0/d/nh5uXeeUcqTeQiVlg==
   concourse:target_vpc: operations_vpc
   concourse:web_auto_scale:
     desired: 5
