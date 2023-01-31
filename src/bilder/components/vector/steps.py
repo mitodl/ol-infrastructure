@@ -1,9 +1,11 @@
 from pathlib import Path
 
+from pyinfra import host
 from pyinfra.api import deploy
 from pyinfra.operations import files, server, systemd
 
 from bilder.components.vector.models import VectorConfig
+from bilder.facts.has_systemd import HasSystemd
 
 
 def _debian_pkg_repo():
@@ -46,7 +48,18 @@ def _install_from_package():
     )
 
 
-@deploy("Install vector and determine shared configuration items.")
+# Wrapper function to do everything in one call.
+@deploy("Install and configure vector.")
+def install_and_configure_vector(vector_config: VectorConfig):
+    install_vector(vector_config)
+    configure_vector(vector_config)
+    if host.get_fact(HasSystemd):
+        vector_service(vector_config)
+
+
+# TODO: MD 20230131 Deprecate calling install_vector, configure_vector, manage_service from outside the module.
+# aka, make them private functions.
+@deploy("Install vector: Install and determine shared configuration items.")
 def install_vector(vector_config: VectorConfig):
     install_method_map = {"package": _install_from_package}
     install_method_map[vector_config.install_method]()
@@ -62,6 +75,7 @@ def install_vector(vector_config: VectorConfig):
 
     # Special permissions and configuration for running with dockerized services.
     # Make sure you install vector AFTER installing docker, when applicable.
+    # TODO: MD 20230131 Split docker config out to its own private function.
     if vector_config.is_docker:
         server.shell(
             name="Add vector user to docker group",
@@ -103,7 +117,7 @@ def install_vector(vector_config: VectorConfig):
         ] = {}
 
 
-@deploy("Configure Vector")
+@deploy("Configure Vector: create configuration files")
 def configure_vector(vector_config: VectorConfig):
     for fpath, context in vector_config.configuration_templates.items():
         files.template(
@@ -140,7 +154,7 @@ def configure_vector(vector_config: VectorConfig):
     )
 
 
-@deploy("Manage Vector service")
+@deploy("Configure Vector: Setup systemd service")
 def vector_service(
     vector_config: VectorConfig,
     do_restart=False,

@@ -39,11 +39,7 @@ from bilder.components.hashicorp.vault.models import (
     VaultTCPListener,
 )
 from bilder.components.vector.models import VectorConfig
-from bilder.components.vector.steps import (
-    configure_vector,
-    install_vector,
-    vector_service,
-)
+from bilder.components.vector.steps import install_and_configure_vector
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 from bridge.lib.magic_numbers import (
@@ -343,9 +339,7 @@ vector_config = VectorConfig(is_docker=True, use_global_log_sink=True)
 vector_config.configuration_templates[
     TEMPLATES_DIRECTORY.joinpath("vector", "redash_logs.yaml")
 ] = {}
-install_vector(vector_config)
-configure_vector(vector_config)
-vector_service(vector_config)
+install_and_configure_vector(vector_config)
 
 consul_template_permissions(consul_template.configuration)
 
