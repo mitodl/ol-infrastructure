@@ -27,12 +27,12 @@ repos:
     - '80'
     - --preserve-quotes
 - repo: https://github.com/adrienverge/yamllint.git
-  rev: v1.28.0
+  rev: v1.29.0
   hooks:
   - id: yamllint
     args: [--format, parsable, -d, relaxed]
 - repo: https://github.com/asottile/pyupgrade
-  rev: v3.3.0
+  rev: v3.3.1
   hooks:
   - id: pyupgrade
     args:
@@ -62,7 +62,7 @@ repos:
     - --exclude-files
     - src/ol_infrastructure/applications/ocw_site/redirect_dict
 - repo: https://github.com/PyCQA/isort
-  rev: 5.10.1
+  rev: 5.12.0
   hooks:
   - id: isort
 - repo: https://github.com/asottile/yesqa
@@ -72,11 +72,11 @@ repos:
     additional_dependencies:
     - git+https://github.com/wemake-services/wemake-python-styleguide#egg=wemake-python-styleguide
 - repo: https://github.com/psf/black
-  rev: 22.10.0
+  rev: 22.12.0
   hooks:
   - id: black
 - repo: https://github.com/PyCQA/flake8
-  rev: 5.0.4
+  rev: 6.0.0
   hooks:
   - id: flake8
     additional_dependencies:
@@ -96,6 +96,6 @@ repos:
     - types-PyYAML
     - types-requests
 - repo: https://github.com/shellcheck-py/shellcheck-py
-  rev: v0.8.0.4
+  rev: v0.9.0.2
   hooks:
   - id: shellcheck
