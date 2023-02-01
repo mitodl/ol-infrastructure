@@ -1,7 +1,11 @@
+from pathlib import Path
+
+from pyinfra import host
 from pyinfra.api import deploy
 from pyinfra.operations import files, server, systemd
 
 from bilder.components.vector.models import VectorConfig
+from bilder.facts.has_systemd import HasSystemd
 
 
 def _debian_pkg_repo():
@@ -44,10 +48,23 @@ def _install_from_package():
     )
 
 
-@deploy("Install vector")
+# Wrapper function to do everything in one call.
+@deploy("Install and configure vector.")
+def install_and_configure_vector(vector_config: VectorConfig):
+    install_vector(vector_config)
+    configure_vector(vector_config)
+    if host.get_fact(HasSystemd):
+        vector_service(vector_config)
+
+
+# TODO: MD 20230131 Deprecate calling install_vector, configure_vector, manage_service from outside the module.
+# aka, make them private functions.
+@deploy("Install vector: Install and determine shared configuration items.")
 def install_vector(vector_config: VectorConfig):
     install_method_map = {"package": _install_from_package}
     install_method_map[vector_config.install_method]()
+
+    # Running a vector_log_proxy server is special
     if vector_config.is_proxy:
         files.directory(
             name="Ensure TLS config directory exists",
@@ -55,15 +72,52 @@ def install_vector(vector_config: VectorConfig):
             user=vector_config.user,
             present=True,
         )
-    # Make sure you install vector AFTER installing docker when applicable.
+
+    # Special permissions and configuration for running with dockerized services.
+    # Make sure you install vector AFTER installing docker, when applicable.
+    # TODO: MD 20230131 Split docker config out to its own private function.
     if vector_config.is_docker:
         server.shell(
             name="Add vector user to docker group",
             commands=[f"/usr/bin/gpasswd -a {vector_config.user} docker"],
         )
+        vector_config.configuration_templates[
+            Path(__file__).resolve().parent.joinpath("templates", "docker_source.yaml")
+        ] = {}
+
+        server.shell(
+            name="Backup vector.service defintion",
+            commands=["/usr/bin/mv /lib/systemd/system/vector.service /root"],
+        )
+        files.put(
+            dest="/lib/systemd/system/vector.service",
+            group="root",
+            mode="0644",
+            name="Place docker specific vector.service definition",
+            src=str(
+                Path(__file__)
+                .resolve()
+                .parent.joinpath("files", "vector_and_docker.service")
+            ),
+            user="root",
+        )
+
+    # Config flags to enable global sink configurations
+    if vector_config.use_global_log_sink:
+        vector_config.configuration_templates[
+            Path(__file__)
+            .resolve()
+            .parent.joinpath("templates", "global_log_sink.yaml")
+        ] = {}
+    if vector_config.use_global_metric_sink:
+        vector_config.configuration_templates[
+            Path(__file__)
+            .resolve()
+            .parent.joinpath("templates", "global_metric_sink.yaml")
+        ] = {}
 
 
-@deploy("Configure Vector")
+@deploy("Configure Vector: create configuration files")
 def configure_vector(vector_config: VectorConfig):
     for fpath, context in vector_config.configuration_templates.items():
         files.template(
@@ -80,6 +134,10 @@ def configure_vector(vector_config: VectorConfig):
 
     # Validate the vector configuration files that were laid down
     # and confirm that vector starts without issue.
+    #
+    # TODO MD 20230127 This won't work once we switch the sink config to be
+    # consul/vault templates. Need to come up with something else or remove
+    # this entirely. Vector now offers unit tests so perhaps we can use that.
     server.shell(
         name="Run vector validate",
         commands=["/usr/bin/vector validate --no-environment"],
@@ -96,7 +154,7 @@ def configure_vector(vector_config: VectorConfig):
     )
 
 
-@deploy("Manage Vector service")
+@deploy("Configure Vector: Setup systemd service")
 def vector_service(
     vector_config: VectorConfig,
     do_restart=False,

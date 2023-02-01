@@ -1,0 +1,32 @@
+---
+transforms:
+  parse_airbyte_logs:
+    type: remap
+    inputs:
+    - "parse_docker_stdout_stderr"
+    source: |
+      .application = "airbyte"
+
+      # Remap some service names to make them more meaningful.
+      if .service == "init" {
+        .service = "airbyte-init"
+      }
+      if .service == "bootloader" {
+        .service = "airbyte-bootloader"
+      }
+      if .service == "worker" {
+        .service = "airbyte-worker"
+      }
+      if .service == "server" {
+        .service = "airbyte-server"
+      }
+      if .service == "webapp" {
+        .service = "airbyte-webapp"
+      }
+      # refer to the docker-compose.yaml.tmpl file in bilder/images
+
+  enrich_logs_global_funnel:
+    type: aws_ec2_metadata
+    inputs:
+    - "parse_airbyte_logs"
+    namespace: ec2

@@ -39,6 +39,8 @@ from bilder.components.hashicorp.vault.models import (
     VaultListener,
     VaultTCPListener,
 )
+from bilder.components.vector.models import VectorConfig
+from bilder.components.vector.steps import install_and_configure_vector
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
@@ -163,10 +165,19 @@ consul_template = ConsulTemplate(
 )
 hashicorp_products = [vault, consul, consul_template]
 
-consul_template_permissions(consul_template.configuration)
-
 for product in hashicorp_products:
     configure_hashicorp_product(product)
+
+# Install and configure vector
+vector_config = VectorConfig(is_docker=True, use_global_log_sink=True)
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "xqueue_logs.yaml")
+] = {}
+install_and_configure_vector(vector_config)
+
+
+consul_template_permissions(consul_template.configuration)
+
 if host.get_fact(HasSystemd):
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
