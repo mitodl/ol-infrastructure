@@ -1,28 +1,17 @@
 #  noqa: WPS232
 import sys
-import textwrap
 
-from concourse.lib.constants import (
-    PULUMI_CODE_PATH,
-    PULUMI_WATCHED_PATHS,
-    REGISTRY_IMAGE,
-)
+from concourse.lib.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+from concourse.lib.containers import container_build_task
 from concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from concourse.lib.models.fragment import PipelineFragment
-from concourse.lib.models.pipeline import (  # noqa: WPS235
-    AnonymousResource,
-    Command,
+from concourse.lib.models.pipeline import (
     GetStep,
     Identifier,
     Input,
     Job,
-    Output,
     Pipeline,
-    Platform,
     PutStep,
-    RegistryImage,
-    TaskConfig,
-    TaskStep,
 )
 from concourse.lib.resources import git_repo, registry_image
 
@@ -71,47 +60,23 @@ def build_ovs_pipeline() -> Pipeline:
         ],
     )
 
-    dcind_resource = AnonymousResource(
-        type=REGISTRY_IMAGE,
-        source=RegistryImage(repository="mitodl/concourse-dcind", tag="latest"),
-    )
-
-    # TODO MD 20230110
-    # May be able to convert this to something that uses 'concourse.lib.tasks.container_build_task'
     docker_build_job = Job(
         name="build-ovs-image",
         build_log_retention={"builds": 10},
         plan=[
             GetStep(get=ovs_rc_repo.name, trigger=True),
-            TaskStep(
-                task=Identifier("build-ovs-container"),
-                privileged=True,
-                config=TaskConfig(
-                    platform=Platform.linux,
-                    image_resource=dcind_resource,
-                    inputs=[Input(name=ovs_rc_repo.name)],
-                    outputs=[Output(name=ovs_rc_repo.name)],
-                    run=Command(
-                        path="/bin/entrypoint.sh",
-                        args=[
-                            "bash",
-                            "-ceux",
-                            textwrap.dedent(
-                                f"""mount -t cgroup -o none,name=systemd cgroup /sys/fs/cgroup/systemd
-                                cd {ovs_rc_repo.name}
-                                chmod 777 .
-                                docker build . -f Dockerfile --target=production -t ovs-app:latest
-                                FINAL_IMG_ID="$(docker images | grep "ovs-app" |  tr -s ' ' | cut -d ' ' -f 3)"
-                                docker save "${{FINAL_IMG_ID}}" -o ovs-app.tar"""
-                            ),  # noqa: WPS355
-                        ],
-                    ),
-                ),
+            container_build_task(
+                inputs=[Input(name=ovs_rc_repo.name)],
+                build_parameters={
+                    "CONTEXT": ovs_rc_repo.name,
+                    "TARGET": "production",
+                },
+                build_args=[],
             ),
             PutStep(
                 put=ovs_registry_image.name,
                 params={
-                    "image": f"{ovs_rc_repo.name}/ovs-app.tar",
+                    "image": "image/image.tar",
                     "additional_tags": f"./{ovs_rc_repo.name}/.git/describe_ref",
                 },
             ),
