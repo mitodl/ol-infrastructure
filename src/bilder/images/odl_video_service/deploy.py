@@ -170,13 +170,13 @@ mit_md_certificate_file = shib_conf_directory.joinpath("mit-md-cert.pem")
 consul_templates.extend(
     [
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-            "{{ printf .Data.key }}{{ end }}",
+            contents='{{ with secret "secret-odl-video-service/ovs-secrets" }}'
+            "{{ printf .Data.data.nginx.tls_key }}{{ end }}",
             destination=Path(certificate_key_file),
         ),
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-            "{{ printf .Data.value }}{{ end }}",
+            contents='{{ with secret "secret-odl-video-service/ovs-secrets" }}'
+            "{{ printf .Data.data.nginx.tls_certificate }}{{ end }}",
             destination=Path(certificate_file),
         ),
         ConsulTemplateTemplate(
