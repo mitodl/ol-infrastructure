@@ -8,8 +8,6 @@ config:
   concourse:db_capacity: "334"
   concourse:db_password:
     secure: v1:qHlfVScY6TRQO3Xy:Yvn53MfChba/lCUxcp3hKjKJX9cqjfR2OcsrbJFEY36IhwJIW7V16PKpuHc9cjjk
-  concourse:dockerhub_credentials:
-    secure: v1:slySRgEfav4QWI/c:WGfHXvftFBvFnuK5SctOZTn9zjkx+bPb9PGsoaL4T2LFUK/M3Ba1JC9hu3h2IPjTOG4RIaD155eMhC/LJ0GCw5c8hQFJHhZJ1dbatoY1bo6kH483ICy7EZ0hUQf/bPZmMag=
   concourse:target_vpc: operations_vpc
   concourse:web_auto_scale:
     desired: 1
