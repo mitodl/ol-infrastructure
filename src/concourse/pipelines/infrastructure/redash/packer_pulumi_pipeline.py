@@ -24,6 +24,7 @@ redash_pulumi_code = git_repo(
     paths=PULUMI_WATCHED_PATHS
     + [
         "src/ol_infrastructure/applications/redash/",
+        "src/bridge/secrets/redash/",
     ],
 )
 

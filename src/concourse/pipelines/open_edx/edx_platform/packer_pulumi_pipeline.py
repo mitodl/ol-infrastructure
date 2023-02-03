@@ -27,7 +27,7 @@ def build_edx_pipeline(
         paths=PULUMI_WATCHED_PATHS
         + [
             "src/ol_infrastructure/applications/edxapp/",
-            "src/bridge/secrets/edx/",
+            "src/bridge/secrets/edxapp/",
             "src/bridge/settings/openedx/",
         ],
     )
