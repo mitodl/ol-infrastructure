@@ -480,9 +480,11 @@ ovs_server_ami = ec2.get_ami(
 block_device_mappings = [BlockDeviceMapping()]
 
 ovs_lb_config = OLLoadBalancerConfig(
-    subnets=subnets,
-    security_groups=[ovs_server_security_group],
     enable_insecure_http=True,
+    listener_cert_domain="video.odl.mit.edu",
+    listener_use_acm=True,
+    security_groups=[ovs_server_security_group],
+    subnets=subnets,
     tags=instance_tags,
 )
 
