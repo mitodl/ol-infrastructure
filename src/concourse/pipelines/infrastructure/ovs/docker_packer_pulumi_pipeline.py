@@ -57,6 +57,7 @@ def build_ovs_pipeline() -> Pipeline:
         paths=PULUMI_WATCHED_PATHS
         + [
             PULUMI_CODE_PATH.joinpath("applications/odl_video_service/"),
+            "src/bridge/secrets/odl_video_service/",
         ],
     )
 
