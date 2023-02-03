@@ -60,6 +60,7 @@ def build_notes_pipeline(
         + [
             PULUMI_CODE_PATH.joinpath("applications/edx_notes/"),
             "src/bridge/settings/openedx/",
+            "src/bridge/secrets/edx_notes/",
         ],
     )
 
