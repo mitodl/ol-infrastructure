@@ -41,8 +41,6 @@ from bilder.components.hashicorp.vault.models import (
 from bilder.components.traefik.models import traefik_static
 from bilder.components.traefik.models.component import TraefikConfig
 from bilder.components.traefik.steps import configure_traefik
-from bilder.components.vector.models import VectorConfig
-from bilder.components.vector.steps import install_and_configure_vector
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 from bilder.lib.template_helpers import (
@@ -50,7 +48,12 @@ from bilder.lib.template_helpers import (
     place_consul_template_file,
 )
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
+from bridge.lib.versions import (
+    CONSUL_TEMPLATE_VERSION,
+    CONSUL_VERSION,
+    KEYCLOAK_VERSION,
+    VAULT_VERSION,
+)
 from bridge.secrets.sops import set_env_secrets
 
 set_env_secrets(Path("consul/consul.env"))
@@ -58,26 +61,21 @@ set_env_secrets(Path("consul/consul.env"))
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
 
-OPENEDX_RELEASE = os.environ["OPENEDX_RELEASE"]
-files.put(
-    name="Create env file for edx_notes",
-    src=StringIO(OPENEDX_RELEASE),
-    dest="/etc/default/openedx",
-)
-
-DEPLOYMENT = os.environ["DEPLOYMENT"] or os.environ["PKR_VAR_business_unit"]
-if DEPLOYMENT not in ["mitxonline", "mitx", "xpro", "mitx-staging"]:
-    raise ValueError(
-        "DEPLOYMENT should be on these values 'mitxonline', 'mitx', 'xpro', 'mitx-staging' "  # noqa: E501
-    )
-
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "consul-template": os.environ.get(
         "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION
     ),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
+    "keycloak": os.environ.get("KEYCLOAK_VERSION", KEYCLOAK_VERSION),
 }
+
+# Set the keycloak version in defaults
+files.put(
+    name=f"Set the keycloak version to {VERSIONS['keycloak']}",
+    src=StringIO(VERSIONS["keycloak"]),
+    dest="/etc/default/keycloak-version",
+)
 
 watched_files: list[Path] = []
 consul_templates: list[ConsulTemplateTemplate] = []
@@ -114,10 +112,8 @@ traefik_static_config = traefik_static.TraefikStaticConfig(
 traefik_config = TraefikConfig(static_configuration=traefik_static_config)
 configure_traefik(traefik_config)
 
-
-# Place static files
 files.put(
-    name="Upload env file for docker-compose",
+    name="Upload docker-compose.yaml",
     src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml")),
     dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
     mode="0664",
@@ -140,8 +136,8 @@ vault_config = VaultAgentConfig(
     auto_auth=VaultAutoAuthConfig(
         method=VaultAutoAuthMethod(
             type="aws",
-            mount_path=f"auth/aws-{DEPLOYMENT}",
-            config=VaultAutoAuthAWS(role="edx-notes-server"),
+            mount_path="auth/aws-keycloak",
+            config=VaultAutoAuthAWS(role="keycloak-server"),
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),
@@ -170,15 +166,6 @@ dot_env_template = place_consul_template_file(
 consul_templates.append(dot_env_template)
 watched_files.append(dot_env_template.destination)
 
-config_file_template = place_consul_template_file(
-    name="edx_notes_settings.yaml",
-    repo_path=FILES_DIRECTORY,
-    template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
-    destination_path=DOCKER_COMPOSE_DIRECTORY,
-)
-consul_templates.append(config_file_template)
-watched_files.append(config_file_template.destination)
-
 consul_template = ConsulTemplate(
     version=VERSIONS["consul-template"],
     configuration={
@@ -194,11 +181,11 @@ for product in hashicorp_products:
     configure_hashicorp_product(product)
 
 # Install and configure vector
-vector_config = VectorConfig(is_docker=True, use_global_log_sink=True)
-vector_config.configuration_templates[
-    TEMPLATES_DIRECTORY.joinpath("vector", "edx_notes_logs.yaml")
-] = {}
-install_and_configure_vector(vector_config)
+# vector_config = VectorConfig(is_docker=True, use_global_log_sink=True)
+# vector_config.configuration_templates[
+#    TEMPLATES_DIRECTORY.joinpath("vector", "keycloak_logs.yaml")
+# ] = {}
+# install_and_configure_vector(vector_config)
 
 consul_template_permissions(consul_template.configuration)
 
