@@ -17,7 +17,7 @@ from bridge.lib.magic_numbers import (
 CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH = 32
 
 
-class IframeOptions(str, Enum):  # noqa: WPS600
+class IframeOptions(str, Enum):
     deny = "deny"
     same_origin = "sameorigin"
 
@@ -287,7 +287,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         description="The maximum number of open connections for the api connection pool. (default: 10)",  # noqa: E501
     )
     db_max_conns_backend: PositiveInt = Field(
-        PositiveInt(50),  # noqa: WPS432
+        PositiveInt(50),
         concourse_env_var="CONCOURSE_BACKEND_MAX_CONNS",
         description="The maximum number of open connections for the backend connection pool. (default: 50)",  # noqa: E501
     )
@@ -1812,7 +1812,7 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
 
     @validator("additional_resource_types_directory")
     def validate_additional_resource_types_directory(
-        cls, additional_resource_types_directory, values  # noqa: N805, WPS110
+        cls, additional_resource_types_directory, values  # noqa: N805
     ):
-        """Ensure that the resource types directory is always beneath the deploy_directory"""  # noqa: D400, DAR101, DAR201, E501
+        """Ensure that the resource types directory is always beneath the deploy_directory"""  # noqa: E501
         return values["deploy_directory"] / additional_resource_types_directory

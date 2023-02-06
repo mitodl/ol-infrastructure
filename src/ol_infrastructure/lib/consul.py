@@ -29,7 +29,7 @@ def get_consul_provider(
 
 def consul_key_helper(key_value_mapping: dict[str, str]):
     keys = []
-    for key, val in key_value_mapping.items():  # noqa: WPS110
+    for key, val in key_value_mapping.items():
         keys.append(
             consul.KeysKeyArgs(
                 path=key,

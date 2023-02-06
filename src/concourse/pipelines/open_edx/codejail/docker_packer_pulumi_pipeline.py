@@ -28,12 +28,12 @@ def build_codejail_pipeline(
         branch="main",
     )
 
-    codejail_registry_image = registry_image(  # noqa: S106
+    codejail_registry_image = registry_image(
         name=Identifier("openedx-codejail-container"),
         image_repository="mitodl/codejail",
         image_tag=release_name,
         username="((dockerhub.username))",
-        password="((dockerhub.password))",
+        password="((dockerhub.password))",  # noqa: S106
     )
 
     codejail_dockerfile_repo = git_repo(
@@ -56,8 +56,8 @@ def build_codejail_pipeline(
         name=Identifier("ol-infrastructure-deploy"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
-        paths=PULUMI_WATCHED_PATHS
-        + [
+        paths=[
+            *PULUMI_WATCHED_PATHS,
             PULUMI_CODE_PATH.joinpath("applications/codejail/"),
             "src/bridge/settings/openedx",
         ],
@@ -74,7 +74,7 @@ def build_codejail_pipeline(
                     Input(name=codejail_dockerfile_repo.name),
                 ],
                 build_parameters={
-                    "CONTEXT": f"{codejail_dockerfile_repo.name}/dockerfiles/openedx-codejail/",
+                    "CONTEXT": f"{codejail_dockerfile_repo.name}/dockerfiles/openedx-codejail/",  # noqa: E501
                     "BUILD_ARG_OPENEDX_BRANCH": openedx_branch,
                 },
                 build_args=[
@@ -142,8 +142,8 @@ def build_codejail_pipeline(
 
     return Pipeline(
         resource_types=combined_fragments.resource_types,
-        resources=combined_fragments.resources
-        + [
+        resources=[
+            *combined_fragments.resources,
             codejail_pulumi_code,
             codejail_packer_code,
         ],

@@ -283,20 +283,18 @@ consul.Keys(
     "redash-consul-template-data",
     keys=[
         consul.KeysKeyArgs(
-            path=f"redash/rds_endpoint",  # noqa: F541, WPS237
+            path=f"redash/rds_endpoint",  # noqa: F541
             value=redash_db.db_instance.address,
         ),
         consul.KeysKeyArgs(
-            path=f"redash/frontend_host",  # noqa: F541, WPS237
+            path=f"redash/frontend_host",  # noqa: F541
             value=redash_config.require("domain"),
         ),
         consul.KeysKeyArgs(
-            path=f"redash/cache_endpoint_address",  # noqa: F541, WPS237
+            path=f"redash/cache_endpoint_address",  # noqa: F541
             value=redash_redis_cluster.address,
         ),
-        consul.KeysKeyArgs(
-            path=f"redash/app_name", value="app_name"  # noqa: F541, WPS237
-        ),
+        consul.KeysKeyArgs(path=f"redash/app_name", value="app_name"),  # noqa: F541
     ],
     opts=consul_provider,
 )
@@ -309,8 +307,8 @@ vault.generic.Secret(
     data_json=json.dumps(redash_secrets["sp_certificate_data"]),
 )
 
-# If we've specified that datsources will be managed, store some values in consul/vault for
-# that particular functionality
+# If we've specified that datsources will be managed, store some values in
+# consul/vault for that particular functionality.
 # Refer to DATASOUCE_MANAGEMENT.md
 if redash_config.get_bool("manage_datasources"):
     datasource_config_consul_keys = []
@@ -350,7 +348,7 @@ if redash_config.get_bool("manage_datasources"):
         datasource_config_consul_keys.append(
             consul.KeysKeyArgs(
                 path="redash/datasource_configs/xpro-pg-production/db_host",
-                # MD 20230123 Can't find the pulumi stack associated with this datasource.
+                # noqa: E501 MD 20230123 Can't find the pulumi stack associated with this datasource.
                 value="production-apps-rds-postgres-mitxpro.cbnm7ajau6mi.us-east-1.rds.amazonaws.com",
             )
         )
@@ -409,11 +407,11 @@ web_lt_config = OLLaunchTemplateConfig(
                         "write_files": [
                             {
                                 "path": "/etc/default/docker-compose",
-                                "content": textwrap.dedent(  # noqa: WPS462
+                                "content": textwrap.dedent(
                                     """\
                             COMPOSE_PROFILES=web
                                     """
-                                ),  # noqa: WPS355
+                                ),
                                 "owner": "root:root",
                             },
                             {
@@ -444,7 +442,7 @@ web_lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             """
-                                ),  # noqa: WPS355
+                                ),
                                 "owner": "root:root",
                             },
                         ]
@@ -509,11 +507,11 @@ worker_lt_config = OLLaunchTemplateConfig(
                         "write_files": [
                             {
                                 "path": "/etc/default/docker-compose",
-                                "content": textwrap.dedent(  # noqa: WPS462
+                                "content": textwrap.dedent(
                                     """\
                             COMPOSE_PROFILES=worker
                                     """
-                                ),  # noqa: WPS355
+                                ),
                                 "owner": "root:root",
                             },
                             {
@@ -540,7 +538,7 @@ worker_lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             """
-                                ),  # noqa: WPS355
+                                ),
                                 "owner": "root:root",
                             },
                         ]
@@ -574,7 +572,7 @@ worker_as_setup = OLAutoScaling(
     lb_config=None,
 )
 
-fifteen_minutes = 60 * 15  # noqa: WPS432
+fifteen_minutes = 60 * 15
 redash_domain = route53.Record(
     f"redash-{stack_info.env_suffix}-service-domain",
     name=redash_config.require("domain"),

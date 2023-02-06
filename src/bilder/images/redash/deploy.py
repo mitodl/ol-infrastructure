@@ -57,7 +57,7 @@ from bridge.secrets.sops import set_env_secrets
 
 
 # TODO MD 20231013 Switch over to the shared lib functions that do this
-def place_jinja_template_file(  # noqa: WPS211
+def place_jinja_template_file(  # noqa: PLR0913
     name: str,
     repo_path: Path,
     destination_path: Path,
@@ -67,7 +67,7 @@ def place_jinja_template_file(  # noqa: WPS211
 ):
     files.template(
         name=f"Place and interpolate {name} jinja template file",
-        src=str(repo_path.joinpath(name + ".j2")),  # noqa: WPS336
+        src=str(repo_path.joinpath(name + ".j2")),
         dest=str(destination_path.joinpath(name)),
         context=context,
         mode="0664",
@@ -76,7 +76,7 @@ def place_jinja_template_file(  # noqa: WPS211
 
 
 # TODO MD 20231013 Switch over to the shared lib functions that do this
-def place_consul_template_file(  # noqa: WPS211
+def place_consul_template_file(  # noqa: PLR0913
     name: str,
     repo_path: Path,
     template_path: Path,
@@ -87,13 +87,13 @@ def place_consul_template_file(  # noqa: WPS211
 ):
     files.put(
         name=f"Place {name} template file.",
-        src=str(repo_path.joinpath(name + ".tmpl")),  # noqa: WPS336
-        dest=str(template_path.joinpath(name + ".tmpl")),  # noqa: WPS336
+        src=str(repo_path.joinpath(name + ".tmpl")),
+        dest=str(template_path.joinpath(name + ".tmpl")),
         mode=mode,
     )
     consul_templates.append(
         ConsulTemplateTemplate(
-            source=template_path.joinpath(name + ".tmpl"),  # noqa: WPS336
+            source=template_path.joinpath(name + ".tmpl"),
             destination=destination_path.joinpath(name),
         )
     )
@@ -102,7 +102,7 @@ def place_consul_template_file(  # noqa: WPS211
 
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
-VERSIONS = {  # noqa: WPS407
+VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "consul-template": os.environ.get(
         "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION
@@ -188,7 +188,7 @@ jinja_context = {
     "nginx_directory": nginx_conf_directory,
     "shib_directory": shib_conf_directory,
 }
-for filename, dest_dir in jinja_templated_files.items():  # noqa: WPS440
+for filename, dest_dir in jinja_templated_files.items():
     place_jinja_template_file(
         name=filename,
         repo_path=TEMPLATES_DIRECTORY,
@@ -204,7 +204,7 @@ consul_templated_files = {
     ".env": DOCKER_COMPOSE_DIRECTORY,
     "shibboleth2.xml": shib_conf_directory,
 }
-for filename, dest_dir in consul_templated_files.items():  # noqa: WPS440
+for filename, dest_dir in consul_templated_files.items():
     place_consul_template_file(
         name=filename,
         repo_path=FILES_DIRECTORY,
@@ -214,7 +214,8 @@ for filename, dest_dir in consul_templated_files.items():  # noqa: WPS440
         watched_files=watched_files,
     )
 
-# Finally, datasources.yaml is a special snowflake and requires a command run after being updated.
+# Finally, datasources.yaml is a special snowflake
+# and requires a command run after being updated.
 files.put(
     name="Place datasources.yaml.tmpl template file.",
     src=str(FILES_DIRECTORY.joinpath("datasources.yaml.tmpl")),

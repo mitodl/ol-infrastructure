@@ -35,7 +35,7 @@ class ConsulExternalServicesMonitor(HashicorpProduct):
         return self
 
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
-        for fpath, config in self.configuration.items():  # noqa: WPS526
+        for fpath, config in self.configuration.items():
             yield self.configuration_directory.joinpath(fpath), config.json(
                 exclude_none=True, indent=2
             )

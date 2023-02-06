@@ -16,8 +16,8 @@ from bridge.settings.openedx.version_matrix import (
 )
 
 
-def _fetch_application_version(  # noqa: WPS234
-    release_map: dict[  # noqa: WPS320
+def _fetch_application_version(
+    release_map: dict[
         OpenEdxSupportedRelease,
         dict[OpenEdxDeploymentName, list[OpenEdxApplicationVersion]],
     ],
@@ -33,8 +33,8 @@ def _fetch_application_version(  # noqa: WPS234
     return fetched_app_version
 
 
-def _fetch_applications_by_type(  # noqa: WPS234
-    release_map: dict[  # noqa: WPS320
+def _fetch_applications_by_type(
+    release_map: dict[
         OpenEdxSupportedRelease,
         dict[OpenEdxDeploymentName, list[OpenEdxApplicationVersion]],
     ],
@@ -62,8 +62,8 @@ def filter_deployments_by_release(release: str) -> list[DeploymentEnvRelease]:
     return filtered_deployments
 
 
-def _filter_deployments_by_application(  # noqa: WPS231, WPS234
-    release_map: dict[  # noqa: WPS320
+def _filter_deployments_by_application(
+    release_map: dict[
         OpenEdxSupportedRelease,
         dict[OpenEdxDeploymentName, list[OpenEdxApplicationVersion]],
     ],

@@ -24,8 +24,8 @@ def build_edx_pipeline(
     edx_pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        paths=PULUMI_WATCHED_PATHS
-        + [
+        paths=[
+            *PULUMI_WATCHED_PATHS,
             "src/ol_infrastructure/applications/edxapp/",
             "src/bridge/secrets/edx/",
             "src/bridge/settings/openedx/",
@@ -125,9 +125,13 @@ def build_edx_pipeline(
 
     return Pipeline(
         resource_types=combined_fragments.resource_types,
-        resources=combined_fragments.resources
-        + [edx_platform_code, edx_pulumi_code, edx_base_image_code]
-        + list(loop_resources),
+        resources=[
+            *combined_fragments.resources,
+            edx_platform_code,
+            edx_pulumi_code,
+            edx_base_image_code,
+            *list(loop_resources),
+        ],
         jobs=combined_fragments.jobs,
     )
 

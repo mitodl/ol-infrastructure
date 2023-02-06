@@ -14,11 +14,11 @@ from bilder.components.hashicorp.models import (
 
 
 class VaultAutoAuthMethodConfig(FlexibleBaseModel, abc.ABC):
-    pass  # noqa: WPS420, WPS604
+    pass
 
 
 class VaultAutoAuthSinkConfig(FlexibleBaseModel, abc.ABC):
-    pass  # noqa: WPS420, WPS604
+    pass
 
 
 class VaultAutoAuthFileSink(VaultAutoAuthSinkConfig):
@@ -170,7 +170,7 @@ class VaultConnectionConfig(FlexibleBaseModel):
 
 class VaultTemplate(FlexibleBaseModel):
     source: Optional[Path]
-    contents: Optional[str]  # noqa: WPS110
+    contents: Optional[str]
     destination: Path
     create_dest_dirs: bool = True
     command: Optional[str]
@@ -291,7 +291,7 @@ class Vault(HashicorpProduct):
         return context_dict
 
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
-        for fpath, config in self.configuration.items():  # noqa: WPS526
+        for fpath, config in self.configuration.items():
             yield self.configuration_directory.joinpath(fpath), config.json(
                 exclude_none=True, indent=2
             )

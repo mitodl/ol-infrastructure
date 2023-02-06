@@ -1,6 +1,7 @@
 # A python script that will set datasources in redash
 import json
-import subprocess  # noqa: S404
+import subprocess
+import sys
 
 import yaml
 
@@ -8,7 +9,7 @@ with open("/etc/redash/datasources.yaml") as yamlfile:
     config = yaml.safe_load(yamlfile)
 
 container_id = (
-    subprocess.run(  # noqa: S603
+    subprocess.run(
         [
             "/usr/bin/docker",
             "ps",
@@ -26,7 +27,7 @@ container_id = (
 
 returncode = 0
 for datasource in config["managed_datasources"]:
-    update_output = subprocess.run(  # noqa: S603
+    update_output = subprocess.run(
         [
             "/usr/bin/docker",
             "exec",
@@ -45,4 +46,4 @@ for datasource in config["managed_datasources"]:
     if update_output.returncode != 0:
         return_code = update_output.returncode
 
-exit(returncode)  # noqa: WPS421
+sys.exit(returncode)

@@ -23,8 +23,8 @@ consul_image_code = git_repo(
 consul_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
     uri="https://github.com/mitodl/ol-infrastructure",
-    paths=PULUMI_WATCHED_PATHS
-    + [
+    paths=[
+        *PULUMI_WATCHED_PATHS,
         "src/ol_infrastructure/infrastructure/consul/",
         "src/ol_infrastructure/substructure/consul/",
     ],
@@ -43,7 +43,7 @@ consul_ami_fragment = packer_jobs(
 )
 
 consul_pulumi_fragments = []
-for network in [  # noqa: WPS335, WPS352
+for network in [
     "mitx",
     "mitx-staging",
     "mitxonline",
@@ -53,7 +53,7 @@ for network in [  # noqa: WPS335, WPS352
     "xpro",
 ]:
     # Missing a few stacks for some apps
-    if network in ["apps", "data"]:  # noqa: WPS510
+    if network in ["apps", "data"]:
         stages = ("QA", "Production")
     else:
         stages = ("CI", "QA", "Production")  # type: ignore
@@ -99,17 +99,21 @@ combined_fragment = PipelineFragment(
 
 consul_pipeline = Pipeline(
     resource_types=combined_fragment.resource_types,
-    resources=combined_fragment.resources
-    + [consul_image_code, consul_release, consul_pulumi_code],
+    resources=[
+        *combined_fragment.resources,
+        consul_image_code,
+        consul_release,
+        consul_pulumi_code,
+    ],
     jobs=combined_fragment.jobs,
 )
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    import sys
 
     with open("definition.json", "w") as definition:
         definition.write(consul_pipeline.json(indent=2))
     sys.stdout.write(consul_pipeline.json(indent=2))
-    print()  # noqa: WPS421
-    print("fly -t pr-inf sp -p packer-pulumi-consul -c definition.json")  # noqa: WPS421
+    print()
+    print("fly -t pr-inf sp -p packer-pulumi-consul -c definition.json")

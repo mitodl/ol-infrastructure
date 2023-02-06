@@ -62,7 +62,7 @@ k8s_vpc_config = OLVPCConfig(
     vpc_name=f"k8s-{stack_info.env_suffix}",
     cidr_block=k8s_config.require("cidr_block"),
     k8s_service_subnet=k8s_config.require("k8s_service_subnet"),
-    num_subnets=16,  # noqa: WPS432
+    num_subnets=16,
     tags={
         "OU": "operations",
         "Environment": f"k8s-{stack_info.env_suffix}",

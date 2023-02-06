@@ -29,7 +29,7 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 ##################################
-##    Setup + Config Retrival   ##  # noqa: E266
+##    Setup + Config Retrival   ##
 ##################################
 
 if Config("vault_server").get("env_namespace"):
@@ -70,7 +70,7 @@ tika_server_tag = f"tika-server-{env_name}"
 consul_provider = get_consul_provider(stack_info)
 
 ###############################
-##     General Resources     ##  # noqa: E266
+##     General Resources     ##
 ###############################
 
 # IAM and instance profile
@@ -224,7 +224,7 @@ lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             """
-                                ),  # noqa: WPS355
+                                ),
                                 "owner": "root:root",
                             },
                             {
@@ -233,7 +233,7 @@ lt_config = OLLaunchTemplateConfig(
                                     f"""\
                             DOMAIN={tika_config.require("web_host_domain")}
                             X_ACCESS_TOKEN={x_access_token}
-                            """  # noqa: WPS237
+                            """
                                 ),
                             },
                         ]
@@ -267,7 +267,7 @@ as_setup = OLAutoScaling(
     lb_config=lb_config,
 )
 
-## Create Route53 DNS records for tika nodes  # noqa: E266
+## Create Route53 DNS records for tika nodes
 five_minutes = 60 * 5
 route53.Record(
     "tika-server-dns-record",

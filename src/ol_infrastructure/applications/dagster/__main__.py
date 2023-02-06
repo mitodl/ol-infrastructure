@@ -2,11 +2,11 @@
 
 - Create an S3 bucket for managing Dagster's intermediate states
 - Create an RDS PostgreSQL instance for storing Dagster's schedule and run state
-- Mount a Vault database backend and provision role definitions for the Dagster RDS database  # noqa: E501
+- Mount a Vault database backend and provision role definitions for the Dagster RDS database
 - Create an IAM role for Dagster instances to allow access to S3 and other AWS resources
 - Setup consul keys needed by various pipelines.
 - Provision an EC2 instance from a pre-built AMI with the pipeline code for Dagster
-"""
+"""  # noqa: E501
 import base64
 import json
 import textwrap
@@ -72,7 +72,7 @@ xpro_mongodb_stack = StackReference(
 )
 
 dagster_bucket_name = f"dagster-{dagster_environment}"
-dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [  # noqa: WPS234
+dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [
     {
         "Effect": "Allow",
         "Action": "s3:ListAllMyBuckets",
@@ -143,7 +143,7 @@ dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [  # noqa: WPS2
     },
 ]
 
-athena_permissions: list[dict[str, Union[str, list[str]]]] = [  # noqa: WPS234
+athena_permissions: list[dict[str, Union[str, list[str]]]] = [
     {
         "Effect": "Allow",
         "Action": [
@@ -610,7 +610,7 @@ dagster_instance = ec2.Instance(
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             """
-                                ),  # noqa: WPS355
+                                ),
                                 "owner": "root:root",
                             },
                             {
@@ -632,7 +632,7 @@ dagster_elastic_ip = ec2.Eip(
     vpc=True,
 )
 
-fifteen_minutes = 60 * 15  # noqa: WPS432
+fifteen_minutes = 60 * 15
 dagster_domain = route53.Record(
     f"dagster-{stack_info.env_suffix}-service-domain",
     name=get_config("dagster:domain"),

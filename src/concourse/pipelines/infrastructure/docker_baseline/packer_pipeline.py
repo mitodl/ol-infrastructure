@@ -48,8 +48,10 @@ docker_baseline_ami_fragment = packer_jobs(
 )
 
 combined_fragment = PipelineFragment(
-    resource_types=docker_baseline_ami_fragment.resource_types
-    + [hashicorp_release_resource],
+    resource_types=[
+        *docker_baseline_ami_fragment.resource_types,
+        hashicorp_release_resource,
+    ],
     resources=docker_baseline_ami_fragment.resources,
     jobs=docker_baseline_ami_fragment.jobs,
 )
@@ -57,8 +59,8 @@ combined_fragment = PipelineFragment(
 
 docker_baseline_pipeline = Pipeline(
     resource_types=combined_fragment.resource_types,
-    resources=combined_fragment.resources
-    + [
+    resources=[
+        *combined_fragment.resources,
         docker_baseline_image_code,
         vector_release,
         vault_agent_release,
@@ -70,12 +72,10 @@ docker_baseline_pipeline = Pipeline(
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    import sys
 
     with open("definition.json", "w") as definition:
         definition.write(docker_baseline_pipeline.json(indent=2))
     sys.stdout.write(docker_baseline_pipeline.json(indent=2))
-    print()  # noqa: WPS421
-    print(  # noqa: WPS421
-        "fly -t pr-inf sp -p packer-docker-baseline -c definition.json"  # noqa: C813
-    )
+    print()
+    print("fly -t pr-inf sp -p packer-docker-baseline -c definition.json")

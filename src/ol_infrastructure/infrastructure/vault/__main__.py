@@ -21,7 +21,7 @@ from typing import Any
 import pulumi_tls as tls
 import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import (  # noqa: WPS235
+from pulumi_aws import (
     acm,
     acmpca,
     autoscaling,
@@ -255,7 +255,7 @@ backup_bucket = s3.Bucket(
             id="reduce_storage_costs",
             transitions=[
                 s3.BucketLifecycleRuleTransitionArgs(
-                    days=30, storage_class="INTELLIGENT_TIERING"  # noqa: WPS432
+                    days=30, storage_class="INTELLIGENT_TIERING"
                 ),
             ],
         ),
@@ -263,7 +263,7 @@ backup_bucket = s3.Bucket(
             enabled=True,
             id="delete_older_than_one_year",
             expiration=s3.BucketLifecycleRuleExpirationArgs(
-                days=365,  # noqa: WPS432
+                days=365,
             ),
         ),
     ],
@@ -385,7 +385,7 @@ vault_listener_csr = tls.CertRequest(
     ),
 )
 vault_listener_cert = acmpca.Certificate(
-    f"vault-server-listener-tls-certificate-{datetime.utcnow().year}",  # noqa: WPS237
+    f"vault-server-listener-tls-certificate-{datetime.utcnow().year}",  # noqa: DTZ003
     certificate_authority_arn=root_ca["arn"],
     certificate_signing_request=vault_listener_csr.cert_request_pem,
     signing_algorithm="SHA512WITHRSA",
@@ -397,7 +397,7 @@ vault_listener_cert = acmpca.Certificate(
 ###################
 
 
-def cloud_init_user_data(  # noqa: WPS211
+def cloud_init_user_data(  # noqa: PLR0913
     kms_key_id,
     vpc_id,
     consul_env_name,
@@ -477,7 +477,7 @@ def cloud_init_user_data(  # noqa: WPS211
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                     """
-                ),  # noqa: WPS355
+                ),
                 "owner": "root:root",
             },
             # TODO: Move TLS key and cert injection to Packer build so that private key
@@ -586,7 +586,7 @@ vault_asg = autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=90,  # noqa: WPS432
+            min_healthy_percentage=90,
             instance_warmup=FIVE_MINUTES * 3,
         ),
         triggers=["tag"],

@@ -118,7 +118,7 @@ iam.RolePolicyAttachment(
 iam.RolePolicyAttachment(
     f"edx-notes-{env_name}-traefik-route53-records-permission",
     policy_arn=policy_stack.require_output("iam_policies")[
-        f"route53_{notes_config.require('dns_zone')}_zone_records"  # noqa: WPS237
+        f"route53_{notes_config.require('dns_zone')}_zone_records"
     ],
     role=notes_instance_role.name,
 )
@@ -178,7 +178,7 @@ lb_config = OLLoadBalancerConfig(
 tg_config = OLTargetGroupConfig(
     vpc_id=vpc_id,
     health_check_interval=60,
-    health_check_matcher="404",  # TODO 20221208 MAD need to revisit health checks + traefik
+    health_check_matcher="404",  # noqa: E501 # TODO 20221208 MAD need to revisit health checks + traefik
     health_check_path="/",
     tags=aws_config.merged_tags({"Name": notes_server_tag}),
 )
@@ -241,7 +241,7 @@ lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             """
-                                ),  # noqa: WPS355
+                                ),
                                 "owner": "root:root",
                             },
                         ],

@@ -10,7 +10,7 @@ import pulumi
 from pulumi_aws import ec2
 
 ec2_client = boto3.client("ec2")
-AWSFilterType = list[dict[str, Union[str, list[str]]]]  # noqa: WPS221
+AWSFilterType = list[dict[str, Union[str, list[str]]]]
 
 default_egress_args = [
     ec2.SecurityGroupEgressArgs(
@@ -24,24 +24,24 @@ default_egress_args = [
 
 
 @unique
-class InstanceTypes(str, Enum):  # noqa: WPS600
+class InstanceTypes(str, Enum):
     burstable_micro = "t3a.micro"
     burstable_small = "t3a.small"
     burstable_medium = "t3a.medium"
     burstable_large = "t3a.large"
     general_purpose_large = "m5a.large"
     general_purpose_xlarge = "m5a.xlarge"
-    general_purpose_2xlarge = "m5a.2xlarge"  # noqa: WPS114
+    general_purpose_2xlarge = "m5a.2xlarge"
     general_prupose_intel_large = "m5.large"
     general_purpose_intel_xlarge = "m5.xlarge"
-    general_purpose_intel_2xlarge = "m5.2xlarge"  # noqa: WPS114
+    general_purpose_intel_2xlarge = "m5.2xlarge"
     high_mem_regular = "r5a.large"
     high_mem_xlarge = "r5a.xlarge"
-    high_mem_2xlarge = "r5a.2xlarge"  # noqa: WPS114
+    high_mem_2xlarge = "r5a.2xlarge"
 
 
 @unique
-class DiskTypes(str, Enum):  # noqa: WPS600
+class DiskTypes(str, Enum):
     magnetic = "standard"
     legacy_ssd = "gp2"
     ssd = "gp3"
@@ -125,7 +125,7 @@ def _conditional_import(
     if resources:
         if len(resources) > 1:
             pulumi.log.info(
-                f"More than one resource returned with filter {filters}. "
+                f"More than one resource returned with filter {filters}. "  # noqa: G004
                 f"Found {resources}"
             )
             raise ValueError(

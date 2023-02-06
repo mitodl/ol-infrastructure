@@ -37,7 +37,7 @@ from bilder.facts.has_systemd import HasSystemd
 from bridge.lib.versions import CONSUL_VERSION, TRAEFIK_VERSION
 from bridge.secrets.sops import set_env_secrets
 
-VERSIONS = {  # noqa: WPS407
+VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "traefik": os.environ.get("TRAEFIK_VERSION", TRAEFIK_VERSION),
 }
@@ -58,8 +58,8 @@ consul_configuration = {
 
 # TODO ACL token
 consul_esm_configuration = {
-    Path("00-default.json"): ConsulExternalServicesMonitorConfig(  # noqa: S106
-        token=""
+    Path("00-default.json"): ConsulExternalServicesMonitorConfig(
+        token=""  # noqa: S106
     ),
 }
 

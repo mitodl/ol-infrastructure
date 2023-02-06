@@ -42,7 +42,7 @@ business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
 cluster_size = search_config.get_int("cluster_size") or 3
 cluster_instance_type = search_config.get("instance_type") or "t3.medium.elasticsearch"
-disk_size = search_config.get_int("disk_size_gb") or 30  # noqa: WPS432
+disk_size = search_config.get_int("disk_size_gb") or 30
 is_public_web = search_config.get_bool("public_web") or False
 is_secured_cluster = search_config.get_bool("secured_cluster") or False
 consul_service_name = (

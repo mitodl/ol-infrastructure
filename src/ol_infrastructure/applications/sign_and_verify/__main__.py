@@ -265,7 +265,7 @@ sign_and_verify_service = ecs.Service(
     f"sign-and-verify-service-{stack_info.env_suffix}",
     cluster=sign_and_verify_cluster.arn,
     desired_count=2,
-    health_check_grace_period_seconds=30,  # noqa: WPS432
+    health_check_grace_period_seconds=30,
     platform_version="LATEST",
     launch_type="FARGATE",
     name=f"sign-and-verify-service-{stack_info.env_suffix}",

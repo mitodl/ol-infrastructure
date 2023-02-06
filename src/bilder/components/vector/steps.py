@@ -57,7 +57,8 @@ def install_and_configure_vector(vector_config: VectorConfig):
         vector_service(vector_config)
 
 
-# TODO: MD 20230131 Deprecate calling install_vector, configure_vector, manage_service from outside the module.
+# TODO: MD 20230131 Deprecate calling install_vector,
+# configure_vector, manage_service from outside the module.
 # aka, make them private functions.
 @deploy("Install vector: Install and determine shared configuration items.")
 def install_vector(vector_config: VectorConfig):

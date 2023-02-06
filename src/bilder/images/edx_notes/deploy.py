@@ -66,12 +66,12 @@ files.put(
 )
 
 DEPLOYMENT = os.environ["DEPLOYMENT"] or os.environ["PKR_VAR_business_unit"]
-if DEPLOYMENT not in ["mitxonline", "mitx", "xpro", "mitx-staging"]:  # noqa: WPS510
+if DEPLOYMENT not in ["mitxonline", "mitx", "xpro", "mitx-staging"]:
     raise ValueError(
         "DEPLOYMENT should be on these values 'mitxonline', 'mitx', 'xpro', 'mitx-staging' "  # noqa: E501
     )
 
-VERSIONS = {  # noqa: WPS407
+VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "consul-template": os.environ.get(
         "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION

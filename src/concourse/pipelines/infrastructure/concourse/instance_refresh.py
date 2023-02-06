@@ -12,7 +12,7 @@ group_configs = []
 for env in environments:
     job_names = []
     for node_class in node_classes:
-        filter_template = f"Name=tag:concourse_type,Values={node_class} Name=tag:Environment,Values=operations-{env}"
+        filter_template = f"Name=tag:concourse_type,Values={node_class} Name=tag:Environment,Values=operations-{env}"  # noqa: E501
         query = "AutoScalingGroups[*].AutoScalingGroupName"
         refresh_job = Job(
             name=f"{env}-{node_class}-instance-refresh",
@@ -49,7 +49,5 @@ if __name__ == "__main__":
     with open("definition.json", "w") as definition:
         definition.write(instance_refresh_pipeline.json(indent=2))
     sys.stdout.write(instance_refresh_pipeline.json(indent=2))
-    print()  # noqa: WPS421
-    print(  # noqa: WPS421
-        "fly -t pr-inf sp -p instance-refresh-concourse -c definition.json"  # noqa: C813
-    )
+    print()
+    print("fly -t pr-inf sp -p instance-refresh-concourse -c definition.json")

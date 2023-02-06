@@ -34,11 +34,11 @@ def build_ovs_pipeline() -> Pipeline:
         branch=ovs_r_branch,
     )
 
-    ovs_registry_image = registry_image(  # noqa: S106
+    ovs_registry_image = registry_image(
         name=Identifier("ovs-image"),
         image_repository="mitodl/ovs-app",
         username="((dockerhub.username))",
-        password="((dockerhub.password))",
+        password="((dockerhub.password))",  # noqa: S106
     )
 
     ovs_packer_code = git_repo(
@@ -54,8 +54,8 @@ def build_ovs_pipeline() -> Pipeline:
         name=Identifier("ol-infrastructure-pulumi-build"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
-        paths=PULUMI_WATCHED_PATHS
-        + [
+        paths=[
+            *PULUMI_WATCHED_PATHS,
             PULUMI_CODE_PATH.joinpath("applications/odl_video_service/"),
             "src/bridge/secrets/odl_video_service/",
         ],
@@ -107,8 +107,7 @@ def build_ovs_pipeline() -> Pipeline:
     pulumi_fragment = pulumi_jobs_chain(
         ovs_pulumi_code,
         stack_names=[
-            f"applications.odl_video_service.{stage}"
-            for stage in ["QA", "Production"]  # noqa: WPS335
+            f"applications.odl_video_service.{stage}" for stage in ["QA", "Production"]
         ],
         project_name="ol-infrastrcuture-ovs-server",
         project_source_path=PULUMI_CODE_PATH.joinpath(
@@ -145,8 +144,12 @@ def build_ovs_pipeline() -> Pipeline:
     )
     return Pipeline(
         resource_types=combined_fragments.resource_types,
-        resources=combined_fragments.resources
-        + [ovs_packer_code, ovs_pulumi_code, ovs_r_repo],
+        resources=[
+            *combined_fragments.resources,
+            ovs_packer_code,
+            ovs_pulumi_code,
+            ovs_r_repo,
+        ],
         jobs=combined_fragments.jobs,
     )
 

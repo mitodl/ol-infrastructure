@@ -55,16 +55,16 @@ combined_fragment = PipelineFragment(
 
 tika_pipeline = Pipeline(
     resource_types=combined_fragment.resource_types,
-    resources=combined_fragment.resources + [tika_image_code, tika_pulumi_code],
+    resources=[*combined_fragment.resources, tika_image_code, tika_pulumi_code],
     jobs=combined_fragment.jobs,
 )
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    import sys
 
     with open("definition.json", "w") as definition:
         definition.write(tika_pipeline.json(indent=2))
     sys.stdout.write(tika_pipeline.json(indent=2))
-    print()  # noqa: WPS421
-    print("fly -t pr-inf sp -p packer-pulumi-tika -c definition.json")  # noqa: WPS421
+    print()
+    print("fly -t pr-inf sp -p packer-pulumi-tika -c definition.json")

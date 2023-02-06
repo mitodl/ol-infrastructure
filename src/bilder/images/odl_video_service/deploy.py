@@ -58,7 +58,7 @@ from bridge.secrets.sops import set_env_secrets
 
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
-VERSIONS = {  # noqa: WPS407
+VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "consul-template": os.environ.get(
         "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION

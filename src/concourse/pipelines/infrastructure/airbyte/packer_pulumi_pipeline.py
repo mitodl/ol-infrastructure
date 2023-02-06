@@ -17,10 +17,7 @@ airbyte_image_code = git_repo(
 airbyte_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
     uri="https://github.com/mitodl/ol-infrastructure",
-    paths=PULUMI_WATCHED_PATHS
-    + [
-        "src/ol_infrastructure/applications/airbyte/",
-    ],
+    paths=[*PULUMI_WATCHED_PATHS, "src/ol_infrastructure/applications/airbyte/"],
 )
 
 get_airbyte_release = GetStep(get=airbyte_release.name, trigger=True)
@@ -34,7 +31,7 @@ airbyte_ami_fragment = packer_jobs(
 
 airbyte_pulumi_fragment = pulumi_jobs_chain(
     airbyte_pulumi_code,
-    # stack_name="applications.airbyte.QA",  # noqa: E800
+    # stack_name="applications.airbyte.QA",
     stack_names=[f"applications.airbyte.{stage}" for stage in ("QA", "Production")],
     project_name="ol-infrastructure-airbyte-server",
     project_source_path=PULUMI_CODE_PATH.joinpath("applications/airbyte/"),
@@ -57,19 +54,21 @@ combined_fragment = PipelineFragment(
 
 airbyte_pipeline = Pipeline(
     resource_types=combined_fragment.resource_types,
-    resources=combined_fragment.resources
-    + [airbyte_image_code, airbyte_release, airbyte_pulumi_code],
+    resources=[
+        *combined_fragment.resources,
+        airbyte_image_code,
+        airbyte_release,
+        airbyte_pulumi_code,
+    ],
     jobs=combined_fragment.jobs,
 )
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    import sys
 
     with open("definition.json", "w") as definition:
         definition.write(airbyte_pipeline.json(indent=2))
     sys.stdout.write(airbyte_pipeline.json(indent=2))
-    print()  # noqa: WPS421
-    print(  # noqa: WPS421
-        "fly -t pr-inf sp -p packer-pulumi-airbyte -c definition.json"  # noqa: C813
-    )
+    print()
+    print("fly -t pr-inf sp -p packer-pulumi-airbyte -c definition.json")

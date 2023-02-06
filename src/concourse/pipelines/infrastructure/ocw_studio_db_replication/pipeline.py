@@ -1,5 +1,5 @@
 from concourse.lib.constants import REGISTRY_IMAGE
-from concourse.lib.models.pipeline import (  # noqa: WPS235
+from concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
     Identifier,
@@ -73,7 +73,7 @@ def db_replication_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    import sys
 
     with open("definition.json", "w") as definition:
         definition.write(db_replication_pipeline().json(indent=2))

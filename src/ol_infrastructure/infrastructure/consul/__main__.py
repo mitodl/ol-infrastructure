@@ -141,8 +141,7 @@ consul_server_security_group = ec2.SecurityGroup(
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=peer_vpcs.apply(
                 lambda peer_vpcs: [
-                    peer.apply(lambda vpc: vpc["cidr"])  # noqa: WPS430
-                    for peer in peer_vpcs.values()
+                    peer.apply(lambda vpc: vpc["cidr"]) for peer in peer_vpcs.values()
                 ]
             ),
             protocol="tcp",
@@ -257,7 +256,7 @@ consul_lb_listener = lb.Listener(
 # Route 53 Setup #
 ##################
 
-FIFTEEN_MINUTES = 60 * 15  # noqa: WPS432
+FIFTEEN_MINUTES = 60 * 15
 consul_dns_name = f"consul-{env_name}.odl.mit.edu"
 consul_domain = route53.Record(
     "consul-server-dns-record",
@@ -294,9 +293,7 @@ instance_type = InstanceTypes[instance_type_name].value
 # using the VPC ID to denote datacenter
 retry_join_wan = peer_vpcs.apply(
     lambda vpc_dict: [
-        peer.apply(
-            lambda vpc: f"provider=aws tag_key=consul_vpc tag_value={vpc['id']}"  # noqa: WPS430
-        )
+        peer.apply(lambda vpc: f"provider=aws tag_key=consul_vpc tag_value={vpc['id']}")
         for peer in vpc_dict.values()
     ]
 )
@@ -346,7 +343,7 @@ def cloud_init_userdata(
             },
             {
                 "path": "/etc/traefik/.htpasswd",
-                "content": f"pulumi:{hashed_password.decode('utf-8')}\n",  # noqa: WPS237
+                "content": f"pulumi:{hashed_password.decode('utf-8')}\n",
                 "owner": "traefik:traefik",
                 "permissions": "0600",
             },
@@ -360,7 +357,7 @@ def cloud_init_userdata(
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                     """
-                ),  # noqa: WPS355
+                ),
                 "owner": "root:root",
             },
         ]
@@ -459,7 +456,7 @@ consul_asg = autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=85,  # noqa: WPS432
+            min_healthy_percentage=85,
             instance_warmup=FIVE_MINUTES,
         ),
         triggers=["tag"],

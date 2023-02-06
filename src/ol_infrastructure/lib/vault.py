@@ -21,7 +21,7 @@ postgres_role_statements = {
         "revoke": Template("DROP ROLE ${app_name};"),
     },
     "admin": {
-        "create": Template(  # noqa: WPS462
+        "create": Template(
             """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
              VALID UNTIL '{{expiration}}' IN ROLE "rds_superuser"
              INHERIT CREATEROLE CREATEDB;
@@ -29,8 +29,8 @@ postgres_role_statements = {
              WITH GRANT OPTION;
           GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{{name}}"
              WITH GRANT OPTION;"""
-        ),  # noqa: WPS355
-        "revoke": Template(  # noqa: WPS462
+        ),
+        "revoke": Template(
             """REVOKE "${app_name}" FROM "{{name}}";
           GRANT "{{name}}" TO ${app_name} WITH ADMIN OPTION;
           SET ROLE ${app_name};
@@ -41,10 +41,10 @@ postgres_role_statements = {
           REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
           REVOKE USAGE ON SCHEMA public FROM "{{name}}";
           DROP USER "{{name}}";"""
-        ),  # noqa: WPS355
+        ),
     },
     "app": {
-        "create": Template(  # noqa: WPS462
+        "create": Template(
             """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
             VALID UNTIL '{{expiration}}' IN ROLE "${app_name}" INHERIT;
           GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${app_name}"
@@ -58,8 +58,8 @@ postgres_role_statements = {
             GRANT ALL PRIVILEGES ON SEQUENCES TO "${app_name}" WITH GRANT OPTION;
           RESET ROLE;
           ALTER ROLE "{{name}}" SET ROLE "${app_name}";"""
-        ),  # noqa: WPS355
-        "revoke": Template(  # noqa: WPS462
+        ),
+        "revoke": Template(
             """REVOKE "${app_name}" FROM "{{name}}";
           GRANT "{{name}}" TO ${app_name} WITH ADMIN OPTION;
           SET ROLE ${app_name};
@@ -70,10 +70,10 @@ postgres_role_statements = {
           REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
           REVOKE USAGE ON SCHEMA public FROM "{{name}}";
           DROP USER "{{name}}";"""
-        ),  # noqa: WPS355
+        ),
     },
     "readonly": {
-        "create": Template(  # noqa: WPS462
+        "create": Template(
             """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
              VALID UNTIL '{{expiration}}';
           GRANT SELECT ON ALL TABLES IN SCHEMA public TO "{{name}}";
@@ -84,13 +84,13 @@ postgres_role_statements = {
           ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public GRANT SELECT
              ON SEQUENCES TO "{{name}}";
           RESET ROLE;"""
-        ),  # noqa: WPS355
-        "revoke": Template(  # noqa: WPS462
+        ),
+        "revoke": Template(
             """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";
           REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
           REVOKE USAGE ON SCHEMA public FROM "{{name}}";
           DROP USER "{{name}}";"""
-        ),  # noqa: WPS355
+        ),
     },
 }
 
@@ -146,7 +146,7 @@ mongodb_role_statements = {
 }
 
 
-class VaultPKIKeyTypeBits(int, Enum):  # noqa: WPS600
+class VaultPKIKeyTypeBits(int, Enum):
     rsa = 4096
     ec = 256
 
@@ -163,11 +163,11 @@ def get_vault_provider(
             f"vault.{vault_env_namespace}.yaml",
         )
     )
-    return pulumi_vault.Provider(  # noqa: S106
+    return pulumi_vault.Provider(
         provider_name or "vault-provider",
         address=vault_address,
         add_address_to_env=True,
-        token="",
+        token="",  # noqa: S106
         auth_login_userpass=pulumi_vault.ProviderAuthLoginUserpassArgs(
             mount="pulumi",
             username=pulumi_vault_creds["auth_username"],

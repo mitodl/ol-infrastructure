@@ -19,8 +19,10 @@ vector_log_proxy_image_code = git_repo(
 vector_log_proxy_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
     uri="https://github.com/mitodl/ol-infrastructure",
-    paths=PULUMI_WATCHED_PATHS
-    + ["src/ol_infrastructure/infrastructure/vector_log_proxy"],
+    paths=[
+        *PULUMI_WATCHED_PATHS,
+        "src/ol_infrastructure/infrastructure/vector_log_proxy",
+    ],
 )
 
 get_vector_release = GetStep(get=vector_release.name, trigger=True)
@@ -62,19 +64,21 @@ combined_fragment = PipelineFragment(
 
 vector_log_proxy_pipeline = Pipeline(
     resource_types=combined_fragment.resource_types,
-    resources=combined_fragment.resources
-    + [vector_log_proxy_image_code, vector_release, vector_log_proxy_pulumi_code],
+    resources=[
+        *combined_fragment.resources,
+        vector_log_proxy_image_code,
+        vector_release,
+        vector_log_proxy_pulumi_code,
+    ],
     jobs=combined_fragment.jobs,
 )
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    import sys
 
     with open("definition.json", "w") as definition:
         definition.write(vector_log_proxy_pipeline.json(indent=2))
     sys.stdout.write(vector_log_proxy_pipeline.json(indent=2))
-    print()  # noqa: WPS421
-    print(  # noqa: WPS421
-        "fly -t pr-inf sp -p packer-pulumi-vector-log-proxy -c definition.json"  # noqa: C813
-    )
+    print()
+    print("fly -t pr-inf sp -p packer-pulumi-vector-log-proxy -c definition.json")

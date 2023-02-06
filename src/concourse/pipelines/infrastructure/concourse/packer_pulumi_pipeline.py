@@ -27,8 +27,8 @@ concourse_image_code = git_repo(
 concourse_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
     uri="https://github.com/mitodl/ol-infrastructure",
-    paths=PULUMI_WATCHED_PATHS
-    + [
+    paths=[
+        *PULUMI_WATCHED_PATHS,
         "src/ol_infrastructure/applications/concourse/",
         "src/bridge/secrets/concourse/",
     ],
@@ -77,8 +77,12 @@ combined_fragment = PipelineFragment(
 def concourse_pipeline() -> Pipeline:
     return Pipeline(
         resource_types=combined_fragment.resource_types,
-        resources=combined_fragment.resources
-        + [concourse_release, concourse_image_code, concourse_pulumi_code],
+        resources=[
+            *combined_fragment.resources,
+            concourse_release,
+            concourse_image_code,
+            concourse_pulumi_code,
+        ],
         jobs=combined_fragment.jobs,
     )
 
@@ -87,7 +91,5 @@ if __name__ == "__main__":
     with open("definition.json", "w") as definition:
         definition.write(concourse_pipeline().json(indent=2))
     sys.stdout.write(concourse_pipeline().json(indent=2))
-    print()  # noqa: WPS421
-    print(  # noqa: WPS421
-        "fly -t pr-inf sp -p packer-pulumi-concourse -c definition.json"  # noqa: C813
-    )
+    print()
+    print("fly -t pr-inf sp -p packer-pulumi-concourse -c definition.json")

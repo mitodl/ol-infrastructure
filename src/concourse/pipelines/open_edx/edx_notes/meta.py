@@ -1,7 +1,7 @@
 import sys
 
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
-from concourse.lib.models.pipeline import (  # noqa: WPS235
+from concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
     GetStep,
@@ -84,5 +84,5 @@ if __name__ == "__main__":
         definition.write(meta_pipeline.json(indent=2))
     sys.stdout.write(meta_pipeline.json(indent=2))
     sys.stdout.write(
-        "\nfly -t <target> set-pipeline -p docker-packer-pulumi-edx-notes-meta -c definition.json"
+        "\nfly -t <target> set-pipeline -p docker-packer-pulumi-edx-notes-meta -c definition.json"  # noqa: E501
     )

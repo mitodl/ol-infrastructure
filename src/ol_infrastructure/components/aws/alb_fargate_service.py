@@ -54,13 +54,13 @@ from ol_infrastructure.lib.ol_types import AWSBase
 
 
 @unique
-class Protocol(str, Enum):  # noqa: WPS600
+class Protocol(str, Enum):
     http = "HTTP"
     https = "HTTPS"
 
 
 @unique
-class Route53RecordType(str, Enum):  # noqa: WPS600
+class Route53RecordType(str, Enum):
     alias = "ALIAS"
     cname = "CNAME"
     none = "NONE"
@@ -99,7 +99,7 @@ class OLApplicationLoadBalancedFargateConfig(AWSBase):
     deployment_max_percent: PositiveInt = PositiveInt(100)
     # Minimum amount, as percentage, of running and healthy tasks required during a
     # deployment
-    deployment_min_percent: PositiveInt = PositiveInt(50)  # noqa: WPS432
+    deployment_min_percent: PositiveInt = PositiveInt(50)
     # If true, load balancer will be internal; not public
     internal: bool = False
     # Whether or not listener will accept requests from all IP addresses
@@ -146,7 +146,7 @@ class OLApplicationLoadBalancedFargateConfig(AWSBase):
 
 
 class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
-    def __init__(  # noqa: WPS231
+    def __init__(
         self,
         config: OLApplicationLoadBalancedFargateConfig,
         opts: Optional[pulumi.ResourceOptions] = None,
@@ -209,7 +209,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
         )
 
         pulumi.log.debug(
-            f"Security group for load balancer created for port {config.listener_port}"
+            f"Security group for load balancer created for port {config.listener_port}"  # noqa: G004, E501
         )
 
         if config.load_balancer:
@@ -225,7 +225,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
                 ip_address_type=config.ip_address_type,
                 name=config.load_balancer_name,
                 subnets=subnets.ids,
-                load_balancer_type=config._load_balancer_type,  # noqa: WPS437
+                load_balancer_type=config._load_balancer_type,
                 security_groups=[lb_security_group],
                 opts=resource_options,
                 tags=config.tags,
@@ -339,7 +339,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
                 )
 
         pulumi.log.debug(
-            f"{listener_protocol} being utilized for load balancer listener"
+            f"{listener_protocol} being utilized for load balancer listener"  # noqa: G004, E501
         )
 
         return listener_protocol, ssl_policy, redirect
@@ -404,7 +404,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
             # created that is mounted to the LB
             if container.attach_to_load_balancer:
                 pulumi.log.debug(
-                    f"Container {container.container_name} will be attached to load "
+                    f"Container {container.container_name} will be attached to load "  # noqa: G004, E501
                     "balancer"
                 )
                 load_balancer_configuration.append(
@@ -428,7 +428,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
         cert = get_certificate(config.zone_name, most_recent=True, statuses=["ISSUED"])
 
         pulumi.log.debug(
-            f"Route 53 zone {config.zone_name} and ACM certificate {config.zone_name} "
+            f"Route 53 zone {config.zone_name} and ACM certificate {config.zone_name} "  # noqa: G004, E501
             "retrieved"
         )
 

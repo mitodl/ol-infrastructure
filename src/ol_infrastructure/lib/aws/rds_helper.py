@@ -8,7 +8,7 @@ rds_client = boto3.client("rds")
 
 
 @unique
-class DBInstanceTypes(str, Enum):  # noqa: WPS600
+class DBInstanceTypes(str, Enum):
     small = "db.t4g.small"
     medium = "db.t4g.medium"
     large = "db.t4g.large"
@@ -20,7 +20,8 @@ class DBInstanceTypes(str, Enum):  # noqa: WPS600
 
 @lru_cache
 def db_engines() -> dict[str, list[str]]:
-    """Generate a list of database engines and their currently available versions on RDS.  # noqa: E501
+    """Generate a list of database engines and their currently available versions
+        on RDS.
 
     :returns: Dictionary of engine names and the list of available versions
     :rtype: Dict[str, List[str]]
@@ -43,7 +44,8 @@ def parameter_group_family(engine: str, engine_version: str) -> str:
     :param engine_version: Version of the RDS database engine being used (e.g. 12.2)
     :type engine_version: str
 
-    :returns: The name of the parameter group family for the specified engine and version  # noqa: E501
+    :returns: The name of the parameter group family for the specified
+        engine and version.
 
     :rtype: str
     """

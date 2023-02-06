@@ -15,7 +15,7 @@ from bridge.settings.openedx.types import (
 )
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from concourse.lib.models.fragment import PipelineFragment
-from concourse.lib.models.pipeline import (  # noqa: WPS235
+from concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
     GetStep,
@@ -77,7 +77,7 @@ def mfe_params(
         "LOGO_WHITE_URL": open_edx.logo_url,
         "MARKETING_SITE_BASE_URL": f"https://{open_edx.marketing_site_domain}",
         "ORDER_HISTORY_URL": None,  # Intentionally left blank to turn off a menu entry
-        "PUBLIC_PATH": f"/{mfe.application.path}/",  # noqa: WPS237
+        "PUBLIC_PATH": f"/{mfe.application.path}/",
         "REFRESH_ACCESS_TOKEN_ENDPOINT": f"https://{open_edx.lms_domain}/login_refresh",
         "SEARCH_CATALOG_URL": f"https://{open_edx.lms_domain}/courses",
         "SESSION_COOKIE_DOMAIN": open_edx.lms_domain,
@@ -106,11 +106,11 @@ def mfe_job(
         get=mfe_repo.name,
         trigger=previous_job is None and open_edx.environment_stage != "production",
     )
-    branding_overrides = textwrap.dedent(  # noqa: WPS462
+    branding_overrides = textwrap.dedent(
         """\
-        npm install @edx/frontend-component-footer@npm:@mitodl/frontend-component-footer-mitol@latest --legacy-peer-deps  # noqa: E501
-        npm install @edx/frontend-component-header@npm:@mitodl/frontend-component-header-mitol@latest --legacy-peer-deps"""
-    )  # noqa: WPS355
+        npm install @edx/frontend-component-footer@npm:@mitodl/frontend-component-footer-mitol@latest --legacy-peer-deps
+        npm install @edx/frontend-component-header@npm:@mitodl/frontend-component-header-mitol@latest --legacy-peer-deps"""  # noqa: E501
+    )
     if previous_job and mfe_repo.name == previous_job.plan[0].get:
         clone_git_repo.passed = [previous_job.name]
     mfe_job_definition = Job(
@@ -152,7 +152,7 @@ def mfe_job(
                                 {branding_overrides}
                                 NODE_ENV=production npm run build
                                 """
-                            ),  # noqa: WPS355
+                            ),
                         ],
                     ),
                 ),
@@ -164,7 +164,7 @@ def mfe_job(
                     "destination": [
                         {
                             "command": "sync",
-                            "dir": f"s3-remote:{open_edx.environment}-edxapp-mfe/{mfe.application.path}/",  # noqa: E501, WPS237
+                            "dir": f"s3-remote:{open_edx.environment}-edxapp-mfe/{mfe.application.path}/",  # noqa: E501
                         }
                     ],
                 },
@@ -197,31 +197,25 @@ def mfe_pipeline(
         *chain.from_iterable(fragments.values()),
     )
     return Pipeline(
-        resource_types=[rclone()] + combined_fragments.resource_types,
+        resource_types=[rclone(), *combined_fragments.resource_types],
         resources=[
             Resource(
                 name=Identifier("mfe-app-bucket"),
                 type="rclone",
                 source={
-                    "config": textwrap.dedent(  # noqa: WPS462
-                        """\
-                        [s3-remote]
-                        type = s3
-                        provider = AWS
-                        env_auth = true
-                        region = us-east-1
-                        """
-                    )  # noqa: WPS355
+                    "config": textwrap.dedent(
+                        "                        [s3-remote]\n                        type = s3\n                        provider = AWS\n                        env_auth = true\n                        region = us-east-1\n                        "  # noqa: E501
+                    )
                 },
             ),
-        ]
-        + combined_fragments.resources,
+            *combined_fragments.resources,
+        ],
         jobs=combined_fragments.jobs,
     )
 
 
 if __name__ == "__main__":
-    from concourse.pipelines.open_edx.mfe.values import deployments  # noqa: WPS433
+    from concourse.pipelines.open_edx.mfe.values import deployments
 
     deployment: OpenEdxDeploymentName = sys.argv[1]
     release_name: OpenEdxSupportedRelease = sys.argv[2]

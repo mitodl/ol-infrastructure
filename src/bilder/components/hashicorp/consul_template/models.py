@@ -38,7 +38,7 @@ class ConsulTemplateVaultConfig(FlexibleBaseModel):
     # to renew you will need to specify renew_token = true as below.
     # - Consul Template will periodically stat the file and update the token if it has
     # changed.
-    # vault_agent_token_file = "/tmp/vault/agent/token"  # noqa: E800
+    # vault_agent_token_file = "/tmp/vault/agent/token"
 
     # This tells Consul Template that the provided token is actually a wrapped
     # token that should be unwrapped using Vault's cubbyhole response wrapping
@@ -112,56 +112,56 @@ class ConsulTemplateConsulConfig(FlexibleBaseModel):
     retry: Optional[dict]
     # This enabled retries. Retries are enabled by default, so this is
     # redundant.
-    # enabled = true  # noqa: E800
+    # enabled = true
 
     # This specifies the number of attempts to make before giving up. Each
     # attempt adds the exponential backoff sleep time. Setting this to
     # zero will implement an unlimited number of retries.
-    # attempts = 12  # noqa: E800
+    # attempts = 12
 
     # This is the base amount of time to sleep between retry attempts. Each
     # retry sleeps for an exponent of 2 longer than this base. For 5 retries,
     # the sleep times would be: 250ms, 500ms, 1s, 2s, then 4s.
-    # backoff = "250ms"  # noqa: E800
+    # backoff = "250ms"
 
     # This is the maximum amount of time to sleep between retry attempts.
     # When max_backoff is set to zero, there is no upper limit to the
     # exponential sleep between retry attempts.
     # If max_backoff is set to 10s and backoff is set to 1s, sleep times
     # would be: 1s, 2s, 4s, 8s, 10s, 10s, ...
-    # max_backoff = "1m"  # noqa: E800
+    # max_backoff = "1m"
 
     # This block configures the SSL options for connecting to the Consul server.
     ssl: Optional[dict]
     # This enables SSL. Specifying any option for SSL will also enable it.
-    # enabled = true  # noqa: E800
+    # enabled = true
 
     # This enables SSL peer verification. The default value is "true", which
     # will check the global CA chain to make sure the given certificates are
     # valid. If you are using a self-signed certificate that you have not added
     # to the CA chain, you may want to disable SSL verification. However, please
     # understand this is a potential security vulnerability.
-    # verify = false  # noqa: E800
+    # verify = false
 
     # This is the path to the certificate to use to authenticate. If just a
     # certificate is provided, it is assumed to contain both the certificate and
     # the key to convert to an X509 certificate. If both the certificate and
     # key are specified, Consul Template will automatically combine them into an
     # X509 certificate for you.
-    # cert = "/path/to/client/cert"  # noqa: E800
-    # key  = "/path/to/client/key"  # noqa: E800
+    # cert = "/path/to/client/cert"
+    # key  = "/path/to/client/key"
 
     # This is the path to the certificate authority to use as a CA. This is
     # useful for self-signed certificates or for organizations using their own
     # internal certificate authority.
-    # ca_cert = "/path/to/ca"  # noqa: E800
+    # ca_cert = "/path/to/ca"
 
     # This is the path to a directory of PEM-encoded CA cert files. If both
     # `ca_cert` and `ca_path` is specified, `ca_cert` is preferred.
-    # ca_path = "path/to/certs/"  # noqa: E800
+    # ca_path = "path/to/certs/"
 
     # This sets the SNI server name to use for validation.
-    # server_name = "my-server.com"  # noqa: E800
+    # server_name = "my-server.com"
 
 
 class ConsulTemplateTemplate(FlexibleBaseModel):
@@ -180,7 +180,7 @@ class ConsulTemplateTemplate(FlexibleBaseModel):
     # file rather then supplying the `source` path to the template file. This is
     # useful for short templates. This option is mutually exclusive with the
     # `source` option.
-    contents: Optional[str]  # noqa: WPS110
+    contents: Optional[str]
     # This is the optional command to run when the template is rendered. The
     # command will only run if the resulting template changes. The command must
     # return within 30s (configurable), and it must have a successful exit code.
@@ -253,7 +253,7 @@ class ConsulTemplate(HashicorpProduct):
         return self
 
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
-        for fpath, config in self.configuration.items():  # noqa: WPS526
+        for fpath, config in self.configuration.items():
             yield self.configuration_directory.joinpath(fpath), config.json(
                 exclude_none=True, indent=2
             )

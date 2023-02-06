@@ -3,7 +3,7 @@ from pydantic import ValidationError
 
 from ol_infrastructure.components.aws.database import OLDBConfig
 
-VALID_CONFIG = dict(  # noqa: C408
+VALID_CONFIG = dict(
     db_name="testdb",
     engine="postgres",
     engine_version="12.2",

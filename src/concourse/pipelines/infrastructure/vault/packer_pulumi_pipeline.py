@@ -21,10 +21,7 @@ vault_image_code = git_repo(
 vault_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
     uri="https://github.com/mitodl/ol-infrastructure",
-    paths=PULUMI_WATCHED_PATHS
-    + [
-        "src/ol_infrastructure/infrastructure/vault/",
-    ],
+    paths=[*PULUMI_WATCHED_PATHS, "src/ol_infrastructure/infrastructure/vault/"],
 )
 
 get_vault_release = GetStep(get=vault_release.name, trigger=True)
@@ -66,17 +63,21 @@ combined_fragment = PipelineFragment(
 
 vault_pipeline = Pipeline(
     resource_types=combined_fragment.resource_types,
-    resources=combined_fragment.resources
-    + [vault_image_code, vault_release, vault_pulumi_code],
+    resources=[
+        *combined_fragment.resources,
+        vault_image_code,
+        vault_release,
+        vault_pulumi_code,
+    ],
     jobs=combined_fragment.jobs,
 )
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    import sys
 
     with open("definition.json", "w") as definition:
         definition.write(vault_pipeline.json(indent=2))
     sys.stdout.write(vault_pipeline.json(indent=2))
-    print()  # noqa: WPS421
-    print("fly -t pr-inf sp -p packer-pulumi-vault -c definition.json")  # noqa: WPS421
+    print()
+    print("fly -t pr-inf sp -p packer-pulumi-vault -c definition.json")

@@ -57,7 +57,7 @@ from bridge.secrets.sops import set_env_secrets
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
 
-VERSIONS = {  # noqa: WPS407
+VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "consul-template": os.environ.get(
         "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION
@@ -118,7 +118,7 @@ for edx_pipeline in edx_pipeline_files:
 # Place NGINX configuration items
 nginx_conf_directory = Path("/etc/nginx")
 nginx_conf_template_file = consul_templates_directory.joinpath(
-    f"nginx.conf.tmpl"  # noqa: F541, WPS237
+    f"nginx.conf.tmpl"  # noqa: F541
 )
 nginx_conf_file = nginx_conf_directory.joinpath("nginx.conf")
 
@@ -203,15 +203,13 @@ watched_docker_compose_files.append(
 
 files.put(
     name="Place the dagster .env file.",
-    src=str(FILES_DIRECTORY.joinpath(f".env.tmpl")),  # noqa: F541, WPS237
-    dest=str(consul_templates_directory.joinpath(f".env.tmpl")),  # noqa: F541, WPS237
+    src=str(FILES_DIRECTORY.joinpath(f".env.tmpl")),  # noqa: F541
+    dest=str(consul_templates_directory.joinpath(f".env.tmpl")),  # noqa: F541
     mode="0664",
 )
 consul_templates.append(
     ConsulTemplateTemplate(
-        source=str(
-            consul_templates_directory.joinpath(f".env.tmpl")  # noqa: F541, WPS237
-        ),
+        source=str(consul_templates_directory.joinpath(f".env.tmpl")),  # noqa: F541
         destination=str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env")),
     )
 )
@@ -257,7 +255,7 @@ vault_config = VaultAgentConfig(
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),
-    # template=vault_templates,  # noqa: E800
+    # template=vault_templates,
 )
 vault = Vault(
     version=VERSIONS["vault"],
