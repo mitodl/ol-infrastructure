@@ -17,7 +17,11 @@ airbyte_image_code = git_repo(
 airbyte_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
     uri="https://github.com/mitodl/ol-infrastructure",
-    paths=[*PULUMI_WATCHED_PATHS, "src/ol_infrastructure/applications/airbyte/"],
+    paths=PULUMI_WATCHED_PATHS
+    + [
+        "src/ol_infrastructure/applications/airbyte/",
+        "src/bridge/secrets/airbyte/",
+    ],
 )
 
 get_airbyte_release = GetStep(get=airbyte_release.name, trigger=True)
