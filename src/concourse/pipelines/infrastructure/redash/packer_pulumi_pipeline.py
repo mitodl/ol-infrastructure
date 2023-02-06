@@ -21,7 +21,11 @@ redash_image_code = git_repo(
 redash_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
     uri="https://github.com/mitodl/ol-infrastructure",
-    paths=[*PULUMI_WATCHED_PATHS, "src/ol_infrastructure/applications/redash/", "src/bridge/secrets/redash/"],
+    paths=[
+        *PULUMI_WATCHED_PATHS,
+        "src/ol_infrastructure/applications/redash/",
+        "src/bridge/secrets/redash/",
+    ],
 )
 
 container_dependencies = [GetStep(get=redash_container_resource.name, trigger=True)]
