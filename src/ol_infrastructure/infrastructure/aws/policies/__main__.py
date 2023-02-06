@@ -42,7 +42,7 @@ odl_zone_route53_policy = iam.Policy(
 
 app_route53_zones = ["mitx", "mitxonline", "xpro", "ocw"]
 app_route53_policies = {}
-for zone in app_route53_zones:  # noqa: WPS426
+for zone in app_route53_zones:
     zone_id = dns_stack.require_output(zone)["id"]
     policy = iam.Policy(
         f"{zone}-zone-route53-records-policy",

@@ -70,7 +70,7 @@ def build_worker_user_data(
                     f"""\
                      CONCOURSE_TEAM={concourse_team}
                      """
-                ),  # noqa: WPS355
+                ),
                 "owner": "root:root",
             }
         )
@@ -78,7 +78,7 @@ def build_worker_user_data(
         yaml_contents["write_files"].append(
             {
                 "path": "/etc/default/concourse-tags",
-                "content": f"CONCOURSE_TAG={','.join(concourse_tags)}",  # noqa: WPS237
+                "content": f"CONCOURSE_TAG={','.join(concourse_tags)}",
                 "owner": "root:root",
             }
         )
@@ -241,7 +241,7 @@ vault.generic.Secret(
         ]
     ).apply(json.dumps),
 )
-for pipeline_var_path, secret_data in read_yaml_secrets(  # noqa: WPS352
+for pipeline_var_path, secret_data in read_yaml_secrets(
     Path(f"concourse/operations.{stack_info.env_suffix}.yaml")
 )["pipelines"].items():
     secret_path = partial("{1}/{0}".format, pipeline_var_path)
@@ -482,8 +482,7 @@ web_launch_config = ec2.LaunchTemplate(
         ec2.LaunchTemplateBlockDeviceMappingArgs(
             device_name="/dev/xvda",
             ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=concourse_config.get_int("web_disk_size")
-                or 25,  # noqa: WPS432
+                volume_size=concourse_config.get_int("web_disk_size") or 25,
                 volume_type=DiskTypes.ssd,
                 delete_on_termination=True,
             ),
@@ -543,7 +542,7 @@ web_launch_config = ec2.LaunchTemplate(
                                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                                     """
-                                ),  # noqa: WPS355
+                                ),
                                 "owner": "root:root",
                             },
                         ]
@@ -569,7 +568,7 @@ web_asg = autoscaling.Group(
     instance_refresh=autoscaling.GroupInstanceRefreshArgs(
         strategy="Rolling",
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50  # noqa: WPS432
+            min_healthy_percentage=50
         ),
         triggers=["tags"],
     ),
@@ -592,7 +591,7 @@ web_asg = autoscaling.Group(
 ############################################
 concourse_worker_instance_profiles = []
 
-for worker_def in concourse_config.get_object("workers") or []:  # noqa: WPS440
+for worker_def in concourse_config.get_object("workers") or []:
     worker_class_name = worker_def["name"]
 
     # Create IAM role + attach policies to it
@@ -612,7 +611,7 @@ for worker_def in concourse_config.get_object("workers") or []:  # noqa: WPS440
         tags=aws_config.tags,  # We will leave all the IAM resources with default tags.
     )
 
-    for iam_policy_name in worker_def["iam_policies"] or []:  # noqa: WPS440
+    for iam_policy_name in worker_def["iam_policies"] or []:
         iam_policy_object = iam_policy_objects[iam_policy_name]
         iam.RolePolicyAttachment(
             f"concourse-instance-policy-worker-{worker_class_name}-policy-{iam_policy_name}-{stack_info.env_suffix}",  # noqa: E501
@@ -650,7 +649,7 @@ for worker_def in concourse_config.get_object("workers") or []:  # noqa: WPS440
             ec2.LaunchTemplateBlockDeviceMappingArgs(
                 device_name="/dev/xvda",
                 ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                    volume_size=worker_def["disk_size_gb"] or 25,  # noqa: WPS432
+                    volume_size=worker_def["disk_size_gb"] or 25,
                     volume_type=DiskTypes.ssd,
                     delete_on_termination=True,
                 ),
@@ -664,7 +663,7 @@ for worker_def in concourse_config.get_object("workers") or []:  # noqa: WPS440
         key_name="oldevops",
         metadata_options=ec2.LaunchTemplateMetadataOptionsArgs(
             http_endpoint="enabled",
-            http_tokens="optional",
+            http_tokens="optional",  # noqa: S106
             http_put_response_hop_limit=5,
             instance_metadata_tags="enabled",
         ),
@@ -701,7 +700,7 @@ for worker_def in concourse_config.get_object("workers") or []:  # noqa: WPS440
         internal=True,
         ip_address_type="dualstack",
         load_balancer_type="application",
-        name=f"concourse-worker-alb-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}",  # noqa: E501, WPS221, WPS237
+        name=f"concourse-worker-alb-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}",  # noqa: E501
         security_groups=[concourse_worker_security_group.id],
         subnets=target_vpc["subnet_ids"],
         tags=aws_config.merged_tags({}),
@@ -719,10 +718,10 @@ for worker_def in concourse_config.get_object("workers") or []:  # noqa: WPS440
             path="/",
             port=CONCOURSE_WORKER_HEALTHCHECK_PORT,
             protocol="HTTP",
-            timeout=20,  # noqa: WPS432
+            timeout=20,
             unhealthy_threshold=5,
         ),
-        name=f"concourse-worker-tg-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}"[  # noqa: WPS221, WPS237
+        name=f"concourse-worker-tg-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}"[
             :TARGET_GROUP_NAME_MAX_LENGTH
         ],
         tags=aws_config.merged_tags(worker_def["aws_tags"]),
@@ -746,7 +745,7 @@ for worker_def in concourse_config.get_object("workers") or []:  # noqa: WPS440
         f"concourse-worker-{worker_class_name}-autoscaling-group",
         desired_capacity=auto_scale_config["desired"] or 1,
         min_size=auto_scale_config["min"] or 1,
-        max_size=auto_scale_config["max"] or 50,  # noqa: WPS432
+        max_size=auto_scale_config["max"] or 50,
         health_check_type="ELB",
         vpc_zone_identifiers=target_vpc["subnet_ids"],
         launch_template=autoscaling.GroupLaunchTemplateArgs(
@@ -755,7 +754,7 @@ for worker_def in concourse_config.get_object("workers") or []:  # noqa: WPS440
         instance_refresh=autoscaling.GroupInstanceRefreshArgs(
             strategy="Rolling",
             preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-                min_healthy_percentage=50,  # noqa: WPS432
+                min_healthy_percentage=50,
             ),
             triggers=["tags"],
         ),

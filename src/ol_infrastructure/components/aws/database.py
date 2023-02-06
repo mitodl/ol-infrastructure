@@ -1,4 +1,4 @@
-"""This module defines a Pulumi component resource for encapsulating our best practices for building RDS instances.  # noqa: E501
+"""This module defines a Pulumi component resource for encapsulating our best practices for building RDS instances.
 
 This includes:
 
@@ -7,7 +7,7 @@ This includes:
 - Manage the root user password
 - Create relevant security groups
 - Create DB instance
-"""
+"""  # noqa: E501
 from enum import Enum
 from typing import Optional, Union
 
@@ -26,7 +26,7 @@ from ol_infrastructure.lib.ol_types import AWSBase
 MAX_BACKUP_DAYS = 35
 
 
-class StorageType(str, Enum):  # noqa: WPS600
+class StorageType(str, Enum):
     """Container for constraining available selection of storage types."""
 
     magnetic = "standard"
@@ -53,7 +53,7 @@ class OLDBConfig(AWSBase):
     engine_version: str
     instance_name: str  # The name of the RDS instance
     password: SecretStr
-    parameter_overrides: list[dict[str, Union[str, bool, int, float]]]  # noqa: WPS234
+    parameter_overrides: list[dict[str, Union[str, bool, int, float]]]
     port: PositiveInt
     subnet_group_name: Union[str, pulumi.Output[str]]
     security_groups: list[SecurityGroup]
@@ -65,7 +65,7 @@ class OLDBConfig(AWSBase):
     prevent_delete: bool = True
     public_access: bool = False
     take_final_snapshot: bool = True
-    storage: PositiveInt = PositiveInt(50)  # noqa: WPS432
+    storage: PositiveInt = PositiveInt(50)
     storage_type: StorageType = StorageType.ssd
     username: str = "oldevops"
     read_replica: Optional[OLReplicaDBConfig] = None
@@ -82,7 +82,7 @@ class OLDBConfig(AWSBase):
 
     @validator("engine_version")
     def is_valid_version(
-        cls: "OLDBConfig", engine_version: str, values: dict  # noqa: N805, WPS110
+        cls: "OLDBConfig", engine_version: str, values: dict  # noqa: N805
     ) -> str:
         engine: str = values.get("engine")  # type: ignore
         engines_map = db_engines()
@@ -98,10 +98,8 @@ class OLPostgresDBConfig(OLDBConfig):
 
     engine: str = "postgres"
     engine_version: str = "13.4"
-    port: PositiveInt = PositiveInt(5432)  # noqa: WPS432
-    parameter_overrides: list[  # noqa: WPS234
-        dict[str, Union[str, bool, int, float]]
-    ] = [
+    port: PositiveInt = PositiveInt(5432)
+    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [
         {"name": "client_encoding", "value": "UTF-8"},
         {"name": "timezone", "value": "UTC"},
         {"name": "rds.force_ssl", "value": 1},
@@ -114,10 +112,8 @@ class OLMariaDBConfig(OLDBConfig):
 
     engine: str = "mariadb"
     engine_version: str = "10.5.13"
-    port: PositiveInt = PositiveInt(3306)  # noqa: WPS432
-    parameter_overrides: list[  # noqa: WPS234
-        dict[str, Union[str, bool, int, float]]
-    ] = [
+    port: PositiveInt = PositiveInt(3306)
+    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [
         {"name": "character_set_client", "value": "utf8mb4"},
         {"name": "character_set_connection", "value": "utf8mb4"},
         {"name": "character_set_database", "value": "utf8mb4"},

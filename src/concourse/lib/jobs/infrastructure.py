@@ -6,7 +6,7 @@ from typing import Optional
 
 from concourse.lib.constants import REGISTRY_IMAGE
 from concourse.lib.models.fragment import PipelineFragment
-from concourse.lib.models.pipeline import (  # noqa: WPS235
+from concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
     GetStep,
@@ -30,7 +30,7 @@ from concourse.lib.resource_types import (
 from concourse.lib.resources import pulumi_provisioner
 
 
-def packer_jobs(  # noqa: WPS211
+def packer_jobs(  # noqa: PLR0913
     dependencies: list[GetStep],
     image_code: Resource,
     packer_template_path: str = "src/bilder/images/.",
@@ -73,12 +73,9 @@ def packer_jobs(  # noqa: WPS211
     )
     validate_job = Job(
         name=Identifier(f"validate-packer-template-{job_name_suffix}".strip("-")),
-        plan=dependencies
-        + [
-            GetStep(
-                get=image_code.name,
-                trigger=True,
-            ),
+        plan=[
+            *dependencies,
+            GetStep(get=image_code.name, trigger=True),
             InParallelStep(
                 in_parallel=[
                     PutStep(
@@ -86,11 +83,14 @@ def packer_jobs(  # noqa: WPS211
                         params={
                             "template": f"{image_code.name}/{packer_template_path}",
                             "objective": "validate",
-                            "vars": {**(packer_vars or {}), **{"node_type": node_type}},
+                            "vars": {
+                                **(packer_vars or {}),
+                                **{"node_type": node_type},  # noqa: PIE800
+                            },
                             **(extra_packer_params or {}),
                         },
                     )
-                    for node_type in (node_types or ["server"])
+                    for node_type in node_types or ["server"]
                 ]
             ),
         ],
@@ -102,13 +102,9 @@ def packer_jobs(  # noqa: WPS211
         dep.passed = [validate_job.name]
     build_job = Job(
         name=Identifier(f"build-packer-template-{job_name_suffix}".strip("-")),
-        plan=build_deps
-        + [
-            GetStep(
-                get=image_code.name,
-                trigger=True,
-                passed=[validate_job.name],
-            ),
+        plan=[
+            *build_deps,
+            GetStep(get=image_code.name, trigger=True, passed=[validate_job.name]),
             InParallelStep(
                 in_parallel=[
                     PutStep(
@@ -116,7 +112,10 @@ def packer_jobs(  # noqa: WPS211
                         params={
                             "template": f"{image_code.name}/{packer_template_path}",
                             "objective": "build",
-                            "vars": {**(packer_vars or {}), **{"node_type": node_type}},
+                            "vars": {
+                                **(packer_vars or {}),
+                                **{"node_type": node_type},  # noqa: PIE800
+                            },
                             "env_vars": {
                                 "AWS_REGION": "us-east-1",
                                 "PYTHONPATH": f"${{PYTHONPATH}}:{image_code.name}/src",
@@ -125,7 +124,7 @@ def packer_jobs(  # noqa: WPS211
                             **(extra_packer_params or {}),
                         },
                     )
-                    for node_type in (node_types or ["server"])
+                    for node_type in node_types or ["server"]
                 ]
             ),
         ],
@@ -137,7 +136,7 @@ def packer_jobs(  # noqa: WPS211
     )
 
 
-def pulumi_jobs_chain(  # noqa: WPS211, WPS231, WPS234
+def pulumi_jobs_chain(  # noqa: PLR0913
     pulumi_code: Resource,
     stack_names: list[str],
     project_name: str,
@@ -203,7 +202,7 @@ def pulumi_jobs_chain(  # noqa: WPS211, WPS231, WPS234
     return chain_fragment
 
 
-def pulumi_job(  # noqa: WPS211
+def pulumi_job(  # noqa: PLR0913
     pulumi_code: Resource,
     stack_name: str,
     project_name: str,
@@ -233,10 +232,7 @@ def pulumi_job(  # noqa: WPS211
         project_name=project_name,
         project_path=f"{pulumi_code.name}/{project_source_path}",
     )
-    if previous_job:
-        passed_job = [previous_job.name]
-    else:
-        passed_job = None
+    passed_job = [previous_job.name] if previous_job else None
     aws_creds_path = Output(name=Identifier("aws_creds"))
     pulumi_job_object = Job(
         name=Identifier(f"deploy-{project_name}-{stack_name.lower()}"),

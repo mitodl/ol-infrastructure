@@ -58,7 +58,7 @@ class OLAmazonCacheConfig(AWSBase):
     def is_valid_version(
         cls: "OLAmazonCacheConfig",  # noqa: N805
         engine_version: str,
-        values: dict,  # noqa: WPS110
+        values: dict,
     ) -> str:
         engine: str = str(values.get("engine"))
         engines_map = cache_engines()
@@ -86,7 +86,7 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
     def is_auth_token_valid(
         cls: "OLAmazonRedisConfig",  # noqa: N805
         auth_token: Optional[str],
-        values: dict,  # noqa: WPS110
+        values: dict,
     ) -> Optional[str]:
         min_token_length = 16
         max_token_length = 128
@@ -176,7 +176,7 @@ class OLAmazonCache(pulumi.ComponentResource):
         self.parameter_group = elasticache.ParameterGroup(
             f"{cache_config.cluster_name}-{cache_config.engine}-{cache_config.engine_version}-parameter-group",  # noqa: E501
             name=(
-                f"{cache_config.cluster_name}-{cache_config.engine_version.replace('.', '')}-parameter-group"  # noqa: E501, WPS237
+                f"{cache_config.cluster_name}-{cache_config.engine_version.replace('.', '')}-parameter-group"  # noqa: E501
             ),
             family=parameter_group_family(
                 cache_config.engine, cache_config.engine_version

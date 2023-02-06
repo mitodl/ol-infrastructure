@@ -1,6 +1,6 @@
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
-from concourse.lib.models.pipeline import (  # noqa: WPS235
+from concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
     GetStep,
@@ -95,9 +95,7 @@ def meta_pipeline() -> Pipeline:
                     trigger=True,
                 ),
                 TaskStep(
-                    task=Identifier(
-                        f"generate-mfe-meta-pipeline-file"  # noqa: F541, WPS237
-                    ),
+                    task=Identifier(f"generate-mfe-meta-pipeline-file"),  # noqa: F541
                     config=TaskConfig(
                         platform=Platform.linux,
                         image_resource=AnonymousResource(
@@ -133,7 +131,7 @@ def meta_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    import sys
 
     with open("definition.json", "w") as definition:
         definition.write(meta_pipeline().json(indent=2))

@@ -28,12 +28,12 @@ def build_notes_pipeline(
         branch=notes_branch,
     )
 
-    notes_registry_image = registry_image(  # noqa: S106
+    notes_registry_image = registry_image(
         name=Identifier("openedx-notes-container"),
         image_repository="mitodl/openedx-notes",
         image_tag=release_name,
         username="((dockerhub.username))",
-        password="((dockerhub.password))",
+        password="((dockerhub.password))",  # noqa: S106
     )
 
     notes_dockerfile_repo = git_repo(
@@ -56,8 +56,8 @@ def build_notes_pipeline(
         name=Identifier("ol-infrastructure-deploy"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
-        paths=PULUMI_WATCHED_PATHS
-        + [
+        paths=[
+            *PULUMI_WATCHED_PATHS,
             PULUMI_CODE_PATH.joinpath("applications/edx_notes/"),
             "src/bridge/settings/openedx/",
             "src/bridge/secrets/edx_notes/",
@@ -75,7 +75,7 @@ def build_notes_pipeline(
                     Input(name=notes_dockerfile_repo.name),
                 ],
                 build_parameters={
-                    "CONTEXT": f"{notes_dockerfile_repo.name}/dockerfiles/openedx-notes/",
+                    "CONTEXT": f"{notes_dockerfile_repo.name}/dockerfiles/openedx-notes/",  # noqa: E501
                     "BUILD_ARG_OPENEDX_COMMON_VERSION": notes_branch,
                 },
                 build_args=[
@@ -144,11 +144,7 @@ def build_notes_pipeline(
 
     return Pipeline(
         resource_types=combined_fragments.resource_types,
-        resources=combined_fragments.resources
-        + [
-            notes_pulumi_code,
-            notes_packer_code,
-        ],
+        resources=[*combined_fragments.resources, notes_pulumi_code, notes_packer_code],
         jobs=combined_fragments.jobs,
     )
 

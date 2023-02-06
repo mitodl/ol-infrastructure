@@ -1,5 +1,5 @@
 from concourse.lib.constants import REGISTRY_IMAGE
-from concourse.lib.models.pipeline import (  # noqa: WPS235
+from concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
     GetStep,
@@ -66,10 +66,10 @@ def custodian_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    import sys
 
     with open("definition.json", "w") as definition:
         definition.write(custodian_pipeline().json(indent=2))
     sys.stdout.write(custodian_pipeline().json(indent=2))
-    print()  # noqa: WPS421
-    print("fly -t pr-inf sp -p misc-cloud-custodian -c definition.json")  # noqa: WPS421
+    print()
+    print("fly -t pr-inf sp -p misc-cloud-custodian -c definition.json")

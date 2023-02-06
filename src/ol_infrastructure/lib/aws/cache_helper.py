@@ -2,7 +2,7 @@ from enum import Enum, unique
 
 
 @unique
-class CacheInstanceTypes(str, Enum):  # noqa: WPS600
+class CacheInstanceTypes(str, Enum):
     small = "cache.t3.small"
     medium = "cache.t2.medium"
     large = "cache.m6g.large"

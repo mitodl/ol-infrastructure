@@ -40,7 +40,7 @@ class PulumiMocks(pulumi.runtime.Mocks):
 
         output = {}
 
-        for key in args.args.keys():
+        for key in args.args:
             print(f"Key - {key}, Value - {args.args[key]}")
 
         if args.token == "aws:ec2/getSubnetIds:getSubnetIds":  # noqa: S105
@@ -271,7 +271,7 @@ class TestClassBaseFargateArguments:
             assert container["memory"] == 512
             assert container["command"] is None
             assert container["cpu"] is None
-            assert container["environment"] == []  # noqa: WPS520
+            assert container["environment"] == []
             assert not container["essential"]
             assert container["logConfiguration"] is None
 
@@ -374,7 +374,7 @@ class TestClassAllFargateArguments:
 
             security_groups = network_configuration["security_groups"]
 
-            for key in security_groups:  # noqa: WPS440
+            for key in security_groups:
                 assert key == "ecs-task-sec-group_id"
 
         return self.service.network_configuration.apply(check_network_configuration)
@@ -411,7 +411,7 @@ class TestClassAllFargateArguments:
         return self.service.force_new_deployment.apply(check_force_deployment)
 
     @pulumi.runtime.test
-    def test_cpu_memory_for_task_containers(self):  # noqa: WPS231
+    def test_cpu_memory_for_task_containers(self):
         def check_cpu_mem(args):
             cpu, memory, container_definitions = args
             containers = json.loads(container_definitions)
@@ -425,10 +425,10 @@ class TestClassAllFargateArguments:
             for container in containers:
                 port_mapping = container["portMappings"][0]
                 image = container["image"]
-                assert image == "nginx" or image == "otel"  # noqa: WPS514
+                assert image == "nginx" or image == "otel"
 
                 name = container["name"]
-                assert name == "nginx" or name == "otel"  # noqa: WPS514
+                assert name == "nginx" or name == "otel"
 
                 assert container["logConfiguration"]["logDriver"] == "awslogs"
 

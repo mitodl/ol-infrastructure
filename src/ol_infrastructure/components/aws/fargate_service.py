@@ -44,14 +44,14 @@ from ol_infrastructure.lib.ol_types import AWSBase
 
 
 @unique
-class DeploymentControllerTypes(str, Enum):  # noqa: WPS600
+class DeploymentControllerTypes(str, Enum):
     ecs = "ECS"
     code_deploy = "CODE_DEPLOY"
     external = "EXTERNAL"
 
 
 @unique
-class LaunchTypes(str, Enum):  # noqa: WPS600
+class LaunchTypes(str, Enum):
     fargate = "FARGATE"
     ec2 = "EC2"
     external = "EXTERNAL"
@@ -74,7 +74,7 @@ class OLFargateServiceConfig(AWSBase):
     deployment_max_percent: PositiveInt = PositiveInt(100)
     # Minimum amount, as percentage, of running and healthy tasks required during a
     # deployment
-    deployment_min_percent: PositiveInt = PositiveInt(50)  # noqa: WPS432
+    deployment_min_percent: PositiveInt = PositiveInt(50)
     # Seconds to ignore failing load balancer health checks on newly created tasks. Only
     # applies when LB exists
     health_check_grace_period_seconds: PositiveInt = PositiveInt(60)
@@ -105,14 +105,16 @@ class OLFargateServiceConfig(AWSBase):
     # Retrieve all subnets from the provided VPC (vpc id). NOTE: No filtering is made
     # upon subnets
     def get_service_network_configuration(self) -> ServiceNetworkConfigurationArgs:
-        pulumi.log.debug(f"retrieving all subnets from VPC '{self.vpc_id}'")
+        pulumi.log.debug(
+            f"retrieving all subnets from VPC '{self.vpc_id}'"  # noqa: G004
+        )
 
         subnets = get_subnet_ids(
             vpc_id=self.vpc_id,
         )
 
         pulumi.log.debug(
-            f"assign public IP addresses is set to {self.assign_public_ip}"
+            f"assign public IP addresses is set to {self.assign_public_ip}"  # noqa: G004, E501
         )
 
         return ServiceNetworkConfigurationArgs(
@@ -121,11 +123,11 @@ class OLFargateServiceConfig(AWSBase):
             security_groups=[group.id for group in self.security_groups],
         )
 
-    def get_deployment_controller(  # noqa: WPS615
+    def get_deployment_controller(
         self,
     ) -> ServiceDeploymentControllerArgs:
         pulumi.log.debug(
-            f"ECS deployment controller type is {self._deployment_controller}"
+            f"ECS deployment controller type is {self._deployment_controller}"  # noqa: G004, E501
         )
 
         return ServiceDeploymentControllerArgs(type=self._deployment_controller)
@@ -154,7 +156,7 @@ class OLFargateService(pulumi.ComponentResource):
 
         if config.cluster:
             pulumi.log.debug(
-                "using existing ECS Cluster '{}' provided in arguments".format(
+                "using existing ECS Cluster '{}' provided in arguments".format(  # noqa: G001, E501
                     config.cluster.id
                 )
             )
@@ -199,14 +201,15 @@ class OLFargateService(pulumi.ComponentResource):
 
         service_role_arn = ""
         if config.service_role:
-            pulumi.log.debug(f"Attaching existing service role {config.service_role}")
+            pulumi.log.debug(
+                f"Attaching existing service role {config.service_role}"  # noqa: G004
+            )
             service_role_arn = config.service_role.arn
 
         health_check_grace_period = None
         if config.load_balancer_configuration:
             pulumi.log.debug(
-                "Setting health check grace period to "
-                f"{config.health_check_grace_period_seconds} seconds"
+                f"Setting health check grace period to {config.health_check_grace_period_seconds} seconds"  # noqa: G004, E501
             )
             health_check_grace_period = config.health_check_grace_period_seconds
 
@@ -221,11 +224,11 @@ class OLFargateService(pulumi.ComponentResource):
             deployment_controller=config.get_deployment_controller(),
             deployment_circuit_breaker=circuit_breaker,
             health_check_grace_period_seconds=health_check_grace_period,
-            launch_type=config._launch_type,  # noqa: WPS437
+            launch_type=config._launch_type,
             network_configuration=config.get_service_network_configuration(),
             load_balancers=config.load_balancer_configuration,
             task_definition=self.task_definition.arn,
-            platform_version=config._fargate_platform_version,  # noqa: WPS437
+            platform_version=config._fargate_platform_version,
             force_new_deployment=config.force_new_deployment,
             enable_ecs_managed_tags=config.enable_ecs_managed_tags,
             tags=config.tags,
@@ -255,7 +258,7 @@ class OLFargateService(pulumi.ComponentResource):
 
         :rtype: str
         """
-        if (  # noqa: WPS337
+        if (
             not config.task_definition_config
             or not config.task_definition_config.container_definition_configs
         ):
@@ -275,7 +278,7 @@ class OLFargateService(pulumi.ComponentResource):
 
             environment = []
             if container.environment:
-                for key in container.environment.keys():
+                for key in container.environment:
                     environment.append(
                         {"name": key, "value": container.environment[key]}
                     )
@@ -300,7 +303,7 @@ class OLFargateService(pulumi.ComponentResource):
                 }
             )
 
-        pulumi.log.debug(f"container definitions: {outputs}")
+        pulumi.log.debug(f"container definitions: {outputs}")  # noqa: G004
 
         return json.dumps(outputs)
 
@@ -327,7 +330,7 @@ class OLFargateService(pulumi.ComponentResource):
         )
 
         role = Role(
-            f"{config.task_definition_config.task_def_name}-role",  # noqa: WPS237
+            f"{config.task_definition_config.task_def_name}-role",
             assume_role_policy=json.dumps(
                 {
                     "Version": "2012-10-17",
@@ -346,7 +349,7 @@ class OLFargateService(pulumi.ComponentResource):
         )
 
         RolePolicyAttachment(
-            f"{config.task_definition_config.task_def_name}-policy-attachment",  # noqa: WPS237
+            f"{config.task_definition_config.task_def_name}-policy-attachment",
             role=role.name,
             policy_arn=ManagedPolicy.AMAZON_ECS_TASK_EXECUTION_ROLE_POLICY,
             opts=self.resource_options,

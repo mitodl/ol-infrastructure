@@ -21,11 +21,7 @@ redash_image_code = git_repo(
 redash_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
     uri="https://github.com/mitodl/ol-infrastructure",
-    paths=PULUMI_WATCHED_PATHS
-    + [
-        "src/ol_infrastructure/applications/redash/",
-        "src/bridge/secrets/redash/",
-    ],
+    paths=[*PULUMI_WATCHED_PATHS, "src/ol_infrastructure/applications/redash/", "src/bridge/secrets/redash/"],
 )
 
 container_dependencies = [GetStep(get=redash_container_resource.name, trigger=True)]
@@ -63,16 +59,16 @@ combined_fragment = PipelineFragment(
 
 redash_pipeline = Pipeline(
     resource_types=combined_fragment.resource_types,
-    resources=combined_fragment.resources + [redash_image_code, redash_pulumi_code],
+    resources=[*combined_fragment.resources, redash_image_code, redash_pulumi_code],
     jobs=combined_fragment.jobs,
 )
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    import sys
 
     with open("definition.json", "w") as definition:
         definition.write(redash_pipeline.json(indent=2))
     sys.stdout.write(redash_pipeline.json(indent=2))
-    print()  # noqa: WPS421
-    print("fly -t pr-inf sp -p packer-pulumi-redash -c definition.json")  # noqa: WPS421
+    print()
+    print("fly -t pr-inf sp -p packer-pulumi-redash -c definition.json")

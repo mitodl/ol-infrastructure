@@ -51,7 +51,7 @@ policy_definition = {
             "Action": [
                 "autoscaling:StartInstanceRefresh",
             ],
-            "Resource": "arn:aws:autoscaling:*:*:autoScalingGroup:*:autoScalingGroupName/concourse-*",
+            "Resource": "arn:aws:autoscaling:*:*:autoScalingGroup:*:autoScalingGroupName/concourse-*",  # noqa: E501
         },
         {
             "Effect": "Allow",

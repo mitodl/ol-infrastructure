@@ -9,7 +9,7 @@ from bridge.secrets.sops import read_yaml_secrets
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-s", "--stack", help="pulumi stack name", required=True)
-args = vars(parser.parse_args())  # noqa: WPS421
+args = vars(parser.parse_args())
 
 env_prefix = args["stack"].split(".")[-2]
 env_suffix = args["stack"].split(".")[-1]
@@ -19,7 +19,7 @@ master_password = read_yaml_secrets(
     Path(f"opensearch/opensearch.{env_prefix}.{env_suffix}.yaml")
 )["master_user_password"]
 
-stream = os.popen(f"pulumi stack output -s {args['stack']} 'cluster'")  # noqa: S605
+stream = os.popen(f"pulumi stack output -s {args['stack']} 'cluster'")
 cluster_output = stream.read()
 cluster = json.loads(cluster_output)
 
@@ -96,30 +96,30 @@ role_mappings = {
 
 for r_name, r_def in roles.items():
     url = f"https://{cluster['endpoint']}/_plugins/_security/api/roles/{r_name}"
-    response = requests.put(
+    response = requests.put(  # noqa: S113
         url,
         headers=headers,
         auth=auth,
         data=json.dumps(r_def),
     )
-    print(response.text)  # noqa: WPS421
+    print(response.text)
 
 for u_name, u_def in users.items():
     url = f"https://{cluster['endpoint']}/_plugins/_security/api/internalusers/{u_name}"
-    response = requests.put(
+    response = requests.put(  # noqa: S113
         url,
         headers=headers,
         auth=auth,
         data=json.dumps(u_def),
     )
-    print(response.text)  # noqa: WPS421
+    print(response.text)
 
-for r_name, rm in role_mappings.items():  # noqa: WPS440
+for r_name, rm in role_mappings.items():
     url = f"https://{cluster['endpoint']}/_plugins/_security/api/rolesmapping/{r_name}"
-    response = requests.put(
+    response = requests.put(  # noqa: S113
         url,
         headers=headers,
         auth=auth,
         data=json.dumps(rm),
     )
-    print(response.text)  # noqa: WPS421
+    print(response.text)

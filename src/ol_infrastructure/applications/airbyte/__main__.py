@@ -42,7 +42,7 @@ from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 ##################################
-##    Setup + Config Retrival   ##  # noqa: E266
+##    Setup + Config Retrival   ##
 ##################################
 
 if Config("vault_server").get("env_namespace"):
@@ -85,7 +85,7 @@ airbyte_server_tag = f"airbyte-server-{env_name}"
 consul_provider = get_consul_provider(stack_info)
 
 ###############################
-##     General Resources     ##  # noqa: E266
+##     General Resources     ##
 ###############################
 
 # IAM and instance profile
@@ -413,7 +413,7 @@ airbyte_db_consul_service = Service(
 
 connection_string = Output.all(address=db_address, port=db_port, name=db_name).apply(
     lambda db: "jdbc:postgresql://{address}:{port}/{name}?ssl=true&sslmode=require".format(  # noqa: E501
-        **db  # noqa: C815
+        **db
     )
 )
 
@@ -424,12 +424,12 @@ consul.Keys(
         consul.KeysKeyArgs(path="airbyte/database-port", value=db_port),
         consul.KeysKeyArgs(path="airbyte/database-name", value=db_name),
         consul.KeysKeyArgs(
-            path=f"airbyte/database-connection-string",  # noqa: F541, WPS237
+            path=f"airbyte/database-connection-string",  # noqa: F541
             value=connection_string,
         ),
         consul.KeysKeyArgs(
             path="airbyte/vault-address",
-            value=f"{Config('vault').get('address')}/",  # noqa: WPS237
+            value=f"{Config('vault').get('address')}/",
         ),
     ],
     opts=consul_provider,
@@ -511,7 +511,7 @@ lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             """
-                                ),  # noqa: WPS355
+                                ),
                                 "owner": "root:root",
                             },
                         ]
@@ -545,7 +545,7 @@ as_setup = OLAutoScaling(
     lb_config=lb_config,
 )
 
-## Create Route53 DNS records for airbyte  # noqa: E266
+## Create Route53 DNS records for airbyte
 five_minutes = 60 * 5
 route53.Record(
     "airbyte-server-dns-record",

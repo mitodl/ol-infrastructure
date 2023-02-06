@@ -65,8 +65,8 @@ target_vpc_id = target_vpc["id"]
 
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
-# We will take the entire secret structure and load it into Vault as is under the root mount
-# further down in the file
+# We will take the entire secret structure and load it into Vault as is under
+# the root mount further down in the file.
 secrets = read_yaml_secrets(
     Path(f"odl_video_service/data.{stack_info.env_suffix}.yaml")
 )
@@ -120,7 +120,7 @@ ovs_server_policy_document = {
             ],
             "Effect": "Allow",
             "Resource": [
-                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:pipeline/{secrets['misc']['et_pipeline_id']}"  # noqa: WPS221, WPS237
+                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:pipeline/{secrets['misc']['et_pipeline_id']}"
             ],
         },
         {
@@ -130,7 +130,7 @@ ovs_server_policy_document = {
             "Effect": "Allow",
             "Resource": [
                 f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:preset/*",
-                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:pipeline/{secrets['misc']['et_pipeline_id']}",  # noqa: WPS221, WPS237
+                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:pipeline/{secrets['misc']['et_pipeline_id']}",
             ],
         },
         {
@@ -213,16 +213,16 @@ ovs_server_policy_document = {
             ],
             "Effect": "Allow",
             "Resource": [
-                f"arn:aws:s3:::{ovs_config.get('s3_bucket_name')}/",  # noqa: WPS237
-                f"arn:aws:s3:::{ovs_config.get('s3_subtitle_bucket_name')}/",  # noqa: WPS237
-                f"arn:aws:s3:::{ovs_config.get('s3_thumbnail_bucket_name')}/",  # noqa: WPS237
-                f"arn:aws:s3:::{ovs_config.get('s3_transcode_bucket_name')}/",  # noqa: WPS237
-                f"arn:aws:s3:::{ovs_config.get('s3_watch_bucket_name')}/",  # noqa: WPS237
-                f"arn:aws:s3:::{ovs_config.get('s3_bucket_name')}/*",  # noqa: WPS237
-                f"arn:aws:s3:::{ovs_config.get('s3_subtitle_bucket_name')}/*",  # noqa: WPS237
-                f"arn:aws:s3:::{ovs_config.get('s3_thumbnail_bucket_name')}/*",  # noqa: WPS237
-                f"arn:aws:s3:::{ovs_config.get('s3_transcode_bucket_name')}/*",  # noqa: WPS237
-                f"arn:aws:s3:::{ovs_config.get('s3_watch_bucket_name')}/*",  # noqa: WPS237
+                f"arn:aws:s3:::{ovs_config.get('s3_bucket_name')}/",
+                f"arn:aws:s3:::{ovs_config.get('s3_subtitle_bucket_name')}/",
+                f"arn:aws:s3:::{ovs_config.get('s3_thumbnail_bucket_name')}/",
+                f"arn:aws:s3:::{ovs_config.get('s3_transcode_bucket_name')}/",
+                f"arn:aws:s3:::{ovs_config.get('s3_watch_bucket_name')}/",
+                f"arn:aws:s3:::{ovs_config.get('s3_bucket_name')}/*",
+                f"arn:aws:s3:::{ovs_config.get('s3_subtitle_bucket_name')}/*",
+                f"arn:aws:s3:::{ovs_config.get('s3_thumbnail_bucket_name')}/*",
+                f"arn:aws:s3:::{ovs_config.get('s3_transcode_bucket_name')}/*",
+                f"arn:aws:s3:::{ovs_config.get('s3_watch_bucket_name')}/*",
             ],
         },
     ],
@@ -236,7 +236,7 @@ ovs_server_policy = iam.Policy(
         stringify=True,
         parliament_config=parliament_config,
     ),
-    description="AWS access permissions to allow odl-video-service to s3 buckets and transcode services.",
+    description="AWS access permissions to allow odl-video-service to s3 buckets and transcode services.",  # noqa: E501
 )
 
 ovs_server_instance_role = iam.Role(
@@ -302,14 +302,14 @@ ovs_server_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_HTTPS_PORT,
             to_port=DEFAULT_HTTPS_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the odl-video-service server on port {DEFAULT_HTTPS_PORT}",
+            description=f"Allow traffic to the odl-video-service server on port {DEFAULT_HTTPS_PORT}",  # noqa: E501
         ),
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
             from_port=DEFAULT_HTTP_PORT,
             to_port=DEFAULT_HTTP_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the odl-video-service server on port {DEFAULT_HTTP_PORT}",
+            description=f"Allow traffic to the odl-video-service server on port {DEFAULT_HTTP_PORT}",  # noqa: E501
         ),
     ],
     egress=default_egress_args,
@@ -332,7 +332,7 @@ ovs_database_security_group = ec2.SecurityGroup(
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
-            description=f"Access to Postgres from odl-video-service nodes on {DEFAULT_POSTGRES_PORT}",
+            description=f"Access to Postgres from odl-video-service nodes on {DEFAULT_POSTGRES_PORT}",  # noqa: E501
         ),
     ],
     vpc_id=target_vpc_id,
@@ -348,11 +348,11 @@ ovs_redis_security_group = ec2.SecurityGroup(
             security_groups=[
                 ovs_server_security_group.id,
             ],
-            # cidr_blocks=[target_vpc["cidr"]], # noqa: E800
+            # cidr_blocks=[target_vpc["cidr"]],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
-            description=f"Access to Redis from odl-video-service nodes on {DEFAULT_REDIS_PORT}",
+            description=f"Access to Redis from odl-video-service nodes on {DEFAULT_REDIS_PORT}",  # noqa: E501
         ),
     ],
     egress=default_egress_args,
@@ -548,7 +548,7 @@ ovs_lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             """
-                                ),  # noqa: WPS355
+                                ),
                                 "owner": "root:root",
                             },
                         ],
@@ -610,7 +610,7 @@ ovs_server_vault_mount = vault.Mount(
     path="secret-odl-video-service",
     type="kv-v2",
     options={"version": 2},
-    description="Storage of configuration credentials and secrets used by odl-video-service",
+    description="Storage of configuration credentials and secrets used by odl-video-service",  # noqa: E501
     opts=ResourceOptions(delete_before_replace=True),
 )
 
@@ -638,8 +638,7 @@ consul_keys = {
     "ovs/log_level": ovs_config.get("log_level"),
     "ovs/nginx_config_file_path": nginx_config_file_path,
     "ovs/redis_cluster_address": ovs_server_redis_cluster.address,
-    "ovs/redis_max_connections": redis_config.get("max_connections")
-    or 65000,  # noqa: WPS432
+    "ovs/redis_max_connections": redis_config.get("max_connections") or 65000,
     "ovs/s3_bucket_name": ovs_config.get("s3_bucket_name"),
     "ovs/s3_subtitle_bucket_name": ovs_config.get("s3_subtitle_bucket_name"),
     "ovs/s3_thumbnail_bucket_name": ovs_config.get("s3_thumbnail_bucket_name"),

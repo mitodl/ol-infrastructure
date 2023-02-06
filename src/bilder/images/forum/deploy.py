@@ -51,7 +51,7 @@ set_env_secrets(Path("consul/consul.env"))
 
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
-VERSIONS = {  # noqa: WPS407
+VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
     "consul-template": os.environ.get(
@@ -84,7 +84,7 @@ files.put(
 
 # Acceptable values mitxonline, mitx, xpro, mitx-staging
 DEPLOYMENT = os.environ["DEPLOYMENT"]
-if DEPLOYMENT not in ["mitxonline", "mitx", "xpro", "mitx-staging"]:  # noqa: WPS510
+if DEPLOYMENT not in ["mitxonline", "mitx", "xpro", "mitx-staging"]:
     raise ValueError(
         "DEPLOYMENT should be on these values 'mitxonline', 'mitx', 'xpro', 'mitx-staging' "  # noqa: E501
     )
@@ -109,7 +109,7 @@ consul_configuration[Path("01-forum.json")] = ConsulConfig(
     services=[
         ConsulService(
             name="forum",
-            port=4567,  # noqa: WPS432
+            port=4567,
             check=ConsulServiceTCPCheck(
                 name="edxapp-forum",
                 tcp="localhost:4567",

@@ -8,7 +8,7 @@ from concourse.lib.resources import git_repo
 simple_resource_types = []
 simple_resources = []
 simple_jobs = []
-for service in ["kms", "network"]:  # noqa: WPS335
+for service in ["kms", "network"]:
     simple_pulumi_code = git_repo(
         name=Identifier(f"ol-infrastructure-pulumi-{service}"),
         uri="https://github.com/mitodl/ol-infrastructure",
@@ -28,11 +28,11 @@ for service in ["kms", "network"]:  # noqa: WPS335
 
     simple_service_fragment = PipelineFragment(
         resource_types=simple_pulumi_chain.resource_types,
-        resources=[simple_pulumi_code] + simple_pulumi_chain.resources,
+        resources=[simple_pulumi_code, *simple_pulumi_chain.resources],
         jobs=simple_pulumi_chain.jobs,
     )
     simple_resource_types.extend(simple_service_fragment.resource_types)
-    simple_resources.extend([simple_pulumi_code] + simple_service_fragment.resources)
+    simple_resources.extend([simple_pulumi_code, *simple_service_fragment.resources])
     simple_jobs.extend(simple_service_fragment.jobs)
 
 
@@ -46,7 +46,7 @@ simple_services_combined_fragment = PipelineFragment(
 oneoff_resource_types = []
 oneoff_resources = []
 oneoff_jobs = []
-for service in ["dns", "policies"]:  # noqa: WPS335, WPS440
+for service in ["dns", "policies"]:
     oneoff_pulumi_code = git_repo(
         name=Identifier(f"ol-infrastructure-pulumi-{service}"),
         uri="https://github.com/mitodl/ol-infrastructure",
@@ -63,11 +63,11 @@ for service in ["dns", "policies"]:  # noqa: WPS335, WPS440
 
     oneoff_service_fragment = PipelineFragment(
         resource_types=oneoff_pulumi_chain.resource_types,
-        resources=[oneoff_pulumi_code] + oneoff_pulumi_chain.resources,
+        resources=[oneoff_pulumi_code, *oneoff_pulumi_chain.resources],
         jobs=oneoff_pulumi_chain.jobs,
     )
     oneoff_resource_types.extend(oneoff_service_fragment.resource_types)
-    oneoff_resources.extend([oneoff_pulumi_code] + oneoff_service_fragment.resources)
+    oneoff_resources.extend([oneoff_pulumi_code, *oneoff_service_fragment.resources])
     oneoff_jobs.extend(oneoff_service_fragment.jobs)
 
 oneoff_services_combined_fragment = PipelineFragment(
@@ -93,10 +93,10 @@ aws_pipeline = Pipeline(
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    import sys
 
     with open("definition.json", "w") as definition:
         definition.write(aws_pipeline.json(indent=2))
     sys.stdout.write(aws_pipeline.json(indent=2))
-    print()  # noqa: WPS421
-    print("fly -t pr-inf sp -p pulumi-aws -c definition.json")  # noqa: WPS421
+    print()
+    print("fly -t pr-inf sp -p pulumi-aws -c definition.json")

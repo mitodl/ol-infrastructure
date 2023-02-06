@@ -72,7 +72,7 @@ from bridge.lib.magic_numbers import (
 from bridge.lib.versions import CONCOURSE_VERSION, CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 
-VERSIONS = {  # noqa: WPS407
+VERSIONS = {
     "concourse": os.environ.get("CONCOURSE_VERSION", CONCOURSE_VERSION),
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
@@ -85,10 +85,10 @@ node_type = os.environ.get("NODE_TYPE", CONCOURSE_WEB_NODE_TYPE)
 set_env_secrets(Path("consul/consul.env"))
 concourse_base_config = ConcourseBaseConfig(version=VERSIONS["concourse"])
 concourse_config_map = {
-    CONCOURSE_WEB_NODE_TYPE: partial(  # noqa: S106
+    CONCOURSE_WEB_NODE_TYPE: partial(
         ConcourseWebConfig,
         admin_user="oldevops",
-        admin_password=(
+        admin_password=(  # noqa: S106
             '{{ with secret "secret-concourse/web" }}'
             "{{ .Data.data.admin_password }}"
             "{{ end }}"
@@ -98,7 +98,7 @@ concourse_config_map = {
             "{{ .Data.username }}"
             "{{ end }}"
         ),
-        database_password=(
+        database_password=(  # noqa: S106
             '{{ with secret "postgres-concourse/creds/app" }}'
             "{{ .Data.password }}"
             "{{ end }}"
@@ -114,7 +114,7 @@ concourse_config_map = {
             "{{ .Data.data.github_client_id }}"
             "{{ end }}"
         ),
-        github_client_secret=(
+        github_client_secret=(  # noqa: S106
             '{{ with secret "secret-concourse/web" }}'
             "{{ .Data.data.github_client_secret }}"
             "{{ end }}"
@@ -139,9 +139,9 @@ concourse_config_map = {
         enable_p2p_volume_streaming=True,
         prometheus_bind_ip=IPv4Address("127.0.0.1"),
         prometheus_bind_port=CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
-        secret_cache_duration="1m",  # pragma: allowlist secret
+        secret_cache_duration="1m",  # pragma: allowlist secret # noqa: S106
         secret_cache_enabled=True,  # pragma: allowlist secret
-        vault_client_token="this-token-gets-overridden-by-the-vault-agent",
+        vault_client_token="token-gets-overridden-by-vault-agent",  # noqa: S106
         vault_insecure_skip_verify=True,
         vault_path_prefix="/secret-concourse",
         vault_url=f"http://localhost:{VAULT_HTTP_PORT}",
@@ -238,7 +238,7 @@ consul_configuration = {Path("00-default.json"): ConsulConfig()}
 
 vector_config = VectorConfig()
 
-if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
+if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
     # Setting this attribute after instantiating the object to bypass validation
     concourse_config.encryption_key = SecretStr(
         '{{ with secret "secret-concourse/web" }}'
@@ -295,9 +295,7 @@ vault_config = VaultAgentConfig(
         method=VaultAutoAuthMethod(
             type="aws",
             mount_path="auth/aws",
-            config=VaultAutoAuthAWS(
-                role=f"concourse-{concourse_config._node_type}"  # noqa: WPS437
-            ),
+            config=VaultAutoAuthAWS(role=f"concourse-{concourse_config._node_type}"),
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),
@@ -323,7 +321,7 @@ hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
 
 # Caddy and Vault are tightly coupled and this step cannot happen until vault is installed.  # noqa: E501
-if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: WPS437
+if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
     create_placeholder_tls_config(caddy_config)
 
 vault_template_permissions(vault_config)

@@ -18,12 +18,14 @@ def notification(
     :param body: The text to send to slack as the 'body' of the notification. Additional
         details that are hidden when the alert is collapsed.
     :param alert_type: The type of alert to send. Determined the color of the alert
-        in slack. See: https://github.com/arbourd/concourse-slack-alert-resource#alert-types.
+        in slack.
+        See: https://github.com/arbourd/concourse-slack-alert-resource#alert-types.
         At this time we don't support 'started' notifications.
 
-    :returns: A `PutStep` object that can be executed as an 'on_success', 'on_failure', etc
+    :returns: A `PutStep` object that can be executed as an 'on_success',
+        'on_failure', etc
     """
-    params = {"alert_type": alert_type, "message": title, "text": body}  # noqa: WPS110
+    params = {"alert_type": alert_type, "message": title, "text": body}
     return PutStep(
         put=resource.name,
         params=params,

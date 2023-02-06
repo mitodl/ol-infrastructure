@@ -1,7 +1,7 @@
 import sys
 
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
-from concourse.lib.models.pipeline import (  # noqa: WPS235
+from concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
     GetStep,

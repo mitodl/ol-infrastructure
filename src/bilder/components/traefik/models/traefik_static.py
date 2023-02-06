@@ -570,7 +570,7 @@ class Providers(FieldModel):
         None, alias="providersThrottleDuration"
     )
     docker: Optional[Docker] = None
-    file: Optional[FileProvider] = None  # noqa: WPS110
+    file: Optional[FileProvider] = None
     marathon: Optional[Marathon] = None
     kubernetes_ingress: Optional[KubernetesIngress] = Field(
         None, alias="kubernetesIngress"
@@ -589,7 +589,7 @@ class Providers(FieldModel):
     zoo_keeper: Optional[ZooKeeper] = Field(None, alias="zooKeeper")
     redis: Optional[Redis] = None
     http: Optional[Http1] = None
-    plugin: Optional[dict[str, dict[str, Any]]] = None  # noqa: WPS234
+    plugin: Optional[dict[str, dict[str, Any]]] = None
 
 
 class ForwardingTimeouts(FieldModel):

@@ -57,7 +57,7 @@ class OpenLearningOpenEdxDeployment(Enum):
         return deployment.value
 
 
-ReleaseMap: dict[  # noqa: WPS234
+ReleaseMap: dict[
     OpenEdxSupportedRelease,
     dict[OpenEdxDeploymentName, list[OpenEdxApplicationVersion]],
 ] = {

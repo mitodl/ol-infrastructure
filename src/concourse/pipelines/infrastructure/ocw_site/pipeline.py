@@ -25,13 +25,13 @@ pulumi_jobs = pulumi_jobs_chain(
 )
 
 ocw_site_pipeline = Pipeline(
-    resources=pulumi_jobs.resources + [ocw_site_pulumi_code],
+    resources=[*pulumi_jobs.resources, ocw_site_pulumi_code],
     resource_types=pulumi_jobs.resource_types,
     jobs=pulumi_jobs.jobs,
 )
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    import sys
 
     with open("definition.json", "w") as definition:
         definition.write(ocw_site_pipeline.json(indent=2))

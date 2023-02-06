@@ -28,10 +28,10 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 setup_vault_provider()
 github_provider = github.Provider(
     "github-provider",
-    owner=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))[  # noqa: F541, WPS237
+    owner=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))[  # noqa: F541
         "owner"
     ],
-    token=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))[  # noqa: F541, WPS237
+    token=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))[  # noqa: F541
         "token"
     ],
 )

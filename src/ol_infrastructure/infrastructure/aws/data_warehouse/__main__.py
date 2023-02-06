@@ -41,7 +41,7 @@ results_bucket = s3.Bucket(
     lifecycle_rules=[
         s3.BucketLifecycleRuleArgs(
             enabled=True,
-            expiration=s3.BucketLifecycleRuleExpirationArgs(days=30),  # noqa: WPS432
+            expiration=s3.BucketLifecycleRuleExpirationArgs(days=30),
             id="expire_old_query_results",
         )
     ],
@@ -130,7 +130,7 @@ parliament_config: dict[str, Any] = {
     "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []}
 }
 
-query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [  # noqa: WPS234
+query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
     {
         "Effect": "Allow",
         "Action": [

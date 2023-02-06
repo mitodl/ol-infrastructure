@@ -57,24 +57,24 @@ vault_github_auth = github.AuthBackend(
 
 policy_folder = (Path(__file__).resolve()).parent.parent.joinpath("policies/github/")
 for hcl_file in policy_folder.iterdir():
-    if (  # noqa: WPS337
+    if (
         "software_engineer.hcl" in hcl_file.name
         and stack_info.env_suffix != "production"
     ):
-        software_engineer_policy_file = open(hcl_file).read()
+        software_engineer_policy_file = open(hcl_file).read()  # noqa: SIM115
         software_engineer_policy = Policy(
             "github-auth-software-engineer", policy=software_engineer_policy_file
         )
-        for team in ["vault-developer-access"]:  # noqa: WPS335
+        for team in ["vault-developer-access"]:
             vault_github_auth_team = github.Team(
                 f"vault-github-auth-{team}",
                 team=team,
                 policies=[software_engineer_policy],
             )
     if "admin.hcl" in hcl_file.name:
-        devops_policy_file = open(hcl_file).read()
+        devops_policy_file = open(hcl_file).read()  # noqa: SIM115
         devops_policy = Policy("github-auth-devops", policy=devops_policy_file)
-        for team in ["vault-devops-access"]:  # noqa: WPS335, WPS440
+        for team in ["vault-devops-access"]:
             vault_github_auth_team = github.Team(
                 f"vault-github-auth-{team}", team=team, policies=[devops_policy]
             )

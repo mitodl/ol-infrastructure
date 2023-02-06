@@ -25,12 +25,12 @@ def build_xqueue_pipeline(release_name: str):
         branch=xqueue_branch,
     )
 
-    xqueue_registry_image = registry_image(  # noqa: S106
+    xqueue_registry_image = registry_image(
         name=Identifier("openedx-xqueue-container"),
         image_repository="mitodl/xqueue",
         image_tag=release_name,
         username="((dockerhub.username))",
-        password="((dockerhub.password))",
+        password="((dockerhub.password))",  # noqa: S106
     )
 
     xqueue_dockerfile_repo = git_repo(
@@ -53,8 +53,8 @@ def build_xqueue_pipeline(release_name: str):
         name=Identifier("ol-infrastructure-deploy"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
-        paths=PULUMI_WATCHED_PATHS
-        + [
+        paths=[
+            *PULUMI_WATCHED_PATHS,
             PULUMI_CODE_PATH.joinpath("applications/xqueue/"),
             "src/bridge/settings/openedx/",
         ],
@@ -71,7 +71,7 @@ def build_xqueue_pipeline(release_name: str):
                     Input(name=xqueue_dockerfile_repo.name),
                 ],
                 build_parameters={
-                    "CONTEXT": f"{xqueue_dockerfile_repo.name}/dockerfiles/openedx-xqueue",
+                    "CONTEXT": f"{xqueue_dockerfile_repo.name}/dockerfiles/openedx-xqueue",  # noqa: E501
                     "BUILD_ARG_OPENEDX_COMMON_VERSION": xqueue_branch,
                 },
                 build_args=[
@@ -139,8 +139,8 @@ def build_xqueue_pipeline(release_name: str):
 
     return Pipeline(
         resource_types=combined_fragments.resource_types,
-        resources=combined_fragments.resources
-        + [
+        resources=[
+            *combined_fragments.resources,
             xqueue_pulumi_code,
             xqueue_packer_code,
         ],

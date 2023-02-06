@@ -3,7 +3,7 @@ from pydantic import ValidationError
 
 from ol_infrastructure.components.aws.olvpc import OLVPCConfig
 
-VALID_CONFIG = dict(  # noqa: C408
+VALID_CONFIG = dict(
     tags={"OU": "operations", "Environment": "test"},
     vpc_name="test",
     cidr_block="192.168.0.0/16",

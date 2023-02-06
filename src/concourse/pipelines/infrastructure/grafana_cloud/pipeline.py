@@ -1,6 +1,6 @@
 from concourse.lib.constants import REGISTRY_IMAGE
 from concourse.lib.models.fragment import PipelineFragment
-from concourse.lib.models.pipeline import (  # noqa: WPS235
+from concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
     GetStep,
@@ -115,18 +115,18 @@ commit_managed_dashboards_job = Job(
                 run=Command(
                     path="bash",
                     args=[
-                        "-xc",  # noqa: WPS462
+                        "-xc",
                         """  cd changed_repo;
                                 git config user.name "concourse";
                                 git config user.email "odl-devops@mit.edu";
-                                UNTRACKED_FILES=`git ls-files --other --exclude-standard --directory`;  # noqa: E501
+                                UNTRACKED_FILES=`git ls-files --other --exclude-standard --directory`;
                                 git diff --exit-code;
                                 if [ $? != 0 ] || [ "$UNTRACKED_FILES" != "" ]; then
                                   git add .;
                                   git commit -m "Automated git sync for grafana-ci";
                                 else
                                   echo "Nothing to commit.";
-                                fi;""",
+                                fi;""",  # noqa: E501
                     ],
                 ),
             ),
@@ -269,9 +269,9 @@ dashboards_combined_fragment = PipelineFragment(
 )
 
 alerting_jobs = []
-for tool in ["loki", "cortex", "alertmanager"]:  # noqa: WPS335
+for tool in ["loki", "cortex", "alertmanager"]:
     # Add a linter step for loki and cortex configurations
-    if tool in ["loki", "cortex"]:  # noqa: WPS510
+    if tool in ["loki", "cortex"]:
         resource_name = f"{tool}-alert-rules"
         linter_job = Job(
             name=f"lint-managed-{tool}-rules",
@@ -310,7 +310,7 @@ for tool in ["loki", "cortex", "alertmanager"]:  # noqa: WPS335
                                 f"""cd {resource_name};
                                     git config user.name "concourse";
                                     git config user.email "odl-devops@mit.edu";
-                                    UNTRACKED_FILES=`git ls-files --other --exclude-standard --directory`;  # noqa: E501
+                                    UNTRACKED_FILES=`git ls-files --other --exclude-standard --directory`;
                                     git diff --exit-code;
                                     if [ $? != 0 ] || [ "$UNTRACKED_FILES" != "" ]; then
                                       git add .;
@@ -318,7 +318,7 @@ for tool in ["loki", "cortex", "alertmanager"]:  # noqa: WPS335
                                     else
                                       echo "Nothing to commit.";
                                     fi
-                                """,
+                                """,  # noqa: E501
                             ],
                         ),
                     ),
@@ -346,18 +346,18 @@ for tool in ["loki", "cortex", "alertmanager"]:  # noqa: WPS335
         alerting_jobs.append(linter_job)
     else:
         resource_name = f"{tool}-config"
-    for stage in ["ci", "qa", "production"]:  # noqa: WPS335
-        params = {  # noqa: WPS110
+    for stage in ["ci", "qa", "production"]:
+        params = {
             "CORTEX_API_KEY": f"((cortextool.cortex-api-key-{stage}))",
             "CORTEX_API_USER": f"((cortextool.{tool}-rules-api-user-{stage}))",
             "CORTEX_TENANT_ID": f"((cortextool.{tool}-rules-api-user-{stage}))",
             "OPS_TEAM_OPS_GENIE_API_KEY": "((cortextool.ops-team-ops-genie-api-key))",
             "TESTING_OPS_GENIE_API_KEY": "((cortextool.testing-ops-genie-api-key))",
-            "SLACK_NOTIFICATIONS_OCW_MISC_API_URL": "((cortextool.slack-notifications-ocw-misc-api-url))",
+            "SLACK_NOTIFICATIONS_OCW_MISC_API_URL": "((cortextool.slack-notifications-ocw-misc-api-url))",  # noqa: E501
             "ENVIRONMENT_NAME": stage.upper(),
             "RESOURCE_NAME": resource_name,
         }
-        if tool in ["cortex", "loki"]:  # noqa: WPS510
+        if tool in ["cortex", "loki"]:
             job_name = f"sync-managed-{tool}-rules-{stage}"
             interpolate_command = "$RESOURCE_NAME/ci/interpolate_rules_yaml.sh"
             command = (
@@ -400,7 +400,7 @@ for tool in ["loki", "cortex", "alertmanager"]:  # noqa: WPS335
                             args=[
                                 "-exc",
                                 f"""{interpolate_command};
-                                    {command};""",  # noqa: WPS318
+                                    {command};""",
                             ],
                         ),
                     ),
@@ -460,12 +460,10 @@ grafana_pipeline = Pipeline(
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    import sys
 
     with open("definition.json", "w") as definition:
         definition.write(grafana_pipeline.json(indent=2))
     sys.stdout.write(grafana_pipeline.json(indent=2))
-    print()  # noqa: WPS421
-    print(  # noqa: WPS421
-        "fly -t pr-inf sp -p misc-grafana-management -c definition.json"  # noqa: C813
-    )
+    print()
+    print("fly -t pr-inf sp -p misc-grafana-management -c definition.json")

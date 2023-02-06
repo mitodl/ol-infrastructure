@@ -93,7 +93,7 @@ draft_backup_bucket = s3.Bucket(
         s3.BucketLifecycleRuleArgs(
             enabled=True,
             noncurrent_version_expiration=s3.BucketLifecycleRuleNoncurrentVersionExpirationArgs(  # noqa: E501
-                days=90,  # noqa: WPS432
+                days=90,
             ),
         )
     ],
@@ -145,7 +145,7 @@ live_backup_bucket = s3.Bucket(
         s3.BucketLifecycleRuleArgs(
             enabled=True,
             noncurrent_version_expiration=s3.BucketLifecycleRuleNoncurrentVersionExpirationArgs(  # noqa: E501
-                days=90,  # noqa: WPS432
+                days=90,
             ),
         )
     ],
@@ -234,7 +234,7 @@ for purpose in ("draft", "live"):
         conditions=[
             fastly.ServiceVclConditionArgs(
                 name="not course media or old akamai",
-                statement='req.url.path !~ "^/coursemedia" && req.url.path !~ "^/ans\\d+"',  # noqa: E501, WPS342
+                statement='req.url.path !~ "^/coursemedia" && req.url.path !~ "^/ans\\d+"',  # noqa: E501
                 type="REQUEST",
             ),
             fastly.ServiceVclConditionArgs(
@@ -256,7 +256,7 @@ for purpose in ("draft", "live"):
             ),
             fastly.ServiceVclConditionArgs(
                 name="is old Akamai file",
-                statement='req.url.path ~ "^/ans\\d+" && req.url.path !~ "/ans7870/21f/21f.027"',  # noqa: E501, WPS342
+                statement='req.url.path ~ "^/ans\\d+" && req.url.path !~ "/ans7870/21f/21f.027"',  # noqa: E501
                 type="REQUEST",
             ),
         ],
@@ -357,7 +357,7 @@ for purpose in ("draft", "live"):
             fastly.ServiceVclSnippetArgs(
                 content=snippets_dir.joinpath("ttl_setup.vcl").read_text(),
                 name="TTLs setup",
-                priority=110,  # noqa: WPS432
+                priority=110,
                 type="fetch",
             ),
             fastly.ServiceVclSnippetArgs(
@@ -368,7 +368,7 @@ for purpose in ("draft", "live"):
             fastly.ServiceVclSnippetArgs(
                 content=snippets_dir.joinpath("s3_bucket_proxying.vcl").read_text(),
                 name="S3 Bucket Proxying",
-                priority=200,  # noqa: WPS432
+                priority=200,
                 type="miss",
             ),
             fastly.ServiceVclSnippetArgs(
@@ -413,7 +413,7 @@ for purpose in ("draft", "live"):
         f"ocw-{purpose}-{stack_info.env_suffix}",
         service_id=servicevcl_backend.id,
         dictionary_id=servicevcl_backend.dictionaries[0].dictionary_id,
-        items=json.load(open("redirect_dict.json")),
+        items=json.load(open("redirect_dict.json")),  # noqa: SIM115
         manage_items=True,
         opts=ResourceOptions(protect=True).merge(fastly_provider),
     )

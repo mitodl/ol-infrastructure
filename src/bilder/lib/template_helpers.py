@@ -7,7 +7,7 @@ from bilder.components.hashicorp.consul_template.models import ConsulTemplateTem
 CONSUL_TEMPLATE_DIRECTORY = "/etc/consul-template"
 
 
-def place_jinja_template_file(  # noqa: WPS211
+def place_jinja_template_file(  # noqa: PLR0913
     name: str,
     repo_path: Path,
     destination_path: Path,
@@ -17,18 +17,18 @@ def place_jinja_template_file(  # noqa: WPS211
     user: str = "root",
     group: str = "root",
 ):
-
     """Interpolate and place a file on the destination at AMI bake time.
     Predicate function that side effects multiple arguments and has no return.
 
     :param name: The name the file will ultimately have on the destination system.
     :type name: str
 
-    :param repo_path: The path within this code repository that contains the source template.
+    :param repo_path: The path within this code repository containing the
+        source template.
     :type repo_path: Path
 
-    :param destination_path: The path on the destination system for the file to be placed at.
-        This does NOT include the filename, just the directory.
+    :param destination_path: The path on the destination system for the file to be
+        placed at. This does NOT include the filename, just the directory.
     :type destination_path: Path
 
     :param context: A dictionary containing the values to interpolate into the tempalte.
@@ -39,7 +39,8 @@ def place_jinja_template_file(  # noqa: WPS211
         destination_path + name to the list.
     :type watched_files: list[Path]
 
-    :param mode: The permissions specifier for the file on the destination system. Numerical form.
+    :param mode: The permissions specifier for the file on the destination system.
+        Numerical form.
     :type mode: str
 
     :param user: The file user of the rendered template on the system.
@@ -49,12 +50,13 @@ def place_jinja_template_file(  # noqa: WPS211
     :type group: str
 
     :rtype: Path
-    :returns: A Path object representing the path of the ultimate file (not the template file).
+    :returns: A Path object representing the path of the ultimate file
+        (not the template file).
     """
     dest = destination_path.joinpath(name)
     files.template(
         name=f"Place and interpolate {name} jinja template file",
-        src=str(repo_path.joinpath(name + ".j2")),  # noqa: WPS336
+        src=str(repo_path.joinpath(name + ".j2")),
         dest=dest,
         context=context,
         mode="0664",
@@ -64,7 +66,7 @@ def place_jinja_template_file(  # noqa: WPS211
     return dest
 
 
-def place_consul_template_file(  # noqa: WPS211
+def place_consul_template_file(  # noqa: PLR0913
     name: str,
     repo_path: Path,
     template_path: Path,
@@ -81,22 +83,26 @@ def place_consul_template_file(  # noqa: WPS211
     :param name: The name the file will ultimately have on the destination system.
     :type name: str
 
-    :param repo_path: The path within this code repository that contains the source template.
+    :param repo_path: The path within this code repository that contains the
+        source template.
     :type repo_path: Path
 
-    :param template_path: The path on the destination system where the template will be placed.
+    :param template_path: The path on the destination system where the template
+        will be placed.
     :type template_path: Path
 
-    :param destination_path: The path on the destination system for the file to be placed at.
-        This does NOT include the filename, just the directory.
+    :param destination_path: The path on the destination system for the file
+        to be placed at. This does NOT include the filename, just the directory.
     :type destination_path: Path
 
-    :param mode: The permissions specifier for the file on the destination system. Numerical form.
-        both the unrendered template AND the rendered file will have the same permissions.
+    :param mode: The permissions specifier for the file on the destination system.
+        Numerical form. both the unrendered template AND the rendered file will have
+        the same permissions.
     :type mode: str
 
-    :param user: The file user for the the unrendered template only. The rendered file will
-        always have consul-template:consul-template usership. Set the mode accordingly.
+    :param user: The file user for the the unrendered template only. The rendered
+        file will always have consul-template:consul-template usership.
+        Set the mode accordingly.
     :type user: str
 
     :param group: The group for the unrendered template only. The rendered file will
@@ -104,19 +110,19 @@ def place_consul_template_file(  # noqa: WPS211
     :type group: str
 
     :rtype: ConsulTemplateTemplate
-    :returns: A ConsulTemplateTemplate object that can be appended to the master list of consul
-        templates.
+    :returns: A ConsulTemplateTemplate object that can be appended to the master list
+        of consul templates.
     """
     files.put(
         name=f"Place {name} template file.",
-        src=str(repo_path.joinpath(name + ".tmpl")),  # noqa: WPS336
-        dest=str(template_path.joinpath(name + ".tmpl")),  # noqa: WPS336
+        src=str(repo_path.joinpath(name + ".tmpl")),
+        dest=str(template_path.joinpath(name + ".tmpl")),
         mode=mode,
         user=user,
         group=group,
     )
     return ConsulTemplateTemplate(
-        source=template_path.joinpath(name + ".tmpl"),  # noqa: WPS336
+        source=template_path.joinpath(name + ".tmpl"),
         destination=destination_path.joinpath(name),
         perms=mode,
     )

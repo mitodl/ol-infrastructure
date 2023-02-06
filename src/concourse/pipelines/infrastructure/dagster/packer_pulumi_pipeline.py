@@ -31,10 +31,7 @@ dagster_image_code = git_repo(
 dagster_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
     uri="https://github.com/mitodl/ol-infrastructure",
-    paths=PULUMI_WATCHED_PATHS
-    + [
-        "src/ol_infrastructure/applications/dagster/",
-    ],
+    paths=[*PULUMI_WATCHED_PATHS, "src/ol_infrastructure/applications/dagster/"],
 )
 
 container_dependencies = [
@@ -75,18 +72,16 @@ combined_fragment = PipelineFragment(
 
 dagster_pipeline = Pipeline(
     resource_types=combined_fragment.resource_types,
-    resources=combined_fragment.resources + [dagster_image_code, dagster_pulumi_code],
+    resources=[*combined_fragment.resources, dagster_image_code, dagster_pulumi_code],
     jobs=combined_fragment.jobs,
 )
 
 
 if __name__ == "__main__":
-    import sys  # noqa: WPS433
+    import sys
 
     with open("definition.json", "w") as definition:
         definition.write(dagster_pipeline.json(indent=2))
     sys.stdout.write(dagster_pipeline.json(indent=2))
-    print()  # noqa: WPS421
-    print(  # noqa: WPS421
-        "fly -t pr-inf sp -p packer-pulumi-dagster -c definition.json"  # noqa: C813
-    )
+    print()
+    print("fly -t pr-inf sp -p packer-pulumi-dagster -c definition.json")

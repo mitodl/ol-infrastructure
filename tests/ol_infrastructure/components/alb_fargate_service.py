@@ -38,7 +38,7 @@ class PulumiMocks(pulumi.runtime.Mocks):
 
         output = {}
 
-        for key in args.args.keys():
+        for key in args.args:
             print(f"Key - {key}, Value - {args.args[key]}")
 
         if args.token == "aws:ec2/getSubnetIds:getSubnetIds":  # noqa: S105
@@ -145,7 +145,7 @@ class TestClassBaseAlbFargateArguments:
     @pulumi.runtime.test
     def test_default_parameters(self):
         def check_defaults(args):
-            (  # noqa: WPS236
+            (
                 drop_invalid_header_fields,
                 enable_cross_zone_load_balancing,
                 enable_deletion_protection,
@@ -317,7 +317,7 @@ class TestClassBaseAlbFargateArguments:
             assert container["memory"] == 512
             assert container["command"] is None
             assert container["cpu"] is None
-            assert container["environment"] == []  # noqa: WPS520
+            assert container["environment"] == []
             assert not container["essential"]
             assert container["logConfiguration"] is None
 

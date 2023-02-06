@@ -15,12 +15,12 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
 def privatize_mongo_uri(mongo_uri):
-    """Returns a mongodb uri that has '-pri' appended to each hostname. Intentionally verbose rather than clever."""  # noqa: D401, DAR101, DAR201, E501
+    """Returns a mongodb uri that has '-pri' appended to each hostname. Intentionally verbose rather than clever."""  # noqa: D401, E501
     regex = r"(?:(?:mongodb\:\/\/)|,)([^.]+)"
     matches = findall(regex, mongo_uri)
     privatized_mongo_uri = mongo_uri
     for hostname in matches:
-        new_hostname = hostname + "-pri"  # noqa: WPS336
+        new_hostname = hostname + "-pri"
         privatized_mongo_uri = sub(hostname, new_hostname, privatized_mongo_uri)
     return privatized_mongo_uri
 
@@ -52,11 +52,9 @@ max_disk_size = atlas_config.get_int("disk_autoscale_max_gb")
 max_instance_type = atlas_config.get("cluster_autoscale_max_size")
 min_instance_type = atlas_config.get("cluster_autoscale_min_size")
 num_instances = atlas_config.get_int("cluster_instance_count") or 3
-if (  # noqa: WPS337
-    enable_cloud_backup := atlas_config.get_bool("enable_cloud_backup") is None
-):
+if enable_cloud_backup := atlas_config.get_bool("enable_cloud_backup") is None:
     enable_cloud_backup = True
-if (  # noqa: WPS337
+if (
     enable_point_in_time_recovery := atlas_config.get_bool(
         "enable_point_in_time_recovery"
     )

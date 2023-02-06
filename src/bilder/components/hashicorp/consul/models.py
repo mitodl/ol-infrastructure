@@ -107,7 +107,7 @@ class Consul(HashicorpProduct):
         return self
 
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
-        for fpath, config in self.configuration.items():  # noqa: WPS526
+        for fpath, config in self.configuration.items():
             yield self.configuration_directory.joinpath(fpath), config.json(
                 exclude_none=True, indent=2, by_alias=True
             )
@@ -117,9 +117,7 @@ class Consul(HashicorpProduct):
         data_dir = list(
             filter(
                 None,
-                map(  # noqa: C417
-                    lambda config: config.data_dir, self.configuration.values()
-                ),
+                map(lambda config: config.data_dir, self.configuration.values()),
             )
         )[0]
         return data_dir or Path("/var/lib/consul/")

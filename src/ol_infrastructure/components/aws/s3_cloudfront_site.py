@@ -9,7 +9,7 @@ from pulumi_aws import acm, cloudfront, s3
 from ol_infrastructure.lib.ol_types import AWSBase
 
 
-class CloudfrontPriceClass(str, Enum):  # noqa: WPS600
+class CloudfrontPriceClass(str, Enum):
     """Valid price classes for CloudFront to control tradeoffs of price vs. latency for global visitors."""  # noqa: E501
 
     # For more details on price class refer to below link and search for PriceClass
@@ -31,14 +31,17 @@ class S3ServerlessSiteConfig(AWSBase):
 
 
 class S3ServerlessSite(ComponentResource):
-    """A Pulumi component for constructing the resources to host a static website using S3 and Cloudfront."""  # noqa: E501
+    """A Pulumi component for constructing the resources to host a static website
+    using S3 and Cloudfront.
+    """
 
     def __init__(
         self,
         site_config: S3ServerlessSiteConfig,
         opts: Optional[ResourceOptions] = None,
     ):
-        """Create an S3 bucket, ACM certificate, and Cloudfront distribution for hosting a static site.  # noqa: E501
+        """Create an S3 bucket, ACM certificate, and Cloudfront distribution for
+            hosting a static site.
 
         :param site_config: Configuration object for customizing the component
         :type site_config: S3ServerlessSiteConfig

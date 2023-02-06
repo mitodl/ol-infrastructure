@@ -24,7 +24,7 @@ def install_concourse(concourse_config: ConcourseBaseConfig):
         present=True,
         home=concourse_config.deploy_directory,
         ensure_home=False,
-        shell="/bin/false",  # noqa: S604
+        shell="/bin/false",
         system=True,
     )
     installation_directory = (
@@ -210,9 +210,9 @@ def configure_concourse(
         recursive=True,
         present=True,
     )
-    if concourse_config._node_type == "web":  # noqa: WPS437
+    if concourse_config._node_type == "web":
         _manage_web_node_keys(concourse_config)
-    elif concourse_config._node_type == "worker":  # noqa: WPS437
+    elif concourse_config._node_type == "worker":
         files.directory(
             name="Create Concourse worker state directory",
             path=str(concourse_config.work_dir),

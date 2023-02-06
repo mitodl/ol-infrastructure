@@ -56,7 +56,7 @@ class PipelineFragment(BaseModel):
         details
 
         :param cls: The class object
-        :param resources: The list of resources defined on the class instance  # noqa: DAR102
+        :param resources: The list of resources defined on the class instance
 
         :returns: A list of resources that has been deduplicated.
         """

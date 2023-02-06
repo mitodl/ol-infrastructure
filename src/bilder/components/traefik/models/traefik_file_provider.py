@@ -1543,7 +1543,7 @@ class Issuer(BaseModel):
     )
 
 
-class Info(BaseModel):  # noqa: WPS110
+class Info(BaseModel):
     """
     The info option select the specific client certificate details you want to add to
     the X-Forwarded-Tls-Client-Cert-Info header.  The value of the header will be an
@@ -1603,7 +1603,7 @@ class PassTLSClientCertMiddleware(BaseModel):
             " certificate."
         ),
     )
-    info: Optional[Info] = Field(  # noqa: WPS110
+    info: Optional[Info] = Field(
         None,
         description=(
             "The info option select the specific client certificate details you want to"

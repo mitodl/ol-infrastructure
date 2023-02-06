@@ -50,48 +50,48 @@ mitxpro_edxapp_security_group = ec2.SecurityGroup(
             cidr_blocks=[xpro_vpc["cidr"]],
             ipv6_cidr_blocks=[xpro_vpc["cidr_v6"]],
             protocol="tcp",
-            from_port=22,  # noqa: WPS432
-            to_port=22,  # noqa: WPS432
+            from_port=22,
+            to_port=22,
             description="mitxpro_vpc ssh access",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=[operations_vpc["cidr"]],
             ipv6_cidr_blocks=[operations_vpc["cidr_v6"]],
             protocol="tcp",
-            from_port=22,  # noqa: WPS432
-            to_port=22,  # noqa: WPS432
+            from_port=22,
+            to_port=22,
             description="operations_vpc ssh access",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=["0.0.0.0/0"],
             ipv6_cidr_blocks=["::/0"],
             protocol="tcp",
-            from_port=80,  # noqa: WPS432
-            to_port=80,  # noqa: WPS432
+            from_port=80,
+            to_port=80,
             description="HTTP access",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=["0.0.0.0/0"],
             ipv6_cidr_blocks=["::/0"],
             protocol="tcp",
-            from_port=443,  # noqa: WPS432
-            to_port=443,  # noqa: WPS432
+            from_port=443,
+            to_port=443,
             description="HTTPS access",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=[xpro_vpc["cidr"]],
             ipv6_cidr_blocks=[xpro_vpc["cidr_v6"]],
             protocol="tcp",
-            from_port=4567,  # noqa: WPS432
-            to_port=4567,  # noqa: WPS432
+            from_port=4567,
+            to_port=4567,
             description="Forum access",
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=[xpro_vpc["cidr"]],
             ipv6_cidr_blocks=[xpro_vpc["cidr_v6"]],
             protocol="tcp",
-            from_port=18040,  # noqa: WPS432
-            to_port=18040,  # noqa: WPS432
+            from_port=18040,
+            to_port=18040,
             description="Xqueue access",
         ),
     ],
@@ -119,15 +119,15 @@ mitxpro_edxapp_db_security_group = ec2.SecurityGroup(
                 dagster_app.require_output("dagster_app")["security_group"],
             ],
             protocol="tcp",
-            from_port=3306,  # noqa: WPS432
-            to_port=3306,  # noqa: WPS432
+            from_port=3306,
+            to_port=3306,
         ),
         ec2.SecurityGroupIngressArgs(
             cidr_blocks=[operations_vpc["cidr"]],
             ipv6_cidr_blocks=[operations_vpc["cidr_v6"]],
             protocol="tcp",
-            from_port=3306,  # noqa: WPS432
-            to_port=3306,  # noqa: WPS432
+            from_port=3306,
+            to_port=3306,
         ),
     ],
     tags=aws_config.tags,
@@ -209,7 +209,7 @@ mitxpro_edxapp_db_consul_service = Service(
     "edxapp-mysql",
     node=mitxpro_edxapp_db_consul_node.name,
     name="edxapp-mysql",
-    port=3306,  # noqa: WPS432
+    port=3306,
     meta={
         "external-node": True,
         "external-probe": True,
@@ -222,7 +222,7 @@ mitxpro_edxapp_db_consul_service = Service(
             "name": "mitxpro_edxapp_db",
             "timeout": "60s",
             "status": "passing",
-            "tcp": f"{mitxpro_edxapp_db.db_instance.address}:3306",  # noqa: WPS237
+            "tcp": f"{mitxpro_edxapp_db.db_instance.address}:3306",
         }
     ],
     tags=["rds", "mitxpro", "mitxpro_edxapp", mitxpro_environment],

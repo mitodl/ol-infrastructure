@@ -113,7 +113,7 @@ def create_placeholder_tls_config(caddy_config: CaddyConfig):
         packages=["acl"],
     )
     server.shell(
-        name=f"Generate TLS certificate + key",  # noqa: F541, WPS237
+        name=f"Generate TLS certificate + key",  # noqa: F541
         commands=[
             f'openssl req -newkey rsa:4098 -x509 -sha256 -days 365 -nodes -out {caddy_config.tls_cert_path} -keyout {caddy_config.tls_key_path} -subj "/C=US/ST=Massachusetts/L=Cambridge/O=MIT/OU=ODL/CN=this.is.not.a.valid.certificate.odl.mit.edu"',  # noqa: E501
         ],
@@ -128,7 +128,7 @@ def create_placeholder_tls_config(caddy_config: CaddyConfig):
     # After much futzing about with setfacl, chmod, chgrp, etc ... the easiest thing is to just add vault  # noqa: E501
     # as a secondary group to the caddy user and set the ownership on the TLS files to vault:vault  # noqa: E501
     server.shell(
-        name=f"Set ownership of the TLS cert and key",  # noqa: F541, WPS237
+        name=f"Set ownership of the TLS cert and key",  # noqa: F541
         commands=[
             f"chown caddy:vault {caddy_config.tls_cert_path}",
             f"chown caddy:vault {caddy_config.tls_key_path}",
@@ -136,7 +136,7 @@ def create_placeholder_tls_config(caddy_config: CaddyConfig):
         ],
     )
     server.shell(
-        name=f"Add vault group to caddy user",  # noqa: F541, WPS237
+        name=f"Add vault group to caddy user",  # noqa: F541
         commands=[
             f"usermod -a -G vault {caddy_config.caddy_user}",
         ],

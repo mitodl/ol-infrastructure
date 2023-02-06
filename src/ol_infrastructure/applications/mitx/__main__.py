@@ -9,7 +9,7 @@ from ol_infrastructure.components.aws.s3_cloudfront_site import (
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
-fifteen_minutes = 60 * 15  # noqa: WPS432
+fifteen_minutes = 60 * 15
 dns_stack = StackReference("infrastructure.aws.dns")
 stack_info = parse_stack()
 mitx_environment = f"mitx-{stack_info.env_suffix}"

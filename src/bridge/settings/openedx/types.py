@@ -4,12 +4,12 @@ from typing import Literal, NamedTuple, Optional, Union
 from pydantic import BaseModel
 
 
-class OpenEdxApplication(str, Enum):  # noqa: WPS600
+class OpenEdxApplication(str, Enum):
     repository: str
 
     def __new__(cls, app: str, repository: str):
         enum_element = str.__new__(cls, app)
-        enum_element._value_ = app  # noqa: WPS437
+        enum_element._value_ = app
         enum_element.repository = repository
         return enum_element
 
@@ -22,13 +22,13 @@ class OpenEdxApplication(str, Enum):  # noqa: WPS600
     xqueue_watcher = ("xqueue-watcher", "https://github.com/openedx/xqueue-watcher")
 
 
-class OpenEdxMicroFrontend(str, Enum):  # noqa: WPS600
+class OpenEdxMicroFrontend(str, Enum):
     repository: str
     path: str
 
     def __new__(cls, app: str, repository: str, path: str):
         enum_element = str.__new__(cls, app)
-        enum_element._value_ = app  # noqa: WPS437
+        enum_element._value_ = app
         enum_element.repository = repository
         enum_element.path = path
         return enum_element
@@ -63,12 +63,12 @@ OpenEdxApplicationType = Literal["MFE", "IDA"]
 OpenEdxDeploymentName = Literal["mitx", "mitx-staging", "mitxonline", "xpro"]
 
 
-class OpenEdxSupportedRelease(str, Enum):  # noqa: WPS600
+class OpenEdxSupportedRelease(str, Enum):
     branch: str
 
     def __new__(cls, release_name: str, release_branch: str):
         enum_element = str.__new__(cls, release_name)
-        enum_element._value_ = release_name  # noqa: WPS437
+        enum_element._value_ = release_name
         enum_element.branch = release_branch
         return enum_element
 

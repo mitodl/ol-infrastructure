@@ -4,12 +4,12 @@ from pydantic import BaseModel, validator
 
 from ol_infrastructure.lib.aws.ec2_helper import aws_regions
 
-REQUIRED_TAGS = {"OU", "Environment"}  # noqa: WPS407
-RECOMMENDED_TAGS = {"Application", "Owner"}  # noqa: WPS407
+REQUIRED_TAGS = {"OU", "Environment"}
+RECOMMENDED_TAGS = {"Application", "Owner"}
 
 
 @unique
-class BusinessUnit(str, Enum):  # noqa: WPS600
+class BusinessUnit(str, Enum):
     """Canonical source of truth for defining valid OU tags.
 
     We rely on tagging AWS resources with a valid OU to allow for cost allocation to
@@ -17,7 +17,7 @@ class BusinessUnit(str, Enum):  # noqa: WPS600
     """
 
     bootcamps = "bootcamps"
-    data = "data"  # noqa: WPS110
+    data = "data"
     digital_credentials = "digital-credentials"
     micromasters = "micromasters"
     mit_open = "mit-open"
@@ -33,7 +33,7 @@ class BusinessUnit(str, Enum):  # noqa: WPS600
 
 
 @unique
-class Environment(str, Enum):  # noqa: WPS600
+class Environment(str, Enum):
     """Canonical reference for valid environment names."""
 
     xpro = "xpro"
@@ -41,12 +41,12 @@ class Environment(str, Enum):  # noqa: WPS600
     mitx = "mitx"
     mitx_online = "mitxonline"
     applications = "applications"
-    data = "data"  # noqa: WPS110
+    data = "data"
     operations = "operations"
 
 
 @unique
-class Apps(str, Enum):  # noqa: WPS600
+class Apps(str, Enum):
     """Canonical source of truth for defining apps."""
 
     bootcamps = "bootcamps"
@@ -85,8 +85,10 @@ class AWSBase(BaseModel):
             )
         try:
             BusinessUnit(tags["OU"])
-        except ValueError:
-            raise ValueError("The OU tag specified is not a valid business unit")
+        except ValueError as exc:
+            raise ValueError(
+                "The OU tag specified is not a valid business unit"
+            ) from exc
         return tags
 
     @validator("region")
@@ -102,8 +104,8 @@ class AWSBase(BaseModel):
         applicable set of tags to then be updated with specific tags to be set on child
         resources in a ComponentResource class.
 
-        :param *new_tags: One or more dictionaries of specific tags to be set on  # noqa: RST213
-                                                                        a child resource.  # noqa: E501
+        :param *new_tags: One or more dictionaries of specific tags to be set on
+                            a child resource.
         :type new_tags: Dict[Text, Text]
 
         :returns: Merged dictionary of base tags and specific tags to be set on a child

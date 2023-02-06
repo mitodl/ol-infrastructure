@@ -57,7 +57,7 @@ from bridge.secrets.sops import set_env_secrets
 from bridge.settings.openedx.accessors import fetch_application_version
 from bridge.settings.openedx.types import OpenEdxApplication
 
-VERSIONS = {  # noqa: WPS407
+VERSIONS = {
     "consul": CONSUL_VERSION,
     "vault": VAULT_VERSION,
     "consul-template": CONSUL_TEMPLATE_VERSION,
@@ -240,7 +240,7 @@ if node_type == WEB_NODE_TYPE:
         services=[
             ConsulService(
                 name="edxapp",
-                port=8000,  # noqa: WPS432
+                port=8000,
                 tags=["lms"],
                 check=ConsulServiceTCPCheck(
                     name="edxapp-lms",
@@ -339,7 +339,7 @@ if host.get_fact(HasSystemd):
         start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
-            f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} && "  # noqa: WPS237
+            f"/bin/bash -c 'chown edxapp:www-data {lms_config_path} && "
             # Ensure that Vault can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {lms_config_path} && "
             f"setfacl -m u:edxapp:rwx {lms_config_path} && "
@@ -354,7 +354,7 @@ if host.get_fact(HasSystemd):
         start_now=False,
         onchange_command=(
             # Let edxapp read the rendered config file
-            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} && "  # noqa: WPS237
+            f"/bin/bash -c 'chown edxapp:www-data {studio_config_path} && "
             # Ensure that Vault can update the file when credentials refresh
             f"setfacl -m u:consul-template:rwx {studio_config_path} && "
             f"setfacl -m u:edxapp:rwx {studio_config_path} && "

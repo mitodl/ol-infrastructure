@@ -34,7 +34,7 @@ pulumi_vault_creds = read_yaml_secrets(
 )
 
 
-def init_vault_cluster(vault_addr):  # noqa: WPS231
+def init_vault_cluster(vault_addr):
     vault_client = hvac.Client(url=f"https://{vault_addr}")
     recovery_keys = []
     if not vault_client.sys.is_initialized():
@@ -60,7 +60,7 @@ def init_vault_cluster(vault_addr):  # noqa: WPS231
 
         vault_ready = False
         while not vault_ready:
-            try:  # noqa: WPS229
+            try:
                 pulumi.log.info(
                     "Trying to enable the userpass backend",
                     vault_client.sys.is_sealed(),
