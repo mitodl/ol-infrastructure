@@ -45,12 +45,12 @@ repos:
     - --exclude-files
     - src/ol_infrastructure/applications/ocw_site/redirect_dict
 - repo: https://github.com/psf/black
-  rev: 22.10.0
+  rev: 23.1.0
   hooks:
   - id: black
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.238'
+  rev: 'v0.0.243'
   hooks:
   - id: ruff
     args: [--extend-ignore=D1, --fix]
@@ -66,6 +66,6 @@ repos:
     - types-PyYAML
     - types-requests
 - repo: https://github.com/shellcheck-py/shellcheck-py
-  rev: v0.8.0.4
+  rev: v0.9.0.2
   hooks:
   - id: shellcheck
