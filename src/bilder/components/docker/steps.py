@@ -12,7 +12,6 @@ from pyinfra.operations import apt, files
 
 
 def _apt_install():
-
     apt.packages(
         name="Ensure Docker CE prerequisites are present",
         present=True,
@@ -64,7 +63,6 @@ def _apt_install():
 
 @deploy("Deploy Docker")
 def deploy_docker(config: Optional[dict[str, Any]] = None):
-
     if host.get_fact(DebPackages):
         _apt_install()
     else:

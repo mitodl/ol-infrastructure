@@ -23,7 +23,6 @@ from ol_infrastructure.lib.ol_types import AWSBase
 
 class PulumiMocks(pulumi.runtime.Mocks):
     def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-
         print("TYPE: ", args.typ)
 
         outputs = args.inputs
@@ -37,7 +36,6 @@ class PulumiMocks(pulumi.runtime.Mocks):
         return [f"{args.name}_id", outputs]
 
     def call(self, args: pulumi.runtime.MockCallArgs):
-
         output = {}
 
         for key in args.args:
@@ -84,7 +82,6 @@ security_group = SecurityGroup(
 
 
 class TestClassBaseFargateArguments:
-
     fargate_service = OLFargateService(
         config=OLFargateServiceConfig(
             vpc_id=pulumi.Output.from_input(vpc_id),
@@ -279,7 +276,6 @@ class TestClassBaseFargateArguments:
 
 
 class TestClassAllFargateArguments:
-
     assign_public_ip = False
     desired_count = 3
     max_percent = 200

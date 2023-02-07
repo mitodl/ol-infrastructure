@@ -212,7 +212,6 @@ class OLAutoScaling(pulumi.ComponentResource):
         lb_config: Optional[OLLoadBalancerConfig] = None,
         opts: Optional[pulumi.ResourceOptions] = None,
     ):
-
         super().__init__(
             "ol:infrastructure:aws:auto_scale_group:OLAutoScaleGroup",
             asg_config.asg_name,

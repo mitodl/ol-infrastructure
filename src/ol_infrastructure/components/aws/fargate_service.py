@@ -142,7 +142,6 @@ class OLFargateService(pulumi.ComponentResource):
         config: OLFargateServiceConfig,
         opts: Optional[pulumi.ResourceOptions] = None,
     ):
-
         super().__init__(
             "ol:infrastructure:aws:ecs:OLFargateService",
             config.service_name,
@@ -172,7 +171,6 @@ class OLFargateService(pulumi.ComponentResource):
         # We'll enable rollback, as well as, circuit breaker if caller opts in
         circuit_breaker = None
         if config.deployment_circuit_breaker_enabled:
-
             pulumi.log.debug("ecs service deployment service breaker enabled")
 
             circuit_breaker = ServiceDeploymentCircuitBreakerArgs(
