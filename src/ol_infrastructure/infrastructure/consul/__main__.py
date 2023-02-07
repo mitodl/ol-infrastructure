@@ -285,7 +285,7 @@ consul_ami = ec2.get_ami(
 
 # Select instance type
 instance_type_name = (
-    consul_config.get("instance_type") or InstanceTypes.burstable_medium.name
+    consul_config.get("instance_type") or InstanceTypes.burstable_micro.name
 )
 instance_type = InstanceTypes[instance_type_name].value
 
