@@ -53,7 +53,7 @@ for network in [
     "xpro",
 ]:
     # Missing a few stacks for some apps
-    if network in ["apps", "data"]:
+    if network in ["data"]:
         stages = ("QA", "Production")
     else:
         stages = ("CI", "QA", "Production")  # type: ignore
