@@ -25,6 +25,7 @@ default_egress_args = [
 
 @unique
 class InstanceTypes(str, Enum):
+    burstable_nano = "t3a.nano"
     burstable_micro = "t3a.micro"
     burstable_small = "t3a.small"
     burstable_medium = "t3a.medium"
