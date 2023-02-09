@@ -14,6 +14,12 @@ path "secret-concourse/*" {
   capabilities = ["read", "list"]
 }
 
+# To allow Devs to update creds and
+# run the replication on their own
+path "secret-concourse/ocw/ocw-studio-db-replication" {
+  capabilities = ["read", "list", "update"]
+}
+
 # Read app secrets
 path "secret-bootcamps/*" {
   capabilities = ["read", "list"]
