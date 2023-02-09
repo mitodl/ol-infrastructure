@@ -170,6 +170,20 @@ xpro_vpc_config = OLVPCConfig(
 )
 xpro_vpc = OLVPC(xpro_vpc_config)
 
+micromasters_config = Config("micromasters_vpc")
+micromasters_vpc_config = OLVPCConfig(
+    vpc_name=f"micromasters-{stack_info.env_suffix}",
+    cidr_block=micromasters_config.require("cidr_block"),
+    num_subnets=5,
+    tags={
+        "OU": "micromasters",
+        "Environment": f"micromasters-{stack_info.env_suffix}",
+        "business_unit": "micromasters",
+        "Name": f"Micromasters {stack_info.name}",
+    },
+)
+micromasters_vpc = OLVPC(micromasters_vpc_config)
+
 data_vpc_exports = vpc_exports(
     data_vpc,
     [
@@ -372,6 +386,29 @@ xpro_vpc_exports.update(
 )
 export("xpro_vpc", xpro_vpc_exports)
 
+
+micromasters_vpc_exports = vpc_exports(micromasters_vpc, ["data_vpc", "operations_vpc"])
+micromasters_vpc_exports.update(
+    {
+        "security_groups": {
+            "default": micromasters_vpc.olvpc.id.apply(default_group).id,
+            "ssh": public_ssh(micromasters_vpc_config.vpc_name, micromasters_vpc.olvpc)(
+                tags=micromasters_vpc_config.merged_tags(
+                    {"Name": f"micromasters-{stack_info.env_suffix}-public-ssh"}
+                ),
+                name=f"micromasters-{stack_info.env_suffix}-public-ssh",
+            ).id,
+            "web": public_web(micromasters_vpc_config.vpc_name, micromasters_vpc.olvpc)(
+                tags=micromasters_vpc_config.merged_tags(
+                    {"Name": f"micromasters-{stack_info.env_suffix}-public-web"}
+                ),
+                name=f"micromasters-{stack_info.env_suffix}-public-web",
+            ).id,
+        }
+    }
+)
+export("micromasters_vpc", micromasters_vpc_exports)
+
 # TODO: MD 2022-05-13 This probably needs to be expanded upon once the k8s network is peered to others  # noqa: E501
 # when it gains some security groups.
 k8s_vpc_exports = vpc_exports(k8s_vpc)
@@ -482,6 +519,11 @@ data_to_xpro_peer = OLVPCPeeringConnection(
     data_vpc,
     xpro_vpc,
 )
+data_to_micromasters_peer = OLVPCPeeringConnection(
+    "ol-data-{0}-to-micromasters-{0}-vpc-peer".format(stack_info.env_suffix),
+    data_vpc,
+    micromasters_vpc,
+)
 operations_to_applications_peer = OLVPCPeeringConnection(
     "ol-operations-{0}-to-applications-{0}-vpc-peer".format(stack_info.env_suffix),
     operations_vpc,
@@ -513,6 +555,11 @@ operations_to_xpro_peer = OLVPCPeeringConnection(
     "ol-operations-{0}-to-mitxpro-{0}-vpc-peer".format(stack_info.env_suffix),
     operations_vpc,
     xpro_vpc,
+)
+operations_to_micromasters_peer = OLVPCPeeringConnection(
+    "ol-operations-{0}-to-micromasters-{0}-vpc-peer".format(stack_info.env_suffix),
+    operations_vpc,
+    micromasters_vpc,
 )
 
 if stack_info.env_suffix == "production":
