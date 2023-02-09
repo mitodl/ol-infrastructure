@@ -14,3 +14,4 @@ config:
   residential_staging_vpc:cidr_block: 10.30.0.0/16
   residential_vpc:cidr_block: 10.5.0.0/16
   xpro_vpc:cidr_block: 10.6.0.0/16
+  micromasters_vpc:cidr_block: 10.32.0.0/16
