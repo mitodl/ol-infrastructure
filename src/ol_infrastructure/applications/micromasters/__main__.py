@@ -27,7 +27,7 @@ setup_vault_provider()
 micromasters_config = Config("micromasters")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-micromasters_vpc = network_stack.require_output("micromasters_vpc")
+micromasters_vpc = network_stack.require_output("applications_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 micromasters_environment = f"micromasters-{stack_info.env_suffix}"
 aws_config = AWSBase(
