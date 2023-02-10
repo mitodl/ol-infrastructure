@@ -1,4 +1,4 @@
-FROM docker.io/ruby:3.0.4-slim-bullseye
+FROM docker.io/ruby:3.2.1-slim-bullseye
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update && \
   apt upgrade -y && \
