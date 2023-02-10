@@ -52,7 +52,7 @@ aws_account = get_caller_identity()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
-consul_stack = StackReference(f"infrastructure.consul.apps.{stack_info.name}")
+consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 
 # target vpc is 'operations', for a non-app-specific service
@@ -64,9 +64,7 @@ mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
 # TODO MD 20230206
 # This might be needed in the future but right now it just causes errors
-# secrets = read_yaml_secrets(
-#    Path(f"odl_video_service/data.{stack_info.env_suffix}.yaml")
-# )
+secrets = read_yaml_secrets(Path(f"keycloak/data.{stack_info.env_suffix}.yaml"))
 
 aws_config = AWSBase(
     tags={"OU": "operations", "Environment": f"operations-{stack_info.env_suffix}"}
@@ -384,11 +382,11 @@ keycloak_server_vault_mount = vault.Mount(
 )
 
 
-# keycloak_server_secrets = vault.generic.Secret(
-#    "keycloak-server-configuration-secrets",
-#    path=keycloak_server_vault_mount.path.apply("{}/keycloak-secrets".format),
-#    data_json=json.dumps(secrets),
-# )
+keycloak_server_secrets = vault.generic.Secret(
+    "keycloak-server-configuration-secrets",
+    path=keycloak_server_vault_mount.path.apply("{}/keycloak-secrets".format),
+    data_json=json.dumps(secrets),
+)
 domain = keycloak_config.get("domain")
 consul_keys = {
     "keycloak/keycloak_host": domain,

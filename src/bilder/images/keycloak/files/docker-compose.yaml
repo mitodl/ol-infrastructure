@@ -2,6 +2,8 @@
 services:
   keycloak:
     image: quay.io/keycloak/keycloak:${VERSION}
+    command:
+    - "start-dev"
     env_file:
     - ./.env
     labels:
@@ -9,6 +11,7 @@ services:
     - "traefik.http.routers.keycloak.rule=Host(`${KEYCLOAK_HOST}`)"
     - "traefik.http.routers.keycloak.tls.certresolver=letsencrypt_resolver"
     - "traefik.http.routers.keycloak.entrypoints=https"
+    # Probably need to mount a keycloak.conf file
     volumes: []
   traefik:
     image: traefik:v2.9

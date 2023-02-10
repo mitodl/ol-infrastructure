@@ -136,7 +136,7 @@ vault_config = VaultAgentConfig(
     auto_auth=VaultAutoAuthConfig(
         method=VaultAutoAuthMethod(
             type="aws",
-            mount_path="auth/aws-keycloak",
+            mount_path="auth/aws",
             config=VaultAutoAuthAWS(role="keycloak-server"),
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
