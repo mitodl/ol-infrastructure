@@ -14,4 +14,3 @@ config:
   residential_vpc:cidr_block: 10.7.0.0/16
   xpro_vpc:cidr_block: 10.8.0.0/16
   xpro_vpc:name: mitxpro-production
-  micromasters_vpc:cidr_block: 10.33.0.0/16
