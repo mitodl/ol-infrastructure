@@ -59,7 +59,12 @@ consul_template_config = ConsulTemplate()
 hashicorp_products = [vault, consul, consul_template_config]
 install_hashicorp_products(hashicorp_products)
 
-deploy_docker()
+docker_config = {
+    "log-driver": "json-file",
+    "log-opts": {"max-size": "10m", "max-file": "3"},
+}
+
+deploy_docker(docker_config)
 
 if host.get_fact(HasSystemd):
     server.service(
