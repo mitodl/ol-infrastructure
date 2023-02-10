@@ -5,7 +5,6 @@ from bilder.lib.model_helpers import OLBaseSettings
 
 
 class PomeriumConfig(OLBaseSettings):
-
     configuration_directory: Path = Path("/etc/pomerium")
     configuration_template_directory: Path = Path("/etc/vault-templates.d")
 

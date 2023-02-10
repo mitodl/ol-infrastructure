@@ -59,7 +59,7 @@ consul_configuration = {
 # TODO ACL token
 consul_esm_configuration = {
     Path("00-default.json"): ConsulExternalServicesMonitorConfig(
-        token=""  # noqa: S106
+        token=""
     ),
 }
 

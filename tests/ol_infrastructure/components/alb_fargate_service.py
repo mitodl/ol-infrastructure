@@ -22,7 +22,6 @@ from ol_infrastructure.lib.ol_types import AWSBase
 
 class PulumiMocks(pulumi.runtime.Mocks):
     def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-
         print(args.typ)
         outputs = args.inputs
         if args.typ == "aws:ecs/cluster:Cluster":
@@ -35,7 +34,6 @@ class PulumiMocks(pulumi.runtime.Mocks):
         return [f"{args.name}_id", outputs]
 
     def call(self, args: pulumi.runtime.MockCallArgs):
-
         output = {}
 
         for key in args.args:
@@ -82,7 +80,6 @@ security_group = SecurityGroup(
 
 
 class TestClassBaseAlbFargateArguments:
-
     alb_fargate_service = OLApplicationLoadBalancedFargateService(
         config=OLApplicationLoadBalancedFargateConfig(
             name=base_name,

@@ -167,7 +167,7 @@ def get_vault_provider(
         provider_name or "vault-provider",
         address=vault_address,
         add_address_to_env=True,
-        token="",  # noqa: S106
+        token="",
         auth_login_userpass=pulumi_vault.ProviderAuthLoginUserpassArgs(
             mount="pulumi",
             username=pulumi_vault_creds["auth_username"],

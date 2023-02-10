@@ -151,7 +151,6 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
         config: OLApplicationLoadBalancedFargateConfig,
         opts: Optional[pulumi.ResourceOptions] = None,
     ):
-
         super().__init__(
             "ol:infrastructure:aws:ecs:OLALBFargatService", config.name, None, opts
         )
@@ -423,7 +422,6 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
         load_balancer: LoadBalancer,
         opts: ResourceOptions,
     ) -> tuple[Record, str]:
-
         zone = get_zone(config.zone_name)
         cert = get_certificate(config.zone_name, most_recent=True, statuses=["ISSUED"])
 
