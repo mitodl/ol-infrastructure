@@ -111,7 +111,7 @@ micromasters_iam_policy = iam.Policy(
 micromasters_vault_backend_role = vault.aws.SecretBackendRole(
     "micromasters-app",
     name="micromasters",
-    backend="aws",
+    backend="aws-mitx",
     credential_type="iam_user",
     policy_arns=[micromasters_iam_policy.arn],
 )
@@ -166,19 +166,4 @@ micromasters_vault_backend_config = OLVaultPostgresDatabaseConfig(
 )
 micromasters_vault_backend = OLVaultDatabaseBackend(micromasters_vault_backend_config)
 
-# # Set Consul key for use in edxapp configuration template
-# consul.Keys(
-#     "micromasters-app-domain-for-edxapp",
-#     keys=[
-#         consul.KeysKeyArgs(
-#             path="edxapp/marketing-domain",
-#             value=micromasters_config.require("domain"),
-#         ),
-#         consul.KeysKeyArgs(
-#             path="edxapp/proctortrack-base-url",
-#             value=micromasters_config.require("proctortrack_url"),
-#         ),
-#     ],
-# )
-#
 export("micromasters_app", {"rds_host": micromasters_db.db_instance.address})
