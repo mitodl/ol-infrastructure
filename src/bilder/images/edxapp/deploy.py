@@ -167,9 +167,6 @@ vector_config.configuration_templates[
     TEMPLATES_DIRECTORY.joinpath("vector", "edxapp_logs.yaml.j2")
 ] = {"edx_installation": EDX_INSTALLATION_NAME}
 vector_config.configuration_templates[
-    TEMPLATES_DIRECTORY.joinpath("vector", "edxapp_metrics.yaml.j2")
-] = {"edx_installation": EDX_INSTALLATION_NAME}
-vector_config.configuration_templates[
     TEMPLATES_DIRECTORY.joinpath("vector", "edxapp_migrations_logs.yaml.j2")
 ] = {"edx_installation": EDX_INSTALLATION_NAME}
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
@@ -210,6 +207,9 @@ if node_type == WEB_NODE_TYPE:
     vector_config.configuration_templates[
         TEMPLATES_DIRECTORY.joinpath("vector", "edxapp_tracking_logs.yaml.j2")
     ] = {}
+    vector_config.configuration_templates[
+        TEMPLATES_DIRECTORY.joinpath("vector", "edxapp_metrics.yaml.j2")
+    ] = {"edx_installation": EDX_INSTALLATION_NAME}
     vault_templates.extend(
         [
             VaultTemplate(
