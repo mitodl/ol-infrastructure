@@ -41,9 +41,8 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-# Configuration items and initialziations
-if Config("vault_server").get("env_namespace"):
-    setup_vault_provider()
+setup_vault_provider()
+
 keycloak_config = Config("keycloak")
 stack_info = parse_stack()
 
@@ -59,6 +58,8 @@ vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}
 target_vpc_name = keycloak_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
 target_vpc = network_stack.require_output(target_vpc_name)
 target_vpc_id = target_vpc["id"]
+
+data_vpc = network_stack.require_output("data_vpc")
 
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
@@ -138,6 +139,7 @@ keycloak_database_security_group = ec2.SecurityGroup(
                 keycloak_server_security_group.id,
                 consul_stack.require_output("security_groups")["consul_server"],
                 vault_stack.require_output("vault_server")["security_group"],
+                data_vpc["security_groups"]["integrator"],
             ],
             cidr_blocks=[target_vpc["cidr"]],
             protocol="tcp",
@@ -201,9 +203,9 @@ keycloak_db_consul_service = Service(
     },
     checks=[
         ServiceCheckArgs(
-            check_id="keycloak-instance-db",
+            check_id="keycloak-db",
             interval="10s",
-            name="keycloak-instance-db",
+            name="keycloak-db",
             timeout="60s",
             status="passing",
             tcp=Output.all(
@@ -249,8 +251,8 @@ keycloak_server_ami = ec2.get_ami(
 block_device_mappings = [BlockDeviceMapping()]
 
 keycloak_lb_config = OLLoadBalancerConfig(
-    enable_insecure_http=True,
-    listener_cert_domain="video.odl.mit.edu",
+    enable_insecure_http=False,
+    listener_cert_domain="*.odl.mit.edu",
     listener_use_acm=True,
     security_groups=[keycloak_server_security_group],
     subnets=subnets,
