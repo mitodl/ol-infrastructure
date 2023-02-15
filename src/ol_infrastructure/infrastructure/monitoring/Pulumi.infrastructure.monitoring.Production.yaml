@@ -1,0 +1,7 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gGmUka22ZxA+gSjtTQYJpu7AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMwgs2uibhDk5Norz9AgEQgDthPFx801sr1BklahUFoE2gLVQIt1AkbzGBbes+1R6BNTKg2gjoS8f5EeDhNyTQy3+TNxKbzMgjLG4l7A==
+config:
+  monitoring:fastly_customer_id:
+    secure: v1:BlStRhJvdFsmqolz:d4JLskD5SCxBCqzm4RLBybe7IbvxCcCvm2Fpxsp+W6GqkH84mBI=
+  monitoring:fastly_logging_bucket_name: mitodl-fastly-access-logs
