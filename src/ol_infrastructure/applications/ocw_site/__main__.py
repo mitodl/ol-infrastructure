@@ -31,6 +31,15 @@ fastly_provider = get_fastly_provider()
 
 dns_stack = StackReference("infrastructure.aws.dns")
 ocw_zone = dns_stack.require_output("ocw")
+
+monitoring_stack = StackReference("infrastructure.monitoring.Production")
+fastly_access_logging_bucket = monitoring_stack.require_output(
+    "fastly_access_logging_bucket"
+)
+fastly_access_logging_iam_role = monitoring_stack.require_output(
+    "fastly_access_logging_iam_role"
+)
+
 # Create S3 buckets
 # There are two buckets for each environment (QA, Production):
 # One for the that environment's draft site (where authors test content
@@ -453,6 +462,15 @@ for purpose in ("draft", "live"):
                 content=snippets_dir.joinpath("reroute_redirects.vcl").read_text(),
                 name="Reroute Redirects",
                 type="error",
+            ),
+        ],
+        logging_s3s=[
+            fastly.ServiceVclLoggingS3Args(
+                bucket_name=fastly_access_logging_bucket["bucket_name"],
+                name=f"ocw-{purpose}-{stack_info.env_suffix}-logging-args",
+                path=f"/ocw/{purpose}/{stack_info.env_suffix}/",
+                redundancy="standard",
+                s3_iam_role=fastly_access_logging_iam_role["role_arn"],
             ),
         ],
         stale_if_error=True,

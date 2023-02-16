@@ -14,7 +14,7 @@ monitoring_config = Config("monitoring")
 fastly_logging_bucket_name = monitoring_config.get("fastly_logging_bucket_name")
 
 fastly_logging_bucket = s3.Bucket(
-    fastly_logging_bucket_name,
+    f"{fastly_logging_bucket_name}-{stack_info.env_suffix}",
     bucket=fastly_logging_bucket_name,
     acl="private",
     server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
@@ -26,6 +26,13 @@ fastly_logging_bucket = s3.Bucket(
             bucket_key_enabled=True,
         )
     ),
+)
+
+s3.BucketPublicAccessBlock(
+    f"{fastly_logging_bucket_name}-{stack_info.env_suffix}_block_public_access",
+    bucket=fastly_logging_bucket.bucket,
+    block_public_acls=True,
+    block_public_policy=True,
 )
 
 # Ref: https://docs.fastly.com/en/guides/creating-an-aws-iam-role-for-fastly-logging
@@ -41,11 +48,11 @@ fastly_policy_document = {
         }
     ],
 }
-fastly_logging_iam_policy_name = "ol-fast-access-logs-policy"
+fastly_logging_iam_policy_name = "ol-fastly-access-logs-policy"
 
 fastly_logging_iam_policy = iam.Policy(
     fastly_logging_iam_policy_name,
-    name="access-logs-policy",
+    name=fastly_logging_iam_policy_name,
     path="/ol-infrastructure/iam/fastly/",
     policy=lint_iam_policy(fastly_policy_document, stringify=True),
 )
@@ -66,6 +73,12 @@ fastly_logging_iam_role = iam.Role(
             "Sid": "S3LoggingTrustPolicy",
         },
     },
+)
+
+iam.RolePolicyAttachment(
+    "ol-fastly-access-logs-role-permissions",
+    policy_arn=fastly_logging_iam_policy.arn,
+    role=fastly_logging_iam_role.name,
 )
 
 export(
