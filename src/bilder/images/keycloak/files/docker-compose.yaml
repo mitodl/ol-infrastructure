@@ -3,7 +3,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:${VERSION}
     command:
-    - "start-dev"
+    - "start --features=preview"
     env_file:
     - ./.env
     labels:
