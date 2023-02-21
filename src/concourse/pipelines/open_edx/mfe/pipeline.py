@@ -48,6 +48,7 @@ class OpenEdxVars(BaseModel):
     studio_domain: str
     support_url: str
     terms_of_service_url: str
+    accessibility_url: Optional[str]
     trademark_text: Optional[str]
 
     @property
@@ -85,6 +86,7 @@ def mfe_params(
         "STUDIO_BASE_URL": f"https://{open_edx.studio_domain}",
         "SUPPORT_URL": f"https://{open_edx.support_url}",
         "TERMS_OF_SERVICE_URL": open_edx.terms_of_service_url,
+        "ACCESSIBILITY_URL": open_edx.accessibility_url,
         "TRADEMARK_TEXT": open_edx.trademark_text,
         "USER_INFO_COOKIE_NAME": f"{open_edx.environment}-edx-user-info",
     }
