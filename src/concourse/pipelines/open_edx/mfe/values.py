@@ -99,6 +99,7 @@ mitxonline = [
         studio_domain="studio-qa.mitxonline.mit.edu",
         support_url="mitxonline.zendesk.com/hc/",
         terms_of_service_url="https://rc.mitxonline.mit.edu/terms-of-service/",
+        accessibility_url="https://accessibility.mit.edu/",
         trademark_text="© MITxOnline. All rights reserved except where noted.",
     ),
     OpenEdxVars(
@@ -115,6 +116,7 @@ mitxonline = [
         studio_domain="studio.mitxonline.mit.edu",
         support_url="mitxonline.zendesk.com/hc/",
         terms_of_service_url="https://mitxonline.mit.edu/terms-of-service/",
+        accessibility_url="https://accessibility.mit.edu/",
         trademark_text="© MITxOnline. All rights reserved except where noted.",
     ),
 ]
@@ -133,6 +135,7 @@ xpro = [
         studio_domain="studio-ci.xpro.mit.edu",
         support_url="xpro.zendesk.com/hc",
         terms_of_service_url="https://ci.xpro.mit.edu/terms-of-service/",
+        accessibility_url="https://accessibility.mit.edu/",
     ),
     OpenEdxVars(
         deployment_name="xpro",
@@ -147,6 +150,7 @@ xpro = [
         studio_domain="studio-rc.xpro.mit.edu",
         support_url="xpro.zendesk.com/hc",
         terms_of_service_url="https://rc.xpro.mit.edu/terms-of-service/",
+        accessibility_url="https://accessibility.mit.edu/",
     ),
     OpenEdxVars(
         deployment_name="xpro",
@@ -161,6 +165,7 @@ xpro = [
         studio_domain="studio.xpro.mit.edu",
         support_url="xpro.zendesk.com/hc",
         terms_of_service_url="https://xpro.mit.edu/terms-of-service/",
+        accessibility_url="https://accessibility.mit.edu/",
     ),
 ]
 
