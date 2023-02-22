@@ -3,7 +3,7 @@ services:
   keycloak:
     image: mitodl/keycloak:${VERSION}
     command:
-    - "start --features=preview"
+    - "start --features=preview -Dkeycloak.profile.feature.upload_scripts=enabled"
     env_file:
     - ./.env
     labels:
