@@ -100,7 +100,7 @@ mitxonline = [
         support_url="mitxonline.zendesk.com/hc/",
         terms_of_service_url="https://rc.mitxonline.mit.edu/terms-of-service/",
         accessibility_url="https://accessibility.mit.edu/",
-        trademark_text="© MITxOnline. All rights reserved except where noted.",
+        trademark_text="© MITx Online. All rights reserved except where noted.",
     ),
     OpenEdxVars(
         contact_url="https://mitxonline.zendesk.com/hc/en-us/requests/new",
@@ -117,7 +117,7 @@ mitxonline = [
         support_url="mitxonline.zendesk.com/hc/",
         terms_of_service_url="https://mitxonline.mit.edu/terms-of-service/",
         accessibility_url="https://accessibility.mit.edu/",
-        trademark_text="© MITxOnline. All rights reserved except where noted.",
+        trademark_text="© MITx Online. All rights reserved except where noted.",
     ),
 ]
 
