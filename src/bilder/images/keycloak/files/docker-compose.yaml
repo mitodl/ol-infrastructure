@@ -1,7 +1,7 @@
 ---
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:${VERSION}
+    image: mitodl/keycloak:${VERSION}
     command:
     - "start --features=preview"
     env_file:
