@@ -1,0 +1,26 @@
+---
+services:
+  keycloak:
+    image: mitodl/keycloak:${VERSION}
+    command:
+    - "start --features=preview"
+    env_file:
+    - ./.env
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.keycloak.rule=Host(`${KC_HOSTNAME}`)"
+    - "traefik.http.routers.keycloak.tls.certresolver=letsencrypt_resolver"
+    - "traefik.http.routers.keycloak.entrypoints=https"
+    # Probably need to mount a keycloak.conf file
+    volumes: []
+  traefik:
+    image: traefik:v2.9
+    command:
+    - "--configFile=/etc/traefik/traefik.yaml"
+    ports:
+    - "80:80"
+    - "443:443"
+    volumes:
+      # So that Traefik can listen to the Docker events
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - /etc/traefik/:/etc/traefik/
