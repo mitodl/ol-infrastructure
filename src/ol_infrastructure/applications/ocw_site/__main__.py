@@ -469,6 +469,7 @@ for purpose in ("draft", "live"):
                 bucket_name=fastly_access_logging_bucket["bucket_name"],
                 name=f"ocw-{purpose}-{stack_info.env_suffix}-logging-args",
                 format=fastly_log_format_string,
+                compression_codec="gzip",
                 message_type="blank",
                 path=f"/ocw/{stack_info.env_suffix}/{purpose}/",
                 redundancy="standard",
