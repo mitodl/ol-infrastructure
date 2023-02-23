@@ -82,6 +82,7 @@ consul_templates = []
 ##################################################
 # Put down EDX pipeline consul templates
 edx_pipeline_files = [
+    "edxorg_gcp.yaml",
     "mitxonline_edx.yaml",
     "residential_edx.yaml",
     "xpro_edx.yaml",
