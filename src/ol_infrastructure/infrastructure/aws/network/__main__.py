@@ -514,25 +514,3 @@ operations_to_xpro_peer = OLVPCPeeringConnection(
     operations_vpc,
     xpro_vpc,
 )
-if stack_info.env_suffix == "production":
-    # TODO: Delete this once we migrate the Micromasters RDS into the applications VPC
-    # (TMM 2021-05-19)
-    # This is necessary in order for Redash to be able to access the
-    # MicroMasters read replica
-
-    # Update 2022-08-23 (TMM): Micromasters is being actively deprecated and the Redash
-    # instance has been migrated into the Data VPC. The result is that we need to keep
-    # this hack in place until Micromasters is taken out of operation, because it's not
-    # worth the effort to actually migrate the RDS instance.
-    ec2.Route(
-        "operations-to-micromasters-peer-route",
-        route_table_id=operations_vpc.route_table.id,
-        destination_cidr_block="10.10.0.0/16",
-        vpc_peering_connection_id="pcx-0d1b9264",
-    )
-    ec2.Route(
-        "data-to-micromasters-peer-route",
-        route_table_id=data_vpc.route_table.id,
-        destination_cidr_block="10.10.0.0/16",
-        vpc_peering_connection_id="pcx-0cfc129dda49e516c",
-    )
