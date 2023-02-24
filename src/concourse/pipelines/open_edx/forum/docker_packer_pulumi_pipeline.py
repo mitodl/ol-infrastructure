@@ -39,7 +39,7 @@ def build_forum_pipeline(
     forum_dockerfile_repo = git_repo(
         name=Identifier("forum-dockerfile"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="md/forum_timeouts_adj_v2",
+        branch="main",
         paths=["dockerfiles/openedx-forum/Dockerfile"],
     )
 
@@ -55,7 +55,7 @@ def build_forum_pipeline(
     forum_pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-deploy"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="md/forum_timeouts_adj_v2",
+        branch="main",
         paths=[
             *PULUMI_WATCHED_PATHS,
             PULUMI_CODE_PATH.joinpath("applications/forum/"),
