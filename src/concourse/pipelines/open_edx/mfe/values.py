@@ -91,16 +91,18 @@ mitxonline = [
         environment="mitxonline-qa",
         environment_stage="QA",
         favicon_url="https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico",  # noqa: E501
-        honor_code_url="https://rc.mitxonline.mit.edu/honor-code/",
         lms_domain="courses-qa.mitxonline.mit.edu",
         logo_url="https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png",  # noqa: E501
         marketing_site_domain="rc.mitxonline.mit.edu",
         site_name="MITx Online QA",
         studio_domain="studio-qa.mitxonline.mit.edu",
         support_url="mitxonline.zendesk.com/hc/",
+        trademark_text="© MITx Online. All rights reserved except where noted.",
+        honor_code_url="https://rc.mitxonline.mit.edu/honor-code/",
         terms_of_service_url="https://rc.mitxonline.mit.edu/terms-of-service/",
         accessibility_url="https://accessibility.mit.edu/",
-        trademark_text="© MITx Online. All rights reserved except where noted.",
+        about_us_url="https://rc.mitxonline.mit.edu/about-us/",
+        privacy_policy_url="https://rc.mitxonline.mit.edu/privacy-policy/",
     ),
     OpenEdxVars(
         contact_url="https://mitxonline.zendesk.com/hc/en-us/requests/new",
@@ -108,16 +110,18 @@ mitxonline = [
         environment="mitxonline-production",
         environment_stage="Production",
         favicon_url="https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico",  # noqa: E501
-        honor_code_url="https://mitxonline.mit.edu/honor-code/",
         lms_domain="courses.mitxonline.mit.edu",
         logo_url="https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/logo.png",  # noqa: E501
         marketing_site_domain="mitxonline.mit.edu",
         site_name="MITx Online",
         studio_domain="studio.mitxonline.mit.edu",
         support_url="mitxonline.zendesk.com/hc/",
+        trademark_text="© MITx Online. All rights reserved except where noted.",
+        honor_code_url="https://mitxonline.mit.edu/honor-code/",
         terms_of_service_url="https://mitxonline.mit.edu/terms-of-service/",
         accessibility_url="https://accessibility.mit.edu/",
-        trademark_text="© MITx Online. All rights reserved except where noted.",
+        about_us_url="https://mitxonline.mit.edu/about-us/",
+        privacy_policy_url="https://mitxonline.mit.edu/privacy-policy/",
     ),
 ]
 
@@ -127,45 +131,51 @@ xpro = [
         environment="xpro-ci",
         environment_stage="CI",
         favicon_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico",  # noqa: E501
-        honor_code_url="https://ci.xpro.mit.edu/honor-code/",
         lms_domain="courses-ci.xpro.mit.edu",
         logo_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png",  # noqa: E501
         marketing_site_domain="ci.xpro.mit.edu",
         site_name="MIT xPRO CI",
         studio_domain="studio-ci.xpro.mit.edu",
         support_url="xpro.zendesk.com/hc",
+        honor_code_url="https://ci.xpro.mit.edu/honor-code/",
         terms_of_service_url="https://ci.xpro.mit.edu/terms-of-service/",
         accessibility_url="https://accessibility.mit.edu/",
+        about_us_url="https://ci.xpro.mit.edu/about-us/",
+        privacy_policy_url="https://ci.xpro.mit.edu/privacy-policy/",
     ),
     OpenEdxVars(
         deployment_name="xpro",
         environment="xpro-qa",
         environment_stage="QA",
         favicon_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico",  # noqa: E501
-        honor_code_url="https://rc.xpro.mit.edu/honor-code/",
         lms_domain="courses-rc.xpro.mit.edu",
         logo_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png",  # noqa: E501
         marketing_site_domain="rc.xpro.mit.edu",
         site_name="MIT xPRO RC",
         studio_domain="studio-rc.xpro.mit.edu",
         support_url="xpro.zendesk.com/hc",
+        honor_code_url="https://rc.xpro.mit.edu/honor-code/",
         terms_of_service_url="https://rc.xpro.mit.edu/terms-of-service/",
         accessibility_url="https://accessibility.mit.edu/",
+        about_us_url="https://rc.xpro.mit.edu/about-us/",
+        privacy_policy_url="https:/rc.xpro.mit.edu/privacy-policy/",
     ),
     OpenEdxVars(
         deployment_name="xpro",
         environment="xpro-production",
         environment_stage="Production",
         favicon_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico",  # noqa: E501
-        honor_code_url="https://xpro.mit.edu/honor-code/",
         lms_domain="courses.xpro.mit.edu",
         logo_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png",  # noqa: E501
         marketing_site_domain="xpro.mit.edu",
         site_name="MIT xPRO",
         studio_domain="studio.xpro.mit.edu",
         support_url="xpro.zendesk.com/hc",
+        honor_code_url="https://xpro.mit.edu/honor-code/",
         terms_of_service_url="https://xpro.mit.edu/terms-of-service/",
         accessibility_url="https://accessibility.mit.edu/",
+        about_us_url="https://xpro.mit.edu/about-us/",
+        privacy_policy_url="https:/xpro.mit.edu/privacy-policy/",
     ),
 ]
 
