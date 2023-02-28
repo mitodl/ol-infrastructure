@@ -374,7 +374,7 @@ class OLAutoScaling(pulumi.ComponentResource):
             vpc_security_group_ids=lt_config.security_groups,
             metadata_options=LaunchTemplateMetadataOptionsArgs(
                 http_endpoint="enabled",
-                http_tokens="optional",  # noqa: S106
+                http_tokens="optional",
                 http_put_response_hop_limit=5,
                 instance_metadata_tags="enabled",
             ),
