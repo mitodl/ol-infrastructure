@@ -18,7 +18,7 @@ application, you'd use `micromasters-ci`.
 ╰ ➤ heroku addons -a micromasters-ci | grep -i postgres
 heroku-postgresql (postgresql-rigid-71273)  mini   $5/month   created
  └─ as HEROKU_POSTGRES_YELLOW
-``` 
+```
 so in this case we see that postgresql-rigid-71273 is attached as HEROKU_POSTGRES_YELLOW
 - A set of URLs to browse when the transition is done to ensure everything is working properly. You should also browse them before the transition to note how
 everything looks.
