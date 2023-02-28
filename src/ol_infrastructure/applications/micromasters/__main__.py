@@ -6,7 +6,6 @@
 
 import json
 
-import pulumi_consul as consul
 import pulumi_vault as vault
 from pulumi import Config, StackReference, export
 from pulumi_aws import ec2, iam, s3
