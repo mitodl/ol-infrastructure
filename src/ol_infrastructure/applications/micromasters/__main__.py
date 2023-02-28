@@ -1,4 +1,5 @@
-"""Create the infrastructure and services needed to support the MicroMasters application.
+"""Create the infrastructure and services needed to support the
+MicroMasters application.
 
 - Create a PostgreSQL database in AWS RDS for production environments
 - Create an IAM policy to grant access to S3 and other resources
