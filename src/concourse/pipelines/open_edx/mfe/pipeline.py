@@ -40,15 +40,18 @@ class OpenEdxVars(BaseModel):
     environment: str
     environment_stage: EnvStage
     favicon_url: str
-    honor_code_url: Optional[str]
     lms_domain: str
     logo_url: str
     marketing_site_domain: str
     site_name: str
     studio_domain: str
     support_url: str
-    terms_of_service_url: str
     trademark_text: Optional[str]
+    honor_code_url: Optional[str]
+    terms_of_service_url: str
+    accessibility_url: Optional[str]
+    about_us_url: Optional[str]
+    privacy_policy_url: Optional[str]
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -66,7 +69,6 @@ def mfe_params(
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "CONTACT_URL": open_edx.contact_url,
         "FAVICON_URL": open_edx.favicon_url,
-        "HONOR_CODE_URL": open_edx.honor_code_url,
         "LANGUAGE_PREFERENCE_COOKIE_NAME": f"{open_edx.environment}-open-edx-language-preference",  # noqa: E501
         "LMS_BASE_URL": f"https://{open_edx.lms_domain}",
         "LOGIN_URL": f"https://{open_edx.lms_domain}/login",
@@ -84,9 +86,13 @@ def mfe_params(
         "SITE_NAME": open_edx.site_name,
         "STUDIO_BASE_URL": f"https://{open_edx.studio_domain}",
         "SUPPORT_URL": f"https://{open_edx.support_url}",
-        "TERMS_OF_SERVICE_URL": open_edx.terms_of_service_url,
         "TRADEMARK_TEXT": open_edx.trademark_text,
         "USER_INFO_COOKIE_NAME": f"{open_edx.environment}-edx-user-info",
+        "HONOR_CODE_URL": open_edx.honor_code_url,
+        "TERMS_OF_SERVICE_URL": open_edx.terms_of_service_url,
+        "ACCESSIBILITY_URL": open_edx.accessibility_url,
+        "ABOUT_US_URL": open_edx.about_us_url,
+        "PRIVACY_POLICY_URL": open_edx.privacy_policy_url,
     }
 
 

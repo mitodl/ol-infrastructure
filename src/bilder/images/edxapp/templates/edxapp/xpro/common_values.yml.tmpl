@@ -198,6 +198,7 @@ CODE_JAIL:
     user: sandbox
 ENABLE_CODEJAIL_REST_SERVICE: true
 CODE_JAIL_REST_SERVICE_HOST: http://codejail.service.consul:8000
+CONTACT_US_ENABLE: false
 COMMENTS_SERVICE_URL: http://forum.service.consul:4567  # MODIFIED
 COMPREHENSIVE_THEME_DIRS:
 - /edx/app/edxapp/themes/  # MODIFIED
@@ -384,7 +385,12 @@ MICROSITE_CONFIGURATION: {}
 MICROSITE_ROOT_DIR: /edx/app/edxapp/edx-microsite
 MITXPRO_CORE_REDIRECT_ALLOW_RE_LIST: ["^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh)", "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"]  # ADDED VALUE
 MKTG_URLS: {}
-MKTG_URL_LINK_MAP: {}
+MKTG_URL_LINK_MAP:
+    TOS: tos
+    HONOR: honor
+    ABOUT: about
+    PRIVACY: privacy
+    ACCESSIBILITY: accessibility
 MOBILE_STORE_URLS: {}
 ########################################################################################
 # Previously assumed to be unnecessary config as it duplicates code from               #
