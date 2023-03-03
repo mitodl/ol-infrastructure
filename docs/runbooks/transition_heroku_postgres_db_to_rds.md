@@ -139,3 +139,13 @@ All you need to do is promote the old Heroku managed DB back into use:
 Obviously substitute your db and application for the ones above.
 
 Re-run your tests as defined above to make sure everything's working right post-rollback.
+
+## S3 Buckets
+
+Our applications use S3 buckets for CMS asset storage and backup among other things.
+
+You will need to either continue using the existing buckets by using `pulumi import` or creating new onnes. You should create
+new ones if the old ones don't conform to naming conventions. You'll also need to ensure that IAM permissions are properly
+set in your Pulumi code.
+
+To sync the bucket contents, use the [AWS CLI](https://docs.aws.amazon.com/cli/latest/reference/s3/sync.html) `aws s3 sync` command.
