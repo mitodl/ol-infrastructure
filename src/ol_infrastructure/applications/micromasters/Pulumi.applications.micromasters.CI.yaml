@@ -8,6 +8,5 @@ config:
   micromasters:db_password:
     secure: v1:DTEttuHYUMFQ5AJM:FSsYgItu3JT8hNcO/kz/JJn3t/dSHEWl5RSNUzlErvov6GDajBte9cvhMjrWi1itHopHJCkiseHdBxjz8Iulaodo9eeHQwSMrAq3+HuWgXE=
   micromasters:domain: ci.micromasters.mit.edu
-  micromasters:proctortrack_url: https://preproduction.verificient.com
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
