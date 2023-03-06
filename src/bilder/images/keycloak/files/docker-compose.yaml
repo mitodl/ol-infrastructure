@@ -3,7 +3,8 @@ services:
   keycloak:
     image: mitodl/keycloak:${VERSION}
     command:
-    - "start --features=preview -Dkeycloak.profile.feature.upload_scripts=enabled"
+    - "start --features=preview -Dkeycloak.profile.feature.upload_scripts=enabled\
+      \ --spi-connections-jpa-default-migration-strategy=update"
     env_file:
     - ./.env
     labels:
@@ -11,8 +12,8 @@ services:
     - "traefik.http.routers.keycloak.rule=Host(`${KC_HOSTNAME}`)"
     - "traefik.http.routers.keycloak.tls.certresolver=letsencrypt_resolver"
     - "traefik.http.routers.keycloak.entrypoints=https"
-    # Probably need to mount a keycloak.conf file
-    volumes: []
+    volumes:
+    - /etc/docker/compose/cache-ispn-jdbc-ping.xml:/opt/keycloak/conf/cache-ispn-jdbc-ping.xml:ro
   traefik:
     image: traefik:v2.9
     command:
