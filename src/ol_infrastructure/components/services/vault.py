@@ -29,8 +29,8 @@ from ol_infrastructure.lib.vault import (
     postgres_role_statements,
 )
 
-SIX_MONTHS = 60 * 60 * 24 * 30 * 6  # noqa: WPS432
-TWELVE_MONTHS = 60 * 60 * 24 * 30 * 12  # noqa: WPS432
+SIX_MONTHS = 60 * 60 * 24 * 30 * 6
+TWELVE_MONTHS = 60 * 60 * 24 * 30 * 12
 VAULT_API_URL = "https://active.vault.service.consul/v1"
 
 CERTIFICATE_CONFIG = {
@@ -263,7 +263,6 @@ class OLVaultAWSSecretsEngine(ComponentResource):
         self.register_outputs({})
 
 
-
 class OLVaultPKIIntermediateCABackendConfig(BaseModel):
     max_ttl: int = ONE_MONTH_SECONDS * 12
     default_ttl: int = ONE_MONTH_SECONDS * 12
@@ -444,7 +443,7 @@ class OLVaultPKIIntermediateRoleConfig(BaseModel):
     cert_type: str  # Should be client or server
     resource_name: Text
 
-    class Config:  # noqa: WPS431, WPS306, D106
+    class Config:
         arbitrary_types_allowed = True
 
     @validator("cert_type")
@@ -483,7 +482,6 @@ class OLVaultPKIIntermediateRole(ComponentResource):
             # forcing role name so that pulumi doesn't add suffix
             name=role_config.role_name,
             backend=role_config.pki_intermediate_backend.path,
-
             allowed_domains=role_config.allowed_domains,
             allow_glob_domains=True,
             key_type=role_config.key_config.name,
