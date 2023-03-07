@@ -42,6 +42,8 @@ services:
     ports:
     - "4000"
     command: ["--package-name", "ol_orchestrate.repositories.edx_gcs_courses"]
+    volumes:
+    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     env_file:
       - .env
   nginx:
