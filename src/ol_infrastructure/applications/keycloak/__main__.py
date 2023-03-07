@@ -123,6 +123,21 @@ keycloak_server_security_group = ec2.SecurityGroup(
             cidr_blocks=["0.0.0.0/0"],
             description=f"Allow traffic to the keycloak server on port {DEFAULT_HTTPS_PORT}",  # noqa: E501
         ),
+        # https://infinispan.org/docs/stable/titles/security/security.html#ports_protocols
+        ec2.SecurityGroupIngressArgs(
+            self=True,
+            from_port=7800,
+            to_port=7800,
+            protocol="tcp",
+            description="Allow all keycloak servers to talk to all other keycloak servers on port 7800 tcp for IPSN clustering.",  # noqa: E501
+        ),
+        ec2.SecurityGroupIngressArgs(
+            self=True,
+            from_port=7800,
+            to_port=7800,
+            protocol="udp",
+            description="Allow all keycloak servers to talk to all other keycloak servers on port 7800 udp for IPSN clustering.",  # noqa: E501
+        ),
     ],
     egress=default_egress_args,
     vpc_id=target_vpc_id,
