@@ -27,6 +27,7 @@ setup_vault_provider()
 micromasters_config = Config("micromasters")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
 micromasters_vpc = network_stack.require_output("applications_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 micromasters_environment = f"micromasters-{stack_info.env_suffix}"
@@ -41,6 +42,7 @@ aws_config = AWSBase(
 # Create S3 bucket
 
 # Bucket used to store files from MicroMasters app.
+kms_s3_key = kms_stack.require_output("kms_s3_data_analytics_key")
 micromasters_bucket_name = f"ol-micromasters-app-{stack_info.env_suffix}"
 micromasters_bucket = s3.Bucket(
     f"micromasters-{stack_info.env_suffix}",
@@ -50,12 +52,22 @@ micromasters_bucket = s3.Bucket(
     ),
     tags=aws_config.tags,
     acl="private",
+    server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
+        rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
+                sse_algorithm="aws:kms",
+                kms_master_key_id=kms_s3_key["id"],
+            ),
+            bucket_key_enabled=True,
+        )
+    ),
     policy=json.dumps(
         {
             "Version": "2012-10-17",
             "Statement": [
                 {
                     "Effect": "Allow",
+                    "Principal": "*",
                     "Action": ["s3:GetObject","s3:ListAllMyBuckets", "s3:ListBucket", "s3:ListObjects", "s3:PutObject", "s3:DeleteObject"],
                     "Resource": [f"arn:aws:s3:::{micromasters_bucket_name}/*"],
                 }
