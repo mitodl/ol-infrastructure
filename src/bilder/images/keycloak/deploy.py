@@ -119,6 +119,13 @@ files.put(
     mode="0664",
 )
 
+files.put(
+    name="Upload cache configuration xml",
+    src=str(FILES_DIRECTORY.joinpath("cache-ispn-jdbc-ping.xml")),
+    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("cache-ispn-jdbc-ping.xml")),
+    mode="0664",
+)
+
 # Install vault, consul, consul-template
 vault_config = VaultAgentConfig(
     cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
