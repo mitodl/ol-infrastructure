@@ -663,7 +663,7 @@ for worker_def in concourse_config.get_object("workers") or []:
         key_name="oldevops",
         metadata_options=ec2.LaunchTemplateMetadataOptionsArgs(
             http_endpoint="enabled",
-            http_tokens="optional",  # noqa: S106
+            http_tokens="optional",
             http_put_response_hop_limit=5,
             instance_metadata_tags="enabled",
         ),

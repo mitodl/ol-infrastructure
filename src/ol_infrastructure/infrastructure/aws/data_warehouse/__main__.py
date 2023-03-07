@@ -2,7 +2,7 @@ import json
 from typing import Any, Union
 
 from pulumi import Config, StackReference, export
-from pulumi_aws import athena, glue, iam, lakeformation, s3
+from pulumi_aws import athena, glue, iam, s3
 
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -93,10 +93,6 @@ for data_stage in data_stages:
         versioning=s3.BucketVersioningArgs(enabled=True),
         tags=aws_config.merged_tags({"OU": "data"}),
     )
-    lakeformation.Resource(
-        f"lakeformation_s3_bucket_{data_stage}",
-        arn=lake_storage_bucket.arn,
-    )
     warehouse_buckets.append(lake_storage_bucket)
     s3.BucketPublicAccessBlock(
         f"ol_data_lake_s3_bucket_{data_stage}_block_public_access",
@@ -109,10 +105,6 @@ for data_stage in data_stages:
         name=f"ol_warehouse_{stack_info.env_suffix}_{data_stage}",
         description=f"Data mart for data in {data_stage} format in the {stack_info.env_suffix} environment.",  # noqa: E501
         location_uri=lake_storage_bucket.bucket.apply(lambda bucket: f"s3://{bucket}/"),
-    )
-    lakeformation.Resource(
-        f"lakeformation_warehouse_db_{data_stage}",
-        arn=warehouse_db.arn,
     )
     warehouse_dbs.append(warehouse_db)
 
@@ -146,6 +138,7 @@ query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
             "glue:BatchDeletePartition",
             "glue:BatchDeleteTable",
             "glue:BatchGetPartition",
+            "glue:CreateDatabase",
             "glue:CreateTable",
             "glue:CreatePartition",
             "glue:DeletePartition",
