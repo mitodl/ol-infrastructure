@@ -84,7 +84,7 @@ files.put(
 files.put(
     name="Place Airbyte flags file",
     src=str(FILES_DIRECTORY.joinpath("flags.yml")),
-    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("files.yml")),
+    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("flags.yml")),
     mode="0664",
 )
 
