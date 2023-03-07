@@ -68,7 +68,14 @@ micromasters_bucket = s3.Bucket(
                 {
                     "Effect": "Allow",
                     "Principal": "*",
-                    "Action": ["s3:GetObject","s3:ListAllMyBuckets", "s3:ListBucket", "s3:ListObjects", "s3:PutObject", "s3:DeleteObject"],
+                    "Action": [
+                        "s3:GetObject",
+                        "s3:ListAllMyBuckets",
+                        "s3:ListBucket",
+                        "s3:ListObjects",
+                        "s3:PutObject",
+                        "s3:DeleteObject",
+                    ],
                     "Resource": [f"arn:aws:s3:::{micromasters_bucket_name}/*"],
                 }
             ],
