@@ -80,9 +80,9 @@ postgres_role_statements = {
           GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO "{{name}}";
           SET ROLE "{{name}}";
           ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public GRANT SELECT
-             ON TABLES TO "{{name}}";
+             ON ALL TABLES TO "{{name}}";
           ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public GRANT SELECT
-             ON SEQUENCES TO "{{name}}";
+             ON ALL SEQUENCES TO "{{name}}";
           RESET ROLE;"""
         ),
         "revoke": Template(

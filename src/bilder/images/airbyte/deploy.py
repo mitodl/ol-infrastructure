@@ -76,7 +76,7 @@ configure_pomerium(pomerium_config)
 
 files.put(
     name="Place the airbyte docker-compose.yaml file",
-    src=str(FILES_DIRECTORY.joinpath("files", "docker-compose.yaml")),
+    src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml")),
     dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
     mode="0664",
 )
@@ -84,7 +84,7 @@ files.put(
 files.put(
     name="Place Airbyte flags file",
     src=str(FILES_DIRECTORY.joinpath("flags.yml")),
-    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("files.yml")),
+    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("flags.yml")),
     mode="0664",
 )
 
