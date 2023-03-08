@@ -42,6 +42,7 @@ aws_config = AWSBase(
 
 # Bucket used to store files from MicroMasters app.
 micromasters_bucket_name = f"ol-micromasters-app-{stack_info.env_suffix}"
+micromasters_audit_bucket_name = f"odl-micromasters-audit-{stack_info.env_suffix}"
 micromasters_bucket = s3.Bucket(
     f"micromasters-{stack_info.env_suffix}",
     bucket=micromasters_bucket_name,
@@ -90,6 +91,7 @@ micromasters_iam_policy = iam.Policy(
                 },
                 {
                     "Effect": "Allow",
+                    "Principal": "*",
                     "Action": [
                         "s3:ListBucket*",
                         "s3:PutObject",
@@ -100,6 +102,8 @@ micromasters_iam_policy = iam.Policy(
                     "Resource": [
                         f"arn:aws:s3:::{micromasters_bucket_name}",
                         f"arn:aws:s3:::{micromasters_bucket_name}/*",
+                        f"arn:aws:s3:::{micromasters_audit_bucket_name}",
+                        f"arn:aws:s3:::{micromasters_audit_bucket_name}/*",
                     ],
                 },
             ],
