@@ -316,7 +316,7 @@ class OLVaultPKIIntermediateCABackend(ComponentResource):
             pkisecret.SecretBackendIntermediateCertRequest(
                 "pki-intermediate-ca-csr",
                 backend=self.pki_intermediate_ca_backend.id,
-                common_name="pki-intermediate-ca " "Intermediate Authority",
+                common_name="pki-intermediate-ca Intermediate Authority",
                 type="internal",
                 country=CERTIFICATE_CONFIG["country"],
                 province=CERTIFICATE_CONFIG["state"],

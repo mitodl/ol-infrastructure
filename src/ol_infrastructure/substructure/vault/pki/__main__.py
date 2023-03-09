@@ -17,11 +17,10 @@ env_config = Config("environment")
 stack_info = parse_stack()
 pki_intermediate_export = {}
 
-acmpca_stack = StackReference("infrastructure.aws.private_ca")
-root_ca_arn = acmpca_stack.require_output("root_ca").apply(lambda rca: f"{rca['arn']}")
+root_ca = StackReference("infrastcuture.aws.private_ca").require_output("root_ca")
+root_ca_arn = root_ca["arn"]
 
-if Config("vault_server").get("env_namespace"):
-    setup_vault_provider()
+setup_vault_provider()
 
 pki_intermediate_ca_config = OLVaultPKIIntermediateCABackendConfig(
     max_ttl=TWELVE_MONTHS * 5,
