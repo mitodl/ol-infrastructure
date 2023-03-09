@@ -1,0 +1,12 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHi+npazf3LfzV9oCtcYyCMYLOzaQhbo9xt6lJVVpz9tkQHmbQbdOIGG4Jt34XVtsKrHAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMzjNghqk4vTeob3lJAgEQgDt7H0yPqnjaQpouv/pngrLocorB4cYIcu+1zjTT95OxLKYWG6n4zAOokfTG64Ut0fyLkxA2EvI7vytTgg==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-micromasters-ci.odl.mit.edu
+  consul:scheme: https
+  micromasters:db_password:
+    secure: v1:DTEttuHYUMFQ5AJM:FSsYgItu3JT8hNcO/kz/JJn3t/dSHEWl5RSNUzlErvov6GDajBte9cvhMjrWi1itHopHJCkiseHdBxjz8Iulaodo9eeHQwSMrAq3+HuWgXE=
+  micromasters:domain: micromasters-ci.odl.mit.edu
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
