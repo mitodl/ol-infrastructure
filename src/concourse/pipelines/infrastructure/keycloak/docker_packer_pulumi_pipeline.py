@@ -17,14 +17,14 @@ from concourse.lib.resources import git_repo, registry_image
 
 
 def build_keycloak_pipeline() -> Pipeline:
-    # When the odl-custom-keycloak repo is ready for it and has doof implemented,
+    # When the ol-keycloak-customization repo is ready for it and has doof implemented,
     # this should be split into two resources, one for `release` and another for
     # `release-canidate` branch. Then refs should be updated. See OVS pipeline.
-    keycloak_branch = "main"
-    keycloak_repo = git_repo(
-        Identifier("mitodl-custom-keycloak-md-main"),
-        uri="https://github.com/mitodl/odl-custom-keycloak",
-        branch=keycloak_branch,
+    keycloak_customization_branch = "main"
+    keycloak_customization_repo = git_repo(
+        Identifier("ol-keycloak-customization-md-main"),
+        uri="https://github.com/mitodl/ol-keycloak-customization",
+        branch=keycloak_customization_branch,
     )
 
     keycloak_registry_image = registry_image(
@@ -57,13 +57,17 @@ def build_keycloak_pipeline() -> Pipeline:
         name="build-keycloak-docker-image",
         build_log_retention={"builds": 10},
         plan=[
-            GetStep(get=keycloak_repo.name, trigger=True),
+            GetStep(get=keycloak_customization_repo.name, trigger=True),
             container_build_task(
-                inputs=[Input(name=keycloak_repo.name)],
+                inputs=[Input(name=keycloak_customization_repo.name)],
                 build_parameters={
-                    "CONTEXT": keycloak_repo.name,
-                    "DOCKERFILE": f"{keycloak_repo.name}/Dockerfile.hosted",
-                    "BUILD_ARGS_FILE": f"{keycloak_repo.name}/.keycloak_upstream_tag",
+                    "CONTEXT": keycloak_customization_repo.name,
+                    "DOCKERFILE": (
+                        f"{keycloak_customization_repo.name}/Dockerfile.hosted"
+                    ),
+                    "BUILD_ARGS_FILE": (
+                        f"{keycloak_customization_repo.name}/.keycloak_upstream_tag"
+                    ),
                     "IMAGE_PLATFORM": "linux/amd64",
                 },
                 build_args=[],
@@ -72,14 +76,16 @@ def build_keycloak_pipeline() -> Pipeline:
                 put=keycloak_registry_image.name,
                 params={
                     "image": "image/image.tar",
-                    "additional_tags": f"./{keycloak_repo.name}/.git/describe_ref",
+                    "additional_tags": (
+                        f"./{keycloak_customization_repo.name}/.git/describe_ref"
+                    ),
                 },
             ),
         ],
     )
 
     container_fragment = PipelineFragment(
-        resources=[keycloak_repo, keycloak_registry_image],
+        resources=[keycloak_customization_repo, keycloak_registry_image],
         jobs=[docker_build_job],
     )
 
@@ -90,12 +96,12 @@ def build_keycloak_pipeline() -> Pipeline:
                 trigger=True,
                 passed=[docker_build_job.name],
             ),
-            GetStep(get=keycloak_repo.name, trigger=False),
+            GetStep(get=keycloak_customization_repo.name, trigger=False),
         ],
         image_code=keycloak_packer_code,
         packer_template_path="src/bilder/images/keycloak/keycloak.pkr.hcl",
         env_vars_from_files={
-            "KEYCLOAK_VERSION": f"{keycloak_repo.name}/.git/describe_ref"
+            "KEYCLOAK_VERSION": f"{keycloak_customization_repo.name}/.git/describe_ref"
         },
         job_name_suffix="keycloak",
     )
@@ -124,7 +130,7 @@ def build_keycloak_pipeline() -> Pipeline:
             # Expand this to account for `release` and `release-canidate` branches
             0: [
                 GetStep(
-                    get=keycloak_repo.name,
+                    get=keycloak_customization_repo.name,
                     trigger=True,
                     passed=[ami_fragment.jobs[-1].name],
                 ),
