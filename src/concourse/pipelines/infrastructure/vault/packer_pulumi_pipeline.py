@@ -1,9 +1,17 @@
 from concourse.lib.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from concourse.lib.models.fragment import PipelineFragment
-from concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
+from concourse.lib.models.pipeline import (
+    GetStep,
+    Identifier,
+    Pipeline,
+    Resource,
+    ResourceType,
+    Job,
+)
 from concourse.lib.resource_types import hashicorp_resource
 from concourse.lib.resources import git_repo, hashicorp_release
+
 
 vault_release = hashicorp_release(Identifier("vault-release"), "vault")
 vault_image_code = git_repo(
@@ -22,6 +30,11 @@ vault_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
     uri="https://github.com/mitodl/ol-infrastructure",
     paths=[*PULUMI_WATCHED_PATHS, "src/ol_infrastructure/infrastructure/vault/"],
+)
+vault_pulumi_substructure_code = git_repo(
+    name=Identifier("ol-infrastructure-pulumi-substructure"),
+    uri="https://github.com/mitodl/ol-infrastructure",
+    paths=[*PULUMI_WATCHED_PATHS, "src/ol_infrastructure/substructure/vault/"],
 )
 
 get_vault_release = GetStep(get=vault_release.name, trigger=True)
@@ -53,12 +66,37 @@ vault_pulumi_fragment = pulumi_jobs_chain(
     ],
 )
 
+substructure_resource_types: list[ResourceType] = []
+substructure_resources: list[Resource] = []
+substructure_jobs: list[Job] = []
+
+for substructure in ["pki"]:
+    substructure_fragment = pulumi_jobs_chain(
+        vault_pulumi_substructure_code,
+        project_name="ol-infrastructure-vault-substructure",
+        stack_names=[
+            f"substructure.vault.{substructure}.operations.{stage}"
+            for stage in ("CI", "QA", "Production")
+        ],
+        project_source_path=PULUMI_CODE_PATH.joinpath(
+            "substructure/vault/{substucture}/"
+        ),
+    )
+    substructure_resource_types = (
+        substructure_resource_types + substructure_fragment.resource_types
+    )
+    substructure_resources = substructure_resources + substructure_fragment.resources
+    substructure_jobs = substructure_jobs = substructure_fragment.jobs
+
 combined_fragment = PipelineFragment(
     resource_types=vault_ami_fragment.resource_types
     + vault_pulumi_fragment.resource_types
+    + substructure_resource_types
     + [hashicorp_resource()],
-    resources=vault_ami_fragment.resources + vault_pulumi_fragment.resources,
-    jobs=vault_ami_fragment.jobs + vault_pulumi_fragment.jobs,
+    resources=vault_ami_fragment.resources
+    + vault_pulumi_fragment.resources
+    + substructure_resources,
+    jobs=vault_ami_fragment.jobs + vault_pulumi_fragment.jobs + substructure_jobs,
 )
 
 vault_pipeline = Pipeline(
@@ -68,6 +106,7 @@ vault_pipeline = Pipeline(
         vault_image_code,
         vault_release,
         vault_pulumi_code,
+        vault_pulumi_substructure_code,
     ],
     jobs=combined_fragment.jobs,
 )
