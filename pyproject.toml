@@ -148,4 +148,5 @@ inline-quotes = "double"
 
 [tool.ruff.per-file-ignores]
 "test_*.py" = ["S101"]
+"src/ol_infrastructure/substructure/vault/pki/__main__.py" = ["E501"]
 "src/ol_infrastructure/lib/fastly.py" = ["E501"]

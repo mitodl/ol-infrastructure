@@ -377,12 +377,8 @@ class OLVaultPKIIntermediateCABackend(ComponentResource):
         self.pki_intermediate_ca_config_urls = pkisecret.SecretBackendConfigUrls(
             "pki-intermediate-ca-config-url",
             backend=self.pki_intermediate_ca_backend.id,
-            crl_distribution_points=[
-                f"{VAULT_API_URL}/backend_config.vault_intermediate_ca_backend_path/crl"
-            ],
-            issuing_certificates=[
-                f"{VAULT_API_URL}/backend_config.vault_intermediate_ca_backend_path/ca"
-            ],
+            crl_distribution_points=[f"{VAULT_API_URL}/pki_intermediate_ca/crl"],
+            issuing_certificates=[f"{VAULT_API_URL}/pki_intermediate_ca/ca"],
         )
         self.register_outputs(
             {"pki_intermediate_ca": self.pki_intermediate_ca_backend.id}
@@ -509,24 +505,22 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
         )
 
         # Install the signed pki-intermediate-ca from AWS as pki-intermediate-ca
-        self.pki_intermediate_environment_config_urls = (
-            pkisecret.SecretBackendConfigUrls(
-                f"pki-intermediate-{backend_config.environment_name}-config-url",
-                backend=self.pki_intermediate_environment_backend.id,
-                crl_distribution_points=[
-                    f"{VAULT_API_URL}/backend_confg.environment_name/crl"
+        self.pki_intermediate_environment_config_urls = pkisecret.SecretBackendConfigUrls(  # noqa: E501
+            f"pki-intermediate-{backend_config.environment_name}-config-url",
+            backend=self.pki_intermediate_environment_backend.id,
+            crl_distribution_points=[
+                f"{VAULT_API_URL}/pki_intermediate_{backend_config.environment_name}/crl"
+            ],
+            issuing_certificates=[
+                f"{VAULT_API_URL}/pki_intermediate_{backend_config.environment_name}/ca"
+            ],
+            opts=ResourceOptions(
+                depends_on=[
+                    self.pki_intermediate_environment_set_signed,
+                    self.pki_intermediate_environment_backend_config,
                 ],
-                issuing_certificates=[
-                    f"{VAULT_API_URL}/backend_confg.environment_name/ca"
-                ],
-                opts=ResourceOptions(
-                    depends_on=[
-                        self.pki_intermediate_environment_set_signed,
-                        self.pki_intermediate_environment_backend_config,
-                    ],
-                    parent=self.pki_intermediate_environment_signed_csr,
-                ),
-            )
+                parent=self.pki_intermediate_environment_signed_csr,
+            ),
         )
 
         self.register_outputs({})

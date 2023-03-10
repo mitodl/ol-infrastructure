@@ -29,6 +29,17 @@ pki_intermediate_ca_config = OLVaultPKIIntermediateCABackendConfig(
 )
 pki_intermediate_ca = OLVaultPKIIntermediateCABackend(pki_intermediate_ca_config)
 
+pki_intermediate_ca_export_struct = {
+    "intermediate_certificate": pki_intermediate_ca.pki_intermediate_ca_aws_signed_csr.certificate,
+    "intermediate_certificate_bundle": pki_intermediate_ca.pki_intermediate_ca_aws_signed_csr.certificate_chain,
+    "root_ca_arn": pki_intermediate_ca.pki_intermediate_ca_aws_signed_csr.certificate_authority_arn,
+    "intermediate_crl_url": pki_intermediate_ca.pki_intermediate_ca_config_urls.crl_distribution_points[
+        0
+    ],
+    "intermediate_issuing_url": pki_intermediate_ca.pki_intermediate_ca_config_urls.issuing_certificates[
+        0
+    ],
+}
 
 for business_unit in BusinessUnit:
     pki_intermediate_env_config = OLVaultPKIIntermediateEnvBackendConfig(
@@ -42,11 +53,25 @@ for business_unit in BusinessUnit:
 
     pki_intermediate_env = OLVaultPKIIntermediateEnvBackend(pki_intermediate_env_config)
 
+    pki_intermediate_env_export_struct = {
+        "intermediate_certificate": pki_intermediate_env.pki_intermediate_environment_signed_csr.certificate,
+        "intermediate_certificate_bundle": pki_intermediate_env.pki_intermediate_environment_signed_csr.certificate_bundle,
+        "intermediate_certificate_ca_chains": pki_intermediate_env.pki_intermediate_environment_signed_csr.ca_chains,
+        "intermediate_certificate_issuing_ca": pki_intermediate_env.pki_intermediate_environment_signed_csr.issuing_ca,
+        "intermediate_common_name": pki_intermediate_env.pki_intermediate_environment_signed_csr.common_name,
+        "intermediate_serial_number": pki_intermediate_env.pki_intermediate_environment_signed_csr.serial_number,
+        "intermediate_crl_url": pki_intermediate_env.pki_intermediate_environment_config_urls.crl_distribution_points[
+            0
+        ],
+        "intermediate_issuing_url": pki_intermediate_env.pki_intermediate_environment_config_urls.issuing_certificates[
+            0
+        ],
+    }
     pki_intermediate_export.update(
         {
-            f"pki_intermediate_{business_unit.value}": pki_intermediate_env,
+            f"pki_intermediate_{business_unit.value}": pki_intermediate_env_export_struct,
         }
     )
 
 export("pki_intermediate_export", pki_intermediate_export)
-export("pki_intermediate_ca", pki_intermediate_ca)
+export("pki_intermediate_ca", pki_intermediate_ca_export_struct)
