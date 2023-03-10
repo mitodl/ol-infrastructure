@@ -17,7 +17,7 @@ env_config = Config("environment")
 stack_info = parse_stack()
 pki_intermediate_export = {}
 
-root_ca = StackReference("infrastcuture.aws.private_ca").require_output("root_ca")
+root_ca = StackReference("infrastructure.aws.private_ca").require_output("root_ca")
 root_ca_arn = root_ca["arn"]
 
 setup_vault_provider()
