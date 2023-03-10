@@ -58,6 +58,7 @@ for business_unit in BusinessUnit:
     )
 
     pki_intermediate_env_export_struct = {
+        "mount_path": pki_intermediate_env.pki_intermediate_environment_backend.path,
         "intermediate_certificate": pki_intermediate_env.pki_intermediate_environment_signed_csr.certificate,
         "intermediate_certificate_bundle": pki_intermediate_env.pki_intermediate_environment_signed_csr.certificate_bundle,
         "intermediate_certificate_ca_chains": pki_intermediate_env.pki_intermediate_environment_signed_csr.ca_chains,

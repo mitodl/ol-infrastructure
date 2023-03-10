@@ -532,6 +532,7 @@ class OLVaultPKIIntermediateRoleConfig(BaseModel):
     default_ttl: int = ONE_MONTH_SECONDS * 6
     key_usages: list[str] = ["DigitalSignature", "KeyAgreement", "KeyEncipherment"]
     allowed_domains: list[str]
+    allow_subdomains: bool = False
     cert_type: str  # Should be client or server
     resource_name: str
 
@@ -576,6 +577,7 @@ class OLVaultPKIIntermediateRole(ComponentResource):
             backend=role_config.pki_intermediate_backend_mount_path,
             allowed_domains=role_config.allowed_domains,
             allow_glob_domains=True,
+            allow_subdomains=role_config.allow_subdomains,
             key_type=role_config.key_config.name,
             key_bits=role_config.key_config.value,
             ttl=role_config.default_ttl,
