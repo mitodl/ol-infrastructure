@@ -126,7 +126,7 @@ class OpenEdxApplicationVersion(BaseModel):
         if self.branch_override:
             return self.branch_override
         if self.application == "edx-platform" and self.release == "master":
-            return "release"
+            return "2u/release"
         return self.release.branch
 
     @property
