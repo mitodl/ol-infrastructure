@@ -158,7 +158,7 @@ xpro = [
         terms_of_service_url="https://rc.xpro.mit.edu/terms-of-service/",
         accessibility_url="https://accessibility.mit.edu/",
         about_us_url="https://rc.xpro.mit.edu/about-us/",
-        privacy_policy_url="https:/rc.xpro.mit.edu/privacy-policy/",
+        privacy_policy_url="https://rc.xpro.mit.edu/privacy-policy/",
     ),
     OpenEdxVars(
         deployment_name="xpro",
@@ -175,7 +175,7 @@ xpro = [
         terms_of_service_url="https://xpro.mit.edu/terms-of-service/",
         accessibility_url="https://accessibility.mit.edu/",
         about_us_url="https://xpro.mit.edu/about-us/",
-        privacy_policy_url="https:/xpro.mit.edu/privacy-policy/",
+        privacy_policy_url="https://xpro.mit.edu/privacy-policy/",
     ),
 ]
 

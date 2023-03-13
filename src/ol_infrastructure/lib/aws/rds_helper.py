@@ -12,6 +12,7 @@ class DBInstanceTypes(str, Enum):
     small = "db.t4g.small"
     medium = "db.t4g.medium"
     large = "db.t4g.large"
+    xlarge = "db.t4g.xlarge"
     general_purpose_large = "db.m6g.large"
     general_purpose_xlarge = "db.m6g.xlarge"
     high_mem_regular = "db.r6g.large"

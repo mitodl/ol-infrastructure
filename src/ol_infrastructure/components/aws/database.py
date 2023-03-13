@@ -37,7 +37,7 @@ class StorageType(str, Enum):
 class OLReplicaDBConfig(BaseModel):
     """Configuration object for defining configuration needed to create a read replica."""  # noqa: E501
 
-    instance_size: str = "db.t3.small"
+    instance_size: str = DBInstanceTypes.medium
     storage_type: StorageType = StorageType.ssd
     public_access: bool = False
     security_groups: Optional[list[SecurityGroup]] = None
