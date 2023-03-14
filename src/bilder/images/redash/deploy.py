@@ -232,7 +232,6 @@ consul_templates.append(
 )
 watched_files.append(redash_conf_directory.joinpath("datasources.yaml"))
 
-
 # Add consul template confgs for files that are just populated straight from vault.
 consul_templates.extend(
     [
@@ -329,6 +328,13 @@ consul_template = ConsulTemplate(
 
 # Consul and vault were installed in the docker-baseline-ami, consul-template is missing
 install_hashicorp_products([consul_template])
+
+# Only on redash server do we need to give user: consul-template permission to
+# interact with the docker system daemon
+server.shell(
+    name="Add the docker group as a supplemental to user: consul-template",
+    commands=["usermod -aG docker consul-template"],
+)
 
 hashicorp_products = [vault, consul, consul_template]
 
