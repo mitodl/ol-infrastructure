@@ -9,7 +9,7 @@ xpro_dns_config = Config("xpro_dns")
 stack_info = parse_stack()
 dns_stack = StackReference("infrastructure.aws.dns")
 xpro_zone = dns_stack.require_output("xpro")
-fifteen_minutes = 60 * 15
+FIFTEEN_MINUTES = 60 * 15
 aws_tags = AWSBase(tags={"OU": BusinessUnit.xpro, "Environment": "xpro"}).tags
 
 
@@ -23,7 +23,7 @@ def xpro_partner_record(
         subdomain,
         name=name_base(subdomain),
         type=record_type,
-        ttl=fifteen_minutes,
+        ttl=FIFTEEN_MINUTES,
         records=record if isinstance(record, list) else [record],
         zone_id=xpro_zone["id"],
     )

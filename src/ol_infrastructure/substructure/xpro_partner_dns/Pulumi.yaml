@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-substructure-xpro-dns
+name: ol-infrastructure-substructure-xpro-partner-dns
 runtime: python
 description: A project for managing DNS records related to xPro partners
 backend:
