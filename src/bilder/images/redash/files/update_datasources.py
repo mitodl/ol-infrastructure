@@ -31,7 +31,6 @@ for datasource in config["managed_datasources"]:
         [
             "/usr/bin/docker",
             "exec",
-            "-it",
             container_id,
             "python3",
             "manage.py",
