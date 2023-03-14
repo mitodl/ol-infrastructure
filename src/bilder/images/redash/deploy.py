@@ -230,7 +230,6 @@ consul_templates.append(
         command_timeout="120s",
     )
 )
-watched_files.append(redash_conf_directory.joinpath("datasources.yaml"))
 
 # Add consul template confgs for files that are just populated straight from vault.
 consul_templates.extend(

@@ -4,6 +4,11 @@ import subprocess
 import sys
 
 import yaml
+import time
+
+# Pause for 15 seconds to give docker-compose time to
+# restart containers if that is triggered
+time.sleep(15)
 
 with open("/etc/redash/datasources.yaml") as yamlfile:
     config = yaml.safe_load(yamlfile)
@@ -31,6 +36,7 @@ for datasource in config["managed_datasources"]:
         [
             "/usr/bin/docker",
             "exec",
+            "-t",
             container_id,
             "python3",
             "manage.py",
