@@ -44,6 +44,6 @@ for datasource in config["managed_datasources"]:
         capture_output=True,
     )
     if update_output.returncode != 0:
-        return_code = update_output.returncode
+        returncode = update_output.returncode
 
 sys.exit(returncode)
