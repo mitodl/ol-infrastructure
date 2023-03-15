@@ -1,8 +1,9 @@
-from pulumi import StackReference, export, Config
-from pulumi_aws import s3, iam
+from pulumi import StackReference, export, Config, Alias, ResourceOptions
+from pulumi_aws import s3, iam, sns
 
-from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 stack_info = parse_stack()
 
@@ -11,10 +12,52 @@ kms_s3_key = kms_stack.require_output("kms_s3_data_analytics_key")
 
 monitoring_config = Config("monitoring")
 
+aws_config = AWSBase(
+    tags={"OU": "operations", "Environment": f"operations-{stack_info.env_suffix}"}
+)
+
+### SNS Resources for notifying opsgenie
+
+# TODO: MD 20230315 Migrate to SNS integration. Email is easier to start with.
+# https://support.atlassian.com/opsgenie/docs/integrate-opsgenie-with-incoming-amazon-sns/
+critical_sns_topic = sns.Topic(
+    f"monitoring-critical-alerts-sns-topic-{stack_info.env_suffix}",
+    name="OpsGenie_Critical_Notifications",
+    tags=aws_config.merged_tags({"Name": "OpsGenie Critical Notifications"}),
+)
+warning_sns_topic = sns.Topic(
+    f"monitoring-warning-alerts-sns-topic-{stack_info.env_suffix}",
+    name="OpsGenie_Warning_Notifications",
+    tags=aws_config.merged_tags({"Name": "OpsGenie Warning Notifications"}),
+)
+
+critical_topic_subscription = sns.TopicSubscription(
+    f"monitoring-critical-alerts-sns-topic-subscription-{stack_info.env_suffix}",
+    endpoint=monitoring_config.get("opsgenie_critical_email_address"),
+    protocol="email",
+    topic=critical_sns_topic.arn,
+)
+
+warning_topic_subscription = sns.TopicSubscription(
+    f"monitoring-warning-alerts-sns-topic-subscription-{stack_info.env_suffix}",
+    endpoint=monitoring_config.get("opsgenie_warning_email_address"),
+    protocol="email",
+    topic=warning_sns_topic.arn,
+)
+
+export(
+    "opsgenie_sns_topics",
+    {
+        "critical_sns_topic_arn": critical_sns_topic.arn,
+        "warning_sns_topic_arn": warning_sns_topic.arn,
+    },
+)
+
+### Fastly Logs shippting to S3
 fastly_logging_bucket_name = monitoring_config.get("fastly_logging_bucket_name")
 
 fastly_logging_bucket = s3.Bucket(
-    f"{fastly_logging_bucket_name}-{stack_info.env_suffix}",
+    f"monitoring-{fastly_logging_bucket_name}-{stack_info.env_suffix}",
     bucket=fastly_logging_bucket_name,
     acl="private",
     server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
@@ -26,13 +69,29 @@ fastly_logging_bucket = s3.Bucket(
             bucket_key_enabled=True,
         )
     ),
+    tags=aws_config.merged_tags(
+        {"OU": "open-courseware", "Name": fastly_logging_bucket_name}
+    ),
+    # Renamed this resource but we don't want pulumi to destroy the existing bucket.
+    opts=ResourceOptions(
+        aliases=[Alias(name=f"{fastly_logging_bucket_name}-{stack_info.env_suffix}")]
+    ),
 )
 
 s3.BucketPublicAccessBlock(
-    f"{fastly_logging_bucket_name}-{stack_info.env_suffix}_block_public_access",
+    f"monitoring-{fastly_logging_bucket_name}-{stack_info.env_suffix}_block_public_access",
     bucket=fastly_logging_bucket.bucket,
     block_public_acls=True,
     block_public_policy=True,
+    # Renamed this resource but we don't want pulumi to destroy the
+    # existing configuration
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                name=f"{fastly_logging_bucket_name}-{stack_info.env_suffix}_block_public_access"  # noqa: E501
+            )
+        ]
+    ),
 )
 
 # Ref: https://docs.fastly.com/en/guides/creating-an-aws-iam-role-for-fastly-logging
