@@ -234,7 +234,7 @@ ReleaseMap: dict[
                 application="edx-platform",  # type: ignore
                 application_type="IDA",
                 release="master",
-                branch_override="release",
+                branch_override="2u/release",
             ),
             OpenEdxApplicationVersion(
                 application="edxapp_theme",  # type: ignore

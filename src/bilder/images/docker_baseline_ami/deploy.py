@@ -54,9 +54,9 @@ vault = Vault(
     configuration={Path("vault.json"): vault_config},
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
-consul_template_config = ConsulTemplate()
+consul_template = ConsulTemplate(version=VERSIONS["consul_template"])
 
-hashicorp_products = [vault, consul, consul_template_config]
+hashicorp_products = [vault, consul, consul_template]
 install_hashicorp_products(hashicorp_products)
 
 docker_config = {
