@@ -10,6 +10,7 @@ production_defaults = {
         "multi_az": True,
         "instance_size": DBInstanceTypes.general_purpose_large.value,
         "read_replica": OLReplicaDBConfig(),
+        "monitoring_profile_name": "production",
     },
     "redis": {"instance_type": CacheInstanceTypes.large},
 }
@@ -21,6 +22,7 @@ qa_defaults = {
         "prevent_delete": False,
         "take_final_snapshot": False,
         "backup_days": 7,
+        "monitoring_profile_name": "qa",
     },
     "redis": {"instance_type": CacheInstanceTypes.small},
 }
@@ -32,6 +34,7 @@ ci_defaults = {
         "prevent_delete": False,
         "take_final_snapshot": False,
         "backup_days": 1,
+        "monitoring_profile_name": "ci",
     },
     "redis": {"instance_type": CacheInstanceTypes.small},
 }
