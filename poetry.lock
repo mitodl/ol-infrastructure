@@ -1783,13 +1783,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "5.5.0"
+version = "5.6.0"
 description = "A Pulumi package for creating and managing github cloud resources."
 category = "main"
 optional = false
 python-versions = "*"
 files = [
-    {file = "pulumi_github-5.5.0.tar.gz", hash = "sha256:59fa9680e8c0d649f9e30b46570ae59989d145a2fc7640bc17c953d22d48b2fd"},
+    {file = "pulumi_github-5.6.0.tar.gz", hash = "sha256:6374f0e8bda263f93c362e49883cfb3627dafc15cb8225467b8f205300488264"},
 ]
 
 [package.dependencies]
