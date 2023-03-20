@@ -1,7 +1,8 @@
-from typing import Optional
+from typing import Optional, Union
+
 
 from pydantic import PositiveInt, validator, BaseModel
-from pulumi import ComponentResource, ResourceOptions
+from pulumi import ComponentResource, ResourceOptions, Output
 from ol_infrastructure.lib.aws.monitoring_helper import get_monitoring_sns_arn
 
 from pulumi_aws import cloudwatch
@@ -26,6 +27,7 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
     statistic: str = "Average"
     threshold: int
     treat_missing_data_as: str = "missing"
+    unit: Optional[str]
 
     # TODO: MD 20230315 refactor to accomodate anomaly detection alerts
     @validator("comparison_operator")
@@ -78,6 +80,100 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
             )
         return statistic
 
+    @validator("unit")
+    def is_valid_unit(cls, unit: str) -> Union[str, None]:  # noqa: N805
+        valid_units = [
+            "Bits",
+            "Bits/Second",
+            "Bytes",
+            "Bytes/Second",
+            "Count",
+            "Count/Second",
+            "Gigabits",
+            "Gigabits/Second",
+            "Gigabytes",
+            "Gigabytes/Second",
+            "Kilobits",
+            "Kilobits/Second",
+            "Kilobytes",
+            "Kilobytes/Second",
+            "Megabits",
+            "Megabits/Second",
+            "Megabytes",
+            "Megabytes/Second",
+            "Microseconds",
+            "Milliseconds",
+            "Percent",
+            "Seconds",
+            "Terabits",
+            "Terabits/Second",
+            "Terabytes",
+            "Terabytes/Second",
+        ]
+        if unit and unit.title() in valid_units:
+            return unit.title()
+        elif unit and unit.title() not in valid_units:
+            raise ValueError(
+                f"unit: {unit} is not valid. Valid units are: {valid_units}",
+            )
+        else:  # It is valid for a unit to not be provided.
+            return None
+
+
+class OLCloudWatchAlarmSimpleElastiCacheConfig(OLCloudWatchAlarmSimpleConfig):
+    """Configuration object for definition monitoring of an ElastiCache
+    deployment.
+    """
+
+    cluster_id: Union[str, Output[str]]
+    node_id: str
+    namespace: str = "AWS/ElastiCache"
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class OLCloudWatchAlarmSimpleElastiCache(ComponentResource):
+    metric_alarm: cloudwatch.MetricAlarm = None
+
+    def __init__(
+        self,
+        alarm_config: OLCloudWatchAlarmSimpleElastiCacheConfig,
+        opts: Optional[ResourceOptions] = None,
+    ):
+        super().__init__(
+            "ol:infrastructure.aws.cloudwatch.OLCloudWatchAlarmElastiCache",
+            alarm_config.name,
+            None,
+            opts,
+        )
+        resource_options = ResourceOptions(parent=self).merge(opts)  # type: ignore
+
+        sns_topic_arn = get_monitoring_sns_arn(alarm_config.level)
+        cache_cluster_id = f"{alarm_config.cluster_id}{alarm_config.node_id}"
+
+        self.metric_alarm = cloudwatch.MetricAlarm(
+            f"{cache_cluster_id}-{alarm_config.metric_name}-simple-elasticache_alarm",
+            actions_enabled=True,
+            alarm_actions=[sns_topic_arn],
+            alarm_description=alarm_config.description,
+            comparison_operator=alarm_config.comparison_operator,
+            datapoints_to_alarm=alarm_config.datapoints_to_alarm,
+            dimensions={
+                "CacheClusterId": cache_cluster_id,
+            },
+            evaluation_periods=alarm_config.evaluation_periods,
+            metric_name=alarm_config.metric_name,
+            name=f"simple-elasticache-{cache_cluster_id}-{alarm_config.metric_name}",
+            namespace=alarm_config.namespace,
+            period=alarm_config.period,
+            statistic=alarm_config.statistic,
+            treat_missing_data=alarm_config.treat_missing_data_as,
+            threshold=alarm_config.threshold,
+            unit=alarm_config.unit,
+            opts=resource_options,
+        )
+
 
 class OLCloudWatchAlarmSimpleRDSConfig(OLCloudWatchAlarmSimpleConfig):
     """Configuration object for defining monitoring of an RDS deployment."""
@@ -122,5 +218,6 @@ class OLCloudWatchAlarmSimpleRDS(ComponentResource):
             statistic=alarm_config.statistic,
             treat_missing_data=alarm_config.treat_missing_data_as,
             threshold=alarm_config.threshold,
+            unit=alarm_config.unit,
             opts=resource_options,
         )

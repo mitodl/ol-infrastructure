@@ -18,6 +18,11 @@ from ol_infrastructure.lib.aws.elasticache_helper import (
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 
+from ol_infrastructure.components.aws.cloudwatch import (
+    OLCloudWatchAlarmSimpleElastiCache,
+    OLCloudWatchAlarmSimpleElastiCacheConfig,
+)
+
 PulumiString = Union[str, pulumi.Output[str]]
 MAX_MEMCACHED_CLUSTER_SIZE = 20
 
@@ -36,6 +41,7 @@ class OLAmazonCacheConfig(AWSBase):
     engine: str
     engine_version: str
     instance_type: str
+    monitoring_profile_name: str = "ci"
     num_instances: PositiveInt = PositiveInt(3)
     parameter_overrides: Optional[dict[str, Any]] = None
     port: int
@@ -67,6 +73,17 @@ class OLAmazonCacheConfig(AWSBase):
                 f"The specified version of the {engine} engine is not supported in AWS."
             )
         return engine_version
+
+    @validator("monitoring_profile_name")
+    def is_valid_monitoring_profile(
+        cls: "OLAmazonCacheConfig", monitoring_profile_name: str  # noqa: N805
+    ) -> str:
+        valid_monitoring_profile_names = ["production", "qa", "ci", "disabled"]
+        if monitoring_profile_name not in valid_monitoring_profile_names:
+            raise ValueError(
+                f"The specified monitoring profile: {monitoring_profile_name} is not valid."  # noqa: E501
+            )
+        return monitoring_profile_name
 
 
 class OLAmazonRedisConfig(OLAmazonCacheConfig):
@@ -201,6 +218,20 @@ class OLAmazonCache(pulumi.ComponentResource):
         else:
             cache_cluster, address = self.memcached(cache_config, resource_options)  # type: ignore  # noqa: E501
 
+        monitoring_profile = self._get_default_monitoring_profile(
+            cache_config.monitoring_profile_name, cache_config.engine
+        )
+        for alarm_name, alarm_args in monitoring_profile.items():
+            for i in range(1, cache_config.num_instances + 1):
+                node_id_suffix = f"-00{i}"
+                alarm_config = OLCloudWatchAlarmSimpleElastiCacheConfig(
+                    cluster_id=cache_config.cluster_name,
+                    node_id=node_id_suffix,
+                    name=f"{cache_config.cluster_name}{node_id_suffix}-{alarm_name}-OLCloudWatchAlarmSimpleElastiCacheConfig",
+                    **alarm_args,
+                )
+                OLCloudWatchAlarmSimpleElastiCache(alarm_config=alarm_config)
+
         self.cache_cluster = cache_cluster
         self.address = address
 
@@ -283,3 +314,38 @@ class OLAmazonCache(pulumi.ComponentResource):
         )
         address = cache_cluster.member_clusters
         return (cache_cluster, address)
+
+    def _get_default_monitoring_profile(self, profile_name: str, engine: str):
+        if profile_name == "disabled":
+            return {}
+        if engine == "redis":
+            return self._get_default_redis_monitoring_profile(profile_name)
+        elif engine == "memcached":
+            return self._get_default_memcached_monitoring_profile(profile_name)
+        else:
+            raise ValueError(f"Invalid engine specifier: {engine}")
+
+    def _get_default_memcached_monitoring_profile(self, profile_name: str):
+        return {}  # not implemented
+
+    def _get_default_redis_monitoring_profile(self, profile_name: str):
+        global_profiles = {
+            "EngineCPUUtilization": {
+                "comparison_operator": "GreaterThanThreshold",
+                "description": "ElastiCache - High CPU utilization bu the Redis engine.",  # noqa: E501
+                "datapoints_to_alarm": 2,
+                "level": "warning",
+                "period": 300,  # 5 minutes
+                "evaluation_periods": 2,  # 10 Minutes
+                "metric_name": "EngineCPUUtilization",
+                "threshold": 50,  # percent
+                "unit": "Percent",
+            }
+        }
+
+        monitoring_profiles: dict[str, dict] = {
+            "ci": {},
+            "qa": {},
+            "production": {},
+        }
+        return dict(**global_profiles, **(monitoring_profiles[profile_name]))

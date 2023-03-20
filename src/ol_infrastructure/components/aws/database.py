@@ -101,7 +101,7 @@ class OLDBConfig(AWSBase):
     def is_valid_monitoring_profile(
         cls: "OLDBConfig", monitoring_profile_name: str  # noqa: N805
     ) -> str:
-        valid_monitoring_profile_names = ["production", "qa", "ci"]
+        valid_monitoring_profile_names = ["production", "qa", "ci", "disabled"]
         if monitoring_profile_name not in valid_monitoring_profile_names:
             raise ValueError(
                 f"The specified monitoring profile: {monitoring_profile_name} is not valid."  # noqa: E501
@@ -246,15 +246,17 @@ class OLAmazonDB(pulumi.ComponentResource):
             monitoring_profile = self._get_default_monitoring_profile(
                 db_config.monitoring_profile_name
             )
-            for alarm_name, alarm_config in monitoring_profile.items():
+            for alarm_name, alarm_args in monitoring_profile.items():
                 alarm_config = OLCloudWatchAlarmSimpleRDSConfig(
                     database_identifier=db_config.instance_name,
                     name=f"{db_config.instance_name}-{alarm_name}-OLCloudWatchAlarmSimpleRDSConfig",
-                    **alarm_config,
+                    **alarm_args,
                 )
                 OLCloudWatchAlarmSimpleRDS(alarm_config=alarm_config)
 
     def _get_default_monitoring_profile(self, profile_name: str):
+        if profile_name == "disabled":
+            return {}
         global_profiles = {
             "CPUUtilization": {
                 "comparison_operator": "GreaterThanThreshold",
@@ -265,6 +267,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 "evaluation_periods": 6,  # 30 minutes
                 "metric_name": "CPUUtilization",
                 "threshold": 50,  # percent
+                "unit": "Percent",
             },
             "FreeStorageSpace": {
                 "comparison_operator": "LessThanThreshold",
@@ -275,6 +278,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 "evaluation_periods": 6,  # 30 minutes
                 "metric_name": "FreeStorageSpace",
                 "threshold": 5368709120,  # 5 gigabytes
+                "unit": "Bytes",
             },
             "WriteLatency": {
                 "comparison_operator": "GreaterThanThreshold",
@@ -284,7 +288,8 @@ class OLAmazonDB(pulumi.ComponentResource):
                 "period": 300,  # 5 minutes
                 "evaluation_periods": 2,  # 10 minutes
                 "metric_name": "WriteLatency",
-                "threshold": 0.020,  # 20 milliseconds
+                "threshold": 20,
+                "unit": "Milliseconds",
             },
             "ReadLatency": {
                 "comparison_operator": "GreaterThanThreshold",
@@ -294,7 +299,8 @@ class OLAmazonDB(pulumi.ComponentResource):
                 "period": 300,  # 5 minutes
                 "evaluation_periods": 2,  # 10 minutes
                 "metric_name": "ReadLatency",
-                "threshold": 0.010,  # 10 milliseconds
+                "threshold": 10,
+                "unit": "Milliseconds",
             },
         }
 
@@ -311,6 +317,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                     "evaluation_periods": 2,  # 10 minutes
                     "metric_name": "EBSIOBlanace%",
                     "threshold": 75,  # percent
+                    "unit": "Percent",
                 },
                 "DiskQueueDepth": {
                     "comparison_operator": "GreaterThanThreshold",
