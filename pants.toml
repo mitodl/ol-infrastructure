@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.14.0"
+pants_version = "2.16.0a0"
 backend_packages = [
   'pants.backend.docker.lint.hadolint',
   'pants.backend.experimental.python',
@@ -8,6 +8,7 @@ backend_packages = [
   'pants.backend.python.lint.flake8',
   'pants.backend.python.lint.isort',
   'pants.backend.python.typecheck.mypy',
+  'pants.backend.experimental.python.lint.ruff',
   'pants.backend.shell',
   'pants.backend.shell.lint.shellcheck',
   'pants.backend.shell.lint.shfmt',
@@ -16,7 +17,7 @@ pants_ignore = ['copier_templates/*']
 
 [python]
 enable_resolves = true
-interpreter_constraints = ['>=3.9']
+interpreter_constraints = ['>=3.10']
 
 [flake8]
 config = 'setup.cfg'
