@@ -32,7 +32,7 @@ fastly_provider = get_fastly_provider()
 dns_stack = StackReference("infrastructure.aws.dns")
 ocw_zone = dns_stack.require_output("ocw")
 
-monitoring_stack = StackReference("infrastructure.monitoring.Production")
+monitoring_stack = StackReference("infrastructure.monitoring")
 fastly_access_logging_bucket = monitoring_stack.require_output(
     "fastly_access_logging_bucket"
 )
