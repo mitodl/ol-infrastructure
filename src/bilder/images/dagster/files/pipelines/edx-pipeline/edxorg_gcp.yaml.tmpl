@@ -6,7 +6,7 @@ resources:
       client_id: "{{ .Data.client_id }}"
       client_x509_cert_url: {{ .Data.cert_url }}
       private_key: | # Dedent the next line so all of the contents are properly indented, otherwise first line is double indented.6
-{{ .Data.private_key | nindent 8 }}
+{{ .Data.private_key | indent 8 }}
       private_key_id: {{ .Data.private_key_id }}
       project_id: {{ .Data.project_id }}
       token_uri: {{ .Data.token_uri }}{{ end }}
