@@ -1,6 +1,10 @@
 import pulumi_keycloak as keycloak
 
+<<<<<<< HEAD
 from pulumi import Config, ResourceOptions
+=======
+from pulumi import Config
+>>>>>>> 886c7ff6 (Minor formatting)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 env_config = Config("environment")
@@ -9,6 +13,7 @@ env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 keycloak_config = Config("keycloak")
 
 
+<<<<<<< HEAD
 # Create a Keycloak provider cause we ran into an issue with pulumi reading
 # config from stack definition.
 keycloak_provider = keycloak.Provider(
@@ -37,13 +42,34 @@ ol_platform_engineering_realm = keycloak.Realm(
     access_code_lifespan_user_action="15m",
     attributes={
         "business_unit": f"operations-{env_name}",
+=======
+# Create a Keycloak provider instance
+provider = keycloak.Provider(
+    "identity-provider",
+    base_url=f"https://identity-{env_name}.odl.mit.edu/auth/",
+    realm="master",
+    client_id="",
+    client_secret="",
+)
+
+# Create OL Platform Engineering Realm
+realm = keycloak.Realm(
+    "ol-platform-engineering",
+    access_code_lifespan="1h",
+    attributes={
+        "mycustomAttribute": "myCustomValue",
+>>>>>>> 886c7ff6 (Minor formatting)
     },
     display_name="OL PLatform Engineering",
     display_name_html="<b>OL PLatform Engineering</b>",
     enabled=True,
     login_theme="base",
     duplicate_emails_allowed=False,
+<<<<<<< HEAD
     otp_policy=keycloak.RealmOtpPolicyArgs(
+=======
+    otp_policy=keycloak.RealmOptPolicyArgs(
+>>>>>>> 886c7ff6 (Minor formatting)
         algorithm="HmacSHA256",
         digits=6,
         initial_counter=2,
@@ -51,10 +77,17 @@ ol_platform_engineering_realm = keycloak.Realm(
         period=30,
         type="totp",
     ),
+<<<<<<< HEAD
     realm="ol-platform-engineering",
     reset_password_allowed=True,
     verify_email=True,
     password_policy="upperCase(2) and digits(4) and length(30) and specialChars(4) and forceExpiredPasswordChange(365) and notUsername and notEmail",  # noqa: S106, E501
+=======
+    reset_password_allowed=True,
+    verify_email=True,
+    password_policy="upperCase(2) and length(30) and forceExpiredPasswordChange(365) and notUsername",  # noqa: S106, E501
+    realm="ol-platform-engineering",
+>>>>>>> 886c7ff6 (Minor formatting)
     security_defenses=keycloak.RealmSecurityDefensesArgs(
         brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(
             failure_reset_time_seconds=43200,
@@ -77,6 +110,7 @@ ol_platform_engineering_realm = keycloak.Realm(
     ),
     smtp_server=keycloak.RealmSmtpServerArgs(
         auth=keycloak.RealmSmtpServerAuthArgs(
+<<<<<<< HEAD
             password=email_password,
             username=email_username,
         ),
@@ -84,11 +118,21 @@ ol_platform_engineering_realm = keycloak.Realm(
         from_display_name="Identity - OL PLatform Engineering",
         host=email_host,
         port=587,
+=======
+            password=keycloak_config.email_password,
+            username=keycloak_config.email_username,
+        ),
+        from_="odl-devops@mit.edu",
+        from_display_name="Identity - OL PLatform Engineering",
+        host=keycloak_config.email_host,
+        port=keycloak_config.email_host,
+>>>>>>> 886c7ff6 (Minor formatting)
         reply_to="odl-devops@mit.edu",
         reply_to_display_name="Identity - OL Platform Engineering",
         starttls=True,
     ),
     ssl_required="external",
+<<<<<<< HEAD
     offline_session_idle_timeout="168h",
     sso_session_idle_timeout="2h",
     sso_session_max_lifespan="24h",
@@ -135,4 +179,6 @@ realm_identity_provider = keycloak.oidc.IdentityProvider(
     authorization_url=f"https://keycloak-{env_name}.odl.mit.edu/auth/realm/{ol_platform_engineering_realm.realm}/github/endpoint",
     token_url="https://tokenurl.com",  # noqa: S106
     opts=resource_options,
+=======
+>>>>>>> 886c7ff6 (Minor formatting)
 )
