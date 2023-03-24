@@ -23,7 +23,7 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
     metric_name: str
     name: str
     namespace: str
-    period: PositiveInt = PositiveInt(300)  # Five minutes
+    period: PositiveInt = 300  # Five minutes
     statistic: str = "Average"
     threshold: int
     treat_missing_data_as: str = "missing"
