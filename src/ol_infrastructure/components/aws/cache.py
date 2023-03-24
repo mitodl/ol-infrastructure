@@ -332,7 +332,7 @@ class OLAmazonCache(pulumi.ComponentResource):
         global_profiles = {
             "EngineCPUUtilization": {
                 "comparison_operator": "GreaterThanThreshold",
-                "description": "ElastiCache - High CPU utilization bu the Redis engine.",  # noqa: E501
+                "description": "ElastiCache - High CPU utilization by the Redis engine.",  # noqa: E501
                 "datapoints_to_alarm": 2,
                 "level": "warning",
                 "period": 300,  # 5 minutes
