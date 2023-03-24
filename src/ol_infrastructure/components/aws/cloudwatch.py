@@ -35,12 +35,12 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
         cls,  # noqa: N805
         comparison_operator: str,
     ) -> str:
-        valid_basic_operators = [
+        valid_basic_operators = (
             "GreaterThanOrEqualToThreshold",
             "GreaterThanThreshold",
             "LessThanThreshold",
             "LessThanOrEqualToThreshold",
-        ]
+        )
         if comparison_operator not in valid_basic_operators:
             raise ValueError(
                 f"comparison_operator: {comparison_operator} is not valid. "
@@ -50,7 +50,7 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
 
     @validator("level")
     def is_valid_level(cls, level: str) -> str:  # noqa: N805
-        if level.lower() not in ["warning", "critical"]:
+        if level.lower() not in ("warning", "critical"):
             raise ValueError(
                 f"level: {level} is not valid. Valid levels are "
                 "'warning' and 'critical'"
@@ -62,7 +62,7 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
         cls,  # noqa: N805
         treat_missing_data_as: str,
     ) -> str:
-        valid_treat_missing_data_as = ["missing", "ignore", "breaching", "notBreaching"]
+        valid_treat_missing_data_as = ("missing", "ignore", "breaching", "notBreaching")
         if treat_missing_data_as not in valid_treat_missing_data_as:
             raise ValueError(
                 f"treat_missing_data_as: {treat_missing_data_as} is not valid. "
@@ -72,7 +72,7 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
 
     @validator("statistic")
     def is_valid_statistic(cls, statistic: str) -> str:  # noqa: N805
-        valid_statistics = ["SampleCount", "Average", "Sum", "Minimum", "Maximum"]
+        valid_statistics = ("SampleCount", "Average", "Sum", "Minimum", "Maximum")
         if statistic not in valid_statistics:
             raise ValueError(
                 f"statistic: {statistic} is not valid. Valid statistics "
@@ -82,7 +82,7 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
 
     @validator("unit")
     def is_valid_unit(cls, unit: str) -> Union[str, None]:  # noqa: N805
-        valid_units = [
+        valid_units = (
             "Bits",
             "Bits/Second",
             "Bytes",
@@ -109,7 +109,7 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
             "Terabits/Second",
             "Terabytes",
             "Terabytes/Second",
-        ]
+        )
         if unit and unit.title() in valid_units:
             return unit.title()
         elif unit and unit.title() not in valid_units:

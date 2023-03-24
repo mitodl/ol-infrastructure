@@ -78,7 +78,7 @@ class OLAmazonCacheConfig(AWSBase):
     def is_valid_monitoring_profile(
         cls: "OLAmazonCacheConfig", monitoring_profile_name: str  # noqa: N805
     ) -> str:
-        valid_monitoring_profile_names = ["production", "qa", "ci", "disabled"]
+        valid_monitoring_profile_names = ("production", "qa", "ci", "disabled")
         if monitoring_profile_name not in valid_monitoring_profile_names:
             raise ValueError(
                 f"The specified monitoring profile: {monitoring_profile_name} is not valid."  # noqa: E501
