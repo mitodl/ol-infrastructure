@@ -68,7 +68,7 @@ fastly_logging_bucket = s3.Bucket(
         )
     ),
     tags=aws_config.merged_tags(
-        {"OU": "open-courseware", "Name": fastly_logging_bucket_name}
+        {"OU": "operations", "Name": fastly_logging_bucket_name}
     ),
     # Renamed this resource but we don't want pulumi to destroy the existing bucket.
     opts=ResourceOptions(
