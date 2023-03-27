@@ -22,6 +22,10 @@ from ol_infrastructure.lib.aws.rds_helper import (
     parameter_group_family,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.components.aws.cloudwatch import (
+    OLCloudWatchAlarmSimpleRDS,
+    OLCloudWatchAlarmSimpleRDSConfig,
+)
 
 MAX_BACKUP_DAYS = 35
 
@@ -69,6 +73,7 @@ class OLDBConfig(AWSBase):
     storage_type: StorageType = StorageType.ssd
     username: str = "oldevops"
     read_replica: Optional[OLReplicaDBConfig] = None
+    monitoring_profile_name: str
 
     class Config:
         arbitrary_types_allowed = True
@@ -91,6 +96,17 @@ class OLDBConfig(AWSBase):
                 f"The specified version of the {engine} engine is not supported in AWS."
             )
         return engine_version
+
+    @validator("monitoring_profile_name")
+    def is_valid_monitoring_profile(
+        cls: "OLDBConfig", monitoring_profile_name: str  # noqa: N805
+    ) -> str:
+        valid_monitoring_profile_names = ("production", "qa", "ci", "disabled")
+        if monitoring_profile_name not in valid_monitoring_profile_names:
+            raise ValueError(
+                f"The specified monitoring profile: {monitoring_profile_name} is not valid."  # noqa: E501
+            )
+        return monitoring_profile_name
 
 
 class OLPostgresDBConfig(OLDBConfig):
@@ -225,3 +241,95 @@ class OLAmazonDB(pulumi.ComponentResource):
             component_outputs["rds_replica"] = self.db_replica
 
         self.register_outputs(component_outputs)
+
+        if db_config.monitoring_profile_name:
+            monitoring_profile = self._get_default_monitoring_profile(
+                db_config.monitoring_profile_name
+            )
+            for alarm_name, alarm_args in monitoring_profile.items():
+                alarm_config = OLCloudWatchAlarmSimpleRDSConfig(
+                    database_identifier=db_config.instance_name,
+                    name=f"{db_config.instance_name}-{alarm_name}-OLCloudWatchAlarmSimpleRDSConfig",
+                    **alarm_args,
+                )
+                OLCloudWatchAlarmSimpleRDS(alarm_config=alarm_config)
+
+    def _get_default_monitoring_profile(self, profile_name: str):
+        if profile_name == "disabled":
+            return {}
+        global_profiles = {
+            "CPUUtilization": {
+                "comparison_operator": "GreaterThanThreshold",
+                "description": "RDS - Extended High CPU Utilization",
+                "datapoints_to_alarm": 6,
+                "level": "warning",
+                "period": 300,  # 5 minutes
+                "evaluation_periods": 6,  # 30 minutes
+                "metric_name": "CPUUtilization",
+                "threshold": 50,  # percent
+                "unit": "Percent",
+            },
+            "FreeStorageSpace": {
+                "comparison_operator": "LessThanThreshold",
+                "description": "RDS - Low Disk Space Remaining",
+                "datapoints_to_alarm": 6,
+                "level": "warning",
+                "period": 300,  # 5 minutes
+                "evaluation_periods": 6,  # 30 minutes
+                "metric_name": "FreeStorageSpace",
+                "threshold": 5368709120,  # 5 gigabytes
+                "unit": "Bytes",
+            },
+            "WriteLatency": {
+                "comparison_operator": "GreaterThanThreshold",
+                "description": "RDS - High Write Latency",
+                "datapoints_to_alarm": 2,
+                "level": "warning",
+                "period": 300,  # 5 minutes
+                "evaluation_periods": 2,  # 10 minutes
+                "metric_name": "WriteLatency",
+                "threshold": 20,
+                "unit": "Milliseconds",
+            },
+            "ReadLatency": {
+                "comparison_operator": "GreaterThanThreshold",
+                "description": "RDS - High Read Latency",
+                "datapoints_to_alarm": 2,
+                "level": "warning",
+                "period": 300,  # 5 minutes
+                "evaluation_periods": 2,  # 10 minutes
+                "metric_name": "ReadLatency",
+                "threshold": 10,
+                "unit": "Milliseconds",
+            },
+        }
+
+        monitoring_profiles = {
+            "ci": {},
+            "qa": {},
+            "production": {
+                "EBSIOBlance": {
+                    "comparison_operator": "LessThanThreshold",
+                    "description": "RDS - EBS IO Balance Remaining",
+                    "datapoints_to_alarm": 2,
+                    "level": "warning",
+                    "period": 300,  # 5 minutes
+                    "evaluation_periods": 2,  # 10 minutes
+                    "metric_name": "EBSIOBlanace%",
+                    "threshold": 75,  # percent
+                    "unit": "Percent",
+                },
+                "DiskQueueDepth": {
+                    "comparison_operator": "GreaterThanThreshold",
+                    "description": "RDS - Disk Queue Depth - Requests waiting",
+                    "datapoints_to_alarm": 2,
+                    "statistic": "Stdev",
+                    "level": "warning",
+                    "period": 300,  # 5 minutes
+                    "evaluation_periods": 2,  # 10 minutes
+                    "metric_name": "DiskQueueDepth",
+                    "threshold": 1,  # requests
+                },
+            },
+        }
+        return dict(**global_profiles, **(monitoring_profiles[profile_name]))
