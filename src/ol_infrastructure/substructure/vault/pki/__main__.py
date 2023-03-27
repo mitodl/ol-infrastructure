@@ -27,7 +27,9 @@ pki_intermediate_ca_config = OLVaultPKIIntermediateCABackendConfig(
     default_ttl=TWELVE_MONTHS * 4,
     acmpca_rootca_arn=root_ca_arn,
 )
-pki_intermediate_ca = OLVaultPKIIntermediateCABackend(pki_intermediate_ca_config)
+pki_intermediate_ca = OLVaultPKIIntermediateCABackend(
+    backend_config=pki_intermediate_ca_config, opts=ResourceOptions(protect=True)
+)
 
 pki_intermediate_ca_export_struct = {
     "intermediate_certificate": pki_intermediate_ca.pki_intermediate_ca_aws_signed_csr.certificate,
@@ -51,7 +53,9 @@ for business_unit in BusinessUnit:
         opts=ResourceOptions(parent=pki_intermediate_ca),
     )
 
-    pki_intermediate_env = OLVaultPKIIntermediateEnvBackend(pki_intermediate_env_config)
+    pki_intermediate_env = OLVaultPKIIntermediateEnvBackend(
+        backend_config=pki_intermediate_env_config, opts=ResourceOptions(protect=True)
+    )
 
     pki_intermediate_env_export_struct = {
         "intermediate_certificate": pki_intermediate_env.pki_intermediate_environment_signed_csr.certificate,
