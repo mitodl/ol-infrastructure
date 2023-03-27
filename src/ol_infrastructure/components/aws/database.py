@@ -323,7 +323,6 @@ class OLAmazonDB(pulumi.ComponentResource):
                     "comparison_operator": "GreaterThanThreshold",
                     "description": "RDS - Disk Queue Depth - Requests waiting",
                     "datapoints_to_alarm": 2,
-                    "statistic": "Stdev",
                     "level": "warning",
                     "period": 300,  # 5 minutes
                     "evaluation_periods": 2,  # 10 minutes
