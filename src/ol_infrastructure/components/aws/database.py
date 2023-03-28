@@ -315,7 +315,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                     "level": "warning",
                     "period": 300,  # 5 minutes
                     "evaluation_periods": 2,  # 10 minutes
-                    "metric_name": "EBSIOBlanace%",
+                    "metric_name": "EBSIOBalance%",
                     "threshold": 75,  # percent
                     "unit": "Percent",
                 },
