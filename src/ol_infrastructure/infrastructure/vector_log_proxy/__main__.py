@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, StackReference
+from pulumi import Config, StackReference, export
 from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
 
 from bridge.secrets.sops import read_yaml_secrets
@@ -346,7 +346,7 @@ autoscaling.Group(
 
 ## Create Route53 DNS records for vector-log-proxy nodes
 five_minutes = 60 * 5
-route53.Record(
+dns_entry = route53.Record(
     "vector-log-proxy-dns-record",
     name=vector_log_proxy_config.require("web_host_domain"),
     type="CNAME",
@@ -354,3 +354,5 @@ route53.Record(
     records=[vector_log_proxy_lb.dns_name],
     zone_id=mitodl_zone_id,
 )
+
+export("vector_log_proxy", {"fqdn": dns_entry.fqdn})
