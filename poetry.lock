@@ -507,18 +507,18 @@ tox = ["tox"]
 
 [[package]]
 name = "datamodel-code-generator"
-version = "0.17.1"
+version = "0.17.2"
 description = "Datamodel Code Generator"
 category = "dev"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "datamodel_code_generator-0.17.1-py3-none-any.whl", hash = "sha256:8e3bf374dff69ce65e07feed3322f5b83432cc7d3974169865ede69c4b98bf92"},
-    {file = "datamodel_code_generator-0.17.1.tar.gz", hash = "sha256:a22e1f71b76c149a0fbb8214f7b1e4926c01bf5bc94ce5264a932d65599fb4a9"},
+    {file = "datamodel_code_generator-0.17.2-py3-none-any.whl", hash = "sha256:b42b8b4da4055ea96ddf303efecfa37316bb025e88513fffc4dad960cb56b43c"},
+    {file = "datamodel_code_generator-0.17.2.tar.gz", hash = "sha256:e88e000b254b07937a45902e95c08c9edec21eee3492c3a3ad4b6a4115345924"},
 ]
 
 [package.dependencies]
-argcomplete = ">=1.10,<3.0"
+argcomplete = ">=1.10,<4.0"
 black = ">=19.10b0"
 genson = ">=1.2.1,<2.0"
 inflect = ">=4.1.0,<6.0"
