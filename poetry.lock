@@ -1767,13 +1767,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-mongodbatlas"
-version = "3.7.1"
+version = "3.7.2"
 description = "A Pulumi package for creating and managing mongodbatlas cloud resources."
 category = "main"
 optional = false
 python-versions = "*"
 files = [
-    {file = "pulumi_mongodbatlas-3.7.1.tar.gz", hash = "sha256:9eaa1dc4d3037e5742229a94c5039f731bf7f27b37a8d5c50d33386a488d8506"},
+    {file = "pulumi_mongodbatlas-3.7.2.tar.gz", hash = "sha256:c561aabfd873a38661484890eba9375321be7fde6e678d84793ea9f9aa55407c"},
 ]
 
 [package.dependencies]
