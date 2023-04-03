@@ -47,32 +47,36 @@ def tubular_pipeline() -> Pipeline:
                 ),
             ),
             LoadVarStep(
-                load_var=Identifier("tubular_retirees_var"),
+                load_var=Identifier("tubular_retirees"),
                 file=Identifier(tubular_retirees.name),
                 reveal=True,
-                ),
+            ),
             # Add Across Step - https://concourse-ci.org/across-step.html#schema.across here
             # I don't really understand how this fits into the Python model. Does the Across step get enclosed within a TaskStep?
-            TaskStep(
-                task=Identifier("tubular-retire-users-task"),
-                config=TaskConfig(
-                    platform=Platform.linux,
-                    image_resource=AnonymousResource(
-                        type=REGISTRY_IMAGE,
-                        source=RegistryImage(repository="mitodl/openedx-tubular"),
-                    ),
-                    inputs=[
-                        Input(
-                            name=tubular_retirees.name
-                            )
-                        ],
-                    run=Command(
-                        path="/app/scripts/retire_one_learner.py",
-                        # I have no idea if /etc is the right place for the configs to live,
-                        # Or what the config should look like.
-                        args=[
-                            "--config_file", "/etc/openedx_config.yml",
-                            ]
+            across(
+                var: tubular_retireees
+                values: ((tubular_retirees))
+                TaskStep(
+                    task=Identifier("tubular-retire-users-task"),
+                    config=TaskConfig(
+                        platform=Platform.linux,
+                        image_resource=AnonymousResource(
+                            type=REGISTRY_IMAGE,
+                            source=RegistryImage(repository="mitodl/openedx-tubular"),
+                        ),
+                        inputs=[
+                            Input(
+                                name=tubular_retirees.name
+                                )
+                            ],
+                        run=Command(
+                            path="/app/scripts/retire_one_learner.py",
+                            # I have no idea if /etc is the right place for the configs to live,
+                            # Or what the config should look like.
+                            args=[
+                                "--config_file", "/etc/openedx_config.yml",
+                                ]
+                        ),
                     ),
                 ),
             ),
