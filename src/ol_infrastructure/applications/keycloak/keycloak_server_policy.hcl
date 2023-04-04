@@ -8,3 +8,7 @@ path "secret-keycloak" {
 path "secret-keycloak/*" {
   capabilities = ["read"]
 }
+
+path "sys/leases/renew" {
+  capabilities = ["update"]
+}
