@@ -5,13 +5,15 @@ import base64
 import json
 import textwrap
 from pathlib import Path
+from os import linesep
 
 import pulumi_vault as vault
 import yaml
 from pulumi import Config, StackReference, export
-from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
+from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53, s3
 
 from bridge.secrets.sops import read_yaml_secrets
+from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
@@ -43,7 +45,10 @@ target_vpc_name = (
 )
 target_vpc = network_stack.require_output(target_vpc_name)
 
-VECTOR_LOG_PROXY_PORT = vector_log_proxy_config.get("listener_port") or 9000
+HEROKU_LOG_PROXY_PORT = vector_log_proxy_config.get("heroku_listener_port") or 9000
+FASTLY_LOG_PROXY_PORT = (
+    vector_log_proxy_config.get("fastly_listener_port") or DEFAULT_HTTPS_PORT
+)
 
 consul_security_groups = consul_stack.require_output("security_groups")
 aws_config = AWSBase(
@@ -110,9 +115,13 @@ vector_log_proxy_secrets_mount = vault.Mount(
     path="secret-vector-log-proxy",
     type="kv-v2",
 )
-heroku_proxy_credentials = read_yaml_secrets(
-    Path(f"vector/heroku_proxy.{stack_info.env_suffix}.yaml")
+proxy_credentials = read_yaml_secrets(
+    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
 )
+heroku_proxy_credentials = proxy_credentials["heroku"]
+fastly_proxy_credentials = proxy_credentials["fastly"]
+
+# This secret is never actually referenced by anything but it is good to have.
 vault.generic.Secret(
     "vector-log-proxy-http-auth-creds",
     path=vector_log_proxy_secrets_mount.path.apply(
@@ -120,8 +129,14 @@ vault.generic.Secret(
     ),
     data_json=json.dumps(
         {
-            "username": heroku_proxy_credentials["username"],
-            "password": heroku_proxy_credentials["password"],
+            "fastly": {
+                "username": fastly_proxy_credentials["username"],
+                "password": fastly_proxy_credentials["password"],
+            },
+            "heroku": {
+                "username": heroku_proxy_credentials["username"],
+                "password": heroku_proxy_credentials["password"],
+            },
         }
     ),
 )
@@ -158,14 +173,62 @@ vector_log_proxy_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
-            from_port=VECTOR_LOG_PROXY_PORT,
-            to_port=VECTOR_LOG_PROXY_PORT,
+            from_port=HEROKU_LOG_PROXY_PORT,
+            to_port=HEROKU_LOG_PROXY_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the vector-log-proxy server on port {VECTOR_LOG_PROXY_PORT}",  # noqa: E501
+            description=f"Allow traffic to the vector-log-proxy server on port {HEROKU_LOG_PROXY_PORT}",  # noqa: E501
+        ),
+        ec2.SecurityGroupIngressArgs(
+            protocol="tcp",
+            from_port=FASTLY_LOG_PROXY_PORT,
+            to_port=FASTLY_LOG_PROXY_PORT,
+            cidr_blocks=["0.0.0.0/0"],
+            description=f"Allow traffic to the vector-log-proxy server on port {FASTLY_LOG_PROXY_PORT}",  # noqa: E501
         ),
     ],
     egress=default_egress_args,
     vpc_id=vpc_id,
+)
+
+########################################
+#     Fastly Service Hash Challenge    #
+########################################
+# Need to give fastly a proof-of-ownership for sending logs to a https endpoint
+# see:
+# https://docs.fastly.com/en/guides/log-streaming-https#prerequisites
+
+fastly_service_hash_bucket_name = f"mitodl-vector-log-proxy-static-{env_name}"
+fastly_service_hash_bucket = s3.Bucket(
+    f"vector-log-proxy-fastly-service-hash-bucket-{env_name}",
+    bucket=fastly_service_hash_bucket_name,
+    acl="public-read",
+    tags=aws_config.tags,
+)
+
+service_hash_content = ""
+for service_hash in vector_log_proxy_config.get_object(
+    "fastly_service_id_sha256sums"
+).values():
+    service_hash_content = service_hash_content + service_hash + linesep
+
+fastly_service_hash_bucket_name_with_prefix = ".well-known/fastly/logging/challenge"
+fastly_service_hash_object = s3.BucketObjectv2(
+    fastly_service_hash_bucket_name_with_prefix,
+    bucket=fastly_service_hash_bucket_name,
+    acl="public-read",
+    content=service_hash_content,
+    content_type="text/plain",
+)
+
+service_hash_bucket_fqdn = fastly_service_hash_bucket.bucket_domain_name.apply(
+    lambda domain: f"{domain}"
+)
+challenge_url = fastly_service_hash_bucket.bucket_domain_name.apply(
+    lambda domain: f"https://{domain}/{fastly_service_hash_bucket_name_with_prefix}"
+)
+export(
+    "fastly_service_hash_bucket",
+    {"challenge_url": challenge_url, "bucket_fqdn": service_hash_bucket_fqdn},
 )
 
 ###################################
@@ -190,36 +253,68 @@ vector_log_proxy_lb = lb.LoadBalancer(
 )
 
 TARGET_GROUP_NAME_MAX_LENGTH = 32
-vector_log_proxy_lb_target_group = lb.TargetGroup(
-    "vector-log-proxy-alb-target-group",
+
+heroku_log_proxy_lb_target_group = lb.TargetGroup(
+    "heroku-vector-log-proxy-alb-target-group",
     vpc_id=vpc_id,
     target_type="instance",
-    port=VECTOR_LOG_PROXY_PORT,
+    port=HEROKU_LOG_PROXY_PORT,
     protocol="HTTPS",
     health_check=lb.TargetGroupHealthCheckArgs(
         healthy_threshold=2,
         interval=120,
         path="/events",
-        port=str(VECTOR_LOG_PROXY_PORT),
+        port=str(HEROKU_LOG_PROXY_PORT),
         protocol="HTTPS",
         matcher="405",
     ),
-    name=vector_log_proxy_tag[:TARGET_GROUP_NAME_MAX_LENGTH],
+    name=("heroku-" + vector_log_proxy_tag)[:TARGET_GROUP_NAME_MAX_LENGTH].rstrip("-"),
     tags=aws_config.tags,
 )
+fastly_log_proxy_lb_target_group = lb.TargetGroup(
+    "fastly-vector-log-proxy-alb-target-group",
+    vpc_id=vpc_id,
+    target_type="instance",
+    port=FASTLY_LOG_PROXY_PORT,
+    protocol="HTTPS",
+    health_check=lb.TargetGroupHealthCheckArgs(
+        healthy_threshold=2,
+        interval=120,
+        path="/events",
+        port=str(FASTLY_LOG_PROXY_PORT),
+        protocol="HTTPS",
+        matcher="405",
+    ),
+    name=("fastly-" + vector_log_proxy_tag)[:TARGET_GROUP_NAME_MAX_LENGTH].rstrip("-"),
+    tags=aws_config.tags,
+)
+
 vector_log_proxy_acm_cert = acm.get_certificate(
     domain="*.odl.mit.edu", most_recent=True, statuses=["ISSUED"]
 )
-vector_log_proxy_alb_listener = lb.Listener(
-    "vector-log-proxy-alb-listener",
+heroku_log_proxy_alb_listener = lb.Listener(
+    "heroku-vector-log-proxy-alb-listener",
     certificate_arn=vector_log_proxy_acm_cert.arn,
     load_balancer_arn=vector_log_proxy_lb.arn,
-    port=VECTOR_LOG_PROXY_PORT,
+    port=HEROKU_LOG_PROXY_PORT,
     protocol="HTTPS",
     default_actions=[
         lb.ListenerDefaultActionArgs(
             type="forward",
-            target_group_arn=vector_log_proxy_lb_target_group.arn,
+            target_group_arn=heroku_log_proxy_lb_target_group.arn,
+        )
+    ],
+)
+heroku_log_proxy_alb_listener = lb.Listener(
+    "fastly-vector-log-proxy-alb-listener",
+    certificate_arn=vector_log_proxy_acm_cert.arn,
+    load_balancer_arn=vector_log_proxy_lb.arn,
+    port=FASTLY_LOG_PROXY_PORT,
+    protocol="HTTPS",
+    default_actions=[
+        lb.ListenerDefaultActionArgs(
+            type="forward",
+            target_group_arn=fastly_log_proxy_lb_target_group.arn,
         )
     ],
 )
@@ -289,6 +384,17 @@ vector_log_proxy_launch_config = ec2.LaunchTemplate(
                                 "owner": "consul:consul",
                             },
                             {
+                                "path": "/etc/default/traefik",
+                                "content": textwrap.dedent(
+                                    f"""\
+                            DOMAIN={vector_log_proxy_config.require('web_host_domain')}
+                            FASTLY_SERVICE_HASH_BUCKET_FQDN={service_hash_bucket_fqdn}
+                            FASTLY_SERVICE_HASH_BUCKET_CHALLENGE_URL="{challenge_url}"
+                            """
+                                ),
+                                "owner": "root:root",
+                            },
+                            {
                                 "path": "/etc/default/vector",
                                 "content": textwrap.dedent(
                                     f"""\
@@ -300,6 +406,9 @@ vector_log_proxy_launch_config = ec2.LaunchTemplate(
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
                             HEROKU_PROXY_PASSWORD={heroku_proxy_credentials['password']}
                             HEROKU_PROXY_USERNAME={heroku_proxy_credentials['username']}
+                            FASTLY_PROXY_PASSWORD={fastly_proxy_credentials['password']}
+                            FASTLY_PROXY_USERNAME={fastly_proxy_credentials['username']}
+                            FASTLY_CHALLENGE_REDIRECT_URL={challenge_url}
                             """
                                 ),
                                 "owner": "root:root",
@@ -330,7 +439,10 @@ autoscaling.Group(
         ),
         triggers=["tags"],
     ),
-    target_group_arns=[vector_log_proxy_lb_target_group.arn],
+    target_group_arns=[
+        heroku_log_proxy_lb_target_group.arn,
+        fastly_log_proxy_lb_target_group.arn,
+    ],
     tags=[
         autoscaling.GroupTagArgs(
             key=key_name,
@@ -342,7 +454,6 @@ autoscaling.Group(
         ).items()
     ],
 )
-
 
 ## Create Route53 DNS records for vector-log-proxy nodes
 five_minutes = 60 * 5
