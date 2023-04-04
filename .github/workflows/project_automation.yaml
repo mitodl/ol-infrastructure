@@ -1,0 +1,19 @@
+---
+name: Add new issues to OL Engineering Project
+
+on:
+  issues:
+    types:
+    - opened
+
+jobs:
+  add-to-project:
+    name: Add issue to project
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/add-to-project@v0.4.1
+      with:
+          # You can target a project in a different organization
+          # to the issue
+        project-url: https://github.com/orgs/mitodl/projects/21
+        github-token: ${{ secrets.GH_PROJECT_AUTOMATION_TOKEN }}

@@ -8,5 +8,5 @@ if (beresp.status == 404) {
     }
     error 602 "redirect";
   }
-  error 902 "Fastly Internal"; # Let the synthetic 404 take over
+  error 901 "Fastly Internal"; # Let the synthetic 404 take over
 }

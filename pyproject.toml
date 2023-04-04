@@ -9,7 +9,7 @@ classifiers = [
     'Operating System :: Linux',
     'Programming Language :: Python',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.10',
 ]
 repository = "https://github.com/mitodl/ol-infrastructure"
 packages = [
@@ -19,14 +19,14 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.11"
+python = "^3.11"
 boto3 = "^1.24"
 httpx = "^0.23.0"
 hvac = {extras = ["parser"], version = "^1.0.0"}
 parliament = "^1.6.0"
 pulumi = "^3.39.1"
 pulumi-aws = "^5.13.0"
-pulumi-fastly = "^6.0.0"
+pulumi-fastly = "^7.0.0"
 pulumi-github = "^5.0.0"
 pulumi-tls = "^4.1.0"
 pulumi-vault = "^5.5.0, !=5.7.0"
@@ -46,11 +46,11 @@ pre-commit = "^3.0.0"
 pytest = "^7.1.1"
 pytest-testinfra = "^7.0.0"
 pyupgrade = "^3.0.0"
-ruff = "^0.0.254"
+ruff = "^0"
 
 
 [tool.black]
-target-version = ["py38"]
+target-version = ["py311"]
 
 [tool.isort]
 profile = "black"
@@ -60,7 +60,7 @@ requires = ["poetry_core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py311"
 line-length = 88
 select = [
     "A",      # flake8-builtins
