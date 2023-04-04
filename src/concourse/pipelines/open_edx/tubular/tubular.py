@@ -13,6 +13,7 @@ from concourse.lib.models.pipeline import (
     RegistryImage,
     TaskConfig,
     TaskStep,
+    AcrossVar
 )
 
 
@@ -53,7 +54,11 @@ def tubular_pipeline() -> Pipeline:
             ),
             TaskStep(
                 task=Identifier("tubular-retire-users-task"),
-                across=Identifier(tubular_retirees),
+                across=AcrossVar(
+                    var=tubular_retirees,
+                    values=tubular_retirees,
+                    fail_fast=True,
+                ),
                 config=TaskConfig(
                     platform=Platform.linux,
                     image_resource=AnonymousResource(
