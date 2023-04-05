@@ -5,10 +5,10 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-production.odl.mit.edu
   edxapp:business_unit: residential
+  edxapp:db_max_storage_gb: "1000"
   edxapp:db_password:
     secure: v1:vkG4n/X+C+SBaMf7:W/zi1Bxqkab0Hx1HAAiVhZuj/8WOJ7v94lxfERa5YIF5dD037uuULgPxIt+3zzHVur26pBcVIk4=
-  edxapp:db_storage_gb: 500
-  edxapp:db_max_storage_gb: 1000
+  edxapp:db_storage_gb: "500"
   edxapp:dns_zone: mitx
   edxapp:domains:
     lms: lms.mitx.mit.edu
@@ -33,7 +33,7 @@ config:
   edxapp:web_instance_type: general_purpose_xlarge
   edxapp:web_node_capacity: "5"
   edxapp:worker_disk_size: "50"
-  edxapp:worker_node_capacity: "2"
+  edxapp:worker_node_capacity: "5"
   mongodb:atlas_project_id: 61b728704656cb4747e589a0
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

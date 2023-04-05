@@ -340,7 +340,17 @@ class OLAmazonCache(pulumi.ComponentResource):
                 "metric_name": "EngineCPUUtilization",
                 "threshold": 50,  # percent
                 "unit": "Percent",
-            }
+            },
+            "DatabaseMemoryUsagePercentage": {
+                "comparison_operator": "GreaterThanThreshold",
+                "description": "ElastiCache - High memory utilization by the Redis engine.",  # noqa: E501
+                "datapoints_to_alarm": 2,
+                "level": "warning",
+                "period": 300,  # 5 minutes
+                "evaluation_periods": 2,  # 10 Minutes
+                "metric_name": "DatabaseMemoryUsagePercentage",
+                "threshold": 90,  # percent
+            },
         }
 
         monitoring_profiles: dict[str, dict] = {

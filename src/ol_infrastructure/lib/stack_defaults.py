@@ -12,7 +12,7 @@ production_defaults = {
         "read_replica": OLReplicaDBConfig(),
         "monitoring_profile_name": "production",
     },
-    "redis": {"instance_type": CacheInstanceTypes.large},
+    "redis": {"instance_type": CacheInstanceTypes.high_mem_large},
 }
 
 qa_defaults = {
