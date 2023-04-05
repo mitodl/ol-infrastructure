@@ -66,6 +66,11 @@ mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 # TODO MD 20230206
 # This might be needed in the future but right now it just causes errors
 secrets = read_yaml_secrets(Path(f"keycloak/data.{stack_info.env_suffix}.yaml"))
+if secrets is None:
+    raise ValueError(
+        "You must create the secrets structure at "
+        "src/bridge/secrets/keycloak/data.{stack_info.env_suffix}.yaml"
+    )
 
 aws_config = AWSBase(
     tags={"OU": "operations", "Environment": f"operations-{stack_info.env_suffix}"}
