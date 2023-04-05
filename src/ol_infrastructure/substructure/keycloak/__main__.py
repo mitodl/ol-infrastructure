@@ -12,18 +12,19 @@ keycloak_config = Config("keycloak")
 # Create a Keycloak provider instance
 provider = keycloak.Provider(
     "identity-provider",
-    base_url=f"https://identity-{env_name}.odl.mit.edu/auth/",
+    base_url=f"https://sso-{env_name}.odl.mit.edu/auth/",
     realm="master",
     client_id="",
     client_secret="",
 )
 
 # Create OL Platform Engineering Realm
-realm = keycloak.Realm(
+ol_platform_engineering_realm = keycloak.Realm(
     "ol-platform-engineering",
-    access_code_lifespan="1h",
+    access_code_lifespan="30m",
+    access_code_lifespan_user_action="15m",
     attributes={
-        "mycustomAttribute": "myCustomValue",
+        "business_unit": f"operations-{env_name}",
     },
     display_name="OL PLatform Engineering",
     display_name_html="<b>OL PLatform Engineering</b>",
@@ -40,7 +41,7 @@ realm = keycloak.Realm(
     ),
     reset_password_allowed=True,
     verify_email=True,
-    password_policy="upperCase(2) and length(30) and forceExpiredPasswordChange(365) and notUsername",  # noqa: S106, E501
+    password_policy="upperCase(2) and digits(4) and length(30) and specialChars(4) and historyPassword(3) and forceExpiredPasswordChange(365) and notUsername and notEmail",  # noqa: S106, E501
     realm="ol-platform-engineering",
     security_defenses=keycloak.RealmSecurityDefensesArgs(
         brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(
@@ -76,4 +77,47 @@ realm = keycloak.Realm(
         starttls=True,
     ),
     ssl_required="external",
+    offline_session_idle_timeout="7d",
+    sso_session_idle_timeout="2h",
+    sso_session_max_lifespan="1d",
+)
+
+required_action_configure_otp = keycloak.RequiredAction(
+    "requiredAction",
+    realm_id=ol_platform_engineering_realm.realm,
+    alias="configure-otp",
+    default_action=True,
+    enabled=True,
+)
+
+required_action_verify_email = keycloak.RequiredAction(
+    "requiredAction",
+    realm_id=ol_platform_engineering_realm.realm,
+    alias="verify-email",
+    default_action=True,
+    enabled=True,
+)
+
+required_action_update_password = keycloak.RequiredAction(
+    "requiredAction",
+    realm_id=ol_platform_engineering_realm.realm,
+    alias="updated-password",
+    default_action=True,
+    enabled=True,
+)
+
+github_oauth_client_id = keycloak_config.require("github_oauth_client_id")
+github_oauth_client_secret = keycloak_config.require("github_oauth_client_secret")
+
+realm_identity_provider = keycloak.oidc.IdentityProvider(
+    "realmIdentityProvider",
+    realm=ol_platform_engineering_realm.id,
+    alias="github-idp",
+    client_id=github_oauth_client_id,
+    client_secret=github_oauth_client_secret,
+    authorization_url="https://authorizationurl.com",
+    token_url="https://tokenurl.com",  # noqa: S106
+    extra_config={
+        "clientAuthMethod": "client_secret_post",
+    },
 )
