@@ -5,7 +5,6 @@ MicroMasters application.
 - Create an IAM policy to grant access to S3 and other resources
 """
 
-import json
 
 import pulumi_vault as vault
 from pulumi import Config, StackReference, export
@@ -51,25 +50,6 @@ micromasters_bucket = s3.Bucket(
     ),
     tags=aws_config.tags,
     acl="private",
-    policy=json.dumps(
-        {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Action": [
-                        "s3:GetObject",
-                        "s3:ListAllMyBuckets",
-                        "s3:ListBucket",
-                        "s3:ListObjects",
-                        "s3:PutObject",
-                        "s3:DeleteObject",
-                    ],
-                    "Resource": [f"arn:aws:s3:::{micromasters_bucket_name}/*"],
-                }
-            ],
-        }
-    ),
     cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
 )
 
@@ -91,7 +71,6 @@ micromasters_iam_policy = iam.Policy(
                 },
                 {
                     "Effect": "Allow",
-                    "Principal": "*",
                     "Action": [
                         "s3:ListBucket*",
                         "s3:PutObject",
