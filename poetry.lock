@@ -1702,13 +1702,13 @@ six = ">=1.12,<2.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "5.34.0"
+version = "5.35.0"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 category = "main"
 optional = false
 python-versions = "*"
 files = [
-    {file = "pulumi_aws-5.34.0.tar.gz", hash = "sha256:edb2b0857478a209e23c5e797a2aab227dd3bd3d9cbef31222b0c68a98a00b73"},
+    {file = "pulumi_aws-5.35.0.tar.gz", hash = "sha256:c2c7cedd79a3e2f6dab63fe89de2b3adb8a815a924d05cd45e06f8ad6719160a"},
 ]
 
 [package.dependencies]
