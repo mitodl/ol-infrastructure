@@ -39,10 +39,10 @@ transforms:
     inputs:
     - "fastly_log_proxy"
     source: |
-      # Placeholder remap just for testing at the moment.
-      abort_match_boring_apps, err = (match_any(.app_name, [r'ol-eng-library', r'.*wiki.*']))
-      if abort_match_boring_apps {
-        abort
+      event, err = parse_json(.message)
+      if event != null {
+        .,err = merge(., event)
+        del(.message)
       }
   heroku_drop_unwanted_logs:
     type: remap
@@ -71,7 +71,7 @@ sinks:
     # Probably change this as appropriate
     {% raw %}
       environment: "{{ environment }}"
-      application: "{{ app_name }}"
+      application: "{{ application }}"
       service: "fastly"
     {% endraw %}
     out_of_order_action: rewrite_timestamp

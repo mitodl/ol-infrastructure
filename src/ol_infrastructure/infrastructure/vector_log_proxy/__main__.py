@@ -9,7 +9,7 @@ from os import linesep
 
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, StackReference, export
+from pulumi import Config, StackReference, export, Output, ResourceOptions
 from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53, s3
 
 from bridge.secrets.sops import read_yaml_secrets
@@ -23,6 +23,65 @@ from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
+
+
+def build_user_data(consul_dc, challenge_url, service_hash_bucket_fqdn):
+    cloud_config_contents = {
+        "write_files": [
+            {
+                "path": "/etc/consul.d/02-autojoin.json",
+                "content": json.dumps(
+                    {
+                        "retry_join": [
+                            "provider=aws tag_key=consul_env " f"tag_value={consul_dc}"
+                        ],
+                        "datacenter": consul_dc,
+                    }
+                ),
+                "owner": "consul:consul",
+            },
+            {
+                "path": "/etc/default/traefik",
+                "content": textwrap.dedent(
+                    f"""\
+            DOMAIN={vector_log_proxy_config.require('web_host_domain')}
+            FASTLY_SERVICE_HASH_BUCKET_FQDN={service_hash_bucket_fqdn}
+            FASTLY_SERVICE_HASH_BUCKET_CHALLENGE_URL="{challenge_url}"
+            """
+                ),
+                "owner": "root:root",
+            },
+            {
+                "path": "/etc/default/vector",
+                "content": textwrap.dedent(
+                    f"""\
+            ENVIRONMENT={consul_dc}
+            VECTOR_CONFIG_DIR=/etc/vector/
+            AWS_REGION={aws_config.region}
+            GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
+            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
+            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
+            HEROKU_PROXY_PASSWORD={heroku_proxy_credentials['password']}
+            HEROKU_PROXY_USERNAME={heroku_proxy_credentials['username']}
+            FASTLY_PROXY_PASSWORD={fastly_proxy_credentials['password']}
+            FASTLY_PROXY_USERNAME={fastly_proxy_credentials['username']}
+            FASTLY_CHALLENGE_REDIRECT_URL={challenge_url}
+            """
+                ),
+                "owner": "root:root",
+            },
+        ]
+    }
+
+    return base64.b64encode(
+        "#cloud-config\n{}".format(
+            yaml.dump(
+                cloud_config_contents,
+                sort_keys=True,
+            )
+        ).encode("utf8")
+    ).decode("utf8")
+
 
 ##################################
 ##    Setup + Config Retrival   ##
@@ -69,7 +128,7 @@ vector_log_proxy_ami = ec2.get_ami(
     owners=[aws_account.account_id],
 )
 
-vector_log_proxy_tag = f"vector-server-{env_name}"
+vector_log_proxy_tag = f"vector-{env_name}"
 consul_provider = get_consul_provider(stack_info)
 
 ###############################
@@ -218,6 +277,7 @@ fastly_service_hash_object = s3.BucketObjectv2(
     acl="public-read",
     content=service_hash_content,
     content_type="text/plain",
+    opts=ResourceOptions(parent=fastly_service_hash_bucket),
 )
 
 service_hash_bucket_fqdn = fastly_service_hash_bucket.bucket_domain_name.apply(
@@ -280,7 +340,7 @@ fastly_log_proxy_lb_target_group = lb.TargetGroup(
     health_check=lb.TargetGroupHealthCheckArgs(
         healthy_threshold=2,
         interval=120,
-        path="/events",
+        path="/",
         port=str(FASTLY_LOG_PROXY_PORT),
         protocol="HTTPS",
         matcher="405",
@@ -364,61 +424,16 @@ vector_log_proxy_launch_config = ec2.LaunchTemplate(
         ),
     ],
     tags=aws_config.tags,
-    user_data=consul_datacenter.apply(
-        lambda consul_dc: base64.b64encode(
-            "#cloud-config\n{}".format(
-                yaml.dump(
-                    {
-                        "write_files": [
-                            {
-                                "path": "/etc/consul.d/02-autojoin.json",
-                                "content": json.dumps(
-                                    {
-                                        "retry_join": [
-                                            "provider=aws tag_key=consul_env "
-                                            f"tag_value={consul_dc}"
-                                        ],
-                                        "datacenter": consul_dc,
-                                    }
-                                ),
-                                "owner": "consul:consul",
-                            },
-                            {
-                                "path": "/etc/default/traefik",
-                                "content": textwrap.dedent(
-                                    f"""\
-                            DOMAIN={vector_log_proxy_config.require('web_host_domain')}
-                            FASTLY_SERVICE_HASH_BUCKET_FQDN={service_hash_bucket_fqdn}
-                            FASTLY_SERVICE_HASH_BUCKET_CHALLENGE_URL="{challenge_url}"
-                            """
-                                ),
-                                "owner": "root:root",
-                            },
-                            {
-                                "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
-                            ENVIRONMENT={consul_dc}
-                            VECTOR_CONFIG_DIR=/etc/vector/
-                            AWS_REGION={aws_config.region}
-                            GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
-                            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
-                            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            HEROKU_PROXY_PASSWORD={heroku_proxy_credentials['password']}
-                            HEROKU_PROXY_USERNAME={heroku_proxy_credentials['username']}
-                            FASTLY_PROXY_PASSWORD={fastly_proxy_credentials['password']}
-                            FASTLY_PROXY_USERNAME={fastly_proxy_credentials['username']}
-                            FASTLY_CHALLENGE_REDIRECT_URL={challenge_url}
-                            """
-                                ),
-                                "owner": "root:root",
-                            },
-                        ]
-                    },
-                    sort_keys=True,
-                )
-            ).encode("utf8")
-        ).decode("utf8")
+    user_data=Output.all(
+        consul_dc=consul_datacenter,
+        challenge_url=challenge_url,
+        service_hash_bucket_fqdn=service_hash_bucket_fqdn,
+    ).apply(
+        lambda init_dict: build_user_data(
+            init_dict["consul_dc"],
+            init_dict["challenge_url"],
+            init_dict["service_hash_bucket_fqdn"],
+        )
     ),
 )
 
