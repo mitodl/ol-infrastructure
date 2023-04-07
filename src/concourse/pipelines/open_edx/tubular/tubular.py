@@ -12,16 +12,12 @@ from concourse.lib.models.pipeline import (
     Platform,
     RegistryImage,
     TaskConfig,
-    TaskStep,
-    AcrossVar
+    AcrossVar,
 )
 
 
-
 def tubular_pipeline() -> Pipeline:
-    tubular_retirees=Output(
-                name=Identifier("tubular-retirees")
-            )
+    tubular_retirees = Output(name=Identifier("tubular-retirees"))
     tubular_job_object = Job(
         name=Identifier("deploy-tubular-world"),
         max_in_flight=1,  # Only allow 1 Pulumi task at a time since they lock anyway.
@@ -37,54 +33,50 @@ def tubular_pipeline() -> Pipeline:
                     outputs=[tubular_retirees],
                     run=Command(
                         path="/app/scripts/get_learners_to_retire.py",
-                        # I have no idea if /etc is the right place for the configs to live,
-                        # Or what the config should look like.
                         args=[
-                            "--config_file", "/etc/openedx_config.yml",
-                            "--output_dir", tubular_retirees.name,
-                            "--cool_off_days", "5"
-                            ]
+                            "--config_file",
+                            "/etc/openedx_config.yml",
+                            "--output_dir",
+                            tubular_retirees.name,
+                            "--cool_off_days",
+                            "5",
+                        ],
                     ),
                 ),
             ),
             LoadVarStep(
-                load_var=Identifier("tubular_retirees"),
-                file=Identifier(tubular_retirees.name),
+                load_var="tubular_retirees",
+                file="tubular_retirees.name/actual_file_name_we_dont_know",
                 reveal=True,
             ),
             TaskStep(
                 task=Identifier("tubular-retire-users-task"),
-                across=AcrossVar(
-                    var=tubular_retirees,
-                    values=tubular_retirees,
-                    fail_fast=True,
-                ),
+                across=[
+                    AcrossVar(
+                        var="tubular_retiree",
+                        values="((.tubular_retirees))",
+                        fail_fast=True,
+                    ),
+                ],
                 config=TaskConfig(
                     platform=Platform.linux,
                     image_resource=AnonymousResource(
                         type=REGISTRY_IMAGE,
                         source=RegistryImage(repository="mitodl/openedx-tubular"),
                     ),
-                    inputs=[
-                        Input(
-                            name=tubular_retirees.name
-                            )
-                        ],
+                    inputs=[Input(name=tubular_retirees.name)],
                     run=Command(
                         path="/app/scripts/retire_one_learner.py",
-                        # I have no idea if /etc is the right place for the configs to live,
-                        # Or what the config should look like.
                         args=[
-                            "--config_file", "/etc/openedx_config.yml",
-                            ]
+                            "--config_file",
+                            "/etc/openedx_config.yml",
+                        ],
                     ),
                 ),
             ),
         ],
     )
-    tubular_pipeline = Pipeline(
-            jobs=[tubular_job_object]
-            )
+    tubular_pipeline = Pipeline(jobs=[tubular_job_object])
     return tubular_pipeline
 
 

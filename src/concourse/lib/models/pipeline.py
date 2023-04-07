@@ -235,7 +235,7 @@ class GroupConfig(BaseModel):
 
 
 class StepModifierMixin(BaseModel):
-    across: Optional[AcrossVar] = Field(
+    across: Optional[list[AcrossVar]] = Field(
         None,
         description="Run a step multiple times with different combinations of variable "
         "values. The across step can be combined with the load_var step, the "
@@ -473,7 +473,7 @@ class AcrossVar(BaseModel):
             " printed."
         ),
     )
-    values: Optional[list[Value]] = Field(
+    values: Optional[Union[list[Value], str]] = Field(
         None,
         description=(
             "The list of values that the  schema.across_var.var  var  will  iterate"
