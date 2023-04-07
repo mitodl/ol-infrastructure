@@ -149,3 +149,17 @@ new ones if the old ones don't conform to naming conventions. You'll also need t
 set in your Pulumi code.
 
 To sync the bucket contents, use the [AWS CLI](https://docs.aws.amazon.com/cli/latest/reference/s3/sync.html) `aws s3 sync` command.
+
+For example, the command we used to sync the old micromasters S3 bucket to the new one which conforms to our desired naming
+conventions is:
+```
+aws s3 sync s3://odl-micromasters-production s3://ol-micromasters-app-production
+```
+
+## Saltstack & Cloudfront
+
+Currently, we are using Saltstack to configure some aspects of our Heroku applications, including which S3 bucket to use and which
+CloudFront distribution we're fronting the app with.
+
+**TODO**: This section needs to be way less of a hand wave and include actual detail as to how to operate the Saltstack side or
+whatever we replace it with.
