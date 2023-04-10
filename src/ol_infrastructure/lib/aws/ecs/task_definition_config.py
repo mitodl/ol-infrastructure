@@ -13,7 +13,7 @@ class OLFargateTaskDefinitionConfig(BaseModel):
     """Maps to 'family' property which is unique name for Task Definition."""
 
     task_def_name: str
-    # ARN of IAM role use for task execution role. Default will be a role created w/
+    # ARN of IAM role to use for task execution role. Default will be a role created w/
     # AmazonECSTaskExecutionRolePolicy This role allows ECS Agent and Docker daemon to
     # make calls such as:
     # - sending logs to CloudWatch

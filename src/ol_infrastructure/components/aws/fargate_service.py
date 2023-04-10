@@ -25,6 +25,7 @@ from typing import Optional, Union
 
 import pulumi
 from pulumi_aws.ec2 import SecurityGroup, get_subnet_ids
+from pulumi_aws.ec2.get_security_group import AwaitableGetSecurityGroupResult
 from pulumi_aws.ecs import (
     Cluster,
     Service,
@@ -87,7 +88,7 @@ class OLFargateServiceConfig(AWSBase):
     # subnets, from this VPC
     vpc_id: Union[pulumi.Output[str], str]
     # Security groups associated with the service and tasks
-    security_groups: list[SecurityGroup]
+    security_groups: list[Union[SecurityGroup, AwaitableGetSecurityGroupResult]]
     # Force a new task deploymennt of the service
     force_new_deployment: bool = False
     # Task Definition(s) to be used with ECS Service
@@ -138,9 +139,7 @@ class OLFargateServiceConfig(AWSBase):
 
 class OLFargateService(pulumi.ComponentResource):
     def __init__(
-        self,
-        config: OLFargateServiceConfig,
-        opts: Optional[pulumi.ResourceOptions] = None,
+        self, config: OLFargateServiceConfig, opts: pulumi.ResourceOptions = None
     ):
         super().__init__(
             "ol:infrastructure:aws:ecs:OLFargateService",
@@ -207,7 +206,8 @@ class OLFargateService(pulumi.ComponentResource):
         health_check_grace_period = None
         if config.load_balancer_configuration:
             pulumi.log.debug(
-                f"Setting health check grace period to {config.health_check_grace_period_seconds} seconds"  # noqa: G004, E501
+                "Setting health check grace period to "  # noqa: G004
+                f"{config.health_check_grace_period_seconds} seconds"
             )
             health_check_grace_period = config.health_check_grace_period_seconds
 
