@@ -156,18 +156,18 @@ uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
 name = "boto3"
-version = "1.26.105"
+version = "1.26.109"
 description = "The AWS SDK for Python"
 category = "main"
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "boto3-1.26.105-py3-none-any.whl", hash = "sha256:f4951f8162905b96fd045e32853ba8cf707042faac846a23910817c508ef27d7"},
-    {file = "boto3-1.26.105.tar.gz", hash = "sha256:2914776e0138530ec6464d0e2f05b4aa18e9212ac920c48472f8a93650feaed2"},
+    {file = "boto3-1.26.109-py3-none-any.whl", hash = "sha256:a1c48674c2ff25ddced599c51d14ba7a6dbe9fd51641e8d63a6887bebd9712d7"},
+    {file = "boto3-1.26.109.tar.gz", hash = "sha256:d388cb7f54f1a3056f91ffcfb5cf18b226454204e5df7a5c10774718c3fbb166"},
 ]
 
 [package.dependencies]
-botocore = ">=1.29.105,<1.30.0"
+botocore = ">=1.29.109,<1.30.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.6.0,<0.7.0"
 
@@ -176,14 +176,14 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.29.105"
+version = "1.29.109"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "botocore-1.29.105-py3-none-any.whl", hash = "sha256:06a2838daad3f346cba5460d0d3deb198225b556ff9ca729798d787fadbdebde"},
-    {file = "botocore-1.29.105.tar.gz", hash = "sha256:17c82391dfd6aaa8f96fbbb08cad2c2431ef3cda0ece89e6e6ba444c5eed45c2"},
+    {file = "botocore-1.29.109-py3-none-any.whl", hash = "sha256:cf43dddb7e2ba5425fe19fad68b10043307b61d9103d06566f1ab6034e38b8db"},
+    {file = "botocore-1.29.109.tar.gz", hash = "sha256:2e449525f0ccedb31fdb962a77caac48b4c486c23515b84c5989a39a1823a024"},
 ]
 
 [package.dependencies]
@@ -437,23 +437,23 @@ testing = ["flake8 (<5)", "pytest (>=6)", "pytest-black (>=0.3.7)", "pytest-chec
 
 [[package]]
 name = "copier"
-version = "7.0.1"
+version = "7.1.0"
 description = "A library for rendering project templates."
 category = "dev"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "copier-7.0.1-py3-none-any.whl", hash = "sha256:c969890db6f1f69db02239f094458a91e36c22248d2952a03e75ac2460179c98"},
-    {file = "copier-7.0.1.tar.gz", hash = "sha256:3d81916dad27d003674070b365bfcd965eb69d5a97920b226d6db88a6e7193d6"},
+    {file = "copier-7.1.0-py3-none-any.whl", hash = "sha256:200284c0bac56aea765991f4ee972c6475f8de4cf017dd0a7e21f061d15c0244"},
+    {file = "copier-7.1.0.tar.gz", hash = "sha256:a15737bc6669cfc741622c9978c45314ff808412a727b4b3968ff982d923fe46"},
 ]
 
 [package.dependencies]
 colorama = ">=0.4.3"
 dunamai = ">=1.7.0"
-iteration_utilities = ">=0.11.0"
+funcy = ">=1.17"
 jinja2 = ">=3.1.1"
 jinja2-ansible-filters = ">=1.3.1"
-packaging = ">=21.0"
+packaging = ">=23.0"
 pathspec = ">=0.9.0"
 plumbum = ">=1.6.9"
 pydantic = ">=1.10.2"
@@ -644,19 +644,31 @@ idna = ">=2.0.0"
 
 [[package]]
 name = "filelock"
-version = "3.10.7"
+version = "3.11.0"
 description = "A platform independent file lock."
 category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "filelock-3.10.7-py3-none-any.whl", hash = "sha256:bde48477b15fde2c7e5a0713cbe72721cb5a5ad32ee0b8f419907960b9d75536"},
-    {file = "filelock-3.10.7.tar.gz", hash = "sha256:892be14aa8efc01673b5ed6589dbccb95f9a8596f0507e232626155495c18105"},
+    {file = "filelock-3.11.0-py3-none-any.whl", hash = "sha256:f08a52314748335c6460fc8fe40cd5638b85001225db78c2aa01c8c0db83b318"},
+    {file = "filelock-3.11.0.tar.gz", hash = "sha256:3618c0da67adcc0506b015fd11ef7faf1b493f0b40d87728e19986b536890c37"},
 ]
 
 [package.extras]
-docs = ["furo (>=2022.12.7)", "sphinx (>=6.1.3)", "sphinx-autodoc-typehints (>=1.22,!=1.23.4)"]
+docs = ["furo (>=2023.3.27)", "sphinx (>=6.1.3)", "sphinx-autodoc-typehints (>=1.22,!=1.23.4)"]
 testing = ["covdefaults (>=2.3)", "coverage (>=7.2.2)", "diff-cover (>=7.5)", "pytest (>=7.2.2)", "pytest-cov (>=4)", "pytest-mock (>=3.10)", "pytest-timeout (>=2.1)"]
+
+[[package]]
+name = "funcy"
+version = "2.0"
+description = "A fancy and practical functional tools"
+category = "dev"
+optional = false
+python-versions = "*"
+files = [
+    {file = "funcy-2.0-py2.py3-none-any.whl", hash = "sha256:53df23c8bb1651b12f095df764bfb057935d49537a56de211b098f4c79614bb0"},
+    {file = "funcy-2.0.tar.gz", hash = "sha256:3963315d59d41c6f30c04bc910e10ab50a3ac4a225868bfa96feed133df075cb"},
+]
 
 [[package]]
 name = "genson"
@@ -1056,54 +1068,6 @@ colors = ["colorama (>=0.4.3)"]
 pipfile-deprecated-finder = ["pip-shims (>=0.5.2)", "pipreqs", "requirementslib"]
 plugins = ["setuptools"]
 requirements-deprecated-finder = ["pip-api", "pipreqs"]
-
-[[package]]
-name = "iteration-utilities"
-version = "0.11.0"
-description = "Utilities based on Pythons iterators and generators."
-category = "dev"
-optional = false
-python-versions = ">=3.5"
-files = [
-    {file = "iteration_utilities-0.11.0-cp35-cp35m-manylinux1_i686.whl", hash = "sha256:17c9418d967fd8020211ebd5770332fc6cf11800eec446a31fcad4fe96fe4009"},
-    {file = "iteration_utilities-0.11.0-cp35-cp35m-manylinux1_x86_64.whl", hash = "sha256:243de0d75c54200350fe2f1aa4c08471f95fe4ca77fca741ae50b495ccd7420c"},
-    {file = "iteration_utilities-0.11.0-cp35-cp35m-manylinux2010_x86_64.whl", hash = "sha256:a074f8bbbfd75b9980819a5f342e90069c421dffebc66724bccc84034c9cdcd2"},
-    {file = "iteration_utilities-0.11.0-cp35-cp35m-manylinux2014_x86_64.whl", hash = "sha256:e046738b578a9c7f7ca96a5d7554191d12f22a897ada78ab4d5ac1a92afc47ba"},
-    {file = "iteration_utilities-0.11.0-cp36-cp36m-macosx_10_14_x86_64.whl", hash = "sha256:c4bb9be1d0ac15b13b0c2f4ada6159a32067f6e1af6ce65e3c72fda4deab4478"},
-    {file = "iteration_utilities-0.11.0-cp36-cp36m-manylinux1_i686.whl", hash = "sha256:37f427f2682aad3b27afab8edcfa8002268d1eab30c4957200a004af3d5f5b0e"},
-    {file = "iteration_utilities-0.11.0-cp36-cp36m-manylinux1_x86_64.whl", hash = "sha256:0dc2aed43691d38052fe99d94f04886324818d058fb030068e14343008fe856b"},
-    {file = "iteration_utilities-0.11.0-cp36-cp36m-manylinux2010_x86_64.whl", hash = "sha256:f06c4862911aad6c21529ecc0d6744048712303eb37afecc9ee5ffa804ba6614"},
-    {file = "iteration_utilities-0.11.0-cp36-cp36m-manylinux2014_x86_64.whl", hash = "sha256:e7ad14f9bd0bb6d69b6ac30811decedcb71a16e2d4e528a469fe865ad8d57305"},
-    {file = "iteration_utilities-0.11.0-cp36-cp36m-win32.whl", hash = "sha256:4005c4cbfaacf9897367dc92055e85d4990d5ab43a3234ff5be5b222e42fd511"},
-    {file = "iteration_utilities-0.11.0-cp36-cp36m-win_amd64.whl", hash = "sha256:a9981e55e560389079201b97b10b885050bdfc2cd55d76a830307899a6c475f5"},
-    {file = "iteration_utilities-0.11.0-cp37-cp37m-macosx_10_14_x86_64.whl", hash = "sha256:112b615d596c939a427f08943c0e5594bca672bd67dc7ac928deb4a6a9637df7"},
-    {file = "iteration_utilities-0.11.0-cp37-cp37m-manylinux1_i686.whl", hash = "sha256:b6541b081a95a1c8b8a0ebb08d2ae49e649b3d8e75bb55e1b4eed7687561bd09"},
-    {file = "iteration_utilities-0.11.0-cp37-cp37m-manylinux1_x86_64.whl", hash = "sha256:1c9a1d58ca2f5260eed057e1b9d0b08f62a8e42153224476598f2dd079ae765e"},
-    {file = "iteration_utilities-0.11.0-cp37-cp37m-manylinux2010_x86_64.whl", hash = "sha256:ae7cebc811843de5868400a8cc7e401569452e9cbaa09ebfccc4882f2507c36a"},
-    {file = "iteration_utilities-0.11.0-cp37-cp37m-manylinux2014_x86_64.whl", hash = "sha256:46485bb3c7db9267014a1453009c612fb658d85ba4a41bee01346663b3797de6"},
-    {file = "iteration_utilities-0.11.0-cp37-cp37m-win32.whl", hash = "sha256:3d154511cc177872bb843dcc789591f23214bc9d568db542f95c3cf4cc78b4eb"},
-    {file = "iteration_utilities-0.11.0-cp37-cp37m-win_amd64.whl", hash = "sha256:3f276186d2afc979c86ab4f505e398f9f206a8ad42c510d6000b1ed49748ca74"},
-    {file = "iteration_utilities-0.11.0-cp38-cp38-macosx_10_14_x86_64.whl", hash = "sha256:07edb8a7553fda1cfb59e4d761f7e03b3607b948cbd3549250bcb489a7bb0f81"},
-    {file = "iteration_utilities-0.11.0-cp38-cp38-manylinux1_i686.whl", hash = "sha256:08a00db7beac8647b00c5d9968e14235b33d387f4e2900ae1b1a4cfbf68894bb"},
-    {file = "iteration_utilities-0.11.0-cp38-cp38-manylinux1_x86_64.whl", hash = "sha256:d10a7a6564b32a2266b67994264151e073f77463145b0cac8245cbd1da1b0013"},
-    {file = "iteration_utilities-0.11.0-cp38-cp38-manylinux2010_x86_64.whl", hash = "sha256:f586a65e72a1120c9427e1903068268f11f0d73af0f56a247419f33ca0d4c3db"},
-    {file = "iteration_utilities-0.11.0-cp38-cp38-manylinux2014_x86_64.whl", hash = "sha256:d2f5e4acce15dbb731b71f9d109c329eee7bcb4d64c1bd9cc2669afca542ede8"},
-    {file = "iteration_utilities-0.11.0-cp38-cp38-win32.whl", hash = "sha256:c37f44ee027d35cb25527260ccd4dcdd23ed6015f957dab4dc1398692e6df7a1"},
-    {file = "iteration_utilities-0.11.0-cp38-cp38-win_amd64.whl", hash = "sha256:47244350489474d25f516286554a3d9df235505e759ce7381ec1c8acf0734ac4"},
-    {file = "iteration_utilities-0.11.0-cp39-cp39-macosx_10_14_x86_64.whl", hash = "sha256:15f7c88cdaaed2346e086cf993a283a694b74613039aa3d931279e0e40e9dca2"},
-    {file = "iteration_utilities-0.11.0-cp39-cp39-manylinux1_i686.whl", hash = "sha256:1666e00a4058620f5d2ca2de12927dc1819e36e1f37c8cfa17050c4db9d6703a"},
-    {file = "iteration_utilities-0.11.0-cp39-cp39-manylinux1_x86_64.whl", hash = "sha256:2593385dbe50636c3fec5a9c73a3413c265062608deba37dc54b7be83c23d663"},
-    {file = "iteration_utilities-0.11.0-cp39-cp39-manylinux2010_x86_64.whl", hash = "sha256:4805bda63753ad446af8c69035f7b6a1554176147d636a27f8a1f0ad297c405f"},
-    {file = "iteration_utilities-0.11.0-cp39-cp39-manylinux2014_x86_64.whl", hash = "sha256:7aecba49b749630f30860535156b50399f23175f91fbb2a9849c3b41d40acac2"},
-    {file = "iteration_utilities-0.11.0-cp39-cp39-win32.whl", hash = "sha256:bd40f6af97e887950377777d7ce69bb47356a3f7d29f65f95687f4aaaf33a783"},
-    {file = "iteration_utilities-0.11.0-cp39-cp39-win_amd64.whl", hash = "sha256:72020ff072f61a05974d82e5850dab3088339907e34c0fe20d8a6bf373e0ddbe"},
-    {file = "iteration_utilities-0.11.0.tar.gz", hash = "sha256:f91f41a2549e9a7e40ff5460fdf9033b6ee5b305d9be77943b63a554534c2a77"},
-]
-
-[package.extras]
-all = ["numpydoc", "pytest", "sphinx"]
-doc = ["numpydoc", "sphinx"]
-test = ["pytest"]
 
 [[package]]
 name = "jinja2"
@@ -1683,13 +1647,13 @@ files = [
 
 [[package]]
 name = "pulumi"
-version = "3.61.0"
+version = "3.62.0"
 description = "Pulumi's Python SDK"
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi-3.61.0-py3-none-any.whl", hash = "sha256:de216e7683cd1814823aa6a03c61285e7c26d5131088ddeaeec1a802b2e65b17"},
+    {file = "pulumi-3.62.0-py3-none-any.whl", hash = "sha256:0b0bef3d7fd30545860f097b42d6dfd24ad7b144442f93f90064ffdf17c12306"},
 ]
 
 [package.dependencies]
@@ -1734,13 +1698,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-fastly"
-version = "7.1.0"
+version = "7.2.0"
 description = "A Pulumi package for creating and managing fastly cloud resources."
 category = "main"
 optional = false
 python-versions = "*"
 files = [
-    {file = "pulumi_fastly-7.1.0.tar.gz", hash = "sha256:ad60826a26b807d9e7f9cca1cf738aadf0c3e30fb502a256d97eb83baa1f63f8"},
+    {file = "pulumi_fastly-7.2.0.tar.gz", hash = "sha256:18e623516dcb9eba2350cc7f8676322c820942ecfa05584425db65e9640b0ec6"},
 ]
 
 [package.dependencies]
@@ -1750,13 +1714,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "5.6.0"
+version = "5.7.0"
 description = "A Pulumi package for creating and managing github cloud resources."
 category = "main"
 optional = false
 python-versions = "*"
 files = [
-    {file = "pulumi_github-5.6.0.tar.gz", hash = "sha256:6374f0e8bda263f93c362e49883cfb3627dafc15cb8225467b8f205300488264"},
+    {file = "pulumi_github-5.7.0.tar.gz", hash = "sha256:ba719408d081e820ee436aad377f7112615313aa15ab1653acd985003f536fae"},
 ]
 
 [package.dependencies]
@@ -1880,14 +1844,14 @@ email = ["email-validator (>=1.0.3)"]
 
 [[package]]
 name = "pygments"
-version = "2.14.0"
+version = "2.15.0"
 description = "Pygments is a syntax highlighting package written in Python."
 category = "dev"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 files = [
-    {file = "Pygments-2.14.0-py3-none-any.whl", hash = "sha256:fa7bd7bd2771287c0de303af8bfdfc731f51bd2c6a47ab69d117138893b82717"},
-    {file = "Pygments-2.14.0.tar.gz", hash = "sha256:b3ed06a9e8ac9a9aae5a6f5dbe78a8a58655d17b43b93c078f094ddc476ae297"},
+    {file = "Pygments-2.15.0-py3-none-any.whl", hash = "sha256:77a3299119af881904cd5ecd1ac6a66214b6e9bed1f2db16993b54adede64094"},
+    {file = "Pygments-2.15.0.tar.gz", hash = "sha256:f7e36cffc4c517fbc252861b9a6e4644ca0e5abadf9a113c72d1358ad09b9500"},
 ]
 
 [package.extras]
@@ -2044,25 +2008,24 @@ yaml = ["ruamel.yaml"]
 
 [[package]]
 name = "pytest"
-version = "7.2.2"
+version = "7.3.0"
 description = "pytest: simple powerful testing with Python"
 category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pytest-7.2.2-py3-none-any.whl", hash = "sha256:130328f552dcfac0b1cec75c12e3f005619dc5f874f0a06e8ff7263f0ee6225e"},
-    {file = "pytest-7.2.2.tar.gz", hash = "sha256:c99ab0c73aceb050f68929bc93af19ab6db0558791c6a0715723abe9d0ade9d4"},
+    {file = "pytest-7.3.0-py3-none-any.whl", hash = "sha256:933051fa1bfbd38a21e73c3960cebdad4cf59483ddba7696c48509727e17f201"},
+    {file = "pytest-7.3.0.tar.gz", hash = "sha256:58ecc27ebf0ea643ebfdf7fb1249335da761a00c9f955bcd922349bcb68ee57d"},
 ]
 
 [package.dependencies]
-attrs = ">=19.2.0"
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
 iniconfig = "*"
 packaging = "*"
 pluggy = ">=0.12,<2.0"
 
 [package.extras]
-testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "pygments (>=2.7.2)", "requests", "xmlschema"]
+testing = ["argcomplete", "attrs (>=19.2.0)", "hypothesis (>=3.56)", "mock", "nose", "pygments (>=2.7.2)", "requests", "xmlschema"]
 
 [[package]]
 name = "pytest-testinfra"
