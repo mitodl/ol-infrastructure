@@ -1,0 +1,19 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgETHpUoPHq8nk5V5ShbAMblAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM/6mAXRBgS3I1VQlGAgEQgDvak3BSMtx3oePo+tc1MB9+b7JL+Wg0mkYgtcnDSE4lKh8a2pyC0F5r1SnrCk07qeE5X+ILCCVeKXMxMA==
+config:
+  keycloak:client_id:
+    secure: v1:BkWbaZVoElrjHJm7:Ti69EMKQfvYtLDcrKJZTankVy12gSw==
+  keycloak:client_secret:
+    secure: v1:ewmG5VqfRwLxrPmA:IcEVxEohrtStaYX4xkr3B3QLVM592Kej6XKky+XWZrRTtzXgzoSfE+BfQ1hmi9Ij
+  keycloak:email_host:
+    secure: v1:swp7hkmN53N42cWS:tHmgd6AzJEKco5XBqjF8RspFlJkD0PsBmp+gytkFsOM=
+  keycloak:email_password:
+    secure: v1:D3r4nV78I5WwOPeq:11qN0BLRcgIZimjisckFz9Q2AA8hXdHubDQxjJHqeQ==
+  keycloak:email_username:
+    secure: v1:Uxscw7J8NqxO/NbK:NCGzgYTGRmeIovnjZyXrb6ztDW7levn0
+  keycloak:github_oauth_client_id:
+    secure: v1:wgw0MUKEPbWlmdVK:ebCCZ6V30JUVZRavQciR5tyMIkwq6coR4Q/TPIGjovI8rBCK
+  keycloak:github_oauth_client_secret:
+    secure: v1:6BcgqLEr4rfLHgGG:CElmtKU6KUdaHuxIIK1Beqj342493CR0EsJapJ1lCI/+4jWkGrh1xWK4mLAOpmCQLmQ3KemXvKo=
+  keycloak:url: https://keycloak-qa.odl.mit.edu
