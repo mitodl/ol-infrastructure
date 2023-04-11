@@ -34,7 +34,7 @@ class StorageType(str, Enum):
     """Container for constraining available selection of storage types."""
 
     magnetic = "standard"
-    ssd = "gp2"
+    ssd = "gp3"
     performance = "io1"
 
 
