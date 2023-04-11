@@ -208,7 +208,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
         )
 
         pulumi.log.debug(
-            f"Security group for load balancer created for port {config.listener_port}"  # noqa: G004, E501
+            f"Security group for load balancer created for port {config.listener_port}"  # noqa: E501
         )
 
         if config.load_balancer:
@@ -338,7 +338,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
                 )
 
         pulumi.log.debug(
-            f"{listener_protocol} being utilized for load balancer listener"  # noqa: G004, E501
+            f"{listener_protocol} being utilized for load balancer listener"  # noqa: E501
         )
 
         return listener_protocol, ssl_policy, redirect
@@ -403,7 +403,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
             # created that is mounted to the LB
             if container.attach_to_load_balancer:
                 pulumi.log.debug(
-                    f"Container {container.container_name} will be attached to load "  # noqa: G004, E501
+                    f"Container {container.container_name} will be attached to load "  # noqa: E501
                     "balancer"
                 )
                 load_balancer_configuration.append(
@@ -426,7 +426,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
         cert = get_certificate(config.zone_name, most_recent=True, statuses=["ISSUED"])
 
         pulumi.log.debug(
-            f"Route 53 zone {config.zone_name} and ACM certificate {config.zone_name} "  # noqa: G004, E501
+            f"Route 53 zone {config.zone_name} and ACM certificate {config.zone_name} "  # noqa: E501
             "retrieved"
         )
 

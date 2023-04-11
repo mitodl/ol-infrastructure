@@ -65,7 +65,7 @@ files.put(
     dest="/etc/default/openedx",
 )
 
-DEPLOYMENT = os.environ["DEPLOYMENT"] or os.environ["PKR_VAR_business_unit"]
+DEPLOYMENT = os.environ["DEPLOYMENT"] or os.environ["PKR_VAR_BUSINESS_UNIT"]
 if DEPLOYMENT not in ["mitxonline", "mitx", "xpro", "mitx-staging"]:
     raise ValueError(
         "DEPLOYMENT should be on these values 'mitxonline', 'mitx', 'xpro', 'mitx-staging' "  # noqa: E501

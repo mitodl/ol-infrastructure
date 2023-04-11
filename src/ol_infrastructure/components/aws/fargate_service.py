@@ -107,7 +107,7 @@ class OLFargateServiceConfig(AWSBase):
     # upon subnets
     def get_service_network_configuration(self) -> ServiceNetworkConfigurationArgs:
         pulumi.log.debug(
-            f"retrieving all subnets from VPC '{self.vpc_id}'"  # noqa: G004
+            f"retrieving all subnets from VPC '{self.vpc_id}'"
         )
 
         subnets = get_subnet_ids(
@@ -115,7 +115,7 @@ class OLFargateServiceConfig(AWSBase):
         )
 
         pulumi.log.debug(
-            f"assign public IP addresses is set to {self.assign_public_ip}"  # noqa: G004, E501
+            f"assign public IP addresses is set to {self.assign_public_ip}"  # noqa: E501
         )
 
         return ServiceNetworkConfigurationArgs(
@@ -128,7 +128,7 @@ class OLFargateServiceConfig(AWSBase):
         self,
     ) -> ServiceDeploymentControllerArgs:
         pulumi.log.debug(
-            f"ECS deployment controller type is {self._deployment_controller}"  # noqa: G004, E501
+            f"ECS deployment controller type is {self._deployment_controller}"  # noqa: E501
         )
 
         return ServiceDeploymentControllerArgs(type=self._deployment_controller)
@@ -154,7 +154,7 @@ class OLFargateService(pulumi.ComponentResource):
 
         if config.cluster:
             pulumi.log.debug(
-                "using existing ECS Cluster '{}' provided in arguments".format(  # noqa: G001, E501
+                "using existing ECS Cluster '{}' provided in arguments".format(  # noqa: E501
                     config.cluster.id
                 )
             )
@@ -199,14 +199,14 @@ class OLFargateService(pulumi.ComponentResource):
         service_role_arn = ""
         if config.service_role:
             pulumi.log.debug(
-                f"Attaching existing service role {config.service_role}"  # noqa: G004
+                f"Attaching existing service role {config.service_role}"
             )
             service_role_arn = config.service_role.arn
 
         health_check_grace_period = None
         if config.load_balancer_configuration:
             pulumi.log.debug(
-                "Setting health check grace period to "  # noqa: G004
+                "Setting health check grace period to "
                 f"{config.health_check_grace_period_seconds} seconds"
             )
             health_check_grace_period = config.health_check_grace_period_seconds
@@ -301,7 +301,7 @@ class OLFargateService(pulumi.ComponentResource):
                 }
             )
 
-        pulumi.log.debug(f"container definitions: {outputs}")  # noqa: G004
+        pulumi.log.debug(f"container definitions: {outputs}")
 
         return json.dumps(outputs)
 
