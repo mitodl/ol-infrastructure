@@ -21,11 +21,6 @@ keycloak_provider = keycloak.Provider(
 )
 
 resource_options = ResourceOptions(provider=keycloak_provider)
-# realm = keycloak.Realm("new-python-realm",
-#   realm="my-example-python-realm",
-#   opts=resource_options,
-# )
-
 email_host = keycloak_config.require("email_host")
 email_password = keycloak_config.require("email_password")
 email_username = keycloak_config.require("email_username")
@@ -43,7 +38,7 @@ ol_platform_engineering_realm = keycloak.Realm(
     enabled=True,
     login_theme="base",
     duplicate_emails_allowed=False,
-    otp_policy=keycloak.RealmOtpPolicyArgs(
+    otp_policy=keycloak.RealmOptPolicyArgs(
         algorithm="HmacSHA256",
         digits=6,
         initial_counter=2,
