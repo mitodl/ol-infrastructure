@@ -146,6 +146,8 @@ def configure_vector(vector_config: VectorConfig):
             "VECTOR_CONFIG_DIR": "/etc/vector",
             "AWS_REGION": "us-east-1",
             "ENVIRONMENT": "placeholder",
+            "FASTLY_PROXY_PASSWORD": "placeholder",  # pragma: allowlist secret
+            "FASTLY_PROXY_USERNAME": "placeholder",
             "GRAFANA_CLOUD_API_KEY": "placeholder",  # pragma: allowlist secret
             "HOSTNAME": "placeholder",
             "HEROKU_PROXY_PASSWORD": "placeholder",  # pragma: allowlist secret

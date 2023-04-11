@@ -39,3 +39,15 @@ heroku drains:add -a '<Name of the heroku application>' "https://<HEROKU_PROXY_U
 This needs to be done for every app and every *instance* of that app. So `micromasters`, `micromasters-rc`, micromasters-ci`... And so on. The parameters on the URL directly map to *labels* in Grafana Cloud which are used to find the appropriate logs. They are important so don't omit them.
 
 If you mess one up, you can remove it easily enough with the same command but `drains:remove`.
+
+### Fastly Logging
+
+#### sha256sum
+
+To add a new service to the fastly -> vector -> grafana pipeline, you will need to get the service ID hash and add it to the appropriate environments.
+
+```
+echo -n "<service id from fastly>" | sha256sum
+```
+
+The `-n` is important, otherwise it will add a newline to your echo'd string and the hash will not be correct. You can get `sha256sum` on macOS from the `brew` package `coreutils`.

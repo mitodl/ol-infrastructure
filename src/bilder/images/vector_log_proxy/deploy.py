@@ -1,4 +1,5 @@
 import os
+import yaml
 from pathlib import Path
 
 from pyinfra import host
@@ -34,15 +35,44 @@ from bilder.components.vector.steps import (
 )
 from bilder.facts.has_systemd import HasSystemd
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
+from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION, TRAEFIK_VERSION
 from bridge.secrets.sops import set_env_secrets
+
+from bilder.components.traefik.models import traefik_static, traefik_file_provider
+from bilder.components.traefik.models.component import TraefikConfig
+from bilder.components.traefik.steps import (
+    configure_traefik,
+    install_traefik_binary,
+    traefik_service,
+)
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
+    "traefik": os.environ.get("TRAEFIK_VERSION", TRAEFIK_VERSION),
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
+FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
 VECTOR_INSTALL_NAME = os.environ.get("VECTOR_LOG_PROXY_NAME", "vector-log-proxy")
+
+
+# Configure and install traefik
+traefik_config = TraefikConfig(
+    static_configuration=traefik_static.TraefikStaticConfig.parse_obj(
+        yaml.safe_load(
+            FILES_DIRECTORY.joinpath("traefik", "static_config.yaml").read_text()
+        )
+    ),
+    file_configurations={
+        Path("vector.yaml"): traefik_file_provider.TraefikFileConfig.parse_obj(
+            yaml.safe_load(
+                FILES_DIRECTORY.joinpath("traefik", "dynamic_config.yaml").read_text()
+            )
+        )
+    },
+)
+install_traefik_binary(traefik_config)
+traefik_config_changed = configure_traefik(traefik_config)
 
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
@@ -80,6 +110,20 @@ vault_config = VaultAgentConfig(
             "{{ printf .Data.value }}{{ end }}",
             destination=Path(f"{vector_config.tls_config_directory}/odl_wildcard.cert"),
         ),
+        VaultTemplate(
+            contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+            "{{ printf .Data.key }}{{ end }}",
+            destination=Path(
+                f"{traefik_config.configuration_directory}/odl_wildcard.key"
+            ),
+        ),
+        VaultTemplate(
+            contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+            "{{ printf .Data.value }}{{ end }}",
+            destination=Path(
+                f"{traefik_config.configuration_directory}/odl_wildcard.cert"
+            ),
+        ),
     ],
 )
 vault = Vault(
@@ -110,6 +154,7 @@ for product in hashicorp_products:
     configure_hashicorp_product(product)
 
 if host.get_fact(HasSystemd):
+    traefik_service(traefik_config=traefik_config, start_immediately=False)
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
     watched_vector_files = [

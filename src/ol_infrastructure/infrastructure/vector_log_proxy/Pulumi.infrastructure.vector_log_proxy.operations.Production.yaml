@@ -8,3 +8,6 @@ config:
   vault_server:env_namespace: operations.production
   vector_log_proxy:target_vpc: operations_vpc
   vector_log_proxy:web_host_domain: log-proxy.odl.mit.edu
+  vector_log_proxy:fastly_service_id_sha256sums:
+    ocw_draft_production: c5775b67b4b2dbbf99233ef493f471f2d420160702041fdc3695cb5ab66ae28b  # pragma: allowlist secret
+    ocw_live_production: 267abb9b8b4ace0b3335447c354e709ad8cd3f5871d88b5e017a0bd9b7a1d974  # pragma: allowlist secret
