@@ -501,8 +501,8 @@ for purpose in ("draft", "live"):
             fastly.ServiceVclLoggingS3Args(
                 bucket_name=fastly_access_logging_bucket["bucket_name"],
                 name=f"ocw-{purpose}-{stack_info.env_suffix}-s3-logging-args",
-                format=build_fastly_log_format_string(),
-                compression_codec="gzip",
+                format=build_fastly_log_format_string(additional_static_fields={}),
+                gzip_level=3,
                 message_type="blank",
                 path=f"/ocw/{stack_info.env_suffix}/{purpose}/",
                 redundancy="standard",
