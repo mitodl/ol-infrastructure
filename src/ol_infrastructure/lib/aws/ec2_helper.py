@@ -126,7 +126,7 @@ def _conditional_import(
     if resources:
         if len(resources) > 1:
             pulumi.log.info(
-                f"More than one resource returned with filter {filters}. "  # noqa: G004
+                f"More than one resource returned with filter {filters}. "
                 f"Found {resources}"
             )
             raise ValueError(
