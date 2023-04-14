@@ -106,9 +106,7 @@ class OLFargateServiceConfig(AWSBase):
     # Retrieve all subnets from the provided VPC (vpc id). NOTE: No filtering is made
     # upon subnets
     def get_service_network_configuration(self) -> ServiceNetworkConfigurationArgs:
-        pulumi.log.debug(
-            f"retrieving all subnets from VPC '{self.vpc_id}'"
-        )
+        pulumi.log.debug(f"retrieving all subnets from VPC '{self.vpc_id}'")
 
         subnets = get_subnet_ids(
             vpc_id=self.vpc_id,
@@ -198,9 +196,7 @@ class OLFargateService(pulumi.ComponentResource):
 
         service_role_arn = ""
         if config.service_role:
-            pulumi.log.debug(
-                f"Attaching existing service role {config.service_role}"
-            )
+            pulumi.log.debug(f"Attaching existing service role {config.service_role}")
             service_role_arn = config.service_role.arn
 
         health_check_grace_period = None

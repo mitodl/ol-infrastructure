@@ -29,7 +29,9 @@ custodian_registry_image = AnonymousResource(
 job_filename_dict = {
     "sync-ec2-tags": "sync_ec2_tags.yaml",
     "tag-ebs-resources-for-cleanup": "tag_ebs_resources_for_cleanup.yaml",
-    "perform-cleanup": "cleanup_ebs_resources.yaml",
+    "perform-ebs-cleanup": "cleanup_ebs_resources.yaml",
+    "tag-packer-sg-for-cleanup": "tag_packer_security_groups_for_cleanup.yaml",
+    "perform-packer-sg-cleanup": "cleanup_packer_security_groups.yaml",
 }
 
 
