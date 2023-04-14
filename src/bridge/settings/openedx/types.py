@@ -74,6 +74,7 @@ class OpenEdxSupportedRelease(str, Enum):
 
     master = ("master", "master")
     olive = ("olive", "open-release/olive.master")
+    palm = ("palm", "open-release/palm.master")
 
 
 class EnvRelease(NamedTuple):

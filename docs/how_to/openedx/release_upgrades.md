@@ -1,0 +1,131 @@
+# How To Update The Release Version Of An Open edX Deployment
+
+## Open edX Releases
+Open edX cuts new named releases approximately every 6 months. Each of our deployments
+needs to be able to independently upgrade the respective version on their own
+schedule. MITx Residential upgrades twice per year, roughly aligned with the release
+timing of the upstream Open edX platform, whereas xPro has typically upgraded on an
+annual basis in the December timeframe.
+
+## Open Learning's Open edX Deployments
+At Open Learning we have four distinct installations of Open edX, each with their own
+release cadence and configuration requirements. For each of those deployments we have
+multiple environment stages (e.g. CI, QA, Production). Each of those deployment * stages
+combinations needs to be able to have their versions managed independently, with newer
+versions being progressively toggled to higher environments.
+
+This is further complicated by the long testing cycles for new releases in a given
+deployment. We need to be able to deploy a newer release to a lower environment stage,
+while maintaining the ability to deploy patches of the current release in a given time
+period to subsequent environments. For example, as we start testing the Palm release for
+the MITx Residential deployment we need to get it installed in the CI
+environment. Meanwhile, we may have a bug-fix or security patch that needs to be tested
+in the QA environment and propagated to Production.
+
+In addition to the cartesian product of (versions * deployments * env stages) we also
+have to manage these values across the different components of the Open edX
+ecosystem. For example, the core of the platform is called edx-platform, which in turn
+relies on a forum service, the edx-notes API service, a codejail REST API service, and
+myriad MFEs (Micro-FrontEnds). For any of these different components we may need to be
+able to override the repository and/or branch that we are building/deploying from.
+
+## Versioning of Build and Deploy
+In order to support this sea of complexity we have a module of `bridge.settings.openedx`
+that has a combination of data structures and helper functions to control what
+applications and versions get deployed where and when. These values are then used in the
+build stages of the different components, as well as driving the deployment pipelines in
+Concourse that are responsible for orchestrating all of this.
+
+## Managing Supported Releases
+We only want to support the build and deployment of a minimal subset of Open edX
+releases. This is controlled by the Enum `OpenEdxSupportedRelease` in the
+`bridge.settings.openedx.types` module. When there is a new release created it needs to
+be added to this Enum.  For example, to add support for the Palm release a new line is
+added of the format `palm = ("palm", "open-release/palm.master")`
+
+When we have upgraded all deployments past a given release we remove it from that Enum
+so that we no longer need to worry about maintaining configuration/code/etc. for that
+release.
+
+## Performing An Upgrade
+There are two data structures that control the applications and versions that get
+included in a given deployment and which version to use in the respective environment
+stage. The `OpenLearningOpenEdxDeployment` Enum is the top level that sets the release
+name for the environment stage of a given deployment. The `ReleaseMap` dictionary is
+used to manage any overrides of repository and branch for a given component of the
+platform, as well as which components are included in that deployment.
+
+For example, to upgrade our MITx Residential deployments to start testing the Palm release we change the `CI` stages of the `mitx` and `mitx-staging` deployments to use the `palm` value for the `OpenEdxSupportedRelease`
+
+```diff
+@@ -13,7 +13,7 @@ class OpenLearningOpenEdxDeployment(Enum):
+     mitx = DeploymentEnvRelease(
+         deployment_name="mitx",
+         env_release_map=[
+-            EnvRelease("CI", OpenEdxSupportedRelease["olive"]),
++            EnvRelease("CI", OpenEdxSupportedRelease["palm"]),
+             EnvRelease("QA", OpenEdxSupportedRelease["olive"]),
+             EnvRelease("Production", OpenEdxSupportedRelease["olive"]),
+         ],
+@@ -21,7 +21,7 @@ class OpenLearningOpenEdxDeployment(Enum):
+     mitx_staging = DeploymentEnvRelease(
+         deployment_name="mitx-staging",
+         env_release_map=[
+-            EnvRelease("CI", OpenEdxSupportedRelease["olive"]),
++            EnvRelease("CI", OpenEdxSupportedRelease["palm"]),
+             EnvRelease("QA", OpenEdxSupportedRelease["olive"]),
+             EnvRelease("Production", OpenEdxSupportedRelease["olive"]),
+         ],
+```
+
+Because Palm is a new release for these deployments we also need to add a `palm` key to
+the `ReleaseMap` dictionary that contains the applications that are associated with
+those deployments and the appropriate `OpenEdxApplicationVersion` records for that
+deployment.
+
+```diff
+@@ -61,6 +61,122 @@ ReleaseMap: dict[
+     OpenEdxSupportedRelease,
+     dict[OpenEdxDeploymentName, list[OpenEdxApplicationVersion]],
+ ] = {
++    "palm": {
++        "mitx": [
++            OpenEdxApplicationVersion(
++                application="edx-platform",  # type: ignore
++                application_type="IDA",
++                release="palm",
++                branch_override="mitx/palm",
++                origin_override="https://github.com/mitodl/edx-platform",
++            ),
+             ...
++        ],
++        "mitx-staging": [
++            OpenEdxApplicationVersion(
++                application="edx-platform",  # type: ignore
++                application_type="IDA",
++                release="palm",
++                branch_override="mitx/palm",
++                origin_override="https://github.com/mitodl/edx-platform",
++            ),
+             ...
++        ],
++    },
+     "olive": {
+         "mitx": [
+             OpenEdxApplicationVersion(
+```
+
+All of the deployment pipelines for these application components are managed by a
+corresponding `meta` pipeline that will automatically update the build and pipeline
+configuration based on the changed version information as soon as it is merged into the
+`master` branch of `ol-infrastructure`.
+
+**Note - TMM 2023-04-14**
+
+- The current configuration of our meta pipelines means that before the updates to the
+`bridge.settings.openedx.version_matrix` module can be picked up by the `meta` pipelines
+the `ol-infrastructure` docker image needs to be built and pushed to our registry so
+that it can be loaded. This means that once the [ol-infrastructure image
+pipeline](https://cicd.odl.mit.edu/teams/main/pipelines/ol-infrastructure-docker-container)
+completes it might be necessary to manually trigger the meta pipelines again.
+- Once a new release is deployed to a given environment stage for the first time it may be necessary to manually ensure that all database migrations are run properly. It will be attempted automatically on deployment, but there are often conflicts between the existing database state and the migration logic that require intervention.

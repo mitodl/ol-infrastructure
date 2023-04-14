@@ -13,7 +13,7 @@ class OpenLearningOpenEdxDeployment(Enum):
     mitx = DeploymentEnvRelease(
         deployment_name="mitx",
         env_release_map=[
-            EnvRelease("CI", OpenEdxSupportedRelease["olive"]),
+            EnvRelease("CI", OpenEdxSupportedRelease["palm"]),
             EnvRelease("QA", OpenEdxSupportedRelease["olive"]),
             EnvRelease("Production", OpenEdxSupportedRelease["olive"]),
         ],
@@ -21,7 +21,7 @@ class OpenLearningOpenEdxDeployment(Enum):
     mitx_staging = DeploymentEnvRelease(
         deployment_name="mitx-staging",
         env_release_map=[
-            EnvRelease("CI", OpenEdxSupportedRelease["olive"]),
+            EnvRelease("CI", OpenEdxSupportedRelease["palm"]),
             EnvRelease("QA", OpenEdxSupportedRelease["olive"]),
             EnvRelease("Production", OpenEdxSupportedRelease["olive"]),
         ],
@@ -61,6 +61,122 @@ ReleaseMap: dict[
     OpenEdxSupportedRelease,
     dict[OpenEdxDeploymentName, list[OpenEdxApplicationVersion]],
 ] = {
+    "palm": {
+        "mitx": [
+            OpenEdxApplicationVersion(
+                application="edx-platform",  # type: ignore
+                application_type="IDA",
+                release="palm",
+                branch_override="mitx/palm",
+                origin_override="https://github.com/mitodl/edx-platform",
+            ),
+            OpenEdxApplicationVersion(
+                application="edxapp_theme",  # type: ignore
+                application_type="IDA",
+                release="palm",
+                branch_override="palm",
+                origin_override="https://github.com/mitodl/mitx-theme",
+            ),
+            OpenEdxApplicationVersion(
+                application="forum",  # type: ignore
+                application_type="IDA",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
+                application="xqueue",  # type: ignore
+                application_type="IDA",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
+                application="notes-api",  # type: ignore
+                application_type="IDA",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
+                application="learning",  # type: ignore
+                application_type="MFE",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
+                application="gradebook",  # type: ignore
+                application_type="MFE",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
+                application="course-authoring",  # type: ignore
+                application_type="MFE",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
+                application="library-authoring",  # type: ignore
+                application_type="MFE",
+                release="palm",
+                branch_override="master",
+            ),
+            OpenEdxApplicationVersion(
+                application="ora-grading",  # type: ignore
+                application_type="MFE",
+                release="palm",
+            ),
+        ],
+        "mitx-staging": [
+            OpenEdxApplicationVersion(
+                application="edx-platform",  # type: ignore
+                application_type="IDA",
+                release="palm",
+                branch_override="mitx/palm",
+                origin_override="https://github.com/mitodl/edx-platform",
+            ),
+            OpenEdxApplicationVersion(
+                application="edxapp_theme",  # type: ignore
+                application_type="IDA",
+                release="palm",
+                branch_override="palm",
+                origin_override="https://github.com/mitodl/mitx-theme",
+            ),
+            OpenEdxApplicationVersion(
+                application="forum",  # type: ignore
+                application_type="IDA",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
+                application="xqueue",  # type: ignore
+                application_type="IDA",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
+                application="notes-api",  # type: ignore
+                application_type="IDA",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
+                application="learning",  # type: ignore
+                application_type="MFE",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
+                application="gradebook",  # type: ignore
+                application_type="MFE",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
+                application="course-authoring",  # type: ignore
+                application_type="MFE",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
+                application="library-authoring",  # type: ignore
+                application_type="MFE",
+                release="palm",
+                branch_override="master",
+            ),
+            OpenEdxApplicationVersion(
+                application="ora-grading",  # type: ignore
+                application_type="MFE",
+                release="palm",
+            ),
+        ],
+    },
     "olive": {
         "mitx": [
             OpenEdxApplicationVersion(
