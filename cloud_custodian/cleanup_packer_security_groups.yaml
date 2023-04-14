@@ -1,0 +1,23 @@
+---
+policies:
+- name: delete-marked-packer-sgs
+  resource: aws.security-group
+  description: |
+    Remove all security-groups that have been marked for delete in tag:custodian_cleanup
+  filters:
+  # Including all the conditions + marked-for-op just in case anything changed.
+  - and:
+    - type: marked-for-op
+      tag: "custodian_cleanup"
+      op: delete
+    - type: value
+      key: "Description"
+      op: eq
+      value: "Temporary group for Packer"
+    - type: value
+      key: "GroupName"
+      op: glob
+      value: "packer_*"
+    - "unused"
+  actions:
+  - delete
