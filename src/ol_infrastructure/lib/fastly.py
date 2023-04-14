@@ -16,6 +16,8 @@ __base_fastly_log_format_string = """{
 "geo_continent_code":"%{json.escape(client.geo.continent_code)}V",
 "geo_country":"%{json.escape(client.geo.country_name)}V",
 "geo_country_code":"%{json.escape(client.geo.country_code)}V",
+"geo_latitude":%{client.geo.latitude}V,
+"geo_longitude":%{client.geo.longitude}V,
 "geo_region":"%{json.escape(client.geo.region.utf8)}V",
 "host":"%{if(req.http.Fastly-Orig-Host,json.escape(req.http.Fastly-Orig-Host),json.escape(req.http.Host))}V",
 "request_body_size_bytes":%{req.body_bytes_read}V,
