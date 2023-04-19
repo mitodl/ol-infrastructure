@@ -16,11 +16,12 @@ policy_definition = {
         {
             "Effect": "Allow",
             "Action": [
+                "s3:*MultiPartUpload*",
+                "s3:DeleteObject",
                 "s3:GetObject*",
+                "s3:ListBucket*",
                 "s3:PutObject",
                 "s3:PutObjectTagging",
-                "s3:DeleteObject",
-                "s3:ListBucket*",
             ],
             "Resource": [
                 "arn:aws:s3:::ocw-content*",
