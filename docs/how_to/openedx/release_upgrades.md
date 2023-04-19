@@ -1,18 +1,19 @@
 # How To Update The Release Version Of An Open edX Deployment
 
 ## Open edX Releases
-Open edX cuts new named releases approximately every 6 months. Each of our deployments
-needs to be able to independently upgrade the respective version on their own
-schedule. MITx Residential upgrades twice per year, roughly aligned with the release
-timing of the upstream Open edX platform, whereas xPro has typically upgraded on an
-annual basis in the December timeframe.
+Open edX cuts new named releases [approximately every 6
+months](https://openedx.atlassian.net/wiki/spaces/COMM/pages/3613392957/Open+edX+release+schedule). Each
+of our deployments needs to be able to independently upgrade the respective version on
+their own schedule. MITx Residential upgrades twice per year, roughly aligned with the
+release timing of the upstream Open edX platform, whereas xPro has typically upgraded on
+an annual basis in the December timeframe.
 
 ## Open Learning's Open edX Deployments
 At Open Learning we have four distinct installations of Open edX, each with their own
 release cadence and configuration requirements. For each of those deployments we have
 multiple environment stages (e.g. CI, QA, Production). Each of those deployment * stages
 combinations needs to be able to have their versions managed independently, with newer
-versions being progressively toggled to higher environments.
+versions being progressively promoted to higher environments.
 
 This is further complicated by the long testing cycles for new releases in a given
 deployment. We need to be able to deploy a newer release to a lower environment stage,
@@ -55,7 +56,9 @@ name for the environment stage of a given deployment. The `ReleaseMap` dictionar
 used to manage any overrides of repository and branch for a given component of the
 platform, as well as which components are included in that deployment.
 
-For example, to upgrade our MITx Residential deployments to start testing the Palm release we change the `CI` stages of the `mitx` and `mitx-staging` deployments to use the `palm` value for the `OpenEdxSupportedRelease`
+For example, to upgrade our MITx Residential deployments to start testing the Palm
+release we change the `CI` stages of the `mitx` and `mitx-staging` deployments to use
+the `palm` value for the `OpenEdxSupportedRelease`
 
 ```diff
 @@ -13,7 +13,7 @@ class OpenLearningOpenEdxDeployment(Enum):
@@ -115,17 +118,22 @@ deployment.
              OpenEdxApplicationVersion(
 ```
 
-All of the deployment pipelines for these application components are managed by a
-corresponding `meta` pipeline that will automatically update the build and pipeline
-configuration based on the changed version information as soon as it is merged into the
-`master` branch of `ol-infrastructure`.
+All of the [deployment
+pipelines](https://github.com/mitodl/ol-infrastructure/blob/main/src/concourse/pipelines/open_edx/)
+for these application components are managed by a corresponding `meta` pipeline that
+will automatically update the build and pipeline configuration based on the changed
+version information as soon as it is merged into the `master` branch of
+`ol-infrastructure`.
 
 **Note - TMM 2023-04-14**
 
 - The current configuration of our meta pipelines means that before the updates to the
-`bridge.settings.openedx.version_matrix` module can be picked up by the `meta` pipelines
-the `ol-infrastructure` docker image needs to be built and pushed to our registry so
-that it can be loaded. This means that once the [ol-infrastructure image
-pipeline](https://cicd.odl.mit.edu/teams/main/pipelines/ol-infrastructure-docker-container)
-completes it might be necessary to manually trigger the meta pipelines again.
-- Once a new release is deployed to a given environment stage for the first time it may be necessary to manually ensure that all database migrations are run properly. It will be attempted automatically on deployment, but there are often conflicts between the existing database state and the migration logic that require intervention.
+  `bridge.settings.openedx.version_matrix` module can be picked up by the `meta`
+  pipelines the `ol-infrastructure` docker image needs to be built and pushed to our
+  registry so that it can be loaded. This means that once the [ol-infrastructure image
+  pipeline](https://cicd.odl.mit.edu/teams/main/pipelines/ol-infrastructure-docker-container)
+  completes it might be necessary to manually trigger the meta pipelines again.
+- Once a new release is deployed to a given environment stage for the first time it may
+  be necessary to manually ensure that all database migrations are run properly. It will
+  be attempted automatically on deployment, but there are often conflicts between the
+  existing database state and the migration logic that require intervention.
