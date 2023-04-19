@@ -115,9 +115,9 @@ ocw_studio_iam_policy = iam.Policy(
                 {
                     "Effect": "Allow",
                     "Action": [
+                        "s3:*MultiPartUpload*",
                         "s3:ListBucket*",
-                        "s3:PutObject",
-                        "s3:PutObjectAcl",
+                        "s3:PutObject*",
                         "s3:GetObject*",
                         "s3:DeleteObject*",
                     ],
@@ -165,7 +165,7 @@ ocw_studio_iam_policy = iam.Policy(
                         "s3:DeleteObject",
                         "s3:GetObject*",
                         "s3:ListBucket*",
-                        "s3:PutObject",
+                        "s3:PutObject*",
                         "s3:PutObjectTagging",
                     ],
                     "Resource": [
