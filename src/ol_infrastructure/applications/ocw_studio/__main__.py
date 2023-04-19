@@ -156,6 +156,23 @@ ocw_studio_iam_policy = iam.Policy(
                     "Action": "iam:PassRole",
                     "Resource": f"arn:aws:iam::610119931565:role/service-role-mediaconvert-ocw-studio-{stack_info.env_suffix}",  # noqa: E501
                 },
+                # Temporary permissions until video archives are synced via management
+                # command. TMM 2023-04-19
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:*MultiPartUpload*",
+                        "s3:DeleteObject",
+                        "s3:GetObject*",
+                        "s3:ListBucket*",
+                        "s3:PutObject",
+                        "s3:PutObjectTagging",
+                    ],
+                    "Resource": [
+                        f"arn:aws:s3:::ocw-content*{stack_info.env_suffix}",
+                        f"arn:aws:s3:::ocw-content*{stack_info.env_suffix}/*",
+                    ],
+                },
             ],
         },
         stringify=True,
