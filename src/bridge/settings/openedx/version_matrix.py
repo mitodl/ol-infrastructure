@@ -64,6 +64,11 @@ ReleaseMap: dict[
     "palm": {
         "mitx": [
             OpenEdxApplicationVersion(
+                application="course-authoring",  # type: ignore
+                application_type="MFE",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
                 application="edx-platform",  # type: ignore
                 application_type="IDA",
                 release="palm",
@@ -83,13 +88,8 @@ ReleaseMap: dict[
                 release="palm",
             ),
             OpenEdxApplicationVersion(
-                application="xqueue",  # type: ignore
-                application_type="IDA",
-                release="palm",
-            ),
-            OpenEdxApplicationVersion(
-                application="notes-api",  # type: ignore
-                application_type="IDA",
+                application="gradebook",  # type: ignore
+                application_type="MFE",
                 release="palm",
             ),
             OpenEdxApplicationVersion(
@@ -98,12 +98,7 @@ ReleaseMap: dict[
                 release="palm",
             ),
             OpenEdxApplicationVersion(
-                application="gradebook",  # type: ignore
-                application_type="MFE",
-                release="palm",
-            ),
-            OpenEdxApplicationVersion(
-                application="course-authoring",  # type: ignore
+                application="learner-dashboard",  # type: ignore
                 application_type="MFE",
                 release="palm",
             ),
@@ -114,13 +109,28 @@ ReleaseMap: dict[
                 branch_override="master",
             ),
             OpenEdxApplicationVersion(
+                application="notes-api",  # type: ignore
+                application_type="IDA",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
                 application="ora-grading",  # type: ignore
                 application_type="MFE",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
+                application="xqueue",  # type: ignore
+                application_type="IDA",
                 release="palm",
             ),
         ],
         "mitx-staging": [
             OpenEdxApplicationVersion(
+                application="course-authoring",  # type: ignore
+                application_type="MFE",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
                 application="edx-platform",  # type: ignore
                 application_type="IDA",
                 release="palm",
@@ -140,27 +150,12 @@ ReleaseMap: dict[
                 release="palm",
             ),
             OpenEdxApplicationVersion(
-                application="xqueue",  # type: ignore
-                application_type="IDA",
-                release="palm",
-            ),
-            OpenEdxApplicationVersion(
-                application="notes-api",  # type: ignore
-                application_type="IDA",
-                release="palm",
-            ),
-            OpenEdxApplicationVersion(
-                application="learning",  # type: ignore
-                application_type="MFE",
-                release="palm",
-            ),
-            OpenEdxApplicationVersion(
                 application="gradebook",  # type: ignore
                 application_type="MFE",
                 release="palm",
             ),
             OpenEdxApplicationVersion(
-                application="course-authoring",  # type: ignore
+                application="learning",  # type: ignore
                 application_type="MFE",
                 release="palm",
             ),
@@ -171,8 +166,18 @@ ReleaseMap: dict[
                 branch_override="master",
             ),
             OpenEdxApplicationVersion(
+                application="notes-api",  # type: ignore
+                application_type="IDA",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
                 application="ora-grading",  # type: ignore
                 application_type="MFE",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
+                application="xqueue",  # type: ignore
+                application_type="IDA",
                 release="palm",
             ),
         ],
@@ -180,6 +185,11 @@ ReleaseMap: dict[
     "olive": {
         "mitx": [
             OpenEdxApplicationVersion(
+                application="course-authoring",  # type: ignore
+                application_type="MFE",
+                release="olive",
+            ),
+            OpenEdxApplicationVersion(
                 application="edx-platform",  # type: ignore
                 application_type="IDA",
                 release="olive",
@@ -199,13 +209,8 @@ ReleaseMap: dict[
                 release="olive",
             ),
             OpenEdxApplicationVersion(
-                application="xqueue",  # type: ignore
-                application_type="IDA",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="notes-api",  # type: ignore
-                application_type="IDA",
+                application="gradebook",  # type: ignore
+                application_type="MFE",
                 release="olive",
             ),
             OpenEdxApplicationVersion(
@@ -214,12 +219,7 @@ ReleaseMap: dict[
                 release="olive",
             ),
             OpenEdxApplicationVersion(
-                application="gradebook",  # type: ignore
-                application_type="MFE",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="course-authoring",  # type: ignore
+                application="learner-dashboard",  # type: ignore
                 application_type="MFE",
                 release="olive",
             ),
@@ -230,13 +230,28 @@ ReleaseMap: dict[
                 branch_override="master",
             ),
             OpenEdxApplicationVersion(
+                application="notes-api",  # type: ignore
+                application_type="IDA",
+                release="olive",
+            ),
+            OpenEdxApplicationVersion(
                 application="ora-grading",  # type: ignore
                 application_type="MFE",
+                release="olive",
+            ),
+            OpenEdxApplicationVersion(
+                application="xqueue",  # type: ignore
+                application_type="IDA",
                 release="olive",
             ),
         ],
         "mitx-staging": [
             OpenEdxApplicationVersion(
+                application="course-authoring",  # type: ignore
+                application_type="MFE",
+                release="olive",
+            ),
+            OpenEdxApplicationVersion(
                 application="edx-platform",  # type: ignore
                 application_type="IDA",
                 release="olive",
@@ -256,27 +271,12 @@ ReleaseMap: dict[
                 release="olive",
             ),
             OpenEdxApplicationVersion(
-                application="xqueue",  # type: ignore
-                application_type="IDA",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="notes-api",  # type: ignore
-                application_type="IDA",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="learning",  # type: ignore
-                application_type="MFE",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
                 application="gradebook",  # type: ignore
                 application_type="MFE",
                 release="olive",
             ),
             OpenEdxApplicationVersion(
-                application="course-authoring",  # type: ignore
+                application="learning",  # type: ignore
                 application_type="MFE",
                 release="olive",
             ),
@@ -287,12 +287,28 @@ ReleaseMap: dict[
                 branch_override="master",
             ),
             OpenEdxApplicationVersion(
+                application="notes-api",  # type: ignore
+                application_type="IDA",
+                release="olive",
+            ),
+            OpenEdxApplicationVersion(
                 application="ora-grading",  # type: ignore
                 application_type="MFE",
                 release="olive",
             ),
+            OpenEdxApplicationVersion(
+                application="xqueue",  # type: ignore
+                application_type="IDA",
+                release="olive",
+            ),
         ],
         "xpro": [
+            OpenEdxApplicationVersion(
+                application="course-authoring",  # type: ignore
+                application_type="MFE",
+                release="olive",
+                branch_override="master",
+            ),
             OpenEdxApplicationVersion(
                 application="edx-platform",  # type: ignore
                 application_type="IDA",
@@ -311,17 +327,12 @@ ReleaseMap: dict[
                 release="olive",
             ),
             OpenEdxApplicationVersion(
-                application="notes-api",  # type: ignore
-                application_type="IDA",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="learning",  # type: ignore
+                application="gradebook",  # type: ignore
                 application_type="MFE",
                 release="olive",
             ),
             OpenEdxApplicationVersion(
-                application="gradebook",  # type: ignore
+                application="learning",  # type: ignore
                 application_type="MFE",
                 release="olive",
             ),
@@ -332,10 +343,9 @@ ReleaseMap: dict[
                 branch_override="master",
             ),
             OpenEdxApplicationVersion(
-                application="course-authoring",  # type: ignore
-                application_type="MFE",
+                application="notes-api",  # type: ignore
+                application_type="IDA",
                 release="olive",
-                branch_override="master",
             ),
             OpenEdxApplicationVersion(
                 application="ora-grading",  # type: ignore
@@ -346,6 +356,16 @@ ReleaseMap: dict[
     },
     "master": {
         "mitxonline": [
+            OpenEdxApplicationVersion(
+                application="communications",  # type: ignore
+                application_type="MFE",
+                release="master",
+            ),
+            OpenEdxApplicationVersion(
+                application="course-authoring",  # type: ignore
+                application_type="MFE",
+                release="master",
+            ),
             OpenEdxApplicationVersion(
                 application="edx-platform",  # type: ignore
                 application_type="IDA",
@@ -365,6 +385,11 @@ ReleaseMap: dict[
                 release="master",
             ),
             OpenEdxApplicationVersion(
+                application="gradebook",  # type: ignore
+                application_type="MFE",
+                release="master",
+            ),
+            OpenEdxApplicationVersion(
                 application="learning",  # type: ignore
                 application_type="MFE",
                 release="master",
@@ -372,17 +397,12 @@ ReleaseMap: dict[
                 origin_override="https://github.com/mitodl/frontend-app-learning",
             ),
             OpenEdxApplicationVersion(
-                application="gradebook",  # type: ignore
-                application_type="MFE",
-                release="master",
-            ),
-            OpenEdxApplicationVersion(
                 application="library-authoring",  # type: ignore
                 application_type="MFE",
                 release="master",
             ),
             OpenEdxApplicationVersion(
-                application="course-authoring",  # type: ignore
+                application="ora-grading",  # type: ignore
                 application_type="MFE",
                 release="master",
             ),

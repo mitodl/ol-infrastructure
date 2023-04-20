@@ -140,6 +140,30 @@ will automatically update the build and pipeline configuration based on the chan
 version information as soon as it is merged into the `master` branch of
 `ol-infrastructure`.
 
+## Supporting New Applications
+There are two categories of applications that comprise the overall Open edX
+platform. These are "IDA"s (Independently Deployable Applications), and "MFE"s (Micro
+Front-Ends). An IDA is a Django application that can be deployed as a backend service
+and typically integrates with the edx-platform (LMS and CMS) via OAuth. An MFE is a
+ReactJS application that is deployed as a standalone site which then interacts with LMS
+and/or CMS via REST APIs.
+
+In order to ensure that we have visibility into which of these components we are
+deploying there is an Enum of
+[`OpenEdxApplication`](https://github.com/mitodl/ol-infrastructure/blob/main/src/bridge/settings/openedx/types.py#L7)
+and
+[`OpenEdxMicroFrontend`](https://github.com/mitodl/ol-infrastructure/blob/main/src/bridge/settings/openedx/types.py#L25)
+respectively which captures the details of which elements of the overall edX ecosystem
+we are supporting in our deployments. These Enums are then used as an attribute of the
+[`OpenEdxApplicationVersion`](https://github.com/mitodl/ol-infrastructure/blob/main/src/bridge/settings/openedx/types.py#L121)
+model which captures the details of a specific instance of one of those
+components. These are then used in the `ReleaseMap` dict to show which versions and
+deployments include the given instance of that application and version.
+
+To add support for a new IDA or MFE you need to add a new entry to the appropriate Enum,
+and then include an instance of an `OpenEdxApplicationVersion` that points to that
+application in the `ReleaseMap` at the appropriate location.
+
 **Note - TMM 2023-04-14**
 
 - The current configuration of our meta pipelines means that before the updates to the
