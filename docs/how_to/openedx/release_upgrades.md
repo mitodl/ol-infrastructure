@@ -8,6 +8,10 @@ their own schedule. MITx Residential upgrades twice per year, roughly aligned wi
 release timing of the upstream Open edX platform, whereas xPro has typically upgraded on
 an annual basis in the December timeframe.
 
+Our MITx Online deployment of Open edX is a special case in that it deploys directly
+from the master branches of the different applications and has a weekly release
+schedule.
+
 ## Open Learning's Open edX Deployments
 At Open Learning we have four distinct installations of Open edX, each with their own
 release cadence and configuration requirements. For each of those deployments we have
@@ -26,9 +30,14 @@ in the QA environment and propagated to Production.
 In addition to the cartesian product of (versions * deployments * env stages) we also
 have to manage these values across the different components of the Open edX
 ecosystem. For example, the core of the platform is called edx-platform, which in turn
-relies on a forum service, the edx-notes API service, a codejail REST API service, and
-myriad MFEs (Micro-FrontEnds). For any of these different components we may need to be
-able to override the repository and/or branch that we are building/deploying from.
+relies on:
+- a forum service
+- the edx-notes API service
+- a codejail REST API service
+- and myriad MFEs (Micro-FrontEnds).
+
+For any of these different components we may need to be able to override the repository
+and/or branch that we are building/deploying from.
 
 ## Versioning of Build and Deploy
 In order to support this sea of complexity we have a module of `bridge.settings.openedx`
@@ -52,9 +61,15 @@ release.
 There are two data structures that control the applications and versions that get
 included in a given deployment and which version to use in the respective environment
 stage. The `OpenLearningOpenEdxDeployment` Enum is the top level that sets the release
-name for the environment stage of a given deployment. The `ReleaseMap` dictionary is
-used to manage any overrides of repository and branch for a given component of the
-platform, as well as which components are included in that deployment.
+name for the environment stage of a given deployment.
+
+There are situations where we need to customize a component that is being deployed. In
+those cases we typically create a fork of the upstream repository where we manage the
+patches that we require. The `ReleaseMap` dictionary is used to manage any overrides of
+repository and branch for a given component of the platform, as well as which components
+are included in that deployment. The `OpenEdxApplicationVersion` structure will map to
+the default repositories and branches for a given component, but supplies a
+`branch_override` and `origin_override` parameter to manage these customizations.
 
 For example, to upgrade our MITx Residential deployments to start testing the Palm
 release we change the `CI` stages of the `mitx` and `mitx-staging` deployments to use
