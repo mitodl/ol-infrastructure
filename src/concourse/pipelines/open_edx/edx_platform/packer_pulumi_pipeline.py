@@ -74,6 +74,7 @@ def build_edx_pipeline(
                 f"src/bilder/images/edxapp/templates/edxapp/{deployment.deployment_name}/",  # noqa: E501
                 "src/bilder/images/edxapp/custom_install.pkr.hcl",
                 f"src/bilder/images/edxapp/packer_vars/{deployment.deployment_name}.pkrvars.hcl",  # noqa: E501
+                f"src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl",  # noqa: E501
             ],
         )
         loop_resources.append(custom_image_code)
