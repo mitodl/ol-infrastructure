@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from pyinfra import host
-from pyinfra.operations import server
+from pyinfra.operations import apt, server
 
 from bilder.components.docker.steps import create_systemd_service, deploy_docker
 from bilder.components.hashicorp.consul.models import Consul, ConsulConfig
@@ -29,6 +29,12 @@ VERSIONS = {
     ),
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
+
+apt.packages(
+    name="Remove unattended upgrades",
+    packages=["unattended-upgrades"],
+    present=False,
+)
 
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
