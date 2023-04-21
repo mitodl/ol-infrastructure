@@ -1,3 +1,4 @@
+# -*- mode: yaml -*-
 {{ with secret "secret-mitx-staging/mongodb-edxapp" }}
 mongodb_settings: &mongo_params
   authsource: admin
@@ -218,10 +219,12 @@ COURSE_CATALOG_API_URL: http://localhost:8008/api/v1
 COURSE_CATALOG_URL_ROOT: http://localhost:8008
 COURSE_CATALOG_VISIBILITY_PERMISSION: staff
 COURSE_MODE_DEFAULTS:
+    android_sku: null
     bulk_sku: null
     currency: usd
     description: null
     expiration_datetime: null
+    ios_sku: null
     min_price: 0
     name: Honor
     sku: null
@@ -592,16 +595,6 @@ STUDENT_FILEUPLOAD_MAX_SIZE: 52428800
 EMAIL_HOST: outgoing.mit.edu
 EMAIL_PORT: 587
 EMAIL_USE_TLS: true
-COURSE_MODE_DEFAULTS:
-  name: Honor
-  bulk_sku: null
-  currency: usd
-  description: null
-  expiration_datetime: null
-  min_price: 0
-  sku: null
-  slug: honor
-  suggested_prices:
 ADMINS:
   - ["MITx Stacktrace Recipients", "cuddle-bunnies@mit.edu"]
 ALLOW_ALL_ADVANCED_COMPONENTS: true
