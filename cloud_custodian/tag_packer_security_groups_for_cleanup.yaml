@@ -11,6 +11,9 @@ policies:
       op: eq
       value: "Temporary group for Packer"
     - type: value
+      key: 'tag:custodian_cleanup'
+      value: absent
+    - type: value
       key: "GroupName"
       op: glob
       value: "packer_*"
