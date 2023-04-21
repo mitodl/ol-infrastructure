@@ -86,6 +86,9 @@ class OpenEdxSupportedRelease(str, Enum):
     olive = ("olive", "open-release/olive.master")
     palm = ("palm", "open-release/palm.master")
 
+    def __str__(self):
+        return self.value
+
 
 class EnvRelease(NamedTuple):
     environment: EnvStage
