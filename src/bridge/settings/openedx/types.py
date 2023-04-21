@@ -33,6 +33,11 @@ class OpenEdxMicroFrontend(str, Enum):
         enum_element.path = path
         return enum_element
 
+    communications = (
+        "communications",
+        "https://github.com/openedx/frontend-app-communications",
+        "communications",
+    )
     course_authoring = (
         "course-authoring",
         "https://github.com/openedx/frontend-app-course-authoring",
@@ -44,6 +49,11 @@ class OpenEdxMicroFrontend(str, Enum):
         "gradebook",
     )
     learn = ("learning", "https://github.com/openedx/frontend-app-learning", "learn")
+    learner_dashboard = (
+        "learner-dashboard",
+        "https://github.com/openedx/frontend-app-learner-dashboard",
+        "dashboard",
+    )
     library_authoring = (
         "library-authoring",
         "https://github.com/openedx/frontend-app-library-authoring",
@@ -51,7 +61,7 @@ class OpenEdxMicroFrontend(str, Enum):
     )
     ora_grading = (
         "ora-grading",
-        "https://github.com/edx/frontend-app-ora-grading",
+        "https://github.com/openedx/frontend-app-ora-grading",
         "ora-grading",
     )
 
@@ -74,6 +84,7 @@ class OpenEdxSupportedRelease(str, Enum):
 
     master = ("master", "master")
     olive = ("olive", "open-release/olive.master")
+    palm = ("palm", "open-release/palm.master")
 
 
 class EnvRelease(NamedTuple):
