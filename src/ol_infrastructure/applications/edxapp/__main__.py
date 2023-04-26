@@ -520,7 +520,7 @@ edxapp_db_config = OLMariaDBConfig(
     security_groups=[edxapp_db_security_group],
     tags=aws_config.tags,
     db_name="edxapp",
-    engine_version="10.5.12",
+    engine_version="10.5.17",
     storage=edxapp_config.get_int("db_storage_gb") or 50,
     max_storage=edxapp_config.get_int("db_max_storage_gb") or 500,
     **defaults(stack_info)["rds"],
