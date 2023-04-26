@@ -1697,13 +1697,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-fastly"
-version = "7.2.0"
+version = "7.3.0"
 description = "A Pulumi package for creating and managing fastly cloud resources."
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=3.7"
 files = [
-    {file = "pulumi_fastly-7.2.0.tar.gz", hash = "sha256:18e623516dcb9eba2350cc7f8676322c820942ecfa05584425db65e9640b0ec6"},
+    {file = "pulumi_fastly-7.3.0.tar.gz", hash = "sha256:e96d537a09650c895a62ec8b42ccd6b8732791b4399d8540ca2ff45e81c5371d"},
 ]
 
 [package.dependencies]
