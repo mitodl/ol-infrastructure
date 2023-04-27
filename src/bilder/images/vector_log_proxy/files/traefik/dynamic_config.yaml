@@ -2,7 +2,7 @@
 http:
   routers:
     s3-hash-file-router:
-      rule: 'Host("{{ env "DOMAIN" }}") && Path("/.well-known/fastly/logging/challenge")'
+      rule: 'Path("/.well-known/fastly/logging/challenge")'
       service: s3-hash-file-service
       middlewares:
       - "remove-auth"
