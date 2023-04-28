@@ -74,6 +74,19 @@ def install_vector(vector_config: VectorConfig):
             present=True,
         )
 
+    server.shell(
+        name="Backup original vector.service defintion",
+        commands=["/usr/bin/mv /lib/systemd/system/vector.service /root"],
+    )
+    files.put(
+        dest="/lib/systemd/system/vector.service",
+        group="root",
+        mode="0644",
+        name="Override original vector.service definition",
+        src=str(Path(__file__).resolve().parent.joinpath("files", "vector.service")),
+        user="root",
+    )
+
     # Special permissions and configuration for running with dockerized services.
     # Make sure you install vector AFTER installing docker, when applicable.
     # TODO: MD 20230131 Split docker config out to its own private function.
@@ -85,23 +98,6 @@ def install_vector(vector_config: VectorConfig):
         vector_config.configuration_templates[
             Path(__file__).resolve().parent.joinpath("templates", "docker_source.yaml")
         ] = {}
-
-        server.shell(
-            name="Backup vector.service defintion",
-            commands=["/usr/bin/mv /lib/systemd/system/vector.service /root"],
-        )
-        files.put(
-            dest="/lib/systemd/system/vector.service",
-            group="root",
-            mode="0644",
-            name="Place docker specific vector.service definition",
-            src=str(
-                Path(__file__)
-                .resolve()
-                .parent.joinpath("files", "vector_and_docker.service")
-            ),
-            user="root",
-        )
 
     # Config flags to enable global sink configurations
     if vector_config.use_global_log_sink:

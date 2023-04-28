@@ -1,9 +1,16 @@
 [Unit]
 Description=Vector
 Documentation=https://vector.dev
-After=network-online.target
+Wants=docker.service
 After=docker.service
+Wants=vault.service
+After=vault.service
+Wants=consul.service
+After=consul.service
+Wants=consul-template.service
+After=consul-template.service
 Requires=network-online.target
+After=network-online.target
 
 [Service]
 User=vector
