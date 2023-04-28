@@ -2,8 +2,7 @@
 http:
   routers:
     s3-hash-file-router:
-      # To get the hashes you need to provide the correct hostname as well as challenge path.
-      rule: 'Host("{{ env "DOMAIN" }}") && Path("/.well-known/fastly/logging/challenge")'
+      rule: 'Path("/.well-known/fastly/logging/challenge")'
       service: s3-hash-file-service
       # Do not forward auth headers to aws, it will get confused.
       middlewares:
