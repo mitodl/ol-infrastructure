@@ -158,7 +158,6 @@ class OLAutoScaleGroupConfig(AWSBase):
     """Configuration Object for defining configuration needed to create an autoscale group."""  # noqa: E501
 
     asg_name: str
-    aws_config: AWSBase
     desired_size: PositiveInt = PositiveInt(2)
     health_check_grace_period: NonNegativeInt = NonNegativeInt(0)
     health_check_type: str = "ELB"
@@ -263,6 +262,7 @@ class OLAutoScaling(pulumi.ComponentResource):
                 health_check=target_group_healthcheck,
                 stickiness=target_group_stickiness,
                 opts=resource_options,
+                tags=tg_config.tags,
             )
 
         # Create Load Balancer
@@ -279,6 +279,7 @@ class OLAutoScaling(pulumi.ComponentResource):
                 name=load_balancer_name,
                 security_groups=[group.id for group in lb_config.security_groups],
                 subnets=lb_config.subnets,
+                tags=lb_config.tags,
                 opts=resource_options,
             )
 
@@ -293,6 +294,7 @@ class OLAutoScaling(pulumi.ComponentResource):
                         target_group_arn=self.target_group.arn,
                     )
                 ],
+                tags=lb_config.tags,
             )
             if lb_config.listener_use_acm:
                 listener_args.certificate_arn = get_certificate(
@@ -304,6 +306,7 @@ class OLAutoScaling(pulumi.ComponentResource):
                 f"{resource_name_prefix}load-balancer-listener",
                 args=listener_args,
                 opts=resource_options,
+                tags=lb_config.tags,
             )
 
             if lb_config.enable_insecure_http:
@@ -321,6 +324,7 @@ class OLAutoScaling(pulumi.ComponentResource):
                         ],
                     ),
                     opts=resource_options,
+                    tags=lb_config.tags,
                 )
 
         # Build list of block devices for launch template
@@ -388,7 +392,7 @@ class OLAutoScaling(pulumi.ComponentResource):
                 value=key_value,
                 propagate_at_launch=True,
             )
-            for key_name, key_value in asg_config.aws_config.merged_tags(
+            for key_name, key_value in asg_config.merged_tags(
                 {"ami_id": lt_config.image_id}
             ).items()
         ]
