@@ -41,7 +41,7 @@ xpro_partner_record(
 
 xpro_partner_record(
     "globalalumni",
-    record="108.128.56.156",
+    record="99.81.253.115",
 )
 
 xpro_partner_record(
