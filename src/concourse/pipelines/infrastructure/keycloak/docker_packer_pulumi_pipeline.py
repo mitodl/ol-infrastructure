@@ -22,7 +22,7 @@ def build_keycloak_pipeline() -> Pipeline:
     # `release-canidate` branch. Then refs should be updated. See OVS pipeline.
     keycloak_customization_branch = "main"
     keycloak_customization_repo = git_repo(
-        Identifier("ol-keycloak-customization-md-main"),
+        Identifier("ol-keycloak-customization"),
         uri="https://github.com/mitodl/ol-keycloak-customization",
         branch=keycloak_customization_branch,
     )
@@ -113,6 +113,7 @@ def build_keycloak_pipeline() -> Pipeline:
             f"applications.keycloak.{stage}"
             for stage in [
                 "CI",
+                "QA",
             ]
         ],
         project_name="ol-infrastructure-keycloak",
