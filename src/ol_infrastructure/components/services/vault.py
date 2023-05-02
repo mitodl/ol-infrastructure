@@ -329,16 +329,14 @@ class OLVaultPKIIntermediateCABackend(ComponentResource):
         )
 
         # Create a default issuer role for pki-intermediate-ca
-        self.pki_intermediate_ca_default_issuer_config = (
-            OLVaultPKIIntermediateRoleConfig(
-                pki_intermediate_backend=self.pki_intermediate_ca_backend,
-                role_name="default-issuer",
-                key_config=VaultPKIKeyTypeBits.rsa,
-                allowed_domains=["mit.edu"],
-                cert_type="server",
-                resource_name="pki-intermediate-ca-role-default-issuer",
-                opts=ResourceOptions(parent=self.pki_intermediate_ca_cert_request),
-            )
+        self.pki_intermediate_ca_default_issuer_config = OLVaultPKIIntermediateRoleConfig(  # noqa: E501
+            pki_intermediate_backend_mount_path=self.pki_intermediate_ca_backend.path,
+            role_name="default-issuer",
+            key_config=VaultPKIKeyTypeBits.rsa,
+            allowed_domains=["mit.edu"],
+            cert_type="server",
+            resource_name="pki-intermediate-ca-role-default-issuer",
+            opts=ResourceOptions(parent=self.pki_intermediate_ca_cert_request),
         )
         self.pki_intermediate_ca_default_issuer = OLVaultPKIIntermediateRole(
             self.pki_intermediate_ca_default_issuer_config,
@@ -458,7 +456,7 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
 
         # Create a default issuer role for pki-intermediate-{env}
         self.pki_intermediate_environment_default_issuer_config = OLVaultPKIIntermediateRoleConfig(  # noqa: E501
-            pki_intermediate_backend=self.pki_intermediate_environment_backend,
+            pki_intermediate_backend_mount_path=self.pki_intermediate_environment_backend.path,
             role_name="default-issuer",
             key_config=VaultPKIKeyTypeBits.rsa,
             allowed_domains=["mit.edu"],
@@ -527,13 +525,14 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
 
 
 class OLVaultPKIIntermediateRoleConfig(BaseModel):
-    pki_intermediate_backend: Mount
+    pki_intermediate_backend_mount_path: Output = None
     role_name: str
     key_config: VaultPKIKeyTypeBits
     max_ttl: int = ONE_MONTH_SECONDS * 7
     default_ttl: int = ONE_MONTH_SECONDS * 6
     key_usages: list[str] = ["DigitalSignature", "KeyAgreement", "KeyEncipherment"]
     allowed_domains: list[str]
+    allow_subdomains: bool = False
     cert_type: str  # Should be client or server
     resource_name: str
 
@@ -575,9 +574,10 @@ class OLVaultPKIIntermediateRole(ComponentResource):
             role_config.resource_name,
             # forcing role name so that pulumi doesn't add suffix
             name=role_config.role_name,
-            backend=role_config.pki_intermediate_backend.path,
+            backend=role_config.pki_intermediate_backend_mount_path,
             allowed_domains=role_config.allowed_domains,
             allow_glob_domains=True,
+            allow_subdomains=role_config.allow_subdomains,
             key_type=role_config.key_config.name,
             key_bits=role_config.key_config.value,
             ttl=role_config.default_ttl,

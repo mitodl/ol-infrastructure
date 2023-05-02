@@ -37,7 +37,7 @@ def build_keycloak_pipeline() -> Pipeline:
     keycloak_packer_code = git_repo(
         name=Identifier("ol-infrastructure-packer-build"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="md/issue_1330",
+        branch="main",
         paths=[
             "src/bilder/images/keycloak",
         ],
@@ -46,7 +46,7 @@ def build_keycloak_pipeline() -> Pipeline:
     keycloak_pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi-build"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="md/issue_1330",
+        branch="main",
         paths=[
             *PULUMI_WATCHED_PATHS,
             PULUMI_CODE_PATH.joinpath("applications/keycloak/"),
