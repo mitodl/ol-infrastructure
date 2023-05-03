@@ -11,5 +11,13 @@
   "timezone": "US/Eastern",
   "lockFileMaintenance": {
     "enabled": true
-  }
+  },
+  "packageRules": [
+    {
+      "matchPackagePrefixes": [
+        "pulumi-"
+      ],
+      "groupName": "pulumi-plugins"
+    }
+  ]
 }
