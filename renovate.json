@@ -1,7 +1,9 @@
 {
   "extends": [
+    ":allNonMajor",
     ":automergeMinor",
     ":rebaseStalePrs",
+    ":recommended",
     ":separateMajorReleases",
     "config:base"
   ],
