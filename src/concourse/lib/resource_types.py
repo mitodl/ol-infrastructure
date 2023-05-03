@@ -6,7 +6,7 @@ def hashicorp_resource() -> ResourceType:
     return ResourceType(
         name=Identifier("hashicorp-release"),
         type=REGISTRY_IMAGE,
-        source=RegistryImage(repository="starkandwayne/hashicorp-release-resource"),
+        source=RegistryImage(repository="mitodl/hashicorp-release-resource"),
     )
 
 
