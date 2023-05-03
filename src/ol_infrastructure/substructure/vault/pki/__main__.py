@@ -28,7 +28,8 @@ pki_intermediate_ca_config = OLVaultPKIIntermediateCABackendConfig(
     acmpca_rootca_arn=root_ca_arn,
 )
 pki_intermediate_ca = OLVaultPKIIntermediateCABackend(
-    backend_config=pki_intermediate_ca_config, opts=ResourceOptions(protect=True)
+    backend_config=pki_intermediate_ca_config,
+    opts=ResourceOptions(protect=True),
 )
 
 pki_intermediate_ca_export_struct = {
@@ -50,11 +51,16 @@ for business_unit in BusinessUnit:
         environment_name=f"{business_unit.value}",
         acmpca_rootca_arn=root_ca_arn,
         parent_intermediate_ca=pki_intermediate_ca,
-        opts=ResourceOptions(parent=pki_intermediate_ca),
+        opts=ResourceOptions(
+            parent=pki_intermediate_ca, depends_on=[pki_intermediate_ca]
+        ),
     )
 
     pki_intermediate_env = OLVaultPKIIntermediateEnvBackend(
-        backend_config=pki_intermediate_env_config, opts=ResourceOptions(protect=True)
+        backend_config=pki_intermediate_env_config,
+        opts=ResourceOptions(
+            protect=True, parent=pki_intermediate_ca, depends_on=[pki_intermediate_ca]
+        ),
     )
 
     pki_intermediate_env_export_struct = {
