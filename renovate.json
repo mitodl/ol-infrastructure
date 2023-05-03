@@ -1,6 +1,5 @@
 {
   "extends": [
-    ":allNonMajor",
     ":automergeMinor",
     ":rebaseStalePrs",
     ":recommended",
@@ -13,5 +12,24 @@
   "timezone": "US/Eastern",
   "lockFileMaintenance": {
     "enabled": true
-  }
+  },
+  "packageRules": [
+    {
+      "matchPackagePrefixes": [
+        "pulumi-"
+      ],
+      "groupName": "pulumi-plugins"
+    },
+    {
+      "groupName": "all non-major dependencies",
+      "groupSlug": "all-minor-patch",
+      "matchPackagePatterns": [
+        "*"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ]
+    }
+  ]
 }
