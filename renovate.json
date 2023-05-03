@@ -2,9 +2,9 @@
   "extends": [
     ":automergeMinor",
     ":rebaseStalePrs",
-    ":recommended",
     ":separateMajorReleases",
-    "config:base"
+    "config:base",
+    "group:allNonMajor"
   ],
   "schedule": [
     "every weekend"
@@ -19,17 +19,6 @@
         "pulumi-"
       ],
       "groupName": "pulumi-plugins"
-    },
-    {
-      "groupName": "all non-major dependencies",
-      "groupSlug": "all-minor-patch",
-      "matchPackagePatterns": [
-        "*"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ]
     }
   ]
 }
