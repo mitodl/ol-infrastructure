@@ -569,7 +569,7 @@ dagster_instance = ec2.Instance(
     iam_instance_profile=dagster_profile.id,
     tags=instance_tags,
     volume_tags=instance_tags,
-    subnet_id=data_vpc["subnet_ids"][0],
+    subnet_id=data_vpc["subnet_ids"][1],
     key_name="oldevops",
     root_block_device=ec2.InstanceRootBlockDeviceArgs(
         volume_type=DiskTypes.ssd, volume_size=100
