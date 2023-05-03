@@ -43,7 +43,7 @@ if node_type == WEB_NODE_TYPE:
         name="Proactively create edxapp user for setting permissions on theme repo",
         user=EDX_USER,
         present=True,
-        shell="/bin/false",
+        shell="/bin/false",  # noqa: S604
     )
     files.directory(
         name="Ensure themes directory is present",

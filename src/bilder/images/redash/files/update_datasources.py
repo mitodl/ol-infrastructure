@@ -15,7 +15,7 @@ with open("/etc/redash/datasources.yaml") as yamlfile:
 
 container_id = (
     subprocess.run(
-        [
+        [  # noqa: S603
             "/usr/bin/docker",
             "ps",
             "--no-trunc",
@@ -33,7 +33,7 @@ container_id = (
 returncode = 0
 for datasource in config["managed_datasources"]:
     update_output = subprocess.run(
-        [
+        [  # noqa: S603
             "/usr/bin/docker",
             "exec",
             "-t",

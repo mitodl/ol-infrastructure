@@ -22,7 +22,7 @@ master_password = read_yaml_secrets(
     Path(f"opensearch/opensearch.{env_prefix}.{env_suffix}.yaml")
 )["master_user_password"]
 
-stream = os.popen(f"pulumi stack output -s {args['stack']} 'cluster'")
+stream = os.popen(f"pulumi stack output -s {args['stack']} 'cluster'")  # noqa: S605
 cluster_output = stream.read()
 cluster = json.loads(cluster_output)
 

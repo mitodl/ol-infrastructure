@@ -24,7 +24,7 @@ def install_concourse(concourse_config: ConcourseBaseConfig):
         present=True,
         home=concourse_config.deploy_directory,
         ensure_home=False,
-        shell="/bin/false",
+        shell="/bin/false",  # noqa: S604
         system=True,
     )
     installation_directory = (

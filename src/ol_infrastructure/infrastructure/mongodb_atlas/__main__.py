@@ -15,7 +15,7 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
 def privatize_mongo_uri(mongo_uri):
-    """Returns a mongodb uri that has '-pri' appended to each hostname. Intentionally verbose rather than clever."""  # noqa: D401, E501
+    """Return a mongodb uri that has '-pri' appended to each hostname. Intentionally verbose rather than clever."""  # noqa: E501
     regex = r"(?:(?:mongodb\:\/\/)|,)([^.]+)"
     matches = findall(regex, mongo_uri)
     privatized_mongo_uri = mongo_uri

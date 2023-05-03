@@ -18,7 +18,7 @@ def _ensure_traefik_user(traefik_config: TraefikConfig):
         name="Create system user for Traefik",
         user=traefik_config.user,
         system=True,
-        shell="/bin/false",
+        shell="/bin/false",  # noqa: S604
     )
 
 

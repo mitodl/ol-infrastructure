@@ -24,7 +24,7 @@ def install_hashicorp_products(hashicorp_products: list[HashicorpProduct]):
             name=f"Create system user for {product.name}",
             user=product.name,
             system=True,
-            shell="/bin/false",
+            shell="/bin/false",  # noqa: S604
         )
         if linux_family(host.get_fact(LinuxName)).lower == "debian":
             cpu_arch = host.get_fact(DebianCpuArch)
