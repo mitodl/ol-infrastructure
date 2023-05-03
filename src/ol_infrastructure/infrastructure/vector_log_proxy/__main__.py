@@ -340,10 +340,10 @@ fastly_log_proxy_lb_target_group = lb.TargetGroup(
     health_check=lb.TargetGroupHealthCheckArgs(
         healthy_threshold=2,
         interval=120,
-        path="/.well-known/fastly/logging/challenge",
+        path="/",
         port=str(FASTLY_LOG_PROXY_PORT),
         protocol="HTTPS",
-        matcher="200",
+        matcher="405",
     ),
     name=("fastly-" + vector_log_proxy_tag)[:TARGET_GROUP_NAME_MAX_LENGTH].rstrip("-"),
     tags=aws_config.tags,
