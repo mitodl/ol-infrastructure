@@ -3,8 +3,7 @@
     ":automergeMinor",
     ":rebaseStalePrs",
     ":separateMajorReleases",
-    "config:base",
-    "group:allNonMajor"
+    "config:base"
   ],
   "schedule": [
     "every weekend"
