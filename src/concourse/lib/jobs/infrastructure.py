@@ -228,7 +228,7 @@ def pulumi_job(  # noqa: PLR0913
     """
     pulumi_provisioner_resource_type = pulumi_provisioner_resource()
     pulumi_resource = pulumi_provisioner(
-        name=Identifier("pulumi-project"),
+        name=Identifier(f"pulumi-{project_name}"),
         project_name=project_name,
         project_path=f"{pulumi_code.name}/{project_source_path}",
     )
