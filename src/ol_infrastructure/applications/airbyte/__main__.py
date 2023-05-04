@@ -457,7 +457,7 @@ grafana_credentials = read_yaml_secrets(
     Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
 )
 
-block_device_mappings = [BlockDeviceMapping()]
+block_device_mappings = [BlockDeviceMapping(volume_size=50)]
 tag_specs = [
     TagSpecification(
         resource_type="instance",
