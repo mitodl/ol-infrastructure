@@ -25,7 +25,7 @@ config:
   ovs:s3_watch_bucket_name: odl-video-service-uploaded-rc
   ovs:target_vpc: applications_vpc
   ovs:use_shibboleth: "True"
-  ovs:feature_annotations: "True"
+  ovs:feature_annotations: "False"
   redis:max_connections: "30"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
