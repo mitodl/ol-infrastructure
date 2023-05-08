@@ -1359,12 +1359,22 @@ edxapp_fastly_service = fastly.ServiceVcl(
             action="pass",
             cache_condition="Django Admin Route",
             name="Django Admin Route",
-        )
+        ),
+        fastly.ServiceVclCacheSettingArgs(
+            action="pass",
+            cache_condition="Django API Route",
+            name="Django API Route",
+        ),
     ],
     conditions=[
         fastly.ServiceVclConditionArgs(
             name="Django Admin Route",
             statement='req.url ~ "^/admin"',
+            type="CACHE",
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="Django API Route",
+            statement='req.url ~ "^/api/"',
             type="CACHE",
         ),
         fastly.ServiceVclConditionArgs(
