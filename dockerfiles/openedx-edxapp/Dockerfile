@@ -42,7 +42,7 @@ FROM base as themes
 #ARG XPRO_THEME_REPO="https://github.com/mitodl/mitxpro-theme.git"
 #ARG XPRO_THEME_VERSION="olive"
 
-COPY collected_themes /openedx/themes
+COPY ./collected_themes /openedx/themes
 
 #RUN mkdir -p /openedx/themes \
 #    && git clone $MITX_THEME_REPO --branch $MITX_THEME_VERSION --depth 1 /openedx/themes/mitx \
