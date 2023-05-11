@@ -20,10 +20,11 @@ RUN cd /tmp \
     && rm -rf openedx-i18n*
 
 FROM base as code
-ARG EDX_PLATFORM_REPO="https://github.com/openedx/edx-platform.git"
-ARG EDX_PLATFORM_VERSION="open-release/olive.3"
-RUN mkdir -p /openedx/edx-platform \
-    && git clone $EDX_PLATFORM_REPO --branch $EDX_PLATFORM_VERSION --depth 1 /openedx/edx-platform
+#ARG EDX_PLATFORM_REPO="https://github.com/openedx/edx-platform.git"
+#ARG EDX_PLATFORM_VERSION="open-release/olive.3"
+COPY edx_platform /openedx/edx-platform
+#RUN mkdir -p /openedx/edx-platform \
+#    && git clone $EDX_PLATFORM_REPO --branch $EDX_PLATFORM_VERSION --depth 1 /openedx/edx-platform
 RUN pip install --user --no-cache-dir -r /root/pip-pkg-list -r /openedx/edx-platform/requirements/edx/base.txt
 
 WORKDIR /openedx/edx-platform
@@ -34,18 +35,20 @@ RUN nodeenv /openedx/nodeenv --node=16.14.0 --prebuilt \
 
 FROM base as themes
 
-ARG MITX_THEME_REPO="https://github.com/mitodl/mitx-theme.git"
-ARG MITX_THEME_VERSION="olive"
-ARG MITXONLINE_THEME_REPO="https://github.com/mitodl/mitxonline-theme.git"
-ARG MITXONLINE_THEME_VERSION="main"
-ARG XPRO_THEME_REPO="https://github.com/mitodl/mitxpro-theme.git"
-ARG XPRO_THEME_VERSION="olive"
+#ARG MITX_THEME_REPO="https://github.com/mitodl/mitx-theme.git"
+#ARG MITX_THEME_VERSION="olive"
+#ARG MITXONLINE_THEME_REPO="https://github.com/mitodl/mitxonline-theme.git"
+#ARG MITXONLINE_THEME_VERSION="main"
+#ARG XPRO_THEME_REPO="https://github.com/mitodl/mitxpro-theme.git"
+#ARG XPRO_THEME_VERSION="olive"
 
-RUN mkdir -p /openedx/themes \
-    && git clone $MITX_THEME_REPO --branch $MITX_THEME_VERSION --depth 1 /openedx/themes/mitx \
-    && git clone $MITX_THEME_REPO --branch $MITX_THEME_VERSION --depth 1 /openedx/themes/mitx-staging \
-    && git clone $MITXONLINE_THEME_REPO --branch $MITXONLINE_THEME_VERSION --depth 1 /openedx/themes/mitxonline-theme \
-    && git clone $XPRO_THEME_REPO --branch $XPRO_THEME_VERSION --depth 1 /openedx/themes/mitxpro-theme
+COPY collected_themes /openedx/themes
+
+#RUN mkdir -p /openedx/themes \
+#    && git clone $MITX_THEME_REPO --branch $MITX_THEME_VERSION --depth 1 /openedx/themes/mitx \
+#    && git clone $MITX_THEME_REPO --branch $MITX_THEME_VERSION --depth 1 /openedx/themes/mitx-staging \
+#    && git clone $MITXONLINE_THEME_REPO --branch $MITXONLINE_THEME_VERSION --depth 1 /openedx/themes/mitxonline-theme \
+#    && git clone $XPRO_THEME_REPO --branch $XPRO_THEME_VERSION --depth 1 /openedx/themes/mitxpro-theme
 
 FROM base as tutor-utils
 
