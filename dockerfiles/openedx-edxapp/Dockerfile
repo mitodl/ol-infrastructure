@@ -22,7 +22,7 @@ RUN cd /tmp \
 FROM base as code
 #ARG EDX_PLATFORM_REPO="https://github.com/openedx/edx-platform.git"
 #ARG EDX_PLATFORM_VERSION="open-release/olive.3"
-COPY edx_platform /openedx/edx-platform
+COPY ./edx_platform /openedx/edx-platform
 #RUN mkdir -p /openedx/edx-platform \
 #    && git clone $EDX_PLATFORM_REPO --branch $EDX_PLATFORM_VERSION --depth 1 /openedx/edx-platform
 RUN pip install --user --no-cache-dir -r /root/pip-pkg-list -r /openedx/edx-platform/requirements/edx/base.txt
