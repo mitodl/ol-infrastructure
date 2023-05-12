@@ -2,6 +2,7 @@ from concourse.lib.constants import REGISTRY_IMAGE
 from concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
+    GetStep,
     TaskStep,
     Identifier,
     Job,
@@ -29,6 +30,7 @@ def tubular_pipeline() -> Pipeline:
         name=Identifier("deploy-tubular-world"),
         max_in_flight=1,  # Only allow 1 Pulumi task at a time since they lock anyway.
         plan=[
+            GetStep(get=tubular_config_repo.name, trigger=True),
             TaskStep(
                 task=Identifier("tubular-generate-retirees-task"),
                 config=TaskConfig(
@@ -119,7 +121,9 @@ def tubular_pipeline() -> Pipeline:
             ),
         ],
     )
-    tubular_pipeline = Pipeline(jobs=[tubular_job_object])
+    tubular_pipeline = Pipeline(
+        resources=[tubular_config_repo], jobs=[tubular_job_object]
+    )
     return tubular_pipeline
 
 
