@@ -20,6 +20,7 @@ from concourse.lib.resources import git_repo
 pipeline_code = git_repo(
     name=Identifier("edxapp-pipeline-code"),
     uri="https://github.com/mitodl/ol-infrastructure",
+    # TODO MD 20230512 Fix to main branch one testing completed
     branch="md/edxapp_docker_migration",
     paths=[
         "src/bridge/settings/openedx/",

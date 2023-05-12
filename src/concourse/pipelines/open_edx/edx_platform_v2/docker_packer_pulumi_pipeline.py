@@ -33,6 +33,7 @@ def build_edx_pipeline(release_name: str) -> Pipeline:
     edx_docker_code = git_repo(
         name=Identifier("ol-infrastructure-docker"),
         uri="https://github.com/mitodl/ol-infrastructure",
+        # TODO MD 20230512 Fix to main branch once testing completed
         branch="md/edxapp_docker_migration",
         paths=["dockerfiles/openedx-edxapp"],
     )

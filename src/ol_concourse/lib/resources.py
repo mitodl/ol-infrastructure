@@ -4,12 +4,13 @@ from ol_concourse.lib.models.pipeline import Identifier, RegistryImage, Resource
 from ol_concourse.lib.models.resource import Git
 
 
-def git_repo(
+def git_repo(  # noqa: PLR0913
     name: Identifier,
     uri: str,
     branch: str = "main",
     check_every: str = "60s",
     paths: Optional[list[str]] = None,
+    depth: Optional[int] = None,
     **kwargs,
 ) -> Resource:
     return Resource(
@@ -121,10 +122,11 @@ def schedule(name: Identifier, interval: str) -> Resource:
     )
 
 
-def registry_image(
+def registry_image(  # noqa: PLR0913
     name: Identifier,
     image_repository: str,
     image_tag: Optional[str] = None,
+    variant: Optional[str] = None,
     username=None,
     password=None,
 ) -> Resource:
@@ -134,6 +136,8 @@ def registry_image(
     if username and password:
         image_source["username"] = username
         image_source["password"] = password
+    if variant:
+        image_source["variant"] = variant
     return Resource(
         name=name,
         type="registry-image",
