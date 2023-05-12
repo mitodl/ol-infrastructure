@@ -21,7 +21,7 @@ def tubular_pipeline() -> Pipeline:
     tubular_config_repo = git_repo(
         name=Identifier("tubular-pipeline-config"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="main",
+        branch="cpatti_openedx_tubular",
         paths=["src/concourse/pipelines/open_edx/tubular/"],
     )
     tubular_retirees = Output(name=Identifier("tubular-retirees"))
@@ -40,14 +40,15 @@ def tubular_pipeline() -> Pipeline:
                     outputs=[tubular_retirees],
                     params={
                         "TUBULAR_OAUTH_CLIENT_ID": "((tubular_oauth_client.id))",
-                        "TUBULAR_OAUTH_CLIENT_SECRET": "((tubular_oauth_client.secret))",
+                        "TUBULAR_OAUTH_CLIENT_SECRET":\
+                                "((tubular_oauth_client.secret))",
                         "TUBULAR_LMS_HOST": "((tubular_oauth_client.host))",
                     },
                     run=Command(
                         path="/app/scripts/get_learners_to_retire.py",
                         args=[
                             "--config_file",
-                            f"{tubular_config_repo.name}/src/concourse/pipelines/open_edx/tubular/openedx_config.yml",
+                            f"{tubular_config_repo.name}/src/concourse/pipelines/open_edx/tubular/openedx-config.yml",
                             "--output_dir",
                             tubular_retirees.name,
                             "--cool_off_days",
