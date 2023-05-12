@@ -1,0 +1,4 @@
+---
+retirement_pipeline:
+- ['RETIRING_FORUMS', 'FORUMS_COMPLETE', 'LMS', 'retirement_retire_forum']
+- ['RETIRING_LMS', 'LMS_COMPLETE', 'LMS', 'retirement_lms_retire']

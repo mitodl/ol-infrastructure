@@ -1883,6 +1883,10 @@ class Pipeline(BaseModel):
     class Config:
         extra = Extra.forbid
 
+    def json(self, *args, **kwargs):
+        kwargs["exclude_none"] = True
+        return super().json(*args, **kwargs)
+
     jobs: Optional[list[Job]] = Field(
         None,
         description=(
