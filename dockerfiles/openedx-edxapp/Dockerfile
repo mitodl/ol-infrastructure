@@ -1,5 +1,5 @@
 # Heavily inspired by Tutor from overhang.io
-FROM --platform=linux/amd64 python:3.8.12-buster as base
+FROM --platform=linux/amd64 python:3.8.12-buster as final
 
 ENV DEBIAN_FRONTEND=noninteractive
 COPY ./apt-pkg-list /root
