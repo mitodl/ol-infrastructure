@@ -12,6 +12,7 @@ edx_plugins_added = {
         "ol-openedx-sentry",
         "ol-openedx-course-export",
         "ol-openedx-checkout-external",
+        "sentry-sdk==1.2.1", # Fix RecursionError
         "social-auth-mitxpro==0.6.1",
     ],
     "xpro": [
@@ -53,6 +54,7 @@ edx_plugins_added = {
         # msg=self signed certificate (TMM 2022-12-01)
         # Downgrade to version used in Nutmeg due to conflicts with SAML implementation
         "lxml==4.5.0",
+        "sentry-sdk==1.2.1", # Fix RecursionError
     ],
     "mitx-staging": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
@@ -81,6 +83,7 @@ edx_plugins_added = {
         # msg=self signed certificate (TMM 2022-12-01)
         # Downgrade to version used in Nutmeg due to conflicts with SAML implementation
         "lxml==4.5.0",
+        "sentry-sdk==1.2.1", # Fix RecursionError
     ],
 }
 
