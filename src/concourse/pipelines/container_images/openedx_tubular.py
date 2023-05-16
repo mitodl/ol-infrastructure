@@ -14,8 +14,8 @@ from concourse.lib.resources import git_repo
 
 tubular_repository = git_repo(
     name=Identifier("openedx-tubular"),
-    uri="https://github.com/openedx/tubular",
-    branch="master",
+    uri="https://github.com/mitodl/tubular",
+    branch="cpatti_openedx_tubular",
     check_every="24h",
 )
 
