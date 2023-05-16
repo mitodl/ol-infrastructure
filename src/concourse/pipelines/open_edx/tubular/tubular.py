@@ -39,11 +39,11 @@ def tubular_pipeline() -> Pipeline:
                         type=REGISTRY_IMAGE,
                         source=RegistryImage(repository="mitodl/openedx-tubular"),
                     ),
+                    inputs=[Input(name=Identifier("tubular-pipeline-config"))],
                     outputs=[tubular_retirees],
                     params={
                         "TUBULAR_OAUTH_CLIENT_ID": "((tubular_oauth_client.id))",
-                        "TUBULAR_OAUTH_CLIENT_SECRET":\
-                                "((tubular_oauth_client.secret))",
+                        "TUBULAR_OAUTH_CLIENT_SECRET": "((tubular_oauth_client.secret))",  # noqa: E501
                         "TUBULAR_LMS_HOST": "((tubular_oauth_client.host))",
                     },
                     run=Command(
