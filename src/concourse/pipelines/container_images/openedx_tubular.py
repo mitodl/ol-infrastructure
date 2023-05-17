@@ -15,7 +15,7 @@ from concourse.lib.resources import git_repo
 tubular_repository = git_repo(
     name=Identifier("openedx-tubular"),
     uri="https://github.com/mitodl/tubular",
-    branch="cpatti_openedx_tubular",
+    branch="cpatti_configure_with_env",
     check_every="24h",
 )
 
