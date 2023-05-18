@@ -114,6 +114,11 @@ def tubular_pipeline() -> Pipeline:
                         source=RegistryImage(repository="mitodl/openedx-tubular"),
                     ),
                     inputs=[tubular_retirees, Input(name=tubular_config_repo.name)],
+                    params={
+                        "TUBULAR_OAUTH_CLIENT_ID": "((tubular_oauth_client.id))",
+                        "TUBULAR_OAUTH_CLIENT_SECRET": "((tubular_oauth_client.secret))",  # noqa: E501
+                        "TUBULAR_LMS_HOST": "((tubular_oauth_client.host))",
+                    },
                     run=Command(
                         path="/app/scripts/retire_one_learner.py",
                         args=[
