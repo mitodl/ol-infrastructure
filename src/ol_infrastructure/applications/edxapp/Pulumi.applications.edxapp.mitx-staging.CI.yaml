@@ -22,7 +22,7 @@ config:
     communications: communications
     course_authoring: course-authoring
     gradebook: gradebook
-    learner_dashboard: dashboard
+    learner_dashboard: home
     learning: learn
     library_authoring: library-authoring
     ora_grading: ora-grading

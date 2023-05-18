@@ -52,7 +52,7 @@ class OpenEdxMicroFrontend(str, Enum):
     learner_dashboard = (
         "learner-dashboard",
         "https://github.com/openedx/frontend-app-learner-dashboard",
-        "dashboard",
+        "home",
     )
     library_authoring = (
         "library-authoring",
