@@ -64,6 +64,11 @@ ReleaseMap: dict[
     "palm": {
         "mitx": [
             OpenEdxApplicationVersion(
+                application="communications",  # type: ignore
+                application_type="MFE",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
                 application="course-authoring",  # type: ignore
                 application_type="MFE",
                 release="palm",
@@ -93,12 +98,12 @@ ReleaseMap: dict[
                 release="palm",
             ),
             OpenEdxApplicationVersion(
-                application="learning",  # type: ignore
+                application="learner-dashboard",  # type: ignore
                 application_type="MFE",
                 release="palm",
             ),
             OpenEdxApplicationVersion(
-                application="learner-dashboard",  # type: ignore
+                application="learning",  # type: ignore
                 application_type="MFE",
                 release="palm",
             ),
@@ -125,6 +130,11 @@ ReleaseMap: dict[
             ),
         ],
         "mitx-staging": [
+            OpenEdxApplicationVersion(
+                application="communications",  # type: ignore
+                application_type="MFE",
+                release="palm",
+            ),
             OpenEdxApplicationVersion(
                 application="course-authoring",  # type: ignore
                 application_type="MFE",
