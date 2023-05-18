@@ -19,8 +19,10 @@ config:
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
+    communications: communications
     course_authoring: course-authoring
     gradebook: gradebook
+    learner_dashboard: dashboard
     learning: learn
     library_authoring: library-authoring
     ora_grading: ora-grading

@@ -20,9 +20,12 @@ config:
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
+    communications: communications
     course_authoring: course-authoring
     gradebook: gradebook
     learning: learn
+    library_authoring: library-authoring
+    ora_grading: ora-grading
   edxapp:google_analytics_id: UA-5145472-46
   edxapp:mail_domain: edxapp-mail-qa.mitxonline.mit.edu
   edxapp:sender_email_address: support@edxapp-mail-qa.mitxonline.mit.edu
