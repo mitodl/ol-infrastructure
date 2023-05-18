@@ -160,6 +160,11 @@ ReleaseMap: dict[
                 release="palm",
             ),
             OpenEdxApplicationVersion(
+                application="learner-dashboard",  # type: ignore
+                application_type="MFE",
+                release="palm",
+            ),
+            OpenEdxApplicationVersion(
                 application="library-authoring",  # type: ignore
                 application_type="MFE",
                 release="palm",
