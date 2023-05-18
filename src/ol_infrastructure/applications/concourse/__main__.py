@@ -811,7 +811,7 @@ vault.aws.AuthBackendRole(
     bound_ami_ids=[concourse_worker_ami.id],
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[ops_vpc_id],
-    token_policies=[concourse_vault_policy.name],
+    token_policies=[concourse_vault_resource_policy.name],
 )
 
 # Create Route53 DNS records for Concourse web nodes
