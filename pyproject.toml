@@ -47,6 +47,7 @@ pytest = "^7.1.1"
 pytest-testinfra = "^7.0.0"
 pyupgrade = "^3.0.0"
 ruff = "^0"
+ipython = {version = "^8.13.2", optional = true}
 
 
 [tool.black]
