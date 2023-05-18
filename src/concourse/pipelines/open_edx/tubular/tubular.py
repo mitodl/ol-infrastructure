@@ -27,6 +27,7 @@ def tubular_pipeline() -> Pipeline:
         paths=["src/concourse/pipelines/open_edx/tubular/"],
     )
     tubular_retirees = Output(name=Identifier("tubular-retirees"))
+    tubular_config_path = f"{tubular_config_repo.name}/src/concourse/pipelines/open_edx/tubular/openedx-config.yml"  # noqa: E501
     tubular_job_object = Job(
         name=Identifier("deploy-tubular-world"),
         max_in_flight=1,  # Only allow 1 Pulumi task at a time since they lock anyway.
@@ -51,7 +52,7 @@ def tubular_pipeline() -> Pipeline:
                         path="/app/scripts/get_learners_to_retire.py",
                         args=[
                             "--config_file",
-                            f"{tubular_config_repo.name}/src/concourse/pipelines/open_edx/tubular/openedx-config.yml",
+                            tubular_config_path,
                             "--output_dir",
                             f"{tubular_retirees.name}/processing",
                             "--cool_off_days",
@@ -112,12 +113,12 @@ def tubular_pipeline() -> Pipeline:
                         type=REGISTRY_IMAGE,
                         source=RegistryImage(repository="mitodl/openedx-tubular"),
                     ),
-                    inputs=[Input(name=tubular_retirees.name)],
+                    inputs=[tubular_retirees, Input(name=tubular_config_repo.name)],
                     run=Command(
                         path="/app/scripts/retire_one_learner.py",
                         args=[
                             "--config_file",
-                            f"{tubular_config_repo.name}/src/concourse/pipelines/open_edx/tubular/openedx_config.yml",
+                            tubular_config_path,
                             "--username",
                             "((.:tubular_retiree))",
                         ],
