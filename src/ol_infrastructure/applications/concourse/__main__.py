@@ -791,6 +791,29 @@ vault.aws.AuthBackendRole(
     token_policies=[concourse_vault_policy.name],
 )
 
+# Vault policy definition
+concourse_vault_resource_policy = vault.Policy(
+    "concourse-vault-resource-policy",
+    name="concourse-vault",
+    policy=Path(__file__).parent.joinpath("concourse_vault_policy.hcl").read_text(),
+)
+vault.aws.AuthBackendRole(
+    "concourse-vault-resource-ec2-vault-auth",
+    backend="aws",
+    auth_type="iam",
+    inferred_entity_type="ec2_instance",
+    inferred_aws_region=aws_config.region,
+    bound_iam_instance_profile_arns=[
+        iam_instance_profile.arn
+        for iam_instance_profile in concourse_worker_instance_profiles
+    ],
+    role="concourse-vault-resource",
+    bound_ami_ids=[concourse_worker_ami.id],
+    bound_account_ids=[aws_account.account_id],
+    bound_vpc_ids=[ops_vpc_id],
+    token_policies=[concourse_vault_policy.name],
+)
+
 # Create Route53 DNS records for Concourse web nodes
 five_minutes = 60 * 5
 route53.Record(
