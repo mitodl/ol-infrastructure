@@ -52,7 +52,7 @@ def tubular_pipeline() -> Pipeline:
                             "--config_file",
                             f"{tubular_config_repo.name}/src/concourse/pipelines/open_edx/tubular/openedx-config.yml",
                             "--output_dir",
-                            tubular_retirees.name,
+                            f"{tubular_retirees.name}/processing",
                             "--cool_off_days",
                             "5",
                         ],
@@ -76,7 +76,7 @@ def tubular_pipeline() -> Pipeline:
                             """
                             import json
                             from pathlib import Path
-                            learner_dir = Path("((tubular_retirees))")
+                            learner_dir = Path("((tubular_retirees))/processing")
                             rfiles = learner_dir.glob("learner*")
                             retirees = [ rfile.name for rfile in rfiles ]
                             with open("vars.json","w") as vj:
