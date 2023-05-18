@@ -1,3 +1,4 @@
+import textwrap
 from concourse.lib.constants import REGISTRY_IMAGE
 from concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -67,21 +68,25 @@ def tubular_pipeline() -> Pipeline:
                         type=REGISTRY_IMAGE,
                         source=RegistryImage(repository="mitodl/openedx-tubular"),
                     ),
-                    inputs=[Input(name=tubular_retirees.name)],
+                    inputs=[tubular_retirees],
                     # inline bash script to generate retirees yaml
                     run=Command(
                         path="python",
                         args=[
                             "-c",
-                            """
+                            textwrap.dedent(
+                                """\
                             import json
                             from pathlib import Path
-                            learner_dir = Path("((tubular_retirees))/processing")
+                            learner_dir = Path("{retirees_dir}/processing")
                             rfiles = learner_dir.glob("learner*")
                             retirees = [ rfile.name for rfile in rfiles ]
-                            with open("vars.json","w") as vj:
-                                vj.write(json.dumps(retirees))'
-                            """,
+                            with open("retirees_dir/vars.json","w") as vj:
+                                vj.write(json.dumps(retirees))
+                            """.format(
+                                    retirees_dir=tubular_retirees.name
+                                )
+                            ),
                         ],
                     ),
                     outputs=[Output(name=Identifier("retirees_dir"))],
