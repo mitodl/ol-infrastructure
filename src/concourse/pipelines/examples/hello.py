@@ -5,14 +5,12 @@ from concourse.lib.models.pipeline import (
     TaskStep,
     Identifier,
     Job,
-    Output,
     Pipeline,
     Platform,
     RegistryImage,
     TaskConfig,
     TaskStep,
 )
-
 
 
 def hello_pipeline() -> Pipeline:
@@ -28,17 +26,12 @@ def hello_pipeline() -> Pipeline:
                         type=REGISTRY_IMAGE,
                         source=RegistryImage(repository="busybox"),
                     ),
-                    run=Command(
-                        path="echo",
-                        args=["Hello, World!"]
-                    ),
+                    run=Command(path="echo", args=["Hello, World!"]),
                 ),
             ),
         ],
     )
-    hello_pipeline = Pipeline(
-            jobs=[hello_job_object]
-            )
+    hello_pipeline = Pipeline(jobs=[hello_job_object])
     return hello_pipeline
 
 
