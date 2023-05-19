@@ -16,7 +16,7 @@ from concourse.lib.models.pipeline import (
     TaskConfig,
     AcrossVar,
 )
-from concourse.lib.resources import git_repo
+from concourse.lib.resources import git_repo, schedule
 
 
 def tubular_pipeline() -> Pipeline:
@@ -26,6 +26,7 @@ def tubular_pipeline() -> Pipeline:
         branch="cpatti_openedx_tubular",
         paths=["src/concourse/pipelines/open_edx/tubular/"],
     )
+    tubular_build_schedule = schedule(Identifier("build-schedule"), interval="168h")
     tubular_retirees = Output(name=Identifier("tubular-retirees"))
     tubular_config_path = f"{tubular_config_repo.name}/src/concourse/pipelines/open_edx/tubular/openedx-config.yml"  # noqa: E501
     tubular_job_object = Job(
@@ -33,6 +34,7 @@ def tubular_pipeline() -> Pipeline:
         max_in_flight=1,  # Only allow 1 Pulumi task at a time since they lock anyway.
         plan=[
             GetStep(get=tubular_config_repo.name, trigger=True),
+            GetStep(get=tubular_build_schedule.name, trigger=True),
             TaskStep(
                 task=Identifier("tubular-generate-retirees-task"),
                 config=TaskConfig(
@@ -133,7 +135,8 @@ def tubular_pipeline() -> Pipeline:
         ],
     )
     tubular_pipeline = Pipeline(
-        resources=[tubular_config_repo], jobs=[tubular_job_object]
+        resources=[tubular_config_repo, tubular_build_schedule],
+        jobs=[tubular_job_object],
     )
     return tubular_pipeline
 
