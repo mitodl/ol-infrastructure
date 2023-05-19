@@ -8,7 +8,7 @@ import re
 from enum import Enum
 from typing import Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConstrainedStr, Extra, Field
+from pydantic import BaseModel, ConstrainedStr, Extra, Field, PositiveInt
 
 
 class Identifier(ConstrainedStr):
@@ -234,7 +234,32 @@ class GroupConfig(BaseModel):
     )
 
 
-class PutStep(Step):
+class StepModifierMixin(BaseModel):
+    across: Optional[list[AcrossVar]] = Field(
+        None,
+        description="Run a step multiple times with different combinations of variable "
+        "values. The across step can be combined with the load_var step, the "
+        "set_pipeline step, and instanced pipelines to maintain a dynamically sized "
+        "group of related pipelines.",
+    )
+    attempts: Optional[PositiveInt] = Field(
+        None,
+        description="The total number of times a step should be tried before it should "
+        "fail, e.g. 5 will run the step up to 5 times before giving up.",
+    )
+    timeout: Optional[Duration] = Field(
+        None,
+        description="The amount of time to limit the step's execution to, e.g. 30m for "
+        "30 minutes.",
+    )
+    tags: Optional[list[str]] = Field(
+        None,
+        description="The tags by which to match workers. The step will be placed within"
+        " the a pool of workers that match all of the given set of tags.",
+    )
+
+
+class PutStep(Step, StepModifierMixin):
     class Config:
         extra = Extra.forbid
 
@@ -448,7 +473,7 @@ class AcrossVar(BaseModel):
             " printed."
         ),
     )
-    values: Optional[list[Value]] = Field(
+    values: Optional[Union[list[Value], str]] = Field(
         None,
         description=(
             "The list of values that the  schema.across_var.var  var  will  iterate"
@@ -627,7 +652,7 @@ class VaultConfig(BaseModel):
     )
 
 
-class SetPipelineStep(Step):
+class SetPipelineStep(Step, StepModifierMixin):
     class Config:
         extra = Extra.forbid
 
@@ -768,7 +793,7 @@ class SetPipelineStep(Step):
     )
 
 
-class LoadVarStep(Step):
+class LoadVarStep(Step, StepModifierMixin):
     class Config:
         extra = Extra.forbid
 
@@ -1102,7 +1127,7 @@ class ResourceType(BaseModel):
     )
 
 
-class GetStep(Step):
+class GetStep(Step, StepModifierMixin):
     class Config:
         extra = Extra.forbid
 
@@ -1432,7 +1457,7 @@ class TaskConfig(BaseModel):
     )
 
 
-class TaskStep(Step):
+class TaskStep(Step, StepModifierMixin):
     class Config:
         extra = Extra.forbid
 
@@ -1656,7 +1681,7 @@ class TaskStep(Step):
     )
 
 
-class InParallelStep(Step):
+class InParallelStep(Step, StepModifierMixin):
     class Config:
         extra = Extra.forbid
 
@@ -1832,6 +1857,12 @@ class Job(BaseModel):
             " set  schema.resource.public    to `true` ."
         ),
     )
+    no_get: Optional[bool] = Field(
+        None,
+        description=(
+            "Skips the get step that usually follows the completion of the put step."
+        ),
+    )
     on_failure: Optional[Step] = Field(
         None,
         description=(
@@ -1851,6 +1882,10 @@ class Job(BaseModel):
 class Pipeline(BaseModel):
     class Config:
         extra = Extra.forbid
+
+    def json(self, *args, **kwargs):
+        kwargs["exclude_none"] = True
+        return super().json(*args, **kwargs)
 
     jobs: Optional[list[Job]] = Field(
         None,
@@ -1926,7 +1961,7 @@ class Pipeline(BaseModel):
     )
 
 
-class TryStep(Step):
+class TryStep(Step, StepModifierMixin):
     class Config:
         extra = Extra.forbid
 
@@ -1994,7 +2029,7 @@ class InParallelConfig(BaseModel):
     )
 
 
-class DoStep(Step):
+class DoStep(Step, StepModifierMixin):
     class Config:
         extra = Extra.forbid
 
