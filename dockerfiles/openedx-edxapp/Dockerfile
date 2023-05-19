@@ -1,4 +1,8 @@
 # Heavily inspired by Tutor from overhang.io
+
+# This dockerfile is not expected to work locally. Only executes correctly within the context
+# of its concourse pipeline.
+
 FROM --platform=linux/amd64 python:3.8.12-buster as base
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -20,11 +24,8 @@ RUN cd /tmp \
     && rm -rf openedx-i18n*
 
 FROM base as code
-#ARG EDX_PLATFORM_REPO="https://github.com/openedx/edx-platform.git"
-#ARG EDX_PLATFORM_VERSION="open-release/olive.3"
+# Expected to be run in concourse where the edx-platform code will come from a git resource @ edx_platform
 COPY ./edx_platform /openedx/edx-platform
-#RUN mkdir -p /openedx/edx-platform \
-#    && git clone $EDX_PLATFORM_REPO --branch $EDX_PLATFORM_VERSION --depth 1 /openedx/edx-platform
 RUN pip install --user --no-cache-dir -r /root/pip-pkg-list -r /openedx/edx-platform/requirements/edx/base.txt
 
 WORKDIR /openedx/edx-platform
@@ -35,20 +36,8 @@ RUN nodeenv /openedx/nodeenv --node=16.14.0 --prebuilt \
 
 FROM base as themes
 
-#ARG MITX_THEME_REPO="https://github.com/mitodl/mitx-theme.git"
-#ARG MITX_THEME_VERSION="olive"
-#ARG MITXONLINE_THEME_REPO="https://github.com/mitodl/mitxonline-theme.git"
-#ARG MITXONLINE_THEME_VERSION="main"
-#ARG XPRO_THEME_REPO="https://github.com/mitodl/mitxpro-theme.git"
-#ARG XPRO_THEME_VERSION="olive"
-
+# Expected to be run by concourse where the themes will be collected into one directory prior to docker build
 COPY ./collected_themes /openedx/themes
-
-#RUN mkdir -p /openedx/themes \
-#    && git clone $MITX_THEME_REPO --branch $MITX_THEME_VERSION --depth 1 /openedx/themes/mitx \
-#    && git clone $MITX_THEME_REPO --branch $MITX_THEME_VERSION --depth 1 /openedx/themes/mitx-staging \
-#    && git clone $MITXONLINE_THEME_REPO --branch $MITXONLINE_THEME_VERSION --depth 1 /openedx/themes/mitxonline-theme \
-#    && git clone $XPRO_THEME_REPO --branch $XPRO_THEME_VERSION --depth 1 /openedx/themes/mitxpro-theme
 
 FROM base as tutor-utils
 
@@ -97,6 +86,8 @@ ENV DJANGO_SETTINGS_MODULE lms.envs.docker-production
 ENV NO_PYTHON_UNINSTALL 1
 ENV NO_PREREQ_INSTALL 0
 
+# These are important but their provanance is unknown at this time.
+# The reason they need to be installed like this is also unknown.
 RUN pip install --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
     && pip install --user --no-cache-dir -e "git+https://github.com/openedx/django-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
     && pip install --user --no-cache-dir -e "git+https://github.com/openedx/blockstore.git@9d623bc04f479a1af29204d438fa442ea8380fae#egg=blockstore" \

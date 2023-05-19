@@ -1,0 +1,124 @@
+---
+version: "3.7"
+services:
+# Webapp definitions
+  caddy:
+    image: docker.io/caddy:2.6.3
+    profiles:
+    - web
+    env_file:
+    - ./.env
+    - ./.env_caddy
+    restart: unless-stopped
+    ports:
+    - "80:80"
+    - "443:443"
+    volumes:
+    - ./settings/Caddyfile:/etc/caddy/Caddyfile:ro
+    - ./tls/certificate_no_chain:/etc/caddy/certificate:ro
+    - ./tls/key:/etc/caddy/key:ro
+  lms:
+    image: mitodl/edxapp:${EDXAPP_DOCKER_TAG}
+    profiles:
+    - web
+    env_file:
+    - ./.env
+    environment:
+      SERVICE_VARIANT: lms
+      DJANGO_SETTINGS_MODULE: lms.envs.docker-production
+      UWSGI_WORKERS: 2
+    ports:
+    - "8000:8000" # this is to advertise the consul service but we will block direct access with the sg
+                  # we might not need this anymore?
+    restart: unless-stopped
+    volumes:
+    - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
+    - ./settings/uwsgi.ini:/openedx/edx-platform/uswsgi.ini:ro
+    - /opt/data:/openedx/data
+    - /opt/data/media:/openedx/media
+    depends_on:
+    - lms-permissions
+  cms:
+    image: mitodl/edxapp:${EDXAPP_DOCKER_TAG}
+    profiles:
+    - web
+    env_file:
+    - ./.env
+    environment:
+      SERVICE_VARIANT: cms
+      DJANGO_SETTINGS_MODULE: cms.envs.docker-production
+      UWSGI_WORKERS: 2
+    restart: unless-stopped
+    volumes:
+    - ./settings/cms.env.yml:/openedx/config/cms.env.yml:ro
+    - ./settings/uwsgi.ini:/openedx/edx-platform/uswsgi.ini:ro
+    - /opt/data:/openedx/data
+    - /opt/data/media:/openedx/media
+    depends_on:
+      - cms-permissions
+
+# Worker definitions
+  lms-worker:
+    image: mitodl/edxapp:${EDXAPP_DOCKER_TAG}
+    profiles:
+    - worker
+    env_file:
+    - ./.env
+    environment:
+      SERVICE_VARIANT: lms
+      DJANGO_SETTINGS_MODULE: lms.envs.docker-production
+    command: celery --app=lms.celery worker --loglevel=info --hostname=edx.lms.core.default.%%h
+      --max-tasks-per-child=100 --exclude-queues=edx.cms.core.default
+    restart: unless-stopped
+    volumes:
+    - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
+    - ./settings/uwsgi.ini:/openedx/edx-platform/uswsgi.ini:ro
+    - /opt/data:/openedx/data
+    - /opt/data/media:/openedx/media
+    depends_on:
+    - lms-permissions
+  cms-worker:
+    image: mitodl/edxapp:${EDXAPP_DOCKER_TAG}
+    profiles:
+    - web
+    env_file:
+    - ./.env
+    environment:
+      SERVICE_VARIANT: cms
+      DJANGO_SETTINGS_MODULE: cms.envs.docker-production
+    command: celery --app=cms.celery worker --loglevel=info --hostname=edx.cms.core.default.%%h
+      --max-tasks-per-child 100 --exclude-queues=edx.lms.core.default
+    restart: unless-stopped
+    volumes:
+    - ./settings/cms.env.yml:/openedx/config/cms.env.yml:ro
+    - ./settings/uwsgi.ini:/openedx/edx-platform/uswsgi.ini:ro
+    - /opt/data:/openedx/data
+    - /opt/data/media:/openedx/media
+    depends_on:
+    - cms-permissions
+
+# Permission definitions
+  lms-permissions:
+    image: overhangio/openedx-permissions:${TUTOR_PERMISSIONS_TAG}
+    profiles:
+    - web
+    - worker
+    env_file:
+    - ./.env
+    command: ["1000", "/openedx/data", "/openedx/media"]
+    restart: on-failure
+    volumes:
+    - /opt/data:/openedx/data
+    - /opt/data/media:/openedx/media
+  cms-permissions:
+    image: overhangio/openedx-permissions:${TUTOR_PERMISSIONS_TAG}
+    profiles:
+    - web
+    - worker
+    env_file:
+    - ./.env
+    command: ["1000", "/openedx/data", "/openedx/media"]
+    restart: on-failure
+    volumes:
+    - /opt/data:/openedx/data
+    - /opt/data/media:/openedx/media
