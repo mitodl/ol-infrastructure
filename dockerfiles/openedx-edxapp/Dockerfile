@@ -67,14 +67,26 @@ ENV PATH /openedx/.local/bin:/openedx/bin:/openedx/edx-platform/node_modules/.bi
 WORKDIR /openedx/edx-platform
 
 RUN pip install --user --no-cache-dir -e .
+
+# TODO MD 20230522 Not sure if we need to be making this mitol directory
 RUN mkdir -p /openedx/config  ./lms/envs/mitol ./cms/envs/mitol
+
+# TODO MD 20230522 Not sure what revisions.yml is for
 COPY --chown=app:app settings/revisions.yml /openedx/config/revisions.yml
+
+# These are dummy configs to allow some of the collectstatic steps to run
 COPY --chown=app:app settings/lms.env.yml /openedx/config/lms.env.yml
 COPY --chown=app:app settings/cms.env.yml /openedx/config/cms.env.yml
+
+# TODO MD 20230522 What is going on with these? Not sure if they are ever used
 COPY --chown=app:app settings/lms/assets.not_py /openedx/edx-platform/lms/envs/mitol/assets.py
 COPY --chown=app:app settings/lms/i18n.not_py /openedx/edx-platform/lms/envs/mitol/i18n.py
 COPY --chown=app:app settings/cms/assets.not_py /openedx/edx-platform/cms/envs/mitol/assets.py
 COPY --chown=app:app settings/cms/i18n.not_py /openedx/edx-platform/cms/envs/mitol/i18n.py
+
+# Olive is missing the docker-production environment for CMS so for now we will just drop in our own 'patch' for both
+COPY --chown=app:app settings/lms/envs/docker-production.not_py /openedx/edx-platform/lms/envs/docker-production.py
+COPY --chown=app:app settings/cms/envs/docker-production.not_py /openedx/edx-platform/cms/envs/docker-production.py
 
 FROM collected AS build-static-assets
 

@@ -206,7 +206,10 @@ if node_type == WEB_NODE_TYPE:
                 + "/"
                 + EDX_INSTALLATION_NAME
                 + '-wildcard-certificate" }}'
-                "{{ printf .Data.cert_chain }}{{ end }}"
+                # TODO MD 20230522 Need to go through every key cert pair and extract
+                # the certificate from the chain and store it in just 'cert' at the same
+                # vault mount.
+                "{{ printf .Data.cert }}{{ end }}"
             ),
             destination=tls_certificate_file,
         ),
@@ -269,7 +272,7 @@ consul_templates.append(
     ConsulTemplateTemplate(
         source=lms_config_consul_template_file,
         destination=lms_config_file,
-        perms="0660",
+        perms="0664",
     )
 )
 watched_files.append(lms_config_file)
@@ -294,7 +297,7 @@ consul_templates.append(
     ConsulTemplateTemplate(
         source=cms_config_consul_template_file,
         destination=cms_config_file,
-        perms="0660",
+        perms="0664",
     )
 )
 watched_files.append(cms_config_file)
