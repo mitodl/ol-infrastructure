@@ -506,14 +506,14 @@ tox = ["tox"]
 
 [[package]]
 name = "datamodel-code-generator"
-version = "0.18.1"
+version = "0.19.0"
 description = "Datamodel Code Generator"
 category = "dev"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "datamodel_code_generator-0.18.1-py3-none-any.whl", hash = "sha256:1555d0a01a3af1d0fe9c6af15d39af86cef45fd1915587c2fd5bb4117b0720b1"},
-    {file = "datamodel_code_generator-0.18.1.tar.gz", hash = "sha256:3b360d7902d682ea011d5711b1037ba4dcf1b3b6b5f56bc39ed7f5aed51facb6"},
+    {file = "datamodel_code_generator-0.19.0-py3-none-any.whl", hash = "sha256:082c8c0f72b42953fb04bd4a4e76bbd7b1cd4c07f3000fbd019c9a196e2bdf6b"},
+    {file = "datamodel_code_generator-0.19.0.tar.gz", hash = "sha256:13ca59944d6aa347dd5f674f90f5d7f1004626a65ecade6c364b90c1a47ef499"},
 ]
 
 [package.dependencies]
@@ -2614,4 +2614,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "6537b75e4975e0d7613afeac4f904196d3091462267b635117d9e6f9b461e30a"
+content-hash = "1a229eea303f2cf7bcb56de9d42537fc68ee5395554473f98b19a1f08f805c72"
