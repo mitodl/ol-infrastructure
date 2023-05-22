@@ -2028,14 +2028,14 @@ testing = ["argcomplete", "attrs (>=19.2.0)", "hypothesis (>=3.56)", "mock", "no
 
 [[package]]
 name = "pytest-testinfra"
-version = "7.0.0"
+version = "8.1.0"
 description = "Test infrastructures"
 category = "dev"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "pytest-testinfra-7.0.0.tar.gz", hash = "sha256:38c2ce2df4e25f685636c7db9ac15083a7cf3e4a8a997d5fa654e8a7bedeadce"},
-    {file = "pytest_testinfra-7.0.0-py3-none-any.whl", hash = "sha256:0b28076d7088fb0c8e868119639f1259f95dd0e735ae8045ead34433ce8cbc98"},
+    {file = "pytest-testinfra-8.1.0.tar.gz", hash = "sha256:9b40828b58fb7ac2bff29cc1465934adf434f10dd5a108f60535dee52660a63d"},
+    {file = "pytest_testinfra-8.1.0-py3-none-any.whl", hash = "sha256:bf7df6306244da6a832f977766e75408317315aa1452c41c30e2541ef7978007"},
 ]
 
 [package.dependencies]
@@ -2614,4 +2614,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "5c83ceb7d017d676019d5712c489a61ef8a68e0157276bdbdd7c81f32d5a90d8"
+content-hash = "6537b75e4975e0d7613afeac4f904196d3091462267b635117d9e6f9b461e30a"
