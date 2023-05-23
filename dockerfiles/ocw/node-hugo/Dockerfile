@@ -1,11 +1,12 @@
 FROM  node:14-buster-slim
 LABEL maintainer="MIT Open Learning (odl-devops@mit.edu)"
 LABEL description="Node and Hugo, used for building OCW website"
-LABEL version="0.4"
+LABEL version="0.5"
 WORKDIR /tmp
-ENV HUGO_VERSION='0.110.0'
+ENV HUGO_VERSION="0.112.0"
 ENV HUGO_NAME="hugo_extended_${HUGO_VERSION}_linux-amd64"
-ENV GO_FILE_NAME="go1.18.2.linux-amd64.tar.gz"
+ENV GO_VERSION="1.20.4"
+ENV GO_FILE_NAME="go${GO_VERSION}.linux-amd64.tar.gz"
 ENV GO_URL="https://golang.org/dl/${GO_FILE_NAME}"
 ENV HUGO_URL="https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/${HUGO_NAME}.deb"
 RUN apt update && \
