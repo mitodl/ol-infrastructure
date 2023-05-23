@@ -85,8 +85,8 @@ COPY --chown=app:app settings/cms/assets.not_py /openedx/edx-platform/cms/envs/m
 COPY --chown=app:app settings/cms/i18n.not_py /openedx/edx-platform/cms/envs/mitol/i18n.py
 
 # Olive is missing the docker-production environment for CMS so for now we will just drop in our own 'patch' for both
-COPY --chown=app:app settings/lms/envs/docker-production.not_py /openedx/edx-platform/lms/envs/docker-production.py
-COPY --chown=app:app settings/cms/envs/docker-production.not_py /openedx/edx-platform/cms/envs/docker-production.py
+COPY --chown=app:app settings/lms/docker-production.not_py /openedx/edx-platform/lms/envs/docker-production.py
+COPY --chown=app:app settings/cms/docker-production.not_py /openedx/edx-platform/cms/envs/docker-production.py
 
 FROM collected AS build-static-assets
 
