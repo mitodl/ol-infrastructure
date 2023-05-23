@@ -126,4 +126,11 @@ ENV DJANGO_SETTINGS_MODULE="invalid"
 COPY --chown=app:app settings/uwsgi.ini /openedx/edx-platform
 COPY --chown=app:app settings/logsettings.py /openedx/edx-platform/openedx/core/lib
 
+# Setup known_hosts file for git-import-export-plugin
+RUN mkdir /openedx/.ssh \
+    && chown app:app /openedx/.ssh \
+    && chmod 0700 /openedx/.ssh \
+    && ssh-keyscan 'github.com' 'github.mit.edu' >> /openedx/.ssh/known_hosts \
+    && chmod 0600 /openedx/.ssh/known_hosts
+
 CMD uwsgi uwsgi.ini
