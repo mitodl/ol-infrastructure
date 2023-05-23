@@ -2,7 +2,6 @@ from concourse.lib.constants import REGISTRY_IMAGE
 from concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
-    TaskStep,
     Identifier,
     Job,
     Pipeline,
