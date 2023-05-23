@@ -23,7 +23,7 @@ def tubular_pipeline() -> Pipeline:
     tubular_config_repo = git_repo(
         name=Identifier("tubular-pipeline-config"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="cpatti_openedx_tubular",
+        branch="main",
         paths=["src/concourse/pipelines/open_edx/tubular/"],
     )
     tubular_build_schedule = schedule(Identifier("build-schedule"), interval="168h")
