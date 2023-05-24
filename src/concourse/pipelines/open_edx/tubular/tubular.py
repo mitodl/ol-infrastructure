@@ -85,12 +85,11 @@ def tubular_pipeline() -> Pipeline:
                             rfiles = learner_dir.glob("learner*")
                             retirees = []
                             for rfile in rfiles:
-                                retirees = [ rfile.read_text().split("=")[-1] ]
+                                retiree = rfile.read_text().strip('\\n').split("=")[-1]
+                                retirees.append(retiree)
                             with open("retirees_dir/vars.json","w") as vj:
                                 vj.write(json.dumps(retirees))
-                            """.format(
-                                    retirees_dir=tubular_retirees.name
-                                )
+                            """
                             ),
                         ],
                     ),
