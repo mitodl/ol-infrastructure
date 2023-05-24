@@ -98,6 +98,11 @@ files.put(
     src=io.StringIO(VERSIONS["tutor_permissions"]),
     dest="/etc/default/tutor_permissions_tag",
 )
+files.put(
+    name=f"Setting the COMPOSE_PROFILES variable to {node_type} for docker compose",
+    src=io.StringIO(f"COMPOSE_PROFILES={node_type}"),
+    dest="/etc/default/docker-compose",
+)
 
 # Preload some docker images. This will accelerate the first startup
 server.shell(
@@ -112,6 +117,7 @@ data_directory = Path("/opt/data")
 media_directory = data_directory.joinpath("media")
 settings_directory = DOCKER_COMPOSE_DIRECTORY.joinpath("settings")
 tls_directory = DOCKER_COMPOSE_DIRECTORY.joinpath("tls")
+ssh_directory = DOCKER_COMPOSE_DIRECTORY.joinpath("ssh")
 
 files.directory(
     name="Create docker compose directory",
@@ -124,15 +130,15 @@ files.directory(
 files.directory(
     name="Create data directory",
     path=data_directory,
-    user="root",
-    group="root",
+    user="1000",
+    group="1000",
     present=True,
 )
 files.directory(
     name="Create media directory",
     path=media_directory,
-    user="root",
-    group="root",
+    user="1000",
+    group="1000",
     present=True,
 )
 files.directory(
@@ -147,6 +153,14 @@ files.directory(
     path=tls_directory,
     user="root",
     group="root",
+    present=True,
+)
+files.directory(
+    name="Create SSH directory",
+    path=ssh_directory,
+    user="1000",
+    group="1000",
+    mode="0700",
     present=True,
 )
 
@@ -228,6 +242,7 @@ if node_type == WEB_NODE_TYPE:
             destination=tls_key_file,
         ),
     )
+
     watched_files.extend([tls_certificate_file, tls_key_file])
 
     # Additionally, on web nodes create the consul service for edxapp
@@ -246,6 +261,19 @@ if node_type == WEB_NODE_TYPE:
         ],
     )
 
+# Setup the ssh key for git-auto-export-plugin
+ssh_key_file = ssh_directory.joinpath("id_rsa")
+consul_templates.append(
+    ConsulTemplateTemplate(
+        contents=(
+            '{{with secret "secret-operations/global/github-enterprise-ssh" }}'
+            "{{ printf .Data.private_key }}{{ end }}"
+        ),
+        perms="0600",
+        destination=ssh_key_file,
+    )
+)
+watched_files.append(ssh_key_file)
 
 # Setup the lms.env.yml and cms.env.yml files for edxapp
 EDX_TEMPLATES_DIRECTORY = TEMPLATES_DIRECTORY.joinpath("edxapp", EDX_INSTALLATION_NAME)
