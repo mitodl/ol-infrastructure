@@ -1,5 +1,5 @@
 # -*- mode: yaml -*-
-{{ with secret "secret-mitx-staging/mongodb-edxapp" }}
+{{ with secret "secret-mitx/mongodb-edxapp" }}
 mongodb_settings: &mongo_params
   authsource: admin
   host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
@@ -11,7 +11,7 @@ mongodb_settings: &mongo_params
   ssl: {{ keyOrDefault "mongodb/use-ssl" "false" }}
 {{ end }}
 
-{{ with secret "mariadb-mitx-staging/creds/edxapp" }}
+{{ with secret "mariadb-mitx/creds/edxapp" }}
 mysql_creds: &mysql_creds
   ENGINE: django.db.backends.mysql
   HOST: {{ keyOrDefault "edxapp/rds-host" "edxapp-db.service.consul" }}
@@ -20,7 +20,7 @@ mysql_creds: &mysql_creds
   PASSWORD: {{ .Data.password }}
 {{ end }}
 
-{{ with secret "secret-mitx-staging/edxapp" }}
+{{ with secret "secret-mitx/edxapp" }}
 CANVAS_ACCESS_TOKEN: {{ .Data.canvas_access_token }}
 CELERY_BROKER_PASSWORD: {{ .Data.redis_auth_token }}
 EMAIL_HOST_PASSWORD: {{ .Data.email_password }}
@@ -39,7 +39,7 @@ JWT_AUTH:  # NEEDS ATTENTION
     JWT_AUTH_COOKIE: {{ env "ENVIRONMENT"}}-edx-jwt-cookie
     JWT_AUTH_COOKIE_HEADER_PAYLOAD: {{ env "ENVIRONMENT" }}-edx-jwt-cookie-header-payload
     JWT_AUTH_COOKIE_SIGNATURE: {{ env "ENVIRONMENT" }}-edx-jwt-cookie-signature
-    JWT_ISSUER: 'https://{{ key "edxapp/lms-domain" }}/oauth2'
+    JWT_ISSUER: https://{{ key "edxapp/lms-domain" }}/oauth2
     JWT_LOGIN_CLIENT_ID: login-service-client-id
     JWT_LOGIN_SERVICE_USERNAME: login_service_user
     JWT_PRIVATE_SIGNING_JWK: '{{ .Data.private_signing_jwk }}'
@@ -56,14 +56,14 @@ SOCIAL_AUTH_SAML_SP_PUBLIC_CERT: '{{ .Data.saml_public_cert }}'
 SYSADMIN_GITHUB_WEBHOOK_KEY: {{ .Data.sysadmin_git_webhook_secret }}
 YOUTUBE_API_KEY: {{ .Data.youtube_api_key }}
 {{ end }}
-{{ with secret "secret-mitx-staging/edx-xqueue" }}
+{{ with secret "secret-mitx/edx-xqueue" }}
 XQUEUE_INTERFACE:
     django_auth:
         password: {{ .Data.edxapp_password }}
         username: edxapp
     url: http://xqueue.service.consul:8040  # MODIFIED
 {{ end }}
-{{ with secret "secret-mitx-staging/edx-forum" }}
+{{ with secret "secret-mitx/edx-forum" }}
 COMMENTS_SERVICE_KEY: {{ .Data.forum_api_key }}
 {{ end }}
 
@@ -89,7 +89,7 @@ DATABASES:
     NAME: edxapp_csmh
     OPTIONS:
       charset: utf8mb4
-    {{ with secret "mariadb-mitx-staging/creds/edxapp-csmh"}}
+    {{ with secret "mariadb-mitx/creds/edxapp-csmh"}}
     PASSWORD: {{ .Data.password }}
     USER: {{ .Data.username }}
     {{ end }}
@@ -110,6 +110,7 @@ CONTENTSTORE:
         <<: *mongo_params
     ENGINE: xmodule.contentstore.mongo.MongoContentStore
     OPTIONS:
+        auth_source: ''
         <<: *mongo_params
 
 ACTIVATION_EMAIL_SUPPORT_LINK: ''
@@ -126,7 +127,7 @@ AUTH_PASSWORD_VALIDATORS:
         max_length: 75
 AWS_ACCESS_KEY_ID: "" # MODIFIED - not setting as we will use IAM Instance Profiles
 # AWS_QUERYSTRING_AUTH: false
-AWS_S3_CUSTOM_DOMAIN: {{ key "edxapp/s3-storage-bucket" }}.s3.amazonaws.com
+AWS_S3_CUSTOM_DOMAIN: {{ key "edxapp/s3-storage-bucket" }}.s3.amazonaws.com  # MODIFIED
 AWS_SECRET_ACCESS_KEY: ""  # MODIFIED - not setting as we will use IAM Instance Profiles
 AWS_SES_CONFIGURATION_SET: {{ key "edxapp/ses-configuration-set" }}  # ADDED KEY
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
@@ -193,7 +194,7 @@ CERT_QUEUE: certificates
 CMS_BASE: {{ key "edxapp/studio-domain" }}  # MODIFIED
 ENABLE_CODEJAIL_REST_SERVICE: true
 CODE_JAIL_REST_SERVICE_HOST: http://codejail.service.consul:8000
-COMMENTS_SERVICE_URL: http://forum.service.consul:4567 # MODIFIED
+COMMENTS_SERVICE_URL: http://forum.service.consul:4567  # MODIFIED
 COMPREHENSIVE_THEME_DIRS:
   - /openedx/themes/  # MODIFIED
 COMPREHENSIVE_THEME_LOCALE_PATHS: []
@@ -204,11 +205,10 @@ CORS_ORIGIN_WHITELIST:
   - https://{{ key "edxapp/studio-domain" }}
   - https://idp.mit.edu
 COURSES_WITH_UNSAFE_CODE: []
-COURSES_INVITE_ONLY: true
 COURSE_ABOUT_VISIBILITY_PERMISSION: see_exists
 COURSE_CATALOG_API_URL: http://localhost:8008/api/v1
 COURSE_CATALOG_URL_ROOT: http://localhost:8008
-COURSE_CATALOG_VISIBILITY_PERMISSION: staff
+COURSE_CATALOG_VISIBILITY_PERMISSION: see_exists
 COURSE_MODE_DEFAULTS:
     android_sku: null
     bulk_sku: null
@@ -237,9 +237,8 @@ DEFAULT_FEEDBACK_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_FILE_STORAGE: storages.backends.s3boto3.S3Boto3Storage  # MODIFIED
 DEFAULT_FROM_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_MOBILE_AVAILABLE: false
-DEFAULT_SITE_THEME: mitx-staging  # MODIFIED - Using a generic name to simplify usage across deployments
+DEFAULT_SITE_THEME: mitx  # MODIFIED - Using a generic name to simplify usage across deployments
 DEPRECATED_ADVANCED_COMPONENT_TYPES: []
-
 EDXMKTG_USER_INFO_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-user-info
 {{ if keyOrDefault "edxapp/enable_notes" "false" | parseBool }}
 EDXNOTES_INTERNAL_API: https://{{ key "edx/notes-api-host" }}/api/v1
@@ -481,7 +480,7 @@ SOCIAL_SHARING_SETTINGS:
     CUSTOM_COURSE_URLS: false
     DASHBOARD_FACEBOOK: false
     DASHBOARD_TWITTER: false
-STATIC_ROOT_BASE: /openedx/staticfiles
+STATIC_ROOT_BASE: /edx/var/edxapp/staticfiles
 STATIC_URL_BASE: /static/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
@@ -584,4 +583,4 @@ EMAIL_USE_TLS: true
 ADMINS:
   - ["MITx Stacktrace Recipients", "cuddle-bunnies@mit.edu"]
 ALLOW_ALL_ADVANCED_COMPONENTS: true
-SYSADMIN_DEFAULT_BRANCH: master
+SYSADMIN_DEFAULT_BRANCH: live
