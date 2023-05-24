@@ -162,7 +162,6 @@ ignore = [
 ]
 typing-modules = ["colour.hints"]
 fixable = ["I", "D", "B", "E", "F", "UP", "C4", "Q", "RET", "PIE", "SIM","UP", "W", "RUF"]
-exclude = ["dockerfiles/openedx-edxapp/settings/*"]
 
 [tool.ruff.pydocstyle]
 convention = "pep257"
