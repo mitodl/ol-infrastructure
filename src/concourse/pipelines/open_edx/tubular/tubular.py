@@ -58,7 +58,7 @@ def tubular_pipeline() -> Pipeline:
                             "--output_dir",
                             f"{tubular_retirees.name}/processing",
                             "--cool_off_days",
-                            "5",
+                            "0",
                         ],
                     ),
                 ),
@@ -81,9 +81,11 @@ def tubular_pipeline() -> Pipeline:
                                 """\
                             import json
                             from pathlib import Path
-                            learner_dir = Path("{retirees_dir}/processing")
+                            learner_dir = Path("tubular-retirees/processing")
                             rfiles = learner_dir.glob("learner*")
-                            retirees = [ rfile.name for rfile in rfiles ]
+                            retirees = []
+                            for rfile in rfiles:
+                                retirees = [ rfile.read_text().split("=")[-1] ]
                             with open("retirees_dir/vars.json","w") as vj:
                                 vj.write(json.dumps(retirees))
                             """.format(
