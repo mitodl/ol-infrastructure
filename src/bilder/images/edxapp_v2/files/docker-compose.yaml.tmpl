@@ -9,12 +9,12 @@ services:
     - worker
     env_file:
     - ./.env
-    command: ["1000", "/openedx/data", "/openedx/media", /openedx/.ssh"]
+    command: ["1000", "/openedx/data", "/openedx/media", "/openedx/.ssh"]
     restart: on-failure
     volumes:
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
-    - ./.ssh/id_rsa:/openedx/.ssh/id_rsa
+    - ./ssh/id_rsa:/openedx/.ssh/id_rsa
   cms-permissions:
     image: overhangio/openedx-permissions:${TUTOR_PERMISSIONS_TAG}
     profiles:
@@ -22,12 +22,12 @@ services:
     - worker
     env_file:
     - ./.env
-    command: ["1000", "/openedx/data", "/openedx/media", /openedx/.ssh"]
+    command: ["1000", "/openedx/data", "/openedx/media", "/openedx/.ssh"]
     restart: on-failure
     volumes:
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
-    - ./.ssh/id_rsa:/openedx/.ssh/id_rsa
+    - ./ssh/id_rsa:/openedx/.ssh/id_rsa
 
   lms-migrations:
     image:  mitodl/edxapp:${EDXAPP_DOCKER_TAG}
@@ -102,7 +102,7 @@ services:
     - ./settings/uwsgi.ini:/openedx/edx-platform/uswsgi.ini:ro
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
-    - ./.ssh/id_rsa:/openedx/.ssh/id_rsa:ro
+    - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
     depends_on:
       lms-migrations:
         condition: service_completed_successfully
@@ -122,7 +122,7 @@ services:
     - ./settings/uwsgi.ini:/openedx/edx-platform/uswsgi.ini:ro
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
-    - ./.ssh/id_rsa:/openedx/.ssh/id_rsa:ro
+    - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
     depends_on:
       cms-migrations:
         condition: service_completed_successfully
@@ -145,7 +145,7 @@ services:
     - ./settings/uwsgi.ini:/openedx/edx-platform/uswsgi.ini:ro
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
-    - ./.ssh/id_rsa:/openedx/.ssh/id_rsa:ro
+    - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
     depends_on:
       lms-migrations:
         condition: service_completed_successfully
@@ -167,7 +167,7 @@ services:
     - ./settings/uwsgi.ini:/openedx/edx-platform/uswsgi.ini:ro
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
-    - ./.ssh/id_rsa:/openedx/.ssh/id_rsa:ro
+    - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
     depends_on:
       cms-migrations:
         condition: service_completed_successfully
