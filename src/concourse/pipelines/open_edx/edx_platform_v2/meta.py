@@ -22,12 +22,6 @@ pipeline_code = git_repo(
     uri="https://github.com/mitodl/ol-infrastructure",
     # TODO MD 20230512 Fix to main branch one testing completed
     branch="md/edxapp_docker_migration",
-    paths=[
-        "src/bridge/settings/openedx/",
-        "src/concourse/lib/",
-        "src/concourse/pipelines/open_edx/edx_platform_v2",
-        "dockerfiles/openedx-edxapp",
-    ],
 )
 
 
