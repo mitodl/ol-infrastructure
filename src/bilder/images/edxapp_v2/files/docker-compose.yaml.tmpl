@@ -9,12 +9,11 @@ services:
     - worker
     env_file:
     - ./.env
-    command: ["1000", "/openedx/data", "/openedx/media", "/openedx/.ssh"]
+    command: ["1000", "/openedx/data", "/openedx/media"]
     restart: on-failure
     volumes:
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
-    - ./ssh/id_rsa:/openedx/.ssh/id_rsa
   cms-permissions:
     image: overhangio/openedx-permissions:${TUTOR_PERMISSIONS_TAG}
     profiles:
@@ -22,12 +21,11 @@ services:
     - worker
     env_file:
     - ./.env
-    command: ["1000", "/openedx/data", "/openedx/media", "/openedx/.ssh"]
+    command: ["1000", "/openedx/data", "/openedx/media"]
     restart: on-failure
     volumes:
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
-    - ./ssh/id_rsa:/openedx/.ssh/id_rsa
 
   lms-migrations:
     image:  mitodl/edxapp:${EDXAPP_DOCKER_TAG}
