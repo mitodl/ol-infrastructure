@@ -30,6 +30,7 @@ def consul_template_permissions(
                 # consul-template creates it. If the mask isn't re-calc'd
                 # consul-template will lose its ability to manage the file
                 # despite the acl as the effective perms will become ---
+                # Helpful link: https://askubuntu.com/q/257896
                 f"setfacl --mask -R -m u:consul-template:rwx {filename.parent}",
                 f"setfacl --mask -R -d -m u:consul-template:rwx {filename.parent}",
             ],
