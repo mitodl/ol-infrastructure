@@ -25,8 +25,12 @@ def consul_template_permissions(
         server.shell(
             commands=[
                 # Recursively add read/write permissions for consul-template to
-                # directory
-                f"setfacl -R -m u:consul-template:rwx {filename.parent}",
-                f"setfacl -R -d -m u:consul-template:rwx {filename.parent}",
+                # directory. Additionally re-calc the mask as well for
+                # specific cases where file ownership may be modified after
+                # consul-template creates it. If the mask isn't re-calc'd
+                # consul-template will lose its ability to manage the file
+                # despite the acl as the effective perms will become ---
+                f"setfacl --mask -R -m u:consul-template:rwx {filename.parent}",
+                f"setfacl --mask -R -d -m u:consul-template:rwx {filename.parent}",
             ],
         )
