@@ -120,11 +120,14 @@ edxapp_vpc = network_stack.require_output(target_vpc)
 edxapp_vpc_id = edxapp_vpc["id"]
 data_vpc = network_stack.require_output("data_vpc")
 data_integrator_secgroup = data_vpc["security_groups"]["integrator"]
+
+framework = "docker" if edxapp_config.get("use_docker") else "ansible"
 ami_filters = [
     ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
     ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
     ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
     ec2.GetAmiFilterArgs(name="tag:openedx_release", values=[openedx_release]),
+    ec2.GetAmiFilterArgs(name="tag:framework", values=[framework]),
 ]
 edxapp_web_ami = ec2.get_ami(
     filters=[ec2.GetAmiFilterArgs(name="name", values=["edxapp-web-*"]), *ami_filters],
@@ -139,6 +142,7 @@ edxapp_worker_ami = ec2.get_ami(
     most_recent=True,
     owners=[aws_account.account_id],
 )
+
 edxapp_zone = dns_stack.require_output(edxapp_config.require("dns_zone"))
 edxapp_zone_id = edxapp_zone["id"]
 kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
