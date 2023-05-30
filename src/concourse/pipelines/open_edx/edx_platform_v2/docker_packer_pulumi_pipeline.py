@@ -19,6 +19,7 @@ from concourse.lib.models.pipeline import (
     TaskStep,
 )
 from concourse.lib.resources import git_repo, registry_image
+from concourse.lib.jobs.infrastructure import packer_jobs
 
 from bridge.settings.openedx.accessors import (
     filter_deployments_by_release,
@@ -38,9 +39,8 @@ def build_edx_pipeline(release_name: str) -> Pipeline:
         paths=["dockerfiles/openedx-edxapp"],
     )
 
-    # Get the various edx theme repos for each release
-
     container_fragments = []
+    packer_fragments = []
     for deployment in filter_deployments_by_release(release_name):
         theme_git_resources = []
         theme_get_steps = []
@@ -71,6 +71,24 @@ def build_edx_pipeline(release_name: str) -> Pipeline:
         edx_platform_git_resources.append(edx_platform_git_resource)
         edx_platform_get_steps.append(
             GetStep(get=edx_platform_git_resource.name, trigger=False)
+        )
+
+        edx_ami_code = git_repo(
+            name=Identifier(f"edxapp-custom-image-{deployment.deployment_name}"),
+            uri="https://github.com/mitodl/ol-infrastructure",
+            # TODO MD 20230512 Fix to main branch once testing completed
+            branch="md/edxapp_docker_migration",
+            paths=[
+                "src/bridge/settings/openedx/",
+                "src/bilder/components/",
+                "src/bilder/images/edxapp/deploy.py",
+                "src/bilder/images/edxapp/group_data/",
+                "src/bilder/images/edxapp/templates/vector/",
+                f"src/bilder/images/edxapp/templates/edxapp/{deployment.deployment_name}/",  # noqa: E501
+                "src/bilder/images/edxapp/custom_install.pkr.hcl",
+                f"src/bilder/images/edxapp/packer_vars/{deployment.deployment_name}.pkrvars.hcl",  # noqa: E501
+                f"src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl",  # noqa: E501
+            ],
         )
 
         edx_registry_image_resource = registry_image(
@@ -168,6 +186,7 @@ def build_edx_pipeline(release_name: str) -> Pipeline:
                 resources=[
                     edx_docker_code,
                     edx_registry_image_resource,
+                    edx_ami_code,
                     *theme_git_resources,
                     *edx_platform_git_resources,
                 ],
@@ -175,7 +194,31 @@ def build_edx_pipeline(release_name: str) -> Pipeline:
             )
         )
 
-    combined_fragments = PipelineFragment.combine_fragments(*container_fragments)
+        packer_fragments.append(
+            packer_jobs(
+                dependencies=[
+                    GetStep(
+                        trigger=False,
+                        passed=[edx_registry_image_resource.name],
+                    ),
+                ],
+                image_code=edx_ami_code,
+                packer_template_path="src/bilder/images/edxapp_v2/custom_install.pkr.hcl",  # noqa: E501
+                node_types=["web", "worker"],
+                extra_packer_params={
+                    "only": ["amazon-ebs.edxapp"],
+                    "var_files": [
+                        f"{edx_ami_code.name}/src/bilder/images/edxapp_v2/packer_vars/{release_name}.pkrvars.hcl",  # noqa: E501
+                        f"{edx_ami_code.name}/src/bilder/images/edxapp_v2/packer_vars/{deployment.deployment_name}.pkrvars.hcl",  # noqa: E501
+                    ],
+                },
+                job_name_suffix=deployment.deployment_name,
+            )
+        )
+
+    combined_fragments = PipelineFragment.combine_fragments(
+        *container_fragments, *packer_fragments
+    )
     return Pipeline(
         resource_types=combined_fragments.resource_types,
         resources=[
