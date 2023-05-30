@@ -213,7 +213,7 @@ def build_edx_pipeline(release_name: str) -> Pipeline:
                         f"{edx_ami_code.name}/src/bilder/images/edxapp_v2/packer_vars/{deployment.deployment_name}.pkrvars.hcl",  # noqa: E501
                     ],
                 },
-                job_name_suffix=deployment.deployment_name,
+                job_name_suffix=f"{release_name}-{deployment.deployment_name}",
             )
         )
 
