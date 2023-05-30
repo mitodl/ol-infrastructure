@@ -83,6 +83,7 @@ source "amazon-ebs" "edxapp" {
     OU              = var.business_unit
     app             = local.app_name
     deployment      = var.installation_target
+    framework       = "ansible"
     purpose         = "${local.app_name}-${var.node_type}"
     openedx_release = var.openedx_release
   }
