@@ -1,5 +1,4 @@
-# -*- mode: yaml -*-
-{{ with secret "secret-mitx/mongodb-edxapp" }}
+{{ with secret "secret-mitxonline/mongodb-edxapp" }}
 mongodb_settings: &mongo_params
   authsource: admin
   host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
@@ -11,7 +10,7 @@ mongodb_settings: &mongo_params
   ssl: {{ keyOrDefault "mongodb/use-ssl" "false" }}
 {{ end }}
 
-{{ with secret "mariadb-mitx/creds/edxapp" }}
+{{ with secret "mariadb-mitxonline/creds/edxapp" }}
 mysql_creds: &mysql_creds
   ENGINE: django.db.backends.mysql
   HOST: {{ keyOrDefault "edxapp/rds-host" "edxapp-db.service.consul" }}
@@ -20,12 +19,9 @@ mysql_creds: &mysql_creds
   PASSWORD: {{ .Data.password }}
 {{ end }}
 
-{{ with secret "secret-mitx/edxapp" }}
-CANVAS_ACCESS_TOKEN: {{ .Data.canvas_access_token }}
+{{ with secret "secret-mitxonline/edxapp" }}
 CELERY_BROKER_PASSWORD: {{ .Data.redis_auth_token }}
-EMAIL_HOST_PASSWORD: {{ .Data.email_password }}
-EMAIL_HOST_USER: {{ .Data.email_username }}
-FERNET_KEYS: {{ .Data.fernet_keys }}  # MODIFIED KEY - Needs to be an array
+FERNET_KEYS: {{ .Data.fernet_keys }}
 redis_cache_config: &redis_cache_config
   BACKEND: django_redis.cache.RedisCache
   LOCATION: rediss://default@edxapp-redis.service.consul:6379/0
@@ -35,11 +31,11 @@ redis_cache_config: &redis_cache_config
     PASSWORD: {{ .Data.redis_auth_token }}
 SECRET_KEY: {{ .Data.django_secret_key }}
 JWT_AUTH:  # NEEDS ATTENTION
-    JWT_AUDIENCE: mitx
+    JWT_AUDIENCE: mitxonline
     JWT_AUTH_COOKIE: {{ env "ENVIRONMENT"}}-edx-jwt-cookie
     JWT_AUTH_COOKIE_HEADER_PAYLOAD: {{ env "ENVIRONMENT" }}-edx-jwt-cookie-header-payload
     JWT_AUTH_COOKIE_SIGNATURE: {{ env "ENVIRONMENT" }}-edx-jwt-cookie-signature
-    JWT_ISSUER: https://{{ key "edxapp/lms-domain" }}/oauth2
+    JWT_ISSUER: 'https://{{ key "edxapp/lms-domain" }}/oauth2'
     JWT_LOGIN_CLIENT_ID: login-service-client-id
     JWT_LOGIN_SERVICE_USERNAME: login_service_user
     JWT_PRIVATE_SIGNING_JWK: '{{ .Data.private_signing_jwk }}'
@@ -48,22 +44,18 @@ JWT_AUTH:  # NEEDS ATTENTION
     JWT_SIGNING_ALGORITHM: RS512
     JWT_ISSUERS:
       - ISSUER: https://{{ key "edxapp/lms-domain" }}/oauth2
-        AUDIENCE: mitx
+        AUDIENCE: mitxonline
         SECRET_KEY: {{ .Data.django_secret_key }}
+RETIRED_USER_SALTS: {{ .Data.user_retirement_salts }}
 SENTRY_DSN: {{ .Data.sentry_dsn }}
-SOCIAL_AUTH_SAML_SP_PRIVATE_KEY: '{{ .Data.saml_private_key }}'
-SOCIAL_AUTH_SAML_SP_PUBLIC_CERT: '{{ .Data.saml_public_cert }}'
-SYSADMIN_GITHUB_WEBHOOK_KEY: {{ .Data.sysadmin_git_webhook_secret }}
-YOUTUBE_API_KEY: {{ .Data.youtube_api_key }}
-{{ end }}
-{{ with secret "secret-mitx/edx-xqueue" }}
 XQUEUE_INTERFACE:
     django_auth:
-        password: {{ .Data.edxapp_password }}
+        password: {{ .Data.xqueue_edxapp_password }}
         username: edxapp
     url: http://xqueue.service.consul:8040  # MODIFIED
 {{ end }}
-{{ with secret "secret-mitx/edx-forum" }}
+
+{{ with secret "secret-mitxonline/edx-forum" }}
 COMMENTS_SERVICE_KEY: {{ .Data.forum_api_key }}
 {{ end }}
 
@@ -89,7 +81,7 @@ DATABASES:
     NAME: edxapp_csmh
     OPTIONS:
       charset: utf8mb4
-    {{ with secret "mariadb-mitx/creds/edxapp-csmh"}}
+    {{ with secret "mariadb-mitxonline/creds/edxapp-csmh"}}
     PASSWORD: {{ .Data.password }}
     USER: {{ .Data.username }}
     {{ end }}
@@ -127,7 +119,7 @@ AUTH_PASSWORD_VALIDATORS:
         max_length: 75
 AWS_ACCESS_KEY_ID: "" # MODIFIED - not setting as we will use IAM Instance Profiles
 # AWS_QUERYSTRING_AUTH: false
-AWS_S3_CUSTOM_DOMAIN: {{ key "edxapp/s3-storage-bucket" }}.s3.amazonaws.com  # MODIFIED
+AWS_S3_CUSTOM_DOMAIN: {{ key "edxapp/s3-storage-bucket" }}.s3.amazonaws.com
 AWS_SECRET_ACCESS_KEY: ""  # MODIFIED - not setting as we will use IAM Instance Profiles
 AWS_SES_CONFIGURATION_SET: {{ key "edxapp/ses-configuration-set" }}  # ADDED KEY
 AWS_SES_REGION_ENDPOINT: email.us-east-1.amazonaws.com
@@ -172,7 +164,6 @@ CACHES:  # MODIFIED
     staticfiles:
       <<: *redis_cache_config
       KEY_PREFIX: staticfiles
-CANVAS_BASE_URL: {{ key "edxapp/canvas-url" }}
 CELERYBEAT_SCHEDULER: redbeat.RedBeatScheduler  # MODIFIED
 CELERY_BROKER_HOSTNAME: edxapp-redis.service.consul:6379  # MODIFIED
 CELERY_BROKER_TRANSPORT: rediss  # MODIFIED - second "s" indicates "secure"
@@ -192,35 +183,25 @@ CERTIFICATE_TEMPLATE_LANGUAGES:
     es: Español
 CERT_QUEUE: certificates
 CMS_BASE: {{ key "edxapp/studio-domain" }}  # MODIFIED
+CONTACT_US_ENABLE: false
 ENABLE_CODEJAIL_REST_SERVICE: true
 CODE_JAIL_REST_SERVICE_HOST: http://codejail.service.consul:8000
 COMMENTS_SERVICE_URL: http://forum.service.consul:4567  # MODIFIED
 COMPREHENSIVE_THEME_DIRS:
-  - /openedx/themes/  # MODIFIED
+- /openedx/themes/  # MODIFIED
 COMPREHENSIVE_THEME_LOCALE_PATHS: []
 CONTACT_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 CORS_ORIGIN_ALLOW_ALL: false
 CORS_ORIGIN_WHITELIST:
   - https://{{ key "edxapp/lms-domain" }}
   - https://{{ key "edxapp/studio-domain" }}
-  - https://idp.mit.edu
+  - https://{{ key "edxapp/preview-domain" }}
+  - https://{{ key "edxapp/marketing-domain" }}
 COURSES_WITH_UNSAFE_CODE: []
 COURSE_ABOUT_VISIBILITY_PERMISSION: see_exists
 COURSE_CATALOG_API_URL: http://localhost:8008/api/v1
 COURSE_CATALOG_URL_ROOT: http://localhost:8008
-COURSE_CATALOG_VISIBILITY_PERMISSION: see_exists
-COURSE_MODE_DEFAULTS:
-    android_sku: null
-    bulk_sku: null
-    currency: usd
-    description: null
-    expiration_datetime: null
-    ios_sku: null
-    min_price: 0
-    name: Honor
-    sku: null
-    slug: honor
-    suggested_prices: ''
+COURSE_CATALOG_VISIBILITY_PERMISSION: staff
 COURSE_IMPORT_EXPORT_BUCKET: {{ key "edxapp/s3-course-bucket" }}  # MODIFIED
 CREDENTIALS_INTERNAL_SERVICE_URL: http://localhost:8005
 CREDENTIALS_PUBLIC_SERVICE_URL: http://localhost:8005
@@ -237,8 +218,9 @@ DEFAULT_FEEDBACK_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_FILE_STORAGE: storages.backends.s3boto3.S3Boto3Storage  # MODIFIED
 DEFAULT_FROM_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_MOBILE_AVAILABLE: false
-DEFAULT_SITE_THEME: mitx  # MODIFIED - Using a generic name to simplify usage across deployments
+DEFAULT_SITE_THEME: mitxonline  # MODIFIED
 DEPRECATED_ADVANCED_COMPONENT_TYPES: []
+
 EDXMKTG_USER_INFO_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-user-info
 {{ if keyOrDefault "edxapp/enable_notes" "false" | parseBool }}
 EDXNOTES_INTERNAL_API: https://{{ key "edx/notes-api-host" }}/api/v1
@@ -256,7 +238,7 @@ ELASTIC_SEARCH_CONFIG_ES7:
 - host: {{ keyOrDefault "elasticsearch/host" "elasticsearch.service.consul" }}
   port: 443
   use_ssl: true
-EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend  # MODIFIED
+EMAIL_BACKEND: django_ses.SESBackend  # MODIFIED
 # EMAIL_HOST: localhost
 # EMAIL_HOST_PASSWORD: ''
 # EMAIL_HOST_USER: ''
@@ -269,23 +251,20 @@ FACEBOOK_API_VERSION: v2.1
 FACEBOOK_APP_ID: FACEBOOK_APP_ID
 FACEBOOK_APP_SECRET: FACEBOOK_APP_SECRET
 FEATURES:
-    ASSUME_ZERO_GRADE_IF_ABSENT_FOR_ALL_TESTS: true
+    ALLOW_COURSE_STAFF_GRADE_DOWNLOADS: true # ADDED KEY
+    ALLOW_PUBLIC_ACCOUNT_CREATION: true
     AUTH_USE_OPENID_PROVIDER: true
     AUTOMATIC_AUTH_FOR_TESTING: false
     CUSTOM_COURSES_EDX: false
     EMBARGO: true  # ADDED KEY
     ENABLE_BULK_ENROLLMENT_VIEW: false
+    ENABLE_BULK_USER_RETIREMENT: true
     ENABLE_COMBINED_LOGIN_REGISTRATION: true
     ENABLE_CORS_HEADERS: true  # MODIFIED
     ENABLE_COUNTRY_ACCESS: false
     ENABLE_CREDIT_API: false
     ENABLE_CREDIT_ELIGIBILITY: false
     ENABLE_CROSS_DOMAIN_CSRF_COOKIE: true  # MODIFIED
-    ENABLE_COURSEWARE_INDEX: true
-    ENABLE_COURSEWARE_SEARCH: true
-    ENABLE_CONTENT_LIBRARY_INDEX: true
-    ENABLE_LIBRARY_AUTHORING_MICROFRONTEND: true
-    ENABLE_LIBRARY_INDEX: true
     ENABLE_CSMH_EXTENDED: true
     ENABLE_DISCUSSION_HOME_PANEL: true
     ENABLE_DISCUSSION_SERVICE: true
@@ -296,7 +275,7 @@ FEATURES:
     ENABLE_GIT_AUTO_EXPORT: true  # ADDED KEY
     ENABLE_GRADE_DOWNLOADS: true
     ENABLE_INSTRUCTOR_ANALYTICS: false
-    ENABLE_LTI_PROVIDER: true  # MODIFIED
+    ENABLE_LTI_PROVIDER: false
     ENABLE_MKTG_SITE: false
     ENABLE_MOBILE_REST_API: true
     ENABLE_NEW_BULK_EMAIL_EXPERIENCE: true  # ADDED KEY
@@ -306,46 +285,13 @@ FEATURES:
     ENABLE_SPECIAL_EXAMS: true # MODIFIED FOR PROCTORTRACK
     ENABLE_THIRD_PARTY_AUTH: true
     ENABLE_UNICODE_USERNAME: true  # ADDED KEY
+    ENABLE_V2_CERT_DISPLAY_SETTINGS: true # ADDED KEY
     ENABLE_VIDEO_UPLOAD_PIPELINE: true # MODIFIED
     MILESTONES_APP: true # ADDED KEY FOR PROCTORTRACK
     PREVIEW_LMS_BASE: {{ key "edxapp/preview-domain" }}  # MODIFIED
     SHOW_FOOTER_LANGUAGE_SELECTOR: false
     SHOW_HEADER_LANGUAGE_SELECTOR: false
     SKIP_EMAIL_VALIDATION: true # ADDED KEY
-    ALLOW_PUBLIC_ACCOUNT_CREATION: true
-    # FEATURES From Residential
-    ALLOW_ALL_ADVANCED_COMPONENTS: true
-    ALLOW_COURSE_STAFF_GRADE_DOWNLOADS: true
-    BYPASS_ACTIVATION_EMAIL_FOR_EXTAUTH: true
-    CERTIFICATES_ENABLED: false
-    DISABLE_HONOR_CERTIFICATES: true
-    DISABLE_LOGIN_BUTTON: false
-    ENABLE_AUTO_COURSE_REGISTRATION: true
-    ENABLE_CANVAS_INTEGRATION: true
-    ENABLE_COURSE_BLOCKS_NAVIGATION_API: true
-    ENABLE_INSTRUCTOR_BACKGROUND_TASKS: true
-    ENABLE_INSTRUCTOR_EMAIL: true
-    ENABLE_INSTRUCTOR_LEGACY_DASHBOARD: true
-    ENABLE_INSTRUCTOR_REMOTE_GRADEBOOK_CONTROLS: true
-    ENABLE_PAID_COURSE_REGISTRATION: false
-    ENABLE_PREREQUISITE_COURSES: true
-    ENABLE_RENDER_XBLOCK_API: true
-    ENABLE_SHOPPING_CART: true
-    ENABLE_THIRD_PARTY_ONLY_AUTH: true
-    REQUIRE_COURSE_EMAIL_AUTH: false
-    REROUTE_ACTIVATION_EMAIL: mitx-support@mit.edu
-    RESTRICT_ENROLL_BY_REG_METHOD: false
-    RESTRICT_ENROLL_SOCIAL_PROVIDERS:
-    - mit-kerberos
-    SESSION_COOKIE_SECURE: true
-    ALLOW_COURSE_RERUNS: true
-    ALLOW_HIDING_DISCUSSION_TAB: true
-    DISABLE_COURSE_CREATION: true
-    DISABLE_START_DATES: false # DEFAULT
-    ENABLE_EXPORT_GIT: true
-    ENABLE_GIT_AUTO_EXPORT: true
-    SEGMENT_IO: false
-    STAFF_EMAIL: mitx-support@mit.edu
 FEEDBACK_SUBMISSION_EMAIL: ''
 FILE_UPLOAD_STORAGE_BUCKET_NAME: {{ key "edxapp/s3-storage-bucket" }}
 FILE_UPLOAD_STORAGE_PREFIX: submissions_attachments
@@ -369,6 +315,7 @@ HELP_TOKENS_BOOKS:
 ICP_LICENSE: null
 ICP_LICENSE_INFO: {}
 IDA_LOGOUT_URI_LIST:
+  - https://{{ key "edxapp/marketing-domain" }}/logout
   - https://{{ key "edxapp/studio-domain" }}/logout
 ID_VERIFICATION_SUPPORT_LINK: ''
 INTEGRATED_CHANNELS_API_CHUNK_TRANSMISSION_LIMIT:
@@ -386,14 +333,24 @@ LOGIN_REDIRECT_WHITELIST:  # MODIFIED
   - {{ key "edxapp/studio-domain" }}
   - {{ key "edxapp/lms-domain" }}
   - {{ key "edxapp/preview-domain" }}
-LOG_DIR: /openedx/data/var/log/edx
+  - {{ key "edxapp/marketing-domain" }}
+LOG_DIR: /openedx/data/var/log/ed/openedx/data/var/log/edx
 MAINTENANCE_BANNER_TEXT: Sample banner message
+MARKETING_SITE_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support mitxonline-theme
+MARKETING_SITE_CHECKOUT_URL: https://{{ key "edxapp/marketing-domain" }}/cart/add/ # ADDED - to support mitxonline checkout
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
 MITXPRO_CORE_REDIRECT_ALLOW_RE_LIST: ["^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh)", "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"]  # ADDED VALUE
 MKTG_URLS: {}
-MKTG_URL_LINK_MAP: {}
+MKTG_URL_LINK_MAP:
+    TOS: tos
+    HONOR: honor
+    ABOUT: about
+    PRIVACY: privacy
+    ACCESSIBILITY: accessibility
+    HELP_CENTER: help-center
+MKTG_URL_OVERRIDES: {}
 MOBILE_STORE_URLS: {}
 ########################################################################################
 # Previously assumed to be unnecessary config as it duplicates code from               #
@@ -422,25 +379,30 @@ MODULESTORE:
                 default_class: xmodule.hidden_module.HiddenDescriptor
                 fs_root: /openedx/data/var/edxapp/data
                 render_template: common.djangoapps.edxmako.shortcuts.render_to_string
-ORA2_FILE_PREFIX: ora2  # MODIFIED
+ORA2_FILE_PREFIX: mitxonline/ora2  # MODIFIED
 PARTNER_SUPPORT_EMAIL: ''
 PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG:
     ENFORCE_COMPLIANCE_ON_LOGIN: false
 PASSWORD_RESET_SUPPORT_LINK: ''
 PAYMENT_SUPPORT_EMAIL: {{ key "edxapp/sender-email-address" }}  # MODIFIED
-PLATFORM_DESCRIPTION: MITx Residential # MODIFIED
+PLATFORM_DESCRIPTION: MITx Online # MODIFIED
 PLATFORM_FACEBOOK_ACCOUNT: http://www.facebook.com/YourPlatformFacebookAccount
-PLATFORM_NAME: MITx Residential  # MODIFIED
+PLATFORM_NAME: MITx Online  # MODIFIED
 PLATFORM_TWITTER_ACCOUNT: '@YourPlatformTwitterAccount'
 POLICY_CHANGE_GRADES_ROUTING_KEY: edx.lms.core.default
-PRESS_EMAIL: support@mitx.mit.edu # MODIFIED
+PRESS_EMAIL: support@mitxonline.mit.edu # MODIFIED
+{{ with secret "secret-mitxonline/edxapp" }}
 PROCTORING_BACKENDS:
-    DEFAULT: 'null'
+    DEFAULT: 'proctortrack'
+    'proctortrack':
+      'client_id': '{{ .Data.proctortrack_client_id }}'
+      'client_secret': '{{ .Data.proctortrack_client_secret }}'
+      'base_url': '{{ key "edxapp/proctortrack-base-url" }}'
     'null': {}
-    'proctortrack': {}
+PROCTORING_USER_OBFUSCATION_KEY: {{ .Data.proctortrack_user_obfuscation_key }}
+{{ end }}
 
-PROCTORING_SETTINGS:
-    MUST_BE_VERIFIED_TRACK: false
+PROCTORING_SETTINGS: {}
 REGISTRATION_EXTRA_FIELDS:
     city: hidden
     confirm_email: hidden
@@ -453,17 +415,26 @@ REGISTRATION_EXTRA_FIELDS:
     terms_of_service: hidden
     year_of_birth: optional
 RETIRED_EMAIL_DOMAIN: retired.invalid
-RETIRED_EMAIL_PREFIX: retired__user_
-RETIRED_USERNAME_PREFIX: retired__user_
-RETIRED_USER_SALTS:
-- OVERRIDE ME WITH A RANDOM VALUE
-- ROTATE SALTS BY APPENDING NEW VALUES
-RETIREMENT_SERVICE_WORKER_USERNAME: retirement_worker
+RETIRED_EMAIL_PREFIX: retired__user__
+RETIRED_USERNAME_PREFIX: retired__user__
+RETIREMENT_SERVICE_WORKER_USERNAME: retirement_service_worker
 RETIREMENT_STATES:
-- PENDING
-- ERRORED
-- ABORTED
-- COMPLETE
+    - PENDING
+    - RETIRING_FORUMS
+    - FORUMS_COMPLETE
+    - RETIRING_ENROLLMENTS
+    - ENROLLMENTS_COMPLETE
+    - RETIRING_NOTES
+    - NOTES_COMPLETE
+    - RETIRING_PROCTORING
+    - PROCTORING_COMPLETE
+    - RETIRING_LMS_MISC
+    - LMS_MISC_COMPLETE
+    - RETIRING_LMS
+    - LMS_COMPLETE
+    - ERRORED
+    - ABORTED
+    - COMPLETE
 SEGMENT_KEY: null
 SENTRY_ENVIRONMENT: {{ env "ENVIRONMENT" }}
 SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
@@ -485,6 +456,7 @@ STATIC_ROOT_BASE: /openedx/staticfiles
 STATIC_URL_BASE: /static/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
+SUPPORT_SITE_LINK: https://mitxonline.zendesk.com/hc/
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
 TIME_ZONE: America/New_York
@@ -515,6 +487,7 @@ XBLOCK_FS_STORAGE_BUCKET: null
 XBLOCK_FS_STORAGE_PREFIX: null
 XBLOCK_SETTINGS: {}
 X_FRAME_OPTIONS: DENY
+YOUTUBE_API_KEY: null
 ZENDESK_API_KEY: ''
 ZENDESK_CUSTOM_FIELDS: {}
 ZENDESK_GROUP_ID_MAPPING: {}
@@ -541,6 +514,14 @@ ZENDESK_USER: ''
 #######################################
 # SYSLOG_SERVER: ''
 
+#######################################
+# Not Using SAML For This Environment #
+#######################################
+# SOCIAL_AUTH_SAML_SP_PRIVATE_KEY: ''
+# SOCIAL_AUTH_SAML_SP_PRIVATE_KEY_DICT: {}
+# SOCIAL_AUTH_SAML_SP_PUBLIC_CERT: ''
+# SOCIAL_AUTH_SAML_SP_PUBLIC_CERT_DICT: {}
+
 ##############################
 # CAS Is No Longer Supported #
 ##############################
@@ -560,7 +541,7 @@ ZENDESK_USER: ''
 ##############################################
 # ECOMMERCE_API_SIGNING_KEY: SET-ME-PLEASE
 # ECOMMERCE_API_URL: http://localhost:8002/api/v2
-# ECOMMERCE_PUBLIC_URL_ROOT: http://localhost:8002
+ECOMMERCE_PUBLIC_URL_ROOT: {{ key "edxapp/lms-domain" }}  # MODIFIED
 
 #############################################
 # Deprecated settings that are no longer used #
@@ -575,13 +556,3 @@ ZENDESK_USER: ''
 #     AUDIENCE: SET-ME-PLEASE
 #     ISSUER: http://127.0.0.1:8000/oauth2
 #     SECRET_KEY: SET-ME-PLEASE
-
-TIME_ZONE_DISPLAYED_FOR_DEADLINES: America/New_York
-STUDENT_FILEUPLOAD_MAX_SIZE: 52428800
-EMAIL_HOST: outgoing.mit.edu
-EMAIL_PORT: 587
-EMAIL_USE_TLS: true
-ADMINS:
-  - ["MITx Stacktrace Recipients", "cuddle-bunnies@mit.edu"]
-ALLOW_ALL_ADVANCED_COMPONENTS: true
-SYSADMIN_DEFAULT_BRANCH: live
