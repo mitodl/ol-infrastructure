@@ -198,8 +198,9 @@ def build_edx_pipeline(release_name: str) -> Pipeline:
             packer_jobs(
                 dependencies=[
                     GetStep(
+                        get=edx_registry_image_resource.name,
                         trigger=False,
-                        passed=[edx_registry_image_resource.name],
+                        passed=[docker_build_job.name],
                     ),
                 ],
                 image_code=edx_ami_code,
