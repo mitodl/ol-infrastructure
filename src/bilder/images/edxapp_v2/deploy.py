@@ -269,6 +269,8 @@ consul_templates.append(
             '{{with secret "secret-operations/global/github-enterprise-ssh" }}'
             "{{ printf .Data.private_key }}{{ end }}"
         ),
+        group="1000",
+        user="1000",
         perms="0600",
         destination=ssh_key_file,
     )
