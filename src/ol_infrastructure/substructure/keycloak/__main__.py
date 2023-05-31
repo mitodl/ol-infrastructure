@@ -49,7 +49,7 @@ ol_platform_engineering_realm = keycloak.Realm(
     realm="ol-platform-engineering",
     reset_password_allowed=True,
     verify_email=True,
-    password_policy="upperCase(2) and digits(4) and length(30) and specialChars(4) and forceExpiredPasswordChange(365) and notUsername and notEmail",  # noqa: S106, E501
+    password_policy="upperCase(2) and digits(4) and length(30) and specialChars(4) and forceExpiredPasswordChange(365) and notUsername and notEmail",  # noqa: S106, E501 # pragma: allowlist secret
     security_defenses=keycloak.RealmSecurityDefensesArgs(
         brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(
             failure_reset_time_seconds=43200,
@@ -114,20 +114,5 @@ required_action_update_password = keycloak.RequiredAction(
     alias="UPDATE_PASSWORD",
     default_action=True,
     enabled=True,
-    opts=resource_options,
-)
-
-github_oauth_client_id = keycloak_config.require("github_oauth_client_id")
-github_oauth_client_secret = keycloak_config.require("github_oauth_client_secret")
-
-realm_identity_provider = keycloak.oidc.IdentityProvider(
-    "github-idp",
-    realm=ol_platform_engineering_realm.id,
-    alias="github-idp",
-    display_name="GitHub",
-    client_id=github_oauth_client_id,
-    client_secret=github_oauth_client_secret,
-    authorization_url=f"https://{env_name}.odl.mit.edu/auth/realm/ol-platform-engineering/github/endpoint",
-    token_url="https://tokenurl.com",  # noqa: S106
     opts=resource_options,
 )

@@ -12,8 +12,4 @@ config:
     secure: v1:D3r4nV78I5WwOPeq:11qN0BLRcgIZimjisckFz9Q2AA8hXdHubDQxjJHqeQ==
   keycloak:email_username:
     secure: v1:Uxscw7J8NqxO/NbK:NCGzgYTGRmeIovnjZyXrb6ztDW7levn0
-  keycloak:github_oauth_client_id:
-    secure: v1:wgw0MUKEPbWlmdVK:ebCCZ6V30JUVZRavQciR5tyMIkwq6coR4Q/TPIGjovI8rBCK
-  keycloak:github_oauth_client_secret:
-    secure: v1:6BcgqLEr4rfLHgGG:CElmtKU6KUdaHuxIIK1Beqj342493CR0EsJapJ1lCI/+4jWkGrh1xWK4mLAOpmCQLmQ3KemXvKo=
   keycloak:url: https://keycloak-qa.odl.mit.edu
