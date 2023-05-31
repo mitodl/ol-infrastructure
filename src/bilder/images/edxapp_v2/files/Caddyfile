@@ -1,5 +1,8 @@
 # Heavily inspired by and lifted from tutor
 # https://github.com/overhangio/tutor/blob/2e276cbb09c47e177bca6c0bcd44aee53bb5a0b6/tutor/templates/apps/caddy/Caddyfile
+#
+# This file and other files adapted from Tutor are covered by and subject to the AGPL-3
+# as a clause 5 'aggregate'.
 
 # These blank lines between the brackets are important ?
 {

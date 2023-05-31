@@ -1,5 +1,8 @@
 # Heavily inspired by Tutor from overhang.io
 
+# This file and other files adapted from Tutor are covered by and subject to the AGPL-3
+# as a clause 5 'aggregate'.
+
 # This dockerfile is not expected to work locally. Only executes correctly within the context
 # of its concourse pipeline.
 

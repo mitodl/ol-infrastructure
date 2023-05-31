@@ -129,8 +129,6 @@ ami_filters = [
     ec2.GetAmiFilterArgs(name="tag:openedx_release", values=[openedx_release]),
     ec2.GetAmiFilterArgs(name="tag:framework", values=[framework]),
 ]
-if edxapp_config.get("use_docker"):
-    ami_filters.append(ec2.GetAmiFilterArgs(name="tag:framework", values=["docker"]))
 edxapp_web_ami = ec2.get_ami(
     filters=[ec2.GetAmiFilterArgs(name="name", values=["edxapp-web-*"]), *ami_filters],
     most_recent=True,
@@ -1067,6 +1065,19 @@ def cloud_init_user_data_func(
                     }
                 ),
                 "owner": "consul:consul",
+            },
+            # There should be something that triggers this only if framework = docker
+            {
+                "path": "/etc/docker/compose/.env_caddy",
+                "content": textwrap.dedent(
+                    f"""\
+                    EDXAPP_LMS_URL={edxapp_domains["lms"]}
+                    EDXAPP_LMS_PREVIEW_URL={edxapp_domains["preview"]}
+                    EDXAPP_CMS_URL={edxapp_domains["studio"]}
+                    """
+                ),
+                "owner": "root:root",
+                "permissions": "0664",
             },
             {
                 "path": "/etc/default/vector",
