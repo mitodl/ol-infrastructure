@@ -46,6 +46,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
     packer_fragments = []
     group_configs = []
     for release_name in releases:
+        job_names = []
         for deployment in filter_deployments_by_release(release_name):
             theme_git_resources = []
             theme_get_steps = []
@@ -186,6 +187,8 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                 ],
             )
 
+            job_names.append(docker_build_job.name)
+
             container_fragments.append(
                 PipelineFragment(
                     resources=[
@@ -221,13 +224,15 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                     job_name_suffix=f"{release_name}-{deployment.deployment_name}",
                 )
             )
+            job_names.append(packer_fragments[-1].jobs[-1].name)
+            job_names.append(packer_fragments[-1].jobs[-2].name)
 
         combined_fragments = PipelineFragment.combine_fragments(
             *container_fragments, *packer_fragments
         )
         group_config = GroupConfig(
             name=f"{release_name}",
-            jobs=[job.name for job in combined_fragments.jobs],
+            jobs=job_names,
         )
         group_configs.append(group_config)
     return Pipeline(
@@ -241,7 +246,6 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
 
 
 if __name__ == "__main__":
-    # release_name = sys.argv[1]
     releases = [release_name.name for release_name in OpenEdxSupportedRelease]
     pipeline_json = build_edx_pipeline(releases).json(indent=1)
     with open("definition.json", "w") as definition:
