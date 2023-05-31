@@ -81,13 +81,13 @@ def build_edx_pipeline(release_name: str) -> Pipeline:
             paths=[
                 "src/bridge/settings/openedx/",
                 "src/bilder/components/",
-                "src/bilder/images/edxapp/deploy.py",
-                "src/bilder/images/edxapp/group_data/",
-                "src/bilder/images/edxapp/templates/vector/",
-                f"src/bilder/images/edxapp/templates/edxapp/{deployment.deployment_name}/",  # noqa: E501
-                "src/bilder/images/edxapp/custom_install.pkr.hcl",
-                f"src/bilder/images/edxapp/packer_vars/{deployment.deployment_name}.pkrvars.hcl",  # noqa: E501
-                f"src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl",  # noqa: E501
+                "src/bilder/images/edxapp_v2/deploy.py",
+                "src/bilder/images/edxapp_v2/group_data/",
+                "src/bilder/images/edxapp_v2/templates/vector/",
+                f"src/bilder/images/edxapp_v2/templates/edxapp/{deployment.deployment_name}/",  # noqa: E501
+                "src/bilder/images/edxapp_v2/custom_install.pkr.hcl",
+                f"src/bilder/images/edxapp_v2/packer_vars/{deployment.deployment_name}.pkrvars.hcl",  # noqa: E501
+                f"src/bilder/images/edxapp_v2/packer_vars/{release_name}.pkrvars.hcl",  # noqa: E501
             ],
         )
 
