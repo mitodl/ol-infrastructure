@@ -7,9 +7,8 @@
 import json
 from pathlib import Path
 
-import pulumi_github as github
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, StackReference, export
 from pulumi_aws import ec2, iam, s3
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
@@ -26,16 +25,6 @@ from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
-github_provider = github.Provider(
-    "github-provider",
-    owner=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))[  # noqa: F541
-        "owner"
-    ],
-    token=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))[  # noqa: F541
-        "token"
-    ],
-)
-github_options = ResourceOptions(provider=github_provider)
 bootcamps_config = Config("bootcamps")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -44,7 +33,7 @@ data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 aws_config = AWSBase(
     tags={
-        "OU": "open-courseware",
+        "OU": "bootcamps",
         "Environment": f"applications_{stack_info.env_suffix}",
         "Application": "bootcamps",
     }
@@ -68,7 +57,7 @@ bootcamps_storage_bucket = s3.Bucket(
                     "Effect": "Allow",
                     "Principal": {"AWS": "*"},
                     "Action": "s3:GetObject",
-                    "Resource": f"arn:aws:s3:::{bootcamps_storage_bucket_name}/courses/*",
+                    "Resource": f"arn:aws:s3:::{bootcamps_storage_bucket_name}/courses/*",  # noqa: E501
                 }
             ],
         }
