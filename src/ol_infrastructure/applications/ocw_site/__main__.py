@@ -475,6 +475,13 @@ for purpose in ("draft", "live"):
                 name="Reroute Redirects",
                 type="error",
             ),
+            fastly.ServiceVclSnippetArgs(
+                content=snippets_dir.joinpath(
+                    "large_object_segmented_caching.vcl"
+                ).read_text(),
+                name="Segmented Caching",
+                type="recv",
+            ),
         ],
         logging_https=[
             fastly.ServiceVclLoggingHttpArgs(
