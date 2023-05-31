@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pulumi_github as github
 import pulumi_vault as vault
-from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
-from pulumi_aws import cloudwatch, ec2, iam, s3
+from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi_aws import ec2, iam, s3
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.secrets.sops import read_yaml_secrets
@@ -206,39 +206,6 @@ vault.generic.Secret(
     path=bootcamps_secrets.path.apply("{}/app-config".format),
     data_json=json.dumps(vault_secrets),
 )
-gh_repo = github.get_repository(
-    full_name="mitodl/bootcamps-hugo-projects", opts=InvokeOptions(provider=github_provider)
-)
-bootcamps_starter_webhook = github.RepositoryWebhook(
-    "bootcamps-hugo-project-sync-with-bootcamps-webhook",
-    repository=gh_repo.name,
-    events=["push"],
-    active=True,
-    configuration=github.RepositoryWebhookConfigurationArgs(
-        url="https://{}/api/starters/site_configs/".format(
-            bootcamps_config.require("app_domain")
-        ),
-        content_type="application/json",
-        secret=vault_secrets["github_shared_secret"],
-    ),
-    opts=github_options,
-)
-
-# Configure SNS Topic and Subscription
-bootcamps_sns_topic = sns.Topic(
-    f"bootcamps-{stack_info.env_suffix}-sns-topic", tags=aws_config.tags
-)
-
-bootcamps_sns_topic_subscription = sns.TopicSubscription(
-    "bootcamps-sns-topic-subscription",
-    endpoint="https://{}/api/transcode-jobs/".format(
-        bootcamps_config.require("app_domain")
-    ),
-    protocol="https",
-    raw_message_delivery=True,
-    topic=bootcamps_sns_topic.arn,
-)
-
 export(
     "bootcamps_app",
     {

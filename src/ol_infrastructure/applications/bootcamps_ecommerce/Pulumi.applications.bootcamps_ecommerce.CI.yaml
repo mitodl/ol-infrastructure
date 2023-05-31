@@ -1,2 +1,7 @@
 secretsprovider: awskms://alias/infrastructure-secrets-ci
-encryptedkey: AQICAHi+npazf3LfzV9oCtcYyCMYLOzaQhbo9xt6lJVVpz9tkQElhZMNgoUE8KIpbI3II1ItAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMYmRRMF4enB5au8YFAgEQgDu19QOkXR/l8J0aGdL9oBbWGLFRsrOuQyW712SSDkW2scOrIRkOU68F17kxhUiN7gzVtfnqo45Jc6oesQ==
+encryptedkey: AQICAHi+npazf3LfzV9oCtcYyCMYLOzaQhbo9xt6lJVVpz9tkQEWGDti2N/R8X9OTEyXDohiAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMs3ymWFJvoDmvxm3YAgEQgDvKovX7y4s+YrdRQCk8voIFjpavGtJsqqUiCX9OtvdeA5UPh+73j9i4qlEkwtEBQS9MsPJt5iPxKsGCAw==
+config:
+  bootcamps:db_password:
+    secure: v1:SIYLn1QgH44l5GBV:DwU+LauqvGbnUUPx0B+s0E8A2VHgBYFPadslIa11gapyzpZ/lPz7S+lL9k3dEmH3X8w7LJPO3PRpKDQ=
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

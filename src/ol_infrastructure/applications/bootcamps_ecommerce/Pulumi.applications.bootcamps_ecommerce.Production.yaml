@@ -1,2 +1,5 @@
 secretsprovider: awskms://alias/infrastructure-secrets-production
-encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgEy1aVFLDpzvkV2cZbUuN5EAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMu0prUOqG5gw7kxwpAgEQgDtDjHuIkKv3eEsdJNW3ynscSCc77swtO+ge5+1KdORkbE37XM+fqEM2u/KQXthadeEZqlnbLcGK0fKCyA==
+encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgF/5cQ+OxyJPAkWCuRdDviwAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMKH+nRuGZvoWM1HaAAgEQgDuioyF6MH5vrMssHZr14qm3ojCtiiOZe+2U+Tg+X6dyHHrADWwMicBTgF+rzXdrRhsLaNmof5ELd8c+QA==
+config:
+  bootcamps_ecommerce:vault.address: https://vault-production.odl.mit.edu
+  bootcamps_ecommerce:vault_address: https://vault-production.odl.mit.edu
