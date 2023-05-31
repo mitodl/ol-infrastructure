@@ -1,6 +1,5 @@
 import sys
 
-from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
@@ -25,23 +24,23 @@ pipeline_code = git_repo(
 )
 
 
-def build_meta_job(release_name):
-    if release_name == "meta":
+def build_meta_job(pipeline_name: str):
+    if pipeline_name == "meta":
         pipeline_definition_path = (
             "src/concourse/pipelines/open_edx/edx_platform_v2/meta.py"
         )
         pipeline_team = "main"
         pipeline_id = "self"
     else:
-        pipeline_definition_path = "src/concourse/pipelines/open_edx/edx_platform_v2/docker_packer_pulumi_pipeline.py"  # noqa: E501
+        pipeline_definition_path = "src/concourse/pipelines/open_edx/edx_platform_v2/grouped_docker_packer_pulumi_pipeline.py"  # noqa: E501
         pipeline_team = "infrastructure"
-        pipeline_id = f"docker-packer-pulumi-edxapp-{release_name}"
+        pipeline_id = f"docker-packer-pulumi-edxapp-{pipeline_name}"
     return Job(
-        name=Identifier(f"create-edxapp-{release_name}-docker-pipeline"),
+        name=Identifier(f"create-edxapp-{pipeline_name}-docker-pipeline"),
         plan=[
             GetStep(get=pipeline_code.name, trigger=True),
             TaskStep(
-                task=Identifier(f"generate-{release_name}-pipeline-definition"),
+                task=Identifier(f"generate-{pipeline_name}-pipeline-definition"),
                 config=TaskConfig(
                     platform=Platform.linux,
                     image_resource=AnonymousResource(
@@ -59,7 +58,6 @@ def build_meta_job(release_name):
                         user="root",
                         args=[
                             f"../{pipeline_code.name}/{pipeline_definition_path}",
-                            release_name,
                         ],
                     ),
                 ),
@@ -73,8 +71,7 @@ def build_meta_job(release_name):
     )
 
 
-meta_jobs = [build_meta_job(release_name) for release_name in OpenEdxSupportedRelease]
-meta_jobs.append(build_meta_job("meta"))
+meta_jobs = [build_meta_job("meta"), build_meta_job("global")]
 
 meta_pipeline = Pipeline(resources=[pipeline_code], jobs=meta_jobs)
 
