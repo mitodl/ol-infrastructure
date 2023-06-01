@@ -71,9 +71,7 @@
     }
 }
 
-# default listener for AWS LB
 :443 {
-    handle_path /user_api/v1/account/login_session/ {
-        import proxy "lms:8000"
-    }
+    reverse_proxy "lms:8080"
+    tls /etc/caddy/certificate /etc/caddy/key
 }
