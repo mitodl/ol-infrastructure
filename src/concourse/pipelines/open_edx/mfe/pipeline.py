@@ -46,6 +46,7 @@ class OpenEdxVars(BaseModel):
     site_name: str
     studio_domain: str
     support_url: str
+    schedule_email_section: Optional[str]
     trademark_text: Optional[str]
     honor_code_url: Optional[str]
     terms_of_service_url: str
@@ -86,6 +87,7 @@ def mfe_params(
         "SITE_NAME": open_edx.site_name,
         "STUDIO_BASE_URL": f"https://{open_edx.studio_domain}",
         "SUPPORT_URL": f"https://{open_edx.support_url}",
+        "SCHEDULE_EMAIL_SECTION": open_edx.schedule_email_section,
         "TRADEMARK_TEXT": open_edx.trademark_text,
         "USER_INFO_COOKIE_NAME": f"{open_edx.environment}-edx-user-info",
         "HONOR_CODE_URL": open_edx.honor_code_url,
