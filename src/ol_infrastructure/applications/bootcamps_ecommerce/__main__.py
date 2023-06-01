@@ -95,11 +95,6 @@ bootcamps_iam_policy = iam.Policy(
                         f"arn:aws:s3:::{bootcamps_storage_bucket_name}/*",
                     ],
                 },
-                {
-                    "Effect": "Allow",
-                    "Action": ["execute-api:Invoke", "execute-api:ManageConnections"],
-                    "Resource": "arn:aws:execute-api:*:*:*",
-                },
             ],
         },
         stringify=True,
@@ -140,17 +135,8 @@ bootcamps_db_security_group = ec2.SecurityGroup(
             security_groups=[data_vpc["security_groups"]["integrator"]],
         ),
     ],
-    egress=[
-        ec2.SecurityGroupEgressArgs(
-            from_port=0,
-            to_port=0,
-            protocol="-1",
-            cidr_blocks=["0.0.0.0/0"],
-            ipv6_cidr_blocks=["::/0"],
-        )
-    ],
     tags=aws_config.merged_tags(
-        {"name": "bootcamps-db-access-applications-{stack_info.env_suffix}"}
+        {"name": f"bootcamps-db-access-applications-{stack_info.env_suffix}"}
     ),
     vpc_id=apps_vpc["id"],
 )
@@ -169,7 +155,7 @@ bootcamps_db = OLAmazonDB(bootcamps_db_config)
 
 bootcamps_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=bootcamps_db_config.db_name,
-    mount_point=f"{bootcamps_db_config.engine}-bootcamps-applications-{stack_info.env_suffix}",  # noqa: E501
+    mount_point=f"{bootcamps_db_config.engine}-bootcamps",
     db_admin_username=bootcamps_db_config.username,
     db_admin_password=bootcamps_db_config.password.get_secret_value(),
     db_host=bootcamps_db.db_instance.address,
