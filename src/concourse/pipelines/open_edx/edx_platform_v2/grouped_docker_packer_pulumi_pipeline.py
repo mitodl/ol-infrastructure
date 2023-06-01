@@ -89,6 +89,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                     "src/bilder/components/",
                     "src/bilder/images/edxapp_v2/deploy.py",
                     "src/bilder/images/edxapp_v2/group_data/",
+                    "src/bilder/images/edxapp_v2/files/",
                     "src/bilder/images/edxapp_v2/templates/vector/",
                     f"src/bilder/images/edxapp_v2/templates/edxapp/{deployment.deployment_name}/",  # noqa: E501
                     "src/bilder/images/edxapp_v2/custom_install.pkr.hcl",
@@ -127,9 +128,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                         in_parallel=theme_get_steps
                         + edx_platform_get_steps
                         + [GetStep(get=edx_docker_code.name, trigger=False)]
-                    )
-                ]
-                + [
+                    ),
                     TaskStep(
                         task=Identifier("collect-code"),
                         config=TaskConfig(
