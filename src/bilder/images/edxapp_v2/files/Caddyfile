@@ -4,11 +4,8 @@
 # This file and other files adapted from Tutor are covered by and subject to the AGPL-3
 # as a clause 5 'aggregate'.
 
-# These blank lines between the brackets are important ?
 {
-
-
-
+    auto_https off
 }
 
 # proxy directive snippet (with logging) to be used as follows:
