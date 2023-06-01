@@ -97,6 +97,7 @@ mitxonline = [
         site_name="MITx Online QA",
         studio_domain="studio-qa.mitxonline.mit.edu",
         support_url="mitxonline.zendesk.com/hc/",
+        schedule_email_section="true",  # Because the communication MFE treats this boolean as string
         trademark_text="© MITx Online. All rights reserved except where noted.",
         honor_code_url="https://rc.mitxonline.mit.edu/honor-code/",
         terms_of_service_url="https://rc.mitxonline.mit.edu/terms-of-service/",
