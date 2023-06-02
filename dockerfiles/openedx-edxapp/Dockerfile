@@ -126,7 +126,6 @@ ENV UWSGI_WORKERS=2
 # DJANGO_SETTINGS_MODULE MUST be provided at runtime to control if we're a CMS or LMS
 ENV DJANGO_SETTINGS_MODULE="invalid"
 
-COPY --chown=app:app settings/uwsgi.ini /openedx/edx-platform
 COPY --chown=app:app settings/logsettings.py /openedx/edx-platform/openedx/core/lib
 
 # Setup known_hosts file for git-import-export-plugin

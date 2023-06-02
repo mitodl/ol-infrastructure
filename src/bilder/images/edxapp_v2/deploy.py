@@ -170,6 +170,7 @@ consul_templates: list[ConsulTemplateTemplate] = []
 # Firstly place down normal files requiring no special templating activities
 untemplated_files = {
     "Caddyfile": settings_directory,
+    "uwsgi.ini": settings_directory,
 }
 
 for ut_filename, dest_dir in untemplated_files.items():
