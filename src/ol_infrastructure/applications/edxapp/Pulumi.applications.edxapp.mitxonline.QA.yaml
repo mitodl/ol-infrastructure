@@ -19,6 +19,7 @@ config:
     secure: v1:IqXRArQveCV+9lkE:cRaraFuN2dDmI29PD4QifOU7MrRFdszOoaUb7o3pDJordt4TSjw8fIxldWfMzNhZRLC+NS291DorO1IuN6ASdCbt5d53aMvHVt+3hA6wyuI11OFjk7U=
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enable_notes: "True"
+  edxapp:enable_bulk_email_mfe: "True"
   edxapp:enabled_mfes:
     communications: communications
     course_authoring: course-authoring
