@@ -170,26 +170,6 @@ data_lake_policy_document = {
                 f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
             ],
         },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "lakeformation:StartTransaction",
-                "lakeformation:CommitTransaction",
-                "lakeformation:CancelTransaction",
-                "lakeformation:ExtendTransaction",
-                "lakeformation:DescribeTransaction",
-                "lakeformation:ListTransactions",
-                "lakeformation:StartQueryPlanning",
-                "lakeformation:GetQueryState",
-                "lakeformation:GetWorkUnitResults",
-                "lakeformation:GetWorkUnits",
-                "lakeformation:GetQueryStatistics",
-                "lakeformation:GetTableObjects",
-                "lakeformation:UpdateTableObjects",
-                "lakeformation:DeleteObjectsOnCancel",
-            ],
-            "Resource": "*",
-        },
     ],
 }
 data_lake_policy = iam.Policy(
@@ -202,6 +182,45 @@ data_lake_policy = iam.Policy(
         parliament_config=parliament_config,
     ),
     description="AWS access permissions to allow airbyte to use ol-data-lake-* buckets",
+)
+
+# Create IAM policy for Airbyte to read from S3 source buckets
+# TODO: Turn this into a stack reference after exporting the bucket names from the
+# edxapp Pulumi project. (TMM 2023-06-02)
+s3_source_buckets = [
+    f"{edxapp_deployment}-{stack_info.env_suffix}-edxapp-tracking"
+    for edxapp_deployment in ("mitxonline", "mitx", "mitx-staging", "xpro")
+]
+s3_source_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "s3:ListAllMyBuckets",
+            "Resource": "*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject*",
+                "s3:ListBucket*",
+            ],
+            "Resource": [
+                f"arn:aws:s3:::{bucket_name}" for bucket_name in s3_source_buckets
+            ]
+            + [f"arn:aws:s3:::{bucket_name}/*" for bucket_name in s3_source_buckets],
+        },
+    ],
+}
+s3_source_policy = iam.Policy(
+    "airbyte-s3-source-access-policy",
+    name_prefix="airbyte-s3-source-policy-",
+    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
+    policy=lint_iam_policy(
+        s3_source_policy_document,
+        stringify=True,
+    ),
+    description="AWS access permissions to access S3 buckets for data sources",
 )
 
 iam.RolePolicyAttachment(
@@ -217,6 +236,11 @@ iam.RolePolicyAttachment(
 iam.RolePolicyAttachment(
     f"airbyte-server-data-lake-access-policy-{env_name}",
     policy_arn=data_lake_policy.arn,
+    role=airbyte_server_instance_role.name,
+)
+iam.RolePolicyAttachment(
+    f"airbyte-server-s3-source-access-polic-{env_name}",
+    policy_arn=s3_source_policy.arn,
     role=airbyte_server_instance_role.name,
 )
 
@@ -282,6 +306,15 @@ airbyte_vault_mount = vault.Mount(
     options={"version": 2},
     description="Storage of configuration credentials used in Airbyte connections.",
     opts=ResourceOptions(delete_before_replace=True),
+)
+
+# Define a Vault role that can be used to generate credentials for the S3 source policy
+vault.aws.SecretBackendRole(
+    "airbyte-s3-source-vault-aws-role",
+    name="airbyte-sources",
+    backend="aws-mitx",
+    credential_type="iam_user",
+    policy_arns=[s3_source_policy.arn],
 )
 
 airbyte_vault_secrets = read_yaml_secrets(
