@@ -97,7 +97,7 @@ services:
     restart: unless-stopped
     volumes:
     - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
-    - ./settings/uwsgi.ini:/openedx/edx/platform/uwsgi.ini:ro
+    - ./settings/uwsgi.ini:/openedx/edx-platform/uwsgi.ini:ro
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
     - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
