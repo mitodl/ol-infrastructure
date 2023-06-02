@@ -5,14 +5,12 @@
 - Create an IAM policy to grant access to S3 and other resources
 """
 import json
-from pathlib import Path
 
 import pulumi_vault as vault
 from pulumi import Config, StackReference, export
 from pulumi_aws import ec2, iam, s3
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
-from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -169,18 +167,10 @@ bootcamps_vault_backend = OLVaultDatabaseBackend(bootcamps_vault_backend_config)
 bootcamps_secrets = vault.Mount(
     "bootcamps-vault-secrets-storage",
     path="secret-bootcamps",
-    type="kv-v2",
+    type="generic",
     description="Static secrets storage for the bootcamps application",
 )
 
-vault_secrets = read_yaml_secrets(
-    Path(f"bootcamps/bootcamps.{stack_info.env_suffix}.yaml")
-)
-vault.generic.Secret(
-    "bootcamps-vault-secrets",
-    path=bootcamps_secrets.path.apply("{}/app-config".format),
-    data_json=json.dumps(vault_secrets),
-)
 export(
     "bootcamps_app",
     {
