@@ -4,7 +4,6 @@
 - Create a PostgreSQL database in AWS RDS for production environments
 - Create an IAM policy to grant access to S3 and other resources
 """
-import json
 
 import pulumi_vault as vault
 from pulumi import Config, StackReference, export
@@ -46,19 +45,6 @@ bootcamps_storage_bucket = s3.Bucket(
     bucket=bootcamps_storage_bucket_name,
     versioning=s3.BucketVersioningArgs(
         enabled=True,
-    ),
-    policy=json.dumps(
-        {
-            "Version": "2008-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Principal": {"AWS": "*"},
-                    "Action": "s3:GetObject",
-                    "Resource": f"arn:aws:s3:::{bootcamps_storage_bucket_name}/courses/*",  # noqa: E501
-                }
-            ],
-        }
     ),
     tags=aws_config.tags,
 )
@@ -106,8 +92,8 @@ bootcamps_iam_policy = iam.Policy(
 )
 
 bootcamps_vault_backend_role = vault.aws.SecretBackendRole(
-    f"bootcamps-app-{stack_info.env_suffix}",
-    name=f"bootcamps-app-{stack_info.env_suffix}",
+    "bootcamps-app",
+    name="bootcamps-app",
     backend="aws-mitx",
     credential_type="iam_user",
     policy_arns=[bootcamps_iam_policy.arn],

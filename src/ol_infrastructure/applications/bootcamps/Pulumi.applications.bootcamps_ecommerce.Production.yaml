@@ -1,8 +1,0 @@
----
-secretsprovider: awskms://alias/infrastructure-secrets-production
-encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgF/5cQ+OxyJPAkWCuRdDviwAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMKH+nRuGZvoWM1HaAAgEQgDuioyF6MH5vrMssHZr14qm3ojCtiiOZe+2U+Tg+X6dyHHrADWwMicBTgF+rzXdrRhsLaNmof5ELd8c+QA==
-config:
-  bootcamps:db_password:
-    secure: v1:mKQZW5+6rQ82skp3:FZmwFW32OmgD9n/+HGp/aWBvc62lhZvEBopjiJ0NgVJM5x2YkmDdGGgVcFLqke4+kOWSnMBTAxrFe6g=
-  vault:address: https://vault-production.odl.mit.edu
-  vault_server:env_namespace: operations.production
