@@ -69,8 +69,8 @@ services:
       - "8080:8080"
     volumes:
       - "{{ context.traefik_directory}}/traefik.yaml:/etc/traefik/traefik.yaml:ro"
-      - {{ context.certificate_file }}:/etc/traefik/odl-wildcard.pem:ro
-      - {{ context.certificate_key_file }}:/etc/traefik/odl-wildcard-key.pem:ro
+      - "{{ context.certificate_file }}:/etc/traefik/odl-wildcard.pem:ro"
+      - "{{ context.certificate_key_file }}:/etc/traefik/odl-wildcard-key.pem:ro"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
   traefik-forward-auth:
     image: thomseddon/traefik-forward-auth:2
