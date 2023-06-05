@@ -190,6 +190,14 @@ files.put(
     dest=str(consul_templates_directory.joinpath(f".env.tmpl")),  # noqa: F541
     mode="0664",
 )
+
+files.put(
+    name="Place the traefik-forward-auth .env file.",
+    src=str(FILES_DIRECTORY.joinpath(f".env_traefik_forward_auth.tmpl")),  # noqa: F541
+    dest=str(consul_templates_directory.joinpath(".env_traefik_forward_auth.tmpl")),
+    mode="0664",
+)
+
 consul_templates.append(
     ConsulTemplateTemplate(
         source=str(consul_templates_directory.joinpath(f".env.tmpl")),  # noqa: F541
@@ -197,6 +205,18 @@ consul_templates.append(
     )
 )
 watched_docker_compose_files.append(str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env")))
+
+consul_templates.append(
+    ConsulTemplateTemplate(
+        source=str(
+            consul_templates_directory.joinpath(".env_traefik_forward_auth.tmpl")
+        ),
+        destination=str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth")),
+    )
+)
+watched_docker_compose_files.append(
+    str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth"))
+)
 
 ##################################################
 # Configure Consul and Vault
