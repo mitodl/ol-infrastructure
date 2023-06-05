@@ -67,4 +67,22 @@ managed_datasources:
     port: 5432
     sslmode: "require"
     user: '{{ .Data.username }}{{ end }}'
+- name: "Bootcamp Ecommerce"
+  type: pg
+  options:
+    dbname: "bootcamps"
+    host: '{{ keyOrDefault "redash/datasource_configs/bootcamps-pg-production/db_host" "missing" }}'
+    password: '{{ with secret "postgres-bootcamps/creds/readonly" }}{{ .Data.password }}'
+    port: 5432
+    sslmode: "require"
+    user: '{{ .Data.username }}{{ end }}'
+- name: "MicroMasters"
+  type: pg
+  options:
+    dbname: "micromasters"
+    host: '{{ keyOrDefault "redash/datasource_configs/bootcamps-production/db_host" "missing" }}'
+    password: '{{ with secret "postgres-micromasters/creds/readonly" }}{{ .Data.password }}'
+    port: 5432
+    sslmode: "require"
+    user: '{{ .Data.username }}{{ end }}'
 {{ end }}

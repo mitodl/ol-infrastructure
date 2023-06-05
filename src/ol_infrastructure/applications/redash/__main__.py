@@ -317,6 +317,8 @@ if redash_config.get_bool("manage_datasources"):
         f"applications.odl_video_service.{stack_info.name}"
     )
     ocw_studio_stack = StackReference(f"applications.ocw_studio.{stack_info.name}")
+    micromsters_stack = StackReference(f"applications.micromasters.{stack_info.name}")
+    bootcamps_stack = StackReference(f"applications.bootcamps.{stack_info.name}")
     if stack_info.name == "QA":
         datasource_config_consul_keys.append(
             consul.KeysKeyArgs(
@@ -350,6 +352,20 @@ if redash_config.get_bool("manage_datasources"):
                 path="redash/datasource_configs/xpro-pg-production/db_host",
                 # noqa: E501 MD 20230123 Can't find the pulumi stack associated with this datasource.
                 value="production-apps-rds-postgres-mitxpro.cbnm7ajau6mi.us-east-1.rds.amazonaws.com",
+            )
+        )
+        datasource_config_consul_keys.append(
+            consul.KeysKeyArgs(
+                path="redash/datasource_configs/bootcamps-pg-production/db_host",
+                # noqa: E501 MD 20230123 Can't find the pulumi stack associated with this datasource.
+                value=bootcamps_stack.require_output("bootcamps_app")["rds_host"],
+            )
+        )
+        datasource_config_consul_keys.append(
+            consul.KeysKeyArgs(
+                path="redash/datasource_configs/micromasters-pg-production/db_host",
+                # noqa: E501 MD 20230123 Can't find the pulumi stack associated with this datasource.
+                value=ocw_studio_stack.require_output("micromasters_app")["rds_host"],
             )
         )
     consul.Keys(
