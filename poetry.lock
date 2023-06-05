@@ -437,18 +437,19 @@ testing = ["flake8 (<5)", "pytest (>=6)", "pytest-black (>=0.3.7)", "pytest-chec
 
 [[package]]
 name = "copier"
-version = "7.2.0"
+version = "8.0.0"
 description = "A library for rendering project templates."
 category = "dev"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "copier-7.2.0-py3-none-any.whl", hash = "sha256:9f2546c085dd2ac0850467aa437f0c345d1ac056cade7358edffb642a3106052"},
-    {file = "copier-7.2.0.tar.gz", hash = "sha256:b6b3933efc6325da184d3940dd57e9869641798cad95f52d5cc193c9b443b313"},
+    {file = "copier-8.0.0-py3-none-any.whl", hash = "sha256:adad3b4c8101584ea2c2e2580e34f37e791940ae103e2480ae9f509d32e6cb0b"},
+    {file = "copier-8.0.0.tar.gz", hash = "sha256:a204c3aba22fd97ce69220ea378b924e30d516eca0e7885ab1857fde8b8dc5c5"},
 ]
 
 [package.dependencies]
 colorama = ">=0.4.3"
+decorator = ">=5.1.1"
 dunamai = ">=1.7.0"
 funcy = ">=1.17"
 jinja2 = ">=3.1.1"
@@ -532,6 +533,18 @@ toml = ">=0.10.0,<1.0.0"
 
 [package.extras]
 http = ["httpx"]
+
+[[package]]
+name = "decorator"
+version = "5.1.1"
+description = "Decorators for Humans"
+category = "dev"
+optional = false
+python-versions = ">=3.5"
+files = [
+    {file = "decorator-5.1.1-py3-none-any.whl", hash = "sha256:b8c3f85900b9dc423225913c5aace94729fe1fa9763b38939a95226f02d37186"},
+    {file = "decorator-5.1.1.tar.gz", hash = "sha256:637996211036b6385ef91435e4fae22989472f9d571faba8927ba8253acbc330"},
+]
 
 [[package]]
 name = "diagrams"
