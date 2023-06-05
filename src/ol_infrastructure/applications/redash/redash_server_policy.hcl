@@ -20,6 +20,15 @@ path "sys/leases/renew" {
 path "postgres-mitxonline/creds/readonly" {
   capabilities = ["read"]
 }
+
+path "postgres-micromasters/creds/readonly" {
+  capabilities = ["read"]
+}
+
+path "postgres-bootcamps/creds/readonly" {
+  capabilities = ["read"]
+}
+
 path "postgres-mitxonline/creds/readonly/*" {
   capabilities = ["read"]
 }
