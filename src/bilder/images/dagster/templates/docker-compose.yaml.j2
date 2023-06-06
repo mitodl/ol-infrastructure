@@ -9,6 +9,8 @@ services:
     - "3000:3000"
     env_file:
       - .env
+    labels:
+      - "traefik.enable=true"
   dagster-daemon:
     image: mitodl/data-platform-dagster-daemon:{{ context.dagster_version }}
     container_name: dagster-daemon
@@ -46,13 +48,38 @@ services:
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     env_file:
       - .env
-  nginx:
-    image: nginx
+  traefik:
+    image: traefik:latest
+    container_name: traefik
     restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entryPoints.http.address=:80"
+      - "--entryPoints.http.http.redirections.entryPoint.to=https"
+      - "--entryPoints.http.http.redirections.entryPoint.scheme=https"
+      - "--entryPoints.https.address=:443"
+      - "--log.level=WARN"
+      - "--accesslog=true"
+      - "--providers.file.filename=/etc/traefik/traefik.yml"
     ports:
-    - {{ context.listener_port }}:{{ context.listener_port }}
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
     volumes:
-    - {{ context.certificate_file }}:/etc/nginx/nginx.pem:ro
-    - {{ context.certificate_key_file }}:/etc/nginx/nginx-key.pem:ro
-    - {{ context.nginx_directory }}/nginx.conf:/etc/nginx/conf.d/dagster.conf:ro
-    - {{ context.nginx_directory }}/htpasswd:/etc/nginx/htpasswd:ro
+      - "{{ context.traefik_directory}}/traefik.yaml:/etc/traefik/traefik.yaml:ro"
+      - "{{ context.certificate_file }}:/etc/traefik/odl-wildcard.pem:ro"
+      - "{{ context.certificate_key_file }}:/etc/traefik/odl-wildcard-key.pem:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+  traefik-forward-auth:
+    image: thomseddon/traefik-forward-auth:2
+    container_name: traefik-forward-auth
+    restart: unless-stopped
+    env_file:
+      - .env_traefik_forward_auth
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.traefik-forward-auth.forwardauth.address=http://traefik-forward-auth:4181"
+      - "traefik.http.middlewares.traefik-forward-auth.forwardauth.authResponseHeaders=X-Forwarded-User"
+      - "traefik.http.services.traefik-forward-auth.loadbalancer.server.port=4181"

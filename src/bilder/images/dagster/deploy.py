@@ -116,54 +116,36 @@ for edx_pipeline in edx_pipeline_files:
     )
 
 ##################################################
-# Place NGINX configuration items
-nginx_conf_directory = Path("/etc/nginx")
-nginx_conf_template_file = consul_templates_directory.joinpath(
-    f"nginx.conf.tmpl"  # noqa: F541
+# Place Traefik configuration items
+traefik_conf_directory = Path("/etc/traefik")
+traefik_conf_template_file = consul_templates_directory.joinpath(
+    f"traefik.yml.tmpl"  # noqa: F541
 )
-nginx_conf_file = nginx_conf_directory.joinpath("nginx.conf")
+traefik_conf_file = traefik_conf_directory.joinpath("traefik.yml")
 
-nginx_htpasswd_file = nginx_conf_directory.joinpath("htpasswd")
-nginx_htpasswd_template_file = consul_templates_directory.joinpath("htpasswd.tmpl")
-
-certificate_file = nginx_conf_directory.joinpath("star.odl.mit.edu.crt")
-certificate_key_file = nginx_conf_directory.joinpath("star.odl.mit.edu.key")
+certificate_file = traefik_conf_directory.joinpath("star.odl.mit.edu.crt")
+certificate_key_file = traefik_conf_directory.joinpath("star.odl.mit.edu.key")
 
 files.directory(
-    name="Create NGINX directory",
-    path=str(nginx_conf_directory),
+    name="Create Traefik directory",
+    path=str(traefik_conf_directory),
     user="root",
     group="root",
     present=True,
 )
 files.put(
-    name="Create the NGINX configuration consul-template file.",
-    src=str(FILES_DIRECTORY.joinpath("nginx.conf.tmpl")),
-    dest=str(nginx_conf_template_file),
+    name="Create the Traefik configuration consul-template file.",
+    src=str(FILES_DIRECTORY.joinpath("traefik.yml.tmpl")),
+    dest=str(traefik_conf_template_file),
     mode="0664",
 )
 consul_templates.append(
     ConsulTemplateTemplate(
-        source=str(nginx_conf_template_file),
-        destination=str(nginx_conf_file),
+        source=str(traefik_conf_template_file),
+        destination=str(traefik_conf_file),
     )
 )
-watched_docker_compose_files.append(str(nginx_conf_file))
-
-
-files.put(
-    name="Create the NGINX htpasswd consul-template file.",
-    src=str(FILES_DIRECTORY.joinpath("htpasswd.tmpl")),
-    dest=str(nginx_htpasswd_template_file),
-    mode="0664",
-)
-consul_templates.append(
-    ConsulTemplateTemplate(
-        source=str(nginx_htpasswd_template_file),
-        destination=str(nginx_htpasswd_file),
-    )
-)
-watched_docker_compose_files.append(str(nginx_htpasswd_file))
+watched_docker_compose_files.append(str(traefik_conf_file))
 
 consul_templates.extend(
     [
@@ -189,7 +171,7 @@ docker_compose_context = {
     "listener_port": DEFAULT_HTTPS_PORT,
     "certificate_file": certificate_file,
     "certificate_key_file": certificate_key_file,
-    "nginx_directory": nginx_conf_directory,
+    "traefik_directory": traefik_conf_directory,
 }
 files.template(
     name="Place the dagster docker-compose.yaml file",
@@ -208,6 +190,14 @@ files.put(
     dest=str(consul_templates_directory.joinpath(f".env.tmpl")),  # noqa: F541
     mode="0664",
 )
+
+files.put(
+    name="Place the traefik-forward-auth .env file.",
+    src=str(FILES_DIRECTORY.joinpath(f".env_traefik_forward_auth.tmpl")),  # noqa: F541
+    dest=str(consul_templates_directory.joinpath(".env_traefik_forward_auth.tmpl")),
+    mode="0664",
+)
+
 consul_templates.append(
     ConsulTemplateTemplate(
         source=str(consul_templates_directory.joinpath(f".env.tmpl")),  # noqa: F541
@@ -215,6 +205,18 @@ consul_templates.append(
     )
 )
 watched_docker_compose_files.append(str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env")))
+
+consul_templates.append(
+    ConsulTemplateTemplate(
+        source=str(
+            consul_templates_directory.joinpath(".env_traefik_forward_auth.tmpl")
+        ),
+        destination=str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth")),
+    )
+)
+watched_docker_compose_files.append(
+    str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth"))
+)
 
 ##################################################
 # Configure Consul and Vault
