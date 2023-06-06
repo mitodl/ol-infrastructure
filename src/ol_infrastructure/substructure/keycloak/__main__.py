@@ -116,3 +116,15 @@ required_action_update_password = keycloak.RequiredAction(
     enabled=True,
     opts=resource_options,
 )
+
+# Create Dagster OIDC client
+keycloak_domain_name = keycloak_config.require("url")
+dagster_openid_client = keycloak.openid.Client(
+    "ol-dagster-client",
+    realm_id=ol_platform_engineering_realm.realm,
+    client_id="ol-dagster-client",
+    enabled=True,
+    access_type="CONFIDENTIAL",
+    valid_redirect_uris=[f"https://{keycloak_domain_name}/*"],
+    login_theme="keycloak",
+)
