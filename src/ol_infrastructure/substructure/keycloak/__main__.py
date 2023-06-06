@@ -125,6 +125,8 @@ dagster_openid_client = keycloak.openid.Client(
     client_id="ol-dagster-client",
     enabled=True,
     access_type="CONFIDENTIAL",
-    valid_redirect_uris=[f"https://{keycloak_domain_name}/*"],
+    standard_flow_enabled=True,
+    valid_redirect_uris=[f"{keycloak_domain_name}/*"],
     login_theme="keycloak",
+    opts=resource_options,
 )
