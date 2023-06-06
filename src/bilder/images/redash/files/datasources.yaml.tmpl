@@ -80,7 +80,7 @@ managed_datasources:
   type: pg
   options:
     dbname: "micromasters"
-    host: '{{ keyOrDefault "redash/datasource_configs/bootcamps-production/db_host" "missing" }}'
+    host: '{{ keyOrDefault "redash/datasource_configs/micromasters-pg-production/db_host" "missing" }}'
     password: '{{ with secret "postgres-micromasters/creds/readonly" }}{{ .Data.password }}'
     port: 5432
     sslmode: "require"
