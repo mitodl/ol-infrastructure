@@ -119,9 +119,9 @@ for edx_pipeline in edx_pipeline_files:
 # Place Traefik configuration items
 traefik_conf_directory = Path("/etc/traefik")
 traefik_conf_template_file = consul_templates_directory.joinpath(
-    f"traefik.yml.tmpl"  # noqa: F541
+    f"traefik.yaml.tmpl"  # noqa: F541
 )
-traefik_conf_file = traefik_conf_directory.joinpath("traefik.yml")
+traefik_conf_file = traefik_conf_directory.joinpath("traefik.yaml")
 
 certificate_file = traefik_conf_directory.joinpath("star.odl.mit.edu.crt")
 certificate_key_file = traefik_conf_directory.joinpath("star.odl.mit.edu.key")
@@ -135,7 +135,7 @@ files.directory(
 )
 files.put(
     name="Create the Traefik configuration consul-template file.",
-    src=str(FILES_DIRECTORY.joinpath("traefik.yml.tmpl")),
+    src=str(FILES_DIRECTORY.joinpath("traefik.yaml.tmpl")),
     dest=str(traefik_conf_template_file),
     mode="0664",
 )
