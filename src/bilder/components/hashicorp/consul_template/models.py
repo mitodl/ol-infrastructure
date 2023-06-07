@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from bilder.components.hashicorp.models import (
     FlexibleBaseModel,
@@ -226,6 +226,13 @@ class ConsulTemplateTemplate(FlexibleBaseModel):
     # The wait value for a template takes precedence over any globally-configured
     # wait.
     wait: Optional[str]
+    # These are the user and group ownerships of the rendered file. They can be
+    # specified in the form of username/group name or UID/GID. If left unspecified,
+    # Consul Template will preserve the ownerships of the existing file. If no file
+    # exists, the ownerships will default to the user running Consul Template. This
+    # option is not supported on Windows.
+    user: Optional[Union[str, int]]
+    group: Optional[Union[str, int]]
 
 
 class ConsulTemplateConfig(HashicorpConfig):
