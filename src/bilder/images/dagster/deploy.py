@@ -138,6 +138,8 @@ files.put(
     src=str(FILES_DIRECTORY.joinpath("traefik.yaml.tmpl")),
     dest=str(traefik_conf_template_file),
     mode="0664",
+    user="root",
+    group="root",
 )
 consul_templates.append(
     ConsulTemplateTemplate(
@@ -153,11 +155,15 @@ consul_templates.extend(
             contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
             "{{ printf .Data.key }}{{ end }}",
             destination=Path(certificate_key_file),
+            user="root",
+            group="root",
         ),
         ConsulTemplateTemplate(
             contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
             "{{ printf .Data.value }}{{ end }}",
             destination=Path(certificate_file),
+            user="root",
+            group="root",
         ),
     ]
 )
