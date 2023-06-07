@@ -27,13 +27,14 @@ signing_key: "{{ .Data.data.signing_key }}"
 
 # Generate 256 bit random keys  e.g. `head -c32 /dev/urandom | base64`
 cookie_secret: "{{ .Data.data.cookie_secret }}"
-
+timeout_read: 1800s
 routes:
 - from: "https://{{ .Data.data.application_address }}/"
   ## TODO: MAD 20220606 Need to come up with a way to paramartize this or making it more generic
   ## OR, perhaps this becomes the standard. If were going to expose an app frontend, it shall be named 'webapp'
   to: http://webapp:80
   pass_identity_headers: true
+  timeout: 1800s
   policy:
   - allow:
       or:
