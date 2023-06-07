@@ -6,11 +6,14 @@ services:
     container_name: dagit
     restart: unless-stopped
     ports:
-    - "3000:3000"
+    - ":3000"
     env_file:
       - .env
     labels:
       - "traefik.enable=true"
+      - "traefik.http.routers.dagit.rule=Host(`{{ key "data/dagster-hostname" }}`)"
+      - "traefik.http.routers.dagit.middlewares=traefik-forward-auth"
+      - "traefik.http.routers.dagit.tls=true"
   dagster-daemon:
     image: mitodl/data-platform-dagster-daemon:{{ context.dagster_version }}
     container_name: dagster-daemon
@@ -62,15 +65,15 @@ services:
       - "--entryPoints.https.address=:443"
       - "--log.level=WARN"
       - "--accesslog=true"
-      - "--providers.file.filename=/etc/traefik/traefik.yml"
+      - "--providers.file.filename=/etc/traefik/traefik.yaml"
     ports:
       - "80:80"
       - "443:443"
       - "8080:8080"
     volumes:
       - "{{ context.traefik_directory}}/traefik.yaml:/etc/traefik/traefik.yaml:ro"
-      - "{{ context.certificate_file }}:/etc/traefik/odl-wildcard.pem:ro"
-      - "{{ context.certificate_key_file }}:/etc/traefik/odl-wildcard-key.pem:ro"
+      - "{{ context.certificate_file }}:/etc/traefik/star.odl.mit.edu.crt:ro"
+      - "{{ context.certificate_key_file }}:/etc/traefik/star.odl.mit.edu.key:ro"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
   traefik-forward-auth:
     image: thomseddon/traefik-forward-auth:2
