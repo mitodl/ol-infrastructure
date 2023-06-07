@@ -357,14 +357,12 @@ if redash_config.get_bool("manage_datasources"):
         datasource_config_consul_keys.append(
             consul.KeysKeyArgs(
                 path="redash/datasource_configs/bootcamps-pg-production/db_host",
-                # noqa: E501 MD 20230123 Can't find the pulumi stack associated with this datasource.
                 value=bootcamps_stack.require_output("bootcamps_app")["rds_host"],
             )
         )
         datasource_config_consul_keys.append(
             consul.KeysKeyArgs(
                 path="redash/datasource_configs/micromasters-pg-production/db_host",
-                # noqa: E501 MD 20230123 Can't find the pulumi stack associated with this datasource.
                 value=micromasters_stack.require_output("micromasters_app")["rds_host"],
             )
         )
