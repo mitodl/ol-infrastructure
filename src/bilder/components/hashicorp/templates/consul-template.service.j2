@@ -11,6 +11,7 @@ ExecReload=/bin/kill -HUP $MAINPID
 KillSignal=SIGTERM
 User=consul-template
 Group=consul-template
+AmbientCapabilities=CAP_CHOWN CAP_FOWNER CAP_DAC_OVERRIDE CAP_KILL
 
 [Install]
 WantedBy=multi-user.target
