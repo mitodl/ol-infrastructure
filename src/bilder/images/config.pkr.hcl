@@ -1,6 +1,6 @@
 # metadata
 packer {
-  required_version = "~> 1.8.0"
+  required_version = "~> 1.9.0"
 
   required_plugins {
     amazon = {
