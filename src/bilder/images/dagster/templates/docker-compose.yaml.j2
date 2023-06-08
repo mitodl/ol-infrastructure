@@ -65,7 +65,7 @@ services:
       - "--entryPoints.https.address=:443"
       - "--log.level=WARN"
       - "--accesslog=true"
-      - "--providers.file.filename=/etc/traefik/traefik.yaml"
+      - "--providers.file.filename=/traefik/traefik.yaml"
     ports:
       - "80:80"
       - "443:443"
