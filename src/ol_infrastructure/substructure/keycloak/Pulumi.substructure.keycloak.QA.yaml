@@ -13,3 +13,5 @@ config:
   keycloak:email_username:
     secure: v1:Uxscw7J8NqxO/NbK:NCGzgYTGRmeIovnjZyXrb6ztDW7levn0
   keycloak:url: https://sso-qa.odl.mit.edu
+  keycloak:clients:
+    dagster: https://pipelines-qa.odl.mit.edu
