@@ -145,6 +145,8 @@ consul_templates.append(
     ConsulTemplateTemplate(
         source=str(traefik_conf_template_file),
         destination=str(traefik_conf_file),
+        user="root",
+        group="root",
     )
 )
 watched_docker_compose_files.append(str(traefik_conf_file))
