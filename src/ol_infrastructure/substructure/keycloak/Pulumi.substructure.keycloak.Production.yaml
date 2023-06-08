@@ -1,0 +1,17 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgF6LD3AC9aDhHZ8J3SdTKTrAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM7UqV4xkz6mym2LbAAgEQgDt2BFqcsnYAUr+fyvsAmQKTBuYpEHcraW8xU6+UrD/++MwqrkxANEP5lwmE4EnM+xuIb7KntcacHB9tgw==
+config:
+  keycloak:client_id:
+    secure: v1:dSDA5hz/hyCVG+iM:svRPv7tBwgaayQ02V45IVZexvk9NOctxe8VyFKtwMtL7+SOyVlE=
+  keycloak:client_secret:
+    secure: v1:S37V30SgVSa0wEB2:HutFnVORWyJk/Afb+AaptBvwK9wsUriAvouAA9+Jax/RmQPth1a8lzRKLsYZTiKL
+  keycloak:clients:
+    dagster: https://pipelines.odl.mit.edu
+  keycloak:email_host:
+    secure: v1:uUNy9qLfg9qhJMlW:mVTX4cHT2+WytQptDuB+uzIpA+UO4CSjVlDW4iHcF9E=
+  keycloak:email_password:
+    secure: v1:h2Nlf0N1QtabfvGs:VMm0V5UvkXyjNpJ0gQfcqCVcw35XHF7an1omtVfLqg==
+  keycloak:email_username:
+    secure: v1:qw0/egOdCOUJi9Vy:CtyFmcodURyRrv9pG9o9wY9J+N2r6IoC
+  keycloak:url: https://sso-production.odl.mit.edu
