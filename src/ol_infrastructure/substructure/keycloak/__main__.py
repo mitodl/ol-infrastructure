@@ -7,6 +7,7 @@ env_config = Config("environment")
 stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 keycloak_config = Config("keycloak")
+keycloak_clients = keycloak_config.require_object("clients")
 
 
 # Create a Keycloak provider cause we ran into an issue with pulumi reading
@@ -49,7 +50,7 @@ ol_platform_engineering_realm = keycloak.Realm(
     realm="ol-platform-engineering",
     reset_password_allowed=True,
     verify_email=True,
-    password_policy="upperCase(2) and digits(4) and length(30) and specialChars(4) and forceExpiredPasswordChange(365) and notUsername and notEmail",  # noqa: S106, E501 # pragma: allowlist secret
+    password_policy="upperCase(2) and digits(4) and length(30) and specialChars(4) and forceExpiredPasswordChange(365) and notUsername and notEmail",  # noqa: E501,S106 # pragma: allowlist secret
     security_defenses=keycloak.RealmSecurityDefensesArgs(
         brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(
             failure_reset_time_seconds=43200,
@@ -118,7 +119,7 @@ required_action_update_password = keycloak.RequiredAction(
 )
 
 # Create Dagster OIDC client
-dagster_domain_name = keycloak_config.require("url")
+dagster_domain_name = keycloak_clients["dagster"]
 dagster_openid_client = keycloak.openid.Client(
     "ol-dagster-client",
     realm_id=ol_platform_engineering_realm.realm,
