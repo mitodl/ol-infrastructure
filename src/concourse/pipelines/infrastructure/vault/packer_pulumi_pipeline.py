@@ -1,4 +1,8 @@
-from concourse.lib.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+from concourse.pipelines.constants import (
+    PULUMI_CODE_PATH,
+    PULUMI_WATCHED_PATHS,
+    PACKER_WATCHED_PATHS,
+)
 from concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from concourse.lib.models.fragment import PipelineFragment
 from concourse.lib.models.pipeline import (
@@ -18,9 +22,7 @@ vault_image_code = git_repo(
         "src/bilder/components/",
         "src/bilder/images/vault/",
         "src/bilder/components/hashicorp/",
-        "src/bilder/images/packer.pkr.hcl",
-        "src/bilder/images/variables.pkr.hcl",
-        "src/bilder/images/config.pkr.hcl",
+        *PACKER_WATCHED_PATHS,
     ],
 )
 vault_pulumi_code = git_repo(

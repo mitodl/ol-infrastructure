@@ -1,8 +1,8 @@
-from concourse.lib.constants import PULUMI_CODE_PATH
 from concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from concourse.lib.models.fragment import PipelineFragment
 from concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from concourse.lib.resources import git_repo
+from concourse.pipelines.constants import PACKER_WATCHED_PATHS, PULUMI_CODE_PATH
 
 # This job doesn't trigger automatically when a new version of Tika is released.
 # tika_version will need to be updated in src/bilder/components/tika/models.py
@@ -14,6 +14,7 @@ tika_image_code = git_repo(
         "src/bilder/components/",
         "src/bilder/images/tika/",
         "src/bridge/lib/versions.py",
+        *PACKER_WATCHED_PATHS,
     ],
 )
 

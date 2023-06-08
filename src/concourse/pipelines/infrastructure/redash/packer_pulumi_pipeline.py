@@ -1,4 +1,4 @@
-from concourse.lib.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+from concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from concourse.lib.models.fragment import PipelineFragment
 from concourse.lib.models.pipeline import GetStep, Identifier, Pipeline

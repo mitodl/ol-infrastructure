@@ -3,6 +3,7 @@ from concourse.lib.models.fragment import PipelineFragment
 from concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from concourse.lib.resource_types import hashicorp_resource
 from concourse.lib.resources import git_repo, github_release, hashicorp_release
+from concourse.pipelines.constants import PACKER_WATCHED_PATHS
 
 hashicorp_release_resource = hashicorp_resource()
 vector_release = github_release(Identifier("vector-release"), "vectordotdev", "vector")
@@ -23,6 +24,7 @@ docker_baseline_image_code = git_repo(
         "src/bilder/components/",
         "src/bilder/images/docker_baseline_ami/",
         "src/bridge/lib/versions.py",
+        *PACKER_WATCHED_PATHS,
     ],
 )
 

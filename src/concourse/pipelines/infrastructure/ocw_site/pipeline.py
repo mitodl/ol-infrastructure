@@ -1,4 +1,4 @@
-from concourse.lib.constants import PULUMI_CODE_PATH
+from concourse.pipelines.constants import PULUMI_CODE_PATH
 from concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from concourse.lib.models.pipeline import Identifier, Pipeline
 from concourse.lib.resources import git_repo

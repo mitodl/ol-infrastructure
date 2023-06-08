@@ -1,11 +1,15 @@
 import itertools
 
-from concourse.lib.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from concourse.lib.models.fragment import PipelineFragment
 from concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from concourse.lib.resource_types import hashicorp_resource
 from concourse.lib.resources import git_repo, hashicorp_release
+from concourse.pipelines.constants import (
+    PACKER_WATCHED_PATHS,
+    PULUMI_CODE_PATH,
+    PULUMI_WATCHED_PATHS,
+)
 
 consul_release = hashicorp_release(Identifier("consul-release"), "consul")
 consul_image_code = git_repo(
@@ -15,9 +19,7 @@ consul_image_code = git_repo(
         "src/bilder/components/",
         "src/bilder/images/consul/",
         "src/bilder/components/hashicorp/",
-        "src/bilder/images/packer.pkr.hcl",
-        "src/bilder/images/variables.pkr.hcl",
-        "src/bilder/images/config.pkr.hcl",
+        *PACKER_WATCHED_PATHS,
     ],
 )
 consul_pulumi_code = git_repo(

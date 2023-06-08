@@ -1,8 +1,12 @@
-from concourse.lib.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from concourse.lib.models.fragment import PipelineFragment
 from concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from concourse.lib.resources import git_repo, github_release
+from concourse.pipelines.constants import (
+    PACKER_WATCHED_PATHS,
+    PULUMI_CODE_PATH,
+    PULUMI_WATCHED_PATHS,
+)
 
 vector_release = github_release(Identifier("vector-release"), "vectordotdev", "vector")
 
@@ -13,6 +17,7 @@ vector_log_proxy_image_code = git_repo(
         "src/bilder/components/",
         "src/bilder/images/vector_log_proxy/",
         "src/bridge/lib/versions.py",
+        *PACKER_WATCHED_PATHS,
     ],
 )
 

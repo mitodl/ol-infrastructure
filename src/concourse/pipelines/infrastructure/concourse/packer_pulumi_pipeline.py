@@ -1,10 +1,14 @@
 import sys
 
-from concourse.lib.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from concourse.lib.models.fragment import PipelineFragment
 from concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from concourse.lib.resources import git_repo, github_release
+from concourse.pipelines.constants import (
+    PACKER_WATCHED_PATHS,
+    PULUMI_CODE_PATH,
+    PULUMI_WATCHED_PATHS,
+)
 
 #############
 # RESOURCES #
@@ -18,9 +22,7 @@ concourse_image_code = git_repo(
     paths=[
         "src/bilder/components/",
         "src/bilder/images/concourse",
-        "src/bilder/images/packer.pkr.hcl",
-        "src/bilder/images/variables.pkr.hcl",
-        "src/bilder/images/config.pkr.hcl",
+        *PACKER_WATCHED_PATHS,
     ],
 )
 
