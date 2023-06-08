@@ -103,6 +103,12 @@ files.put(
     src=io.StringIO(f"COMPOSE_PROFILES={node_type}"),
     dest="/etc/default/docker-compose",
 )
+files.line(
+    name=f"Setting COMPOSE_PROFILES variable to {node_type} in the default profile",
+    path="/etc/profile",
+    line=f"\nexport COMPOSE_PROFILES={node_type}",
+    present=True,
+)
 
 # Preload some docker images. This will accelerate the first startup
 server.shell(
@@ -208,6 +214,14 @@ consul_configuration = {
         services=[],
     )
 }
+
+# Add an inline consul-template for rendering the waffle_flags.yaml file
+consul_templates.append(
+    ConsulTemplateTemplate(
+        contents='{{ key "edxapp/waffle_flags.yaml" }}',
+        destination=settings_directory.joinpath("waffle_flags.yaml"),
+    )
+)
 
 # Create a few in-line consul templates for the wildcard certificate + key
 # but only do this on webnodes to limit distribution of secrets

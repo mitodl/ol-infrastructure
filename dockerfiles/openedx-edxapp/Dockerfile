@@ -91,6 +91,9 @@ COPY --chown=app:app settings/cms/i18n.not_py /openedx/edx-platform/cms/envs/mit
 COPY --chown=app:app settings/lms/docker-production.not_py /openedx/edx-platform/lms/envs/docker-production.py
 COPY --chown=app:app settings/cms/docker-production.not_py /openedx/edx-platform/cms/envs/docker-production.py
 
+# Copy in special waffle flag setting script
+COPY --chown=app:app settings/set_waffle_flags.not_py /openedx/edx-platform/set_waffle_flags.py
+
 FROM collected AS build-static-assets
 
 ENV REVISION_CFG /openedx/config/revisions.yml
