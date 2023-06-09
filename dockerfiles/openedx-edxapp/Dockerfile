@@ -87,10 +87,6 @@ COPY --chown=app:app settings/lms/i18n.not_py /openedx/edx-platform/lms/envs/mit
 COPY --chown=app:app settings/cms/assets.not_py /openedx/edx-platform/cms/envs/mitol/assets.py
 COPY --chown=app:app settings/cms/i18n.not_py /openedx/edx-platform/cms/envs/mitol/i18n.py
 
-# Olive is missing the docker-production environment for CMS so for now we will just drop in our own 'patch' for both
-COPY --chown=app:app settings/lms/docker-production.not_py /openedx/edx-platform/lms/envs/docker-production.py
-COPY --chown=app:app settings/cms/docker-production.not_py /openedx/edx-platform/cms/envs/docker-production.py
-
 # Copy in special waffle flag setting script
 COPY --chown=app:app settings/set_waffle_flags.not_py /openedx/edx-platform/set_waffle_flags.py
 
@@ -100,7 +96,7 @@ ENV REVISION_CFG /openedx/config/revisions.yml
 ENV LMS_CFG /openedx/config/lms.env.yml
 ENV CMS_CFG /openedx/config/cms.env.yml
 
-ENV DJANGO_SETTINGS_MODULE lms.envs.docker-production
+ENV DJANGO_SETTINGS_MODULE lms.envs.production
 ENV NO_PYTHON_UNINSTALL 1
 ENV NO_PREREQ_INSTALL 0
 
@@ -128,8 +124,6 @@ FROM build-static-assets AS final
 ENV UWSGI_WORKERS=2
 # DJANGO_SETTINGS_MODULE MUST be provided at runtime to control if we're a CMS or LMS
 ENV DJANGO_SETTINGS_MODULE="invalid"
-
-COPY --chown=app:app settings/logsettings.py /openedx/edx-platform/openedx/core/lib
 
 # Setup known_hosts file for git-import-export-plugin
 RUN mkdir /openedx/.ssh \
