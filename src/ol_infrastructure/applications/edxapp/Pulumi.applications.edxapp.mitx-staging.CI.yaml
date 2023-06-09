@@ -5,14 +5,14 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-staging-ci.odl.mit.edu
   edxapp:additional_waffle_flags:
-  - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everybody"]
-  - ["learner_home_mfe.enabled", "--create", "--superusers", "--everybody"]
+  - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
+  - ["learner_home_mfe.enabled", "--create", "--superusers", "--everyone"]
   - ["learner_recommendations.enable_dashboard_recommendations", "--create", "--superusers",
-    "--everybody"]
+    "--everyone"]
   - ["new_core_editors.use_new_problem_editor", "--create", "--superusers"]
-  - ["new_core_editors.use_new_text_editor", "--create", "--superusers", "--everybody"]
-  - ["new_core_editors.use_new_video_editor", "--create", "--superusers", "--everybody"]
-  - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everybody"]
+  - ["new_core_editors.use_new_text_editor", "--create", "--superusers", "--everyone"]
+  - ["new_core_editors.use_new_video_editor", "--create", "--superusers", "--everyone"]
+  - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
   edxapp:business_unit: residential-staging
   edxapp:db_password:
     secure: "v1:ZB90id7gJ0z4NB/r:S3dGQ6OhdFOl1VdJ8cMOyLTc1L/T36F3ULUBvwMi5XOpyCbRDSyPhxb1DXZQ75DMS8R54Qa8pYE="
