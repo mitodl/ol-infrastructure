@@ -1742,13 +1742,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-keycloak"
-version = "5.1.0"
+version = "5.2.0"
 description = "A Pulumi package for creating and managing keycloak cloud resources."
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=3.7"
 files = [
-    {file = "pulumi_keycloak-5.1.0.tar.gz", hash = "sha256:08bc795851f2e1257e18c874bd7faa484ef563d611967e5b6d5b43179caa22c9"},
+    {file = "pulumi_keycloak-5.2.0.tar.gz", hash = "sha256:4262a534b899bbc22c986dc9575efebc8c336b83216fe29e0a56237fb100aded"},
 ]
 
 [package.dependencies]
@@ -1758,13 +1758,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-mongodbatlas"
-version = "3.7.2"
+version = "3.8.1"
 description = "A Pulumi package for creating and managing mongodbatlas cloud resources."
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=3.7"
 files = [
-    {file = "pulumi_mongodbatlas-3.7.2.tar.gz", hash = "sha256:c561aabfd873a38661484890eba9375321be7fde6e678d84793ea9f9aa55407c"},
+    {file = "pulumi_mongodbatlas-3.8.1.tar.gz", hash = "sha256:65b15ac544a27b689da2753d374629a24d6e2eaa0b18ce2b67837fb135d80519"},
 ]
 
 [package.dependencies]
