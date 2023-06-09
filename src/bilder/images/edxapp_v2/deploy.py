@@ -121,6 +121,7 @@ server.shell(
 # Create skeleton directory structures for docker-compose
 data_directory = Path("/opt/data")
 media_directory = data_directory.joinpath("media")
+tracking_logs_directory = data_directory.joinpath("logs")
 settings_directory = DOCKER_COMPOSE_DIRECTORY.joinpath("settings")
 tls_directory = DOCKER_COMPOSE_DIRECTORY.joinpath("tls")
 ssh_directory = DOCKER_COMPOSE_DIRECTORY.joinpath("ssh")
@@ -167,6 +168,13 @@ files.directory(
     user="1000",
     group="1000",
     mode="0700",
+    present=True,
+)
+files.directory(
+    name="Create tracking logs directory",
+    path=tracking_logs_directory,
+    user="1000",
+    group="1000",
     present=True,
 )
 
