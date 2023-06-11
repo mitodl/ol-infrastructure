@@ -189,7 +189,7 @@ keycloak_db_config = OLPostgresDBConfig(
     security_groups=[keycloak_database_security_group],
     parameter_overrides=[],
     db_name="keycloak",
-    engine_version="12.8",
+    engine_version="12.15",
     tags=aws_config.tags,
     **rds_defaults,
 )
