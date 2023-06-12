@@ -32,7 +32,7 @@ COPY ./edx_platform /openedx/edx-platform
 
 ARG DEPLOYMENT_NAME="invalid"
 RUN pip install --user --no-cache-dir -r /root/$DEPLOYMENT_NAME-pkg-list -r /openedx/edx-platform/requirements/edx/base.txt
-RUN if [ "$DEPLOYMENT_NAME" = "mitxonline" ]; then pip remove --user --no-cache-dir "edx-name-affirmation"; fi
+RUN if [ "$DEPLOYMENT_NAME" = "mitxonline" ]; then pip uninstall --user --no-cache-dir "edx-name-affirmation"; fi
 
 WORKDIR /openedx/edx-platform
 ENV PATH /root/.local/bin:/openedx/nodeenv/bin:${PATH}
