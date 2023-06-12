@@ -31,8 +31,8 @@ concourse_pulumi_code = git_repo(
     uri="https://github.com/mitodl/ol-infrastructure",
     paths=[
         *PULUMI_WATCHED_PATHS,
-        "src/ol_infrastructure/applications/concourse/",
-        "src/bridge/secrets/concourse/",
+        "src/ol_infrastructure/applications/concourse",
+        "src/bridge/secrets/concourse",
     ],
 )
 
