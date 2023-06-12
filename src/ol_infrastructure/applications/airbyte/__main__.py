@@ -393,7 +393,6 @@ airbyte_db_config = OLPostgresDBConfig(
     parameter_overrides=[{"name": "rds.force_ssl", "value": 0}],
     tags=aws_config.tags,
     db_name="airbyte",
-    engine_version="12.7",
     **rds_defaults,
 )
 airbyte_db = OLAmazonDB(airbyte_db_config)

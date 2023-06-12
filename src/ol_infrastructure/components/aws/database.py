@@ -113,7 +113,7 @@ class OLPostgresDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to Postgres."""
 
     engine: str = "postgres"
-    engine_version: str = "13.4"
+    engine_version: str = "15.3"
     port: PositiveInt = PositiveInt(5432)
     parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [
         {"name": "client_encoding", "value": "UTF-8"},
@@ -127,7 +127,7 @@ class OLMariaDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to MariaDB."""
 
     engine: str = "mariadb"
-    engine_version: str = "10.5.13"
+    engine_version: str = "10.6.12"
     port: PositiveInt = PositiveInt(3306)
     parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [
         {"name": "character_set_client", "value": "utf8mb4"},
