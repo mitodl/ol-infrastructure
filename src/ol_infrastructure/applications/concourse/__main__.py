@@ -362,7 +362,7 @@ concourse_db_config = OLPostgresDBConfig(
     security_groups=[concourse_db_security_group],
     tags=aws_config.tags,
     db_name="concourse",
-    engine_version="12.7",
+    engine_version="12.14",
     **rds_defaults,
 )
 concourse_db = OLAmazonDB(concourse_db_config)
@@ -649,7 +649,9 @@ for worker_def in concourse_config.get_object("workers") or []:
             ec2.LaunchTemplateBlockDeviceMappingArgs(
                 device_name="/dev/xvda",
                 ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                    volume_size=worker_def["disk_size_gb"] or 25,
+                    iops=worker_def.get("disk_iops", 3000),
+                    throughput=worker_def.get("disk_throughput", 125),
+                    volume_size=worker_def.get("disk_size_gb", 250),
                     volume_type=DiskTypes.ssd,
                     delete_on_termination=True,
                 ),
