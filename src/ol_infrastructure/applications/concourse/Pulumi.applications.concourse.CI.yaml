@@ -26,7 +26,9 @@ config:
     aws_tags:
       OU: open-courseware
     concourse_team: ocw
-    disk_size_gb: 200
+    disk_size_gb: 100
+    disk_throughput: 125
+    disk_iops: 3000
     iam_policies:
     - base
     - ocw
