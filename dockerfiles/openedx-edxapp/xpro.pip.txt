@@ -1,0 +1,10 @@
+celery-redbeat  # Support for using Redis as the lock for Celery schedules
+django-redis  # Support for Redis caching in Django
+edx-sysadmin
+edx-username-changer==0.3.0
+mitxpro-openedx-extensions==1.0.0
+ol-openedx-logging
+ol-openedx-sentry
+ol-openedx-course-export
+social-auth-mitxpro==0.6.1
+git+https://github.com/ubc/ubcpi.git@1.0.0#egg=ubcpi-xblock

@@ -10,7 +10,7 @@ FROM --platform=linux/amd64 python:3.8.12-buster as base
 
 ENV DEBIAN_FRONTEND=noninteractive
 COPY ./apt-pkg-list /root
-COPY ./pip-pkg-list /root
+COPY ./*.pip.txt /root
 RUN apt update \
     && apt install -y --no-install-recommends $(cat /root/apt-pkg-list) \
     && apt autoremove -y \
@@ -29,7 +29,10 @@ RUN cd /tmp \
 FROM base as code
 # Expected to be run in concourse where the edx-platform code will come from a git resource @ edx_platform
 COPY ./edx_platform /openedx/edx-platform
-RUN pip install --user --no-cache-dir -r /root/pip-pkg-list -r /openedx/edx-platform/requirements/edx/base.txt
+
+ARG DEPLOYMENT_NAME="invalid"
+RUN pip install --user --no-cache-dir -r /root/$DEPLOYMENT_NAME-pkg-list -r /openedx/edx-platform/requirements/edx/base.txt
+RUN if [ "$DEPLOYMENT_NAME" = "mitxonline" ]; then pip remove --user --no-cache-dir "edx-name-affirmation"; fi
 
 WORKDIR /openedx/edx-platform
 ENV PATH /root/.local/bin:/openedx/nodeenv/bin:${PATH}

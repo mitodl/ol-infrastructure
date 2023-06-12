@@ -174,7 +174,9 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                             "CONTEXT": "ol-infrastructure-docker/dockerfiles/openedx-edxapp",  # noqa: E501
                             "TARGET": "final",
                         },
-                        build_args=[],
+                        build_args=[
+                            f"DEPLOYMENT_NAME={deployment.deployment_name}",
+                        ],
                     ),
                     PutStep(
                         put=edx_registry_image_resource.name,
@@ -253,6 +255,6 @@ if __name__ == "__main__":
     sys.stdout.writelines(
         {
             "\n",
-            "fly -t <target> set-pipeline -p grouped-docker-packer-pulumi-edxapp -c definition.json",  # noqa: E501
+            "fly -t <target> set-pipeline -p docker-packer-pulumi-edxapp-global -c definition.json",  # noqa: E501
         }
     )
