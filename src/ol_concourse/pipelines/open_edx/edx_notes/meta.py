@@ -21,19 +21,21 @@ pipeline_code = git_repo(
     name=Identifier("notes-pipeline-code"),
     uri="https://github.com/mitodl/ol-infrastructure",
     paths=[
-        "src/concourse/lib/",
-        "src/concourse/pipelines/open_edx/edx_notes/",
+        "src/ol_concourse/lib/",
+        "src/ol_concourse/pipelines/open_edx/edx_notes/",
     ],
 )
 
 
 def build_meta_job(release_name):
     if release_name == "meta":
-        pipeline_definition_path = "src/concourse/pipelines/open_edx/edx_notes/meta.py"
+        pipeline_definition_path = (
+            "src/ol_concourse/pipelines/open_edx/edx_notes/meta.py"
+        )
         pipeline_team = "main"
         pipeline_id = "self"
     else:
-        pipeline_definition_path = "src/concourse/pipelines/open_edx/edx_notes/docker_packer_pulumi_pipeline.py"  # noqa: E501
+        pipeline_definition_path = "src/ol_concourse/pipelines/open_edx/edx_notes/docker_packer_pulumi_pipeline.py"  # noqa: E501
         pipeline_team = "infrastructure"
         pipeline_id = f"docker-packer-pulumi-edx-notes-{release_name}"
     return Job(

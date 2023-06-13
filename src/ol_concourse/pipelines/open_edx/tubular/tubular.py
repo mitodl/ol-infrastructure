@@ -24,11 +24,11 @@ def tubular_pipeline() -> Pipeline:
         name=Identifier("tubular-pipeline-config"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
-        paths=["src/concourse/pipelines/open_edx/tubular/"],
+        paths=["src/ol_concourse/pipelines/open_edx/tubular/"],
     )
     tubular_build_schedule = schedule(Identifier("build-schedule"), interval="168h")
     tubular_retirees = Output(name=Identifier("tubular-retirees"))
-    tubular_config_path = f"{tubular_config_repo.name}/src/concourse/pipelines/open_edx/tubular/openedx-config.yml"  # noqa: E501
+    tubular_config_path = f"{tubular_config_repo.name}/src/ol_concourse/pipelines/open_edx/tubular/openedx-config.yml"  # noqa: E501
     tubular_job_object = Job(
         name=Identifier("deploy-tubular-world"),
         max_in_flight=1,  # Only allow 1 Pulumi task at a time since they lock anyway.

@@ -22,19 +22,21 @@ pipeline_code = git_repo(
     uri="https://github.com/mitodl/ol-infrastructure",
     paths=[
         "src/bridge/settings/openedx/",
-        "src/concourse/lib/",
-        "src/concourse/pipelines/open_edx/codejail/",
+        "src/ol_concourse/lib/",
+        "src/ol_concourse/pipelines/open_edx/codejail/",
     ],
 )
 
 
 def build_meta_job(release_name):
     if release_name == "meta":
-        pipeline_definition_path = "src/concourse/pipelines/open_edx/codejail/meta.py"
+        pipeline_definition_path = (
+            "src/ol_concourse/pipelines/open_edx/codejail/meta.py"
+        )
         pipeline_team = "main"
         pipeline_id = "self"
     else:
-        pipeline_definition_path = "src/concourse/pipelines/open_edx/codejail/docker_packer_pulumi_pipeline.py"  # noqa: E501
+        pipeline_definition_path = "src/ol_concourse/pipelines/open_edx/codejail/docker_packer_pulumi_pipeline.py"  # noqa: E501
         pipeline_team = "infrastructure"
         pipeline_id = f"docker-packer-pulumi-codejail-{release_name}"
     return Job(

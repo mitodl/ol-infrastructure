@@ -11,7 +11,7 @@ resources:
     - poetry.lock
     - Dockerfile
     - src/bridge
-    - src/concourse
+    - src/ol_concourse
 
 - name: ol-infrastructure-image
   type: registry-image
