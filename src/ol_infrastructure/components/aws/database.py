@@ -229,6 +229,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 opts=resource_options,
                 publicly_accessible=db_config.read_replica.public_access,
                 replicate_source_db=self.db_instance.id,
+                skip_final_snapshot=True,
                 storage_type=db_config.read_replica.storage_type.value,
                 storage_encrypted=True,
                 tags=db_config.tags,
