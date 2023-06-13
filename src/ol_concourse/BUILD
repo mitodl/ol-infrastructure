@@ -9,7 +9,7 @@ python_distribution(
         "./lib:concourse-libs",
     ],
     description="A Pythonic way to manage your Concourse pipelines",
-    interpreter_constraints=">=3.9",
+    interpreter_constraints=[">=3.9"],
     provides=python_artifact(
         name="ol-concourse",
         version="0.4.0",
