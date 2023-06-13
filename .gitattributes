@@ -1,5 +1,6 @@
 poetry.lock binary
 yarn.lock binary
+requirements.txt binary
 black.lockfile binary
 build-support-bin.lockfile binary
 flake8.lockfile binary
