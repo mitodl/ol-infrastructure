@@ -88,5 +88,5 @@ def create_systemd_service():
             Path(__file__).resolve().parent.joinpath("files", "docker-compose.service")
         ),
         dest="/usr/lib/systemd/system/docker-compose.service",
-        mode="755",
+        mode="644",
     )
