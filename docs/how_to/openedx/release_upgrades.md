@@ -134,7 +134,7 @@ deployment.
 ```
 
 All of the [deployment
-pipelines](https://github.com/mitodl/ol-infrastructure/blob/main/src/concourse/pipelines/open_edx/)
+pipelines](https://github.com/mitodl/ol-infrastructure/blob/main/src/ol_concourse/pipelines/open_edx/)
 for these application components are managed by a corresponding `meta` pipeline that
 will automatically update the build and pipeline configuration based on the changed
 version information as soon as it is merged into the `master` branch of

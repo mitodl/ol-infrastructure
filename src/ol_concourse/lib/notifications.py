@@ -12,7 +12,7 @@ def notification(
     """Generate a PutStep for sending notifications (to just slack, for now).
 
     :param resource: The slack_notification_resource object for the pipeline.
-        See src/concourse/lib/resources.py
+        See src/ol_concourse/lib/resources.py
     :param title: The text to send to slack as the 'title' of the notification. The bold
         main line.
     :param body: The text to send to slack as the 'body' of the notification. Additional

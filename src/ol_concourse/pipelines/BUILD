@@ -7,7 +7,7 @@ python_distribution(
     name="ol-concourse-pipelines",
     dependencies=[
         ":concourse-pipelines",
-        "src/concourse:ol-concourse",
+        "src/ol_concourse:ol-concourse",
     ],
     description="Concourse pipeline definitions used at MIT Open Learning",
     provides=python_artifact(

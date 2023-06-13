@@ -32,7 +32,7 @@ postgres_role_statements = {
         ),
         "revoke": Template(
             """REVOKE "${app_name}" FROM "{{name}}";
-          GRANT CREATE ON SCHEMA public TO ${app_name};
+          GRANT CREATE ON SCHEMA public TO ${app_name} WITH GRANT OPTION;
           GRANT "{{name}}" TO ${app_name} WITH ADMIN OPTION;
           SET ROLE ${app_name};
           REASSIGN OWNED BY "{{name}}" TO "${app_name}";
@@ -48,7 +48,7 @@ postgres_role_statements = {
         "create": Template(
             """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
             VALID UNTIL '{{expiration}}' IN ROLE "${app_name}" INHERIT;
-          GRANT CREATE ON SCHEMA public TO ${app_name};
+          GRANT CREATE ON SCHEMA public TO ${app_name} WITH GRANT OPTION;
           GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${app_name}"
              WITH GRANT OPTION;
           GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "${app_name}"

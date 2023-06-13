@@ -22,7 +22,7 @@ focus on the errors :)
 
 ## It Gets Easier - Building Pipelines in Python
 
-Thankfully, we have been spared the pain of coding pipelines in YAML by virtue of a [Python wrapper](https://github.com/mitodl/ol-infrastructure/tree/main/src/concourse)
+Thankfully, we have been spared the pain of coding pipelines in YAML by virtue of a [Python wrapper](https://github.com/mitodl/ol-infrastructure/tree/main/src/ol_concourse)
 that Tobias Macey wrote.
 
 Each YAML section is wrapped in a Python object. It's a 1 to 1 mapping because the Python models are auto-generated from the

@@ -107,7 +107,7 @@ I like to keep my target names reasonably short, so for the target I created for
 
 Once we have a suitable target defined, we can use it to actually create our pipeline for real:
 
-* From a checked out mitodl/ol-infrastructure repository, change directory to the `src/concourse/pipelines/open_edx/tubular` folder.
+* From a checked out mitodl/ol-infrastructure repository, change directory to the `src/ol_concourse/pipelines/open_edx/tubular` folder.
 * Run `poetry run python tubular.py` - This should print a reasonable looking blob of JSON to the screen with a fly command to run at the bottom.
 * Go ahead and run that command! For example, given the mo-qa target I defined above, I ran: `fly -t mo-qa sp -p misc-cloud-tubular -c definition.json`.
   * At this point fly should show you the pipeline definition and will ask you if you want to actually make the change. Answer yes.
