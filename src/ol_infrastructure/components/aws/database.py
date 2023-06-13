@@ -223,6 +223,7 @@ class OLAmazonDB(pulumi.ComponentResource):
         if db_config.read_replica:
             self.db_replica = rds.Instance(
                 f"{db_config.instance_name}-{db_config.engine}-replica",
+                final_snapshot_identifier=f"{db_config.instance_name}-{db_config.engine}-final-snapshot",  # noqa: E501
                 identifier=f"{db_config.instance_name}-replica",
                 instance_class=db_config.read_replica.instance_size,
                 kms_key_id=self.db_instance.kms_key_id,
