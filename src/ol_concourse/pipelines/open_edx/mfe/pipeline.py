@@ -123,7 +123,7 @@ def mfe_job(
         branding_overrides += textwrap.dedent(
             """\
 
-            npm install @edx/brand@git+https://git@github.com/mitodl/brand-mitol-residential#master --legacy-peer-deps"""  # noqa: E501
+            npm install @edx/brand@npm:@mitodl/brand-mitol-residential@latest --legacy-peer-deps"""  # noqa: E501
         )
     if previous_job and mfe_repo.name == previous_job.plan[0].get:
         clone_git_repo.passed = [previous_job.name]
