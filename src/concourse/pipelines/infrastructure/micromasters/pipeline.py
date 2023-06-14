@@ -1,7 +1,8 @@
-from concourse.pipelines.constants import PULUMI_CODE_PATH
-from concourse.lib.jobs.infrastructure import pulumi_jobs_chain
-from concourse.lib.models.pipeline import Identifier, Pipeline
-from concourse.lib.resources import git_repo
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH
+from ol_concourse.lib.models.fragment import PipelineFragment
+from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
+from ol_concourse.lib.models.pipeline import Identifier, Pipeline
+from ol_concourse.lib.resources import git_repo
 
 micromasters_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi-micromasters"),
@@ -25,10 +26,11 @@ pulumi_jobs = pulumi_jobs_chain(
     project_source_path=PULUMI_CODE_PATH.joinpath("applications/micromasters/"),
 )
 
+mm_fragment = PipelineFragment.combine_fragments(pulumi_jobs)
 micromasters_pipeline = Pipeline(
-    resources=[*pulumi_jobs.resources, micromasters_pulumi_code],
-    resource_types=pulumi_jobs.resource_types,
-    jobs=pulumi_jobs.jobs,
+    resources=[*mm_fragment.resources, micromasters_pulumi_code],
+    resource_types=mm_fragment.resource_types,
+    jobs=mm_fragment.jobs,
 )
 
 if __name__ == "__main__":
