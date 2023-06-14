@@ -119,7 +119,10 @@ def mfe_job(
         npm install @edx/frontend-component-footer@npm:@mitodl/frontend-component-footer-mitol@latest --legacy-peer-deps
         npm install @edx/frontend-component-header@npm:@mitodl/frontend-component-header-mitol@latest --legacy-peer-deps"""  # noqa: E501
     )
-    if open_edx.environment == "mitx-ci" and mfe_name == "frontend-app-learner-dashboard":
+    if (
+        open_edx.environment == "mitx-ci"
+        and mfe_name == "frontend-app-learner-dashboard"
+    ):
         branding_overrides += textwrap.dedent(
             """\
 
