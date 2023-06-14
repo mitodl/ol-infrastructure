@@ -119,7 +119,7 @@ RUN mkdir -p /openedx/data/var/edxapp/course_repos \
     && mkdir -p /openedx/data/var/log/edx
 
 RUN paver compile_sass --theme-dirs /openedx/themes/ \
-    && openedx-assets collect --settings=mitol.assets \
+    && openedx-assets collect --settings=mitol.assets --themes=$DEPLOYMENT_NAME \
     && rdfind -makesymlinks true -followsymlinks true /openedx/staticfiles/
 
 FROM build-static-assets AS final
