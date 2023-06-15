@@ -31,7 +31,7 @@ FROM base as code
 COPY ./edx_platform /openedx/edx-platform
 
 ARG DEPLOYMENT_NAME="invalid"
-RUN pip install --user --no-cache-dir -r /root/$DEPLOYMENT_NAME.pip.txt -r /openedx/edx-platform/requirements/edx/base.txt
+RUN pip install --user --no-cache-dir -r /openedx/edx-platform/requirements/edx/base.txt -r /root/$DEPLOYMENT_NAME.pip.txt
 RUN if [ "$DEPLOYMENT_NAME" = "mitxonline" ]; then pip uninstall --user --no-cache-dir "edx-name-affirmation"; fi
 
 WORKDIR /openedx/edx-platform
