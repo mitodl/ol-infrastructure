@@ -10,7 +10,7 @@ FROM --platform=linux/amd64 python:3.8.12-buster as base
 
 ENV DEBIAN_FRONTEND=noninteractive
 COPY ./apt-pkg-list /root/
-COPY ./pip_package_lists/ /root/
+COPY ./pip_package_lists /root/
 RUN apt update \
     && apt install -y --no-install-recommends $(cat /root/apt-pkg-list) \
     && apt autoremove -y \
@@ -32,7 +32,8 @@ COPY ./edx_platform /openedx/edx-platform
 
 ARG DEPLOYMENT_NAME="invalid"
 ARG RELEASE_NAME="invalid"
-RUN pip install --user --no-cache-dir -r /openedx/edx-platform/requirements/edx/base.txt \
+RUN ls -Rltrha /root/pip_package_lists \
+    && pip install --user --no-cache-dir -r /openedx/edx-platform/requirements/edx/base.txt \
     && pip install --user --no-cache-dir -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
 RUN if [ "$DEPLOYMENT_NAME" = "mitxonline" ]; then pip uninstall --user --no-cache-dir "edx-name-affirmation"; fi
 
