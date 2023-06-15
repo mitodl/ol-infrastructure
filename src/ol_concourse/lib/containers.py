@@ -7,6 +7,7 @@ from ol_concourse.lib.models.pipeline import (
     Input,
     TaskConfig,
     TaskStep,
+    Cache,
 )
 
 
@@ -25,6 +26,7 @@ def container_build_task(
                 "source": {"repository": "concourse/oci-build-task"},
             },
             params=build_parameters,
+            caches=[Cache(path="cache")],
             run=Command(
                 path="build",
                 args=build_args or [],

@@ -173,6 +173,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                         build_parameters={
                             "CONTEXT": "ol-infrastructure-docker/dockerfiles/openedx-edxapp",  # noqa: E501
                             "TARGET": "final",
+                            "BUILD_ARG_RELEASE_NAME": release_name,
                             "BUILD_ARG_DEPLOYMENT_NAME": deployment.deployment_name,
                         },
                         build_args=[],

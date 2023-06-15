@@ -1,15 +1,19 @@
+celery-redbeat==2.1.1  # Support for using Redis as the lock for Celery schedules
 django-redis==5.2.0
 edx-git-auto-export==0.3
+edx-sysadmin==0.2.1
+edx-username-changer==0.3.0
+git+https://github.com/ubc/ubcpi.git@1.0.0#egg=ubcpi-xblock
+mitxpro-openedx-extensions==1.0.0
 nodeenv>=1.7.0
 ol-openedx-canvas-integration==0.2.6
 ol-openedx-course-export==0.1.2
+ol-openedx-logging==0.2.0
 ol-openedx-rapid-response-reports==0.2.2
 ol-openedx-sentry==0.1.2
-ol-openedx-logging==0.1.0
-edx-sysadmin==0.2.1
-social_auth_mitxpro==0.6.1
 openedx-scorm-xblock>=15.0.0,<16.0.0
 pip==22.3.1
 setuptools==65.5.1
+social-auth-mitxpro==0.6.1
 uwsgi==2.0.21
 wheel==0.38.4
