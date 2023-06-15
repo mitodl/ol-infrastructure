@@ -3,9 +3,9 @@ import sys
 
 
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
-from concourse.lib.containers import container_build_task
-from concourse.lib.models.fragment import PipelineFragment
-from concourse.lib.models.pipeline import (
+from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.models.fragment import PipelineFragment
+from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
     GetStep,
@@ -21,8 +21,8 @@ from concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from concourse.lib.resources import git_repo, registry_image
-from concourse.lib.jobs.infrastructure import packer_jobs
+from ol_concourse.lib.resources import git_repo, registry_image
+from ol_concourse.lib.jobs.infrastructure import packer_jobs
 
 from bridge.settings.openedx.accessors import (
     filter_deployments_by_release,
