@@ -39,7 +39,10 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
         uri="https://github.com/mitodl/ol-infrastructure",
         # TODO MD 20230512 Fix to main branch once testing completed
         branch="md/edxapp_docker_migration",
-        paths=["dockerfiles/openedx-edxapp"],
+        paths=[
+            "dockerfiles/openedx-edxapp",
+            "src/concourse/pipelines/open_edx/edx_platform_v2",
+        ],
     )
 
     container_fragments = []
