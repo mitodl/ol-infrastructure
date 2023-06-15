@@ -10,7 +10,7 @@ FROM --platform=linux/amd64 python:3.8.12-buster as base
 
 ENV DEBIAN_FRONTEND=noninteractive
 COPY ./apt-pkg-list /root/
-COPY ./pip_package_lists /root/
+COPY ./pip_package_lists/ /root/
 RUN apt update \
     && apt install -y --no-install-recommends $(cat /root/apt-pkg-list) \
     && apt autoremove -y \
