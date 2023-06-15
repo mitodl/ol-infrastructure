@@ -1,6 +1,6 @@
 import sys
 
-from concourse.lib.models.pipeline import (
+from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
     GetStep,
@@ -14,7 +14,7 @@ from concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from concourse.lib.resources import git_repo
+from ol_concourse.lib.resources import git_repo
 
 pipeline_code = git_repo(
     name=Identifier("edxapp-pipeline-code"),
@@ -27,12 +27,12 @@ pipeline_code = git_repo(
 def build_meta_job(pipeline_name: str):
     if pipeline_name == "meta":
         pipeline_definition_path = (
-            "src/concourse/pipelines/open_edx/edx_platform_v2/meta.py"
+            "src/ol_concourse/pipelines/open_edx/edx_platform_v2/meta.py"
         )
         pipeline_team = "main"
         pipeline_id = "self"
     else:
-        pipeline_definition_path = "src/concourse/pipelines/open_edx/edx_platform_v2/grouped_docker_packer_pulumi_pipeline.py"  # noqa: E501
+        pipeline_definition_path = "src/ol_concourse/pipelines/open_edx/edx_platform_v2/grouped_docker_packer_pulumi_pipeline.py"  # noqa: E501
         pipeline_team = "infrastructure"
         pipeline_id = f"docker-packer-pulumi-edxapp-{pipeline_name}"
     return Job(
