@@ -1,0 +1,47 @@
+---
+sources:
+  collect_edx_tracking_logs:
+    file_key: log_file
+    type: file
+    include:
+    - /edx/var/log/tracking/tracking.log
+
+transforms:
+  parse_edx_tracking_logs:
+    inputs:
+    - 'collect_edx_tracking_logs'
+    type: remap
+    source: |
+      parsed, err = parse_json(.message)
+      if parsed != null {
+        del(.message)
+        . = merge!(., parsed)
+        .labels = ["edx_tracking"]
+        .environment = "${ENVIRONMENT}"
+      } else {
+        log(err, level: "error")
+        .malformed = true
+      }
+
+  filter_malformed_message_edx_tracking_logs:
+    inputs:
+    - 'parse_edx_tracking_logs'
+    type: filter
+    condition: .malformed != true
+
+sinks:
+  ship_edx_tracking_logs_to_s3:
+    inputs:
+    - 'filter_malformed_message_edx_tracking_logs'
+    type: aws_s3
+    bucket: ${ENVIRONMENT}-edxapp-tracking
+    region: us-east-1
+    key_prefix: logs/%F/%H_
+    encoding:
+      codec: json
+    framing:
+      method: "newline_delimited"
+    batch:
+      timeout_secs: {{60 * 60}}
+      max_bytes: {{1024 * 1024 * 1024 * 2}}
+    healthcheck: false
