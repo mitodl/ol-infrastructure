@@ -12,7 +12,8 @@ transforms:
     - 'collect_edx_tracking_logs'
     type: remap
     source: |
-      parsed, err = parse_json(.message)
+      # Only parse top level JSON and render nested objects as strings
+      parsed, err = parse_json(.message, max_depth: 1)
       if parsed != null {
         del(.message)
         . = merge!(., parsed)
@@ -23,20 +24,41 @@ transforms:
         .malformed = true
       }
 
-  filter_malformed_message_edx_tracking_logs:
+  filter_out_malformed_message_edx_tracking_logs:
     inputs:
     - 'parse_edx_tracking_logs'
     type: filter
     condition: .malformed != true
 
+  filter_out_well_formed_message_edx_tracking_logs:
+    inputs:
+    - 'parse_edx_tracking_logs'
+    type: filter
+    condition: .malformed == true
+
 sinks:
   ship_edx_tracking_logs_to_s3:
     inputs:
-    - 'filter_malformed_message_edx_tracking_logs'
+    - 'filter_out_malformed_message_edx_tracking_logs'
     type: aws_s3
     bucket: ${ENVIRONMENT}-edxapp-tracking
     region: us-east-1
-    key_prefix: logs/%F/%H_
+    key_prefix: valid/%F/%H_
+    encoding:
+      codec: json
+    framing:
+      method: "newline_delimited"
+    batch:
+      timeout_secs: {{60 * 60}}
+      max_bytes: {{1024 * 1024 * 1024 * 2}}
+    healthcheck: false
+  ship_malformed_edx_tracking_logs_to_s3:
+    inputs:
+    - 'filter_out_well_formed_message_edx_tracking_logs'
+    type: aws_s3
+    bucket: ${ENVIRONMENT}-edxapp-tracking
+    region: us-east-1
+    key_prefix: malformed/%F/%H_
     encoding:
       codec: json
     framing:
