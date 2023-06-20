@@ -41,7 +41,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
         branch="md/edxapp_docker_migration",
         paths=[
             "dockerfiles/openedx-edxapp/",
-            "src/concourse/pipelines/open_edx/edx_platform_v2",
+            "src/ol_concourse/pipelines/open_edx/edx_platform_v2",
         ],
     )
 

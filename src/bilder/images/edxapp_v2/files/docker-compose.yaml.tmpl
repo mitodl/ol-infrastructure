@@ -27,66 +27,6 @@ services:
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
 
-  lms-migrations:
-    image:  mitodl/edxapp:${EDXAPP_DOCKER_TAG}
-    profiles:
-    - web
-    - worker
-    env_file:
-    - ./.env
-    environment:
-      SERVICE_VARIANT: lms
-      DJANGO_SETTINGS_MODULE: lms.envs.production
-    restart: on-failure
-    volumes:
-    - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
-    - /opt/data:/openedx/data
-    - /opt/data/media:/openedx/media
-    command: ["python", "manage.py", "lms", "migrate", "--noinput"]
-    depends_on:
-      lms-permissions:
-        condition: service_completed_successfully
-  cms-migrations:
-    image:  mitodl/edxapp:${EDXAPP_DOCKER_TAG}
-    profiles:
-    - web
-    - worker
-    env_file:
-    - ./.env
-    environment:
-      SERVICE_VARIANT: cms
-      DJANGO_SETTINGS_MODULE: cms.envs.production
-    restart: on-failure
-    volumes:
-    - ./settings/cms.env.yml:/openedx/config/cms.env.yml:ro
-    - /opt/data:/openedx/data
-    - /opt/data/media:/openedx/media
-    command: ["python", "manage.py", "cms", "migrate", "--noinput"]
-    depends_on:
-      cms-permissions:
-        condition: service_completed_successfully
-
-  # Starting the app will not be contigent on the success of the waffle flag
-  # init container
-  waffle-flags:
-    image: mitodl/edxapp:${EDXAPP_DOCKER_TAG}
-    profiles:
-    - web
-    - worker
-    environment:
-      SERVICE_VARIANT: lms
-      DJANGO_SETTINGS_MODULE: lms.envs.production
-    restart: on-failure
-    volumes:
-    - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
-    - ./settings/waffle_flags.yaml:/openedx/config/waffle_flags.yaml:ro
-    - /opt/data:/openedx/data
-    - /opt/data/media:/openedx/media
-    command: ["python", "set_waffle_flags.py", "/openedx/config/waffle_flags.yaml"]
-    depends_on:
-      lms-permissions:
-        condition: service_completed_successfully
-
 # Webapp definitions
   caddy:
     image: docker.io/caddy:2.6.3
@@ -125,8 +65,6 @@ services:
     depends_on:
       lms-migrations:
         condition: service_completed_successfully
-      waffle-flags:
-        condition: service_completed_successfully
   cms:
     image: mitodl/edxapp:${EDXAPP_DOCKER_TAG}
     profiles:
@@ -147,10 +85,63 @@ services:
     depends_on:
       cms-migrations:
         condition: service_completed_successfully
-      waffle-flags:
-        condition: service_completed_successfully
 
 # Worker definitions
+  lms-migrations:
+    image:  mitodl/edxapp:${EDXAPP_DOCKER_TAG}
+    profiles:
+    - worker
+    env_file:
+    - ./.env
+    environment:
+      SERVICE_VARIANT: lms
+      DJANGO_SETTINGS_MODULE: lms.envs.production
+    restart: on-failure
+    volumes:
+    - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
+    - /opt/data:/openedx/data
+    - /opt/data/media:/openedx/media
+    command: ["python", "manage.py", "lms", "migrate", "--noinput"]
+    depends_on:
+      lms-permissions:
+        condition: service_completed_successfully
+  cms-migrations:
+    image:  mitodl/edxapp:${EDXAPP_DOCKER_TAG}
+    profiles:
+    - worker
+    env_file:
+    - ./.env
+    environment:
+      SERVICE_VARIANT: cms
+      DJANGO_SETTINGS_MODULE: cms.envs.production
+    restart: on-failure
+    volumes:
+    - ./settings/cms.env.yml:/openedx/config/cms.env.yml:ro
+    - /opt/data:/openedx/data
+    - /opt/data/media:/openedx/media
+    command: ["python", "manage.py", "cms", "migrate", "--noinput"]
+    depends_on:
+      cms-permissions:
+        condition: service_completed_successfully
+
+
+  waffle-flags:
+    image: mitodl/edxapp:${EDXAPP_DOCKER_TAG}
+    profiles:
+    - worker
+    environment:
+      SERVICE_VARIANT: lms
+      DJANGO_SETTINGS_MODULE: lms.envs.production
+    restart: on-failure
+    volumes:
+    - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
+    - ./settings/waffle_flags.yaml:/openedx/config/waffle_flags.yaml:ro
+    - /opt/data:/openedx/data
+    - /opt/data/media:/openedx/media
+    command: ["python", "set_waffle_flags.py", "/openedx/config/waffle_flags.yaml"]
+    depends_on:
+      lms-permissions:
+        condition: service_completed_successfully
   lms-worker:
     image: mitodl/edxapp:${EDXAPP_DOCKER_TAG}
     profiles:
@@ -172,6 +163,23 @@ services:
       lms-migrations:
         condition: service_completed_successfully
       waffle-flags:
+        condition: service_completed_successfully
+
+  process-scheduled-emails:
+    image: mitodl/edxapp:${EDXAPP_DOCKER_TAG}
+    profiles:
+    - worker
+    environment:
+      SERVICE_VARIANT: lms
+      DJANGO_SETTINGS_MODULE: lms.envs.production
+    restart: on-failure
+    volumes:
+    - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
+    - /opt/data:/openedx/data
+    - /opt/data/media:/openedx/media
+    command: ["python", "process_secheduled_emails.py"]
+    depends_on:
+      lms-permissions:
         condition: service_completed_successfully
 
   cms-worker:
