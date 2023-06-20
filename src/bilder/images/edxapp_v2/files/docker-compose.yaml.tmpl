@@ -177,7 +177,7 @@ services:
     - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
-    command: ["python", "process_secheduled_emails.py"]
+    command: ["python", "process_scheduled_emails.py"]
     depends_on:
       lms-permissions:
         condition: service_completed_successfully
