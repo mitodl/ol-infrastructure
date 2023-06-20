@@ -1710,13 +1710,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-fastly"
-version = "8.0.0"
+version = "8.1.1"
 description = "A Pulumi package for creating and managing fastly cloud resources."
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_fastly-8.0.0.tar.gz", hash = "sha256:40c4a55fc260c7f079c41481a618db1ccbcf3483e13e0d6f989f57a1759ce2ba"},
+    {file = "pulumi_fastly-8.1.1.tar.gz", hash = "sha256:333c24f34085ab496240eae210ae2d7e0fd56749c5068b8738a17f0e86dc138c"},
 ]
 
 [package.dependencies]
@@ -1726,13 +1726,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "5.10.0"
+version = "5.12.0"
 description = "A Pulumi package for creating and managing github cloud resources."
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_github-5.10.0.tar.gz", hash = "sha256:c21acdbdc43c54b0d1aa1c9b979d6cc3472d307f9b379a131d6be0e31281ba9f"},
+    {file = "pulumi_github-5.12.0.tar.gz", hash = "sha256:5211669dff350c5815495977cf3f35f45fea1445540a7f5b0fe48e0180876459"},
 ]
 
 [package.dependencies]
