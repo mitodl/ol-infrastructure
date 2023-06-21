@@ -3,7 +3,9 @@
 ## Pre-Requisites
 
 - You'll need the email address the user registered under. e.g. cpatti@mit.edu
-- You'll need the pre-requisites defined in [How To Access An MIT OL OpenEdX Django Admin manage.py](https://github.com/mitodl/ol-infrastructure/docs/how_to/access_openedx_djange_manage.md)
+- You'll need the pre-requisites defined in [How To Access An MIT OL OpenEdX Django Admin manage.py](https://github.com/mitodl/ol-infrastructure/blob/main/docs/how_to/access_openedx_djange_manage.md).
+
+
 ## Look Up This User's username
 
 You'll need to have Django admin and superuser access to the product you're looking to retire users for.
@@ -24,7 +26,7 @@ This should yield the user's username. Copy that off into a safe place as we'll 
 
 ## Get Yourself Connected
 
-First, follow the step by step instructions defined in [How To Access An MIT OL OpenEdX Django Admin manage.py](https://github.com/mitodl/ol-infrastructure/docs/how_to/access_openedx_djange_manage.md).
+First, follow the step by step instructions defined in [How To Access An MIT OL OpenEdX Django Admin manage.py](https://github.com/mitodl/ol-infrastructure/blob/main/docs/how_to/access_openedx_djange_manage.md).
 
 This will land you at a shell prompt of the OpenEdX worker for the product in question.
 
