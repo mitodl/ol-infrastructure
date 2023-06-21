@@ -75,10 +75,11 @@ Now that we've successfully staged our user for retirement, we need to tell the 
   - [CI](https://cicd-ci.odl.mit.edu)
   - [QA](https://cicd-qa.odl.mit.edu/)
   - [Production](https://cicd.odl.mit.edu)
+
   and search for 'tubular'. You'll want the tubular pipeline in the group associated with whichever product you're working with. In our case, it'd be
   the [misc-cloud-tubular pipeline in the mitxonline group](https://cicd.odl.mit.edu/teams/mitxonline/pipelines/misc-cloud-tubular).
 - Click the green + icon with a circle around it in the upper right of your screen. This will trigger a run of this pipeline.
 - If all goes well, you should see each stage go green one by one. You can click on any stage to see more detail around what that stage is doing.
-  - You can see an example of a successful pipeline run [here](https://cicd.odl.mit.edu/teams/mitxonline/pipelines/misc-cloud-tubular/jobs/deploy-tubular-world/builds/26)
+  You can see an example of a successful pipeline run [here](https://cicd.odl.mit.edu/teams/mitxonline/pipelines/misc-cloud-tubular/jobs/deploy-tubular-world/builds/26)
 
 At this point, if the pipeline is green, congratulations are in order! This user had been retired!
