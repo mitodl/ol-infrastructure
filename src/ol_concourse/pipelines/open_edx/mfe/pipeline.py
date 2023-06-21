@@ -119,6 +119,15 @@ def mfe_job(
         npm install @edx/frontend-component-footer@npm:@mitodl/frontend-component-footer-mitol@latest --legacy-peer-deps
         npm install @edx/frontend-component-header@npm:@mitodl/frontend-component-header-mitol@latest --legacy-peer-deps"""  # noqa: E501
     )
+    if (
+        open_edx.environment == "mitx-ci"
+        and mfe_name == "frontend-app-learner-dashboard"
+    ):
+        branding_overrides += textwrap.dedent(
+            """\
+
+            npm install @edx/brand@npm:@mitodl/brand-mitol-residential@latest --legacy-peer-deps"""  # noqa: E501
+        )
     if previous_job and mfe_repo.name == previous_job.plan[0].get:
         clone_git_repo.passed = [previous_job.name]
     mfe_job_definition = Job(
