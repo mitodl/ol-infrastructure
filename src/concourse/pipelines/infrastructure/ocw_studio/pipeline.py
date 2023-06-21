@@ -1,4 +1,4 @@
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.pipeline import Identifier, Pipeline
@@ -9,9 +9,9 @@ ocw_studio_pulumi_code = git_repo(
     uri="https://github.com/mitodl/ol-infrastructure",
     branch="main",
     paths=[
-        *PULUMI_WATCHED_PATHS,
-        str(PULUMI_CODE_PATH.joinpath("applications/ocw_studio/")),
-        "src/bridge/secrets/ocw_studio/",
+        "src/ol_infrastructure/applications/ocw_studio/",
+        "src/ol_infrastructure/lib/",
+        "src/bridge/lib/",
     ],
 )
 
