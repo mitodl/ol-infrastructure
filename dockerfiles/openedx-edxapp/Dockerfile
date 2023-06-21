@@ -76,7 +76,6 @@ WORKDIR /openedx/edx-platform
 
 RUN pip install --user --no-cache-dir -e .
 
-# TODO MD 20230522 Not sure if we need to be making this mitol directory
 RUN mkdir -p /openedx/config  ./lms/envs/mitol ./cms/envs/mitol
 
 # These are dummy configs to allow some of the collectstatic steps to run
