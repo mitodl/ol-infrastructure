@@ -67,8 +67,3 @@ sinks:
       timeout_secs: {{60 * 60}}
       max_bytes: {{1024 * 1024 * 1024 * 2}}
     healthcheck: false
-sources:
-  collect_edx_tracking_logs:
-    file_key: log_file
-    type: file
-    include:
