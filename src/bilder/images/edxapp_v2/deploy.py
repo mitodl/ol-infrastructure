@@ -42,6 +42,8 @@ from bilder.components.hashicorp.vault.models import (
     VaultListener,
     VaultTCPListener,
 )
+from bilder.components.vector.models import VectorConfig
+from bilder.components.vector.steps import vector_service, install_and_configure_vector
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 from bilder.lib.template_helpers import (
@@ -75,6 +77,8 @@ TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
 
 set_env_secrets(Path("consul/consul.env"))
+
+vector_config = VectorConfig(is_docker=True, use_global_log_sink=True)
 
 # TODO MD 20230515 Probably don't need this anymore.
 apt.packages(
@@ -283,6 +287,9 @@ if node_type == WEB_NODE_TYPE:
             ),
         ],
     )
+    vector_config.configuration_templates[
+        TEMPLATES_DIRECTORY.joinpath("vector", "edxapp_tracking_logs.yaml.j2")
+    ] = {}
 
 # Setup the ssh key for git-auto-export-plugin
 ssh_key_file = ssh_directory.joinpath("id_rsa")
@@ -403,15 +410,12 @@ for product in hashicorp_products:
 consul_template_permissions(consul_template.configuration)
 
 ## Install and configure vector
-# vector_config = VectorConfig(is_docker=True, use_global_log_sink=True)
-# vector_config.configuration_templates[
-#    TEMPLATES_DIRECTORY.joinpath("vector", "odl_video_service_logs.yaml")
-# ] = {}
-# install_and_configure_vector(vector_config)
+install_and_configure_vector(vector_config)
 
 if host.get_fact(HasSystemd):
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
+    vector_service(vector_config)
     server.service(
         name="Ensure docker compose service is enabled",
         service="docker-compose",
