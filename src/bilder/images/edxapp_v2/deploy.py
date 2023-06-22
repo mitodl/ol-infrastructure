@@ -43,7 +43,7 @@ from bilder.components.hashicorp.vault.models import (
     VaultTCPListener,
 )
 from bilder.components.vector.models import VectorConfig
-from bilder.components.vector.steps import vector_service, install_and_configure_vector
+from bilder.components.vector.steps import install_and_configure_vector
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 from bilder.lib.template_helpers import (
@@ -415,7 +415,6 @@ install_and_configure_vector(vector_config)
 if host.get_fact(HasSystemd):
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
-    vector_service(vector_config)
     server.service(
         name="Ensure docker compose service is enabled",
         service="docker-compose",
