@@ -36,13 +36,6 @@ transforms:
     type: filter
     condition: .malformed == true
 
-  # This filter must exist
-  enrich_logs_global_funnel:
-    type: aws_ec2_metadata
-    inputs:
-    - "parse_edx_tracking_logs"
-    namespace: ec2
-
 sinks:
   ship_edx_tracking_logs_to_s3:
     inputs:
