@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 
 from pyinfra import host
-from pyinfra.operations import files, server, apt
+from pyinfra.operations import files, server
 
 from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models import (
@@ -79,13 +79,9 @@ FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
 set_env_secrets(Path("consul/consul.env"))
 
 vector_config = VectorConfig(is_docker=True, use_global_log_sink=True)
-
-# TODO MD 20230515 Probably don't need this anymore.
-apt.packages(
-    name="Remove unattended-upgrades to prevent race conditions during build.",
-    packages=["unattended-upgrades"],
-    present=False,
-)
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "edxapp_parsing.yaml.j2")
+] = {}
 
 # Setup some environment variables that will be pulled in by docker / docker-compose
 EDX_INSTALLATION_NAME = os.environ.get("EDX_INSTALLATION", "mitxonline")
@@ -247,9 +243,6 @@ if node_type == WEB_NODE_TYPE:
                 + "/"
                 + EDX_INSTALLATION_NAME
                 + '-wildcard-certificate" }}'
-                # TODO MD 20230522 Need to go through every key cert pair and extract
-                # the certificate from the chain and store it in just 'cert' at the same
-                # vault mount.
                 "{{ printf .Data.cert }}{{ end }}"
             ),
             destination=tls_certificate_file,
