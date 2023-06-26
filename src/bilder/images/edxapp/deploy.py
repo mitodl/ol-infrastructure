@@ -144,6 +144,18 @@ files.line(
 )
 
 files.put(
+    name="Setup process_scheduled_instructor_tasks cron task.",
+    src=str(
+        Path(__file__)
+        .resolve()
+        .parent.joinpath("files", "process_scheduled_instructor_tasks")
+    ),
+    dest=str(Path("/etc/cron.d/process_scheduled_instructor_tasks")),
+    user="root",
+    group="root",
+)
+
+files.put(
     name="Setup the database migrations service definition",
     src=str(Path(__file__).resolve().parent.joinpath("files", "migrations.service")),
     dest=str(Path("/usr/lib/systemd/system/migrations.service")),
