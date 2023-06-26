@@ -132,7 +132,7 @@ class OpenEdxApplicationVersion(BaseModel):
     @property
     def runtime_version(self) -> str:
         # Default to Python 3.8 for IDAs and Node 16 for MFEs
-        app_type_runtime = "3.8" if self.application_type == "IDA" else "16"
+        app_type_runtime = "3.8" if self.application_type == "IDA" else "18"
         return self.runtime_version_override or app_type_runtime
 
     @property

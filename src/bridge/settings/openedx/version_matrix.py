@@ -198,131 +198,13 @@ ReleaseMap: dict[
         ],
     },
     "olive": {
-        "mitx": [
-            OpenEdxApplicationVersion(
-                application="course-authoring",  # type: ignore
-                application_type="MFE",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="edx-platform",  # type: ignore
-                application_type="IDA",
-                release="olive",
-                branch_override="mitx/olive",
-                origin_override="https://github.com/mitodl/edx-platform",
-            ),
-            OpenEdxApplicationVersion(
-                application="edxapp_theme",  # type: ignore
-                application_type="IDA",
-                release="olive",
-                branch_override="olive",
-                origin_override="https://github.com/mitodl/mitx-theme",
-            ),
-            OpenEdxApplicationVersion(
-                application="forum",  # type: ignore
-                application_type="IDA",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="gradebook",  # type: ignore
-                application_type="MFE",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="learning",  # type: ignore
-                application_type="MFE",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="learner-dashboard",  # type: ignore
-                application_type="MFE",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="library-authoring",  # type: ignore
-                application_type="MFE",
-                release="olive",
-                branch_override="master",
-            ),
-            OpenEdxApplicationVersion(
-                application="notes-api",  # type: ignore
-                application_type="IDA",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="ora-grading",  # type: ignore
-                application_type="MFE",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="xqueue",  # type: ignore
-                application_type="IDA",
-                release="olive",
-            ),
-        ],
-        "mitx-staging": [
-            OpenEdxApplicationVersion(
-                application="course-authoring",  # type: ignore
-                application_type="MFE",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="edx-platform",  # type: ignore
-                application_type="IDA",
-                release="olive",
-                branch_override="mitx/olive",
-                origin_override="https://github.com/mitodl/edx-platform",
-            ),
-            OpenEdxApplicationVersion(
-                application="edxapp_theme",  # type: ignore
-                application_type="IDA",
-                release="olive",
-                branch_override="olive",
-                origin_override="https://github.com/mitodl/mitx-theme",
-            ),
-            OpenEdxApplicationVersion(
-                application="forum",  # type: ignore
-                application_type="IDA",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="gradebook",  # type: ignore
-                application_type="MFE",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="learning",  # type: ignore
-                application_type="MFE",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="library-authoring",  # type: ignore
-                application_type="MFE",
-                release="olive",
-                branch_override="master",
-            ),
-            OpenEdxApplicationVersion(
-                application="notes-api",  # type: ignore
-                application_type="IDA",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="ora-grading",  # type: ignore
-                application_type="MFE",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="xqueue",  # type: ignore
-                application_type="IDA",
-                release="olive",
-            ),
-        ],
         "xpro": [
             OpenEdxApplicationVersion(
                 application="course-authoring",  # type: ignore
                 application_type="MFE",
                 release="olive",
                 branch_override="master",
+                runtime_version_override="16",
             ),
             OpenEdxApplicationVersion(
                 application="edx-platform",  # type: ignore
@@ -345,17 +227,20 @@ ReleaseMap: dict[
                 application="gradebook",  # type: ignore
                 application_type="MFE",
                 release="olive",
+                runtime_version_override="16",
             ),
             OpenEdxApplicationVersion(
                 application="learning",  # type: ignore
                 application_type="MFE",
                 release="olive",
+                runtime_version_override="16",
             ),
             OpenEdxApplicationVersion(
                 application="library-authoring",  # type: ignore
                 application_type="MFE",
                 release="olive",
                 branch_override="master",
+                runtime_version_override="16",
             ),
             OpenEdxApplicationVersion(
                 application="notes-api",  # type: ignore
@@ -366,6 +251,7 @@ ReleaseMap: dict[
                 application="ora-grading",  # type: ignore
                 application_type="MFE",
                 release="olive",
+                runtime_version_override="16",
             ),
         ],
     },
