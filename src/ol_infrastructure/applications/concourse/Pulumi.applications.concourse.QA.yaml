@@ -34,7 +34,7 @@ config:
     iam_policies:
     - base
     - ocw
-    instance_type: m6a.xlarge
+    instance_type: general_purpose_xlarge
     name: ocw
   - auto_scale:
       desired: 2
@@ -49,7 +49,7 @@ config:
     - operations
     - cloud_custodian
     - infra
-    instance_type: t3a.medium
+    instance_type: burstable_medium
     name: infra
   - auto_scale:
       desired: 3
@@ -61,7 +61,7 @@ config:
     iam_policies:
     - base
     - operations
-    instance_type: t3a.large
+    instance_type: burstable_large
     name: generic
   consul:address: https://consul-operations-qa.odl.mit.edu
   vault:address: https://vault-qa.odl.mit.edu

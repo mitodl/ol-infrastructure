@@ -30,6 +30,7 @@ class InstanceTypes(str, Enum):
     burstable_small = "t3a.small"
     burstable_medium = "t3a.medium"
     burstable_large = "t3a.large"
+    burstable_xlarge = "t3a.xlarge"
     general_purpose_large = "m6a.large"
     general_purpose_xlarge = "m6a.xlarge"
     general_purpose_2xlarge = "m6a.2xlarge"
