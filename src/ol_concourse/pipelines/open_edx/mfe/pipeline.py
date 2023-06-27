@@ -153,12 +153,14 @@ def mfe_job(
                             # This uses the --legacy-peer-deps flag to allow for
                             # mismatched versions of react defined in tertiary
                             # dependencies https://stackoverflow.com/a/66620869
+                            # Ensure that webpack is installed (TMM 2023-06-27)
                             textwrap.dedent(
                                 f"""\
                                 apt-get update
                                 apt-get install -q -y python build-essential
                                 npm install --legacy-peer-deps
                                 {branding_overrides}
+                                npm install webpack --legacy-peer-deps
                                 NODE_ENV=production npm run build
                                 """
                             ),
