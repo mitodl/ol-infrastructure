@@ -63,7 +63,7 @@ config:
     iam_policies:
     - base
     - operations
-    instance_type: burstable_xlarge
+    instance_type: t3a.xlarge
     name: generic
   consul:address: https://consul-operations-production.odl.mit.edu
   vault:address: https://vault-production.odl.mit.edu
