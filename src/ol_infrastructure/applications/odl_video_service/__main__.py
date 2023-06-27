@@ -373,7 +373,6 @@ ovs_db_config = OLPostgresDBConfig(
     security_groups=[ovs_database_security_group],
     parameter_overrides=[],
     db_name="odlvideo",
-    engine_version="12.8",
     tags=aws_config.tags,
     **rds_defaults,
 )
