@@ -262,6 +262,7 @@ FEATURES:
     ENABLE_COMBINED_LOGIN_REGISTRATION: true
     ENABLE_CORS_HEADERS: true  # MODIFIED
     ENABLE_COUNTRY_ACCESS: false
+    ENABLE_COURSE_HOME_REDIRECT: true
     ENABLE_CREDIT_API: false
     ENABLE_CREDIT_ELIGIBILITY: false
     ENABLE_CROSS_DOMAIN_CSRF_COOKIE: true  # MODIFIED
@@ -276,12 +277,13 @@ FEATURES:
     ENABLE_GRADE_DOWNLOADS: true
     ENABLE_INSTRUCTOR_ANALYTICS: false
     ENABLE_LTI_PROVIDER: false
-    ENABLE_MKTG_SITE: false
+    ENABLE_MKTG_SITE: true
     ENABLE_MOBILE_REST_API: true
     ENABLE_NEW_BULK_EMAIL_EXPERIENCE: true  # ADDED KEY
     ENABLE_OAUTH2_PROVIDER: true
     ENABLE_PUBLISHER: false
     ENABLE_READING_FROM_MULTIPLE_HISTORY_TABLES: true
+    ENABLE_COURSE_HOME_REDIRECT: true
     ENABLE_SPECIAL_EXAMS: true # MODIFIED FOR PROCTORTRACK
     ENABLE_THIRD_PARTY_AUTH: true
     ENABLE_UNICODE_USERNAME: true  # ADDED KEY
@@ -342,7 +344,8 @@ MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within
 MEDIA_URL: /media/
 MICROSITE_CONFIGURATION: {}
 MITXPRO_CORE_REDIRECT_ALLOW_RE_LIST: ["^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh)", "^/courses/.*/xblock/.*/handler_noauth/outcome_service_handler"]  # ADDED VALUE
-MKTG_URLS: {}
+MKTG_URLS:
+    ROOT: https://{{ key "edxapp/marketing-domain" }}/
 MKTG_URL_LINK_MAP:
     TOS: tos
     HONOR: honor
@@ -350,7 +353,14 @@ MKTG_URL_LINK_MAP:
     PRIVACY: privacy
     ACCESSIBILITY: accessibility
     HELP_CENTER: help-center
-MKTG_URL_OVERRIDES: {}
+MKTG_URL_OVERRIDES:
+    COURSES: https://{{ key "edxapp/marketing-domain" }}/
+    PRIVACY: https://{{ key "edxapp/marketing-domain" }}/privacy-policy/
+    TOS: https://{{ key "edxapp/marketing-domain" }}/terms-of-service/
+    ABOUT: https://{{ key "edxapp/marketing-domain" }}/about-us/
+    HONOR: https://{{ key "edxapp/marketing-domain" }}/honor-code/
+    ACCESSIBILITY: https://accessibility.mit.edu/
+    TOS_AND_HONOR: ''
 MOBILE_STORE_URLS: {}
 ########################################################################################
 # Previously assumed to be unnecessary config as it duplicates code from               #
