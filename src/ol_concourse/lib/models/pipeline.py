@@ -257,6 +257,41 @@ class StepModifierMixin(BaseModel):
         description="The tags by which to match workers. The step will be placed within"
         " the a pool of workers that match all of the given set of tags.",
     )
+    ensure: Optional[Step] = Field(
+        None,
+        description=(
+            "Step to execute regardless of whether the job succeeds, fails, errors, or "
+            " aborts. Equivalent to the  schema.ensure  hook."
+        ),
+    )
+    on_abort: Optional[Step] = Field(
+        None,
+        description=(
+            "Step to execute when the task aborts. Equivalent to the schema.on_abort"
+            " hook."
+        ),
+    )
+    on_error: Optional[Step] = Field(
+        None,
+        description=(
+            "Step to execute when the task errors. Equivalent to the schema.on_error"
+            " hook."
+        ),
+    )
+    on_failure: Optional[Step] = Field(
+        None,
+        description=(
+            "Step to execute when the task fails. Equivalent to the schema.on_failure"
+            " hook."
+        ),
+    )
+    on_success: Optional[Step] = Field(
+        None,
+        description=(
+            "Step to execute when the task succeeds. Equivalent to the"
+            " schema.on_success  hook."
+        ),
+    )
 
 
 class PutStep(Step, StepModifierMixin):
@@ -1710,85 +1745,6 @@ class Job(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    build_logs_to_retain: Optional[Number] = Field(
-        None,
-        description=(
-            "Deprecated.  Equivalent to setting   "
-            " schema.build_log_retention_policy.builds"
-            " `job.build_log_retention.builds` ."
-        ),
-    )
-    max_in_flight: Optional[Number] = Field(
-        None,
-        description=(
-            "If set, specifies a maximum number of builds to run at a time. If  "
-            " `serial` or `serial_groups` are set, they take precedence and  force this"
-            " value to be `1` ."
-        ),
-    )
-    serial: Optional[bool] = Field(
-        None,
-        description=(
-            "Default `false` .  If set to `true` , builds will queue up  and execute"
-            " one-by-one, rather than executing in parallel."
-        ),
-    )
-    old_name: Optional[Identifier] = Field(
-        None,
-        description=(
-            "The old name of the job. If configured, the history of old job will be "
-            " inherited to the new one. Once the pipeline is set, this field can be "
-            " removed as the builds have been transfered.     \n@example  Renaming a"
-            " job \n   This can be used to rename a job without losing its history,"
-            " like so:     ```yaml\njobs:\n- name: new-name\n  old_name: current-name\n"
-            "  plan: [{get: 10m}]\n```     After the pipeline is set, because the"
-            " builds have been inherited, the job can  have the field removed:    "
-            " ```yaml\njobs:\n- name: new-name\n  plan: [{get: 10m}]\n```"
-        ),
-    )
-    on_success: Optional[Step] = Field(
-        None,
-        description=(
-            "Step to execute when the job succeeds. Equivalent to the   "
-            " schema.on_success  hook."
-        ),
-    )
-    ensure: Optional[Step] = Field(
-        None,
-        description=(
-            "Step to execute regardless of whether the job succeeds, fails, errors, or "
-            " aborts. Equivalent to the  schema.ensure  hook."
-        ),
-    )
-    on_error: Optional[Step] = Field(
-        None,
-        description=(
-            "Step to execute when the job errors. Equivalent to the    schema.on_error "
-            " hook."
-        ),
-    )
-    disable_manual_trigger: Optional[bool] = Field(
-        None,
-        description=(
-            "Default `false` .  If set to `true` , manual triggering of  the job (via"
-            " the web UI or  fly-trigger-job  ) will be disabled."
-        ),
-    )
-    serial_groups: Optional[list[Identifier]] = Field(
-        None,
-        description=(
-            "Default `[]` .  When set to an array of arbitrary tag-like  strings,"
-            " builds of this job and other jobs referencing the same tags will  be"
-            " serialized.     \n@example  Limiting parallelism \n   This can be used to"
-            " ensure that certain jobs do not run at the same time,  like so:    "
-            " ```yaml\njobs:\n- name: job-a\n  serial_groups: [some-tag]\n- name:"
-            " job-b\n  serial_groups: [some-tag, some-other-tag]\n- name: job-c\n "
-            " serial_groups: [some-other-tag]\n```     In this example, `job-a` and"
-            " `job-c` can run concurrently, but  neither job can run builds at the same"
-            " time as `job-b` .    The builds are executed in their order of creation,"
-            " across all jobs with  common tags."
-        ),
-    )
     build_log_retention: Optional[BuildLogRetentionPolicy] = Field(
         None,
         description=(
@@ -1825,14 +1781,27 @@ class Job(BaseModel):
             " build logs, and at least 1 succeeded build log.  Default is 0."
         ),
     )
-    name: Optional[Identifier] = Field(
+    build_logs_to_retain: Optional[Number] = Field(
         None,
         description=(
-            "The name of the job. This should be short; it will show up in URLs."
+            "Deprecated.  Equivalent to setting   "
+            " schema.build_log_retention_policy.builds"
+            " `job.build_log_retention.builds` ."
         ),
     )
-    plan: Optional[list[Step]] = Field(
-        None, description="The sequence of  steps  steps  to execute."
+    disable_manual_trigger: Optional[bool] = Field(
+        None,
+        description=(
+            "Default `false` .  If set to `true` , manual triggering of  the job (via"
+            " the web UI or  fly-trigger-job  ) will be disabled."
+        ),
+    )
+    ensure: Optional[Step] = Field(
+        None,
+        description=(
+            "Step to execute regardless of whether the job succeeds, fails, errors, or "
+            " aborts. Equivalent to the  schema.ensure  hook."
+        ),
     )
     interruptible: Optional[bool] = Field(
         None,
@@ -1843,6 +1812,70 @@ class Job(BaseModel):
             " the builds of this job. You may want this if e.g. you have a "
             " self-deploying Concourse or long-running-but-low-importance jobs."
         ),
+    )
+    max_in_flight: Optional[Number] = Field(
+        None,
+        description=(
+            "If set, specifies a maximum number of builds to run at a time. If  "
+            " `serial` or `serial_groups` are set, they take precedence and  force this"
+            " value to be `1` ."
+        ),
+    )
+    name: Optional[Identifier] = Field(
+        None,
+        description=(
+            "The name of the job. This should be short; it will show up in URLs."
+        ),
+    )
+    no_get: Optional[bool] = Field(
+        None,
+        description=(
+            "Skips the get step that usually follows the completion of the put step."
+        ),
+    )
+    old_name: Optional[Identifier] = Field(
+        None,
+        description=(
+            "The old name of the job. If configured, the history of old job will be "
+            " inherited to the new one. Once the pipeline is set, this field can be "
+            " removed as the builds have been transfered.     \n@example  Renaming a"
+            " job \n   This can be used to rename a job without losing its history,"
+            " like so:     ```yaml\njobs:\n- name: new-name\n  old_name: current-name\n"
+            "  plan: [{get: 10m}]\n```     After the pipeline is set, because the"
+            " builds have been inherited, the job can  have the field removed:    "
+            " ```yaml\njobs:\n- name: new-name\n  plan: [{get: 10m}]\n```"
+        ),
+    )
+    on_abort: Optional[Step] = Field(
+        None,
+        description=(
+            "Step to execute when the job aborts. Equivalent to the    schema.on_abort "
+            " hook."
+        ),
+    )
+    on_error: Optional[Step] = Field(
+        None,
+        description=(
+            "Step to execute when the job errors. Equivalent to the    schema.on_error "
+            " hook."
+        ),
+    )
+    on_failure: Optional[Step] = Field(
+        None,
+        description=(
+            "Step to execute when the job fails. Equivalent to the    schema.on_failure"
+            "  hook."
+        ),
+    )
+    on_success: Optional[Step] = Field(
+        None,
+        description=(
+            "Step to execute when the job succeeds. Equivalent to the   "
+            " schema.on_success  hook."
+        ),
+    )
+    plan: Optional[list[Step]] = Field(
+        None, description="The sequence of  steps  steps  to execute."
     )
     public: Optional[bool] = Field(
         None,
@@ -1857,24 +1890,26 @@ class Job(BaseModel):
             " set  schema.resource.public    to `true` ."
         ),
     )
-    no_get: Optional[bool] = Field(
+    serial: Optional[bool] = Field(
         None,
         description=(
-            "Skips the get step that usually follows the completion of the put step."
+            "Default `false` .  If set to `true` , builds will queue up  and execute"
+            " one-by-one, rather than executing in parallel."
         ),
     )
-    on_failure: Optional[Step] = Field(
+    serial_groups: Optional[list[Identifier]] = Field(
         None,
         description=(
-            "Step to execute when the job fails. Equivalent to the    schema.on_failure"
-            "  hook."
-        ),
-    )
-    on_abort: Optional[Step] = Field(
-        None,
-        description=(
-            "Step to execute when the job aborts. Equivalent to the    schema.on_abort "
-            " hook."
+            "Default `[]` .  When set to an array of arbitrary tag-like  strings,"
+            " builds of this job and other jobs referencing the same tags will  be"
+            " serialized.     \n@example  Limiting parallelism \n   This can be used to"
+            " ensure that certain jobs do not run at the same time,  like so:    "
+            " ```yaml\njobs:\n- name: job-a\n  serial_groups: [some-tag]\n- name:"
+            " job-b\n  serial_groups: [some-tag, some-other-tag]\n- name: job-c\n "
+            " serial_groups: [some-other-tag]\n```     In this example, `job-a` and"
+            " `job-c` can run concurrently, but  neither job can run builds at the same"
+            " time as `job-b` .    The builds are executed in their order of creation,"
+            " across all jobs with  common tags."
         ),
     )
 
@@ -1964,6 +1999,7 @@ class Pipeline(BaseModel):
 class TryStep(Step, StepModifierMixin):
     class Config:
         extra = Extra.forbid
+        allow_population_by_field_name = True
 
     try_: Optional[Step] = Field(
         None,
