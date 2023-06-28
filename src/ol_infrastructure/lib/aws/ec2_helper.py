@@ -7,6 +7,7 @@ from typing import Optional, Union
 
 import boto3
 import pulumi
+from botocore.exceptions import ClientError
 from pulumi_aws import ec2
 
 ec2_client = boto3.client("ec2")
@@ -21,6 +22,14 @@ default_egress_args = [
         ipv6_cidr_blocks=["::/0"],
     )
 ]
+
+
+def is_valid_instance_type(instance_type):
+    try:
+        ec2_client.describe_instance_types(InstanceTypes=[instance_type])
+        return True
+    except ClientError:
+        return False
 
 
 @unique
@@ -41,6 +50,18 @@ class InstanceTypes(str, Enum):
     high_mem_xlarge = "r6a.xlarge"
     high_mem_2xlarge = "r6a.2xlarge"
     high_mem_4xlarge = "r6a.4xlarge"
+
+    @classmethod
+    def dereference(cls, instance_specifier):
+        try:
+            instance_type = cls[instance_specifier].value
+        except KeyError:
+            # The instance type specified is a direct specifier (e.g. t3a.large)
+            if is_valid_instance_type(instance_specifier):
+                instance_type = instance_specifier
+            else:
+                raise ValueError from None
+        return instance_type
 
 
 @unique
