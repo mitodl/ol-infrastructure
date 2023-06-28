@@ -28,7 +28,6 @@ class BusinessUnit(str, Enum):
     ovs = "odl-video"
     residential = "residential"
     residential_staging = "residential-staging"
-    starteam = "starteam"
     xpro = "mitxpro"
 
 
@@ -61,7 +60,6 @@ class Apps(str, Enum):
     ocw_build = "ocw-build"
     odl_video_service = "ovs"
     redash = "redash"
-    starcellbio = "starcellbio"
     xpro = "xpro"
 
 
