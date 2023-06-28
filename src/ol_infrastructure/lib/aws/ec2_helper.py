@@ -43,7 +43,7 @@ class InstanceTypes(str, Enum):
     general_purpose_large = "m6a.large"
     general_purpose_xlarge = "m6a.xlarge"
     general_purpose_2xlarge = "m6a.2xlarge"
-    general_prupose_intel_large = "m6i.large"
+    general_purpose_intel_large = "m6i.large"
     general_purpose_intel_xlarge = "m6i.xlarge"
     general_purpose_intel_2xlarge = "m6i.2xlarge"
     high_mem_regular = "r6a.large"

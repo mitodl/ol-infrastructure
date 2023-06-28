@@ -525,7 +525,7 @@ cloud_init_param = Output.all(
 )
 
 vault_instance_type = (
-    vault_config.get("instance_type") or InstanceTypes.general_prupose_intel_large.name
+    vault_config.get("instance_type") or InstanceTypes.general_purpose_intel_large.name
 )
 vault_launch_config = ec2.LaunchTemplate(
     "vault-server-launch-template",
