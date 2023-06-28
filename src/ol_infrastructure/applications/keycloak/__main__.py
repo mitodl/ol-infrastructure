@@ -240,10 +240,10 @@ keycloak_db_consul_service = Service(
 )
 
 # Provision EC2 resources
-instance_type_name = (
-    keycloak_config.get("instance_type") or InstanceTypes.burstable_medium.name
+instance_type_name = keycloak_config.get(
+    "instance_type", InstanceTypes.burstable_medium.name
 )
-instance_type = InstanceTypes[instance_type_name].value
+instance_type = InstanceTypes.dereference(instance_type_name)
 
 subnets = target_vpc["subnet_ids"]
 subnet_id = subnets.apply(chain)

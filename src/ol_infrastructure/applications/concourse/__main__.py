@@ -637,11 +637,7 @@ for worker_def in concourse_config.get_object("workers") or []:
     worker_instance_type_name = worker_def.get(
         "instance_type", InstanceTypes.burstable_large.name
     )
-    try:
-        worker_instance_type = InstanceTypes[worker_instance_type_name].value
-    except KeyError:
-        # The instance type specified is a direct specifier (e.g. t3a.large)
-        worker_instance_type = worker_instance_type_name
+    worker_instance_type = InstanceTypes.dereference(worker_instance_type_name)
     worker_launch_config = ec2.LaunchTemplate(
         f"concourse-worker-{worker_class_name}-launch-template",
         name_prefix=f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}-",
