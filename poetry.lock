@@ -1706,13 +1706,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "5.12.0"
+version = "5.12.1"
 description = "A Pulumi package for creating and managing github cloud resources."
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_github-5.12.0.tar.gz", hash = "sha256:5211669dff350c5815495977cf3f35f45fea1445540a7f5b0fe48e0180876459"},
+    {file = "pulumi_github-5.12.1.tar.gz", hash = "sha256:b3e6582d0af39de6dfabcc809d615416b5ab89ab597f39537fc133427582e405"},
 ]
 
 [package.dependencies]
@@ -1738,13 +1738,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-mongodbatlas"
-version = "3.8.1"
+version = "3.9.0"
 description = "A Pulumi package for creating and managing mongodbatlas cloud resources."
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_mongodbatlas-3.8.1.tar.gz", hash = "sha256:65b15ac544a27b689da2753d374629a24d6e2eaa0b18ce2b67837fb135d80519"},
+    {file = "pulumi_mongodbatlas-3.9.0.tar.gz", hash = "sha256:2731f213d27985623e4ac68e0772dcb975d3a7fe41df452d700b13f0a58f4c9d"},
 ]
 
 [package.dependencies]
