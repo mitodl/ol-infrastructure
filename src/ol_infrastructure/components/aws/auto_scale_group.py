@@ -166,11 +166,11 @@ class OLAutoScaleGroupConfig(AWSBase):
     vpc_zone_identifiers: pulumi.Output[str]
 
     instance_refresh_checkpoint_delay: PositiveInt = PositiveInt(3600)
-    instance_refresh_checkpoint_percentages: list[NonNegativeInt] = []
+    instance_refresh_checkpoint_percentages: list[NonNegativeInt] = []  # noqa: RUF012
     instance_refresh_warmup: PositiveInt = PositiveInt(health_check_grace_period)
     instance_refresh_min_healthy_percentage: NonNegativeInt = NonNegativeInt(50)
     instance_refresh_strategy: str = "Rolling"
-    instance_refresh_triggers: list[str] = ["tags"]
+    instance_refresh_triggers: list[str] = ["tags"]  # noqa: RUF012
 
     class Config:
         arbitrary_types_allowed = True

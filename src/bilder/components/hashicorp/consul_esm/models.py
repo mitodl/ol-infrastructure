@@ -11,7 +11,7 @@ class ConsulExternalServicesMonitorConfig(HashicorpConfig):
     consul_service: str = "consul-esm"
     consul_service_tag: str = "consul-esm"
     consul_kv_path: str = "consul-esm/"
-    external_node_meta: dict[str, str] = {"external-node": "true"}
+    external_node_meta: dict[str, str] = {"external-node": "true"}  # noqa: RUF012
     node_reconnect_timeout: str = "72h"
     node_probe_interval: str = "30s"
     http_addr: str = "localhost:8500"

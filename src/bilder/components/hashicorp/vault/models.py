@@ -263,7 +263,7 @@ class VaultServerConfig(HashicorpConfig):
 class Vault(HashicorpProduct):
     _name: str = "vault"
     version: str = "1.8.0"
-    configuration: dict[Path, HashicorpConfig] = {
+    configuration: dict[Path, HashicorpConfig] = {  # noqa: RUF012
         Path("vault.json"): VaultAgentConfig()
     }
     configuration_directory: Path = Path("/etc/vault/")

@@ -31,7 +31,7 @@ class NomadJob(OLBaseSettings):
 class Nomad(HashicorpProduct):
     _name: str = "nomad"
     version: str = "1.0.4"
-    configuration: dict[Path, NomadConfig] = {
+    configuration: dict[Path, NomadConfig] = {  # noqa: RUF012
         Path("/etc/nomad.d/00-default.json"): NomadConfig(client=NomadClientConfig())
     }
     configuration_directory: Path = Path("/etc/nomad.d/")

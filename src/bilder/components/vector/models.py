@@ -12,7 +12,7 @@ class VectorInstallMethod(str, Enum):
 class VectorConfig(OLBaseSettings):
     install_method: VectorInstallMethod = VectorInstallMethod.package
     user: str = "vector"
-    configuration_templates: dict[Path, dict[str, Any]] = {
+    configuration_templates: dict[Path, dict[str, Any]] = {  # noqa: RUF012
         Path(__file__).resolve().parent.joinpath("templates", "vector.toml"): {},
         Path(__file__).resolve().parent.joinpath("templates", "host_metrics.yaml"): {},
     }

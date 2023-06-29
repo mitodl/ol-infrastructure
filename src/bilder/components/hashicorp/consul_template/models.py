@@ -214,7 +214,7 @@ class ConsulTemplateTemplate(FlexibleBaseModel):
     right_delimiter: str = "}}"
     # These are functions that are not permitted in the template. If a template
     # includes one of these functions, it will exit with an error.
-    function_blacklist: Optional[list[str]] = []
+    function_blacklist: Optional[list[str]] = []  # noqa: RUF012
     # If a sandbox path is provided, any path provided to the `file` function is
     # checked that it falls within the sandbox path. Relative paths that try to
     # traverse outside the sandbox path will exit with an error.
@@ -236,7 +236,7 @@ class ConsulTemplateTemplate(FlexibleBaseModel):
 
 
 class ConsulTemplateConfig(HashicorpConfig):
-    template: list[ConsulTemplateTemplate] = [
+    template: list[ConsulTemplateTemplate] = [  # noqa: RUF012
         ConsulTemplateTemplate(destination=Path("/tmp/test.txt"))  # noqa: S108
     ]
     vault_agent_token_file: Optional[Path]
@@ -250,7 +250,7 @@ class ConsulTemplateConfig(HashicorpConfig):
 class ConsulTemplate(HashicorpProduct):
     _name: str = "consul-template"
     version: str = "0.26.0"
-    configuration: dict[Path, ConsulTemplateConfig] = {
+    configuration: dict[Path, ConsulTemplateConfig] = {  # noqa: RUF012
         Path("00-default.json"): ConsulTemplateConfig()
     }
     configuration_directory: Path = Path("/etc/consul-template/conf.d/")

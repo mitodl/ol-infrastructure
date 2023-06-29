@@ -30,7 +30,7 @@ class ConsulAddresses(FlexibleBaseModel):
 class ConsulDNSConfig(FlexibleBaseModel):
     allow_stale: bool = True
     node_ttl: str = "30s"
-    service_ttl: dict[str, str] = {"*": "30s"}
+    service_ttl: dict[str, str] = {"*": "30s"}  # noqa: RUF012
 
 
 class ConsulServiceCheck(FlexibleBaseModel, abc.ABC):
@@ -98,7 +98,9 @@ class ConsulConfig(HashicorpConfig):
 class Consul(HashicorpProduct):
     _name: str = "consul"
     version: str = "1.10.0"
-    configuration: dict[Path, ConsulConfig] = {Path("00-default.json"): ConsulConfig()}
+    configuration: dict[Path, ConsulConfig] = {  # noqa: RUF012
+        Path("00-default.json"): ConsulConfig()
+    }
     configuration_directory: Path = Path("/etc/consul.d/")
     systemd_execution_type: str = "notify"
 
