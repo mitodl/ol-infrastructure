@@ -1639,13 +1639,13 @@ files = [
 
 [[package]]
 name = "pulumi"
-version = "3.73.0"
+version = "3.74.0"
 description = "Pulumi's Python SDK"
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi-3.73.0-py3-none-any.whl", hash = "sha256:6060694bf88854a4db4fb571d131d6e6ca61e55a93935af951ee624de78769ee"},
+    {file = "pulumi-3.74.0-py3-none-any.whl", hash = "sha256:d6b6c10ffc85f18694a6fbf3355d1f93a7004e3b6fb7d03da1ec4ccaae659a2e"},
 ]
 
 [package.dependencies]
