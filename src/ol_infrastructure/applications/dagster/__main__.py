@@ -72,6 +72,10 @@ xpro_mongodb_stack = StackReference(
 )
 
 dagster_bucket_name = f"dagster-{dagster_environment}"
+s3_tracking_logs_buckets = [
+    f"{edxapp_deployment}-{stack_info.env_suffix}-edxapp-tracking"
+    for edxapp_deployment in ("mitxonline", "mitx", "mitx-staging", "xpro")
+]
 dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [
     {
         "Effect": "Allow",
@@ -140,6 +144,18 @@ dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [
             f"arn:aws:s3:::*-{stack_info.env_suffix}-edxapp-courses",
             f"arn:aws:s3:::*-{stack_info.env_suffix}-edxapp-courses/*",
         ],
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "s3:GetObject*",
+            "s3:ListBucket*",
+            "s3:PutObject*",
+        ],
+        "Resource": [
+            f"arn:aws:s3:::{bucket_name}" for bucket_name in s3_tracking_logs_buckets
+        ]
+        + [f"arn:aws:s3:::{bucket_name}/*" for bucket_name in s3_tracking_logs_buckets],
     },
 ]
 
