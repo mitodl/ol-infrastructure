@@ -150,7 +150,7 @@ dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [
         "Action": [
             "s3:GetObject*",
             "s3:ListBucket*",
-            "s3:PutObject*",
+            "s3:PutObject",
         ],
         "Resource": [
             f"arn:aws:s3:::{bucket_name}" for bucket_name in s3_tracking_logs_buckets
