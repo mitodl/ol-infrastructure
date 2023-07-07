@@ -119,6 +119,10 @@ draft_backup_bucket = s3.Bucket(
             ],
         }
     ),
+    website=s3.BucketWebsiteArgs(
+        index_document="index.html",
+        error_document="error.html",
+    ),
     cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
     versioning=s3.BucketVersioningArgs(enabled=True),
     lifecycle_rules=[
