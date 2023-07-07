@@ -304,7 +304,8 @@ ReleaseMap: dict[
                 application="edx-platform",  # type: ignore
                 application_type="IDA",
                 release="master",
-                branch_override="2u/release",
+                branch_override="revert_mathjax_resize",
+                origin_override="https://github.com/mitodl/edx-platform",
             ),
             OpenEdxApplicationVersion(
                 application="edxapp_theme",  # type: ignore
