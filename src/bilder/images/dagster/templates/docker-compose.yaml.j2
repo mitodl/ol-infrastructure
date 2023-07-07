@@ -37,7 +37,18 @@ services:
     restart: unless-stopped
     ports:
     - "4000"
-    command: ["--package-name", "ol_orchestrate.definitions.elt"]
+    command: ["--package-name", "ol_orchestrate.definitions.lakehouse.elt"]
+    env_file:
+      - .env
+  tracking-log-reprocessing:
+    image: mitodl/data-platform-tracking-log-reprocessing:{{ context.dagster_version }}
+    container_name: tracking-log-reprocessing
+    restart: unless-stopped
+    ports:
+    - "4000"
+    command: ["--package-name", "ol_orchestrate.definitions.edx.normalize_tracking_logs"]
+    volumes:
+    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     env_file:
       - .env
   edx-gcs-courses-pipeline:
