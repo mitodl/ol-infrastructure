@@ -149,6 +149,10 @@ draft_offline_bucket = s3.Bucket(
             ],
         }
     ),
+    website=s3.BucketWebsiteArgs(
+        index_document="index.html",
+        error_document="error.html",
+    ),
     cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
 )
 
@@ -221,6 +225,10 @@ live_offline_bucket = s3.Bucket(
                 }
             ],
         }
+    ),
+    website=s3.BucketWebsiteArgs(
+        index_document="index.html",
+        error_document="error.html",
     ),
     cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
 )
