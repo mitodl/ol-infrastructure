@@ -163,60 +163,6 @@ athena_permissions: list[dict[str, Union[str, list[str]]]] = [
     {
         "Effect": "Allow",
         "Action": [
-            "athena:ListDataCatalogs",
-            "athena:ListWorkGroups",
-        ],
-        "Resource": ["*"],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "athena:ListTagsForResource",
-            "athena:TagResource",
-            "athena:UntagResource",
-        ],
-        "Resource": [
-            f"arn:*:athena:*:*:workgroup/*{stack_info.env_suffix}",
-            "arn:*:athena:*:*:datacatalog/*",
-        ],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "athena:BatchGetNamedQuery",
-            "athena:BatchGetQueryExecution",
-            "athena:CreateNamedQuery",
-            "athena:DeleteNamedQuery",
-            "athena:GetNamedQuery",
-            "athena:GetQueryExecution",
-            "athena:GetQueryResults",
-            "athena:GetQueryResultsStream",
-            "athena:GetWorkGroup",
-            "athena:ListNamedQueries",
-            "athena:ListQueryExecutions",
-            "athena:StartQueryExecution",
-            "athena:StopQueryExecution",
-            "athena:UpdateWorkGroup",
-        ],
-        "Resource": [f"arn:*:athena:*:*:workgroup/*{stack_info.env_suffix}"],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "athena:CreateDataCatalog",
-            "athena:DeleteDataCatalog",
-            "athena:GetDataCatalog",
-            "athena:GetDatabase",
-            "athena:GetTableMetadata",
-            "athena:ListDatabases",
-            "athena:ListTableMetadata",
-            "athena:UpdateDataCatalog",
-        ],
-        "Resource": ["arn:*:athena:*:*:datacatalog/*"],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
             "glue:TagResource",
             "glue:UnTagResource",
         ],
@@ -248,26 +194,6 @@ athena_permissions: list[dict[str, Union[str, list[str]]]] = [
             f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}",
             f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}/*",
         ],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "lakeformation:StartTransaction",
-            "lakeformation:CommitTransaction",
-            "lakeformation:CancelTransaction",
-            "lakeformation:ExtendTransaction",
-            "lakeformation:DescribeTransaction",
-            "lakeformation:ListTransactions",
-            "lakeformation:StartQueryPlanning",
-            "lakeformation:GetQueryState",
-            "lakeformation:GetWorkUnitResults",
-            "lakeformation:GetWorkUnits",
-            "lakeformation:GetQueryStatistics",
-            "lakeformation:GetTableObjects",
-            "lakeformation:UpdateTableObjects",
-            "lakeformation:DeleteObjectsOnCancel",
-        ],
-        "Resource": "*",
     },
 ]
 
