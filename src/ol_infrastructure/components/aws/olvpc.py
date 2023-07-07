@@ -18,7 +18,7 @@ from typing import Optional
 
 from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import ec2, elasticache, rds
-from pydantic import PositiveInt, validator
+from pydantic import field_validator, PositiveInt, validator
 
 from ol_infrastructure.lib.aws.ec2_helper import (
     availability_zones,
@@ -56,10 +56,9 @@ class OLVPCConfig(AWSBase):
     enable_ipv6: bool = True
     default_public_ip: bool = True
 
-    @validator("cidr_block")
-    def is_private_net(
-        cls: "OLVPCConfig", network: IPv4Network  # noqa: N805
-    ) -> IPv4Network:
+    @field_validator("cidr_block")
+    @classmethod
+    def is_private_net(cls: "OLVPCConfig", network: IPv4Network) -> IPv4Network:
         """Ensure that only private subnets are assigned to VPC.
 
         :param network: CIDR block configured for the VPC to be created
@@ -83,6 +82,10 @@ class OLVPCConfig(AWSBase):
             )
         return network
 
+    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.  # noqa: E501
+    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.  # noqa: E501
+    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.  # noqa: E501
+    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.  # noqa: E501
     @validator("k8s_service_subnet")
     def k8s_service_subnet_is_subnet(
         cls: "OLVPCConfig",  # noqa: N805
@@ -105,16 +108,15 @@ class OLVPCConfig(AWSBase):
 
         :rtype: IPv4Network
         """
-        network = values.get("cidr_block")  # type: ignore
+        network = values.get("cidr_block")
         assert network is not None
         if k8s_service_subnet is not None and not k8s_service_subnet.subnet_of(network):
             raise ValueError(f"{k8s_service_subnet} is not a subnet of {network}")
         return k8s_service_subnet
 
-    @validator("num_subnets")
-    def min_subnets(
-        cls: "OLVPCConfig", num_nets: PositiveInt  # noqa: N805
-    ) -> PositiveInt:
+    @field_validator("num_subnets")
+    @classmethod
+    def min_subnets(cls: "OLVPCConfig", num_nets: PositiveInt) -> PositiveInt:
         """Enforce that no fewer than the minimum number of subnets are created.
 
         :param num_nets: Number of subnets to be created in the VPC
@@ -154,7 +156,7 @@ class OLVPC(ComponentResource):
         :type opts: Optional[ResourceOptions]
         """
         super().__init__("ol:infrastructure:aws:VPC", vpc_config.vpc_name, None, opts)
-        resource_options = ResourceOptions.merge(  # type: ignore
+        resource_options = ResourceOptions.merge(
             ResourceOptions(parent=self),
             opts,
         )
@@ -338,7 +340,7 @@ class OLVPCPeeringConnection(ComponentResource):
         super().__init__(
             "ol:infrastructure:aws:VPCPeeringConnection", vpc_peer_name, None, opts
         )
-        resource_options = ResourceOptions.merge(  # type: ignore
+        resource_options = ResourceOptions.merge(
             ResourceOptions(parent=self),
             opts,
         )
@@ -356,7 +358,7 @@ class OLVPCPeeringConnection(ComponentResource):
                     "Name": f"{source_vpc.vpc_config.vpc_name} to {destination_vpc.vpc_config.vpc_name} peer"  # noqa: E501
                 }
             ),
-            opts=resource_options.merge(vpc_peer_resource_opts),  # type: ignore
+            opts=resource_options.merge(vpc_peer_resource_opts),
         )
         self.source_to_dest_route = ec2.Route(
             f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-route",  # noqa: E501

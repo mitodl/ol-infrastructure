@@ -1,7 +1,7 @@
 from typing import Optional, Union
 
 
-from pydantic import PositiveInt, validator, BaseModel
+from pydantic import field_validator, ConfigDict, PositiveInt, BaseModel
 from pulumi import ComponentResource, ResourceOptions, Output
 from ol_infrastructure.lib.aws.monitoring_helper import get_monitoring_sns_arn
 
@@ -27,12 +27,13 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
     statistic: str = "Average"
     threshold: int
     treat_missing_data_as: str = "missing"
-    unit: Optional[str]
+    unit: Optional[str] = None
 
     # TODO: MD 20230315 refactor to accomodate anomaly detection alerts
-    @validator("comparison_operator")
+    @field_validator("comparison_operator")
+    @classmethod
     def is_valid_comparison_operator(
-        cls,  # noqa: N805
+        cls,
         comparison_operator: str,
     ) -> str:
         valid_basic_operators = (
@@ -48,8 +49,9 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
             )
         return comparison_operator
 
-    @validator("level")
-    def is_valid_level(cls, level: str) -> str:  # noqa: N805
+    @field_validator("level")
+    @classmethod
+    def is_valid_level(cls, level: str) -> str:
         if level.lower() not in ("warning", "critical"):
             raise ValueError(
                 f"level: {level} is not valid. Valid levels are "
@@ -57,9 +59,10 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
             )
         return level.lower()
 
-    @validator("treat_missing_data_as")
+    @field_validator("treat_missing_data_as")
+    @classmethod
     def is_valid_missing_data_as(
-        cls,  # noqa: N805
+        cls,
         treat_missing_data_as: str,
     ) -> str:
         valid_treat_missing_data_as = ("missing", "ignore", "breaching", "notBreaching")
@@ -70,8 +73,9 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
             )
         return treat_missing_data_as
 
-    @validator("statistic")
-    def is_valid_statistic(cls, statistic: str) -> str:  # noqa: N805
+    @field_validator("statistic")
+    @classmethod
+    def is_valid_statistic(cls, statistic: str) -> str:
         valid_statistics = ("SampleCount", "Average", "Sum", "Minimum", "Maximum")
         if statistic not in valid_statistics:
             raise ValueError(
@@ -80,8 +84,9 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
             )
         return statistic
 
-    @validator("unit")
-    def is_valid_unit(cls, unit: str) -> Union[str, None]:  # noqa: N805
+    @field_validator("unit")
+    @classmethod
+    def is_valid_unit(cls, unit: str) -> Union[str, None]:
         valid_units = (
             "Bits",
             "Bits/Second",
@@ -128,9 +133,7 @@ class OLCloudWatchAlarmSimpleElastiCacheConfig(OLCloudWatchAlarmSimpleConfig):
     cluster_id: Union[str, Output[str]]
     node_id: str
     namespace: str = "AWS/ElastiCache"
-
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class OLCloudWatchAlarmSimpleElastiCache(ComponentResource):
@@ -147,7 +150,7 @@ class OLCloudWatchAlarmSimpleElastiCache(ComponentResource):
             None,
             opts,
         )
-        resource_options = ResourceOptions(parent=self).merge(opts)  # type: ignore
+        resource_options = ResourceOptions(parent=self).merge(opts)
 
         sns_topic_arn = get_monitoring_sns_arn(alarm_config.level)
         cache_cluster_id = f"{alarm_config.cluster_id}{alarm_config.node_id}"
@@ -196,7 +199,7 @@ class OLCloudWatchAlarmSimpleRDS(ComponentResource):
             None,
             opts,
         )
-        resource_options = ResourceOptions(parent=self).merge(opts)  # type: ignore
+        resource_options = ResourceOptions(parent=self).merge(opts)
 
         sns_topic_arn = get_monitoring_sns_arn(alarm_config.level)
 

@@ -4,6 +4,7 @@ from typing import Any, Optional
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from pydantic.main import BaseModel
+from pydantic_settings import SettingsConfigDict
 
 from bilder.lib.model_helpers import OLBaseSettings
 
@@ -16,23 +17,21 @@ class CaddyPlugin(BaseModel):
     """
 
     repository: str
-    version: Optional[str]
+    version: Optional[str] = None
 
 
 class CaddyConfig(OLBaseSettings):
+    model_config = SettingsConfigDict(env_prefix="caddy_")
     caddyfile: Path = Path(__file__).resolve().parent.joinpath("templates/Caddyfile.j2")
     data_directory: Path = Path("/var/lib/caddy/")
-    domains: Optional[list[str]]
+    domains: Optional[list[str]] = None
     log_file: Optional[Path] = Path("/var/log/caddy/caddy.log")
-    plugins: Optional[list[CaddyPlugin]]
-    template_context: Optional[dict[str, Any]]
-    upstream_address: Optional[str]
+    plugins: Optional[list[CaddyPlugin]] = None
+    template_context: Optional[dict[str, Any]] = None
+    upstream_address: Optional[str] = None
     tls_cert_path: Path = Path("/etc/caddy/odl_wildcard.cert")
     tls_key_path: Path = Path("/etc/caddy/odl_wildcard.key")
     caddy_user: Optional[str] = "caddy"
-
-    class Config:
-        env_prefix = "caddy_"
 
     def custom_download_url(self, os: str = "linux", arch: str = "amd64"):
         url_base = "https://caddyserver.com/api/download"

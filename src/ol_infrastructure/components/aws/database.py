@@ -14,7 +14,15 @@ from typing import Optional, Union
 import pulumi
 from pulumi_aws import rds
 from pulumi_aws.ec2 import SecurityGroup
-from pydantic import BaseModel, PositiveInt, SecretStr, conint, validator
+from pydantic import (
+    field_validator,
+    ConfigDict,
+    BaseModel,
+    PositiveInt,
+    SecretStr,
+    conint,
+    validator,
+)
 
 from ol_infrastructure.lib.aws.rds_helper import (
     DBInstanceTypes,
@@ -45,9 +53,7 @@ class OLReplicaDBConfig(BaseModel):
     storage_type: StorageType = StorageType.ssd
     public_access: bool = False
     security_groups: Optional[list[SecurityGroup]] = None
-
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class OLDBConfig(AWSBase):
@@ -74,17 +80,20 @@ class OLDBConfig(AWSBase):
     username: str = "oldevops"
     read_replica: Optional[OLReplicaDBConfig] = None
     monitoring_profile_name: str
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    class Config:
-        arbitrary_types_allowed = True
-
-    @validator("engine")
-    def is_valid_engine(cls: "OLDBConfig", engine: str) -> str:  # noqa: N805
+    @field_validator("engine")
+    @classmethod
+    def is_valid_engine(cls: "OLDBConfig", engine: str) -> str:
         valid_engines = db_engines()
         if engine not in valid_engines:
             raise ValueError("The specified DB engine is not a valid option in AWS.")
         return engine
 
+    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.  # noqa: E501
+    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.  # noqa: E501
+    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.  # noqa: E501
+    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.  # noqa: E501
     @validator("engine_version")
     def is_valid_version(
         cls: "OLDBConfig", engine_version: str, values: dict  # noqa: N805
@@ -97,9 +106,10 @@ class OLDBConfig(AWSBase):
             )
         return engine_version
 
-    @validator("monitoring_profile_name")
+    @field_validator("monitoring_profile_name")
+    @classmethod
     def is_valid_monitoring_profile(
-        cls: "OLDBConfig", monitoring_profile_name: str  # noqa: N805
+        cls: "OLDBConfig", monitoring_profile_name: str
     ) -> str:
         valid_monitoring_profile_names = ("production", "qa", "ci", "disabled")
         if monitoring_profile_name not in valid_monitoring_profile_names:
@@ -168,7 +178,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             opts,
         )
 
-        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore  # noqa: E501
+        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
 
         if db_config.read_replica and db_config.engine == "postgres":
             # Necessary to allow for long-running sync queries from the replica

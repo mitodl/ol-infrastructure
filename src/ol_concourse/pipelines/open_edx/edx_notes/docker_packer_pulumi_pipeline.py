@@ -154,7 +154,7 @@ if __name__ == "__main__":
     pipeline_json = build_notes_pipeline(
         release_name,
         OpenLearningOpenEdxDeployment,
-    ).json(indent=2)
+    ).model_dump_json(indent=2)
     with open("definition.json", "w") as definition:
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)

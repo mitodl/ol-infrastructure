@@ -17,7 +17,7 @@ def git_repo(
         type="git",
         icon="git",
         check_every=check_every,
-        source=Git(uri=uri, branch=branch, paths=paths),
+        source=Git(uri=uri, branch=branch, paths=paths).model_dump(exclude_none=True),
         **kwargs,
     )
 
@@ -33,7 +33,9 @@ def ssh_git_repo(
         name=name,
         type="git",
         icon="git",
-        source=Git(uri=uri, branch=branch, paths=paths, private_key=private_key),
+        source=Git(
+            uri=uri, branch=branch, paths=paths, private_key=private_key
+        ).model_dump(exclude_none=True),
     )
 
 

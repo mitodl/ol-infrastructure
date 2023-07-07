@@ -50,7 +50,7 @@ repos:
   - id: black
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.276'
+  rev: 'v0.0.277'
   hooks:
   - id: ruff
     args: [--extend-ignore=D1, --fix]
@@ -61,8 +61,10 @@ repos:
     args:
     - --explicit-package-bases
     - --namespace-packages
+    - --config-file=pyproject.toml
+    - --warn-unused-configs
     additional_dependencies:
-    - pydantic
+    - pydantic>1
     - types-PyYAML
     - types-requests
 - repo: https://github.com/shellcheck-py/shellcheck-py
