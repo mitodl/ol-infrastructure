@@ -6,8 +6,8 @@ config:
   ocw_site:domains:
     draft:
     - draft.ocw.mit.edu
-    - ocw-preview.odl.mit.edu
     live:
     - live.ocw.mit.edu
     - ocw.mit.edu
     - www.ocw.mit.edu
+    - ocw-preview.odl.mit.edu
