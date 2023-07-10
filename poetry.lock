@@ -1436,14 +1436,14 @@ invoke = ["invoke (>=1.3)"]
 
 [[package]]
 name = "parliament"
-version = "1.6.1"
+version = "1.6.2"
 description = "parliament audits your AWS IAM policies"
 category = "main"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "parliament-1.6.1-py3-none-any.whl", hash = "sha256:236528d66c4b8886d5482f9ad4eb85115e304aa3d25e52d7be0fb60f3a65a708"},
-    {file = "parliament-1.6.1.tar.gz", hash = "sha256:39c854dcf5c35c02366cfea531078f585bd6a6183248f792874588c8c48feca3"},
+    {file = "parliament-1.6.2-py3-none-any.whl", hash = "sha256:57000eab4f12da9091243fec870ad90c61ef5c6032fc2752ef8e4b149b04b7b7"},
+    {file = "parliament-1.6.2.tar.gz", hash = "sha256:05f9db2bda8d85f039dbe27716538f025b7cb973d336568762a06217e3b7e3ae"},
 ]
 
 [package.dependencies]
