@@ -10,8 +10,8 @@ from typing import Any, Literal, Optional, Union
 from pydantic import ConfigDict, BaseModel, Field, PositiveInt, RootModel, constr
 
 
-class Identifier(RootModel):
-    root: constr(pattern=r"^[a-z][\w\d\-_.]*$")
+class Identifier(RootModel[str]):
+    root: constr(pattern=r"^[a-z][\w\d\-_.]*$")  # type: ignore[valid-type]
 
     def __hash__(self):
         return str.__hash__(self.root)
@@ -21,15 +21,15 @@ class Step(BaseModel):
     pass
 
 
-class Version(RootModel):
+class Version(RootModel[dict[str, str]]):
     root: dict[str, str]
 
 
-class Value(RootModel):
+class Value(RootModel[str]):
     root: str
 
 
-class Duration(RootModel):
+class Duration(RootModel[str]):
     root: str
 
 
@@ -187,7 +187,7 @@ class Command(BaseModel):
     )
 
 
-class Number(RootModel):
+class Number(RootModel[float]):
     root: float
 
 

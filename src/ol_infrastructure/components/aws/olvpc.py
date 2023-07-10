@@ -18,7 +18,7 @@ from typing import Optional
 
 from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import ec2, elasticache, rds
-from pydantic import field_validator, PositiveInt, validator
+from pydantic import FieldValidationInfo, field_validator, PositiveInt
 
 from ol_infrastructure.lib.aws.ec2_helper import (
     availability_zones,
@@ -58,7 +58,7 @@ class OLVPCConfig(AWSBase):
 
     @field_validator("cidr_block")
     @classmethod
-    def is_private_net(cls: "OLVPCConfig", network: IPv4Network) -> IPv4Network:
+    def is_private_net(cls, network: IPv4Network) -> IPv4Network:
         """Ensure that only private subnets are assigned to VPC.
 
         :param network: CIDR block configured for the VPC to be created
@@ -82,15 +82,10 @@ class OLVPCConfig(AWSBase):
             )
         return network
 
-    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.  # noqa: E501
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.  # noqa: E501
-    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.  # noqa: E501
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.  # noqa: E501
-    @validator("k8s_service_subnet")
+    @field_validator("k8s_service_subnet")
+    @classmethod
     def k8s_service_subnet_is_subnet(
-        cls: "OLVPCConfig",  # noqa: N805
-        k8s_service_subnet: Optional[IPv4Network],
-        values: dict,
+        cls, k8s_service_subnet: Optional[IPv4Network], info: FieldValidationInfo
     ) -> Optional[IPv4Network]:
         """Ensure that specified k8s subnet is actually a subnet of the cidr specified
             for the VPC.
@@ -108,7 +103,7 @@ class OLVPCConfig(AWSBase):
 
         :rtype: IPv4Network
         """
-        network = values.get("cidr_block")
+        network = info.data["cidr_block"]
         assert network is not None
         if k8s_service_subnet is not None and not k8s_service_subnet.subnet_of(network):
             raise ValueError(f"{k8s_service_subnet} is not a subnet of {network}")
@@ -116,7 +111,7 @@ class OLVPCConfig(AWSBase):
 
     @field_validator("num_subnets")
     @classmethod
-    def min_subnets(cls: "OLVPCConfig", num_nets: PositiveInt) -> PositiveInt:
+    def min_subnets(cls, num_nets: PositiveInt) -> PositiveInt:
         """Enforce that no fewer than the minimum number of subnets are created.
 
         :param num_nets: Number of subnets to be created in the VPC

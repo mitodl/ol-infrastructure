@@ -9,7 +9,13 @@ from typing import Any, Optional, Union
 
 import pulumi
 from pulumi_aws import elasticache
-from pydantic import field_validator, ConfigDict, PositiveInt, conint, validator
+from pydantic import (
+    FieldValidationInfo,
+    field_validator,
+    ConfigDict,
+    PositiveInt,
+    conint,
+)
 
 from bridge.lib.magic_numbers import DEFAULT_MEMCACHED_PORT, DEFAULT_REDIS_PORT
 from ol_infrastructure.lib.aws.elasticache_helper import (
@@ -53,23 +59,16 @@ class OLAmazonCacheConfig(AWSBase):
 
     @field_validator("engine")
     @classmethod
-    def is_valid_engine(cls: "OLAmazonCacheConfig", engine: str) -> str:
+    def is_valid_engine(cls, engine: str) -> str:
         valid_engines = cache_engines()
         if engine not in valid_engines:
             raise ValueError("The specified cache engine is not a valid option in AWS.")
         return engine
 
-    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.  # noqa: E501
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.  # noqa: E501
-    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.  # noqa: E501
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.  # noqa: E501
-    @validator("engine_version")
-    def is_valid_version(
-        cls: "OLAmazonCacheConfig",  # noqa: N805
-        engine_version: str,
-        values: dict,
-    ) -> str:
-        engine: str = str(values.get("engine"))
+    @field_validator("engine_version")
+    @classmethod
+    def is_valid_version(cls, engine_version: str, info: FieldValidationInfo) -> str:
+        engine = info.data["engine"]
         engines_map = cache_engines()
         if engine_version not in engines_map.get(engine, []):
             raise ValueError(
@@ -79,9 +78,7 @@ class OLAmazonCacheConfig(AWSBase):
 
     @field_validator("monitoring_profile_name")
     @classmethod
-    def is_valid_monitoring_profile(
-        cls: "OLAmazonCacheConfig", monitoring_profile_name: str
-    ) -> str:
+    def is_valid_monitoring_profile(cls, monitoring_profile_name: str) -> str:
         valid_monitoring_profile_names = ("production", "qa", "ci", "disabled")
         if monitoring_profile_name not in valid_monitoring_profile_names:
             raise ValueError(
@@ -103,21 +100,17 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
     port: PositiveInt = PositiveInt(DEFAULT_REDIS_PORT)
     snapshot_retention_days: PositiveInt = PositiveInt(5)
 
-    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.  # noqa: E501
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.  # noqa: E501
-    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.  # noqa: E501
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.  # noqa: E501
-    @validator("auth_token")
+    @field_validator("auth_token")
+    @classmethod
     def is_auth_token_valid(
-        cls: "OLAmazonRedisConfig",  # noqa: N805
-        auth_token: Optional[str],
-        values: dict,
+        cls, auth_token: Optional[str], info: FieldValidationInfo
     ) -> Optional[str]:
+        encrypt_transit = info.data["encrypt_transit"]
         min_token_length = 16
         max_token_length = 128
-        if not values["encrypt_transit"]:
+        if not encrypt_transit:
             return auth_token
-        if values["encrypt_transit"] and auth_token is None:
+        if encrypt_transit and auth_token is None:
             raise ValueError("Cannot encrypt transit with no auth token configured")
         token_valid = min_token_length <= len(
             auth_token or ""
@@ -131,7 +124,7 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
 
     @field_validator("cluster_name")
     @classmethod
-    def is_valid_cluster_name(cls: "OLAmazonRedisConfig", cluster_name: str) -> str:
+    def is_valid_cluster_name(cls, cluster_name: str) -> str:
         cluster_name_max_length = 41
         is_valid: bool = True
         is_valid = 1 < len(cluster_name) < cluster_name_max_length
@@ -148,11 +141,11 @@ class OLAmazonMemcachedConfig(OLAmazonCacheConfig):
     engine: str = "memcached"
     engine_version: str = "1.5.16"
     port: PositiveInt = PositiveInt(DEFAULT_MEMCACHED_PORT)
-    num_instances: conint(ge=1, le=MAX_MEMCACHED_CLUSTER_SIZE) = 3  # type: ignore
+    num_instances: conint(ge=1, le=MAX_MEMCACHED_CLUSTER_SIZE) = 3  # type: ignore[valid-type]  # noqa: E501
 
     @field_validator("cluster_name")
     @classmethod
-    def is_valid_cluster_name(cls: "OLAmazonMemcachedConfig", cluster_name: str) -> str:
+    def is_valid_cluster_name(cls, cluster_name: str) -> str:
         max_cluster_name_length = 51
         is_valid: bool = True
         is_valid = 1 < len(cluster_name) < max_cluster_name_length
@@ -357,7 +350,7 @@ class OLAmazonCache(pulumi.ComponentResource):
             },
         }
 
-        monitoring_profiles: dict[str, dict] = {
+        monitoring_profiles: dict[str, dict[str, Any]] = {
             "ci": {},
             "qa": {},
             "production": {},

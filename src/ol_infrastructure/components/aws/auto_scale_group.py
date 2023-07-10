@@ -78,7 +78,7 @@ class OLTargetGroupConfig(AWSBase):
 
     @field_validator("stickiness")
     @classmethod
-    def is_valid_stickiness(cls: "OLTargetGroupConfig", stickiness: str) -> str:
+    def is_valid_stickiness(cls, stickiness: str) -> str:
         if stickiness and stickiness not in ["lb_cookie"]:
             raise ValueError(
                 f"stickiness: {stickiness} is not valid. Only 'lb_cookie' is supported at this time."  # noqa: E501
@@ -106,9 +106,7 @@ class OLLoadBalancerConfig(AWSBase):
 
     @field_validator("ip_address_type")
     @classmethod
-    def is_valid_ip_address_type(
-        cls: "OLLoadBalancerConfig", ip_address_type: str
-    ) -> str:
+    def is_valid_ip_address_type(cls, ip_address_type: str) -> str:
         if ip_address_type not in ["dualstack", "ipv4"]:
             raise ValueError(
                 f"ip_address_type: {ip_address_type} is not valid. Only 'dualstack' and 'ipv4 are accepted'"  # noqa: E501
@@ -117,9 +115,7 @@ class OLLoadBalancerConfig(AWSBase):
 
     @field_validator("load_balancer_type")
     @classmethod
-    def is_valid_load_balancer_type(
-        cls: "OLLoadBalancerConfig", load_balancer_type: str
-    ) -> str:
+    def is_valid_load_balancer_type(cls, load_balancer_type: str) -> str:
         if load_balancer_type not in [
             "application",
             "gateway",
@@ -166,16 +162,14 @@ class OLAutoScaleGroupConfig(AWSBase):
 
     @field_validator("instance_refresh_strategy")
     @classmethod
-    def is_valid_strategy(cls: "OLAutoScaleGroupConfig", strategy: str) -> str:
+    def is_valid_strategy(cls, strategy: str) -> str:
         if strategy != "Rolling":
             raise ValueError("The only vaild instance refresh strategy is 'Rolling'")
         return strategy
 
     @field_validator("health_check_type")
     @classmethod
-    def is_valid_healthcheck(
-        cls: "OLAutoScaleGroupConfig", health_check_type: str
-    ) -> str:
+    def is_valid_healthcheck(cls, health_check_type: str) -> str:
         if health_check_type not in ["ELB", "EC2"]:
             raise ValueError(
                 f"health_check_type: {health_check_type} is not valid. Only 'ELB' or 'EC2' are accepted."  # noqa: E501

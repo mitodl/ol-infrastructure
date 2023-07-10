@@ -327,10 +327,10 @@ class OLVaultPKIIntermediateCABackend(ComponentResource):
             allowed_domains=["mit.edu"],
             cert_type="server",
             resource_name="pki-intermediate-ca-role-default-issuer",
-            opts=ResourceOptions(parent=self.pki_intermediate_ca_cert_request),
         )
         self.pki_intermediate_ca_default_issuer = OLVaultPKIIntermediateRole(
             self.pki_intermediate_ca_default_issuer_config,
+            opts=ResourceOptions(parent=self.pki_intermediate_ca_cert_request),
         )
 
         # Sign passed CSR for pki-intermediate-ca from the AWS Private CA
@@ -449,10 +449,10 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
             allowed_domains=["mit.edu"],
             cert_type="server",
             resource_name=f"pki-intermediate-{backend_config.environment_name}-default-issuer",
-            opts=ResourceOptions(parent=self.pki_intermediate_environment_cert_request),
         )
         self.pki_intermediate_environment_default_issuer = OLVaultPKIIntermediateRole(
             self.pki_intermediate_environment_default_issuer_config,
+            opts=ResourceOptions(parent=self.pki_intermediate_environment_cert_request),
         )
 
         # Sign passed CSR for pki-intermediate-{env} with pki-intermediate-ca

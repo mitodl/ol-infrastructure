@@ -590,7 +590,11 @@ class HttpServiceItem3(BaseModel):
     failover: Optional[HttpFailoverService] = None
 
 
-class HttpService(RootModel):
+class HttpService(
+    RootModel[
+        Union[HttpServiceItem, HttpServiceItem1, HttpServiceItem2, HttpServiceItem3]
+    ]
+):
     root: Union[
         HttpServiceItem, HttpServiceItem1, HttpServiceItem2, HttpServiceItem3
     ] = Field(
@@ -1913,8 +1917,8 @@ class HttpMiddlewareItem22(BaseModel):
     )
 
 
-class HttpMiddleware(RootModel):
-    root: Union[
+HttpMiddleware = RootModel[
+    Union[
         HttpMiddlewareItem,
         HttpMiddlewareItem1,
         HttpMiddlewareItem2,
@@ -1939,6 +1943,7 @@ class HttpMiddleware(RootModel):
         HttpMiddlewareItem21,
         HttpMiddlewareItem22,
     ]
+]
 
 
 class Domain2(BaseModel):
@@ -2116,8 +2121,7 @@ class TcpServiceItem1(BaseModel):
     weighted: Optional[TcpWeightedService] = None
 
 
-class TcpService(RootModel):
-    root: Union[TcpServiceItem, TcpServiceItem1]
+TcpService = RootModel[Union[TcpServiceItem, TcpServiceItem1]]
 
 
 class UdpRouter(BaseModel):
@@ -2186,8 +2190,7 @@ class UdpServiceItem1(BaseModel):
     weighted: Optional[UdpWeightedService] = None
 
 
-class UdpService(RootModel):
-    root: Union[UdpServiceItem, UdpServiceItem1]
+UdpService = RootModel[Union[UdpServiceItem, UdpServiceItem1]]
 
 
 class Http(BaseModel):

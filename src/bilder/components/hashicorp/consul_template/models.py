@@ -69,19 +69,19 @@ class ConsulTemplateVaultConfig(FlexibleBaseModel):
     # This section details the retry options for connecting to Vault. Please see
     # the retry options in the Consul section for more information (they are the
     # same).
-    retry: Optional[dict] = None
+    retry: Optional[dict[str, bool | int | str]] = None
 
     # This section details the SSL options for connecting to the Vault server.
     # Please see the SSL options in the Consul section for more information (they
     # are the same).
-    ssl: Optional[dict] = None
+    ssl: Optional[dict[str, bool | str]] = None
 
 
 class ConsulTemplateConsulConfig(FlexibleBaseModel):
     # This block specifies the basic authentication information to pass with the
     # request. For more information on authentication, please see the Consul
     # documentation.
-    auth: Optional[dict] = None
+    auth: Optional[dict[str, bool | str]] = None
 
     # This is the address of the Consul agent. By default, this is
     # 127.0.0.1:8500, which is the default bind and port for a local Consul
@@ -111,7 +111,7 @@ class ConsulTemplateConsulConfig(FlexibleBaseModel):
     # face of failure. Instead, it uses exponential back-off and retry functions
     # to wait for the cluster to become available, as is customary in distributed
     # systems.
-    retry: Optional[dict] = None
+    retry: Optional[dict[str, bool | int | str]] = None
     # This enabled retries. Retries are enabled by default, so this is
     # redundant.
     # enabled = true
@@ -134,7 +134,7 @@ class ConsulTemplateConsulConfig(FlexibleBaseModel):
     # max_backoff = "1m"
 
     # This block configures the SSL options for connecting to the Consul server.
-    ssl: Optional[dict] = None
+    ssl: Optional[dict[str, bool | str]] = None
     # This enables SSL. Specifying any option for SSL will also enable it.
     # enabled = true
 
