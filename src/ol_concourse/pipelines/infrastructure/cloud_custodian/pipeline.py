@@ -71,7 +71,7 @@ if __name__ == "__main__":
     import sys
 
     with open("definition.json", "w") as definition:
-        definition.write(custodian_pipeline().json(indent=2))
-    sys.stdout.write(custodian_pipeline().json(indent=2))
+        definition.write(custodian_pipeline().model_dump_json(indent=2))
+    sys.stdout.write(custodian_pipeline().model_dump_json(indent=2))
     print()
     print("fly -t pr-inf sp -p misc-cloud-custodian -c definition.json")

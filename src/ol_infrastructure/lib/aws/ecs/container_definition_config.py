@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel, PositiveInt, Field
+from pydantic import ConfigDict, BaseModel, PositiveInt, Field
 
 from bridge.lib.magic_numbers import DEFAULT_HTTP_PORT, HALF_GIGABYTE_MB
 from ol_infrastructure.lib.pulumi_helper import StackInfo
@@ -45,9 +45,7 @@ class OLContainerLogConfig(BaseModel):
     # Options to pass to log config
     options: Optional[dict[str, str]] = None
     secret_options: Optional[list[Secret]] = None
-
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 # Many more options available (in AWS) that are not defined in this configuration
@@ -128,6 +126,4 @@ class OLFargateContainerDefinitionConfig(BaseModel):
         "configuration templates via Vault agent or consul-template sidecars.",
         parameter_name="volumesFrom",
     )
-
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)

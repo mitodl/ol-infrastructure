@@ -55,7 +55,7 @@ class S3ServerlessSite(ComponentResource):
             "ol:infrastructure:aws:S3ServerlessSite", site_config.site_name, None, opts
         )
 
-        resource_opts = ResourceOptions(parent=self).merge(opts)  # type: ignore
+        resource_opts = ResourceOptions(parent=self).merge(opts)
 
         self.site_bucket = s3.Bucket(
             f"{site_config.site_name}-bucket",

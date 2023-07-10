@@ -1,10 +1,13 @@
 from pathlib import Path
 
+from pydantic_settings import SettingsConfigDict
+
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 from bilder.lib.model_helpers import OLBaseSettings
 
 
 class PomeriumConfig(OLBaseSettings):
+    model_config = SettingsConfigDict(env_prefix="pomerium_")
     configuration_directory: Path = Path("/etc/pomerium")
     configuration_template_directory: Path = Path("/etc/vault-templates.d")
 
@@ -25,6 +28,3 @@ class PomeriumConfig(OLBaseSettings):
     configuration_template_file: Path = configuration_template_directory.joinpath(
         "config.yaml.tmpl"
     )
-
-    class Config:
-        env_prefix = "pomerium_"

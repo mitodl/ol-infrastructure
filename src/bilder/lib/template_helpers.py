@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 from pyinfra.operations import files
 
@@ -11,7 +12,7 @@ def place_jinja_template_file(  # noqa: PLR0913
     name: str,
     repo_path: Path,
     destination_path: Path,
-    context: dict,
+    context: dict[str, Any],
     watched_files: list[Path],
     mode: str = "0644",
     user: str = "root",

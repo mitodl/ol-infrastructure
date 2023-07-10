@@ -157,8 +157,8 @@ def build_keycloak_pipeline() -> Pipeline:
 
 if __name__ == "__main__":
     with open("definition.json", "w") as definition:
-        definition.write(build_keycloak_pipeline().json(indent=2))
-    sys.stdout.write(build_keycloak_pipeline().json(indent=2))
+        definition.write(build_keycloak_pipeline().model_dump_json(indent=2))
+    sys.stdout.write(build_keycloak_pipeline().model_dump_json(indent=2))
     sys.stdout.writelines(
         ("\n", "fly -t pr-inf sp -p docker-packer-pulumi-keycloak -c definition.json")
     )

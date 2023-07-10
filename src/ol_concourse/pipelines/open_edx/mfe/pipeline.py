@@ -35,7 +35,7 @@ from ol_concourse.lib.resources import git_repo
 
 
 class OpenEdxVars(BaseModel):
-    contact_url: Optional[str]
+    contact_url: Optional[str] = None
     deployment_name: OpenEdxDeploymentName
     environment: str
     environment_stage: EnvStage
@@ -46,13 +46,13 @@ class OpenEdxVars(BaseModel):
     site_name: str
     studio_domain: str
     support_url: str
-    schedule_email_section: Optional[str]
-    trademark_text: Optional[str]
-    honor_code_url: Optional[str]
+    schedule_email_section: Optional[str] = None
+    trademark_text: Optional[str] = None
+    honor_code_url: Optional[str] = None
     terms_of_service_url: str
-    accessibility_url: Optional[str]
-    about_us_url: Optional[str]
-    privacy_policy_url: Optional[str]
+    accessibility_url: Optional[str] = None
+    about_us_url: Optional[str] = None
+    privacy_policy_url: Optional[str] = None
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -232,5 +232,5 @@ if __name__ == "__main__":
     release_name: OpenEdxSupportedRelease = sys.argv[2]
     pipeline = mfe_pipeline(deployment, release_name)
     with open("definition.json", "w") as definition:
-        definition.write(pipeline.json(indent=2))
-    sys.stdout.write(pipeline.json(indent=2))
+        definition.write(pipeline.model_dump_json(indent=2))
+    sys.stdout.write(pipeline.model_dump_json(indent=2))
