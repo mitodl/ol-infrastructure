@@ -148,8 +148,9 @@ dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [
     {
         "Effect": "Allow",
         "Action": [
+            "s3:GetBucketLocation",
             "s3:GetObject*",
-            "s3:ListBucket*",
+            "s3:ListBucket",
             "s3:PutObject",
         ],
         "Resource": [
