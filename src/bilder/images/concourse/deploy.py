@@ -163,7 +163,9 @@ concourse_config_map = {
 }
 concourse_config: Union[
     ConcourseWebConfig, ConcourseWorkerConfig
-] = concourse_config_map[node_type]()
+] = concourse_config_map[
+    node_type
+]()  # type: ignore
 vault_template_map = {
     CONCOURSE_WEB_NODE_TYPE: [
         partial(

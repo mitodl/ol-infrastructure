@@ -2,13 +2,11 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from pydantic import SecretStr
-from pydantic_settings import SettingsConfigDict
 
 from bilder.components.hashicorp.models import HashicorpConfig, HashicorpProduct
 
 
 class ConsulExternalServicesMonitorConfig(HashicorpConfig):
-    model_config = SettingsConfigDict(env_prefix="consul_esm_")
     log_level: str = "INFO"
     consul_service: str = "consul-esm"
     consul_service_tag: str = "consul-esm"
@@ -21,6 +19,9 @@ class ConsulExternalServicesMonitorConfig(HashicorpConfig):
     ping_type: str = "udp"
     passing_threshold: int = 0
     critical_threshold: int = 5
+
+    class Config:
+        env_prefix = "consul_esm_"
 
 
 class ConsulExternalServicesMonitor(HashicorpProduct):
@@ -35,6 +36,6 @@ class ConsulExternalServicesMonitor(HashicorpProduct):
 
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
         for fpath, config in self.configuration.items():
-            yield self.configuration_directory.joinpath(fpath), config.model_dump_json(
+            yield self.configuration_directory.joinpath(fpath), config.json(
                 exclude_none=True, indent=2
             )

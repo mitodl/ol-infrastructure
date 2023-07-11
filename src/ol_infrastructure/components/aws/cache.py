@@ -9,13 +9,7 @@ from typing import Any, Optional, Union
 
 import pulumi
 from pulumi_aws import elasticache
-from pydantic import (
-    FieldValidationInfo,
-    field_validator,
-    ConfigDict,
-    PositiveInt,
-    conint,
-)
+from pydantic import PositiveInt, conint, validator
 
 from bridge.lib.magic_numbers import DEFAULT_MEMCACHED_PORT, DEFAULT_REDIS_PORT
 from ol_infrastructure.lib.aws.elasticache_helper import (
@@ -55,20 +49,24 @@ class OLAmazonCacheConfig(AWSBase):
     subnet_group: Union[
         str, pulumi.Output[str]
     ]  # the name of the subnet group created in the OLVPC component
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @field_validator("engine")
-    @classmethod
-    def is_valid_engine(cls, engine: str) -> str:
+    class Config:
+        arbitrary_types_allowed = True
+
+    @validator("engine")
+    def is_valid_engine(cls: "OLAmazonCacheConfig", engine: str) -> str:  # noqa: N805
         valid_engines = cache_engines()
         if engine not in valid_engines:
             raise ValueError("The specified cache engine is not a valid option in AWS.")
         return engine
 
-    @field_validator("engine_version")
-    @classmethod
-    def is_valid_version(cls, engine_version: str, info: FieldValidationInfo) -> str:
-        engine = info.data["engine"]
+    @validator("engine_version")
+    def is_valid_version(
+        cls: "OLAmazonCacheConfig",  # noqa: N805
+        engine_version: str,
+        values: dict,
+    ) -> str:
+        engine: str = str(values.get("engine"))
         engines_map = cache_engines()
         if engine_version not in engines_map.get(engine, []):
             raise ValueError(
@@ -76,9 +74,10 @@ class OLAmazonCacheConfig(AWSBase):
             )
         return engine_version
 
-    @field_validator("monitoring_profile_name")
-    @classmethod
-    def is_valid_monitoring_profile(cls, monitoring_profile_name: str) -> str:
+    @validator("monitoring_profile_name")
+    def is_valid_monitoring_profile(
+        cls: "OLAmazonCacheConfig", monitoring_profile_name: str  # noqa: N805
+    ) -> str:
         valid_monitoring_profile_names = ("production", "qa", "ci", "disabled")
         if monitoring_profile_name not in valid_monitoring_profile_names:
             raise ValueError(
@@ -100,17 +99,17 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
     port: PositiveInt = PositiveInt(DEFAULT_REDIS_PORT)
     snapshot_retention_days: PositiveInt = PositiveInt(5)
 
-    @field_validator("auth_token")
-    @classmethod
+    @validator("auth_token")
     def is_auth_token_valid(
-        cls, auth_token: Optional[str], info: FieldValidationInfo
+        cls: "OLAmazonRedisConfig",  # noqa: N805
+        auth_token: Optional[str],
+        values: dict,
     ) -> Optional[str]:
-        encrypt_transit = info.data["encrypt_transit"]
         min_token_length = 16
         max_token_length = 128
-        if not encrypt_transit:
+        if not values["encrypt_transit"]:
             return auth_token
-        if encrypt_transit and auth_token is None:
+        if values["encrypt_transit"] and auth_token is None:
             raise ValueError("Cannot encrypt transit with no auth token configured")
         token_valid = min_token_length <= len(
             auth_token or ""
@@ -122,9 +121,10 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
             )
         return auth_token
 
-    @field_validator("cluster_name")
-    @classmethod
-    def is_valid_cluster_name(cls, cluster_name: str) -> str:
+    @validator("cluster_name")
+    def is_valid_cluster_name(
+        cls: "OLAmazonRedisConfig", cluster_name: str  # noqa: N805
+    ) -> str:
         cluster_name_max_length = 41
         is_valid: bool = True
         is_valid = 1 < len(cluster_name) < cluster_name_max_length
@@ -141,11 +141,12 @@ class OLAmazonMemcachedConfig(OLAmazonCacheConfig):
     engine: str = "memcached"
     engine_version: str = "1.5.16"
     port: PositiveInt = PositiveInt(DEFAULT_MEMCACHED_PORT)
-    num_instances: conint(ge=1, le=MAX_MEMCACHED_CLUSTER_SIZE) = 3  # type: ignore[valid-type]  # noqa: E501
+    num_instances: conint(ge=1, le=MAX_MEMCACHED_CLUSTER_SIZE) = 3  # type: ignore
 
-    @field_validator("cluster_name")
-    @classmethod
-    def is_valid_cluster_name(cls, cluster_name: str) -> str:
+    @validator("cluster_name")
+    def is_valid_cluster_name(
+        cls: "OLAmazonMemcachedConfig", cluster_name: str  # noqa: N805
+    ) -> str:
         max_cluster_name_length = 51
         is_valid: bool = True
         is_valid = 1 < len(cluster_name) < max_cluster_name_length
@@ -170,7 +171,9 @@ class OLAmazonCache(pulumi.ComponentResource):
             None,
             opts,
         )
-        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
+        resource_options = pulumi.ResourceOptions(parent=self).merge(
+            opts
+        )  # type: ignore
 
         clustered_redis = cache_config.engine == "redis" and getattr(  # noqa: B009
             cache_config, "cluster_mode_enabled"
@@ -204,16 +207,16 @@ class OLAmazonCache(pulumi.ComponentResource):
             if cache_config.engine_version.startswith("6"):
                 cache_options = resource_options.merge(
                     pulumi.ResourceOptions(ignore_changes=["engine_version"])
-                )
+                )  # type: ignore
             else:
                 cache_options = resource_options
             cache_cluster, address = self.redis(
-                cache_config,
+                cache_config,  # type: ignore
                 clustered_redis,
                 cache_options,
             )
         else:
-            cache_cluster, address = self.memcached(cache_config, resource_options)
+            cache_cluster, address = self.memcached(cache_config, resource_options)  # type: ignore  # noqa: E501
 
         monitoring_profile = self._get_default_monitoring_profile(
             cache_config.monitoring_profile_name, cache_config.engine
@@ -252,7 +255,7 @@ class OLAmazonCache(pulumi.ComponentResource):
             )
             cache_node_count = None
         else:
-            cluster_mode_param = None
+            cluster_mode_param = None  # type: ignore
             cache_node_count = cache_config.num_instances
 
         cache_cluster = elasticache.ReplicationGroup(
@@ -350,7 +353,7 @@ class OLAmazonCache(pulumi.ComponentResource):
             },
         }
 
-        monitoring_profiles: dict[str, dict[str, Any]] = {
+        monitoring_profiles: dict[str, dict] = {
             "ci": {},
             "qa": {},
             "production": {},

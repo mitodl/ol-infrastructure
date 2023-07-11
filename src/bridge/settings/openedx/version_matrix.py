@@ -70,44 +70,44 @@ ReleaseMap: dict[
     "palm": {
         "mitx": [
             OpenEdxApplicationVersion(
-                application="communications",
+                application="communications",  # type: ignore
                 application_type="MFE",
                 release="palm",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="course-authoring",
+                application="course-authoring",  # type: ignore
                 application_type="MFE",
                 release="palm",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="edx-platform",
+                application="edx-platform",  # type: ignore
                 application_type="IDA",
                 release="palm",
                 branch_override="mitx/palm",
                 origin_override="https://github.com/mitodl/edx-platform",
             ),
             OpenEdxApplicationVersion(
-                application="edxapp_theme",
+                application="edxapp_theme",  # type: ignore
                 application_type="IDA",
                 release="palm",
                 branch_override="palm",
                 origin_override="https://github.com/mitodl/mitx-theme",
             ),
             OpenEdxApplicationVersion(
-                application="forum",
+                application="forum",  # type: ignore
                 application_type="IDA",
                 release="palm",
             ),
             OpenEdxApplicationVersion(
-                application="gradebook",
+                application="gradebook",  # type: ignore
                 application_type="MFE",
                 release="palm",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="learner-dashboard",
+                application="learner-dashboard",  # type: ignore
                 application_type="MFE",
                 release="palm",
                 branding_overrides={
@@ -116,81 +116,81 @@ ReleaseMap: dict[
                 },
             ),
             OpenEdxApplicationVersion(
-                application="learning",
+                application="learning",  # type: ignore
                 application_type="MFE",
                 release="palm",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="library-authoring",
+                application="library-authoring",  # type: ignore
                 application_type="MFE",
                 release="palm",
                 branch_override="master",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="notes-api",
+                application="notes-api",  # type: ignore
                 application_type="IDA",
                 release="palm",
             ),
             OpenEdxApplicationVersion(
-                application="ora-grading",
+                application="ora-grading",  # type: ignore
                 application_type="MFE",
                 release="palm",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="xqueue",
+                application="xqueue",  # type: ignore
                 application_type="IDA",
                 release="palm",
             ),
         ],
         "mitx-staging": [
             OpenEdxApplicationVersion(
-                application="communications",
+                application="communications",  # type: ignore
                 application_type="MFE",
                 release="palm",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="course-authoring",
+                application="course-authoring",  # type: ignore
                 application_type="MFE",
                 release="palm",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="edx-platform",
+                application="edx-platform",  # type: ignore
                 application_type="IDA",
                 release="palm",
                 branch_override="mitx/palm",
                 origin_override="https://github.com/mitodl/edx-platform",
             ),
             OpenEdxApplicationVersion(
-                application="edxapp_theme",
+                application="edxapp_theme",  # type: ignore
                 application_type="IDA",
                 release="palm",
                 branch_override="palm",
                 origin_override="https://github.com/mitodl/mitx-theme",
             ),
             OpenEdxApplicationVersion(
-                application="forum",
+                application="forum",  # type: ignore
                 application_type="IDA",
                 release="palm",
             ),
             OpenEdxApplicationVersion(
-                application="gradebook",
+                application="gradebook",  # type: ignore
                 application_type="MFE",
                 release="palm",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="learning",
+                application="learning",  # type: ignore
                 application_type="MFE",
                 release="palm",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="learner-dashboard",
+                application="learner-dashboard",  # type: ignore
                 application_type="MFE",
                 release="palm",
                 branding_overrides={
@@ -199,25 +199,25 @@ ReleaseMap: dict[
                 },
             ),
             OpenEdxApplicationVersion(
-                application="library-authoring",
+                application="library-authoring",  # type: ignore
                 application_type="MFE",
                 release="palm",
                 branch_override="master",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="notes-api",
+                application="notes-api",  # type: ignore
                 application_type="IDA",
                 release="palm",
             ),
             OpenEdxApplicationVersion(
-                application="ora-grading",
+                application="ora-grading",  # type: ignore
                 application_type="MFE",
                 release="palm",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="xqueue",
+                application="xqueue",  # type: ignore
                 application_type="IDA",
                 release="palm",
             ),
@@ -226,7 +226,7 @@ ReleaseMap: dict[
     "olive": {
         "xpro": [
             OpenEdxApplicationVersion(
-                application="course-authoring",
+                application="course-authoring",  # type: ignore
                 application_type="MFE",
                 release="olive",
                 branch_override="master",
@@ -234,38 +234,38 @@ ReleaseMap: dict[
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="edx-platform",
+                application="edx-platform",  # type: ignore
                 application_type="IDA",
                 release="olive",
             ),
             OpenEdxApplicationVersion(
-                application="edxapp_theme",
+                application="edxapp_theme",  # type: ignore
                 application_type="IDA",
                 release="olive",
                 branch_override="olive",
                 origin_override="https://github.com/mitodl/mitxpro-theme",
             ),
             OpenEdxApplicationVersion(
-                application="forum",
+                application="forum",  # type: ignore
                 application_type="IDA",
                 release="olive",
             ),
             OpenEdxApplicationVersion(
-                application="gradebook",
+                application="gradebook",  # type: ignore
                 application_type="MFE",
                 release="olive",
                 runtime_version_override="16",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="learning",
+                application="learning",  # type: ignore
                 application_type="MFE",
                 release="olive",
                 runtime_version_override="16",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="library-authoring",
+                application="library-authoring",  # type: ignore
                 application_type="MFE",
                 release="olive",
                 branch_override="master",
@@ -273,12 +273,12 @@ ReleaseMap: dict[
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="notes-api",
+                application="notes-api",  # type: ignore
                 application_type="IDA",
                 release="olive",
             ),
             OpenEdxApplicationVersion(
-                application="ora-grading",
+                application="ora-grading",  # type: ignore
                 application_type="MFE",
                 release="olive",
                 runtime_version_override="16",
@@ -289,43 +289,43 @@ ReleaseMap: dict[
     "master": {
         "mitxonline": [
             OpenEdxApplicationVersion(
-                application="communications",
+                application="communications",  # type: ignore
                 application_type="MFE",
                 release="master",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="course-authoring",
+                application="course-authoring",  # type: ignore
                 application_type="MFE",
                 release="master",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="edx-platform",
+                application="edx-platform",  # type: ignore
                 application_type="IDA",
                 release="master",
                 branch_override="2u/release",
             ),
             OpenEdxApplicationVersion(
-                application="edxapp_theme",
+                application="edxapp_theme",  # type: ignore
                 application_type="IDA",
                 release="master",
                 branch_override="main",
                 origin_override="https://github.com/mitodl/mitxonline-theme",
             ),
             OpenEdxApplicationVersion(
-                application="forum",
+                application="forum",  # type: ignore
                 application_type="IDA",
                 release="master",
             ),
             OpenEdxApplicationVersion(
-                application="gradebook",
+                application="gradebook",  # type: ignore
                 application_type="MFE",
                 release="master",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="learning",
+                application="learning",  # type: ignore
                 application_type="MFE",
                 release="master",
                 branch_override="open-learning",
@@ -333,13 +333,13 @@ ReleaseMap: dict[
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="library-authoring",
+                application="library-authoring",  # type: ignore
                 application_type="MFE",
                 release="master",
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="ora-grading",
+                application="ora-grading",  # type: ignore
                 application_type="MFE",
                 release="master",
                 branding_overrides=default_branding_overrides,

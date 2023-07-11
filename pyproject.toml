@@ -31,17 +31,16 @@ pulumi-github = "^5.0.0"
 pulumi-tls = "^4.1.0"
 pulumi-vault = "^5.5.0, !=5.7.0"
 pulumi_consul = "^3.5.0"
-pydantic = "^2"
+pydantic = "^1"
 pyinfra = "^2.3"
 pulumi-mongodbatlas = "^3.3.0"
 bcrypt = "^4.0.0"
 pulumi-keycloak = "^5.1.0"
-pydantic-settings = "^2.0.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "*"
 copier = "*"
-datamodel-code-generator = "*"
+datamodel-code-generator = "^0.20.0"
 diagrams = "*"
 mypy = "<1.5"
 pre-commit = "^3.0.0"
@@ -60,26 +59,6 @@ profile = "black"
 [build-system]
 requires = ["poetry_core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.mypy]
-python_version = "3.11"
-plugins = [
-  "pydantic.mypy"
-]
-follow_imports = "normal"
-warn_redundant_casts = true
-warn_unused_ignores = true
-disallow_any_generics = true
-check_untyped_defs = true
-no_implicit_reexport = true
-ignore_missing_imports = true
-# for strict mypy: (this is the tricky one :-))
-# disallow_untyped_defs = true
-
-[tool.pydantic-mypy]
-init_forbid_extra = true
-init_typed = true
-warn_required_dynamic_aliases = true
 
 [tool.ruff]
 target-version = "py311"

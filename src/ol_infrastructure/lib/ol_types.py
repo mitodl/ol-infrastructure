@@ -1,6 +1,6 @@
 from enum import Enum, unique
 
-from pydantic import field_validator, BaseModel
+from pydantic import BaseModel, validator
 
 from ol_infrastructure.lib.aws.ec2_helper import aws_regions
 
@@ -73,9 +73,8 @@ class AWSBase(BaseModel):
         super().__init__(**kwargs)
         self.tags.update({"pulumi_managed": "true"})
 
-    @field_validator("tags")
-    @classmethod
-    def enforce_tags(cls, tags: dict[str, str]) -> dict[str, str]:
+    @validator("tags")
+    def enforce_tags(cls, tags: dict[str, str]) -> dict[str, str]:  # noqa: N805
         if not REQUIRED_TAGS.issubset(tags.keys()):
             raise ValueError(
                 "Not all required tags have been specified. Missing tags: {}".format(
@@ -90,9 +89,8 @@ class AWSBase(BaseModel):
             ) from exc
         return tags
 
-    @field_validator("region")
-    @classmethod
-    def check_region(cls, region: str) -> str:
+    @validator("region")
+    def check_region(cls, region: str) -> str:  # noqa: N805
         if region not in aws_regions():
             raise ValueError("The specified region does not exist")
         return region

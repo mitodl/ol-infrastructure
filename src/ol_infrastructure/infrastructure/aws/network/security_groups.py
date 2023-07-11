@@ -1,13 +1,8 @@
 from functools import partial
-from typing import ParamSpec
-from collections.abc import Callable
 
 from pulumi_aws import ec2
 
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
-
-
-SecurityGroupParams = ParamSpec("SecurityGroupParams")
 
 
 def default_group(vpc_id: str) -> ec2.AwaitableGetSecurityGroupResult:
@@ -20,9 +15,7 @@ def default_group(vpc_id: str) -> ec2.AwaitableGetSecurityGroupResult:
     )
 
 
-def public_web(
-    vpc_name: str, vpc: ec2.Vpc
-) -> Callable[SecurityGroupParams, ec2.SecurityGroup]:
+def public_web(vpc_name: str, vpc: ec2.Vpc) -> partial:
     """Create a security group that exposes a webserver to the public internet.
 
     :param vpc_name: The name of the VPC where the security group is being created.
@@ -63,9 +56,7 @@ def public_web(
     )
 
 
-def public_ssh(
-    vpc_name: str, vpc: ec2.Vpc
-) -> Callable[SecurityGroupParams, ec2.SecurityGroup]:
+def public_ssh(vpc_name: str, vpc: ec2.Vpc) -> partial:
     """Create a security group that exposes a webserver to the public internet.
 
     :param vpc_name: The name of the VPC where the security group is being created.
@@ -98,9 +89,7 @@ def public_ssh(
     )
 
 
-def salt_minion(
-    vpc_name: str, vpc: ec2.Vpc, ops_vpc: ec2.Vpc
-) -> Callable[SecurityGroupParams, ec2.SecurityGroup]:
+def salt_minion(vpc_name: str, vpc: ec2.Vpc, ops_vpc: ec2.Vpc) -> partial:
     """Create a security group to allow access to Salt minions from the appropriate
         Salt master.
 

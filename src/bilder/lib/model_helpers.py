@@ -1,5 +1,6 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseSettings
 
 
 class OLBaseSettings(BaseSettings):
-    model_config = SettingsConfigDict(case_sensitive=False)
+    class Config:
+        case_sensitive = False

@@ -8,11 +8,13 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import ConfigDict, BaseModel, Field
+from pydantic import BaseModel, Extra, Field
 
 
 class FieldModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+    class Config:
+        allow_population_by_field_name = True
+        extra = Extra.forbid
 
 
 class Filters(FieldModel):

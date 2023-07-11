@@ -65,7 +65,7 @@ if __name__ == "__main__":
     import sys
 
     with open("definition.json", "w") as definition:
-        definition.write(tika_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(tika_pipeline.model_dump_json(indent=2))
+        definition.write(tika_pipeline.json(indent=2))
+    sys.stdout.write(tika_pipeline.json(indent=2))
     print()
     print("fly -t pr-inf sp -p packer-pulumi-tika -c definition.json")

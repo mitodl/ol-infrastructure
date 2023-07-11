@@ -58,8 +58,8 @@ docker_pipeline = Pipeline(
 
 if __name__ == "__main__":
     with open("definition.json", "w") as definition:
-        definition.write(docker_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(docker_pipeline.model_dump_json(indent=2))
+        definition.write(docker_pipeline.json(indent=2))
+    sys.stdout.write(docker_pipeline.json(indent=2))
     sys.stdout.write(
         "fly -t <prod_target> set-pipeline -p docker-openedx-tubular-image -c definition.json"  # noqa: E501
     )

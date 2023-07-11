@@ -81,7 +81,7 @@ if __name__ == "__main__":
     import sys
 
     with open("definition.json", "w") as definition:
-        definition.write(dagster_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(dagster_pipeline.model_dump_json(indent=2))
+        definition.write(dagster_pipeline.json(indent=2))
+    sys.stdout.write(dagster_pipeline.json(indent=2))
     print()
     print("fly -t pr-inf sp -p packer-pulumi-dagster -c definition.json")

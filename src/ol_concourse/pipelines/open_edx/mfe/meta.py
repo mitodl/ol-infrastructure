@@ -134,5 +134,5 @@ if __name__ == "__main__":
     import sys
 
     with open("definition.json", "w") as definition:
-        definition.write(meta_pipeline().model_dump_json(indent=2))
-    sys.stdout.write(meta_pipeline().model_dump_json(indent=2))
+        definition.write(meta_pipeline().json(indent=2))
+    sys.stdout.write(meta_pipeline().json(indent=2))

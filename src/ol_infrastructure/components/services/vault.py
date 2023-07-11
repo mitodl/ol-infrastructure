@@ -15,7 +15,7 @@ from typing import Optional, Union
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_vault import Mount, aws, database, pkisecret
 from pulumi_aws.acmpca import Certificate, CertificateValidityArgs
-from pydantic import field_validator, ConfigDict, BaseModel
+from pydantic import BaseModel, validator
 
 from bridge.lib.magic_numbers import (
     DEFAULT_MONGODB_PORT,
@@ -68,8 +68,10 @@ class OLVaultDatabaseConfig(BaseModel):
     db_host: Union[str, Output[str]]
     max_ttl: int = ONE_MONTH_SECONDS * 6
     default_ttl: int = ONE_MONTH_SECONDS * 6
-    connection_options: Optional[dict[str, str]] = None
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    connection_options: Optional[dict[str, str]]
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class OLVaultPostgresDatabaseConfig(OLVaultDatabaseConfig):
@@ -121,7 +123,9 @@ class OLVaultDatabaseBackend(ComponentResource):
             opts,
         )
 
-        resource_opts = ResourceOptions.merge(ResourceOptions(parent=self), opts)
+        resource_opts = ResourceOptions.merge(
+            ResourceOptions(parent=self), opts
+        )  # type: ignore
 
         self.db_mount = Mount(
             f"{db_config.db_name}-mount-point",
@@ -149,7 +153,9 @@ class OLVaultDatabaseBackend(ComponentResource):
         db_option_dict.update(db_config.connection_options or {})
         self.db_connection = database.SecretBackendConnection(
             f"{db_config.db_name}-database-connection",
-            opts=resource_opts.merge(ResourceOptions(parent=self.db_mount)),
+            opts=resource_opts.merge(
+                ResourceOptions(parent=self.db_mount)
+            ),  # type: ignore
             backend=db_config.mount_point,
             verify_connection=db_config.verify_connection,
             allowed_roles=sorted(db_config.role_statements.keys()),
@@ -162,7 +168,9 @@ class OLVaultDatabaseBackend(ComponentResource):
         for role_name, role_defs in db_config.role_statements.items():
             self.db_roles[role_name] = database.SecretBackendRole(
                 f"{db_config.db_name}-database-role-{role_name}",
-                opts=resource_opts.merge(ResourceOptions(parent=self.db_connection)),
+                opts=resource_opts.merge(
+                    ResourceOptions(parent=self.db_connection)
+                ),  # type: ignore
                 name=role_name,
                 backend=self.db_mount.path,
                 db_name=db_config.db_name,
@@ -212,9 +220,8 @@ class OLVaultAWSSecretsEngineConfig(BaseModel):
     policy_documents: dict[str, str]
     credential_type: str = "iam_user"
 
-    @field_validator("vault_backend_path")
-    @classmethod
-    def is_valid_path(cls, vault_backend_path: str) -> str:
+    @validator("vault_backend_path")
+    def is_valid_path(cls, vault_backend_path: str) -> str:  # noqa: N805
         if vault_backend_path.startswith("/") or vault_backend_path.endswith("/"):
             raise ValueError(
                 f"The specified path value {vault_backend_path} can not start or "
@@ -233,7 +240,7 @@ class OLVaultAWSSecretsEngine(ComponentResource):
             "ol:services:Vault:AWSSecretsEngine", engine_config.app_name, None, opts
         )
 
-        resource_options = ResourceOptions(parent=self).merge(opts)
+        resource_options = ResourceOptions(parent=self).merge(opts)  # type: ignore
 
         self.aws_secrets_engine = aws.SecretBackend(
             # TODO verify app_name exists based on Apps class in ol_types
@@ -261,7 +268,9 @@ class OLVaultPKIIntermediateCABackendConfig(BaseModel):
     max_ttl: int = ONE_MONTH_SECONDS * 12
     default_ttl: int = ONE_MONTH_SECONDS * 12
     acmpca_rootca_arn: Output = None
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class OLVaultPKIIntermediateCABackend(ComponentResource):
@@ -289,7 +298,7 @@ class OLVaultPKIIntermediateCABackend(ComponentResource):
             opts,
         )
 
-        resource_options = ResourceOptions(parent=self).merge(opts)
+        resource_options = ResourceOptions(parent=self).merge(opts)  # type: ignore
 
         # Create the pki-intermediate-ca endpoint / mount
         self.pki_intermediate_ca_backend = Mount(
@@ -327,10 +336,10 @@ class OLVaultPKIIntermediateCABackend(ComponentResource):
             allowed_domains=["mit.edu"],
             cert_type="server",
             resource_name="pki-intermediate-ca-role-default-issuer",
+            opts=ResourceOptions(parent=self.pki_intermediate_ca_cert_request),
         )
         self.pki_intermediate_ca_default_issuer = OLVaultPKIIntermediateRole(
             self.pki_intermediate_ca_default_issuer_config,
-            opts=ResourceOptions(parent=self.pki_intermediate_ca_cert_request),
         )
 
         # Sign passed CSR for pki-intermediate-ca from the AWS Private CA
@@ -380,7 +389,9 @@ class OLVaultPKIIntermediateEnvBackendConfig(BaseModel):
     default_ttl: int = ONE_MONTH_SECONDS * 12
     acmpca_rootca_arn: Output = None
     parent_intermediate_ca: OLVaultPKIIntermediateCABackend = None  # type: ignore
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class OLVaultPKIIntermediateEnvBackend(ComponentResource):
@@ -409,7 +420,9 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
             depends_on=[
                 backend_config.parent_intermediate_ca.pki_intermediate_ca_default_issuer
             ],
-        ).merge(opts)
+        ).merge(
+            opts
+        )  # type: ignore
 
         # Create the pki-intermediate-{env} endpoint / mount
         self.pki_intermediate_environment_backend = Mount(
@@ -449,10 +462,10 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
             allowed_domains=["mit.edu"],
             cert_type="server",
             resource_name=f"pki-intermediate-{backend_config.environment_name}-default-issuer",
+            opts=ResourceOptions(parent=self.pki_intermediate_environment_cert_request),
         )
         self.pki_intermediate_environment_default_issuer = OLVaultPKIIntermediateRole(
             self.pki_intermediate_environment_default_issuer_config,
-            opts=ResourceOptions(parent=self.pki_intermediate_environment_cert_request),
         )
 
         # Sign passed CSR for pki-intermediate-{env} with pki-intermediate-ca
@@ -522,11 +535,12 @@ class OLVaultPKIIntermediateRoleConfig(BaseModel):
     allow_subdomains: bool = False
     cert_type: str  # Should be client or server
     resource_name: str
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @field_validator("cert_type")
-    @classmethod
-    def is_valid_cert_type(cls, cert_type: str) -> str:
+    class Config:
+        arbitrary_types_allowed = True
+
+    @validator("cert_type")
+    def is_valid_cert_type(cls, cert_type: str) -> str:  # noqa: N805
         if cert_type not in {"server", "client"}:
             raise ValueError(
                 f"The specified certificate type {cert_type} has to be either client "
@@ -548,7 +562,7 @@ class OLVaultPKIIntermediateRole(ComponentResource):
             opts,
         )
 
-        resource_options = ResourceOptions(parent=self).merge(opts)
+        resource_options = ResourceOptions(parent=self).merge(opts)  # type: ignore
 
         # Default is True for both flags
         flag_type = {

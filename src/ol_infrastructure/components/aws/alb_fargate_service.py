@@ -38,7 +38,7 @@ from pulumi_aws.lb import (
     TargetGroup,
 )
 from pulumi_aws.route53 import Record, RecordAliasArgs, get_zone
-from pydantic import ConfigDict, PositiveInt
+from pydantic import PositiveInt
 
 from bridge.lib.magic_numbers import DEFAULT_HTTP_PORT, DEFAULT_HTTPS_PORT
 from ol_infrastructure.components.aws.fargate_service import (
@@ -140,7 +140,9 @@ class OLApplicationLoadBalancedFargateConfig(AWSBase):
     _launch_type: LaunchTypes = LaunchTypes.fargate
     # Defines what type of load balancer to use. Always set to 'application'
     _load_balancer_type: str = "application"
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):

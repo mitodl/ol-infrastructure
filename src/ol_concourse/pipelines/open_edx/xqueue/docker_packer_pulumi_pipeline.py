@@ -152,7 +152,7 @@ if __name__ == "__main__":
     release_name = sys.argv[1]
     pipeline_json = build_xqueue_pipeline(
         release_name,
-    ).model_dump_json(indent=2)
+    ).json(indent=2)
     with open("definition.json", "w") as definition:
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)

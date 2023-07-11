@@ -2,8 +2,6 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional
 
-from pydantic_settings import SettingsConfigDict
-
 from bilder.components.hashicorp.models import FlexibleBaseModel, HashicorpProduct
 from bilder.lib.model_helpers import OLBaseSettings
 
@@ -17,14 +15,17 @@ class NomadServerConfig(FlexibleBaseModel):
 
 
 class NomadConfig(OLBaseSettings):
-    model_config = SettingsConfigDict(env_prefix="nomad_")
-    client: Optional[NomadClientConfig] = None
+    client: Optional[NomadClientConfig]
     data_dir: Optional[Path] = Path("/var/lib/nomad/")
-    server: Optional[NomadServerConfig] = None
+    server: Optional[NomadServerConfig]
+
+    class Config:
+        env_prefix = "nomad_"
 
 
 class NomadJob(OLBaseSettings):
-    model_config = SettingsConfigDict(env_prefix="nomad_job_")
+    class Config:
+        env_prefix = "nomad_job_"
 
 
 class Nomad(HashicorpProduct):
@@ -41,7 +42,7 @@ class Nomad(HashicorpProduct):
 
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
         for fpath, config in self.configuration.items():
-            yield fpath, config.model_dump_json(exclude_none=True, indent=2)
+            yield fpath, config.json(exclude_none=True, indent=2)
 
     @property
     def data_directory(self) -> Path:

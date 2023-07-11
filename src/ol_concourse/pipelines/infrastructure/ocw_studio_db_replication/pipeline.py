@@ -76,8 +76,8 @@ if __name__ == "__main__":
     import sys
 
     with open("definition.json", "w") as definition:
-        definition.write(db_replication_pipeline().model_dump_json(indent=2))
-    sys.stdout.write(db_replication_pipeline().model_dump_json(indent=2))
+        definition.write(db_replication_pipeline().json(indent=2))
+    sys.stdout.write(db_replication_pipeline().json(indent=2))
     sys.stdout.write("\n")
     sys.stdout.write(
         "fly -t qa-ocw set-pipeline -p ocw-studio-db-replication -c definition.json\n"

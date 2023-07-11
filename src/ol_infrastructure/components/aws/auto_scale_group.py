@@ -27,7 +27,7 @@ from pulumi_aws.lb import (
     TargetGroupHealthCheckArgs,
     TargetGroupStickinessArgs,
 )
-from pydantic import field_validator, ConfigDict, BaseModel, NonNegativeInt, PositiveInt
+from pydantic import BaseModel, NonNegativeInt, PositiveInt, validator
 
 from bridge.lib.magic_numbers import (
     AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
@@ -46,7 +46,9 @@ class BlockDeviceMapping(BaseModel):
     device_name: str = "/dev/xvda"
     volume_size: PositiveInt = PositiveInt(25)
     volume_type: DiskTypes = DiskTypes.ssd
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class TagSpecification(BaseModel):
@@ -54,7 +56,9 @@ class TagSpecification(BaseModel):
 
     resource_type: str
     tags: dict[str, str]
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class OLTargetGroupConfig(AWSBase):
@@ -74,11 +78,14 @@ class OLTargetGroupConfig(AWSBase):
     health_check_protocol: str = "HTTPS"
     health_check_timeout: PositiveInt = PositiveInt(5)
     health_check_unhealthy_threshold: PositiveInt = PositiveInt(3)
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @field_validator("stickiness")
-    @classmethod
-    def is_valid_stickiness(cls, stickiness: str) -> str:
+    class Config:
+        arbitrary_types_allowed = True
+
+    @validator("stickiness")
+    def is_valid_stickiness(
+        cls: "OLTargetGroupConfig", stickiness: str  # noqa: N805
+    ) -> str:
         if stickiness and stickiness not in ["lb_cookie"]:
             raise ValueError(
                 f"stickiness: {stickiness} is not valid. Only 'lb_cookie' is supported at this time."  # noqa: E501
@@ -102,20 +109,24 @@ class OLLoadBalancerConfig(AWSBase):
     listener_cert_domain: str = "*.odl.mit.edu"
     listener_protocol: str = "HTTPS"
     listener_action_type: str = "forward"
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @field_validator("ip_address_type")
-    @classmethod
-    def is_valid_ip_address_type(cls, ip_address_type: str) -> str:
+    class Config:
+        arbitrary_types_allowed = True
+
+    @validator("ip_address_type")
+    def is_valid_ip_address_type(
+        cls: "OLLoadBalancerConfig", ip_address_type: str  # noqa: N805
+    ) -> str:
         if ip_address_type not in ["dualstack", "ipv4"]:
             raise ValueError(
                 f"ip_address_type: {ip_address_type} is not valid. Only 'dualstack' and 'ipv4 are accepted'"  # noqa: E501
             )
         return ip_address_type
 
-    @field_validator("load_balancer_type")
-    @classmethod
-    def is_valid_load_balancer_type(cls, load_balancer_type: str) -> str:
+    @validator("load_balancer_type")
+    def is_valid_load_balancer_type(
+        cls: "OLLoadBalancerConfig", load_balancer_type: str  # noqa: N805
+    ) -> str:
         if load_balancer_type not in [
             "application",
             "gateway",
@@ -138,7 +149,9 @@ class OLLaunchTemplateConfig(AWSBase):
     security_groups: list[Union[SecurityGroup, pulumi.Output]]
     tag_specifications: list[TagSpecification]
     user_data: Optional[Union[str, pulumi.Output[str]]]
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class OLAutoScaleGroupConfig(AWSBase):
@@ -158,18 +171,22 @@ class OLAutoScaleGroupConfig(AWSBase):
     instance_refresh_min_healthy_percentage: NonNegativeInt = NonNegativeInt(50)
     instance_refresh_strategy: str = "Rolling"
     instance_refresh_triggers: list[str] = ["tags"]  # noqa: RUF012
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @field_validator("instance_refresh_strategy")
-    @classmethod
-    def is_valid_strategy(cls, strategy: str) -> str:
+    class Config:
+        arbitrary_types_allowed = True
+
+    @validator("instance_refresh_strategy")
+    def is_valid_strategy(
+        cls: "OLAutoScaleGroupConfig", strategy: str  # noqa: N805
+    ) -> str:
         if strategy != "Rolling":
             raise ValueError("The only vaild instance refresh strategy is 'Rolling'")
         return strategy
 
-    @field_validator("health_check_type")
-    @classmethod
-    def is_valid_healthcheck(cls, health_check_type: str) -> str:
+    @validator("health_check_type")
+    def is_valid_healthcheck(
+        cls: "OLAutoScaleGroupConfig", health_check_type: str  # noqa: N805
+    ) -> str:
         if health_check_type not in ["ELB", "EC2"]:
             raise ValueError(
                 f"health_check_type: {health_check_type} is not valid. Only 'ELB' or 'EC2' are accepted."  # noqa: E501
@@ -207,7 +224,7 @@ class OLAutoScaling(pulumi.ComponentResource):
             )
 
         # Shared attributes
-        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
+        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)  # type: ignore  # noqa: E501
         resource_name_prefix = f"{asg_config.asg_name}-"
 
         # Create target group

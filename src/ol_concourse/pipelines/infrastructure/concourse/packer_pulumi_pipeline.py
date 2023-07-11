@@ -91,7 +91,7 @@ def concourse_pipeline() -> Pipeline:
 
 if __name__ == "__main__":
     with open("definition.json", "w") as definition:
-        definition.write(concourse_pipeline().model_dump_json(indent=2))
-    sys.stdout.write(concourse_pipeline().model_dump_json(indent=2))
+        definition.write(concourse_pipeline().json(indent=2))
+    sys.stdout.write(concourse_pipeline().json(indent=2))
     print()
     print("fly -t pr-inf sp -p packer-pulumi-concourse -c definition.json")

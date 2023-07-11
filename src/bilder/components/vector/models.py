@@ -2,8 +2,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from pydantic_settings import SettingsConfigDict
-
 from bilder.lib.model_helpers import OLBaseSettings
 
 
@@ -12,7 +10,6 @@ class VectorInstallMethod(str, Enum):
 
 
 class VectorConfig(OLBaseSettings):
-    model_config = SettingsConfigDict(env_prefix="vector_")
     install_method: VectorInstallMethod = VectorInstallMethod.package
     user: str = "vector"
     configuration_templates: dict[Path, dict[str, Any]] = {  # noqa: RUF012
@@ -26,3 +23,6 @@ class VectorConfig(OLBaseSettings):
     use_global_log_sink: bool = False
     use_global_metric_sink: bool = False
     tls_config_directory: Path = Path("/etc/vector/ssl/")
+
+    class Config:
+        env_prefix = "vector_"

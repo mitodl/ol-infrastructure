@@ -1,7 +1,7 @@
 from typing import Optional
 
 from pulumi import Output
-from pydantic import ConfigDict, BaseModel, PositiveInt
+from pydantic import BaseModel, PositiveInt
 
 from bridge.lib.magic_numbers import HALF_GIGABYTE_MB, ONE_GIGAHERTZ
 from ol_infrastructure.lib.aws.ecs.container_definition_config import (
@@ -30,4 +30,6 @@ class OLFargateTaskDefinitionConfig(BaseModel):
     memory_mib: PositiveInt = PositiveInt(HALF_GIGABYTE_MB)
     # List of container definitions that will be attached to task
     container_definition_configs: list[OLFargateContainerDefinitionConfig]
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    class Config:
+        arbitrary_types_allowed = True

@@ -29,8 +29,8 @@ if __name__ == "__main__":
     import sys
 
     with open("definition.json", "w") as definition:
-        definition.write(xpro_partner_dns_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(xpro_partner_dns_pipeline.model_dump_json(indent=2))
+        definition.write(xpro_partner_dns_pipeline.json(indent=2))
+    sys.stdout.write(xpro_partner_dns_pipeline.json(indent=2))
     sys.stdout.writelines(
         [
             "\n",

@@ -70,7 +70,8 @@ def install_hashicorp_products(hashicorp_products: list[HashicorpProduct]):
         files.directory(
             name=f"Ensure configuration directory for {product.name}",
             path=str(
-                product.configuration_directory or product.configuration_file.parent
+                product.configuration_directory
+                or product.configuration_file.parent  # type: ignore
             ),
             present=True,
             user=product.name,
@@ -80,7 +81,7 @@ def install_hashicorp_products(hashicorp_products: list[HashicorpProduct]):
         if hasattr(product, "data_directory"):
             files.directory(
                 name=f"Create data directory for {product.name}",
-                path=str(product.data_directory),
+                path=str(product.data_directory),  # type: ignore
                 present=True,
                 user=product.name,
                 group=product.name,

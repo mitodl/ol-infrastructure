@@ -156,7 +156,7 @@ if __name__ == "__main__":
     pipeline_json = build_codejail_pipeline(
         release_name,
         OpenLearningOpenEdxDeployment,
-    ).model_dump_json(indent=2)
+    ).json(indent=2)
     with open("definition.json", "w") as definition:
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)

@@ -1,4 +1,4 @@
-from pydantic import field_validator, BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from ol_concourse.lib.models.pipeline import Job, Resource, ResourceType
 
@@ -8,10 +8,9 @@ class PipelineFragment(BaseModel):
     resources: list[Resource] = Field(default_factory=list)
     jobs: list[Job] = Field(default_factory=list)
 
-    @field_validator("resource_types")
-    @classmethod
+    @validator("resource_types")
     def deduplicate_resource_types(
-        cls, resource_types: list[ResourceType]
+        cls, resource_types: list[ResourceType]  # noqa: N805
     ) -> list[ResourceType]:
         """Ensure that there are no duplicate resource type definitions.
 
@@ -39,9 +38,10 @@ class PipelineFragment(BaseModel):
                 unique_resource_types.append(resource_type)
         return unique_resource_types
 
-    @field_validator("resources")
-    @classmethod
-    def deduplicate_resources(cls, resources: list[Resource]) -> list[Resource]:
+    @validator("resources")
+    def deduplicate_resources(
+        cls, resources: list[Resource]  # noqa: N805
+    ) -> list[Resource]:
         """Ensure that there are no duplicate resource definitions.
 
         Concourse pipelines don't support duplicate definitions of resources, where the
