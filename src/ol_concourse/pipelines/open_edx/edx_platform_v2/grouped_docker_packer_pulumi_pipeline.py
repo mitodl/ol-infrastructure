@@ -1,7 +1,6 @@
 #  noqa: WPS232
 import sys
 
-
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.models.fragment import PipelineFragment
@@ -22,7 +21,8 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, registry_image
-from ol_concourse.lib.jobs.infrastructure import packer_jobs
+from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
+from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS, PULUMI_CODE_PATH
 
 from bridge.settings.openedx.accessors import (
     filter_deployments_by_release,
@@ -47,6 +47,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
 
     container_fragments = []
     packer_fragments = []
+    pulumi_fragments = []
     group_configs = []
     for release_name in releases:
         job_names = []
@@ -101,6 +102,21 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                 ],
             )
 
+            edx_pulumi_code = git_repo(
+                name=Identifier(
+                    f"edxapp-ol-infrastructure-pulumi-{deployment.deployment_name}"
+                ),
+                uri="https://github.com/mitodl/ol-infrastructure",
+                # TODO MD 20230512 Fix to main branch once testing completed
+                branch="md/edxapp_docker_migration",
+                paths=[
+                    *PULUMI_WATCHED_PATHS,
+                    "src/ol_infrastructure/applications/edxapp/",
+                    "src/bridge/secrets/edxapp/",
+                    "src/bridge/settings/openedx/",
+                ],
+            )
+
             edx_registry_image_resource = registry_image(
                 name=Identifier(
                     f"edxapp-{release_name}-{deployment.deployment_name}-image"
@@ -111,7 +127,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                 password="((dockerhub.password))",  # noqa: S106
             )
 
-            build_inputs = (
+            docker_build_inputs = (
                 [
                     Input(name=edx_platform_git_resource.name)
                     for edx_platform_git_resource in edx_platform_git_resources
@@ -143,7 +159,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                                     "tag": "3.18.0",
                                 },
                             ),
-                            inputs=build_inputs,
+                            inputs=docker_build_inputs,
                             outputs=[
                                 Output(name=Identifier("collected_themes")),
                                 Output(name=Identifier("edx_platform")),
@@ -199,6 +215,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                         edx_docker_code,
                         edx_registry_image_resource,
                         edx_ami_code,
+                        edx_pulumi_code,
                         *theme_git_resources,
                         *edx_platform_git_resources,
                     ],
@@ -231,8 +248,30 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
             job_names.append(packer_fragments[-1].jobs[-1].name)
             job_names.append(packer_fragments[-1].jobs[-2].name)
 
+            pulumi_fragments.append(
+                pulumi_jobs_chain(
+                    edx_pulumi_code,
+                    stack_names=[
+                        f"applications.edxapp.{deployment.deployment_name}.{stage}"
+                        for stage in deployment.envs_by_release(release_name)
+                    ],
+                    project_name="ol-infrastructure-edxapp-application",
+                    project_source_path=PULUMI_CODE_PATH.joinpath(
+                        "applications/edxapp/"
+                    ),
+                    dependencies=[
+                        GetStep(
+                            get=packer_fragments[-1].resources[-1].name,
+                            trigger=False,
+                            passed=[packer_fragments[-1].jobs[-1].name],
+                        ),
+                    ],
+                )
+            )
+            job_names.extend([job.name for job in pulumi_fragments[-1].jobs])
+
         combined_fragments = PipelineFragment.combine_fragments(
-            *container_fragments, *packer_fragments
+            *container_fragments, *packer_fragments, *pulumi_fragments
         )
         group_config = GroupConfig(
             name=f"{release_name}",
