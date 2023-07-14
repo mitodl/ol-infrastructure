@@ -59,9 +59,7 @@ from bilder.components.hashicorp.vault.models import (
 from bilder.components.hashicorp.vault.steps import vault_template_permissions
 from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import (
-    configure_vector,
-    install_vector,
-    vector_service,
+    install_and_configure_vector,
 )
 from bilder.facts.has_systemd import HasSystemd
 from bridge.lib.magic_numbers import (
@@ -327,9 +325,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
 vault_template_permissions(vault_config)
 
 # Install vector
-install_vector(vector_config)
-configure_vector(vector_config)
-vector_service(vector_config)
+install_and_configure_vector(vector_config)
 
 for product in hashicorp_products:
     configure_hashicorp_product(product)

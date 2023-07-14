@@ -42,56 +42,6 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-
-def build_worker_user_data(
-    concourse_team: str, concourse_tags: list[str], consul_dc: str
-) -> str:
-    yaml_contents = {
-        "write_files": [
-            {
-                "path": "/etc/consul.d/02-autojoin.json",
-                "content": json.dumps(
-                    {
-                        "retry_join": [
-                            "provider=aws tag_key=consul_env " f"tag_value={consul_dc}"
-                        ],
-                        "datacenter": consul_dc,
-                    }
-                ),
-                "owner": "consul:consul",
-            },
-        ]
-    }
-    if concourse_team:
-        yaml_contents["write_files"].append(
-            {
-                "path": "/etc/default/concourse-team",
-                "content": textwrap.dedent(
-                    f"""\
-                     CONCOURSE_TEAM={concourse_team}
-                     """
-                ),
-                "owner": "root:root",
-            }
-        )
-    if concourse_tags:
-        yaml_contents["write_files"].append(
-            {
-                "path": "/etc/default/concourse-tags",
-                "content": f"CONCOURSE_TAG={','.join(concourse_tags)}",
-                "owner": "root:root",
-            }
-        )
-    return base64.b64encode(
-        "#cloud-config\n{}".format(
-            yaml.dump(
-                yaml_contents,
-                sort_keys=True,
-            )
-        ).encode("utf8")
-    ).decode("utf8")
-
-
 ##################################
 #     Setup + Config Retrival    #
 ##################################
@@ -137,6 +87,74 @@ concourse_worker_ami = ec2.get_ami(
 )
 concourse_web_tag = f"concourse-web-{stack_info.env_suffix}"
 consul_provider = get_consul_provider(stack_info)
+
+grafana_credentials = read_yaml_secrets(
+    Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
+)
+
+
+def build_worker_user_data(
+    concourse_team: str, concourse_tags: list[str], consul_dc: str
+) -> str:
+    yaml_contents = {
+        "write_files": [
+            {
+                "path": "/etc/consul.d/02-autojoin.json",
+                "content": json.dumps(
+                    {
+                        "retry_join": [
+                            "provider=aws tag_key=consul_env " f"tag_value={consul_dc}"
+                        ],
+                        "datacenter": consul_dc,
+                    }
+                ),
+                "owner": "consul:consul",
+            },
+            {
+                "path": "/etc/default/vector",
+                "content": textwrap.dedent(
+                    f"""\
+                    ENVIRONMENT={consul_dc}
+                    VECTOR_CONFIG_DIR=/etc/vector/
+                    AWS_REGION={aws_config.region}
+                    GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
+                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
+                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
+                    """
+                ),
+                "owner": "root:root",
+            },
+        ]
+    }
+    if concourse_team:
+        yaml_contents["write_files"].append(
+            {
+                "path": "/etc/default/concourse-team",
+                "content": textwrap.dedent(
+                    f"""\
+                     CONCOURSE_TEAM={concourse_team}
+                     """
+                ),
+                "owner": "root:root",
+            }
+        )
+    if concourse_tags:
+        yaml_contents["write_files"].append(
+            {
+                "path": "/etc/default/concourse-tags",
+                "content": f"CONCOURSE_TAG={','.join(concourse_tags)}",
+                "owner": "root:root",
+            }
+        )
+    return base64.b64encode(
+        "#cloud-config\n{}".format(
+            yaml.dump(
+                yaml_contents,
+                sort_keys=True,
+            )
+        ).encode("utf8")
+    ).decode("utf8")
+
 
 ###############################
 #      General Resources      #
@@ -466,9 +484,6 @@ web_instance_type = (
 )
 consul_datacenter = consul_stack.require_output("datacenter")
 
-grafana_credentials = read_yaml_secrets(
-    Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
-)
 
 web_launch_config = ec2.LaunchTemplate(
     "concourse-web-launch-template",
