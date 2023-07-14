@@ -1658,13 +1658,13 @@ six = ">=1.12,<2.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "5.41.0"
+version = "5.42.0"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_aws-5.41.0.tar.gz", hash = "sha256:a7ef0275c09109b4dce5194ef396711c7214c075d46001b9988652404b2e7d58"},
+    {file = "pulumi_aws-5.42.0.tar.gz", hash = "sha256:98bedf49a63b6a44b107d7f3a8b38f14bd69a00e928f87e4be39149048f72597"},
 ]
 
 [package.dependencies]
@@ -1706,13 +1706,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "5.14.0"
+version = "5.14.1"
 description = "A Pulumi package for creating and managing github cloud resources."
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_github-5.14.0.tar.gz", hash = "sha256:9c99015745270a1419022b5a8705f78f7be105781f007dc1bbf6d3601f4354ba"},
+    {file = "pulumi_github-5.14.1.tar.gz", hash = "sha256:fd22063defc6ff8691067978df854571b7c5cf8bae50f317ae8bf22cb3317ba3"},
 ]
 
 [package.dependencies]
@@ -1738,13 +1738,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-mongodbatlas"
-version = "3.9.0"
+version = "3.9.1"
 description = "A Pulumi package for creating and managing mongodbatlas cloud resources."
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_mongodbatlas-3.9.0.tar.gz", hash = "sha256:2731f213d27985623e4ac68e0772dcb975d3a7fe41df452d700b13f0a58f4c9d"},
+    {file = "pulumi_mongodbatlas-3.9.1.tar.gz", hash = "sha256:dcb6dada3fd541bdf78729b117739516b9119ca4b14e3ea9938ab0fb208bd4a0"},
 ]
 
 [package.dependencies]
