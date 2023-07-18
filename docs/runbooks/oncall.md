@@ -44,7 +44,7 @@ long.
 
 _Mitigation_
 
-```
+```console
 From salt-pr master:
 
 sudo ssh -i /etc/salt/keys/aws/salt-production.pem ubuntu@10.7.0.78
@@ -117,3 +117,53 @@ root@ip-10-7-0-78:/edx/var/log/xqwatcher# df -h .
 Filesystem      Size  Used Avail Use% Mounted on
 /dev/root        20G  7.4G   12G  38%                  <<<<<<<<<<< acceptable utilization
 ```
+
+## OCW / odl-video-service
+
+### Request by deeveloper to add videos
+
+_Diagnosis_
+
+N/A - developer request
+
+_Mitigation_
+
+Use the AWS EC2 web console and find instances of type
+`odl-video-service-production` - detailed instructions for accessing the
+instance can be found
+[here](https://github.com/mitodl/ol-infrastructure/blob/main/docs/how_to/access_openedx_djange_manage.md).
+
+The only difference in this case is that the user is `admin` rather than
+`ubuntu`. Stop when you get a shell prompt and rejoin this document.
+
+First, run:
+
+`sudo docker compose ps` to see a list of running processes. In our case, we're
+looking for `app`. This isn't strictly necessary here as we know what we're
+looking for, but good to look before you leap anyway.
+
+You should see something like:
+
+```console
+admin@ip-10-13-3-50:/etc/docker/compose$ sudo docker compose ps
+NAME                IMAGE                                 COMMAND                  SERVICE             CREATED             STATUS              PORTS
+compose-app-1       mitodl/ovs-app:v0.69.0-5-gf76af37     "/bin/bash -c ' slee…"   app                 3 weeks ago         Up 3 weeks          0.0.0.0:8087->8087/tcp, :::8087->8087/tcp, 8089/tcp
+compose-celery-1    mitodl/ovs-app:v0.69.0-5-gf76af37     "/bin/bash -c ' slee…"   celery              3 weeks ago         Up 3 weeks          8089/tcp
+compose-nginx-1     pennlabs/shibboleth-sp-nginx:latest   "/usr/bin/supervisor…"   nginx               3 weeks ago         Up 3 weeks          0.0.0.0:80->80/tcp, :::80->80/tcp, 0.0.0.0:443->443/tcp, :::443->443/tcp
+```
+
+Now run:
+
+`sudo docker compose exec -it app /bin/bash` which should get you a new, less
+colorful shell prompt.
+
+At this point you can run the manage.py command the developer gave you in slack.
+In my case, this is what I ran and the output I got:
+
+```console
+mitodl@486c7fbba98b:/src$ python ./manage.py add_hls_video_to_edx --edx-course-id course-v1:xPRO+DECA_Boeing+SPOC_R0
+Attempting to post video(s) to edX...
+Video successfully added to edX – VideoFile: CCADE_V11JW_Hybrid_Data_Formats_v1.mp4 (105434), edX url: https://courses.xpro.mit.edu/api/val/v0/videos/
+```
+
+You're all set!
