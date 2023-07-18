@@ -1,4 +1,3 @@
-#  noqa: WPS232
 from collections.abc import Iterable
 from copy import deepcopy
 from pathlib import Path

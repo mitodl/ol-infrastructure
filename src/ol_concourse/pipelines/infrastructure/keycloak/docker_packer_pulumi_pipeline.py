@@ -1,4 +1,3 @@
-#  noqa: WPS232
 import sys
 
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
