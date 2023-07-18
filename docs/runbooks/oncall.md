@@ -1,7 +1,7 @@
 # Table of Contents
 * [Style Guide](#style-guide)
 * [XQueueWatcher](#xqueuewatcher)
-* [OVS](#ovs)
+* [OVS](#OVS)
 
 # Introduction
 
