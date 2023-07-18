@@ -1,7 +1,7 @@
 # Table of Contents
 * [Style Guide](#style-guide)
 * [XQueueWatcher](#xqueuewatcher)
-* [OCW / odl-video-service](#ocw-/-odl-video-service)
+* [OVS](#ovs)
 
 # Introduction
 
@@ -118,7 +118,7 @@ Filesystem      Size  Used Avail Use% Mounted on
 /dev/root        20G  7.4G   12G  38%                  <<<<<<<<<<< acceptable utilization
 ```
 
-## OCW / odl-video-service
+## OVS
 
 ### Request by deeveloper to add videos
 
