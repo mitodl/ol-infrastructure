@@ -40,7 +40,7 @@ pulumi-keycloak = "^5.1.0"
 [tool.poetry.group.dev.dependencies]
 black = "*"
 copier = "*"
-datamodel-code-generator = "^0.20.0"
+datamodel-code-generator = "^0.21.0"
 diagrams = "*"
 mypy = "<1.5"
 pre-commit = "^3.0.0"

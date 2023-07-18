@@ -507,14 +507,14 @@ test-randomorder = ["pytest-randomly"]
 
 [[package]]
 name = "datamodel-code-generator"
-version = "0.20.0"
+version = "0.21.1"
 description = "Datamodel Code Generator"
 category = "dev"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "datamodel_code_generator-0.20.0-py3-none-any.whl", hash = "sha256:fdb8dc18fd3a5d2c92e5e3ac473c5a48f3540066941e56fd947d2975cfebd281"},
-    {file = "datamodel_code_generator-0.20.0.tar.gz", hash = "sha256:84dc7d6ae64ca67834b414c107adf3510f46a474ac21467a683aca0a4a8f0806"},
+    {file = "datamodel_code_generator-0.21.1-py3-none-any.whl", hash = "sha256:9898d4a39a54638022850b0df85fab0ef20394382e88482b8bf8925d4817c493"},
+    {file = "datamodel_code_generator-0.21.1.tar.gz", hash = "sha256:feab1c222c5bc3b7c53e1dc8b299bbc261bb17e9dbc22fdd60fc3a2806694ecc"},
 ]
 
 [package.dependencies]
@@ -526,8 +526,8 @@ isort = ">=4.3.21,<6.0"
 jinja2 = ">=2.10.1,<4.0"
 openapi-spec-validator = ">=0.2.8,<=0.5.2"
 packaging = "*"
-prance = ">=0.18.2,<1.0"
-pydantic = {version = ">=1.10.0,<2.0.0", extras = ["email"], markers = "python_version >= \"3.11\" and python_version < \"4.0\""}
+prance = ">=0.18.2"
+pydantic = {version = ">=1.10.0,<3.0", extras = ["email"], markers = "python_version >= \"3.11\" and python_version < \"4.0\""}
 PySnooper = ">=0.4.1,<2.0.0"
 toml = ">=0.10.0,<1.0.0"
 
@@ -2655,4 +2655,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "fd0e9b1832256f6dab98e2ba8d57353e3041c8da9d8936c25a7a223c30e88e6c"
+content-hash = "fa39e3d4aa280aa3352d8efec146eb9d1e5b2ee2bcf1b626696424e848012a8c"
