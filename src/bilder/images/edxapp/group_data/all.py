@@ -13,7 +13,7 @@ edx_plugins_added = {
         "ol-openedx-course-export",
         "ol-openedx-checkout-external",
         "sentry-sdk==1.21.1",  # Fix RecursionError
-        "social-auth-mitxpro==0.6.1",
+        "social-auth-mitxpro==0.6.2",
     ],
     "xpro": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
