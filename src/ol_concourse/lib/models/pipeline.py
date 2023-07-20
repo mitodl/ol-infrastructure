@@ -10,7 +10,7 @@ from typing import Any, Literal, Optional, Union
 from pydantic import ConfigDict, BaseModel, Field, PositiveInt, RootModel, constr
 
 
-class Identifier(RootModel[str]):
+class Identifier(RootModel):  # type: ignore
     root: constr(pattern=r"^[a-z][\w\d\-_.]*$")  # type: ignore[valid-type]
 
     def __hash__(self):
@@ -1894,9 +1894,13 @@ class Job(BaseModel):
 class Pipeline(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    def json(self, *args, **kwargs):
+    def model_dump_json(self, *args, **kwargs):
         kwargs["exclude_none"] = True
-        return super().json(*args, **kwargs)
+        kwargs["by_alias"] = True
+        return super().model_dump_json(*args, **kwargs)
+
+    def json(self, *args, **kwargs):
+        return self.model_dump_json(*args, **kwargs)
 
     jobs: Optional[list[Job]] = Field(
         None,
