@@ -7,26 +7,40 @@ x-logging: &default-logging
     max-file: "5"
   driver: json-file
 services:
-  pomerium:
-    extends:
-      file: pomerium-compose.yaml
-      service: pomerium
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    command:
+    - "--configFile=/etc/traefik/traefik.yaml"
+    ports:
+    - "443:443"
+    volumes:
+      # So that Traefik can listen to the Docker events
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - ./traefik/:/traefik/:ro
     networks:
     - airbyte_internal
     - airbyte_public
     depends_on:
     - webapp
     - server
-  nginx:
-    extends:
-      file: pomerium-compose.yaml
-      service: nginx
+  traefik-forward-auth:
+    image: thomseddon/traefik-forward-auth:2
+    container_name: traefik-forward-auth
+    restart: unless-stopped
+    env_file:
+    - .env_traefik_forward_auth
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.middlewares.traefik-forward-auth.forwardauth.address=http://traefik-forward-auth:4181"
+    - "traefik.http.middlewares.traefik-forward-auth.forwardauth.authResponseHeaders=X-Forwarded-User"
+    - "traefik.http.services.traefik-forward-auth.loadbalancer.server.port=4181"
     networks:
     - airbyte_internal
-    - airbyte_public
     depends_on:
     - webapp
     - server
+    - traefik
   # hook in case we need to add init behavior
   # every root service (no depends_on) should depend on init
   init:
@@ -200,6 +214,13 @@ services:
     - INTERNAL_API_HOST=${INTERNAL_API_HOST}
     - CONNECTOR_BUILDER_API_HOST=${CONNECTOR_BUILDER_API_HOST}
     - TRACKING_STRATEGY=${TRACKING_STRATEGY}
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.airbyte-webapp.rule=Host(`${AIRBYTE_HOSTNAME}`)"
+    - "traefik.http.routers.airbyte-webapp.middlewares=traefik-forward-auth"
+    - "traefik.http.routers.airbyte-webapp.tls=true"
+    - "traefik.http.routers.dagster-webapp.rule=Host(`airbyte.service.consul`)"
+    - "traefik.http.middlewares.dagster-webapp.basicauth.users=${DAGSTER_USER_PASS}"
     networks:
     - airbyte_internal
     depends_on:
