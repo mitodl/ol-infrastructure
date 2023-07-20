@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional
 
-from pydantic import ConfigDict, BaseModel
+from pydantic import ConfigDict, BaseModel, SerializeAsAny
 
 from bilder.lib.model_helpers import OLBaseSettings
 
@@ -20,7 +20,7 @@ class HashicorpProduct(BaseModel, abc.ABC):
     _name: str
     version: str
     install_directory: Optional[Path] = None
-    configuration: dict[Path, HashicorpConfig]
+    configuration: dict[Path, SerializeAsAny[HashicorpConfig]]
     configuration_directory: Optional[Path] = None
     configuration_file: Optional[Path] = None
 

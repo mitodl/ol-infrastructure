@@ -7,7 +7,15 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal, Optional, Union
 
-from pydantic import ConfigDict, BaseModel, Field, PositiveInt, RootModel, constr
+from pydantic import (
+    ConfigDict,
+    BaseModel,
+    Field,
+    PositiveInt,
+    RootModel,
+    SerializeAsAny,
+    constr,
+)
 
 
 class Identifier(RootModel):  # type: ignore
@@ -253,35 +261,35 @@ class StepModifierMixin(BaseModel):
         description="The tags by which to match workers. The step will be placed within"
         " the a pool of workers that match all of the given set of tags.",
     )
-    ensure: Optional[Step] = Field(
+    ensure: Optional[SerializeAsAny[Step]] = Field(
         None,
         description=(
             "Step to execute regardless of whether the job succeeds, fails, errors, or "
             " aborts. Equivalent to the  schema.ensure  hook."
         ),
     )
-    on_abort: Optional[Step] = Field(
+    on_abort: Optional[SerializeAsAny[Step]] = Field(
         None,
         description=(
             "Step to execute when the task aborts. Equivalent to the schema.on_abort"
             " hook."
         ),
     )
-    on_error: Optional[Step] = Field(
+    on_error: Optional[SerializeAsAny[Step]] = Field(
         None,
         description=(
             "Step to execute when the task errors. Equivalent to the schema.on_error"
             " hook."
         ),
     )
-    on_failure: Optional[Step] = Field(
+    on_failure: Optional[SerializeAsAny[Step]] = Field(
         None,
         description=(
             "Step to execute when the task fails. Equivalent to the schema.on_failure"
             " hook."
         ),
     )
-    on_success: Optional[Step] = Field(
+    on_success: Optional[SerializeAsAny[Step]] = Field(
         None,
         description=(
             "Step to execute when the task succeeds. Equivalent to the"
@@ -1698,7 +1706,7 @@ class TaskStep(Step, StepModifierMixin):
 class InParallelStep(Step, StepModifierMixin):
     model_config = ConfigDict(extra="forbid")
 
-    in_parallel: Optional[Union[list[Step], InParallelConfig]] = Field(
+    in_parallel: Optional[Union[list[SerializeAsAny[Step]], InParallelConfig]] = Field(
         None,
         description=(
             "Steps are either configured as a array or within an   "
@@ -1773,7 +1781,7 @@ class Job(BaseModel):
             " the web UI or  fly-trigger-job  ) will be disabled."
         ),
     )
-    ensure: Optional[Step] = Field(
+    ensure: Optional[SerializeAsAny[Step]] = Field(
         None,
         description=(
             "Step to execute regardless of whether the job succeeds, fails, errors, or "
@@ -1823,36 +1831,36 @@ class Job(BaseModel):
             " ```yaml\njobs:\n- name: new-name\n  plan: [{get: 10m}]\n```"
         ),
     )
-    on_abort: Optional[Step] = Field(
+    on_abort: Optional[SerializeAsAny[Step]] = Field(
         None,
         description=(
             "Step to execute when the job aborts. Equivalent to the    schema.on_abort "
             " hook."
         ),
     )
-    on_error: Optional[Step] = Field(
+    on_error: Optional[SerializeAsAny[Step]] = Field(
         None,
         description=(
             "Step to execute when the job errors. Equivalent to the    schema.on_error "
             " hook."
         ),
     )
-    on_failure: Optional[Step] = Field(
+    on_failure: Optional[SerializeAsAny[Step]] = Field(
         None,
         description=(
             "Step to execute when the job fails. Equivalent to the    schema.on_failure"
             "  hook."
         ),
     )
-    on_success: Optional[Step] = Field(
+    on_success: Optional[SerializeAsAny[Step]] = Field(
         None,
         description=(
-            "Step to execute when the job succeeds. Equivalent to the   "
+            "Step to execute when the job succeeds. Equivalent to the"
             " schema.on_success  hook."
         ),
     )
-    plan: Optional[list[Step]] = Field(
-        None, description="The sequence of  steps  steps  to execute."
+    plan: Optional[list[SerializeAsAny[Step]]] = Field(
+        None, description="The sequence of steps to execute."
     )
     public: Optional[bool] = Field(
         None,
@@ -1979,7 +1987,7 @@ class Pipeline(BaseModel):
 class TryStep(Step, StepModifierMixin):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    try_: Optional[Step] = Field(
+    try_: Optional[SerializeAsAny[Step]] = Field(
         None,
         alias="try",
         description=(
@@ -2027,7 +2035,7 @@ class InParallelConfig(BaseModel):
             " will be interrupted and pending steps will no longer be scheduled."
         ),
     )
-    steps: Optional[list[Step]] = Field(
+    steps: Optional[list[SerializeAsAny[Step]]] = Field(
         None,
         description=(
             "The steps to perform in parallel.   \n@example  Fetching artifacts in"
@@ -2045,7 +2053,7 @@ class InParallelConfig(BaseModel):
 class DoStep(Step, StepModifierMixin):
     model_config = ConfigDict(extra="forbid")
 
-    do: Optional[list[Step]] = Field(
+    do: Optional[list[SerializeAsAny[Step]]] = Field(
         None,
         description=(
             "@example  Running multiple steps in a try \n   This can be used to perform"
