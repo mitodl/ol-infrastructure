@@ -79,6 +79,14 @@ watched_docker_compose_files = []
 consul_templates_directory = Path("/etc/consul-template")
 consul_templates = []
 
+# Preload the dagster image to accelerate the startup
+server.shell(
+    name=f"Preload mitodl/mono-dagster:{VERSIONS['dagster']}",
+    commands=[
+        f"/usr/bin/docker pull mitodl/mono-dagster:{VERSIONS['dagster']}",
+    ],
+)
+
 ##################################################
 # Put down EDX pipeline consul templates
 edx_pipeline_files = [
