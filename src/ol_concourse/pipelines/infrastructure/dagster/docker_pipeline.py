@@ -2,12 +2,18 @@ import sys
 
 from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.models.pipeline import (
+    AnonymousResource,
+    Command,
     GetStep,
     Identifier,
     Input,
+    Output,
     Job,
+    TaskStep,
+    TaskConfig,
     Pipeline,
     PutStep,
+    Platform,
 )
 from ol_concourse.lib.resources import git_repo, registry_image
 
@@ -40,11 +46,40 @@ def build_dagster_docker_pipeline() -> Pipeline:
                 },
                 build_args=[],
             ),
+            TaskStep(
+                task=Identifier("collect-tags"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    inputs=[Input(name=data_platform_repo.name)],
+                    outputs=[Output(name="tags")],
+                    image_resource=AnonymousResource(
+                        type="registry-image",
+                        source={
+                            "repository": "mitodl/ol-infrastructure",
+                            "tag": "latest",
+                        },
+                    ),
+                    run=Command(
+                        path="sh",
+                        user="root",
+                        # dir="tags",
+                        args=[
+                            "-exc",
+                            f"""ls -ltrha;
+                            ls -lthra ../;
+                            egrep -A1 "^name = \\"dagster\\"$" {data_platform_repo.name}/poetry.lock | tail -n 1 | cut -d'"' -f2 >> tags/collected_tags;
+                            echo " " >> tags/collected_tags;
+                            cat ./{data_platform_repo.name}/.git/describe_ref >> tags/collected_tags;""",  # noqa: E501
+                        ],
+                    ),
+                ),
+            ),
             PutStep(
                 put=mono_dagster_image.name,
+                inputs="all",
                 params={
                     "image": "image/image.tar",
-                    "additional_tags": f"./{data_platform_repo.name}/.git/describe_ref",
+                    "additional_tags": "tags/collected_tags",
                 },
             ),
         ],
