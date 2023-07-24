@@ -1,7 +1,9 @@
 # Table of Contents
+
 * [Style Guide](#style-guide)
+* [SaltStack](#saltstack)
 * [XQueueWatcher](#xqueuewatcher)
-* [OVS](#OVS)
+* [OVS](#ovs)
 
 # Introduction
 
@@ -32,6 +34,55 @@ This will allow the oncall to get only as much Diagnosis in as required to
 identify the issue and focus on putting out the fire.
 
 # Products
+
+## SaltStack
+
+### MemoryUsageWarning operations-<ENVIRONMENT>
+
+_Diagnosis_
+
+You get an alert like: `[Prometheus]: [FIRING:1] MemoryUsageWarning operations-qa (memory ip-10-1-3-33 integrations/linux_host warning)`.
+
+
+You'll need an account and ssh key set up on the saltstack master hosts. This should happen when you join the team.
+
+Now, ssh into the salt master appropriate to the environment you received the alert for. The IP address is cited in the alert. So, for the above:
+
+(Substitute your username and the appropriate environment if not qa, e.g. production)
+```
+ssh -l cpatti salt-qa.odl.mit.edu
+```
+
+Next, check free memory:
+
+```
+mdavidson@ip-10-1-3-33:~$ free -h
+              total        used        free      shared  buff/cache   available
+Mem:           7.5G        7.2G        120M         79M        237M         66M
+Swap:            0B          0B          0B
+```
+
+In this case, the machine only has 120M free which isn't great.
+
+_Mitigation_
+
+We probably need to restart the Salt master service. Use the systemctl command for that:
+
+
+```
+root@ip-10-1-3-33:~#  systemctl restart salt-master
+```
+
+Now, wait a minute and then check free memory again. There should be significantly more available:
+
+```
+root@ip-10-1-3-33:~# free -h
+              total        used        free      shared  buff/cache   available
+Mem:           7.5G        1.9G        5.3G         80M        280M        5.3G
+Swap:            0B          0B          0B
+```
+
+If what you see is something like the above, you're good to go. Problem solved (for now!)
 
 ## XQueueWatcher
 
