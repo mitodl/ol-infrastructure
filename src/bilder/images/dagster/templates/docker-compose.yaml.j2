@@ -1,11 +1,11 @@
 version: "3.7"
 
 services:
-  dagit:
+  dagster-webserver:
     image: mitodl/mono-dagster:{{ context.dagster_version }}
-    container_name: dagit
+    container_name: dagster-webserver
     restart: unless-stopped
-    entrypoint: ["poetry", "run", "dagit", "-h", "0.0.0.0", "-p", "3000"]
+    entrypoint: ["poetry", "run", "dagster-webserver", "-w", "/opt/dagster/app/workspace.yaml", "-h", "0.0.0.0", "-p", "3000"]
     ports:
     - ":3000"
     env_file:
@@ -19,7 +19,7 @@ services:
     image: mitodl/mono-dagster:{{ context.dagster_version }}
     container_name: dagster-daemon
     restart: unless-stopped
-    entrypoint: ["poetry", "run", "dagster-daemon", "run"]
+    entrypoint: ["poetry", "run", "dagster-daemon", "run", "-w", "/opt/dagster/app/workspace.yaml"]
     env_file:
       - .env
   edx-pipeline:
