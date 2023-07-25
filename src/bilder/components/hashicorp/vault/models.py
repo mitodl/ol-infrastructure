@@ -287,7 +287,7 @@ class Vault(HashicorpProduct):
             "configuration_directory": self.configuration_directory,
         }
         if self.operating_mode() == "agent":
-            context_dict["configuration_file"] = list(self.configuration.keys())[0]
+            context_dict["configuration_file"] = next(iter(self.configuration.keys()))
         return context_dict
 
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
