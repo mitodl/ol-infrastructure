@@ -116,8 +116,12 @@ class Consul(HashicorpProduct):
 
     @property
     def data_directory(self) -> Path:
-        data_dir = next(iter(filter(
-                None,
-                map(lambda config: config.data_dir, self.configuration.values()),
-            )))
+        data_dir = next(
+            iter(
+                filter(
+                    None,
+                    map(lambda config: config.data_dir, self.configuration.values()),
+                )
+            )
+        )
         return data_dir or Path("/var/lib/consul/")
