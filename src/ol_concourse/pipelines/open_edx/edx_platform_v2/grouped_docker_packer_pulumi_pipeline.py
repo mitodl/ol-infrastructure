@@ -254,7 +254,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                         f"applications.edxapp.{deployment.deployment_name}.{stage}"
                         for stage in deployment.envs_by_release(release_name)
                     ],
-                    project_name="ol-infrastructure-edxapp-application",
+                    project_name=f"ol-infrastructure-edxapp-application.{deployment.deployment_name}",
                     project_source_path=PULUMI_CODE_PATH.joinpath(
                         "applications/edxapp",
                     ),
