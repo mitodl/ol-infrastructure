@@ -88,6 +88,23 @@ files.put(
     mode="0664",
 )
 
+files.directory(
+    name="Create Temporal dynamic config directory",
+    path=str(DOCKER_COMPOSE_DIRECTORY.joinpath("temporal", "dynamicconfig")),
+    present=True,
+)
+
+files.download(
+    name="Retrieve Temporal dynamicconfig file",
+    src="https://raw.githubusercontent.com/airbytehq/airbyte-platform/main/temporal/dynamicconfig/development.yaml",  # noqa: E501
+    dest=str(
+        DOCKER_COMPOSE_DIRECTORY.joinpath(
+            "temporal", "dynamicconfig", "development.yaml"
+        )
+    ),
+    mode="0644",
+)
+
 files.put(
     name="Set the Airbyte version",
     src=io.StringIO(VERSIONS["airbyte"]),
