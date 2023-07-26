@@ -1,4 +1,3 @@
-#  noqa: WPS232
 import sys
 
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
@@ -257,7 +256,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                     ],
                     project_name="ol-infrastructure-edxapp-application",
                     project_source_path=PULUMI_CODE_PATH.joinpath(
-                        "applications/edxapp/"
+                        "applications/edxapp",
                     ),
                     dependencies=[
                         GetStep(
