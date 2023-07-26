@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 
 from pyinfra import host
-from pyinfra.operations import files, server
+from pyinfra.operations import apt, files, server
 
 from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models import (
@@ -108,6 +108,12 @@ files.line(
     path="/etc/profile",
     line=f"\nexport COMPOSE_PROFILES={node_type}",
     present=True,
+)
+
+apt.packages(
+    name="Remove unattended-upgrades to prevent race conditions during build",
+    packages=["unattended-upgrades"],
+    present=False,
 )
 
 # Preload some docker images. This will accelerate the first startup
