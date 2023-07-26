@@ -234,6 +234,10 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                     image_code=edx_ami_code,
                     packer_template_path="src/bilder/images/edxapp_v2/custom_install.pkr.hcl",  # noqa: E501
                     node_types=["web", "worker"],
+                    env_vars_from_files={
+                        "DOCKER_REPO_NAME": f"{edx_registry_image_resource.name}/repository",  # noqa: E501
+                        "DOCKER_IMAGE_DIGEST": f"{edx_registry_image_resource.name}/digest",  # noqa: E501
+                    },
                     extra_packer_params={
                         "only": ["amazon-ebs.edxapp"],
                         "var_files": [

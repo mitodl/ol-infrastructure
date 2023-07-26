@@ -85,13 +85,16 @@ vector_config.configuration_templates[
 
 # Setup some environment variables that will be pulled in by docker / docker-compose
 EDX_INSTALLATION_NAME = os.environ.get("EDX_INSTALLATION", "mitxonline")
+DOCKER_REPO_NAME = os.environ.get("DOCKER_REPO_NAME", "mitodl/edxapp")
+DOCKER_IMAGE_DIGEST = os.environ.get("DOCKER_IMAGE_DIGEST")
+
 edx_version = fetch_application_version(
     OPENEDX_RELEASE, EDX_INSTALLATION_NAME, OpenEdxApplication.edxapp
 )
 files.put(
-    name=f"Setting the EDXAPP_DOCKER_TAG env var to {OPENEDX_RELEASE}-{EDX_INSTALLATION_NAME}",  # noqa: E501
-    src=io.StringIO(f"{OPENEDX_RELEASE}-{EDX_INSTALLATION_NAME}"),
-    dest="/etc/default/edxapp_docker_tag",
+    name=f"Setting the DOCKER_REPO_AND_DIGEST env var to {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",  # noqa: E501
+    src=io.StringIO(f"{DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}"),
+    dest="/etc/default/docker_repo_and_digest",
 )
 files.put(
     name=f"Settings the TUTOR_PERMISSIONS_VERSION env var to {VERSIONS['tutor_permissions']}",  # noqa: E501
@@ -118,10 +121,8 @@ apt.packages(
 
 # Preload some docker images. This will accelerate the first startup
 server.shell(
-    name=f"Preload mitodl/edxapp:{OPENEDX_RELEASE}-{EDX_INSTALLATION_NAME}",
-    commands=[
-        f"/usr/bin/docker pull mitodl/edxapp:{OPENEDX_RELEASE}-{EDX_INSTALLATION_NAME}"
-    ],
+    name=f"Preload {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",
+    commands=[f"/usr/bin/docker pull {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}"],
 )
 
 # Create skeleton directory structures for docker-compose
