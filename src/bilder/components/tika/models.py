@@ -1,9 +1,12 @@
 from pathlib import Path
 
+from pydantic_settings import SettingsConfigDict
+
 from bilder.lib.model_helpers import OLBaseSettings
 
 
 class TikaConfig(OLBaseSettings):
+    model_config = SettingsConfigDict(env_prefix="tika_")
     version: str = "2.4.0"
     install_directory: Path = Path("/opt/tika")
     tika_user: str = "tika"
@@ -17,6 +20,3 @@ class TikaConfig(OLBaseSettings):
     tika_group: str = tika_user
     tika_log_config_file: str = f"{install_directory}/log4j2_tika.xml"
     tika_port: str = "9998"
-
-    class Config:
-        env_prefix = "tika_"

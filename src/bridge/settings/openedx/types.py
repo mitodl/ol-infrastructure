@@ -125,10 +125,10 @@ class OpenEdxApplicationVersion(BaseModel):
     application: Union[OpenEdxApplication, OpenEdxMicroFrontend]
     release: OpenEdxSupportedRelease
     application_type: OpenEdxApplicationType
-    branch_override: Optional[str]
-    origin_override: Optional[str]
-    runtime_version_override: Optional[str]
-    branding_overrides: Optional[dict[str, str]]
+    branch_override: Optional[str] = None
+    origin_override: Optional[str] = None
+    runtime_version_override: Optional[str] = None
+    branding_overrides: Optional[dict[str, str]] = None
 
     @property
     def runtime_version(self) -> str:

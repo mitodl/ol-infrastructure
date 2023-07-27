@@ -36,7 +36,7 @@ from pulumi_aws.ecs import (
     TaskDefinition,
 )
 from pulumi_aws.iam import ManagedPolicy, Role, RolePolicyAttachment
-from pydantic import PositiveInt
+from pydantic import ConfigDict, PositiveInt
 
 from ol_infrastructure.lib.aws.ecs.task_definition_config import (
     OLFargateTaskDefinitionConfig,
@@ -131,15 +131,14 @@ class OLFargateServiceConfig(AWSBase):
 
         return ServiceDeploymentControllerArgs(type=self._deployment_controller)
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class OLFargateService(pulumi.ComponentResource):
     def __init__(
         self,
         config: OLFargateServiceConfig,
-        opts: pulumi.ResourceOptions | None = None,  # type: ignore
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:aws:ecs:OLFargateService",
@@ -148,9 +147,7 @@ class OLFargateService(pulumi.ComponentResource):
             opts,
         )
 
-        self.resource_options = pulumi.ResourceOptions(parent=self).merge(
-            opts
-        )  # type: ignore
+        self.resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
 
         if config.cluster:
             pulumi.log.debug(

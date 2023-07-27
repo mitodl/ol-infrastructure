@@ -4,31 +4,33 @@
 
 from __future__ import annotations
 
-import re
 from enum import Enum
 from typing import Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConstrainedStr, Extra, Field, PositiveInt
+from pydantic import ConfigDict, BaseModel, Field, PositiveInt, RootModel, constr
 
 
-class Identifier(ConstrainedStr):  # type: ignore
-    regex = re.compile(r"^[a-z][\w\d\-_.]*$")
+class Identifier(RootModel[str]):
+    root: constr(pattern=r"^[a-z][\w\d\-_.]*$")  # type: ignore[valid-type]
+
+    def __hash__(self):
+        return str.__hash__(self.root)
 
 
 class Step(BaseModel):
     pass
 
 
-class Version(BaseModel):
-    __root__: dict[str, str]
+class Version(RootModel[dict[str, str]]):
+    root: dict[str, str]
 
 
-class Value(str):
-    pass
+class Value(RootModel[str]):
+    root: str
 
 
-class Duration(BaseModel):
-    __root__: str
+class Duration(RootModel[str]):
+    root: str
 
 
 class RegistryImage(BaseModel):
@@ -37,8 +39,7 @@ class RegistryImage(BaseModel):
 
 
 class DisplayConfig(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     background_image: Optional[str] = Field(
         None,
@@ -51,8 +52,7 @@ class DisplayConfig(BaseModel):
 
 
 class Cache(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     path: Optional[str] = Field(
         None,
@@ -132,8 +132,7 @@ class Platform(str, Enum):
 
 
 class VarSource(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     name: Optional[str] = Field(
         None,
@@ -149,8 +148,7 @@ class Vars(BaseModel):
 
 
 class Command(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     args: Optional[list[str]] = Field(
         None,
@@ -180,7 +178,7 @@ class Command(BaseModel):
             " file to execute, e.g. `/bin/bash` ."
         ),
     )
-    dir: Optional[str] = Field(
+    dir: Optional[str | Identifier] = Field(
         None,
         description=(
             "A directory, relative to the initial working directory, to set as the "
@@ -189,13 +187,12 @@ class Command(BaseModel):
     )
 
 
-class Number(BaseModel):
-    __root__: float
+class Number(RootModel[float]):
+    root: float
 
 
 class DummyConfig(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     vars: Optional[Vars] = Field(
         None, description="A mapping of var name to var value."
@@ -203,8 +200,7 @@ class DummyConfig(BaseModel):
 
 
 class GroupConfig(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     name: Optional[Identifier] = Field(
         None,
@@ -295,8 +291,7 @@ class StepModifierMixin(BaseModel):
 
 
 class PutStep(Step, StepModifierMixin):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     resource: Optional[str] = Field(
         None,
@@ -385,8 +380,7 @@ class PutStep(Step, StepModifierMixin):
 
 
 class AnonymousResource(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     source: Optional[dict[str, Any]] = Field(
         None,
@@ -421,8 +415,7 @@ class AnonymousResource(BaseModel):
 
 
 class Output(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     path: Optional[str] = Field(
         None,
@@ -442,8 +435,7 @@ class Output(BaseModel):
 
 
 class BuildLogRetentionPolicy(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     days: Optional[Number] = Field(
         None,
@@ -471,8 +463,7 @@ class BuildLogRetentionPolicy(BaseModel):
 
 
 class Input(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     path: Optional[str] = Field(
         None,
@@ -495,8 +486,7 @@ class Input(BaseModel):
 
 
 class AcrossVar(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     var: Optional[Identifier] = Field(
         None,
@@ -561,8 +551,7 @@ class AcrossVar(BaseModel):
 
 
 class DummyVarSource(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     config: Optional[DummyConfig] = Field(
         None,
@@ -582,8 +571,7 @@ class DummyVarSource(BaseModel):
 
 
 class VaultConfig(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     path_prefix: Optional[str] = Field(
         None,
@@ -688,8 +676,7 @@ class VaultConfig(BaseModel):
 
 
 class SetPipelineStep(Step, StepModifierMixin):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     set_pipeline: Optional[Union[Identifier, Literal["self"]]] = Field(
         None,
@@ -829,8 +816,7 @@ class SetPipelineStep(Step, StepModifierMixin):
 
 
 class LoadVarStep(Step, StepModifierMixin):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     format: Optional[Format] = Field(
         None,
@@ -893,8 +879,7 @@ class LoadVarStep(Step, StepModifierMixin):
 
 
 class Resource(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     name: Optional[Identifier] = Field(
         None,
@@ -1033,8 +1018,7 @@ class Resource(BaseModel):
 
 
 class ContainerLimits(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     cpu: Optional[Number] = Field(
         None,
@@ -1061,8 +1045,7 @@ class ContainerLimits(BaseModel):
 
 
 class ResourceType(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     privileged: Optional[bool] = Field(
         None,
@@ -1086,7 +1069,7 @@ class ResourceType(BaseModel):
             " type's image."
         ),
     )
-    source: Optional[dict[str, Any]] = Field(
+    source: Optional[dict[str, Any] | RegistryImage] = Field(
         None,
         description=(
             "The configuration for the resource type's resource. This varies  by"
@@ -1163,8 +1146,7 @@ class ResourceType(BaseModel):
 
 
 class GetStep(Step, StepModifierMixin):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     version: Optional[Union[Literal["latest"], Literal["every"], Version]] = Field(
         None,
@@ -1280,8 +1262,7 @@ class GetStep(Step, StepModifierMixin):
 
 
 class VaultVarSource(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     type: Optional[Literal["vault"]] = Field(
         None,
@@ -1331,8 +1312,7 @@ class VaultVarSource(BaseModel):
 
 
 class TaskConfig(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     image_resource: Optional[AnonymousResource] = Field(
         None,
@@ -1493,8 +1473,7 @@ class TaskConfig(BaseModel):
 
 
 class TaskStep(Step, StepModifierMixin):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     config: Optional[TaskConfig] = Field(
         None,
@@ -1717,8 +1696,7 @@ class TaskStep(Step, StepModifierMixin):
 
 
 class InParallelStep(Step, StepModifierMixin):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     in_parallel: Optional[Union[list[Step], InParallelConfig]] = Field(
         None,
@@ -1742,8 +1720,7 @@ class InParallelStep(Step, StepModifierMixin):
 
 
 class Job(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     build_log_retention: Optional[BuildLogRetentionPolicy] = Field(
         None,
@@ -1915,12 +1892,10 @@ class Job(BaseModel):
 
 
 class Pipeline(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     def json(self, *args, **kwargs):
         kwargs["exclude_none"] = True
-        kwargs["by_alias"] = True
         return super().json(*args, **kwargs)
 
     jobs: Optional[list[Job]] = Field(
@@ -1998,9 +1973,7 @@ class Pipeline(BaseModel):
 
 
 class TryStep(Step, StepModifierMixin):
-    class Config:
-        extra = Extra.forbid
-        allow_population_by_field_name = True
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     try_: Optional[Step] = Field(
         None,
@@ -2020,8 +1993,7 @@ class TryStep(Step, StepModifierMixin):
 
 
 class InParallelConfig(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     limit: Optional[Number] = Field(
         None,
@@ -2067,8 +2039,7 @@ class InParallelConfig(BaseModel):
 
 
 class DoStep(Step, StepModifierMixin):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     do: Optional[list[Step]] = Field(
         None,

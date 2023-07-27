@@ -61,8 +61,10 @@ repos:
     args:
     - --explicit-package-bases
     - --namespace-packages
+    - --config-file=pyproject.toml
+    - --warn-unused-configs
     additional_dependencies:
-    - pydantic
+    - pydantic>1
     - types-PyYAML
     - types-requests
 - repo: https://github.com/shellcheck-py/shellcheck-py
