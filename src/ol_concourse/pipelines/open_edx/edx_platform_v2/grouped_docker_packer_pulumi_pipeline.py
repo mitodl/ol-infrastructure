@@ -250,36 +250,32 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
             )
             job_names.append(packer_fragments[-1].jobs[-1].name)
             job_names.append(packer_fragments[-1].jobs[-2].name)
-            if deployment.deployment_name != "mitxonline":
-                pulumi_fragments.append(
-                    pulumi_jobs_chain(
-                        edx_pulumi_code,
-                        stack_names=[
-                            f"applications.edxapp.{deployment.deployment_name}.{stage}"
-                            for stage in deployment.envs_by_release(release_name)
-                        ],
-                        project_name=f"ol-infrastructure-edxapp-application.{deployment.deployment_name}",
-                        project_source_path=PULUMI_CODE_PATH.joinpath(
-                            "applications/edxapp",
-                        ),
-                        dependencies=[
-                            GetStep(
-                                get=packer_fragments[-1].resources[-1].name,
-                                trigger=False,
-                                passed=[packer_fragments[-1].jobs[-1].name],
-                            ),
-                        ],
-                    )
-                )
-                job_names.extend([job.name for job in pulumi_fragments[-1].jobs])
 
-                combined_fragments = PipelineFragment.combine_fragments(
-                    *container_fragments, *packer_fragments, *pulumi_fragments
+            pulumi_fragments.append(
+                pulumi_jobs_chain(
+                    edx_pulumi_code,
+                    stack_names=[
+                        f"applications.edxapp.{deployment.deployment_name}.{stage}"
+                        for stage in deployment.envs_by_release(release_name)
+                    ],
+                    project_name=f"ol-infrastructure-edxapp-application.{deployment.deployment_name}",
+                    project_source_path=PULUMI_CODE_PATH.joinpath(
+                        "applications/edxapp",
+                    ),
+                    dependencies=[
+                        GetStep(
+                            get=packer_fragments[-1].resources[-1].name,
+                            trigger=False,
+                            passed=[packer_fragments[-1].jobs[-1].name],
+                        ),
+                    ],
                 )
-            else:
-                combined_fragments = PipelineFragment.combine_fragments(
-                    *container_fragments, *packer_fragments
-                )
+            )
+            job_names.extend([job.name for job in pulumi_fragments[-1].jobs])
+
+        combined_fragments = PipelineFragment.combine_fragments(
+            *container_fragments, *packer_fragments, *pulumi_fragments
+        )
         group_config = GroupConfig(
             name=f"{release_name}",
             jobs=job_names,
