@@ -62,9 +62,6 @@ services:
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
     - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
-    depends_on:
-      lms-migrations:
-        condition: service_completed_successfully
   cms:
     image: ${DOCKER_REPO_AND_DIGEST}
     profiles:
@@ -82,9 +79,6 @@ services:
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
     - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
-    depends_on:
-      cms-migrations:
-        condition: service_completed_successfully
 
 # Worker definitions
   lms-migrations:
