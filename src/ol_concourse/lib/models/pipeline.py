@@ -11,7 +11,7 @@ from typing import Any, Literal, Optional, Union
 from pydantic import BaseModel, ConstrainedStr, Extra, Field, PositiveInt
 
 
-class Identifier(ConstrainedStr):
+class Identifier(ConstrainedStr):  # type: ignore
     regex = re.compile(r"^[a-z][\w\d\-_.]*$")
 
 
@@ -1920,6 +1920,7 @@ class Pipeline(BaseModel):
 
     def json(self, *args, **kwargs):
         kwargs["exclude_none"] = True
+        kwargs["by_alias"] = True
         return super().json(*args, **kwargs)
 
     jobs: Optional[list[Job]] = Field(
