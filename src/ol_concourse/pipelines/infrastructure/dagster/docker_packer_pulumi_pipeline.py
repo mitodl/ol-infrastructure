@@ -22,8 +22,7 @@ from ol_concourse.lib.resources import git_repo, registry_image
 
 
 def build_dagster_docker_pipeline() -> Pipeline:
-    # data_platform_branch = "main"
-    data_platform_branch = "md/issue_767"
+    data_platform_branch = "main"
     data_platform_repo = git_repo(
         Identifier("ol-data-platform"),
         uri="https://github.com/mitodl/ol-data-platform",
@@ -36,8 +35,7 @@ def build_dagster_docker_pipeline() -> Pipeline:
         username="((dockerhub.username))",
         password="((dockerhub.password))",  # noqa: S106
     )
-    # packer_code_branch = "main"
-    packer_code_branch = "md/issue_767"
+    packer_code_branch = "main"
     packer_code = git_repo(
         name=Identifier("ol-infrastructure-packer"),
         uri="https://github.com/mitodl/ol-infrastructure",
@@ -45,8 +43,7 @@ def build_dagster_docker_pipeline() -> Pipeline:
         branch=packer_code_branch,
     )
 
-    # pulumi_code_branch = "main"
-    pulumi_code_branch = "md/issue_767"
+    pulumi_code_branch = "main"
     pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi"),
         uri="https://github.com/mitodl/ol-infrastructure",
