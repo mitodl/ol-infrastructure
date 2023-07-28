@@ -2,7 +2,7 @@ version: "3.7"
 
 services:
   dagster-webserver:
-    image: mitodl/mono-dagster:{{ context.dagster_version }}
+    image: mitodl/{{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     container_name: dagster-webserver
     restart: unless-stopped
     entrypoint: ["poetry", "run", "dagster-webserver", "-w", "/opt/dagster/app/workspace.yaml", "-h", "0.0.0.0", "-p", "3000"]
@@ -16,14 +16,14 @@ services:
       - "traefik.http.routers.dagit.middlewares=traefik-forward-auth"
       - "traefik.http.routers.dagit.tls=true"
   dagster-daemon:
-    image: mitodl/mono-dagster:{{ context.dagster_version }}
+    image: mitodl/{{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     container_name: dagster-daemon
     restart: unless-stopped
     entrypoint: ["poetry", "run", "dagster-daemon", "run", "-w", "/opt/dagster/app/workspace.yaml"]
     env_file:
       - .env
   edx-pipeline:
-    image: mitodl/mono-dagster:{{ context.dagster_version }}
+    image: mitodl/{{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     container_name: edx-pipeline
     restart: unless-stopped
     entrypoint: ["poetry", "run", "dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "--package-name", "ol_orchestrate.repositories.open_edx"]
@@ -34,7 +34,7 @@ services:
     env_file:
       - .env
   lakehouse-assets-graph:
-    image: mitodl/mono-dagster:{{ context.dagster_version }}
+    image: mitodl/{{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     container_name: lakehouse-assets-graph
     restart: unless-stopped
     ports:
@@ -43,7 +43,7 @@ services:
     env_file:
       - .env
   tracking-log-reprocessing:
-    image: mitodl/mono-dagster:{{ context.dagster_version }}
+    image: mitodl/{{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     container_name: tracking-log-reprocessing
     restart: unless-stopped
     ports:
@@ -54,7 +54,7 @@ services:
     env_file:
       - .env
   edx-gcs-courses-pipeline:
-    image: mitodl/mono-dagster:{{ context.dagster_version }}
+    image: mitodl/{{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     container_name: edx-gcs-courses-pipeline
     restart: unless-stopped
     ports:

@@ -15,6 +15,9 @@ from ol_concourse.lib.models.pipeline import (
     PutStep,
     Platform,
 )
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
+from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.resources import git_repo, registry_image
 
 
@@ -32,6 +35,20 @@ def build_dagster_docker_pipeline() -> Pipeline:
         image_repository="mitodl/mono-dagster",
         username="((dockerhub.username))",
         password="((dockerhub.password))",  # noqa: S106
+    )
+
+    packer_code = git_repo(
+        name=Identifier("ol-infrastructure-packer"),
+        uri="https://github.com/mitodl/ol-infrastructure",
+        paths=["src/bilder/components/", "src/bilder/images/dagster/"],
+        branch="main",
+    )
+
+    pulumi_code = git_repo(
+        name=Identifier("ol-infrastructure-pulumi"),
+        uri="https://github.com/mitodl/ol-infrastructure",
+        paths=[*PULUMI_WATCHED_PATHS, "src/ol_infrastructure/applications/dagster/"],
+        branch="main",
     )
 
     docker_build_job = Job(
@@ -85,9 +102,56 @@ def build_dagster_docker_pipeline() -> Pipeline:
         ],
     )
 
+    packer_fragment = packer_jobs(
+        dependencies=[
+            GetStep(
+                get=mono_dagster_image.name,
+                trigger=True,
+                passed=[docker_build_job.name],
+            )
+        ],
+        image_code=packer_code,
+        packer_template_path="src/bilder/images/dagster/dagster.pkr.hcl",
+        env_vars_from_files={
+            "DOCKER_REPO_NAME": f"{mono_dagster_image.name}/repository",
+            "DOCKER_IMAGE_DIGEST": f"{mono_dagster_image.name}/digest",
+        },
+        extra_packer_params={
+            "only": ["amazon-ebs.dagster"],
+        },
+    )
+
+    pulumi_fragment = pulumi_jobs_chain(
+        pulumi_code,
+        stack_names=[f"applciations.dagster.{stage}" for stage in ("QA", "Production")],
+        project_name="ol-infrastructure-dagster-server",
+        project_source_path=PULUMI_CODE_PATH.joinpath("applications/dagster/"),
+        dependencies=[
+            GetStep(
+                get=packer_fragment.resources[-1].name,
+                trigger=True,
+                passed=[packer_fragment.jobs[-1].name],
+            ),
+        ],
+    )
+
+    combined_fragment = PipelineFragment(
+        resource_types=packer_fragment.resource_types + pulumi_fragment.resource_types,
+        resources=[
+            data_platform_repo,
+            mono_dagster_image,
+            packer_code,
+            pulumi_code,
+            *packer_fragment.resources,
+            *pulumi_fragment.resources,
+        ],
+        jobs=[docker_build_job, *packer_fragment.jobs, *pulumi_fragment.jobs],
+    )
+
     return Pipeline(
-        resources=[data_platform_repo, mono_dagster_image],
-        jobs=[docker_build_job],
+        resource_types=combined_fragment.resource_types,
+        resources=combined_fragment.resources,
+        jobs=combined_fragment.jobs,
     )
 
 
@@ -96,5 +160,5 @@ if __name__ == "__main__":
         definition.write(build_dagster_docker_pipeline().json(indent=2))
     sys.stdout.write(build_dagster_docker_pipeline().json(indent=2))
     sys.stdout.writelines(
-        ("\n", "fly -t pr-main sp -p docker-mono-dagster -c definition.json")
+        ("\n", "fly -t pr-inf sp -p docker-packer-pulumi-dagster -c definition.json")
     )
