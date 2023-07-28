@@ -84,7 +84,7 @@ consul_templates = []
 server.shell(
     name=f"Preload {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",
     commands=[
-        f"/usr/bin/docker/pull {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",
+        f"/usr/bin/docker pull {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",
     ],
 )
 
