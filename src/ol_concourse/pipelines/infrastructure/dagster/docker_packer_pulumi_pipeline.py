@@ -36,19 +36,22 @@ def build_dagster_docker_pipeline() -> Pipeline:
         username="((dockerhub.username))",
         password="((dockerhub.password))",  # noqa: S106
     )
-
+    # packer_code_branch = "main"
+    packer_code_branch = "md/issue_767"
     packer_code = git_repo(
         name=Identifier("ol-infrastructure-packer"),
         uri="https://github.com/mitodl/ol-infrastructure",
         paths=["src/bilder/components/", "src/bilder/images/dagster/"],
-        branch="main",
+        branch=packer_code_branch,
     )
 
+    # pulumi_code_branch = "main"
+    pulumi_code_branch = "md/issue_767"
     pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi"),
         uri="https://github.com/mitodl/ol-infrastructure",
         paths=[*PULUMI_WATCHED_PATHS, "src/ol_infrastructure/applications/dagster/"],
-        branch="main",
+        branch=pulumi_code_branch,
     )
 
     docker_build_job = Job(

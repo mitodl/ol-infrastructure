@@ -82,7 +82,7 @@ consul_templates = []
 
 # Preload the dagster image to accelerate the startup
 server.shell(
-    name=f"Preload mitodl/{DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",
+    name=f"Preload {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",
     commands=[
         f"/usr/bin/docker/pull {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",
     ],
