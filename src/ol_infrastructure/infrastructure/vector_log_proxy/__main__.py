@@ -74,7 +74,7 @@ def build_user_data(consul_dc, challenge_url, service_hash_bucket_fqdn):
     }
 
     return base64.b64encode(
-        "#cloud-config\n{}".format(
+        "#cloud-config\n{}".format(  # noqa: UP032
             yaml.dump(
                 cloud_config_contents,
                 sort_keys=True,

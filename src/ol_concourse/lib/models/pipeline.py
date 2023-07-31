@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
 from pydantic import (
     ConfigDict,
@@ -14,12 +14,12 @@ from pydantic import (
     PositiveInt,
     RootModel,
     SerializeAsAny,
-    constr,
+    StringConstraints,
 )
 
 
 class Identifier(RootModel):  # type: ignore
-    root: constr(pattern=r"^[a-z][\w\d\-_.]*$")  # type: ignore[valid-type]
+    root: Annotated[str, StringConstraints(pattern=r"^[a-z][\w\d\-_.]*$")]
 
     def __hash__(self):
         return str.__hash__(self.root)
