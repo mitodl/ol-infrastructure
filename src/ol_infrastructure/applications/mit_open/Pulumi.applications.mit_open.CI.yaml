@@ -1,0 +1,7 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHi+npazf3LfzV9oCtcYyCMYLOzaQhbo9xt6lJVVpz9tkQFYWXR26bejAFxfYQIRCj4BAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMw91fVvPyx7rx2gkgAgEQgDsLrdcEUT0SPIWURgB0clDobZqw9mfuVTjxEACpyGfJ03DW6RS4M1KUn2KhgcmiJ0Wu4HnB+byQ7SAJWA==
+config:
+  consul:address: https://consul-apps-ci.odl.mit.edu
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

@@ -3,10 +3,17 @@ from pulumi.output import Output
 from pulumi_aws import iam, s3
 from pulumi_vault import aws
 
+from bridge.lib.magic_numbers import FIVE_MINUTES
+
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+
 from ol_infrastructure.lib.vault import setup_vault_provider
+
+# Configuration items and initialziations
+if Config("vault_server").get("env_namespace"):
+    setup_vault_provider()
 
 setup_vault_provider()
 mit_open_config = Config("mit_open")
@@ -22,18 +29,18 @@ app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
     stack_info.env_suffix
 ]
 
-app_storage_bucket_name = f"mit-open-app-storage-{app_env_suffix}"
+app_storage_bucket_name = f"ol-mit-open-app-storage-{app_env_suffix}"
 application_storage_bucket = s3.Bucket(
-    f"mit_open_learning_application_storage_bucket_{stack_info.env_suffix}",
+    f"ol_mit_app_storage_bucket_{stack_info.env_suffix}",
     bucket=app_storage_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
 )
 
-FIVE_MINUTES = 300
+course_data_bucket_name = f"ol-mit-open-course-data-{app_env_suffix}"
 course_data_bucket = s3.Bucket(
-    f"mit-open-learning-course-data-{stack_info.env_suffix}",
-    bucket=f"open-learning-course-data-{app_env_suffix}",
+    f"ol_mit_course_data_bucket_{stack_info.env_suffix}",
+    bucket=course_data_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     cors_rules=[
         s3.BucketCorsRuleArgs(
@@ -53,6 +60,7 @@ parliament_config = {
     "RESOURCE_EFFECTIVELY_STAR": {},
 }
 
+# TODO: MD 07312023 Requires review of bucket names
 s3_bucket_permissions = [
     {
         "Action": [
@@ -91,6 +99,7 @@ s3_bucket_permissions = [
     },
 ]
 
+# TODO: MD 07312023 Requires review
 athena_warehouse_access_statements = [
     {
         "Effect": "Allow",
@@ -195,8 +204,8 @@ open_policy_document = {
 }
 
 mit_open_iam_policy = iam.Policy(
-    f"mit_open_iam_permissions_{stack_info.env_suffix}",
-    name=f"mit-open-application-permissions-{stack_info.env_suffix}",
+    f"ol_mit_open_iam_permissions_{stack_info.env_suffix}",
+    name=f"ol-mit-open-application-permissions-{stack_info.env_suffix}",
     path=f"/ol-applications/mit-open/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         open_policy_document, stringify=True, parliament_config=parliament_config
@@ -204,16 +213,13 @@ mit_open_iam_policy = iam.Policy(
 )
 
 mit_open_vault_iam_role = aws.SecretBackendRole(
-    f"mit-open-iam-permissions-vault-policy-{stack_info.env_suffix}",
-    name=f"mit-open-application-{stack_info.env_suffix}",
-    # TODO: Make this configurable to support multiple AWS backends. TMM 2021-03-04
-    backend="aws-mitx",
+    f"ol-mit-open-iam-permissions-vault-policy-{stack_info.env_suffix}",
+    name=f"ol-mit-open-application-{stack_info.env_suffix}",
+    backend="aws",
     credential_type="iam_user",
     policy_arns=[mit_open_iam_policy.arn],
 )
 
-# TODO MD 07312023 Should this be renamed?
-# Need to reconcile with other stack refs first.
 export(
     "mit_open",
     {
