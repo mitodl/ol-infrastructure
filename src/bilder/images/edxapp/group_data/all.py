@@ -5,6 +5,7 @@ edx_plugins_added = {
     "mitxonline": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "django-redis",  # Support for Redis caching in Django
+        "edx-proctoring-proctortrack==1.1.1",
         "edx-sysadmin",
         "edx-username-changer==0.3.0",
         "mitxpro-openedx-extensions==1.0.0",
