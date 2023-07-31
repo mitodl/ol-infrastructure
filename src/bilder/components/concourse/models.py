@@ -47,7 +47,7 @@ class ConcourseBaseConfig(OLBaseSettings):
         :rtype: List[Path]
         """
         for field in self.model_fields.values():
-            field_value = self.dict()[field.name]
+            field_value = self.model_dump()[field.name]
             if field.annotation == Path and field_value:
                 yield field_value
 

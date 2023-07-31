@@ -130,7 +130,7 @@ def registry_image(
 ) -> Resource:
     image_source = RegistryImage(
         repository=image_repository, tag=image_tag or "latest"
-    ).dict()
+    ).model_dump()
     if username and password:
         image_source["username"] = username
         image_source["password"] = password
