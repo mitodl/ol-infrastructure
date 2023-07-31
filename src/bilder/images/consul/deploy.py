@@ -64,13 +64,13 @@ consul_esm_configuration = {
 
 # Install Traefik
 traefik_config = TraefikConfig(
-    static_configuration=traefik_static.TraefikStaticConfig.parse_obj(
+    static_configuration=traefik_static.TraefikStaticConfig.model_validate(
         yaml.safe_load(
             FILES_DIRECTORY.joinpath("traefik", "static_config.yaml").read_text()
         )
     ),
     file_configurations={
-        Path("consul.yaml"): traefik_file_provider.TraefikFileConfig.parse_obj(
+        Path("consul.yaml"): traefik_file_provider.TraefikFileConfig.model_validate(
             yaml.safe_load(
                 FILES_DIRECTORY.joinpath("traefik", "dynamic_config.yaml").read_text()
             )
