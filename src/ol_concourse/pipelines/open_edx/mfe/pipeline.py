@@ -157,12 +157,12 @@ def mfe_job(
                             textwrap.dedent(
                                 f"""\
                                 apt-get update
-                                apt-get install -q -y python build-essential
+                                apt-get install -q -y python3 python-is-python3 build-essential
                                 npm install --legacy-peer-deps
                                 {branding_overrides}
                                 npm install webpack --legacy-peer-deps
                                 NODE_ENV=production npm run build
-                                """
+                                """  # noqa: E501
                             ),
                         ],
                     ),
