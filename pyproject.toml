@@ -16,6 +16,7 @@ packages = [
     {include = "ol_infrastructure", from = "src"},
     {include = "bridge", from = "src"},
     {include = "bilder", from = "src"},
+    {include = "ol_concourse", from = "src"},
 ]
 
 [tool.poetry.dependencies]

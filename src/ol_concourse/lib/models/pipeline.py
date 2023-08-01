@@ -15,14 +15,34 @@ from pydantic import (
     RootModel,
     SerializeAsAny,
     StringConstraints,
+    model_serializer,
+    model_validator,
 )
 
 
-class Identifier(RootModel):  # type: ignore
-    root: Annotated[str, StringConstraints(pattern=r"^[a-z][\w\d\-_.]*$")]
+class Identifier(RootModel[str]):
+    root: Annotated[
+        str,
+        StringConstraints(
+            strip_whitespace=True, strict=False, pattern=r"^[a-z][\w\d\-_.]*$"
+        ),
+    ]
 
     def __hash__(self):
         return str.__hash__(self.root)
+
+    @model_serializer
+    def serialize(self):
+        if hasattr(self, "root"):
+            return self.root
+        return self
+        # return self.root
+
+    @model_validator(mode="after")  # type: ignore[arg-type]
+    def coerce_to_string(self):
+        if hasattr(self, "root"):
+            return self.root
+        return self
 
 
 class Step(BaseModel):
@@ -390,7 +410,7 @@ class PutStep(Step, StepModifierMixin):
 class AnonymousResource(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    source: Optional[dict[str, Any]] = Field(
+    source: Optional[dict[str, Any] | RegistryImage] = Field(
         None,
         description=(
             "The configuration for the resource; see    schema.resource.source  ."
