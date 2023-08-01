@@ -134,7 +134,7 @@ def mfe_job(
                         type="registry-image",
                         source={
                             "repository": "node",
-                            "tag": f"{mfe.runtime_version}-bullseye-slim",
+                            "tag": f"{mfe.runtime_version}-bookworm-slim",
                         },
                     ),
                     inputs=[Input(name=mfe_repo.name)],

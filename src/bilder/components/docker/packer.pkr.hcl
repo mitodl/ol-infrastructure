@@ -24,10 +24,10 @@ source "amazon-ebs" "docker" {
     app     = "${local.app_name}"
     purpose = "${local.app_name}"
   }
-  # Base all builds off of the most recent Debian 10 image built by the Debian organization.
+  # Base all builds off of the most recent Debian 12 image built by the Debian organization.
   source_ami_filter {
     filters = {
-      name                = "debian-10-amd64*"
+      name                = "debian-12-amd64*"
       root-device-type    = "ebs"
       virtualization-type = "hvm"
     }
@@ -50,7 +50,7 @@ source "amazon-ebs" "docker" {
 }
 
 source "docker" "docker" {
-  image      = "debian:buster"
+  image      = "debian:bookworm"
   discard    = true
   privileged = true
   changes = [
