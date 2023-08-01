@@ -20,10 +20,10 @@ source "amazon-ebs" "third-party" {
     app     = var.app_name
     purpose = "${var.app_name}-${var.node_type}"
   }
-  # Base all builds off of the most recent Debian 11 image built by the Debian organization.
+  # Base all builds off of the most recent Debian 12 image built by the Debian organization.
   source_ami_filter {
     filters = {
-      name                = "debian-11-amd64*"
+      name                = "debian-12-amd64*"
       root-device-type    = "ebs"
       virtualization-type = "hvm"
     }
@@ -52,7 +52,7 @@ source "amazon-ebs" "third-party" {
 }
 
 source "docker" "concourse" {
-  image  = "debian:buster"
+  image  = "debian:bookworm"
   commit = true
   changes = [
     "USER concourse",

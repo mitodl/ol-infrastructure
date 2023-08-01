@@ -14,7 +14,7 @@ jobs:
         name: ''
         source:
           repository: node
-          tag: 16-bullseye-slim
+          tag: 16-bookworm-slim
         type: docker-image
       inputs:
       - name: ocw-to-hugo

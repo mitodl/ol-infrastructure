@@ -56,7 +56,7 @@ source "amazon-ebs" "xqueue" {
     purpose         = "${local.app_name}-${var.deployment}-${var.openedx_release}"
     openedx_release = var.openedx_release
   }
-  # Base all builds off of the most recent docker_baseline_ami built by us, based of Debian 11
+  # Base all builds off of the most recent docker_baseline_ami built by us, based of Debian 12
   source_ami_filter {
     filters = {
       name                = "docker_baseline_ami-${var.node_type}-*"
