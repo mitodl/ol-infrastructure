@@ -497,7 +497,7 @@ def cloud_init_user_data(  # noqa: PLR0913
             {"path": "/etc/ssl/ol_root_ca.pem", "content": ca_cert},
         ],
     }
-    cloud_config = "#cloud-config\n{}".format(  # noqa: UP032
+    cloud_config = "#cloud-config\n{}".format(
         yaml.dump(
             cloud_config_contents,
             sort_keys=False,

@@ -1086,7 +1086,7 @@ def cloud_init_user_data_func(
         ]
     }
     return base64.b64encode(
-        "#cloud-config\n{}".format(  # noqa: UP032
+        "#cloud-config\n{}".format(
             yaml.dump(
                 cloud_config_content,
                 sort_keys=True,

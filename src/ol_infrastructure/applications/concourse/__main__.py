@@ -147,7 +147,7 @@ def build_worker_user_data(
             }
         )
     return base64.b64encode(
-        "#cloud-config\n{}".format(  # noqa: UP032
+        "#cloud-config\n{}".format(
             yaml.dump(
                 yaml_contents,
                 sort_keys=True,
