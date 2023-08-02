@@ -20,7 +20,7 @@ search_config = pulumi.Config("opensearch")
 env_config = pulumi.Config("environment")
 stack_info = parse_stack()
 
-if stack_info.env_prefix in ["open", "mit-open"]:
+if stack_info.env_prefix in ["open", "mitopen"]:
     consul_stack = pulumi.StackReference(
         f"infrastructure.consul.apps.{stack_info.name}"
     )

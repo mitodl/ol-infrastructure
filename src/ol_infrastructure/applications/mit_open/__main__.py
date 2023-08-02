@@ -22,7 +22,7 @@ aws_config = AWSBase(
     tags={
         "OU": "mit-open",
         "Environment": stack_info.env_suffix,
-        "Application": "mit-open",
+        "Application": "mitopen",
     }
 )
 app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
@@ -205,23 +205,23 @@ open_policy_document = {
 
 mit_open_iam_policy = iam.Policy(
     f"ol_mit_open_iam_permissions_{stack_info.env_suffix}",
-    name=f"ol-mit-open-application-permissions-{stack_info.env_suffix}",
-    path=f"/ol-applications/mit-open/{stack_info.env_suffix}/",
+    name=f"ol-mitopen-application-permissions-{stack_info.env_suffix}",
+    path=f"/ol-applications/mitopen/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         open_policy_document, stringify=True, parliament_config=parliament_config
     ),
 )
 
 mit_open_vault_iam_role = aws.SecretBackendRole(
-    f"ol-mit-open-iam-permissions-vault-policy-{stack_info.env_suffix}",
-    name=f"ol-mit-open-application-{stack_info.env_suffix}",
+    f"ol-mitopen-iam-permissions-vault-policy-{stack_info.env_suffix}",
+    name=f"ol-mitopen-application-{stack_info.env_suffix}",
     backend="aws",
     credential_type="iam_user",
     policy_arns=[mit_open_iam_policy.arn],
 )
 
 export(
-    "mit_open",
+    "mitopen",
     {
         "iam_policy": mit_open_iam_policy.arn,
         "vault_iam_role": Output.all(
