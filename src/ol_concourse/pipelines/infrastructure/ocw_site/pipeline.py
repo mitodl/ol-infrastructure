@@ -34,7 +34,7 @@ if __name__ == "__main__":
     import sys
 
     with open("definition.json", "w") as definition:
-        definition.write(ocw_site_pipeline.json(indent=2))
-    sys.stdout.write(ocw_site_pipeline.json(indent=2))
+        definition.write(ocw_site_pipeline.model_dump_json(indent=2))
+    sys.stdout.write(ocw_site_pipeline.model_dump_json(indent=2))
     sys.stdout.write("\n")
     sys.stdout.write("fly -t pr-inf set-pipeline -p pulumi-ocw-site -c definition.json")

@@ -103,7 +103,7 @@ if __name__ == "__main__":
     import sys
 
     with open("definition.json", "w") as definition:
-        definition.write(vault_pipeline.json(indent=2))
-    sys.stdout.write(vault_pipeline.json(indent=2))
+        definition.write(vault_pipeline.model_dump_json(indent=2))
+    sys.stdout.write(vault_pipeline.model_dump_json(indent=2))
     print()
     print("fly -t pr-inf sp -p packer-pulumi-vault -c definition.json")

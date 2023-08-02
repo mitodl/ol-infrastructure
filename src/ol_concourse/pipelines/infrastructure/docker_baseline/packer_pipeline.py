@@ -77,7 +77,7 @@ if __name__ == "__main__":
     import sys
 
     with open("definition.json", "w") as definition:
-        definition.write(docker_baseline_pipeline.json(indent=2))
-    sys.stdout.write(docker_baseline_pipeline.json(indent=2))
+        definition.write(docker_baseline_pipeline.model_dump_json(indent=2))
+    sys.stdout.write(docker_baseline_pipeline.model_dump_json(indent=2))
     print()
     print("fly -t pr-inf sp -p packer-docker-baseline -c definition.json")

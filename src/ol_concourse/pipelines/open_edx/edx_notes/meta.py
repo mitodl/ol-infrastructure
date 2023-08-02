@@ -83,8 +83,8 @@ meta_pipeline = Pipeline(resources=[pipeline_code], jobs=meta_jobs)
 
 if __name__ == "__main__":
     with open("definition.json", "w") as definition:
-        definition.write(meta_pipeline.json(indent=2))
-    sys.stdout.write(meta_pipeline.json(indent=2))
+        definition.write(meta_pipeline.model_dump_json(indent=2))
+    sys.stdout.write(meta_pipeline.model_dump_json(indent=2))
     sys.stdout.write(
         "\nfly -t <target> set-pipeline -p docker-packer-pulumi-edx-notes-meta -c definition.json"  # noqa: E501
     )

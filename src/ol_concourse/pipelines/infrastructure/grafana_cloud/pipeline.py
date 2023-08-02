@@ -463,7 +463,7 @@ if __name__ == "__main__":
     import sys
 
     with open("definition.json", "w") as definition:
-        definition.write(grafana_pipeline.json(indent=2))
-    sys.stdout.write(grafana_pipeline.json(indent=2))
+        definition.write(grafana_pipeline.model_dump_json(indent=2))
+    sys.stdout.write(grafana_pipeline.model_dump_json(indent=2))
     print()
     print("fly -t pr-inf sp -p misc-grafana-management -c definition.json")

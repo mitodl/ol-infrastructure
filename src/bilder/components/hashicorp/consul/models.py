@@ -2,8 +2,10 @@ import abc
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional
+from pydantic import SerializeAsAny
 
 from pydantic.fields import Field
+from pydantic_settings import SettingsConfigDict
 
 from bilder.components.hashicorp.models import (
     FlexibleBaseModel,
@@ -17,14 +19,14 @@ class ConsulACLToken(FlexibleBaseModel):
 
 
 class ConsulACL(FlexibleBaseModel):
-    tokens: Optional[list[ConsulACLToken]]
+    tokens: Optional[list[ConsulACLToken]] = None
 
 
 class ConsulAddresses(FlexibleBaseModel):
     dns: Optional[str] = "0.0.0.0"  # noqa: S104
     http: Optional[str] = "0.0.0.0"  # noqa: S104
-    https: Optional[str]
-    grpc: Optional[str]
+    https: Optional[str] = None
+    grpc: Optional[str] = None
 
 
 class ConsulDNSConfig(FlexibleBaseModel):
@@ -34,65 +36,63 @@ class ConsulDNSConfig(FlexibleBaseModel):
 
 
 class ConsulServiceCheck(FlexibleBaseModel, abc.ABC):
-    id: Optional[str]
+    id: Optional[str] = None
 
 
 class ConsulServiceTCPCheck(ConsulServiceCheck):
-    id: Optional[str]
+    id: Optional[str] = None
     name: str
     tcp: str
-    interval: Optional[str]
-    timeout: Optional[str]
+    interval: Optional[str] = None
+    timeout: Optional[str] = None
 
 
 class ConsulService(FlexibleBaseModel):
-    id: Optional[str]
-    tags: Optional[list[str]]
-    meta: Optional[dict[str, str]]
+    id: Optional[str] = None
+    tags: Optional[list[str]] = None
+    meta: Optional[dict[str, str]] = None
     name: str
-    port: Optional[int]
-    address: Optional[str]
-    check: Optional[ConsulServiceCheck]
+    port: Optional[int] = None
+    address: Optional[str] = None
+    check: Optional[SerializeAsAny[ConsulServiceCheck]] = None
 
 
 class ConsulTelemetry(FlexibleBaseModel):
-    dogstatsd_addr: Optional[str]
+    dogstatsd_addr: Optional[str] = None
     disable_hostname: Optional[bool] = True
     prometheus_retention_time: Optional[str] = "60s"
 
 
 class ConsulConfig(HashicorpConfig):
-    acl: Optional[ConsulACL]
+    model_config = SettingsConfigDict(env_prefix="consul_")
+    acl: Optional[ConsulACL] = None
     addresses: Optional[ConsulAddresses] = ConsulAddresses()
-    advertise_addr: Optional[str]
-    bootstrap_expect: Optional[int]
-    client_addr: Optional[str]
+    advertise_addr: Optional[str] = None
+    bootstrap_expect: Optional[int] = None
+    client_addr: Optional[str] = None
     data_dir: Optional[Path] = Path("/var/lib/consul/")
-    datacenter: Optional[str]
+    datacenter: Optional[str] = None
     disable_host_node_id: Optional[bool] = True
     dns_config: Optional[ConsulDNSConfig] = ConsulDNSConfig()
-    encrypt: Optional[str]
+    encrypt: Optional[str] = None
     enable_syslog: bool = True
     leave_on_terminate: bool = True
     log_level: Optional[str] = "WARN"
     log_json: bool = True
-    primary_datacenter: Optional[str]
+    primary_datacenter: Optional[str] = None
     recursors: Optional[list[str]] = Field(
         None,
         description="List of DNS servers to use for resolving non-consul addresses",
     )
     rejoin_after_leave: bool = True
-    retry_join: Optional[list[str]]
-    retry_join_wan: Optional[list[str]]
+    retry_join: Optional[list[str]] = None
+    retry_join_wan: Optional[list[str]] = None
     server: bool = False
-    service: Optional[ConsulService]
-    services: Optional[list[ConsulService]]
+    service: Optional[ConsulService] = None
+    services: Optional[list[ConsulService]] = None
     skip_leave_on_interrupt: bool = True
-    telemetry: Optional[ConsulTelemetry]
+    telemetry: Optional[ConsulTelemetry] = None
     ui: bool = False
-
-    class Config:
-        env_prefix = "consul_"
 
 
 class Consul(HashicorpProduct):
@@ -110,7 +110,7 @@ class Consul(HashicorpProduct):
 
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
         for fpath, config in self.configuration.items():
-            yield self.configuration_directory.joinpath(fpath), config.json(
+            yield self.configuration_directory.joinpath(fpath), config.model_dump_json(
                 exclude_none=True, indent=2, by_alias=True
             )
 
