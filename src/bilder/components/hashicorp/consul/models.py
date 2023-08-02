@@ -2,6 +2,7 @@ import abc
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional
+from pydantic import SerializeAsAny
 
 from pydantic.fields import Field
 from pydantic_settings import SettingsConfigDict
@@ -53,7 +54,7 @@ class ConsulService(FlexibleBaseModel):
     name: str
     port: Optional[int] = None
     address: Optional[str] = None
-    check: Optional[ConsulServiceCheck] = None
+    check: Optional[SerializeAsAny[ConsulServiceCheck]] = None
 
 
 class ConsulTelemetry(FlexibleBaseModel):

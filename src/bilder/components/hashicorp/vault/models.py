@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional, Union
 
-from pydantic import field_validator
+from pydantic import SerializeAsAny, field_validator
 from pydantic.types import conint
 from pydantic_settings import SettingsConfigDict
 
@@ -54,7 +54,7 @@ class VaultAutoAuthMethod(FlexibleBaseModel):
     mount_path: Optional[str] = None
     namespace: Optional[str] = None
     wrap_ttl: Optional[Union[str, int]] = None
-    config: VaultAutoAuthMethodConfig
+    config: SerializeAsAny[VaultAutoAuthMethodConfig]
 
 
 class VaultAutoAuthSink(FlexibleBaseModel):
@@ -65,7 +65,7 @@ class VaultAutoAuthSink(FlexibleBaseModel):
     derive_key: bool = False
     aad: Optional[str] = None
     aad_env_var: Optional[str] = None
-    config: list[VaultAutoAuthSinkConfig]
+    config: list[SerializeAsAny[VaultAutoAuthSinkConfig]]
 
 
 class VaultAgentCache(FlexibleBaseModel):
