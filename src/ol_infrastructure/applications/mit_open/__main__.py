@@ -29,17 +29,17 @@ app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
     stack_info.env_suffix
 ]
 
-app_storage_bucket_name = f"ol-mit-open-app-storage-{app_env_suffix}"
+app_storage_bucket_name = f"ol-mitopen-app-storage-{app_env_suffix}"
 application_storage_bucket = s3.Bucket(
-    f"ol_mit_app_storage_bucket_{stack_info.env_suffix}",
+    f"ol_mitopen_app_storage_bucket_{stack_info.env_suffix}",
     bucket=app_storage_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
 )
 
-course_data_bucket_name = f"ol-mit-open-course-data-{app_env_suffix}"
+course_data_bucket_name = f"ol-mitopen-course-data-{app_env_suffix}"
 course_data_bucket = s3.Bucket(
-    f"ol_mit_course_data_bucket_{stack_info.env_suffix}",
+    f"ol_mitopen_course_data_bucket_{stack_info.env_suffix}",
     bucket=course_data_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     cors_rules=[
@@ -99,112 +99,13 @@ s3_bucket_permissions = [
     },
 ]
 
-# TODO: MD 07312023 Requires review
-athena_warehouse_access_statements = [
-    {
-        "Effect": "Allow",
-        "Action": [
-            "s3:GetObject*",
-            "s3:ListBucket",
-        ],
-        "Resource": [
-            f"arn:aws:s3:::ol-data-lake-mitx-{stack_info.env_suffix}",
-            f"arn:aws:s3:::ol-data-lake-mitx-{stack_info.env_suffix}/*",
-            f"arn:aws:s3:::ol-data-lake-mit-open-{stack_info.env_suffix}",
-            f"arn:aws:s3:::ol-data-lake-mit-open-{stack_info.env_suffix}/*",
-        ],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "s3:PutObject",
-            "s3:GetBucketLocation",
-            "s3:GetObject",
-            "s3:ListBucket",
-        ],
-        "Resource": [
-            f"arn:aws:s3:::ol-warehouse-results-{stack_info.env_suffix}",
-            f"arn:aws:s3:::ol-warehouse-results-{stack_info.env_suffix}/*",
-        ],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "athena:ListDataCatalogs",
-            "athena:ListWorkGroups",
-        ],
-        "Resource": ["*"],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "s3:ListBucket",
-            "S3:GetObject",
-        ],
-        "Resource": [
-            f"arn:aws:s3:::ol-data-lake-mitx-{stack_info.env_suffix}",
-            f"arn:aws:s3:::ol-data-lake-mitx-{stack_info.env_suffix}/*",
-            f"arn:aws:s3:::ol-data-lake-mit-open-{stack_info.env_suffix}",
-            f"arn:aws:s3:::ol-data-lake-mit-open-{stack_info.env_suffix}/*",
-            f"arn:aws:s3:::ol-warehouse-results-{stack_info.env_suffix}",
-        ],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "athena:BatchGetNamedQuery",
-            "athena:BatchGetQueryExecution",
-            "athena:GetNamedQuery",
-            "athena:GetQueryExecution",
-            "athena:GetQueryResults",
-            "athena:GetQueryResultsStream",
-            "athena:GetWorkGroup",
-            "athena:ListNamedQueries",
-            "athena:ListQueryExecutions",
-            "athena:StartQueryExecution",
-            "athena:StopQueryExecution",
-        ],
-        "Resource": [
-            f"arn:*:athena:*:*:workgroup/ol-warehouse-{stack_info.env_suffix}"
-        ],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "athena:GetDataCatalog",
-            "athena:GetDatabase",
-            "athena:GetTableMetadata",
-            "athena:ListDatabases",
-            "athena:ListTableMetadata",
-        ],
-        "Resource": ["arn:*:athena:*:*:datacatalog/*"],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "glue:BatchGetPartition",
-            "glue:GetDatabase",
-            "glue:GetDatabases",
-            "glue:GetPartition",
-            "glue:GetPartitions",
-            "glue:GetTable",
-            "glue:GetTables",
-        ],
-        "Resource": [
-            "arn:aws:glue:*:*:catalog",
-            f"arn:aws:glue:*:*:database/ol_warehouse_mitx_{stack_info.env_suffix}",
-            f"arn:aws:glue:*:*:database/ol_warehouse_mit_open_{stack_info.env_suffix}",
-            f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}/*",
-        ],
-    },
-]
 open_policy_document = {
     "Version": IAM_POLICY_VERSION,
-    "Statement": s3_bucket_permissions + athena_warehouse_access_statements,
+    "Statement": s3_bucket_permissions,
 }
 
 mit_open_iam_policy = iam.Policy(
-    f"ol_mit_open_iam_permissions_{stack_info.env_suffix}",
+    f"ol_mitopen_iam_permissions_{stack_info.env_suffix}",
     name=f"ol-mitopen-application-permissions-{stack_info.env_suffix}",
     path=f"/ol-applications/mitopen/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
