@@ -302,7 +302,7 @@ ocw_starter_webhook = github.RepositoryWebhook(
         url="https://{}/api/starters/site_configs/".format(
             ocw_studio_config.require("app_domain")
         ),
-        content_type="application/json",
+        content_type="json",
         secret=vault_secrets["github_shared_secret"],
     ),
     opts=github_options,
