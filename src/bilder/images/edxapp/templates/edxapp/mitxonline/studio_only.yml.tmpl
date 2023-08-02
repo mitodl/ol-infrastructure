@@ -6,6 +6,9 @@ GIT_REPO_EXPORT_DIR: /edx/var/edxapp/export_course_repos
 GIT_EXPORT_DEFAULT_IDENT:
   name: MITx Online
   email: mitx-devops@mit.edu
+JS_ENV_EXTRA_CONFIG:  # ADDED KEY
+  PROCTORTRACK_CDN_URL: https://verificientstatic-preprod.storage.googleapis.com/cdn/fb_cjs/edx_preprod_cjs.IQEQWWZ2.js
+  PROCTORTRACK_CONFIG_KEY: 1PKRwFPezxXj3TsD
 LIBRARY_AUTHORING_MICROFRONTEND_URL: /library-authoring/
 PARSE_KEYS: {}
 SITE_NAME: {{ key "edxapp/studio-domain" }}  # MODIFIED
