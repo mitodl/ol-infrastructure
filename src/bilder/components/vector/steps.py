@@ -2,6 +2,7 @@ from pathlib import Path
 
 from pyinfra import host
 from pyinfra.api import deploy
+from pyinfra.facts.files import File
 from pyinfra.operations import files, server, systemd
 
 from bilder.components.vector.models import VectorConfig
@@ -73,11 +74,11 @@ def install_vector(vector_config: VectorConfig):
             user=vector_config.user,
             present=True,
         )
-
-    server.shell(
-        name="Backup original vector.service defintion",
-        commands=["/usr/bin/mv /lib/systemd/system/vector.service /root"],
-    )
+    if host.get_fact(File, "/lib/systemd/system/vector.service"):
+        server.shell(
+            name="Backup original vector.service defintion",
+            commands=["/usr/bin/mv /lib/systemd/system/vector.service /root"],
+        )
     files.put(
         dest="/lib/systemd/system/vector.service",
         group="root",
