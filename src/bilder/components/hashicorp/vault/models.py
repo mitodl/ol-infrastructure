@@ -202,14 +202,16 @@ class VaultListener(FlexibleBaseModel):
 
 
 class ConsulServiceRegistration(FlexibleBaseModel):
-    address: Optional[str]  # address of Consul agent to communicate with
+    # address of Consul agent to communicate with
+    address: Optional[str] = None
     check_timeout: Optional[str] = None
     disable_registration: str = "false"
     scheme: Optional[str] = "http"
     service: Optional[str] = "vault"
     service_tags: Optional[list[str]] = None
     service_address: Optional[str] = ""
-    token: Optional[str]  # Consul ACL token to authorize setting the service definition
+    # Consul ACL token to authorize setting the service definition
+    token: Optional[str] = None
     tls_ca_file: Optional[Path] = None
     tls_cert_file: Optional[Path] = None
     tls_key_file: Optional[Path] = None
