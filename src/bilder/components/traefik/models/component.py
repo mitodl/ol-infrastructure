@@ -15,4 +15,6 @@ class TraefikConfig(OLBaseSettings):
     configuration_directory: Path = Path("/etc/traefik")
     static_configuration_file: Path = Path("traefik.yaml")
     static_configuration: traefik_static.TraefikStaticConfig
-    file_configurations: Optional[dict[Path, traefik_file_provider.TraefikFileConfig]]
+    file_configurations: Optional[
+        dict[Path, traefik_file_provider.TraefikFileConfig]
+    ] = None
