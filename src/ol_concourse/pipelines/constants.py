@@ -11,4 +11,5 @@ PACKER_WATCHED_PATHS = [
     "src/bilder/images/packer.pkr.hcl",
     "src/bilder/images/config.pkr.hcl",
     "src/bilder/images/variables.pkr.hcl",
+    "src/bilder/components/",
 ]
