@@ -280,7 +280,7 @@ class HttpRouter(BaseModel):
             " HTTP services (not TCP services)."
         ),
     )
-    tls: Optional[Tls1] = Field(
+    tls: Optional[Tls | Tls1] = Field(
         None,
         description=(
             "When a TLS section is specified, it instructs Traefik that the current"
