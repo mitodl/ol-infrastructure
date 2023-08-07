@@ -63,7 +63,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                 branch=theme.release_branch,
             )
             theme_git_resources.append(theme_git_resource)
-            theme_get_steps.append(GetStep(get=theme_git_resource.name, trigger=False))
+            theme_get_steps.append(GetStep(get=theme_git_resource.name, trigger=True))
 
             edx_platform_git_resources = []
             edx_platform_get_steps = []
@@ -79,7 +79,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
             )
             edx_platform_git_resources.append(edx_platform_git_resource)
             edx_platform_get_steps.append(
-                GetStep(get=edx_platform_git_resource.name, trigger=False)
+                GetStep(get=edx_platform_git_resource.name, trigger=True)
             )
 
             edx_ami_code = git_repo(
@@ -145,7 +145,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                     InParallelStep(
                         in_parallel=theme_get_steps
                         + edx_platform_get_steps
-                        + [GetStep(get=edx_docker_code.name, trigger=False)]
+                        + [GetStep(get=edx_docker_code.name, trigger=True)]
                     ),
                     TaskStep(
                         task=Identifier("collect-code"),
@@ -227,7 +227,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                     dependencies=[
                         GetStep(
                             get=edx_registry_image_resource.name,
-                            trigger=False,
+                            trigger=True,
                             passed=[docker_build_job.name],
                         ),
                     ],
@@ -265,7 +265,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                     dependencies=[
                         GetStep(
                             get=packer_fragments[-1].resources[-1].name,
-                            trigger=False,
+                            trigger=True,
                             passed=[packer_fragments[-1].jobs[-1].name],
                         ),
                     ],
