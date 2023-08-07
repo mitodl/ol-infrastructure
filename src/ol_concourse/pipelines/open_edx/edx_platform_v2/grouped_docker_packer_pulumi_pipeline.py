@@ -141,6 +141,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
             docker_build_job = Job(
                 name=f"build-{release_name}-{deployment.deployment_name}-edxapp-image",
                 build_log_retention={"builds": 10},
+                max_in_flight=1,
                 plan=[
                     InParallelStep(
                         in_parallel=theme_get_steps
