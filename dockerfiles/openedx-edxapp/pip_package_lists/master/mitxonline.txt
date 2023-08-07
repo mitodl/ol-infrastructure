@@ -15,5 +15,6 @@ openedx-scorm-xblock>=15.0.0,<16.0.0
 pip==22.3.1
 sentry-sdk==1.21.1  # Fix RecursionError
 setuptools==65.5.1
+social-auth-mitxpro==0.6.1
 uwsgi==2.0.21
 wheel==0.38.4
