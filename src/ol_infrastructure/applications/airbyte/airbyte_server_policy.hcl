@@ -18,6 +18,10 @@ path "secret-airbyte/*" {
   capabilities = ["read", "create", "patch", "delete", "list", "update"]
 }
 
+path "secret-operations/sso/airbyte" {
+  capabilities = ["read"]
+}
+
 path "sys/leases/renew" {
   capabilities = ["update"]
 }
