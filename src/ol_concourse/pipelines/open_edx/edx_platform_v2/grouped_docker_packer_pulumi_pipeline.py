@@ -36,8 +36,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
     edx_docker_code = git_repo(
         name=Identifier("ol-infrastructure-docker"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        # TODO MD 20230512 Fix to main branch once testing completed
-        branch="md/edxapp_docker_migration",
+        branch="main",
         paths=[
             "dockerfiles/openedx-edxapp/",
             "src/ol_concourse/pipelines/open_edx/edx_platform_v2",
@@ -85,8 +84,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
             edx_ami_code = git_repo(
                 name=Identifier(f"edxapp-custom-image-{deployment.deployment_name}"),
                 uri="https://github.com/mitodl/ol-infrastructure",
-                # TODO MD 20230512 Fix to main branch once testing completed
-                branch="md/edxapp_docker_migration",
+                branch="main",
                 paths=[
                     "src/bridge/settings/openedx/",
                     "src/bilder/components/",
@@ -106,8 +104,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                     f"edxapp-ol-infrastructure-pulumi-{deployment.deployment_name}"
                 ),
                 uri="https://github.com/mitodl/ol-infrastructure",
-                # TODO MD 20230512 Fix to main branch once testing completed
-                branch="md/edxapp_docker_migration",
+                branch="main",
                 paths=[
                     *PULUMI_WATCHED_PATHS,
                     "src/ol_infrastructure/applications/edxapp/",
