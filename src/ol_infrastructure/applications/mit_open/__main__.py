@@ -3,10 +3,17 @@ from pulumi.output import Output
 from pulumi_aws import iam, s3
 from pulumi_vault import aws
 
+from bridge.lib.magic_numbers import FIVE_MINUTES
+
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+
 from ol_infrastructure.lib.vault import setup_vault_provider
+
+# Configuration items and initialziations
+if Config("vault_server").get("env_namespace"):
+    setup_vault_provider()
 
 setup_vault_provider()
 mit_open_config = Config("mit_open")
@@ -15,25 +22,25 @@ aws_config = AWSBase(
     tags={
         "OU": "mit-open",
         "Environment": stack_info.env_suffix,
-        "Application": "mit-open",
+        "Application": "mitopen",
     }
 )
 app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
     stack_info.env_suffix
 ]
 
-app_storage_bucket_name = f"mit-open-app-storage-{app_env_suffix}"
+app_storage_bucket_name = f"ol-mitopen-app-storage-{app_env_suffix}"
 application_storage_bucket = s3.Bucket(
-    f"mit_open_learning_application_storage_bucket_{stack_info.env_suffix}",
+    f"ol_mitopen_app_storage_bucket_{stack_info.env_suffix}",
     bucket=app_storage_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
 )
 
-FIVE_MINUTES = 300
+course_data_bucket_name = f"ol-mitopen-course-data-{app_env_suffix}"
 course_data_bucket = s3.Bucket(
-    f"mit-open-learning-course-data-{stack_info.env_suffix}",
-    bucket=f"open-learning-course-data-{app_env_suffix}",
+    f"ol_mitopen_course_data_bucket_{stack_info.env_suffix}",
+    bucket=course_data_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     cors_rules=[
         s3.BucketCorsRuleArgs(
@@ -53,6 +60,7 @@ parliament_config = {
     "RESOURCE_EFFECTIVELY_STAR": {},
 }
 
+# TODO: MD 07312023 Requires review of bucket names
 s3_bucket_permissions = [
     {
         "Action": [
@@ -91,129 +99,30 @@ s3_bucket_permissions = [
     },
 ]
 
-athena_warehouse_access_statements = [
-    {
-        "Effect": "Allow",
-        "Action": [
-            "s3:GetObject*",
-            "s3:ListBucket",
-        ],
-        "Resource": [
-            f"arn:aws:s3:::ol-data-lake-mitx-{stack_info.env_suffix}",
-            f"arn:aws:s3:::ol-data-lake-mitx-{stack_info.env_suffix}/*",
-            f"arn:aws:s3:::ol-data-lake-mit-open-{stack_info.env_suffix}",
-            f"arn:aws:s3:::ol-data-lake-mit-open-{stack_info.env_suffix}/*",
-        ],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "s3:PutObject",
-            "s3:GetBucketLocation",
-            "s3:GetObject",
-            "s3:ListBucket",
-        ],
-        "Resource": [
-            f"arn:aws:s3:::ol-warehouse-results-{stack_info.env_suffix}",
-            f"arn:aws:s3:::ol-warehouse-results-{stack_info.env_suffix}/*",
-        ],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "athena:ListDataCatalogs",
-            "athena:ListWorkGroups",
-        ],
-        "Resource": ["*"],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "s3:ListBucket",
-            "S3:GetObject",
-        ],
-        "Resource": [
-            f"arn:aws:s3:::ol-data-lake-mitx-{stack_info.env_suffix}",
-            f"arn:aws:s3:::ol-data-lake-mitx-{stack_info.env_suffix}/*",
-            f"arn:aws:s3:::ol-data-lake-mit-open-{stack_info.env_suffix}",
-            f"arn:aws:s3:::ol-data-lake-mit-open-{stack_info.env_suffix}/*",
-            f"arn:aws:s3:::ol-warehouse-results-{stack_info.env_suffix}",
-        ],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "athena:BatchGetNamedQuery",
-            "athena:BatchGetQueryExecution",
-            "athena:GetNamedQuery",
-            "athena:GetQueryExecution",
-            "athena:GetQueryResults",
-            "athena:GetQueryResultsStream",
-            "athena:GetWorkGroup",
-            "athena:ListNamedQueries",
-            "athena:ListQueryExecutions",
-            "athena:StartQueryExecution",
-            "athena:StopQueryExecution",
-        ],
-        "Resource": [
-            f"arn:*:athena:*:*:workgroup/ol-warehouse-{stack_info.env_suffix}"
-        ],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "athena:GetDataCatalog",
-            "athena:GetDatabase",
-            "athena:GetTableMetadata",
-            "athena:ListDatabases",
-            "athena:ListTableMetadata",
-        ],
-        "Resource": ["arn:*:athena:*:*:datacatalog/*"],
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "glue:BatchGetPartition",
-            "glue:GetDatabase",
-            "glue:GetDatabases",
-            "glue:GetPartition",
-            "glue:GetPartitions",
-            "glue:GetTable",
-            "glue:GetTables",
-        ],
-        "Resource": [
-            "arn:aws:glue:*:*:catalog",
-            f"arn:aws:glue:*:*:database/ol_warehouse_mitx_{stack_info.env_suffix}",
-            f"arn:aws:glue:*:*:database/ol_warehouse_mit_open_{stack_info.env_suffix}",
-            f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}/*",
-        ],
-    },
-]
 open_policy_document = {
     "Version": IAM_POLICY_VERSION,
-    "Statement": s3_bucket_permissions + athena_warehouse_access_statements,
+    "Statement": s3_bucket_permissions,
 }
 
 mit_open_iam_policy = iam.Policy(
-    f"mit_open_iam_permissions_{stack_info.env_suffix}",
-    name=f"mit-open-application-permissions-{stack_info.env_suffix}",
-    path=f"/ol-applications/mit-open/{stack_info.env_suffix}/",
+    f"ol_mitopen_iam_permissions_{stack_info.env_suffix}",
+    name=f"ol-mitopen-application-permissions-{stack_info.env_suffix}",
+    path=f"/ol-applications/mitopen/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         open_policy_document, stringify=True, parliament_config=parliament_config
     ),
 )
 
 mit_open_vault_iam_role = aws.SecretBackendRole(
-    f"mit-open-iam-permissions-vault-policy-{stack_info.env_suffix}",
-    name=f"mit-open-application-{stack_info.env_suffix}",
-    # TODO: Make this configurable to support multiple AWS backends. TMM 2021-03-04
-    backend="aws-mitx",
+    f"ol-mitopen-iam-permissions-vault-policy-{stack_info.env_suffix}",
+    name=f"ol-mitopen-application-{stack_info.env_suffix}",
+    backend="aws",
     credential_type="iam_user",
     policy_arns=[mit_open_iam_policy.arn],
 )
 
 export(
-    "mit_open",
+    "mitopen",
     {
         "iam_policy": mit_open_iam_policy.arn,
         "vault_iam_role": Output.all(

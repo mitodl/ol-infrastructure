@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 from pydantic import (
+    computed_field,
     field_serializer,
     field_validator,
     Field,
@@ -1463,10 +1464,6 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     _node_type: str = "worker"
     user: str = Field(default="root", exclude=True)
 
-    additional_resource_types_directory: Path = Field(
-        Path("resource-types"),
-        description="The sub-path to use underneat the configured deploy_directory",
-    )
     additional_resource_types_s3_location: Optional[str] = Field(
         None,
         description="Address and path of s3 bucket to find additional concourse resource types.",  # noqa: E501
@@ -1613,7 +1610,7 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
         description="Path to an init executable (non-absolute names get resolved from "
         "$PATH). (default: /usr/local/concourse/bin/init)",
     )
-    containerd_max_containers: Optional[str] = Field(
+    containerd_max_containers: Optional[str | int] = Field(
         None,
         alias="CONCOURSE_CONTAINERD_MAX_CONTAINERS",
         description="Max container capacity. 0 means no limit. (default: 250)",
@@ -1770,7 +1767,7 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
         alias="CONCOURSE_TSA_HOST",
         description="TSA host to forward the worker through. (default: 127.0.0.1:2222)",
     )
-    tsa_public_key: Optional[str]
+    tsa_public_key: Optional[str] = None
     tsa_public_key_path: Path = Field(
         Path("/etc/concourse/tsa_host_key.pub"),
         alias="CONCOURSE_TSA_PUBLIC_KEY",
@@ -1805,11 +1802,8 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     def serialize_tags(self, tags: list[str]) -> str:
         return ",".join(tags)
 
-    # TODO MAD 20220217 : Create validators around the additional_resource_types* atrributes  # noqa: E501
-    @field_validator("additional_resource_types_directory", "deploy_directory")
-    @classmethod
-    def validate_additional_resource_types_directory(
-        cls, additional_resource_types_directory, deploy_directory
-    ):
-        """Ensure that the resource types directory is always beneath the deploy_directory"""  # noqa: E501
-        return deploy_directory / additional_resource_types_directory
+    @computed_field  # type: ignore[misc]
+    @property
+    def additional_resource_types_directory(self) -> Path:
+        """The sub-path to use underneat the configured deploy_directory."""
+        return self.deploy_directory.joinpath("resource-types")

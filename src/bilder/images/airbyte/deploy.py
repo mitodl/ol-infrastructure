@@ -40,11 +40,11 @@ from bilder.components.hashicorp.vault.models import (
     VaultConnectionConfig,
     VaultListener,
     VaultTCPListener,
-    VaultTemplate,
 )
 from bilder.components.hashicorp.vault.steps import vault_template_permissions
-from bilder.components.pomerium.models import PomeriumConfig
-from bilder.components.pomerium.steps import configure_pomerium
+from bilder.components.traefik.models import traefik_static
+from bilder.components.traefik.models.component import TraefikConfig
+from bilder.components.traefik.steps import configure_traefik
 from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import install_and_configure_vector
 from bilder.facts.has_systemd import HasSystemd
@@ -54,6 +54,7 @@ from bridge.lib.versions import (
     AIRBYTE_VERSION,
     CONSUL_TEMPLATE_VERSION,
     CONSUL_VERSION,
+    TRAEFIK_VERSION,
     VAULT_VERSION,
 )
 from bridge.secrets.sops import set_env_secrets
@@ -67,12 +68,32 @@ VERSIONS = {
     ),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
     "airbyte": os.environ.get("AIRBYTE_VERSION", AIRBYTE_VERSION),
+    "traefik": os.environ.get("TRAEFIK_VERSION", TRAEFIK_VERSION),
 }
 
 set_env_secrets(Path("consul/consul.env"))
 
-pomerium_config = PomeriumConfig(docker_tag="v0.19.1")
-configure_pomerium(pomerium_config)
+# Configure and install traefik
+traefik_static_config = traefik_static.TraefikStaticConfig(
+    log=traefik_static.Log(format="json"),
+    providers=traefik_static.Providers(docker=traefik_static.Docker()),
+    certificates_resolvers={
+        "letsencrypt_resolver": traefik_static.CertificatesResolvers(
+            acme=traefik_static.Acme(
+                email="odl-devops@mit.edu",
+                storage="/etc/traefik/acme.json",
+                dns_challenge=traefik_static.DnsChallenge(provider="route53"),
+            )
+        )
+    },
+    entry_points={
+        "https": traefik_static.EntryPoints(address=":443"),
+    },
+)
+traefik_config = TraefikConfig(
+    static_configuration=traefik_static_config, version=VERSIONS["traefik"]
+)
+configure_traefik(traefik_config)
 
 files.put(
     name="Place the airbyte docker-compose.yaml file",
@@ -112,23 +133,6 @@ files.put(
 )
 
 env_template_file = Path("/etc/consul-template/.env.tmpl")
-nginx_pomerium_conf_template_file = (
-    pomerium_config.configuration_template_directory.joinpath(
-        "nginx_pomerium.conf.tmpl"
-    )
-)
-nginx_pomerium_conf_file = Path(
-    pomerium_config.configuration_directory.joinpath("nginx_pomerium.conf")
-)
-nginx_htpasswd_template_file = Path(
-    pomerium_config.configuration_template_directory.joinpath("nginx_htpasswd.tmpl")
-)
-nginx_htpasswd_file = Path(
-    pomerium_config.configuration_directory.joinpath("nginx_htpasswd")
-)
-nginx_proxy_conf_file = Path(
-    pomerium_config.configuration_directory.joinpath("nginx_proxy.conf")
-)
 
 files.put(
     name="Create the .env template file in docker-compose directory.",
@@ -138,51 +142,12 @@ files.put(
 )
 
 files.put(
-    name="Create the pomerium nginx configuration file template",
-    src=str(FILES_DIRECTORY.joinpath("nginx_pomerium.conf.tmpl")),
-    dest=str(nginx_pomerium_conf_template_file),
+    name="Place the traefik-forward-auth .env file.",
+    src=str(FILES_DIRECTORY.joinpath(".env_traefik_forward_auth.tmpl")),
+    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth.tmpl")),
     mode="0664",
 )
 
-files.put(
-    name="Create the nginx htpasswd file template for nginx basic auth on the dagster bypass.",  # noqa: E501
-    src=str(FILES_DIRECTORY.joinpath("nginx_htpasswd.tmpl")),
-    dest=str(nginx_htpasswd_template_file),
-    mode="0664",
-)
-
-files.put(
-    name="Create the the proxy nginx configuration file in the pomerium etc directory.",
-    src=str(FILES_DIRECTORY.joinpath("nginx_proxy.conf")),
-    dest=str(nginx_proxy_conf_file),
-    mode="0664",
-)
-
-
-vault_templates = [
-    VaultTemplate(
-        source=pomerium_config.configuration_template_file,
-        destination=pomerium_config.configuration_file,
-    ),
-    VaultTemplate(
-        source=nginx_pomerium_conf_template_file,
-        destination=nginx_pomerium_conf_file,
-    ),
-    VaultTemplate(
-        source=nginx_htpasswd_template_file,
-        destination=nginx_htpasswd_file,
-    ),
-    VaultTemplate(
-        contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-        "{{ printf .Data.key }}{{ end }}",
-        destination=pomerium_config.certificate_key_file,
-    ),
-    VaultTemplate(
-        contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-        "{{ printf .Data.value }}{{ end }}",
-        destination=pomerium_config.certificate_file,
-    ),
-]
 consul_configuration = {
     Path("00-default.json"): ConsulConfig(
         addresses=ConsulAddresses(dns="127.0.0.1", http="127.0.0.1"),
@@ -222,7 +187,7 @@ vault_config = VaultAgentConfig(
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),
-    template=vault_templates,
+    # template=vault_templates,
 )
 vault = Vault(
     version=VERSIONS["vault"],
@@ -245,6 +210,14 @@ consul_template = ConsulTemplate(
         )
     },
 )
+
+consul_templates.append(
+    ConsulTemplateTemplate(
+        source=str(FILES_DIRECTORY.joinpath(".env_traefik_forward_auth.tmpl")),
+        destination=str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth")),
+    )
+)
+
 # Install consul-template because the docker-baseline-ami doesn't come with it
 install_hashicorp_products([consul_template])
 
@@ -275,11 +248,7 @@ if host.get_fact(HasSystemd):
 
     watched_docker_compose_files = [
         DOCKER_COMPOSE_DIRECTORY.joinpath(".env"),
-        pomerium_config.certificate_file,
-        pomerium_config.certificate_key_file,
-        nginx_htpasswd_file,
-        nginx_pomerium_conf_file,
-        pomerium_config.configuration_file,
+        DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth"),
     ]
     service_configuration_watches(
         service_name="docker-compose", watched_files=watched_docker_compose_files
