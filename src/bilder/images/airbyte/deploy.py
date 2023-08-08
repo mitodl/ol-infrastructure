@@ -249,7 +249,6 @@ if host.get_fact(HasSystemd):
     watched_docker_compose_files = [
         DOCKER_COMPOSE_DIRECTORY.joinpath(".env"),
         DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth"),
-        traefik_config.configuration_file,
     ]
     service_configuration_watches(
         service_name="docker-compose", watched_files=watched_docker_compose_files
