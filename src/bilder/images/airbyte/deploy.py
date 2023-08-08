@@ -134,6 +134,7 @@ files.put(
 
 env_template_file = Path("/etc/consul-template/.env.tmpl")
 consul_templates_directory = Path("/etc/consul-template")
+consul_templates = []
 
 files.put(
     name="Create the .env template file in docker-compose directory.",
@@ -196,20 +197,11 @@ vault = Vault(
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 
-consul_templates = [
+consul_templates.append(
     ConsulTemplateTemplate(
         source=env_template_file,
         destination=str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env")),
     )
-]
-consul_template = ConsulTemplate(
-    version=VERSIONS["consul-template"],
-    configuration={
-        Path("00-default.json"): ConsulTemplateConfig(
-            vault=ConsulTemplateVaultConfig(),
-            template=consul_templates,
-        )
-    },
 )
 
 consul_templates.append(
@@ -219,6 +211,16 @@ consul_templates.append(
         ),
         destination=str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth")),
     )
+)
+
+consul_template = ConsulTemplate(
+    version=VERSIONS["consul-template"],
+    configuration={
+        Path("00-default.json"): ConsulTemplateConfig(
+            vault=ConsulTemplateVaultConfig(),
+            template=consul_templates,
+        )
+    },
 )
 
 # Install consul-template because the docker-baseline-ami doesn't come with it
