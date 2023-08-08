@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, Extra, Field
+from pydantic import ConfigDict, BaseModel, Field, RootModel
 
 from bilder.components.traefik.models.traefik_static import ServersTransport
 
@@ -106,9 +106,7 @@ class DefaultCertificate(BaseModel):
     a self-signed certificate.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     cert_file: Optional[str] = Field(None, alias="certFile")
     key_file: Optional[str] = Field(None, alias="keyFile")
@@ -126,9 +124,7 @@ class Domain(BaseModel):
 class DefaultGeneratedCert(BaseModel):
     """GeneratedCert defines the default generated certificate configuration."""
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     resolver: Optional[str] = Field(
         None,
@@ -143,9 +139,7 @@ class DefaultGeneratedCert(BaseModel):
 
 
 class Stores(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     default_certificate: Optional[DefaultCertificate] = Field(
         None,
@@ -168,9 +162,7 @@ class Stores(BaseModel):
 class Tls(BaseModel):
     """Configures the TLS connection, TLS options, and certificate stores."""
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     certificates: Optional[list[Certificate]] = None
     options: Optional[dict[str, Options]] = Field(
@@ -239,9 +231,7 @@ class HttpRouter(BaseModel):
     request, or act before forwarding the request to the service.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     entry_points: Optional[list[str]] = Field(
         None,
@@ -290,7 +280,7 @@ class HttpRouter(BaseModel):
             " HTTP services (not TCP services)."
         ),
     )
-    tls: Optional[Tls1] = Field(
+    tls: Optional[Tls | Tls1] = Field(
         None,
         description=(
             "When a TLS section is specified, it instructs Traefik that the current"
@@ -438,14 +428,12 @@ class HttpLoadBalancerService(BaseModel):
     traffic to.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     servers: list[Server] = Field(
         ...,
         description="Servers declare a single instance of your program.",
-        min_items=1,
+        min_length=1,
     )
     sticky: Optional[Sticky] = Field(
         None,
@@ -527,9 +515,7 @@ class HttpWeightedService(BaseModel):
     servers.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     services: Optional[list[Service]] = None
     sticky: Optional[Sticky1] = Field(
@@ -556,9 +542,7 @@ class HttpMirroringService(BaseModel):
     being mirrored.  See the maxBodySize option for how to modify this behaviour.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     service: Optional[str] = None
     max_body_size: Optional[int] = Field(
@@ -575,9 +559,7 @@ class HttpMirroringService(BaseModel):
 
 
 class HttpFailoverService(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     service: Optional[str] = None
     fallback: Optional[str] = None
@@ -585,39 +567,35 @@ class HttpFailoverService(BaseModel):
 
 
 class HttpServiceItem(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     load_balancer: Optional[HttpLoadBalancerService] = Field(None, alias="loadBalancer")
 
 
 class HttpServiceItem1(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     weighted: Optional[HttpWeightedService] = None
 
 
 class HttpServiceItem2(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     mirroring: Optional[HttpMirroringService] = None
 
 
 class HttpServiceItem3(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     failover: Optional[HttpFailoverService] = None
 
 
-class HttpService(BaseModel):
-    __root__: Union[
+class HttpService(
+    RootModel[
+        Union[HttpServiceItem, HttpServiceItem1, HttpServiceItem2, HttpServiceItem3]
+    ]
+):
+    root: Union[
         HttpServiceItem, HttpServiceItem1, HttpServiceItem2, HttpServiceItem3
     ] = Field(
         ...,
@@ -631,9 +609,7 @@ class HttpService(BaseModel):
 class AddPrefixMiddleware(BaseModel):
     """AddPrefix middleware updates the URL Path of the request before forwarding."""
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     prefix: Optional[str] = Field(
         None,
@@ -704,9 +680,7 @@ class BufferingMiddleware(BaseModel):
     can minimize time spent sending data to a service.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     max_request_body_bytes: Optional[int] = Field(
         None,
@@ -762,11 +736,9 @@ class ChainMiddleware(BaseModel):
     middleware.  It makes reusing the same groups easier.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    middlewares: Optional[list[str]] = Field(None, min_items=1)
+    middlewares: Optional[list[str]] = Field(None, min_length=1)
 
 
 class CircuitBreakerMiddleware(BaseModel):
@@ -782,9 +754,7 @@ class CircuitBreakerMiddleware(BaseModel):
     services.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     expression: Optional[str] = Field(
         None,
@@ -823,9 +793,7 @@ class CircuitBreakerMiddleware(BaseModel):
 class CompressMiddleware(BaseModel):
     """The Compress middleware enables the gzip compression."""
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     excluded_content_types: Optional[list[str]] = Field(
         None,
@@ -862,9 +830,7 @@ class ContentTypeMiddleware(BaseModel):
     version.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     auto_detect: Optional[bool] = Field(
         default=False,
@@ -884,9 +850,7 @@ class DigestAuthMiddleware(BaseModel):
     contents of usersFile have precedence over the values in users.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     users: Optional[list[str]] = Field(
         None,
@@ -936,9 +900,7 @@ class ErrorsMiddleware(BaseModel):
     Traefik.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     status: Optional[list[str]] = Field(
         None,
@@ -1011,9 +973,7 @@ class ForwardAuthMiddleware(BaseModel):
     performed.  Otherwise, the response from the authentication server is returned.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     address: Optional[str] = Field(
         None,
@@ -1065,9 +1025,7 @@ class ForwardAuthMiddleware(BaseModel):
 class HeadersMiddleware(BaseModel):
     """The Headers middleware can manage the requests/responses headers."""
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     custom_request_headers: Optional[dict[str, str]] = Field(
         None,
@@ -1332,9 +1290,7 @@ class HeadersMiddleware(BaseModel):
 class IpStrategy(BaseModel):
     """Defines parameters that set how Traefik will determine the client IP."""
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     depth: Optional[int] = Field(
         None,
@@ -1359,9 +1315,7 @@ class IpStrategy(BaseModel):
 class IpWhiteListMiddleware(BaseModel):
     """IPWhitelist accepts / refuses requests based on the client IP."""
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     source_range: Optional[list[str]] = Field(
         None,
@@ -1381,9 +1335,7 @@ class SourceCriterion(BaseModel):
     requestHost.  If none are set, the default is to use the requestHost.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     ip_strategy: Optional[IpStrategy] = Field(None, alias="ipStrategy")
     request_header_name: Optional[str] = Field(
@@ -1407,9 +1359,7 @@ class InFlightReqMiddleware(BaseModel):
     the number of simultaneous in-flight requests can be applied.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     amount: Optional[int] = Field(
         None,
@@ -1592,9 +1542,7 @@ class Info(BaseModel):
 class PassTLSClientCertMiddleware(BaseModel):
     """Adds in header the selected data from the passed client tls certificate."""
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     pem: Optional[bool] = Field(
         None,
@@ -1617,9 +1565,7 @@ class PassTLSClientCertMiddleware(BaseModel):
 class PluginMiddleware(BaseModel):
     """Some plugins will need to be configured by adding a dynamic configuration."""
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.allow
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
 
 class RateLimitMiddleware(BaseModel):
@@ -1628,9 +1574,7 @@ class RateLimitMiddleware(BaseModel):
     requests, and allows one to define what fair is.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     average: Optional[Union[str, float]] = Field(
         None,
@@ -1662,9 +1606,7 @@ class RateLimitMiddleware(BaseModel):
 class RedirectRegexMiddleware(BaseModel):
     """Redirect a request from an url to another with regex matching and replacement."""
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     permanent: Optional[bool] = Field(
         None,
@@ -1693,9 +1635,7 @@ class RedirectRegexMiddleware(BaseModel):
 class RedirectSchemeMiddleware(BaseModel):
     """RedirectScheme redirect request from a scheme to another."""
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     permanent: Optional[bool] = Field(
         None,
@@ -1721,9 +1661,7 @@ class ReplacePathMiddleware(BaseModel):
     specified one and will store the original path in a X-Replaced-Path header.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     path: Optional[str] = Field(
         None,
@@ -1740,9 +1678,7 @@ class ReplacePathRegexMiddleware(BaseModel):
     original path in a X-Replaced-Path header.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     regex: Optional[str] = Field(
         None,
@@ -1769,9 +1705,7 @@ class RetryMiddleware(BaseModel):
     answers, the middleware stops retrying, regardless of the response status.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     attempts: int = Field(
         ...,
@@ -1795,9 +1729,7 @@ class StripPrefixMiddleware(BaseModel):
     prefix and will store the matching path prefix in a X-Forwarded-Prefix header.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     prefixes: Optional[list[str]] = Field(
         None,
@@ -1824,9 +1756,7 @@ class StripPrefixRegexMiddleware(BaseModel):
     prefix and will store the matching path prefix in a X-Forwarded-Prefix header.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     regex: Optional[list[str]] = Field(
         None,
@@ -1838,41 +1768,31 @@ class StripPrefixRegexMiddleware(BaseModel):
 
 
 class HttpMiddlewareItem(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     add_prefix: Optional[AddPrefixMiddleware] = Field(None, alias="addPrefix")
 
 
 class HttpMiddlewareItem1(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     basic_auth: Optional[BasicAuthMiddleware] = Field(None, alias="basicAuth")
 
 
 class HttpMiddlewareItem2(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     buffering: Optional[BufferingMiddleware] = None
 
 
 class HttpMiddlewareItem3(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     chain: Optional[ChainMiddleware] = None
 
 
 class HttpMiddlewareItem4(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     circuit_breaker: Optional[CircuitBreakerMiddleware] = Field(
         None, alias="circuitBreaker"
@@ -1880,73 +1800,55 @@ class HttpMiddlewareItem4(BaseModel):
 
 
 class HttpMiddlewareItem5(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     compress: Optional[CompressMiddleware] = None
 
 
 class HttpMiddlewareItem6(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     content_type: Optional[ContentTypeMiddleware] = Field(None, alias="contentType")
 
 
 class HttpMiddlewareItem7(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     digest_auth: Optional[DigestAuthMiddleware] = Field(None, alias="digestAuth")
 
 
 class HttpMiddlewareItem8(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     errors: Optional[ErrorsMiddleware] = None
 
 
 class HttpMiddlewareItem9(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     forward_auth: Optional[ForwardAuthMiddleware] = Field(None, alias="forwardAuth")
 
 
 class HttpMiddlewareItem10(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     headers: Optional[HeadersMiddleware] = None
 
 
 class HttpMiddlewareItem11(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     ip_white_list: Optional[IpWhiteListMiddleware] = Field(None, alias="ipWhiteList")
 
 
 class HttpMiddlewareItem12(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     in_flight_req: Optional[InFlightReqMiddleware] = Field(None, alias="inFlightReq")
 
 
 class HttpMiddlewareItem13(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     pass_tls_client_cert: Optional[PassTLSClientCertMiddleware] = Field(
         None, alias="passTLSClientCert"
@@ -1954,25 +1856,19 @@ class HttpMiddlewareItem13(BaseModel):
 
 
 class HttpMiddlewareItem14(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     plugin: Optional[PluginMiddleware] = None
 
 
 class HttpMiddlewareItem15(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     rate_limit: Optional[RateLimitMiddleware] = Field(None, alias="rateLimit")
 
 
 class HttpMiddlewareItem16(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     redirect_regex: Optional[RedirectRegexMiddleware] = Field(
         None, alias="redirectRegex"
@@ -1980,9 +1876,7 @@ class HttpMiddlewareItem16(BaseModel):
 
 
 class HttpMiddlewareItem17(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     redirect_scheme: Optional[RedirectSchemeMiddleware] = Field(
         None, alias="redirectScheme"
@@ -1990,17 +1884,13 @@ class HttpMiddlewareItem17(BaseModel):
 
 
 class HttpMiddlewareItem18(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     replace_path: Optional[ReplacePathMiddleware] = Field(None, alias="replacePath")
 
 
 class HttpMiddlewareItem19(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     replace_path_regex: Optional[ReplacePathRegexMiddleware] = Field(
         None, alias="replacePathRegex"
@@ -2008,33 +1898,27 @@ class HttpMiddlewareItem19(BaseModel):
 
 
 class HttpMiddlewareItem20(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     retry: Optional[RetryMiddleware] = None
 
 
 class HttpMiddlewareItem21(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     strip_prefix: Optional[StripPrefixMiddleware] = Field(None, alias="stripPrefix")
 
 
 class HttpMiddlewareItem22(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     strip_prefix_regex: Optional[StripPrefixRegexMiddleware] = Field(
         None, alias="stripPrefixRegex"
     )
 
 
-class HttpMiddleware(BaseModel):
-    __root__: Union[
+HttpMiddleware = RootModel[
+    Union[
         HttpMiddlewareItem,
         HttpMiddlewareItem1,
         HttpMiddlewareItem2,
@@ -2059,6 +1943,7 @@ class HttpMiddleware(BaseModel):
         HttpMiddlewareItem21,
         HttpMiddlewareItem22,
     ]
+]
 
 
 class Domain2(BaseModel):
@@ -2118,9 +2003,7 @@ class TcpRouter(BaseModel):
     TCP routers, then the HTTP routers will take over.
     """
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     entry_points: Optional[list[str]] = Field(
         None,
@@ -2183,14 +2066,12 @@ class ProxyProtocol(BaseModel):
 
 
 class TcpLoadBalancerService(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     servers: list[Server1] = Field(
         ...,
         description="Servers declare a single instance of your program.",
-        min_items=1,
+        min_length=1,
     )
     termination_delay: Optional[float] = Field(
         100,
@@ -2216,46 +2097,35 @@ class TcpLoadBalancerService(BaseModel):
 
 
 class Service1(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     name: str
     weight: float
 
 
 class TcpWeightedService(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    services: list[Service1] = Field(..., min_items=1)
+    services: list[Service1] = Field(..., min_length=1)
 
 
 class TcpServiceItem(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     load_balancer: Optional[TcpLoadBalancerService] = Field(None, alias="loadBalancer")
 
 
 class TcpServiceItem1(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     weighted: Optional[TcpWeightedService] = None
 
 
-class TcpService(BaseModel):
-    __root__: Union[TcpServiceItem, TcpServiceItem1]
+TcpService = RootModel[Union[TcpServiceItem, TcpServiceItem1]]
 
 
 class UdpRouter(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     entry_points: Optional[list[str]] = Field(
         None,
@@ -2282,9 +2152,7 @@ class Server2(BaseModel):
 class UdpLoadBalancerService(BaseModel):
     """In charge of balancing the requests between the servers of the same service."""
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     servers: list[Server2] = Field(
         ...,
@@ -2293,45 +2161,36 @@ class UdpLoadBalancerService(BaseModel):
             " load-balancing group, i.e. each address (IP:Port) on which an instance of"
             " the service's program is deployed."
         ),
-        min_items=1,
+        min_length=1,
     )
 
 
 class Service2(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     name: str
     weight: float
 
 
 class UdpWeightedService(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    services: list[Service2] = Field(..., min_items=1)
+    services: list[Service2] = Field(..., min_length=1)
 
 
 class UdpServiceItem(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     load_balancer: Optional[UdpLoadBalancerService] = Field(None, alias="loadBalancer")
 
 
 class UdpServiceItem1(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     weighted: Optional[UdpWeightedService] = None
 
 
-class UdpService(BaseModel):
-    __root__: Union[UdpServiceItem, UdpServiceItem1]
+UdpService = RootModel[Union[UdpServiceItem, UdpServiceItem1]]
 
 
 class Http(BaseModel):
@@ -2367,9 +2226,7 @@ class Tcp(BaseModel):
 
 
 class Udp(BaseModel):
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     routers: Optional[dict[str, UdpRouter]] = Field(
         None,
@@ -2397,9 +2254,7 @@ class Udp(BaseModel):
 class TraefikFileConfig(BaseModel):
     """Traefik v2 Dynamic Configuration File Provider"""
 
-    class Config:
-        allow_population_by_field_name = True
-        extra = Extra.forbid
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     http: Optional[Http] = None
     tcp: Optional[Tcp] = None

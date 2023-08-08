@@ -1,4 +1,3 @@
-#  noqa: WPS232
 from collections.abc import Iterable
 from copy import deepcopy
 from pathlib import Path
@@ -173,7 +172,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913
         for dependency in dependencies or []:
             # These mutations apply globally if the dependencies aren't copied below
             dependency.trigger = not bool(previous_job or production_stack)
-            dependency.passed = passed_param or dependency.passed  # type: ignore
+            dependency.passed = passed_param or dependency.passed
 
         # Need to copy the dependencies because otherwise they are globally mutated
         local_dependencies = [

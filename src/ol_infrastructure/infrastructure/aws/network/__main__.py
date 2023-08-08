@@ -400,11 +400,7 @@ applications_vpc_exports.update(
                 operations_vpc.olvpc,
             )(
                 tags=applications_vpc_config.merged_tags(
-                    {
-                        "Name": "applications-{}-salt-minion".format(
-                            stack_info.env_suffix
-                        )
-                    }
+                    {"Name": f"applications-{stack_info.env_suffix}-salt-minion"}
                 ),
                 name=f"applications-{stack_info.env_suffix}-salt-minion",
             ).id,

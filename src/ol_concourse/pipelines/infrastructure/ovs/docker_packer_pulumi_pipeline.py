@@ -1,4 +1,3 @@
-#  noqa: WPS232
 import sys
 
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
@@ -156,8 +155,8 @@ def build_ovs_pipeline() -> Pipeline:
 
 if __name__ == "__main__":
     with open("definition.json", "w") as definition:
-        definition.write(build_ovs_pipeline().json(indent=2))
-    sys.stdout.write(build_ovs_pipeline().json(indent=2))
+        definition.write(build_ovs_pipeline().model_dump_json(indent=2))
+    sys.stdout.write(build_ovs_pipeline().model_dump_json(indent=2))
     sys.stdout.writelines(
         ("\n", "fly -t pr-inf sp -p docker-packer-pulumi-ovs -c definition.json")
     )

@@ -46,7 +46,6 @@ from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, VAULT_HTTP_PORT
 from bridge.lib.versions import (
     CONSUL_TEMPLATE_VERSION,
     CONSUL_VERSION,
-    DAGSTER_VERSION,
     VAULT_VERSION,
 )
 from bridge.secrets.sops import set_env_secrets
@@ -63,8 +62,10 @@ VERSIONS = {
         "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION
     ),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
-    "dagster": os.environ.get("DAGSTER_VERSION", DAGSTER_VERSION),
 }
+
+DOCKER_REPO_NAME = os.environ.get("DOCKER_REPO_NAME", "mitodl/mono-dagster")
+DOCKER_IMAGE_DIGEST = os.environ.get("DOCKER_IMAGE_DIGEST")
 
 set_env_secrets(Path("consul/consul.env"))
 
@@ -78,6 +79,14 @@ watched_docker_compose_files = []
 
 consul_templates_directory = Path("/etc/consul-template")
 consul_templates = []
+
+# Preload the dagster image to accelerate the startup
+server.shell(
+    name=f"Preload {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",
+    commands=[
+        f"/usr/bin/docker pull {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",
+    ],
+)
 
 ##################################################
 # Put down EDX pipeline consul templates
@@ -174,7 +183,8 @@ watched_docker_compose_files.extend([str(certificate_file), str(certificate_key_
 ##################################################
 # Put down the docker compose configurations + .env
 docker_compose_context = {
-    "dagster_version": VERSIONS["dagster"],
+    "docker_repo_name": DOCKER_REPO_NAME,
+    "docker_image_digest": DOCKER_IMAGE_DIGEST,
     "edx_pipeline_definition_directory": edx_pipeline_directory,
     "listener_port": DEFAULT_HTTPS_PORT,
     "certificate_file": certificate_file,

@@ -50,7 +50,7 @@ instance_refresh_pipeline = Pipeline(
 
 if __name__ == "__main__":
     with open("definition.json", "w") as definition:
-        definition.write(instance_refresh_pipeline.json(indent=2))
-    sys.stdout.write(instance_refresh_pipeline.json(indent=2))
+        definition.write(instance_refresh_pipeline.model_dump_json(indent=2))
+    sys.stdout.write(instance_refresh_pipeline.model_dump_json(indent=2))
     print()
     print("fly -t pr-inf sp -p instance-refresh-concourse -c definition.json")

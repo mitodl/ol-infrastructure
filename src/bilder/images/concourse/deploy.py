@@ -59,9 +59,7 @@ from bilder.components.hashicorp.vault.models import (
 from bilder.components.hashicorp.vault.steps import vault_template_permissions
 from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import (
-    configure_vector,
-    install_vector,
-    vector_service,
+    install_and_configure_vector,
 )
 from bilder.facts.has_systemd import HasSystemd
 from bridge.lib.magic_numbers import (
@@ -163,9 +161,7 @@ concourse_config_map = {
 }
 concourse_config: Union[
     ConcourseWebConfig, ConcourseWorkerConfig
-] = concourse_config_map[
-    node_type
-]()  # type: ignore
+] = concourse_config_map[node_type]()
 vault_template_map = {
     CONCOURSE_WEB_NODE_TYPE: [
         partial(
@@ -174,7 +170,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/web" }}'
                 "{{ printf .Data.data.tsa_private_key }}{{ end }}"
             ),
-            destination=concourse_config.dict().get("tsa_host_key_path"),
+            destination=concourse_config.model_dump().get("tsa_host_key_path"),
         ),
         partial(
             VaultTemplate,
@@ -182,7 +178,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/web" }}'
                 "{{ printf .Data.data.session_signing_key }}{{ end }}"
             ),
-            destination=concourse_config.dict().get("session_signing_key_path"),
+            destination=concourse_config.model_dump().get("session_signing_key_path"),
         ),
         partial(
             VaultTemplate,
@@ -190,7 +186,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/web" }}'
                 "{{ printf .Data.data.worker_public_key }}{{ end }}"
             ),
-            destination=concourse_config.dict().get("authorized_keys_file"),
+            destination=concourse_config.model_dump().get("authorized_keys_file"),
         ),
         partial(
             VaultTemplate,
@@ -216,7 +212,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/worker" }}'
                 "{{ printf .Data.data.worker_private_key }}{{ end }}"
             ),
-            destination=concourse_config.dict().get("worker_private_key_path"),
+            destination=concourse_config.model_dump().get("worker_private_key_path"),
         ),
         partial(
             VaultTemplate,
@@ -224,7 +220,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/worker" }}'
                 "{{ printf .Data.data.tsa_public_key }}{{ end }}"
             ),
-            destination=concourse_config.dict().get("tsa_public_key_path"),
+            destination=concourse_config.model_dump().get("tsa_public_key_path"),
         ),
     ],
 }
@@ -264,7 +260,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
     caddy_config = CaddyConfig(
         caddyfile=Path(__file__).resolve().parent.joinpath("templates", "caddyfile.j2"),
     )
-    caddy_config.template_context = caddy_config.dict()
+    caddy_config.template_context = caddy_config.model_dump()
     install_caddy(caddy_config)
     caddy_config_changed = configure_caddy(caddy_config)
     # Completion of caddy install is below after vault is installed
@@ -327,9 +323,7 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
 vault_template_permissions(vault_config)
 
 # Install vector
-install_vector(vector_config)
-configure_vector(vector_config)
-vector_service(vector_config)
+install_and_configure_vector(vector_config)
 
 for product in hashicorp_products:
     configure_hashicorp_product(product)

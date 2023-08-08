@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-mit_open-application
+name: ol-infrastructure-mitopen-application
 runtime: python
 description: Manage infrastructure required by the MIT Open application
 backend:

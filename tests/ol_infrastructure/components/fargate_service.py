@@ -421,10 +421,10 @@ class TestClassAllFargateArguments:
             for container in containers:
                 port_mapping = container["portMappings"][0]
                 image = container["image"]
-                assert image == "nginx" or image == "otel"
+                assert image in {"nginx", "otel"}
 
                 name = container["name"]
-                assert name == "nginx" or name == "otel"
+                assert name in {"nginx", "otel"}
 
                 assert container["logConfiguration"]["logDriver"] == "awslogs"
 

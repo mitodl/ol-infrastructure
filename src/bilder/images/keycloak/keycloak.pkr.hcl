@@ -46,7 +46,7 @@ source "amazon-ebs" "keycloak" {
     app     = "${local.app_name}"
     purpose = "${local.app_name}-${var.node_type}"
   }
-  # Base all builds off of the most recent docker_baseline_ami built by us, based of Debian 11
+  # Base all builds off of the most recent docker_baseline_ami built by us, based of Debian 12
 
   source_ami_filter {
     filters = {

@@ -59,7 +59,7 @@ source "amazon-ebs" "edx_notes" {
     purpose         = "${local.app_name}-${var.openedx_release}"
     openedx_release = var.openedx_release
   }
-  # Base all builds off of the most recent docker_baseline_ami built by us, based of Debian 11
+  # Base all builds off of the most recent docker_baseline_ami built by us, based of Debian 12
 
   source_ami_filter {
     filters = {

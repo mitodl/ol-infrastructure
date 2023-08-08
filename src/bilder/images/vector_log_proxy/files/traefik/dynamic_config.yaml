@@ -9,8 +9,9 @@ http:
       middlewares:
       - "remove-auth"
       tls:
-      - certFile: "/etc/traefik/odl_wildcard.cert"
-        keyFile: "/etc/traefik/odl_wildcard.key"
+        certificates:
+        - certFile: "/etc/traefik/odl_wildcard.cert"
+          keyFile: "/etc/traefik/odl_wildcard.key"
     vector-router:
       # Any request for '/' will be answered and forwarded to vector.
       # This is a workaround for AWS loadbalancing.
@@ -19,8 +20,9 @@ http:
       rule: 'Path("/")'
       service: vector-service
       tls:
-      - certFile: "/etc/traefik/odl_wildcard.cert"
-        keyFile: "/etc/traefik/odl_wildcard.key"
+        certificates:
+        - certFile: "/etc/traefik/odl_wildcard.cert"
+          keyFile: "/etc/traefik/odl_wildcard.key"
   middlewares:
     remove-auth:
       headers:

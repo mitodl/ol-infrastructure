@@ -381,10 +381,10 @@ if host.get_fact(HasSystemd):
         start_now=False,
     )
 
-if "mitodl" in edx_version.git_origin and node_type == WEB_NODE_TYPE:
+if node_type == WEB_NODE_TYPE:
     # Recompile static assets to ensure that any JS tweaks are rendered at runtime.
     server.shell(
-        name="Compile static assets for Canvas integration",
+        name="Compile static assets",
         commands=["/edx/bin/edxapp-update-assets"],
     )
 

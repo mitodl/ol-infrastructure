@@ -5,6 +5,7 @@ edx_plugins_added = {
     "mitxonline": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules
         "django-redis",  # Support for Redis caching in Django
+        "edx-proctoring-proctortrack==1.1.1",
         "edx-sysadmin",
         "edx-username-changer==0.3.0",
         "mitxpro-openedx-extensions==1.0.0",
@@ -13,7 +14,7 @@ edx_plugins_added = {
         "ol-openedx-course-export",
         "ol-openedx-checkout-external",
         "sentry-sdk==1.21.1",  # Fix RecursionError
-        "social-auth-mitxpro==0.6.1",
+        "social-auth-mitxpro==0.6.2",
     ],
     "xpro": [
         "celery-redbeat",  # Support for using Redis as the lock for Celery schedules

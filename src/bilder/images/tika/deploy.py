@@ -108,7 +108,7 @@ configure_tika(tika_config)
 caddy_config = CaddyConfig(
     caddyfile=Path(__file__).resolve().parent.joinpath("templates", "caddyfile.j2"),
 )
-caddy_config.template_context = caddy_config.dict()
+caddy_config.template_context = caddy_config.model_dump()
 install_caddy(caddy_config)
 caddy_config_changed = configure_caddy(caddy_config)
 
