@@ -28,6 +28,6 @@ LOCALE_PATHS.append("/openedx/locale/contrib/locale")
 LOCALE_PATHS.append("/openedx/locale/user/locale")
 
 JS_ENV_EXTRA_CONFIG = {
-  PROCTORTRACK_CDN_URL: "https://verificientstatic-preprod.storage.googleapis.com/cdn/fb_cjs/edx_preprod_cjs.IQEQWWZ2.js",
-  PROCTORTRACK_CONFIG_KEY: "1PKRwFPezxXj3TsD"
+  "PROCTORTRACK_CDN_URL": "https://verificientstatic-preprod.storage.googleapis.com/cdn/fb_cjs/edx_preprod_cjs.IQEQWWZ2.js",
+  "PROCTORTRACK_CONFIG_KEY": "1PKRwFPezxXj3TsD"
 }
