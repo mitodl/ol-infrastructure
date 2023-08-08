@@ -1,21 +1,30 @@
 ---
 secretsprovider: awskms://alias/infrastructure-secrets-ci
-encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQH3lrWmSrfJ6OGoyQvrwx1GAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM4J/T5eAboC8seh7uAgEQgDv9RL0j/cIjptkrvjnRRSa07lMZaiZT17j8gEToIxmZidrXYwO4ezztfb0+BQmX9Kp5naU7qq6SxO7lWA==
+encryptedkey: "AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQH3lrWmSrfJ6OGoyQvrwx1GAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM4J/T5eAboC8seh7uAgEQgDv9RL0j/cIjptkrvjnRRSa07lMZaiZT17j8gEToIxmZidrXYwO4ezztfb0+BQmX9Kp5naU7qq6SxO7lWA=="
 config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-staging-ci.odl.mit.edu
+  edxapp:additional_waffle_flags:
+  - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
+  - ["learner_home_mfe.enabled", "--create", "--superusers", "--everyone"]
+  - ["learner_recommendations.enable_dashboard_recommendations", "--create", "--superusers",
+    "--everyone"]
+  - ["new_core_editors.use_new_problem_editor", "--create", "--superusers"]
+  - ["new_core_editors.use_new_text_editor", "--create", "--superusers", "--everyone"]
+  - ["new_core_editors.use_new_video_editor", "--create", "--superusers", "--everyone"]
+  - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
   edxapp:business_unit: residential-staging
   edxapp:db_password:
-    secure: v1:ZB90id7gJ0z4NB/r:S3dGQ6OhdFOl1VdJ8cMOyLTc1L/T36F3ULUBvwMi5XOpyCbRDSyPhxb1DXZQ75DMS8R54Qa8pYE=
+    secure: "v1:ZB90id7gJ0z4NB/r:S3dGQ6OhdFOl1VdJ8cMOyLTc1L/T36F3ULUBvwMi5XOpyCbRDSyPhxb1DXZQ75DMS8R54Qa8pYE="
   edxapp:dns_zone: mitx
   edxapp:domains:
     lms: staging-ci.mitx.mit.edu
     preview: preview-staging-ci.mitx.mit.edu
     studio: studio-staging-ci.mitx.mit.edu
   edxapp:edx_forum_secrets:
-    secure: v1:TMUUvuM6tlFYbT3r:Zmp7UuIteRPHVNghhms3+xqHZT+1DZjoJU1tEjsZiny0XCTIJJXY4E+OKNEDMoblo3FR4FtQEFdU719imPMdR9zk+Kb7oh3rZzf74QmMcMlSL2P743T98MchMvM3Fa1RyBf4PgebMSNZJ9GdDg==
+    secure: "v1:TMUUvuM6tlFYbT3r:Zmp7UuIteRPHVNghhms3+xqHZT+1DZjoJU1tEjsZiny0XCTIJJXY4E+OKNEDMoblo3FR4FtQEFdU719imPMdR9zk+Kb7oh3rZzf74QmMcMlSL2P743T98MchMvM3Fa1RyBf4PgebMSNZJ9GdDg=="
   edxapp:edx_xqueue_secrets:
-    secure: v1:yojXnLWnr80P8t0T:sS5KRaJa6JUwEckAjQr0Ln4l/6O1ma69CHF38VhXUfG/pUUqxw1Q8XJBVzlRIVT4yzq7O6UhzRYc2dizDbw5iQsH4/54mdUhfrFreZaZSAO5Ta9uKAmzv4vG1lJ5hI5hwFsg0fm+mUKBq2LFa2tiCVAwoS64BSW1uoO4GBWTUl1hYPXZaouIX0rAd/sgzLq35w==
+    secure: "v1:yojXnLWnr80P8t0T:sS5KRaJa6JUwEckAjQr0Ln4l/6O1ma69CHF38VhXUfG/pUUqxw1Q8XJBVzlRIVT4yzq7O6UhzRYc2dizDbw5iQsH4/54mdUhfrFreZaZSAO5Ta9uKAmzv4vG1lJ5hI5hwFsg0fm+mUKBq2LFa2tiCVAwoS64BSW1uoO4GBWTUl1hYPXZaouIX0rAd/sgzLq35w=="
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
@@ -26,6 +35,7 @@ config:
     learning: learn
     library_authoring: library-authoring
     ora_grading: ora-grading
+  edxapp:use_docker: true
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-staging-ci.mitx.mit.edu
   edxapp:min_web_nodes: "1"

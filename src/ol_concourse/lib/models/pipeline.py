@@ -907,7 +907,7 @@ class LoadVarStep(Step, StepModifierMixin):
 
 
 class Resource(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
     name: Optional[Identifier] = Field(
         None,
