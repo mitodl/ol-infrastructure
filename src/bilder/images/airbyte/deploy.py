@@ -40,7 +40,6 @@ from bilder.components.hashicorp.vault.models import (
     VaultConnectionConfig,
     VaultListener,
     VaultTCPListener,
-    VaultTemplate,
 )
 from bilder.components.hashicorp.vault.steps import vault_template_permissions
 from bilder.components.traefik.models import traefik_static
@@ -149,12 +148,6 @@ files.put(
     mode="0664",
 )
 
-vault_templates = [
-    VaultTemplate(
-        source=traefik_config.configuration_template_file,
-        destination=traefik_config.configuration_file,
-    ),
-]
 consul_configuration = {
     Path("00-default.json"): ConsulConfig(
         addresses=ConsulAddresses(dns="127.0.0.1", http="127.0.0.1"),
@@ -194,7 +187,7 @@ vault_config = VaultAgentConfig(
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),
-    template=vault_templates,
+    # template=vault_templates,
 )
 vault = Vault(
     version=VERSIONS["vault"],
