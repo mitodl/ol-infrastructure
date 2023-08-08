@@ -133,6 +133,7 @@ files.put(
 )
 
 env_template_file = Path("/etc/consul-template/.env.tmpl")
+consul_templates_directory = Path("/etc/consul-template")
 
 files.put(
     name="Create the .env template file in docker-compose directory.",
@@ -143,8 +144,8 @@ files.put(
 
 files.put(
     name="Place the traefik-forward-auth .env file.",
-    src=str(FILES_DIRECTORY.joinpath(".env_traefik_forward_auth.tmpl")),
-    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth.tmpl")),
+    src=str(TEMPLATES_DIRECTORY.joinpath(".env_traefik_forward_auth.tmpl")),
+    dest=str(consul_templates_directory.joinpath(".env_traefik_forward_auth.tmpl")),
     mode="0664",
 )
 
@@ -213,7 +214,9 @@ consul_template = ConsulTemplate(
 
 consul_templates.append(
     ConsulTemplateTemplate(
-        source=str(FILES_DIRECTORY.joinpath(".env_traefik_forward_auth.tmpl")),
+        source=str(
+            consul_templates_directory.joinpath(".env_traefik_forward_auth.tmpl")
+        ),
         destination=str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth")),
     )
 )
