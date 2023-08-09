@@ -38,7 +38,7 @@ class Identifier(RootModel[str]):
         return self
         # return self.root
 
-    @model_validator(mode="after")  # type: ignore[arg-type]
+    @model_validator(mode="after")
     def coerce_to_string(self):
         if hasattr(self, "root"):
             return self.root
