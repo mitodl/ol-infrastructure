@@ -28,6 +28,9 @@ class Identifier(RootModel[str]):
         ),
     ]
 
+    def __str__(self):
+        return self.root
+
     def __hash__(self):
         return str.__hash__(self.root)
 
