@@ -322,11 +322,6 @@ airbyte_vault_secrets = read_yaml_secrets(
 )
 
 vault.generic.Secret(
-    "airbyte-server-configuration-pomerium-secrets",
-    path=airbyte_vault_mount.path.apply("{}/pomerium".format),
-    data_json=json.dumps(airbyte_vault_secrets["pomerium"]),
-)
-vault.generic.Secret(
     "airbyte-server-configuration-sentry-secrets",
     path=airbyte_vault_mount.path.apply("{}/sentry-dsn".format),
     data_json=json.dumps(airbyte_vault_secrets["sentry-dsn"]),
@@ -480,7 +475,7 @@ tg_config = OLTargetGroupConfig(
     vpc_id=vpc_id,
     health_check_interval=60,
     health_check_matcher="200-399",
-    health_check_path="/.pomerium",
+    health_check_path="/",
     tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
 )
 
