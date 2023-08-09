@@ -222,6 +222,7 @@ services:
     - INTERNAL_API_HOST=${INTERNAL_API_HOST}
     - CONNECTOR_BUILDER_API_HOST=${CONNECTOR_BUILDER_API_HOST}
     - TRACKING_STRATEGY=${TRACKING_STRATEGY}
+    - KEYCLOAK_INTERNAL_HOST=localhost # placeholder to ensure the webapp's nginx config is valid
     labels:
     - "traefik.enable=true"
     - "traefik.http.routers.airbyte-webapp.rule=Host(`${AIRBYTE_HOSTNAME}`)"
