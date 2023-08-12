@@ -1,5 +1,6 @@
 import io
 import os
+import yaml
 from functools import partial
 from ipaddress import IPv4Address
 from pathlib import Path
@@ -12,12 +13,12 @@ from bilder.components.baseline.steps import (
     install_baseline_packages,
     service_configuration_watches,
 )
-from bilder.components.caddy.models import CaddyConfig
-from bilder.components.caddy.steps import (
-    caddy_service,
-    configure_caddy,
-    create_placeholder_tls_config,
-    install_caddy,
+from bilder.components.traefik.models import traefik_static
+from bilder.components.traefik.models.component import TraefikConfig
+from bilder.components.traefik.steps import (
+    configure_traefik,
+    traefik_service,
+    install_traefik_binary,
 )
 from bilder.components.concourse.models import (
     ConcourseBaseConfig,
@@ -66,13 +67,19 @@ from bridge.lib.magic_numbers import (
     CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
     VAULT_HTTP_PORT,
 )
-from bridge.lib.versions import CONCOURSE_VERSION, CONSUL_VERSION, VAULT_VERSION
+from bridge.lib.versions import (
+    CONCOURSE_VERSION,
+    CONSUL_VERSION,
+    TRAEFIK_VERSION,
+    VAULT_VERSION,
+)
 from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {
     "concourse": os.environ.get("CONCOURSE_VERSION", CONCOURSE_VERSION),
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
+    "traefik": os.environ.get("TRAEFIK_VERSION", TRAEFIK_VERSION),
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 CONCOURSE_WEB_NODE_TYPE = "web"
@@ -169,7 +176,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/web" }}'
                 "{{ printf .Data.data.tsa_private_key }}{{ end }}"
             ),
-            destination=concourse_config.model_dump().get("tsa_host_key_path"),
+            destination=concourse_config.dict().get("tsa_host_key_path"),
         ),
         partial(
             VaultTemplate,
@@ -177,7 +184,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/web" }}'
                 "{{ printf .Data.data.session_signing_key }}{{ end }}"
             ),
-            destination=concourse_config.model_dump().get("session_signing_key_path"),
+            destination=concourse_config.dict().get("session_signing_key_path"),
         ),
         partial(
             VaultTemplate,
@@ -185,7 +192,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/web" }}'
                 "{{ printf .Data.data.worker_public_key }}{{ end }}"
             ),
-            destination=concourse_config.model_dump().get("authorized_keys_file"),
+            destination=concourse_config.dict().get("authorized_keys_file"),
         ),
         partial(
             VaultTemplate,
@@ -193,7 +200,8 @@ vault_template_map = {
                 '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
                 "{{ printf .Data.value }}{{ end }}"
             ),
-            destination=Path("/etc/caddy/odl_wildcard.cert"),
+            # destination=Path("/etc/caddy/odl_wildcard.cert"),
+            destination=Path("/etc/traefik/odl_wildcard.cert"),
         ),
         partial(
             VaultTemplate,
@@ -201,7 +209,8 @@ vault_template_map = {
                 '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
                 "{{ printf .Data.key }}{{ end }}"
             ),
-            destination=Path("/etc/caddy/odl_wildcard.key"),
+            # destination=Path("/etc/caddy/odl_wildcard.key"),
+            destination=Path("/etc/traefik/odl_wildcard.key"),
         ),
     ],
     CONCOURSE_WORKER_NODE_TYPE: [
@@ -211,7 +220,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/worker" }}'
                 "{{ printf .Data.data.worker_private_key }}{{ end }}"
             ),
-            destination=concourse_config.model_dump().get("worker_private_key_path"),
+            destination=concourse_config.dict().get("worker_private_key_path"),
         ),
         partial(
             VaultTemplate,
@@ -219,7 +228,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/worker" }}'
                 "{{ printf .Data.data.tsa_public_key }}{{ end }}"
             ),
-            destination=concourse_config.model_dump().get("tsa_public_key_path"),
+            destination=concourse_config.dict().get("tsa_public_key_path"),
         ),
     ],
 }
@@ -255,14 +264,15 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
         ]
     )
 
-    # Install Caddy
-    caddy_config = CaddyConfig(
-        caddyfile=Path(__file__).resolve().parent.joinpath("templates", "caddyfile.j2"),
+    # Install Traefik
+    FILES_DIRECTORY = Path(__file__).parent.joinpath("templates")
+    traefik_config = TraefikConfig(
+        static_configuration=traefik_static.TraefikStaticConfig.parse_obj(
+            yaml.safe_load(FILES_DIRECTORY.joinpath("static_config.yaml").read_text())
+        ),
     )
-    caddy_config.template_context = caddy_config.model_dump()
-    install_caddy(caddy_config)
-    caddy_config_changed = configure_caddy(caddy_config)
-    # Completion of caddy install is below after vault is installed
+    install_traefik_binary(traefik_config)
+    traefik_config_changed = configure_traefik(traefik_config)
 
     # Add vector configurations specific to concourse web nodes
     vector_config.configuration_templates[
@@ -315,10 +325,6 @@ consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
 
-# Caddy and Vault are tightly coupled and this step cannot happen until vault is installed.  # noqa: E501
-if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
-    create_placeholder_tls_config(caddy_config)
-
 vault_template_permissions(vault_config)
 
 # Install vector
@@ -346,13 +352,15 @@ if host.get_fact(HasSystemd):
             ]
         )
         service_configuration_watches(
-            service_name="caddy",
+            service_name="traefik",
             watched_files=[
-                Path("/etc/caddy/odl_wildcard.cert"),
-                Path("/etc/caddy/odl_wildcard.key"),
+                # Path("/etc/caddy/odl_wildcard.cert"),
+                # Path("/etc/caddy/odl_wildcard.key"),
+                Path("/etc/traefik/odl_wildcard.cert"),
+                Path("/etc/traefik/odl_wildcard.key"),
             ],
         )
-        caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
+        traefik_service(traefik_config=traefik_config, do_reload=traefik_config_changed)
     else:
         watched_concourse_files.extend(
             [
