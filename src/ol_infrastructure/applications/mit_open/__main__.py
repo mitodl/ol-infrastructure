@@ -1,9 +1,14 @@
-from pulumi import Config, export
+from pulumi import Config, export, ResourceOptions
 from pulumi.output import Output
 from pulumi_aws import iam, s3
-from pulumi_vault import aws
+from pathlib import Path
+
+import json
+
+import pulumi_vault as vault
 
 from bridge.lib.magic_numbers import FIVE_MINUTES
+from bridge.secrets.sops import read_yaml_secrets
 
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -113,12 +118,31 @@ mit_open_iam_policy = iam.Policy(
     ),
 )
 
-mit_open_vault_iam_role = aws.SecretBackendRole(
+mit_open_vault_iam_role = vault.aws.SecretBackendRole(
     f"ol-mitopen-iam-permissions-vault-policy-{stack_info.env_suffix}",
     name=f"ol-mitopen-application-{stack_info.env_suffix}",
-    backend="aws",
+    backend="aws-mitx",
     credential_type="iam_user",
     policy_arns=[mit_open_iam_policy.arn],
+)
+
+mit_open_vault_mount = vault.Mount(
+    f"ol-mitopen-configuration-secrets-mount-{stack_info.env_suffix}",
+    path="secret-mitopen",
+    type="kv-v2",
+    options={"version": 2},
+    description="Storage of configuration secrets used by MIT-Open",
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+mit_open_vault_secrets = read_yaml_secrets(
+    Path(f"mitopen/secrets.{stack_info.env_suffix}.yaml"),
+)
+
+vault.generic.Secret(
+    f"ol-mitopen-configuration-secrets-{stack_info.env_suffix}",
+    path=mit_open_vault_mount.path.apply("{}/secrets".format),
+    data_json=json.dumps(mit_open_vault_secrets),
 )
 
 export(
