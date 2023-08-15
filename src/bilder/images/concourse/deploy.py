@@ -5,7 +5,6 @@ from ipaddress import IPv4Address
 from pathlib import Path
 from typing import Union
 
-from pydantic import SecretStr
 from pyinfra import host
 from pyinfra.api.util import get_template
 
@@ -236,7 +235,7 @@ vector_config = VectorConfig()
 
 if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
     # Setting this attribute after instantiating the object to bypass validation
-    concourse_config.encryption_key = SecretStr(
+    concourse_config.encryption_key = (
         '{{ with secret "secret-concourse/web" }}'
         "{{ .Data.data.encryption_key }}"
         "{{ end }}"
