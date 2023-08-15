@@ -51,7 +51,7 @@ config:
     - infra
     - operations
     - cloud_custodian
-    instance_type: c6a.large
+    instance_type: c6a.xlarge
     name: infra
   - auto_scale:
       desired: 3
