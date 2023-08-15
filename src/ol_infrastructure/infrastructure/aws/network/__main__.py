@@ -452,7 +452,7 @@ operations_vpc_exports.update(
 export("operations_vpc", operations_vpc_exports)
 
 data_to_mitx_online_peer = OLVPCPeeringConnection(
-    "ol-data-{0}-to-mitx-online-{0}-vpc-peer".format(stack_info.env_suffix),
+    f"ol-data-{stack_info.env_suffix}-to-mitx-online-{stack_info.env_suffix}-vpc-peer",
     data_vpc,
     mitx_online_vpc,
 )
@@ -469,12 +469,12 @@ data_to_mitx_staging_peer = OLVPCPeeringConnection(
     residential_mitx_staging_vpc,
 )
 data_to_applications_peer = OLVPCPeeringConnection(
-    "ol-data-{0}-to-applications-{0}-vpc-peer".format(stack_info.env_suffix),
+    f"ol-data-{stack_info.env_suffix}-to-applications-{stack_info.env_suffix}-vpc-peer",
     data_vpc,
     applications_vpc,
 )
 data_to_xpro_peer = OLVPCPeeringConnection(
-    "ol-data-{0}-to-mitxpro-{0}-vpc-peer".format(stack_info.env_suffix),
+    f"ol-data-{stack_info.env_suffix}-to-mitxpro-{stack_info.env_suffix}-vpc-peer",
     data_vpc,
     xpro_vpc,
 )
@@ -484,7 +484,7 @@ operations_to_applications_peer = OLVPCPeeringConnection(
     applications_vpc,
 )
 operations_to_data_peer = OLVPCPeeringConnection(
-    "ol-operations-{0}-to-ol-data-{0}-vpc-peer".format(stack_info.env_suffix),
+    f"ol-operations-{stack_info.env_suffix}-to-ol-data-{stack_info.env_suffix}-vpc-peer",
     operations_vpc,
     data_vpc,
 )
@@ -506,7 +506,7 @@ operations_to_mitx_staging_peer = OLVPCPeeringConnection(
     residential_mitx_staging_vpc,
 )
 operations_to_xpro_peer = OLVPCPeeringConnection(
-    "ol-operations-{0}-to-mitxpro-{0}-vpc-peer".format(stack_info.env_suffix),
+    f"ol-operations-{stack_info.env_suffix}-to-mitxpro-{stack_info.env_suffix}-vpc-peer",
     operations_vpc,
     xpro_vpc,
 )
