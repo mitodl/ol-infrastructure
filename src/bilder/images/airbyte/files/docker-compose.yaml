@@ -17,7 +17,7 @@ services:
     volumes:
       # So that Traefik can listen to the Docker events
     - /var/run/docker.sock:/var/run/docker.sock:ro
-    - ./traefik/:/traefik/:ro
+    - /etc/traefik/:/etc/traefik/
     networks:
     - airbyte_internal
     - airbyte_public
