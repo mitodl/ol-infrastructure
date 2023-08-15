@@ -37,6 +37,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
         name=Identifier("ol-infrastructure-docker"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
+        depth=1,
         paths=[
             "dockerfiles/openedx-edxapp/",
             "src/ol_concourse/pipelines/open_edx/edx_platform_v2",
