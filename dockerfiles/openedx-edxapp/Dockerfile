@@ -6,7 +6,7 @@
 # This dockerfile is not expected to work locally. Only executes correctly within the context
 # of its concourse pipeline.
 
-FROM --platform=linux/amd64 python:3.8.12-buster as base
+FROM --platform=linux/amd64 python:3.11.4-buster as base
 
 ENV DEBIAN_FRONTEND=noninteractive
 COPY ./apt-pkg-list /root/
