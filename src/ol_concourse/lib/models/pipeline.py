@@ -225,7 +225,7 @@ class Number(RootModel[float]):
 class DummyConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vars: Optional[Vars] = Field(
+    vars: Optional[dict[str, Any]] = Field(
         None, description="A mapping of var name to var value."
     )
 
