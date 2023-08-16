@@ -591,7 +591,7 @@ class DummyVarSource(VarSource):
         ),
     )
     type: Optional[Literal["dummy"]] = Field(
-        None,
+        "dummy",
         description=(
             "The `dummy` type supports configuring a static map of vars to values.   "
             " This is really only useful if you have no better alternative for"
