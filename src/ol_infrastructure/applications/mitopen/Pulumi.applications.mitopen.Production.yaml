@@ -3,5 +3,7 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgGq710cJf4taf7FUfw+iIGNAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM2JcEQu/tozu3tO8TAgEQgDvnl65jF/6aC66eb97jIrt3/CIL6a5XcVwv9E8EWgWlrX3cJadv9f2X0bcVLKiGPImjG4qTL6m5sDN7Ig==
 config:
   consul:address: https://consul-apps-production.odl.mit.edu
+  mitopen:db_password:
+    secure: v1:siGmu4+ZCOqekx7l:4Pdgv4fKZIjWJPAcZDBdpvZ0mUW10SUcX/9ZatsnZbR/euYoklo8dTTFu4i/5kTnJHHYot1QK3xS+gk++lHZfneBoC9qBR+l2qzlvvNBoN8=
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
