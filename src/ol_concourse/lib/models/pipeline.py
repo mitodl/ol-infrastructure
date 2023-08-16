@@ -1981,7 +1981,7 @@ class Pipeline(BaseModel):
             " pipeline to use."
         ),
     )
-    var_sources: Optional[list[VarSource]] = Field(
+    var_sources: Optional[list[SerializeAsAny[VarSource]]] = Field(
         None, description="A set of  var-sources  for the pipeline to use."
     )
     display: Optional[DisplayConfig] = Field(
