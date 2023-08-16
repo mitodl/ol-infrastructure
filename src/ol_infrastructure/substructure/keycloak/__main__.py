@@ -158,7 +158,7 @@ ol_apps_realm = keycloak.Realm(
         "business_unit": f"operations-{env_name}",
     },
     display_name="OL Apps",
-    display_name_html="<b>MIT Open Learning Apps</b>",
+    display_name_html="<b>MIT Open Learning Applications</b>",
     enabled=True,
     login_theme="base",
     duplicate_emails_allowed=False,
