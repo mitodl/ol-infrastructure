@@ -581,7 +581,7 @@ class AcrossVar(BaseModel):
     )
 
 
-class DummyVarSource(BaseModel):
+class DummyVarSource(VarSource):
     model_config = ConfigDict(extra="forbid")
 
     config: Optional[DummyConfig] = Field(
