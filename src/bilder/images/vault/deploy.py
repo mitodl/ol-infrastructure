@@ -53,7 +53,7 @@ VERSIONS = {
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
 
-install_baseline_packages(packages=["curl", "gnupg", "jq"])
+install_baseline_packages(packages=["curl", "gnupg", "jq", "cron"])
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
 # Install Traefik
