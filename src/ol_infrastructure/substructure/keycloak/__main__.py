@@ -173,7 +173,7 @@ ol_apps_realm = keycloak.Realm(
     realm="olapps",
     reset_password_allowed=True,
     verify_email=True,
-    password_policy="upperCase(2) and digits(2) and length(12) and specialChars(2) and forceExpiredPasswordChange(365) and notUsername and notEmail",  # noqa: E501,S106 # pragma: allowlist secret
+    password_policy="upperCase(1) and digits(1) and specialChars(1) and length(8) and notUsername and notEmail",  # noqa: E501,S106 # pragma: allowlist secret
     security_defenses=keycloak.RealmSecurityDefensesArgs(
         brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(
             failure_reset_time_seconds=43200,
@@ -218,7 +218,7 @@ required_action_configure_otp = keycloak.RequiredAction(
     "ol-apps-configure-totp",
     realm_id=ol_apps_realm.realm,
     alias="CONFIGURE_TOTP",
-    default_action=True,
+    default_action=False,
     enabled=True,
     opts=resource_options,
 )
