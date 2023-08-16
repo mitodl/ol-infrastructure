@@ -2,10 +2,17 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgETHpUoPHq8nk5V5ShbAMblAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM/6mAXRBgS3I1VQlGAgEQgDvak3BSMtx3oePo+tc1MB9+b7JL+Wg0mkYgtcnDSE4lKh8a2pyC0F5r1SnrCk07qeE5X+ILCCVeKXMxMA==
 config:
+  keycloak:captcha_secret_key:
+    secure: v1:1E3EkLudtby/+Y9+:c4Td2R+PU6zbbq8pT8YdswHaE1G2gFkvDEOglcNhId9naf4Pz+ZogxRCRf3wOHhfW1WwMXWK0Ko=
+  keycloak:captcha_site_key:
+    secure: v1:qfpDPBuqKr7Lp01m:fjWusuP2ez07+kFQMDVRQtK4VhEEawh2yH0rX91pjR+Re9Az9Uttr2fYiI6yFX3tDUijl072S2Y=
   keycloak:client_id:
     secure: v1:BkWbaZVoElrjHJm7:Ti69EMKQfvYtLDcrKJZTankVy12gSw==
   keycloak:client_secret:
     secure: v1:ewmG5VqfRwLxrPmA:IcEVxEohrtStaYX4xkr3B3QLVM592Kej6XKky+XWZrRTtzXgzoSfE+BfQ1hmi9Ij
+  keycloak:clients:
+    airbyte: https://airbyte-qa.odl.mit.edu
+    dagster: https://pipelines-qa.odl.mit.edu
   keycloak:email_host:
     secure: v1:swp7hkmN53N42cWS:tHmgd6AzJEKco5XBqjF8RspFlJkD0PsBmp+gytkFsOM=
   keycloak:email_password:
@@ -13,6 +20,3 @@ config:
   keycloak:email_username:
     secure: v1:Uxscw7J8NqxO/NbK:NCGzgYTGRmeIovnjZyXrb6ztDW7levn0
   keycloak:url: https://sso-qa.odl.mit.edu
-  keycloak:clients:
-    dagster: https://pipelines-qa.odl.mit.edu
-    airbyte: https://airbyte-qa.odl.mit.edu
