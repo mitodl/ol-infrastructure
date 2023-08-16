@@ -32,8 +32,8 @@ COPY ./edx_platform /openedx/edx-platform
 
 ARG DEPLOYMENT_NAME="invalid"
 ARG RELEASE_NAME="invalid"
-RUN pip install --user --no-cache-dir -r /openedx/edx-platform/requirements/edx/base.txt \
-    && pip install --user --no-cache-dir -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
+RUN pip install --no-warn-script-location --user --no-cache-dir -r /openedx/edx-platform/requirements/edx/base.txt \
+    && pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
 RUN if [ "$DEPLOYMENT_NAME" = "mitxonline" ]; then pip uninstall --yes "edx-name-affirmation"; fi
 
 WORKDIR /openedx/edx-platform
@@ -74,7 +74,7 @@ RUN chmod a+x /openedx/bin/*
 ENV PATH /openedx/.local/bin:/openedx/bin:/openedx/edx-platform/node_modules/.bin:/openedx/nodeenv/bin:${PATH}
 WORKDIR /openedx/edx-platform
 
-RUN pip install --user --no-cache-dir -e .
+RUN pip install --no-warn-script-location --user --no-cache-dir -e .
 
 RUN mkdir -p /openedx/config  ./lms/envs/mitol ./cms/envs/mitol
 
@@ -106,10 +106,10 @@ ENV NO_PREREQ_INSTALL 0
 ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "https://verificientstatic-preprod.storage.googleapis.com/cdn/fb_cjs/edx_preprod_cjs.IQEQWWZ2.js", "PROCTORTRACK_CONFIG_KEY": "<1PKRwFPezxXj3TsD>"}'
 # These are important but their provanance is unknown at this time.
 # The reason they need to be installed like this is also unknown.
-RUN pip install --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
-    && pip install --user --no-cache-dir -e "git+https://github.com/openedx/django-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
-    && pip install --user --no-cache-dir -e "git+https://github.com/openedx/blockstore.git@9d623bc04f479a1af29204d438fa442ea8380fae#egg=blockstore" \
-    && pip install --user --no-cache-dir -e "git+https://github.com/openedx/olxcleaner.git@2f0d6c7f126cbd69c9724b7b57a0b2565330a297#egg=olxcleaner"
+RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
+    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/django-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
+    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/blockstore.git@9d623bc04f479a1af29204d438fa442ea8380fae#egg=blockstore" \
+    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/olxcleaner.git@2f0d6c7f126cbd69c9724b7b57a0b2565330a297#egg=olxcleaner"
 
 RUN openedx-assets xmodule \
     && openedx-assets npm \
