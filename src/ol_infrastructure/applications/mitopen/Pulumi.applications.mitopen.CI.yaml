@@ -3,5 +3,8 @@ secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHi+npazf3LfzV9oCtcYyCMYLOzaQhbo9xt6lJVVpz9tkQFYWXR26bejAFxfYQIRCj4BAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMw91fVvPyx7rx2gkgAgEQgDsLrdcEUT0SPIWURgB0clDobZqw9mfuVTjxEACpyGfJ03DW6RS4M1KUn2KhgcmiJ0Wu4HnB+byQ7SAJWA==
 config:
   consul:address: https://consul-apps-ci.odl.mit.edu
+  mitopen:db_instance_size: "db.t4g.small"
+  mitopen:db_password:
+    secure: v1:ZZ4ut2r9+y00hVUD:WVS70vD4UgLSgCxyV/eEN9xOUg0RXGicpnoEkWc8iGqoPM9uKiJrzFEdKL831wFJ2J6MoRmXoODPZ2OzuNIoo8eYkTljPOizDYSms2QHAGE=
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
