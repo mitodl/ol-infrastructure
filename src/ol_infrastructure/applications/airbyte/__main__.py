@@ -458,6 +458,10 @@ consul.Keys(
             path="airbyte/vault-address",
             value=f"{Config('vault').get('address')}/",
         ),
+        consul.KeysKeyArgs(
+            path="airbyte/airbyte-hostname",
+            value=airbyte_config.require("web_host_domain"),
+        ),
     ],
     opts=consul_provider,
 )
