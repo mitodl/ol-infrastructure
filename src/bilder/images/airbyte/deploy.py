@@ -146,7 +146,7 @@ files.put(
 files.put(
     name="Place the traefik-forward-auth .env file.",
     src=str(TEMPLATES_DIRECTORY.joinpath(".env_traefik_forward_auth.tmpl")),
-    dest=str(consul_templates_directory.joinpath(".env_traefik_forward_auth")),
+    dest=str(consul_templates_directory.joinpath(".env_traefik_forward_auth.tmpl")),
     mode="0664",
 )
 
