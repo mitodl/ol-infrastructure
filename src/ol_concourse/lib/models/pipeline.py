@@ -225,7 +225,7 @@ class Number(RootModel[float]):
 class DummyConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vars: Optional[Vars] = Field(
+    vars: Optional[dict[str, Any]] = Field(
         None, description="A mapping of var name to var value."
     )
 
@@ -581,7 +581,7 @@ class AcrossVar(BaseModel):
     )
 
 
-class DummyVarSource(BaseModel):
+class DummyVarSource(VarSource):
     model_config = ConfigDict(extra="forbid")
 
     config: Optional[DummyConfig] = Field(
@@ -591,7 +591,7 @@ class DummyVarSource(BaseModel):
         ),
     )
     type: Optional[Literal["dummy"]] = Field(
-        None,
+        "dummy",
         description=(
             "The `dummy` type supports configuring a static map of vars to values.   "
             " This is really only useful if you have no better alternative for"
@@ -1981,7 +1981,7 @@ class Pipeline(BaseModel):
             " pipeline to use."
         ),
     )
-    var_sources: Optional[list[VarSource]] = Field(
+    var_sources: Optional[list[SerializeAsAny[VarSource]]] = Field(
         None, description="A set of  var-sources  for the pipeline to use."
     )
     display: Optional[DisplayConfig] = Field(
