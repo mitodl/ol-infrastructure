@@ -111,6 +111,7 @@ RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/blockstore.git@9d623bc04f479a1af29204d438fa442ea8380fae#egg=blockstore" \
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/olxcleaner.git@2f0d6c7f126cbd69c9724b7b57a0b2565330a297#egg=olxcleaner"
 RUN if [ "$DEPLOYMENT_NAME" = "mitxonline" ]; then pip install --no-warn-script-location --user --no-cache-dir "edx-proctoring-proctortrack==1.2.1"; fi
+RUN echo '{"status":"done","chunks":{"edx-proctoring-proctortrack":[{"name":"edx-proctoring-proctortrack.js","path":"/openedx/edx-platform/common/static/bundles/edx-proctoring-proctortrack.js"}]}}' > /openedx/staticfiles/webpack-worker-stats.json
 
 RUN openedx-assets xmodule \
     && openedx-assets npm \
