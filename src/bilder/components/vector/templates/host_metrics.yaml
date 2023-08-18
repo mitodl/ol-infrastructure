@@ -12,9 +12,27 @@ sources:
     - memory
     - network
     disk:
+      # We only care about actual devices
       devices:
         includes:
         - 'nvme?n?'
+    filesystem:
+      # We only care about actual fileystems
+      filesystems:
+        includes:
+        - "ext?"
+        - "btrfs"
+        - "xfs"
+    mountpoint:
+      # We only ever mount devices at root
+      mountpoints:
+        includes:
+        - "/"
+    network:
+      # We only care about the actual network device
+      devices:
+        includes:
+        - "ens5"
 
 transforms:
   cleanup_host_metrics:
@@ -23,23 +41,17 @@ transforms:
     inputs:
     - 'collect_host_metrics'
     source: |
-      # Drop all the not-real filesystems metrics
-      abort_match_filesystem, err = !(match_any(.tags.filesystem, [r'ext.', r'btrfs', r'xfs']))
-      if abort_match_filesystem {
-        abort
-      }
-      # Drop metrics relating to the loopback network interface
-      abort_match_loopback_device, err = (match_any(.tags.device, [r'lo']))
-      if abort_match_loopback_device {
-        abort
-      }
+      # Remove the 'host' label because it is just a duplicate of 'instance'
+      del(.tags.host)
 
   add_labels_to_host_metrics:
     type: remap
     inputs:
     - 'cleanup_host_metrics'
     source: |
-      .tags.environment = "${ENVIRONMENT}"
+      .tags.environment = "${ENVIRONMENT:-missing_environment}"
+      .tags.application = "${APPLICATION:-missing_application}"
+      .tags.service = "${SERVICE:-missing_service}"
       .tags.instance = "${HOSTNAME}"
       .tags.job = "integrations/linux_host"
 
