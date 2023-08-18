@@ -472,6 +472,8 @@ def cloud_init_user_data(  # noqa: PLR0913
                 "content": textwrap.dedent(
                     f"""\
                     ENVIRONMENT={consul_env_name}
+                    APPLICATION=vault
+                    SERVICE=vault
                     VECTOR_CONFIG_DIR=/etc/vector/
                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}

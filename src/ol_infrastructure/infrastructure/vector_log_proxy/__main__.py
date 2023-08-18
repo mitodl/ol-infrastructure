@@ -56,6 +56,8 @@ def build_user_data(consul_dc, challenge_url, service_hash_bucket_fqdn):
                 "content": textwrap.dedent(
                     f"""\
             ENVIRONMENT={consul_dc}
+            APPLICATION=vector-log-proxy
+            SERVICE=vector-log-proxy
             VECTOR_CONFIG_DIR=/etc/vector/
             AWS_REGION={aws_config.region}
             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}

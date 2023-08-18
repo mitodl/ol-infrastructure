@@ -450,6 +450,8 @@ web_lt_config = OLLaunchTemplateConfig(
                                 "content": textwrap.dedent(
                                     f"""\
                             ENVIRONMENT={consul_dc}
+                            APPLICATION=data-platform
+                            SERVICE=redash
                             VECTOR_CONFIG_DIR=/etc/vector/
                             AWS_REGION={aws_config.region}
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
