@@ -110,6 +110,7 @@ RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/django-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/blockstore.git@9d623bc04f479a1af29204d438fa442ea8380fae#egg=blockstore" \
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/olxcleaner.git@2f0d6c7f126cbd69c9724b7b57a0b2565330a297#egg=olxcleaner"
+RUN if [ "$DEPLOYMENT_NAME" = "mitxonline" ]; then pip install --no-warn-script-location --user --no-cahce-dir "edx-proctoring-proctortrack=1.2.1"; fi
 
 RUN openedx-assets xmodule \
     && openedx-assets npm \
