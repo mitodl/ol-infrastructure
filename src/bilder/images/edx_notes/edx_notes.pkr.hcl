@@ -36,7 +36,7 @@ source "amazon-ebs" "edx_notes" {
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
   launch_block_device_mappings {
-    device_name           = "/dev/sda1"
+    device_name           = "/dev/xvda"
     volume_size           = 25
     delete_on_termination = true
   }
