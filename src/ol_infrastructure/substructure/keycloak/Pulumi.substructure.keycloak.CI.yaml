@@ -1,0 +1,19 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHi+npazf3LfzV9oCtcYyCMYLOzaQhbo9xt6lJVVpz9tkQHpMQwRqf/EDyjHtgc9PpBrAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMp4sFsrI21U3yju5pAgEQgDv+w0KTW6e8fKqtizilkgPASV4sfeJ3/8qATl1EUUwhKU5jZM5jYS7LIbi027t5MFpWM8UxULdB09/vhQ==
+config:
+  keycloak:captcha_secret_key:
+    secure: v1:FuEI8eCoK/NSCmRb:DjMueCoc0NFB0+EuQTMVKgcanbvRy9UEs2bQQy/HNTq9/owBp3d0oD3MK+ydg6+dwz+9KlQz1Ro=
+  keycloak:captcha_site_key:
+    secure: v1:eLnDmk5/RWahlmKa:u4uJlHPCMfcfrED5y6uHxJkS+gtEEr/oTKhOwVVDgJiuGYcMVRLfpVF4txk3UTgFHr5DlDKVS7w=
+  keycloak:client_id:
+    secure: v1:yUi9Gz4PwFc9yy9R:s3/3nHcEW2wIxOaq9LUFKT0omyctCw==
+  keycloak:client_secret:
+    secure: v1:P5o6ZpkbE58s9kqg:3oS/Yeorg1vpIZpYY1lV5BB74lSeWYG/xq48RQEfwEkXzL4dtuvvngurcikRH3mn
+  keycloak:email_host:
+    secure: v1:MrbVZ4ogyOuncjKY:BYybjnG3t7M0+um5T78SPT7Ui0lX1j0PLXK66LIg3J8=
+  keycloak:email_password:
+    secure: v1:jTbLeeiRgylCaSw8:loaF85jFVvguTR6v/7+QxHHFVQOHahb3DBYje0rfWw==
+  keycloak:email_username:
+    secure: v1:LcToO4zDp4OVLD8U:BAUKx2upZ8WufSQQNTsB1PI+3D1leg18
+  keycloak:url: https://sso-ci.odl.mit.edu

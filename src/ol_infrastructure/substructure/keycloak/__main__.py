@@ -7,7 +7,7 @@ env_config = Config("environment")
 stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 keycloak_config = Config("keycloak")
-keycloak_clients = keycloak_config.require_object("clients")
+keycloak_clients = keycloak_config.get("clients")
 
 
 # Create a Keycloak provider cause we ran into an issue with pulumi reading
@@ -40,7 +40,7 @@ ol_platform_engineering_realm = keycloak.Realm(
     display_name="OL PLatform Engineering",
     display_name_html="<b>OL PLatform Engineering</b>",
     enabled=True,
-    login_theme="base",
+    login_theme="keycloak",
     duplicate_emails_allowed=False,
     otp_policy=keycloak.RealmOtpPolicyArgs(
         algorithm="HmacSHA256",
@@ -121,33 +121,35 @@ required_action_update_password = keycloak.RequiredAction(
     opts=resource_options,
 )
 
-# Create Dagster OIDC client
-dagster_domain_name = keycloak_clients["dagster"]
-dagster_openid_client = keycloak.openid.Client(
-    "ol-dagster-client",
-    realm_id=ol_platform_engineering_realm.realm,
-    client_id="ol-dagster-client",
-    enabled=True,
-    access_type="CONFIDENTIAL",
-    standard_flow_enabled=True,
-    valid_redirect_uris=[f"{dagster_domain_name}/*"],
-    login_theme="keycloak",
-    opts=resource_options,
-)
+# Check if any OIDC clients exists in config and create them
+if keycloak_clients:
+    # Create Dagster OIDC client
+    dagster_domain_name = keycloak_clients["dagster"]
+    dagster_openid_client = keycloak.openid.Client(
+        "ol-dagster-client",
+        realm_id=ol_platform_engineering_realm.realm,
+        client_id="ol-dagster-client",
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        valid_redirect_uris=[f"{dagster_domain_name}/*"],
+        login_theme="keycloak",
+        opts=resource_options,
+    )
 
-# Create Airbyte OIDC client
-airbyte_domain_name = keycloak_clients["airbyte"]
-airbyte_openid_client = keycloak.openid.Client(
-    "ol-airbyte-client",
-    realm_id=ol_platform_engineering_realm.realm,
-    client_id="ol-airbyte-client",
-    enabled=True,
-    access_type="CONFIDENTIAL",
-    standard_flow_enabled=True,
-    valid_redirect_uris=[f"{airbyte_domain_name}/*"],
-    login_theme="keycloak",
-    opts=resource_options,
-)
+    # Create Airbyte OIDC client
+    airbyte_domain_name = keycloak_clients["airbyte"]
+    airbyte_openid_client = keycloak.openid.Client(
+        "ol-airbyte-client",
+        realm_id=ol_platform_engineering_realm.realm,
+        client_id="ol-airbyte-client",
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        valid_redirect_uris=[f"{airbyte_domain_name}/*"],
+        login_theme="keycloak",
+        opts=resource_options,
+    )
 
 # Create OL Public Realm
 ol_apps_realm = keycloak.Realm(
@@ -160,7 +162,7 @@ ol_apps_realm = keycloak.Realm(
     display_name="OL Apps",
     display_name_html="<b>MIT Open Learning Applications</b>",
     enabled=True,
-    login_theme="base",
+    login_theme="keycloak",
     duplicate_emails_allowed=False,
     otp_policy=keycloak.RealmOtpPolicyArgs(
         algorithm="HmacSHA256",
@@ -185,7 +187,8 @@ ol_apps_realm = keycloak.Realm(
             wait_increment_seconds=60,
         ),
         headers=keycloak.RealmSecurityDefensesHeadersArgs(
-            content_security_policy="frame-src 'self' https://www.google.com/recaptcha/; frame-ancestors 'self'; object-src 'none'; script-src 'self' https://www.google.com/recaptcha/;",  # noqa: E501
+            content_security_policy="frame-src 'self', https://www.google.com/recaptcha/, https://recaptcha.google.com/recaptcha/; frame-ancestors 'self'; object-src 'none'; script-src 'self', https://www.google.com/recaptcha/, https://www.gstatic.com/recaptcha/;",  # noqa: E501
+            # content_security_policy="frame-src 'self'; frame-ancestors 'self'; object-src 'none';",  # noqa: E501
             content_security_policy_report_only="",
             strict_transport_security="max-age=31536000; includeSubDomains",
             x_content_type_options="nosniff",
@@ -214,7 +217,7 @@ ol_apps_realm = keycloak.Realm(
     opts=resource_options,
 )
 
-required_action_configure_otp = keycloak.RequiredAction(
+ol_apps_required_action_configure_otp = keycloak.RequiredAction(
     "ol-apps-configure-totp",
     realm_id=ol_apps_realm.realm,
     alias="CONFIGURE_TOTP",
@@ -223,7 +226,7 @@ required_action_configure_otp = keycloak.RequiredAction(
     opts=resource_options,
 )
 
-required_action_verify_email = keycloak.RequiredAction(
+ol_apps_required_action_verify_email = keycloak.RequiredAction(
     "ol-apps-verify-email",
     realm_id=ol_apps_realm.realm,
     alias="VERIFY_EMAIL",
@@ -232,7 +235,7 @@ required_action_verify_email = keycloak.RequiredAction(
     opts=resource_options,
 )
 
-required_action_update_password = keycloak.RequiredAction(
+ol_apps_required_action_update_password = keycloak.RequiredAction(
     "ol-apps-update-password",
     realm_id=ol_apps_realm.realm,
     alias="UPDATE_PASSWORD",
@@ -242,46 +245,47 @@ required_action_update_password = keycloak.RequiredAction(
 )
 
 # Make CAPTCHA required in the registartion flow
-ol_apps_registration_flow = keycloak.get_authentication_flow_output(
-    realm_id=ol_apps_realm.id, alias="registration", opts=resource_options
-)
+# ol_apps_registration_flow = keycloak.get_authentication_flow(
+#     realm_id=ol_apps_realm.realm, alias="registration",
+# opts=InvokeOptions(provider=keycloak_provider)
+# )
 
-ol_apps_captcha_execution = keycloak.authentication.Execution(
-    "captcha_execution",
-    realm_id=ol_apps_realm.id,
-    parent_flow_alias=ol_apps_registration_flow.alias,
-    authenticator="registration",
-    requirement="REQUIRED",
-    opts=resource_options,
-)
+# ol_apps_captcha_execution = keycloak.authentication.Execution(
+#     "captcha_execution",
+#     realm_id=ol_apps_realm.id,
+#     parent_flow_alias=ol_apps_registration_flow.alias,
+#     authenticator="registration",
+#     requirement="REQUIRED",
+#     opts=resource_options,
+# )
 
-ol_apps_captcha_execution_config = keycloak.authentication.ExecutionConfig(
-    "registration-recaptcha-action",
-    realm_id=ol_apps_realm.id,
-    execution_id=ol_apps_captcha_execution.id,
-    alias="registration-recaptcha-action",
-    config={
-        "RecaptchaSiteKey": captcha_site_key,
-        "RecaptchaSecret": captcha_secret_key,
-    },
-    opts=resource_options,
-)
+# ol_apps_captcha_execution_config = keycloak.authentication.ExecutionConfig(
+#     "registration-recaptcha-action",
+#     realm_id=ol_apps_realm.id,
+#     execution_id=ol_apps_captcha_execution.id,
+#     alias="registration-recaptcha-action",
+#     config={
+#         "RecaptchaSiteKey": captcha_site_key,
+#         "RecaptchaSecret": captcha_secret_key,
+#     },
+#     opts=resource_options,
+# )
 
-ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
-    "touchstone-idp",
-    realm=ol_apps_realm.id,
-    alias="touchstone-idp",
-    display_name="MIT Touchstone",
-    entity_id=f"{keycloak_url}/realms/olapps",
-    force_authn=True,
-    post_binding_response=True,
-    principal_attribute="",
-    signing_certificate="",
-    single_sign_on_service_url="https://idp.mit.edu/idp/Authn/MIT",
-    store_token=False,
-    trust_email=True,
-    validate_signature=True,
-    want_assertions_encrypted=True,
-    want_assertions_signed=True,
-    opts=resource_options,
-)
+# ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
+#     "touchstone-idp",
+#     realm=ol_apps_realm.id,
+#     alias="touchstone-idp",
+#     display_name="MIT Touchstone",
+#     entity_id=f"{keycloak_url}/realms/olapps",
+#     force_authn=True,
+#     post_binding_response=True,
+#     principal_attribute="",
+#     signing_certificate="",
+#     single_sign_on_service_url="https://idp.mit.edu/idp/Authn/MIT",
+#     store_token=False,
+#     trust_email=True,
+#     validate_signature=True,
+#     want_assertions_encrypted=True,
+#     want_assertions_signed=True,
+#     opts=resource_options,
+# )
