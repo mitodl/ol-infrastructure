@@ -26,3 +26,9 @@ derive_settings(__name__)
 
 LOCALE_PATHS.append("/openedx/locale/contrib/locale")
 LOCALE_PATHS.append("/openedx/locale/user/locale")
+PROCTORING_BACKENDS:
+    DEFAULT: 'proctortrack'
+    'proctortrack':
+      'client_id': ''
+      'client_secret': ''
+      'base_url': ''
