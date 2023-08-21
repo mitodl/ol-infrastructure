@@ -88,6 +88,7 @@ RATELIMIT_RATE: '600/m'  # ADDED KEY
 RECALCULATE_GRADES_ROUTING_KEY: edx.lms.core.default
 SITE_NAME: {{ key "edxapp/lms-domain" }}  # MODIFIED
 SESSION_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-lms-sessionid  # MODIFIED
+STATIC_URL_BASE: /static/lms/
 THIRD_PARTY_AUTH_BACKENDS:
 - social_auth_mitxpro.backends.MITxProOAuth2
 - social_core.backends.google.GoogleOAuth2
