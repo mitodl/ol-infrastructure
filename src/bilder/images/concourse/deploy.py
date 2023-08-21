@@ -13,7 +13,7 @@ from bilder.components.baseline.steps import (
     install_baseline_packages,
     service_configuration_watches,
 )
-from bilder.components.traefik.models import traefik_static
+from bilder.components.traefik.models import traefik_static, traefik_file_provider
 from bilder.components.traefik.models.component import TraefikConfig
 from bilder.components.traefik.steps import (
     configure_traefik,
@@ -265,11 +265,24 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
     )
 
     # Install Traefik
-    FILES_DIRECTORY = Path(__file__).parent.joinpath("templates")
+    FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
     traefik_config = TraefikConfig(
         static_configuration=traefik_static.TraefikStaticConfig.model_validate(
-            yaml.safe_load(FILES_DIRECTORY.joinpath("static_config.yaml").read_text())
+            yaml.safe_load(
+                FILES_DIRECTORY.joinpath("traefik", "static_config.yaml").read_text()
+            )
         ),
+        file_configurations={
+            Path(
+                "concourse.yaml"
+            ): traefik_file_provider.TraefikFileConfig.model_validate(
+                yaml.safe_load(
+                    FILES_DIRECTORY.joinpath(
+                        "traefik", "dynamic_config.yaml"
+                    ).read_text()
+                )
+            )
+        },
     )
     install_traefik_binary(traefik_config)
     traefik_config_changed = configure_traefik(traefik_config)
