@@ -1,0 +1,21 @@
+---
+## Dynamic configuration
+access_log:
+  filePath: /var/log/traefik_access_log
+entryPoints:
+  https:
+    address: ":443"
+routers:
+  concourse:
+    rule: "Host(`{{ $DOMAIN:cicd.odl.mit.edu }}`) && Path(`/api/v1/info`)"
+    tls:
+      certResolver: myresolver
+      acme:
+      email: odl-devops@mit.edu
+      storage: acme.json
+      tlsChallenge:
+services:
+  concourse-service:
+    loadBalancer:
+      servers:
+      - url: "http://127.0.0.1:8080"

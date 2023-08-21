@@ -267,8 +267,8 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
     # Install Traefik
     FILES_DIRECTORY = Path(__file__).parent.joinpath("templates")
     traefik_config = TraefikConfig(
-        static_configuration=traefik_static.TraefikStaticConfig.parse_obj(
-            yaml.safe_load(FILES_DIRECTORY.joinpath("dynamic_config.yaml").read_text())
+        static_configuration=traefik_static.TraefikStaticConfig.model_validate(
+            yaml.safe_load(FILES_DIRECTORY.joinpath("static_config.yaml").read_text())
         ),
     )
     install_traefik_binary(traefik_config)
