@@ -114,6 +114,7 @@ RUN if [ "$DEPLOYMENT_NAME" = "mitxonline" ]; then pip install --no-warn-script-
 
 RUN openedx-assets xmodule \
     && openedx-assets npm \
+    && openedx-assets collect --settings=mitol.assets \
     && openedx-assets webpack --env=prod \
     && openedx-assets common
 
