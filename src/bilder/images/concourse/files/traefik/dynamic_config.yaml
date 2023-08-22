@@ -5,12 +5,12 @@ http:
     filePath: /var/log/traefik_access_log
   routers:
     concourse-router:
-      rule: "Host(`{{ $DOMAIN:cicd.odl.mit.edu }}`) && Path(`/api/v1/info`)"
+      rule: Host("{{ env "DOMAIN" }}") && Path("/api/v1/info")
       service: concourse-service
       tls:
         certResolver: letsencrypt_resolver
     concourse-healthcheck:
-      rule: PathPrefix("//api/v1/info")
+      rule: PathPrefix("/api/v1/info")
       service: concourse-service
       tls:
         certResolver: letsencrypt_resolver
