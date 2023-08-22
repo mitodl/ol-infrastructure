@@ -176,7 +176,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/web" }}'
                 "{{ printf .Data.data.tsa_private_key }}{{ end }}"
             ),
-            destination=concourse_config.dict().get("tsa_host_key_path"),
+            destination=concourse_config.model_dump().get("tsa_host_key_path"),
         ),
         partial(
             VaultTemplate,
@@ -184,7 +184,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/web" }}'
                 "{{ printf .Data.data.session_signing_key }}{{ end }}"
             ),
-            destination=concourse_config.dict().get("session_signing_key_path"),
+            destination=concourse_config.model_dump().get("session_signing_key_path"),
         ),
         partial(
             VaultTemplate,
@@ -192,7 +192,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/web" }}'
                 "{{ printf .Data.data.worker_public_key }}{{ end }}"
             ),
-            destination=concourse_config.dict().get("authorized_keys_file"),
+            destination=concourse_config.model_dump().get("authorized_keys_file"),
         ),
         partial(
             VaultTemplate,
@@ -220,7 +220,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/worker" }}'
                 "{{ printf .Data.data.worker_private_key }}{{ end }}"
             ),
-            destination=concourse_config.dict().get("worker_private_key_path"),
+            destination=concourse_config.model_dump().get("worker_private_key_path"),
         ),
         partial(
             VaultTemplate,
@@ -228,7 +228,7 @@ vault_template_map = {
                 '{{ with secret "secret-concourse/worker" }}'
                 "{{ printf .Data.data.tsa_public_key }}{{ end }}"
             ),
-            destination=concourse_config.dict().get("tsa_public_key_path"),
+            destination=concourse_config.model_dump().get("tsa_public_key_path"),
         ),
     ],
 }
