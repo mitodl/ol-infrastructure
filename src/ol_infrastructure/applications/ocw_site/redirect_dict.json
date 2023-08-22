@@ -437,6 +437,7 @@
   "/courses/physics/8-13-14-experimental-physics-i-ii-junior-lab-fall-2007-spring-2008/labs/lab22": "307|discard|https://{{AK_HOSTHEADER}}/courses/physics/8-13-14-experimental-physics-i-ii-junior-lab-fall-2016-spring-2017/",
   "/courses/physics/8-13-14-experimental-physics-i-ii-junior-lab-fall-2007-spring-2008/labs/lab6": "307|discard|https://{{AK_HOSTHEADER}}/courses/physics/8-13-14-experimental-physics-i-ii-junior-lab-fall-2016-spring-2017/",
   "/courses/political-science": "307|discard|https://{{AK_HOSTHEADER}}/search/?d=Political%20Science&s=department_course_numbers.sort_coursenum",
+  "/courses/res-21m-001-heavy-metal-101-january-iap-2123": "301|keep|https://{{AK_HOSTHEADER}}/courses/res-21m-001-heavy-metal-101-january-iap-2023/",
   "/courses/res-tll-008-social-and-ethical-responsibilities-of-computing-serc-fall-2021": "301|keep|https://{{AK_HOSTHEADER}}/courses/res-tll-008-social-and-ethical-responsibilities-of-computing-serc/",
   "/courses/science-technology-and-society": "307|discard|https://{{AK_HOSTHEADER}}/search/?d=Science%2C%20Technology%2C%20and%20Society&s=department_course_numbers.sort_coursenum",
   "/courses/special-programs/sp-272-culture-tech-spring-2003": "307|discard|https://{{AK_HOSTHEADER}}/courses/experimental-study-group/es-272-culture-tech-spring-2003/",
