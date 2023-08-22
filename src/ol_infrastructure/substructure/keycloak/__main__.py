@@ -1,3 +1,4 @@
+import json
 import pulumi_keycloak as keycloak
 
 from pulumi import Config, ResourceOptions
@@ -121,35 +122,35 @@ required_action_update_password = keycloak.RequiredAction(
     opts=resource_options,
 )
 
-# Check if any OIDC clients exists in config and create them
+# Check if any OIDC clients exist in config and create them
 if keycloak_clients:
-    # Create Dagster OIDC client
-    dagster_domain_name = keycloak_clients["dagster"]
-    dagster_openid_client = keycloak.openid.Client(
-        "ol-dagster-client",
-        realm_id=ol_platform_engineering_realm.realm,
-        client_id="ol-dagster-client",
-        enabled=True,
-        access_type="CONFIDENTIAL",
-        standard_flow_enabled=True,
-        valid_redirect_uris=[f"{dagster_domain_name}/*"],
-        login_theme="keycloak",
-        opts=resource_options,
-    )
+    keycloak_clients = json.loads(keycloak_clients)
+    for client_name, client_domain in keycloak_clients.items():
+        openid_client = keycloak.openid.Client(
+            f"ol-{client_name}-client",
+            realm_id=ol_platform_engineering_realm.realm,
+            client_id=f"ol-{client_name}-client",
+            enabled=True,
+            access_type="CONFIDENTIAL",
+            standard_flow_enabled=True,
+            valid_redirect_uris=[f"{client_domain}/*"],
+            login_theme="keycloak",
+            opts=resource_options,
+        )
 
-    # Create Airbyte OIDC client
-    airbyte_domain_name = keycloak_clients["airbyte"]
-    airbyte_openid_client = keycloak.openid.Client(
-        "ol-airbyte-client",
-        realm_id=ol_platform_engineering_realm.realm,
-        client_id="ol-airbyte-client",
-        enabled=True,
-        access_type="CONFIDENTIAL",
-        standard_flow_enabled=True,
-        valid_redirect_uris=[f"{airbyte_domain_name}/*"],
-        login_theme="keycloak",
-        opts=resource_options,
-    )
+    # # Create Airbyte OIDC client
+    # airbyte_domain_name = keycloak_clients["airbyte"]
+    # airbyte_openid_client = keycloak.openid.Client(
+    #     "ol-airbyte-client",
+    #     realm_id=ol_platform_engineering_realm.realm,
+    #     client_id="ol-airbyte-client",
+    #     enabled=True,
+    #     access_type="CONFIDENTIAL",
+    #     standard_flow_enabled=True,
+    #     valid_redirect_uris=[f"{airbyte_domain_name}/*"],
+    #     login_theme="keycloak",
+    #     opts=resource_options,
+    # )
 
 # Create OL Public Realm
 ol_apps_realm = keycloak.Realm(
