@@ -115,8 +115,8 @@ def build_worker_user_data(
                 "content": textwrap.dedent(
                     f"""\
                     ENVIRONMENT={consul_dc}
-                    APPLICATION=concourse
-                    SERVICE=concourse-worker
+                    APPLICATION=concourse-worker
+                    SERVICE=concourse
                     VECTOR_CONFIG_DIR=/etc/vector/
                     AWS_REGION={aws_config.region}
                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
@@ -553,8 +553,8 @@ web_launch_config = ec2.LaunchTemplate(
                                 "content": textwrap.dedent(
                                     f"""\
                                     ENVIRONMENT={consul_dc}
-                                    APPLICATION=concourse
-                                    SERVICE=concourse-web
+                                    APPLICATION=concourse-web
+                                    SERVICE=concourse
                                     VECTOR_CONFIG_DIR=/etc/vector/
                                     AWS_REGION={aws_config.region}
                                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
