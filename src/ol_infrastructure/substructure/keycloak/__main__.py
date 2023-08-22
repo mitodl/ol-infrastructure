@@ -138,20 +138,6 @@ if keycloak_clients:
             opts=resource_options,
         )
 
-    # # Create Airbyte OIDC client
-    # airbyte_domain_name = keycloak_clients["airbyte"]
-    # airbyte_openid_client = keycloak.openid.Client(
-    #     "ol-airbyte-client",
-    #     realm_id=ol_platform_engineering_realm.realm,
-    #     client_id="ol-airbyte-client",
-    #     enabled=True,
-    #     access_type="CONFIDENTIAL",
-    #     standard_flow_enabled=True,
-    #     valid_redirect_uris=[f"{airbyte_domain_name}/*"],
-    #     login_theme="keycloak",
-    #     opts=resource_options,
-    # )
-
 # Create OL Public Realm
 ol_apps_realm = keycloak.Realm(
     "olapps",
