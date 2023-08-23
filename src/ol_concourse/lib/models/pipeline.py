@@ -56,8 +56,8 @@ class Version(RootModel[dict[str, str]]):
     root: dict[str, str]
 
 
-class Value(RootModel[str]):
-    root: str
+class Value(RootModel[Any]):
+    pass
 
 
 class Duration(RootModel[str]):
