@@ -83,7 +83,7 @@ RATELIMIT_RATE: '600/m'  # ADDED KEY
 RECALCULATE_GRADES_ROUTING_KEY: edx.lms.core.default
 SITE_NAME: {{ key "edxapp/lms-domain" }}  # MODIFIED
 SESSION_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-lms-sessionid  # MODIFIED
-STATIC_URL_BASE: /static/lms/
+STATIC_ROOT_BASE: /openedx/staticfiles/lms/
 THIRD_PARTY_AUTH_BACKENDS:
 - common.djangoapps.third_party_auth.saml.SAMLAuthBackend
 TRACKING_SEGMENTIO_WEBHOOK_SECRET: ''
