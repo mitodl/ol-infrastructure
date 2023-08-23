@@ -20,8 +20,9 @@ DATABASES = {
 }
 
 
-STATIC_ROOT = STATIC_ROOT_BASE
-WEBPACK_LOADER["DEFAULT"]["STATS_FILE"] = path(STATIC_ROOT) / "webpack-stats.json"
+STATIC_ROOT = path(STATIC_ROOT_BASE) / "lms"
+WEBPACK_LOADER["DEFAULT"]["STATS_FILE"] = STATIC_ROOT / "webpack-stats.json"
+WEBPACK_LOADER["WORKERS"]["STATS_FILE"] = STATIC_ROOT / "webpack-worker-stats.json"
 
 derive_settings(__name__)
 
