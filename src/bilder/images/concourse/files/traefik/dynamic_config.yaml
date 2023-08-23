@@ -5,7 +5,7 @@ http:
     filePath: /var/log/traefik_access_log
   routers:
     concourse-router:
-      rule: Host("{{ env "DOMAIN" }}") && Path("/api/v1/info")
+      rule: Host(`${DOMAIN}`) && Path("/")
       service: concourse-service
       tls:
         certResolver: letsencrypt_resolver
