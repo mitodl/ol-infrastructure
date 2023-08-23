@@ -225,12 +225,11 @@ services:
     - KEYCLOAK_INTERNAL_HOST=localhost # placeholder to ensure the webapp's nginx config is valid
     labels:
     - "traefik.enable=true"
+    - "traefik.http.routers.airbyte-webapp.rule=Host(`${AIRBYTE_HOSTNAME}`)"
     - "traefik.http.routers.airbyte-webapp.middlewares=traefik-forward-auth"
     - "traefik.http.routers.airbyte-webapp.tls=true"
-    - "traefik.http.routers.airbyte-webapp.tls.domains[0].main=${AIRBYTE_HOSTNAME}"
     - "traefik.http.routers.dagster-webapp.rule=Host(`airbyte.service.consul`)"
     - "traefik.http.middlewares.dagster-webapp.basicauth.users=${DAGSTER_USER_PASS}"
-    - "traefik.http.routers.dagster-webapp.tls=true"
     networks:
     - airbyte_internal
     depends_on:
