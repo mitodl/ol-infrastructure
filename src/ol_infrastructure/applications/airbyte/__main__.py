@@ -470,7 +470,6 @@ consul.Keys(
 #     Web Node EC2 Deployment     #
 ###################################
 lb_config = OLLoadBalancerConfig(
-    health_check_path="/ping",
     subnets=target_vpc["subnet_ids"],
     security_groups=[airbyte_server_security_group],
     tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
