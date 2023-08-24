@@ -1,0 +1,19 @@
+---
+## Dynamic configuration
+http:
+  routers:
+    concourse-router:
+      rule: Host("{{env "DOMAIN"}}")
+      service: concourse-service
+      tls:
+        certResolver: letsencrypt_resolver
+    concourse-healthcheck:
+      rule: Path("/api/v1/info")
+      service: concourse-service
+      tls:
+        certResolver: letsencrypt_resolver
+  services:
+    concourse-service:
+      loadBalancer:
+        servers:
+        - url: http://localhost:8080

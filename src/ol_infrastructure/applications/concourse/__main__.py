@@ -541,7 +541,7 @@ web_launch_config = ec2.LaunchTemplate(
                                 "owner": "consul:consul",
                             },
                             {
-                                "path": "/etc/default/caddy",
+                                "path": "/etc/default/traefik",
                                 "content": "DOMAIN={}".format(
                                     concourse_config.require("web_host_domain")
                                 ),
