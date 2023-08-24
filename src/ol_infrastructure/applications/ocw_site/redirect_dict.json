@@ -358,6 +358,7 @@
   "/ans7870/21f/21f.027/home/index.html": "307|discard|https://visualizingcultures.mit.edu/",
   "/comments": "307|discard|https://mitocw.zendesk.com/hc/en-us/articles/6636015233051-Comments-Policy-for-YouTube-and-Social-Media",
   "/courses": "307|keep|https://{{AK_HOSTHEADER}}/search/?s=department_course_numbers.sort_coursenum",
+  "/courses/18-785-number-theory-i-fall-2019": "301|keep|https://{{AK_HOSTHEADER}}/courses/18-785-number-theory-i-fall-2021/",
   "/courses/12-003-atmosphere-ocean-and-climate-dynamics-fall-2008/resources/lab11/experiment-xi-baroclinic-instability-of-the-thermal-wind": "301|discard|https://ocw.mit.edu/courses/12-003-atmosphere-ocean-and-climate-dynamics-fall-2008/resources/experiment-xi-baroclinic-instability-of-the-thermal-wind/",
   "/courses/6-002x-related-curriculum": "307|keep|https://{{AK_HOSTHEADER}}/courses/mitx-related-courseware/index.htm",
   "/courses/aeronautics-and-astronautics": "307|discard|https://{{AK_HOSTHEADER}}/search/?d=Aeronautics%20and%20Astronautics&s=department_course_numbers.sort_coursenum",
