@@ -10,10 +10,6 @@ http:
     concourse-healthcheck:
       rule: Path("/api/v1/info")
       service: concourse-service
-      # tls:
-      #   domains:
-      #     - {{.DOMAIN}}
-      #   certResolver: letsencrypt_resolver
   services:
     concourse-service:
       loadBalancer:
