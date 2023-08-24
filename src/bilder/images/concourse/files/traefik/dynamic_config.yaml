@@ -1,19 +1,19 @@
 ---
 ## Dynamic configuration
 http:
-  access_log:
-    filePath: /var/log/traefik_access_log
   routers:
     concourse-router:
-      rule: Host(`${DOMAIN}`) && Path("/")
+      rule: Host("{{env "DOMAIN"}}")
       service: concourse-service
       tls:
         certResolver: letsencrypt_resolver
     concourse-healthcheck:
-      rule: PathPrefix("/api/v1/info")
+      rule: Path("/api/v1/info")
       service: concourse-service
-      tls:
-        certResolver: letsencrypt_resolver
+      # tls:
+      #   domains:
+      #     - {{.DOMAIN}}
+      #   certResolver: letsencrypt_resolver
   services:
     concourse-service:
       loadBalancer:

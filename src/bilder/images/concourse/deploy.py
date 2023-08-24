@@ -194,24 +194,6 @@ vault_template_map = {
             ),
             destination=concourse_config.model_dump().get("authorized_keys_file"),
         ),
-        partial(
-            VaultTemplate,
-            contents=(
-                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-                "{{ printf .Data.value }}{{ end }}"
-            ),
-            # destination=Path("/etc/caddy/odl_wildcard.cert"),
-            destination=Path("/etc/traefik/odl_wildcard.cert"),
-        ),
-        partial(
-            VaultTemplate,
-            contents=(
-                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-                "{{ printf .Data.key }}{{ end }}"
-            ),
-            # destination=Path("/etc/caddy/odl_wildcard.key"),
-            destination=Path("/etc/traefik/odl_wildcard.key"),
-        ),
     ],
     CONCOURSE_WORKER_NODE_TYPE: [
         partial(
@@ -363,15 +345,6 @@ if host.get_fact(HasSystemd):
                 concourse_config.session_signing_key_path,
                 concourse_config.tsa_host_key_path,
             ]
-        )
-        service_configuration_watches(
-            service_name="traefik",
-            watched_files=[
-                # Path("/etc/caddy/odl_wildcard.cert"),
-                # Path("/etc/caddy/odl_wildcard.key"),
-                Path("/etc/traefik/odl_wildcard.cert"),
-                Path("/etc/traefik/odl_wildcard.key"),
-            ],
         )
         traefik_service(traefik_config=traefik_config, do_reload=traefik_config_changed)
     else:
