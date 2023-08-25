@@ -229,6 +229,20 @@ ol_apps_required_action_update_password = keycloak.RequiredAction(
     opts=resource_options,
 )
 
+# OpenID client that Devs can use for their local development
+if stack_info.env_suffix == "ci":
+    openid_client = keycloak.openid.Client(
+        "ol-open-local",
+        realm_id=ol_apps_realm.realm,
+        client_id="ol-open-local",
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        valid_redirect_uris=["*"],
+        login_theme="keycloak",
+        opts=resource_options,
+    )
+
 ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
     "touchstone-idp",
     realm=ol_apps_realm.id,
