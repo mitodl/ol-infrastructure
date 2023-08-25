@@ -1,4 +1,3 @@
-import json
 import pulumi_keycloak as keycloak
 
 from pulumi import Config, ResourceOptions
@@ -8,7 +7,6 @@ env_config = Config("environment")
 stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 keycloak_config = Config("keycloak")
-keycloak_clients = keycloak_config.get("clients")
 
 
 # Create a Keycloak provider cause we ran into an issue with pulumi reading
@@ -122,22 +120,6 @@ required_action_update_password = keycloak.RequiredAction(
     opts=resource_options,
 )
 
-# Check if any OIDC clients exist in config and create them
-if keycloak_clients:
-    keycloak_clients = json.loads(keycloak_clients)
-    for client_name, client_domain in keycloak_clients.items():
-        openid_client = keycloak.openid.Client(
-            f"ol-{client_name}-client",
-            realm_id=ol_platform_engineering_realm.realm,
-            client_id=f"ol-{client_name}-client",
-            enabled=True,
-            access_type="CONFIDENTIAL",
-            standard_flow_enabled=True,
-            valid_redirect_uris=[f"{client_domain}/*"],
-            login_theme="keycloak",
-            opts=resource_options,
-        )
-
 # Create OL Public Realm
 ol_apps_realm = keycloak.Realm(
     "olapps",
@@ -160,6 +142,7 @@ ol_apps_realm = keycloak.Realm(
         type="totp",
     ),
     realm="olapps",
+    registration_allowed=True,
     reset_password_allowed=True,
     verify_email=True,
     password_policy="upperCase(1) and digits(1) and specialChars(1) and length(8) and notUsername and notEmail",  # noqa: E501,S106 # pragma: allowlist secret
@@ -224,24 +207,44 @@ ol_apps_required_action_update_password = keycloak.RequiredAction(
     "ol-apps-update-password",
     realm_id=ol_apps_realm.realm,
     alias="UPDATE_PASSWORD",
-    default_action=True,
+    default_action=False,
     enabled=True,
     opts=resource_options,
 )
 
-ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
-    "touchstone-idp",
-    realm=ol_apps_realm.id,
-    alias="touchstone-idp",
-    display_name="MIT Touchstone",
-    entity_id=f"{keycloak_url}/realms/olapps",
-    force_authn=True,
-    post_binding_response=True,
-    principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
-    single_sign_on_service_url="https://idp.mit.edu/idp/profile/SAML2/Redirect/SSO",
-    trust_email=True,
-    validate_signature=True,
-    want_assertions_encrypted=True,
-    want_assertions_signed=True,
-    opts=resource_options,
-)
+
+# Check if any Openid clients exist in config and create them
+for openid_clients in keycloak_config.get_object("openid_clients"):
+    realm_name = openid_clients.get("realm_name")
+    client_details = openid_clients.get("client_info")
+    for client_name, client_url in client_details.items():
+        openid_client = keycloak.openid.Client(
+            f"ol-{client_name}-client",
+            realm_id=realm_name,
+            client_id=f"ol-{client_name}-client",
+            enabled=True,
+            access_type="CONFIDENTIAL",
+            standard_flow_enabled=True,
+            valid_redirect_uris=[f"{client_url}/*"],
+            login_theme="keycloak",
+            opts=resource_options,
+        )
+
+if stack_info.env_suffix != "ci":
+    ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
+        "touchstone-idp",
+        realm=ol_apps_realm.id,
+        alias="touchstone-idp",
+        display_name="MIT Touchstone",
+        entity_id=f"{keycloak_url}/realms/olapps",
+        force_authn=True,
+        post_binding_response=True,
+        post_binding_authn_request=True,
+        principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
+        single_sign_on_service_url="https://idp.mit.edu/idp/profile/SAML2/Redirect/SSO",
+        trust_email=True,
+        validate_signature=True,
+        want_assertions_encrypted=True,
+        want_assertions_signed=True,
+        opts=resource_options,
+    )

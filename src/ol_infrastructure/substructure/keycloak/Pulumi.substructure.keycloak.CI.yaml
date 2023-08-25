@@ -17,3 +17,7 @@ config:
   keycloak:email_username:
     secure: v1:LcToO4zDp4OVLD8U:BAUKx2upZ8WufSQQNTsB1PI+3D1leg18
   keycloak:url: https://sso-ci.odl.mit.edu
+  keycloak:openid_clients:
+  - realm_name: olapps
+    client_info:
+      open-local: "*"
