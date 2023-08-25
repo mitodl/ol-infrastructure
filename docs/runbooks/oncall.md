@@ -171,6 +171,20 @@ Filesystem      Size  Used Avail Use% Mounted on
 
 ## OVS
 
+### [Prometheus]: [FIRING:1] InvalidAccessKeyProduction apps-production (odl-video-service critical)
+
+_Diagnosis_
+
+This happens sometimes when the applications's instance S3 credentials become out of date.
+
+_Mitigation_
+
+Use the AWS EC2 web console and navigate to the EC2 -> Auto Scaling Group pane. Search on:
+`odl-video-service-production`
+
+Once you have the right ASG, click on the "Instance Refresh" tab and then click
+the "Start Instance Refresh" button.
+
 ### Request by deeveloper to add videos
 
 _Diagnosis_
