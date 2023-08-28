@@ -235,8 +235,8 @@ services:
     - "traefik.http.routers.dagster-webapp.tls.certResolver=${CERTIFICATE_RESOLVER}"
     - "traefik.http.routers.dagster-webapp.tls.domains[0].main=${AIRBYTE_HOSTNAME}"
     - "traefik.http.routers.dagster-webapp.tls=true"
-    - "traefik.tls.stores.OdlWildcard.certFile=/etc/traefik/star.odl.mit.edu.crt"
-    - "traefik.tls.stores.OdlWildcard.keyFile=/etc/traefik/star.odl.mit.edu.key"
+    - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
+    - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
     networks:
     - airbyte_internal
     depends_on:
