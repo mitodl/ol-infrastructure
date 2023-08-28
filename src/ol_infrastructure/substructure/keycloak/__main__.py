@@ -219,7 +219,7 @@ for openid_clients in keycloak_config.get_object("openid_clients"):
     client_details = openid_clients.get("client_info")
     for client_name, client_url in client_details.items():
         openid_client = keycloak.openid.Client(
-            f"ol-{client_name}-client",
+            f"{realm_name}-{client_name}-client",
             realm_id=realm_name,
             client_id=f"ol-{client_name}-client",
             enabled=True,
