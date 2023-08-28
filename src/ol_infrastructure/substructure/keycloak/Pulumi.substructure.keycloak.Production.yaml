@@ -14,3 +14,11 @@ config:
   keycloak:email_username:
     secure: v1:qw0/egOdCOUJi9Vy:CtyFmcodURyRrv9pG9o9wY9J+N2r6IoC
   keycloak:url: https://sso-production.odl.mit.edu
+  keycloak:openid_clients:
+  - realm_name: olapps
+    client_info:
+      open: https://mit-open.odl.mit.edu
+  - realm_name: ol-platform-engineering
+    client_info:
+      airbyte: https://airbyte.odl.mit.edu
+      dagster: https://pipelines.odl.mit.edu

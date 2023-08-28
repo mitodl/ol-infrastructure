@@ -10,9 +10,14 @@ config:
     secure: v1:BkWbaZVoElrjHJm7:Ti69EMKQfvYtLDcrKJZTankVy12gSw==
   keycloak:client_secret:
     secure: v1:ewmG5VqfRwLxrPmA:IcEVxEohrtStaYX4xkr3B3QLVM592Kej6XKky+XWZrRTtzXgzoSfE+BfQ1hmi9Ij
-  keycloak:clients:
-    airbyte: https://airbyte-qa.odl.mit.edu
-    dagster: https://pipelines-qa.odl.mit.edu
+  keycloak:openid_clients:
+  - realm_name: olapps
+    client_info:
+      open: https://mit-open-rc.odl.mit.edu
+  - realm_name: ol-platform-engineering
+    client_info:
+      airbyte: https://airbyte-qa.odl.mit.edu
+      dagster: https://pipelines-qa.odl.mit.edu
   keycloak:email_host:
     secure: v1:swp7hkmN53N42cWS:tHmgd6AzJEKco5XBqjF8RspFlJkD0PsBmp+gytkFsOM=
   keycloak:email_password:
