@@ -23,11 +23,11 @@ sources:
         - "ext?"
         - "btrfs"
         - "xfs"
-    mountpoint:
-      # We only ever mount devices at root
-      mountpoints:
-        includes:
-        - "/"
+      mountpoint:
+        # We only ever mount devices at root
+        mountpoints:
+          includes:
+          - "/"
     network:
       # We only care about the actual network device
       devices:
