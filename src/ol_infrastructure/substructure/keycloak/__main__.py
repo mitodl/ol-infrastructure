@@ -212,7 +212,6 @@ ol_apps_required_action_update_password = keycloak.RequiredAction(
     opts=resource_options,
 )
 
-
 # Check if any Openid clients exist in config and create them
 for openid_clients in keycloak_config.get_object("openid_clients"):
     realm_name = openid_clients.get("realm_name")

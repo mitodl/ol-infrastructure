@@ -462,6 +462,12 @@ consul.Keys(
             path="airbyte/airbyte-hostname",
             value=airbyte_config.require("web_host_domain"),
         ),
+        consul.KeysKeyArgs(
+            path="airbyte/traefik-certificate-resolver",
+            value="letsencrypt_staging_resolver"
+            if stack_info.env_suffix != "production"
+            else "letsencrypt_resolver",
+        ),
     ],
     opts=consul_provider,
 )

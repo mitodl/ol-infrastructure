@@ -83,8 +83,17 @@ traefik_static_config = traefik_static.TraefikStaticConfig(
                 email="odl-devops@mit.edu",
                 storage="/etc/traefik/acme.json",
                 dns_challenge=traefik_static.DnsChallenge(provider="route53"),
+                caServer="https://acme-v02.api.letsencrypt.org/directory",
             )
-        )
+        ),
+        "letsencrypt_staging_resolver": traefik_static.CertificatesResolvers(
+            acme=traefik_static.Acme(
+                email="odl-devops@mit.edu",
+                storage="/etc/traefik/acme.json",
+                dns_challenge=traefik_static.DnsChallenge(provider="route53"),
+                caServer="https://acme-staging-v02.api.letsencrypt.org/directory",
+            )
+        ),
     },
     entry_points={
         "https": traefik_static.EntryPoints(address=":443"),
