@@ -102,6 +102,7 @@ traefik_static_config = traefik_static.TraefikStaticConfig(
 traefik_config = TraefikConfig(
     static_configuration=traefik_static_config, version=VERSIONS["traefik"]
 )
+traefik_conf_directory = traefik_config.configuration_directory
 configure_traefik(traefik_config)
 
 files.put(
@@ -141,9 +142,26 @@ files.put(
     dest="/etc/default/airbyte-version",
 )
 
+certificate_file = traefik_conf_directory.joinpath("star.odl.mit.edu.crt")
+certificate_key_file = traefik_conf_directory.joinpath("star.odl.mit.edu.key")
 env_template_file = Path("/etc/consul-template/.env.tmpl")
 consul_templates_directory = Path("/etc/consul-template")
-consul_templates = []
+consul_templates = [
+    ConsulTemplateTemplate(
+        contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+        "{{ printf .Data.key }}{{ end }}",
+        destination=Path(certificate_key_file),
+        user="root",
+        group="root",
+    ),
+    ConsulTemplateTemplate(
+        contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+        "{{ printf .Data.value }}{{ end }}",
+        destination=Path(certificate_file),
+        user="root",
+        group="root",
+    ),
+]
 
 files.put(
     name="Create the .env template file in docker-compose directory.",
