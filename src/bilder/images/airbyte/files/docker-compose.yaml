@@ -227,7 +227,7 @@ services:
     - "traefik.enable=true"
     - "traefik.http.middlewares.dagster-webapp.basicauth.users=${DAGSTER_USER_PASS}"
     - "traefik.http.routers.airbyte-webapp.middlewares=traefik-forward-auth"
-    - "traefik.http.routers.airbyte-webapp.rule=Host(`${AIRBYTE_HOSTNAME}`)"
+    - "traefik.http.routers.airbyte-webapp.rule=Host(`${AIRBYTE_HOSTNAME}`) || Path('/api/v1/health)"
     - "traefik.http.routers.airbyte-webapp.tls.certResolver=${CERTIFICATE_RESOLVER}"
     - "traefik.http.routers.airbyte-webapp.tls.domains[0].main=${AIRBYTE_HOSTNAME}"
     - "traefik.http.routers.airbyte-webapp.tls.certificates[0].certFile=/etc/traefik/star.odl.mit.edu.crt"
