@@ -194,6 +194,22 @@ vault_template_map = {
             ),
             destination=concourse_config.model_dump().get("authorized_keys_file"),
         ),
+        partial(
+            VaultTemplate,
+            contents=(
+                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+                "{{ printf .Data.value }}{{ end }}"
+            ),
+            destination=Path("/etc/traefik/odl_wildcard.cert"),
+        ),
+        partial(
+            VaultTemplate,
+            contents=(
+                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+                "{{ printf .Data.key }}{{ end }}"
+            ),
+            destination=Path("/etc/traefik/odl_wildcard.key"),
+        ),
     ],
     CONCOURSE_WORKER_NODE_TYPE: [
         partial(
