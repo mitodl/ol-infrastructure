@@ -813,7 +813,7 @@ ses_domain_mail_from_txt = route53.Record(
 edxapp_ses_domain_dkim = ses.DomainDkim(
     "edxapp-ses-domain-dkim", domain=edxapp_ses_domain_identity.domain
 )
-for loop_counter in range(0, 3):
+for loop_counter in range(3):
     route53.Record(
         f"edxapp-ses-domain-dkim-record-{loop_counter}",
         zone_id=edxapp_zone_id,
