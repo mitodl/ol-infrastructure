@@ -547,6 +547,8 @@ dagster_instance = ec2.Instance(
                                 "content": textwrap.dedent(
                                     f"""\
                             ENVIRONMENT={consul_dc}
+                            APPLICATION=dagster
+                            SERVICE=data-platform
                             VECTOR_CONFIG_DIR=/etc/vector/
                             AWS_REGION={aws_config.region}
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}

@@ -43,7 +43,7 @@ config:
     aws_tags:
       OU: operations
     concourse_team: infrastructure
-    disk_size_gb: 150
+    disk_size_gb: 300
     disk_throughput: 300
     disk_iops: 4000
     iam_policies:
@@ -54,12 +54,12 @@ config:
     instance_type: c6a.xlarge
     name: infra
   - auto_scale:
-      desired: 3
-      max: 5
+      desired: 2
+      max: 3
       min: 2
     aws_tags:
       OU: operations
-    disk_size_gb: 200
+    disk_size_gb: 100
     iam_policies:
     - base
     - operations
