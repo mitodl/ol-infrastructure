@@ -12,10 +12,3 @@ entryPoints:
 providers:
   file:
     filename: /etc/traefik/concourse.yaml
-certificatesResolvers:
-  letsencrypt_resolver:
-    acme:
-      email: odl-devops@mit.edu
-      storage: /etc/traefik/acme.json
-      dnsChallenge:
-        provider: route53
