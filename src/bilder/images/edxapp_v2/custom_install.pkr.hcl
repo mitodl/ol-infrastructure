@@ -39,7 +39,7 @@ source "amazon-ebs" "edxapp" {
   instance_type           = "m5.xlarge"
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
-    volume_size           = 20
+    volume_size           = 25
     delete_on_termination = true
   }
   run_tags = {
