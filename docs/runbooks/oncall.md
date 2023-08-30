@@ -232,3 +232,18 @@ Video successfully added to edX – VideoFile: CCADE_V11JW_Hybrid_Data_Formats_v
 ```
 
 You're all set!
+
+## Bootcamp-Ecommerce
+
+### [Prometheus]: [FIRING:1] AlternateInvalidAccessKeyProduction production (bootcamp-ecommerce critical)
+
+_Diagnosis_
+
+N/A
+
+_Mitigation_
+
+You need to refresh the credentials the salt-proxy is using for Heroku to manage this app.
+
+- ssh to the salt production server: `ssh salt-production.odl.mit.edu`
+- Run the salt proxy command to refresh creds: `salt proxy-bootcamps-production state.sls heroku.update_heroku_config`
