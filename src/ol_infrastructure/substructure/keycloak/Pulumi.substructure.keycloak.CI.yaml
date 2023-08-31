@@ -21,3 +21,5 @@ config:
   - realm_name: olapps
     client_info:
       open-local: "*"
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
