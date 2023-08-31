@@ -1,9 +1,8 @@
-# Table of Contents
-
 * [Style Guide](#style-guide)
 * [SaltStack](#saltstack)
 * [XQueueWatcher](#xqueuewatcher)
 * [OVS](#ovs)
+* [Bootcamp-Ecommerce](#bootcamp-ecommerce)
 
 # Introduction
 
@@ -246,4 +245,31 @@ _Mitigation_
 You need to refresh the credentials the salt-proxy is using for Heroku to manage this app.
 
 - ssh to the salt production server: `ssh salt-production.odl.mit.edu`
-- Run the salt proxy command to refresh creds: `salt proxy-bootcamps-production state.sls heroku.update_heroku_config`
+- Run the salt proxy command to refresh creds: `salt proxy-bootcamps-production state.sls heroku.update_heroku_config`. You should see output similar to the following:
+  ```
+cpatti@ip-10-0-2-195:~$ sudo salt proxy-bootcamps-production state.sls heroku.update_heroku_config
+proxy-bootcamps-production:
+----------
+          ID: update_heroku_bootcamp-ecommerce_config
+    Function: heroku.update_app_config_vars
+        Name: bootcamp-ecommerce
+      Result: True
+     Comment:
+     Started: 14:43:58.916128
+    Duration: 448.928 ms
+     Changes:
+              ----------
+              new:
+                  ----------
+
+** 8< snip 8< secret squirrel content elided **
+
+Summary for proxy-bootcamps-production
+------------
+Succeeded: 1 (changed=1)
+Failed:    0
+------------
+Total states run:     1
+Total run time: 448.928 ms
+cpatti@ip-10-0-2-195:~$
+  ```
