@@ -1,0 +1,7 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHi+npazf3LfzV9oCtcYyCMYLOzaQhbo9xt6lJVVpz9tkQHRAfdgguE0ficef2EFuXmBAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMC2QOHTYPoZdXLHFTAgEQgDvlZ6kvl5m5k0bRiUZQbv6zbO7+7ehufnJBLtOml12zF/pdqXpvokKfrHFlg5JVgTJtFr1PUdjWRNg2XA==
+config:
+  aws:region: us-east-1
+  environment:business_unit: data
+  environment:vpc_reference: data_vpc
