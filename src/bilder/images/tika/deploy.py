@@ -1,19 +1,9 @@
 import os
 from pathlib import Path
-
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
-from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
+from pyinfra.operations import files
 
 from bilder.components.baseline.steps import service_configuration_watches
-from bilder.components.caddy.models import CaddyConfig
-from bilder.components.caddy.steps import (
-    caddy_service,
-    configure_caddy,
-    create_placeholder_tls_config,
-    install_caddy,
-)
 from bilder.components.hashicorp.consul.models import Consul, ConsulConfig
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
 from bilder.components.hashicorp.steps import (
@@ -44,12 +34,21 @@ from bilder.components.vector.steps import (
     install_vector,
     vector_service,
 )
+from bilder.components.traefik.models import traefik_static
+from bilder.components.traefik.models.component import TraefikConfig
+from bilder.components.traefik.steps import configure_traefik
 from bilder.facts.has_systemd import HasSystemd
+from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
+from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION, TRAEFIK_VERSION
+from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
+    "traefik": os.environ.get("TRAEFIK_VERSION", TRAEFIK_VERSION),
 }
+FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 VECTOR_INSTALL_NAME = os.environ.get("VECTOR_LOG_PROXY_NAME", "vector-log-proxy")
 
@@ -105,15 +104,46 @@ tika_config = TikaConfig()
 install_tika(tika_config)
 configure_tika(tika_config)
 
-caddy_config = CaddyConfig(
-    caddyfile=Path(__file__).resolve().parent.joinpath("templates", "caddyfile.j2"),
+# Configure and install traefik
+traefik_static_config = traefik_static.TraefikStaticConfig(
+    log=traefik_static.Log(format="json"),
+    providers=traefik_static.Providers(docker=traefik_static.Docker()),
+    certificates_resolvers={
+        "letsencrypt_resolver": traefik_static.CertificatesResolvers(
+            acme=traefik_static.Acme(
+                email="odl-devops@mit.edu",
+                storage="/etc/traefik/acme.json",
+                dns_challenge=traefik_static.DnsChallenge(provider="route53"),
+                caServer="https://acme-v02.api.letsencrypt.org/directory",
+            )
+        ),
+        "letsencrypt_staging_resolver": traefik_static.CertificatesResolvers(
+            acme=traefik_static.Acme(
+                email="odl-devops@mit.edu",
+                storage="/etc/traefik/acme.json",
+                dns_challenge=traefik_static.DnsChallenge(provider="route53"),
+                caServer="https://acme-staging-v02.api.letsencrypt.org/directory",
+            )
+        ),
+    },
+    entry_points={
+        "https": traefik_static.EntryPoints(address=":443"),
+    },
 )
-caddy_config.template_context = caddy_config.model_dump()
-install_caddy(caddy_config)
-caddy_config_changed = configure_caddy(caddy_config)
+traefik_config = TraefikConfig(
+    static_configuration=traefik_static_config, version=VERSIONS["traefik"]
+)
+traefik_conf_directory = traefik_config.configuration_directory
+configure_traefik(traefik_config)
+
+files.put(
+    name="Place the airbyte docker-compose.yaml file",
+    src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml")),
+    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
+    mode="0664",
+)
 
 vault_template_permissions(vault_config)
-create_placeholder_tls_config(caddy_config)
 
 # Install vector
 vector_config.configuration_templates[
@@ -137,12 +167,10 @@ if host.get_fact(HasSystemd):
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
 
-    watched_caddy_files = [
-        "/etc/caddy/odl_wildcard.cert",
-        "/etc/caddy/odl_wildcard.key",
+    watched_docker_compose_files = [
+        DOCKER_COMPOSE_DIRECTORY.joinpath(".env"),
+        # DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth"),
     ]
     service_configuration_watches(
-        service_name="caddy",
-        watched_files=watched_caddy_files,
+        service_name="docker-compose", watched_files=watched_docker_compose_files
     )
-    caddy_service(caddy_config=caddy_config, do_reload=caddy_config_changed)
