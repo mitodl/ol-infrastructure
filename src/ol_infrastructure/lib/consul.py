@@ -3,13 +3,13 @@ from typing import Union
 
 import pulumi
 import pulumi_consul as consul
-
 from bridge.secrets.sops import read_yaml_secrets
+
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
 def get_consul_provider(
-    stack_info: StackInfo, wrap_in_pulumi_options: bool = True
+    stack_info: StackInfo, wrap_in_pulumi_options: bool = True  # noqa: FBT001, FBT002
 ) -> Union[consul.Provider, pulumi.ResourceOptions]:
     consul_config = pulumi.Config("consul")
     consul_provider = consul.Provider(

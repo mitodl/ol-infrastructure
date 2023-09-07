@@ -76,7 +76,7 @@ meta_pipeline = Pipeline(resources=[pipeline_code], jobs=meta_jobs)
 
 
 if __name__ == "__main__":
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(meta_pipeline.json(indent=2))
     sys.stdout.write(meta_pipeline.json(indent=2))
     sys.stdout.write(

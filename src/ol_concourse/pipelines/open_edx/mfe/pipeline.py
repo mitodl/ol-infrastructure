@@ -4,8 +4,6 @@ from collections import defaultdict
 from itertools import chain, product
 from typing import Optional
 
-from pydantic import BaseModel
-
 from bridge.settings.openedx.accessors import fetch_applications_by_type
 from bridge.settings.openedx.types import (
     EnvStage,
@@ -14,6 +12,8 @@ from bridge.settings.openedx.types import (
     OpenEdxSupportedRelease,
 )
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
+from pydantic import BaseModel
+
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -231,6 +231,6 @@ if __name__ == "__main__":
     deployment: OpenEdxDeploymentName = sys.argv[1]
     release_name: OpenEdxSupportedRelease = sys.argv[2]
     pipeline = mfe_pipeline(deployment, release_name)
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline.model_dump_json(indent=2))
     sys.stdout.write(pipeline.model_dump_json(indent=2))

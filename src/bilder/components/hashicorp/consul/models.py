@@ -2,8 +2,8 @@ import abc
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional
-from pydantic import SerializeAsAny
 
+from pydantic import SerializeAsAny
 from pydantic.fields import Field
 from pydantic_settings import SettingsConfigDict
 
@@ -36,11 +36,11 @@ class ConsulDNSConfig(FlexibleBaseModel):
 
 
 class ConsulServiceCheck(FlexibleBaseModel, abc.ABC):
-    id: Optional[str] = None
+    id: Optional[str] = None  # noqa: A003
 
 
 class ConsulServiceTCPCheck(ConsulServiceCheck):
-    id: Optional[str] = None
+    id: Optional[str] = None  # noqa: A003
     name: str
     tcp: str
     interval: Optional[str] = None
@@ -48,7 +48,7 @@ class ConsulServiceTCPCheck(ConsulServiceCheck):
 
 
 class ConsulService(FlexibleBaseModel):
-    id: Optional[str] = None
+    id: Optional[str] = None  # noqa: A003
     tags: Optional[list[str]] = None
     meta: Optional[dict[str, str]] = None
     name: str
@@ -100,7 +100,7 @@ class Consul(HashicorpProduct):
     version: str = "1.10.0"
     configuration: dict[Path, ConsulConfig] = {  # noqa: RUF012
         Path("00-default.json"): ConsulConfig()
-    }
+    }  # noqa: RUF012, RUF100
     configuration_directory: Path = Path("/etc/consul.d/")
     systemd_execution_type: str = "notify"
 
@@ -120,7 +120,7 @@ class Consul(HashicorpProduct):
             iter(
                 filter(
                     None,
-                    map(lambda config: config.data_dir, self.configuration.values()),
+                    (config.data_dir for config in self.configuration.values()),
                 )
             )
         )

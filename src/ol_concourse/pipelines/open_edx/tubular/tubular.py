@@ -1,20 +1,21 @@
 import textwrap
+
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.models.pipeline import (
+    AcrossVar,
     AnonymousResource,
     Command,
     GetStep,
-    TaskStep,
     Identifier,
+    Input,
     Job,
     LoadVarStep,
     Output,
-    Input,
     Pipeline,
     Platform,
     RegistryImage,
     TaskConfig,
-    AcrossVar,
+    TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, schedule
 
@@ -97,7 +98,6 @@ def tubular_pipeline() -> Pipeline:
                 ),
             ),
             LoadVarStep(
-                #                inputs=["retirees_dir"],
                 load_var="tubular_retirees",
                 file="retirees_dir/vars.json",
                 reveal=True,
@@ -135,18 +135,17 @@ def tubular_pipeline() -> Pipeline:
             ),
         ],
     )
-    tubular_pipeline = Pipeline(
+    return Pipeline(
         resources=[tubular_config_repo, tubular_build_schedule],
         jobs=[tubular_job_object],
     )
-    return tubular_pipeline
 
 
 if __name__ == "__main__":
     import sys
 
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(tubular_pipeline().model_dump_json(indent=2))
     sys.stdout.write(tubular_pipeline().model_dump_json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p misc-cloud-tubular -c definition.json")
+    print()  # noqa: T201
+    print("fly -t pr-inf sp -p misc-cloud-tubular -c definition.json")  # noqa: T201

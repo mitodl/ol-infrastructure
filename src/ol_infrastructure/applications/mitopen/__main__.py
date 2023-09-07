@@ -1,16 +1,14 @@
-from pulumi import Config, export, ResourceOptions, StackReference
-from pulumi.output import Output
-from pulumi_aws import iam, s3, ec2
+import json
 from pathlib import Path
 
-import json
-
 import pulumi_vault as vault
-
-from bridge.lib.magic_numbers import FIVE_MINUTES, DEFAULT_POSTGRES_PORT
+from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT, FIVE_MINUTES
 from bridge.secrets.sops import read_yaml_secrets
+from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi.output import Output
+from pulumi_aws import ec2, iam, s3
 
-from ol_infrastructure.components.aws.database import OLPostgresDBConfig, OLAmazonDB
+from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
@@ -19,7 +17,6 @@ from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_po
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
@@ -69,7 +66,7 @@ parliament_config = {
     "RESOURCE_EFFECTIVELY_STAR": {},
 }
 
-# TODO: MD 07312023 Requires review of bucket names
+# TODO: MD 07312023 Requires review of bucket names  # noqa: FIX002, TD002, TD003
 s3_bucket_permissions = [
     {
         "Action": [

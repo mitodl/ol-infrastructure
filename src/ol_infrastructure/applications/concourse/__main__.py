@@ -14,10 +14,6 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, StackReference
-from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
-from pulumi_consul import Node, Service, ServiceCheckArgs
-
 from bridge.lib.magic_numbers import (
     CONCOURSE_WORKER_HEALTHCHECK_PORT,
     DEFAULT_HTTPS_PORT,
@@ -25,6 +21,10 @@ from bridge.lib.magic_numbers import (
     MAXIMUM_PORT_NUMBER,
 )
 from bridge.secrets.sops import read_yaml_secrets
+from pulumi import Config, Output, StackReference
+from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
+from pulumi_consul import Node, Service, ServiceCheckArgs
+
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -103,7 +103,8 @@ def build_worker_user_data(
                 "content": json.dumps(
                     {
                         "retry_join": [
-                            "provider=aws tag_key=consul_env " f"tag_value={consul_dc}"
+                            "provider=aws tag_key=consul_env "
+                            f"tag_value={consul_dc}"  # noqa: ISC001, RUF100
                         ],
                         "datacenter": consul_dc,
                     }

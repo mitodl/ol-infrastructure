@@ -1,11 +1,10 @@
+from collections.abc import Callable
 from functools import partial
 from typing import ParamSpec
-from collections.abc import Callable
 
 from pulumi_aws import ec2
 
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
-
 
 SecurityGroupParams = ParamSpec("SecurityGroupParams")
 

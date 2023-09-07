@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 
 import requests
-
 from bridge.secrets.sops import read_yaml_secrets
 
 parser = argparse.ArgumentParser()
@@ -27,8 +26,12 @@ read_only_role = {
     "cluster_permissions": ["cluster_composite_ops_ro"],
     "index_permissions": [
         {
-            "index_patterns": ["*"],  # TODO: Define actual indices
-            "allowed_actions": ["read"],  # TODO: Confirm this is all that is needed
+            "index_patterns": [
+                "*"
+            ],  # TODO: Define actual indices  # noqa: FIX002, TD002, TD003
+            "allowed_actions": [
+                "read"
+            ],  # TODO: Confirm this is all that is needed  # noqa: FIX002, TD002, TD003
         }
     ],
 }
@@ -40,7 +43,9 @@ read_write_role = {
     ],
     "index_permissions": [
         {
-            "index_patterns": ["*"],  # TODO: Define actual indices
+            "index_patterns": [
+                "*"
+            ],  # TODO: Define actual indices  # noqa: FIX002, TD002, TD003
             "allowed_actions": [
                 "crud",
                 "create_index",
@@ -49,7 +54,7 @@ read_write_role = {
                 "indices:data/read/scroll/clear",
                 "indices:data/read/scroll*",
                 "indices:data/read/scroll/clear*",
-            ],  # TODO: Confirm this is all that is needed
+            ],  # TODO: Confirm this is all that is needed  # noqa: FIX002, TD002, TD003
         }
     ],
 }
@@ -102,7 +107,7 @@ for r_name, r_def in roles.items():
         auth=auth,
         data=json.dumps(r_def),
     )
-    print(response.text)
+    print(response.text)  # noqa: T201
 
 for u_name, u_def in users.items():
     url = f"https://{cluster['endpoint']}/_plugins/_security/api/internalusers/{u_name}"
@@ -112,7 +117,7 @@ for u_name, u_def in users.items():
         auth=auth,
         data=json.dumps(u_def),
     )
-    print(response.text)
+    print(response.text)  # noqa: T201
 
 for r_name, rm in role_mappings.items():
     url = f"https://{cluster['endpoint']}/_plugins/_security/api/rolesmapping/{r_name}"
@@ -122,4 +127,4 @@ for r_name, rm in role_mappings.items():
         auth=auth,
         data=json.dumps(rm),
     )
-    print(response.text)
+    print(response.text)  # noqa: T201

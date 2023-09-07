@@ -5,6 +5,12 @@ and OLApplicationLoadBalancedFargateService can be utilized)
 """
 
 import pulumi
+from bridge.lib.magic_numbers import (
+    DEFAULT_HTTP_PORT,
+    DEFAULT_HTTPS_PORT,
+    ONE_GIGABYTE_MB,
+    ONE_GIGAHERTZ,
+)
 from pulumi_aws.cloudwatch import LogGroup
 from pulumi_aws.ec2 import (
     SecurityGroup,
@@ -13,12 +19,6 @@ from pulumi_aws.ec2 import (
 )
 from pulumi_aws.ecs import Cluster
 
-from bridge.lib.magic_numbers import (
-    DEFAULT_HTTP_PORT,
-    DEFAULT_HTTPS_PORT,
-    ONE_GIGABYTE_MB,
-    ONE_GIGAHERTZ,
-)
 from ol_infrastructure.components.aws.alb_fargate_service import (
     OLApplicationLoadBalancedFargateConfig,
     OLApplicationLoadBalancedFargateService,

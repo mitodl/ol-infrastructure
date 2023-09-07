@@ -1,6 +1,12 @@
 from typing import Optional, Union
 
 import pulumi
+from bridge.lib.magic_numbers import (
+    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
+    AWS_TARGET_GROUP_NAME_MAX_LENGTH,
+    DEFAULT_HTTP_PORT,
+    DEFAULT_HTTPS_PORT,
+)
 from pulumi_aws.acm import get_certificate
 from pulumi_aws.autoscaling import (
     Group,
@@ -27,14 +33,8 @@ from pulumi_aws.lb import (
     TargetGroupHealthCheckArgs,
     TargetGroupStickinessArgs,
 )
-from pydantic import field_validator, ConfigDict, BaseModel, NonNegativeInt, PositiveInt
+from pydantic import BaseModel, ConfigDict, NonNegativeInt, PositiveInt, field_validator
 
-from bridge.lib.magic_numbers import (
-    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
-    AWS_TARGET_GROUP_NAME_MAX_LENGTH,
-    DEFAULT_HTTP_PORT,
-    DEFAULT_HTTPS_PORT,
-)
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, InstanceTypes
 from ol_infrastructure.lib.ol_types import AWSBase
 
@@ -80,9 +80,8 @@ class OLTargetGroupConfig(AWSBase):
     @classmethod
     def is_valid_stickiness(cls, stickiness: str) -> str:
         if stickiness and stickiness not in ["lb_cookie"]:
-            raise ValueError(
-                f"stickiness: {stickiness} is not valid. Only 'lb_cookie' is supported at this time."  # noqa: E501
-            )
+            msg = f"stickiness: {stickiness} is not valid. Only 'lb_cookie' is supported at this time."  # noqa: E501
+            raise ValueError(msg)
         return stickiness
 
 
@@ -108,9 +107,8 @@ class OLLoadBalancerConfig(AWSBase):
     @classmethod
     def is_valid_ip_address_type(cls, ip_address_type: str) -> str:
         if ip_address_type not in ["dualstack", "ipv4"]:
-            raise ValueError(
-                f"ip_address_type: {ip_address_type} is not valid. Only 'dualstack' and 'ipv4 are accepted'"  # noqa: E501
-            )
+            msg = f"ip_address_type: {ip_address_type} is not valid. Only 'dualstack' and 'ipv4 are accepted'"  # noqa: E501
+            raise ValueError(msg)
         return ip_address_type
 
     @field_validator("load_balancer_type")
@@ -121,9 +119,8 @@ class OLLoadBalancerConfig(AWSBase):
             "gateway",
             "network",
         ]:
-            raise ValueError(
-                f"load_balancer_type: {load_balancer_type} is not valid. Only 'application', 'gateway', or 'network' are accepted"  # noqa: E501
-            )
+            msg = f"load_balancer_type: {load_balancer_type} is not valid. Only 'application', 'gateway', or 'network' are accepted"  # noqa: E501
+            raise ValueError(msg)
         return load_balancer_type
 
 
@@ -164,16 +161,16 @@ class OLAutoScaleGroupConfig(AWSBase):
     @classmethod
     def is_valid_strategy(cls, strategy: str) -> str:
         if strategy != "Rolling":
-            raise ValueError("The only vaild instance refresh strategy is 'Rolling'")
+            msg = "The only vaild instance refresh strategy is 'Rolling'"
+            raise ValueError(msg)
         return strategy
 
     @field_validator("health_check_type")
     @classmethod
     def is_valid_healthcheck(cls, health_check_type: str) -> str:
         if health_check_type not in ["ELB", "EC2"]:
-            raise ValueError(
-                f"health_check_type: {health_check_type} is not valid. Only 'ELB' or 'EC2' are accepted."  # noqa: E501
-            )
+            msg = f"health_check_type: {health_check_type} is not valid. Only 'ELB' or 'EC2' are accepted."  # noqa: E501
+            raise ValueError(msg)
         return health_check_type
 
 
@@ -186,7 +183,7 @@ class OLAutoScaling(pulumi.ComponentResource):
     auto_scale_group: Group = None
     launch_template: LaunchTemplate = None
 
-    def __init__(  # noqa: PLR0913
+    def __init__(  # noqa: C901, PLR0913
         self,
         asg_config: OLAutoScaleGroupConfig,
         lt_config: OLLaunchTemplateConfig,
@@ -202,9 +199,8 @@ class OLAutoScaling(pulumi.ComponentResource):
         )
 
         if bool(tg_config) != bool(lb_config):
-            raise ValueError(
-                "Both lb_config and tg_config must be provided if one is provided"
-            )
+            msg = "Both lb_config and tg_config must be provided if one is provided"
+            raise ValueError(msg)
 
         # Shared attributes
         resource_options = pulumi.ResourceOptions(parent=self).merge(opts)

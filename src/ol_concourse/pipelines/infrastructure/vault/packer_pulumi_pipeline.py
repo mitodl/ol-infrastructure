@@ -1,8 +1,3 @@
-from ol_concourse.pipelines.constants import (
-    PULUMI_CODE_PATH,
-    PULUMI_WATCHED_PATHS,
-    PACKER_WATCHED_PATHS,
-)
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
@@ -12,7 +7,11 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resource_types import hashicorp_resource
 from ol_concourse.lib.resources import git_repo, hashicorp_release
-
+from ol_concourse.pipelines.constants import (
+    PACKER_WATCHED_PATHS,
+    PULUMI_CODE_PATH,
+    PULUMI_WATCHED_PATHS,
+)
 
 vault_release = hashicorp_release(Identifier("vault-release"), "vault")
 vault_image_code = git_repo(
@@ -68,7 +67,7 @@ vault_pulumi_fragment = pulumi_jobs_chain(
 substructure_fragments = []
 
 for substructure in ["pki"]:
-    substructure_fragments.append(
+    substructure_fragments.append(  # noqa: PERF401
         pulumi_jobs_chain(
             vault_pulumi_substructure_code,
             project_name=f"ol-infrastructure-vault-{substructure}",
@@ -102,8 +101,8 @@ vault_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys
 
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(vault_pipeline.model_dump_json(indent=2))
     sys.stdout.write(vault_pipeline.model_dump_json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p packer-pulumi-vault -c definition.json")
+    print()  # noqa: T201
+    print("fly -t pr-inf sp -p packer-pulumi-vault -c definition.json")  # noqa: T201

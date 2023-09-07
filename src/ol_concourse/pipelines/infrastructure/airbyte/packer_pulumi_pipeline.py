@@ -1,8 +1,8 @@
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo, github_release
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 airbyte_release = github_release(Identifier("airbyte-release"), "airbytehq", "airbyte")
 airbyte_image_code = git_repo(
@@ -35,7 +35,6 @@ airbyte_ami_fragment = packer_jobs(
 
 airbyte_pulumi_fragment = pulumi_jobs_chain(
     airbyte_pulumi_code,
-    # stack_name="applications.airbyte.QA",
     stack_names=[f"applications.airbyte.{stage}" for stage in ("QA", "Production")],
     project_name="ol-infrastructure-airbyte-server",
     project_source_path=PULUMI_CODE_PATH.joinpath("applications/airbyte/"),
@@ -71,8 +70,8 @@ airbyte_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys
 
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(airbyte_pipeline.model_dump_json(indent=2))
     sys.stdout.write(airbyte_pipeline.model_dump_json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p packer-pulumi-airbyte -c definition.json")
+    print()  # noqa: T201
+    print("fly -t pr-inf sp -p packer-pulumi-airbyte -c definition.json")  # noqa: T201

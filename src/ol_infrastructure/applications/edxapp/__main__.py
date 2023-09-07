@@ -19,6 +19,16 @@ import pulumi_fastly as fastly
 import pulumi_mongodbatlas as atlas
 import pulumi_vault as vault
 import yaml
+from bridge.lib.magic_numbers import (
+    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
+    DEFAULT_HTTP_PORT,
+    DEFAULT_HTTPS_PORT,
+    DEFAULT_MYSQL_PORT,
+    DEFAULT_REDIS_PORT,
+    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
+)
+from bridge.secrets.sops import read_yaml_secrets
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import (
     acm,
@@ -34,16 +44,6 @@ from pulumi_aws import (
 )
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
-from bridge.lib.magic_numbers import (
-    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
-    DEFAULT_HTTP_PORT,
-    DEFAULT_HTTPS_PORT,
-    DEFAULT_MYSQL_PORT,
-    DEFAULT_REDIS_PORT,
-    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
-)
-from bridge.secrets.sops import read_yaml_secrets
-from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -398,7 +398,7 @@ edxapp_db_security_group = ec2.SecurityGroup(
                 data_vpc["security_groups"]["integrator"],
                 vault_stack.require_output("vault_server")["security_group"],
             ],
-            # TODO: Create Vault security group to act as source of allowed
+            # TODO: Create Vault security group to act as source of allowed  # noqa: E501, FIX002, TD002, TD003
             # traffic. (TMM 2021-05-04)
             cidr_blocks=[
                 edxapp_vpc["cidr"],

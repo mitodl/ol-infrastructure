@@ -14,7 +14,7 @@ else:
 
 
 def read_yaml_secrets(sops_file: Path) -> dict[str, Any]:
-    yaml_data = subprocess.run(
+    yaml_data = subprocess.run(  # noqa: PLW1510
         [  # noqa: S603
             SOPS_BINARY,
             "--decrypt",
@@ -26,7 +26,7 @@ def read_yaml_secrets(sops_file: Path) -> dict[str, Any]:
 
 
 def read_json_secrets(sops_file: Path) -> dict[str, Any]:
-    json_data = subprocess.run(
+    json_data = subprocess.run(  # noqa: PLW1510
         [  # noqa: S603
             SOPS_BINARY,
             "--decrypt",
@@ -38,7 +38,7 @@ def read_json_secrets(sops_file: Path) -> dict[str, Any]:
 
 
 def set_env_secrets(sops_file: Path) -> None:
-    env_data = subprocess.run(
+    env_data = subprocess.run(  # noqa: PLW1510
         [  # noqa: S603
             SOPS_BINARY,
             "--decrypt",

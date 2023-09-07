@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 
 import requests
-
 from bridge.secrets.sops import read_yaml_secrets
 
 # Documentation on request formats:
@@ -73,7 +72,6 @@ read_write_user = {
     "roles": ["read_write_role"],
 }
 
-# headers = {"Content-Type": "application/json", "Connection": "close"}
 headers = {"Content-Type": "application/json"}
 auth = requests.auth.HTTPBasicAuth(master_username, master_password)
 
@@ -105,7 +103,7 @@ for r_name, r_def in roles.items():
         auth=auth,
         data=json.dumps(r_def),
     )
-    print(response.text)
+    print(response.text)  # noqa: T201
 
 for u_name, u_def in users.items():
     url = f"https://{cluster['endpoint']}/_opendistro/_security/api/internalusers/{u_name}"  # noqa: E501
@@ -115,7 +113,7 @@ for u_name, u_def in users.items():
         auth=auth,
         data=json.dumps(u_def),
     )
-    print(response.text)
+    print(response.text)  # noqa: T201
 
 for r_name, rm in role_mappings.items():
     url = (
@@ -127,4 +125,4 @@ for r_name, rm in role_mappings.items():
         auth=auth,
         data=json.dumps(rm),
     )
-    print(response.text)
+    print(response.text)  # noqa: T201

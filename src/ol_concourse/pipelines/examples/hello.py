@@ -30,15 +30,14 @@ def hello_pipeline() -> Pipeline:
             ),
         ],
     )
-    hello_pipeline = Pipeline(jobs=[hello_job_object])
-    return hello_pipeline
+    return Pipeline(jobs=[hello_job_object])
 
 
 if __name__ == "__main__":
     import sys
 
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(hello_pipeline().model_dump_json(indent=2))
     sys.stdout.write(hello_pipeline().model_dump_json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p misc-cloud-hello -c definition.json")
+    print()  # noqa: T201
+    print("fly -t pr-inf sp -p misc-cloud-hello -c definition.json")  # noqa: T201

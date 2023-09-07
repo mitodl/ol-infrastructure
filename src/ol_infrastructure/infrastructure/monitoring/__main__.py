@@ -1,5 +1,5 @@
-from pulumi import StackReference, export, Config, Alias, ResourceOptions
-from pulumi_aws import s3, iam, sns
+from pulumi import Alias, Config, ResourceOptions, StackReference, export
+from pulumi_aws import iam, s3, sns
 
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -16,7 +16,7 @@ aws_config = AWSBase(tags={"OU": "operations", "Environment": "operations-produc
 
 ### SNS Resources for notifying opsgenie
 
-# TODO: MD 20230315 Migrate to SNS integration. Email is easier to start with.
+# TODO: MD 20230315 Migrate to SNS integration. Email is easier to start with.  # noqa: E501, FIX002, TD002
 # https://support.atlassian.com/opsgenie/docs/integrate-opsgenie-with-incoming-amazon-sns/
 critical_sns_topic = sns.Topic(
     "monitoring-critical-alerts-sns-topic",

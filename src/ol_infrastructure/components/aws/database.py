@@ -15,25 +15,25 @@ import pulumi
 from pulumi_aws import rds
 from pulumi_aws.ec2 import SecurityGroup
 from pydantic import (
-    FieldValidationInfo,
-    field_validator,
-    ConfigDict,
     BaseModel,
+    ConfigDict,
+    FieldValidationInfo,
     PositiveInt,
     SecretStr,
     conint,
+    field_validator,
 )
 
+from ol_infrastructure.components.aws.cloudwatch import (
+    OLCloudWatchAlarmSimpleRDS,
+    OLCloudWatchAlarmSimpleRDSConfig,
+)
 from ol_infrastructure.lib.aws.rds_helper import (
     DBInstanceTypes,
     db_engines,
     parameter_group_family,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.components.aws.cloudwatch import (
-    OLCloudWatchAlarmSimpleRDS,
-    OLCloudWatchAlarmSimpleRDSConfig,
-)
 
 MAX_BACKUP_DAYS = 35
 
@@ -67,7 +67,7 @@ class OLDBConfig(AWSBase):
     port: PositiveInt
     subnet_group_name: Union[str, pulumi.Output[str]]
     security_groups: list[SecurityGroup]
-    backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore
+    backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore  # noqa: E501, PGH003
     db_name: Optional[str] = None  # The name of the database schema to create
     instance_size: str = DBInstanceTypes.general_purpose_large.value
     max_storage: Optional[PositiveInt] = None  # Set to allow for storage autoscaling
@@ -87,7 +87,8 @@ class OLDBConfig(AWSBase):
     def is_valid_engine(cls, engine: str) -> str:
         valid_engines = db_engines()
         if engine not in valid_engines:
-            raise ValueError("The specified DB engine is not a valid option in AWS.")
+            msg = "The specified DB engine is not a valid option in AWS."
+            raise ValueError(msg)
         return engine
 
     @field_validator("engine_version")
@@ -96,9 +97,10 @@ class OLDBConfig(AWSBase):
         engine = info.data["engine"]
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
-            raise ValueError(
+            msg = (
                 f"The specified version of the {engine} engine is not supported in AWS."
             )
+            raise ValueError(msg)
         return engine_version
 
     @field_validator("monitoring_profile_name")
@@ -106,9 +108,8 @@ class OLDBConfig(AWSBase):
     def is_valid_monitoring_profile(cls, monitoring_profile_name: str) -> str:
         valid_monitoring_profile_names = ("production", "qa", "ci", "disabled")
         if monitoring_profile_name not in valid_monitoring_profile_names:
-            raise ValueError(
-                f"The specified monitoring profile: {monitoring_profile_name} is not valid."  # noqa: E501
-            )
+            msg = f"The specified monitoring profile: {monitoring_profile_name} is not valid."  # noqa: E501
+            raise ValueError(msg)
         return monitoring_profile_name
 
 

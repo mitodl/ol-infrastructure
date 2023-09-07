@@ -20,6 +20,15 @@ from typing import Any
 
 import pulumi_tls as tls
 import yaml
+from bridge.lib.magic_numbers import (
+    DEFAULT_HTTPS_PORT,
+    DEFAULT_RSA_KEY_SIZE,
+    FIVE_MINUTES,
+    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
+    VAULT_CLUSTER_PORT,
+    VAULT_HTTP_PORT,
+)
+from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import (
     acm,
@@ -33,15 +42,6 @@ from pulumi_aws import (
     s3,
 )
 
-from bridge.lib.magic_numbers import (
-    DEFAULT_HTTPS_PORT,
-    DEFAULT_RSA_KEY_SIZE,
-    FIVE_MINUTES,
-    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
-    VAULT_CLUSTER_PORT,
-    VAULT_HTTP_PORT,
-)
-from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -482,7 +482,7 @@ def cloud_init_user_data(  # noqa: PLR0913
                 ),
                 "owner": "root:root",
             },
-            # TODO: Move TLS key and cert injection to Packer build so that private key
+            # TODO: Move TLS key and cert injection to Packer build so that private key  # noqa: E501, FIX002, TD002, TD003
             # information isn't being passed as userdata (TMM 2021-08-06)
             {
                 "path": "/etc/vault/ssl/vault.key",

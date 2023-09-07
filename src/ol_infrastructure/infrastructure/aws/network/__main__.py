@@ -372,7 +372,7 @@ xpro_vpc_exports.update(
 )
 export("xpro_vpc", xpro_vpc_exports)
 
-# TODO: MD 2022-05-13 This probably needs to be expanded upon once the k8s network is peered to others  # noqa: E501
+# TODO: MD 2022-05-13 This probably needs to be expanded upon once the k8s network is peered to others  # noqa: E501, FIX002, TD002, TD003
 # when it gains some security groups.
 k8s_vpc_exports = vpc_exports(k8s_vpc)
 export("k8s_vpc", k8s_vpc_exports)

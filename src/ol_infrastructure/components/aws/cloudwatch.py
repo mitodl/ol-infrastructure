@@ -1,11 +1,10 @@
 from typing import Optional, Union
 
-
-from pydantic import field_validator, ConfigDict, PositiveInt, BaseModel
-from pulumi import ComponentResource, ResourceOptions, Output
-from ol_infrastructure.lib.aws.monitoring_helper import get_monitoring_sns_arn
-
+from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_aws import cloudwatch
+from pydantic import BaseModel, ConfigDict, PositiveInt, field_validator
+
+from ol_infrastructure.lib.aws.monitoring_helper import get_monitoring_sns_arn
 
 
 # "simple"
@@ -29,7 +28,7 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
     treat_missing_data_as: str = "missing"
     unit: Optional[str] = None
 
-    # TODO: MD 20230315 refactor to accomodate anomaly detection alerts
+    # TODO: MD 20230315 refactor to accomodate anomaly detection alerts  # noqa: E501, FIX002, TD002, TD003
     @field_validator("comparison_operator")
     @classmethod
     def is_valid_comparison_operator(
@@ -43,20 +42,16 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
             "LessThanOrEqualToThreshold",
         )
         if comparison_operator not in valid_basic_operators:
-            raise ValueError(
-                f"comparison_operator: {comparison_operator} is not valid. "
-                "Valid operators are: {valid_basic_operators}"
-            )
+            msg = f"comparison_operator: {comparison_operator} is not valid. Valid operators are: {{valid_basic_operators}}"  # noqa: E501
+            raise ValueError(msg)
         return comparison_operator
 
     @field_validator("level")
     @classmethod
     def is_valid_level(cls, level: str) -> str:
         if level.lower() not in ("warning", "critical"):
-            raise ValueError(
-                f"level: {level} is not valid. Valid levels are "
-                "'warning' and 'critical'"
-            )
+            msg = f"level: {level} is not valid. Valid levels are 'warning' and 'critical'"  # noqa: E501
+            raise ValueError(msg)
         return level.lower()
 
     @field_validator("treat_missing_data_as")
@@ -67,10 +62,8 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
     ) -> str:
         valid_treat_missing_data_as = ("missing", "ignore", "breaching", "notBreaching")
         if treat_missing_data_as not in valid_treat_missing_data_as:
-            raise ValueError(
-                f"treat_missing_data_as: {treat_missing_data_as} is not valid. "
-                "Valid settings are: {valid_treat_missing_data_as}"
-            )
+            msg = f"treat_missing_data_as: {treat_missing_data_as} is not valid. Valid settings are: {{valid_treat_missing_data_as}}"  # noqa: E501
+            raise ValueError(msg)
         return treat_missing_data_as
 
     @field_validator("statistic")
@@ -78,10 +71,8 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
     def is_valid_statistic(cls, statistic: str) -> str:
         valid_statistics = ("SampleCount", "Average", "Sum", "Minimum", "Maximum")
         if statistic not in valid_statistics:
-            raise ValueError(
-                f"statistic: {statistic} is not valid. Valid statistics "
-                "are: {valid_statistics}"
-            )
+            msg = f"statistic: {statistic} is not valid. Valid statistics are: {{valid_statistics}}"  # noqa: E501
+            raise ValueError(msg)
         return statistic
 
     @field_validator("unit")
@@ -118,8 +109,9 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
         if unit and unit.title() in valid_units:
             return unit.title()
         elif unit and unit.title() not in valid_units:
+            msg = f"unit: {unit} is not valid. Valid units are: {valid_units}"
             raise ValueError(
-                f"unit: {unit} is not valid. Valid units are: {valid_units}",
+                msg,
             )
         else:  # It is valid for a unit to not be provided.
             return None

@@ -8,7 +8,7 @@ from pyinfra.operations import apt, files, systemd
 @deploy("Install baseline requirements")
 def install_baseline_packages(
     packages: Optional[list[str]] = None,
-    upgrade_system: bool = False,
+    upgrade_system: bool = False,  # noqa: FBT001, FBT002
 ):
     apt.packages(
         name="Install baseline packages for Debian based hosts",
@@ -23,7 +23,7 @@ def service_configuration_watches(
     service_name: str,
     watched_files: list[Path],
     onchange_command: Optional[str] = None,
-    start_now: bool = True,
+    start_now: bool = True,  # noqa: FBT001, FBT002
 ):
     onchange_command = (
         onchange_command or f"/usr/bin/systemctl restart {service_name}.service"

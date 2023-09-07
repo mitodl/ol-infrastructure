@@ -2,6 +2,9 @@ import os
 from io import StringIO
 from pathlib import Path
 
+from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
+from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files, server
 
@@ -49,9 +52,6 @@ from bilder.lib.template_helpers import (
     CONSUL_TEMPLATE_DIRECTORY,
     place_consul_template_file,
 )
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
-from bridge.secrets.sops import set_env_secrets
 
 set_env_secrets(Path("consul/consul.env"))
 
@@ -67,9 +67,8 @@ files.put(
 
 DEPLOYMENT = os.environ["DEPLOYMENT"] or os.environ["PKR_VAR_BUSINESS_UNIT"]
 if DEPLOYMENT not in ["mitxonline", "mitx", "xpro", "mitx-staging"]:
-    raise ValueError(
-        "DEPLOYMENT should be on these values 'mitxonline', 'mitx', 'xpro', 'mitx-staging' "  # noqa: E501
-    )
+    msg = "DEPLOYMENT should be on these values 'mitxonline', 'mitx', 'xpro', 'mitx-staging' "  # noqa: E501
+    raise ValueError(msg)
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),

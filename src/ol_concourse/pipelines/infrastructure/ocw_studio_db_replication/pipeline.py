@@ -75,7 +75,7 @@ def db_replication_pipeline() -> Pipeline:
 if __name__ == "__main__":
     import sys
 
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(db_replication_pipeline().model_dump_json(indent=2))
     sys.stdout.write(db_replication_pipeline().model_dump_json(indent=2))
     sys.stdout.write("\n")

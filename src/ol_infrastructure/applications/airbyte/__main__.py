@@ -9,16 +9,16 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam, route53
-from pulumi_consul import Node, Service, ServiceCheckArgs
-
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
 )
 from bridge.secrets.sops import read_yaml_secrets
+from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_consul import Node, Service, ServiceCheckArgs
+
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
@@ -185,7 +185,7 @@ data_lake_policy = iam.Policy(
 )
 
 # Create IAM policy for Airbyte to read from S3 source buckets
-# TODO: Turn this into a stack reference after exporting the bucket names from the
+# TODO: Turn this into a stack reference after exporting the bucket names from the  # noqa: E501, FIX002, TD002, TD003
 # edxapp Pulumi project. (TMM 2023-06-02)
 s3_source_buckets = [
     f"{edxapp_deployment}-{stack_info.env_suffix}-edxapp-tracking"

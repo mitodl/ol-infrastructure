@@ -1,8 +1,11 @@
-# TODO: Create substructure module to populate secrets mounts
+# TODO: Create substructure module to populate secrets mounts  # noqa: E501, FIX002, TD002, TD003
 import os
 from pathlib import Path
 
 import yaml
+from bridge.lib.magic_numbers import HOURS_IN_MONTH, VAULT_CLUSTER_PORT, VAULT_HTTP_PORT
+from bridge.lib.versions import CONSUL_VERSION, TRAEFIK_VERSION, VAULT_VERSION
+from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files
 
@@ -41,9 +44,6 @@ from bilder.components.vector.steps import (
     vector_service,
 )
 from bilder.facts.has_systemd import HasSystemd
-from bridge.lib.magic_numbers import HOURS_IN_MONTH, VAULT_CLUSTER_PORT, VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_VERSION, TRAEFIK_VERSION, VAULT_VERSION
-from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),

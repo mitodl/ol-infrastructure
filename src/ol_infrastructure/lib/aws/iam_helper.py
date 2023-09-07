@@ -22,14 +22,14 @@ def _is_parliament_finding_filtered(
                 for finding_action in finding.location["actions"]
             ]
             action_matches.append(any(matches))
-    else:
+    else:  # noqa: PLW0120
         action_matches.append("all")  # type: ignore[arg-type]
     return any(action_matches)
 
 
 def lint_iam_policy(
     policy_document: Union[str, dict[str, Any]],
-    stringify: bool = False,
+    stringify: bool = False,  # noqa: FBT001, FBT002
     parliament_config: Optional[dict[str, Any]] = None,
 ) -> Union[str, dict[str, Any]]:
     """Lint the contents of an IAM policy and abort execution if issues are found.
@@ -67,7 +67,8 @@ def lint_iam_policy(
         if not _is_parliament_finding_filtered(finding, parliament_config or {})
     ]
     if findings:
-        raise Exception("Potential issues found with IAM policy document", findings)
+        msg = "Potential issues found with IAM policy document"
+        raise Exception(msg, findings)  # noqa: TRY002
     return (
         stringified_document if stringify and stringified_document else policy_document
     )

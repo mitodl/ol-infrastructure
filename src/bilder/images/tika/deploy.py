@@ -1,6 +1,9 @@
 import os
 from pathlib import Path
 
+from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
+from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 
 from bilder.components.baseline.steps import service_configuration_watches
@@ -42,9 +45,6 @@ from bilder.components.vector.steps import (
     vector_service,
 )
 from bilder.facts.has_systemd import HasSystemd
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
-from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),

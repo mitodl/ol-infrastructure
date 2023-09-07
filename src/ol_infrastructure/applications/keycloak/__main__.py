@@ -10,16 +10,16 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam, route53
-from pulumi_consul import Node, Service, ServiceCheckArgs
-
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
 )
 from bridge.secrets.sops import read_yaml_secrets
+from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_consul import Node, Service, ServiceCheckArgs
+
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
@@ -32,16 +32,16 @@ from ol_infrastructure.components.aws.auto_scale_group import (
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
-    OLVaultPostgresDatabaseConfig,
     OLVaultPKIIntermediateRole,
     OLVaultPKIIntermediateRoleConfig,
+    OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
 from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import setup_vault_provider, VaultPKIKeyTypeBits
+from ol_infrastructure.lib.vault import VaultPKIKeyTypeBits, setup_vault_provider
 
 setup_vault_provider()
 
@@ -66,14 +66,12 @@ data_vpc = network_stack.require_output("data_vpc")
 
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
-# TODO MD 20230206
+# TODO MD 20230206  # noqa: FIX002, TD002, TD003, TD004
 # This might be needed in the future but right now it just causes errors
 secrets = read_yaml_secrets(Path(f"keycloak/data.{stack_info.env_suffix}.yaml"))
 if secrets is None:
-    raise ValueError(
-        "You must create the secrets structure at "
-        "src/bridge/secrets/keycloak/data.{stack_info.env_suffix}.yaml"
-    )
+    msg = "You must create the secrets structure at src/bridge/secrets/keycloak/data.{stack_info.env_suffix}.yaml"  # noqa: E501
+    raise ValueError(msg)
 
 aws_config = AWSBase(
     tags={"OU": "operations", "Environment": f"operations-{stack_info.env_suffix}"}
@@ -285,7 +283,7 @@ keycloak_tg_config = OLTargetGroupConfig(
     vpc_id=target_vpc["id"],
     target_group_healthcheck=False,
     health_check_interval=60,
-    health_check_matcher="404",  # TODO Figure out a real endpoint for this
+    health_check_matcher="404",  # TODO Figure out a real endpoint for this  # noqa: E501, FIX002, TD002, TD003, TD004
     health_check_path="/ping",
     stickiness="lb_cookie",
     tags=instance_tags,
@@ -465,7 +463,7 @@ route53.Record(
     zone_id=mitodl_zone_id,
 )
 
-# TODO MD 20230206 revisit this, probably need to export more things
+# TODO MD 20230206 revisit this, probably need to export more things  # noqa: E501, FIX002, TD002, TD003, TD004
 export(
     "keycloak",
     {

@@ -12,17 +12,17 @@ from enum import Enum
 from string import Template
 from typing import Optional, Union
 
-from pulumi import ComponentResource, Output, ResourceOptions
-from pulumi_vault import Mount, aws, database, pkisecret
-from pulumi_aws.acmpca import Certificate, CertificateValidityArgs
-from pydantic import field_validator, ConfigDict, BaseModel
-
 from bridge.lib.magic_numbers import (
     DEFAULT_MONGODB_PORT,
     DEFAULT_MYSQL_PORT,
     DEFAULT_POSTGRES_PORT,
     ONE_MONTH_SECONDS,
 )
+from pulumi import ComponentResource, Output, ResourceOptions
+from pulumi_aws.acmpca import Certificate, CertificateValidityArgs
+from pulumi_vault import Mount, aws, database, pkisecret
+from pydantic import BaseModel, ConfigDict, field_validator
+
 from ol_infrastructure.lib.vault import (
     VaultPKIKeyTypeBits,
     mongodb_role_statements,
@@ -216,10 +216,8 @@ class OLVaultAWSSecretsEngineConfig(BaseModel):
     @classmethod
     def is_valid_path(cls, vault_backend_path: str) -> str:
         if vault_backend_path.startswith("/") or vault_backend_path.endswith("/"):
-            raise ValueError(
-                f"The specified path value {vault_backend_path} can not start or "
-                "end with a slash"
-            )
+            msg = f"The specified path value {vault_backend_path} can not start or end with a slash"  # noqa: E501
+            raise ValueError(msg)
         return vault_backend_path
 
 
@@ -236,7 +234,7 @@ class OLVaultAWSSecretsEngine(ComponentResource):
         resource_options = ResourceOptions(parent=self).merge(opts)
 
         self.aws_secrets_engine = aws.SecretBackend(
-            # TODO verify app_name exists based on Apps class in ol_types
+            # TODO verify app_name exists based on Apps class in ol_types  # noqa: E501, FIX002, TD002, TD003, TD004
             f"aws-{engine_config.app_name}",
             access_key=engine_config.aws_access_key,
             secret_key=engine_config.aws_secret_key,
@@ -379,7 +377,7 @@ class OLVaultPKIIntermediateEnvBackendConfig(BaseModel):
     max_ttl: int = ONE_MONTH_SECONDS * 12
     default_ttl: int = ONE_MONTH_SECONDS * 12
     acmpca_rootca_arn: Output = None
-    parent_intermediate_ca: OLVaultPKIIntermediateCABackend = None  # type: ignore
+    parent_intermediate_ca: OLVaultPKIIntermediateCABackend = None  # type: ignore  # noqa: E501, PGH003
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -528,10 +526,8 @@ class OLVaultPKIIntermediateRoleConfig(BaseModel):
     @classmethod
     def is_valid_cert_type(cls, cert_type: str) -> str:
         if cert_type not in {"server", "client"}:
-            raise ValueError(
-                f"The specified certificate type {cert_type} has to be either client "
-                "or server"
-            )
+            msg = f"The specified certificate type {cert_type} has to be either client or server"  # noqa: E501
+            raise ValueError(msg)
         return cert_type
 
 

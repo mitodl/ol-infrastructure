@@ -1,24 +1,24 @@
 import sys
 
 from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
+from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
     GetStep,
     Identifier,
     Input,
-    Output,
     Job,
-    TaskStep,
-    TaskConfig,
+    Output,
     Pipeline,
-    PutStep,
     Platform,
+    PutStep,
+    TaskConfig,
+    TaskStep,
 )
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
-from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
-from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.resources import git_repo, registry_image
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 
 def build_dagster_docker_pipeline() -> Pipeline:
@@ -79,7 +79,6 @@ def build_dagster_docker_pipeline() -> Pipeline:
                     run=Command(
                         path="sh",
                         user="root",
-                        # dir="tags",
                         args=[
                             "-exc",
                             f"""ls -ltrha;
@@ -156,7 +155,7 @@ def build_dagster_docker_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(build_dagster_docker_pipeline().json(indent=2))
     sys.stdout.write(build_dagster_docker_pipeline().json(indent=2))
     sys.stdout.writelines(

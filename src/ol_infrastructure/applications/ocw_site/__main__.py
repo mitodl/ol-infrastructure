@@ -1,12 +1,8 @@
-import json
 import base64
+import json
 from pathlib import Path
 
 import pulumi_fastly as fastly
-from pulumi import Config, ResourceOptions, StackReference, export, Output
-from pulumi_aws import iam, route53, s3
-
-from bridge.secrets.sops import read_yaml_secrets
 from bridge.lib.constants import FASTLY_A_TLS_1_2, FASTLY_CNAME_TLS_1_3
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
@@ -16,10 +12,14 @@ from bridge.lib.magic_numbers import (
     ONE_MEGABYTE_BYTE,
     SECONDS_IN_ONE_DAY,
 )
+from bridge.secrets.sops import read_yaml_secrets
+from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi_aws import iam, route53, s3
+
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.fastly import (
-    get_fastly_provider,
     build_fastly_log_format_string,
+    get_fastly_provider,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -534,7 +534,7 @@ for purpose in ("draft", "live"):
         f"ocw-{purpose}-{stack_info.env_suffix}",
         service_id=servicevcl_backend.id,
         dictionary_id=servicevcl_backend.dictionaries[0].dictionary_id,
-        items=json.load(open("redirect_dict.json")),  # noqa: SIM115
+        items=json.load(open("redirect_dict.json")),  # noqa: PTH123, SIM115
         manage_items=True,
         opts=ResourceOptions(protect=True).merge(fastly_provider),
     )
@@ -546,7 +546,7 @@ for purpose in ("draft", "live"):
         # creating an Apex record in Route53. This means that we have to use an A
         # record. If it's deeper than 3 levels then it's a subdomain of ocw.mit.edu and
         # we can use a CNAME.
-        record_type = "A" if len(domain.split(".")) == 3 else "CNAME"
+        record_type = "A" if len(domain.split(".")) == 3 else "CNAME"  # noqa: PLR2004
         record_value = (
             [str(addr) for addr in FASTLY_A_TLS_1_2]
             if record_type == "A"

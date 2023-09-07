@@ -27,7 +27,7 @@ default_egress_args = [
 def is_valid_instance_type(instance_type):
     try:
         ec2_client.describe_instance_types(InstanceTypes=[instance_type])
-        return True
+        return True  # noqa: TRY300
     except ClientError:
         return False
 
@@ -152,9 +152,8 @@ def _conditional_import(
                 f"More than one resource returned with filter {filters}. "
                 f"Found {resources}"
             )
-            raise ValueError(
-                "Too many resources returned. A more precise filter is needed."
-            )
+            msg = "Too many resources returned. A more precise filter is needed."
+            raise ValueError(msg)
         resource = resources[0]
         tags = resource["Tags"]
         resource_id = resource[attribute_id_key]

@@ -210,9 +210,9 @@ def configure_concourse(
         recursive=True,
         present=True,
     )
-    if concourse_config._node_type == "web":
+    if concourse_config._node_type == "web":  # noqa: SLF001
         _manage_web_node_keys(concourse_config)
-    elif concourse_config._node_type == "worker":
+    elif concourse_config._node_type == "worker":  # noqa: SLF001
         files.directory(
             name="Create Concourse worker state directory",
             path=str(concourse_config.work_dir),
@@ -228,7 +228,7 @@ def configure_concourse(
 @deploy("Register and enable Concourse service")
 def register_concourse_service(
     concourse_config: Union[ConcourseWebConfig, ConcourseWorkerConfig],
-    restart=False,
+    restart=False,  # noqa: FBT002
 ):
     # Create Systemd unit to manage Concourse service
     systemd_unit = files.template(

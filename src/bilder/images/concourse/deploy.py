@@ -1,24 +1,29 @@
 import io
 import os
-import yaml
 from functools import partial
 from ipaddress import IPv4Address
 from pathlib import Path
 from typing import Union
 
+import yaml
+from bridge.lib.magic_numbers import (
+    CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
+    CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
+    VAULT_HTTP_PORT,
+)
+from bridge.lib.versions import (
+    CONCOURSE_VERSION,
+    CONSUL_VERSION,
+    TRAEFIK_VERSION,
+    VAULT_VERSION,
+)
+from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.api.util import get_template
 
 from bilder.components.baseline.steps import (
     install_baseline_packages,
     service_configuration_watches,
-)
-from bilder.components.traefik.models import traefik_static, traefik_file_provider
-from bilder.components.traefik.models.component import TraefikConfig
-from bilder.components.traefik.steps import (
-    configure_traefik,
-    traefik_service,
-    install_traefik_binary,
 )
 from bilder.components.concourse.models import (
     ConcourseBaseConfig,
@@ -57,23 +62,18 @@ from bilder.components.hashicorp.vault.models import (
     VaultTemplate,
 )
 from bilder.components.hashicorp.vault.steps import vault_template_permissions
+from bilder.components.traefik.models import traefik_file_provider, traefik_static
+from bilder.components.traefik.models.component import TraefikConfig
+from bilder.components.traefik.steps import (
+    configure_traefik,
+    install_traefik_binary,
+    traefik_service,
+)
 from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import (
     install_and_configure_vector,
 )
 from bilder.facts.has_systemd import HasSystemd
-from bridge.lib.magic_numbers import (
-    CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
-    CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
-    VAULT_HTTP_PORT,
-)
-from bridge.lib.versions import (
-    CONCOURSE_VERSION,
-    CONSUL_VERSION,
-    TRAEFIK_VERSION,
-    VAULT_VERSION,
-)
-from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {
     "concourse": os.environ.get("CONCOURSE_VERSION", CONCOURSE_VERSION),
@@ -240,7 +240,7 @@ consul_configuration = {Path("00-default.json"): ConsulConfig()}
 
 vector_config = VectorConfig()
 
-if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:
+if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: SLF001
     # Setting this attribute after instantiating the object to bypass validation
     concourse_config.encryption_key = (
         '{{ with secret "secret-concourse/web" }}'
@@ -311,7 +311,9 @@ vault_config = VaultAgentConfig(
         method=VaultAutoAuthMethod(
             type="aws",
             mount_path="auth/aws",
-            config=VaultAutoAuthAWS(role=f"concourse-{concourse_config._node_type}"),
+            config=VaultAutoAuthAWS(
+                role=f"concourse-{concourse_config._node_type}"  # noqa: SLF001
+            ),  # noqa: RUF100, SLF001
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),

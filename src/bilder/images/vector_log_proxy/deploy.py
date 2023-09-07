@@ -1,7 +1,10 @@
 import os
-import yaml
 from pathlib import Path
 
+import yaml
+from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import CONSUL_VERSION, TRAEFIK_VERSION, VAULT_VERSION
+from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 
 from bilder.components.baseline.steps import service_configuration_watches
@@ -27,6 +30,13 @@ from bilder.components.hashicorp.vault.models import (
     VaultTemplate,
 )
 from bilder.components.hashicorp.vault.steps import vault_template_permissions
+from bilder.components.traefik.models import traefik_file_provider, traefik_static
+from bilder.components.traefik.models.component import TraefikConfig
+from bilder.components.traefik.steps import (
+    configure_traefik,
+    install_traefik_binary,
+    traefik_service,
+)
 from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import (
     configure_vector,
@@ -34,17 +44,6 @@ from bilder.components.vector.steps import (
     vector_service,
 )
 from bilder.facts.has_systemd import HasSystemd
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION, TRAEFIK_VERSION
-from bridge.secrets.sops import set_env_secrets
-
-from bilder.components.traefik.models import traefik_static, traefik_file_provider
-from bilder.components.traefik.models.component import TraefikConfig
-from bilder.components.traefik.steps import (
-    configure_traefik,
-    install_traefik_binary,
-    traefik_service,
-)
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),

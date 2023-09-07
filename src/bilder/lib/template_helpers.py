@@ -13,8 +13,8 @@ def place_jinja_template_file(  # noqa: PLR0913
     repo_path: Path,
     destination_path: Path,
     context: dict[str, Any],
-    watched_files: list[Path],
-    mode: str = "0644",
+    watched_files: list[Path],  # noqa: ARG001
+    mode: str = "0644",  # noqa: ARG001
     user: str = "root",
     group: str = "root",
 ):

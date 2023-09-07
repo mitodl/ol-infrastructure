@@ -2,12 +2,12 @@ from typing import Optional
 
 from ol_concourse.lib.jobs.infrastructure import Output
 from ol_concourse.lib.models.pipeline import (
+    Cache,
     Command,
     Identifier,
     Input,
     TaskConfig,
     TaskStep,
-    Cache,
 )
 
 
