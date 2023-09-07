@@ -91,7 +91,7 @@ def install_hashicorp_products(hashicorp_products: list[HashicorpProduct]):
 @deploy("Register Hashicorp Service")
 def register_services(
     hashicorp_products: list[HashicorpProduct],
-    start_services_immediately=True,
+    start_services_immediately=True,  # noqa: FBT002
 ):
     for product in hashicorp_products:
         systemd_unit = files.template(

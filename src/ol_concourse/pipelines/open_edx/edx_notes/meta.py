@@ -1,6 +1,7 @@
 import sys
 
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
+
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
@@ -82,7 +83,7 @@ meta_pipeline = Pipeline(resources=[pipeline_code], jobs=meta_jobs)
 
 
 if __name__ == "__main__":
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(meta_pipeline.model_dump_json(indent=2))
     sys.stdout.write(meta_pipeline.model_dump_json(indent=2))
     sys.stdout.write(

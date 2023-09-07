@@ -1,6 +1,9 @@
 import os
 from pathlib import Path
 
+from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION, TRAEFIK_VERSION
+from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files
 
@@ -40,9 +43,6 @@ from bilder.components.traefik.models.component import TraefikConfig
 from bilder.components.traefik.steps import configure_traefik
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION, TRAEFIK_VERSION
-from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),

@@ -112,9 +112,9 @@ def configure_traefik(traefik_config: TraefikConfig):
 @deploy("Manage traefik service")
 def traefik_service(
     traefik_config: TraefikConfig,
-    do_restart=False,
-    do_reload=False,
-    start_immediately=False,
+    do_restart=False,  # noqa: FBT002
+    do_reload=False,  # noqa: FBT002
+    start_immediately=False,  # noqa: FBT002
 ):
     systemd_unit = files.template(
         name="Create service definition for Traefik",

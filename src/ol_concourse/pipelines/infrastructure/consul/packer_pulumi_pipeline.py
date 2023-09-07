@@ -55,10 +55,10 @@ for network in [
     "xpro",
 ]:
     # Missing a few stacks for some apps
-    if network in ["data"]:
+    if network in ["data"]:  # noqa: SIM108
         stages = ("QA", "Production")
     else:
-        stages = ("CI", "QA", "Production")  # type: ignore
+        stages = ("CI", "QA", "Production")  # type: ignore  # noqa: PGH003
     consul_pulumi_fragment = pulumi_jobs_chain(
         consul_pulumi_code,
         project_name="ol-infrastructure-consul-server",
@@ -114,8 +114,8 @@ consul_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys
 
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(consul_pipeline.model_dump_json(indent=2))
     sys.stdout.write(consul_pipeline.model_dump_json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p packer-pulumi-consul -c definition.json")
+    print()  # noqa: T201
+    print("fly -t pr-inf sp -p packer-pulumi-consul -c definition.json")  # noqa: T201

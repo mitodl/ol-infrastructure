@@ -6,10 +6,10 @@
 """
 
 import pulumi_vault as vault
+from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from pulumi import Config, StackReference, export
 from pulumi_aws import ec2, iam, s3
 
-from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,

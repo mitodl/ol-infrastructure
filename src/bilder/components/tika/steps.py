@@ -73,7 +73,7 @@ def configure_tika(tika_config: TikaConfig):
 
 
 @deploy("Manage Tika Service")
-def tika_service(tika_config: TikaConfig):
+def tika_service(tika_config: TikaConfig):  # noqa: ARG001
     systemd.service(
         name="Enable Tika service",
         service="tika-server",

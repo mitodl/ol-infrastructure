@@ -144,7 +144,9 @@ def create_placeholder_tls_config(caddy_config: CaddyConfig):
 
 
 @deploy("Manage Caddy Service")
-def caddy_service(caddy_config: CaddyConfig, do_restart=False, do_reload=False):
+def caddy_service(
+    caddy_config: CaddyConfig, do_restart=False, do_reload=False  # noqa: FBT002
+):  # noqa: FBT002, RUF100
     systemd.service(
         name="Enable Caddy service",
         service="caddy",

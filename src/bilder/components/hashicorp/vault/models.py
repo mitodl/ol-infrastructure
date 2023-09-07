@@ -35,7 +35,7 @@ class VaultAutoAuthAppRole(VaultAutoAuthMethodConfig):
 
 class VaultAutoAuthAWS(VaultAutoAuthMethodConfig):
     # The type of authentication; must be ec2 or iam.
-    type: str = "iam"
+    type: str = "iam"  # noqa: A003
     # The role to authenticate against on Vault.
     role: str
     # In seconds, how frequently the Vault agent should check for new credentials if
@@ -49,7 +49,7 @@ class VaultAutoAuthAWS(VaultAutoAuthMethodConfig):
 
 
 class VaultAutoAuthMethod(FlexibleBaseModel):
-    type: str
+    type: str  # noqa: A003
     mount_path: Optional[str] = None
     namespace: Optional[str] = None
     wrap_ttl: Optional[Union[str, int]] = None
@@ -57,7 +57,7 @@ class VaultAutoAuthMethod(FlexibleBaseModel):
 
 
 class VaultAutoAuthSink(FlexibleBaseModel):
-    type: str
+    type: str  # noqa: A003
     wrap_ttl: Optional[Union[str, int]] = None
     dh_type: Optional[str] = None
     dh_path: Optional[Path] = None
@@ -272,7 +272,8 @@ class Vault(HashicorpProduct):
     def validate_consistent_config_types(cls, configuration):
         type_set = {type(config_obj) for config_obj in configuration.values()}
         if len(type_set) > 1:
-            raise ValueError("There are server and agent configuration objects present")
+            msg = "There are server and agent configuration objects present"
+            raise ValueError(msg)
         return configuration
 
     def operating_mode(self) -> str:

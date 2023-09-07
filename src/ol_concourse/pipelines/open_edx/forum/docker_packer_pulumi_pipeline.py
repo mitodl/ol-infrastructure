@@ -3,7 +3,7 @@ import sys
 from bridge.settings.openedx.accessors import filter_deployments_by_release
 from bridge.settings.openedx.types import DeploymentEnvRelease, OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+
 from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
@@ -16,10 +16,11 @@ from ol_concourse.lib.models.pipeline import (
     PutStep,
 )
 from ol_concourse.lib.resources import git_repo, registry_image
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 
 def build_forum_pipeline(
-    release_name: str, edx_deployments: list[DeploymentEnvRelease]
+    release_name: str, edx_deployments: list[DeploymentEnvRelease]  # noqa: ARG001
 ):
     forum_branch = OpenEdxSupportedRelease[release_name].branch
     forum_repo = git_repo(
@@ -153,7 +154,7 @@ if __name__ == "__main__":
         release_name,
         OpenLearningOpenEdxDeployment,
     ).model_dump_json(indent=2)
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)
     sys.stdout.writelines(

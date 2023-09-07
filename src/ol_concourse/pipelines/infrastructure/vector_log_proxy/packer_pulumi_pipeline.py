@@ -82,8 +82,10 @@ vector_log_proxy_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys
 
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(vector_log_proxy_pipeline.model_dump_json(indent=2))
     sys.stdout.write(vector_log_proxy_pipeline.model_dump_json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p packer-pulumi-vector-log-proxy -c definition.json")
+    print()  # noqa: T201
+    print(  # noqa: T201
+        "fly -t pr-inf sp -p packer-pulumi-vector-log-proxy -c definition.json"
+    )  # noqa: RUF100, T201

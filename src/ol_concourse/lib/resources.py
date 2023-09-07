@@ -10,7 +10,7 @@ def git_repo(  # noqa: PLR0913
     branch: str = "main",
     check_every: str = "60s",
     paths: Optional[list[str]] = None,
-    depth: Optional[int] = None,
+    depth: Optional[int] = None,  # noqa: ARG001
     **kwargs,
 ) -> Resource:
     return Resource(

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import ConfigDict, BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FieldModel(BaseModel):
@@ -34,7 +34,7 @@ class Fields(FieldModel):
 
 class AccessLog(FieldModel):
     file_path: Optional[str] = Field(None, alias="filePath")
-    format: Optional[str] = None
+    format: Optional[str] = None  # noqa: A003
     filters: Optional[Filters] = None
     fields: Optional[Fields] = None
     buffering_size: Optional[int] = Field(None, alias="bufferingSize")
@@ -206,7 +206,7 @@ class Hub(FieldModel):
 class Log(FieldModel):
     level: Optional[str] = None
     file_path: Optional[str] = Field(None, alias="filePath")
-    format: Optional[str] = None
+    format: Optional[str] = None  # noqa: A003
 
 
 class Prometheus(FieldModel):

@@ -2,6 +2,11 @@ import os
 import tempfile
 from pathlib import Path
 
+from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
+from bridge.secrets.sops import set_env_secrets
+from bridge.settings.openedx.accessors import fetch_application_version
+from bridge.settings.openedx.types import OpenEdxApplication
 from pyinfra import host
 from pyinfra.operations import apt, files, git, pip, server
 
@@ -51,11 +56,6 @@ from bilder.components.vector.steps import (
 from bilder.facts.has_systemd import HasSystemd
 from bilder.images.edxapp.lib import OPENEDX_RELEASE, WEB_NODE_TYPE, node_type
 from bilder.images.edxapp.plugins.git_export_import import git_auto_export
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
-from bridge.secrets.sops import set_env_secrets
-from bridge.settings.openedx.accessors import fetch_application_version
-from bridge.settings.openedx.types import OpenEdxApplication
 
 VERSIONS = {
     "consul": CONSUL_VERSION,

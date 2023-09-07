@@ -8,12 +8,12 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, ResourceOptions, StackReference
-from pulumi_aws import ec2, get_caller_identity, iam, route53
-
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
+from pulumi import Config, ResourceOptions, StackReference
+from pulumi_aws import ec2, get_caller_identity, iam, route53
+
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
@@ -178,7 +178,7 @@ lb_config = OLLoadBalancerConfig(
 tg_config = OLTargetGroupConfig(
     vpc_id=vpc_id,
     health_check_interval=60,
-    health_check_matcher="404",  # noqa: E501 # TODO 20221208 MAD need to revisit health checks + traefik
+    health_check_matcher="404",
     health_check_path="/",
     tags=aws_config.merged_tags({"Name": notes_server_tag}),
 )

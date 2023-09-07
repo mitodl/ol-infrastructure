@@ -8,26 +8,25 @@ import re
 from typing import Any, Optional, Union
 
 import pulumi
+from bridge.lib.magic_numbers import DEFAULT_MEMCACHED_PORT, DEFAULT_REDIS_PORT
 from pulumi_aws import elasticache
 from pydantic import (
-    FieldValidationInfo,
-    field_validator,
     ConfigDict,
+    FieldValidationInfo,
     PositiveInt,
     conint,
+    field_validator,
 )
-
-from bridge.lib.magic_numbers import DEFAULT_MEMCACHED_PORT, DEFAULT_REDIS_PORT
-from ol_infrastructure.lib.aws.elasticache_helper import (
-    cache_engines,
-    parameter_group_family,
-)
-from ol_infrastructure.lib.ol_types import AWSBase
 
 from ol_infrastructure.components.aws.cloudwatch import (
     OLCloudWatchAlarmSimpleElastiCache,
     OLCloudWatchAlarmSimpleElastiCacheConfig,
 )
+from ol_infrastructure.lib.aws.elasticache_helper import (
+    cache_engines,
+    parameter_group_family,
+)
+from ol_infrastructure.lib.ol_types import AWSBase
 
 PulumiString = Union[str, pulumi.Output[str]]
 MAX_MEMCACHED_CLUSTER_SIZE = 20
@@ -62,7 +61,8 @@ class OLAmazonCacheConfig(AWSBase):
     def is_valid_engine(cls, engine: str) -> str:
         valid_engines = cache_engines()
         if engine not in valid_engines:
-            raise ValueError("The specified cache engine is not a valid option in AWS.")
+            msg = "The specified cache engine is not a valid option in AWS."
+            raise ValueError(msg)
         return engine
 
     @field_validator("engine_version")
@@ -71,9 +71,10 @@ class OLAmazonCacheConfig(AWSBase):
         engine = info.data["engine"]
         engines_map = cache_engines()
         if engine_version not in engines_map.get(engine, []):
-            raise ValueError(
+            msg = (
                 f"The specified version of the {engine} engine is not supported in AWS."
             )
+            raise ValueError(msg)
         return engine_version
 
     @field_validator("monitoring_profile_name")
@@ -81,9 +82,8 @@ class OLAmazonCacheConfig(AWSBase):
     def is_valid_monitoring_profile(cls, monitoring_profile_name: str) -> str:
         valid_monitoring_profile_names = ("production", "qa", "ci", "disabled")
         if monitoring_profile_name not in valid_monitoring_profile_names:
-            raise ValueError(
-                f"The specified monitoring profile: {monitoring_profile_name} is not valid."  # noqa: E501
-            )
+            msg = f"The specified monitoring profile: {monitoring_profile_name} is not valid."  # noqa: E501
+            raise ValueError(msg)
         return monitoring_profile_name
 
 
@@ -95,7 +95,7 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
     engine: str = "redis"
     engine_version: str = "6.x"
     kms_key_id: Optional[PulumiString] = None
-    num_instances: conint(ge=1, le=5) = 1  # type: ignore
+    num_instances: conint(ge=1, le=5) = 1  # type: ignore  # noqa: PGH003
     shard_count: PositiveInt = PositiveInt(1)
     port: PositiveInt = PositiveInt(DEFAULT_REDIS_PORT)
     snapshot_retention_days: PositiveInt = PositiveInt(5)
@@ -111,15 +111,14 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
         if not encrypt_transit:
             return auth_token
         if encrypt_transit and auth_token is None:
-            raise ValueError("Cannot encrypt transit with no auth token configured")
+            msg = "Cannot encrypt transit with no auth token configured"
+            raise ValueError(msg)
         token_valid = min_token_length <= len(
             auth_token or ""
         ) <= max_token_length and bool(re.search(r"[^'\"/@\\W]+", auth_token or ""))
         if not token_valid:
-            raise ValueError(
-                "The configured auth token has invalid characters. "
-                'Only printable ASCII characters excluding ", / and @ are allowed.'
-            )
+            msg = 'The configured auth token has invalid characters. Only printable ASCII characters excluding ", / and @ are allowed.'  # noqa: E501
+            raise ValueError(msg)
         return auth_token
 
     @field_validator("cluster_name")
@@ -130,10 +129,8 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
         is_valid = 1 < len(cluster_name) < cluster_name_max_length
         is_valid = not bool(re.search("[^a-zA-Z-9-]", cluster_name))
         if not is_valid:
-            raise ValueError(
-                "The cluster name does not comply with the Elasticache naming "
-                "constraints for Redis"
-            )
+            msg = "The cluster name does not comply with the Elasticache naming constraints for Redis"  # noqa: E501
+            raise ValueError(msg)
         return cluster_name
 
 
@@ -151,10 +148,8 @@ class OLAmazonMemcachedConfig(OLAmazonCacheConfig):
         is_valid = 1 < len(cluster_name) < max_cluster_name_length
         is_valid = not bool(re.search("[^a-zA-Z-9-]", cluster_name))
         if not is_valid:
-            raise ValueError(
-                "The cluster name does not comply with the Elasticache naming "
-                "constraints for Memcached"
-            )
+            msg = "The cluster name does not comply with the Elasticache naming constraints for Memcached"  # noqa: E501
+            raise ValueError(msg)
         return cluster_name
 
 
@@ -242,7 +237,7 @@ class OLAmazonCache(pulumi.ComponentResource):
     def redis(
         self,
         cache_config: OLAmazonRedisConfig,
-        cluster_mode: bool,
+        cluster_mode: bool,  # noqa: FBT001
         resource_options: pulumi.ResourceOptions,
     ):
         if cluster_mode:
@@ -320,9 +315,12 @@ class OLAmazonCache(pulumi.ComponentResource):
         elif engine == "memcached":
             return self._get_default_memcached_monitoring_profile(profile_name)
         else:
-            raise ValueError(f"Invalid engine specifier: {engine}")
+            msg = f"Invalid engine specifier: {engine}"
+            raise ValueError(msg)
 
-    def _get_default_memcached_monitoring_profile(self, profile_name: str):
+    def _get_default_memcached_monitoring_profile(
+        self, profile_name: str  # noqa: ARG002
+    ):  # noqa: ARG002, RUF100
         return {}  # not implemented
 
     def _get_default_redis_monitoring_profile(self, profile_name: str):

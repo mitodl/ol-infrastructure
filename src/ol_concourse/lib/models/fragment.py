@@ -1,4 +1,4 @@
-from pydantic import field_validator, BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ol_concourse.lib.models.pipeline import Job, Resource, ResourceType
 

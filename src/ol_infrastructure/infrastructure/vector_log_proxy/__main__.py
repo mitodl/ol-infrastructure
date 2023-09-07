@@ -4,16 +4,16 @@
 import base64
 import json
 import textwrap
-from pathlib import Path
 from os import linesep
+from pathlib import Path
 
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, StackReference, export, Output, ResourceOptions
+from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
+from bridge.secrets.sops import read_yaml_secrets
+from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53, s3
 
-from bridge.secrets.sops import read_yaml_secrets
-from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
@@ -33,7 +33,8 @@ def build_user_data(consul_dc, challenge_url, service_hash_bucket_fqdn):
                 "content": json.dumps(
                     {
                         "retry_join": [
-                            "provider=aws tag_key=consul_env " f"tag_value={consul_dc}"
+                            "provider=aws tag_key=consul_env "
+                            f"tag_value={consul_dc}"  # noqa: ISC001, RUF100
                         ],
                         "datacenter": consul_dc,
                     }

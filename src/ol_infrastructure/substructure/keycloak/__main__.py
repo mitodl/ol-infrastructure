@@ -1,8 +1,10 @@
 import json
 import secrets
+
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions
+
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 

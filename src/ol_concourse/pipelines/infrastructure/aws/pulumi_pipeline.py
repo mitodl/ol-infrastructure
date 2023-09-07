@@ -1,8 +1,8 @@
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 # Simple services that follow well defined patterns (CI -> QA -> Production)
 simple_resource_types = []
@@ -95,8 +95,8 @@ aws_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys
 
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(aws_pipeline.model_dump_json(indent=2))
     sys.stdout.write(aws_pipeline.model_dump_json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p pulumi-aws -c definition.json")
+    print()  # noqa: T201
+    print("fly -t pr-inf sp -p pulumi-aws -c definition.json")  # noqa: T201

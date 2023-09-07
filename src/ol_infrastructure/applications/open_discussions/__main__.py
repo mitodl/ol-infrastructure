@@ -206,13 +206,13 @@ mit_open_iam_policy = iam.Policy(
 mit_open_vault_iam_role = aws.SecretBackendRole(
     f"mit-open-iam-permissions-vault-policy-{stack_info.env_suffix}",
     name=f"mit-open-application-{stack_info.env_suffix}",
-    # TODO: Make this configurable to support multiple AWS backends. TMM 2021-03-04
+    # TODO: Make this configurable to support multiple AWS backends. TMM 2021-03-04  # noqa: E501, FIX002, TD002, TD003
     backend="aws-mitx",
     credential_type="iam_user",
     policy_arns=[mit_open_iam_policy.arn],
 )
 
-# TODO MD 07312023 Should this be renamed?
+# TODO MD 07312023 Should this be renamed?  # noqa: FIX002, TD002, TD003, TD004
 # Need to reconcile with other stack refs first.
 export(
     "mit_open",

@@ -1,8 +1,8 @@
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH
-from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
+from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH
 
 bootcamps_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi-bootcamps"),
@@ -36,7 +36,7 @@ bootcamps_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys
 
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(bootcamps_pipeline.json(indent=2))
     sys.stdout.write(bootcamps_pipeline.json(indent=2))
     sys.stdout.write("\n")

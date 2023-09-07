@@ -1,6 +1,6 @@
 from enum import Enum, unique
 
-from pydantic import field_validator, BaseModel
+from pydantic import BaseModel, field_validator
 
 from ol_infrastructure.lib.aws.ec2_helper import aws_regions
 
@@ -77,24 +77,23 @@ class AWSBase(BaseModel):
     @classmethod
     def enforce_tags(cls, tags: dict[str, str]) -> dict[str, str]:
         if not REQUIRED_TAGS.issubset(tags.keys()):
-            raise ValueError(
-                "Not all required tags have been specified. Missing tags: {}".format(
-                    REQUIRED_TAGS.difference(tags.keys())
-                )
+            msg = "Not all required tags have been specified. Missing tags: {}".format(
+                REQUIRED_TAGS.difference(tags.keys())
             )
+            raise ValueError(msg)
         try:
             BusinessUnit(tags["OU"])
         except ValueError as exc:
-            raise ValueError(
-                "The OU tag specified is not a valid business unit"
-            ) from exc
+            msg = "The OU tag specified is not a valid business unit"
+            raise ValueError(msg) from exc
         return tags
 
     @field_validator("region")
     @classmethod
     def check_region(cls, region: str) -> str:
         if region not in aws_regions():
-            raise ValueError("The specified region does not exist")
+            msg = "The specified region does not exist"
+            raise ValueError(msg)
         return region
 
     def merged_tags(self, *new_tags: dict[str, str]) -> dict[str, str]:

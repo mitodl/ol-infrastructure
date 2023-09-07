@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 PULUMI_CODE_PATH = Path("src/ol_infrastructure")
 PULUMI_WATCHED_PATHS = [
     "src/ol_infrastructure/lib/",

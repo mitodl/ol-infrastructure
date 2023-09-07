@@ -2,6 +2,14 @@ import os
 from io import StringIO
 from pathlib import Path
 
+from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import (
+    CONSUL_TEMPLATE_VERSION,
+    CONSUL_VERSION,
+    KEYCLOAK_VERSION,
+    VAULT_VERSION,
+)
+from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files, server
 
@@ -47,14 +55,6 @@ from bilder.lib.template_helpers import (
     CONSUL_TEMPLATE_DIRECTORY,
     place_consul_template_file,
 )
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import (
-    CONSUL_TEMPLATE_VERSION,
-    CONSUL_VERSION,
-    KEYCLOAK_VERSION,
-    VAULT_VERSION,
-)
-from bridge.secrets.sops import set_env_secrets
 
 set_env_secrets(Path("consul/consul.env"))
 
@@ -188,11 +188,8 @@ for product in hashicorp_products:
     configure_hashicorp_product(product)
 
 # Install and configure vector
-# vector_config = VectorConfig(is_docker=True, use_global_log_sink=True)
 # vector_config.configuration_templates[
-#    TEMPLATES_DIRECTORY.joinpath("vector", "keycloak_logs.yaml")
 # ] = {}
-# install_and_configure_vector(vector_config)
 
 consul_template_permissions(consul_template.configuration)
 

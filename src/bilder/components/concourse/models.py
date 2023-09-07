@@ -6,21 +6,21 @@ from ipaddress import IPv4Address, IPv6Address
 from pathlib import Path
 from typing import Optional, Union
 
-from pydantic import (
-    computed_field,
-    field_serializer,
-    field_validator,
-    Field,
-    PositiveInt,
-    SecretStr,
-)
-from pydantic_settings import SettingsConfigDict
-
-from bilder.lib.model_helpers import OLBaseSettings
 from bridge.lib.magic_numbers import (
     CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
     DEFAULT_POSTGRES_PORT,
 )
+from pydantic import (
+    Field,
+    PositiveInt,
+    SecretStr,
+    computed_field,
+    field_serializer,
+    field_validator,
+)
+from pydantic_settings import SettingsConfigDict
+
+from bilder.lib.model_helpers import OLBaseSettings
 
 CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH = 32
 
@@ -1442,10 +1442,8 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     @classmethod
     def validate_encryption_key_length(cls, encryption_key):
         if len(encryption_key) != CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH:
-            raise ValueError(
-                "Encryption key is not the correct length. "
-                "It needs to be a 32 byte random string."
-            )
+            msg = "Encryption key is not the correct length. It needs to be a 32 byte random string."  # noqa: E501
+            raise ValueError(msg)
         return encryption_key
 
     @property

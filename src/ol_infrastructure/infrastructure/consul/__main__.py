@@ -5,9 +5,6 @@ from pathlib import Path
 
 import bcrypt
 import yaml
-from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
-
 from bridge.lib.magic_numbers import (
     CONSUL_DNS_PORT,
     CONSUL_HTTP_PORT,
@@ -18,6 +15,9 @@ from bridge.lib.magic_numbers import (
     FIVE_MINUTES,
 )
 from bridge.secrets.sops import read_yaml_secrets
+from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
+
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
@@ -301,7 +301,7 @@ retry_join_wan = peer_vpcs.apply(
 
 # Make cloud-init userdata
 def cloud_init_userdata(
-    consul_vpc_id,
+    consul_vpc_id,  # noqa: ARG001
     consul_env_name,
     retry_join_wan_array,
     domain_name,

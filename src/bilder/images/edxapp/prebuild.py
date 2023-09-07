@@ -1,15 +1,15 @@
 import json
 import tempfile
 
-from pyinfra.operations import apt, files, git, server
-
-from bilder.components.baseline.steps import install_baseline_packages
-from bilder.images.edxapp.lib import OPENEDX_RELEASE, WEB_NODE_TYPE, node_type
 from bridge.settings.openedx.accessors import (
     fetch_application_version,
     filter_deployments_by_release,
 )
 from bridge.settings.openedx.types import OpenEdxApplication
+from pyinfra.operations import apt, files, git, server
+
+from bilder.components.baseline.steps import install_baseline_packages
+from bilder.images.edxapp.lib import OPENEDX_RELEASE, WEB_NODE_TYPE, node_type
 
 EDX_USER = "edxapp"
 

@@ -1,5 +1,3 @@
-from pulumi import Config, export, ResourceOptions, StackReference
-
 from ol_infrastructure.components.services.vault import (
     OLVaultPKIIntermediateCABackend,
     OLVaultPKIIntermediateCABackendConfig,
@@ -9,6 +7,7 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib.ol_types import BusinessUnit
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
+from pulumi import Config, ResourceOptions, StackReference, export
 
 SIX_MONTHS = 60 * 60 * 24 * 30 * 6
 TWELVE_MONTHS = 60 * 60 * 24 * 30 * 12

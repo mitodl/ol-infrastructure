@@ -18,7 +18,7 @@ from typing import Optional
 
 from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import ec2, elasticache, rds
-from pydantic import FieldValidationInfo, field_validator, PositiveInt
+from pydantic import FieldValidationInfo, PositiveInt, field_validator
 
 from ol_infrastructure.lib.aws.ec2_helper import (
     availability_zones,
@@ -72,14 +72,11 @@ class OLVPCConfig(AWSBase):
         :rtype: IPv4Network
         """
         if not network.is_private:
-            raise ValueError(
-                "Specified CIDR block for VPC is not an RFC1918 private network"
-            )
+            msg = "Specified CIDR block for VPC is not an RFC1918 private network"
+            raise ValueError(msg)
         if network.prefixlen > MAX_NET_PREFIX:
-            raise ValueError(
-                "Specified CIDR block has a prefix that is too large. "
-                "Please specify a network with a prefix length between /16 and /21"
-            )
+            msg = "Specified CIDR block has a prefix that is too large. Please specify a network with a prefix length between /16 and /21"  # noqa: E501
+            raise ValueError(msg)
         return network
 
     @field_validator("k8s_service_subnet")
@@ -104,9 +101,10 @@ class OLVPCConfig(AWSBase):
         :rtype: IPv4Network
         """
         network = info.data["cidr_block"]
-        assert network is not None
+        assert network is not None  # noqa: S101
         if k8s_service_subnet is not None and not k8s_service_subnet.subnet_of(network):
-            raise ValueError(f"{k8s_service_subnet} is not a subnet of {network}")
+            msg = f"{k8s_service_subnet} is not a subnet of {network}"
+            raise ValueError(msg)
         return k8s_service_subnet
 
     @field_validator("num_subnets")
@@ -125,10 +123,8 @@ class OLVPCConfig(AWSBase):
         :rtype: PositiveInt
         """
         if num_nets < MIN_SUBNETS:
-            raise ValueError(
-                "There should be at least 2 subnets defined for a VPC to allow for "
-                "high availability across availability zones"
-            )
+            msg = "There should be at least 2 subnets defined for a VPC to allow for high availability across availability zones"  # noqa: E501
+            raise ValueError(msg)
         return num_nets
 
 
@@ -226,7 +222,7 @@ class OLVPC(ComponentResource):
             )
             if imported_subnet_id:
                 subnet = ec2.get_subnet(id=imported_subnet_id)
-                zone = subnet.availability_zone
+                zone = subnet.availability_zone  # noqa: PLW2901
             ol_subnet = ec2.Subnet(
                 net_name,
                 cidr_block=str(subnet_v4),

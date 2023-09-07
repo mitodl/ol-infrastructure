@@ -76,8 +76,8 @@ docker_baseline_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys
 
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(docker_baseline_pipeline.model_dump_json(indent=2))
     sys.stdout.write(docker_baseline_pipeline.model_dump_json(indent=2))
-    print()
-    print("fly -t pr-inf sp -p packer-docker-baseline -c definition.json")
+    print()  # noqa: T201
+    print("fly -t pr-inf sp -p packer-docker-baseline -c definition.json")  # noqa: T201

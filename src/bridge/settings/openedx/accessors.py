@@ -46,7 +46,7 @@ def _fetch_applications_by_type(
     fetched_app_versions = []
     for app_version in app_versions:
         if app_version.application_type == application_type:
-            fetched_app_versions.append(app_version)
+            fetched_app_versions.append(app_version)  # noqa: PERF401
     return fetched_app_versions
 
 
@@ -80,7 +80,7 @@ def _filter_deployments_by_application(
             app_versions = release_map[release_name][deployment.value.deployment_name]
             for app_version in app_versions:
                 if app_version.application == application_name:
-                    filtered_deployments.append(deployment.value)
+                    filtered_deployments.append(deployment.value)  # noqa: PERF401
     return filtered_deployments
 
 

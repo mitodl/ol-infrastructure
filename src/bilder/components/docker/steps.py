@@ -66,8 +66,9 @@ def deploy_docker(config: Optional[dict[str, Any]] = None):
     if host.get_fact(DebPackages):
         _apt_install()
     else:
+        msg = "Apt not found, pyinfra-docker cannot provision this machine!"
         raise DeployError(
-            ("Apt not found, pyinfra-docker cannot provision this machine!"),
+            (msg),
         )
 
     if config:

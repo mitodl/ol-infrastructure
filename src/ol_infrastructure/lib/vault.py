@@ -12,7 +12,6 @@ from typing import Optional
 
 import pulumi
 import pulumi_vault
-
 from bridge.secrets.sops import read_yaml_secrets
 
 postgres_role_statements = {

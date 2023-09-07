@@ -1,8 +1,7 @@
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH
 from ol_concourse.lib.jobs.infrastructure import pulumi_job
 from ol_concourse.lib.models.pipeline import Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo
-
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH
 
 xpro_dns_code = git_repo(
     Identifier("ol-infrastructure"),
@@ -28,7 +27,7 @@ xpro_partner_dns_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys
 
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(xpro_partner_dns_pipeline.model_dump_json(indent=2))
     sys.stdout.write(xpro_partner_dns_pipeline.model_dump_json(indent=2))
     sys.stdout.writelines(

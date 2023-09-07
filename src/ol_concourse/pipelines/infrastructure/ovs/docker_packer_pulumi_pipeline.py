@@ -1,6 +1,5 @@
 import sys
 
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
@@ -13,6 +12,7 @@ from ol_concourse.lib.models.pipeline import (
     PutStep,
 )
 from ol_concourse.lib.resources import git_repo, registry_image
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 
 def build_ovs_pipeline() -> Pipeline:
@@ -154,7 +154,7 @@ def build_ovs_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(build_ovs_pipeline().model_dump_json(indent=2))
     sys.stdout.write(build_ovs_pipeline().model_dump_json(indent=2))
     sys.stdout.writelines(

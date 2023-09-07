@@ -4,7 +4,6 @@ from pathlib import Path
 import hvac
 import pulumi
 import pulumi_vault as vault
-
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import get_vault_provider
@@ -24,7 +23,8 @@ recovery_threshold = vault_config.get_int("recovery_threshold") or 2
 pgp_public_keys: list[str] = vault_config.get_object("pgp_keys")
 
 if pgp_public_keys and len(pgp_public_keys) != key_shares:
-    raise ValueError("The number of PGP keys needs to match the number of key shares.")
+    msg = "The number of PGP keys needs to match the number of key shares."
+    raise ValueError(msg)
 
 PULUMI = "pulumi"
 pulumi_vault_creds = read_yaml_secrets(
@@ -55,7 +55,9 @@ def init_vault_cluster(vault_addr):
             "recovering the cluster."
         )
 
-        with open("vault_recovery_keys.txt", "w") as vault_recovery_keys_file:
+        with open(  # noqa: PTH123
+            "vault_recovery_keys.txt", "w"
+        ) as vault_recovery_keys_file:  # noqa: PTH123, RUF100
             vault_recovery_keys_file.write("\n".join(recovery_keys))
 
         vault_ready = False

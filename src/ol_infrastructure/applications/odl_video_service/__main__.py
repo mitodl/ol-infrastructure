@@ -10,10 +10,6 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam, route53
-from pulumi_consul import Node, Service, ServiceCheckArgs
-
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_HTTP_PORT,
@@ -22,6 +18,10 @@ from bridge.lib.magic_numbers import (
     DEFAULT_REDIS_PORT,
 )
 from bridge.secrets.sops import read_yaml_secrets
+from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_consul import Node, Service, ServiceCheckArgs
+
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
@@ -144,7 +144,7 @@ ovs_server_policy_document = {
         },
         # This block against odl-video-service* buckets is REQUIRED
         # App does not work without it?????
-        # TODO MAD 20221115 Why is it required?
+        # TODO MAD 20221115 Why is it required?  # noqa: FIX002, TD002, TD003, TD004
         # The S3 permissions block following this SHOULD cover what this provides
         # but the app must be making some kind of call to bucket that isn't qualified
         # by the environment (CI,RC,Production)
@@ -348,7 +348,6 @@ ovs_redis_security_group = ec2.SecurityGroup(
             security_groups=[
                 ovs_server_security_group.id,
             ],
-            # cidr_blocks=[target_vpc["cidr"]],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
@@ -491,7 +490,7 @@ ovs_tg_config = OLTargetGroupConfig(
     vpc_id=target_vpc["id"],
     target_group_healthcheck=False,
     health_check_interval=60,
-    health_check_matcher="404",  # TODO Figure out a real endpoint for this
+    health_check_matcher="404",  # TODO Figure out a real endpoint for this  # noqa: E501, FIX002, TD002, TD003, TD004
     health_check_path="/ping",
     stickiness="lb_cookie",
     tags=instance_tags,
@@ -668,7 +667,7 @@ for domain in ovs_config.get_object("route53_managed_domains"):
         zone_id=mitodl_zone_id,
     )
 
-# TODO MD 20221011 revisit this, probably need to export more things
+# TODO MD 20221011 revisit this, probably need to export more things  # noqa: E501, FIX002, TD002, TD003, TD004
 export(
     "odl_video_service",
     {

@@ -1,8 +1,8 @@
 from typing import Optional
 
-from pydantic import ConfigDict, BaseModel, PositiveInt, Field
-
 from bridge.lib.magic_numbers import DEFAULT_HTTP_PORT, HALF_GIGABYTE_MB
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt
+
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
@@ -38,7 +38,7 @@ class Secret(BaseModel):
 
 
 class OLContainerLogConfig(BaseModel):
-    # TODO: Put list of options in Enum object and set as type (TMM 2021-09-15)
+    # TODO: Put list of options in Enum object and set as type (TMM 2021-09-15)  # noqa: E501, FIX002, TD002, TD003
     # Possible values are: "awslogs", "fluentd", "gelf", "json-file", "journald",
     # "logentries", "splunk", "syslog", "awsfirelens"
     log_driver: str
@@ -89,7 +89,7 @@ class OLFargateContainerDefinitionConfig(BaseModel):
         parameter_name="cpu",
     )
     is_essential: bool = Field(
-        False,
+        False,  # noqa: FBT003
         description="Enabling this flag means if this container stops or fails, "
         "all other containers that are part of the task are stopped",
         parameter_name="essential",
@@ -110,13 +110,13 @@ class OLFargateContainerDefinitionConfig(BaseModel):
         parameter_name="logConfiguration",
     )
     privileged: bool = Field(
-        False,
+        False,  # noqa: FBT003
         description="If enabled, container is given elevated privileges, "
         "similar to 'root' user",
         parameter_name="privileged",
     )
     attach_to_load_balancer: bool = Field(
-        False,
+        False,  # noqa: FBT003
         description="If set to True, container will be attached to target group and "
         "load balancer using the port_mappings name and container port",
     )

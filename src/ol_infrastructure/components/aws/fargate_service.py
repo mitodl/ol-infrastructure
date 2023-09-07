@@ -217,11 +217,11 @@ class OLFargateService(pulumi.ComponentResource):
             deployment_controller=config.get_deployment_controller(),
             deployment_circuit_breaker=circuit_breaker,
             health_check_grace_period_seconds=health_check_grace_period,
-            launch_type=config._launch_type,
+            launch_type=config._launch_type,  # noqa: SLF001
             network_configuration=config.get_service_network_configuration(),
             load_balancers=config.load_balancer_configuration,
             task_definition=self.task_definition.arn,
-            platform_version=config._fargate_platform_version,
+            platform_version=config._fargate_platform_version,  # noqa: SLF001
             force_new_deployment=config.force_new_deployment,
             enable_ecs_managed_tags=config.enable_ecs_managed_tags,
             tags=config.tags,
@@ -255,7 +255,8 @@ class OLFargateService(pulumi.ComponentResource):
             not config.task_definition_config
             or not config.task_definition_config.container_definition_configs
         ):
-            raise ValueError("At least one container definition must be defined")
+            msg = "At least one container definition must be defined"
+            raise ValueError(msg)
 
         pulumi.log.debug("Creating container task definitions")
 
@@ -272,7 +273,7 @@ class OLFargateService(pulumi.ComponentResource):
             environment = []
             if container.environment:
                 for key in container.environment:
-                    environment.append(
+                    environment.append(  # noqa: PERF401
                         {"name": key, "value": container.environment[key]}
                     )
 

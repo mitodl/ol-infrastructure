@@ -1,7 +1,16 @@
 import sys
 
-from bridge.settings.openedx.types import OpenEdxSupportedRelease
+from bridge.settings.openedx.accessors import (
+    fetch_application_version,
+    filter_deployments_by_release,
+)
+from bridge.settings.openedx.types import (
+    OpenEdxApplication,
+    OpenEdxSupportedRelease,
+)
+
 from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -20,19 +29,10 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, registry_image
-from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
-from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS, PULUMI_CODE_PATH
-
-from bridge.settings.openedx.accessors import (
-    filter_deployments_by_release,
-    fetch_application_version,
-)
-from bridge.settings.openedx.types import (
-    OpenEdxApplication,
-)
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 
-def build_edx_pipeline(release_names: list[str]) -> Pipeline:
+def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
     edx_docker_code = git_repo(
         name=Identifier("ol-infrastructure-docker"),
         uri="https://github.com/mitodl/ol-infrastructure",
@@ -293,7 +293,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
 if __name__ == "__main__":
     releases = [release_name.name for release_name in OpenEdxSupportedRelease]
     pipeline_json = build_edx_pipeline(releases).json(indent=1)
-    with open("definition.json", "w") as definition:
+    with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)
     sys.stdout.writelines(

@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional
 
-from pydantic import ConfigDict, BaseModel, SerializeAsAny
+from pydantic import BaseModel, ConfigDict, SerializeAsAny
 
 from bilder.lib.model_helpers import OLBaseSettings
 
@@ -26,11 +26,12 @@ class HashicorpProduct(BaseModel, abc.ABC):
 
     @abc.abstractproperty
     def systemd_template_context(self):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abc.abstractmethod
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
-        raise NotImplementedError("This method has not been implemented")
+        msg = "This method has not been implemented"
+        raise NotImplementedError(msg)
 
     @property
     def name(self):

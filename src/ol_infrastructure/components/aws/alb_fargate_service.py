@@ -20,6 +20,7 @@ from enum import Enum, unique
 from typing import Optional
 
 import pulumi
+from bridge.lib.magic_numbers import DEFAULT_HTTP_PORT, DEFAULT_HTTPS_PORT
 from pulumi.resource import ResourceOptions
 from pulumi_aws.acm import get_certificate
 from pulumi_aws.ec2 import (
@@ -40,7 +41,6 @@ from pulumi_aws.lb import (
 from pulumi_aws.route53 import Record, RecordAliasArgs, get_zone
 from pydantic import ConfigDict, PositiveInt
 
-from bridge.lib.magic_numbers import DEFAULT_HTTP_PORT, DEFAULT_HTTPS_PORT
 from ol_infrastructure.components.aws.fargate_service import (
     DeploymentControllerTypes,
     LaunchTypes,
@@ -164,24 +164,20 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
 
         ingress_cidr = ["0.0.0.0/0"]
         if not config.listener_open_to_all_traffic:
-            # TODO: need to provide capabilitiy for caller to set IP range
-            raise ValueError(
-                "If listener is not open to all IP ranges, valid CIDR block must be "
-                "present"
-            )
+            # TODO: need to provide capabilitiy for caller to set IP range  # noqa: E501, FIX002, TD002, TD003
+            msg = "If listener is not open to all IP ranges, valid CIDR block must be present"  # noqa: E501
+            raise ValueError(msg)
 
         # Certificate, hosted zone, and domain are all required if HTTPs is to be
         # supported
         if config.load_balancer_protocol == Protocol.https:
             if not config.zone_name:
-                raise ValueError(
-                    "HTTPs protocol must be accompanied by a valid Route 53 Zone"
-                )
+                msg = "HTTPs protocol must be accompanied by a valid Route 53 Zone"
+                raise ValueError(msg)
 
             if not config.domain_name:
-                raise ValueError(
-                    "HTTPs protocol must be accompanied by a valid domain name"
-                )
+                msg = "HTTPs protocol must be accompanied by a valid domain name"
+                raise ValueError(msg)
 
         # This SG will be used to provide correct type of access to the LB. We will
         # force TCP protocol and only
@@ -222,7 +218,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
                 ip_address_type=config.ip_address_type,
                 name=config.load_balancer_name,
                 subnets=subnets.ids,
-                load_balancer_type=config._load_balancer_type,
+                load_balancer_type=config._load_balancer_type,  # noqa: SLF001
                 security_groups=[lb_security_group],
                 opts=resource_options,
                 tags=config.tags,
@@ -265,7 +261,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
             opts=resource_options,
         )
 
-        # TODO: route 53, hosted zone, record created
+        # TODO: route 53, hosted zone, record created  # noqa: FIX002, TD002, TD003
 
         # Only containers that explicitly asked to be attached to TG will
         load_balancer_configuration = self.attach_containers_to_target_group(
@@ -322,7 +318,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
         if config.load_balancer_protocol == Protocol.https:
             listener_protocol = "HTTPS"
 
-            # TODO: allow this to be configured
+            # TODO: allow this to be configured  # noqa: FIX002, TD002, TD003
             ssl_policy = "ELBSecurityPolicy-2016-08"
             config.listener_port = 443
 
@@ -447,8 +443,10 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
             )
 
         elif config.route53_record_type == Route53RecordType.cname:
-            raise ValueError("CNAME records are not supported")
+            msg = "CNAME records are not supported"
+            raise ValueError(msg)
         else:
-            raise ValueError("Route 53 record type must be ALIAS or CNAME")
+            msg = "Route 53 record type must be ALIAS or CNAME"
+            raise ValueError(msg)
 
         return record, cert.arn
