@@ -49,7 +49,6 @@ VERSIONS = {
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
     "traefik": os.environ.get("TRAEFIK_VERSION", TRAEFIK_VERSION),
 }
-FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 VECTOR_INSTALL_NAME = os.environ.get("VECTOR_LOG_PROXY_NAME", "vector-log-proxy")
 
@@ -82,12 +81,12 @@ vault_config = VaultAgentConfig(
         VaultTemplate(
             contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
             "{{ printf .Data.key }}{{ end }}",
-            destination=Path("/etc/caddy/odl_wildcard.key"),
+            destination=Path("/etc/traefik/odl_wildcard.key"),
         ),
         VaultTemplate(
             contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
             "{{ printf .Data.value }}{{ end }}",
-            destination=Path("/etc/caddy/odl_wildcard.cert"),
+            destination=Path("/etc/traefik/odl_wildcard.cert"),
         ),
     ],
 )
@@ -100,7 +99,7 @@ consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
 
-# Install and Configure Caddy and Tika
+# Install and Configure Traefik and Tika
 tika_config = TikaConfig()
 install_tika(tika_config)
 configure_tika(tika_config)
@@ -139,7 +138,7 @@ configure_traefik(traefik_config)
 
 files.put(
     name="Place the airbyte docker-compose.yaml file",
-    src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml")),
+    src=str(TEMPLATES_DIRECTORY.joinpath("docker-compose.yaml")),
     dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
     mode="0664",
 )
@@ -149,9 +148,6 @@ vault_template_permissions(vault_config)
 # Install vector
 vector_config.configuration_templates[
     TEMPLATES_DIRECTORY.joinpath("vector", "tika-logs.yaml.j2")
-] = {}
-vector_config.configuration_templates[
-    TEMPLATES_DIRECTORY.joinpath("vector", "caddy-logs.yaml.j2")
 ] = {}
 install_vector(vector_config)
 configure_vector(vector_config)
