@@ -1,10 +1,11 @@
 import os
 from pathlib import Path
+
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION, TRAEFIK_VERSION
+from bridge.lib.versions import CONSUL_VERSION, TRAEFIK_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
-from pyinfra.operations import files
+from pyinfra.operations import files, server
 
 from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models import Consul, ConsulConfig
@@ -29,17 +30,15 @@ from bilder.components.hashicorp.vault.models import (
     VaultTemplate,
 )
 from bilder.components.hashicorp.vault.steps import vault_template_permissions
-from bilder.components.tika.models import TikaConfig
-from bilder.components.tika.steps import configure_tika, install_tika, tika_service
+from bilder.components.traefik.models import traefik_static
+from bilder.components.traefik.models.component import TraefikConfig
+from bilder.components.traefik.steps import configure_traefik
 from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import (
     configure_vector,
     install_vector,
     vector_service,
 )
-from bilder.components.traefik.models import traefik_static
-from bilder.components.traefik.models.component import TraefikConfig
-from bilder.components.traefik.steps import configure_traefik
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 
@@ -98,11 +97,6 @@ consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
 hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
 
-# Install and Configure Traefik and Tika
-tika_config = TikaConfig()
-install_tika(tika_config)
-configure_tika(tika_config)
-
 # Configure and install traefik
 traefik_static_config = traefik_static.TraefikStaticConfig(
     log=traefik_static.Log(format="json"),
@@ -136,7 +130,7 @@ traefik_conf_directory = traefik_config.configuration_directory
 configure_traefik(traefik_config)
 
 files.put(
-    name="Place the airbyte docker-compose.yaml file",
+    name="Place the Tika docker-compose.yaml file",
     src=str(TEMPLATES_DIRECTORY.joinpath("docker-compose.yaml")),
     dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
     mode="0664",
@@ -157,15 +151,20 @@ for product in hashicorp_products:
 
 # Setup systemd daemons for everything
 if host.get_fact(HasSystemd):
-    tika_service(tika_config)
     vector_service(vector_config)
 
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
 
+    server.service(
+        name="Ensure docker compose service is enabled",
+        service="docker-compose",
+        running=False,
+        enabled=True,
+    )
+
     watched_docker_compose_files = [
         DOCKER_COMPOSE_DIRECTORY.joinpath(".env"),
-        # DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth"),
     ]
     service_configuration_watches(
         service_name="docker-compose", watched_files=watched_docker_compose_files
