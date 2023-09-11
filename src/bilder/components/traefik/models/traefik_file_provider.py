@@ -6,12 +6,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
-if TYPE_CHECKING:
-    from bilder.components.traefik.models.traefik_static import ServersTransport
+from bilder.components.traefik.models.traefik_static import (
+    ServersTransport,
+)
 
 
 class Certificate(BaseModel):

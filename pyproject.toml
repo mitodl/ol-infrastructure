@@ -136,7 +136,7 @@ select = [
     "SLOT",  # flake8-slots
     "T10",  # flake8-debugger
     "T20",  # flake8-print
-    "TCH",  # flake8-type-checking
+    # "TCH",  # flake8-type-checking
     "TD",  # flake8-todos
     "TID",  # flake8-tidy-imports
     "TRY",  # tryceratops
