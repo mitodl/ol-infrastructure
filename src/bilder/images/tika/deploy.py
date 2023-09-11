@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
+
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION, TRAEFIK_VERSION
+from bridge.lib.versions import CONSUL_VERSION, TRAEFIK_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files
@@ -31,15 +32,15 @@ from bilder.components.hashicorp.vault.models import (
 from bilder.components.hashicorp.vault.steps import vault_template_permissions
 from bilder.components.tika.models import TikaConfig
 from bilder.components.tika.steps import configure_tika, install_tika, tika_service
+from bilder.components.traefik.models import traefik_static
+from bilder.components.traefik.models.component import TraefikConfig
+from bilder.components.traefik.steps import configure_traefik
 from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import (
     configure_vector,
     install_vector,
     vector_service,
 )
-from bilder.components.traefik.models import traefik_static
-from bilder.components.traefik.models.component import TraefikConfig
-from bilder.components.traefik.steps import configure_traefik
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 
@@ -165,7 +166,6 @@ if host.get_fact(HasSystemd):
 
     watched_docker_compose_files = [
         DOCKER_COMPOSE_DIRECTORY.joinpath(".env"),
-        # DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth"),
     ]
     service_configuration_watches(
         service_name="docker-compose", watched_files=watched_docker_compose_files
