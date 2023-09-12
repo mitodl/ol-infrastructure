@@ -16,16 +16,6 @@
 
 version: "3.8"
 services:
-
-  traefik:
-    command:
-      # Enabling Docker provider
-    - "--providers.docker=true"
-      # Do not expose containers unless explicitly told so
-    - "--providers.docker.exposedbydefault=false"
-    volumes:
-    - "/var/run/docker.sock:/var/run/docker.sock:ro"
-
   ## Apache Tika Server
   tika:
     image: apache/tika:2.4.0-full
@@ -52,3 +42,14 @@ services:
     - "traefik.http.routers.tika.domains.main='{$DOMAIN}'"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
+  traefik:
+    image: traefik:v2.10
+    command:
+    - "--configFile=/etc/traefik/traefik.yaml"
+    ports:
+    - "80:80"
+    - "443:443"
+    volumes:
+      # So that Traefik can listen to the Docker events
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - /etc/traefik/:/etc/traefik/
