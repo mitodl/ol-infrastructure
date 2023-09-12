@@ -21,8 +21,9 @@ global_vault_mount = vault.Mount(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-vault.generic.Secret(
-    "global-vault-secrets",
-    path=global_vault_mount.path.apply("{}/data".format),
-    data_json=json.dumps(global_vault_secrets),
-)
+for key, data in global_vault_secrets.items():
+    vault.generic.Secret(
+        "global-vault-secrets",
+        path=global_vault_mount.path.apply(lambda path: "{path}/{key}".format(path=path, key=key)),
+        data_json=json.dumps(data),
+    )
