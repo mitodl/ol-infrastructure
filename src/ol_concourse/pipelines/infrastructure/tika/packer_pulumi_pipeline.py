@@ -27,9 +27,8 @@ tika_ami_fragment = packer_jobs(
     dependencies=[],
     image_code=tika_image_code,
     packer_template_path="src/bilder/images/tika/tika.pkr.hcl",
-    packer_vars={"app_name": "tika"},
     node_types=["server"],
-    extra_packer_params={"only": ["amazon-ebs.third-party"]},
+    extra_packer_params={"only": ["amazon-ebs.tika"]},
 )
 
 tika_pulumi_fragment = pulumi_jobs_chain(
