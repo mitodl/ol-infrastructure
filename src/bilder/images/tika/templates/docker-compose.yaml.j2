@@ -1,0 +1,55 @@
+---
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: "3.8"
+services:
+  ## Apache Tika Server
+  tika:
+    image: apache/tika:2.4.0-full
+    # Use custom script as entrypoint to go fetch models and setup recognisers
+    entrypoint: ["/ner/run_tika_server.sh"]
+    restart: on-failure
+    ports:
+    - "9998:9998"
+    # volumes:
+    #   -  ./sample-configs/ner/:/ner/
+    # labels:
+      # Explicitly tell Traefik to expose this container
+    - "traefik.enable=true"
+      # The domain the service will respond to
+    # - "traefik.http.routers.tika.rule=Host(`tika.localhost`)"
+    - "traefik.http.routers.tika.rule=Host('${TIKA_HOSTNAME}')"
+      # Allow request only from the predefined entry point named "web"
+    - "traefik.http.routers.tika.entrypoints=web"
+      # Token authentication via environment variable
+    - "traefik.http.middlewares.test-apikey.plugin.apiKey.secretValue='{$X_ACCESS_TOKEN}'"
+      # Add labels for wildcard TLS cert
+    - "traefik.http.routers.tika.tls=true"
+    - "traefik.http.routers.tika.priority=1"
+    - "traefik.http.routers.tika.domains.main='{$DOMAIN}'"
+    - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
+    - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
+  traefik:
+    image: traefik:v2.10
+    command:
+    - "--configFile=/etc/traefik/traefik.yaml"
+    ports:
+    - "80:80"
+    - "443:443"
+    volumes:
+      # So that Traefik can listen to the Docker events
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - /etc/traefik/:/etc/traefik/
