@@ -24,7 +24,7 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
     namespace: str
     period: PositiveInt = 300  # Five minutes
     statistic: str = "Average"
-    threshold: int
+    threshold: Union[int, float]
     treat_missing_data_as: str = "missing"
     unit: Optional[str] = None
 
