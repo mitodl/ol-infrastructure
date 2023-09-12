@@ -73,7 +73,6 @@ ReleaseMap: dict[
                 application="communications",
                 application_type="MFE",
                 release="palm",
-                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="course-authoring",
@@ -104,7 +103,6 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="palm",
-                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="learner-dashboard",
@@ -150,7 +148,6 @@ ReleaseMap: dict[
                 application="communications",
                 application_type="MFE",
                 release="palm",
-                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="course-authoring",
@@ -181,7 +178,6 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="palm",
-                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="learning",
@@ -255,7 +251,6 @@ ReleaseMap: dict[
                 application_type="MFE",
                 release="olive",
                 runtime_version_override="16",
-                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="learning",
@@ -292,7 +287,6 @@ ReleaseMap: dict[
                 application="communications",
                 application_type="MFE",
                 release="master",
-                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="course-authoring",
@@ -322,7 +316,9 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="master",
-                branding_overrides=default_branding_overrides,
+                # TODO(Tobias Macey 2023-09-12): Remove this once  # noqa: FIX002
+                # https://github.com/openedx/frontend-app-gradebook/pull/345 is merged.
+                origin_override="https://github.com/mitodl/frontend-app-gradebook",
             ),
             OpenEdxApplicationVersion(
                 application="learning",
