@@ -228,7 +228,7 @@ lt_config = OLLaunchTemplateConfig(
                                 "owner": "root:root",
                             },
                             {
-                                "path": "/etc/default/traefik",
+                                "path": "/etc/docker/compose/.env",
                                 "content": textwrap.dedent(
                                     f"""\
                             DOMAIN={tika_config.require("web_host_domain")}
