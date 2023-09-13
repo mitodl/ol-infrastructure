@@ -103,8 +103,8 @@ ENV DJANGO_SETTINGS_MODULE lms.envs.production
 ENV NO_PYTHON_UNINSTALL 1
 ENV NO_PREREQ_INSTALL 0
 # Configure proctortrack javascript settings
-ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "\"https://verificientstatic-preprod.storage.googleapis.com/cdn/fb_cjs/edx_preprod_cjs.IQEQWWZ2.js\"", "PROCTORTRACK_CONFIG_KEY": "\"1PKRwFPezxXj3TsD\""}'
-# These are important but their provanance is unknown at this time.
+ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "\"https://verificientstatic.storage.googleapis.com/cdn/fb_cjs/edx_us_cjs.IQEQWWZ2.js\"", "PROCTORTRACK_CONFIG_KEY": "\"1PKRwFPezxXj3TsD\""}'
+g# These are important but their provanance is unknown at this time.
 # The reason they need to be installed like this is also unknown.
 RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/django-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
