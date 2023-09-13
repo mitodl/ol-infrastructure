@@ -32,6 +32,6 @@ config:
   edxapp:web_node_capacity: "9"
   edxapp:worker_node_capacity: "5"
   mongodb:atlas_project_id: 61f0a63f8bc1f86a073a7148
-  redis:instance_type: cache.r6g.large
+  redis:instance_type: cache.r6g.xlarge
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

@@ -117,7 +117,7 @@ def mfe_job(
     branding_overrides = "\n".join(
         (
             f"npm install {component}:{override} --legacy-peer-deps"
-            for component, override in mfe.branding_overrides.items()
+            for component, override in (mfe.branding_overrides or {}).items()
         )
     )
     if previous_job and mfe_repo.name == previous_job.plan[0].get:

@@ -297,8 +297,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 "period": 300,  # 5 minutes
                 "evaluation_periods": 2,  # 10 minutes
                 "metric_name": "WriteLatency",
-                "threshold": 20,
-                "unit": "Milliseconds",
+                "threshold": 0.020,  # 20 milliseconds
             },
             "ReadLatency": {
                 "comparison_operator": "GreaterThanThreshold",
@@ -308,8 +307,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 "period": 300,  # 5 minutes
                 "evaluation_periods": 2,  # 10 minutes
                 "metric_name": "ReadLatency",
-                "threshold": 10,
-                "unit": "Milliseconds",
+                "threshold": 0.010,  # 10 milliseconds
             },
         }
 
