@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-ecs
+runtime: python
+description: Deploy and manage ECS clusters in AWS
+backend:
+  url: s3://mitol-pulumi-state/
