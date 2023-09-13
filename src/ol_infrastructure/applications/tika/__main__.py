@@ -228,7 +228,7 @@ lt_config = OLLaunchTemplateConfig(
                                 "owner": "root:root",
                             },
                             {
-                                "path": "/etc/default/caddy",
+                                "path": "/etc/default/traefik",
                                 "content": textwrap.dedent(
                                     f"""\
                             DOMAIN={tika_config.require("web_host_domain")}
