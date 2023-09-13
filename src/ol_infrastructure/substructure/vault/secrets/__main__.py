@@ -1,4 +1,5 @@
 import json
+from functools import partial
 from pathlib import Path
 
 import pulumi_vault as vault
@@ -22,10 +23,9 @@ global_vault_mount = vault.Mount(
 )
 
 for key, data in global_vault_secrets.items():
+    secret_path = partial("{1}/{0}".format, key)
     vault.generic.Secret(
-        "global-vault-secrets",
-        path=global_vault_mount.path.apply(
-            lambda path: f"{path}/{key}"
-        ),
+        f"global-vault-secrets-{key}",
+        path=global_vault_mount.path.apply(secret_path),
         data_json=json.dumps(data),
     )
