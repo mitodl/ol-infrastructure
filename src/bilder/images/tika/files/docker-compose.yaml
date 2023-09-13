@@ -39,8 +39,6 @@ services:
       # Explicitly tell Traefik to expose this container
     - "traefik.enable=true"
       # The domain the service will respond to
-    # - "traefik.http.routers.tika.rule=Host(`tika.localhost`)"
-    # - "traefik.http.routers.tika.rule=Host(`{$TIKA_HOSTNAME}`)"
     - "traefik.http.routers.tika.rule=Host(`{$DOMAIN}`)"
       # Allow request only from the predefined entry point named "web"
     - "traefik.http.routers.tika.entrypoints=web"
