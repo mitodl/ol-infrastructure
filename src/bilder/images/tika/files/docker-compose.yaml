@@ -41,7 +41,7 @@ services:
       # The domain the service will respond to
     - "traefik.http.routers.tika.rule=Host(`{$DOMAIN}`)"
       # Allow request only from the predefined entry point named "web"
-    - "traefik.http.routers.tika.entrypoints=web"
+      #- "traefik.http.routers.tika.entrypoints=web"
       # Token authentication via environment variable
     - "traefik.http.middlewares.test-apikey.plugin.apiKey.secretValue=`{$X_ACCESS_TOKEN}`"
       # Add labels for wildcard TLS cert
