@@ -5,7 +5,7 @@ resources:
       s3_prefix: pipeline-storage/xpro_edx
   results_dir:
     config:
-      outputs_directory_date_format: '%Y%m%d'
+      date_format: '%Y%m%d'
   healthchecks:
     config:
       check_id: {{ with secret "secret-data/pipelines/edx/xpro/healthchecks-io-check-id" }}{{ .Data.value }}{{ end }}
