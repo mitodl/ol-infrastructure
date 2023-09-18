@@ -47,7 +47,7 @@ services:
       # Add labels for wildcard TLS cert
     - "traefik.http.routers.tika.tls=true"
     - "traefik.http.routers.tika.priority=1"
-    - "traefik.http.routers.tika.domains.main=`{$DOMAIN}`"
+      #    - "traefik.http.routers.tika.domains.main=`{$DOMAIN}`"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
     volumes:
