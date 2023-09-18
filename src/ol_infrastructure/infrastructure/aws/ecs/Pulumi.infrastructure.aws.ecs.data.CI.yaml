@@ -6,4 +6,7 @@ config:
   cluster:min_size: 2
   cluster:max_size: 4
   cluster:desired_size: 2
+  cluster:traefik_enabled: "true"
+  cluster:traefik_refresh_interval_seconds: 15
+  cluster:traefik_log_level: "INFO"
   environment:target_vpc: data_vpc
