@@ -1,0 +1,33 @@
+---
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:1.9.5
+    ports:
+    - "8011:8011"
+    links:
+    - web
+    - watch
+  web:
+    working_dir: /app
+    build: .
+    command: gunicorn -b 0.0.0.0:8000 -w 3 -k uvicorn.workers.UvicornWorker semantic_mitopen.main:app
+    volumes:
+    - .:/app
+    ports:
+    - 8000:8000
+    env_file: .env
+  watch:
+    image: node:18.4.0
+    working_dir: /app
+    command: >
+      /bin/bash -c 'npm install && npm run start'
+    ports:
+    - "3000:3000"
+    volumes:
+    - .:/app
+    environment:
+      DOCKER_HOST: ${DOCKER_HOST:-missing}
+      CONTAINER_NAME: 'watch'
+    env_file: .env
