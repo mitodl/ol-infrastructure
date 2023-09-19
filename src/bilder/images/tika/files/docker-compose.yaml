@@ -30,6 +30,9 @@ services:
     image: traefik:v2.10
     command:
     - "--configFile=/etc/traefik/traefik.yaml"
+    - "--providers.docker"
+    - "--log.level=WARN"
+    - "--accesslog=true"
     env_file:
     - .env
     ports:
@@ -45,6 +48,7 @@ services:
       # Add labels for wildcard TLS cert
     - "traefik.http.routers.tika.tls=true"
     - "traefik.http.routers.tika.priority=1"
+    - "traefik.http.routers.tika.entrypoints=https"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
     volumes:
