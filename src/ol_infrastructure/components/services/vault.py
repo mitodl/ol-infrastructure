@@ -205,7 +205,7 @@ class OLVaultAWSSecretsEngineConfig(BaseModel):
     app_name: str
     aws_access_key: str
     default_lease_ttl_seconds: int = ONE_MONTH_SECONDS * 6
-    max_lease_ttl_seconds: int = ONE_MONTH_SECONDS * 6
+    max_lease_ttl_seconds: int = ONE_MONTH_SECONDS * 3
     description: str
     aws_secret_key: str
     vault_backend_path: str
