@@ -38,7 +38,6 @@ services:
     labels:
       # Explicitly tell Traefik to expose this container
     - "traefik.enable=true"
-    - "traefik.log.level=DEBUG"
       # The domain the service will respond to
     - "traefik.http.routers.tika.rule=Host(`${DOMAIN}`)"
       # Token authentication via environment variable
