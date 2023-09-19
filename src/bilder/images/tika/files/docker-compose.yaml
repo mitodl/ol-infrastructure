@@ -33,6 +33,7 @@ services:
     - "--providers.docker"
     - "--log.level=WARN"
     - "--accesslog=true"
+    - "--accesslog.filepath=/var/log/traefik_access_log"
     env_file:
     - .env
     ports:
