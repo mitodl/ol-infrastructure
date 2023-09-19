@@ -67,7 +67,7 @@ class OLVaultDatabaseConfig(BaseModel):
     verify_connection: bool = True
     db_host: Union[str, Output[str]]
     max_ttl: int = ONE_MONTH_SECONDS * 6
-    default_ttl: int = ONE_MONTH_SECONDS * 6
+    default_ttl: int = ONE_MONTH_SECONDS * 3
     connection_options: Optional[dict[str, str]] = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
