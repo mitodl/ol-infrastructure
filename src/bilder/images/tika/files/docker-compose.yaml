@@ -26,6 +26,31 @@ services:
     - "9998:9998"
     # volumes:
     #   -  ./sample-configs/ner/:/ner/
+    labels:
+      # Explicitly tell Traefik to expose this container
+    - "traefik.enable=true"
+      # Token authentication via environment variable
+    - "traefik.http.middlewares.checkheaders.plugin.checkheadersplugin.headers.header"
+    - "traefik.http.middlewares.checkheaders.plugin.checkheadersplugin.headers.name=X-Access-Token"
+    - "traefik.http.middlewares.checkheaders.plugin.checkheadersplugin.headers.values=${X_ACCESS_TOKEN}"
+    - "traefik.http.middlewares.checkheaders.plugin.checkheadersplugin.headers.matchtype=one"
+    - "traefik.http.middlewares.checkheaders.plugin.checkheadersplugin.headers.debug=true"
+      # Add labels for wildcard TLS cert
+    - "traefik.http.routers.tika.tls=true"
+    - "traefik.http.routers.tika.priority=1"
+    - "traefik.http.routers.tika.middlewares=checkheaders"
+    - "traefik.http.routers.tika.entrypoints=https"
+      # The domain the service will respond to
+    - "traefik.http.routers.tika.rule=Host(`${DOMAIN}`)"
+    # Health check
+    - "traefik.http.routers.healthcheck.tls=true"
+    - "traefik.http.routers.healthcheck.priority=2"
+    - "traefik.http.routers.healthcheck.entrypoints=https"
+    - "traefik.http.routers.healthcheck.rule=Path(`/version`)"
+
+    # ODL wildcard cert
+    - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
+    - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
   traefik:
     image: traefik:v2.10
     command:
@@ -33,21 +58,7 @@ services:
     env_file:
     - .env
     ports:
-    - "80:80"
     - "443:443"
-    labels:
-      # Explicitly tell Traefik to expose this container
-    - "traefik.enable=true"
-      # The domain the service will respond to
-    - "traefik.http.routers.tika.rule=Host(`${DOMAIN}`)"
-      # Token authentication via environment variable
-    - "traefik.http.middlewares.test-apikey.plugin.apiKey.secretValue=`${X_ACCESS_TOKEN}`"
-      # Add labels for wildcard TLS cert
-    - "traefik.http.routers.tika.tls=true"
-    - "traefik.http.routers.tika.priority=1"
-    - "traefik.http.routers.tika.entrypoints=https"
-    - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
-    - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
     volumes:
       # So that Traefik can listen to the Docker events
     - /var/run/docker.sock:/var/run/docker.sock:ro
