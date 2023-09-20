@@ -100,7 +100,9 @@ install_hashicorp_products(hashicorp_products)
 
 # Configure and install traefik
 traefik_static_config = traefik_static.TraefikStaticConfig(
-    log=traefik_static.Log(format="json"),
+    log=traefik_static.Log(
+        level="DEBUG", format="json", filePath="/var/log/traefik_log"
+    ),
     providers=traefik_static.Providers(docker=traefik_static.Docker()),
     entry_points={
         "https": traefik_static.EntryPoints(address=":443"),
