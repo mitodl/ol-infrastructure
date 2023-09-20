@@ -32,9 +32,9 @@ services:
     - "--configFile=/etc/traefik/traefik.yaml"
     - "--providers.docker"
     - "--log.level=DEBUG"
-    - "--log.filepath=/etc/traefik/traefik_log"
+    - "--log.filepath=/var/log/traefik_log"
     - "--accesslog=true"
-    - "--accesslog.filepath=/etc/traefik/traefik_access_log"
+    - "--accesslog.filepath=/var/log/traefik_access_log"
     env_file:
     - .env
     ports:
