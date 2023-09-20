@@ -305,6 +305,9 @@ dagster_db_security_group = ec2.SecurityGroup(
     vpc_id=data_vpc["id"],
 )
 
+rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["monitoring_profile_name"] = "disabled"
+
 dagster_db_config = OLPostgresDBConfig(
     instance_name=f"ol-etl-db-{stack_info.env_suffix}",
     password=get_config("dagster:db_password"),
@@ -312,7 +315,7 @@ dagster_db_config = OLPostgresDBConfig(
     security_groups=[dagster_db_security_group],
     tags=aws_config.tags,
     db_name="dagster",
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 dagster_db = OLAmazonDB(dagster_db_config)
 
