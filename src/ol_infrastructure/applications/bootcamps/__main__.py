@@ -6,7 +6,6 @@
 """
 
 import json
-from functools import partial
 from pathlib import Path
 
 import pulumi_vault as vault
@@ -170,7 +169,6 @@ bootcamps_vault_secrets = read_yaml_secrets(
 )
 
 for key, data in bootcamps_vault_secrets.items():
-    secret_path = partial("{1}/{0}".format, key)
     vault.kv.SecretV2(
         f"bootcamps-vault-secrets-{key}",
         name=key,
