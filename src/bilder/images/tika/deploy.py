@@ -108,9 +108,11 @@ traefik_static_config = traefik_static.TraefikStaticConfig(
         "https": traefik_static.EntryPoints(address=":443"),
     },
     experimental=traefik_static.Experimental(
-        plugins=traefik_static.Plugins(
-            module_name="github.com/dkijkuit/checkheadersplugi", version="v0.2.6"
-        )
+        plugins={
+            "checkheadersplugin": traefik_static.Plugins(
+                moduleName="github.com/dkijkuit/checkheadersplugin", version="v0.2.6"
+            )
+        }
     ),
 )
 traefik_config = TraefikConfig(
