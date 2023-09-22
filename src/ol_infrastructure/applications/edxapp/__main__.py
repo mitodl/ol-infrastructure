@@ -885,8 +885,10 @@ consul_kv_data = {
     else "false",  # intended quoted boolean
     "google-analytics-id": edxapp_config.require("google_analytics_id"),
     "lms-domain": edxapp_domains["lms"],
+    "marketing-domain": edxapp_domains["marketing"],
     "preview-domain": edxapp_domains["preview"],
     "rds-host": edxapp_db.db_instance.address,
+    "proctortrack-base-url": edxapp_config.get("proctortrack_url") or "",
     "s3-course-bucket": course_bucket_name,
     "s3-grades-bucket": grades_bucket_name,
     "s3-storage-bucket": storage_bucket_name,

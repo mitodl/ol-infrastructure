@@ -6,7 +6,6 @@
 
 import json
 
-import pulumi_consul as consul
 import pulumi_vault as vault
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from pulumi import Config, StackReference, export
@@ -165,20 +164,5 @@ mitxonline_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_host=mitxonline_db.db_instance.address,
 )
 mitxonline_vault_backend = OLVaultDatabaseBackend(mitxonline_vault_backend_config)
-
-# Set Consul key for use in edxapp configuration template
-consul.Keys(
-    "mitxonline-app-domain-for-edxapp",
-    keys=[
-        consul.KeysKeyArgs(
-            path="edxapp/marketing-domain",
-            value=mitxonline_config.require("domain"),
-        ),
-        consul.KeysKeyArgs(
-            path="edxapp/proctortrack-base-url",
-            value=mitxonline_config.require("proctortrack_url"),
-        ),
-    ],
-)
 
 export("mitxonline_app", {"rds_host": mitxonline_db.db_instance.address})
