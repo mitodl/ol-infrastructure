@@ -276,7 +276,7 @@ if stack_info.env_suffix != "ci":
     )
     oidc_attribute_importer_identity_provider_mapper = (
         keycloak.AttributeImporterIdentityProviderMapper(
-            "oidcAttributeImporterIdentityProviderMapper",
+            "map-touchstone-saml-email-attribute",
             realm=ol_apps_realm.id,
             claim_name="email",
             identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
@@ -284,9 +284,10 @@ if stack_info.env_suffix != "ci":
             extra_config={
                 "syncMode": "INHERIT",
             },
+            opts=resource_options,
         ),
         keycloak.AttributeImporterIdentityProviderMapper(
-            "oidcAttributeImporterIdentityProviderMapper",
+            "map-touchstone-saml-last-name-attribute",
             realm=ol_apps_realm.id,
             claim_name="sn",
             identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
@@ -294,9 +295,10 @@ if stack_info.env_suffix != "ci":
             extra_config={
                 "syncMode": "INHERIT",
             },
+            opts=resource_options,
         ),
         keycloak.AttributeImporterIdentityProviderMapper(
-            "oidcAttributeImporterIdentityProviderMapper",
+            "map-touchstone-saml-first-name-attribute",
             realm=ol_apps_realm.id,
             claim_name="givenName",
             identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
@@ -304,5 +306,6 @@ if stack_info.env_suffix != "ci":
             extra_config={
                 "syncMode": "INHERIT",
             },
+            opts=resource_options,
         ),
     )
