@@ -13,6 +13,7 @@ config:
   edxapp:dns_zone: mitxonline
   edxapp:domains:
     lms: courses-qa.mitxonline.mit.edu
+    marketing: rc.mitxonline.mit.edu
     preview: preview-qa.mitxonline.mit.edu
     studio: studio-qa.mitxonline.mit.edu
   edxapp:edx_forum_secrets:
@@ -28,6 +29,7 @@ config:
     ora_grading: ora-grading
   edxapp:google_analytics_id: UA-5145472-46
   edxapp:mail_domain: edxapp-mail-qa.mitxonline.mit.edu
+  edxapp:proctortrack_url: https://preproduction.verificient.com
   edxapp:sender_email_address: support@edxapp-mail-qa.mitxonline.mit.edu
   edxapp:use_docker: true
   edxapp:web_node_capacity: "3"
