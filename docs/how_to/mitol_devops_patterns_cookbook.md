@@ -30,6 +30,8 @@ actual token:
 curl  --header 'X-Access-Token: <crazy hex digits>' https://tika-qa.odl.mit.edu
 ```
 
+_How To Build It_
+
 Traefik does not contain this functionality by default, so we must leverage the
 [checkheaders](https://plugins.traefik.io/plugins/628c9eda108ecc83915d7760/check-request-headers-plugin)
 Traefik middleware plugin.
