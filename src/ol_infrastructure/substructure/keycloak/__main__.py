@@ -274,3 +274,35 @@ if stack_info.env_suffix != "ci":
         want_assertions_signed=True,
         opts=resource_options,
     )
+    oidc_attribute_importer_identity_provider_mapper = (
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "oidcAttributeImporterIdentityProviderMapper",
+            realm=ol_apps_realm.id,
+            claim_name="email",
+            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+            user_attribute="email",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+        ),
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "oidcAttributeImporterIdentityProviderMapper",
+            realm=ol_apps_realm.id,
+            claim_name="sn",
+            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+            user_attribute="lastName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+        ),
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "oidcAttributeImporterIdentityProviderMapper",
+            realm=ol_apps_realm.id,
+            claim_name="givenName",
+            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+            user_attribute="firstName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+        ),
+    )
