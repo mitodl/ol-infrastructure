@@ -7,6 +7,7 @@ git+https://github.com/raccoongang/xblock-pdf.git@8d63047c53bc8fdd84fa7b0ec577bb
 nodeenv>=1.7.0
 ol-openedx-canvas-integration==0.2.6
 ol-openedx-course-export==0.1.2
+ol-openedx-course-structure-api
 ol-openedx-logging==0.2.0
 ol-openedx-rapid-response-reports==0.2.2
 ol-openedx-sentry==0.1.2
