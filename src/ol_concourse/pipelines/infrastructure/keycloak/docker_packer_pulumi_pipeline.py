@@ -63,7 +63,7 @@ def build_keycloak_pipeline() -> Pipeline:
     keycloak_user_migration_plugin_repo = git_repo(
         name=Identifier("keycloak-user-migration-plugin"),
         uri="https://github.com/daniel-frak/keycloak-user-migration",
-        branch="main",
+        branch="master",
     )
 
     keycloak_metrics_spi_repo = git_repo(
@@ -111,7 +111,7 @@ def build_keycloak_pipeline() -> Pipeline:
                 config=TaskConfig(
                     platform=Platform.linux,
                     inputs=[Input(name=keycloak_metrics_spi_repo.name)],
-                    outputs=[],
+                    outputs=[metrics_spi_plugin_output],
                     image_resource=maven_registry_image,
                     run=Command(
                         path="sh",
@@ -128,8 +128,8 @@ def build_keycloak_pipeline() -> Pipeline:
             container_build_task(
                 inputs=[
                     Input(name=keycloak_customization_repo.name),
-                    Input(metrics_spi_plugin_output.name),
-                    Input(user_migration_output.name),
+                    Input(name=metrics_spi_plugin_output.name),
+                    Input(name=user_migration_output.name),
                 ],
                 build_parameters={
                     "CONTEXT": keycloak_customization_repo.name,
