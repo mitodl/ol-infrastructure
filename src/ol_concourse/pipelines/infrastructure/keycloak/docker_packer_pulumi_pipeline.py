@@ -75,7 +75,7 @@ def build_keycloak_pipeline() -> Pipeline:
 
     maven_registry_image = AnonymousResource(
         type=REGISTRY_IMAGE,
-        source=RegistryImage(repository="maven", tag="3.9.4-eclipse-temurin-11"),
+        source=RegistryImage(repository="maven", tag="3.9.4-eclipse-temurin-17"),
     )
 
     user_migration_output = Output(name=Identifier("user_migration_plugin"))
