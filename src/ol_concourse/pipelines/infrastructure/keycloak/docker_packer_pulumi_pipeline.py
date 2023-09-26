@@ -153,7 +153,6 @@ def build_keycloak_pipeline() -> Pipeline:
                                 f"""\
                         mkdir {image_build_context.name}/plugins/
                         cp -r {keycloak_customization_repo.name}/* {image_build_context.name}/
-                        cp -r {keycloak_customization_repo.name}/.* {image_build_context.name}/
                         cp -r {metrics_spi_plugin_output.name}/* {image_build_context.name}/plugins/
                         cp -r {user_migration_output.name}/* {image_build_context.name}/plugins/
                         """  # noqa: E501
