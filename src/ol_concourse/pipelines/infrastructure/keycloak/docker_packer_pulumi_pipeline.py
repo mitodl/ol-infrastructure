@@ -1,15 +1,23 @@
 import sys
 
+from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
+    AnonymousResource,
+    Command,
     GetStep,
     Identifier,
     Input,
     Job,
+    Output,
     Pipeline,
+    Platform,
     PutStep,
+    RegistryImage,
+    TaskConfig,
+    TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, registry_image
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
@@ -52,13 +60,77 @@ def build_keycloak_pipeline() -> Pipeline:
         ],
     )
 
+    keycloak_user_migration_plugin_repo = git_repo(
+        name=Identifier("keycloak-user-migration-plugin"),
+        uri="https://github.com/daniel-frak/keycloak-user-migration",
+        branch="main",
+    )
+
+    keycloak_metrics_spi_repo = git_repo(
+        name=Identifier("keycloak-metrics-spi"),
+        uri="https://github.com/aerogear/keycloak-metrics-spi",
+        branch="main",
+    )
+
+    maven_registry_image = AnonymousResource(
+        type=REGISTRY_IMAGE,
+        source=RegistryImage(repository="maven", tag="3.9.2-eclipse-temurin-17"),
+    )
+
+    user_migration_output = Output(name="user_migration_plugin")
+    metrics_spi_plugin_output = Output(name="metrics_spi_plugin")
+
     docker_build_job = Job(
         name="build-keycloak-docker-image",
         build_log_retention={"builds": 10},
         plan=[
             GetStep(get=keycloak_customization_repo.name, trigger=True),
+            TaskStep(
+                task=Identifier("build-user-migration-jar"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    inputs=[Input(name=keycloak_user_migration_plugin_repo.name)],
+                    outputs=[user_migration_output],
+                    image_resource=maven_registry_image,
+                    run=Command(
+                        path="sh",
+                        user="root",
+                        args=[
+                            "-exc",
+                            f"""cp ./{keycloak_user_migration_plugin_repo.name}/pom.xml /tmp/;
+                            cp ./{keycloak_user_migration_plugin_repo.name}/src /tmp/src;
+                            cd /tmp;
+                            mvn clean package;
+                            cp /tmp/target/*.jar {user_migration_output.name}/user_migration.jar;""",  # noqa: E501
+                        ],
+                    ),
+                ),
+            ),
+            TaskStep(
+                task=Identifier("build-metrics-spi-jar"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    inputs=[Input(name=keycloak_metrics_spi_repo.name)],
+                    outputs=[],
+                    image_resource=maven_registry_image,
+                    run=Command(
+                        path="sh",
+                        user="root",
+                        args=[
+                            "-exc",
+                            f"""cd ./{keycloak_metrics_spi_repo};
+                            mvn package;
+                            cp *.jar {metrics_spi_plugin_output.name}/metrics_spi.jar;""",  # noqa: E501
+                        ],
+                    ),
+                ),
+            ),
             container_build_task(
-                inputs=[Input(name=keycloak_customization_repo.name)],
+                inputs=[
+                    Input(name=keycloak_customization_repo.name),
+                    Input(metrics_spi_plugin_output.name),
+                    Input(user_migration_output.name),
+                ],
                 build_parameters={
                     "CONTEXT": keycloak_customization_repo.name,
                     "DOCKERFILE": (
@@ -113,6 +185,7 @@ def build_keycloak_pipeline() -> Pipeline:
             for stage in [
                 "CI",
                 "QA",
+                "Production",
             ]
         ],
         project_name="ol-infrastructure-keycloak",
