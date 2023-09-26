@@ -1,4 +1,5 @@
 import sys
+import textwrap
 
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.containers import container_build_task
@@ -63,13 +64,13 @@ def build_keycloak_pipeline() -> Pipeline:
     keycloak_user_migration_plugin_repo = git_repo(
         name=Identifier("keycloak-user-migration-plugin"),
         uri="https://github.com/daniel-frak/keycloak-user-migration",
-        branch="main",
+        branch="master",
     )
 
     keycloak_metrics_spi_repo = git_repo(
         name=Identifier("keycloak-metrics-spi"),
         uri="https://github.com/aerogear/keycloak-metrics-spi",
-        branch="main",
+        branch="master",
     )
 
     maven_registry_image = AnonymousResource(
@@ -77,14 +78,17 @@ def build_keycloak_pipeline() -> Pipeline:
         source=RegistryImage(repository="maven", tag="3.9.2-eclipse-temurin-17"),
     )
 
-    user_migration_output = Output(name="user_migration_plugin")
-    metrics_spi_plugin_output = Output(name="metrics_spi_plugin")
+    user_migration_output = Output(name=Identifier("user_migration_plugin"))
+    metrics_spi_plugin_output = Output(name=Identifier("metrics_spi_plugin"))
+    image_build_context = Output(name=Identifier("image-build-context"))
 
     docker_build_job = Job(
         name="build-keycloak-docker-image",
         build_log_retention={"builds": 10},
         plan=[
             GetStep(get=keycloak_customization_repo.name, trigger=True),
+            GetStep(get=keycloak_user_migration_plugin_repo.name, trigger=True),
+            GetStep(get=keycloak_metrics_spi_repo.name, trigger=True),
             TaskStep(
                 task=Identifier("build-user-migration-jar"),
                 config=TaskConfig(
@@ -97,11 +101,11 @@ def build_keycloak_pipeline() -> Pipeline:
                         user="root",
                         args=[
                             "-exc",
-                            f"""cp ./{keycloak_user_migration_plugin_repo.name}/pom.xml /tmp/;
-                            cp ./{keycloak_user_migration_plugin_repo.name}/src /tmp/src;
-                            cd /tmp;
-                            mvn clean package;
-                            cp /tmp/target/*.jar {user_migration_output.name}/user_migration.jar;""",  # noqa: E501
+                            f"""cp ./{keycloak_user_migration_plugin_repo.name}/pom.xml /tmp/
+                            cp -r ./{keycloak_user_migration_plugin_repo.name}/src /tmp/src
+                            cd /tmp
+                            mvn clean package
+                            cp /tmp/target/*.jar {user_migration_output.name}/""",  # noqa: E501
                         ],
                     ),
                 ),
@@ -111,28 +115,56 @@ def build_keycloak_pipeline() -> Pipeline:
                 config=TaskConfig(
                     platform=Platform.linux,
                     inputs=[Input(name=keycloak_metrics_spi_repo.name)],
-                    outputs=[],
+                    outputs=[metrics_spi_plugin_output],
                     image_resource=maven_registry_image,
                     run=Command(
                         path="sh",
                         user="root",
                         args=[
                             "-exc",
-                            f"""cd ./{keycloak_metrics_spi_repo};
-                            mvn package;
-                            cp *.jar {metrics_spi_plugin_output.name}/metrics_spi.jar;""",  # noqa: E501
+                            f"""cd ./{keycloak_metrics_spi_repo}
+                            mvn package
+                            cp *.jar {metrics_spi_plugin_output.name}/""",
+                        ],
+                    ),
+                ),
+            ),
+            TaskStep(
+                task=Identifier("collect-artifacts-for-build-context"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    outputs=[image_build_context],
+                    inputs=[
+                        Input(name=keycloak_customization_repo.name),
+                        Input(name=metrics_spi_plugin_output.name),
+                        Input(name=user_migration_output.name),
+                    ],
+                    image_resource=AnonymousResource(
+                        type=REGISTRY_IMAGE,
+                        source=RegistryImage(repository="debian", tag="12-slim"),
+                    ),
+                    run=Command(
+                        path="sh",
+                        args=[
+                            "-exc",
+                            textwrap.dedent(
+                                f"""\
+                        cp -r {keycloak_customization_repo.name}/* {image_build_context.name}/
+                        cp -r {metrics_spi_plugin_output.name}/* {image_build_context.name}/
+                        cp -r {user_migration_output.name}/* {image_build_context.name}/
+                        """  # noqa: E501
+                            ),
                         ],
                     ),
                 ),
             ),
             container_build_task(
                 inputs=[
+                    Input(name=image_build_context.name),
                     Input(name=keycloak_customization_repo.name),
-                    Input(metrics_spi_plugin_output.name),
-                    Input(user_migration_output.name),
                 ],
                 build_parameters={
-                    "CONTEXT": keycloak_customization_repo.name,
+                    "CONTEXT": image_build_context.name,
                     "DOCKERFILE": (
                         f"{keycloak_customization_repo.name}/Dockerfile.hosted"
                     ),
@@ -156,7 +188,12 @@ def build_keycloak_pipeline() -> Pipeline:
     )
 
     container_fragment = PipelineFragment(
-        resources=[keycloak_customization_repo, keycloak_registry_image],
+        resources=[
+            keycloak_customization_repo,
+            keycloak_registry_image,
+            keycloak_user_migration_plugin_repo,
+            keycloak_metrics_spi_repo,
+        ],
         jobs=[docker_build_job],
     )
 
