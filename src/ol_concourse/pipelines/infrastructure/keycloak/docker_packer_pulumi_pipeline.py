@@ -77,13 +77,60 @@ def build_keycloak_pipeline() -> Pipeline:
         source=RegistryImage(repository="maven", tag="3.9.2-eclipse-temurin-17"),
     )
 
+    user_migration_output = Output(name="user_migration_plugin")
+    metrics_spi_plugin_output = Output(name="metrics_spi_plugin")
+
     docker_build_job = Job(
         name="build-keycloak-docker-image",
         build_log_retention={"builds": 10},
         plan=[
             GetStep(get=keycloak_customization_repo.name, trigger=True),
+            TaskStep(
+                task=Identifier("build-user-migration-jar"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    inputs=[Input(name=keycloak_user_migration_plugin_repo.name)],
+                    outputs=[user_migration_output],
+                    image_resource=maven_registry_image,
+                    run=Command(
+                        path="sh",
+                        user="root",
+                        args=[
+                            "-exc",
+                            f"""cp ./{keycloak_user_migration_plugin_repo.name}/pom.xml /tmp/;
+                            cp ./{keycloak_user_migration_plugin_repo.name}/src /tmp/src;
+                            cd /tmp;
+                            mvn clean package;
+                            cp /tmp/target/*.jar {user_migration_output.name}/user_migration.jar;""",  # noqa: E501
+                        ],
+                    ),
+                ),
+            ),
+            TaskStep(
+                task=Identifier("build-metrics-spi-jar"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    inputs=[Input(name=keycloak_metrics_spi_repo.name)],
+                    outputs=[],
+                    image_resource=maven_registry_image,
+                    run=Command(
+                        path="sh",
+                        user="root",
+                        args=[
+                            "-exc",
+                            f"""cd ./{keycloak_metrics_spi_repo};
+                            mvn package;
+                            cp *.jar {metrics_spi_plugin_output.name}/metrics_spi.jar;""",  # noqa: E501
+                        ],
+                    ),
+                ),
+            ),
             container_build_task(
-                inputs=[Input(name=keycloak_customization_repo.name)],
+                inputs=[
+                    Input(name=keycloak_customization_repo.name),
+                    Input(metrics_spi_plugin_output.name),
+                    Input(user_migration_output.name),
+                ],
                 build_parameters={
                     "CONTEXT": keycloak_customization_repo.name,
                     "DOCKERFILE": (
@@ -95,46 +142,6 @@ def build_keycloak_pipeline() -> Pipeline:
                     "IMAGE_PLATFORM": "linux/amd64",
                 },
                 build_args=[],
-            ),
-            TaskStep(
-                task=Identifier("build-user-migration-jar"),
-                config=TaskConfig(
-                    platform=Platform.linux,
-                    inputs=[Input(name=keycloak_user_migration_plugin_repo.name)],
-                    outputs=[Output(name="user_migration.jar")],
-                    image_resource=maven_registry_image,
-                    run=Command(
-                        path="sh",
-                        user="root",
-                        args=[
-                            "-exc",
-                            f"""cp ./{keycloak_user_migration_plugin_repo.name}/pom.xml /tmp/;
-                            cp ./{keycloak_user_migration_plugin_repo.name}/src /tmp/src;
-                            cd /tmp;
-                            mvn clean package;
-                            cp /tmp/target/*.jar /opt/keycloak/providers/user_migration.jar;""",  # noqa: E501
-                        ],
-                    ),
-                ),
-            ),
-            TaskStep(
-                task=Identifier("build-metrics-spi-jar"),
-                config=TaskConfig(
-                    platform=Platform.linux,
-                    inputs=[Input(name=keycloak_metrics_spi_repo.name)],
-                    outputs=[Output(name="metrics_spi.jar")],
-                    image_resource=maven_registry_image,
-                    run=Command(
-                        path="sh",
-                        user="root",
-                        args=[
-                            "-exc",
-                            f"""cd ./{keycloak_metrics_spi_repo};
-                            mvn package;
-                            cp *.jar /opt/keycloak/providers/metrics_spi.jar;""",  # noqa: E501
-                        ],
-                    ),
-                ),
             ),
             PutStep(
                 put=keycloak_registry_image.name,
