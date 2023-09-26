@@ -105,6 +105,7 @@ def build_keycloak_pipeline() -> Pipeline:
                             cp -r ./{keycloak_user_migration_plugin_repo.name}/src /tmp/src
                             cd /tmp
                             mvn clean package
+                            cd -
                             cp /tmp/target/*.jar {user_migration_output.name}/""",  # noqa: E501
                         ],
                     ),
@@ -122,9 +123,10 @@ def build_keycloak_pipeline() -> Pipeline:
                         user="root",
                         args=[
                             "-exc",
-                            f"""cd ./{keycloak_metrics_spi_repo}
+                            f"""cd {keycloak_metrics_spi_repo.name}
                             mvn package
-                            cp *.jar {metrics_spi_plugin_output.name}/""",
+                            cd ../
+                            cp {keycloak_metrics_spi_repo.name}/target/*.jar {metrics_spi_plugin_output.name}/""",  # noqa: E501
                         ],
                     ),
                 ),
@@ -149,9 +151,11 @@ def build_keycloak_pipeline() -> Pipeline:
                             "-exc",
                             textwrap.dedent(
                                 f"""\
+                        mkdir {image_build_context.name}/plugins/
                         cp -r {keycloak_customization_repo.name}/* {image_build_context.name}/
-                        cp -r {metrics_spi_plugin_output.name}/* {image_build_context.name}/
-                        cp -r {user_migration_output.name}/* {image_build_context.name}/
+                        cp -r {keycloak_customization_repo.name}/.* {image_build_context.name}/
+                        cp -r {metrics_spi_plugin_output.name}/* {image_build_context.name}/plugins/
+                        cp -r {user_migration_output.name}/* {image_build_context.name}/plugins/
                         """  # noqa: E501
                             ),
                         ],
