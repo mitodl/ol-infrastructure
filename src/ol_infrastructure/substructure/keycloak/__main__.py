@@ -3,6 +3,7 @@ import secrets
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
+from bridge.lib.magic_numbers import SECONDS_IN_ONE_DAY
 from pulumi import Config, Output, ResourceOptions
 
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -191,6 +192,17 @@ ol_apps_realm = keycloak.Realm(
     offline_session_idle_timeout="168h",
     sso_session_idle_timeout="2h",
     sso_session_max_lifespan="24h",
+    opts=resource_options,
+)
+
+olapps_realm_events = keycloak.RealmEvents(
+    "realmEvents",
+    realm_id=ol_apps_realm.realm,
+    events_enabled=True,
+    events_expiration=SECONDS_IN_ONE_DAY,
+    admin_events_enabled=True,
+    admin_events_details_enabled=True,
+    events_listeners=["metrics-listener"],
     opts=resource_options,
 )
 
