@@ -317,9 +317,6 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="master",
-                # TODO(Tobias Macey 2023-09-12): Remove this once  # noqa: FIX002
-                # https://github.com/openedx/frontend-app-gradebook/pull/345 is merged.
-                origin_override="https://github.com/mitodl/frontend-app-gradebook",
             ),
             OpenEdxApplicationVersion(
                 application="learning",
