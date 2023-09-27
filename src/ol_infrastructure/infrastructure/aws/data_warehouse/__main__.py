@@ -8,6 +8,7 @@ from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
+current_aws_account = s3.get_canonical_user_id()
 data_warehouse_config = Config("data_warehouse")
 data_lake_query_engine_config = Config("data-lake-query-engine")
 stack_info = parse_stack()
@@ -75,6 +76,30 @@ athena_warehouse_workgroup = athena.Workgroup(
 )
 
 warehouse_buckets = []
+data_landing_zone_bucket = s3.BucketV2(
+    "ol_data_lake_landing_zone_bucket",
+    bucket=f"ol-data-lake-landing-zone-{stack_info.env_suffix}",
+)
+data_landing_zone_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol_data_lake_landing_zone_bucket_ownership_controls",
+    bucket=data_landing_zone_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+s3.BucketServerSideEncryptionConfigurationV2(
+    "encrypt_ol_data_lake_landing_zone_bucket",
+    bucket=data_landing_zone_bucket.id,
+    rules=[
+        s3.BucketServerSideEncryptionConfigurationV2RuleArgs(
+            bucket_key_enabled=True,
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationV2RuleApplyServerSideEncryptionByDefaultArgs(
+                sse_algorithm="aws:kms"
+            ),
+        )
+    ],
+)
+warehouse_buckets.append(data_landing_zone_bucket)
 warehouse_dbs = []
 for data_stage in data_stages:
     lake_storage_bucket = s3.Bucket(
@@ -85,7 +110,7 @@ for data_stage in data_stages:
             rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
                 apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
                     sse_algorithm="aws:kms",
-                    kms_master_key_id=s3_kms_key["id"],
+                    kms_master_key_id=s3_kms_key["arn"],
                 ),
                 bucket_key_enabled=True,
             )

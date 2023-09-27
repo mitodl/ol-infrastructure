@@ -198,13 +198,24 @@ athena_permissions: list[dict[str, Union[str, list[str]]]] = [
     },
 ]
 
+edxorg_program_credentials_role_assumption = {
+    "Effect": "Allow",
+    "Action": ["sts:AssumeRole"],
+    "Resource": "arn:aws:iam::708756755355:role/mit-s3-edx-program-reports-access",
+}
+
 dagster_iam_permissions = {
     "Version": "2012-10-17",
-    "Statement": dagster_s3_permissions + athena_permissions,
+    "Statement": [
+        *dagster_s3_permissions,
+        *athena_permissions,
+        edxorg_program_credentials_role_assumption,
+    ],
 }
 
 parliament_config: dict[str, Any] = {
-    "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []}
+    "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []},
+    "CREDENTIALS_EXPOSURE": {"ignore_locations": [{"actions": "sts:assumeRole"}]},
 }
 
 dagster_runtime_bucket = s3.Bucket(
