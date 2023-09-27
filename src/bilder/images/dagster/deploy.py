@@ -75,6 +75,14 @@ server.user(
     system=True,
     ensure_home=False,
 )
+
+files.put(
+    name="Set AWS config file for use with STS assume role credentials",
+    src=FILES_DIRECTORY.joinpath("aws_config.ini"),
+    dest="/etc/aws/config",
+    create_remote_dir=True,
+)
+
 watched_docker_compose_files = []
 
 consul_templates_directory = Path("/etc/consul-template")
