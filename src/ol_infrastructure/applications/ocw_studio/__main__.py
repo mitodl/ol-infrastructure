@@ -68,12 +68,24 @@ ocw_storage_bucket = s3.BucketV2(
     bucket=ocw_storage_bucket_name,
     tags=aws_config.tags,
 )
+ocw_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol-ocw-studio-app-ownership-controls",
+    bucket=ocw_storage_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
 s3.BucketVersioningV2(
     "ol-ocw-studio-app-bucket-versioning",
     bucket=ocw_storage_bucket.id,
     versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
         status="Enabled"
     ),
+)
+ocw_storage_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-ocw-studio-app-bucket-public-access-controls",
+    bucket=ocw_storage_bucket.id,
+    block_public_policy=False,
 )
 s3.BucketPolicy(
     "ol-ocw-studio-app-bucket-policy",
@@ -90,6 +102,12 @@ s3.BucketPolicy(
                 }
             ],
         }
+    ),
+    opts=ResourceOptions(
+        depends_on=[
+            ocw_storage_bucket_public_access,
+            ocw_storage_bucket_ownership_controls,
+        ]
     ),
 )
 
