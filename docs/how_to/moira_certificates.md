@@ -23,3 +23,10 @@ Both of these applications utilize the same two environment variables for storin
   - Inside a single JSON structure at `misc.mit_ws_certificate` and `misc.mit_ws_private_key`
 - Maintained automatically by pulumi.
   - `sr/bridge/secrets/odl_video_service` or [here](https://github.com/mitodl/ol-infrastructure/tree/main/src/bridge/secrets/odl_video_service)
+
+## Certificate Usage and Expiration Tracking
+
+| Action Date | Application | Description | Who |
+|-------------|-------------|-------------|-----|
+| 20230625    | Open        | Replaced MIT Open certificate, expires 20240625 | MD |
+| 20230928    | OVS         | OVS Cert expired, replaced with Open certificate above, expires 20240625 | MD |
