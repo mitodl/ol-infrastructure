@@ -53,6 +53,17 @@ services:
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     env_file:
       - .env
+  edxorg-program-credentials:
+    image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+    container_name: edxorg-program-credentials
+    restart: unless-stopped
+    ports:
+    - "4000"
+    entrypoint: ["poetry", "run", "dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "--package-name", "ol_orchestrate.definitions.edx.sync_program_credential_reports"]
+    volumes:
+    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
+    env_file:
+      - .env
   edx-gcs-courses-pipeline:
     image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     container_name: edx-gcs-courses-pipeline
