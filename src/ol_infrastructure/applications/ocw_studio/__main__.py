@@ -63,12 +63,16 @@ ocw_studio_legacy_markdown_bucket = s3.Bucket(
 
 # Bucket used to store file uploads from ocw-studio app.
 ocw_storage_bucket_name = f"ol-ocw-studio-app-{stack_info.env_suffix}"
-ocw_storage_bucket = s3.Bucket(
+ocw_storage_bucket = s3.BucketV2(
     f"ol-ocw-studio-app-{stack_info.env_suffix}",
     bucket=ocw_storage_bucket_name,
     versioning=s3.BucketVersioningArgs(
         enabled=True,
     ),
+)
+s3.BucketPolicy(
+    "ol-ocw-studio-app-bucket-policy",
+    bucket=ocw_storage_bucket.id,
     policy=json.dumps(
         {
             "Version": "2008-10-17",
