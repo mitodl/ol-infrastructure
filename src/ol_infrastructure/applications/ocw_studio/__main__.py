@@ -66,8 +66,12 @@ ocw_storage_bucket_name = f"ol-ocw-studio-app-{stack_info.env_suffix}"
 ocw_storage_bucket = s3.BucketV2(
     f"ol-ocw-studio-app-{stack_info.env_suffix}",
     bucket=ocw_storage_bucket_name,
-    versioning=s3.BucketVersioningArgs(
-        enabled=True,
+)
+s3.BucketVersioningV2(
+    "ol-ocw-studio-app-bucket-versioning",
+    bucket=ocw_storage_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
     ),
 )
 s3.BucketPolicy(
