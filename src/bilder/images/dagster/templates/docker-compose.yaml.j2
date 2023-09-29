@@ -62,6 +62,7 @@ services:
     entrypoint: ["poetry", "run", "dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "--package-name", "ol_orchestrate.definitions.edx.sync_program_credential_reports"]
     volumes:
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
+    - /etc/aws/:/etc/aws/:ro
     env_file:
       - .env
   edx-gcs-courses-pipeline:
