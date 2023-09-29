@@ -191,6 +191,7 @@ s3_source_buckets = [
     f"{edxapp_deployment}-{stack_info.env_suffix}-edxapp-tracking"
     for edxapp_deployment in ("mitxonline", "mitx", "mitx-staging", "xpro")
 ]
+s3_source_buckets.append(f"ol-data-lake-landing-zone-{stack_info.env_suffix}")
 s3_source_policy_document = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
