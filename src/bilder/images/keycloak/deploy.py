@@ -2,7 +2,10 @@ import os
 from io import StringIO
 from pathlib import Path
 
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.magic_numbers import (
+    KEYCLOAK_PROMETHEUS_METRICS_PORT,
+    VAULT_HTTP_PORT,
+)
 from bridge.lib.versions import (
     CONSUL_TEMPLATE_VERSION,
     CONSUL_VERSION,
@@ -49,6 +52,8 @@ from bilder.components.hashicorp.vault.models import (
 from bilder.components.traefik.models import traefik_static
 from bilder.components.traefik.models.component import TraefikConfig
 from bilder.components.traefik.steps import configure_traefik
+from bilder.components.vector.models import VectorConfig
+from bilder.components.vector.steps import install_and_configure_vector
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 from bilder.lib.template_helpers import (
@@ -188,8 +193,15 @@ for product in hashicorp_products:
     configure_hashicorp_product(product)
 
 # Install and configure vector
-# vector_config.configuration_templates[
-# ] = {}
+vector_config = VectorConfig(
+    is_docker=True,
+    use_global_log_sink=True,
+    use_global_metric_sink=True,
+)
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "keycloak_logs_metrics.yaml")
+] = {"keycloak_prometheus_port": KEYCLOAK_PROMETHEUS_METRICS_PORT}
+install_and_configure_vector(vector_config)
 
 consul_template_permissions(consul_template.configuration)
 
