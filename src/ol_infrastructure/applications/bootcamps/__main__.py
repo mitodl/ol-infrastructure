@@ -5,9 +5,13 @@
 - Create an IAM policy to grant access to S3 and other resources
 """
 
+import json
+from pathlib import Path
+
 import pulumi_vault as vault
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
-from pulumi import Config, StackReference, export
+from bridge.secrets.sops import read_yaml_secrets
+from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, iam, s3
 
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -21,7 +25,8 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-setup_vault_provider()
+if Config("vault_server").get("env_namespace"):
+    setup_vault_provider()
 bootcamps_config = Config("bootcamps")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -153,9 +158,23 @@ bootcamps_vault_backend = OLVaultDatabaseBackend(bootcamps_vault_backend_config)
 bootcamps_secrets = vault.Mount(
     "bootcamps-vault-secrets-storage",
     path="secret-bootcamps",
-    type="generic",
+    type="kv",
+    options={"version": 2},
     description="Static secrets storage for the bootcamps application",
+    opts=ResourceOptions(delete_before_replace=True),
 )
+
+bootcamps_vault_secrets = read_yaml_secrets(
+    Path(f"bootcamps/secrets.{stack_info.env_suffix}.yaml")
+)
+
+for key, data in bootcamps_vault_secrets.items():
+    vault.kv.SecretV2(
+        f"bootcamps-vault-secrets-{key}",
+        name=key,
+        mount=bootcamps_secrets,
+        data_json=json.dumps(data),
+    )
 
 export(
     "bootcamps_app",
