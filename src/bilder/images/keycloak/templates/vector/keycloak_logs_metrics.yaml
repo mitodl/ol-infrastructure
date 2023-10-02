@@ -4,7 +4,7 @@ sources:
     type: prometheus_scrape
     endpoints:
     - http://localhost:{{ context.keycloak_prometheus_port }}/realms/master/metrics
-    scrape_interval_secs: 10
+    scrape_interval_secs: 60
 
 transforms:
   noop_metric_global_funnel:
