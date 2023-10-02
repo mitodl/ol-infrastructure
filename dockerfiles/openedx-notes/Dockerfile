@@ -1,4 +1,4 @@
-FROM python:3.8-slim
+FROM python:3.11-slim
 MAINTAINER MIT Open Learning <odl-devops@mit.edu>
 
 ARG APP_USER_ID=1000
