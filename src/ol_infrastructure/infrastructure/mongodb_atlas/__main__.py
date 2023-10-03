@@ -121,7 +121,7 @@ atlas_security_group = aws.ec2.SecurityGroup(
 # Because all networks @ atlas have the same address space, we need to
 # create privatelinke in the datavpc for airbyte/dagster rather than peering.
 # This costs a little bit of $$$ but is better than going over the internet.
-if data_vpc_access_config.get_bool("create_privatelink_to_datavpc") or False:
+if data_vpc_access_config.get_bool("create_privatelink_to_datavpc"):
     data_vpc = network_stack.require_output("data_vpc")
 
     privatelink_endpoint = atlas.PrivateLinkEndpoint(
@@ -175,15 +175,19 @@ if data_vpc_access_config.get_bool("create_privatelink_to_datavpc") or False:
         or f"https://consul-data-{stack_info.name}.odl.mit.edu"
     )
 
+    # The private endpoint data doesn't show up in the cluster resource
+    # until the second run. This will put an empty list into consul
+    # in the meantime.
+    private_endpoint_list = atlas_cluster.connection_strings.apply(
+        lambda cs: "{}".format(cs[0]["private_endpoints"])
+    )
     consul.Keys(
         "set-mongo-connection-info-in-data-vpc-consul",
         keys=[
             consul.KeysKeyArgs(
-                path=f"mongodb/{environment_name}/private-link-connection-string",
+                path=f"mongodb/{environment_name}/private-endpoints",
                 delete=True,
-                value=atlas_cluster.connection_strings[0]["private_endpoints"][0][
-                    "connection_string"
-                ],
+                value=private_endpoint_list,
             ),
         ],
         opts=pulumi.ResourceOptions(
@@ -196,7 +200,13 @@ if data_vpc_access_config.get_bool("create_privatelink_to_datavpc") or False:
                         Path(f"pulumi/consul.{stack_info.env_suffix}.yaml")
                     )["basic_auth_password"]
                 ),
-            )
+            ),
+            depends_on=[
+                privatelink_endpoint_service,
+                atlas_cluster,
+                data_vpc_endpoint,
+                privatelink_endpoint,
+            ],
         ),
     )
 
