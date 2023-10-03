@@ -673,7 +673,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     lets_encrypt_acme_url: Optional[str] = Field(
         None,
         alias="CONCOURSE_LETS_ENCRYPT_ACME_URL",
-        description="URL of the ACME CA directory endpoint. (default: https://acme_v02.api.letsencrypt.org/directory)",  # noqa: E501
+        description="URL of the ACME CA directory endpoint. (default: https://acme_v02.api.letsencrypt.org/directory)",
     )
     lidar_scanner_interval: Optional[str] = Field(
         None,
@@ -833,7 +833,7 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     newrelic_insights_api_url: Optional[str] = Field(
         None,
         alias="CONCOURSE_NEWRELIC_INSIGHTS_API_URL",
-        description="Base Url for insights Insert API (default: https://insights_collector.newrelic.com)",  # noqa: E501
+        description="Base Url for insights Insert API (default: https://insights_collector.newrelic.com)",
     )
     newrelic_service_prefix: Optional[str] = Field(
         None,

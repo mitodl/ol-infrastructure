@@ -738,7 +738,7 @@ class SetPipelineStep(Step, StepModifierMixin):
             " override the values from files earlier in the list.     \n@example "
             " Configuring static vars with a vars file \n   Where the vars file looks"
             " like:    yaml "
-            " https://raw.githubusercontent.com/concourse/examples/master/pipelines/vars-file.yml"  # noqa: E501
+            " https://raw.githubusercontent.com/concourse/examples/master/pipelines/vars-file.yml"
             "      And the pipeline config is:     ```yaml\njobs:\n- name:"
             " set-pipeline-vars-only\n  plan:\n  - get: examples\n  - set_pipeline:"
             " pipeline-set-with-vars\n    file: examples/pipelines/pipeline-vars.yml\n "
@@ -861,7 +861,7 @@ class LoadVarStep(Step, StepModifierMixin):
             " whitespace).     \n@example  Loading a var with multiple fields \n  "
             " Let's say we have a file with multiple fields, like this yaml file:     "
             " yaml "
-            " https://raw.githubusercontent.com/concourse/examples/master/pipelines/vars-file.yml"  # noqa: E501
+            " https://raw.githubusercontent.com/concourse/examples/master/pipelines/vars-file.yml"
             "      We could pass these values to subsequent steps by loading it  into a"
             " var with `load_var` , which will detect that it is in YAML  format based"
             " on the file extension:     ```yaml\njobs:\n- name: loading-vars\n "
@@ -888,7 +888,7 @@ class LoadVarStep(Step, StepModifierMixin):
             " examples\n  type: git\n  icon: github\n  source:\n    uri:"
             " https://github.com/concourse/examples.git\n- name: img\n  type: mock\n```"
             "      `simple-value.txt` looks like this:   "
-            " https://raw.githubusercontent.com/concourse/examples/master/misc/simple-value.txt"  # noqa: E501
+            " https://raw.githubusercontent.com/concourse/examples/master/misc/simple-value.txt"
         ),
     )
     reveal: Optional[bool] = Field(
@@ -1022,7 +1022,7 @@ class Resource(BaseModel):
             " need to include the pipeline vars for a single pipeline instance."
             " Currently  you can not have webhooks for all instances of a pipeline.   "
             " The pipeline vars should be added to the webhook URL as  URL  parameters "
-            " https://developer.mozilla.org/en-US/docs/Learn/Common_questions/What_is_a_URL#parameters"  # noqa: E501
+            " https://developer.mozilla.org/en-US/docs/Learn/Common_questions/What_is_a_URL#parameters"
             '    with the format `vars.MY-VAR="SOME-VALUE"` . A webhook URL for a '
             " pipeline instance may look like this:     `\n     "
             ' /api/v1/teams/TEAM_NAME/pipelines/PIPELINE_NAME/resources/RESOURCE_NAME/check/webhook?webhook_token=WEBHOOK_TOKEN&vars.my-var="some-value"&vars.second-var="two"\n'  # noqa: E501
@@ -1547,7 +1547,7 @@ class TaskStep(Step, StepModifierMixin):
             " schema.task.params `params` can have default values  declared in the"
             " task.     \n@example  Running a task with env var params \n   Let's say"
             " we have a  schema.task-config  task config  like  so:      yaml "
-            " https://raw.githubusercontent.com/concourse/examples/master/tasks/print-param.yml"  # noqa: E501
+            " https://raw.githubusercontent.com/concourse/examples/master/tasks/print-param.yml"
             "      This indicates that there are two params which can be set:  "
             " `ECHO_ME` , which has a default, and `ALSO_ME` which has no  default set."
             "    A pipeline could run the task with values passed in like so:    "
@@ -1618,7 +1618,7 @@ class TaskStep(Step, StepModifierMixin):
             ' second-var: "chips are a close second"\n\nresources:\n- name: ci\n  type:'
             " git\n  source:\n    uri: https://github.com/concourse/examples.git\n```  "
             "   When run with the following  tasks  task config  :      yaml "
-            " https://raw.githubusercontent.com/concourse/examples/master/tasks/print-var.yml"  # noqa: E501
+            " https://raw.githubusercontent.com/concourse/examples/master/tasks/print-var.yml"
             '      The `"((my-var))"` will be resolved to `"Cookies are the\n         '
             ' best"` and `((second-var))` will be resolved to `"chips are\n          a'
             ' close second"` .    This can also be used in combination with  vars  from'
@@ -1639,7 +1639,7 @@ class TaskStep(Step, StepModifierMixin):
             " times in the same plan.     \n@example  Using with `input_mapping`\n  "
             " This is often used together with    schema.task.input_mapping  :    Given"
             " this task config:    yaml "
-            " https://raw.githubusercontent.com/concourse/examples/master/tasks/generic-outputs.yml"  # noqa: E501
+            " https://raw.githubusercontent.com/concourse/examples/master/tasks/generic-outputs.yml"
             "      This pipeline will map the inputs and outputs of the task to match "
             " the name of the resources in the pipeline.   ```yaml\njobs:\n- name:"
             " task-output-mapping\n  plan:\n  - in_parallel:\n    - get: repo\n    -"

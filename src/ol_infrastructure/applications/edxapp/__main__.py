@@ -238,7 +238,7 @@ edxapp_tracking_bucket = s3.Bucket(
     acl="private",
     server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
         rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
                 sse_algorithm="aws:kms",
                 kms_master_key_id=kms_s3_key["id"],
             ),
@@ -307,7 +307,7 @@ edxapp_policy_document = {
             "Action": ["ses:SendEmail", "ses:SendRawEmail"],
             "Resource": [
                 "arn:*:ses:*:*:identity/*mit.edu",
-                f"arn:aws:ses:*:*:configuration-set/edxapp-{stack_info.env_prefix}-{stack_info.env_suffix}",  # noqa: E501
+                f"arn:aws:ses:*:*:configuration-set/edxapp-{stack_info.env_prefix}-{stack_info.env_suffix}",
             ],
         },
         {
@@ -501,7 +501,7 @@ edxapp_notes_iam_role = iam.Role(
         }
     ),
     name_prefix=f"edx-notes-role-{env_name}-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
-    path=f"/ol-applications/edx-notes-api/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
+    path=f"/ol-applications/edx-notes-api/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     tags=aws_config.merged_tags({"Name": f"{env_name}-edx-notes-api-role"}),
 )
 edxapp_notes_vault_auth_role = vault.aws.AuthBackendRole(

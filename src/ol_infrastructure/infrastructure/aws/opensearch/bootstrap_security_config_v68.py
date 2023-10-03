@@ -106,7 +106,7 @@ for r_name, r_def in roles.items():
     print(response.text)  # noqa: T201
 
 for u_name, u_def in users.items():
-    url = f"https://{cluster['endpoint']}/_opendistro/_security/api/internalusers/{u_name}"  # noqa: E501
+    url = f"https://{cluster['endpoint']}/_opendistro/_security/api/internalusers/{u_name}"
     response = requests.put(  # noqa: S113
         url,
         headers=headers,

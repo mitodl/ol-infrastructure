@@ -124,7 +124,7 @@ draft_backup_bucket = s3.Bucket(
     lifecycle_rules=[
         s3.BucketLifecycleRuleArgs(
             enabled=True,
-            noncurrent_version_expiration=s3.BucketLifecycleRuleNoncurrentVersionExpirationArgs(  # noqa: E501
+            noncurrent_version_expiration=s3.BucketLifecycleRuleNoncurrentVersionExpirationArgs(
                 days=90,
             ),
         )
@@ -201,7 +201,7 @@ live_backup_bucket = s3.Bucket(
     lifecycle_rules=[
         s3.BucketLifecycleRuleArgs(
             enabled=True,
-            noncurrent_version_expiration=s3.BucketLifecycleRuleNoncurrentVersionExpirationArgs(  # noqa: E501
+            noncurrent_version_expiration=s3.BucketLifecycleRuleNoncurrentVersionExpirationArgs(
                 days=90,
             ),
         )

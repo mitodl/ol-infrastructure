@@ -93,10 +93,10 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                     "src/bilder/images/edxapp_v2/group_data/",
                     "src/bilder/images/edxapp_v2/files/",
                     "src/bilder/images/edxapp_v2/templates/vector/",
-                    f"src/bilder/images/edxapp_v2/templates/edxapp/{deployment.deployment_name}/",  # noqa: E501
+                    f"src/bilder/images/edxapp_v2/templates/edxapp/{deployment.deployment_name}/",
                     "src/bilder/images/edxapp_v2/custom_install.pkr.hcl",
-                    f"src/bilder/images/edxapp_v2/packer_vars/{deployment.deployment_name}.pkrvars.hcl",  # noqa: E501
-                    f"src/bilder/images/edxapp_v2/packer_vars/{release_name}.pkrvars.hcl",  # noqa: E501
+                    f"src/bilder/images/edxapp_v2/packer_vars/{deployment.deployment_name}.pkrvars.hcl",
+                    f"src/bilder/images/edxapp_v2/packer_vars/{release_name}.pkrvars.hcl",
                 ],
             )
 
@@ -231,7 +231,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                         ),
                     ],
                     image_code=edx_ami_code,
-                    packer_template_path="src/bilder/images/edxapp_v2/custom_install.pkr.hcl",  # noqa: E501
+                    packer_template_path="src/bilder/images/edxapp_v2/custom_install.pkr.hcl",
                     node_types=["web", "worker"],
                     env_vars_from_files={
                         "DOCKER_REPO_NAME": f"{edx_registry_image_resource.name}/repository",  # noqa: E501
@@ -240,8 +240,8 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                     extra_packer_params={
                         "only": ["amazon-ebs.edxapp"],
                         "var_files": [
-                            f"{edx_ami_code.name}/src/bilder/images/edxapp_v2/packer_vars/{release_name}.pkrvars.hcl",  # noqa: E501
-                            f"{edx_ami_code.name}/src/bilder/images/edxapp_v2/packer_vars/{deployment.deployment_name}.pkrvars.hcl",  # noqa: E501
+                            f"{edx_ami_code.name}/src/bilder/images/edxapp_v2/packer_vars/{release_name}.pkrvars.hcl",
+                            f"{edx_ami_code.name}/src/bilder/images/edxapp_v2/packer_vars/{deployment.deployment_name}.pkrvars.hcl",
                         ],
                     },
                     job_name_suffix=f"{release_name}-{deployment.deployment_name}",

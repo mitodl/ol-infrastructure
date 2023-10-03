@@ -87,7 +87,7 @@ conditional_kwargs = {}
 if is_public_web:
     master_user_password = read_yaml_secrets(
         Path(
-            f"opensearch/opensearch.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"  # noqa: E501
+            f"opensearch/opensearch.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"
         )
     )["master_user_password"]
     conditional_kwargs[
@@ -95,7 +95,7 @@ if is_public_web:
     ] = aws.elasticsearch.DomainAdvancedSecurityOptionsArgs(
         enabled=True,
         internal_user_database_enabled=True,
-        master_user_options=aws.elasticsearch.DomainAdvancedSecurityOptionsMasterUserOptionsArgs(  # noqa: E501
+        master_user_options=aws.elasticsearch.DomainAdvancedSecurityOptionsMasterUserOptionsArgs(
             master_user_name="opensearch",
             master_user_password=master_user_password,
         ),
@@ -128,7 +128,7 @@ search_domain = aws.elasticsearch.Domain(
     elasticsearch_version=search_config.get("engine_version") or "7.10",
     cluster_config=aws.elasticsearch.DomainClusterConfigArgs(
         zone_awareness_enabled=True,
-        zone_awareness_config=aws.elasticsearch.DomainClusterConfigZoneAwarenessConfigArgs(  # noqa: E501
+        zone_awareness_config=aws.elasticsearch.DomainClusterConfigZoneAwarenessConfigArgs(
             availability_zone_count=3
         ),
         instance_count=cluster_size,

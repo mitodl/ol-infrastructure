@@ -290,7 +290,7 @@ ocw_studio_db = OLAmazonDB(ocw_studio_db_config)
 
 ocw_studio_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=ocw_studio_db_config.db_name,
-    mount_point=f"{ocw_studio_db_config.engine}-ocw-studio-applications-{stack_info.env_suffix}",  # noqa: E501
+    mount_point=f"{ocw_studio_db_config.engine}-ocw-studio-applications-{stack_info.env_suffix}",
     db_admin_username=ocw_studio_db_config.username,
     db_admin_password=ocw_studio_db_config.password.get_secret_value(),
     db_host=ocw_studio_db.db_instance.address,

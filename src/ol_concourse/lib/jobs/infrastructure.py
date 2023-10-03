@@ -255,7 +255,7 @@ def pulumi_job(  # noqa: PLR0913
                     inputs=[Input(name=pulumi_code.name)],
                     outputs=[aws_creds_path],
                     run=Command(
-                        path=f"{pulumi_code.name}/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"  # noqa: E501
+                        path=f"{pulumi_code.name}/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"
                     ),
                 ),
             ),

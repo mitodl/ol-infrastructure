@@ -116,7 +116,7 @@ unlocked_did_secret_value = secretsmanager.SecretVersion(
             json.dumps(
                 read_json_secrets(
                     Path(
-                        f"digital_credentials/sign_and_verify.{stack_info.env_suffix}.json"  # noqa: E501
+                        f"digital_credentials/sign_and_verify.{stack_info.env_suffix}.json"
                     )
                 )["secretKeySeed"]
             ).encode("utf8")
@@ -232,7 +232,7 @@ sign_and_verify_task = ecs.TaskDefinition(
                         {"name": "DIGEST_CHECK", "value": "true"},
                         {
                             "name": "ISSUER_MEMBERSHIP_REGISTRY_URL",
-                            "value": "https://digitalcredentials.github.io/issuer-registry/registry.json",  # noqa: E501
+                            "value": "https://digitalcredentials.github.io/issuer-registry/registry.json",
                         },
                         {
                             "name": "OIDC_ISSUER_URL",

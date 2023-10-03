@@ -60,7 +60,7 @@ fastly_logging_bucket = s3.Bucket(
     acl="private",
     server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
         rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
                 sse_algorithm="aws:kms",
                 kms_master_key_id=kms_s3_key["id"],
             ),
@@ -90,7 +90,7 @@ s3.BucketPublicAccessBlock(
     opts=ResourceOptions(
         aliases=[
             Alias(
-                name=f"{fastly_logging_bucket_name}-production_block_public_access"  # noqa: E501
+                name=f"{fastly_logging_bucket_name}-production_block_public_access"
             ),
             Alias(
                 name=f"monitoring-{fastly_logging_bucket_name}-production_block_public_access",

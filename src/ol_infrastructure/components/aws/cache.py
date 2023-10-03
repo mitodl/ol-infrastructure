@@ -138,7 +138,7 @@ class OLAmazonMemcachedConfig(OLAmazonCacheConfig):
     engine: str = "memcached"
     engine_version: str = "1.5.16"
     port: PositiveInt = PositiveInt(DEFAULT_MEMCACHED_PORT)
-    num_instances: conint(ge=1, le=MAX_MEMCACHED_CLUSTER_SIZE) = 3  # type: ignore[valid-type]  # noqa: E501
+    num_instances: conint(ge=1, le=MAX_MEMCACHED_CLUSTER_SIZE) = 3  # type: ignore[valid-type]
 
     @field_validator("cluster_name")
     @classmethod
@@ -183,7 +183,7 @@ class OLAmazonCache(pulumi.ComponentResource):
             )
 
         self.parameter_group = elasticache.ParameterGroup(
-            f"{cache_config.cluster_name}-{cache_config.engine}-{cache_config.engine_version}-parameter-group",  # noqa: E501
+            f"{cache_config.cluster_name}-{cache_config.engine}-{cache_config.engine_version}-parameter-group",
             name=(
                 f"{cache_config.cluster_name}-{cache_config.engine_version.replace('.', '')}-parameter-group"  # noqa: E501
             ),

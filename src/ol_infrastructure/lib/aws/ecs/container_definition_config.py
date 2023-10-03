@@ -13,7 +13,7 @@ def build_container_log_options(
     container_name: Optional[str] = None,
 ) -> dict[str, str]:
     return {
-        "awslogs-group": f"ecs/{service_name}/{task_name}/{stack_info.env_suffix}/",  # noqa: E501
+        "awslogs-group": f"ecs/{service_name}/{task_name}/{stack_info.env_suffix}/",
         "awslogs-region": "us-east-1",
         "awslogs-stream-prefix": f"{container_name}",
         "awslogs-create-group": "true",

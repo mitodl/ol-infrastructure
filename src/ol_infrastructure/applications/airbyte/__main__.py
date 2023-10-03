@@ -175,7 +175,7 @@ data_lake_policy_document = {
 data_lake_policy = iam.Policy(
     "data-lake-access-policy",
     name_prefix="airbyte-datalake-policy-",
-    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
+    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         data_lake_policy_document,
         stringify=True,
@@ -216,7 +216,7 @@ s3_source_policy_document = {
 s3_source_policy = iam.Policy(
     "airbyte-s3-source-access-policy",
     name_prefix="airbyte-s3-source-policy-",
-    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
+    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         s3_source_policy_document,
         stringify=True,
@@ -440,7 +440,7 @@ airbyte_db_consul_service = Service(
 )
 
 connection_string = Output.all(address=db_address, port=db_port, name=db_name).apply(
-    lambda db: "jdbc:postgresql://{address}:{port}/{name}?ssl=true&sslmode=require".format(  # noqa: E501
+    lambda db: "jdbc:postgresql://{address}:{port}/{name}?ssl=true&sslmode=require".format(
         **db
     )
 )

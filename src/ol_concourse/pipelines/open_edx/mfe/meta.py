@@ -52,7 +52,7 @@ def meta_job(
                         dir="pipeline",
                         user="root",
                         args=[
-                            "../mfe-pipeline-definitions/src/ol_concourse/pipelines/open_edx/mfe/pipeline.py",  # noqa: E501
+                            "../mfe-pipeline-definitions/src/ol_concourse/pipelines/open_edx/mfe/pipeline.py",
                             open_edx_deployment,
                             open_edx_release,
                         ],
@@ -113,7 +113,7 @@ def meta_pipeline() -> Pipeline:
                             dir="pipeline",
                             user="root",
                             args=[
-                                "../mfe-pipeline-definitions/src/ol_concourse/pipelines/open_edx/mfe/meta.py",  # noqa: E501
+                                "../mfe-pipeline-definitions/src/ol_concourse/pipelines/open_edx/mfe/meta.py",
                             ],
                         ),
                     ),

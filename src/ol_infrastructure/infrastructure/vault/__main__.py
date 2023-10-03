@@ -270,7 +270,7 @@ backup_bucket = s3.Bucket(
     versioning=s3.BucketVersioningArgs(enabled=False),
     server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
         rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
                 sse_algorithm="aws:kms",
                 kms_master_key_id=vault_unseal_key["id"],
             ),

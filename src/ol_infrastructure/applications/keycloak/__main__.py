@@ -431,7 +431,7 @@ keycloak_server_vault_mount = vault.Mount(
     path="secret-keycloak",
     type="kv-v2",
     options={"version": 2},
-    description="Storage of configuration credentials and secrets used by keycloak",  # noqa: E501
+    description="Storage of configuration credentials and secrets used by keycloak",
     opts=ResourceOptions(delete_before_replace=True),
 )
 

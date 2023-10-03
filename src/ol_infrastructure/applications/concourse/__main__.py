@@ -213,7 +213,7 @@ for iam_policy in iam_policy_names or []:
 for iam_policy_name in concourse_config.get_object("web_iam_policies") or []:
     iam_policy_object = iam_policy_objects[iam_policy_name]
     iam.RolePolicyAttachment(
-        f"concourse-instance-policy-web-policy-{iam_policy_name}-{stack_info.env_suffix}",  # noqa: E501
+        f"concourse-instance-policy-web-policy-{iam_policy_name}-{stack_info.env_suffix}",
         policy_arn=iam_policy_object.arn,
         role=concourse_web_instance_role.name,
     )
@@ -634,13 +634,13 @@ for worker_def in concourse_config.get_object("workers") or []:
     for iam_policy_name in worker_def["iam_policies"] or []:
         iam_policy_object = iam_policy_objects[iam_policy_name]
         iam.RolePolicyAttachment(
-            f"concourse-instance-policy-worker-{worker_class_name}-policy-{iam_policy_name}-{stack_info.env_suffix}",  # noqa: E501
+            f"concourse-instance-policy-worker-{worker_class_name}-policy-{iam_policy_name}-{stack_info.env_suffix}",
             policy_arn=iam_policy_object.arn,
             role=concourse_worker_instance_role.name,
         )
 
     concourse_worker_instance_profile = iam.InstanceProfile(
-        f"concourse-instance-profile-worker-{worker_class_name}-{stack_info.env_suffix}",  # noqa: E501
+        f"concourse-instance-profile-worker-{worker_class_name}-{stack_info.env_suffix}",
         role=concourse_worker_instance_role.name,
         path="/ol-applications/concourse/profile/",
     )
@@ -723,7 +723,7 @@ for worker_def in concourse_config.get_object("workers") or []:
         internal=True,
         ip_address_type="dualstack",
         load_balancer_type="application",
-        name=f"concourse-worker-alb-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}",  # noqa: E501
+        name=f"concourse-worker-alb-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}",
         security_groups=[concourse_worker_security_group.id],
         subnets=target_vpc["subnet_ids"],
         tags=aws_config.merged_tags({}),
