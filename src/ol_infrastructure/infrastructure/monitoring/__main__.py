@@ -89,9 +89,7 @@ s3.BucketPublicAccessBlock(
     # existing configuration
     opts=ResourceOptions(
         aliases=[
-            Alias(
-                name=f"{fastly_logging_bucket_name}-production_block_public_access"
-            ),
+            Alias(name=f"{fastly_logging_bucket_name}-production_block_public_access"),
             Alias(
                 name=f"monitoring-{fastly_logging_bucket_name}-production_block_public_access",
             ),
