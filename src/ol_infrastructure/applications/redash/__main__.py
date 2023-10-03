@@ -350,7 +350,7 @@ if redash_config.get_bool("manage_datasources"):
         datasource_config_consul_keys.append(
             consul.KeysKeyArgs(
                 path="redash/datasource_configs/xpro-pg-production/db_host",
-                # noqa: E501 MD 20230123 Can't find the pulumi stack associated with this datasource.
+                # MD 20230123 Can't find the pulumi stack associated with this datasource.
                 value="production-apps-rds-postgres-mitxpro.cbnm7ajau6mi.us-east-1.rds.amazonaws.com",
             )
         )

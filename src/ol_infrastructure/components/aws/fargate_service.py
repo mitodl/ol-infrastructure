@@ -113,7 +113,7 @@ class OLFargateServiceConfig(AWSBase):
         )
 
         pulumi.log.debug(
-            f"assign public IP addresses is set to {self.assign_public_ip}"  # noqa: E501
+            f"assign public IP addresses is set to {self.assign_public_ip}"
         )
 
         return ServiceNetworkConfigurationArgs(
@@ -126,7 +126,7 @@ class OLFargateServiceConfig(AWSBase):
         self,
     ) -> ServiceDeploymentControllerArgs:
         pulumi.log.debug(
-            f"ECS deployment controller type is {self._deployment_controller}"  # noqa: E501
+            f"ECS deployment controller type is {self._deployment_controller}"
         )
 
         return ServiceDeploymentControllerArgs(type=self._deployment_controller)
@@ -151,7 +151,7 @@ class OLFargateService(pulumi.ComponentResource):
 
         if config.cluster:
             pulumi.log.debug(
-                "using existing ECS Cluster '{}' provided in arguments".format(  # noqa: E501
+                "using existing ECS Cluster '{}' provided in arguments".format(
                     config.cluster.id
                 )
             )

@@ -377,7 +377,7 @@ class OLVaultPKIIntermediateEnvBackendConfig(BaseModel):
     max_ttl: int = ONE_MONTH_SECONDS * 12
     default_ttl: int = ONE_MONTH_SECONDS * 12
     acmpca_rootca_arn: Output = None
-    parent_intermediate_ca: OLVaultPKIIntermediateCABackend = None  # type: ignore  # noqa: E501, PGH003
+    parent_intermediate_ca: OLVaultPKIIntermediateCABackend = None  # type: ignore  # noqa: PGH003
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 

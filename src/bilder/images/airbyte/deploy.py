@@ -127,7 +127,7 @@ files.directory(
 
 files.download(
     name="Retrieve Temporal dynamicconfig file",
-    src="https://raw.githubusercontent.com/airbytehq/airbyte-platform/main/temporal/dynamicconfig/development.yaml",  # noqa: E501
+    src="https://raw.githubusercontent.com/airbytehq/airbyte-platform/main/temporal/dynamicconfig/development.yaml",
     dest=str(
         DOCKER_COMPOSE_DIRECTORY.joinpath(
             "temporal", "dynamicconfig", "development.yaml"

@@ -302,7 +302,7 @@ export(
 LOAD_BALANCER_NAME_MAX_LENGTH = 32
 vector_log_proxy_lb = lb.LoadBalancer(
     "vector-log-proxy-load-balancer",
-    name=f"vector-log-proxy-alb-{stack_info.env_prefix[:3]}-{stack_info.env_suffix[:2]}"[  # noqa: E501
+    name=f"vector-log-proxy-alb-{stack_info.env_prefix[:3]}-{stack_info.env_suffix[:2]}"[
         :LOAD_BALANCER_NAME_MAX_LENGTH
     ],
     ip_address_type="dualstack",

@@ -230,7 +230,7 @@ ovs_server_policy_document = {
 ovs_server_policy = iam.Policy(
     "odl-video-service-server-policy",
     name_prefix="odl-video-service-server-policy-",
-    path=f"/ol-applications/odl-video-service-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
+    path=f"/ol-applications/odl-video-service-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         ovs_server_policy_document,
         stringify=True,

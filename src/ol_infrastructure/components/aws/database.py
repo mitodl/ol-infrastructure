@@ -67,7 +67,7 @@ class OLDBConfig(AWSBase):
     port: PositiveInt
     subnet_group_name: Union[str, pulumi.Output[str]]
     security_groups: list[SecurityGroup]
-    backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore  # noqa: E501, PGH003
+    backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore  # noqa: PGH003
     db_name: Optional[str] = None  # The name of the database schema to create
     instance_size: str = DBInstanceTypes.general_purpose_large.value
     max_storage: Optional[PositiveInt] = None  # Set to allow for storage autoscaling
@@ -202,7 +202,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             deletion_protection=db_config.prevent_delete,
             engine=db_config.engine,
             engine_version=db_config.engine_version,
-            final_snapshot_identifier=f"{db_config.instance_name}-{db_config.engine}-final-snapshot",  # noqa: E501
+            final_snapshot_identifier=f"{db_config.instance_name}-{db_config.engine}-final-snapshot",
             identifier=db_config.instance_name,
             instance_class=db_config.instance_size,
             max_allocated_storage=db_config.max_storage,

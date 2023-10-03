@@ -32,7 +32,7 @@ def install_concourse(concourse_config: ConcourseBaseConfig):
     )
     if not host.get_fact(Directory, installation_directory):
         # Download latest Concourse release from GitHub
-        concourse_archive = f"https://github.com/concourse/concourse/releases/download/v{concourse_config.version}/concourse-{concourse_config.version}-linux-amd64.tgz"  # noqa: E501
+        concourse_archive = f"https://github.com/concourse/concourse/releases/download/v{concourse_config.version}/concourse-{concourse_config.version}-linux-amd64.tgz"
         concourse_archive_hash = f"{concourse_archive}.sha1"
         concourse_archive_path = (
             f"/tmp/concourse-{concourse_config.version}.tgz"  # noqa: S108
@@ -165,7 +165,7 @@ def _manage_worker_node_keys(concourse_config: ConcourseWorkerConfig):
 @deploy("Pull down pre-bundled resource types")
 def _install_resource_types(concourse_config: ConcourseWorkerConfig):
     for resource in concourse_config.additional_resource_types or []:
-        resource_archive = f"https://{concourse_config.additional_resource_types_s3_location}/{resource}.tgz"  # noqa: E501
+        resource_archive = f"https://{concourse_config.additional_resource_types_s3_location}/{resource}.tgz"
         resource_path = f"/tmp/{resource}"  # noqa: S108
         resource_archive_path = f"{resource_path}/{resource}.tgz"
         server.shell(

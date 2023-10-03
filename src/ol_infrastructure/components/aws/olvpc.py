@@ -340,7 +340,7 @@ class OLVPCPeeringConnection(ComponentResource):
             str(destination_vpc.vpc_config.cidr_block),
         )
         self.peering_connection = ec2.VpcPeeringConnection(
-            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-vpc-peer",  # noqa: E501
+            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-vpc-peer",
             auto_accept=True,
             vpc_id=source_vpc.olvpc.id,
             peer_vpc_id=destination_vpc.olvpc.id,
@@ -352,14 +352,14 @@ class OLVPCPeeringConnection(ComponentResource):
             opts=resource_options.merge(vpc_peer_resource_opts),
         )
         self.source_to_dest_route = ec2.Route(
-            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-route",  # noqa: E501
+            f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-route",
             route_table_id=source_vpc.route_table.id,
             destination_cidr_block=destination_vpc.olvpc.cidr_block,
             vpc_peering_connection_id=self.peering_connection.id,
             opts=resource_options,
         )
         self.dest_to_source_route = ec2.Route(
-            f"{destination_vpc.vpc_config.vpc_name}-to-{source_vpc.vpc_config.vpc_name}-route",  # noqa: E501
+            f"{destination_vpc.vpc_config.vpc_name}-to-{source_vpc.vpc_config.vpc_name}-route",
             route_table_id=destination_vpc.route_table.id,
             destination_cidr_block=source_vpc.olvpc.cidr_block,
             vpc_peering_connection_id=self.peering_connection.id,

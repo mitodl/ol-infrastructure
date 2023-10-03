@@ -153,7 +153,7 @@ concourse_config_map = {
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
         additional_resource_types=["rclone", "s3-sync"],
-        additional_resource_types_s3_location="ol-eng-artifacts.s3.amazonaws.com/bundled-concourse-resources",  # noqa: E501
+        additional_resource_types_s3_location="ol-eng-artifacts.s3.amazonaws.com/bundled-concourse-resources",
         baggageclaim_bind_ip="0.0.0.0",  # noqa: S104
         baggageclaim_driver="overlay",
         baggageclaim_p2p_interface_family="4",

@@ -89,7 +89,7 @@ forum_server_instance_role = iam.Role(
             },
         }
     ),
-    path=f"/ol-applications/open-edx-forum/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
+    path=f"/ol-applications/open-edx-forum/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     tags=aws_config.tags,
 )
 # Vault policy definition

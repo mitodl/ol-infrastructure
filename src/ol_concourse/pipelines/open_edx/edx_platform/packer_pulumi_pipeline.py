@@ -40,7 +40,7 @@ def build_edx_pipeline(
             "src/bridge/settings/openedx/",
             "src/bilder/images/edxapp/prebuild.py",
             "src/bilder/images/edxapp/edxapp_base.pkr.hcl",
-            f"src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl",  # noqa: E501
+            f"src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl",
             "src/bilder/images/edxapp/files/edxapp_web_playbook.yml",
             "src/bilder/images/edxapp/files/edxapp_worker_playbook.yml",
         ],
@@ -54,7 +54,7 @@ def build_edx_pipeline(
         extra_packer_params={
             "only": ["amazon-ebs.edxapp"],
             "var_files": [
-                f"{edx_base_image_code.name}/src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl"  # noqa: E501
+                f"{edx_base_image_code.name}/src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl"
             ],
         },
         job_name_suffix="base",
@@ -72,10 +72,10 @@ def build_edx_pipeline(
                 "src/bilder/images/edxapp/deploy.py",
                 "src/bilder/images/edxapp/group_data/",
                 "src/bilder/images/edxapp/templates/vector/",
-                f"src/bilder/images/edxapp/templates/edxapp/{deployment.deployment_name}/",  # noqa: E501
+                f"src/bilder/images/edxapp/templates/edxapp/{deployment.deployment_name}/",
                 "src/bilder/images/edxapp/custom_install.pkr.hcl",
-                f"src/bilder/images/edxapp/packer_vars/{deployment.deployment_name}.pkrvars.hcl",  # noqa: E501
-                f"src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl",  # noqa: E501
+                f"src/bilder/images/edxapp/packer_vars/{deployment.deployment_name}.pkrvars.hcl",
+                f"src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl",
             ],
         )
         loop_resources.append(custom_image_code)
@@ -89,13 +89,13 @@ def build_edx_pipeline(
                 ),
             ],
             image_code=custom_image_code,
-            packer_template_path="src/bilder/images/edxapp/custom_install.pkr.hcl",  # noqa: E501
+            packer_template_path="src/bilder/images/edxapp/custom_install.pkr.hcl",
             node_types=["web", "worker"],
             extra_packer_params={
                 "only": ["amazon-ebs.edxapp"],
                 "var_files": [
-                    f"{custom_image_code.name}/src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl",  # noqa: E501
-                    f"{custom_image_code.name}/src/bilder/images/edxapp/packer_vars/{deployment.deployment_name}.pkrvars.hcl",  # noqa: E501
+                    f"{custom_image_code.name}/src/bilder/images/edxapp/packer_vars/{release_name}.pkrvars.hcl",
+                    f"{custom_image_code.name}/src/bilder/images/edxapp/packer_vars/{deployment.deployment_name}.pkrvars.hcl",
                 ],
             },
             job_name_suffix=deployment.deployment_name,
@@ -105,7 +105,7 @@ def build_edx_pipeline(
         edx_pulumi_fragment = pulumi_jobs_chain(
             edx_pulumi_code,
             stack_names=[
-                f"applications.edxapp.{deployment.deployment_name}.{stage}"  # noqa: E501
+                f"applications.edxapp.{deployment.deployment_name}.{stage}"
                 for stage in deployment.envs_by_release(release_name)
             ],
             project_name="ol-infrastructure-edxapp-application",

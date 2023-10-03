@@ -84,7 +84,7 @@ codejail_server_instance_role = iam.Role(
             },
         }
     ),
-    path=f"/ol-applications/open-edx-codejail/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
+    path=f"/ol-applications/open-edx-codejail/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     tags=aws_config.tags,
 )
 # Register edX Platform AMI for Vault AWS auth

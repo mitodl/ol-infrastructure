@@ -334,9 +334,9 @@ class OLAutoScaling(pulumi.ComponentResource):
             triggers=asg_config.instance_refresh_triggers,
             preferences=GroupInstanceRefreshPreferencesArgs(
                 checkpoint_delay=asg_config.instance_refresh_checkpoint_delay,
-                checkpoint_percentages=asg_config.instance_refresh_checkpoint_percentages,  # noqa: E501
+                checkpoint_percentages=asg_config.instance_refresh_checkpoint_percentages,
                 instance_warmup=asg_config.instance_refresh_warmup,
-                min_healthy_percentage=asg_config.instance_refresh_min_healthy_percentage,  # noqa: E501
+                min_healthy_percentage=asg_config.instance_refresh_min_healthy_percentage,
             ),
         )
 

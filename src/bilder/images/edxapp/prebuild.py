@@ -71,7 +71,7 @@ if node_type == WEB_NODE_TYPE:
                 {
                     "edx-proctoring-proctortrack": [
                         "babel-polyfill",
-                        "/edx/app/edxapp/edx-platform/node_modules/edx-proctoring-proctortrack/edx_proctoring_proctortrack/static/proctortrack_custom.js",  # noqa: E501
+                        "/edx/app/edxapp/edx-platform/node_modules/edx-proctoring-proctortrack/edx_proctoring_proctortrack/static/proctortrack_custom.js",
                     ]
                 }
             )

@@ -35,7 +35,7 @@ def install_hashicorp_products(hashicorp_products: list[HashicorpProduct]):
         file_download = f"{product.name}_{product.version}_linux_{cpu_arch}.zip"
         file_hashes = (
             httpx.get(
-                "https://releases.hashicorp.com/{product_name}/{product_version}/{product_name}_{product_version}_SHA256SUMS".format(  # noqa: E501
+                "https://releases.hashicorp.com/{product_name}/{product_version}/{product_name}_{product_version}_SHA256SUMS".format(
                     product_name=product.name, product_version=product.version
                 )
             )
@@ -51,7 +51,7 @@ def install_hashicorp_products(hashicorp_products: list[HashicorpProduct]):
         target_directory = product.install_directory or "/usr/local/bin/"
         download_binary = files.download(
             name=f"Download {product.name} archive",
-            src=f"https://releases.hashicorp.com/{product.name}/{product.version}/{file_download}",  # noqa: E501
+            src=f"https://releases.hashicorp.com/{product.name}/{product.version}/{file_download}",
             dest=download_destination,
             sha256sum=file_hash_map[file_download],
         )
