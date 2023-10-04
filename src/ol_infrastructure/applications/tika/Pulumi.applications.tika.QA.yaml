@@ -4,7 +4,6 @@ encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgFHfBkhf0VwBzMaAl
 config:
   aws:region: us-east-1
   consul:address: https://consul-apps-qa.odl.mit.edu
-  tika:instance_type: m4.large
   tika:auto_scale:
     desired: 2
     max: 3
