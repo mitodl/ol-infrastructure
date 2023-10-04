@@ -30,15 +30,13 @@ def privatize_mongo_uri(mongo_uri):
 ###############
 atlas_config = pulumi.Config("mongodb_atlas")
 env_config = pulumi.Config("environment")
+data_vpc_access_config = pulumi.Config("data_vpc_access")
 stack_info = parse_stack()
 dagster_env_name = stack_info.name
 if stack_info.name == "CI":
     dagster_env_name = "QA"
 network_stack = pulumi.StackReference(f"infrastructure.aws.network.{stack_info.name}")
 dagster_stack = pulumi.StackReference(f"applications.dagster.{dagster_env_name}")
-consul_stack = pulumi.StackReference(
-    f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
-)
 
 #############
 # VARIABLES #
@@ -119,6 +117,98 @@ atlas_security_group = aws.ec2.SecurityGroup(
     ],
     egress=default_egress_args,
 )
+
+# Because all networks @ atlas have the same address space, we need to
+# create privatelinke in the datavpc for airbyte/dagster rather than peering.
+# This costs a little bit of $$$ but is better than going over the internet.
+if data_vpc_access_config.get_bool("create_privatelink_to_datavpc"):
+    data_vpc = network_stack.require_output("data_vpc")
+
+    privatelink_endpoint = atlas.PrivateLinkEndpoint(
+        f"mongodb-atlas-privatelink-endpoint-{environment_name}",
+        project_id=atlas_project.id,
+        provider_name="AWS",
+        region=atlas_config.get("cloud_region") or "US_EAST_1",
+        opts=atlas_provider,
+    )
+
+    # It might not be safe to assume ports 1024-1026 here according to mongo docs
+    # https://www.mongodb.com/docs/atlas/security-private-endpoint/#port-ranges-used-for-private-endpoints
+    data_vpc_endpoint_security_group = aws.ec2.SecurityGroup(
+        f"monogdb-atlas-privatelink-endpoint-security-group-{environment_name}",
+        name=f"mongodb-atlas-privatelink-{environment_name}",
+        tags=aws_config.merged_tags(
+            {"Names": f"mongodb-atlas-privatelink-{environment_name}"}
+        ),
+        vpc_id=data_vpc["id"],
+        ingress=[
+            aws.ec2.SecurityGroupIngressArgs(
+                protocol="tcp",
+                from_port=1024,
+                to_port=1026,
+                security_groups=[data_vpc["security_groups"]["integrator"]],
+            ),
+        ],
+        egress=[],
+    )
+
+    data_vpc_endpoint = aws.ec2.VpcEndpoint(
+        f"mongodb-atlas-privatelink-vpcendpoint-{environment_name}",
+        service_name=privatelink_endpoint.endpoint_service_name,
+        subnet_ids=data_vpc["subnet_ids"],
+        vpc_id=data_vpc["id"],
+        vpc_endpoint_type="Interface",
+        security_group_ids=[data_vpc_endpoint_security_group.id],
+    )
+
+    privatelink_endpoint_service = atlas.PrivateLinkEndpointService(
+        f"mongodb-atlas-privatelink-endpoint-service-{environment_name}",
+        project_id=atlas_project.id,
+        provider_name="AWS",
+        private_link_id=privatelink_endpoint.id,
+        endpoint_service_id=data_vpc_endpoint.id,
+        opts=atlas_provider,
+    )
+
+    data_vpc_consul_address = (
+        data_vpc_access_config.get("consul_address")
+        or f"https://consul-data-{stack_info.name}.odl.mit.edu"
+    )
+
+    # The private endpoint data doesn't show up in the cluster resource
+    # until the second run. This will put an empty list into consul
+    # in the meantime.
+    private_endpoint_list = atlas_cluster.connection_strings.apply(
+        lambda cs: "{}".format(cs[0]["private_endpoints"])
+    )
+    consul.Keys(
+        "set-mongo-connection-info-in-data-vpc-consul",
+        keys=[
+            consul.KeysKeyArgs(
+                path=f"mongodb/{environment_name}/private-endpoints",
+                delete=True,
+                value=private_endpoint_list,
+            ),
+        ],
+        opts=pulumi.ResourceOptions(
+            provider=consul.Provider(
+                "consul-provider-data-vpc",
+                address=data_vpc_consul_address,
+                scheme="https",
+                http_auth="pulumi:{}".format(
+                    read_yaml_secrets(
+                        Path(f"pulumi/consul.{stack_info.env_suffix}.yaml")
+                    )["basic_auth_password"]
+                ),
+            ),
+            depends_on=[
+                privatelink_endpoint_service,
+                atlas_cluster,
+                data_vpc_endpoint,
+                privatelink_endpoint,
+            ],
+        ),
+    )
 
 # It is necessary to manually go to the Mongo Atlas UI and fetch the IP CIDR for adding
 # to the VPC route table
