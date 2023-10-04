@@ -14,7 +14,7 @@ for service in ["mitx", "mitx-staging", "mitxonline", "xpro"]:
         uri="https://github.com/mitodl/ol-infrastructure",
         paths=[
             *PULUMI_WATCHED_PATHS,
-            "src/ol-infrastructure/infrastructure/mongodb_atlas/",
+            "src/ol_infrastructure/infrastructure/mongodb_atlas/",
         ],
     )
 
