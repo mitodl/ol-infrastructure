@@ -529,7 +529,8 @@ dagster_instance = ec2.Instance(
     subnet_id=data_vpc["subnet_ids"][1],
     key_name="oldevops",
     root_block_device=ec2.InstanceRootBlockDeviceArgs(
-        volume_type=DiskTypes.ssd, volume_size=100
+        volume_type=DiskTypes.ssd,
+        volume_size=get_config("dagster:disk_size_gb") or 100,
     ),
     vpc_security_group_ids=[
         data_vpc["security_groups"]["default"],
