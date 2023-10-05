@@ -1165,7 +1165,7 @@ web_launch_config = ec2.LaunchTemplate(
             ),
         ),
     ],
-    instance_type=InstanceTypes[web_instance_type].value,
+    instance_type=InstanceTypes.dereference(web_instance_type),
     key_name=SSH_ACCESS_KEY_NAME,
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
@@ -1307,7 +1307,7 @@ worker_launch_config = ec2.LaunchTemplate(
         edxapp_security_group.id,
         consul_security_groups["consul_agent"],
     ],
-    instance_type=InstanceTypes[worker_instance_type].value,
+    instance_type=InstanceTypes.dereference(worker_instance_type),
     key_name=SSH_ACCESS_KEY_NAME,
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
