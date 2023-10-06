@@ -17,9 +17,9 @@ from pulumi_aws.ec2 import SecurityGroup
 from pydantic import (
     BaseModel,
     ConfigDict,
-    FieldValidationInfo,
     PositiveInt,
     SecretStr,
+    ValidationInfo,
     conint,
     field_validator,
 )
@@ -93,8 +93,8 @@ class OLDBConfig(AWSBase):
 
     @field_validator("engine_version")
     @classmethod
-    def is_valid_version(cls, engine_version: str, info: FieldValidationInfo) -> str:
-        engine = info.data["engine"]
+    def is_valid_version(cls, engine_version: str, info: ValidationInfo) -> str:
+        engine = info.data["engine"]  # type: ignore[attr-defined]
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
             msg = (

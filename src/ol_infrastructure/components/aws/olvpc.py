@@ -18,7 +18,7 @@ from typing import Optional
 
 from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import ec2, elasticache, rds
-from pydantic import FieldValidationInfo, PositiveInt, field_validator
+from pydantic import PositiveInt, ValidationInfo, field_validator
 
 from ol_infrastructure.lib.aws.ec2_helper import (
     availability_zones,
@@ -82,7 +82,7 @@ class OLVPCConfig(AWSBase):
     @field_validator("k8s_service_subnet")
     @classmethod
     def k8s_service_subnet_is_subnet(
-        cls, k8s_service_subnet: Optional[IPv4Network], info: FieldValidationInfo
+        cls, k8s_service_subnet: Optional[IPv4Network], info: ValidationInfo
     ) -> Optional[IPv4Network]:
         """Ensure that specified k8s subnet is actually a subnet of the cidr specified
             for the VPC.
@@ -100,7 +100,7 @@ class OLVPCConfig(AWSBase):
 
         :rtype: IPv4Network
         """
-        network = info.data["cidr_block"]
+        network = info.data["cidr_block"]  # type: ignore[attr-defined]
         assert network is not None  # noqa: S101
         if k8s_service_subnet is not None and not k8s_service_subnet.subnet_of(network):
             msg = f"{k8s_service_subnet} is not a subnet of {network}"

@@ -12,8 +12,8 @@ from bridge.lib.magic_numbers import DEFAULT_MEMCACHED_PORT, DEFAULT_REDIS_PORT
 from pulumi_aws import elasticache
 from pydantic import (
     ConfigDict,
-    FieldValidationInfo,
     PositiveInt,
+    ValidationInfo,
     conint,
     field_validator,
 )
@@ -67,8 +67,8 @@ class OLAmazonCacheConfig(AWSBase):
 
     @field_validator("engine_version")
     @classmethod
-    def is_valid_version(cls, engine_version: str, info: FieldValidationInfo) -> str:
-        engine = info.data["engine"]
+    def is_valid_version(cls, engine_version: str, info: ValidationInfo) -> str:
+        engine = info.data["engine"]  # type: ignore[attr-defined]
         engines_map = cache_engines()
         if engine_version not in engines_map.get(engine, []):
             msg = (
@@ -103,9 +103,9 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
     @field_validator("auth_token")
     @classmethod
     def is_auth_token_valid(
-        cls, auth_token: Optional[str], info: FieldValidationInfo
+        cls, auth_token: Optional[str], info: ValidationInfo
     ) -> Optional[str]:
-        encrypt_transit = info.data["encrypt_transit"]
+        encrypt_transit = info.data["encrypt_transit"]  # type: ignore[attr-defined]
         min_token_length = 16
         max_token_length = 128
         if not encrypt_transit:
