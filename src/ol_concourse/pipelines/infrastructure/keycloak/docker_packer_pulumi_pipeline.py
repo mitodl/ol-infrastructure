@@ -27,6 +27,15 @@ from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PA
 
 
 def build_keycloak_pipeline() -> Pipeline:
+    keycloak_upstream_registry_image = registry_image(
+        name=Identifier("keycloak-upstream-image"),
+        image_repository="quay.io/keycloak/keycloak",
+        image_tag="22.0",
+    )
+    # When the ol-keycloak-customization repo is ready for it and has doof implemented,
+    # this should be split into two resources, one for `release` and another for
+    # `release-canidate` branch. Then refs should be updated. See OVS pipeline.
+    keycloak_customization_branch = "main"
     keycloak_customization_repo = git_repo(
         Identifier("ol-keycloak-customization"),
         uri="https://github.com/mitodl/ol-keycloak-customization",
@@ -93,6 +102,8 @@ def build_keycloak_pipeline() -> Pipeline:
                 trigger=True,
                 version={"version": KEYCLOAK_VERSION},
             ),
+            GetStep(get=keycloak_upstream_registry_image, trigger=True),
+            GetStep(get=keycloak_customization_repo.name, trigger=True),
             GetStep(get=metrics_spi.name, trigger=True),
             GetStep(get=user_migration_spi.name, trigger=True),
             TaskStep(
