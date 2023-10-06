@@ -27,14 +27,10 @@ from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PA
 
 
 def build_keycloak_pipeline() -> Pipeline:
-    # When the ol-keycloak-customization repo is ready for it and has doof implemented,
-    # this should be split into two resources, one for `release` and another for
-    # `release-canidate` branch. Then refs should be updated. See OVS pipeline.
-    keycloak_customization_branch = "main"
     keycloak_customization_repo = git_repo(
         Identifier("ol-keycloak-customization"),
         uri="https://github.com/mitodl/ol-keycloak-customization",
-        branch=keycloak_customization_branch,
+        branch="main",
     )
 
     keycloak_registry_image = registry_image(
@@ -63,39 +59,42 @@ def build_keycloak_pipeline() -> Pipeline:
         ],
     )
 
-    keycloak_user_migration_plugin_repo = github_release(
-        Identifier("user-migration-plugin"), "daniel-frak", "keycloak-user-migration"
+    #############################################
+    # Keycloak Service Provider Interfaces (SPIs)
+    #############################################
+
+    # Repo: https://github.com/jacekkow/keycloak-protocol-cas
+    # Use: Provide CAS support through Keycloak for some old apps
+    cas_protocol_spi = github_release(
+        Identifier("cas-protocol-spi"), "jacekkow", "keycloak-protocol-cas"
     )
 
-    keycloak_metrics_spi_repo = github_release(
+    # Repo: https://github.com/aerogear/keycloak-metrics-spi
+    # Use: Metrics endpoint for vector to scrape and ship to Grafana
+    metrics_spi = github_release(
         Identifier("metrics-spi"), "aerogear", "keycloak-metrics-spi"
     )
 
-    keycloak_cas_protocol_release = github_release(
-        Identifier("cas-protocol-release"), "jacekkow", "keycloak-protocol-cas"
+    # Repo: https://github.com/daniel-frak/keycloak-user-migration
+    # Use: Migrating users from open discussions
+    user_migration_spi = github_release(
+        Identifier("user-migration-spi"), "daniel-frak", "keycloak-user-migration"
     )
 
-    AnonymousResource(
-        type=REGISTRY_IMAGE,
-        source=RegistryImage(repository="maven", tag="3.9.4-eclipse-temurin-17"),
-    )
-
-    user_migration_output = Output(name=Identifier("user_migration_plugin"))
-    metrics_spi_plugin_output = Output(name=Identifier("metrics_spi_plugin"))
+    #############################################
     image_build_context = Output(name=Identifier("image-build-context"))
 
     docker_build_job = Job(
         name="build-keycloak-docker-image",
         build_log_retention={"builds": 10},
         plan=[
-            GetStep(get=keycloak_customization_repo.name, trigger=True),
-            GetStep(get=keycloak_user_migration_plugin_repo.name, trigger=True),
-            GetStep(get=keycloak_metrics_spi_repo.name, trigger=True),
             GetStep(
-                get=keycloak_cas_protocol_release.name,
+                get=cas_protocol_spi.name,
                 trigger=True,
                 version=KEYCLOAK_VERSION,
             ),
+            GetStep(get=metrics_spi.name, trigger=True),
+            GetStep(get=user_migration_spi.name, trigger=True),
             TaskStep(
                 task=Identifier("collect-artifacts-for-build-context"),
                 config=TaskConfig(
@@ -103,9 +102,9 @@ def build_keycloak_pipeline() -> Pipeline:
                     outputs=[image_build_context],
                     inputs=[
                         Input(name=keycloak_customization_repo.name),
-                        Input(name=metrics_spi_plugin_output.name),
-                        Input(name=user_migration_output.name),
-                        Input(name=keycloak_cas_protocol_release.name),
+                        Input(name=cas_protocol_spi.name),
+                        Input(name=metrics_spi.name),
+                        Input(name=user_migration_spi.name),
                     ],
                     image_resource=AnonymousResource(
                         type=REGISTRY_IMAGE,
@@ -119,8 +118,9 @@ def build_keycloak_pipeline() -> Pipeline:
                                 f"""\
                         mkdir {image_build_context.name}/plugins/
                         cp -r {keycloak_customization_repo.name}/* {image_build_context.name}/
-                        cp -r {metrics_spi_plugin_output.name}/* {image_build_context.name}/plugins/
-                        cp -r {user_migration_output.name}/* {image_build_context.name}/plugins/
+                        cp -r {cas_protocol_spi.name}/* {image_build_context.name}/plugins/
+                        cp -r {metrics_spi.name}/* {image_build_context.name}/plugins/
+                        cp -r {user_migration_spi.name}/* {image_build_context.name}/plugins/
                         """  # noqa: E501
                             ),
                         ],
@@ -136,9 +136,6 @@ def build_keycloak_pipeline() -> Pipeline:
                     "CONTEXT": image_build_context.name,
                     "DOCKERFILE": (
                         f"{keycloak_customization_repo.name}/Dockerfile.hosted"
-                    ),
-                    "BUILD_ARGS_FILE": (
-                        f"{keycloak_customization_repo.name}/.keycloak_upstream_tag"
                     ),
                     "IMAGE_PLATFORM": "linux/amd64",
                 },
@@ -160,9 +157,9 @@ def build_keycloak_pipeline() -> Pipeline:
         resources=[
             keycloak_customization_repo,
             keycloak_registry_image,
-            keycloak_user_migration_plugin_repo,
-            keycloak_metrics_spi_repo,
-            keycloak_cas_protocol_release,
+            cas_protocol_spi,
+            metrics_spi,
+            user_migration_spi,
         ],
         jobs=[docker_build_job],
     )
@@ -186,7 +183,6 @@ def build_keycloak_pipeline() -> Pipeline:
 
     pulumi_fragment = pulumi_jobs_chain(
         keycloak_pulumi_code,
-        # Expand stack_names to include QA and Production when the time comes.
         stack_names=[
             f"applications.keycloak.{stage}"
             for stage in [
@@ -205,17 +201,12 @@ def build_keycloak_pipeline() -> Pipeline:
                 trigger=True,
                 passed=[ami_fragment.jobs[-1].name],
             ),
+            GetStep(
+                get=keycloak_customization_repo.name,
+                trigger=True,
+                passed=[ami_fragment.jobs[-1].name],
+            ),
         ],
-        custom_dependencies={
-            # Expand this to account for `release` and `release-canidate` branches
-            0: [
-                GetStep(
-                    get=keycloak_customization_repo.name,
-                    trigger=True,
-                    passed=[ami_fragment.jobs[-1].name],
-                ),
-            ],
-        },
     )
 
     combined_fragments = PipelineFragment.combine_fragments(
