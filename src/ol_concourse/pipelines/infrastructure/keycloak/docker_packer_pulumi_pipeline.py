@@ -1,6 +1,8 @@
 import sys
 import textwrap
 
+from bridge.lib.versions import KEYCLOAK_VERSION
+
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
@@ -20,7 +22,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resources import git_repo, registry_image
+from ol_concourse.lib.resources import git_repo, github_release, registry_image
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 
@@ -73,6 +75,10 @@ def build_keycloak_pipeline() -> Pipeline:
         branch="master",
     )
 
+    keycloak_cas_protocol_release = github_release(
+        Identifier("cas-protocol-release"), "jacekkow", "keycloak-protocol-cas"
+    )
+
     maven_registry_image = AnonymousResource(
         type=REGISTRY_IMAGE,
         source=RegistryImage(repository="maven", tag="3.9.4-eclipse-temurin-17"),
@@ -89,6 +95,11 @@ def build_keycloak_pipeline() -> Pipeline:
             GetStep(get=keycloak_customization_repo.name, trigger=True),
             GetStep(get=keycloak_user_migration_plugin_repo.name, trigger=True),
             GetStep(get=keycloak_metrics_spi_repo.name, trigger=True),
+            GetStep(
+                get=keycloak_cas_protocol_release.name,
+                trigger=True,
+                version=KEYCLOAK_VERSION,
+            ),
             TaskStep(
                 task=Identifier("build-user-migration-jar"),
                 config=TaskConfig(
@@ -140,6 +151,7 @@ def build_keycloak_pipeline() -> Pipeline:
                         Input(name=keycloak_customization_repo.name),
                         Input(name=metrics_spi_plugin_output.name),
                         Input(name=user_migration_output.name),
+                        Input(name=keycloak_cas_protocol_release.name),
                     ],
                     image_resource=AnonymousResource(
                         type=REGISTRY_IMAGE,
@@ -196,6 +208,7 @@ def build_keycloak_pipeline() -> Pipeline:
             keycloak_registry_image,
             keycloak_user_migration_plugin_repo,
             keycloak_metrics_spi_repo,
+            keycloak_cas_protocol_release,
         ],
         jobs=[docker_build_job],
     )
