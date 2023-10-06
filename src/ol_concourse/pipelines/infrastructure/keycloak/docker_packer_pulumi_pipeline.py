@@ -182,9 +182,7 @@ def build_keycloak_pipeline() -> Pipeline:
         ],
         image_code=keycloak_packer_code,
         packer_template_path="src/bilder/images/keycloak/keycloak.pkr.hcl",
-        env_vars_from_files={
-            "KEYCLOAK_VERSION": f"{keycloak_customization_repo.name}/.git/describe_ref"
-        },
+        env_vars_from_files={"KEYCLOAK_VERSION": KEYCLOAK_VERSION},
         job_name_suffix="keycloak",
     )
 
