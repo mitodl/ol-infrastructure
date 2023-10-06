@@ -79,7 +79,7 @@ services:
       - .env
   edxorg-raw-data-import:
     image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
-    container_name: edx-gcs-courses-pipeline
+    container_name: edxorg-raw-data-import
     restart: unless-stopped
     ports:
     - "4000"
