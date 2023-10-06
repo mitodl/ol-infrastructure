@@ -1,3 +1,4 @@
+# -*- mode: yaml -*-
 version: "3.7"
 
 services:
@@ -72,6 +73,17 @@ services:
     ports:
     - "4000"
     entrypoint: ["poetry", "run", "dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "--package-name", "ol_orchestrate.repositories.edx_gcs_courses"]
+    volumes:
+    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
+    env_file:
+      - .env
+  edxorg-raw-data-import:
+    image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+    container_name: edx-gcs-courses-pipeline
+    restart: unless-stopped
+    ports:
+    - "4000"
+    entrypoint: ["poetry", "run", "dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "--package-name", "ol_orchestrate.definitions.edx.retrieve_irx_edx_exports"]
     volumes:
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     env_file:
