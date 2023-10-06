@@ -86,7 +86,10 @@ def build_keycloak_pipeline() -> Pipeline:
     # Repo: https://github.com/daniel-frak/keycloak-user-migration
     # Use: Migrating users from open discussions
     user_migration_spi = github_release(
-        Identifier("user-migration-spi"), "daniel-frak", "keycloak-user-migration"
+        Identifier("user-migration-spi"),
+        "daniel-frak",
+        "keycloak-user-migration",
+        KEYCLOAK_VERSION,
     )
 
     #############################################
@@ -96,11 +99,7 @@ def build_keycloak_pipeline() -> Pipeline:
         name="build-keycloak-docker-image",
         build_log_retention={"builds": 10},
         plan=[
-            GetStep(
-                get=cas_protocol_spi.name,
-                trigger=True,
-                version={"version": KEYCLOAK_VERSION},
-            ),
+            GetStep(get=cas_protocol_spi.name, trigger=True),
             GetStep(get=keycloak_upstream_registry_image.name, trigger=True),
             GetStep(get=keycloak_customization_repo.name, trigger=True),
             GetStep(get=metrics_spi.name, trigger=True),

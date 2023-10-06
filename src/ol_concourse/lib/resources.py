@@ -45,6 +45,7 @@ def github_release(
     owner: str,
     repository: str,
     github_token: str = "((github.public_repo_access_token))",  # noqa: S107
+    tag_filter: Optional[str] = None,
 ) -> Resource:
     """Generate a github-release resource for the given owner/repository.
 
@@ -54,6 +55,7 @@ def github_release(
     :param repository: The name of the repository as it appears in GitHub
     :param github_token: A personal access token with `public_repo` scope to increase
         the rate limit for checking versions.
+    :param tag_filter: Optional str to get specific tag of release.
 
     :returns: A configured Concourse resource object that can be used in a pipeline.
 
@@ -69,6 +71,7 @@ def github_release(
             "owner": owner,
             "release": True,
             "access_token": github_token,
+            "tag_filter": tag_filter,
         },
     )
 
