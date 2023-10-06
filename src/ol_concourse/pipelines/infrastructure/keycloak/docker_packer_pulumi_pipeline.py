@@ -91,7 +91,7 @@ def build_keycloak_pipeline() -> Pipeline:
             GetStep(
                 get=cas_protocol_spi.name,
                 trigger=True,
-                version=KEYCLOAK_VERSION,
+                version={"version": KEYCLOAK_VERSION},
             ),
             GetStep(get=metrics_spi.name, trigger=True),
             GetStep(get=user_migration_spi.name, trigger=True),
