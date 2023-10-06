@@ -228,6 +228,7 @@ def build_keycloak_pipeline() -> Pipeline:
             *combined_fragments.resources,
             keycloak_packer_code,
             keycloak_pulumi_code,
+            keycloak_upstream_registry_image,
         ],
         jobs=combined_fragments.jobs,
     )
