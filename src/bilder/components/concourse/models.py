@@ -72,7 +72,10 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     auth_duration: Optional[str] = Field(
         None,
         alias="CONCOURSE_AUTH_DURATION",
-        description="Length of time for which tokens are valid. Afterwards, users will have to log back in. (default: 24h)",  # noqa: E501
+        description=(
+            "Length of time for which tokens are valid. Afterwards, users will have to"
+            " log back in. (default: 24h)"
+        ),
     )
     authorized_keys_file: Path = Field(
         Path("/etc/concourse/authorized_keys"),
@@ -87,7 +90,10 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     aws_secretsmanager_pipeline_secret_template: Optional[str] = Field(
         None,
         alias="CONCOURSE_AWS_SECRETSMANAGER_PIPELINE_SECRET_TEMPLATE",
-        description="AWS Secrets Manager secret identifier template used for pipeline specific parameter (default: /concourse/{{.Team}}/{{.Pipeline}}/{{.Secret}})",  # noqa: E501
+        description=(
+            "AWS Secrets Manager secret identifier template used for pipeline specific"
+            " parameter (default: /concourse/{{.Team}}/{{.Pipeline}}/{{.Secret}})"
+        ),
     )
     aws_secretsmanager_region: Optional[str] = Field(
         None,
@@ -107,7 +113,10 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     aws_secretsmanager_team_secret_template: Optional[str] = Field(
         None,
         alias="CONCOURSE_AWS_SECRETSMANAGER_TEAM_SECRET_TEMPLATE",
-        description="AWS Secrets Manager secret identifier  template used for team specific parameter (default: /concourse/{{.Team}}/{{.Secret}})",  # noqa: E501
+        description=(
+            "AWS Secrets Manager secret identifier  template used for team specific"
+            " parameter (default: /concourse/{{.Team}}/{{.Secret}})"
+        ),
     )
     aws_ssm_access_key: Optional[str] = Field(
         None,
@@ -117,7 +126,10 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     aws_ssm_pipeline_secret_template: Optional[str] = Field(
         None,
         alias="CONCOURSE_AWS_SSM_PIPELINE_SECRET_TEMPLATE",
-        description="AWS SSM parameter name template used for pipeline specific parameter (default: /concourse/{{.Team}}/{{.Pipeline}}/{{.Secret}})",  # noqa: E501
+        description=(
+            "AWS SSM parameter name template used for pipeline specific parameter"
+            " (default: /concourse/{{.Team}}/{{.Pipeline}}/{{.Secret}})"
+        ),
     )
     aws_ssm_region: Optional[str] = Field(
         None,
@@ -137,12 +149,18 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     aws_ssm_team_secret_template: Optional[str] = Field(
         None,
         alias="CONCOURSE_AWS_SSM_TEAM_SECRET_TEMPLATE",
-        description="AWS SSM parameter name template used for team specific parameter (default: /concourse/{{.Team}}/{{.Secret}})",  # noqa: E501
+        description=(
+            "AWS SSM parameter name template used for team specific parameter (default:"
+            " /concourse/{{.Team}}/{{.Secret}})"
+        ),
     )
     baggageclaim_response_header_timeout: Optional[str] = Field(
         None,
         alias="CONCOURSE_BAGGAGECLAIM_RESPONSE_HEADER_TIMEOUT",
-        description="How long to wait for Baggageclaim to send the response header. (default: 1m)",  # noqa: E501
+        description=(
+            "How long to wait for Baggageclaim to send the response header."
+            " (default: 1m)"
+        ),
     )
     base_resource_type_defaults: Optional[str] = Field(
         None,
@@ -187,17 +205,25 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     cluster_name: Optional[str] = Field(
         None,
         alias="CONCOURSE_CLUSTER_NAME",
-        description="A name for this Concourse cluster, to be displayed on the dashboard page.",  # noqa: E501
+        description=(
+            "A name for this Concourse cluster, to be displayed on the dashboard page."
+        ),
     )
     component_runner_interval: Optional[str] = Field(
         None,
         alias="CONCOURSE_COMPONENT_RUNNER_INTERVAL",
-        description="Interval on which runners are kicked off for builds, locks, scans, and checks (default: 10s)",  # noqa: E501
+        description=(
+            "Interval on which runners are kicked off for builds, locks, scans, and"
+            " checks (default: 10s)"
+        ),
     )
     concurrent_request_limit: Optional[str] = Field(
         None,
         alias="CONCOURSE_CONCURRENT_REQUEST_LIMIT",
-        description="Limit the number of concurrent requests to an API endpoint (Example: ListAllJobs:5)",  # noqa: E501
+        description=(
+            "Limit the number of concurrent requests to an API endpoint (Example:"
+            " ListAllJobs:5)"
+        ),
     )
     config_rbac: Optional[str] = Field(
         None,
@@ -207,7 +233,11 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     container_placement_strategy: Optional[str] = Field(
         None,
         alias="CONCOURSE_CONTAINER_PLACEMENT_STRATEGY",
-        description="Method by which a worker is selected during container placement. If multiple methods are specified, they will be applied in order. Random strategy should only be used alone. (default: volume_locality)",  # noqa: E501
+        description=(
+            "Method by which a worker is selected during container placement. If"
+            " multiple methods are specified, they will be applied in order. Random"
+            " strategy should only be used alone. (default: volume_locality)"
+        ),
     )
     cookie_secure: Optional[bool] = Field(
         None,
@@ -279,22 +309,33 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     db_max_conns_api: PositiveInt = Field(
         PositiveInt(10),
         alias="CONCOURSE_API_MAX_CONNS",
-        description="The maximum number of open connections for the api connection pool. (default: 10)",  # noqa: E501
+        description=(
+            "The maximum number of open connections for the api connection pool."
+            " (default: 10)"
+        ),
     )
     db_max_conns_backend: PositiveInt = Field(
         PositiveInt(50),
         alias="CONCOURSE_BACKEND_MAX_CONNS",
-        description="The maximum number of open connections for the backend connection pool. (default: 50)",  # noqa: E501
+        description=(
+            "The maximum number of open connections for the backend connection pool."
+            " (default: 50)"
+        ),
     )
     debug_bind_ip: Optional[str] = Field(
         None,
         alias="CONCOURSE_DEBUG_BIND_IP",
-        description="IP address on which to listen for the pprof debugger endpoints. (default: 127.0.0.1)",  # noqa: E501
+        description=(
+            "IP address on which to listen for the pprof debugger endpoints. (default:"
+            " 127.0.0.1)"
+        ),
     )
     debug_bind_port: Optional[str] = Field(
         None,
         alias="CONCOURSE_DEBUG_BIND_PORT",
-        description="Port on which to listen for the pprof debugger endpoints. (default: 8079)",  # noqa: E501
+        description=(
+            "Port on which to listen for the pprof debugger endpoints. (default: 8079)"
+        ),
     )
     default_build_logs_to_retain: Optional[str] = Field(
         None,
@@ -319,10 +360,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     display_user_id_per_connector: Optional[str] = Field(
         None,
         alias="CONCOURSE_DISPLAY_USER_ID_PER_CONNECTOR",
-        description="Define how to display user ID for each authentication connector. "
-        "Format is <connector>:<fieldname>. Valid field names are user_id, name, "
-        "username and email, where name maps to claims field username, and username "
-        "maps to claims field preferred username",
+        description=(
+            "Define how to display user ID for each authentication connector. Format is"
+            " <connector>:<fieldname>. Valid field names are user_id, name, username"
+            " and email, where name maps to claims field username, and username maps to"
+            " claims field preferred username"
+        ),
     )
     emit_to_logs: Optional[bool] = Field(
         None,
@@ -332,7 +375,10 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     enable_across_step: Optional[bool] = Field(
         None,
         alias="CONCOURSE_ENABLE_ACROSS_STEP",
-        description="Enable the experimental across step to be used in jobs. The API is subject to change.",  # noqa: E501
+        description=(
+            "Enable the experimental across step to be used in jobs. The API is subject"
+            " to change."
+        ),
     )
     enable_build_auditing: Optional[bool] = Field(
         default=True,
@@ -347,7 +393,10 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     enable_global_resources: Optional[bool] = Field(
         default=True,
         alias="CONCOURSE_ENABLE_GLOBAL_RESOURCES",
-        description="Enable equivalent resources across pipelines and teams to share a single version history.",  # noqa: E501
+        description=(
+            "Enable equivalent resources across pipelines and teams to share a single"
+            " version history."
+        ),
     )
     enable_job_auditing: Optional[bool] = Field(
         default=True,
@@ -383,7 +432,10 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     enable_rerun_when_worker_disappears: Optional[bool] = Field(
         None,
         alias="CONCOURSE_ENABLE_RERUN_WHEN_WORKER_DISAPPEARS",
-        description="Enable automatically build rerun when worker disappears or a network error occurs",  # noqa: E501
+        description=(
+            "Enable automatically build rerun when worker disappears or a network error"
+            " occurs"
+        ),
     )
     enable_resource_auditing: Optional[bool] = Field(
         default=True,
@@ -398,7 +450,9 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     enable_system_auditing: Optional[bool] = Field(
         default=True,
         alias="CONCOURSE_ENABLE_SYSTEM_AUDITING",
-        description="Enable auditing for all api requests connected to system transactions.",  # noqa: E501
+        description=(
+            "Enable auditing for all api requests connected to system transactions."
+        ),
     )
     enable_team_auditing: Optional[bool] = Field(
         default=True,
@@ -422,27 +476,41 @@ class ConcourseWebConfig(ConcourseBaseConfig):
             CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH // 2,
         ),
         alias="CONCOURSE_ENCRYPTION_KEY",
-        description="A 16 or 32 length key used to encrypt sensitive information before storing it in the database.",  # noqa: E501
+        description=(
+            "A 16 or 32 length key used to encrypt sensitive information before storing"
+            " it in the database."
+        ),
     )
     garden_request_timeout: Optional[str] = Field(
         None,
         alias="CONCOURSE_GARDEN_REQUEST_TIMEOUT",
-        description="How long to wait for requests to Garden to complete. 0 means no timeout. (default: 5m)",  # noqa: E501
+        description=(
+            "How long to wait for requests to Garden to complete. 0 means no timeout."
+            " (default: 5m)"
+        ),
     )
     gc_check_recycle_period: Optional[str] = Field(
         None,
         alias="CONCOURSE_GC_CHECK_RECYCLE_PERIOD",
-        description="Period after which to reap checks that are completed. (default: 1m)",  # noqa: E501
+        description=(
+            "Period after which to reap checks that are completed. (default: 1m)"
+        ),
     )
     gc_failed_grace_period: Optional[str] = Field(
         None,
         alias="CONCOURSE_GC_FAILED_GRACE_PERIOD",
-        description="Period after which failed containers will be garbage collected (default: 120h)",  # noqa: E501
+        description=(
+            "Period after which failed containers will be garbage collected (default:"
+            " 120h)"
+        ),
     )
     gc_hijack_grace_period: Optional[str] = Field(
         None,
         alias="CONCOURSE_GC_HIJACK_GRACE_PERIOD",
-        description="Period after which hijacked containers will be garbage collected (default: 5m)",  # noqa: E501
+        description=(
+            "Period after which hijacked containers will be garbage collected"
+            " (default: 5m)"
+        ),
     )
     gc_interval: Optional[str] = Field(
         None,
@@ -452,17 +520,25 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     gc_missing_grace_period: Optional[str] = Field(
         None,
         alias="CONCOURSE_GC_MISSING_GRACE_PERIOD",
-        description="Period after which to reap containers and volumes that were created but went missing from the worker. (default: 5m)",  # noqa: E501
+        description=(
+            "Period after which to reap containers and volumes that were created but"
+            " went missing from the worker. (default: 5m)"
+        ),
     )
     gc_one_off_grace_period: Optional[str] = Field(
         None,
         alias="CONCOURSE_GC_ONE_OFF_GRACE_PERIOD",
-        description="Period after which one_off build containers will be garbage_collected. (default: 5m)",  # noqa: E501
+        description=(
+            "Period after which one_off build containers will be garbage_collected."
+            " (default: 5m)"
+        ),
     )
     gc_var_source_recycle_period: Optional[str] = Field(
         None,
         alias="CONCOURSE_GC_VAR_SOURCE_RECYCLE_PERIOD",
-        description="Period after which to reap var_sources that are not used. (default: 5m)",  # noqa: E501
+        description=(
+            "Period after which to reap var_sources that are not used. (default: 5m)"
+        ),
     )
     github_ca_cert: Optional[str] = Field(
         None,
@@ -482,7 +558,9 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     github_host: Optional[str] = Field(
         None,
         alias="CONCOURSE_GITHUB_HOST",
-        description="Hostname of GitHub Enterprise deployment (No scheme, No trailing slash)",  # noqa: E501
+        description=(
+            "Hostname of GitHub Enterprise deployment (No scheme, No trailing slash)"
+        ),
     )
     github_main_team_concourse_team: Optional[str] = Field(
         "mitodl:odl-engineering", alias="CONCOURSE_MAIN_TEAM_GITHUB_TEAM"
@@ -506,12 +584,17 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     gitlab_host: Optional[str] = Field(
         None,
         alias="CONCOURSE_GITLAB_HOST",
-        description="Hostname of Gitlab Enterprise deployment (Include scheme, No trailing slash)",  # noqa: E501
+        description=(
+            "Hostname of Gitlab Enterprise deployment (Include scheme, No trailing"
+            " slash)"
+        ),
     )
     global_resource_check_timeout: Optional[str] = Field(
         None,
         alias="CONCOURSE_GLOBAL_RESOURCE_CHECK_TIMEOUT",
-        description="Time limit on checking for new versions of resources. (default: 1h)",  # noqa: E501
+        description=(
+            "Time limit on checking for new versions of resources. (default: 1h)"
+        ),
     )
     iframe_options: IframeOptions = Field(
         IframeOptions.deny,
@@ -520,12 +603,18 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     influxdb_batch_duration: Optional[str] = Field(
         None,
         alias="CONCOURSE_INFLUXDB_BATCH_DURATION",
-        description="The duration to wait before emitting a batch of points to InfluxDB, disregarding influxdb_batch_size. (default: 300s)",  # noqa: E501
+        description=(
+            "The duration to wait before emitting a batch of points to InfluxDB,"
+            " disregarding influxdb_batch_size. (default: 300s)"
+        ),
     )
     influxdb_batch_size: Optional[str] = Field(
         None,
         alias="CONCOURSE_INFLUXDB_BATCH_SIZE",
-        description="Number of points to batch together when emitting to InfluxDB. (default: 5000)",  # noqa: E501
+        description=(
+            "Number of points to batch together when emitting to InfluxDB. (default:"
+            " 5000)"
+        ),
     )
     influxdb_database: Optional[str] = Field(
         None,
@@ -555,17 +644,25 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     intercept_idle_timeout: Optional[str] = Field(
         None,
         alias="CONCOURSE_INTERCEPT_IDLE_TIMEOUT",
-        description="Length of time for a intercepted session to be idle before terminating. (default: 0m)",  # noqa: E501
+        description=(
+            "Length of time for a intercepted session to be idle before terminating."
+            " (default: 0m)"
+        ),
     )
     job_scheduling_max_in_flight: Optional[str] = Field(
         None,
         alias="CONCOURSE_JOB_SCHEDULING_MAX_IN_FLIGHT",
-        description="Maximum number of jobs to be scheduling at the same time (default: 32)",  # noqa: E501
+        description=(
+            "Maximum number of jobs to be scheduling at the same time (default: 32)"
+        ),
     )
     ldap_bind_dn: Optional[str] = Field(
         None,
         alias="CONCOURSE_LDAP_BIND_DN",
-        description="(Required) Bind DN for searching LDAP users and groups. Typically this is a read_only user.",  # noqa: E501
+        description=(
+            "(Required) Bind DN for searching LDAP users and groups. Typically this is"
+            " a read_only user."
+        ),
     )
     ldap_bind_pw: Optional[str] = Field(
         None,
@@ -583,17 +680,26 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     ldap_group_search_base_dn: Optional[str] = Field(
         None,
         alias="CONCOURSE_LDAP_GROUP_SEARCH_BASE_DN",
-        description="BaseDN to start the search from. For example 'cn=groups,dc=example,dc=com'",  # noqa: E501
+        description=(
+            "BaseDN to start the search from. For example 'cn=groups,dc=example,dc=com'"
+        ),
     )
     ldap_group_search_filter: Optional[str] = Field(
         None,
         alias="CONCOURSE_LDAP_GROUP_SEARCH_FILTER",
-        description="Optional filter to apply when searching the directory. For example '(objectClass=posixGroup)'",  # noqa: E501
+        description=(
+            "Optional filter to apply when searching the directory. For example"
+            " '(objectClass=posixGroup)'"
+        ),
     )
     ldap_group_search_group_attr: Optional[str] = Field(
         None,
         alias="CONCOURSE_LDAP_GROUP_SEARCH_GROUP_ATTR",
-        description="Adds an additional requirement to the filter that an attribute in the group match the user's attribute value. The exact filter being added is: (<groupAttr>=<userAttr value>)",  # noqa: E501
+        description=(
+            "Adds an additional requirement to the filter that an attribute in the"
+            " group match the user's attribute value. The exact filter being added is:"
+            " (<groupAttr>=<userAttr value>)"
+        ),
     )
     ldap_group_search_name_attr: Optional[str] = Field(
         None,
@@ -603,17 +709,27 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     ldap_group_search_scope: Optional[str] = Field(
         None,
         alias="CONCOURSE_LDAP_GROUP_SEARCH_SCOPE",
-        description="Can either be: 'sub' _ search the whole sub tree or 'one' _ only search one level. Defaults to 'sub'.",  # noqa: E501
+        description=(
+            "Can either be: 'sub' _ search the whole sub tree or 'one' _ only search"
+            " one level. Defaults to 'sub'."
+        ),
     )
     ldap_group_search_user_attr: Optional[str] = Field(
         None,
         alias="CONCOURSE_LDAP_GROUP_SEARCH_USER_ATTR",
-        description="Adds an additional requirement to the filter that an attribute in the group match the user's attribute value. The exact filter being added is: (<groupAttr>=<userAttr value>)",  # noqa: E501
+        description=(
+            "Adds an additional requirement to the filter that an attribute in the"
+            " group match the user's attribute value. The exact filter being added is:"
+            " (<groupAttr>=<userAttr value>)"
+        ),
     )
     ldap_host: Optional[str] = Field(
         None,
         alias="CONCOURSE_LDAP_HOST",
-        description="(Required) The host and optional port of the LDAP server. If port isn't supplied, it will be guessed based on the TLS configuration. 389 or 636.",  # noqa: E501
+        description=(
+            "(Required) The host and optional port of the LDAP server. If port isn't"
+            " supplied, it will be guessed based on the TLS configuration. 389 or 636."
+        ),
     )
     ldap_insecure_no_ssl: Optional[bool] = Field(
         None,
@@ -633,22 +749,31 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     ldap_user_search_base_dn: Optional[str] = Field(
         None,
         alias="CONCOURSE_LDAP_USER_SEARCH_BASE_DN",
-        description="BaseDN to start the search from. For example 'cn=users,dc=example,dc=com'",  # noqa: E501
+        description=(
+            "BaseDN to start the search from. For example 'cn=users,dc=example,dc=com'"
+        ),
     )
     ldap_user_search_email_attr: Optional[str] = Field(
         None,
         alias="CONCOURSE_LDAP_USER_SEARCH_EMAIL_ATTR",
-        description="A mapping of attributes on the user entry to claims. Defaults to 'mail'.",  # noqa: E501
+        description=(
+            "A mapping of attributes on the user entry to claims. Defaults to 'mail'."
+        ),
     )
     ldap_user_search_filter: Optional[str] = Field(
         None,
         alias="CONCOURSE_LDAP_USER_SEARCH_FILTER",
-        description="Optional filter to apply when searching the directory. For example '(objectClass=person)'",  # noqa: E501
+        description=(
+            "Optional filter to apply when searching the directory. For example"
+            " '(objectClass=person)'"
+        ),
     )
     ldap_user_search_id_attr: Optional[str] = Field(
         None,
         alias="CONCOURSE_LDAP_USER_SEARCH_ID_ATTR",
-        description="A mapping of attributes on the user entry to claims. Defaults to 'uid'.",  # noqa: E501
+        description=(
+            "A mapping of attributes on the user entry to claims. Defaults to 'uid'."
+        ),
     )
     ldap_user_search_name_attr: Optional[str] = Field(
         None,
@@ -658,27 +783,42 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     ldap_user_search_scope: Optional[str] = Field(
         None,
         alias="CONCOURSE_LDAP_USER_SEARCH_SCOPE",
-        description="Can either be: 'sub' _ search the whole sub tree or 'one' _ only search one level. Defaults to 'sub'.",  # noqa: E501
+        description=(
+            "Can either be: 'sub' _ search the whole sub tree or 'one' _ only search"
+            " one level. Defaults to 'sub'."
+        ),
     )
     ldap_user_search_username: Optional[str] = Field(
         None,
         alias="CONCOURSE_LDAP_USER_SEARCH_USERNAME",
-        description="Attribute to match against the inputted username. This will be translated and combined with the other filter as '(<attr>=<username>)'.",  # noqa: E501
+        description=(
+            "Attribute to match against the inputted username. This will be translated"
+            " and combined with the other filter as '(<attr>=<username>)'."
+        ),
     )
     ldap_username_prompt: Optional[str] = Field(
         None,
         alias="CONCOURSE_LDAP_USERNAME_PROMPT",
-        description="The prompt when logging in through the UI when __password_connector=ldap. Defaults to 'Username'.",  # noqa: E501
+        description=(
+            "The prompt when logging in through the UI when __password_connector=ldap."
+            " Defaults to 'Username'."
+        ),
     )
     lets_encrypt_acme_url: Optional[str] = Field(
         None,
         alias="CONCOURSE_LETS_ENCRYPT_ACME_URL",
-        description="URL of the ACME CA directory endpoint. (default: https://acme_v02.api.letsencrypt.org/directory)",
+        description=(
+            "URL of the ACME CA directory endpoint. (default:"
+            " https://acme_v02.api.letsencrypt.org/directory)"
+        ),
     )
     lidar_scanner_interval: Optional[str] = Field(
         None,
         alias="CONCOURSE_LIDAR_SCANNER_INTERVAL",
-        description="Interval on which the resource scanner will run to see if new checks need to be scheduled (default: 10s)",  # noqa: E501
+        description=(
+            "Interval on which the resource scanner will run to see if new checks need"
+            " to be scheduled (default: 10s)"
+        ),
     )
     log_cluster_name: Optional[bool] = Field(
         None,
@@ -728,7 +868,10 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     main_team_local_user: Optional[str] = Field(
         None,
         alias="CONCOURSE_MAIN_TEAM_LOCAL_USER",
-        description="A whitelisted local concourse user. These are the users you've added at web startup with the __add_local_user flag.",  # noqa: E501
+        description=(
+            "A whitelisted local concourse user. These are the users you've added at"
+            " web startup with the __add_local_user flag."
+        ),
     )
     main_team_oauth_group: Optional[str] = Field(
         None,
@@ -763,42 +906,69 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     max_active_containers_per_worker: Optional[str] = Field(
         None,
         alias="CONCOURSE_MAX_ACTIVE_CONTAINERS_PER_WORKER",
-        description="Maximum allowed number of active containers per worker. Has effect only when used with limit_active_containers placement strategy. 0 means no limit. (default: 0)",  # noqa: E501
+        description=(
+            "Maximum allowed number of active containers per worker. Has effect only"
+            " when used with limit_active_containers placement strategy. 0 means no"
+            " limit. (default: 0)"
+        ),
     )
     max_active_tasks_per_worker: Optional[str] = Field(
         None,
         alias="CONCOURSE_MAX_ACTIVE_TASKS_PER_WORKER",
-        description="Maximum allowed number of active build tasks per worker. Has effect only when used with limit_active_tasks placement strategy. 0 means no limit. (default: 0)",  # noqa: E501
+        description=(
+            "Maximum allowed number of active build tasks per worker. Has effect only"
+            " when used with limit_active_tasks placement strategy. 0 means no limit."
+            " (default: 0)"
+        ),
     )
     max_active_volumes_per_worker: Optional[str] = Field(
         None,
         alias="CONCOURSE_MAX_ACTIVE_VOLUMES_PER_WORKER",
-        description="Maximum allowed number of active volumes per worker. Has effect only when used with limit_active_volumes placement strategy. 0 means no limit. (default: 0)",  # noqa: E501
+        description=(
+            "Maximum allowed number of active volumes per worker. Has effect only when"
+            " used with limit_active_volumes placement strategy. 0 means no limit."
+            " (default: 0)"
+        ),
     )
     max_build_logs_to_retain: Optional[str] = Field(
         None,
         alias="CONCOURSE_MAX_BUILD_LOGS_TO_RETAIN",
-        description="Maximum build logs to retain, 0 means not specified. Will override values configured in jobs",  # noqa: E501
+        description=(
+            "Maximum build logs to retain, 0 means not specified. Will override values"
+            " configured in jobs"
+        ),
     )
     max_checks_per_second: Optional[int] = Field(
         None,
         alias="CONCOURSE_MAX_CHECKS_PER_SECOND",
-        description="Maximum number of checks that can be started per second. If not specified, this will be calculated as (# of resources)/(resource checking interval). -1 value will remove this maximum limit of checks per second.",  # noqa: E501
+        description=(
+            "Maximum number of checks that can be started per second. If not specified,"
+            " this will be calculated as (# of resources)/(resource checking interval)."
+            " -1 value will remove this maximum limit of checks per second."
+        ),
     )
     max_days_to_retain_build_logs: Optional[int] = Field(
         None,
         alias="CONCOURSE_MAX_DAYS_TO_RETAIN_BUILD_LOGS",
-        description="Maximum days to retain build logs, 0 means not specified. Will override values configured in jobs",  # noqa: E501
+        description=(
+            "Maximum days to retain build logs, 0 means not specified. Will override"
+            " values configured in jobs"
+        ),
     )
     metrics_attribute: Optional[str] = Field(
         None,
         alias="CONCOURSE_METRICS_ATTRIBUTE",
-        description="A key_value attribute to attach to emitted metrics. Can be specified multiple times.",  # noqa: E501
+        description=(
+            "A key_value attribute to attach to emitted metrics. Can be specified"
+            " multiple times."
+        ),
     )
     metrics_buffer_size: Optional[str] = Field(
         None,
         alias="CONCOURSE_METRICS_BUFFER_SIZE",
-        description="The size of the buffer used in emitting event metrics. (default: 1000)",  # noqa: E501
+        description=(
+            "The size of the buffer used in emitting event metrics. (default: 1000)"
+        ),
     )
     metrics_host_name: Optional[str] = Field(
         None,
@@ -823,17 +993,25 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     newrelic_batch_duration: Optional[str] = Field(
         None,
         alias="CONCOURSE_NEWRELIC_BATCH_DURATION",
-        description="Length of time to wait between emitting until all currently batched events are emitted (default: 60s)",  # noqa: E501
+        description=(
+            "Length of time to wait between emitting until all currently batched events"
+            " are emitted (default: 60s)"
+        ),
     )
     newrelic_batch_size: Optional[str] = Field(
         None,
         alias="CONCOURSE_NEWRELIC_BATCH_SIZE",
-        description="Number of events to batch together before emitting (default: 2000)",  # noqa: E501
+        description=(
+            "Number of events to batch together before emitting (default: 2000)"
+        ),
     )
     newrelic_insights_api_url: Optional[str] = Field(
         None,
         alias="CONCOURSE_NEWRELIC_INSIGHTS_API_URL",
-        description="Base Url for insights Insert API (default: https://insights_collector.newrelic.com)",
+        description=(
+            "Base Url for insights Insert API (default:"
+            " https://insights_collector.newrelic.com)"
+        ),
     )
     newrelic_service_prefix: Optional[str] = Field(
         None,
@@ -866,12 +1044,17 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     oauth_groups_key: Optional[str] = Field(
         None,
         alias="CONCOURSE_OAUTH_GROUPS_KEY",
-        description="The groups key indicates which claim to use to map external groups to Concourse teams. (default: groups)",  # noqa: E501
+        description=(
+            "The groups key indicates which claim to use to map external groups to"
+            " Concourse teams. (default: groups)"
+        ),
     )
     oauth_scope: Optional[str] = Field(
         None,
         alias="CONCOURSE_OAUTH_SCOPE",
-        description="Any additional scopes that need to be requested during authorization",  # noqa: E501
+        description=(
+            "Any additional scopes that need to be requested during authorization"
+        ),
     )
     oauth_skip_ssl_validation: Optional[bool] = Field(
         None,
@@ -886,12 +1069,18 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     oauth_user_id_key: Optional[str] = Field(
         None,
         alias="CONCOURSE_OAUTH_USER_ID_KEY",
-        description="The user id key indicates which claim to use to map an external user id to a Concourse user id. (default: user_id)",  # noqa: E501
+        description=(
+            "The user id key indicates which claim to use to map an external user id to"
+            " a Concourse user id. (default: user_id)"
+        ),
     )
     oauth_user_name_key: Optional[str] = Field(
         None,
         alias="CONCOURSE_OAUTH_USER_NAME_KEY",
-        description="The user name key indicates which claim to use to map an external user name to a Concourse user name. (default: user_name)",  # noqa: E501
+        description=(
+            "The user name key indicates which claim to use to map an external user"
+            " name to a Concourse user name. (default: user_name)"
+        ),
     )
     oauth_userinfo_url: Optional[str] = Field(
         None,
@@ -924,27 +1113,42 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     oidc_groups_key: Optional[str] = Field(
         None,
         alias="CONCOURSE_OIDC_GROUPS_KEY",
-        description="The groups key indicates which claim to use to map external groups to Concourse teams. (default: groups)",  # noqa: E501
+        description=(
+            "The groups key indicates which claim to use to map external groups to"
+            " Concourse teams. (default: groups)"
+        ),
     )
     oidc_hosted_domains: Optional[str] = Field(
         None,
         alias="CONCOURSE_OIDC_HOSTED_DOMAINS",
-        description="List of whitelisted domains when using Google, only users from a listed domain will be allowed to log in",  # noqa: E501
+        description=(
+            "List of whitelisted domains when using Google, only users from a listed"
+            " domain will be allowed to log in"
+        ),
     )
     oidc_issuer: Optional[str] = Field(
         None,
         alias="CONCOURSE_OIDC_ISSUER",
-        description="(Required) An OIDC issuer URL that will be used to discover provider configuration using the .well_known/openid_configuration",  # noqa: E501
+        description=(
+            "(Required) An OIDC issuer URL that will be used to discover provider"
+            " configuration using the .well_known/openid_configuration"
+        ),
     )
     oidc_scope: Optional[str] = Field(
         None,
         alias="CONCOURSE_OIDC_SCOPE",
-        description="Any additional scopes of [openid] that need to be requested during authorization. Default to [openid, profile, email].",  # noqa: E501
+        description=(
+            "Any additional scopes of [openid] that need to be requested during"
+            " authorization. Default to [openid, profile, email]."
+        ),
     )
     oidc_skip_email_verified_validation: Optional[bool] = Field(
         None,
         alias="CONCOURSE_OIDC_SKIP_EMAIL_VERIFIED_VALIDATION",
-        description="Ignore the email_verified claim from the upstream provider, treating all users as if email_verified were true.",  # noqa: E501
+        description=(
+            "Ignore the email_verified claim from the upstream provider, treating all"
+            " users as if email_verified were true."
+        ),
     )
     oidc_skip_ssl_validation: Optional[bool] = Field(
         None,
@@ -954,12 +1158,19 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     oidc_user_name_key: Optional[str] = Field(
         None,
         alias="CONCOURSE_OIDC_USER_NAME_KEY",
-        description="The user name key indicates which claim to use to map an external user name to a Concourse user name. (default: username)",  # noqa: E501
+        description=(
+            "The user name key indicates which claim to use to map an external user"
+            " name to a Concourse user name. (default: username)"
+        ),
     )
     old_encryption_key: Optional[str] = Field(
         None,
         alias="CONCOURSE_OLD_ENCRYPTION_KEY",
-        description="Encryption key previously used for encrypting sensitive information. If provided without a new key, data is encrypted. If provided with a new key, data is re_encrypted.",  # noqa: E501
+        description=(
+            "Encryption key previously used for encrypting sensitive information. If"
+            " provided without a new key, data is encrypted. If provided with a new"
+            " key, data is re_encrypted."
+        ),
     )
     opa_timeout: Optional[str] = Field(
         None,
@@ -979,12 +1190,18 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     password_connector: Optional[str] = Field(
         None,
         alias="CONCOURSE_PASSWORD_CONNECTOR",
-        description="Connector to use when authenticating via 'fly login -u ... -p ...' (default: local)",  # noqa: E501
+        description=(
+            "Connector to use when authenticating via 'fly login -u ... -p ...'"
+            " (default: local)"
+        ),
     )
     peer_address: Optional[str] = Field(
         "web.concourse.service.consul",
         alias="CONCOURSE_PEER_ADDRESS",
-        description="Network address of this web node, reachable by other web nodes. Used for forwarded worker addresses. (default: 127.0.0.1)",  # noqa: E501
+        description=(
+            "Network address of this web node, reachable by other web nodes. Used for"
+            " forwarded worker addresses. (default: 127.0.0.1)"
+        ),
     )
     policy_check_filter_action: Optional[str] = Field(
         None,
@@ -1019,12 +1236,17 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     resource_checking_interval: Optional[str] = Field(
         None,
         alias="CONCOURSE_RESOURCE_CHECKING_INTERVAL",
-        description="Interval on which to check for new versions of resources. (default: 1m)",  # noqa: E501
+        description=(
+            "Interval on which to check for new versions of resources. (default: 1m)"
+        ),
     )
     resource_with_webhook_checking_interval: Optional[str] = Field(
         None,
         alias="CONCOURSE_RESOURCE_WITH_WEBHOOK_CHECKING_INTERVAL",
-        description="Interval on which to check for new versions of resources that has webhook defined. (default: 1m)",  # noqa: E501
+        description=(
+            "Interval on which to check for new versions of resources that has webhook"
+            " defined. (default: 1m)"
+        ),
     )
     saml_ca_cert: Optional[str] = Field(
         None,
@@ -1039,7 +1261,10 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     saml_email_attr: Optional[str] = Field(
         None,
         alias="CONCOURSE_SAML_EMAIL_ATTR",
-        description="The email indicates which claim to use to map an external user email to a Concourse user email. (default: email)",  # noqa: E501
+        description=(
+            "The email indicates which claim to use to map an external user email to a"
+            " Concourse user email. (default: email)"
+        ),
     )
     saml_entity_issuer: Optional[str] = Field(
         None,
@@ -1049,17 +1274,26 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     saml_groups_attr: Optional[str] = Field(
         None,
         alias="CONCOURSE_SAML_GROUPS_ATTR",
-        description="The groups key indicates which attribute to use to map external groups to Concourse teams. (default: groups)",  # noqa: E501
+        description=(
+            "The groups key indicates which attribute to use to map external groups to"
+            " Concourse teams. (default: groups)"
+        ),
     )
     saml_groups_delim: Optional[str] = Field(
         None,
         alias="CONCOURSE_SAML_GROUPS_DELIM",
-        description="If specified, groups are returned as string, this delimiter will be used to split the group string.",  # noqa: E501
+        description=(
+            "If specified, groups are returned as string, this delimiter will be used"
+            " to split the group string."
+        ),
     )
     saml_name_id_policy_format: Optional[str] = Field(
         None,
         alias="CONCOURSE_SAML_NAME_ID_POLICY_FORMAT",
-        description="Requested format of the NameID. The NameID value is is mapped to the ID Token 'sub' claim.",  # noqa: E501
+        description=(
+            "Requested format of the NameID. The NameID value is is mapped to the ID"
+            " Token 'sub' claim."
+        ),
     )
     saml_skip_ssl_validation: Optional[bool] = Field(
         None,
@@ -1079,17 +1313,27 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     saml_username_attr: Optional[str] = Field(
         None,
         alias="CONCOURSE_SAML_USERNAME_ATTR",
-        description="The user name indicates which claim to use to map an external user name to a Concourse user name. (default: name)",  # noqa: E501
+        description=(
+            "The user name indicates which claim to use to map an external user name to"
+            " a Concourse user name. (default: name)"
+        ),
     )
     secret_cache_duration: Optional[str] = Field(
         None,
         alias="CONCOURSE_SECRET_CACHE_DURATION",
-        description="If the cache is enabled, secret values will be cached for not longer than this duration (it can be less, if underlying secret lease time is smaller) (default: 1m)",  # noqa: E501
+        description=(
+            "If the cache is enabled, secret values will be cached for not longer than"
+            " this duration (it can be less, if underlying secret lease time is"
+            " smaller) (default: 1m)"
+        ),
     )
     secret_cache_duration_notfound: Optional[str] = Field(
         None,
         alias="CONCOURSE_SECRET_CACHE_DURATION_NOTFOUND",
-        description="If the cache is enabled, secret not found responses will be cached for this duration (default: 10s)",  # noqa: E501
+        description=(
+            "If the cache is enabled, secret not found responses will be cached for"
+            " this duration (default: 10s)"
+        ),
     )
     secret_cache_enabled: Optional[bool] = Field(
         None,
@@ -1099,17 +1343,25 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     secret_cache_purge_interval: Optional[str] = Field(
         None,
         alias="CONCOURSE_SECRET_CACHE_PURGE_INTERVAL",
-        description="If the cache is enabled, expired items will be removed on this interval (default: 10m)",  # noqa: E501
+        description=(
+            "If the cache is enabled, expired items will be removed on this interval"
+            " (default: 10m)"
+        ),
     )
     secret_retry_attempts: Optional[str] = Field(
         None,
         alias="CONCOURSE_SECRET_RETRY_ATTEMPTS",
-        description="The number of attempts secret will be retried to be fetched, in case a retryable error happens. (default: 5)",  # noqa: E501
+        description=(
+            "The number of attempts secret will be retried to be fetched, in case a"
+            " retryable error happens. (default: 5)"
+        ),
     )
     secret_retry_interval: Optional[str] = Field(
         None,
         alias="CONCOURSE_SECRET_RETRY_INTERVAL",
-        description="The interval between secret retry retrieval attempts. (default: 1s)",  # noqa: E501
+        description=(
+            "The interval between secret retry retrieval attempts. (default: 1s)"
+        ),
     )
     session_signing_key: Optional[str] = None
     session_signing_key_path: Path = Field(
@@ -1130,32 +1382,51 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     syslog_ca_cert: Optional[str] = Field(
         None,
         alias="CONCOURSE_SYSLOG_CA_CERT",
-        description="Paths to PEM_encoded CA cert files to use to verify the Syslog server SSL cert.",  # noqa: E501
+        description=(
+            "Paths to PEM_encoded CA cert files to use to verify the Syslog server SSL"
+            " cert."
+        ),
     )
     syslog_drain_interval: Optional[str] = Field(
         None,
         alias="CONCOURSE_SYSLOG_DRAIN_INTERVAL",
-        description="Interval over which checking is done for new build logs to send to syslog server (duration measurement units are s/m/h; eg. 30s/30m/1h) (default: 30s)",  # noqa: E501
+        description=(
+            "Interval over which checking is done for new build logs to send to syslog"
+            " server (duration measurement units are s/m/h; eg. 30s/30m/1h) (default:"
+            " 30s)"
+        ),
     )
     syslog_hostname: Optional[str] = Field(
         None,
         alias="CONCOURSE_SYSLOG_HOSTNAME",
-        description="Client hostname with which the build logs will be sent to the syslog server. (default: atc_syslog_drainer)",  # noqa: E501
+        description=(
+            "Client hostname with which the build logs will be sent to the syslog"
+            " server. (default: atc_syslog_drainer)"
+        ),
     )
     syslog_transport: Optional[str] = Field(
         None,
         alias="CONCOURSE_SYSLOG_TRANSPORT",
-        description="Transport protocol for syslog messages (Currently supporting tcp, udp & tls).",  # noqa: E501
+        description=(
+            "Transport protocol for syslog messages (Currently supporting tcp, udp &"
+            " tls)."
+        ),
     )
     system_claim_key: Optional[str] = Field(
         None,
         alias="CONCOURSE_SYSTEM_CLAIM_KEY",
-        description="The token claim key to use when matching system_claim_values (default: aud)",  # noqa: E501
+        description=(
+            "The token claim key to use when matching system_claim_values (default:"
+            " aud)"
+        ),
     )
     system_claim_value: Optional[str] = Field(
         None,
         alias="CONCOURSE_SYSTEM_CLAIM_VALUE",
-        description="Configure which token requests should be considered 'system' requests. (default: concourse_worker)",  # noqa: E501
+        description=(
+            "Configure which token requests should be considered 'system' requests."
+            " (default: concourse_worker)"
+        ),
     )
     tls_bind_port: Optional[str] = Field(
         None,
@@ -1175,7 +1446,9 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     tls_key: Optional[str] = Field(
         None,
         alias="CONCOURSE_TLS_KEY",
-        description="File containing an RSA private key, used to encrypt HTTPS traffic.",  # noqa: E501
+        description=(
+            "File containing an RSA private key, used to encrypt HTTPS traffic."
+        ),
     )
     tracing_attribute: Optional[str] = Field(
         None,
@@ -1230,7 +1503,9 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     tracing_service_name: Optional[str] = Field(
         None,
         alias="CONCOURSE_TRACING_SERVICE_NAME",
-        description="service name to attach to traces as metadata (default: concourse_web)",  # noqa: E501
+        description=(
+            "service name to attach to traces as metadata (default: concourse_web)"
+        ),
     )
     tracing_stackdriver_projectid: Optional[str] = Field(
         None,
@@ -1245,7 +1520,10 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     tsa_authorized_keys: Optional[str] = Field(
         None,
         alias="CONCOURSE_TSA_AUTHORIZED_KEYS",
-        description="Path to file containing keys to authorize, in SSH authorized_keys format (one public key per line).",  # noqa: E501
+        description=(
+            "Path to file containing keys to authorize, in SSH authorized_keys format"
+            " (one public key per line)."
+        ),
     )
     tsa_bind_ip: Optional[str] = Field(
         None,
@@ -1260,7 +1538,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     tsa_client_id: Optional[str] = Field(
         None,
         alias="CONCOURSE_TSA_CLIENT_ID",
-        description="Client used to fetch a token from the auth server. NOTE: if you change this value you will also need to change the __system_claim_value flag so the atc knows to allow requests from this client. (default: concourse_worker)",  # noqa: E501
+        description=(
+            "Client used to fetch a token from the auth server. NOTE: if you change"
+            " this value you will also need to change the __system_claim_value flag so"
+            " the atc knows to allow requests from this client. (default:"
+            " concourse_worker)"
+        ),
     )
     tsa_client_secret: Optional[str] = Field(
         None,
@@ -1270,22 +1553,32 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     tsa_cluster_name: Optional[str] = Field(
         None,
         alias="CONCOURSE_TSA_CLUSTER_NAME",
-        description="A name for this Concourse cluster, to be displayed on the dashboard page.",  # noqa: E501
+        description=(
+            "A name for this Concourse cluster, to be displayed on the dashboard page."
+        ),
     )
     tsa_debug_bind_ip: Optional[str] = Field(
         None,
         alias="CONCOURSE_TSA_DEBUG_BIND_IP",
-        description="IP address on which to listen for the pprof debugger endpoints. (default: 127.0.0.1)",  # noqa: E501
+        description=(
+            "IP address on which to listen for the pprof debugger endpoints. (default:"
+            " 127.0.0.1)"
+        ),
     )
     tsa_debug_bind_port: Optional[str] = Field(
         None,
         alias="CONCOURSE_TSA_DEBUG_BIND_PORT",
-        description="Port on which to listen for the pprof debugger endpoints. (default: 2221)",  # noqa: E501
+        description=(
+            "Port on which to listen for the pprof debugger endpoints. (default: 2221)"
+        ),
     )
     tsa_garden_request_timeout: Optional[str] = Field(
         None,
         alias="CONCOURSE_TSA_GARDEN_REQUEST_TIMEOUT",
-        description="How long to wait for requests to Garden to complete. 0 means no timeout. (default: 5m)",  # noqa: E501
+        description=(
+            "How long to wait for requests to Garden to complete. 0 means no timeout."
+            " (default: 5m)"
+        ),
     )
     tsa_heartbeat_interval: Optional[str] = Field(
         None,
@@ -1311,7 +1604,10 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     tsa_peer_address: Optional[str] = Field(
         None,
         alias="CONCOURSE_TSA_PEER_ADDRESS",
-        description="Network address of this web node, reachable by other web nodes. Used for forwarded worker addresses. (default: 127.0.0.1)",  # noqa: E501
+        description=(
+            "Network address of this web node, reachable by other web nodes. Used for"
+            " forwarded worker addresses. (default: 127.0.0.1)"
+        ),
     )
     tsa_scope: Optional[str] = Field(
         None,
@@ -1321,12 +1617,18 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     tsa_team_authorized_keys: Optional[Path] = Field(
         None,
         alias="CONCOURSE_TSA_TEAM_AUTHORIZED_KEYS",
-        description="Path to file containing keys to authorize, in SSH authorized_keys format (one public key per line).",  # noqa: E501
+        description=(
+            "Path to file containing keys to authorize, in SSH authorized_keys format"
+            " (one public key per line)."
+        ),
     )
     tsa_team_authorized_keys_file: Optional[Path] = Field(
         None,
         alias="CONCOURSE_TSA_TEAM_AUTHORIZED_KEYS_FILE",
-        description="Path to file containing a YAML array of teams and their authorized SSH keys, e.g. [{team:foo,ssh_keys:[key1,key2]}].",  # noqa: E501
+        description=(
+            "Path to file containing a YAML array of teams and their authorized SSH"
+            " keys, e.g. [{team:foo,ssh_keys:[key1,key2]}]."
+        ),
     )
     tsa_token_url: Optional[str] = Field(
         None,
@@ -1341,22 +1643,34 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     vault_auth_backend_max_ttl: Optional[str] = Field(
         None,
         alias="CONCOURSE_VAULT_AUTH_BACKEND_MAX_TTL",
-        description="Time after which to force a re_login. If not set, the token will just be continuously renewed.",  # noqa: E501
+        description=(
+            "Time after which to force a re_login. If not set, the token will just be"
+            " continuously renewed."
+        ),
     )
     vault_auth_param: Optional[str] = Field(
         None,
         alias="CONCOURSE_VAULT_AUTH_PARAM",
-        description="Paramter to pass when logging in via the backend. Can be specified multiple times.",  # noqa: E501
+        description=(
+            "Paramter to pass when logging in via the backend. Can be specified"
+            " multiple times."
+        ),
     )
     vault_ca_cert: Optional[Path] = Field(
         None,
         alias="CONCOURSE_VAULT_CA_CERT",
-        description="Path to a PEM_encoded CA cert file to use to verify the vault server SSL cert.",  # noqa: E501
+        description=(
+            "Path to a PEM_encoded CA cert file to use to verify the vault server SSL"
+            " cert."
+        ),
     )
     vault_ca_path: Optional[Path] = Field(
         None,
         alias="CONCOURSE_VAULT_CA_PATH",
-        description="Path to a directory of PEM_encoded CA cert files to verify the vault server SSL cert.",  # noqa: E501
+        description=(
+            "Path to a directory of PEM_encoded CA cert files to verify the vault"
+            " server SSL cert."
+        ),
     )
     vault_client_cert: Optional[Path] = Field(
         None,
@@ -1386,7 +1700,10 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     vault_lookup_templates: Optional[str] = Field(
         None,
         alias="CONCOURSE_VAULT_LOOKUP_TEMPLATES",
-        description="Path templates for credential lookup (default: /{{.Team}}/{{.Pipeline}}/{{.Secret}}, /{{.Team}}/{{.Secret}})",  # noqa: E501
+        description=(
+            "Path templates for credential lookup (default:"
+            " /{{.Team}}/{{.Pipeline}}/{{.Secret}}, /{{.Team}}/{{.Secret}})"
+        ),
     )
     vault_namespace: Optional[str] = Field(
         None,
@@ -1396,7 +1713,9 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     vault_path_prefix: Optional[str] = Field(
         None,
         alias="CONCOURSE_VAULT_PATH_PREFIX",
-        description="Path under which to namespace credential lookup. (default: /concourse)",  # noqa: E501
+        description=(
+            "Path under which to namespace credential lookup. (default: /concourse)"
+        ),
     )
     vault_query_timeout: Optional[str] = Field(
         None,
@@ -1406,12 +1725,18 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     vault_retry_initial: Optional[str] = Field(
         None,
         alias="CONCOURSE_VAULT_RETRY_INITIAL",
-        description="The initial time between retries when logging in or re_authing a secret. (default: 1s)",  # noqa: E501
+        description=(
+            "The initial time between retries when logging in or re_authing a secret."
+            " (default: 1s)"
+        ),
     )
     vault_retry_max: Optional[str] = Field(
         None,
         alias="CONCOURSE_VAULT_RETRY_MAX",
-        description="The maximum time between retries when logging in or re_authing a secret. (default: 5m)",  # noqa: E501
+        description=(
+            "The maximum time between retries when logging in or re_authing a secret."
+            " (default: 5m)"
+        ),
     )
     vault_server_name: Optional[str] = Field(
         None,
@@ -1464,7 +1789,9 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
 
     additional_resource_types_s3_location: Optional[str] = Field(
         None,
-        description="Address and path of s3 bucket to find additional concourse resource types.",  # noqa: E501
+        description=(
+            "Address and path of s3 bucket to find additional concourse resource types."
+        ),
     )
     additional_resource_types: Optional[list[str]] = Field(
         None,
@@ -1474,8 +1801,9 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     baggageclaim_bind_ip: Optional[str] = Field(
         None,
         alias="CONCOURSE_BAGGAGECLAIM_BIND_IP",
-        description="IP address on which to listen for API traffic. "
-        "(default: 127.0.0.1)",
+        description=(
+            "IP address on which to listen for API traffic. (default: 127.0.0.1)"
+        ),
     )
     baggageclaim_bind_port: Optional[int] = Field(
         None,
@@ -1490,14 +1818,17 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     baggageclaim_debug_bind_ip: Optional[str] = Field(
         None,
         alias="CONCOURSE_BAGGAGECLAIM_DEBUG_BIND_IP",
-        description="IP address on which to listen for the pprof debugger endpoints. "
-        "(default: 127.0.0.1)",
+        description=(
+            "IP address on which to listen for the pprof debugger endpoints. "
+            "(default: 127.0.0.1)"
+        ),
     )
     baggageclaim_debug_bind_port: Optional[int] = Field(
         None,
         alias="CONCOURSE_BAGGAGECLAIM_DEBUG_BIND_PORT",
-        description="Port on which to listen for the pprof debugger endpoints. "
-        "(default: 7787)",
+        description=(
+            "Port on which to listen for the pprof debugger endpoints. (default: 7787)"
+        ),
     )
     baggageclaim_disable_user_namespaces: Optional[bool] = Field(
         None,
@@ -1532,8 +1863,10 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     baggageclaim_p2p_interface_name_pattern: Optional[str] = Field(
         None,
         alias="CONCOURSE_BAGGAGECLAIM_P2P_INTERFACE_NAME_PATTERN",
-        description="Regular expression to match a network interface for p2p streaming "
-        "(default: eth0)",
+        description=(
+            "Regular expression to match a network interface for p2p streaming "
+            "(default: eth0)"
+        ),
     )
     baggageclaim_volumes: Optional[Path] = Field(
         None,
@@ -1543,8 +1876,9 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     bind_ip: Optional[str] = Field(
         None,
         alias="CONCOURSE_BIND_IP",
-        description="IP address on which to listen for the Garden server. "
-        "(default: 127.0.0.1)",
+        description=(
+            "IP address on which to listen for the Garden server. (default: 127.0.0.1)"
+        ),
     )
     certs_dir: Optional[Path] = Field(
         None,
@@ -1554,26 +1888,33 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     connection_drain_timeout: Optional[str] = Field(
         None,
         alias="CONCOURSE_CONNECTION_DRAIN_TIMEOUT",
-        description="Duration after which a worker should give up draining forwarded "
-        "connections on shutdown. (default: 1h)",
+        description=(
+            "Duration after which a worker should give up draining forwarded "
+            "connections on shutdown. (default: 1h)"
+        ),
     )
     container_runtime: Optional[str] = Field(
         None,
         alias="CONCOURSE_RUNTIME",
-        description="Runtime to use with the worker. Please note that Houdini is "
-        "insecure and doesn't run 'tasks' in containers. (default: guardian)",
+        description=(
+            "Runtime to use with the worker. Please note that Houdini is "
+            "insecure and doesn't run 'tasks' in containers. (default: guardian)"
+        ),
     )
     container_sweeper_max_in_flight: Optional[int] = Field(
         None,
         alias="CONCOURSE_CONTAINER_SWEEPER_MAX_IN_FLIGHT",
-        description="Maximum number of containers which can be swept in parallel. "
-        "(default: 5)",
+        description=(
+            "Maximum number of containers which can be swept in parallel. (default: 5)"
+        ),
     )
     containerd_binary: Optional[Path] = Field(
         Path("/usr/local/concourse/bin/containerd"),
         alias="CONCOURSE_CONTAINERD_BIN",
-        description="Path to a containerd executable (non-absolute names get resolved "
-        "from $PATH).",
+        description=(
+            "Path to a containerd executable (non-absolute names get resolved "
+            "from $PATH)."
+        ),
     )
     containerd_cni_plugins_dir: Optional[Path] = Field(
         None,
@@ -1588,8 +1929,10 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     containerd_dns_server: Optional[str] = Field(
         None,
         alias="CONCOURSE_CONTAINERD_DNS_SERVER",
-        description="DNS server IP address to use instead of automatically determined "
-        "servers. Can be specified multiple times.",
+        description=(
+            "DNS server IP address to use instead of automatically determined "
+            "servers. Can be specified multiple times."
+        ),
     )
     containerd_enable_dns_proxy: Optional[bool] = Field(
         None,
@@ -1599,14 +1942,18 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     containerd_external_ip: Optional[str] = Field(
         None,
         alias="CONCOURSE_CONTAINERD_EXTERNAL_IP",
-        description="IP address to use to reach container's mapped ports. Autodetected "
-        "if not specified.",
+        description=(
+            "IP address to use to reach container's mapped ports. Autodetected "
+            "if not specified."
+        ),
     )
     containerd_init_binary: Optional[Path] = Field(
         Path("/usr/local/concourse/bin/init"),
         alias="CONCOURSE_CONTAINERD_INIT_BIN",
-        description="Path to an init executable (non-absolute names get resolved from "
-        "$PATH). (default: /usr/local/concourse/bin/init)",
+        description=(
+            "Path to an init executable (non-absolute names get resolved from "
+            "$PATH). (default: /usr/local/concourse/bin/init)"
+        ),
     )
     containerd_max_containers: Optional[str | int] = Field(
         None,
@@ -1616,14 +1963,18 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     containerd_mtu: Optional[str] = Field(
         None,
         alias="CONCOURSE_CONTAINERD_MTU",
-        description="MTU size for container network interfaces. Defaults to the MTU "
-        "of the interface used for outbound access by the host.",
+        description=(
+            "MTU size for container network interfaces. Defaults to the MTU "
+            "of the interface used for outbound access by the host."
+        ),
     )
     containerd_network_pool: Optional[str] = Field(
         None,
         alias="CONCOURSE_CONTAINERD_NETWORK_POOL",
-        description="Network range to use for dynamically allocated container subnets. "
-        "(default: 10.80.0.0/16)",
+        description=(
+            "Network range to use for dynamically allocated container subnets. "
+            "(default: 10.80.0.0/16)"
+        ),
     )
     containerd_plugins_dir: Optional[Path] = Field(
         Path("/usr/local/concourse/bin/"),
@@ -1632,26 +1983,33 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     containerd_request_timeout: Optional[str] = Field(
         None,
         alias="CONCOURSE_CONTAINERD_REQUEST_TIMEOUT",
-        description="How long to wait for requests to Containerd to complete. "
-        "0 means no timeout. (default: 5m)",
+        description=(
+            "How long to wait for requests to Containerd to complete. "
+            "0 means no timeout. (default: 5m)"
+        ),
     )
     containerd_restricted_network: Optional[str] = Field(
         None,
         alias="CONCOURSE_CONTAINERD_RESTRICTED_NETWORK",
-        description="Network ranges to which traffic from containers will be "
-        "restricted. Can be specified multiple times.",
+        description=(
+            "Network ranges to which traffic from containers will be "
+            "restricted. Can be specified multiple times."
+        ),
     )
     debug_bind_ip: Optional[str] = Field(
         None,
         alias="CONCOURSE_DEBUG_BIND_IP",
-        description="IP address on which to listen for the pprof debugger endpoints. "
-        "(default: 127.0.0.1)",
+        description=(
+            "IP address on which to listen for the pprof debugger endpoints. "
+            "(default: 127.0.0.1)"
+        ),
     )
     debug_bind_port: Optional[int] = Field(
         None,
         alias="CONCOURSE_DEBUG_BIND_PORT",
-        description="Port on which to listen for the pprof debugger endpoints. "
-        "(default: 7776)",
+        description=(
+            "Port on which to listen for the pprof debugger endpoints. (default: 7776)"
+        ),
     )
     ephemeral: Optional[bool] = Field(
         None,
@@ -1661,14 +2019,18 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     external_garden_url: Optional[str] = Field(
         None,
         alias="CONCOURSE_EXTERNAL_GARDEN_URL",
-        description="API endpoint of an externally managed Garden server to use "
-        "instead of running the embedded Garden server.",
+        description=(
+            "API endpoint of an externally managed Garden server to use "
+            "instead of running the embedded Garden server."
+        ),
     )
     garden_binary: Optional[Path] = Field(
         None,
         alias="CONCOURSE_GARDEN_BIN",
-        description="Path to a garden server executable (non-absolute names get "
-        "resolved from $PATH).",
+        description=(
+            "Path to a garden server executable (non-absolute names get "
+            "resolved from $PATH)."
+        ),
     )
     garden_bind_port: Optional[int] = Field(
         None,
@@ -1678,14 +2040,17 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     garden_config: Optional[Path] = Field(
         None,
         alias="CONCOURSE_GARDEN_CONFIG",
-        description="Path to a config file to use for the Garden backend. "
-        "e.g. 'foo-bar=a,b' for '--foo-bar a --foo-bar b'.",
+        description=(
+            "Path to a config file to use for the Garden backend. "
+            "e.g. 'foo-bar=a,b' for '--foo-bar a --foo-bar b'."
+        ),
     )
     garden_dns_server: Optional[str] = Field(
         None,
         alias="CONCOURSE_GARDEN_DNS_SERVER",
-        description="DNS server IP address to use instead of automatically determined "
-        "servers.",
+        description=(
+            "DNS server IP address to use instead of automatically determined servers."
+        ),
     )
     garden_enable_dns_proxy: Optional[bool] = Field(
         None,
@@ -1700,32 +2065,40 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     garden_network_pool: Optional[str] = Field(
         None,
         alias="CONCOURSE_GARDEN_NETWORK_POOL",
-        description="Network range to use for dynamically allocated container subnets. "
-        "(default:10.80.0.0/16)",
+        description=(
+            "Network range to use for dynamically allocated container subnets. "
+            "(default:10.80.0.0/16)"
+        ),
     )
     garden_request_timeout: Optional[str] = Field(
         None,
         alias="CONCOURSE_GARDEN_REQUEST_TIMEOUT",
-        description="How long to wait for requests to the Garden server to complete. "
-        "0 means no timeout. (default: 5m)",
+        description=(
+            "How long to wait for requests to the Garden server to complete. "
+            "0 means no timeout. (default: 5m)"
+        ),
     )
     healthcheck_bind_ip: Optional[str] = Field(
         None,
         alias="CONCOURSE_HEALTHCHECK_BIND_IP",
-        description="IP address on which to listen for health checking requests. "
-        "(default: 0.0.0.0)",
+        description=(
+            "IP address on which to listen for health checking requests. "
+            "(default: 0.0.0.0)"
+        ),
     )
     healthcheck_bind_port: Optional[int] = Field(
         None,
         alias="CONCOURSE_HEALTHCHECK_BIND_PORT",
-        description="Port on which to listen for health checking requests. "
-        "(default: 8888)",
+        description=(
+            "Port on which to listen for health checking requests. (default: 8888)"
+        ),
     )
     healthcheck_timeout: Optional[str] = Field(
         None,
         alias="CONCOURSE_HEALTHCHECK_TIMEOUT",
-        description="HTTP timeout for the full duration of health checking. "
-        "(default: 5s)",
+        description=(
+            "HTTP timeout for the full duration of health checking. (default: 5s)"
+        ),
     )
     log_level: Optional[str] = Field(
         "info",
@@ -1735,20 +2108,25 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     rebalance_interval: Optional[str] = Field(
         None,
         alias="CONCOURSE_REBALANCE_INTERVAL",
-        description="Duration after which the registration should be swapped to "
-        "another random SSH gateway. (default: 4h)",
+        description=(
+            "Duration after which the registration should be swapped to "
+            "another random SSH gateway. (default: 4h)"
+        ),
     )
     resource_types: Optional[Path] = Field(
         None,
         alias="CONCOURSE_RESOURCE_TYPES",
-        description="Path to directory containing resource types the worker should "
-        "advertise.",
+        description=(
+            "Path to directory containing resource types the worker should advertise."
+        ),
     )
     sweep_interval: Optional[str] = Field(
         None,
         alias="CONCOURSE_SWEEP_INTERVAL",
-        description="Interval on which containers and volumes will be garbage "
-        "collected from the worker. (default: 30s)",
+        description=(
+            "Interval on which containers and volumes will be garbage "
+            "collected from the worker. (default: 30s)"
+        ),
     )
     tags: Optional[list[str]] = Field(
         None,
@@ -1774,8 +2152,9 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     volume_sweeper_max_in_flight: Optional[str] = Field(
         None,
         alias="CONCOURSE_VOLUME_SWEEPER_MAX_IN_FLIGHT",
-        description="Maximum number of volumes which can be swept in parallel. "
-        "(default: 3)",
+        description=(
+            "Maximum number of volumes which can be swept in parallel. (default: 3)"
+        ),
     )
     work_dir: Path = Field(
         Path("/var/concourse/worker/"),
@@ -1785,15 +2164,18 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     worker_name: Optional[str] = Field(
         None,
         alias="CONCOURSE_NAME",
-        description="The name to set for the worker during registration. "
-        "If not specified, the hostname will be used.",
+        description=(
+            "The name to set for the worker during registration. "
+            "If not specified, the hostname will be used."
+        ),
     )
     worker_private_key: Optional[str] = None
     worker_private_key_path: Path = Field(
         Path("/etc/concourse/worker_private_key.pem"),
         alias="CONCOURSE_TSA_WORKER_PRIVATE_KEY",
-        description="File containing the private key to use when authenticating to "
-        "the TSA.",
+        description=(
+            "File containing the private key to use when authenticating to the TSA."
+        ),
     )
 
     @field_serializer("tags", when_used="unless-none", return_type=str)

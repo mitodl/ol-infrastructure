@@ -90,7 +90,10 @@ server.shell(
     name="Update Vault Mount Point",
     commands=[
         "mkdir /etc/xqueue/",
-        f"sed -i -e 's/DEPLOYMENT/{DEPLOYMENT}/g' /etc/consul-template/templates.d/xqueue.yaml.j2",  # noqa: E501
+        (
+            f"sed -i -e 's/DEPLOYMENT/{DEPLOYMENT}/g'"
+            " /etc/consul-template/templates.d/xqueue.yaml.j2"
+        ),
     ],
 )
 

@@ -155,8 +155,9 @@ dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [
         ],
         "Resource": [
             f"arn:aws:s3:::{bucket_name}" for bucket_name in s3_tracking_logs_buckets
-        ]
-        + [f"arn:aws:s3:::{bucket_name}/*" for bucket_name in s3_tracking_logs_buckets],
+        ] + [
+            f"arn:aws:s3:::{bucket_name}/*" for bucket_name in s3_tracking_logs_buckets
+        ],
     },
 ]
 
@@ -559,8 +560,7 @@ dagster_instance = ec2.Instance(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
+                                "content": textwrap.dedent(f"""\
                             ENVIRONMENT={consul_dc}
                             APPLICATION=dagster
                             SERVICE=data-platform
@@ -569,13 +569,14 @@ dagster_instance = ec2.Instance(
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            """
-                                ),
+                            """),
                                 "owner": "root:root",
                             },
                             {
                                 "path": "/etc/default/consul-template",
-                                "content": f"DAGSTER_ENVIRONMENT={stack_info.env_suffix}",  # noqa: E501
+                                "content": (
+                                    f"DAGSTER_ENVIRONMENT={stack_info.env_suffix}"
+                                ),
                             },
                         ]
                     },

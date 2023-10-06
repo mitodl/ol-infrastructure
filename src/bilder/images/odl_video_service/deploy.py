@@ -170,28 +170,38 @@ mit_md_certificate_file = shib_conf_directory.joinpath("mit-md-cert.pem")
 consul_templates.extend(
     [
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-odl-video-service/ovs-secrets" }}'
-            "{{ printf .Data.data.nginx.tls_key }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-odl-video-service/ovs-secrets" }}'
+                "{{ printf .Data.data.nginx.tls_key }}{{ end }}"
+            ),
             destination=Path(certificate_key_file),
         ),
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-odl-video-service/ovs-secrets" }}'
-            "{{ printf .Data.data.nginx.tls_certificate }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-odl-video-service/ovs-secrets" }}'
+                "{{ printf .Data.data.nginx.tls_certificate }}{{ end }}"
+            ),
             destination=Path(certificate_file),
         ),
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-odl-video-service/ovs-secrets" }}'
-            "{{ printf .Data.data.shibboleth.sp_cert }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-odl-video-service/ovs-secrets" }}'
+                "{{ printf .Data.data.shibboleth.sp_cert }}{{ end }}"
+            ),
             destination=Path(sp_certificate_file),
         ),
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-odl-video-service/ovs-secrets" }}'
-            "{{ printf .Data.data.shibboleth.sp_key }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-odl-video-service/ovs-secrets" }}'
+                "{{ printf .Data.data.shibboleth.sp_key }}{{ end }}"
+            ),
             destination=Path(sp_key_file),
         ),
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-odl-video-service/ovs-secrets" }}'
-            "{{ printf .Data.data.shibboleth.mit_md_cert }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-odl-video-service/ovs-secrets" }}'
+                "{{ printf .Data.data.shibboleth.mit_md_cert }}{{ end }}"
+            ),
             destination=Path(mit_md_certificate_file),
         ),
     ]

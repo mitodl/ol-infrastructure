@@ -100,25 +100,33 @@ vault_config = VaultAgentConfig(
     ),
     template=[
         VaultTemplate(
-            contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-            "{{ printf .Data.key }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+                "{{ printf .Data.key }}{{ end }}"
+            ),
             destination=Path(f"{vector_config.tls_config_directory}/odl_wildcard.key"),
         ),
         VaultTemplate(
-            contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-            "{{ printf .Data.value }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+                "{{ printf .Data.value }}{{ end }}"
+            ),
             destination=Path(f"{vector_config.tls_config_directory}/odl_wildcard.cert"),
         ),
         VaultTemplate(
-            contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-            "{{ printf .Data.key }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+                "{{ printf .Data.key }}{{ end }}"
+            ),
             destination=Path(
                 f"{traefik_config.configuration_directory}/odl_wildcard.key"
             ),
         ),
         VaultTemplate(
-            contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-            "{{ printf .Data.value }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+                "{{ printf .Data.value }}{{ end }}"
+            ),
             destination=Path(
                 f"{traefik_config.configuration_directory}/odl_wildcard.cert"
             ),

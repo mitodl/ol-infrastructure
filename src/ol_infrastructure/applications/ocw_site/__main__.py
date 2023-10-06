@@ -47,7 +47,8 @@ vector_log_proxy_secrets = read_yaml_secrets(
 )
 fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
 encoded_fastly_proxy_credentials = base64.b64encode(
-    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
+    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}"
+    .encode()
 ).decode("utf8")
 
 monitoring_stack = StackReference("infrastructure.monitoring")
@@ -332,12 +333,17 @@ for purpose in ("draft", "live"):
             ),
             fastly.ServiceVclConditionArgs(
                 name="not course media or old akamai",
-                statement='req.url.path !~ "^/coursemedia" && req.url.path !~ "^/ans\\d+"',  # noqa: E501
+                statement=(
+                    'req.url.path !~ "^/coursemedia" && req.url.path !~ "^/ans\\d+"'
+                ),
                 type="REQUEST",
             ),
             fastly.ServiceVclConditionArgs(
                 name="is old Akamai file",
-                statement='req.url.path ~ "^/ans\\d+" && req.url.path !~ "/ans7870/21f/21f.027"',  # noqa: E501
+                statement=(
+                    'req.url.path ~ "^/ans\\d+" && req.url.path !~'
+                    ' "/ans7870/21f/21f.027"'
+                ),
                 type="REQUEST",
             ),
         ],

@@ -17,9 +17,11 @@ def build_edx_pipeline(
     edx_platform_code = git_repo(
         name=Identifier("edx-platform"),
         uri="https://github.com/openedx/edx-platform",
-        branch="2u/release"
-        if release_name == "master"
-        else OpenEdxSupportedRelease[release_name].branch,
+        branch=(
+            "2u/release"
+            if release_name == "master"
+            else OpenEdxSupportedRelease[release_name].branch
+        ),
     )
 
     edx_pulumi_code = git_repo(
@@ -150,6 +152,9 @@ if __name__ == "__main__":
     sys.stdout.writelines(
         (
             "\n",
-            f"fly -t <target> set-pipeline -p packer-pulumi-edxapp-{release_name} -c definition.json",  # noqa: E501
+            (
+                "fly -t <target> set-pipeline -p"
+                f" packer-pulumi-edxapp-{release_name} -c definition.json"
+            ),
         )
     )

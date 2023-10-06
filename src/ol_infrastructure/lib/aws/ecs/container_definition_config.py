@@ -58,14 +58,18 @@ class OLFargateContainerDefinitionConfig(BaseModel):
     )
     memory: Optional[PositiveInt] = Field(
         PositiveInt(HALF_GIGABYTE_MB),
-        description="Memory reserved for this container. "
-        "If container exceeds this amount, it will be killed",
+        description=(
+            "Memory reserved for this container. "
+            "If container exceeds this amount, it will be killed"
+        ),
         parameter_name="memory",
     )
     image: str = Field(
         ...,
-        description="Fully qualified (registry/repository:tag) where ECS agent "
-        "can retrieve image",
+        description=(
+            "Fully qualified (registry/repository:tag) where ECS agent "
+            "can retrieve image"
+        ),
         parameter_name="image",
     )
     memory_reservation: Optional[PositiveInt] = Field(
@@ -90,8 +94,10 @@ class OLFargateContainerDefinitionConfig(BaseModel):
     )
     is_essential: bool = Field(
         False,  # noqa: FBT003
-        description="Enabling this flag means if this container stops or fails, "
-        "all other containers that are part of the task are stopped",
+        description=(
+            "Enabling this flag means if this container stops or fails, "
+            "all other containers that are part of the task are stopped"
+        ),
         parameter_name="essential",
     )
     environment: Optional[dict[str, str]] = Field(
@@ -111,19 +117,24 @@ class OLFargateContainerDefinitionConfig(BaseModel):
     )
     privileged: bool = Field(
         False,  # noqa: FBT003
-        description="If enabled, container is given elevated privileges, "
-        "similar to 'root' user",
+        description=(
+            "If enabled, container is given elevated privileges, similar to 'root' user"
+        ),
         parameter_name="privileged",
     )
     attach_to_load_balancer: bool = Field(
         False,  # noqa: FBT003
-        description="If set to True, container will be attached to target group and "
-        "load balancer using the port_mappings name and container port",
+        description=(
+            "If set to True, container will be attached to target group and "
+            "load balancer using the port_mappings name and container port"
+        ),
     )
     volumes_from: Optional[list[dict[str, str]]] = Field(
         None,
-        description="Allow for mounting paths betwen containers. Useful for rendering "
-        "configuration templates via Vault agent or consul-template sidecars.",
+        description=(
+            "Allow for mounting paths betwen containers. Useful for rendering "
+            "configuration templates via Vault agent or consul-template sidecars."
+        ),
         parameter_name="volumesFrom",
     )
     model_config = ConfigDict(arbitrary_types_allowed=True)

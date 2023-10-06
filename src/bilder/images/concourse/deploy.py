@@ -153,7 +153,9 @@ concourse_config_map = {
     CONCOURSE_WORKER_NODE_TYPE: partial(
         ConcourseWorkerConfig,
         additional_resource_types=["rclone", "s3-sync"],
-        additional_resource_types_s3_location="ol-eng-artifacts.s3.amazonaws.com/bundled-concourse-resources",
+        additional_resource_types_s3_location=(
+            "ol-eng-artifacts.s3.amazonaws.com/bundled-concourse-resources"
+        ),
         baggageclaim_bind_ip="0.0.0.0",  # noqa: S104
         baggageclaim_driver="overlay",
         baggageclaim_p2p_interface_family="4",
@@ -165,9 +167,9 @@ concourse_config_map = {
         containerd_network_pool="10.250.0.0/16",
     ),
 }
-concourse_config: Union[
-    ConcourseWebConfig, ConcourseWorkerConfig
-] = concourse_config_map[node_type]()
+concourse_config: Union[ConcourseWebConfig, ConcourseWorkerConfig] = (
+    concourse_config_map[node_type]()
+)
 vault_template_map = {
     CONCOURSE_WEB_NODE_TYPE: [
         partial(

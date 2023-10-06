@@ -71,8 +71,9 @@ def init_vault_cluster(vault_addr):
                 if f"{PULUMI}/" not in enabled_auths:
                     vault_client.sys.enable_auth_method(
                         method_type="userpass",
-                        description="Allow authentication for Pulumi using the "
-                        "user/pass method",
+                        description=(
+                            "Allow authentication for Pulumi using the user/pass method"
+                        ),
                         path=PULUMI,
                     )
 

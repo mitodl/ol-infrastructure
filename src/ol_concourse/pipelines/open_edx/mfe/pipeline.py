@@ -65,12 +65,16 @@ def mfe_params(
     open_edx: OpenEdxVars, mfe: OpenEdxApplicationVersion
 ) -> dict[str, Optional[str]]:
     return {
-        "ACCESS_TOKEN_COOKIE_NAME": f"{open_edx.environment}-edx-jwt-cookie-header-payload",  # noqa: E501
+        "ACCESS_TOKEN_COOKIE_NAME": (
+            f"{open_edx.environment}-edx-jwt-cookie-header-payload"
+        ),
         "BASE_URL": f"https://{open_edx.lms_domain}",
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "CONTACT_URL": open_edx.contact_url,
         "FAVICON_URL": open_edx.favicon_url,
-        "LANGUAGE_PREFERENCE_COOKIE_NAME": f"{open_edx.environment}-open-edx-language-preference",  # noqa: E501
+        "LANGUAGE_PREFERENCE_COOKIE_NAME": (
+            f"{open_edx.environment}-open-edx-language-preference"
+        ),
         "LMS_BASE_URL": f"https://{open_edx.lms_domain}",
         "LOGIN_URL": f"https://{open_edx.lms_domain}/login",
         "LOGOUT_URL": f"https://{open_edx.lms_domain}/logout",
@@ -154,16 +158,14 @@ def mfe_job(
                             # mismatched versions of react defined in tertiary
                             # dependencies https://stackoverflow.com/a/66620869
                             # Ensure that webpack is installed (TMM 2023-06-27)
-                            textwrap.dedent(
-                                f"""\
+                            textwrap.dedent(f"""\
                                 apt-get update
                                 apt-get install -q -y python3 python-is-python3 build-essential
                                 npm install --legacy-peer-deps
                                 {branding_overrides}
                                 npm install webpack --legacy-peer-deps
                                 NODE_ENV=production npm run build
-                                """  # noqa: E501
-                            ),
+                                """),  # noqa: E501
                         ],
                     ),
                 ),

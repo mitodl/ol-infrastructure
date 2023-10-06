@@ -168,6 +168,7 @@ def _install_resource_types(concourse_config: ConcourseWorkerConfig):
         resource_archive = f"https://{concourse_config.additional_resource_types_s3_location}/{resource}.tgz"
         resource_path = f"/tmp/{resource}"  # noqa: S108
         resource_archive_path = f"{resource_path}/{resource}.tgz"
+        addtl_resource_types_dir = concourse_config.additional_resource_types_directory
         server.shell(
             name=f"Setup directory structure for resource_type {resource}",
             commands=[f"mkdir {resource_path}"],
@@ -182,7 +183,7 @@ def _install_resource_types(concourse_config: ConcourseWorkerConfig):
             commands=[
                 f"tar -xvzf {resource_archive_path} -C {resource_path}",
                 f"rm -f {resource_archive_path}",
-                f"mv {resource_path} {concourse_config.additional_resource_types_directory}/",  # noqa: E501
+                f"mv {resource_path} {addtl_resource_types_dir}/",
             ],
         )
         files.directory(

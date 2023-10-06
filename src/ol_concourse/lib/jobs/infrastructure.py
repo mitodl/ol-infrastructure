@@ -265,7 +265,9 @@ def pulumi_job(  # noqa: PLR0913
                 params={
                     "env_os": {
                         "AWS_DEFAULT_REGION": "us-east-1",
-                        "PYTHONPATH": f"/usr/lib/:/tmp/build/put/{pulumi_code.name}/src/",  # noqa: E501
+                        "PYTHONPATH": (
+                            f"/usr/lib/:/tmp/build/put/{pulumi_code.name}/src/"
+                        ),
                     },
                     "stack_name": stack_name,
                 },

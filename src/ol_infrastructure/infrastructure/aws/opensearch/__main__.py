@@ -90,15 +90,15 @@ if is_public_web:
             f"opensearch/opensearch.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml"
         )
     )["master_user_password"]
-    conditional_kwargs[
-        "advanced_security_options"
-    ] = aws.elasticsearch.DomainAdvancedSecurityOptionsArgs(
-        enabled=True,
-        internal_user_database_enabled=True,
-        master_user_options=aws.elasticsearch.DomainAdvancedSecurityOptionsMasterUserOptionsArgs(
-            master_user_name="opensearch",
-            master_user_password=master_user_password,
-        ),
+    conditional_kwargs["advanced_security_options"] = (
+        aws.elasticsearch.DomainAdvancedSecurityOptionsArgs(
+            enabled=True,
+            internal_user_database_enabled=True,
+            master_user_options=aws.elasticsearch.DomainAdvancedSecurityOptionsMasterUserOptionsArgs(
+                master_user_name="opensearch",
+                master_user_password=master_user_password,
+            ),
+        )
     )
 else:
     conditional_kwargs["vpc_options"] = aws.elasticsearch.DomainVpcOptionsArgs(
@@ -107,16 +107,16 @@ else:
     )
 
 if is_secured_cluster:
-    conditional_kwargs[
-        "domain_endpoint_options"
-    ] = aws.elasticsearch.DomainDomainEndpointOptionsArgs(
-        enforce_https=True,
-        tls_security_policy="Policy-Min-TLS-1-2-2019-07",
+    conditional_kwargs["domain_endpoint_options"] = (
+        aws.elasticsearch.DomainDomainEndpointOptionsArgs(
+            enforce_https=True,
+            tls_security_policy="Policy-Min-TLS-1-2-2019-07",
+        )
     )
-    conditional_kwargs[
-        "node_to_node_encryption"
-    ] = aws.elasticsearch.DomainNodeToNodeEncryptionArgs(
-        enabled=True,
+    conditional_kwargs["node_to_node_encryption"] = (
+        aws.elasticsearch.DomainNodeToNodeEncryptionArgs(
+            enabled=True,
+        )
     )
     conditional_kwargs["encrypt_at_rest"] = aws.elasticsearch.DomainEncryptAtRestArgs(
         enabled=True,

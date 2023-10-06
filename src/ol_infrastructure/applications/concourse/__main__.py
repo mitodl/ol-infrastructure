@@ -113,8 +113,7 @@ def build_worker_user_data(
             },
             {
                 "path": "/etc/default/vector",
-                "content": textwrap.dedent(
-                    f"""\
+                "content": textwrap.dedent(f"""\
                     ENVIRONMENT={consul_dc}
                     APPLICATION=concourse-worker
                     SERVICE=concourse
@@ -123,8 +122,7 @@ def build_worker_user_data(
                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                    """
-                ),
+                    """),
                 "owner": "root:root",
             },
         ]
@@ -133,11 +131,9 @@ def build_worker_user_data(
         yaml_contents["write_files"].append(
             {
                 "path": "/etc/default/concourse-team",
-                "content": textwrap.dedent(
-                    f"""\
+                "content": textwrap.dedent(f"""\
                      CONCOURSE_TEAM={concourse_team}
-                     """
-                ),
+                     """),
                 "owner": "root:root",
             }
         )
@@ -308,7 +304,10 @@ concourse_worker_security_group = ec2.SecurityGroup(
             from_port=0,
             to_port=MAXIMUM_PORT_NUMBER,
             protocol="tcp",
-            description="Allow Concourse workers to connect to all other concourse workers for p2p streaming.",  # noqa: E501
+            description=(
+                "Allow Concourse workers to connect to all other concourse workers for"
+                " p2p streaming."
+            ),
         )
     ],
     egress=default_egress_args,
@@ -551,8 +550,7 @@ web_launch_config = ec2.LaunchTemplate(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
+                                "content": textwrap.dedent(f"""\
                                     ENVIRONMENT={consul_dc}
                                     APPLICATION=concourse-web
                                     SERVICE=concourse
@@ -561,8 +559,7 @@ web_launch_config = ec2.LaunchTemplate(
                                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                                    """
-                                ),
+                                    """),
                                 "owner": "root:root",
                             },
                         ]
@@ -661,7 +658,9 @@ for worker_def in concourse_config.get_object("workers") or []:
     worker_launch_config = ec2.LaunchTemplate(
         f"concourse-worker-{worker_class_name}-launch-template",
         name_prefix=f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}-",
-        description=f"Launch template for deploying concourse worker-{worker_class_name} nodes.",  # noqa: E501
+        description=(
+            f"Launch template for deploying concourse worker-{worker_class_name} nodes."
+        ),
         iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
             arn=concourse_worker_instance_profile.arn,
         ),
@@ -723,7 +722,9 @@ for worker_def in concourse_config.get_object("workers") or []:
         internal=True,
         ip_address_type="dualstack",
         load_balancer_type="application",
-        name=f"concourse-worker-alb-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}",
+        name=(
+            f"concourse-worker-alb-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}"
+        ),
         security_groups=[concourse_worker_security_group.id],
         subnets=target_vpc["subnet_ids"],
         tags=aws_config.merged_tags({}),

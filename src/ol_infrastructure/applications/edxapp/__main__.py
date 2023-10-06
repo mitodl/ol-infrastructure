@@ -206,7 +206,9 @@ edxapp_storage_bucket = s3.Bucket(
                     "Effect": "Allow",
                     "Principal": "*",
                     "Action": "s3:GetObject",
-                    "Resource": f"arn:aws:s3:::{storage_bucket_name}/media/video-images/*",  # noqa: E501
+                    "Resource": (
+                        f"arn:aws:s3:::{storage_bucket_name}/media/video-images/*"
+                    ),
                 }
             ],
         },
@@ -376,8 +378,9 @@ edxapp_security_group = ec2.SecurityGroup(
                 edxapp_vpc["cidr"],
             ],
             protocol="tcp",
-            description="Allow traffic to the Xqueue process running on the edxapp "
-            "instances",
+            description=(
+                "Allow traffic to the Xqueue process running on the edxapp instances"
+            ),
         ),
     ],
     egress=default_egress_args,
@@ -419,7 +422,10 @@ edxapp_db_security_group = ec2.SecurityGroup(
 edxapp_vault_mount = vault.Mount(
     "edxapp-vault-generic-secrets-mount",
     path=f"secret-{stack_info.env_prefix}",
-    description="Static secrets storage for Open edX {stack_info.env_prefix} applications and services",  # noqa: E501
+    description=(
+        "Static secrets storage for Open edX {stack_info.env_prefix} applications and"
+        " services"
+    ),
     type="kv",
 )
 edxapp_secrets = vault.generic.Secret(
@@ -880,9 +886,9 @@ waffle_flags_yaml_content = yaml.safe_dump(
 # Manage Consul Data #
 ######################
 consul_kv_data = {
-    "enable_notes": "true"
-    if edxapp_config.get_bool("enable_notes")
-    else "false",  # intended quoted boolean
+    "enable_notes": (
+        "true" if edxapp_config.get_bool("enable_notes") else "false"
+    ),  # intended quoted boolean
     "google-analytics-id": edxapp_config.require("google_analytics_id"),
     "lms-domain": edxapp_domains["lms"],
     "marketing-domain": edxapp_config.get("marketing_domain") or "",
@@ -1091,20 +1097,17 @@ def cloud_init_user_data_func(
             # There should be something that triggers this only if framework = docker
             {
                 "path": "/etc/docker/compose/.env_caddy",
-                "content": textwrap.dedent(
-                    f"""\
+                "content": textwrap.dedent(f"""\
                     EDXAPP_LMS_URL={edxapp_domains["lms"]}
                     EDXAPP_LMS_PREVIEW_URL={edxapp_domains["preview"]}
                     EDXAPP_CMS_URL={edxapp_domains["studio"]}
-                    """
-                ),
+                    """),
                 "owner": "root:root",
                 "permissions": "0664",
             },
             {
                 "path": "/etc/default/vector",
-                "content": textwrap.dedent(
-                    f"""\
+                "content": textwrap.dedent(f"""\
                     ENVIRONMENT={consul_env_name}
                     APPLICATION=edxpp
                     SERVICE=openedx
@@ -1112,8 +1115,7 @@ def cloud_init_user_data_func(
                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                    """
-                ),
+                    """),
                 "owner": "root:root",
             },
             {
@@ -1274,7 +1276,10 @@ web_alb_metric_alarm = cloudwatch.MetricAlarm(
         ),
     },
     datapoints_to_alarm=5,
-    alarm_description="Time elapsed after the request leaves the load balancer until a response from the target is received",  # noqa: E501
+    alarm_description=(
+        "Time elapsed after the request leaves the load balancer until a response from"
+        " the target is received"
+    ),
     alarm_actions=[web_asg_scale_up_policy.arn],
     ok_actions=[web_asg_scale_down_policy.arn],
     tags=aws_config.tags,
@@ -1446,59 +1451,49 @@ edxapp_fastly_service = fastly.ServiceVcl(
     ],
     snippets=[
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(
-                """\
+            content=textwrap.dedent("""\
                 if (table.contains(marketing_redirects, req.url.path)) {
                   error 618 "redirect";
-                }"""
-            ),
+                }"""),
             name="Interrupt Redirected Requests",
             type="recv",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(
-                f"""\
+            content=textwrap.dedent(f"""\
                 if (req.url.path ~ "{mfe_regex}") {{
                   set req.url = req.url.path;
                   unset req.http.Cookie;
-                }}"""
-            ),
+                }}"""),
             name="Strip headers to S3 backend",
             type="recv",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(
-                f"""\
+            content=textwrap.dedent(f"""\
                 if (beresp.status == 404 && req.url.path ~ "{mfe_regex}") {{
                   error 600 "### Custom Response";
-                }}"""
-            ),
+                }}"""),
             name="Manage 404 On S3 Origin for MFE",
             type="fetch",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(
-                f"""\
+            content=textwrap.dedent(f"""\
                 declare local var.mfe_path STRING;
                 if (obj.status == 600) {{
                   set var.mfe_path = regsub(req.url.path, "{mfe_regex}.*", "\\1");
                   set req.url = "/" + var.mfe_path + "/index.html";
                   restart;
-                }}"""
-            ),
+                }}"""),
             name="Fetch site index for MFE custom error",
             priority=120,
             type="error",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(
-                """\
+            content=textwrap.dedent("""\
                 if (obj.status == 618 && obj.response == "redirect") {
                   set obj.status = 302;
                   set obj.http.Location = table.lookup(marketing_redirects, req.url.path) + if (req.url.qs, "?" req.url.qs, "");
                   return (deliver);
-                }"""  # noqa: E501
-            ),
+                }"""),  # noqa: E501
             name="Route Redirect Requests",
             type="error",
         ),

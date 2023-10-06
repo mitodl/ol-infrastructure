@@ -181,12 +181,11 @@ class OLAmazonCache(pulumi.ComponentResource):
                     name="cluster-enabled", value="yes"
                 )
             )
-
+        cluster_name = cache_config.cluster_name
+        engine_version = cache_config.engine_version
         self.parameter_group = elasticache.ParameterGroup(
-            f"{cache_config.cluster_name}-{cache_config.engine}-{cache_config.engine_version}-parameter-group",
-            name=(
-                f"{cache_config.cluster_name}-{cache_config.engine_version.replace('.', '')}-parameter-group"  # noqa: E501
-            ),
+            f"{cluster_name}-{cache_config.engine}-{engine_version}-parameter-group",
+            name=f"{cluster_name}-{engine_version.replace('.', '')}-parameter-group",
             family=parameter_group_family(
                 cache_config.engine, cache_config.engine_version
             ),
@@ -259,9 +258,11 @@ class OLAmazonCache(pulumi.ComponentResource):
             automatic_failover_enabled=True,
             cluster_mode=cluster_mode_param,
             engine="redis",
-            engine_version="6.x"
-            if cache_config.engine_version.startswith("6")
-            else cache_config.engine_version,
+            engine_version=(
+                "6.x"
+                if cache_config.engine_version.startswith("6")
+                else cache_config.engine_version
+            ),
             kms_key_id=cache_config.kms_key_id,
             node_type=cache_config.instance_type,
             num_cache_clusters=cache_node_count,
@@ -327,7 +328,9 @@ class OLAmazonCache(pulumi.ComponentResource):
         global_profiles = {
             "EngineCPUUtilization": {
                 "comparison_operator": "GreaterThanThreshold",
-                "description": "ElastiCache - High CPU utilization by the Redis engine.",  # noqa: E501
+                "description": (
+                    "ElastiCache - High CPU utilization by the Redis engine."
+                ),
                 "datapoints_to_alarm": 2,
                 "level": "warning",
                 "period": 300,  # 5 minutes
@@ -338,7 +341,9 @@ class OLAmazonCache(pulumi.ComponentResource):
             },
             "DatabaseMemoryUsagePercentage": {
                 "comparison_operator": "GreaterThanThreshold",
-                "description": "ElastiCache - High memory utilization by the Redis engine.",  # noqa: E501
+                "description": (
+                    "ElastiCache - High memory utilization by the Redis engine."
+                ),
                 "datapoints_to_alarm": 2,
                 "level": "warning",
                 "period": 300,  # 5 minutes

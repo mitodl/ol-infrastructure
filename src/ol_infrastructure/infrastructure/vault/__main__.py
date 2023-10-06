@@ -413,7 +413,6 @@ def cloud_init_user_data(  # noqa: PLR0913
         Path(f"pulumi/vault.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
     )
     cloud_config_contents = {
-        ""
         "write_files": [
             {
                 "path": "/etc/consul.d/99-autojoin.json",
@@ -430,12 +429,13 @@ def cloud_init_user_data(  # noqa: PLR0913
             },
             {
                 "path": "/etc/default/traefik",
-                "content": (f"DOMAIN={vault_dns_name}\n"),
+                "content": f"DOMAIN={vault_dns_name}\n",
             },
             {
                 "path": "/etc/cron.d/raft_backup",
                 "content": (
-                    f"{vault_backup_cron} root PATH=/usr/local/bin:/usr/bin HEALTH_CHECK_ID={vault_backup_healthcheck_id} BUCKET_NAME={vault_backup_bucket} /usr/sbin/raft_backup.sh\n"  # noqa: E501
+                    f"{vault_backup_cron} root PATH=/usr/local/bin:/usr/bin"
+                    f" HEALTH_CHECK_ID={vault_backup_healthcheck_id} BUCKET_NAME={vault_backup_bucket} /usr/sbin/raft_backup.sh\n"  # noqa: E501
                 ),
             },
             {
@@ -456,8 +456,12 @@ def cloud_init_user_data(  # noqa: PLR0913
                                             f"tag_value={vpc_id}"
                                         ),
                                         "auto_join_port": VAULT_HTTP_PORT,
-                                        "leader_tls_servername": "active.vault.service.consul",  # noqa: E501
-                                        "leader_ca_cert_file": "/etc/ssl/ol_root_ca.pem",  # noqa: E501
+                                        "leader_tls_servername": (
+                                            "active.vault.service.consul"
+                                        ),
+                                        "leader_ca_cert_file": (
+                                            "/etc/ssl/ol_root_ca.pem"
+                                        ),
                                     }
                                 ],
                                 "performance_multiplier": 5,
@@ -469,8 +473,7 @@ def cloud_init_user_data(  # noqa: PLR0913
             },
             {
                 "path": "/etc/default/vector",
-                "content": textwrap.dedent(
-                    f"""\
+                "content": textwrap.dedent(f"""\
                     ENVIRONMENT={consul_env_name}
                     APPLICATION=vault
                     SERVICE=vault
@@ -478,8 +481,7 @@ def cloud_init_user_data(  # noqa: PLR0913
                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                    """
-                ),
+                    """),
                 "owner": "root:root",
             },
             # TODO: Move TLS key and cert injection to Packer build so that private key  # noqa: E501, FIX002, TD002, TD003

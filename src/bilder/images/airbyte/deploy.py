@@ -151,15 +151,19 @@ env_template_file = Path("/etc/consul-template/.env.tmpl")
 consul_templates_directory = Path("/etc/consul-template")
 consul_templates = [
     ConsulTemplateTemplate(
-        contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-        "{{ printf .Data.key }}{{ end }}",
+        contents=(
+            '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+            "{{ printf .Data.key }}{{ end }}"
+        ),
         destination=Path(certificate_key_file),
         user="root",
         group="root",
     ),
     ConsulTemplateTemplate(
-        contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-        "{{ printf .Data.value }}{{ end }}",
+        contents=(
+            '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+            "{{ printf .Data.value }}{{ end }}"
+        ),
         destination=Path(certificate_file),
         user="root",
         group="root",

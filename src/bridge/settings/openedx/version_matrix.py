@@ -58,8 +58,12 @@ class OpenLearningOpenEdxDeployment(Enum):
 
 
 default_branding_overrides = {
-    "@edx/frontend-component-footer@npm": "@mitodl/frontend-component-footer-mitol@latest",  # noqa: E501
-    "@edx/frontend-component-header@npm": "@mitodl/frontend-component-header-mitol@latest",  # noqa: E501
+    "@edx/frontend-component-footer@npm": (
+        "@mitodl/frontend-component-footer-mitol@latest"
+    ),
+    "@edx/frontend-component-header@npm": (
+        "@mitodl/frontend-component-header-mitol@latest"
+    ),
 }
 
 
