@@ -75,7 +75,9 @@ def build_forum_pipeline(
                     Input(name=forum_dockerfile_repo.name),
                 ],
                 build_parameters={
-                    "CONTEXT": f"{forum_dockerfile_repo.name}/dockerfiles/openedx-forum",  # noqa: E501
+                    "CONTEXT": (
+                        f"{forum_dockerfile_repo.name}/dockerfiles/openedx-forum"
+                    ),
                     "BUILD_ARG_OPENEDX_COMMON_VERSION": forum_branch,
                 },
                 build_args=[
@@ -160,6 +162,9 @@ if __name__ == "__main__":
     sys.stdout.writelines(
         (
             "\n",
-            f"fly -t <target> set-pipeline -p docker-packer-pulumi-forum-{release_name} -c definition.json",  # noqa: E501
+            (
+                "fly -t <target> set-pipeline -p"
+                f" docker-packer-pulumi-forum-{release_name} -c definition.json"
+            ),
         )
     )

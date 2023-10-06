@@ -57,8 +57,9 @@ s3.BucketPublicAccessBlock(
 athena_warehouse_workgroup = athena.Workgroup(
     f"ol_warehouse_athena_workgroup_{stack_info.env_suffix}",
     name=f"ol-warehouse-{stack_info.env_suffix}",
-    description="Data warehousing for MIT Open Learning in the "
-    f"{stack_info.name} environment",
+    description=(
+        f"Data warehousing for MIT Open Learning in the {stack_info.name} environment"
+    ),
     state="ENABLED",
     tags=aws_config.merged_tags({"Name": f"ol-warehouse-{stack_info.env_suffix}"}),
     configuration=athena.WorkgroupConfigurationArgs(
@@ -128,7 +129,10 @@ for data_stage in data_stages:
     warehouse_db = glue.CatalogDatabase(
         f"ol_warehouse_database_{data_stage}",
         name=f"ol_warehouse_{stack_info.env_suffix}_{data_stage}",
-        description=f"Data mart for data in {data_stage} format in the {stack_info.env_suffix} environment.",  # noqa: E501
+        description=(
+            f"Data mart for data in {data_stage} format in the"
+            f" {stack_info.env_suffix} environment."
+        ),
         location_uri=lake_storage_bucket.bucket.apply(lambda bucket: f"s3://{bucket}/"),
     )
     warehouse_dbs.append(warehouse_db)
@@ -199,8 +203,7 @@ query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
         "Resource": [
             f"arn:aws:s3:::ol-data-lake-{stage}-{stack_info.env_suffix}"
             for stage in data_stages
-        ]
-        + [
+        ] + [
             f"arn:aws:s3:::ol-data-lake-{stage}-{stack_info.env_suffix}/*"
             for stage in data_stages
         ],

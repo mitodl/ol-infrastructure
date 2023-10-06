@@ -69,8 +69,10 @@ mitxonline_bucket = s3.Bucket(
 
 mitxonline_iam_policy = iam.Policy(
     f"mitxonline-{stack_info.env_suffix}-policy",
-    description="AWS access controls for the MITx Online application in the "
-    f"{stack_info.name} environment",
+    description=(
+        "AWS access controls for the MITx Online application in the "
+        f"{stack_info.name} environment"
+    ),
     path=f"/ol-applications/mitxonline/{stack_info.env_suffix}/",
     name_prefix=f"mitxonline-{stack_info.env_suffix}-application-policy-",
     policy=lint_iam_policy(

@@ -91,12 +91,18 @@ edx_version = fetch_application_version(
     OPENEDX_RELEASE, EDX_INSTALLATION_NAME, OpenEdxApplication.edxapp
 )
 files.put(
-    name=f"Setting the DOCKER_REPO_AND_DIGEST env var to {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",  # noqa: E501
+    name=(
+        "Setting the DOCKER_REPO_AND_DIGEST env var to"
+        f" {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}"
+    ),
     src=io.StringIO(f"{DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}"),
     dest="/etc/default/docker_repo_and_digest",
 )
 files.put(
-    name=f"Settings the TUTOR_PERMISSIONS_VERSION env var to {VERSIONS['tutor_permissions']}",  # noqa: E501
+    name=(
+        "Settings the TUTOR_PERMISSIONS_VERSION env var to"
+        f" {VERSIONS['tutor_permissions']}"
+    ),
     src=io.StringIO(VERSIONS["tutor_permissions"]),
     dest="/etc/default/tutor_permissions_tag",
 )
@@ -248,8 +254,7 @@ if node_type == WEB_NODE_TYPE:
                 + EDX_INSTALLATION_NAME
                 + "/"
                 + EDX_INSTALLATION_NAME
-                + '-wildcard-certificate" }}'
-                "{{ printf .Data.cert }}{{ end }}"
+                + '-wildcard-certificate" }}{{ printf .Data.cert }}{{ end }}'
             ),
             destination=tls_certificate_file,
         ),
@@ -262,8 +267,7 @@ if node_type == WEB_NODE_TYPE:
                 + EDX_INSTALLATION_NAME
                 + "/"
                 + EDX_INSTALLATION_NAME
-                + '-wildcard-certificate" }}'
-                "{{ printf .Data.key }}{{ end }}"
+                + '-wildcard-certificate" }}{{ printf .Data.key }}{{ end }}'
             ),
             destination=tls_key_file,
         ),

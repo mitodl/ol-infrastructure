@@ -72,7 +72,9 @@ def build_xqueue_pipeline(release_name: str):
                     Input(name=xqueue_dockerfile_repo.name),
                 ],
                 build_parameters={
-                    "CONTEXT": f"{xqueue_dockerfile_repo.name}/dockerfiles/openedx-xqueue",  # noqa: E501
+                    "CONTEXT": (
+                        f"{xqueue_dockerfile_repo.name}/dockerfiles/openedx-xqueue"
+                    ),
                     "BUILD_ARG_OPENEDX_COMMON_VERSION": xqueue_branch,
                 },
                 build_args=[
@@ -160,6 +162,9 @@ if __name__ == "__main__":
     sys.stdout.writelines(
         (
             "\n",
-            f"fly -t <target> set-pipeline -p docker-packer-pulumi-xqueue-{release_name} -c definition.json",  # noqa: E501
+            (
+                "fly -t <target> set-pipeline -p"
+                f" docker-packer-pulumi-xqueue-{release_name} -c definition.json"
+            ),
         )
     )

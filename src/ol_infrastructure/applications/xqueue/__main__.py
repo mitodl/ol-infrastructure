@@ -155,7 +155,9 @@ xqueue_server_security_group = ec2.SecurityGroup(
             to_port=XQUEUE_SERVICE_PORT,
             security_groups=[edxapp.get_output("edxapp_security_group")],
             cidr_blocks=[target_vpc["cidr"]],
-            description=f"Allow traffic to the xqueue server on port {XQUEUE_SERVICE_PORT}",  # noqa: E501
+            description=(
+                f"Allow traffic to the xqueue server on port {XQUEUE_SERVICE_PORT}"
+            ),
         ),
     ],
     egress=default_egress_args,
@@ -193,8 +195,7 @@ lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
+                                "content": textwrap.dedent(f"""\
                             ENVIRONMENT={consul_dc}
                             APPLICATION=xqueue
                             SERVICE=openedx
@@ -203,8 +204,7 @@ lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            """
-                                ),
+                            """),
                                 "owner": "root:root",
                             },
                         ],

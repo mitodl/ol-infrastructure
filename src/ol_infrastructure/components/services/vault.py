@@ -338,7 +338,9 @@ class OLVaultPKIIntermediateCABackend(ComponentResource):
             certificate_signing_request=self.pki_intermediate_ca_cert_request.csr,
             signing_algorithm="SHA256WITHRSA",
             validity=CertificateValidityArgs(type="YEARS", value="7"),
-            template_arn="arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen1/V1",
+            template_arn=(
+                "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen1/V1"
+            ),
             opts=ResourceOptions(parent=self.pki_intermediate_ca_default_issuer),
         )
 
@@ -414,29 +416,31 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
             f"pki-intermediate-{backend_config.environment_name}",
             path=f"pki-intermediate-{backend_config.environment_name}",
             type="pki",
-            description="Backend to create certs for "
-            f"pki-intermediate-{backend_config.environment_name} backends",
+            description=(
+                "Backend to create certs for "
+                f"pki-intermediate-{backend_config.environment_name} backends"
+            ),
             max_lease_ttl_seconds=backend_config.max_ttl,
             default_lease_ttl_seconds=backend_config.default_ttl,
             opts=resource_options,
         )
 
         # Generate CSR for pki-intermediate-{env} backend
-        self.pki_intermediate_environment_cert_request = (
-            pkisecret.SecretBackendIntermediateCertRequest(
-                f"pki-intermediate-{backend_config.environment_name}-csr",
-                backend=self.pki_intermediate_environment_backend.id,
-                common_name=f"pki-intermediate-{backend_config.environment_name} "
-                "Intermediate Authority",
-                type="internal",
-                country=CERTIFICATE_CONFIG["country"],
-                province=CERTIFICATE_CONFIG["state"],
-                locality=CERTIFICATE_CONFIG["city"],
-                organization=CERTIFICATE_CONFIG["organization"],
-                ou=CERTIFICATE_CONFIG["organizational_unit"],
-                postal_code=CERTIFICATE_CONFIG["zip_code"],
-                opts=ResourceOptions(parent=self.pki_intermediate_environment_backend),
-            )
+        self.pki_intermediate_environment_cert_request = pkisecret.SecretBackendIntermediateCertRequest(  # noqa: E501
+            f"pki-intermediate-{backend_config.environment_name}-csr",
+            backend=self.pki_intermediate_environment_backend.id,
+            common_name=(
+                f"pki-intermediate-{backend_config.environment_name} "
+                "Intermediate Authority"
+            ),
+            type="internal",
+            country=CERTIFICATE_CONFIG["country"],
+            province=CERTIFICATE_CONFIG["state"],
+            locality=CERTIFICATE_CONFIG["city"],
+            organization=CERTIFICATE_CONFIG["organization"],
+            ou=CERTIFICATE_CONFIG["organizational_unit"],
+            postal_code=CERTIFICATE_CONFIG["zip_code"],
+            opts=ResourceOptions(parent=self.pki_intermediate_environment_backend),
         )
 
         # Create a default issuer role for pki-intermediate-{env}
@@ -446,7 +450,9 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
             key_config=VaultPKIKeyTypeBits.rsa,
             allowed_domains=["mit.edu"],
             cert_type="server",
-            resource_name=f"pki-intermediate-{backend_config.environment_name}-default-issuer",
+            resource_name=(
+                f"pki-intermediate-{backend_config.environment_name}-default-issuer"
+            ),
         )
         self.pki_intermediate_environment_default_issuer = OLVaultPKIIntermediateRole(
             self.pki_intermediate_environment_default_issuer_config,
@@ -454,17 +460,17 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
         )
 
         # Sign passed CSR for pki-intermediate-{env} with pki-intermediate-ca
-        self.pki_intermediate_environment_signed_csr = (
-            pkisecret.SecretBackendRootSignIntermediate(
-                f"pki-intermediate-{backend_config.environment_name}-signed-csr",
-                backend="pki-intermediate-ca",
-                common_name=f"pki-intermediate-{backend_config.environment_name} "
-                "Intermediate Authority",
-                csr=self.pki_intermediate_environment_cert_request.csr,
-                opts=ResourceOptions(
-                    parent=self.pki_intermediate_environment_default_issuer
-                ),
-            )
+        self.pki_intermediate_environment_signed_csr = pkisecret.SecretBackendRootSignIntermediate(  # noqa: E501
+            f"pki-intermediate-{backend_config.environment_name}-signed-csr",
+            backend="pki-intermediate-ca",
+            common_name=(
+                f"pki-intermediate-{backend_config.environment_name} "
+                "Intermediate Authority"
+            ),
+            csr=self.pki_intermediate_environment_cert_request.csr,
+            opts=ResourceOptions(
+                parent=self.pki_intermediate_environment_default_issuer
+            ),
         )
 
         # Associate pki-intermediate-ca bundle with this new pki-intermediate-{env}

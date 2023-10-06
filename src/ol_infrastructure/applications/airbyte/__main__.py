@@ -208,8 +208,7 @@ s3_source_policy_document = {
             ],
             "Resource": [
                 f"arn:aws:s3:::{bucket_name}" for bucket_name in s3_source_buckets
-            ]
-            + [f"arn:aws:s3:::{bucket_name}/*" for bucket_name in s3_source_buckets],
+            ] + [f"arn:aws:s3:::{bucket_name}/*" for bucket_name in s3_source_buckets],
         },
     ],
 }
@@ -341,7 +340,9 @@ airbyte_server_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_HTTPS_PORT,
             to_port=DEFAULT_HTTPS_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the airbyte server on port {DEFAULT_HTTPS_PORT}",  # noqa: E501
+            description=(
+                f"Allow traffic to the airbyte server on port {DEFAULT_HTTPS_PORT}"
+            ),
         ),
     ],
     egress=default_egress_args,
@@ -440,8 +441,10 @@ airbyte_db_consul_service = Service(
 )
 
 connection_string = Output.all(address=db_address, port=db_port, name=db_name).apply(
-    lambda db: "jdbc:postgresql://{address}:{port}/{name}?ssl=true&sslmode=require".format(
-        **db
+    lambda db: (
+        "jdbc:postgresql://{address}:{port}/{name}?ssl=true&sslmode=require".format(
+            **db
+        )
     )
 )
 
@@ -465,9 +468,11 @@ consul.Keys(
         ),
         consul.KeysKeyArgs(
             path="airbyte/traefik-certificate-resolver",
-            value="letsencrypt_staging_resolver"
-            if stack_info.env_suffix != "production"
-            else "letsencrypt_resolver",
+            value=(
+                "letsencrypt_staging_resolver"
+                if stack_info.env_suffix != "production"
+                else "letsencrypt_resolver"
+            ),
         ),
     ],
     opts=consul_provider,
@@ -540,8 +545,7 @@ lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
+                                "content": textwrap.dedent(f"""\
                             ENVIRONMENT={consul_dc}
                             APPLICATION=air-byte
                             SERVICE=data-platform
@@ -550,8 +554,7 @@ lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            """
-                                ),
+                            """),
                                 "owner": "root:root",
                             },
                         ]

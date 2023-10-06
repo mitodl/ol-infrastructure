@@ -114,8 +114,7 @@ def build_keycloak_pipeline() -> Pipeline:
                         path="sh",
                         args=[
                             "-exc",
-                            textwrap.dedent(
-                                f"""\
+                            textwrap.dedent(f"""\
                         mkdir {image_build_context.name}/plugins/
                         cp -r {keycloak_customization_repo.name}/* {image_build_context.name}/
                         cp -r {cas_protocol_spi.name}/* {image_build_context.name}/plugins/

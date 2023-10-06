@@ -40,17 +40,23 @@ def ssh_git_repo(
     )
 
 
-def github_release(name: Identifier, owner: str, repository: str) -> Resource:
+def github_release(
+    name: Identifier,
+    owner: str,
+    repository: str,
+    github_token: str = "((github.public_repo_access_token))",  # noqa: S107
+) -> Resource:
     """Generate a github-release resource for the given owner/repository.
 
-    :param name: The name of the resource. This will get used across subsequent
+    :param name: The name of the resource.  This will get used across subsequent
         pipeline steps that reference this resource.
-    :type name: Identifier
     :param owner: The owner of the repository (e.g. the GitHub user or organization)
-    :type owner: str
     :param repository: The name of the repository as it appears in GitHub
-    :type repository: str
+    :param github_token: A personal access token with `public_repo` scope to increase
+        the rate limit for checking versions.
+
     :returns: A configured Concourse resource object that can be used in a pipeline.
+
     :rtype: Resource
     """
     return Resource(
@@ -58,7 +64,12 @@ def github_release(name: Identifier, owner: str, repository: str) -> Resource:
         type="github-release",
         icon="github",
         check_every="24h",
-        source={"repository": repository, "owner": owner, "release": True},
+        source={
+            "repository": repository,
+            "owner": owner,
+            "release": True,
+            "access_token": github_token,
+        },
     )
 
 

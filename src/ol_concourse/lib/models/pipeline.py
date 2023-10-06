@@ -262,25 +262,33 @@ class GroupConfig(BaseModel):
 class StepModifierMixin(BaseModel):
     across: Optional[list[AcrossVar]] = Field(
         None,
-        description="Run a step multiple times with different combinations of variable "
-        "values. The across step can be combined with the load_var step, the "
-        "set_pipeline step, and instanced pipelines to maintain a dynamically sized "
-        "group of related pipelines.",
+        description=(
+            "Run a step multiple times with different combinations of variable values."
+            " The across step can be combined with the load_var step, the set_pipeline"
+            " step, and instanced pipelines to maintain a dynamically sized group of"
+            " related pipelines."
+        ),
     )
     attempts: Optional[PositiveInt] = Field(
         None,
-        description="The total number of times a step should be tried before it should "
-        "fail, e.g. 5 will run the step up to 5 times before giving up.",
+        description=(
+            "The total number of times a step should be tried before it should "
+            "fail, e.g. 5 will run the step up to 5 times before giving up."
+        ),
     )
     timeout: Optional[Duration] = Field(
         None,
-        description="The amount of time to limit the step's execution to, e.g. 30m for "
-        "30 minutes.",
+        description=(
+            "The amount of time to limit the step's execution to, e.g. 30m for "
+            "30 minutes."
+        ),
     )
     tags: Optional[list[str]] = Field(
         None,
-        description="The tags by which to match workers. The step will be placed within"
-        " the a pool of workers that match all of the given set of tags.",
+        description=(
+            "The tags by which to match workers. The step will be placed within"
+            " the a pool of workers that match all of the given set of tags."
+        ),
     )
     ensure: Optional[SerializeAsAny[Step]] = Field(
         None,

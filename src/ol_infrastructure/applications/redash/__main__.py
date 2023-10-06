@@ -133,15 +133,18 @@ vault.aws.AuthBackendRole(
 
 redash_instance_security_group = ec2.SecurityGroup(
     f"redash-instance-{stack_info.env_suffix}",
-    description="Security group to assign to Redash application to control "
-    "inter-service access",
+    description=(
+        "Security group to assign to Redash application to control inter-service access"
+    ),
     ingress=[
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
             from_port=DEFAULT_HTTPS_PORT,
             to_port=DEFAULT_HTTPS_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the redash webserver on port {DEFAULT_HTTPS_PORT}",  # noqa: E501
+            description=(
+                f"Allow traffic to the redash webserver on port {DEFAULT_HTTPS_PORT}"
+            ),
         ),
     ],
     egress=default_egress_args,  # This is important!
@@ -350,7 +353,7 @@ if redash_config.get_bool("manage_datasources"):
         datasource_config_consul_keys.append(
             consul.KeysKeyArgs(
                 path="redash/datasource_configs/xpro-pg-production/db_host",
-                # MD 20230123 Can't find the pulumi stack associated with this datasource.
+                # MD 20230123 Can't find the pulumi stack associated with this datasource.  # noqa: E501
                 value="production-apps-rds-postgres-mitxpro.cbnm7ajau6mi.us-east-1.rds.amazonaws.com",
             )
         )
@@ -421,11 +424,9 @@ web_lt_config = OLLaunchTemplateConfig(
                         "write_files": [
                             {
                                 "path": "/etc/default/docker-compose",
-                                "content": textwrap.dedent(
-                                    """\
+                                "content": textwrap.dedent("""\
                             COMPOSE_PROFILES=web
-                                    """
-                                ),
+                                    """),
                                 "owner": "root:root",
                             },
                             {
@@ -447,8 +448,7 @@ web_lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
+                                "content": textwrap.dedent(f"""\
                             ENVIRONMENT={consul_dc}
                             APPLICATION=redash
                             SERVICE=data-platform
@@ -457,8 +457,7 @@ web_lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            """
-                                ),
+                            """),
                                 "owner": "root:root",
                             },
                         ]
@@ -523,11 +522,9 @@ worker_lt_config = OLLaunchTemplateConfig(
                         "write_files": [
                             {
                                 "path": "/etc/default/docker-compose",
-                                "content": textwrap.dedent(
-                                    """\
+                                "content": textwrap.dedent("""\
                             COMPOSE_PROFILES=worker
-                                    """
-                                ),
+                                    """),
                                 "owner": "root:root",
                             },
                             {
@@ -545,16 +542,14 @@ worker_lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
+                                "content": textwrap.dedent(f"""\
                             ENVIRONMENT={consul_dc}
                             VECTOR_CONFIG_DIR=/etc/vector/
                             AWS_REGION={aws_config.region}
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            """
-                                ),
+                            """),
                                 "owner": "root:root",
                             },
                         ]

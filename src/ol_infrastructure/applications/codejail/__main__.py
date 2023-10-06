@@ -124,7 +124,9 @@ codejail_server_security_group = ec2.SecurityGroup(
             from_port=CODEJAIL_SERVICE_PORT,
             to_port=CODEJAIL_SERVICE_PORT,
             security_groups=[edxapp_stack.get_output("edxapp_security_group")],
-            description=f"Allow traffic to the codejail server on port {CODEJAIL_SERVICE_PORT}",  # noqa: E501
+            description=(
+                f"Allow traffic to the codejail server on port {CODEJAIL_SERVICE_PORT}"
+            ),
         ),
     ],
     egress=default_egress_args,
@@ -162,8 +164,7 @@ lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
+                                "content": textwrap.dedent(f"""\
                             ENVIRONMENT={consul_dc}
                             APPLICATION=codejail
                             SERVICE=openedx
@@ -172,8 +173,7 @@ lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            """
-                                ),
+                            """),
                                 "owner": "root:root",
                             },
                         ],

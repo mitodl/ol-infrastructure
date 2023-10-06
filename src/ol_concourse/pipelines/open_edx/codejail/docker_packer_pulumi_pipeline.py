@@ -75,7 +75,9 @@ def build_codejail_pipeline(
                     Input(name=codejail_dockerfile_repo.name),
                 ],
                 build_parameters={
-                    "CONTEXT": f"{codejail_dockerfile_repo.name}/dockerfiles/openedx-codejail/",  # noqa: E501
+                    "CONTEXT": (
+                        f"{codejail_dockerfile_repo.name}/dockerfiles/openedx-codejail/"
+                    ),
                     "BUILD_ARG_OPENEDX_BRANCH": openedx_branch,
                 },
                 build_args=[
@@ -164,6 +166,9 @@ if __name__ == "__main__":
     sys.stdout.writelines(
         (
             "\n",
-            f"fly -t <target> set-pipeline -p docker-packer-pulumi-codejail-{release_name} -c definition.json",  # noqa: E501
+            (
+                "fly -t <target> set-pipeline -p"
+                f" docker-packer-pulumi-codejail-{release_name} -c definition.json"
+            ),
         )
     )

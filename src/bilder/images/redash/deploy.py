@@ -236,33 +236,45 @@ consul_templates.append(
 consul_templates.extend(
     [
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-            "{{ printf .Data.key }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+                "{{ printf .Data.key }}{{ end }}"
+            ),
             destination=Path(certificate_key_file),
         ),
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-            "{{ printf .Data.value }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+                "{{ printf .Data.value }}{{ end }}"
+            ),
             destination=Path(certificate_file),
         ),
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-data/redash/sp-certificate-data" }}'
-            "{{ printf .Data.sp_signing_cert }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-data/redash/sp-certificate-data" }}'
+                "{{ printf .Data.sp_signing_cert }}{{ end }}"
+            ),
             destination=Path(sp_signing_cert_file),
         ),
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-data/redash/sp-certificate-data" }}'
-            "{{ printf .Data.sp_signing_key }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-data/redash/sp-certificate-data" }}'
+                "{{ printf .Data.sp_signing_key }}{{ end }}"
+            ),
             destination=Path(sp_signing_key_file),
         ),
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-data/redash/sp-certificate-data" }}'
-            "{{ printf .Data.sp_encrypting_cert }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-data/redash/sp-certificate-data" }}'
+                "{{ printf .Data.sp_encrypting_cert }}{{ end }}"
+            ),
             destination=Path(sp_encrypting_cert_file),
         ),
         ConsulTemplateTemplate(
-            contents='{{ with secret "secret-data/redash/sp-certificate-data" }}'
-            "{{ printf .Data.sp_encrypting_key }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-data/redash/sp-certificate-data" }}'
+                "{{ printf .Data.sp_encrypting_key }}{{ end }}"
+            ),
             destination=Path(sp_encrypting_key_file),
         ),
     ]

@@ -81,7 +81,9 @@ def build_notes_pipeline(
                     Input(name=notes_dockerfile_repo.name),
                 ],
                 build_parameters={
-                    "CONTEXT": f"{notes_dockerfile_repo.name}/dockerfiles/openedx-notes/",  # noqa: E501
+                    "CONTEXT": (
+                        f"{notes_dockerfile_repo.name}/dockerfiles/openedx-notes/"
+                    ),
                     "BUILD_ARG_OPENEDX_COMMON_VERSION": notes_branch,
                 },
                 build_args=[
@@ -167,6 +169,9 @@ if __name__ == "__main__":
     sys.stdout.writelines(
         (
             "\n",
-            f"fly -t <target> set-pipeline -p docker-packer-pulumi-notes-{release_name} -c definition.json",  # noqa: E501
+            (
+                "fly -t <target> set-pipeline -p"
+                f" docker-packer-pulumi-notes-{release_name} -c definition.json"
+            ),
         )
     )

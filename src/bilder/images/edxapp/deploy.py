@@ -136,7 +136,10 @@ files.directory(
 
 # Ugly, hopefully short-term, fix for getting the beat scheduler working again in ODL edx deployments.  # noqa: E501
 files.line(
-    name="Fix beat_scheduler.sh to invoke RedBeat rather than the broken single-beat definition.",  # noqa: E501
+    name=(
+        "Fix beat_scheduler.sh to invoke RedBeat rather than the broken single-beat"
+        " definition."
+    ),
     path=str(Path("/edx/app/edxapp/beat_scheduler.sh")),
     line="^exec.*$",
     replace="exec /edx/app/edxapp/venvs/edxapp/bin/celery beat $@",
@@ -230,8 +233,7 @@ if node_type == WEB_NODE_TYPE:
                     + EDX_INSTALLATION_NAME
                     + "/"
                     + EDX_INSTALLATION_NAME
-                    + '-wildcard-certificate" }}'
-                    "{{ printf .Data.cert_chain }}{{ end }}"
+                    + '-wildcard-certificate" }}{{ printf .Data.cert_chain }}{{ end }}'
                 ),
                 destination=Path("/etc/ssl/certs/edxapp.cert"),
             ),
@@ -241,8 +243,7 @@ if node_type == WEB_NODE_TYPE:
                     + EDX_INSTALLATION_NAME
                     + "/"
                     + EDX_INSTALLATION_NAME
-                    + '-wildcard-certificate" }}'
-                    "{{ printf .Data.key }}{{ end }}"
+                    + '-wildcard-certificate" }}{{ printf .Data.key }}{{ end }}'
                 ),
                 destination=Path("/etc/ssl/private/edxapp.key"),
             ),

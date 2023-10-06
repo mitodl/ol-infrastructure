@@ -102,8 +102,10 @@ sign_and_verify_alb_listener = lb.Listener(
 sign_and_verify_config = Config("sign_and_verify")
 unlocked_did_secret = secretsmanager.Secret(
     f"sign-and-verify-unlocked-did-{stack_info.env_suffix}",
-    description="Base64 encoded JSON object of the Unlocked DID that specifies the "
-    "signing keys for the digital credentials sign and verify service.",
+    description=(
+        "Base64 encoded JSON object of the Unlocked DID that specifies the "
+        "signing keys for the digital credentials sign and verify service."
+    ),
     name_prefix=f"sign-and-verify-unlocked-did-{stack_info.env_suffix}",
     tags=aws_config.tags,
 )
@@ -158,8 +160,10 @@ sign_and_verify_task_execution_role = iam.Role(
 
 sign_and_verify_execution_policy = iam.Policy(
     "ecs-fargate-sign-and-verify-task-execution-policy",
-    description="ECS Fargate task execution policy for sign and verify service to "
-    "grant access for retrieving the Unlocked DID value from AWS Secrets Manager",
+    description=(
+        "ECS Fargate task execution policy for sign and verify service to "
+        "grant access for retrieving the Unlocked DID value from AWS Secrets Manager"
+    ),
     name=f"ecs-fargate-sign-and-verify-task-execution-policy-{stack_info.env_suffix}",
     path=f"/digital-credentials/sign-and-verify-execution-{stack_info.env_suffix}/",
     policy=Output.all(unlocked_did_secret.arn, hmac_secret.arn).apply(
@@ -251,7 +255,9 @@ sign_and_verify_task = ecs.TaskDefinition(
                         "options": {
                             "awslogs-group": f"digital-credentials-sign-and-verify-{stack_info.env_suffix}",  # noqa: E501
                             "awslogs-region": "us-east-1",
-                            "awslogs-stream-prefix": f"sign-and-verify-{stack_info.env_suffix}",  # noqa: E501
+                            "awslogs-stream-prefix": (
+                                f"sign-and-verify-{stack_info.env_suffix}"
+                            ),
                             "awslogs-create-group": "true",
                         },
                     },

@@ -60,7 +60,10 @@ ol_platform_engineering_realm = keycloak.Realm(
     realm="ol-platform-engineering",
     reset_password_allowed=True,
     verify_email=True,
-    password_policy="upperCase(2) and digits(4) and length(30) and specialChars(4) and forceExpiredPasswordChange(365) and notUsername and notEmail",  # noqa: E501,S106 # pragma: allowlist secret
+    password_policy=(  # noqa: S106 # pragma: allowlist secret
+        "upperCase(2) and digits(4) and length(30) and specialChars(4) and"
+        " forceExpiredPasswordChange(365) and notUsername and notEmail"
+    ),
     security_defenses=keycloak.RealmSecurityDefensesArgs(
         brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(
             failure_reset_time_seconds=43200,
@@ -72,7 +75,9 @@ ol_platform_engineering_realm = keycloak.Realm(
             wait_increment_seconds=60,
         ),
         headers=keycloak.RealmSecurityDefensesHeadersArgs(
-            content_security_policy="frame-src 'self'; frame-ancestors 'self'; object-src 'none';",  # noqa: E501
+            content_security_policy=(
+                "frame-src 'self'; frame-ancestors 'self'; object-src 'none';"
+            ),
             content_security_policy_report_only="",
             strict_transport_security="max-age=31536000; includeSubDomains",
             x_content_type_options="nosniff",
@@ -155,7 +160,10 @@ ol_apps_realm = keycloak.Realm(
     login_with_email_allowed=True,
     registration_email_as_username=True,
     verify_email=True,
-    password_policy="upperCase(1) and digits(1) and specialChars(1) and length(8) and notUsername and notEmail",  # noqa: E501,S106 # pragma: allowlist secret
+    password_policy=(  # noqa: S106 # pragma: allowlist secret
+        "upperCase(1) and digits(1) and specialChars(1) and length(8) and notUsername"
+        " and notEmail"
+    ),
     security_defenses=keycloak.RealmSecurityDefensesArgs(
         brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(
             failure_reset_time_seconds=43200,
@@ -167,7 +175,9 @@ ol_apps_realm = keycloak.Realm(
             wait_increment_seconds=60,
         ),
         headers=keycloak.RealmSecurityDefensesHeadersArgs(
-            content_security_policy="frame-src 'self'; frame-ancestors 'self'; object-src 'none';",  # noqa: E501
+            content_security_policy=(
+                "frame-src 'self'; frame-ancestors 'self'; object-src 'none';"
+            ),
             content_security_policy_report_only="",
             strict_transport_security="max-age=31536000; includeSubDomains",
             x_content_type_options="nosniff",

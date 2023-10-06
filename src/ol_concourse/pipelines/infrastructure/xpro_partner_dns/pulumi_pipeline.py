@@ -33,6 +33,9 @@ if __name__ == "__main__":
     sys.stdout.writelines(
         [
             "\n",
-            "fly -t <target> set-pipeline -p pulumi-xpro-partner-dns -c definition.json",  # noqa: E501
+            (
+                "fly -t <target> set-pipeline -p pulumi-xpro-partner-dns -c"
+                " definition.json"
+            ),
         ]
     )

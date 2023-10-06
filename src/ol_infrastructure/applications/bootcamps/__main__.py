@@ -57,8 +57,10 @@ bootcamps_storage_bucket = s3.Bucket(
 
 bootcamps_iam_policy = iam.Policy(
     f"bootcamps-{stack_info.env_suffix}-policy",
-    description="AWS access controls for the bootcamps application in the "
-    f"{stack_info.name} environment",
+    description=(
+        "AWS access controls for the bootcamps application in the "
+        f"{stack_info.name} environment"
+    ),
     path=f"/ol-applications/bootcamps/{stack_info.env_suffix}/",
     name_prefix="aws-permissions-",
     policy=lint_iam_policy(
