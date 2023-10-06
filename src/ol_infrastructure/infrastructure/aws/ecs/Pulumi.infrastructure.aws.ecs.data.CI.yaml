@@ -2,6 +2,8 @@
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHi+npazf3LfzV9oCtcYyCMYLOzaQhbo9xt6lJVVpz9tkQHNGQ/EaxyjUvrvRtw0zlk8AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMTArtJQ1dNwKNQ3QCAgEQgDtaaQ8PNE4M+ZBxIZaczvi/oXVEBvoRNTAAk+6drM5rwivmKju6hXLfcqoKV1jYpzJ/mqexjiOgmyrFDg==
 config:
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
   cluster:instance_size: "t3a.medium"
   cluster:min_size: 2
   cluster:max_size: 4
