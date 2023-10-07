@@ -56,7 +56,10 @@ def github_release(  # noqa: PLR0913
     :param repository: The name of the repository as it appears in GitHub
     :param github_token: A personal access token with `public_repo` scope to increase
         the rate limit for checking versions.
-    :param tag_filter: Optional str to get specific tag of release.
+    :param tag_filter: A regular expression used to filter the repository tags to
+        include in the version results.
+    :param order_by: Indicate whether to order by version number or time.  Primarily
+        useful when in combination with `tag_filter`.
 
     :returns: A configured Concourse resource object that can be used in a pipeline.
 
