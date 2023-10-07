@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from ol_concourse.lib.models.pipeline import Identifier, RegistryImage, Resource
 from ol_concourse.lib.models.resource import Git
@@ -40,12 +40,13 @@ def ssh_git_repo(
     )
 
 
-def github_release(
+def github_release(  # noqa: PLR0913
     name: Identifier,
     owner: str,
     repository: str,
     github_token: str = "((github.public_repo_access_token))",  # noqa: S107
     tag_filter: Optional[str] = None,
+    order_by: Optional[Literal["time", "version"]] = None,
 ) -> Resource:
     """Generate a github-release resource for the given owner/repository.
 
@@ -61,18 +62,23 @@ def github_release(
 
     :rtype: Resource
     """
+    release_config = {
+        "repository": repository,
+        "owner": owner,
+        "release": True,
+    }
+    if tag_filter:
+        release_config["tag_filter"] = tag_filter
+    if github_token:
+        release_config["access_token"] = github_token
+    if order_by:
+        release_config["order_by"] = order_by
     return Resource(
         name=name,
         type="github-release",
         icon="github",
         check_every="24h",
-        source={
-            "repository": repository,
-            "owner": owner,
-            "release": True,
-            "access_token": github_token,
-            "tag_filter": tag_filter,
-        },
+        source=release_config,
     )
 
 

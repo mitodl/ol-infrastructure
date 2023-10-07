@@ -74,22 +74,27 @@ def build_keycloak_pipeline() -> Pipeline:
     # Repo: https://github.com/jacekkow/keycloak-protocol-cas
     # Use: Provide CAS support through Keycloak for some old apps
     cas_protocol_spi = github_release(
-        Identifier("cas-protocol-spi"), "jacekkow", "keycloak-protocol-cas"
+        name=Identifier("cas-protocol-spi"),
+        owner="jacekkow",
+        repository="keycloak-protocol-cas",
+        tag_filter=KEYCLOAK_VERSION,
+        order_by="time",
     )
 
     # Repo: https://github.com/aerogear/keycloak-metrics-spi
     # Use: Metrics endpoint for vector to scrape and ship to Grafana
     metrics_spi = github_release(
-        Identifier("metrics-spi"), "aerogear", "keycloak-metrics-spi"
+        name=Identifier("metrics-spi"),
+        owner="aerogear",
+        repository="keycloak-metrics-spi",
     )
 
     # Repo: https://github.com/daniel-frak/keycloak-user-migration
     # Use: Migrating users from open discussions
     user_migration_spi = github_release(
-        Identifier("user-migration-spi"),
-        "daniel-frak",
-        "keycloak-user-migration",
-        KEYCLOAK_VERSION,
+        name=Identifier("user-migration-spi"),
+        owner="daniel-frak",
+        repository="keycloak-user-migration",
     )
 
     #############################################
@@ -99,8 +104,8 @@ def build_keycloak_pipeline() -> Pipeline:
         name="build-keycloak-docker-image",
         build_log_retention={"builds": 10},
         plan=[
-            GetStep(get=cas_protocol_spi.name, trigger=True),
             GetStep(get=keycloak_upstream_registry_image.name, trigger=True),
+            GetStep(get=cas_protocol_spi.name, trigger=True),
             GetStep(get=keycloak_customization_repo.name, trigger=True),
             GetStep(get=metrics_spi.name, trigger=True),
             GetStep(get=user_migration_spi.name, trigger=True),
@@ -182,7 +187,9 @@ def build_keycloak_pipeline() -> Pipeline:
         ],
         image_code=keycloak_packer_code,
         packer_template_path="src/bilder/images/keycloak/keycloak.pkr.hcl",
-        env_vars_from_files={"KEYCLOAK_VERSION": KEYCLOAK_VERSION},
+        env_vars_from_files={
+            "KEYCLOAK_VERSION": f"{keycloak_customization_repo.name}/.git/describe_ref"
+        },
         job_name_suffix="keycloak",
     )
 
