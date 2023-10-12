@@ -497,7 +497,6 @@ ReleaseMap: dict[
                 application="communications",
                 application_type="MFE",
                 release="master",
-                origin_override="https://github.com/mitodl/frontend-app-communications",
             ),
             OpenEdxApplicationVersion(
                 application="course-authoring",
