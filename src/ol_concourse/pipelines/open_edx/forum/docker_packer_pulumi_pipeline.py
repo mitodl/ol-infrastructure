@@ -74,7 +74,9 @@ def build_forum_pipeline(
     for origin, branch in origin_branches:
         repo_owner = repo_owner_fn(origin)
         forum_tag = forum_tag_template.format(
-            release_name=release_name, repo_owner=repo_owner, branch=branch
+            release_name=release_name,
+            repo_owner=repo_owner,
+            branch=branch.replace("/", "_"),
         )
 
         forum_repo = git_repo(
