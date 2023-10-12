@@ -83,7 +83,9 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
             )
 
             edx_ami_code = git_repo(
-                name=Identifier(f"edxapp-custom-image-{deployment.deployment_name}"),
+                name=Identifier(
+                    f"edxapp-custom-image-{deployment.deployment_name}-{release_name}"
+                ),
                 uri="https://github.com/mitodl/ol-infrastructure",
                 branch="main",
                 paths=[
