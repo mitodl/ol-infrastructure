@@ -68,7 +68,7 @@ class OLAmazonCacheConfig(AWSBase):
     @field_validator("engine_version")
     @classmethod
     def is_valid_version(cls, engine_version: str, info: ValidationInfo) -> str:
-        engine = info.data["engine"]  # type: ignore[attr-defined]
+        engine = info.data["engine"]
         engines_map = cache_engines()
         if engine_version not in engines_map.get(engine, []):
             msg = (
@@ -105,7 +105,7 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
     def is_auth_token_valid(
         cls, auth_token: Optional[str], info: ValidationInfo
     ) -> Optional[str]:
-        encrypt_transit = info.data["encrypt_transit"]  # type: ignore[attr-defined]
+        encrypt_transit = info.data["encrypt_transit"]
         min_token_length = 16
         max_token_length = 128
         if not encrypt_transit:

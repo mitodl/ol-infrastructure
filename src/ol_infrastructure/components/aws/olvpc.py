@@ -100,7 +100,7 @@ class OLVPCConfig(AWSBase):
 
         :rtype: IPv4Network
         """
-        network = info.data["cidr_block"]  # type: ignore[attr-defined]
+        network = info.data["cidr_block"]
         assert network is not None  # noqa: S101
         if k8s_service_subnet is not None and not k8s_service_subnet.subnet_of(network):
             msg = f"{k8s_service_subnet} is not a subnet of {network}"

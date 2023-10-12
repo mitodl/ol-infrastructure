@@ -94,7 +94,7 @@ class OLDBConfig(AWSBase):
     @field_validator("engine_version")
     @classmethod
     def is_valid_version(cls, engine_version: str, info: ValidationInfo) -> str:
-        engine = info.data["engine"]  # type: ignore[attr-defined]
+        engine = info.data["engine"]
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
             msg = (
