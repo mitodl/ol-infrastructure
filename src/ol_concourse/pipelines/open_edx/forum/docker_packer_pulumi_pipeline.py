@@ -1,8 +1,11 @@
 import sys
+from urllib.parse import urlparse
 
-from bridge.settings.openedx.accessors import filter_deployments_by_release
-from bridge.settings.openedx.types import DeploymentEnvRelease, OpenEdxSupportedRelease
-from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
+from bridge.settings.openedx.accessors import (
+    fetch_application_version,
+    filter_deployments_by_release,
+)
+from bridge.settings.openedx.types import DeploymentEnvRelease
 
 from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
@@ -20,22 +23,25 @@ from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PA
 
 
 def build_forum_pipeline(
-    release_name: str, edx_deployments: list[DeploymentEnvRelease]  # noqa: ARG001
+    release_name: str, edx_deployments: list[DeploymentEnvRelease]
 ):
-    forum_branch = OpenEdxSupportedRelease[release_name].branch
-    forum_repo = git_repo(
-        name=Identifier("openedx-forum-code"),
-        uri="https://github.com/openedx/cs_comments_service.git",
-        branch=forum_branch,
-    )
+    # Different deployments might have different overrides for origin or branch that
+    # need to be applied. This will result in separate containers needing to be built
+    # and deployed.
+    app_versions = {}
+    forum_tag_template = "{release_name}-{repo_owner}-{branch}"
 
-    forum_registry_image = registry_image(
-        name=Identifier("openedx-forum-container"),
-        image_repository="mitodl/forum",
-        image_tag=release_name,
-        username="((dockerhub.username))",
-        password="((dockerhub.password))",  # noqa: S106
-    )
+    def repo_owner_fn(origin):
+        return urlparse(origin).path.strip("/").split("/")[0]
+
+    for deployment in edx_deployments:
+        app_versions[deployment.deployment_name] = fetch_application_version(
+            release_name, deployment.deployment_name, "forum"
+        )
+    origin_branches = {
+        (app_version.git_origin, app_version.release_branch)
+        for app_version in app_versions.values()
+    }
 
     forum_dockerfile_repo = git_repo(
         name=Identifier("forum-dockerfile"),
@@ -64,50 +70,75 @@ def build_forum_pipeline(
         ],
     )
 
-    image_build_job = Job(
-        name=Identifier("build-forum-image"),
-        plan=[
-            GetStep(get=forum_repo.name, trigger=True),
-            GetStep(get=forum_dockerfile_repo.name, trigger=True),
-            container_build_task(
-                inputs=[
-                    Input(name=forum_repo.name),
-                    Input(name=forum_dockerfile_repo.name),
-                ],
-                build_parameters={
-                    "CONTEXT": (
-                        f"{forum_dockerfile_repo.name}/dockerfiles/openedx-forum"
-                    ),
-                    "BUILD_ARG_OPENEDX_COMMON_VERSION": forum_branch,
-                },
-                build_args=[
-                    "-t $(cat ./forum-release/commit_sha)",
-                    f"-t {forum_branch}",
-                ],
-            ),
-            PutStep(
-                put=forum_registry_image.name,
-                params={
-                    "image": "image/image.tar",
-                    "additional_tags": f"./{forum_repo.name}/.git/describe_ref",
-                },
-            ),
-        ],
-    )
+    container_fragments = []
+    for origin, branch in origin_branches:
+        repo_owner = repo_owner_fn(origin)
+        forum_tag = forum_tag_template.format(
+            release_name=release_name, repo_owner=repo_owner, branch=branch
+        )
 
-    container_fragment = PipelineFragment(
-        resources=[forum_repo, forum_registry_image, forum_dockerfile_repo],
-        jobs=[image_build_job],
-    )
+        forum_repo = git_repo(
+            name=Identifier(f"openedx-forum-code-{repo_owner}"),
+            uri=origin,
+            branch=branch,
+        )
+
+        forum_registry_image = registry_image(
+            name=Identifier(f"openedx-forum-container-{repo_owner}"),
+            image_repository="mitodl/forum",
+            image_tag=forum_tag,
+            username="((dockerhub.username))",
+            password="((dockerhub.password))",  # noqa: S106
+        )
+
+        image_build_job = Job(
+            name=Identifier(f"build-forum-image-{repo_owner}"),
+            plan=[
+                GetStep(get=forum_repo.name, trigger=True),
+                GetStep(get=forum_dockerfile_repo.name, trigger=True),
+                container_build_task(
+                    inputs=[
+                        Input(name=forum_repo.name),
+                        Input(name=forum_dockerfile_repo.name),
+                    ],
+                    build_parameters={
+                        "CONTEXT": (
+                            f"{forum_dockerfile_repo.name}/dockerfiles/openedx-forum"
+                        ),
+                        "BUILD_ARG_OPENEDX_COMMON_VERSION": branch,
+                        "BUILD_ARG_OPENEDX_FORUM_REPOSITORY": origin,
+                    },
+                    build_args=[
+                        "-t $(cat ./forum-release/commit_sha)",
+                        f"-t {forum_tag}",
+                    ],
+                ),
+                PutStep(
+                    put=forum_registry_image.name,
+                    params={
+                        "image": "image/image.tar",
+                        "additional_tags": f"./{forum_repo.name}/.git/describe_ref",
+                    },
+                ),
+            ],
+        )
+
+        container_fragments.append(
+            PipelineFragment(
+                resources=[forum_repo, forum_registry_image, forum_dockerfile_repo],
+                jobs=[image_build_job],
+            )
+        )
 
     loop_fragments = []
     for deployment in filter_deployments_by_release(release_name):
+        repo_owner = repo_owner_fn(app_versions[deployment.deployment_name].git_origin)
         ami_fragment = packer_jobs(
             dependencies=[
                 GetStep(
-                    get=forum_registry_image.name,
+                    get=Identifier(f"openedx-forum-container-{repo_owner}"),
                     trigger=True,
-                    passed=[image_build_job.name],
+                    passed=[f"build-forum-image-{repo_owner}"],
                 )
             ],
             image_code=forum_packer_code,
@@ -139,7 +170,7 @@ def build_forum_pipeline(
         loop_fragments.append(pulumi_fragment)
 
     combined_fragments = PipelineFragment.combine_fragments(
-        container_fragment,
+        *container_fragments,
         *loop_fragments,
     )
 
@@ -154,7 +185,7 @@ if __name__ == "__main__":
     release_name = sys.argv[1]
     pipeline_json = build_forum_pipeline(
         release_name,
-        OpenLearningOpenEdxDeployment,
+        filter_deployments_by_release(release_name),
     ).model_dump_json(indent=2)
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
