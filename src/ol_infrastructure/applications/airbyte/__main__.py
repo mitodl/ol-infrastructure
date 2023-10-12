@@ -192,6 +192,12 @@ s3_source_buckets = [
     for edxapp_deployment in ("mitxonline", "mitx", "mitx-staging", "xpro")
 ]
 s3_source_buckets.append(f"ol-data-lake-landing-zone-{stack_info.env_suffix}")
+
+# This should use a reference to the monitoring stack but it seems broken at the moment
+# and I can't figure it out
+fastly_access_log_bucket_name = "mitodl-fastly-access-logs"
+s3_source_buckets.append(fastly_access_log_bucket_name)
+
 s3_source_policy_document = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
