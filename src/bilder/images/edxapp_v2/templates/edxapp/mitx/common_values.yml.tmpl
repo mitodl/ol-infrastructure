@@ -493,8 +493,8 @@ USERNAME_REPLACEMENT_WORKER: OVERRIDE THIS WITH A VALID USERNAME
 VIDEO_IMAGE_MAX_AGE: 31536000
 VIDEO_IMAGE_SETTINGS:
     DIRECTORY_PREFIX: video-images/
+    BASE_URL: /media/
     STORAGE_KWARGS:
-        base_url: /media/
         location: media/  # MODIFIED
         bucket: {{ key "edxapp/s3-storage-bucket" }} # MODIFIED
     VIDEO_IMAGE_MAX_BYTES: 2097152
@@ -502,8 +502,8 @@ VIDEO_IMAGE_SETTINGS:
 VIDEO_TRANSCRIPTS_MAX_AGE: 31536000
 VIDEO_TRANSCRIPTS_SETTINGS:
     DIRECTORY_PREFIX: video-transcripts/
+    BASE_URL: /media/
     STORAGE_KWARGS:
-        base_url: /media/
         location: media/  # MODIFIED
         bucket: {{ key "edxapp/s3-storage-bucket" }} # MODIFIED
     VIDEO_TRANSCRIPTS_MAX_BYTES: 3145728

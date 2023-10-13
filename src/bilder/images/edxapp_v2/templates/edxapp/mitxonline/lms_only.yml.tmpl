@@ -1,3 +1,4 @@
+# -*- mode: yaml -*-
 {{ with secret "secret-mitxonline/edxapp" }}
 SOCIAL_AUTH_OAUTH_SECRETS:
   mitxpro-oauth2: {{ .Data.mitxonline_oauth_secret }}
