@@ -40,7 +40,9 @@ ocw_zone = dns_stack.require_output("ocw")
 vector_log_proxy_stack = StackReference(
     f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
 )
-vector_log_proxy_fqdn = vector_log_proxy_stack.require_output("vector_log_proxy")
+vector_log_proxy_fqdn = vector_log_proxy_stack.require_output("vector_log_proxy")[
+    "fqdn"
+]
 
 vector_log_proxy_secrets = read_yaml_secrets(
     Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
@@ -499,7 +501,7 @@ for purpose in ("draft", "live"):
         ],
         logging_https=[
             fastly.ServiceVclLoggingHttpArgs(
-                url=Output.all(fqdn=vector_log_proxy_fqdn["fqdn"]).apply(
+                url=Output.all(fqdn=vector_log_proxy_fqdn).apply(
                     lambda fqdn: "https://{fqdn}".format(**fqdn)
                 ),
                 name=f"ocw-{purpose}-{stack_info.env_suffix}-https-logging-args",
@@ -508,6 +510,7 @@ for purpose in ("draft", "live"):
                     additional_static_fields={
                         "application": "open-courseware",
                         "environment": f"ocw-{stack_info.env_suffix}",
+                        # service will be applied by the vector-log-proxy
                     }
                 ),
                 format_version=2,

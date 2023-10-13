@@ -26,6 +26,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_MYSQL_PORT,
     DEFAULT_REDIS_PORT,
     IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
+    ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
@@ -58,13 +59,17 @@ from ol_infrastructure.lib.aws.ec2_helper import (
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
 from ol_infrastructure.lib.consul import get_consul_provider
-from ol_infrastructure.lib.fastly import get_fastly_provider
+from ol_infrastructure.lib.fastly import (
+    build_fastly_log_format_string,
+    get_fastly_provider,
+)
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import mysql_role_statements, setup_vault_provider
 
 stack_info = parse_stack()
+
 edxapp_config = Config("edxapp")
 if Config("vault").get("address"):
     setup_vault_provider()
@@ -89,6 +94,10 @@ consul_stack = StackReference(
 )
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+monitoring_stack = StackReference("infrastructure.monitoring")
+vector_log_proxy_stack = StackReference(
+    f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
+)
 
 #############
 # Variables #
@@ -1109,7 +1118,7 @@ def cloud_init_user_data_func(
                 "path": "/etc/default/vector",
                 "content": textwrap.dedent(f"""\
                     ENVIRONMENT={consul_env_name}
-                    APPLICATION=edxpp
+                    APPLICATION=edxapp
                     SERVICE=openedx
                     VECTOR_CONFIG_DIR=/etc/vector/
                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
@@ -1360,6 +1369,26 @@ worker_asg = autoscaling.Group(
 # Fastly CDN Managment #
 ########################
 
+vector_log_proxy_secrets = read_yaml_secrets(
+    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
+)
+fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
+encoded_fastly_proxy_credentials = base64.b64encode(
+    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}"
+    .encode()
+).decode("utf8")
+
+vector_log_proxy_fqdn = vector_log_proxy_stack.require_output("vector_log_proxy")[
+    "fqdn"
+]
+
+fastly_access_logging_bucket = monitoring_stack.require_output(
+    "fastly_access_logging_bucket"
+)
+fastly_access_logging_iam_role = monitoring_stack.require_output(
+    "fastly_access_logging_iam_role"
+)
+
 mfe_regex = "^/({})/".format("|".join(edxapp_mfe_paths))
 edxapp_fastly_service = fastly.ServiceVcl(
     f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
@@ -1496,6 +1525,42 @@ edxapp_fastly_service = fastly.ServiceVcl(
                 }"""),  # noqa: E501
             name="Route Redirect Requests",
             type="error",
+        ),
+    ],
+    logging_https=[
+        fastly.ServiceVclLoggingHttpArgs(
+            url=Output.all(fqdn=vector_log_proxy_fqdn).apply(
+                lambda fqdn: "https://{fqdn}".format(**fqdn)
+            ),
+            name=f"fastly-{env_name}-https-logging-args",
+            content_type="application/json",
+            format=build_fastly_log_format_string(
+                additional_static_fields={
+                    "application": "edxapp",
+                    "environment": consul_stack.require_output("datacenter").apply(
+                        lambda consul_dc: f"{consul_dc}"
+                    ),
+                    # service will be applied by the vector-log-proxy
+                }
+            ),
+            format_version=2,
+            header_name="Authorization",
+            header_value=f"Basic {encoded_fastly_proxy_credentials}",
+            json_format="0",
+            method="POST",
+            request_max_bytes=ONE_MEGABYTE_BYTE,
+        )
+    ],
+    logging_s3s=[
+        fastly.ServiceVclLoggingS3Args(
+            bucket_name=fastly_access_logging_bucket["bucket_name"],
+            name=f"fastly-{env_name}-s3-logging-args",
+            format=build_fastly_log_format_string(additional_static_fields={}),
+            gzip_level=3,
+            message_type="blank",
+            path=f"/edxapp/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+            redundancy="standard",
+            s3_iam_role=fastly_access_logging_iam_role["role_arn"],
         ),
     ],
     opts=fastly_provider,
