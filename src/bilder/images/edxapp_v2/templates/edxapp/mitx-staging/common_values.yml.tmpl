@@ -495,18 +495,18 @@ VIDEO_IMAGE_MAX_AGE: 31536000
 VIDEO_IMAGE_SETTINGS:
     DIRECTORY_PREFIX: video-images/
     BASE_URL: /media/
+    BUCKET: {{ key "edxapp/s3-storage-bucket" }} # MODIFIED
     STORAGE_KWARGS:
         location: media/  # MODIFIED
-        bucket: {{ key "edxapp/s3-storage-bucket" }} # MODIFIED
     VIDEO_IMAGE_MAX_BYTES: 2097152
     VIDEO_IMAGE_MIN_BYTES: 2048
 VIDEO_TRANSCRIPTS_MAX_AGE: 31536000
 VIDEO_TRANSCRIPTS_SETTINGS:
     DIRECTORY_PREFIX: video-transcripts/
     BASE_URL: /media/
+    BUCKET: {{ key "edxapp/s3-storage-bucket" }} # MODIFIED
     STORAGE_KWARGS:
         location: media/  # MODIFIED
-        bucket: {{ key "edxapp/s3-storage-bucket" }} # MODIFIED
     VIDEO_TRANSCRIPTS_MAX_BYTES: 3145728
 VIDEO_UPLOAD_PIPELINE:
     BUCKET: ''
