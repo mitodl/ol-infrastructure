@@ -378,7 +378,7 @@ MODULESTORE:
               DOC_STORE_CONFIG:
                 <<: *docstore_config
               OPTIONS:
-                default_class: xmodule.hidden_module.HiddenDescriptor
+                default_class: xmodule.hidden_block.HiddenBlock
                 fs_root: /openedx/data/var/edxapp/data
                 render_template: common.djangoapps.edxmako.shortcuts.render_to_string
             - ENGINE: xmodule.modulestore.mongo.DraftMongoModuleStore
@@ -386,7 +386,7 @@ MODULESTORE:
               DOC_STORE_CONFIG:
                 <<: *docstore_config
               OPTIONS:
-                default_class: xmodule.hidden_module.HiddenDescriptor
+                default_class: xmodule.hidden_block.HiddenBlock
                 fs_root: /openedx/data/var/edxapp/data
                 render_template: common.djangoapps.edxmako.shortcuts.render_to_string
 ORA2_FILE_PREFIX: mitxonline/ora2  # MODIFIED
