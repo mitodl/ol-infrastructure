@@ -15,7 +15,7 @@ openedx-scorm-xblock>=16.0.0,<17.0.0
 pip==23.2.1
 rapid-response-xblock
 sentry-sdk==1.21.1  # Fix RecursionError
-setuptools==65.5.1
+setuptools==65.7.0
 uwsgi==2.0.22
 wheel==0.38.4
 # TODO: Identify source of failures in SAML integration when using lxml==4.9.1
