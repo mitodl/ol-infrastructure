@@ -278,53 +278,63 @@ for openid_clients in keycloak_config.get_object("openid_clients"):
 # OL - First login flow [START]
 # Does not require email verification or confirmation to connect with existing account.
 ol_touchstone_first_login_flow = keycloak.authentication.Flow(
-    "flow", realm_id=ol_apps_realm.id, alias="ol-touchstone-first-login-flow"
+    "ol-touchstone-first-login-flow",
+    realm_id=ol_apps_realm.id,
+    alias="first-login-flow",
+    opts=resource_options,
 )
-login_flow_review_profile_step = keycloak.authentication.Execution(
-    "login-flow-review-profile-step",
+ol_touchstone_first_login_flow_review_profile = keycloak.authentication.Execution(
+    "ol-touchstone-first-login-flow-review-profile",
     realm_id=ol_apps_realm.id,
     parent_flow_alias=ol_touchstone_first_login_flow.alias,
     authenticator="review-profile",
     requirement="REQUIRED",
+    opts=resource_options,
 )
-review_profile_step_config = keycloak.authentication.ExecutionConfig(
-    "config",
-    realm_id=ol_apps_realm.id,
-    execution_id=login_flow_review_profile_step.id,
-    alias="review-profile-step-config",
-    config={
-        "updateProfileOnFirstLogin": "missing",
-    },
+ol_touchstone_first_login_review_profile_config = (
+    keycloak.authentication.ExecutionConfig(
+        "ol-touchstone-first-login-review-profile-config",
+        realm_id=ol_apps_realm.id,
+        execution_id=ol_touchstone_first_login_flow_review_profile.id,
+        alias="review-profile-config",
+        config={
+            "updateProfileOnFirstLogin": "missing",
+        },
+        opts=resource_options,
+    )
 )
-user_creation_or_linking_subflow = keycloak.authentication.Subflow(
-    "subflow",
+ol_touchstone_user_creation_or_linking_subflow = keycloak.authentication.Subflow(
+    "ol-touchstone-user-creation-or-linking-subflow",
     realm_id=ol_apps_realm.id,
     alias="ol-touchstone-first-broker-login-user-creation-or-linking",
     parent_flow_alias=ol_touchstone_first_login_flow.alias,
     provider_id="basic-flow",
     requirement="REQUIRED",
+    opts=resource_options,
 )
-user_creation_or_linking_subflow_create_user_if_unique_step = (
+ol_touchstone_user_creation_or_linking_subflow_create_user_if_unique_step = (
     keycloak.authentication.Execution(
-        "create-user-if-unique-step",
+        "ol-touchstone-create-user-if-unique",
         realm_id=ol_apps_realm.id,
-        parent_flow_alias=user_creation_or_linking_subflow.alias,
+        parent_flow_alias=ol_touchstone_user_creation_or_linking_subflow.alias,
         authenticator="create-user-if-unique",
         requirement="ALTERNATIVE",
+        opts=resource_options,
     )
 )
-user_creation_or_linking_subflow_automatically_set_existing_user_step = (
+ol_touchstone_user_creation_or_linking_subflow_automatically_set_existing_user_step = (
     keycloak.authentication.Execution(
-        "automatically-set-existing-user-step",
+        "ol-touchstone-automatically-set-existing-user",
         realm_id=ol_apps_realm.id,
-        parent_flow_alias=user_creation_or_linking_subflow.alias,
+        parent_flow_alias=ol_touchstone_user_creation_or_linking_subflow.alias,
         authenticator="automatically-set-existing-user",
         requirement="ALTERNATIVE",
+        opts=resource_options,
     )
 )
 # OL - First login flow [END]
 
-if stack_info.env_suffix in ["qa", "rc", "ci"]:
+if stack_info.env_suffix != "ci":
     # Touchstone SAML [START]
     ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
         "touchstone-idp",
@@ -384,6 +394,7 @@ if stack_info.env_suffix in ["qa", "rc", "ci"]:
     )
     # Touchstone SAML [END]
 
+if stack_info.env_suffix != "production":
     # Okta TEST SAML [START]
     ol_apps_okta_saml_identity_provider = keycloak.saml.IdentityProvider(
         "okta-test",
@@ -402,16 +413,17 @@ if stack_info.env_suffix in ["qa", "rc", "ci"]:
         validate_signature=False,
         hide_on_login_page=False,
         signing_certificate=okta_test_saml_certificate,
-        name_id_policy_format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
+        name_id_policy_format="Email",
         want_assertions_encrypted=False,
         post_binding_authn_request=True,
         force_authn=False,
-        principal_type="Subject NameID",
+        principal_type="ATTRIBUTE",
         first_broker_login_flow_alias=ol_touchstone_first_login_flow.alias,
+        opts=resource_options,
     )
     oidc_attribute_importer_identity_provider_mapper = (
         keycloak.AttributeImporterIdentityProviderMapper(
-            "map-touchstone-saml-email-attribute",
+            "map-okta-email-attribute",
             realm=ol_apps_realm.id,
             claim_name="email",
             identity_provider_alias=ol_apps_okta_saml_identity_provider.alias,
@@ -422,7 +434,7 @@ if stack_info.env_suffix in ["qa", "rc", "ci"]:
             opts=resource_options,
         ),
         keycloak.AttributeImporterIdentityProviderMapper(
-            "map-touchstone-saml-last-name-attribute",
+            "map-okta-last-name-attribute",
             realm=ol_apps_realm.id,
             claim_name="lastName",
             identity_provider_alias=ol_apps_okta_saml_identity_provider.alias,
@@ -433,7 +445,7 @@ if stack_info.env_suffix in ["qa", "rc", "ci"]:
             opts=resource_options,
         ),
         keycloak.AttributeImporterIdentityProviderMapper(
-            "map-touchstone-saml-first-name-attribute",
+            "map-okta-first-name-attribute",
             realm=ol_apps_realm.id,
             claim_name="firstName",
             identity_provider_alias=ol_apps_okta_saml_identity_provider.alias,
