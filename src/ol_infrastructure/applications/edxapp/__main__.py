@@ -1534,14 +1534,13 @@ edxapp_fastly_service = fastly.ServiceVcl(
             ),
             name=f"fastly-{env_name}-https-logging-args",
             content_type="application/json",
-            format=build_fastly_log_format_string(
-                additional_static_fields={
-                    "application": "edxapp",
-                    "environment": consul_stack.require_output("datacenter").apply(
-                        lambda consul_dc: f"{consul_dc}"
-                    ),
-                    # service will be applied by the vector-log-proxy
-                }
+            format=consul_stack.require_output("datacenter").apply(
+                lambda dc: build_fastly_log_format_string(
+                    additional_static_fields={
+                        "application": "edxapp",
+                        "environment": dc,
+                    }
+                )
             ),
             format_version=2,
             header_name="Authorization",
