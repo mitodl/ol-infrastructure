@@ -108,6 +108,26 @@ traefik_config = TraefikConfig(
 traefik_conf_directory = traefik_config.configuration_directory
 configure_traefik(traefik_config)
 
+
+# Preload some docker images. This will accelerate the first startup
+docker_repo_names = [
+    "airbyte/airbyte-api-server",
+    "airbyte/worker",
+    "airbyte/webapp",
+    "airbyte/temporal",
+    "airbyte/server",
+    "airbyte/connector-builder-server",
+    "airbyte/cron",
+    "airbyte/init",
+    "airbyte/bootloader",
+]
+for repo_name in docker_repo_names:
+    server.shell(
+        name=f"Preload {repo_name}:{AIRBYTE_VERSION}",
+        commands=[f"/usr/bin/docker pull {repo_name}:{AIRBYTE_VERSION}"],
+    )
+
+
 files.put(
     name="Place the airbyte docker-compose.yaml file",
     src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml")),
