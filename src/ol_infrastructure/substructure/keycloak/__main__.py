@@ -275,7 +275,57 @@ for openid_clients in keycloak_config.get_object("openid_clients"):
             ).apply(json.dumps),
         )
 
-if stack_info.env_suffix != "ci":
+# OL - First login flow [START]
+# Does not require email verification or confirmation to connect with existing account.
+ol_touchstone_first_login_flow = keycloak.authentication.Flow(
+    "flow", realm_id=ol_apps_realm.id, alias="ol-touchstone-first-login-flow"
+)
+login_flow_review_profile_step = keycloak.authentication.Execution(
+    "login-flow-review-profile-step",
+    realm_id=ol_apps_realm.id,
+    parent_flow_alias=ol_touchstone_first_login_flow.alias,
+    authenticator="review-profile",
+    requirement="REQUIRED",
+)
+review_profile_step_config = keycloak.authentication.ExecutionConfig(
+    "config",
+    realm_id=ol_apps_realm.id,
+    execution_id=login_flow_review_profile_step.id,
+    alias="review-profile-step-config",
+    config={
+        "updateProfileOnFirstLogin": "missing",
+    },
+)
+user_creation_or_linking_subflow = keycloak.authentication.Subflow(
+    "subflow",
+    realm_id=ol_apps_realm.id,
+    alias="ol-touchstone-first-broker-login-user-creation-or-linking",
+    parent_flow_alias=ol_touchstone_first_login_flow.alias,
+    provider_id="basic-flow",
+    requirement="REQUIRED",
+)
+user_creation_or_linking_subflow_create_user_if_unique_step = (
+    keycloak.authentication.Execution(
+        "create-user-if-unique-step",
+        realm_id=ol_apps_realm.id,
+        parent_flow_alias=user_creation_or_linking_subflow.alias,
+        authenticator="create-user-if-unique",
+        requirement="ALTERNATIVE",
+    )
+)
+user_creation_or_linking_subflow_automatically_set_existing_user_step = (
+    keycloak.authentication.Execution(
+        "automatically-set-existing-user-step",
+        realm_id=ol_apps_realm.id,
+        parent_flow_alias=user_creation_or_linking_subflow.alias,
+        authenticator="automatically-set-existing-user",
+        requirement="ALTERNATIVE",
+    )
+)
+# OL - First login flow [END]
+
+if stack_info.env_suffix in ["qa", "rc"]:
+    # Touchstone SAML [START]
     ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
         "touchstone-idp",
         realm=ol_apps_realm.id,
@@ -295,6 +345,7 @@ if stack_info.env_suffix != "ci":
         want_assertions_encrypted=True,
         want_assertions_signed=True,
         opts=resource_options,
+        first_broker_login_flow_alias=ol_touchstone_first_login_flow.alias,
     )
     oidc_attribute_importer_identity_provider_mapper = (
         keycloak.AttributeImporterIdentityProviderMapper(
@@ -331,3 +382,67 @@ if stack_info.env_suffix != "ci":
             opts=resource_options,
         ),
     )
+    # Touchstone SAML [END]
+
+    # Okta TEST SAML [START]
+    ol_apps_okta_saml_identity_provider = keycloak.saml.IdentityProvider(
+        "okta-test",
+        realm=ol_apps_realm.id,
+        alias="okta-test",
+        post_binding_logout=False,
+        post_binding_response=True,
+        backchannel_supported=False,
+        entity_id="http://www.okta.com/exk8gfblmeePE5uUQ5d7",
+        login_hint=False,
+        authn_context_comparison_type="exact",
+        sync_mode="IMPORT",
+        single_sign_on_service_url="https://dev-66940844.okta.com/app/dev-66940844_collintestlogin_1/exk8gfblmeePE5uUQ5d7/sso/saml",
+        want_assertions_signed=False,
+        gui_order="10",
+        validate_signature=False,
+        hide_on_login_page=False,
+        signing_certificate="MIIDqDCCApCgAwIBAgIGAYaDoqIJMA0GCSqGSIb3DQEBCwUAMIGUMQswCQYDVQQGEwJVUzETMBEG\nA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEU\nMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJ\nARYNaW5mb0Bva3RhLmNvbTAeFw0yMzAyMjQxMzM0MTlaFw0zMzAyMjQxMzM1MThaMIGUMQswCQYD\nVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsG\nA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEc\nMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoC\nggEBAKrZ0Vel22z1r18U1KYt/y8am1JL+iwZItqFMTTwdwFfhXhkHxzzF/wZx07LheD01M7Zs39b\n3rNVBanzEhiwbg1KwF9xRnd+t6FDF40h6jAWwpjzj3T77PKlpmJfQibfeaMuJWKT2xlrHBx343IO\nYOSIz2E4vMGHPAxdKH9ze/IadTaZqpIhuXWaYBbPA/uPePLeetBBf0/mBJBJSHS9vP6MxZ94WUHM\nuEQ2gIn8rTIZrevxS6qWahky9AwBOGm2OU0NThqeq0KszVHTdKVuAZIfCtkHaosn48QZ2XqmZvRD\n6V2AZ5Mb2ClRJbPi12lvH3ds8KqWUUmyjDwS88IkN+sCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEA\nAllfqAsLw+tPLQTNejbkNfZs6j62PmoKctiGz8xSPVzGedS5qFzLmA5yXSxHOVtIODPlNmlR/ZTa\naEg3skXVzsmxygYvcUHKsuhThwXMOdnHu4NiyVyHYtrjp2FyN4YXJcPnOEqjzSTuJEZXbNSIDtZ9\nQzngeaikibdoKplCRhnp0y3RPVXqRmlSWpOmZ1yE23gZ9oNkdgdtsYh6XfqtNsyt/R8hDHONwwcU\nD7duNc7UvjXop3GXuBYFUvvLwEScaSTut2e8Mmh+VtRNE2jel7mIU57znw3wJiclQKPkZibX/5mc\nRZnHw0QH6UReoi19EoutPOV6hw1uSaRQ1KQuPQ==",
+        name_id_policy_format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
+        entity_id="https://sso-qa.odl.mit.edu/realms/olapps",
+        want_assertions_encrypted=False,
+        want_assertions_signed=False,
+        post_binding_authn_request=True,
+        force_authn=False,
+        principal_type="Subject NameID",
+    )
+    oidc_attribute_importer_identity_provider_mapper = (
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-touchstone-saml-email-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="email",
+            identity_provider_alias=ol_apps_okta_saml_identity_provider.alias,
+            user_attribute="email",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        ),
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-touchstone-saml-last-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="lastName",
+            identity_provider_alias=ol_apps_okta_saml_identity_provider.alias,
+            user_attribute="lastName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        ),
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-touchstone-saml-first-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="firstName",
+            identity_provider_alias=ol_apps_okta_saml_identity_provider.alias,
+            user_attribute="firstName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        ),
+    )
+    # Okta TEST SAML [END]
