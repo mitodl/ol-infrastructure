@@ -287,7 +287,7 @@ ol_touchstone_first_login_flow_review_profile = keycloak.authentication.Executio
     "ol-touchstone-first-login-flow-review-profile",
     realm_id=ol_apps_realm.id,
     parent_flow_alias=ol_touchstone_first_login_flow.alias,
-    authenticator="review-profile",
+    authenticator="idp-review-profile",
     requirement="REQUIRED",
     opts=resource_options,
 )
@@ -317,7 +317,7 @@ ol_touchstone_user_creation_or_linking_subflow_create_user_if_unique_step = (
         "ol-touchstone-create-user-if-unique",
         realm_id=ol_apps_realm.id,
         parent_flow_alias=ol_touchstone_user_creation_or_linking_subflow.alias,
-        authenticator="create-user-if-unique",
+        authenticator="idp-create-user-if-unique",
         requirement="ALTERNATIVE",
         opts=resource_options,
     )
@@ -327,7 +327,7 @@ ol_touchstone_user_creation_or_linking_subflow_automatically_set_existing_user_s
         "ol-touchstone-automatically-set-existing-user",
         realm_id=ol_apps_realm.id,
         parent_flow_alias=ol_touchstone_user_creation_or_linking_subflow.alias,
-        authenticator="automatically-set-existing-user",
+        authenticator="idp-auto-link",
         requirement="ALTERNATIVE",
         opts=resource_options,
     )
@@ -361,7 +361,7 @@ if stack_info.env_suffix != "ci":
         keycloak.AttributeImporterIdentityProviderMapper(
             "map-touchstone-saml-email-attribute",
             realm=ol_apps_realm.id,
-            claim_name="email",
+            attribute_name="email",
             identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
             user_attribute="email",
             extra_config={
@@ -372,7 +372,7 @@ if stack_info.env_suffix != "ci":
         keycloak.AttributeImporterIdentityProviderMapper(
             "map-touchstone-saml-last-name-attribute",
             realm=ol_apps_realm.id,
-            claim_name="sn",
+            attribute_name="sn",
             identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
             user_attribute="lastName",
             extra_config={
@@ -383,7 +383,7 @@ if stack_info.env_suffix != "ci":
         keycloak.AttributeImporterIdentityProviderMapper(
             "map-touchstone-saml-first-name-attribute",
             realm=ol_apps_realm.id,
-            claim_name="givenName",
+            attribute_name="givenName",
             identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
             user_attribute="firstName",
             extra_config={
@@ -425,7 +425,7 @@ if stack_info.env_suffix != "production":
         keycloak.AttributeImporterIdentityProviderMapper(
             "map-okta-email-attribute",
             realm=ol_apps_realm.id,
-            claim_name="email",
+            attribute_name="email",
             identity_provider_alias=ol_apps_okta_saml_identity_provider.alias,
             user_attribute="email",
             extra_config={
@@ -436,7 +436,7 @@ if stack_info.env_suffix != "production":
         keycloak.AttributeImporterIdentityProviderMapper(
             "map-okta-last-name-attribute",
             realm=ol_apps_realm.id,
-            claim_name="lastName",
+            attribute_name="lastName",
             identity_provider_alias=ol_apps_okta_saml_identity_provider.alias,
             user_attribute="lastName",
             extra_config={
@@ -447,7 +447,7 @@ if stack_info.env_suffix != "production":
         keycloak.AttributeImporterIdentityProviderMapper(
             "map-okta-first-name-attribute",
             realm=ol_apps_realm.id,
-            claim_name="firstName",
+            attribute_name="firstName",
             identity_provider_alias=ol_apps_okta_saml_identity_provider.alias,
             user_attribute="firstName",
             extra_config={
