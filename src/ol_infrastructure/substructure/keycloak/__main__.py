@@ -324,7 +324,7 @@ user_creation_or_linking_subflow_automatically_set_existing_user_step = (
 )
 # OL - First login flow [END]
 
-if stack_info.env_suffix in ["qa", "rc"]:
+if stack_info.env_suffix in ["qa", "rc", "ci"]:
     # Touchstone SAML [START]
     ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
         "touchstone-idp",
