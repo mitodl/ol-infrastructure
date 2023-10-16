@@ -407,6 +407,7 @@ if stack_info.env_suffix in ["qa", "rc", "ci"]:
         post_binding_authn_request=True,
         force_authn=False,
         principal_type="Subject NameID",
+        first_broker_login_flow_alias=ol_touchstone_first_login_flow.alias,
     )
     oidc_attribute_importer_identity_provider_mapper = (
         keycloak.AttributeImporterIdentityProviderMapper(
