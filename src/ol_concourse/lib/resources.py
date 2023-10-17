@@ -85,6 +85,39 @@ def github_release(  # noqa: PLR0913
     )
 
 
+def github_issues(
+    name: Identifier,
+    repository: str,
+    issue_prefix: str,
+    github_token: str = "((github.issues_resource_access_token))",  # noqa: S107
+) -> Resource:
+    """Generate a github-release resource for the given owner/repository.
+
+    :param name: The name of the resource.  This will get used across subsequent
+        pipeline steps that reference this resource.
+    :param repository: The name of the repository as it appears in GitHub
+    :param github_token: A personal access token with `public_repo` scope to increase
+        the rate limit for checking versions.
+    :param issue_prefix: A string tobe used to match an issue in the repository for
+     the workflow to detect or act upon.
+
+    :returns: A configured Concourse resource object that can be used in a pipeline.
+
+    :rtype: Resource
+    """
+    return Resource(
+        name=name,
+        type="github-issues",
+        icon="github",
+        check_every="24h",
+        source={
+            "repository": repository,
+            "issue_prefix": issue_prefix,
+            "access_token": github_token,
+        },
+    )
+
+
 def hashicorp_release(name: Identifier, project: str) -> Resource:
     """Generate a hashicorp-release resource for the given application.  # noqa: DAR201
 
