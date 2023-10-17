@@ -240,14 +240,17 @@ class OLAmazonCache(pulumi.ComponentResource):
         resource_options: pulumi.ResourceOptions,
     ):
         if cluster_mode:
-            cluster_mode_param = elasticache.ReplicationGroupClusterModeArgs(
-                num_node_groups=cache_config.shard_count,
-                replicas_per_node_group=cache_config.num_instances,
-            )
-            cache_node_count = None
+            cluster_kwargs = {
+                "num_cache_clusters": None,
+                "num_node_groups": cache_config.shard_count,
+                "replicas_per_node_group": cache_config.num_instances,
+            }
         else:
-            cluster_mode_param = None
-            cache_node_count = cache_config.num_instances
+            cluster_kwargs = {
+                "num_cache_clusters": cache_config.num_instances,
+                "num_node_groups": None,
+                "replicas_per_node_group": None,
+            }
 
         cache_cluster = elasticache.ReplicationGroup(
             f"{cache_config.cluster_name}-{cache_config.engine}-elasticache-cluster",
@@ -256,7 +259,6 @@ class OLAmazonCache(pulumi.ComponentResource):
             auth_token=cache_config.auth_token,
             auto_minor_version_upgrade=cache_config.auto_upgrade,
             automatic_failover_enabled=True,
-            cluster_mode=cluster_mode_param,
             engine="redis",
             engine_version=(
                 "6.x"
@@ -265,7 +267,6 @@ class OLAmazonCache(pulumi.ComponentResource):
             ),
             kms_key_id=cache_config.kms_key_id,
             node_type=cache_config.instance_type,
-            num_cache_clusters=cache_node_count,
             opts=resource_options,
             parameter_group_name=self.parameter_group.name,
             port=cache_config.port,
@@ -276,6 +277,7 @@ class OLAmazonCache(pulumi.ComponentResource):
             subnet_group_name=cache_config.subnet_group,
             tags=cache_config.tags,
             transit_encryption_enabled=cache_config.encrypt_transit,
+            **cluster_kwargs,
         )
         address = (
             cache_cluster.configuration_endpoint_address

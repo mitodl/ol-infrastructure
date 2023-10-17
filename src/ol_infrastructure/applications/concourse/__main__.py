@@ -22,7 +22,7 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, Output, StackReference
-from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
+from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53, vpc
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -298,18 +298,7 @@ concourse_worker_security_group = ec2.SecurityGroup(
     f"concourse-worker-security-group-{stack_info.env_suffix}",
     name=f"concourse-worker-operations-{stack_info.env_suffix}",
     description="Access control for Concourse worker servers",
-    ingress=[
-        ec2.SecurityGroupIngressArgs(
-            self=True,
-            from_port=0,
-            to_port=MAXIMUM_PORT_NUMBER,
-            protocol="tcp",
-            description=(
-                "Allow Concourse workers to connect to all other concourse workers for"
-                " p2p streaming."
-            ),
-        )
-    ],
+    ingress=[],
     egress=default_egress_args,
     vpc_id=ops_vpc_id,
 )
@@ -319,30 +308,46 @@ concourse_web_security_group = ec2.SecurityGroup(
     f"concourse-web-security-group-{stack_info.env_suffix}",
     name=f"concourse-web-operations-{stack_info.env_suffix}",
     description="Access control for Concourse web servers",
-    ingress=[
-        ec2.SecurityGroupIngressArgs(
-            self=True,
-            security_groups=[concourse_worker_security_group.id],
-            from_port=0,
-            to_port=MAXIMUM_PORT_NUMBER,
-            protocol="tcp",
-            description="Allow Concourse workers to connect to Concourse web nodes",
-        )
-    ],
+    ingress=[],
     egress=default_egress_args,
     vpc_id=ops_vpc_id,
 )
 
-ec2.SecurityGroupRule(
-    "concourse-worker-access-from-concourse-web",
+# Link the two groups web    -> worker (all)
+#                     worker -> worker (all)
+#                     worker -> web    (all)
+#         not needed: web    -> web    (all)
+vpc.SecurityGroupIngressRule(
+    "concourse-worker-from-web-nodes",
     security_group_id=concourse_worker_security_group.id,
-    source_security_group_id=concourse_web_security_group.id,
-    protocol="tcp",
+    referenced_security_group_id=concourse_web_security_group.id,
+    ip_protocol="tcp",
     from_port=0,
     to_port=MAXIMUM_PORT_NUMBER,
     description="Allow all traffic from Concourse web nodes to workers",
-    type="ingress",
+    tags=aws_config.tags,
 )
+vpc.SecurityGroupIngressRule(
+    "concourse-worker-from-concourse-worker",
+    security_group_id=concourse_worker_security_group.id,
+    referenced_security_group_id=concourse_worker_security_group.id,
+    ip_protocol="tcp",
+    from_port=0,
+    to_port=MAXIMUM_PORT_NUMBER,
+    description="Allow all traffic from concourse workers to all other workers.",
+    tags=aws_config.tags,
+)
+vpc.SecurityGroupIngressRule(
+    "concourse-web-from-concourse-worker",
+    security_group_id=concourse_web_security_group.id,
+    referenced_security_group_id=concourse_worker_security_group.id,
+    ip_protocol="tcp",
+    from_port=0,
+    to_port=MAXIMUM_PORT_NUMBER,
+    description="Allow all traffic from concourse workers to web nodes.",
+    tags=aws_config.tags,
+)
+
 
 # Create security group for Concourse Postgres database
 concourse_db_security_group = ec2.SecurityGroup(
@@ -587,7 +592,7 @@ web_asg = autoscaling.Group(
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
             min_healthy_percentage=50
         ),
-        triggers=["tags"],
+        triggers=["tag"],
     ),
     target_group_arns=[web_lb_target_group.arn],
     tags=[
@@ -780,7 +785,7 @@ for worker_def in concourse_config.get_object("workers") or []:
             preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
                 min_healthy_percentage=50,
             ),
-            triggers=["tags"],
+            triggers=["tag"],
         ),
         tags=[
             autoscaling.GroupTagArgs(
