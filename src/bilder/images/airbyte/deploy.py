@@ -123,8 +123,8 @@ docker_repo_names = [
 ]
 for repo_name in docker_repo_names:
     server.shell(
-        name=f"Preload {repo_name}:{AIRBYTE_VERSION}",
-        commands=[f"/usr/bin/docker pull {repo_name}:{AIRBYTE_VERSION}"],
+        name=f"Preload {repo_name}:{VERSIONS['airbyte']}",
+        commands=[f"/usr/bin/docker pull {repo_name}:{VERSIONS['airbyte']}"],
     )
 
 
