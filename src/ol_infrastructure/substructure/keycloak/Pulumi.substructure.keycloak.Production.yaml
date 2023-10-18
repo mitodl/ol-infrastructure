@@ -29,5 +29,7 @@ config:
   keycloak:url: https://sso-production.odl.mit.edu
   keycloakd:captcha_site_key:
     secure: v1:/iVlq/nwXfZo5cmO:G36x/OuuRgvg6G7sbnLh9l7XKKua00HsHgrNYOv6UrrlBSdetInWQwqmFLo/5bi8RdcfDKRiQ7k=
+  keycloak:keycloak_user_migration_open_discussions_bearer_token:
+    secure: v1:
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

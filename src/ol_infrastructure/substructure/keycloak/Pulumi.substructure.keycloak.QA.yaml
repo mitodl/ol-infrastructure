@@ -26,5 +26,7 @@ config:
   keycloak:email_username:
     secure: v1:Uxscw7J8NqxO/NbK:NCGzgYTGRmeIovnjZyXrb6ztDW7levn0
   keycloak:url: https://sso-qa.odl.mit.edu
+  keycloak:keycloak_user_migration_open_discussions_bearer_token:
+    secure: v1:
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

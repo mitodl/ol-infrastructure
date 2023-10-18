@@ -22,5 +22,7 @@ config:
     client_info:
       open-local: "*"
       open-discusions: https://discussions-ci.odl.mit.edu
+  keycloak:keycloak_user_migration_open_discussions_bearer_token:
+    secure: v1:
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
