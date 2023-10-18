@@ -403,7 +403,7 @@ airbyte_db = OLAmazonDB(airbyte_db_config)
 # Shorten a few frequently used attributes from the database
 db_address = airbyte_db.db_instance.address
 db_port = airbyte_db.db_instance.port
-db_name = airbyte_db.db_instance.name
+db_name = airbyte_db.db_instance.db_name
 
 airbyte_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=airbyte_db_config.db_name,
