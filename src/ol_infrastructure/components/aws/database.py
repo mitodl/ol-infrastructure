@@ -294,10 +294,10 @@ class OLAmazonDB(pulumi.ComponentResource):
             "WriteLatency": {
                 "comparison_operator": "GreaterThanThreshold",
                 "description": "RDS - High Write Latency",
-                "datapoints_to_alarm": 2,
+                "datapoints_to_alarm": 6,
                 "level": "warning",
                 "period": 300,  # 5 minutes
-                "evaluation_periods": 2,  # 10 minutes
+                "evaluation_periods": 6,  # 30 minutes
                 "metric_name": "WriteLatency",
                 "threshold": 0.020,  # 20 milliseconds
             },
