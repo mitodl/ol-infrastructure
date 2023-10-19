@@ -48,6 +48,7 @@ VERSIONS = {
     "traefik": os.environ.get("TRAEFIK_VERSION", TRAEFIK_VERSION),
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
+FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
 VECTOR_INSTALL_NAME = os.environ.get("VECTOR_LOG_PROXY_NAME", "vector-log-proxy")
 
 # Set up configuration objects
@@ -131,7 +132,7 @@ configure_traefik(traefik_config)
 
 files.put(
     name="Place the Tika docker-compose.yaml file",
-    src=str(TEMPLATES_DIRECTORY.joinpath("docker-compose.yaml")),
+    src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml")),
     dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
     mode="0664",
 )
