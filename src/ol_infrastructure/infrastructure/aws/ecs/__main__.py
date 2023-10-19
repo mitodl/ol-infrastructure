@@ -262,7 +262,7 @@ autoscaling_group = autoscaling.Group(
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
             min_healthy_percentage=50,
         ),
-        triggers=["tags"],
+        triggers=["tag"],
     ),
     tags=autoscaling_group_tags,
 )
