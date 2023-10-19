@@ -1207,7 +1207,7 @@ web_asg = autoscaling.Group(
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
             min_healthy_percentage=50
         ),
-        triggers=["tags"],
+        triggers=["tag"],
     ),
     target_group_arns=[lms_web_lb_target_group.arn, studio_web_lb_target_group.arn],
     tags=[
