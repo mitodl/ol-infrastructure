@@ -98,7 +98,9 @@ def build_ovs_pipeline() -> Pipeline:
             GetStep(get=ovs_rc_repo.name, trigger=False),
         ],
         image_code=ovs_packer_code,
-        packer_template_path="src/bilder/images/odl_video_service/odl_video_service.pkr.hcl",
+        packer_template_path=(
+            "src/bilder/images/odl_video_service/odl_video_service.pkr.hcl"
+        ),
         env_vars_from_files={"OVS_VERSION": f"{ovs_rc_repo.name}/.git/describe_ref"},
         job_name_suffix="ovs",
     )

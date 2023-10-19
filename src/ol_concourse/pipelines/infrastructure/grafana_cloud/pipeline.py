@@ -291,7 +291,10 @@ for tool in ["loki", "cortex", "alertmanager"]:
                             path="sh",
                             args=[
                                 "-exc",
-                                f"cortextool rules lint --backend={tool} {resource_name}/{tool}-rules/*.yaml;",  # noqa: E501
+                                (
+                                    "cortextool rules lint"
+                                    f" --backend={tool} {resource_name}/{tool}-rules/*.yaml;"  # noqa: E501
+                                ),
                             ],
                         ),
                     ),
@@ -353,7 +356,9 @@ for tool in ["loki", "cortex", "alertmanager"]:
             "CORTEX_TENANT_ID": f"((cortextool.{tool}-rules-api-user-{stage}))",
             "OPS_TEAM_OPS_GENIE_API_KEY": "((cortextool.ops-team-ops-genie-api-key))",
             "TESTING_OPS_GENIE_API_KEY": "((cortextool.testing-ops-genie-api-key))",
-            "SLACK_NOTIFICATIONS_OCW_MISC_API_URL": "((cortextool.slack-notifications-ocw-misc-api-url))",  # noqa: E501
+            "SLACK_NOTIFICATIONS_OCW_MISC_API_URL": (
+                "((cortextool.slack-notifications-ocw-misc-api-url))"
+            ),
             "ENVIRONMENT_NAME": stage.upper(),
             "RESOURCE_NAME": resource_name,
         }
@@ -373,12 +378,12 @@ for tool in ["loki", "cortex", "alertmanager"]:
             command = "cortextool alertmanager load $RESOURCE_NAME/alertmanager.yaml"
             directory = ""
             params["CORTEX_ADDRESS"] = "((cortextool.cortex-amconfig-api-address))"
-            params[
-                "CORTEX_API_USER"
-            ] = f"((cortextool.cortex-amconfig-api-user-{stage}))"
-            params[
-                "CORTEX_TENANT_ID"
-            ] = f"((cortextool.cortex-amconfig-api-user-{stage}))"
+            params["CORTEX_API_USER"] = (
+                f"((cortextool.cortex-amconfig-api-user-{stage}))"
+            )
+            params["CORTEX_TENANT_ID"] = (
+                f"((cortextool.cortex-amconfig-api-user-{stage}))"
+            )
             params["ENVIRONMENT_NAME"] = stage
         params["RULE_DIRECTORY"] = directory
         passed_value = [alerting_jobs[-1].name]

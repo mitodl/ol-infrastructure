@@ -32,7 +32,7 @@ def install_concourse(concourse_config: ConcourseBaseConfig):
     )
     if not host.get_fact(Directory, installation_directory):
         # Download latest Concourse release from GitHub
-        concourse_archive = f"https://github.com/concourse/concourse/releases/download/v{concourse_config.version}/concourse-{concourse_config.version}-linux-amd64.tgz"  # noqa: E501
+        concourse_archive = f"https://github.com/concourse/concourse/releases/download/v{concourse_config.version}/concourse-{concourse_config.version}-linux-amd64.tgz"
         concourse_archive_hash = f"{concourse_archive}.sha1"
         concourse_archive_path = (
             f"/tmp/concourse-{concourse_config.version}.tgz"  # noqa: S108
@@ -165,9 +165,10 @@ def _manage_worker_node_keys(concourse_config: ConcourseWorkerConfig):
 @deploy("Pull down pre-bundled resource types")
 def _install_resource_types(concourse_config: ConcourseWorkerConfig):
     for resource in concourse_config.additional_resource_types or []:
-        resource_archive = f"https://{concourse_config.additional_resource_types_s3_location}/{resource}.tgz"  # noqa: E501
+        resource_archive = f"https://{concourse_config.additional_resource_types_s3_location}/{resource}.tgz"
         resource_path = f"/tmp/{resource}"  # noqa: S108
         resource_archive_path = f"{resource_path}/{resource}.tgz"
+        addtl_resource_types_dir = concourse_config.additional_resource_types_directory
         server.shell(
             name=f"Setup directory structure for resource_type {resource}",
             commands=[f"mkdir {resource_path}"],
@@ -182,7 +183,7 @@ def _install_resource_types(concourse_config: ConcourseWorkerConfig):
             commands=[
                 f"tar -xvzf {resource_archive_path} -C {resource_path}",
                 f"rm -f {resource_archive_path}",
-                f"mv {resource_path} {concourse_config.additional_resource_types_directory}/",  # noqa: E501
+                f"mv {resource_path} {addtl_resource_types_dir}/",
             ],
         )
         files.directory(

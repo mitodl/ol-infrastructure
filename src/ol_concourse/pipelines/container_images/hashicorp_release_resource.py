@@ -48,7 +48,9 @@ docker_pipeline = Pipeline(
                     put=hashicorp_release_image.name,
                     params={
                         "image": "image/image.tar",
-                        "additional_tags": f"./{hashicorp_release_repository.name}/.git/describe_ref",  # noqa: E501
+                        "additional_tags": (
+                            f"./{hashicorp_release_repository.name}/.git/describe_ref"
+                        ),
                     },
                 ),
             ],

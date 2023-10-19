@@ -12,8 +12,8 @@ from bridge.lib.magic_numbers import DEFAULT_MEMCACHED_PORT, DEFAULT_REDIS_PORT
 from pulumi_aws import elasticache
 from pydantic import (
     ConfigDict,
-    FieldValidationInfo,
     PositiveInt,
+    ValidationInfo,
     conint,
     field_validator,
 )
@@ -67,7 +67,7 @@ class OLAmazonCacheConfig(AWSBase):
 
     @field_validator("engine_version")
     @classmethod
-    def is_valid_version(cls, engine_version: str, info: FieldValidationInfo) -> str:
+    def is_valid_version(cls, engine_version: str, info: ValidationInfo) -> str:
         engine = info.data["engine"]
         engines_map = cache_engines()
         if engine_version not in engines_map.get(engine, []):
@@ -103,7 +103,7 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
     @field_validator("auth_token")
     @classmethod
     def is_auth_token_valid(
-        cls, auth_token: Optional[str], info: FieldValidationInfo
+        cls, auth_token: Optional[str], info: ValidationInfo
     ) -> Optional[str]:
         encrypt_transit = info.data["encrypt_transit"]
         min_token_length = 16
@@ -138,7 +138,7 @@ class OLAmazonMemcachedConfig(OLAmazonCacheConfig):
     engine: str = "memcached"
     engine_version: str = "1.5.16"
     port: PositiveInt = PositiveInt(DEFAULT_MEMCACHED_PORT)
-    num_instances: conint(ge=1, le=MAX_MEMCACHED_CLUSTER_SIZE) = 3  # type: ignore[valid-type]  # noqa: E501
+    num_instances: conint(ge=1, le=MAX_MEMCACHED_CLUSTER_SIZE) = 3  # type: ignore[valid-type]
 
     @field_validator("cluster_name")
     @classmethod
@@ -181,12 +181,11 @@ class OLAmazonCache(pulumi.ComponentResource):
                     name="cluster-enabled", value="yes"
                 )
             )
-
+        cluster_name = cache_config.cluster_name
+        engine_version = cache_config.engine_version
         self.parameter_group = elasticache.ParameterGroup(
-            f"{cache_config.cluster_name}-{cache_config.engine}-{cache_config.engine_version}-parameter-group",  # noqa: E501
-            name=(
-                f"{cache_config.cluster_name}-{cache_config.engine_version.replace('.', '')}-parameter-group"  # noqa: E501
-            ),
+            f"{cluster_name}-{cache_config.engine}-{engine_version}-parameter-group",
+            name=f"{cluster_name}-{engine_version.replace('.', '')}-parameter-group",
             family=parameter_group_family(
                 cache_config.engine, cache_config.engine_version
             ),
@@ -241,14 +240,17 @@ class OLAmazonCache(pulumi.ComponentResource):
         resource_options: pulumi.ResourceOptions,
     ):
         if cluster_mode:
-            cluster_mode_param = elasticache.ReplicationGroupClusterModeArgs(
-                num_node_groups=cache_config.shard_count,
-                replicas_per_node_group=cache_config.num_instances,
-            )
-            cache_node_count = None
+            cluster_kwargs = {
+                "num_cache_clusters": None,
+                "num_node_groups": cache_config.shard_count,
+                "replicas_per_node_group": cache_config.num_instances,
+            }
         else:
-            cluster_mode_param = None
-            cache_node_count = cache_config.num_instances
+            cluster_kwargs = {
+                "num_cache_clusters": cache_config.num_instances,
+                "num_node_groups": None,
+                "replicas_per_node_group": None,
+            }
 
         cache_cluster = elasticache.ReplicationGroup(
             f"{cache_config.cluster_name}-{cache_config.engine}-elasticache-cluster",
@@ -257,14 +259,14 @@ class OLAmazonCache(pulumi.ComponentResource):
             auth_token=cache_config.auth_token,
             auto_minor_version_upgrade=cache_config.auto_upgrade,
             automatic_failover_enabled=True,
-            cluster_mode=cluster_mode_param,
             engine="redis",
-            engine_version="6.x"
-            if cache_config.engine_version.startswith("6")
-            else cache_config.engine_version,
+            engine_version=(
+                "6.x"
+                if cache_config.engine_version.startswith("6")
+                else cache_config.engine_version
+            ),
             kms_key_id=cache_config.kms_key_id,
             node_type=cache_config.instance_type,
-            num_cache_clusters=cache_node_count,
             opts=resource_options,
             parameter_group_name=self.parameter_group.name,
             port=cache_config.port,
@@ -275,6 +277,7 @@ class OLAmazonCache(pulumi.ComponentResource):
             subnet_group_name=cache_config.subnet_group,
             tags=cache_config.tags,
             transit_encryption_enabled=cache_config.encrypt_transit,
+            **cluster_kwargs,
         )
         address = (
             cache_cluster.configuration_endpoint_address
@@ -327,7 +330,9 @@ class OLAmazonCache(pulumi.ComponentResource):
         global_profiles = {
             "EngineCPUUtilization": {
                 "comparison_operator": "GreaterThanThreshold",
-                "description": "ElastiCache - High CPU utilization by the Redis engine.",  # noqa: E501
+                "description": (
+                    "ElastiCache - High CPU utilization by the Redis engine."
+                ),
                 "datapoints_to_alarm": 2,
                 "level": "warning",
                 "period": 300,  # 5 minutes
@@ -338,7 +343,9 @@ class OLAmazonCache(pulumi.ComponentResource):
             },
             "DatabaseMemoryUsagePercentage": {
                 "comparison_operator": "GreaterThanThreshold",
-                "description": "ElastiCache - High memory utilization by the Redis engine.",  # noqa: E501
+                "description": (
+                    "ElastiCache - High memory utilization by the Redis engine."
+                ),
                 "datapoints_to_alarm": 2,
                 "level": "warning",
                 "period": 300,  # 5 minutes

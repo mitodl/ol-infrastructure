@@ -58,7 +58,10 @@ def install_caddy(caddy_config: CaddyConfig):
         )
         apt.repo(
             name="Set up Caddy APT repository",
-            src="deb https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main",  # noqa: E501
+            src=(
+                "deb https://dl.cloudsmith.io/public/caddy/stable/deb/debian"
+                " any-version main"
+            ),
             present=True,
             filename="caddy.list",
         )
@@ -115,7 +118,12 @@ def create_placeholder_tls_config(caddy_config: CaddyConfig):
     server.shell(
         name=f"Generate TLS certificate + key",  # noqa: F541
         commands=[
-            f'openssl req -newkey rsa:4098 -x509 -sha256 -days 365 -nodes -out {caddy_config.tls_cert_path} -keyout {caddy_config.tls_key_path} -subj "/C=US/ST=Massachusetts/L=Cambridge/O=MIT/OU=ODL/CN=this.is.not.a.valid.certificate.odl.mit.edu"',  # noqa: E501
+            (
+                "openssl req -newkey rsa:4098 -x509 -sha256 -days 365 -nodes -out"
+                f" {caddy_config.tls_cert_path} -keyout"
+                f" {caddy_config.tls_key_path} -subj"
+                ' "/C=US/ST=Massachusetts/L=Cambridge/O=MIT/OU=ODL/CN=this.is.not.a.valid.certificate.odl.mit.edu"'  # noqa: E501
+            ),
         ],
     )
     # This is a workaround for a bahavior quirk of vault-template when it is running as a non-root user.  # noqa: E501

@@ -230,13 +230,16 @@ ovs_server_policy_document = {
 ovs_server_policy = iam.Policy(
     "odl-video-service-server-policy",
     name_prefix="odl-video-service-server-policy-",
-    path=f"/ol-applications/odl-video-service-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
+    path=f"/ol-applications/odl-video-service-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         ovs_server_policy_document,
         stringify=True,
         parliament_config=parliament_config,
     ),
-    description="AWS access permissions to allow odl-video-service to s3 buckets and transcode services.",  # noqa: E501
+    description=(
+        "AWS access permissions to allow odl-video-service to s3 buckets and transcode"
+        " services."
+    ),
 )
 
 ovs_server_instance_role = iam.Role(
@@ -302,14 +305,20 @@ ovs_server_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_HTTPS_PORT,
             to_port=DEFAULT_HTTPS_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the odl-video-service server on port {DEFAULT_HTTPS_PORT}",  # noqa: E501
+            description=(
+                "Allow traffic to the odl-video-service server on port"
+                f" {DEFAULT_HTTPS_PORT}"
+            ),
         ),
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
             from_port=DEFAULT_HTTP_PORT,
             to_port=DEFAULT_HTTP_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the odl-video-service server on port {DEFAULT_HTTP_PORT}",  # noqa: E501
+            description=(
+                "Allow traffic to the odl-video-service server on port"
+                f" {DEFAULT_HTTP_PORT}"
+            ),
         ),
     ],
     egress=default_egress_args,
@@ -332,7 +341,10 @@ ovs_database_security_group = ec2.SecurityGroup(
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
-            description=f"Access to Postgres from odl-video-service nodes on {DEFAULT_POSTGRES_PORT}",  # noqa: E501
+            description=(
+                "Access to Postgres from odl-video-service nodes on"
+                f" {DEFAULT_POSTGRES_PORT}"
+            ),
         ),
     ],
     vpc_id=target_vpc_id,
@@ -351,7 +363,9 @@ ovs_redis_security_group = ec2.SecurityGroup(
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
-            description=f"Access to Redis from odl-video-service nodes on {DEFAULT_REDIS_PORT}",  # noqa: E501
+            description=(
+                f"Access to Redis from odl-video-service nodes on {DEFAULT_REDIS_PORT}"
+            ),
         ),
     ],
     egress=default_egress_args,
@@ -379,7 +393,6 @@ ovs_db = OLAmazonDB(ovs_db_config)
 
 db_address = ovs_db.db_instance.address
 db_port = ovs_db.db_instance.port
-db_name = ovs_db.db_instance.name
 
 ovs_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=ovs_db_config.db_name,
@@ -537,8 +550,7 @@ ovs_lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
+                                "content": textwrap.dedent(f"""\
                             ENVIRONMENT={consul_dc}
                             APPLICATION=ovs
                             SERVICE=ovs
@@ -547,8 +559,7 @@ ovs_lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            """
-                                ),
+                            """),
                                 "owner": "root:root",
                             },
                         ],
@@ -610,7 +621,9 @@ ovs_server_vault_mount = vault.Mount(
     path="secret-odl-video-service",
     type="kv-v2",
     options={"version": 2},
-    description="Storage of configuration credentials and secrets used by odl-video-service",  # noqa: E501
+    description=(
+        "Storage of configuration credentials and secrets used by odl-video-service"
+    ),
     opts=ResourceOptions(delete_before_replace=True),
 )
 
@@ -645,9 +658,9 @@ consul_keys = {
     "ovs/s3_transcode_bucket_name": ovs_config.get("s3_transcode_bucket_name"),
     "ovs/s3_watch_bucket_name": ovs_config.get("s3_watch_bucket_name"),
     "ovs/use_shibboleth": "True" if use_shibboleth else "False",  # Yes, quoted booleans
-    "ovs/feature_annotations": "True"
-    if enabled_annotations
-    else "False",  # Yes, quoted booleans
+    "ovs/feature_annotations": (
+        "True" if enabled_annotations else "False"
+    ),  # Yes, quoted booleans
 }
 consul.Keys(
     "ovs-server-configuration-data",

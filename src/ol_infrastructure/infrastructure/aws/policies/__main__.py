@@ -20,8 +20,10 @@ describe_instance_policy = iam.Policy(
     name="describe-ec2-instances-policy",
     path="/ol-operations/describe-ec2-instances-policy/",
     policy=lint_iam_policy(describe_instance_policy_document, stringify=True),
-    description="Policy permitting EC2 describe instances capabilities for use with "
-    "cloud auto-join systems.",
+    description=(
+        "Policy permitting EC2 describe instances capabilities for use with "
+        "cloud auto-join systems."
+    ),
 )
 
 # TODO MAD 20221208  # noqa: FIX002, TD002, TD003, TD004

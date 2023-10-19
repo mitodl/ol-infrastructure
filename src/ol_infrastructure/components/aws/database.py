@@ -17,9 +17,9 @@ from pulumi_aws.ec2 import SecurityGroup
 from pydantic import (
     BaseModel,
     ConfigDict,
-    FieldValidationInfo,
     PositiveInt,
     SecretStr,
+    ValidationInfo,
     conint,
     field_validator,
 )
@@ -67,7 +67,7 @@ class OLDBConfig(AWSBase):
     port: PositiveInt
     subnet_group_name: Union[str, pulumi.Output[str]]
     security_groups: list[SecurityGroup]
-    backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore  # noqa: E501, PGH003
+    backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore  # noqa: PGH003
     db_name: Optional[str] = None  # The name of the database schema to create
     instance_size: str = DBInstanceTypes.general_purpose_large.value
     max_storage: Optional[PositiveInt] = None  # Set to allow for storage autoscaling
@@ -93,7 +93,7 @@ class OLDBConfig(AWSBase):
 
     @field_validator("engine_version")
     @classmethod
-    def is_valid_version(cls, engine_version: str, info: FieldValidationInfo) -> str:
+    def is_valid_version(cls, engine_version: str, info: ValidationInfo) -> str:
         engine = info.data["engine"]
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
@@ -119,14 +119,14 @@ class OLPostgresDBConfig(OLDBConfig):
     engine: str = "postgres"
     engine_version: str = "15.3"
     port: PositiveInt = PositiveInt(5432)
-    parameter_overrides: list[
-        dict[str, Union[str, bool, int, float]]
-    ] = [  # noqa: RUF012
-        {"name": "client_encoding", "value": "UTF-8"},
-        {"name": "timezone", "value": "UTC"},
-        {"name": "rds.force_ssl", "value": 1},
-        {"name": "autovacuum", "value": 1},
-    ]
+    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = (
+        [  # noqa: RUF012
+            {"name": "client_encoding", "value": "UTF-8"},
+            {"name": "timezone", "value": "UTC"},
+            {"name": "rds.force_ssl", "value": 1},
+            {"name": "autovacuum", "value": 1},
+        ]
+    )
 
 
 class OLMariaDBConfig(OLDBConfig):
@@ -135,19 +135,19 @@ class OLMariaDBConfig(OLDBConfig):
     engine: str = "mariadb"
     engine_version: str = "10.6.12"
     port: PositiveInt = PositiveInt(3306)
-    parameter_overrides: list[
-        dict[str, Union[str, bool, int, float]]
-    ] = [  # noqa: RUF012
-        {"name": "character_set_client", "value": "utf8mb4"},
-        {"name": "character_set_connection", "value": "utf8mb4"},
-        {"name": "character_set_database", "value": "utf8mb4"},
-        {"name": "character_set_filesystem", "value": "utf8mb4"},
-        {"name": "character_set_results", "value": "utf8mb4"},
-        {"name": "character_set_server", "value": "utf8mb4"},
-        {"name": "collation_server", "value": "utf8mb4_unicode_ci"},
-        {"name": "collation_connection", "value": "utf8mb4_unicode_ci"},
-        {"name": "time_zone", "value": "UTC"},
-    ]
+    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = (
+        [  # noqa: RUF012
+            {"name": "character_set_client", "value": "utf8mb4"},
+            {"name": "character_set_connection", "value": "utf8mb4"},
+            {"name": "character_set_database", "value": "utf8mb4"},
+            {"name": "character_set_filesystem", "value": "utf8mb4"},
+            {"name": "character_set_results", "value": "utf8mb4"},
+            {"name": "character_set_server", "value": "utf8mb4"},
+            {"name": "collation_server", "value": "utf8mb4_unicode_ci"},
+            {"name": "collation_connection", "value": "utf8mb4_unicode_ci"},
+            {"name": "time_zone", "value": "UTC"},
+        ]
+    )
 
 
 class OLAmazonDB(pulumi.ComponentResource):
@@ -202,7 +202,9 @@ class OLAmazonDB(pulumi.ComponentResource):
             deletion_protection=db_config.prevent_delete,
             engine=db_config.engine,
             engine_version=db_config.engine_version,
-            final_snapshot_identifier=f"{db_config.instance_name}-{db_config.engine}-final-snapshot",  # noqa: E501
+            final_snapshot_identifier=(
+                f"{db_config.instance_name}-{db_config.engine}-final-snapshot"
+            ),
             identifier=db_config.instance_name,
             instance_class=db_config.instance_size,
             max_allocated_storage=db_config.max_storage,
@@ -292,10 +294,10 @@ class OLAmazonDB(pulumi.ComponentResource):
             "WriteLatency": {
                 "comparison_operator": "GreaterThanThreshold",
                 "description": "RDS - High Write Latency",
-                "datapoints_to_alarm": 2,
+                "datapoints_to_alarm": 6,
                 "level": "warning",
                 "period": 300,  # 5 minutes
-                "evaluation_periods": 2,  # 10 minutes
+                "evaluation_periods": 6,  # 30 minutes
                 "metric_name": "WriteLatency",
                 "threshold": 0.020,  # 20 milliseconds
             },

@@ -15,7 +15,7 @@ class OpenEdxApplication(str, Enum):
 
     codejail = ("codejail", "https://github.com/eduNEXT/codejailservice/")
     edxapp = ("edx-platform", "https://github.com/openedx/edx-platform")
-    forum = ("forum", "https://github.com/mitodl/cs_comments_service")
+    forum = ("forum", "https://github.com/openedx/cs_comments_service")
     notes = ("notes-api", "https://github.com/openedx/edx-notes-api")
     theme = ("edxapp_theme", "")
     xqueue = ("xqueue", "https://github.com/openedx/xqueue")
@@ -85,6 +85,7 @@ class OpenEdxSupportedRelease(str, Enum):
     master = ("master", "master")
     olive = ("olive", "open-release/olive.master")
     palm = ("palm", "open-release/palm.master")
+    quince = ("quince", "open-release/quince.master")
 
     def __str__(self):
         return self.value

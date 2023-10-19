@@ -140,7 +140,9 @@ tika_server_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_HTTPS_PORT,
             to_port=DEFAULT_HTTPS_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the tika server on port {DEFAULT_HTTPS_PORT}",  # noqa: E501
+            description=(
+                f"Allow traffic to the tika server on port {DEFAULT_HTTPS_PORT}"
+            ),
         ),
     ],
     egress=default_egress_args,
@@ -185,7 +187,8 @@ tag_specs = [
 lt_config = OLLaunchTemplateConfig(
     block_device_mappings=block_device_mappings,
     image_id=tika_server_ami.id,
-    instance_type=tika_config.get("instance_type") or InstanceTypes.burstable_medium,
+    instance_type=tika_config.get("instance_type")
+    or InstanceTypes.general_purpose_large,
     instance_profile_arn=tika_server_instance_profile.arn,
     security_groups=[
         tika_server_security_group,
@@ -214,8 +217,7 @@ lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
+                                "content": textwrap.dedent(f"""\
                             ENVIRONMENT={consul_dc}
                             APPLICATION=tika
                             VECTOR_CONFIG_DIR=/etc/vector/
@@ -223,18 +225,15 @@ lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            """
-                                ),
+                            """),
                                 "owner": "root:root",
                             },
                             {
                                 "path": "/etc/docker/compose/.env",
-                                "content": textwrap.dedent(
-                                    f"""\
+                                "content": textwrap.dedent(f"""\
                             DOMAIN={tika_config.require("web_host_domain")}
                             X_ACCESS_TOKEN={x_access_token}
-                            """
-                                ),
+                            """),
                             },
                         ]
                     },

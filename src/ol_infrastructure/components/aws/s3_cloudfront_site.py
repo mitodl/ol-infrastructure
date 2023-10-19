@@ -16,7 +16,9 @@ class CloudfrontPriceClass(str, Enum):
     # https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_DistributionConfig.html
     # NB: POP == Points Of Presence which is where CDN edge servers are located
     us_eu = "PriceClass_100"  # POPs in US, Canada, Europe, and Israel
-    exclude_au_sa = "PriceClass_200"  # POPs in all supported geos except South America and Australia  # noqa: E501
+    exclude_au_sa = (  # POPs in all supported geos except South America and Australia  # noqa: E501
+        "PriceClass_200"
+    )
     all_geos = "PriceClass_All"  # POPs in all supoprted geos
 
 

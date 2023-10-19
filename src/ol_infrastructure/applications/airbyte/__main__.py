@@ -175,7 +175,7 @@ data_lake_policy_document = {
 data_lake_policy = iam.Policy(
     "data-lake-access-policy",
     name_prefix="airbyte-datalake-policy-",
-    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
+    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         data_lake_policy_document,
         stringify=True,
@@ -191,6 +191,13 @@ s3_source_buckets = [
     f"{edxapp_deployment}-{stack_info.env_suffix}-edxapp-tracking"
     for edxapp_deployment in ("mitxonline", "mitx", "mitx-staging", "xpro")
 ]
+s3_source_buckets.append(f"ol-data-lake-landing-zone-{stack_info.env_suffix}")
+
+# This should use a reference to the monitoring stack but it seems broken at the moment
+# and I can't figure it out
+fastly_access_log_bucket_name = "mitodl-fastly-access-logs"
+s3_source_buckets.append(fastly_access_log_bucket_name)
+
 s3_source_policy_document = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
@@ -207,15 +214,14 @@ s3_source_policy_document = {
             ],
             "Resource": [
                 f"arn:aws:s3:::{bucket_name}" for bucket_name in s3_source_buckets
-            ]
-            + [f"arn:aws:s3:::{bucket_name}/*" for bucket_name in s3_source_buckets],
+            ] + [f"arn:aws:s3:::{bucket_name}/*" for bucket_name in s3_source_buckets],
         },
     ],
 }
 s3_source_policy = iam.Policy(
     "airbyte-s3-source-access-policy",
     name_prefix="airbyte-s3-source-policy-",
-    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
+    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         s3_source_policy_document,
         stringify=True,
@@ -340,7 +346,9 @@ airbyte_server_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_HTTPS_PORT,
             to_port=DEFAULT_HTTPS_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the airbyte server on port {DEFAULT_HTTPS_PORT}",  # noqa: E501
+            description=(
+                f"Allow traffic to the airbyte server on port {DEFAULT_HTTPS_PORT}"
+            ),
         ),
     ],
     egress=default_egress_args,
@@ -395,7 +403,7 @@ airbyte_db = OLAmazonDB(airbyte_db_config)
 # Shorten a few frequently used attributes from the database
 db_address = airbyte_db.db_instance.address
 db_port = airbyte_db.db_instance.port
-db_name = airbyte_db.db_instance.name
+db_name = airbyte_db.db_instance.db_name
 
 airbyte_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=airbyte_db_config.db_name,
@@ -439,8 +447,10 @@ airbyte_db_consul_service = Service(
 )
 
 connection_string = Output.all(address=db_address, port=db_port, name=db_name).apply(
-    lambda db: "jdbc:postgresql://{address}:{port}/{name}?ssl=true&sslmode=require".format(  # noqa: E501
-        **db
+    lambda db: (
+        "jdbc:postgresql://{address}:{port}/{name}?ssl=true&sslmode=require".format(
+            **db
+        )
     )
 )
 
@@ -464,9 +474,11 @@ consul.Keys(
         ),
         consul.KeysKeyArgs(
             path="airbyte/traefik-certificate-resolver",
-            value="letsencrypt_staging_resolver"
-            if stack_info.env_suffix != "production"
-            else "letsencrypt_resolver",
+            value=(
+                "letsencrypt_staging_resolver"
+                if stack_info.env_suffix != "production"
+                else "letsencrypt_resolver"
+            ),
         ),
     ],
     opts=consul_provider,
@@ -486,6 +498,7 @@ tg_config = OLTargetGroupConfig(
     health_check_interval=60,
     health_check_matcher="200-399",
     health_check_path="/api/v1/health",
+    health_check_unhealthy_threshold=6,  # give extra time for airbyte to start up
     tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
 )
 
@@ -539,8 +552,7 @@ lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
+                                "content": textwrap.dedent(f"""\
                             ENVIRONMENT={consul_dc}
                             APPLICATION=air-byte
                             SERVICE=data-platform
@@ -549,8 +561,7 @@ lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            """
-                                ),
+                            """),
                                 "owner": "root:root",
                             },
                         ]

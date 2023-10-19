@@ -5,9 +5,9 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-apps-qa.odl.mit.edu
   tika:auto_scale:
-    desired: 1
-    max: 2
-    min: 1
+    desired: 2
+    max: 3
+    min: 2
   tika:business_unit: operations
   tika:target_vpc: applications_vpc
   tika:web_host_domain: tika-qa.odl.mit.edu

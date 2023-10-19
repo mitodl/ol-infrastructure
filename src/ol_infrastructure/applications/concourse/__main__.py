@@ -22,7 +22,7 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, Output, StackReference
-from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
+from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53, vpc
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -113,8 +113,7 @@ def build_worker_user_data(
             },
             {
                 "path": "/etc/default/vector",
-                "content": textwrap.dedent(
-                    f"""\
+                "content": textwrap.dedent(f"""\
                     ENVIRONMENT={consul_dc}
                     APPLICATION=concourse-worker
                     SERVICE=concourse
@@ -123,8 +122,7 @@ def build_worker_user_data(
                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                    """
-                ),
+                    """),
                 "owner": "root:root",
             },
         ]
@@ -133,11 +131,9 @@ def build_worker_user_data(
         yaml_contents["write_files"].append(
             {
                 "path": "/etc/default/concourse-team",
-                "content": textwrap.dedent(
-                    f"""\
+                "content": textwrap.dedent(f"""\
                      CONCOURSE_TEAM={concourse_team}
-                     """
-                ),
+                     """),
                 "owner": "root:root",
             }
         )
@@ -213,7 +209,7 @@ for iam_policy in iam_policy_names or []:
 for iam_policy_name in concourse_config.get_object("web_iam_policies") or []:
     iam_policy_object = iam_policy_objects[iam_policy_name]
     iam.RolePolicyAttachment(
-        f"concourse-instance-policy-web-policy-{iam_policy_name}-{stack_info.env_suffix}",  # noqa: E501
+        f"concourse-instance-policy-web-policy-{iam_policy_name}-{stack_info.env_suffix}",
         policy_arn=iam_policy_object.arn,
         role=concourse_web_instance_role.name,
     )
@@ -302,15 +298,7 @@ concourse_worker_security_group = ec2.SecurityGroup(
     f"concourse-worker-security-group-{stack_info.env_suffix}",
     name=f"concourse-worker-operations-{stack_info.env_suffix}",
     description="Access control for Concourse worker servers",
-    ingress=[
-        ec2.SecurityGroupIngressArgs(
-            self=True,
-            from_port=0,
-            to_port=MAXIMUM_PORT_NUMBER,
-            protocol="tcp",
-            description="Allow Concourse workers to connect to all other concourse workers for p2p streaming.",  # noqa: E501
-        )
-    ],
+    ingress=[],
     egress=default_egress_args,
     vpc_id=ops_vpc_id,
 )
@@ -320,30 +308,46 @@ concourse_web_security_group = ec2.SecurityGroup(
     f"concourse-web-security-group-{stack_info.env_suffix}",
     name=f"concourse-web-operations-{stack_info.env_suffix}",
     description="Access control for Concourse web servers",
-    ingress=[
-        ec2.SecurityGroupIngressArgs(
-            self=True,
-            security_groups=[concourse_worker_security_group.id],
-            from_port=0,
-            to_port=MAXIMUM_PORT_NUMBER,
-            protocol="tcp",
-            description="Allow Concourse workers to connect to Concourse web nodes",
-        )
-    ],
+    ingress=[],
     egress=default_egress_args,
     vpc_id=ops_vpc_id,
 )
 
-ec2.SecurityGroupRule(
-    "concourse-worker-access-from-concourse-web",
+# Link the two groups web    -> worker (all)
+#                     worker -> worker (all)
+#                     worker -> web    (all)
+#         not needed: web    -> web    (all)
+vpc.SecurityGroupIngressRule(
+    "concourse-worker-from-web-nodes",
     security_group_id=concourse_worker_security_group.id,
-    source_security_group_id=concourse_web_security_group.id,
-    protocol="tcp",
+    referenced_security_group_id=concourse_web_security_group.id,
+    ip_protocol="tcp",
     from_port=0,
     to_port=MAXIMUM_PORT_NUMBER,
     description="Allow all traffic from Concourse web nodes to workers",
-    type="ingress",
+    tags=aws_config.tags,
 )
+vpc.SecurityGroupIngressRule(
+    "concourse-worker-from-concourse-worker",
+    security_group_id=concourse_worker_security_group.id,
+    referenced_security_group_id=concourse_worker_security_group.id,
+    ip_protocol="tcp",
+    from_port=0,
+    to_port=MAXIMUM_PORT_NUMBER,
+    description="Allow all traffic from concourse workers to all other workers.",
+    tags=aws_config.tags,
+)
+vpc.SecurityGroupIngressRule(
+    "concourse-web-from-concourse-worker",
+    security_group_id=concourse_web_security_group.id,
+    referenced_security_group_id=concourse_worker_security_group.id,
+    ip_protocol="tcp",
+    from_port=0,
+    to_port=MAXIMUM_PORT_NUMBER,
+    description="Allow all traffic from concourse workers to web nodes.",
+    tags=aws_config.tags,
+)
+
 
 # Create security group for Concourse Postgres database
 concourse_db_security_group = ec2.SecurityGroup(
@@ -551,8 +555,7 @@ web_launch_config = ec2.LaunchTemplate(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
+                                "content": textwrap.dedent(f"""\
                                     ENVIRONMENT={consul_dc}
                                     APPLICATION=concourse-web
                                     SERVICE=concourse
@@ -561,8 +564,7 @@ web_launch_config = ec2.LaunchTemplate(
                                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                                    """
-                                ),
+                                    """),
                                 "owner": "root:root",
                             },
                         ]
@@ -590,7 +592,7 @@ web_asg = autoscaling.Group(
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
             min_healthy_percentage=50
         ),
-        triggers=["tags"],
+        triggers=["tag"],
     ),
     target_group_arns=[web_lb_target_group.arn],
     tags=[
@@ -634,13 +636,13 @@ for worker_def in concourse_config.get_object("workers") or []:
     for iam_policy_name in worker_def["iam_policies"] or []:
         iam_policy_object = iam_policy_objects[iam_policy_name]
         iam.RolePolicyAttachment(
-            f"concourse-instance-policy-worker-{worker_class_name}-policy-{iam_policy_name}-{stack_info.env_suffix}",  # noqa: E501
+            f"concourse-instance-policy-worker-{worker_class_name}-policy-{iam_policy_name}-{stack_info.env_suffix}",
             policy_arn=iam_policy_object.arn,
             role=concourse_worker_instance_role.name,
         )
 
     concourse_worker_instance_profile = iam.InstanceProfile(
-        f"concourse-instance-profile-worker-{worker_class_name}-{stack_info.env_suffix}",  # noqa: E501
+        f"concourse-instance-profile-worker-{worker_class_name}-{stack_info.env_suffix}",
         role=concourse_worker_instance_role.name,
         path="/ol-applications/concourse/profile/",
     )
@@ -661,7 +663,9 @@ for worker_def in concourse_config.get_object("workers") or []:
     worker_launch_config = ec2.LaunchTemplate(
         f"concourse-worker-{worker_class_name}-launch-template",
         name_prefix=f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}-",
-        description=f"Launch template for deploying concourse worker-{worker_class_name} nodes.",  # noqa: E501
+        description=(
+            f"Launch template for deploying concourse worker-{worker_class_name} nodes."
+        ),
         iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
             arn=concourse_worker_instance_profile.arn,
         ),
@@ -723,7 +727,9 @@ for worker_def in concourse_config.get_object("workers") or []:
         internal=True,
         ip_address_type="dualstack",
         load_balancer_type="application",
-        name=f"concourse-worker-alb-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}",  # noqa: E501
+        name=(
+            f"concourse-worker-alb-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}"
+        ),
         security_groups=[concourse_worker_security_group.id],
         subnets=target_vpc["subnet_ids"],
         tags=aws_config.merged_tags({}),
@@ -779,7 +785,7 @@ for worker_def in concourse_config.get_object("workers") or []:
             preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
                 min_healthy_percentage=50,
             ),
-            triggers=["tags"],
+            triggers=["tag"],
         ),
         tags=[
             autoscaling.GroupTagArgs(

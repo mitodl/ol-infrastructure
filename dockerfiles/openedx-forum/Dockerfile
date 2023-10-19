@@ -7,6 +7,7 @@ RUN apt update && \
 # Install dockerize to wait for mongodb/elasticsearch availability
 ARG DOCKERIZE_VERSION=v0.6.1
 ARG OPENEDX_COMMON_VERSION=open-release/olive.3
+ARG OPENEDX_FORUM_REPOSITORY=https://github.com/openedx/cs_comments_service
 
 RUN wget -O /tmp/dockerize.tar.gz https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
     && tar -C /usr/local/bin -xzvf /tmp/dockerize.tar.gz \
@@ -30,7 +31,7 @@ RUN gem install --user-install rake --version 13.0.6
 
 # Install forum
 ENV BUNDLE_GEMFILE Gemfile3
-RUN git clone https://github.com/mitodl/cs_comments_service.git --branch $OPENEDX_COMMON_VERSION --depth 1 /app/cs_comments_service
+RUN git clone $OPENEDX_FORUM_REPOSITORY --branch $OPENEDX_COMMON_VERSION --depth 1 /app/cs_comments_service
 WORKDIR /app/cs_comments_service
 RUN bundle install --deployment
 

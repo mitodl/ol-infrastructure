@@ -48,7 +48,9 @@ def tubular_pipeline() -> Pipeline:
                     outputs=[tubular_retirees],
                     params={
                         "TUBULAR_OAUTH_CLIENT_ID": "((tubular_oauth_client.id))",
-                        "TUBULAR_OAUTH_CLIENT_SECRET": "((tubular_oauth_client.secret))",  # noqa: E501
+                        "TUBULAR_OAUTH_CLIENT_SECRET": (
+                            "((tubular_oauth_client.secret))"
+                        ),
                         "TUBULAR_LMS_HOST": "((tubular_oauth_client.host))",
                     },
                     run=Command(
@@ -78,8 +80,7 @@ def tubular_pipeline() -> Pipeline:
                         path="python",
                         args=[
                             "-c",
-                            textwrap.dedent(
-                                """\
+                            textwrap.dedent("""\
                             import json
                             from pathlib import Path
                             learner_dir = Path("tubular-retirees/processing")
@@ -90,8 +91,7 @@ def tubular_pipeline() -> Pipeline:
                                 retirees.append(retiree)
                             with open("retirees_dir/vars.json","w") as vj:
                                 vj.write(json.dumps(retirees))
-                            """
-                            ),
+                            """),
                         ],
                     ),
                     outputs=[Output(name=Identifier("retirees_dir"))],
@@ -119,7 +119,9 @@ def tubular_pipeline() -> Pipeline:
                     inputs=[tubular_retirees, Input(name=tubular_config_repo.name)],
                     params={
                         "TUBULAR_OAUTH_CLIENT_ID": "((tubular_oauth_client.id))",
-                        "TUBULAR_OAUTH_CLIENT_SECRET": "((tubular_oauth_client.secret))",  # noqa: E501
+                        "TUBULAR_OAUTH_CLIENT_SECRET": (
+                            "((tubular_oauth_client.secret))"
+                        ),
                         "TUBULAR_LMS_HOST": "((tubular_oauth_client.host))",
                     },
                     run=Command(

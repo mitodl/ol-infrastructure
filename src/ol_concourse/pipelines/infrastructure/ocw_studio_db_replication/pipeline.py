@@ -62,7 +62,10 @@ def db_replication_pipeline() -> Pipeline:
                         path="/bin/sh",
                         args=[
                             "-c",
-                            "pg_restore -v --clean --no-privileges --no-owner -d ((destination.database)) ./dump/db.dump",  # noqa: E501
+                            (
+                                "pg_restore -v --clean --no-privileges --no-owner -d"
+                                " ((destination.database)) ./dump/db.dump"
+                            ),
                         ],
                     ),
                 ),

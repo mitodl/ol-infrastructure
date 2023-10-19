@@ -43,19 +43,16 @@ def build_user_data(consul_dc, challenge_url, service_hash_bucket_fqdn):
             },
             {
                 "path": "/etc/default/traefik",
-                "content": textwrap.dedent(
-                    f"""\
+                "content": textwrap.dedent(f"""\
             DOMAIN={vector_log_proxy_config.require('web_host_domain')}
             FASTLY_SERVICE_HASH_BUCKET_FQDN={service_hash_bucket_fqdn}
             FASTLY_SERVICE_HASH_BUCKET_CHALLENGE_URL="{challenge_url}"
-            """
-                ),
+            """),
                 "owner": "root:root",
             },
             {
                 "path": "/etc/default/vector",
-                "content": textwrap.dedent(
-                    f"""\
+                "content": textwrap.dedent(f"""\
             ENVIRONMENT={consul_dc}
             APPLICATION=vector-log-proxy
             SERVICE=vector-log-proxy
@@ -69,8 +66,7 @@ def build_user_data(consul_dc, challenge_url, service_hash_bucket_fqdn):
             FASTLY_PROXY_PASSWORD={fastly_proxy_credentials['password']}
             FASTLY_PROXY_USERNAME={fastly_proxy_credentials['username']}
             FASTLY_CHALLENGE_REDIRECT_URL={challenge_url}
-            """
-                ),
+            """),
                 "owner": "root:root",
             },
         ]
@@ -238,14 +234,20 @@ vector_log_proxy_security_group = ec2.SecurityGroup(
             from_port=HEROKU_LOG_PROXY_PORT,
             to_port=HEROKU_LOG_PROXY_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the vector-log-proxy server on port {HEROKU_LOG_PROXY_PORT}",  # noqa: E501
+            description=(
+                "Allow traffic to the vector-log-proxy server on port"
+                f" {HEROKU_LOG_PROXY_PORT}"
+            ),
         ),
         ec2.SecurityGroupIngressArgs(
             protocol="tcp",
             from_port=FASTLY_LOG_PROXY_PORT,
             to_port=FASTLY_LOG_PROXY_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the vector-log-proxy server on port {FASTLY_LOG_PROXY_PORT}",  # noqa: E501
+            description=(
+                "Allow traffic to the vector-log-proxy server on port"
+                f" {FASTLY_LOG_PROXY_PORT}"
+            ),
         ),
     ],
     egress=default_egress_args,
@@ -302,7 +304,7 @@ export(
 LOAD_BALANCER_NAME_MAX_LENGTH = 32
 vector_log_proxy_lb = lb.LoadBalancer(
     "vector-log-proxy-load-balancer",
-    name=f"vector-log-proxy-alb-{stack_info.env_prefix[:3]}-{stack_info.env_suffix[:2]}"[  # noqa: E501
+    name=f"vector-log-proxy-alb-{stack_info.env_prefix[:3]}-{stack_info.env_suffix[:2]}"[
         :LOAD_BALANCER_NAME_MAX_LENGTH
     ],
     ip_address_type="dualstack",
@@ -455,7 +457,7 @@ autoscaling.Group(
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
             min_healthy_percentage=50
         ),
-        triggers=["tags"],
+        triggers=["tag"],
     ),
     target_group_arns=[
         heroku_log_proxy_lb_target_group.arn,

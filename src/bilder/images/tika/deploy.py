@@ -78,13 +78,17 @@ vault_config = VaultAgentConfig(
     ),
     template=[
         VaultTemplate(
-            contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-            "{{ printf .Data.key }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+                "{{ printf .Data.key }}{{ end }}"
+            ),
             destination=Path("/etc/traefik/odl_wildcard.key"),
         ),
         VaultTemplate(
-            contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-            "{{ printf .Data.value }}{{ end }}",
+            contents=(
+                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+                "{{ printf .Data.value }}{{ end }}"
+            ),
             destination=Path("/etc/traefik/odl_wildcard.cert"),
         ),
     ],
@@ -100,29 +104,20 @@ install_hashicorp_products(hashicorp_products)
 
 # Configure and install traefik
 traefik_static_config = traefik_static.TraefikStaticConfig(
-    log=traefik_static.Log(format="json"),
+    log=traefik_static.Log(
+        level="DEBUG", format="json", filePath="/var/log/traefik_log"
+    ),
     providers=traefik_static.Providers(docker=traefik_static.Docker()),
-    certificates_resolvers={
-        "letsencrypt_resolver": traefik_static.CertificatesResolvers(
-            acme=traefik_static.Acme(
-                email="odl-devops@mit.edu",
-                storage="/etc/traefik/acme.json",
-                dns_challenge=traefik_static.DnsChallenge(provider="route53"),
-                caServer="https://acme-v02.api.letsencrypt.org/directory",
-            )
-        ),
-        "letsencrypt_staging_resolver": traefik_static.CertificatesResolvers(
-            acme=traefik_static.Acme(
-                email="odl-devops@mit.edu",
-                storage="/etc/traefik/acme.json",
-                dns_challenge=traefik_static.DnsChallenge(provider="route53"),
-                caServer="https://acme-staging-v02.api.letsencrypt.org/directory",
-            )
-        ),
-    },
     entry_points={
         "https": traefik_static.EntryPoints(address=":443"),
     },
+    experimental=traefik_static.Experimental(
+        plugins={
+            "checkheadersplugin": traefik_static.Plugins(
+                moduleName="github.com/dkijkuit/checkheadersplugin", version="v0.2.6"
+            )
+        }
+    ),
 )
 traefik_config = TraefikConfig(
     static_configuration=traefik_static_config, version=VERSIONS["traefik"]

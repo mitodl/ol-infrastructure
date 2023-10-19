@@ -155,8 +155,9 @@ dagster_s3_permissions: list[dict[str, Union[str, list[str]]]] = [
         ],
         "Resource": [
             f"arn:aws:s3:::{bucket_name}" for bucket_name in s3_tracking_logs_buckets
-        ]
-        + [f"arn:aws:s3:::{bucket_name}/*" for bucket_name in s3_tracking_logs_buckets],
+        ] + [
+            f"arn:aws:s3:::{bucket_name}/*" for bucket_name in s3_tracking_logs_buckets
+        ],
     },
 ]
 
@@ -198,13 +199,24 @@ athena_permissions: list[dict[str, Union[str, list[str]]]] = [
     },
 ]
 
+edxorg_program_credentials_role_assumption = {
+    "Effect": "Allow",
+    "Action": ["sts:AssumeRole"],
+    "Resource": "arn:aws:iam::708756755355:role/mit-s3-edx-program-reports-access",
+}
+
 dagster_iam_permissions = {
     "Version": "2012-10-17",
-    "Statement": dagster_s3_permissions + athena_permissions,
+    "Statement": [
+        *dagster_s3_permissions,
+        *athena_permissions,
+        edxorg_program_credentials_role_assumption,
+    ],
 }
 
 parliament_config: dict[str, Any] = {
-    "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []}
+    "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []},
+    "CREDENTIALS_EXPOSURE": {"ignore_locations": [{"actions": "sts:assumeRole"}]},
 }
 
 dagster_runtime_bucket = s3.Bucket(
@@ -305,6 +317,9 @@ dagster_db_security_group = ec2.SecurityGroup(
     vpc_id=data_vpc["id"],
 )
 
+rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["monitoring_profile_name"] = "disabled"
+
 dagster_db_config = OLPostgresDBConfig(
     instance_name=f"ol-etl-db-{stack_info.env_suffix}",
     password=get_config("dagster:db_password"),
@@ -312,7 +327,7 @@ dagster_db_config = OLPostgresDBConfig(
     security_groups=[dagster_db_security_group],
     tags=aws_config.tags,
     db_name="dagster",
-    **defaults(stack_info)["rds"],
+    **rds_defaults,
 )
 dagster_db = OLAmazonDB(dagster_db_config)
 
@@ -515,7 +530,8 @@ dagster_instance = ec2.Instance(
     subnet_id=data_vpc["subnet_ids"][1],
     key_name="oldevops",
     root_block_device=ec2.InstanceRootBlockDeviceArgs(
-        volume_type=DiskTypes.ssd, volume_size=100
+        volume_type=DiskTypes.ssd,
+        volume_size=get_config("dagster:disk_size_gb") or 100,
     ),
     vpc_security_group_ids=[
         data_vpc["security_groups"]["default"],
@@ -544,8 +560,7 @@ dagster_instance = ec2.Instance(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
+                                "content": textwrap.dedent(f"""\
                             ENVIRONMENT={consul_dc}
                             APPLICATION=dagster
                             SERVICE=data-platform
@@ -554,13 +569,14 @@ dagster_instance = ec2.Instance(
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            """
-                                ),
+                            """),
                                 "owner": "root:root",
                             },
                             {
                                 "path": "/etc/default/consul-template",
-                                "content": f"DAGSTER_ENVIRONMENT={stack_info.env_suffix}",  # noqa: E501
+                                "content": (
+                                    f"DAGSTER_ENVIRONMENT={stack_info.env_suffix}"
+                                ),
                             },
                         ]
                     },

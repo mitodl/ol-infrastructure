@@ -55,7 +55,11 @@ def custodian_pipeline() -> Pipeline:
                                 path="sh",
                                 args=[
                                     "-exc",
-                                    f"custodian run --region 'us-east-1' --output-dir '.' '{cloud_custodian_release.name}/cloud_custodian/{filename}'",  # noqa: E501
+                                    (
+                                        "custodian run --region 'us-east-1'"
+                                        " --output-dir '.'"
+                                        f" '{cloud_custodian_release.name}/cloud_custodian/{filename}'"  # noqa: E501
+                                    ),
                                 ],
                             ),
                         ),

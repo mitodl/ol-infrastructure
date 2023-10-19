@@ -52,7 +52,7 @@ class InstanceTypes(str, Enum):
     high_mem_4xlarge = "r6a.4xlarge"
 
     @classmethod
-    def dereference(cls, instance_specifier):
+    def dereference(cls, instance_specifier) -> str:
         try:
             instance_type = cls[instance_specifier].value
         except KeyError:

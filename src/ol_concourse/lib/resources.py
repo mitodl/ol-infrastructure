@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from ol_concourse.lib.models.pipeline import Identifier, RegistryImage, Resource
 from ol_concourse.lib.models.resource import Git
@@ -40,25 +40,48 @@ def ssh_git_repo(
     )
 
 
-def github_release(name: Identifier, owner: str, repository: str) -> Resource:
+def github_release(  # noqa: PLR0913
+    name: Identifier,
+    owner: str,
+    repository: str,
+    github_token: str = "((github.public_repo_access_token))",  # noqa: S107
+    tag_filter: Optional[str] = None,
+    order_by: Optional[Literal["time", "version"]] = None,
+) -> Resource:
     """Generate a github-release resource for the given owner/repository.
 
-    :param name: The name of the resource. This will get used across subsequent
+    :param name: The name of the resource.  This will get used across subsequent
         pipeline steps that reference this resource.
-    :type name: Identifier
     :param owner: The owner of the repository (e.g. the GitHub user or organization)
-    :type owner: str
     :param repository: The name of the repository as it appears in GitHub
-    :type repository: str
+    :param github_token: A personal access token with `public_repo` scope to increase
+        the rate limit for checking versions.
+    :param tag_filter: A regular expression used to filter the repository tags to
+        include in the version results.
+    :param order_by: Indicate whether to order by version number or time.  Primarily
+        useful when in combination with `tag_filter`.
+
     :returns: A configured Concourse resource object that can be used in a pipeline.
+
     :rtype: Resource
     """
+    release_config = {
+        "repository": repository,
+        "owner": owner,
+        "release": True,
+    }
+    if tag_filter:
+        release_config["tag_filter"] = tag_filter
+    if github_token:
+        release_config["access_token"] = github_token
+    if order_by:
+        release_config["order_by"] = order_by
     return Resource(
         name=name,
         type="github-release",
         icon="github",
         check_every="24h",
-        source={"repository": repository, "owner": owner, "release": True},
+        source=release_config,
     )
 
 

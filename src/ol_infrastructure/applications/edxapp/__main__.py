@@ -26,6 +26,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_MYSQL_PORT,
     DEFAULT_REDIS_PORT,
     IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
+    ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
@@ -58,13 +59,17 @@ from ol_infrastructure.lib.aws.ec2_helper import (
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
 from ol_infrastructure.lib.consul import get_consul_provider
-from ol_infrastructure.lib.fastly import get_fastly_provider
+from ol_infrastructure.lib.fastly import (
+    build_fastly_log_format_string,
+    get_fastly_provider,
+)
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import mysql_role_statements, setup_vault_provider
 
 stack_info = parse_stack()
+
 edxapp_config = Config("edxapp")
 if Config("vault").get("address"):
     setup_vault_provider()
@@ -89,6 +94,10 @@ consul_stack = StackReference(
 )
 kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+monitoring_stack = StackReference("infrastructure.monitoring")
+vector_log_proxy_stack = StackReference(
+    f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
+)
 
 #############
 # Variables #
@@ -206,7 +215,9 @@ edxapp_storage_bucket = s3.Bucket(
                     "Effect": "Allow",
                     "Principal": "*",
                     "Action": "s3:GetObject",
-                    "Resource": f"arn:aws:s3:::{storage_bucket_name}/media/video-images/*",  # noqa: E501
+                    "Resource": (
+                        f"arn:aws:s3:::{storage_bucket_name}/media/video-images/*"
+                    ),
                 }
             ],
         },
@@ -238,7 +249,7 @@ edxapp_tracking_bucket = s3.Bucket(
     acl="private",
     server_side_encryption_configuration=s3.BucketServerSideEncryptionConfigurationArgs(
         rule=s3.BucketServerSideEncryptionConfigurationRuleArgs(
-            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(  # noqa: E501
+            apply_server_side_encryption_by_default=s3.BucketServerSideEncryptionConfigurationRuleApplyServerSideEncryptionByDefaultArgs(
                 sse_algorithm="aws:kms",
                 kms_master_key_id=kms_s3_key["id"],
             ),
@@ -307,7 +318,7 @@ edxapp_policy_document = {
             "Action": ["ses:SendEmail", "ses:SendRawEmail"],
             "Resource": [
                 "arn:*:ses:*:*:identity/*mit.edu",
-                f"arn:aws:ses:*:*:configuration-set/edxapp-{stack_info.env_prefix}-{stack_info.env_suffix}",  # noqa: E501
+                f"arn:aws:ses:*:*:configuration-set/edxapp-{stack_info.env_prefix}-{stack_info.env_suffix}",
             ],
         },
         {
@@ -376,8 +387,9 @@ edxapp_security_group = ec2.SecurityGroup(
                 edxapp_vpc["cidr"],
             ],
             protocol="tcp",
-            description="Allow traffic to the Xqueue process running on the edxapp "
-            "instances",
+            description=(
+                "Allow traffic to the Xqueue process running on the edxapp instances"
+            ),
         ),
     ],
     egress=default_egress_args,
@@ -419,7 +431,10 @@ edxapp_db_security_group = ec2.SecurityGroup(
 edxapp_vault_mount = vault.Mount(
     "edxapp-vault-generic-secrets-mount",
     path=f"secret-{stack_info.env_prefix}",
-    description="Static secrets storage for Open edX {stack_info.env_prefix} applications and services",  # noqa: E501
+    description=(
+        "Static secrets storage for Open edX {stack_info.env_prefix} applications and"
+        " services"
+    ),
     type="kv",
 )
 edxapp_secrets = vault.generic.Secret(
@@ -501,7 +516,7 @@ edxapp_notes_iam_role = iam.Role(
         }
     ),
     name_prefix=f"edx-notes-role-{env_name}-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
-    path=f"/ol-applications/edx-notes-api/{stack_info.env_prefix}/{stack_info.env_suffix}/",  # noqa: E501
+    path=f"/ol-applications/edx-notes-api/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     tags=aws_config.merged_tags({"Name": f"{env_name}-edx-notes-api-role"}),
 )
 edxapp_notes_vault_auth_role = vault.aws.AuthBackendRole(
@@ -880,13 +895,15 @@ waffle_flags_yaml_content = yaml.safe_dump(
 # Manage Consul Data #
 ######################
 consul_kv_data = {
-    "enable_notes": "true"
-    if edxapp_config.get_bool("enable_notes")
-    else "false",  # intended quoted boolean
+    "enable_notes": (
+        "true" if edxapp_config.get_bool("enable_notes") else "false"
+    ),  # intended quoted boolean
     "google-analytics-id": edxapp_config.require("google_analytics_id"),
     "lms-domain": edxapp_domains["lms"],
+    "marketing-domain": edxapp_config.get("marketing_domain") or "",
     "preview-domain": edxapp_domains["preview"],
     "rds-host": edxapp_db.db_instance.address,
+    "proctortrack-base-url": edxapp_config.get("proctortrack_url") or "",
     "s3-course-bucket": course_bucket_name,
     "s3-grades-bucket": grades_bucket_name,
     "s3-storage-bucket": storage_bucket_name,
@@ -1089,29 +1106,25 @@ def cloud_init_user_data_func(
             # There should be something that triggers this only if framework = docker
             {
                 "path": "/etc/docker/compose/.env_caddy",
-                "content": textwrap.dedent(
-                    f"""\
+                "content": textwrap.dedent(f"""\
                     EDXAPP_LMS_URL={edxapp_domains["lms"]}
                     EDXAPP_LMS_PREVIEW_URL={edxapp_domains["preview"]}
                     EDXAPP_CMS_URL={edxapp_domains["studio"]}
-                    """
-                ),
+                    """),
                 "owner": "root:root",
                 "permissions": "0664",
             },
             {
                 "path": "/etc/default/vector",
-                "content": textwrap.dedent(
-                    f"""\
+                "content": textwrap.dedent(f"""\
                     ENVIRONMENT={consul_env_name}
-                    APPLICATION=edxpp
+                    APPLICATION=edxapp
                     SERVICE=openedx
                     VECTOR_CONFIG_DIR=/etc/vector/
                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                    """
-                ),
+                    """),
                 "owner": "root:root",
             },
             {
@@ -1163,7 +1176,7 @@ web_launch_config = ec2.LaunchTemplate(
             ),
         ),
     ],
-    instance_type=InstanceTypes[web_instance_type].value,
+    instance_type=InstanceTypes.dereference(web_instance_type),
     key_name=SSH_ACCESS_KEY_NAME,
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
@@ -1194,7 +1207,7 @@ web_asg = autoscaling.Group(
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
             min_healthy_percentage=50
         ),
-        triggers=["tags"],
+        triggers=["tag"],
     ),
     target_group_arns=[lms_web_lb_target_group.arn, studio_web_lb_target_group.arn],
     tags=[
@@ -1272,7 +1285,10 @@ web_alb_metric_alarm = cloudwatch.MetricAlarm(
         ),
     },
     datapoints_to_alarm=5,
-    alarm_description="Time elapsed after the request leaves the load balancer until a response from the target is received",  # noqa: E501
+    alarm_description=(
+        "Time elapsed after the request leaves the load balancer until a response from"
+        " the target is received"
+    ),
     alarm_actions=[web_asg_scale_up_policy.arn],
     ok_actions=[web_asg_scale_down_policy.arn],
     tags=aws_config.tags,
@@ -1305,7 +1321,7 @@ worker_launch_config = ec2.LaunchTemplate(
         edxapp_security_group.id,
         consul_security_groups["consul_agent"],
     ],
-    instance_type=InstanceTypes[worker_instance_type].value,
+    instance_type=InstanceTypes.dereference(worker_instance_type),
     key_name=SSH_ACCESS_KEY_NAME,
     tag_specifications=[
         ec2.LaunchTemplateTagSpecificationArgs(
@@ -1352,6 +1368,26 @@ worker_asg = autoscaling.Group(
 ########################
 # Fastly CDN Managment #
 ########################
+
+vector_log_proxy_secrets = read_yaml_secrets(
+    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
+)
+fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
+encoded_fastly_proxy_credentials = base64.b64encode(
+    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}"
+    .encode()
+).decode("utf8")
+
+vector_log_proxy_fqdn = vector_log_proxy_stack.require_output("vector_log_proxy")[
+    "fqdn"
+]
+
+fastly_access_logging_bucket = monitoring_stack.require_output(
+    "fastly_access_logging_bucket"
+)
+fastly_access_logging_iam_role = monitoring_stack.require_output(
+    "fastly_access_logging_iam_role"
+)
 
 mfe_regex = "^/({})/".format("|".join(edxapp_mfe_paths))
 edxapp_fastly_service = fastly.ServiceVcl(
@@ -1444,61 +1480,86 @@ edxapp_fastly_service = fastly.ServiceVcl(
     ],
     snippets=[
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(
-                """\
+            content=textwrap.dedent("""\
                 if (table.contains(marketing_redirects, req.url.path)) {
                   error 618 "redirect";
-                }"""
-            ),
+                }"""),
             name="Interrupt Redirected Requests",
             type="recv",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(
-                f"""\
+            content=textwrap.dedent(f"""\
                 if (req.url.path ~ "{mfe_regex}") {{
                   set req.url = req.url.path;
                   unset req.http.Cookie;
-                }}"""
-            ),
+                }}"""),
             name="Strip headers to S3 backend",
             type="recv",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(
-                f"""\
+            content=textwrap.dedent(f"""\
                 if (beresp.status == 404 && req.url.path ~ "{mfe_regex}") {{
                   error 600 "### Custom Response";
-                }}"""
-            ),
+                }}"""),
             name="Manage 404 On S3 Origin for MFE",
             type="fetch",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(
-                f"""\
+            content=textwrap.dedent(f"""\
                 declare local var.mfe_path STRING;
                 if (obj.status == 600) {{
                   set var.mfe_path = regsub(req.url.path, "{mfe_regex}.*", "\\1");
                   set req.url = "/" + var.mfe_path + "/index.html";
                   restart;
-                }}"""
-            ),
+                }}"""),
             name="Fetch site index for MFE custom error",
             priority=120,
             type="error",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(
-                """\
+            content=textwrap.dedent("""\
                 if (obj.status == 618 && obj.response == "redirect") {
                   set obj.status = 302;
                   set obj.http.Location = table.lookup(marketing_redirects, req.url.path) + if (req.url.qs, "?" req.url.qs, "");
                   return (deliver);
-                }"""  # noqa: E501
-            ),
+                }"""),  # noqa: E501
             name="Route Redirect Requests",
             type="error",
+        ),
+    ],
+    logging_https=[
+        fastly.ServiceVclLoggingHttpArgs(
+            url=Output.all(fqdn=vector_log_proxy_fqdn).apply(
+                lambda fqdn: "https://{fqdn}".format(**fqdn)
+            ),
+            name=f"fastly-{env_name}-https-logging-args",
+            content_type="application/json",
+            format=consul_stack.require_output("datacenter").apply(
+                lambda dc: build_fastly_log_format_string(
+                    additional_static_fields={
+                        "application": "edxapp",
+                        "environment": dc,
+                    }
+                )
+            ),
+            format_version=2,
+            header_name="Authorization",
+            header_value=f"Basic {encoded_fastly_proxy_credentials}",
+            json_format="0",
+            method="POST",
+            request_max_bytes=ONE_MEGABYTE_BYTE,
+        )
+    ],
+    logging_s3s=[
+        fastly.ServiceVclLoggingS3Args(
+            bucket_name=fastly_access_logging_bucket["bucket_name"],
+            name=f"fastly-{env_name}-s3-logging-args",
+            format=build_fastly_log_format_string(additional_static_fields={}),
+            gzip_level=3,
+            message_type="blank",
+            path=f"/edxapp/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+            redundancy="standard",
+            s3_iam_role=fastly_access_logging_iam_role["role_arn"],
         ),
     ],
     opts=fastly_provider,

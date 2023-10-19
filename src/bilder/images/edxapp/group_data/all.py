@@ -33,7 +33,7 @@ edx_plugins_added = {
         "django-redis",  # Support for Redis caching in Django
         "edx-sga",
         "edx-sysadmin",
-        "git+https://github.com/raccoongang/xblock-pdf.git@8d63047c53bc8fdd84fa7b0ec577bb0a729c215f#egg=xblock-pdf",  # noqa: E501
+        "git+https://github.com/raccoongang/xblock-pdf.git@8d63047c53bc8fdd84fa7b0ec577bb0a729c215f#egg=xblock-pdf",
         "ol-openedx-logging==0.1.0",
         "ol-openedx-sentry",
         "ol-openedx-course-export",
@@ -58,7 +58,7 @@ edx_plugins_added = {
         "django-redis",  # Support for Redis caching in Django
         "edx-sga",
         "edx-sysadmin",
-        "git+https://github.com/raccoongang/xblock-pdf.git@8d63047c53bc8fdd84fa7b0ec577bb0a729c215f#egg=xblock-pdf",  # noqa: E501
+        "git+https://github.com/raccoongang/xblock-pdf.git@8d63047c53bc8fdd84fa7b0ec577bb0a729c215f#egg=xblock-pdf",
         "ol-openedx-logging==0.1.0",
         "ol-openedx-sentry",
         "ol-openedx-course-export",

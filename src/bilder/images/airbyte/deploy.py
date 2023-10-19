@@ -98,12 +98,35 @@ traefik_static_config = traefik_static.TraefikStaticConfig(
     entry_points={
         "https": traefik_static.EntryPoints(address=":443"),
     },
+    servers_transport=traefik_static.ServersTransport(
+        forwardingTimeouts=traefik_static.ForwardingTimeouts(idleConnTimeout="300s")
+    ),
 )
 traefik_config = TraefikConfig(
     static_configuration=traefik_static_config, version=VERSIONS["traefik"]
 )
 traefik_conf_directory = traefik_config.configuration_directory
 configure_traefik(traefik_config)
+
+
+# Preload some docker images. This will accelerate the first startup
+docker_repo_names = [
+    "airbyte/airbyte-api-server",
+    "airbyte/worker",
+    "airbyte/webapp",
+    "airbyte/temporal",
+    "airbyte/server",
+    "airbyte/connector-builder-server",
+    "airbyte/cron",
+    "airbyte/init",
+    "airbyte/bootloader",
+]
+for repo_name in docker_repo_names:
+    server.shell(
+        name=f"Preload {repo_name}:{VERSIONS['airbyte']}",
+        commands=[f"/usr/bin/docker pull {repo_name}:{VERSIONS['airbyte']}"],
+    )
+
 
 files.put(
     name="Place the airbyte docker-compose.yaml file",
@@ -127,7 +150,7 @@ files.directory(
 
 files.download(
     name="Retrieve Temporal dynamicconfig file",
-    src="https://raw.githubusercontent.com/airbytehq/airbyte-platform/main/temporal/dynamicconfig/development.yaml",  # noqa: E501
+    src="https://raw.githubusercontent.com/airbytehq/airbyte-platform/main/temporal/dynamicconfig/development.yaml",
     dest=str(
         DOCKER_COMPOSE_DIRECTORY.joinpath(
             "temporal", "dynamicconfig", "development.yaml"
@@ -148,15 +171,19 @@ env_template_file = Path("/etc/consul-template/.env.tmpl")
 consul_templates_directory = Path("/etc/consul-template")
 consul_templates = [
     ConsulTemplateTemplate(
-        contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-        "{{ printf .Data.key }}{{ end }}",
+        contents=(
+            '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+            "{{ printf .Data.key }}{{ end }}"
+        ),
         destination=Path(certificate_key_file),
         user="root",
         group="root",
     ),
     ConsulTemplateTemplate(
-        contents='{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-        "{{ printf .Data.value }}{{ end }}",
+        contents=(
+            '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
+            "{{ printf .Data.value }}{{ end }}"
+        ),
         destination=Path(certificate_file),
         user="root",
         group="root",

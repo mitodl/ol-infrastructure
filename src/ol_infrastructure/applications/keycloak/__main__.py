@@ -127,7 +127,9 @@ keycloak_server_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_HTTPS_PORT,
             to_port=DEFAULT_HTTPS_PORT,
             cidr_blocks=["0.0.0.0/0"],
-            description=f"Allow traffic to the keycloak server on port {DEFAULT_HTTPS_PORT}",  # noqa: E501
+            description=(
+                f"Allow traffic to the keycloak server on port {DEFAULT_HTTPS_PORT}"
+            ),
         ),
         # https://infinispan.org/docs/stable/titles/security/security.html#ports_protocols
         ec2.SecurityGroupIngressArgs(
@@ -135,14 +137,20 @@ keycloak_server_security_group = ec2.SecurityGroup(
             from_port=7800,
             to_port=7800,
             protocol="tcp",
-            description="Allow all keycloak servers to talk to all other keycloak servers on port 7800 tcp for IPSN clustering.",  # noqa: E501
+            description=(
+                "Allow all keycloak servers to talk to all other keycloak servers on"
+                " port 7800 tcp for IPSN clustering."
+            ),
         ),
         ec2.SecurityGroupIngressArgs(
             self=True,
             from_port=7800,
             to_port=7800,
             protocol="udp",
-            description="Allow all keycloak servers to talk to all other keycloak servers on port 7800 udp for IPSN clustering.",  # noqa: E501
+            description=(
+                "Allow all keycloak servers to talk to all other keycloak servers on"
+                " port 7800 udp for IPSN clustering."
+            ),
         ),
     ],
     egress=default_egress_args,
@@ -166,7 +174,9 @@ keycloak_database_security_group = ec2.SecurityGroup(
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
-            description=f"Access to Postgres from keycloak nodes on {DEFAULT_POSTGRES_PORT}",  # noqa: E501
+            description=(
+                f"Access to Postgres from keycloak nodes on {DEFAULT_POSTGRES_PORT}"
+            ),
         ),
     ],
     vpc_id=target_vpc_id,
@@ -194,7 +204,6 @@ keycloak_db = OLAmazonDB(keycloak_db_config)
 
 db_address = keycloak_db.db_instance.address
 db_port = keycloak_db.db_instance.port
-db_name = keycloak_db.db_instance.name
 
 keycloak_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=keycloak_db_config.db_name,
@@ -330,8 +339,7 @@ keycloak_lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
+                                "content": textwrap.dedent(f"""\
                             ENVIRONMENT={consul_dc}
                             APPLICATION=keycloak
                             SERVICE=sso
@@ -340,8 +348,7 @@ keycloak_lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            """
-                                ),
+                            """),
                                 "owner": "root:root",
                             },
                         ],
@@ -431,7 +438,7 @@ keycloak_server_vault_mount = vault.Mount(
     path="secret-keycloak",
     type="kv-v2",
     options={"version": 2},
-    description="Storage of configuration credentials and secrets used by keycloak",  # noqa: E501
+    description="Storage of configuration credentials and secrets used by keycloak",
     opts=ResourceOptions(delete_before_replace=True),
 )
 

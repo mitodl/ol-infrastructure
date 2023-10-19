@@ -40,14 +40,17 @@ ocw_zone = dns_stack.require_output("ocw")
 vector_log_proxy_stack = StackReference(
     f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
 )
-vector_log_proxy_fqdn = vector_log_proxy_stack.require_output("vector_log_proxy")
+vector_log_proxy_fqdn = vector_log_proxy_stack.require_output("vector_log_proxy")[
+    "fqdn"
+]
 
 vector_log_proxy_secrets = read_yaml_secrets(
     Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
 )
 fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
 encoded_fastly_proxy_credentials = base64.b64encode(
-    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
+    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}"
+    .encode()
 ).decode("utf8")
 
 monitoring_stack = StackReference("infrastructure.monitoring")
@@ -124,7 +127,7 @@ draft_backup_bucket = s3.Bucket(
     lifecycle_rules=[
         s3.BucketLifecycleRuleArgs(
             enabled=True,
-            noncurrent_version_expiration=s3.BucketLifecycleRuleNoncurrentVersionExpirationArgs(  # noqa: E501
+            noncurrent_version_expiration=s3.BucketLifecycleRuleNoncurrentVersionExpirationArgs(
                 days=90,
             ),
         )
@@ -201,7 +204,7 @@ live_backup_bucket = s3.Bucket(
     lifecycle_rules=[
         s3.BucketLifecycleRuleArgs(
             enabled=True,
-            noncurrent_version_expiration=s3.BucketLifecycleRuleNoncurrentVersionExpirationArgs(  # noqa: E501
+            noncurrent_version_expiration=s3.BucketLifecycleRuleNoncurrentVersionExpirationArgs(
                 days=90,
             ),
         )
@@ -332,12 +335,17 @@ for purpose in ("draft", "live"):
             ),
             fastly.ServiceVclConditionArgs(
                 name="not course media or old akamai",
-                statement='req.url.path !~ "^/coursemedia" && req.url.path !~ "^/ans\\d+"',  # noqa: E501
+                statement=(
+                    'req.url.path !~ "^/coursemedia" && req.url.path !~ "^/ans\\d+"'
+                ),
                 type="REQUEST",
             ),
             fastly.ServiceVclConditionArgs(
                 name="is old Akamai file",
-                statement='req.url.path ~ "^/ans\\d+" && req.url.path !~ "/ans7870/21f/21f.027"',  # noqa: E501
+                statement=(
+                    'req.url.path ~ "^/ans\\d+" && req.url.path !~'
+                    ' "/ans7870/21f/21f.027"'
+                ),
                 type="REQUEST",
             ),
         ],
@@ -493,7 +501,7 @@ for purpose in ("draft", "live"):
         ],
         logging_https=[
             fastly.ServiceVclLoggingHttpArgs(
-                url=Output.all(fqdn=vector_log_proxy_fqdn["fqdn"]).apply(
+                url=Output.all(fqdn=vector_log_proxy_fqdn).apply(
                     lambda fqdn: "https://{fqdn}".format(**fqdn)
                 ),
                 name=f"ocw-{purpose}-{stack_info.env_suffix}-https-logging-args",
@@ -502,6 +510,7 @@ for purpose in ("draft", "live"):
                     additional_static_fields={
                         "application": "open-courseware",
                         "environment": f"ocw-{stack_info.env_suffix}",
+                        # service will be applied by the vector-log-proxy
                     }
                 ),
                 format_version=2,

@@ -1,23 +1,17 @@
 {
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    ":automergeMinor",
-    ":rebaseStalePrs",
-    ":separateMajorReleases",
-    "config:base"
+    "local>mitodl/.github:renovate-config"
   ],
-  "schedule": [
-    "every weekend"
-  ],
-  "timezone": "US/Eastern",
-  "lockFileMaintenance": {
-    "enabled": true
-  },
   "packageRules": [
     {
       "matchPackagePrefixes": [
-        "pulumi-"
+        "pulumi"
       ],
       "groupName": "pulumi-plugins"
     }
-  ]
+  ],
+  "pip_requirements": {
+    "fileMatch": "dockerfiles/openedx-edxapp/pip_package_lists/.*?/.*.txt"
+  }
 }

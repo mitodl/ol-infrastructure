@@ -255,7 +255,7 @@ def pulumi_job(  # noqa: PLR0913
                     inputs=[Input(name=pulumi_code.name)],
                     outputs=[aws_creds_path],
                     run=Command(
-                        path=f"{pulumi_code.name}/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"  # noqa: E501
+                        path=f"{pulumi_code.name}/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh"
                     ),
                 ),
             ),
@@ -265,7 +265,9 @@ def pulumi_job(  # noqa: PLR0913
                 params={
                     "env_os": {
                         "AWS_DEFAULT_REGION": "us-east-1",
-                        "PYTHONPATH": f"/usr/lib/:/tmp/build/put/{pulumi_code.name}/src/",  # noqa: E501
+                        "PYTHONPATH": (
+                            f"/usr/lib/:/tmp/build/put/{pulumi_code.name}/src/"
+                        ),
                     },
                     "stack_name": stack_name,
                 },

@@ -63,12 +63,33 @@ ocw_studio_legacy_markdown_bucket = s3.Bucket(
 
 # Bucket used to store file uploads from ocw-studio app.
 ocw_storage_bucket_name = f"ol-ocw-studio-app-{stack_info.env_suffix}"
-ocw_storage_bucket = s3.Bucket(
+ocw_storage_bucket = s3.BucketV2(
     f"ol-ocw-studio-app-{stack_info.env_suffix}",
     bucket=ocw_storage_bucket_name,
-    versioning=s3.BucketVersioningArgs(
-        enabled=True,
+    tags=aws_config.tags,
+)
+ocw_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol-ocw-studio-app-ownership-controls",
+    bucket=ocw_storage_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
     ),
+)
+s3.BucketVersioningV2(
+    "ol-ocw-studio-app-bucket-versioning",
+    bucket=ocw_storage_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+ocw_storage_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-ocw-studio-app-bucket-public-access-controls",
+    bucket=ocw_storage_bucket.id,
+    block_public_policy=False,
+)
+s3.BucketPolicy(
+    "ol-ocw-studio-app-bucket-policy",
+    bucket=ocw_storage_bucket.id,
     policy=json.dumps(
         {
             "Version": "2008-10-17",
@@ -82,14 +103,21 @@ ocw_storage_bucket = s3.Bucket(
             ],
         }
     ),
-    tags=aws_config.tags,
+    opts=ResourceOptions(
+        depends_on=[
+            ocw_storage_bucket_public_access,
+            ocw_storage_bucket_ownership_controls,
+        ]
+    ),
 )
 
 
 ocw_studio_iam_policy = iam.Policy(
     f"ocw-studio-{stack_info.env_suffix}-policy",
-    description="AWS access controls for the OCW Studio application in the "
-    f"{stack_info.name} environment",
+    description=(
+        "AWS access controls for the OCW Studio application in the "
+        f"{stack_info.name} environment"
+    ),
     path=f"/ol-applications/ocw-studio/{stack_info.env_suffix}/",
     name_prefix="aws-permissions-",
     policy=lint_iam_policy(
@@ -264,7 +292,9 @@ ocw_studio_db = OLAmazonDB(ocw_studio_db_config)
 
 ocw_studio_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=ocw_studio_db_config.db_name,
-    mount_point=f"{ocw_studio_db_config.engine}-ocw-studio-applications-{stack_info.env_suffix}",  # noqa: E501
+    mount_point=(
+        f"{ocw_studio_db_config.engine}-ocw-studio-applications-{stack_info.env_suffix}"
+    ),
     db_admin_username=ocw_studio_db_config.username,
     db_admin_password=ocw_studio_db_config.password.get_secret_value(),
     db_host=ocw_studio_db.db_instance.address,
