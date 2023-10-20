@@ -282,7 +282,7 @@ for openid_clients in keycloak_config.get_object("openid_clients"):
 ol_touchstone_first_login_flow = keycloak.authentication.Flow(
     "ol-touchstone-first-login-flow",
     realm_id=ol_apps_realm.id,
-    alias="first-login-flow",
+    alias="ol-first-login-flow",
     opts=resource_options,
 )
 ol_touchstone_first_login_flow_review_profile = keycloak.authentication.Execution(
@@ -466,7 +466,7 @@ if stack_info.env_suffix in ["qa", "rc"]:
         realm=ol_apps_realm.id,
         alias="fake-touchstone",
         display_name="Fake Touchstone",
-        entity_id="http://www.okta.com/exkcta3wbyYMdAMAP5d7",
+        entity_id=f"{keycloak_url}/realms/olapps",
         name_id_policy_format="Unspecified",
         force_authn=False,
         post_binding_response=True,
