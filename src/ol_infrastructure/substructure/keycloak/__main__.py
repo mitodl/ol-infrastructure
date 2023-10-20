@@ -413,7 +413,7 @@ if stack_info.env_suffix in ["qa", "rc"]:
         want_assertions_signed=False,
         gui_order="10",
         validate_signature=False,
-        hide_on_login_page=False,
+        hide_on_login_page=True,
         signing_certificate=okta_test_saml_certificate,
         name_id_policy_format="Email",
         want_assertions_encrypted=False,
