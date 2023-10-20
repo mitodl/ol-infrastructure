@@ -458,7 +458,7 @@ if stack_info.env_suffix != "production":
     )
     # Okta TEST SAML [END]
 
-if stack_info.env_suffix in ["qa", "rc"]:
+if stack_info.env_suffix == "qa":
     keycloak.CustomUserFederation(
         "ol-open-discussions-qa-user-migration-federation",
         cache_policy="DEFAULT",
