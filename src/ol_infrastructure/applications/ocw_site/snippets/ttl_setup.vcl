@@ -9,11 +9,11 @@ if (bereq.url.path ~ "^.*(main|common|www|course_v2|instructor_insights|fields|[
   set beresp.http.Cache-Control = "max-age=2629743";
  }
 
-if (bereq.urlpath ~ "^.*\/static_shared\/(images|fonts)\/[a-zA-Z0-9|-]+(\.subset)?\.[0-9a-f]+\.(png|svg|ttf|woff|woff2)") {
+if (bereq.url.path ~ "^.*\/static_shared\/(images|fonts)\/[a-zA-Z0-9|-]+(\.subset)?\.[0-9a-f]+\.(png|svg|ttf|woff|woff2)") {
   set beresp.ttl = 2629743s;  // one month
   set beresp.http.Cache-Control = "max-age=2629743";
 }
-else if (bereq.urlpath ~ "^.*\/static_shared\/(images|fonts)\/.*\.(png|svg|ttf|woff|woff2)") {
+else if (bereq.url.path ~ "^.*\/static_shared\/(images|fonts)\/.*\.(png|svg|ttf|woff|woff2)") {
   set beresp.ttl = 604800s;  // one week
   set beresp.http.Cache-Control = "max-age=604800";
 }
