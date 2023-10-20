@@ -397,7 +397,7 @@ if stack_info.env_suffix != "ci":
     # Touchstone SAML [END]
 
 if stack_info.env_suffix in ["qa", "rc"]:
-    # OKTA-DEV-QA [START]
+    # OKTA-DEV-QA [START] # noqa: ERA001
     ol_apps_okta_saml_identity_provider = keycloak.saml.IdentityProvider(
         "okta-test",
         realm=ol_apps_realm.id,
@@ -458,9 +458,9 @@ if stack_info.env_suffix in ["qa", "rc"]:
             opts=resource_options,
         ),
     )
-    # OKTA-DEV-QA [END]
+    # OKTA-DEV-QA [END] # noqa: ERA001
 
-    # OL-DEV-FAKE-TOUCHSTONE-QA [START]
+    # OL-DEV-FAKE-TOUCHSTONE-QA [START] # noqa: ERA001
     ol_apps_dev_fake_touchstone_qa_identity_provider = keycloak.saml.IdentityProvider(
         "fake-touchstone",
         realm=ol_apps_realm.id,
@@ -518,10 +518,10 @@ if stack_info.env_suffix in ["qa", "rc"]:
             opts=resource_options,
         ),
     )
-    # OL-DEV-FAKE-TOUCHSTONE-QA [END]
+    # OL-DEV-FAKE-TOUCHSTONE-QA [END] # noqa: ERA001
 
 if stack_info.env_suffix == "ci":
-    # OKTA-DEV-CI [START]
+    # OKTA-DEV-CI [START] # noqa: ERA001
     ol_apps_okta_saml_identity_provider = keycloak.saml.IdentityProvider(
         "okta-test",
         realm=ol_apps_realm.id,
@@ -582,9 +582,9 @@ if stack_info.env_suffix == "ci":
             opts=resource_options,
         ),
     )
-    # OKTA-DEV-CI [END]
+    # OKTA-DEV-CI [END] # noqa: ERA001
 
-    # OL-DEV-FAKE-TOUCHSTONE-CI [START]
+    # OL-DEV-FAKE-TOUCHSTONE-CI [START] # noqa: ERA001
     ol_apps_dev_fake_touchstone_ci_identity_provider = keycloak.saml.IdentityProvider(
         "fake-touchstone",
         realm=ol_apps_realm.id,
@@ -642,4 +642,4 @@ if stack_info.env_suffix == "ci":
             opts=resource_options,
         ),
     )
-    # OL-DEV-FAKE-TOUCHSTONE-CI [END]
+    # OL-DEV-FAKE-TOUCHSTONE-CI [END] # noqa: ERA001
