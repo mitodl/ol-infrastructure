@@ -336,67 +336,66 @@ ol_touchstone_user_creation_or_linking_subflow_automatically_set_existing_user_s
 )
 # OL - First login flow [END]
 
-if stack_info.env_suffix != "ci":
-    # Touchstone SAML [START]
-    ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
-        "touchstone-idp",
+# Touchstone SAML [START]
+ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
+    "touchstone-idp",
+    realm=ol_apps_realm.id,
+    alias="touchstone-idp",
+    display_name="MIT Touchstone",
+    entity_id=f"{keycloak_url}/realms/olapps",
+    name_id_policy_format="Unspecified",
+    force_authn=False,
+    post_binding_response=True,
+    post_binding_authn_request=True,
+    principal_type="ATTRIBUTE",
+    principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
+    single_sign_on_service_url="https://idp.mit.edu/idp/profile/SAML2/POST/SSO",
+    trust_email=True,
+    validate_signature=True,
+    signing_certificate=mit_touchstone_cert,
+    want_assertions_encrypted=True,
+    want_assertions_signed=True,
+    opts=resource_options,
+    first_broker_login_flow_alias=ol_touchstone_first_login_flow.alias,
+)
+oidc_attribute_importer_identity_provider_mapper = (
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "map-touchstone-saml-email-attribute",
         realm=ol_apps_realm.id,
-        alias="touchstone-idp",
-        display_name="MIT Touchstone",
-        entity_id=f"{keycloak_url}/realms/olapps",
-        name_id_policy_format="Unspecified",
-        force_authn=False,
-        post_binding_response=True,
-        post_binding_authn_request=True,
-        principal_type="ATTRIBUTE",
-        principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
-        single_sign_on_service_url="https://idp.mit.edu/idp/profile/SAML2/POST/SSO",
-        trust_email=True,
-        validate_signature=True,
-        signing_certificate=mit_touchstone_cert,
-        want_assertions_encrypted=True,
-        want_assertions_signed=True,
+        attribute_name="email",
+        identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+        user_attribute="email",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
         opts=resource_options,
-        first_broker_login_flow_alias=ol_touchstone_first_login_flow.alias,
-    )
-    oidc_attribute_importer_identity_provider_mapper = (
-        keycloak.AttributeImporterIdentityProviderMapper(
-            "map-touchstone-saml-email-attribute",
-            realm=ol_apps_realm.id,
-            attribute_name="email",
-            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
-            user_attribute="email",
-            extra_config={
-                "syncMode": "INHERIT",
-            },
-            opts=resource_options,
-        ),
-        keycloak.AttributeImporterIdentityProviderMapper(
-            "map-touchstone-saml-last-name-attribute",
-            realm=ol_apps_realm.id,
-            attribute_name="sn",
-            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
-            user_attribute="lastName",
-            extra_config={
-                "syncMode": "INHERIT",
-            },
-            opts=resource_options,
-        ),
-        keycloak.AttributeImporterIdentityProviderMapper(
-            "map-touchstone-saml-first-name-attribute",
-            realm=ol_apps_realm.id,
-            attribute_name="givenName",
-            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
-            user_attribute="firstName",
-            extra_config={
-                "syncMode": "INHERIT",
-            },
-            opts=resource_options,
-        ),
-    )
-    # Touchstone SAML [END]
+    ),
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "map-touchstone-saml-last-name-attribute",
+        realm=ol_apps_realm.id,
+        attribute_name="sn",
+        identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+        user_attribute="lastName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    ),
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "map-touchstone-saml-first-name-attribute",
+        realm=ol_apps_realm.id,
+        attribute_name="givenName",
+        identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+        user_attribute="firstName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    ),
+)
+# Touchstone SAML [END]
 
-if stack_info.env_suffix in ["qa", "rc"]:
+if stack_info.env_suffix == "qa":
     # OKTA-DEV-QA [START] # noqa: ERA001
     ol_apps_okta_saml_identity_provider = keycloak.saml.IdentityProvider(
         "okta-test",
