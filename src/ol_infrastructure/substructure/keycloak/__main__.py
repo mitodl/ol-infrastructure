@@ -464,7 +464,9 @@ keycloak.CustomUserFederation(
     config={
         "API_TOKEN_ENABLED": True,
         "API_HTTP_BASIC_ENABLED": False,
-        "API_TOKEN": keycloak_config.get("keycloak_user_migration_open_discussions_bearer_token"),
+        "API_TOKEN": keycloak_config.get(
+            "keycloak_user_migration_open_discussions_bearer_token"
+        ),
         "MIGRATE_UNMAPPED_GROUPS": False,
         "MIGRATE_UNMAPPED_ROLES": False,
         "URI": "https://discussions-rc.odl.mit.edu/api/v0/auth",
