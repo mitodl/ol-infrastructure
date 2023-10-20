@@ -396,7 +396,7 @@ if stack_info.env_suffix != "ci":
     )
     # Touchstone SAML [END]
 
-if stack_info.env_suffix in ["qa", "rc"]:
+if stack_info.env_suffix == "qa":
     # OKTA-DEV-QA [START] # noqa: ERA001
     ol_apps_okta_saml_identity_provider = keycloak.saml.IdentityProvider(
         "okta-test",
