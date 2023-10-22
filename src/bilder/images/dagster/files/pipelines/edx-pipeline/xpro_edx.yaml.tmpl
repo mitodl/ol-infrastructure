@@ -6,6 +6,7 @@ resources:
   results_dir:
     config:
       date_format: '%Y%m%d'
+      dir_prefix: xpro
   healthchecks:
     config:
       check_id: {{ with secret "secret-data/pipelines/edx/xpro/healthchecks-io-check-id" }}{{ .Data.value }}{{ end }}
