@@ -35,7 +35,6 @@ email_password = keycloak_config.require("email_password")
 email_username = keycloak_config.require("email_username")
 keycloak_url = keycloak_config.get("url")
 mit_touchstone_cert = "MIIDCDCCAfCgAwIBAgIJAK/yS5ltGi7MMA0GCSqGSIb3DQEBBQUAMBYxFDASBgNVBAMTC2lkcC5taXQuZWR1MB4XDTEyMDczMDIxNTAxN1oXDTMyMDcyNTIxNTAxN1owFjEUMBIGA1UEAxMLaWRwLm1pdC5lZHUwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDgC5Y2mM/VMThzTWrZ2uyv3Gw0mWU9NgQpWN1HQ/lLBxH1H6pMc5+fGpOdrvxH/Nepdg6uAJwZrclTDAHHpG/THb7K063NRtic8h9UYSqwxIWUCXI8qNijcWA2bW6PFEy4yIP611J+IzQxzD/ZiR+89ouzdjNBrPHzoaIoMwflftYnFc4L/qu4DxE/NWgANYPGEJfWUFTVpfNV1Iet60904zl+O7T79mwaQwwOMUWwk/DEQyvG6bf2uWL4aFx4laBOekrA+5rSHUXAFlhCreTnzZMkVoxSGqYlc5uZuZmpFCXZn+tNpsVYz+c4Hve3WOZwhx/7bMGCwlx7oovoQWQ5AgMBAAGjWTBXMDYGA1UdEQQvMC2CC2lkcC5taXQuZWR1hh5odHRwczovL2lkcC5taXQuZWR1L3NoaWJib2xldGgwHQYDVR0OBBYEFF5aINzhvMR+pOijYHtr3yCKsrMSMA0GCSqGSIb3DQEBBQUAA4IBAQDfVpscchXXa4Al/l9NGNwQ1shpQ8d+k+NpX2Q976jau9DhVHa42F8bfl1EeHLMFlN79aUxFZb3wvr0h5pq3a8F9aWHyKe+0R10ikVueDcAmg0V7MWthFdsyMwHPbnCdSXo2wh0GhjeIF3f3+hZZwrZ4sZqjX2RmsYnyXgS1r5mzuu4W447Q1fbC5BeZTefUhJcfHQ56ztIFtLJdRuHHnqj09CaQVMD1FtovM86vYwVMwMsgOgkN3c7tW6kXHHBHeEA31xUJsqXGTRlwMSyJTju3SFvhXI/8ZIxshTzWURBo+vf6A6QQvSvJAju4zVLZy83YB/cvAFsV3BexZ4xzuQD"  # pragma: allowlist secret # noqa: E501
-okta_test_saml_certificate = "MIIDqDCCApCgAwIBAgIGAYaDoqIJMA0GCSqGSIb3DQEBCwUAMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTAeFw0yMzAyMjQxMzM0MTlaFw0zMzAyMjQxMzM1MThaMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKrZ0Vel22z1r18U1KYt/y8am1JL+iwZItqFMTTwdwFfhXhkHxzzF/wZx07LheD01M7Zs39b3rNVBanzEhiwbg1KwF9xRnd+t6FDF40h6jAWwpjzj3T77PKlpmJfQibfeaMuJWKT2xlrHBx343IO\nYOSIz2E4vMGHPAxdKH9ze/IadTaZqpIhuXWaYBbPA/uPePLeetBBf0/mBJBJSHS9vP6MxZ94WUHMuEQ2gIn8rTIZrevxS6qWahky9AwBOGm2OU0NThqeq0KszVHTdKVuAZIfCtkHaosn48QZ2XqmZvRD6V2AZ5Mb2ClRJbPi12lvH3ds8KqWUUmyjDwS88IkN+sCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAAllfqAsLw+tPLQTNejbkNfZs6j62PmoKctiGz8xSPVzGedS5qFzLmA5yXSxHOVtIODPlNmlR/ZTaaEg3skXVzsmxygYvcUHKsuhThwXMOdnHu4NiyVyHYtrjp2FyN4YXJcPnOEqjzSTuJEZXbNSIDtZ9QzngeaikibdoKplCRhnp0y3RPVXqRmlSWpOmZ1yE23gZ9oNkdgdtsYh6XfqtNsyt/R8hDHONwwcUD7duNc7UvjXop3GXuBYFUvvLwEScaSTut2e8Mmh+VtRNE2jel7mIU57znw3wJiclQKPkZibX/5mcRZnHw0QH6UReoi19EoutPOV6hw1uSaRQ1KQuPQ=="  # pragma: allowlist secret # noqa: E501
 # Create OL Platform Engineering Realm
 ol_platform_engineering_realm = keycloak.Realm(
     "ol-platform-engineering",
@@ -280,7 +279,7 @@ for openid_clients in keycloak_config.get_object("openid_clients"):
 ol_touchstone_first_login_flow = keycloak.authentication.Flow(
     "ol-touchstone-first-login-flow",
     realm_id=ol_apps_realm.id,
-    alias="first-login-flow",
+    alias="ol-first-login-flow",
     opts=resource_options,
 )
 ol_touchstone_first_login_flow_review_profile = keycloak.authentication.Execution(
@@ -334,35 +333,97 @@ ol_touchstone_user_creation_or_linking_subflow_automatically_set_existing_user_s
 )
 # OL - First login flow [END]
 
-if stack_info.env_suffix != "ci":
-    # Touchstone SAML [START]
-    ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
-        "touchstone-idp",
+# Touchstone SAML [START]
+ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
+    "touchstone-idp",
+    realm=ol_apps_realm.id,
+    alias="touchstone-idp",
+    display_name="MIT Touchstone",
+    entity_id=f"{keycloak_url}/realms/olapps",
+    name_id_policy_format="Unspecified",
+    force_authn=False,
+    post_binding_response=True,
+    post_binding_authn_request=True,
+    principal_type="ATTRIBUTE",
+    principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
+    single_sign_on_service_url="https://idp.mit.edu/idp/profile/SAML2/POST/SSO",
+    trust_email=True,
+    validate_signature=True,
+    signing_certificate=mit_touchstone_cert,
+    want_assertions_encrypted=True,
+    want_assertions_signed=True,
+    opts=resource_options,
+    first_broker_login_flow_alias=ol_touchstone_first_login_flow.alias,
+)
+oidc_attribute_importer_identity_provider_mapper = (
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "map-touchstone-saml-email-attribute",
         realm=ol_apps_realm.id,
-        alias="touchstone-idp",
-        display_name="MIT Touchstone",
-        entity_id=f"{keycloak_url}/realms/olapps",
+        attribute_name="email",
+        identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+        user_attribute="email",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    ),
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "map-touchstone-saml-last-name-attribute",
+        realm=ol_apps_realm.id,
+        attribute_name="sn",
+        identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+        user_attribute="lastName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    ),
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "map-touchstone-saml-first-name-attribute",
+        realm=ol_apps_realm.id,
+        attribute_name="givenName",
+        identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+        user_attribute="firstName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    ),
+)
+# Touchstone SAML [END]
+
+if stack_info.env_suffix in ["ci", "qa"]:
+    # OL-DEV-FAKE-TOUCHSTONE [START] # noqa: ERA001
+    ol_apps_dev_fake_touchstone_ci_identity_provider = keycloak.saml.IdentityProvider(
+        "fake-touchstone",
+        realm=ol_apps_realm.id,
+        alias="fake-touchstone",
+        display_name="Fake Touchstone",
+        entity_id="http://www.okta.com/exkcta3wbyYMdAMAP5d7",
         name_id_policy_format="Unspecified",
         force_authn=False,
         post_binding_response=True,
         post_binding_authn_request=True,
         principal_type="ATTRIBUTE",
         principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
-        single_sign_on_service_url="https://idp.mit.edu/idp/profile/SAML2/POST/SSO",
+        single_sign_on_service_url=keycloak_config.get(
+            "fake_touchstone_single_sign_on_service_url"
+        ),
         trust_email=True,
         validate_signature=True,
-        signing_certificate=mit_touchstone_cert,
+        signing_certificate=keycloak_config.get("fake_touchstone_sig_cert"),
         want_assertions_encrypted=True,
         want_assertions_signed=True,
         opts=resource_options,
         first_broker_login_flow_alias=ol_touchstone_first_login_flow.alias,
+        hide_on_login_page=False,
     )
     oidc_attribute_importer_identity_provider_mapper = (
         keycloak.AttributeImporterIdentityProviderMapper(
-            "map-touchstone-saml-email-attribute",
+            f"map-fake-touchstone-{stack_info.env_suffix}-saml-email-attribute",
             realm=ol_apps_realm.id,
             attribute_name="email",
-            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+            identity_provider_alias=ol_apps_dev_fake_touchstone_ci_identity_provider.alias,
             user_attribute="email",
             extra_config={
                 "syncMode": "INHERIT",
@@ -370,10 +431,10 @@ if stack_info.env_suffix != "ci":
             opts=resource_options,
         ),
         keycloak.AttributeImporterIdentityProviderMapper(
-            "map-touchstone-saml-last-name-attribute",
+            f"map-fake-touchstone-{stack_info.env_suffix}-saml-last-name-attribute",
             realm=ol_apps_realm.id,
             attribute_name="sn",
-            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+            identity_provider_alias=ol_apps_dev_fake_touchstone_ci_identity_provider.alias,
             user_attribute="lastName",
             extra_config={
                 "syncMode": "INHERIT",
@@ -381,10 +442,10 @@ if stack_info.env_suffix != "ci":
             opts=resource_options,
         ),
         keycloak.AttributeImporterIdentityProviderMapper(
-            "map-touchstone-saml-first-name-attribute",
+            f"map-fake-touchstone-{stack_info.env_suffix}-saml-first-name-attribute",
             realm=ol_apps_realm.id,
             attribute_name="givenName",
-            identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
+            identity_provider_alias=ol_apps_dev_fake_touchstone_ci_identity_provider.alias,
             user_attribute="firstName",
             extra_config={
                 "syncMode": "INHERIT",
@@ -392,10 +453,8 @@ if stack_info.env_suffix != "ci":
             opts=resource_options,
         ),
     )
-    # Touchstone SAML [END]
-
-if stack_info.env_suffix != "production":
-    # Okta TEST SAML [START]
+    # OL-DEV-FAKE-TOUCHSTONE [END] # noqa: ERA001
+    # OKTA-DEV [START] # noqa: ERA001
     ol_apps_okta_saml_identity_provider = keycloak.saml.IdentityProvider(
         "okta-test",
         realm=ol_apps_realm.id,
@@ -403,16 +462,18 @@ if stack_info.env_suffix != "production":
         post_binding_logout=False,
         post_binding_response=True,
         backchannel_supported=False,
-        entity_id="http://www.okta.com/exk8gfblmeePE5uUQ5d7",
+        entity_id=f"{keycloak_url}/realms/olapps",
         login_hint=False,
         authn_context_comparison_type="exact",
         sync_mode="IMPORT",
-        single_sign_on_service_url="https://dev-66940844.okta.com/app/dev-66940844_collintestlogin_1/exk8gfblmeePE5uUQ5d7/sso/saml",
+        single_sign_on_service_url=keycloak_config.get(
+            "okta_single_sign_on_service_url"
+        ),
         want_assertions_signed=False,
         gui_order="10",
         validate_signature=False,
         hide_on_login_page=False,
-        signing_certificate=okta_test_saml_certificate,
+        signing_certificate=keycloak_config.get("okta_sig_cert"),
         name_id_policy_format="Email",
         want_assertions_encrypted=False,
         post_binding_authn_request=True,
@@ -456,27 +517,4 @@ if stack_info.env_suffix != "production":
             opts=resource_options,
         ),
     )
-    # Okta TEST SAML [END]
-
-if stack_info.env_suffix == "qa":
-    keycloak.CustomUserFederation(
-        "ol-open-discussions-qa-user-migration-federation",
-        cache_policy="DEFAULT",
-        config={
-            "API_TOKEN_ENABLED": True,
-            "API_HTTP_BASIC_ENABLED": False,
-            "API_TOKEN": keycloak_config.get(
-                "keycloak_user_migration_open_discussions_bearer_token"
-            ),
-            "MIGRATE_UNMAPPED_GROUPS": False,
-            "MIGRATE_UNMAPPED_ROLES": False,
-            "URI": "https://discussions-rc.odl.mit.edu/api/v0/auth",
-            "USE_USER_ID_FOR_CREDENTIAL_VERIFICATION": False,
-            "API_HTTP_BASIC_USERNAME": "",
-        },
-        enabled=True,
-        name="Open Discussions",
-        provider_id="User migration using a REST client",
-        realm_id=ol_apps_realm.id,
-        opts=resource_options,
-    )
+    # OKTA-DEV [END] # noqa: ERA001
