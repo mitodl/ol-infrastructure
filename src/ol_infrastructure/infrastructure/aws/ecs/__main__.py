@@ -645,6 +645,8 @@ if cluster_config.get_bool("traefik_enabled") or True:
         ],
     )
 
+    # This is a DEFAULT certificate. Other certificates can be added to the LB
+    # as needed with aws.alb.ListenerCertificate()
     https_listener = lb.Listener(
         f"{environment_name}-ecs-https-listener",
         load_balancer_arn=load_balancer.arn,
