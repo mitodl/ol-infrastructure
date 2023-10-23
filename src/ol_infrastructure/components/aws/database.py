@@ -8,6 +8,7 @@ This includes:
 - Create relevant security groups
 - Create DB instance
 """  # noqa: E501
+
 from enum import Enum
 from typing import Optional, Union
 

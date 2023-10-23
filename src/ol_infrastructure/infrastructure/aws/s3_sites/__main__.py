@@ -1,4 +1,5 @@
 """Module for creating and managing S3 buckets that are not used by any applications."""
+
 from pulumi import StackReference, export
 from pulumi_aws import route53
 

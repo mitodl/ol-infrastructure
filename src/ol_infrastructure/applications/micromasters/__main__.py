@@ -5,7 +5,6 @@ MicroMasters application.
 - Create an IAM policy to grant access to S3 and other resources
 """
 
-
 import pulumi_vault as vault
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from pulumi import Config, StackReference, export

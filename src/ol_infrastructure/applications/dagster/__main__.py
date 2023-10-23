@@ -7,6 +7,7 @@
 - Setup consul keys needed by various pipelines.
 - Provision an EC2 instance from a pre-built AMI with the pipeline code for Dagster
 """  # noqa: E501
+
 import base64
 import json
 import textwrap

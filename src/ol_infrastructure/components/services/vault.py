@@ -7,6 +7,7 @@ This includes:
 - Control the lease TTL settings
 - Define the base set of roles according to our established best practices
 """
+
 import json
 from enum import Enum
 from string import Template

@@ -11,6 +11,7 @@
 - Uses the cloud auto-join functionality to automate new instances joining the
   cluster.  The requisite configuration is passed in via cloud-init user data.
 """
+
 import base64
 import json
 import textwrap
