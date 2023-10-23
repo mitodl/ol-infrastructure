@@ -238,7 +238,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 kms_key_id=self.db_instance.kms_key_id,
                 opts=resource_options,
                 publicly_accessible=db_config.read_replica.public_access,
-                replicate_source_db=self.db_instance.id,
+                replicate_source_db=self.db_instance.identifier,
                 skip_final_snapshot=True,
                 storage_type=db_config.read_replica.storage_type.value,
                 storage_encrypted=True,
