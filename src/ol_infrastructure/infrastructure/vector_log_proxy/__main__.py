@@ -457,7 +457,7 @@ autoscaling.Group(
         preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
             min_healthy_percentage=50
         ),
-        triggers=["tags"],
+        triggers=["tag"],
     ),
     target_group_arns=[
         heroku_log_proxy_lb_target_group.arn,

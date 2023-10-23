@@ -393,7 +393,6 @@ ovs_db = OLAmazonDB(ovs_db_config)
 
 db_address = ovs_db.db_instance.address
 db_port = ovs_db.db_instance.port
-db_name = ovs_db.db_instance.name
 
 ovs_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=ovs_db_config.db_name,

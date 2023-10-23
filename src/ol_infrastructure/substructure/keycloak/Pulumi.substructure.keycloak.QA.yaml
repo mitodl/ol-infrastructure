@@ -10,25 +10,27 @@ config:
     secure: v1:BkWbaZVoElrjHJm7:Ti69EMKQfvYtLDcrKJZTankVy12gSw==
   keycloak:client_secret:
     secure: v1:ewmG5VqfRwLxrPmA:IcEVxEohrtStaYX4xkr3B3QLVM592Kej6XKky+XWZrRTtzXgzoSfE+BfQ1hmi9Ij
-  keycloak:openid_clients:
-  - realm_name: olapps
-    client_info:
-      open: https://mit-open-rc.odl.mit.edu
-      open-discusions: https://discussions-rc.odl.mit.edu
-  - realm_name: ol-platform-engineering
-    client_info:
-      airbyte: https://airbyte-qa.odl.mit.edu
-      dagster: https://pipelines-qa.odl.mit.edu
   keycloak:email_host:
     secure: v1:swp7hkmN53N42cWS:tHmgd6AzJEKco5XBqjF8RspFlJkD0PsBmp+gytkFsOM=
   keycloak:email_password:
     secure: v1:D3r4nV78I5WwOPeq:11qN0BLRcgIZimjisckFz9Q2AA8hXdHubDQxjJHqeQ==
   keycloak:email_username:
     secure: v1:Uxscw7J8NqxO/NbK:NCGzgYTGRmeIovnjZyXrb6ztDW7levn0
+  keycloak:openid_clients:
+  - client_info:
+      open: https://mit-open-rc.odl.mit.edu
+      open-discusions: https://discussions-rc.odl.mit.edu
+    realm_name: olapps
+  - client_info:
+      airbyte: https://airbyte-qa.odl.mit.edu
+      dagster: https://pipelines-qa.odl.mit.edu
+    realm_name: ol-platform-engineering
   keycloak:url: https://sso-qa.odl.mit.edu
   keycloak:fake_touchstone_single_sign_on_service_url: https://dev-66940844.okta.com/app/dev-66940844_oldevtouchstoneqa_1/exkcta3wbyYMdAMAP5d7/sso/saml
   keycloak:fake_touchstone_sig_cert: MIIDqDCCApCgAwIBAgIGAYs/J+MfMA0GCSqGSIb3DQEBCwUAMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTAeFw0yMzEwMTcxOTQwMDBaFw0zMzEwMTcxOTQxMDBaMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALDoKB8rTJG0QcSZdGasCXOdZOfj7o5XQcEks3KyWWrGpqLl2zQE5ZX79Tn+vpx8nse55u3uW9v9aqPv4V2Ou7GL+koCBdnyA2ogvT8vAw4IKfniz5/B42eoLjG/hX4L0qdsCLX/4Xd3TDNw018P6dkro7jierBz1vs7P1gAEmgh8qulDKEG+fZIU73hFG7QUMHEVqwEz+us/0rPq0LHr1/enXlltuQGwGoC7eoEmA1lNdQwUKl4lAMjNal/PcOfIIkbP9VZyqKRt59wCwDgd9bs/Gq5wTWqegA1jBhyuwgklVlwXLcGBIiQ1Kx3PQYonHgjj4Njgtt9Uh2MTJ/f5I0CAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAFXMr24C5awhD0XBgA1f+YtZUmt5i461L9uoLm8KVStVqDgwrKXmMc3zcrugw0i5SAwtrUfEKAI9jpkRcha/ve1GKcbnFnmpclE6igdbCeDWNRlGa2JjaznqYIDsnJyn41JRNnu69IaQ/2V3MGbxcF9BfqPl1NHkfGFYJgq4e48zW+AMuQkvSRF5SaQvWm+66L/Q7TnY8wlzgR4rrWd0DKKaJy81ucBottzB1n8h13phEgqznH7bfjG6oHXfGxf+R8o/vj2EbfHg8A4Jgh90NSsN1Cb2e86pDq24qT+yso/3mh0GX0ge+PD+YH5aC5h0fbxJbGlf5G7e9N3TRne0ckQ== # pragma: allowlist secret # noqa: E501
   keycloak:okta_single_sign_on_service_url: https://dev-66940844.okta.com/app/dev-66940844_collintestlogin_1/exk8gfblmeePE5uUQ5d7/sso/saml
   keycloak:okta_sig_cert: MIIDqDCCApCgAwIBAgIGAYaDoqIJMA0GCSqGSIb3DQEBCwUAMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTAeFw0yMzAyMjQxMzM0MTlaFw0zMzAyMjQxMzM1MThaMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKrZ0Vel22z1r18U1KYt/y8am1JL+iwZItqFMTTwdwFfhXhkHxzzF/wZx07LheD01M7Zs39b3rNVBanzEhiwbg1KwF9xRnd+t6FDF40h6jAWwpjzj3T77PKlpmJfQibfeaMuJWKT2xlrHBx343IOYOSIz2E4vMGHPAxdKH9ze/IadTaZqpIhuXWaYBbPA/uPePLeetBBf0/mBJBJSHS9vP6MxZ94WUHMuEQ2gIn8rTIZrevxS6qWahky9AwBOGm2OU0NThqeq0KszVHTdKVuAZIfCtkHaosn48QZ2XqmZvRD6V2AZ5Mb2ClRJbPi12lvH3ds8KqWUUmyjDwS88IkN+sCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAAllfqAsLw+tPLQTNejbkNfZs6j62PmoKctiGz8xSPVzGedS5qFzLmA5yXSxHOVtIODPlNmlR/ZTaaEg3skXVzsmxygYvcUHKsuhThwXMOdnHu4NiyVyHYtrjp2FyN4YXJcPnOEqjzSTuJEZXbNSIDtZ9QzngeaikibdoKplCRhnp0y3RPVXqRmlSWpOmZ1yE23gZ9oNkdgdtsYh6XfqtNsyt/R8hDHONwwcUD7duNc7UvjXop3GXuBYFUvvLwEScaSTut2e8Mmh+VtRNE2jel7mIU57znw3wJiclQKPkZibX/5mcRZnHw0QH6UReoi19EoutPOV6hw1uSaRQ1KQuPQ== # pragma: allowlist secret # noqa: E501
+  keycloak:user_migration_open_discussions_bearer_token:
+    secure: v1:JlslYpQlva2/fWrn:2sYWwNCeNRNERF4wYmxpnw1+YF1sHp3hBNg6F9upUVH+el+XWc0XrgZ6NEVU8dC4SLc2Hd1r8gg=
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

@@ -154,7 +154,7 @@ class OLAutoScaleGroupConfig(AWSBase):
     instance_refresh_warmup: PositiveInt = PositiveInt(health_check_grace_period)
     instance_refresh_min_healthy_percentage: NonNegativeInt = NonNegativeInt(50)
     instance_refresh_strategy: str = "Rolling"
-    instance_refresh_triggers: list[str] = ["tags"]  # noqa: RUF012
+    instance_refresh_triggers: list[str] = ["tag"]  # noqa: RUF012
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("instance_refresh_strategy")

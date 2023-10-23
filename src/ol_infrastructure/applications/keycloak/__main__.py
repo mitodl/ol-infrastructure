@@ -204,7 +204,6 @@ keycloak_db = OLAmazonDB(keycloak_db_config)
 
 db_address = keycloak_db.db_instance.address
 db_port = keycloak_db.db_instance.port
-db_name = keycloak_db.db_instance.name
 
 keycloak_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=keycloak_db_config.db_name,

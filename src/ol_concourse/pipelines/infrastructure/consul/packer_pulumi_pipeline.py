@@ -54,11 +54,7 @@ for network in [
     "operations",
     "xpro",
 ]:
-    # Missing a few stacks for some apps
-    if network in ["data"]:  # noqa: SIM108
-        stages = ("QA", "Production")
-    else:
-        stages = ("CI", "QA", "Production")  # type: ignore  # noqa: PGH003
+    stages = ("CI", "QA", "Production")
     consul_pulumi_fragment = pulumi_jobs_chain(
         consul_pulumi_code,
         project_name="ol-infrastructure-consul-server",
