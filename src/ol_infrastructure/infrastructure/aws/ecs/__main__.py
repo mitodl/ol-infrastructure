@@ -15,7 +15,7 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, ResourceOptions
-from pulumi_aws import autoscaling, ec2, ecs, iam, lb
+from pulumi_aws import acm, autoscaling, ec2, ecs, iam, lb
 
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -114,6 +114,7 @@ vault_config = json.dumps(
             "address": "https://vault.query.consul:8200",
             "tls_skip_verify": True,
         },
+        "pid_file": "/vault/file/.pid",
         "auto_auth": {
             "method": {
                 "type": "aws",
@@ -128,10 +129,52 @@ vault_config = json.dumps(
                 {
                     "type": "file",
                     "derive_key": False,
-                    "config": [{"path": "/root/token/.vault_token"}],
+                    "config": [{"path": "/vault/.vault_token"}],
                 }
             ],
         },
+        "template": [
+            {
+                "destination": "/vault/file/star.odl.mit.edu.crt",
+                "create_dest_dirs": True,
+                "contents": (
+                    '{{ with secret "secret-operations/global/odl_wildcard_cert" }}{{'
+                    " printf .Data.value }}{{ end }}"
+                ),
+                "error_on_missing_key": True,
+                "backup": True,
+                "left_delimiter": "{{",
+                "right_delimiter": "}}",
+                "function_blacklist": [],
+            },
+            {
+                "destination": "/vault/file/star.odl.mit.edu.key",
+                "create_dest_dirs": True,
+                "contents": (
+                    '{{ with secret "secret-operations/global/odl_wildcard_cert" }}{{'
+                    " printf .Data.key }}{{ end }}"
+                ),
+                "error_on_missing_key": True,
+                "backup": False,
+                "left_delimiter": "{{",
+                "right_delimiter": "}}",
+                "function_blacklist": [],
+            },
+            {
+                "destination": "/vault/file/tls.yaml",
+                "create_dest_dirs": True,
+                "contents": (
+                    "tls:\n  stores:\n    default:\n      defaultCertificate:\n       "
+                    " certFile: /etc/traefik/tls/star.odl.mit.edu.crt\n        keyFile:"
+                    " /etc/traefik/tls/star.odl.mit.edu.key\n"
+                ),
+                "error_on_missing_key": True,
+                "backup": False,
+                "left_delimiter": "{{",
+                "right_delimiter": "}}",
+                "function_blacklist": [],
+            },
+        ],
         "cache": {"use_auto_auth_token": "force"},
         "exit_after_auth": False,
         "listener": [{"tcp": {"address": "127.0.0.1:8200", "tls_disable": True}}],
@@ -151,7 +194,10 @@ consul_template_config = json.dumps(
             {
                 "destination": "/home/consul-template/tls/star.odl.mit.edu.key",
                 "create_dest_dirs": False,
-                "contents": '{{ with secret "secret-operations/global/odl_wildcard_cert" }}{{ printf .Data.value }}{{ end }}',
+                "contents": (
+                    '{{ with secret "secret-operations/global/odl_wildcard_cert" }}{{'
+                    " printf .Data.value }}{{ end }}"
+                ),
                 "error_on_missing_key": True,
                 "left_delimiter": "{{",
                 "right_delimiter": "}}",
@@ -159,7 +205,10 @@ consul_template_config = json.dumps(
             {
                 "destination": "/home/consul-template/tsl/star.odl.mit.edu.crt",
                 "create_dest_dirs": False,
-                "contents": '{{ with secret "secret-odl-video-service/ovs-secrets" }}{{ printf .Data.data.nginx.tls_certificate }}{{ end }}',
+                "contents": (
+                    '{{ with secret "secret-odl-video-service/ovs-secrets" }}{{ printf'
+                    " .Data.data.nginx.tls_certificate }}{{ end }}"
+                ),
                 "error_on_missing_key": True,
                 "left_delimiter": "{{",
                 "right_delimiter": "}}",
@@ -189,8 +238,7 @@ user_data = consul_datacenter.apply(
                         },
                         {
                             "path": "/etc/default/vector",
-                            "content": textwrap.dedent(
-                                f"""\
+                            "content": textwrap.dedent(f"""\
                                             ENVIRONMENT={consul_dc}
                         APPLICATION=ovs
                         SERVICE=ovs
@@ -199,8 +247,7 @@ user_data = consul_datacenter.apply(
                         GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                         GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                         GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                        """
-                            ),
+                        """),
                             "owner": "root:root",
                         },
                         {
@@ -323,7 +370,7 @@ if cluster_config.get_bool("traefik_enabled") or True:
             }
         ],
     }
-    parliament_config = {  # type: Dict[str, Dict]
+    parliament_config: dict[str, Any] = {
         "RESOURCE_STAR": {"ignore_locations": []},
     }
 
@@ -337,8 +384,10 @@ if cluster_config.get_bool("traefik_enabled") or True:
             stringify=True,
             parliament_config=parliament_config,
         ),
-        description="Role that the Amazon ECS container agent and the Docker"
-        " daemon can assumm in {cluster_name}-ecs-cluster.",
+        description=(
+            "Role that the Amazon ECS container agent and the Docker"
+            " daemon can assumm in {cluster_name}-ecs-cluster."
+        ),
     )
     traefik_execution_role = iam.Role(
         f"{environment_name}-ecs-traefik-execution-role",
@@ -364,8 +413,10 @@ if cluster_config.get_bool("traefik_enabled") or True:
                 parliament_config=parliament_config,
             )
         ),
-        description=f"Allows the traefik tasks in {cluster_name}-ecs-cluster"
-        " to discover tasks on ECS clusters.",
+        description=(
+            f"Allows the traefik tasks in {cluster_name}-ecs-cluster"
+            " to discover tasks on ECS clusters."
+        ),
     )
     traefik_task_role = iam.Role(
         f"{environment_name}-ecs-traefik-task-role",
@@ -416,27 +467,27 @@ if cluster_config.get_bool("traefik_enabled") or True:
                     "mountPoints": [
                         {
                             "sourceVolume": "wildcard-certificate",
-                            "containerPath": "/etc/traefik/tls",
+                            "containerPath": "/etc/traefik/tls/",
                             "readOnly": True,
                         },
                     ],
                     "cpu": 512,
                     "memory": 512,
-                    #                    "dependsOn": [
-                    #                    ],
                     "command": [
                         "--api.insecure=true",
                         f"--entryPoints.http.address=:{DEFAULT_HTTP_PORT}",
-                        f"--entryPoints.https.address=:{DEFAULT_HTTPS_PORT}",
                         "--entryPoints.http.http.redirections.entryPoint.to=https",
                         "--entryPoints.http.http.redirections.entryPoint.scheme=https",
+                        f"--entryPoints.https.address=:{DEFAULT_HTTPS_PORT}",
+                        "--providers.file.filename=/etc/traefik/tls/tls.yaml",
                         "--providers.ecs=true",
                         "--providers.ecs.exposedByDefault=false",
                         "--providers.ecs.autoDiscoverClusters=true",
-                        "--providers.ecs.clusters={cluster_name}",
+                        f"--providers.ecs.clusters={cluster_name}",
                         f"--providers.ecs.refreshSeconds={refresh_interval}",
                         f"--log.level={log_level}",
                         "--accesslog=true",
+                        "--ping=true",
                     ],
                     "portMappings": [
                         {
@@ -461,6 +512,21 @@ if cluster_config.get_bool("traefik_enabled") or True:
                             "awslogs-stream-prefix": "ecs",
                         },
                     },
+                    "dependsOn": [
+                        {
+                            "containerName": "traefik-vault-agent",
+                            "condition": "HEALTHY",
+                        }
+                    ],
+                    "healthCheck": {
+                        "command": [
+                            "CMD-SHELL",
+                            "traefik healthcheck --ping",
+                        ],
+                        "interval": 30,
+                        "timeout": 5,
+                        "retries": 3,
+                    },
                 },
                 {
                     "name": "traefik-vault-agent",
@@ -468,24 +534,20 @@ if cluster_config.get_bool("traefik_enabled") or True:
                     "essential": False,
                     "mountPoints": [
                         {
-                            "sourceVolume": "vault-token",
-                            "containerPath": "/root/token",
+                            "sourceVolume": "wildcard-certificate",
+                            "containerPath": "/vault/file/",
                             "readOnly": False,
-                        }
+                        },
                     ],
                     "environment": [
                         {"name": "VAULT_SKIP_VERIFY", "value": "true"},
                         {
-                            "name": "VAULT_CONFIG",
-                            "value": base64.b64encode(
-                                vault_config.encode("utf8")
-                            ).decode("utf8"),
+                            "name": "VAULT_LOCAL_CONFIG",
+                            "value": vault_config,
                         },
                     ],
-                    "entrypoint": ["/bin/sh"],
-                    "command": [
-                        "echo $VAULT_CONFIG | base64 -d > /root/vault.json && vault agent -config=/root/vault.json",
-                    ],
+                    "command": ["agent", "-config=/vault/config/local.json"],
+                    "linuxParameters": {"capabilities": {"add": ["IPC_LOCK"]}},
                     "logConfiguration": {
                         "logDriver": "awslogs",
                         "options": {
@@ -502,8 +564,8 @@ if cluster_config.get_bool("traefik_enabled") or True:
                             "CMD-SHELL",
                             "vault agent --help",
                         ],
-                        "interval": 5,
-                        "timeout": 2,
+                        "interval": 30,
+                        "timeout": 5,
                         "retries": 3,
                     },
                 },
@@ -516,17 +578,9 @@ if cluster_config.get_bool("traefik_enabled") or True:
         requires_compatibilities=["EC2"],
         volumes=[
             ecs.TaskDefinitionVolumeArgs(
-                name="vault-token",
-                docker_volume_configuration=ecs.TaskDefinitionVolumeDockerVolumeConfigurationArgs(
-                    scope="task",
-                    driver="local",
-                ),
-            ),
-            ecs.TaskDefinitionVolumeArgs(
                 name="wildcard-certificate",
                 docker_volume_configuration=ecs.TaskDefinitionVolumeDockerVolumeConfigurationArgs(
-                    scope="task",
-                    driver="local",
+                    scope="task", driver="local"
                 ),
             ),
         ],
@@ -548,7 +602,14 @@ if cluster_config.get_bool("traefik_enabled") or True:
             "-"
         ),
         target_type="instance",
-        # ),
+        health_check=lb.TargetGroupHealthCheckArgs(
+            healthy_threshold=2,
+            interval=10,
+            path="/ping",
+            port=str(DEFAULT_HTTP_PORT),
+            protocol="HTTP",
+            matcher="301",
+        ),
         port=DEFAULT_HTTP_PORT,
         protocol="HTTP",
         vpc_id=target_vpc["id"],
@@ -561,7 +622,7 @@ if cluster_config.get_bool("traefik_enabled") or True:
         health_check=lb.TargetGroupHealthCheckArgs(
             healthy_threshold=2,
             interval=10,
-            path="/",
+            path="/ping",
             port=str(DEFAULT_HTTPS_PORT),
             protocol="HTTPS",
             matcher="404",
@@ -588,7 +649,12 @@ if cluster_config.get_bool("traefik_enabled") or True:
         f"{environment_name}-ecs-https-listener",
         load_balancer_arn=load_balancer.arn,
         port=DEFAULT_HTTPS_PORT,
-        protocol="HTTP",
+        protocol="HTTPS",
+        certificate_arn=acm.get_certificate(
+            domain="*.odl.mit.edu",
+            most_recent=True,
+            statuses=["ISSUED"],
+        ).arn,
         default_actions=[
             lb.ListenerDefaultActionArgs(
                 type="forward",
