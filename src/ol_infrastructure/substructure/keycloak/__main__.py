@@ -457,3 +457,26 @@ if stack_info.env_suffix != "production":
         ),
     )
     # Okta TEST SAML [END]
+
+if stack_info.env_suffix == "qa":
+    keycloak.CustomUserFederation(
+        "ol-open-discussions-qa-user-migration-federation",
+        cache_policy="DEFAULT",
+        config={
+            "API_TOKEN_ENABLED": True,
+            "API_HTTP_BASIC_ENABLED": False,
+            "API_TOKEN": keycloak_config.get(
+                "keycloak_user_migration_open_discussions_bearer_token"
+            ),
+            "MIGRATE_UNMAPPED_GROUPS": False,
+            "MIGRATE_UNMAPPED_ROLES": False,
+            "URI": "https://discussions-rc.odl.mit.edu/api/v0/auth",
+            "USE_USER_ID_FOR_CREDENTIAL_VERIFICATION": False,
+            "API_HTTP_BASIC_USERNAME": "",
+        },
+        enabled=True,
+        name="Open Discussions",
+        provider_id="User migration using a REST client",
+        realm_id=ol_apps_realm.id,
+        opts=resource_options,
+    )

@@ -10,21 +10,23 @@ config:
     secure: v1:BkWbaZVoElrjHJm7:Ti69EMKQfvYtLDcrKJZTankVy12gSw==
   keycloak:client_secret:
     secure: v1:ewmG5VqfRwLxrPmA:IcEVxEohrtStaYX4xkr3B3QLVM592Kej6XKky+XWZrRTtzXgzoSfE+BfQ1hmi9Ij
-  keycloak:openid_clients:
-  - realm_name: olapps
-    client_info:
-      open: https://mit-open-rc.odl.mit.edu
-      open-discusions: https://discussions-rc.odl.mit.edu
-  - realm_name: ol-platform-engineering
-    client_info:
-      airbyte: https://airbyte-qa.odl.mit.edu
-      dagster: https://pipelines-qa.odl.mit.edu
   keycloak:email_host:
     secure: v1:swp7hkmN53N42cWS:tHmgd6AzJEKco5XBqjF8RspFlJkD0PsBmp+gytkFsOM=
   keycloak:email_password:
     secure: v1:D3r4nV78I5WwOPeq:11qN0BLRcgIZimjisckFz9Q2AA8hXdHubDQxjJHqeQ==
   keycloak:email_username:
     secure: v1:Uxscw7J8NqxO/NbK:NCGzgYTGRmeIovnjZyXrb6ztDW7levn0
+  keycloak:openid_clients:
+  - client_info:
+      open: https://mit-open-rc.odl.mit.edu
+      open-discusions: https://discussions-rc.odl.mit.edu
+    realm_name: olapps
+  - client_info:
+      airbyte: https://airbyte-qa.odl.mit.edu
+      dagster: https://pipelines-qa.odl.mit.edu
+    realm_name: ol-platform-engineering
   keycloak:url: https://sso-qa.odl.mit.edu
+  keycloak:user_migration_open_discussions_bearer_token:
+    secure: v1:JlslYpQlva2/fWrn:2sYWwNCeNRNERF4wYmxpnw1+YF1sHp3hBNg6F9upUVH+el+XWc0XrgZ6NEVU8dC4SLc2Hd1r8gg=
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
