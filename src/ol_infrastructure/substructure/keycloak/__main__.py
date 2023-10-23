@@ -406,12 +406,12 @@ if stack_info.env_suffix in ["ci", "qa"]:
         post_binding_authn_request=True,
         principal_type="ATTRIBUTE",
         principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
-        single_sign_on_service_url=keycloak_config.get_object(
+        single_sign_on_service_url=keycloak_config.get(
             "fake_touchstone_single_sign_on_service_url"
         ),
         trust_email=True,
         validate_signature=True,
-        signing_certificate=keycloak_config.get_object("fake_touchstone_sig_cert"),
+        signing_certificate=keycloak_config.get("fake_touchstone_sig_cert"),
         want_assertions_encrypted=True,
         want_assertions_signed=True,
         opts=resource_options,
@@ -466,14 +466,14 @@ if stack_info.env_suffix in ["ci", "qa"]:
         login_hint=False,
         authn_context_comparison_type="exact",
         sync_mode="IMPORT",
-        single_sign_on_service_url=keycloak_config.get_object(
+        single_sign_on_service_url=keycloak_config.get(
             "okta_single_sign_on_service_url"
         ),
         want_assertions_signed=False,
         gui_order="10",
         validate_signature=False,
         hide_on_login_page=False,
-        signing_certificate=keycloak_config.get_object("okta_sig_cert"),
+        signing_certificate=keycloak_config.get("okta_sig_cert"),
         name_id_policy_format="Email",
         want_assertions_encrypted=False,
         post_binding_authn_request=True,
