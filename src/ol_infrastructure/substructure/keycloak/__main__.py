@@ -420,7 +420,7 @@ if stack_info.env_suffix in ["ci", "qa"]:
     )
     oidc_attribute_importer_identity_provider_mapper = (
         keycloak.AttributeImporterIdentityProviderMapper(
-            "map-fake-touchstone-ci-saml-email-attribute",
+            f"map-fake-touchstone-{stack_info.env_suffix}-saml-email-attribute",
             realm=ol_apps_realm.id,
             attribute_name="email",
             identity_provider_alias=ol_apps_dev_fake_touchstone_ci_identity_provider.alias,
@@ -431,7 +431,7 @@ if stack_info.env_suffix in ["ci", "qa"]:
             opts=resource_options,
         ),
         keycloak.AttributeImporterIdentityProviderMapper(
-            "map-fake-touchstone-ci-saml-last-name-attribute",
+            f"map-fake-touchstone-{stack_info.env_suffix}-saml-last-name-attribute",
             realm=ol_apps_realm.id,
             attribute_name="sn",
             identity_provider_alias=ol_apps_dev_fake_touchstone_ci_identity_provider.alias,
@@ -442,7 +442,7 @@ if stack_info.env_suffix in ["ci", "qa"]:
             opts=resource_options,
         ),
         keycloak.AttributeImporterIdentityProviderMapper(
-            "map-fake-touchstone-ci-saml-first-name-attribute",
+            f"map-fake-touchstone-{stack_info.env_suffix}-saml-first-name-attribute",
             realm=ol_apps_realm.id,
             attribute_name="givenName",
             identity_provider_alias=ol_apps_dev_fake_touchstone_ci_identity_provider.alias,
