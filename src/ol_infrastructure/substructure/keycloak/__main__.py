@@ -36,8 +36,6 @@ email_username = keycloak_config.require("email_username")
 keycloak_url = keycloak_config.get("url")
 mit_touchstone_cert = "MIIDCDCCAfCgAwIBAgIJAK/yS5ltGi7MMA0GCSqGSIb3DQEBBQUAMBYxFDASBgNVBAMTC2lkcC5taXQuZWR1MB4XDTEyMDczMDIxNTAxN1oXDTMyMDcyNTIxNTAxN1owFjEUMBIGA1UEAxMLaWRwLm1pdC5lZHUwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDgC5Y2mM/VMThzTWrZ2uyv3Gw0mWU9NgQpWN1HQ/lLBxH1H6pMc5+fGpOdrvxH/Nepdg6uAJwZrclTDAHHpG/THb7K063NRtic8h9UYSqwxIWUCXI8qNijcWA2bW6PFEy4yIP611J+IzQxzD/ZiR+89ouzdjNBrPHzoaIoMwflftYnFc4L/qu4DxE/NWgANYPGEJfWUFTVpfNV1Iet60904zl+O7T79mwaQwwOMUWwk/DEQyvG6bf2uWL4aFx4laBOekrA+5rSHUXAFlhCreTnzZMkVoxSGqYlc5uZuZmpFCXZn+tNpsVYz+c4Hve3WOZwhx/7bMGCwlx7oovoQWQ5AgMBAAGjWTBXMDYGA1UdEQQvMC2CC2lkcC5taXQuZWR1hh5odHRwczovL2lkcC5taXQuZWR1L3NoaWJib2xldGgwHQYDVR0OBBYEFF5aINzhvMR+pOijYHtr3yCKsrMSMA0GCSqGSIb3DQEBBQUAA4IBAQDfVpscchXXa4Al/l9NGNwQ1shpQ8d+k+NpX2Q976jau9DhVHa42F8bfl1EeHLMFlN79aUxFZb3wvr0h5pq3a8F9aWHyKe+0R10ikVueDcAmg0V7MWthFdsyMwHPbnCdSXo2wh0GhjeIF3f3+hZZwrZ4sZqjX2RmsYnyXgS1r5mzuu4W447Q1fbC5BeZTefUhJcfHQ56ztIFtLJdRuHHnqj09CaQVMD1FtovM86vYwVMwMsgOgkN3c7tW6kXHHBHeEA31xUJsqXGTRlwMSyJTju3SFvhXI/8ZIxshTzWURBo+vf6A6QQvSvJAju4zVLZy83YB/cvAFsV3BexZ4xzuQD"  # pragma: allowlist secret # noqa: E501
 okta_test_saml_certificate = "MIIDqDCCApCgAwIBAgIGAYaDoqIJMA0GCSqGSIb3DQEBCwUAMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTAeFw0yMzAyMjQxMzM0MTlaFw0zMzAyMjQxMzM1MThaMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKrZ0Vel22z1r18U1KYt/y8am1JL+iwZItqFMTTwdwFfhXhkHxzzF/wZx07LheD01M7Zs39b3rNVBanzEhiwbg1KwF9xRnd+t6FDF40h6jAWwpjzj3T77PKlpmJfQibfeaMuJWKT2xlrHBx343IO\nYOSIz2E4vMGHPAxdKH9ze/IadTaZqpIhuXWaYBbPA/uPePLeetBBf0/mBJBJSHS9vP6MxZ94WUHMuEQ2gIn8rTIZrevxS6qWahky9AwBOGm2OU0NThqeq0KszVHTdKVuAZIfCtkHaosn48QZ2XqmZvRD6V2AZ5Mb2ClRJbPi12lvH3ds8KqWUUmyjDwS88IkN+sCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAAllfqAsLw+tPLQTNejbkNfZs6j62PmoKctiGz8xSPVzGedS5qFzLmA5yXSxHOVtIODPlNmlR/ZTaaEg3skXVzsmxygYvcUHKsuhThwXMOdnHu4NiyVyHYtrjp2FyN4YXJcPnOEqjzSTuJEZXbNSIDtZ9QzngeaikibdoKplCRhnp0y3RPVXqRmlSWpOmZ1yE23gZ9oNkdgdtsYh6XfqtNsyt/R8hDHONwwcUD7duNc7UvjXop3GXuBYFUvvLwEScaSTut2e8Mmh+VtRNE2jel7mIU57znw3wJiclQKPkZibX/5mcRZnHw0QH6UReoi19EoutPOV6hw1uSaRQ1KQuPQ=="  # pragma: allowlist secret # noqa: E501
-ol_apps_dev_fake_touchstone_ci_sig_cert = "MIIDqDCCApCgAwIBAgIGAYtCTcf2MA0GCSqGSIb3DQEBCwUAMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTAeFw0yMzEwMTgxMDIwMTVaFw0zMzEwMTgxMDIxMTVaMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMhXOW/OMdHhUh0qgf/oJObcwNqUHzp6yO5JHDhPWPfg+TGxAL7capF8Jeni/Mgi2mOOiXOrg0h7dp4xbzPiv1eDS6aJld9diWpsZs42YRgiLrcBUq0Zsnw2qgQmCs4ZCpu6q3TTj2uKGZscmq8aiA31mdObCFzy+vlZbkZNymSCQpnJAjsmXfIbO3aLzxvGqdvtdW7+rFDGR3Ct2a3i+j+03AfCrvCNGn0lGMItgLSmhdyq6yzlVNAA6ptFOy+GcgfjbNNzwsXtCxb1xwN3egl5C6ywFoTV/MIZTo598pHZw/DHaWOKHCKan09teXAb7MNJaudcN7StyiSbYOZVf7sCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAcRnWon72th5mIFxWP3pKde4tnsHgxbm4kyw+6koWRtuK6IntyHjLukK4Wszf0PKofVltSEjez1JL42EZ+vmAh9S5edmFSTDcQjZut0/ciTzD6rKmBoYxZ2vWaxrkLkCz1x15QetdAw/BXTwOQKI1nkly8VqPhX8FevdA2WNPfd3dmOD06mpFlCyU16u/U+C1XLZOe/WCI7XuuEgLo+PYRRbJeEA38Ftmcy0lbEOpeiL74NXGTr4ebOxAY5ylDmYcUpuqO8UjmZvKTnEz8gsc+V2XqONvB0pX7rcrTYDJ4BFhJGJFG9vf8AwPv6SXAVbHZT/Bm3cqgAaPYfFwEIafZg=="  # pragma: allowlist secret # noqa: E501
-ol_apps_dev_fake_touchstone_qa_sig_cert = "MIIDqDCCApCgAwIBAgIGAYs/J+MfMA0GCSqGSIb3DQEBCwUAMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTAeFw0yMzEwMTcxOTQwMDBaFw0zMzEwMTcxOTQxMDBaMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALDoKB8rTJG0QcSZdGasCXOdZOfj7o5XQcEks3KyWWrGpqLl2zQE5ZX79Tn+vpx8nse55u3uW9v9aqPv4V2Ou7GL+koCBdnyA2ogvT8vAw4IKfniz5/B42eoLjG/hX4L0qdsCLX/4Xd3TDNw018P6dkro7jierBz1vs7P1gAEmgh8qulDKEG+fZIU73hFG7QUMHEVqwEz+us/0rPq0LHr1/enXlltuQGwGoC7eoEmA1lNdQwUKl4lAMjNal/PcOfIIkbP9VZyqKRt59wCwDgd9bs/Gq5wTWqegA1jBhyuwgklVlwXLcGBIiQ1Kx3PQYonHgjj4Njgtt9Uh2MTJ/f5I0CAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAFXMr24C5awhD0XBgA1f+YtZUmt5i461L9uoLm8KVStVqDgwrKXmMc3zcrugw0i5SAwtrUfEKAI9jpkRcha/ve1GKcbnFnmpclE6igdbCeDWNRlGa2JjaznqYIDsnJyn41JRNnu69IaQ/2V3MGbxcF9BfqPl1NHkfGFYJgq4e48zW+AMuQkvSRF5SaQvWm+66L/Q7TnY8wlzgR4rrWd0DKKaJy81ucBottzB1n8h13phEgqznH7bfjG6oHXfGxf+R8o/vj2EbfHg8A4Jgh90NSsN1Cb2e86pDq24qT+yso/3mh0GX0ge+PD+YH5aC5h0fbxJbGlf5G7e9N3TRne0ckQ=="  # pragma: allowlist secret # noqa: E501
 # Create OL Platform Engineering Realm
 ol_platform_engineering_realm = keycloak.Realm(
     "ol-platform-engineering",
@@ -460,66 +458,6 @@ if stack_info.env_suffix == "qa":
     )
     # OKTA-DEV-QA [END] # noqa: ERA001
 
-    # OL-DEV-FAKE-TOUCHSTONE-QA [START] # noqa: ERA001
-    ol_apps_dev_fake_touchstone_qa_identity_provider = keycloak.saml.IdentityProvider(
-        "fake-touchstone",
-        realm=ol_apps_realm.id,
-        alias="fake-touchstone",
-        display_name="Fake Touchstone",
-        entity_id=f"{keycloak_url}/realms/olapps",
-        name_id_policy_format="Unspecified",
-        force_authn=False,
-        post_binding_response=True,
-        post_binding_authn_request=True,
-        principal_type="ATTRIBUTE",
-        principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
-        single_sign_on_service_url="https://dev-66940844.okta.com/app/dev-66940844_oldevtouchstoneqa_1/exkcta3wbyYMdAMAP5d7/sso/saml",
-        trust_email=True,
-        validate_signature=True,
-        signing_certificate=ol_apps_dev_fake_touchstone_qa_sig_cert,
-        want_assertions_encrypted=True,
-        want_assertions_signed=True,
-        opts=resource_options,
-        first_broker_login_flow_alias=ol_touchstone_first_login_flow.alias,
-        hide_on_login_page=True,
-    )
-    oidc_attribute_importer_identity_provider_mapper = (
-        keycloak.AttributeImporterIdentityProviderMapper(
-            "map-fake-touchstone-qa-saml-email-attribute",
-            realm=ol_apps_realm.id,
-            attribute_name="email",
-            identity_provider_alias=ol_apps_dev_fake_touchstone_qa_identity_provider.alias,
-            user_attribute="email",
-            extra_config={
-                "syncMode": "INHERIT",
-            },
-            opts=resource_options,
-        ),
-        keycloak.AttributeImporterIdentityProviderMapper(
-            "map-fake-touchstone-qa-saml-last-name-attribute",
-            realm=ol_apps_realm.id,
-            attribute_name="sn",
-            identity_provider_alias=ol_apps_dev_fake_touchstone_qa_identity_provider.alias,
-            user_attribute="lastName",
-            extra_config={
-                "syncMode": "INHERIT",
-            },
-            opts=resource_options,
-        ),
-        keycloak.AttributeImporterIdentityProviderMapper(
-            "map-fake-touchstone-qa-saml-first-name-attribute",
-            realm=ol_apps_realm.id,
-            attribute_name="givenName",
-            identity_provider_alias=ol_apps_dev_fake_touchstone_qa_identity_provider.alias,
-            user_attribute="firstName",
-            extra_config={
-                "syncMode": "INHERIT",
-            },
-            opts=resource_options,
-        ),
-    )
-    # OL-DEV-FAKE-TOUCHSTONE-QA [END] # noqa: ERA001
-
 if stack_info.env_suffix == "ci":
     # OKTA-DEV-CI [START] # noqa: ERA001
     ol_apps_okta_saml_identity_provider = keycloak.saml.IdentityProvider(
@@ -584,7 +522,8 @@ if stack_info.env_suffix == "ci":
     )
     # OKTA-DEV-CI [END] # noqa: ERA001
 
-    # OL-DEV-FAKE-TOUCHSTONE-CI [START] # noqa: ERA001
+if stack_info.env_suffix in ["ci", "qa"]:
+    # OL-DEV-FAKE-TOUCHSTONE [START] # noqa: ERA001
     ol_apps_dev_fake_touchstone_ci_identity_provider = keycloak.saml.IdentityProvider(
         "fake-touchstone",
         realm=ol_apps_realm.id,
@@ -597,10 +536,12 @@ if stack_info.env_suffix == "ci":
         post_binding_authn_request=True,
         principal_type="ATTRIBUTE",
         principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
-        single_sign_on_service_url="https://dev-66940844.okta.com/app/dev-66940844_oldevtouchstoneqa_1/exkcta3wbyYMdAMAP5d7/sso/saml",
+        single_sign_on_service_url=keycloak_config.get_object(
+            "fake_touchstone_single_sign_on_service_url"
+        ),
         trust_email=True,
         validate_signature=True,
-        signing_certificate=ol_apps_dev_fake_touchstone_ci_sig_cert,
+        signing_certificate=keycloak_config.get_object("fake_touchstone_sig_cert"),
         want_assertions_encrypted=True,
         want_assertions_signed=True,
         opts=resource_options,
