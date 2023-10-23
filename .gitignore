@@ -13,3 +13,4 @@ venv/
 .idea/
 *.swp
 pyinfra-debug.log
+.vscode/
