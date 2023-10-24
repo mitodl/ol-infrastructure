@@ -941,18 +941,21 @@ socks = ["socksio (==1.*)"]
 
 [[package]]
 name = "hvac"
-version = "1.2.1"
+version = "2.0.0"
 description = "HashiCorp Vault API client"
 optional = false
-python-versions = ">=3.6.2,<4.0.0"
+python-versions = ">=3.8,<4.0"
 files = [
-    {file = "hvac-1.2.1-py3-none-any.whl", hash = "sha256:cb87f5724be8fd5f57507f5d5a94e6c42d2675128b460bf3186f966e07d4db78"},
-    {file = "hvac-1.2.1.tar.gz", hash = "sha256:c786e3dfa1f35239810e5317cccadbe358f49b8c9001a1f2f68b79a250b9f8a1"},
+    {file = "hvac-2.0.0-py3-none-any.whl", hash = "sha256:3b14d0979b98ea993eca73b7dac7161b5547ede369a9b28f4fa40f18e74ec3f3"},
+    {file = "hvac-2.0.0.tar.gz", hash = "sha256:6a51cb9a0d22fe13e824cb0b0a1ce2eeacb9ce6af68b7d1b6689e25ec1becaf5"},
 ]
 
 [package.dependencies]
-pyhcl = ">=0.4.4,<0.5.0"
+pyhcl = {version = ">=0.4.4,<0.5.0", optional = true, markers = "extra == \"parser\""}
 requests = ">=2.27.1,<3.0.0"
+
+[package.extras]
+parser = ["pyhcl (>=0.4.4,<0.5.0)"]
 
 [[package]]
 name = "identify"
@@ -2696,4 +2699,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "ecf31c1dd8e250401b9441de59d5de3c7e21707ee1d644e9003e0d92341a08f5"
+content-hash = "138d3d1e63694727cd3bff26bf61edc42808d9144b713fc32d06f1010a0ba61c"
