@@ -4,6 +4,7 @@ This creates a single approle auth backend at auth/approle.
 The names of the roles under that backend are based on the hcl
 file names in the vault/policies folder.
 """
+
 from pathlib import Path, PurePath
 
 from ol_infrastructure.lib.pulumi_helper import parse_stack

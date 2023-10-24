@@ -12,6 +12,7 @@
 - Provision an AWS load balancer and connect the deployed EC2 instances
 - Create a DNS record for the deployed load balancer
 """
+
 import base64
 import json
 import textwrap

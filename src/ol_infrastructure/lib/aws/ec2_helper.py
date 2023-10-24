@@ -1,4 +1,5 @@
 """Helper functions for working with EC2 resources."""
+
 from enum import Enum, unique
 from functools import lru_cache
 from ipaddress import IPv4Network

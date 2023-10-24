@@ -19,6 +19,7 @@ Required On Input:
 - VPC
 - Subnets (Implicit)
 """
+
 import json
 from enum import Enum, unique
 from typing import Optional, Union

@@ -7,6 +7,7 @@
 - Create ALB with listeners for routing to deployed edxapp instances
 - Create autoscale groups for web and worker instances
 """
+
 import base64
 import json
 import textwrap

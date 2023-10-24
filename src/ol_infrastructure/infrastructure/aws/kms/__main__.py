@@ -1,4 +1,5 @@
 """State to create symmetric AWS KMS Customer Master Keys (CMK)."""
+
 import json
 
 from pulumi import export

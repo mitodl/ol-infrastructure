@@ -16,6 +16,7 @@ Required On Input:
 - VPC
 - Subnets (Implicit)
 """
+
 from enum import Enum, unique
 from typing import Optional
 

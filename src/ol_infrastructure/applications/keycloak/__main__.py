@@ -1,6 +1,7 @@
 """The complete state needed to provision Keycloak running on Docker.
 
 """
+
 import base64
 import json
 import textwrap

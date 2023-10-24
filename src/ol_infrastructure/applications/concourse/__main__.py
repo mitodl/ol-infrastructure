@@ -5,6 +5,7 @@
 - Create an autoscaling group for Concourse web nodes
 - Create an autoscaling group for Concourse worker instances
 """
+
 import base64
 import importlib
 import json

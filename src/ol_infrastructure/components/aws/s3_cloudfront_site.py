@@ -1,4 +1,5 @@
 """Module for creating and managing static websites hosted in S3 and delivered through Cloudfront."""  # noqa: E501
+
 import json
 from enum import Enum
 from typing import Optional
