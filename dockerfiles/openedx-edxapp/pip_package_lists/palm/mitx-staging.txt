@@ -12,7 +12,7 @@ ol-openedx-logging==0.2.0
 ol-openedx-rapid-response-reports==0.2.2
 ol-openedx-sentry==0.1.2
 openedx-scorm-xblock>=16.0.0,<17.0.0
-pip==23.2.1
+pip==23.3.1
 rapid-response-xblock
 sentry-sdk==1.21.1  # Fix RecursionError
 setuptools==65.7.0
