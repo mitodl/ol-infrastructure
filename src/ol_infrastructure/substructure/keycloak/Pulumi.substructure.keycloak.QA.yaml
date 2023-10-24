@@ -19,7 +19,7 @@ config:
   keycloak:openid_clients:
   - client_info:
       open: https://mit-open-rc.odl.mit.edu
-      open-discusions: https://discussions-rc.odl.mit.edu
+      open-discussions: https://discussions-rc.odl.mit.edu
     realm_name: olapps
   - client_info:
       airbyte: https://airbyte-qa.odl.mit.edu

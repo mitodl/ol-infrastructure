@@ -399,13 +399,12 @@ if stack_info.env_suffix in ["ci", "qa"]:
         realm=ol_apps_realm.id,
         alias="fake-touchstone",
         display_name="Fake Touchstone",
-        entity_id="http://www.okta.com/exkcta3wbyYMdAMAP5d7",
+        entity_id=f"{keycloak_url}/realms/olapps",
         name_id_policy_format="Unspecified",
         force_authn=False,
         post_binding_response=True,
         post_binding_authn_request=True,
-        principal_type="ATTRIBUTE",
-        principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
+        principal_type="SUBJECT",
         single_sign_on_service_url=keycloak_config.get(
             "fake_touchstone_single_sign_on_service_url"
         ),
@@ -417,6 +416,7 @@ if stack_info.env_suffix in ["ci", "qa"]:
         opts=resource_options,
         first_broker_login_flow_alias=ol_touchstone_first_login_flow.alias,
         hide_on_login_page=False,
+        gui_order="60",
     )
     oidc_attribute_importer_identity_provider_mapper = (
         keycloak.AttributeImporterIdentityProviderMapper(
@@ -459,6 +459,7 @@ if stack_info.env_suffix in ["ci", "qa"]:
         "okta-test",
         realm=ol_apps_realm.id,
         alias="okta-test",
+        display_name="Okta test",
         post_binding_logout=False,
         post_binding_response=True,
         backchannel_supported=False,
@@ -470,7 +471,7 @@ if stack_info.env_suffix in ["ci", "qa"]:
             "okta_single_sign_on_service_url"
         ),
         want_assertions_signed=False,
-        gui_order="10",
+        gui_order="50",
         validate_signature=False,
         hide_on_login_page=False,
         signing_certificate=keycloak_config.get("okta_sig_cert"),
