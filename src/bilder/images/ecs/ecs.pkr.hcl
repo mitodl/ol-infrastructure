@@ -1,6 +1,6 @@
 locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
-  app_name  = "odl_video_service"
+  app_name  = "ecs"
 }
 
 variable "build_environment" {
@@ -10,7 +10,7 @@ variable "build_environment" {
 
 variable "business_unit" {
   type    = string
-  default = "ovs"
+  default = "operations"
 }
 
 variable "node_type" {
@@ -18,9 +18,9 @@ variable "node_type" {
   default = "server"
 }
 
-source "amazon-ebs" "odl_video_service" {
-  ami_description         = "Deployment image for ODL Video Serviceserver generated at ${local.timestamp}"
-  ami_name                = "odl_video_service-${var.node_type}-${local.timestamp}"
+source "amazon-ebs" "ecs" {
+  ami_description         = "Deployment image for ECS base server generated at ${local.timestamp}"
+  ami_name                = "ecs-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
   launch_block_device_mappings {
@@ -76,7 +76,7 @@ source "amazon-ebs" "odl_video_service" {
 
 build {
   sources = [
-    "source.amazon-ebs.odl_video_service",
+    "source.amazon-ebs.ecs",
   ]
 
   provisioner "shell-local" {

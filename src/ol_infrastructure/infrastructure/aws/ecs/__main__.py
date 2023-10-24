@@ -15,7 +15,7 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, ResourceOptions
-from pulumi_aws import acm, autoscaling, ec2, ecs, iam, lb
+from pulumi_aws import acm, autoscaling, ec2, ecs, get_caller_identity, iam, lb
 
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -267,11 +267,22 @@ user_data = consul_datacenter.apply(
 ##########
 
 
-ecs_ami_id = "ami-0d8b4d379c115ad61"
+aws_account = get_caller_identity()
+ecs_ami = ec2.get_ami(
+    filters=[
+        ec2.GetAmiFilterArgs(name="tag:OU", values=["operations"]),
+        ec2.GetAmiFilterArgs(name="tag:app", values=["ecs"]),
+        ec2.GetAmiFilterArgs(name="name", values=["ecs-server-*"]),
+        ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
+        ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
+    ],
+    most_recent=True,
+    owners=[aws_account.account_id],
+)
 
 launch_template = ec2.LaunchTemplate(
     f"{environment_name}-ecs-launch-template",
-    image_id=ecs_ami_id,
+    image_id=ecs_ami.id,
     key_name="oldevops",
     iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
         arn="arn:aws:iam::610119931565:instance-profile/ecsInstanceRole",
@@ -290,7 +301,7 @@ autoscaling_group_tags = [
         propagate_at_launch=True,
     )
     for key_name, key_value in aws_config.merged_tags(
-        {"ami_id": ecs_ami_id, "AmazonECSManaged": "true"}
+        {"ami_id": ecs_ami.id, "AmazonECSManaged": "true"}
     ).items()
 ]
 
