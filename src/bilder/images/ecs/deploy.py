@@ -4,7 +4,7 @@ from pathlib import Path
 from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
-from pyinfra.operations import apt, server
+from pyinfra.operations import apt, files, server
 
 from bilder.components.docker.steps import create_systemd_service, deploy_docker
 from bilder.components.hashicorp.consul.models import (
@@ -20,6 +20,7 @@ from bilder.components.hashicorp.steps import (
 )
 from bilder.facts.has_systemd import HasSystemd
 
+FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
@@ -66,6 +67,15 @@ apt.deb(
 ## NOTE
 # the userdata of the instantiated server should create the
 # file /etc/ecs/ecs.config which looks like : ECS_CLUSTER=<cluster-name>
+
+# override the default apparmor profile for ecs to allow ecs agent to run on deb 12
+files.put(
+    name="Override apparmor profile.",
+    src=str(FILES_DIRECTORY.joinpath("ecs-default")),
+    dest=str(Path("/etc/apparmor.d").joinpath("ecs-default")),
+    mode="0644",
+)
+
 
 if host.get_fact(HasSystemd):
     register_services(hashicorp_products, start_services_immediately=False)
