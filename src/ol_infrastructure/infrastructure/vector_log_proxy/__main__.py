@@ -34,8 +34,7 @@ def build_user_data(consul_dc, challenge_url, service_hash_bucket_fqdn):
                 "content": json.dumps(
                     {
                         "retry_join": [
-                            "provider=aws tag_key=consul_env "
-                            f"tag_value={consul_dc}"  # noqa: ISC001, RUF100
+                            "provider=aws tag_key=consul_env " f"tag_value={consul_dc}"  # noqa: ISC001, RUF100
                         ],
                         "datacenter": consul_dc,
                     }
@@ -44,16 +43,19 @@ def build_user_data(consul_dc, challenge_url, service_hash_bucket_fqdn):
             },
             {
                 "path": "/etc/default/traefik",
-                "content": textwrap.dedent(f"""\
+                "content": textwrap.dedent(
+                    f"""\
             DOMAIN={vector_log_proxy_config.require('web_host_domain')}
             FASTLY_SERVICE_HASH_BUCKET_FQDN={service_hash_bucket_fqdn}
             FASTLY_SERVICE_HASH_BUCKET_CHALLENGE_URL="{challenge_url}"
-            """),
+            """
+                ),
                 "owner": "root:root",
             },
             {
                 "path": "/etc/default/vector",
-                "content": textwrap.dedent(f"""\
+                "content": textwrap.dedent(
+                    f"""\
             ENVIRONMENT={consul_dc}
             APPLICATION=vector-log-proxy
             SERVICE=vector-log-proxy
@@ -67,7 +69,8 @@ def build_user_data(consul_dc, challenge_url, service_hash_bucket_fqdn):
             FASTLY_PROXY_PASSWORD={fastly_proxy_credentials['password']}
             FASTLY_PROXY_USERNAME={fastly_proxy_credentials['username']}
             FASTLY_CHALLENGE_REDIRECT_URL={challenge_url}
-            """),
+            """
+                ),
                 "owner": "root:root",
             },
         ]

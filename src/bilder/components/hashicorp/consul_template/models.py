@@ -249,6 +249,7 @@ class ConsulTemplate(HashicorpProduct):
 
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
         for fpath, config in self.configuration.items():
-            yield self.configuration_directory.joinpath(fpath), config.model_dump_json(
-                exclude_none=True, indent=2
+            yield (
+                self.configuration_directory.joinpath(fpath),
+                config.model_dump_json(exclude_none=True, indent=2),
             )

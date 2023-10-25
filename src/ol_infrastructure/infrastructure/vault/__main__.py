@@ -474,7 +474,8 @@ def cloud_init_user_data(  # noqa: PLR0913
             },
             {
                 "path": "/etc/default/vector",
-                "content": textwrap.dedent(f"""\
+                "content": textwrap.dedent(
+                    f"""\
                     ENVIRONMENT={consul_env_name}
                     APPLICATION=vault
                     SERVICE=vault
@@ -482,7 +483,8 @@ def cloud_init_user_data(  # noqa: PLR0913
                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                    """),
+                    """
+                ),
                 "owner": "root:root",
             },
             # TODO: Move TLS key and cert injection to Packer build so that private key  # noqa: E501, FIX002, TD002, TD003

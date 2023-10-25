@@ -49,8 +49,7 @@ vector_log_proxy_secrets = read_yaml_secrets(
 )
 fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
 encoded_fastly_proxy_credentials = base64.b64encode(
-    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}"
-    .encode()
+    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
 ).decode("utf8")
 
 monitoring_stack = StackReference("infrastructure.monitoring")

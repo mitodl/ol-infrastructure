@@ -24,7 +24,8 @@ from ol_concourse.pipelines.constants import (
 
 
 def build_notes_pipeline(
-    release_name: str, edx_deployments: list[DeploymentEnvRelease]  # noqa: ARG001
+    release_name: str,
+    edx_deployments: list[DeploymentEnvRelease],  # noqa: ARG001
 ):
     notes_branch = OpenEdxSupportedRelease[release_name].branch
     notes_repo = git_repo(

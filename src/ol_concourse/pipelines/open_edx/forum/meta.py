@@ -35,7 +35,9 @@ def build_meta_job(release_name):
         pipeline_team = "main"
         pipeline_id = "self"
     else:
-        pipeline_definition_path = "src/ol_concourse/pipelines/open_edx/forum/docker_packer_pulumi_pipeline.py"  # noqa: E501
+        pipeline_definition_path = (
+            "src/ol_concourse/pipelines/open_edx/forum/docker_packer_pulumi_pipeline.py"
+        )
         pipeline_team = "infrastructure"
         pipeline_id = f"docker-packer-pulumi-forum-{release_name}"
     return Job(

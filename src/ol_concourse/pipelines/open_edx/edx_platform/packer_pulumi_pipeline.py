@@ -12,7 +12,8 @@ from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PA
 
 
 def build_edx_pipeline(
-    release_name: str, edx_deployments: list[DeploymentEnvRelease]  # noqa: ARG001
+    release_name: str,
+    edx_deployments: list[DeploymentEnvRelease],  # noqa: ARG001
 ) -> Pipeline:
     edx_platform_code = git_repo(
         name=Identifier("edx-platform"),
