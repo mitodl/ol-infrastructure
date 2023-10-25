@@ -323,7 +323,8 @@ class OLAmazonCache(pulumi.ComponentResource):
             raise ValueError(msg)
 
     def _get_default_memcached_monitoring_profile(
-        self, profile_name: str  # noqa: ARG002
+        self,
+        profile_name: str,  # noqa: ARG002
     ):  # noqa: ARG002, RUF100
         return {}  # not implemented
 

@@ -551,7 +551,8 @@ ovs_lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(f"""\
+                                "content": textwrap.dedent(
+                                    f"""\
                             ENVIRONMENT={consul_dc}
                             APPLICATION=ovs
                             SERVICE=ovs
@@ -560,7 +561,8 @@ ovs_lt_config = OLLaunchTemplateConfig(
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                             GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            """),
+                            """
+                                ),
                                 "owner": "root:root",
                             },
                         ],

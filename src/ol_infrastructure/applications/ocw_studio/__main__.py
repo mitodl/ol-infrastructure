@@ -29,12 +29,8 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 setup_vault_provider()
 github_provider = github.Provider(
     "github-provider",
-    owner=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))[  # noqa: F541
-        "owner"
-    ],
-    token=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))[  # noqa: F541
-        "token"
-    ],
+    owner=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))["owner"],  # noqa: F541
+    token=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))["token"],  # noqa: F541
 )
 github_options = ResourceOptions(provider=github_provider)
 ocw_studio_config = Config("ocw_studio")

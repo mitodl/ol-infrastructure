@@ -1107,17 +1107,20 @@ def cloud_init_user_data_func(
             # There should be something that triggers this only if framework = docker
             {
                 "path": "/etc/docker/compose/.env_caddy",
-                "content": textwrap.dedent(f"""\
+                "content": textwrap.dedent(
+                    f"""\
                     EDXAPP_LMS_URL={edxapp_domains["lms"]}
                     EDXAPP_LMS_PREVIEW_URL={edxapp_domains["preview"]}
                     EDXAPP_CMS_URL={edxapp_domains["studio"]}
-                    """),
+                    """
+                ),
                 "owner": "root:root",
                 "permissions": "0664",
             },
             {
                 "path": "/etc/default/vector",
-                "content": textwrap.dedent(f"""\
+                "content": textwrap.dedent(
+                    f"""\
                     ENVIRONMENT={consul_env_name}
                     APPLICATION=edxapp
                     SERVICE=openedx
@@ -1125,7 +1128,8 @@ def cloud_init_user_data_func(
                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                    """),
+                    """
+                ),
                 "owner": "root:root",
             },
             {
@@ -1375,8 +1379,7 @@ vector_log_proxy_secrets = read_yaml_secrets(
 )
 fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
 encoded_fastly_proxy_credentials = base64.b64encode(
-    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}"
-    .encode()
+    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
 ).decode("utf8")
 
 vector_log_proxy_fqdn = vector_log_proxy_stack.require_output("vector_log_proxy")[
@@ -1481,49 +1484,59 @@ edxapp_fastly_service = fastly.ServiceVcl(
     ],
     snippets=[
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent("""\
+            content=textwrap.dedent(
+                """\
                 if (table.contains(marketing_redirects, req.url.path)) {
                   error 618 "redirect";
-                }"""),
+                }"""
+            ),
             name="Interrupt Redirected Requests",
             type="recv",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(f"""\
+            content=textwrap.dedent(
+                f"""\
                 if (req.url.path ~ "{mfe_regex}") {{
                   set req.url = req.url.path;
                   unset req.http.Cookie;
-                }}"""),
+                }}"""
+            ),
             name="Strip headers to S3 backend",
             type="recv",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(f"""\
+            content=textwrap.dedent(
+                f"""\
                 if (beresp.status == 404 && req.url.path ~ "{mfe_regex}") {{
                   error 600 "### Custom Response";
-                }}"""),
+                }}"""
+            ),
             name="Manage 404 On S3 Origin for MFE",
             type="fetch",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent(f"""\
+            content=textwrap.dedent(
+                f"""\
                 declare local var.mfe_path STRING;
                 if (obj.status == 600) {{
                   set var.mfe_path = regsub(req.url.path, "{mfe_regex}.*", "\\1");
                   set req.url = "/" + var.mfe_path + "/index.html";
                   restart;
-                }}"""),
+                }}"""
+            ),
             name="Fetch site index for MFE custom error",
             priority=120,
             type="error",
         ),
         fastly.ServiceVclSnippetArgs(
-            content=textwrap.dedent("""\
+            content=textwrap.dedent(
+                """\
                 if (obj.status == 618 && obj.response == "redirect") {
                   set obj.status = 302;
                   set obj.http.Location = table.lookup(marketing_redirects, req.url.path) + if (req.url.qs, "?" req.url.qs, "");
                   return (deliver);
-                }"""),  # noqa: E501
+                }"""
+            ),
             name="Route Redirect Requests",
             type="error",
         ),

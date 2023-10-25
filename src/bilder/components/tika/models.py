@@ -11,9 +11,7 @@ class TikaConfig(OLBaseSettings):
     install_directory: Path = Path("/opt/tika")
     tika_user: str = "tika"
 
-    download_url: str = (
-        f"https://archive.apache.org/dist/tika/{version}/tika-server-standard-{version}.jar"
-    )
+    download_url: str = f"https://archive.apache.org/dist/tika/{version}/tika-server-standard-{version}.jar"
     heap_max: str = "2048"
     heap_min: str = "1024"
     install_path: Path = Path(f"/opt/tika/tika-server.{version}.jar")

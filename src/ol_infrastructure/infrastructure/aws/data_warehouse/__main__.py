@@ -203,7 +203,8 @@ query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
         "Resource": [
             f"arn:aws:s3:::ol-data-lake-{stage}-{stack_info.env_suffix}"
             for stage in data_stages
-        ] + [
+        ]
+        + [
             f"arn:aws:s3:::ol-data-lake-{stage}-{stack_info.env_suffix}/*"
             for stage in data_stages
         ],

@@ -120,14 +120,12 @@ class OLPostgresDBConfig(OLDBConfig):
     engine: str = "postgres"
     engine_version: str = "15.3"
     port: PositiveInt = PositiveInt(5432)
-    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = (
-        [  # noqa: RUF012
-            {"name": "client_encoding", "value": "UTF-8"},
-            {"name": "timezone", "value": "UTC"},
-            {"name": "rds.force_ssl", "value": 1},
-            {"name": "autovacuum", "value": 1},
-        ]
-    )
+    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [  # noqa: RUF012
+        {"name": "client_encoding", "value": "UTF-8"},
+        {"name": "timezone", "value": "UTC"},
+        {"name": "rds.force_ssl", "value": 1},
+        {"name": "autovacuum", "value": 1},
+    ]
 
 
 class OLMariaDBConfig(OLDBConfig):
@@ -136,19 +134,17 @@ class OLMariaDBConfig(OLDBConfig):
     engine: str = "mariadb"
     engine_version: str = "10.6.12"
     port: PositiveInt = PositiveInt(3306)
-    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = (
-        [  # noqa: RUF012
-            {"name": "character_set_client", "value": "utf8mb4"},
-            {"name": "character_set_connection", "value": "utf8mb4"},
-            {"name": "character_set_database", "value": "utf8mb4"},
-            {"name": "character_set_filesystem", "value": "utf8mb4"},
-            {"name": "character_set_results", "value": "utf8mb4"},
-            {"name": "character_set_server", "value": "utf8mb4"},
-            {"name": "collation_server", "value": "utf8mb4_unicode_ci"},
-            {"name": "collation_connection", "value": "utf8mb4_unicode_ci"},
-            {"name": "time_zone", "value": "UTC"},
-        ]
-    )
+    parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [  # noqa: RUF012
+        {"name": "character_set_client", "value": "utf8mb4"},
+        {"name": "character_set_connection", "value": "utf8mb4"},
+        {"name": "character_set_database", "value": "utf8mb4"},
+        {"name": "character_set_filesystem", "value": "utf8mb4"},
+        {"name": "character_set_results", "value": "utf8mb4"},
+        {"name": "character_set_server", "value": "utf8mb4"},
+        {"name": "collation_server", "value": "utf8mb4_unicode_ci"},
+        {"name": "collation_connection", "value": "utf8mb4_unicode_ci"},
+        {"name": "time_zone", "value": "UTC"},
+    ]
 
 
 class OLAmazonDB(pulumi.ComponentResource):
