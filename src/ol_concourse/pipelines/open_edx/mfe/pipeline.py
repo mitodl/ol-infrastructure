@@ -158,14 +158,16 @@ def mfe_job(
                             # mismatched versions of react defined in tertiary
                             # dependencies https://stackoverflow.com/a/66620869
                             # Ensure that webpack is installed (TMM 2023-06-27)
-                            textwrap.dedent(f"""\
+                            textwrap.dedent(
+                                f"""\
                                 apt-get update
                                 apt-get install -q -y python3 python-is-python3 build-essential
                                 npm install --legacy-peer-deps
                                 {branding_overrides}
                                 npm install webpack --legacy-peer-deps
                                 NODE_ENV=production npm run build
-                                """),  # noqa: E501
+                                """
+                            ),
                         ],
                     ),
                 ),

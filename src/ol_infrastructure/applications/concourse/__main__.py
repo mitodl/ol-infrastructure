@@ -104,8 +104,7 @@ def build_worker_user_data(
                 "content": json.dumps(
                     {
                         "retry_join": [
-                            "provider=aws tag_key=consul_env "
-                            f"tag_value={consul_dc}"  # noqa: ISC001, RUF100
+                            "provider=aws tag_key=consul_env " f"tag_value={consul_dc}"  # noqa: ISC001, RUF100
                         ],
                         "datacenter": consul_dc,
                     }
@@ -114,7 +113,8 @@ def build_worker_user_data(
             },
             {
                 "path": "/etc/default/vector",
-                "content": textwrap.dedent(f"""\
+                "content": textwrap.dedent(
+                    f"""\
                     ENVIRONMENT={consul_dc}
                     APPLICATION=concourse-worker
                     SERVICE=concourse
@@ -123,7 +123,8 @@ def build_worker_user_data(
                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                    """),
+                    """
+                ),
                 "owner": "root:root",
             },
         ]
@@ -132,9 +133,11 @@ def build_worker_user_data(
         yaml_contents["write_files"].append(
             {
                 "path": "/etc/default/concourse-team",
-                "content": textwrap.dedent(f"""\
+                "content": textwrap.dedent(
+                    f"""\
                      CONCOURSE_TEAM={concourse_team}
-                     """),
+                     """
+                ),
                 "owner": "root:root",
             }
         )
@@ -556,7 +559,8 @@ web_launch_config = ec2.LaunchTemplate(
                             },
                             {
                                 "path": "/etc/default/vector",
-                                "content": textwrap.dedent(f"""\
+                                "content": textwrap.dedent(
+                                    f"""\
                                     ENVIRONMENT={consul_dc}
                                     APPLICATION=concourse-web
                                     SERVICE=concourse
@@ -565,7 +569,8 @@ web_launch_config = ec2.LaunchTemplate(
                                     GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
                                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                                    """),
+                                    """
+                                ),
                                 "owner": "root:root",
                             },
                         ]

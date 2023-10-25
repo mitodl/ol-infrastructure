@@ -9,7 +9,8 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
 def get_consul_provider(
-    stack_info: StackInfo, wrap_in_pulumi_options: bool = True  # noqa: FBT001, FBT002
+    stack_info: StackInfo,
+    wrap_in_pulumi_options: bool = True,  # noqa: FBT001, FBT002
 ) -> Union[consul.Provider, pulumi.ResourceOptions]:
     consul_config = pulumi.Config("consul")
     consul_provider = consul.Provider(

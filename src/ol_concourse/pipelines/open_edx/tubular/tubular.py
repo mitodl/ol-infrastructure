@@ -80,7 +80,8 @@ def tubular_pipeline() -> Pipeline:
                         path="python",
                         args=[
                             "-c",
-                            textwrap.dedent("""\
+                            textwrap.dedent(
+                                """\
                             import json
                             from pathlib import Path
                             learner_dir = Path("tubular-retirees/processing")
@@ -91,7 +92,8 @@ def tubular_pipeline() -> Pipeline:
                                 retirees.append(retiree)
                             with open("retirees_dir/vars.json","w") as vj:
                                 vj.write(json.dumps(retirees))
-                            """),
+                            """
+                            ),
                         ],
                     ),
                     outputs=[Output(name=Identifier("retirees_dir"))],

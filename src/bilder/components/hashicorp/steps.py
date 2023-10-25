@@ -35,8 +35,7 @@ def install_hashicorp_products(hashicorp_products: list[HashicorpProduct]):
         file_download = f"{product.name}_{product.version}_linux_{cpu_arch}.zip"
         file_hashes = (
             httpx.get(
-                "https://releases.hashicorp.com/{product_name}/{product_version}/{product_name}_{product_version}_SHA256SUMS"
-                .format(product_name=product.name, product_version=product.version)
+                f"https://releases.hashicorp.com/{product.name}/{product.version}/{product.name}_{product.version}_SHA256SUMS"
             )
             .read()
             .decode("utf8")

@@ -20,7 +20,8 @@ from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PA
 
 
 def build_codejail_pipeline(
-    release_name: str, edx_deployments: list[DeploymentEnvRelease]  # noqa: ARG001
+    release_name: str,
+    edx_deployments: list[DeploymentEnvRelease],  # noqa: ARG001
 ):
     openedx_branch = OpenEdxSupportedRelease[release_name].branch
     codejail_repo = git_repo(
