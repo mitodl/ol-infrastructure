@@ -88,6 +88,17 @@ services:
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     env_file:
       - .env
+  openedx-ol-data-exports:
+    image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+    container_name: openedx-ol-data-exports
+    restart: unless-stopped
+    ports:
+    - "4000"
+    entrypoint: ["poetry", "run", "dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "--package-name", "ol_orchestrate.definitions.edx.openedx_data_extract"]
+    volumes:
+    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
+    env_file:
+      - .env
   traefik:
     image: traefik:latest
     container_name: traefik
