@@ -164,7 +164,7 @@ operations_vpc = network_stack.require_output("operations_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 mongodb_cluster_uri = mongodb_atlas_stack.require_output("atlas_cluster")[
     "connection_strings"
-]
+][0]
 
 ##############
 # S3 Buckets #
