@@ -99,6 +99,9 @@ monitoring_stack = StackReference("infrastructure.monitoring")
 vector_log_proxy_stack = StackReference(
     f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
 )
+mongodb_atlas_stack = StackReference(
+    f"infrastructure.mongodb_atlas.{stack_info.env_prefix}.{stack_info.name}"
+)
 
 #############
 # Variables #
@@ -159,6 +162,9 @@ kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 kms_s3_key = kms_stack.require_output("kms_s3_data_analytics_key")
 operations_vpc = network_stack.require_output("operations_vpc")
 data_vpc = network_stack.require_output("data_vpc")
+mongodb_cluster_uri = mongodb_atlas_stack.require_output("atlas_cluster")[
+    "connection_strings"
+]
 
 ##############
 # S3 Buckets #
@@ -694,8 +700,14 @@ vault.generic.Secret(
 vault.generic.Secret(
     "forum-mongodb-atlas-user-password",
     path=edxapp_vault_mount.path.apply("{}/mongodb-forum".format),
-    data_json=json.dumps(
-        {"username": "forum", "password": mongo_atlas_credentials["forum"]}
+    data_json=mongodb_cluster_uri.apply(
+        lambda uri: json.dumps(
+            {
+                "username": "forum",
+                "password": mongo_atlas_credentials["forum"],
+                "uri": uri["standard_srv"],  # This is used by Dagster
+            }
+        ),
     ),
 )
 
@@ -1535,7 +1547,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
                   set obj.status = 302;
                   set obj.http.Location = table.lookup(marketing_redirects, req.url.path) + if (req.url.qs, "?" req.url.qs, "");
                   return (deliver);
-                }"""
+                }"""  # noqa: E501
             ),
             name="Route Redirect Requests",
             type="error",
