@@ -166,7 +166,7 @@ def mfe_job(
                                 {branding_overrides}
                                 npm install webpack --legacy-peer-deps
                                 NODE_ENV=production npm run build
-                                """
+                                """  # noqa: E501
                             ),
                         ],
                     ),

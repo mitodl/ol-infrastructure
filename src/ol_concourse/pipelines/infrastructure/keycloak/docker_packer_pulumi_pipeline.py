@@ -135,7 +135,7 @@ def build_keycloak_pipeline() -> Pipeline:
                         cp -r {cas_protocol_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {metrics_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {user_migration_spi.name}/* {image_build_context.name}/plugins/
-                        """
+                        """  # noqa: E501
                             ),
                         ],
                     ),
