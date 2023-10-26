@@ -100,9 +100,6 @@ server.shell(
 # Put down EDX pipeline consul templates
 edx_pipeline_files = [
     "edxorg_gcp.yaml",
-    "mitxonline_edx.yaml",
-    "residential_edx.yaml",
-    "xpro_edx.yaml",
 ]
 
 edx_pipeline_directory = Path("/opt/pipeline_definitions/edx_pipeline")
