@@ -45,15 +45,32 @@ aws_config = AWSBase(
 
 # Bucket used to store file uploads from bootcamps app.
 bootcamps_storage_bucket_name = f"ol-bootcamps-app-{stack_info.env_suffix}"
-bootcamps_storage_bucket = s3.Bucket(
+bootcamps_storage_bucket = s3.BucketV2(
     f"ol-bootcamps-app-{stack_info.env_suffix}",
     bucket=bootcamps_storage_bucket_name,
-    versioning=s3.BucketVersioningArgs(
-        enabled=True,
-    ),
     tags=aws_config.tags,
 )
-
+bootcamps_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol-bootcamps-app-bucket-ownership-controls",
+    bucket=bootcamps_storage_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+s3.BucketVersioningV2(
+    "ol-bootcamps-app-bucket-versioning",
+    bucket=bootcamps_storage_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+ocw_storage_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-bootcamps-app-bucket-public-access",
+    bucket=bootcamps_storage_bucket.id,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+)
 
 bootcamps_iam_policy = iam.Policy(
     f"bootcamps-{stack_info.env_suffix}-policy",
