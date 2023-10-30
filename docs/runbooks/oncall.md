@@ -3,6 +3,7 @@
 * [XQueueWatcher](#xqueuewatcher)
 * [OVS](#ovs)
 * [Bootcamp-Ecommerce](#bootcamp-ecommerce)
+* [MITx (OpenEdX Residential)](#mitx-(openedx-residential))
 
 # Introduction
 
@@ -35,6 +36,7 @@ identify the issue and focus on putting out the fire.
 # Products
 
 ## SaltStack
+
 
 ### MemoryUsageWarning operations-<ENVIRONMENT>
 
@@ -184,6 +186,9 @@ Use the AWS EC2 web console and navigate to the EC2 -> Auto Scaling Group pane. 
 Once you have the right ASG, click on the "Instance Refresh" tab and then click
 the "Start Instance Refresh" button.
 
+_Be sure to un-check the "Enable Skip Matching" box_, or your instance refresh
+will most likely not do anything at all.
+
 ### Request by deeveloper to add videos
 
 _Diagnosis_
@@ -272,4 +277,35 @@ Failed:    0
 Total states run:     1
 Total run time: 448.928 ms
 cpatti@ip-10-0-2-195:~$
-  ```
+```
+
+## MITx (OpenEdX Residential)
+
+### Task handler raised error: "OperationalError(1045, \"Access denied for user 'v-edxa-fmT0KbL5X'@'10.7.0.237' (using password: YES)\
+
+_Diagnosis_
+
+If the oncall receives this page, instances cerdentials to access Vault and the
+secrets it contains have lapsed.
+
+_Mitigation_
+
+Fixing this issue currently requires an instance refresh, as the newly launched
+instances will have all the necessary credentials.
+
+From the EC2 console, on the left hand side, click "Auto Scaling Groups", then
+type 'edxapp-web-mitx-<ENVIRONMENT>' e.g. 'edxapp-web-mitx-production'. This
+should yield 1 result with something like 'edxapp-web-autoscaling-group-XXXX' in
+the 'Name' column. Click that.
+
+Now click the "Instance Refres" tab.
+
+Click "Start instance refresh".
+
+_Be sure to un-check the "Enable Skip Matching" box_, or your instance refresh
+will most likely not do anything at all.
+
+Monitor the instance refresh to ensure it completes successfully. If you have
+been receiving multiple similar pages, they should stop coming in. If they
+continue, please escalate this incident as this problem is user visible and thus
+high impact to customers.
