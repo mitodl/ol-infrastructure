@@ -252,7 +252,8 @@ You need to refresh the credentials the salt-proxy is using for Heroku to manage
 
 - ssh to the salt production server: `ssh salt-production.odl.mit.edu`
 - Run the salt proxy command to refresh creds: `salt proxy-bootcamps-production state.sls heroku.update_heroku_config`. You should see output similar to the following:
-  ```
+
+```
 cpatti@ip-10-0-2-195:~$ sudo salt proxy-bootcamps-production state.sls heroku.update_heroku_config
 proxy-bootcamps-production:
 ----------
@@ -282,11 +283,11 @@ cpatti@ip-10-0-2-195:~$
 
 ## OpenEdX Residential MITx
 
-### Task handler raised error: "OperationalError(1045, \"Access denied for user 'v-edxa-fmT0KbL5X'@'10.7.0.237' (using password: YES)\
+### Task handler raised error: "OperationalError(1045, "Access denied for user 'v-edxa-fmT0KbL5X'@'10.7.0.237' (using password: YES)
 
 _Diagnosis_
 
-If the oncall receives this page, instances cerdentials to access Vault and the
+If the oncall receives this page, instances credentials to access Vault and the
 secrets it contains have lapsed.
 
 _Mitigation_
@@ -299,7 +300,7 @@ type 'edxapp-web-mitx-<ENVIRONMENT>' e.g. 'edxapp-web-mitx-production'. This
 should yield 1 result with something like 'edxapp-web-autoscaling-group-XXXX' in
 the 'Name' column. Click that.
 
-Now click the "Instance Refres" tab.
+Now click the "Instance Refresh" tab.
 
 Click "Start instance refresh".
 
