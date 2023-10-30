@@ -9,7 +9,7 @@ ERROR for site owner: Invalid domain for site key.
 3. There is a dropdown on the top left that lets you see which site/application configuration that you're working with.
 4. Once you're on the site that you care about, there is a gear icon on the top right. Click that for the settings.
 5. Three things to verify:
-  a. Does the site key match what is listed in app configuration + vault?
-  b. Does the secret key match what is listed in app configuration + vault?
-  c. Is the list of domains correct?
-  d. NOTE: When checking keys, look at the end of the string rather than the start. They all seem to start the same.
+  1. Does the site key match what is listed in app configuration + vault?
+  2. Does the secret key match what is listed in app configuration + vault?
+  3. Is the list of domains correct?
+  4. NOTE: When checking keys, look at the end of the string rather than the start. They all seem to start the same.
