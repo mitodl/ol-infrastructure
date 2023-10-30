@@ -93,7 +93,7 @@ ol_platform_engineering_realm = keycloak.Realm(
         from_="odl-devops@mit.edu",
         from_display_name="Identity - OL PLatform Engineering",
         host=email_host,
-        port=587,
+        port="587",
         reply_to="odl-devops@mit.edu",
         reply_to_display_name="Identity - OL Platform Engineering",
         starttls=True,
@@ -131,6 +131,22 @@ required_action_update_password = keycloak.RequiredAction(
     enabled=True,
     opts=resource_options,
 )
+
+""" # noqa: ERA001
+# This can be uncommented when a new release of the pulumi-keycloak
+# library is released that includes the below or similar PR
+# https://github.com/mrparkers/terraform-provider-keycloak/pull/858
+# Currently this is being done manually in the Keycloak UI.
+ol_platform_engineering_rsa_key = keycloak.RealmKeystoreRsa(
+    "ol-platform-engineering-rsa-key",
+    name="ol-platform-engineering-rsa-key",
+    realm_id=ol_platform_engineering_realm.realm,
+    certificate="",
+    private_key="",
+    algorithm="RSA-OEAP",
+    opts=resource_options,
+)
+"""
 
 # Create OL Public Realm
 ol_apps_realm = keycloak.Realm(
@@ -192,7 +208,7 @@ ol_apps_realm = keycloak.Realm(
         from_="odl-devops@mit.edu",
         from_display_name="Identity - Open Learning Platform Engineering",
         host=email_host,
-        port=587,
+        port="587",
         reply_to="odl-devops@mit.edu",
         reply_to_display_name="Identity - Open Learning Platform Engineering",
         starttls=True,
@@ -241,6 +257,22 @@ ol_apps_required_action_update_password = keycloak.RequiredAction(
     enabled=True,
     opts=resource_options,
 )
+
+""" # noqa: ERA001
+# This can be uncommented when a new release of the pulumi-keycloak
+# library is released that includes the below or similar PR
+# https://github.com/mrparkers/terraform-provider-keycloak/pull/858
+# Currently this is being done manually in the Keycloak UI.
+ol_platform_engineering_rsa_key = keycloak.RealmKeystoreRsa(
+    "ol-platform-engineering-rsa-key",
+    name="ol-platform-engineering-rsa-key",
+    realm_id=ol_platform_engineering_realm.realm,
+    certificate="",
+    private_key="",
+    algorithm="RSA-OEAP",
+    opts=resource_options,
+)
+"""
 
 # Check if any Openid clients exist in config and create them
 for openid_clients in keycloak_config.get_object("openid_clients"):
@@ -464,7 +496,6 @@ if stack_info.env_suffix in ["ci", "qa"]:
         post_binding_response=True,
         backchannel_supported=False,
         entity_id=f"{keycloak_url}/realms/olapps",
-        login_hint=False,
         authn_context_comparison_type="exact",
         sync_mode="IMPORT",
         single_sign_on_service_url=keycloak_config.get(
@@ -479,7 +510,7 @@ if stack_info.env_suffix in ["ci", "qa"]:
         want_assertions_encrypted=False,
         post_binding_authn_request=True,
         force_authn=False,
-        principal_type="ATTRIBUTE",
+        principal_type="SUBJECT",
         first_broker_login_flow_alias=ol_touchstone_first_login_flow.alias,
         opts=resource_options,
     )
