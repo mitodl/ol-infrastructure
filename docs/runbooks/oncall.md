@@ -2,8 +2,9 @@
 * [SaltStack](#saltstack)
 * [XQueueWatcher](#xqueuewatcher)
 * [OVS](#ovs)
-* [Bootcamp-Ecommerce](#bootcamp-ecommerce)
-* [MITx (OpenEdX Residential)](#mitx-(openedx-residential))
+* [Bootcamp Ecommerce](#bootcamp-ecommerce)
+* [OpenEdX Residential MITx](#openedx-residential-mitx)
+
 
 # Introduction
 
@@ -237,7 +238,7 @@ Video successfully added to edX – VideoFile: CCADE_V11JW_Hybrid_Data_Formats_v
 
 You're all set!
 
-## Bootcamp-Ecommerce
+## Bootcamp Ecommerce
 
 ### [Prometheus]: [FIRING:1] AlternateInvalidAccessKeyProduction production (bootcamp-ecommerce critical)
 
@@ -279,7 +280,7 @@ Total run time: 448.928 ms
 cpatti@ip-10-0-2-195:~$
 ```
 
-## MITx (OpenEdX Residential)
+## OpenEdX Residential MITx
 
 ### Task handler raised error: "OperationalError(1045, \"Access denied for user 'v-edxa-fmT0KbL5X'@'10.7.0.237' (using password: YES)\
 
