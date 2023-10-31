@@ -1312,7 +1312,7 @@ web_alb_metric_alarm = cloudwatch.MetricAlarm(
 )
 
 worker_instance_type = (
-    edxapp_config.get("worker_instance_type") or InstanceTypes.burstable_large.name
+    edxapp_config.get("worker_instance_type") or InstanceTypes.burstable_medium.name
 )
 worker_launch_config = ec2.LaunchTemplate(
     "edxapp-worker-launch-template",
