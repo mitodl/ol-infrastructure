@@ -22,7 +22,7 @@ config:
   dagster:edx_pipeline_xpro_edx_bucket_name: dagster-data-production
   dagster:edx_pipeline_xpro_edx_course_bucket_name: xpro-production-edxapp-courses
   dagster:edx_pipeline_xpro_edx_xpro_purpose: mitx-etl-xpro-production
-  dagster:instance_type: m7a.4xlarge
+  dagster:instance_type: r6a.4xlarge
   dagster:disk_size_gb: 1000
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
