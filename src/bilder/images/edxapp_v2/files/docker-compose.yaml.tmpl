@@ -14,6 +14,8 @@ services:
     volumes:
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
+    - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
   cms-permissions:
     image: overhangio/openedx-permissions:${TUTOR_PERMISSIONS_TAG}
     profiles:
@@ -26,6 +28,8 @@ services:
     volumes:
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
+    - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
 
 # Webapp definitions
   caddy:
@@ -62,6 +66,8 @@ services:
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
     - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
   cms:
     image: ${DOCKER_REPO_AND_DIGEST}
     profiles:
@@ -79,6 +85,8 @@ services:
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
     - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
 
 # Worker definitions
   lms-migrations:
@@ -95,6 +103,8 @@ services:
     - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
+    - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
     command: ["python", "manage.py", "lms", "migrate", "--noinput"]
     depends_on:
       lms-permissions:
@@ -113,6 +123,8 @@ services:
     - ./settings/cms.env.yml:/openedx/config/cms.env.yml:ro
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
+    - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
     command: ["python", "manage.py", "cms", "migrate", "--noinput"]
     depends_on:
       cms-permissions:
@@ -132,6 +144,8 @@ services:
     - ./settings/waffle_flags.yaml:/openedx/config/waffle_flags.yaml:ro
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
+    - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
     command: ["python", "set_waffle_flags.py", "/openedx/config/waffle_flags.yaml"]
     depends_on:
       lms-permissions:
@@ -153,6 +167,8 @@ services:
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
     - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
     depends_on:
       lms-migrations:
         condition: service_completed_successfully
@@ -171,6 +187,8 @@ services:
     - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
+    - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
     command: ["python", "process_scheduled_emails.py"]
     depends_on:
       lms-permissions:
@@ -193,6 +211,8 @@ services:
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
     - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
     depends_on:
       cms-migrations:
         condition: service_completed_successfully
