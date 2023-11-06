@@ -89,7 +89,12 @@ def github_issues(
     name: Identifier,
     repository: str,
     issue_prefix: str,
-    github_token: str = "((github.issues_resource_access_token))",  # noqa: S107
+    access_token: str = "((github.issues_resource_access_token))",  # noqa: S107
+    issue_state: Literal["open", "closed"] = "closed",
+    labels: Optional[list[str]] = None,
+    assignees: Optional[list[str]] = None,
+    issue_title_template: Optional[str] = None,
+    issue_body_template: Optional[str] = None,
 ) -> Resource:
     """Generate a github-release resource for the given owner/repository.
 
@@ -109,11 +114,17 @@ def github_issues(
         name=name,
         type="github-issues",
         icon="github",
-        check_every="24h",
+        check_every="1h",
+        expose_build_created_by=True,
         source={
             "repository": repository,
             "issue_prefix": issue_prefix,
-            "access_token": github_token,
+            "access_token": access_token,
+            "issue_state": issue_state,
+            "labels": labels,
+            "assignees": assignees,
+            "issue_title_template": issue_title_template,
+            "issue_body_template": issue_body_template,
         },
     )
 
