@@ -15,5 +15,5 @@ openedx-scorm-xblock>=16.0.0,<18.0.0
 pip==23.3.1
 rapid-response-xblock
 setuptools==65.7.0
-uwsgi==2.0.22
+uwsgi==2.0.23
 wheel==0.41.2
