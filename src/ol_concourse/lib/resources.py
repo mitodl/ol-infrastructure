@@ -85,7 +85,7 @@ def github_release(  # noqa: PLR0913
     )
 
 
-def github_issues(
+def github_issues(  # noqa: PLR0913
     name: Identifier,
     repository: str,
     issue_prefix: str,
@@ -110,22 +110,23 @@ def github_issues(
 
     :rtype: Resource
     """
+    issue_config = {
+        "access_token": access_token,
+        "assignees": assignees,
+        "issue_body_template": issue_body_template,
+        "issue_prefix": issue_prefix,
+        "issue_state": issue_state,
+        "issue_title_template": issue_title_template,
+        "labels": labels,
+        "repository": repository,
+    }
     return Resource(
         name=name,
         type="github-issues",
         icon="github",
         check_every="1h",
         expose_build_created_by=True,
-        source={
-            "repository": repository,
-            "issue_prefix": issue_prefix,
-            "access_token": access_token,
-            "issue_state": issue_state,
-            "labels": labels,
-            "assignees": assignees,
-            "issue_title_template": issue_title_template,
-            "issue_body_template": issue_body_template,
-        },
+        source={k: v for k, v in issue_config.items() if v is not None},
     )
 
 
