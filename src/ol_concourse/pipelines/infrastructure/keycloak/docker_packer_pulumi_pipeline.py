@@ -32,12 +32,9 @@ def build_keycloak_pipeline() -> Pipeline:
         image_repository="quay.io/keycloak/keycloak",
         image_tag="22.0",
     )
-    # When the ol-keycloak-customization repo is ready for it and has doof implemented,
-    # this should be split into two resources, one for `release` and another for
-    # `release-canidate` branch. Then refs should be updated. See OVS pipeline.
     keycloak_customization_repo = git_repo(
         Identifier("ol-keycloak-customization"),
-        uri="https://github.com/mitodl/ol-keycloak-customization",
+        uri="https://github.com/mitodl/ol-keycloak",
         branch="main",
     )
 
