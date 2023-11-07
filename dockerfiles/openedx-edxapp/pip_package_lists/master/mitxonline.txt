@@ -3,7 +3,7 @@ django-redis==5.4.0
 edx-git-auto-export==0.3
 edx-sysadmin==0.2.3
 edx-username-changer==0.3.1
-edx-proctoring-proctortrack==1.2.1
+git+https://github.com/anupdhabarde/edx-proctoring-proctortrack.git@31c6c9923a51c903ae83760ecbbac191363aa2a2#egg=edx_proctoring_proctortrack
 mitxpro-openedx-extensions==1.0.0
 nodeenv>=1.7.0
 ol-openedx-canvas-integration==0.2.6
