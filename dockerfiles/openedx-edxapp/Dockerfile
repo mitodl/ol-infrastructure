@@ -32,8 +32,9 @@ COPY ./edx_platform /openedx/edx-platform
 
 ARG DEPLOYMENT_NAME="invalid"
 ARG RELEASE_NAME="invalid"
-RUN pip install --no-warn-script-location --user --no-cache-dir -r /openedx/edx-platform/requirements/edx/base.txt \
-    && pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
+RUN pip install --no-warn-script-location --user --no-cache-dir \
+    -r /openedx/edx-platform/requirements/edx/base.txt \
+    -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
 RUN if [ "$DEPLOYMENT_NAME" = "mitxonline" ]; then pip uninstall --yes "edx-name-affirmation"; fi
 
 WORKDIR /openedx/edx-platform
