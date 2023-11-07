@@ -391,7 +391,7 @@ oidc_attribute_importer_identity_provider_mapper = (
     keycloak.AttributeImporterIdentityProviderMapper(
         "map-touchstone-saml-email-attribute",
         realm=ol_apps_realm.id,
-        attribute_name="email",
+        attribute_name="mail",
         identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
         user_attribute="email",
         extra_config={
