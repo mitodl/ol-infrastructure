@@ -15,6 +15,6 @@ ol-openedx-sentry==0.1.2
 openedx-scorm-xblock>=15.0.0,<16.0.0
 pip==23.3.1
 setuptools==65.7.0
-social-auth-mitxpro==0.6.2
+social-auth-mitxpro==0.6.1
 uwsgi==2.0.23
 wheel==0.41.2
