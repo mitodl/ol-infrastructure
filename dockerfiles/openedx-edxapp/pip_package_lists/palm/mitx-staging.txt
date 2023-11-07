@@ -32,4 +32,4 @@ wheel==0.41.2
 # Learning/CN=lms-ci.mitx.mit.edu/emailAddress=mitx-devops@mit.edu; err=18;
 # msg=self signed certificate (TMM 2022-12-01)
 # Downgrade to version used in Nutmeg due to conflicts with SAML implementation
-lxml==4.5.0
+lxml==4.9.3
