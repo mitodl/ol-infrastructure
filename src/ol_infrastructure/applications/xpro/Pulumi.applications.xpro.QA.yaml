@@ -1,3 +1,7 @@
 ---
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHg42pDDDGBhpaX14TdtzcK1hbiMYTHsYRH4k5GL5RFpIwGcMiNTGI4bGSeuZLFYO01FAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMs2wReGAx/elKP1r6AgEQgDuWEz3UOCOw+tGvBC+7UdkP63C4XCN+u0vPNVVjWZUELINBXuXBvCrw4uD00D9nw6sv9iSM2n6JlZ1THw==
+config:
+  vault:address: https://vault-qa.odl.mit.edu
+  xpro:db_password:
+    secure: v1:WB6QP6vB6A8MP0u7:r83PBcNuGffY6JsCVeUJL+onStVheqhifPzagR97KevEd2PqpdtRxRe+li5Vs25VMxcZQYo1O/jpoSk=
