@@ -3,6 +3,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Optional
 
+from bridge.settings.github.team_members import DEVOPS
+
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
@@ -22,11 +24,12 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 from ol_concourse.lib.resource_types import (
+    github_issues_resource,
     packer_build,
     packer_validate,
     pulumi_provisioner_resource,
 )
-from ol_concourse.lib.resources import pulumi_provisioner
+from ol_concourse.lib.resources import github_issues, pulumi_provisioner
 
 
 def packer_jobs(  # noqa: PLR0913
@@ -142,6 +145,9 @@ def pulumi_jobs_chain(  # noqa: PLR0913
     project_source_path: Path,
     custom_dependencies: Optional[dict[int, list[GetStep]]] = None,
     dependencies: Optional[list[GetStep]] = None,
+    github_issue_assignees: Optional[list[str]] = None,
+    github_issue_labels: Optional[list[str]] = None,
+    github_issue_repository: Optional[str] = None,
 ) -> PipelineFragment:
     """Create a chained sequence of jobs for running Pulumi tasks.
 
@@ -156,19 +162,44 @@ def pulumi_jobs_chain(  # noqa: PLR0913
         triggers for the jobs in the chain
     :param custom_dependencies: A dict of indices and `Get` step definitions that are
         used as inputs or triggers for the jobs in the chain.
+    :param github_issue_assignees: A list of GitHub usernames that should be assigned
+    :param github_issue_labels: A list of GitHub labels that should be applied
     :type custom_dependencies: Dict[int, list[GetStep]]
 
     :returns: A `PipelineFragment` object that can be composed with other fragments to
               build a full pipeline.
     """
-    chain_fragment = PipelineFragment()
+
+    chain_fragment = PipelineFragment(resource_types=[github_issues_resource()])
     previous_job = None
     for index, stack_name in enumerate(stack_names):
+        if index + 1 < len(stack_names):
+            gh_issues_trigger = github_issues(
+                name=Identifier(f"github-issues-{stack_name.lower()}-trigger"),
+                repository=github_issue_repository or "mitodl/concourse-workflow",
+                issue_title_template=f"[bot] Pulumi {project_name} {stack_name} "
+                "deployed.",
+                issue_prefix=f"[bot] Pulumi {project_name} {stack_name} deployed.",
+                issue_state="closed",
+            )
+        else:
+            gh_issues_trigger = None
+
+        gh_issues_post = github_issues(
+            name=Identifier(f"github-issues-{stack_name.lower()}-post"),
+            repository=github_issue_repository or "mitodl/concourse-workflow",
+            issue_title_template=f"[bot] Pulumi {project_name} {stack_name} deployed.",
+            issue_prefix=f"[bot] Pulumi {project_name} {stack_name} deployed.",
+            issue_state="open",
+        )
+
         production_stack = stack_name.lower().endswith("production")
         passed_param = None
         if index != 0:
+            previous_stack = stack_names[index - 1]
             previous_job = chain_fragment.jobs[-1]
             passed_param = [previous_job.name]
+
         for dependency in dependencies or []:
             # These mutations apply globally if the dependencies aren't copied below
             dependency.trigger = not bool(previous_job or production_stack)
@@ -176,11 +207,23 @@ def pulumi_jobs_chain(  # noqa: PLR0913
 
         # Need to copy the dependencies because otherwise they are globally mutated
         local_dependencies = [
-            dependency_step.copy() for dependency_step in (dependencies or [])
+            dependency_step.model_copy() for dependency_step in (dependencies or [])
         ]
+        # Needed to duplicate if conditional because otherwise it messes with the
+        # sequencing of dependencies and whether they had to pass previous stacks.
+        if index != 0:
+            # We don't want the current stage, we want the previous one so that it will
+            # trigger the current stack. This ensures that we are triggering on the
+            # notification that the previous step has been deployed.
+            get_gh_issues = GetStep(
+                get=Identifier(f"github-issues-{previous_stack.lower()}-trigger"),
+                trigger=True,
+            )
+            local_dependencies.append(get_gh_issues)
+
         if custom_dependency := (custom_dependencies or {}).get(index):
             local_custom_dependencies = [
-                custom_dependency_step.copy()
+                custom_dependency_step.model_copy()
                 for custom_dependency_step in custom_dependency
             ]
             local_dependencies.extend(local_custom_dependencies)
@@ -193,11 +236,24 @@ def pulumi_jobs_chain(  # noqa: PLR0913
             local_dependencies,
             previous_job,
         )
+        create_gh_issue = PutStep(
+            put=gh_issues_post.name,
+            params={
+                "labels": github_issue_labels or ["product:infrastructure", "DevOps"],
+                "assignees": github_issue_assignees or DEVOPS,
+            },
+        )
+
+        step_fragment.jobs[0].on_success = create_gh_issue
         chain_fragment.resource_types = (
             chain_fragment.resource_types + step_fragment.resource_types
         )
         chain_fragment.resources = chain_fragment.resources + step_fragment.resources
+        chain_fragment.resources.append(gh_issues_post)
+        if gh_issues_trigger:
+            chain_fragment.resources.append(gh_issues_trigger)
         chain_fragment.jobs.extend(step_fragment.jobs)
+
     return chain_fragment
 
 

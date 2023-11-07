@@ -85,6 +85,51 @@ def github_release(  # noqa: PLR0913
     )
 
 
+def github_issues(  # noqa: PLR0913
+    name: Identifier,
+    repository: str,
+    issue_prefix: str,
+    access_token: str = "((github.issues_resource_access_token))",  # noqa: S107
+    issue_state: Literal["open", "closed"] = "closed",
+    labels: Optional[list[str]] = None,
+    assignees: Optional[list[str]] = None,
+    issue_title_template: Optional[str] = None,
+    issue_body_template: Optional[str] = None,
+) -> Resource:
+    """Generate a github-release resource for the given owner/repository.
+
+    :param name: The name of the resource.  This will get used across subsequent
+        pipeline steps that reference this resource.
+    :param repository: The name of the repository as it appears in GitHub
+    :param github_token: A personal access token with `public_repo` scope to increase
+        the rate limit for checking versions.
+    :param issue_prefix: A string tobe used to match an issue in the repository for
+     the workflow to detect or act upon.
+
+    :returns: A configured Concourse resource object that can be used in a pipeline.
+
+    :rtype: Resource
+    """
+    issue_config = {
+        "access_token": access_token,
+        "assignees": assignees,
+        "issue_body_template": issue_body_template,
+        "issue_prefix": issue_prefix,
+        "issue_state": issue_state,
+        "issue_title_template": issue_title_template,
+        "labels": labels,
+        "repository": repository,
+    }
+    return Resource(
+        name=name,
+        type="github-issues",
+        icon="github",
+        check_every="1h",
+        expose_build_created_by=True,
+        source={k: v for k, v in issue_config.items() if v is not None},
+    )
+
+
 def hashicorp_release(name: Identifier, project: str) -> Resource:
     """Generate a hashicorp-release resource for the given application.  # noqa: DAR201
 

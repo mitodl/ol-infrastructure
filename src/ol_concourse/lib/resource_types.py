@@ -2,6 +2,14 @@ from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.models.pipeline import Identifier, RegistryImage, ResourceType
 
 
+def github_issues_resource() -> ResourceType:
+    return ResourceType(
+        name=Identifier("github-issues"),
+        type=REGISTRY_IMAGE,
+        source=RegistryImage(repository="mitodl/ol-concourse-github-issues"),
+    )
+
+
 def hashicorp_resource() -> ResourceType:
     return ResourceType(
         name=Identifier("hashicorp-release"),
