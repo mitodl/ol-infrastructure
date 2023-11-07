@@ -34,9 +34,7 @@ def install_concourse(concourse_config: ConcourseBaseConfig):
         # Download latest Concourse release from GitHub
         concourse_archive = f"https://github.com/concourse/concourse/releases/download/v{concourse_config.version}/concourse-{concourse_config.version}-linux-amd64.tgz"
         concourse_archive_hash = f"{concourse_archive}.sha1"
-        concourse_archive_path = (
-            f"/tmp/concourse-{concourse_config.version}.tgz"  # noqa: S108
-        )
+        concourse_archive_path = f"/tmp/concourse-{concourse_config.version}.tgz"  # noqa: S108
         files.download(
             name="Download the Concourse release archive",
             src=str(concourse_archive),
