@@ -86,6 +86,14 @@ def build_keycloak_pipeline() -> Pipeline:
         repository="keycloak-metrics-spi",
     )
 
+    # Repo: https://github.com/mitodl/ol-keycloak
+    # Use: OL SPI to customize login process
+    ol_spi = github_release(
+        name=Identifier("ol-spi"),
+        owner="mitodl",
+        repository="ol-keycloak",
+    )
+
     # Repo: https://github.com/daniel-frak/keycloak-user-migration
     # Use: Migrating users from open discussions
     user_migration_spi = github_release(
@@ -105,6 +113,7 @@ def build_keycloak_pipeline() -> Pipeline:
             GetStep(get=cas_protocol_spi.name, trigger=True),
             GetStep(get=keycloak_customization_repo.name, trigger=True),
             GetStep(get=metrics_spi.name, trigger=True),
+            GetStep(get=ol_spi.name, trigger=True),
             GetStep(get=user_migration_spi.name, trigger=True),
             TaskStep(
                 task=Identifier("collect-artifacts-for-build-context"),
@@ -115,6 +124,7 @@ def build_keycloak_pipeline() -> Pipeline:
                         Input(name=keycloak_customization_repo.name),
                         Input(name=cas_protocol_spi.name),
                         Input(name=metrics_spi.name),
+                        Input(name=ol_spi.name),
                         Input(name=user_migration_spi.name),
                     ],
                     image_resource=AnonymousResource(
@@ -131,6 +141,7 @@ def build_keycloak_pipeline() -> Pipeline:
                         cp -r {keycloak_customization_repo.name}/* {image_build_context.name}/
                         cp -r {cas_protocol_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {metrics_spi.name}/* {image_build_context.name}/plugins/
+                        cp -r {ol_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {user_migration_spi.name}/* {image_build_context.name}/plugins/
                         """  # noqa: E501
                             ),
@@ -170,6 +181,7 @@ def build_keycloak_pipeline() -> Pipeline:
             keycloak_registry_image,
             cas_protocol_spi,
             metrics_spi,
+            ol_spi,
             user_migration_spi,
         ],
         jobs=[docker_build_job],
