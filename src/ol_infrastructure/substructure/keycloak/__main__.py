@@ -191,11 +191,12 @@ ol_apps_realm = keycloak.Realm(
         ),
         headers=keycloak.RealmSecurityDefensesHeadersArgs(
             content_security_policy=(
-                "frame-src 'self'; frame-ancestors 'self'; object-src 'none';"
+                "frame-src 'self' https://www.google.com; frame-ancestors 'self'; object-src 'none';"  # noqa: E501
             ),
             content_security_policy_report_only="",
             strict_transport_security="max-age=31536000; includeSubDomains",
             x_content_type_options="nosniff",
+            x_frame_options="https://www.google.com",
             x_robots_tag="none",
             x_xss_protection="1; mode=block",
         ),
@@ -364,6 +365,97 @@ ol_touchstone_user_creation_or_linking_subflow_automatically_set_existing_user_s
     )
 )
 # OL - First login flow [END]
+
+"""
+# This can be uncommented once this issue is resolved - https://github.com/mrparkers/terraform-provider-keycloak/issues/896
+# noqa: ERA001
+# OL - Registration flow [START]
+ol_registration_flow = keycloak.authentication.Flow(
+    "ol-registration-flow",
+    realm_id=ol_apps_realm.id,
+    alias="ol-registration-flow",
+    provider_id="basic-flow",
+    opts=resource_options,
+)
+ol_registration_flow_page_form = keycloak.authentication.Execution(
+    "ol-registration-flow-page-form",
+    realm_id=ol_apps_realm.id,
+    parent_flow_alias=ol_registration_flow.alias,
+    authenticator="registration-page-form",
+    requirement="REQUIRED",
+    opts=resource_options,
+)
+ol_registration_form = keycloak.authentication.Subflow(
+    "ol-registration-form",
+    realm_id=ol_apps_realm.id,
+    #authenticator="registration-page-form",
+    alias="ol-registration-form",
+    parent_flow_alias=ol_registration_flow.alias,
+    provider_id="form-flow",
+    requirement="REQUIRED",
+    opts=resource_options,
+)
+ol_registration_flow_registration_user_creation_step = keycloak.authentication.Execution
+(
+    "ol-registration-flow-registration-user-creation-step",
+    realm_id=ol_apps_realm.id,
+    parent_flow_alias=ol_registration_form.alias,
+    authenticator="registration-user-creation",
+    requirement="REQUIRED",
+    opts=resource_options,
+)
+ol_registration_flow_profile_validation_step = keycloak.authentication.Execution(
+    "ol-registration-flow-profile-validation-step",
+    realm_id=ol_apps_realm.id,
+    parent_flow_alias=ol_registration_form.alias,
+    authenticator="registration-profile-action",
+    requirement="REQUIRED",
+    opts=ResourceOptions(
+        provider=keycloak_provider,
+        depends_on=ol_registration_flow_registration_user_creation_step
+    ),
+)
+ol_registration_flow_password_validation_step = keycloak.authentication.Execution(
+    "ol-registration-flow-password-validation-step",
+    realm_id=ol_apps_realm.id,
+    parent_flow_alias=ol_registration_form.alias,
+    authenticator="registration-password-action",
+    requirement="REQUIRED",
+    opts=ResourceOptions(
+        provider=keycloak_provider,
+        depends_on=ol_registration_flow_profile_validation_step
+    ),
+)
+ol_registration_flow_recaptcha_step = keycloak.authentication.Execution(
+    "ol-registration-flow-recaptcha-step",
+    realm_id=ol_apps_realm.id,
+    parent_flow_alias=ol_registration_form.alias,
+    authenticator="registration-recaptcha-action",
+    requirement="REQUIRED",
+    opts=ResourceOptions(
+        provider=keycloak_provider,
+        depends_on=ol_registration_flow_password_validation_step
+    ),
+)
+ol_registration_flow_recaptcha_step_config = keycloak.authentication.ExecutionConfig(
+    "ol-registration-flow-recaptcha-step-config",
+    realm_id=ol_apps_realm.id,
+    execution_id=ol_registration_flow_recaptcha_step.id,
+    alias="google-recaptcha-v2",
+    config={
+        "recaptchaSiteKey": keycloak_config.get(captcha_site_key),
+        "recaptchaSiteSecret": keycloak_config.get(captcha_secret_key),
+    },
+    opts=resource_options,
+)
+ol_registration_flow_binding = keycloak.authentication.Bindings(
+    "ol-registration-flow-binding",
+    realm_id=ol_apps_realm.id,
+    registration_flow=ol_registration_flow.alias,
+    opts=resource_options,
+)
+# OL - Registration flow [END]
+"""
 
 # Touchstone SAML [START]
 ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
