@@ -35,7 +35,7 @@ data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 aws_config = AWSBase(
     tags={
-        "OU": "xpro",
+        "OU": "mitxpro",
         "Environment": f"applications_{stack_info.env_suffix}",
         "Application": "xpro",
     }
