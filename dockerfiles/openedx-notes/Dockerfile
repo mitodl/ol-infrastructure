@@ -1,9 +1,8 @@
 FROM python:3.8-slim
-MAINTAINER MIT Open Learning <odl-devops@mit.edu>
 
 ARG APP_USER_ID=1000
 RUN apt update && \
-  apt install -y git mariadb-client default-libmysqlclient-dev build-essential && \
+  apt install -y git mariadb-client default-libmysqlclient-dev build-essential pkg-config && \
   apt clean
 RUN useradd --home-dir /app --create-home --shell /bin/bash --uid ${APP_USER_ID} app
 USER ${APP_USER_ID}
