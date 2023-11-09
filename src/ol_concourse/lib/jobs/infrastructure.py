@@ -138,7 +138,7 @@ def packer_jobs(  # noqa: PLR0913
     )
 
 
-def pulumi_jobs_chain(  # noqa: PLR0913
+def pulumi_jobs_chain(  # noqa: PLR0913, C901
     pulumi_code: Resource,
     stack_names: list[str],
     project_name: str,
@@ -194,6 +194,9 @@ def pulumi_jobs_chain(  # noqa: PLR0913
         )
 
         production_stack = stack_name.lower().endswith("production")
+        qa_stack = stack_name.lower().endswith("qa")
+        ci_stack = stack_name.lower().endswith("ci")
+
         passed_param = None
         if index != 0:
             previous_stack = stack_names[index - 1]
@@ -236,10 +239,18 @@ def pulumi_jobs_chain(  # noqa: PLR0913
             local_dependencies,
             previous_job,
         )
+        default_github_issue_labels = ["product:infrastructure", "DevOps"]
+        if ci_stack:
+            default_github_issue_labels.append("promotion-to-qa")
+        elif qa_stack:
+            default_github_issue_labels.append("promotion-to-production")
+        elif production_stack:
+            default_github_issue_labels.append("finalized-deployment")
+
         create_gh_issue = PutStep(
             put=gh_issues_post.name,
             params={
-                "labels": github_issue_labels or ["product:infrastructure", "DevOps"],
+                "labels": github_issue_labels or default_github_issue_labels,
                 "assignees": github_issue_assignees or DEVOPS,
             },
         )
