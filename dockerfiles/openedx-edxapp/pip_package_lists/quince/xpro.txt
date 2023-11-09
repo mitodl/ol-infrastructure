@@ -16,4 +16,4 @@ pip==23.3.1
 setuptools==65.7.0
 social-auth-mitxpro==0.6.3
 uwsgi==2.0.23
-wheel==0.41.2
+wheel==0.41.3
