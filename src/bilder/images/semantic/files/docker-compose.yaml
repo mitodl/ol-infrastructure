@@ -3,7 +3,7 @@ version: '3.8'
 
 services:
   nginx:
-    image: nginx:1.25.2
+    image: nginx:1.25.3
     ports:
     - "8011:8011"
     links:
