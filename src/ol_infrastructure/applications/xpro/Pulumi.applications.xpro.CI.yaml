@@ -3,5 +3,6 @@ secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQGajxbkewesj3PCq3IiGvEkAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMLdJMjR0tj3iBnE3zAgEQgDuyIU42lpmTEO6PIHEU1dyNeIx0UiVTdoUqn4nXWcCOsqlRNWM1o7CyByuiATE23j7d9AIOhwEZxCRvew==
 config:
   vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
   xpro:db_password:
     secure: v1:37ScjUMRQrn2YgQA:3KOoFUWATBblqOCUlFsLj07tl4ebSEymwA/DN/iLbXdrDdCmF7YzlH1XpwFkUzW06IEsXHo=
