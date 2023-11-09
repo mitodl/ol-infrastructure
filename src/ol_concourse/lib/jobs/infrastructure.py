@@ -239,7 +239,11 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901
             local_dependencies,
             previous_job,
         )
-        default_github_issue_labels = ["product:infrastructure", "DevOps"]
+        default_github_issue_labels = [
+            "product:infrastructure",
+            "DevOps",
+            "pipeline-workflow",
+        ]
         if ci_stack:
             default_github_issue_labels.append("promotion-to-qa")
         elif qa_stack:
