@@ -159,7 +159,7 @@ ol_apps_realm = keycloak.Realm(
     display_name="OL Apps",
     display_name_html="<b>MIT Open Learning Applications</b>",
     enabled=True,
-    login_theme="keycloak",
+    login_theme="ol",
     duplicate_emails_allowed=False,
     otp_policy=keycloak.RealmOtpPolicyArgs(
         algorithm="HmacSHA256",
@@ -288,7 +288,6 @@ for openid_clients in keycloak_config.get_object("openid_clients"):
             access_type="CONFIDENTIAL",
             standard_flow_enabled=True,
             valid_redirect_uris=[f"{client_url}/*"],
-            login_theme="keycloak",
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
         )
         vault.generic.Secret(
@@ -459,15 +458,32 @@ ol_registration_flow_binding = keycloak.authentication.Bindings(
 # OL - browser flow [START]
 # username-form -> ol-auth-username-password-form
 ol_browser_flow = keycloak.authentication.Flow(
+    "ol-browser",
+    realm_id=ol_apps_realm.id,
+    alias="ol-browser",
+    opts=resource_options,
+)
+ol_browser_cookie = keycloak.authentication.Execution(
+    "auth-cookie",
+    realm_id=ol_apps_realm.id,
+    parent_flow_alias=ol_browser_flow.alias,
+    authenticator="auth-cookie",
+    requirement="ALTERNATIVE",
+    opts=resource_options,
+)
+ol_browser_flow_forms = keycloak.authentication.Subflow(
     "ol-browser-forms",
     realm_id=ol_apps_realm.id,
     alias="ol-browser forms",
+    parent_flow_alias=ol_browser_flow.alias,
+    provider_id="basic-flow",
+    requirement="ALTERNATIVE",
     opts=resource_options,
 )
 ol_browser_flow_username_form = keycloak.authentication.Execution(
     "auth-username-form",
     realm_id=ol_apps_realm.id,
-    parent_flow_alias=ol_browser_flow.alias,
+    parent_flow_alias=ol_browser_flow_forms.alias,
     authenticator="auth-username-form",
     requirement="REQUIRED",
     opts=resource_options,
@@ -475,7 +491,7 @@ ol_browser_flow_username_form = keycloak.authentication.Execution(
 ol_browser_flow_ol_auth_username_password_form = keycloak.authentication.Execution(
     "ol-auth-username-password-form",
     realm_id=ol_apps_realm.id,
-    parent_flow_alias=ol_browser_flow.alias,
+    parent_flow_alias=ol_browser_flow_forms.alias,
     authenticator="ol-auth-username-password-form",
     requirement="REQUIRED",
     opts=resource_options,
