@@ -456,6 +456,37 @@ ol_registration_flow_binding = keycloak.authentication.Bindings(
 )
 # OL - Registration flow [END]
 """
+# OL - browser flow [START]
+# username-form -> ol-auth-username-password-form
+ol_browser_flow = keycloak.authentication.Flow(
+    "ol-browser-forms",
+    realm_id=ol_apps_realm.id,
+    alias="ol-browser forms",
+    opts=resource_options,
+)
+ol_browser_flow_username_form = keycloak.authentication.Execution(
+    "auth-username-form",
+    realm_id=ol_apps_realm.id,
+    parent_flow_alias=ol_browser_flow.alias,
+    authenticator="auth-username-form",
+    requirement="REQUIRED",
+    opts=resource_options,
+)
+ol_browser_flow_ol_auth_username_password_form = keycloak.authentication.Execution(
+    "ol-auth-username-password-form",
+    realm_id=ol_apps_realm.id,
+    parent_flow_alias=ol_browser_flow.alias,
+    authenticator="ol-auth-username-password-form",
+    requirement="REQUIRED",
+    opts=resource_options,
+)
+# Bind the flow to the olapps realm for browser login.
+browser_authentication_binding = keycloak.authentication.Bindings(
+    "browserAuthenticationBinding",
+    realm_id=ol_apps_realm.id,
+    browser_flow=ol_browser_flow.alias,
+)
+# OL - browser flow [END]
 
 # Touchstone SAML [START]
 ol_apps_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
