@@ -2,7 +2,11 @@ from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo, registry_image
-from ol_concourse.pipelines.constants import PACKER_WATCHED_PATHS, PULUMI_CODE_PATH
+from ol_concourse.pipelines.constants import (
+    PACKER_WATCHED_PATHS,
+    PULUMI_CODE_PATH,
+    PULUMI_WATCHED_PATHS,
+)
 
 tika_docker_image = registry_image(
     name=Identifier("tika-docker-image"),
@@ -23,6 +27,10 @@ tika_image_code = git_repo(
 tika_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
     uri="https://github.com/mitodl/ol-infrastructure",
+    paths=[
+        *PULUMI_WATCHED_PATHS,
+        PULUMI_CODE_PATH.joinpath("applications/tika/"),
+    ],
 )
 
 tika_ami_fragment = packer_jobs(
