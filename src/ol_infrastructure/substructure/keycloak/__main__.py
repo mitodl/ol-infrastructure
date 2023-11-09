@@ -501,6 +501,7 @@ browser_authentication_binding = keycloak.authentication.Bindings(
     "browserAuthenticationBinding",
     realm_id=ol_apps_realm.id,
     browser_flow=ol_browser_flow.alias,
+    opts=resource_options,
 )
 # OL - browser flow [END]
 
