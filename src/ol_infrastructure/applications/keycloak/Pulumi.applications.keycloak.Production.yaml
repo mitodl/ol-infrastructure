@@ -9,7 +9,7 @@ config:
     max: 3
     min: 1
   keycloak:db_capacity: "100"
-  keycloak:domain: sso-production.odl.mit.edu
+  keycloak:domain: sso.odl.mit.edu
   keycloak:rds_password:
     secure: v1:Mm/fdzMRwsMVpw69:MX1c8FwEDhUeFDg5yImmYhxDrl3gi1PK9pZTbStEXiVpRWEGS3gwGELy+Ut33JpVVwvbTaY2l9A=
   keycloak:target_vpc: operations_vpc
