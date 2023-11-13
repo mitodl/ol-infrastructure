@@ -3,7 +3,6 @@ if (beresp.status == 404) {
   set beresp.http.Cache-Control = "max-age=300";
   return(deliver);
 }
-
 # One month cache is for hashed static assets (first two cases), while one week is for unhashed assets (last three cases)
 if (bereq.url.path ~ ".*(main|common|www|course_v2|instructor_insights|fields)\.[0-9a-f]+\.(css|js)\z") || (bereq.url.path ~ ".*[0-9a-f]+\.[0-9a-f]+\.(css|js)\z") {
   # Hashed static theme assets and dynamic imports
