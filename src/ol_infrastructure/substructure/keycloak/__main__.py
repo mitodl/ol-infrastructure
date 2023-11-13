@@ -353,15 +353,16 @@ ol_touchstone_user_creation_or_linking_subflow_create_user_if_unique_step = (
         opts=resource_options,
     )
 )
-ol_touchstone_user_creation_or_linking_subflow_automatically_set_existing_user_step = (
-    keycloak.authentication.Execution(
-        "ol-touchstone-automatically-set-existing-user",
-        realm_id=ol_apps_realm.id,
-        parent_flow_alias=ol_touchstone_user_creation_or_linking_subflow.alias,
-        authenticator="idp-auto-link",
-        requirement="ALTERNATIVE",
-        opts=resource_options,
-    )
+ol_touchstone_user_creation_or_linking_subflow_automatically_set_existing_user_step = keycloak.authentication.Execution(  # noqa: E501
+    "ol-touchstone-automatically-set-existing-user",
+    realm_id=ol_apps_realm.id,
+    parent_flow_alias=ol_touchstone_user_creation_or_linking_subflow.alias,
+    authenticator="idp-auto-link",
+    requirement="ALTERNATIVE",
+    opts=ResourceOptions(
+        provider=keycloak_provider,
+        depends_on=ol_touchstone_user_creation_or_linking_subflow_create_user_if_unique_step,
+    ),
 )
 # OL - First login flow [END]
 
