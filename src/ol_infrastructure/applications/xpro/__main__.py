@@ -177,7 +177,7 @@ xpro_vault_backend = OLVaultDatabaseBackend(xpro_vault_backend_config)
 xpro_secrets = vault.Mount(
     "xpro-vault-secrets-storage",
     path="secret-xpro",
-    type="kv",
+    type="kv-v2",
     options={"version": 2},
     description="Static secrets storage for the xpro application",
     opts=ResourceOptions(delete_before_replace=True),
