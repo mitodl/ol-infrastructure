@@ -27,7 +27,7 @@ repos:
     - '80'
     - --preserve-quotes
 - repo: https://github.com/adrienverge/yamllint.git
-  rev: v1.32.0
+  rev: v1.33.0
   hooks:
   - id: yamllint
     args: [--format, parsable, -d, relaxed]
@@ -46,13 +46,13 @@ repos:
     - src/ol_infrastructure/applications/ocw_site/redirect_dict
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.1.4'
+  rev: 'v0.1.5'
   hooks:
   - id: ruff-format
   - id: ruff
     args: [--extend-ignore=D1, --fix]
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.6.1
+  rev: v1.7.0
   hooks:
   - id: mypy
     args:
