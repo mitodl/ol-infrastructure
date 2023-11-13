@@ -4,15 +4,25 @@ if (beresp.status == 404) {
   return(deliver);
 }
 
-if (bereq.url.path ~ ".*(main|common|www|course_v2|instructor_insights|fields|[0-9a-f]+)\.[0-9a-f]+\.(css|js)") {
-  set beresp.ttl = 2629743s;  // one month
+# One month cache is for hashed static assets (first two cases), while one week is for unhashed assets (last three cases)
+if (bereq.url.path ~ ".*(main|common|www|course_v2|instructor_insights|fields)\.[0-9a-f]+\.(css|js)\z") || (bereq.url.path ~ ".*[0-9a-f]+\.[0-9a-f]+\.(css|js)\z") {
+  # Hashed static theme assets and dynamic imports
+  set beresp.ttl = 2629743s; 
   set beresp.http.Cache-Control = "max-age=2629743";
-}
-
-if (bereq.url.path ~ ".*\/static_shared\/(images|fonts)\/[a-zA-Z0-9|-|_]+(\.subset)?\.[0-9a-f]+\.(png|jpg|jpeg|svg|ttf|woff|woff2)") {
-  set beresp.ttl = 2629743s;  // one month
+} elsif (bereq.url.path ~ ".*/static_shared/images/.*\.[0-9a-f]+\.(png|jpg|jpeg|svg)\z") || (bereq.url.path ~ ".*/static_shared/fonts/.*\.subset\.[0-9a-f]+\.(ttf|woff|woff2)\z") {
+  # Hashed static images and fonts
+  set beresp.ttl = 2629743s;
   set beresp.http.Cache-Control = "max-age=2629743";
-} elsif (bereq.url.path ~ ".*\/static_shared\/(images|fonts)\/.*\.(png|jpg|jpeg|svg|ttf|woff|woff2)") {
-  set beresp.ttl = 604800s;  // one week
+} elsif (bereq.url.path ~ ".*/static_shared/(images|fonts)/.*\.(png|jpg|jpeg|svg|ttf|woff|woff2)\z") {
+  # Non-hashed static images and fonts (if any)
+  set beresp.ttl = 604800s;  
+  set beresp.http.Cache-Control = "max-age=604800";
+} elsif (bereq.url.path ~ ".*/(ocw-www|courses|images)/.*\.(png|jpg|jpeg|svg)\z"){
+  # Any other images
+  set beresp.ttl = 604800s;
+  set beresp.http.Cache-Control = "max-age=604800";
+} elsif (bereq.http.Host ~ "www.ocw-openmatters.org") && (bereq.url.path ~ "^/wp-content/uploads/.*) {
+  # Uploaded images from openmatters
+  set beresp.ttl = 604800s;
   set beresp.http.Cache-Control = "max-age=604800";
 }
