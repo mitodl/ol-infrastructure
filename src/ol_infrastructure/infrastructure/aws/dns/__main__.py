@@ -27,7 +27,7 @@ odl_dns_zone = route53.Zone(
 ol_dns_name = "ol.mit.edu"
 ol_opts = zone_opts(odl_dns_name)
 ol_dns_zone = route53.Zone(
-    "mitodl_subdomain",
+    "mitol_subdomain",
     name=odl_dns_name,
     comment="DNS Zone used for Open Learning resources",
     tags=AWSBase(tags={"OU": "operations", "Environment": "operations"}).tags,
