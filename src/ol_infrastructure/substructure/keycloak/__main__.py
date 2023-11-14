@@ -479,7 +479,10 @@ ol_browser_flow_forms = keycloak.authentication.Subflow(
     parent_flow_alias=ol_browser_flow.alias,
     provider_id="basic-flow",
     requirement="ALTERNATIVE",
-    opts=resource_options,
+    opts=ResourceOptions(
+        provider=keycloak_provider,
+        depends_on=ol_browser_cookie,
+    ),
 )
 ol_browser_flow_username_form = keycloak.authentication.Execution(
     "auth-username-form",
