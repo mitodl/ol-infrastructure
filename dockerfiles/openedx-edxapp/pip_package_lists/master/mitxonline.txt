@@ -5,7 +5,7 @@ edx-sysadmin==0.2.3
 edx-username-changer==0.3.1
 mitxpro-openedx-extensions==1.1.0
 nodeenv>=1.7.0
-ol-openedx-canvas-integration==0.2.6
+ol-openedx-canvas-integration==0.3.0
 ol-openedx-checkout-external
 ol-openedx-course-export==0.1.2
 ol-openedx-course-structure-api
