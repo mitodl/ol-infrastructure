@@ -46,7 +46,7 @@ diagrams = "*"
 mypy = "*"
 pre-commit = "^3.0.0"
 pytest = "^7.1.1"
-pytest-testinfra = "^9.0.0"
+pytest-testinfra = "^10.0.0"
 ruff = "^0"
 
 [build-system]
