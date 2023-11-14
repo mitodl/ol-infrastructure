@@ -24,6 +24,16 @@ odl_dns_zone = route53.Zone(
     opts=odl_opts,
 )
 
+ol_dns_name = "ol.mit.edu"
+ol_opts = zone_opts(odl_dns_name)
+ol_dns_zone = route53.Zone(
+    "mitodl_subdomain",
+    name=odl_dns_name,
+    comment="DNS Zone used for Open Learning resources",
+    tags=AWSBase(tags={"OU": "operations", "Environment": "operations"}).tags,
+    opts=ol_opts,
+)
+
 mitx_dns_name = "mitx.mit.edu"
 mitx_opts = zone_opts(mitx_dns_name)
 mitx_dns_zone = route53.Zone(
@@ -72,3 +82,4 @@ export("mitxonline", {"id": mitxonline_dns_zone.id, "domain": mitxonline_dns_zon
 export("xpro", {"id": xpro_dns_zone.id, "domain": xpro_dns_zone.name})
 export("mitx", {"id": mitx_dns_zone.id, "domain": mitx_dns_zone.name})
 export("ocw", {"id": ocw_dns_zone.id, "domain": ocw_dns_zone.name})
+export("ol", {"id": ol_dns_zone.id, "domain": ol_dns_zone.name})
