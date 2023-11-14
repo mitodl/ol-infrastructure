@@ -19,7 +19,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
@@ -64,12 +64,37 @@ s3.BucketVersioningV2(
         status="Enabled"
     ),
 )
-ocw_storage_bucket_public_access = s3.BucketPublicAccessBlock(
+bootcamps_storage_bucket_public_access = s3.BucketPublicAccessBlock(
     "ol-bootcamps-app-bucket-public-access",
     bucket=bootcamps_storage_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
+)
+s3.BucketPolicy(
+    "ol-bootcamps-app-bucket-policy",
+    bucket=bootcamps_storage_bucket.id,
+    policy=json.dumps(
+        {
+            "Version": IAM_POLICY_VERSION,
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": "*"},
+                    "Action": "s3:GetObject",
+                    "Resource": [
+                        f"arn:aws:s3:::{bootcamps_storage_bucket_name}/images/*",
+                    ],
+                }
+            ],
+        }
+    ),
+    opts=ResourceOptions(
+        depends_on=[
+            bootcamps_storage_bucket_public_access,
+            bootcamps_storage_bucket_ownership_controls,
+        ]
+    ),
 )
 
 bootcamps_iam_policy = iam.Policy(
