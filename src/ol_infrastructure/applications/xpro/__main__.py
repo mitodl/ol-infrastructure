@@ -11,7 +11,7 @@ from pathlib import Path
 import pulumi_vault as vault
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, StackReference, export
 from pulumi_aws import ec2, iam, s3
 
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -174,14 +174,11 @@ xpro_vault_backend = OLVaultDatabaseBackend(xpro_vault_backend_config)
 ######################
 # Secrets Management #
 ######################
-xpro_secrets = vault.Mount(
-    "xpro-vault-secrets-storage",
-    path="secret-xpro",
-    type="kv-v2",
-    options={"version": 2},
-    description="Static secrets storage for the xpro application",
-    opts=ResourceOptions(delete_before_replace=True),
-)
+# Don't create the mount here because it is already created as part of
+# ol_infrastructure/applications/edxapp. Instead we want to factor the creation of all
+# mount points to a single substructure project and use stack references for all usages
+# to populate or retrieve values in the resepective mounts.
+# TMM 2023-11-14
 
 xpro_vault_secrets = read_yaml_secrets(
     Path(f"xpro/secrets.{stack_info.env_suffix}.yaml")
@@ -191,7 +188,9 @@ for key, data in xpro_vault_secrets.items():
     vault.kv.SecretV2(
         f"xpro-vault-secrets-{key}",
         name=key,
-        mount=xpro_secrets,
+        # This mount is created already as part of the edxapp Pulumi project. See note
+        # above for future work.
+        mount="secret-xpro",
         data_json=json.dumps(data),
     )
 
