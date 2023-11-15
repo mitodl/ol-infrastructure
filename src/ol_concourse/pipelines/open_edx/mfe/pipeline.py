@@ -37,6 +37,7 @@ from ol_concourse.lib.resources import git_repo
 class OpenEdxVars(BaseModel):
     contact_url: Optional[str] = None
     deployment_name: OpenEdxDeploymentName
+    display_feedback_widget: Optional[str] = None
     environment: str
     environment_stage: EnvStage
     favicon_url: str
@@ -71,6 +72,7 @@ def mfe_params(
         "BASE_URL": f"https://{open_edx.lms_domain}",
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "CONTACT_URL": open_edx.contact_url,
+        "DISPLAY_FEEDBACK_WIDGET": open_edx.display_feedback_widget,
         "FAVICON_URL": open_edx.favicon_url,
         "LANGUAGE_PREFERENCE_COOKIE_NAME": (
             f"{open_edx.environment}-open-edx-language-preference"
