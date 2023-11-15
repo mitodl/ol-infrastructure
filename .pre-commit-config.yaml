@@ -68,3 +68,9 @@ repos:
   rev: v0.9.0.6
   hooks:
   - id: shellcheck
+- repo: https://github.com/rhysd/actionlint
+  rev: v1.6.26
+  hooks:
+  - id: actionlint
+    name: actionlint
+    description: Runs actionlint to lint GitHub Actions workflow files
