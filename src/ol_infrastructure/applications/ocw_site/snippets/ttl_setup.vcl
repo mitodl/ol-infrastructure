@@ -5,11 +5,11 @@ if (beresp.status == 404) {
 }
 # One month cache is for hashed static assets (first three cases). We use a long cache because the hashes should be updated whenever the files are updated.
 # One week cache is for unhashed assets (last three cases). We use a shorter cache here to ensure those assets remain fresh.
-if (bereq.url.path ~ ".*(main|common|www|course_v2|instructor_insights|fields)\.[0-9a-f]+\.(css|js)\z") || (bereq.url.path ~ ".*[0-9a-f]+\.[0-9a-f]+\.(css|js)\z") {
+if (bereq.url.path ~ ".*(main|common|www|course_v2|instructor_insights|fields)\.[0-9a-f]+\.(css|js)\z" || bereq.url.path ~ ".*[0-9a-f]+\.[0-9a-f]+\.(css|js)\z") {
   # Hashed static theme assets and dynamic imports
   set beresp.ttl = 2629743s;
   set beresp.http.Cache-Control = "max-age=2629743";
-} elsif (bereq.url.path ~ ".*/static_shared/images/.*\.[0-9a-f]+\.(png|jpg|jpeg|svg|gif)\z") || (bereq.url.path ~ ".*/static_shared/fonts/.*\.subset\.[0-9a-f]+\.(ttf|woff|woff2)\z") {
+} elsif (bereq.url.path ~ ".*/static_shared/images/.*\.[0-9a-f]+\.(png|jpg|jpeg|svg|gif)\z" || bereq.url.path ~ ".*/static_shared/fonts/.*\.subset\.[0-9a-f]+\.(ttf|woff|woff2)\z") {
   # Hashed static images and fonts
   set beresp.ttl = 2629743s;
   set beresp.http.Cache-Control = "max-age=2629743";
@@ -25,7 +25,7 @@ if (bereq.url.path ~ ".*(main|common|www|course_v2|instructor_insights|fields)\.
   # Any other images
   set beresp.ttl = 604800s;
   set beresp.http.Cache-Control = "max-age=604800";
-} elsif (bereq.http.Host ~ "www.ocw-openmatters.org") && (bereq.url.path ~ "^/wp-content/uploads/.*\.(png|jpg|jpeg|svg|gif)\z") {
+} elsif (bereq.http.Host ~ "www.ocw-openmatters.org" && bereq.url.path ~ "^/wp-content/uploads/.*\.(png|jpg|jpeg|svg|gif)\z") {
   # Uploaded images in openmatters
   set beresp.ttl = 604800s;
   set beresp.http.Cache-Control = "max-age=604800";
