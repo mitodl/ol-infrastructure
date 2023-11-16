@@ -90,6 +90,7 @@ mitxonline = [
     OpenEdxVars(
         contact_url="https://mitxonline.zendesk.com/hc/en-us/requests/new",
         deployment_name="mitxonline",
+        display_feedback_widget="false",
         environment="mitxonline-qa",
         environment_stage="QA",
         favicon_url="https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico",
@@ -110,6 +111,7 @@ mitxonline = [
     OpenEdxVars(
         contact_url="https://mitxonline.zendesk.com/hc/en-us/requests/new",
         deployment_name="mitxonline",
+        display_feedback_widget="false",
         environment="mitxonline-production",
         environment_stage="Production",
         favicon_url="https://raw.githubusercontent.com/mitodl/mitxonline-theme/main/lms/static/images/favicon.ico",
