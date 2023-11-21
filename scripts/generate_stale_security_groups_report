@@ -17,10 +17,10 @@ for instance in ec2_instances["Reservations"]:
 
 flat_groups = itertools.chain.from_iterable(active_groups)
 active_group_ids = {
-    (group["GroupId"], group["GroupName"], group["VpcId"]) for group in flat_groups
+    (group["GroupId"], group["GroupName"], group.get("VpcId")) for group in flat_groups
 }
 all_group_ids = {
-    (group["GroupId"], group["GroupName"], group["VpcId"])
+    (group["GroupId"], group["GroupName"], group.get("VpcId"))
     for group in groups["SecurityGroups"]
 }
 
