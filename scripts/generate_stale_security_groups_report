@@ -16,14 +16,19 @@ for instance in ec2_instances["Reservations"]:
     active_groups.extend([box["SecurityGroups"] for box in instance["Instances"]])
 
 flat_groups = itertools.chain.from_iterable(active_groups)
-active_group_ids = {(group["GroupId"], group["GroupName"]) for group in flat_groups}
+active_group_ids = {
+    (group["GroupId"], group["GroupName"], group["VpcId"]) for group in flat_groups
+}
 all_group_ids = {
-    (group["GroupId"], group["GroupName"]) for group in groups["SecurityGroups"]
+    (group["GroupId"], group["GroupName"], group["VpcId"])
+    for group in groups["SecurityGroups"]
 }
 
 stale_groups = all_group_ids - active_group_ids
 with open("stale_security_groups.csv", "w") as stale_csv:  # noqa: PTH123
-    writer = csv.DictWriter(stale_csv, fieldnames=("Group ID", "Group Name"))
+    writer = csv.DictWriter(stale_csv, fieldnames=("Group ID", "Group Name", "VPC ID"))
     writer.writeheader()
     for group in stale_groups:
-        writer.writerow({"Group ID": group[0], "Group Name": group[1]})
+        writer.writerow(
+            {"Group ID": group[0], "Group Name": group[1], "VPC ID": group[2]}
+        )
