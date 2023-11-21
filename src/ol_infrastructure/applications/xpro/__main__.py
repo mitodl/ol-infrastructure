@@ -185,12 +185,11 @@ xpro_vault_secrets = read_yaml_secrets(
 )
 
 for key, data in xpro_vault_secrets.items():
-    vault.kv.SecretV2(
+    vault.kv.Secret(
         f"xpro-vault-secrets-{key}",
-        name=key,
         # This mount is created already as part of the edxapp Pulumi project. See note
         # above for future work.
-        mount="secret-xpro",
+        path=f"secret-xpro/{key}",
         data_json=json.dumps(data),
     )
 
