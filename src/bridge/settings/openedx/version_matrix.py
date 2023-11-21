@@ -435,7 +435,6 @@ ReleaseMap: dict[
                 application="course-authoring",
                 application_type="MFE",
                 release="olive",
-                branch_override="master",
                 runtime_version_override="16",
                 branding_overrides=default_branding_overrides,
             ),
