@@ -184,9 +184,11 @@ mitopen_db_config = OLPostgresDBConfig(
     security_groups=[mitopen_db_security_group],
     tags=aws_config.tags,
     db_name="mitopen",
-    parameter_overrides=[{"name": "password_encryption", "value": "md5"}],
     public_access=True,
     **rds_defaults,
+)
+mitopen_db_config.parameter_overrides.append(
+    {"name": "password_encryption", "value": "md5"}
 )
 
 mitopen_db = OLAmazonDB(mitopen_db_config)

@@ -157,7 +157,11 @@ xpro_db_config = OLPostgresDBConfig(
     tags=aws_config.tags,
     db_name="xpro",
     public_access=True,
+    parameter_overrides=[{"name": "password_encryption", "value": "md5"}],
     **defaults(stack_info)["rds"],
+)
+xpro_db_config.parameter_overrides.append(
+    {"name": "password_encryption", "value": "md5"}
 )
 xpro_db = OLAmazonDB(xpro_db_config)
 
