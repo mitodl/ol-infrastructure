@@ -405,6 +405,13 @@ for purpose in ("draft", "live"):
         headers=[
             fastly.ServiceVclHeaderArgs(
                 action="set",
+                destination="http.Access-Control-Allow-Origin",
+                name="CORS Allow Star",
+                source="*",
+                type="cache",
+            ),
+            fastly.ServiceVclHeaderArgs(
+                action="set",
                 destination="http.Surrogate-Key",
                 name="S3 Cache Surrogate Keys",
                 priority=10,
