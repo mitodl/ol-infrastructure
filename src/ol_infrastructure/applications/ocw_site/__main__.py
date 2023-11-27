@@ -407,7 +407,7 @@ for purpose in ("draft", "live"):
                 action="set",
                 destination="http.Access-Control-Allow-Origin",
                 name="CORS Allow Star",
-                source="*",
+                source='"*"',
                 type="cache",
             ),
             fastly.ServiceVclHeaderArgs(
