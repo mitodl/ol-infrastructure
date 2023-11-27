@@ -1430,13 +1430,13 @@ six = ">=1.12,<2.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "6.9.0"
+version = "6.10.0"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_aws-6.9.0-py3-none-any.whl", hash = "sha256:33518ec3446eff1e5fa3c4ddb5907ac1611353505499f2e3d0c79e279caf1748"},
-    {file = "pulumi_aws-6.9.0.tar.gz", hash = "sha256:197381f6b9c2c65e95a6a8d49a91ab2b27c7f7347378a9e874c1f3d3ca5f4501"},
+    {file = "pulumi_aws-6.10.0-py3-none-any.whl", hash = "sha256:6ab1d9fe47919e8a4ecf83d8028b251eaa5d8b0c0ad33ba855c5a6c4e4d83293"},
+    {file = "pulumi_aws-6.10.0.tar.gz", hash = "sha256:0b88bd3f389a7a2579d2aab3c736d4478fb62ff0593a580691ea19be3c76e6c5"},
 ]
 
 [package.dependencies]
@@ -1446,13 +1446,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-consul"
-version = "3.10.0"
+version = "3.11.0"
 description = "A Pulumi package for creating and managing consul resources."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_consul-3.10.0-py3-none-any.whl", hash = "sha256:38106266e7c5afaa6df195a76e6af48f2a9fbac24ad60a299c45b9f3e7b3e1c6"},
-    {file = "pulumi_consul-3.10.0.tar.gz", hash = "sha256:6a878db883bf9d62878bf5d3eb267e7200307869576562f5a1038151468ee70c"},
+    {file = "pulumi_consul-3.11.0-py3-none-any.whl", hash = "sha256:0c3abedeba8bb12f58f18eb00ca40d8170dbe7d68aefe7e7291ea8a7ffc62d0e"},
+    {file = "pulumi_consul-3.11.0.tar.gz", hash = "sha256:b8a6c4a6abce6c3bed8f86c8c69d51f199f44930f326ca5c80be299830b04005"},
 ]
 
 [package.dependencies]
@@ -1509,13 +1509,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-mongodbatlas"
-version = "3.11.2"
+version = "3.12.0"
 description = "A Pulumi package for creating and managing mongodbatlas cloud resources."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_mongodbatlas-3.11.2-py3-none-any.whl", hash = "sha256:7a00e4bae271e5816eba82143f0d2495bcd9402911da766a916ca63343ce7848"},
-    {file = "pulumi_mongodbatlas-3.11.2.tar.gz", hash = "sha256:e796461cf0e676cf6689d7f171207c174443c35294cf128d39604127698aa83e"},
+    {file = "pulumi_mongodbatlas-3.12.0-py3-none-any.whl", hash = "sha256:aeb92f337ca04efdb73c4f1d4997a81b273cbadf9a2f5a05791de7195d9dce41"},
+    {file = "pulumi_mongodbatlas-3.12.0.tar.gz", hash = "sha256:2d885c860cc47a501418321d6e8f7c0cf1596204184c01d1c182f193bd6a26b5"},
 ]
 
 [package.dependencies]
