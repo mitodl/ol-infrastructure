@@ -36,18 +36,6 @@ with this: 'poetry run pulumi stack export -s applications.micromasters.CI | gre
 You'll also need to retrieve the database password from Vault using Pulumi. You can do that with the following invocation:
 `poetry run pulumi config get  "micromasters:db_password"`
 
-## Dump Heroku Managed DB
-
-Use something like the following invocation to dump the contents of the current application database.
-
-`pg_dump -x -O $(heroku config:get DATABASE_URL -a micromasters-rc) > micromasters_qa_db_dump.sql`
-
-Obviously, substitute your app for micromasters and your environment for rc/qa.
-
-(Aside: We use rc and qa interchangably here).
-
-Examine the dump in your editor (read-only to be safe) and ensure that all the necessary components are present: Schema, data, foreign keys, and the like.
-
 ## Construct A New DATABASE_URL
 
 I suggest doing this in a text file you can source easily since you'll be working with this database a bit for this project. I keep such things in an 'envsnips' folder
@@ -78,6 +66,31 @@ other components.
 
 We'll assume $DATABASE_URL is set to to the new RDS database we've created for the rest of the runbook.
 
+## Put the Heroku App Into Maintenance Mode
+
+In order to ensure database consistency during the transition we need to put the
+Heroku application into maintenance mode. 
+
+```
+heroku maintenance:on -a <app>
+```
+
+**CAUTION** customers will see a notice about ongoing maintenance until you
+take the app out of maintenance mode, so be mindful of the wall clock time!
+
+
+## Dump Heroku Managed DB
+
+Use something like the following invocation to dump the contents of the current application database.
+
+`pg_dump -x -O $(heroku config:get DATABASE_URL -a micromasters-rc) > micromasters_qa_db_dump.sql`
+
+Obviously, substitute your app for micromasters and your environment for rc/qa.
+
+(Aside: We use rc and qa interchangably here).
+
+Examine the dump in your editor (read-only to be safe) and ensure that all the necessary components are present: Schema, data, foreign keys, and the like.
+
 ## Restore Dump Into AWS RDS DB
 
 Using the DATABASE_URL we just created and tested, we can now restore the data we dumped in the prior step into the new DB:
@@ -85,6 +98,16 @@ Using the DATABASE_URL we just created and tested, we can now restore the data w
 `psql $DATABASE_URL < micromasters_qa_db_dump.sql`
 
 You will see a lot of output representing each statement as it's processed by the DB. You shouldn't see any errors here.
+
+## Take Heroku application out of maintenance mode
+
+```
+heroku maintenance:off -a <app>
+```
+
+At this point, the application will resume normal operation and be available to
+customers.
+
 
 ## Coordinate Transition
 
