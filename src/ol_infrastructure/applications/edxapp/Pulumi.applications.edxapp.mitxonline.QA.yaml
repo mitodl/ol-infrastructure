@@ -31,7 +31,7 @@ config:
   edxapp:mail_domain: edxapp-mail-qa.mitxonline.mit.edu
   edxapp:proctortrack_url: https://preproduction.verificient.com
   edxapp:sender_email_address: support@edxapp-mail-qa.mitxonline.mit.edu
-  edxapp:use_docker: true
+  edxapp:framework: "docker"
   edxapp:web_node_capacity: "3"
   edxapp:worker_node_capacity: "5"
   mongodb:atlas_project_id: 61a8fd80284fd30a660f2699
