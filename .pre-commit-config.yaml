@@ -46,7 +46,7 @@ repos:
     - src/ol_infrastructure/applications/ocw_site/redirect_dict
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.1.5'
+  rev: 'v0.1.6'
   hooks:
   - id: ruff-format
   - id: ruff
@@ -61,7 +61,7 @@ repos:
     - --config-file=pyproject.toml
     - --warn-unused-configs
     additional_dependencies:
-    - pydantic>1
+    - pydantic>2
     - types-PyYAML
     - types-requests
 - repo: https://github.com/shellcheck-py/shellcheck-py
