@@ -134,7 +134,7 @@ edxapp_vpc_id = edxapp_vpc["id"]
 data_vpc = network_stack.require_output("data_vpc")
 data_integrator_secgroup = data_vpc["security_groups"]["integrator"]
 
-framework = "docker" if edxapp_config.get_bool("use_docker") else "ansible"
+framework = edxapp_config.get("framework") or "ansible"
 ami_filters = [
     ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
     ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
