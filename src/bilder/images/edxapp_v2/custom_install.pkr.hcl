@@ -8,6 +8,11 @@ variable "business_unit" {
   default = "operations"
 }
 
+variable "framework" {
+  type    = string
+  default = "docker"
+}
+
 variable "build_environment" {
   type    = string
   default = "mitxonline-qa"
@@ -83,7 +88,7 @@ source "amazon-ebs" "edxapp" {
     OU              = var.business_unit
     app             = local.app_name
     deployment      = var.installation_target
-    framework       = "docker"
+    framework       = var.framework
     purpose         = "${local.app_name}-${var.node_type}"
     openedx_release = var.openedx_release
   }

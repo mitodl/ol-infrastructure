@@ -247,6 +247,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                             f"{edx_registry_image_resource.name}/digest"
                         ),
                     },
+                    packer_vars={"framework": "docker"},
                     extra_packer_params={
                         "only": ["amazon-ebs.edxapp"],
                         "var_files": [
