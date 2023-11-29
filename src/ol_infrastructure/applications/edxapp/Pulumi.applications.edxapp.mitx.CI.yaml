@@ -32,7 +32,7 @@ config:
   edxapp:min_worker_nodes: "1"
   edxapp:sender_email_address: mitx-support+ci@mit.edu
   edxapp:target_vpc: residential_mitx_vpc
-  edxapp:framework: docker
+  edxapp:framework: "docker"
   edxapp:web_node_capacity: "1"
   edxapp:worker_node_capacity: "1"
   mongodb:atlas_project_id: 617858f961f3016e0ade73e7

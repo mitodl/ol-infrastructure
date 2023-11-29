@@ -35,7 +35,7 @@ config:
     learning: learn
     library_authoring: library-authoring
     ora_grading: ora-grading
-  edxapp:framework: docker
+  edxapp:framework: "docker"
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-staging-ci.mitx.mit.edu
   edxapp:min_web_nodes: "1"
