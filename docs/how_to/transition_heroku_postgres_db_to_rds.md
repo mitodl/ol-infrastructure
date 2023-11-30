@@ -69,7 +69,7 @@ We'll assume $DATABASE_URL is set to to the new RDS database we've created for t
 ## Put the Heroku App Into Maintenance Mode
 
 In order to ensure database consistency during the transition we need to put the
-Heroku application into maintenance mode. 
+Heroku application into maintenance mode.
 
 ```
 heroku maintenance:on -a <app>
