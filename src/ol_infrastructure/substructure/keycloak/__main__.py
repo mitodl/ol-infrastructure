@@ -496,7 +496,7 @@ ol_browser_flow_ol_auth_username_password_form = keycloak.authentication.Executi
     "ol-auth-username-password-form",
     realm_id=ol_apps_realm.id,
     parent_flow_alias=ol_browser_flow_forms.alias,
-    authenticator="ol-auth-username-password-form",
+    authenticator="auth-username-password-form",
     requirement="REQUIRED",
     opts=resource_options,
 )
