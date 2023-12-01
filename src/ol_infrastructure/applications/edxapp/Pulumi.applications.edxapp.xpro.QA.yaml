@@ -5,9 +5,17 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-xpro-qa.odl.mit.edu
   edxapp:additional_waffle_flags:
-  - ["course_experience.relative_dates", "--create", "--superusers", "--everyone",
-    "--staff", "--authenticated"]
+  - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
   - ["courseware.courseware_mfe", "--create", "--superusers", "--everyone"]
+  - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
+  - ["learner_home_mfe.enabled", "--create", "--superusers", "--everyone"]
+  - ["learner_recommendations.enable_dashboard_recommendations", "--create", "--superusers",
+    "--everyone"]
+  - ["new_core_editors.use_new_problem_editor", "--create"]
+  - ["new_core_editors.use_new_text_editor", "--create", "--superusers"]
+  - ["new_core_editors.use_new_video_editor", "--create", "--superusers"]
+  - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
+  - ["studio.library_authoring_mfe", "--create", "--superusers", "--everyone"]
   edxapp:business_unit: mitxpro
   edxapp:db_password:
     secure: v1:+Bcw4dSZUPqWY2cL:g/KKgzrmRlgx2SOuOOB4grCveVaNv5mZVuuFrpGgAGwKEussIqUWTBnFJknEdJ4Hjf5Jw/1W560=
