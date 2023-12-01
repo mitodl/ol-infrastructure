@@ -3,7 +3,7 @@ FROM ubuntu:focal
 RUN apt update && \
   apt-get install -y software-properties-common && \
   apt-add-repository -y ppa:deadsnakes/ppa && apt-get update && \
-  apt-get install git-core language-pack-en python3-pip libmysqlclient-dev ntp libssl-dev python3.8-dev python3.8-venv -qy && \
+  apt-get install git-core language-pack-en python3-pip libmysqlclient-dev ntp libssl-dev python3.8-dev python3.8-venv pkg-config -qy && \
   rm -rf /var/lib/apt/lists/*
 
 ARG OPENEDX_COMMON_VERSION=open-release/olive.master
