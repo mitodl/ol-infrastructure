@@ -888,21 +888,8 @@ edxapp_ses_event_destintations = ses.EventDestination(
 ######################
 # Build waffle flags
 ######################
-default_waffle_list = [
-    [
-        "grades.enforce_freeze_grade_after_course_end",
-        "--create",
-        "--superusers",
-        "--everyone",
-    ],
-    ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"],
-    ["grades.writable_gradebook", "--create", "--superusers", "--everyone"],
-    ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"],
-]
-additional_waffle_list = edxapp_config.get_object("additional_waffle_flags", default=[])
-waffle_flags_yaml_content = yaml.safe_dump(
-    {"waffles": default_waffle_list + additional_waffle_list}
-)
+waffle_list = edxapp_config.get_object("waffle_flags", default=[])
+waffle_flags_yaml_content = yaml.safe_dump({"waffles": waffle_list})
 
 ######################
 # Manage Consul Data #

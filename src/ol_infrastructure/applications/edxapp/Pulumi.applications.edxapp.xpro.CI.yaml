@@ -4,11 +4,14 @@ encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQEGbYgV2EePyiT5w7
 config:
   aws:region: us-east-1
   consul:address: https://consul-xpro-ci.odl.mit.edu
-  edxapp:additional_waffle_flags:
+  edxapp:waffle_flags:
   - ["completion.enable_completion_tracking", "--create", "--superusers", "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
+  - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
+  - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
+  - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
   - ["learner_home_mfe.enabled", "--create", "--superusers", "--everyone"]
   - ["learner_recommendations.enable_dashboard_recommendations", "--create", "--superusers",
     "--everyone"]
@@ -16,6 +19,7 @@ config:
   - ["new_core_editors.use_new_text_editor", "--create", "--superusers"]
   - ["new_core_editors.use_new_video_editor", "--create", "--superusers"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
+  - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--create", "--superusers", "--everyone"]
   edxapp:business_unit: mitxpro
   edxapp:db_password:

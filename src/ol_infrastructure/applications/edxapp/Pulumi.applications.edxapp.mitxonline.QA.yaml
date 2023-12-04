@@ -7,6 +7,20 @@ config:
   consul:http_auth:
     secure: v1:Fa4X7VjchQQhRf6+:LxDvDXBPZUPOgMpcqvo9PxwjMK2lDKrnmJGbaJA7e0i5sVsUyQXTLYpa7lDmC5d1QddyLLkjyQjK5Hi/fEeoJle5986uRKVHXNyjRpcJqx8sN2SbFPHrCDpWQfrsz38=
   consul:scheme: https
+  edxapp:waffle_flags:
+  - ["course_experience.relative_dates", "--create", "--superusers", "--everyone",
+    "--staff", "--authenticated"]
+  - ["discussions.pages_andResources_mfe", "--create", "--superusers", "--staff"]
+  - ["grades.bulk_management", "--create", "--superusers", "--everyone", "--staff",
+    "--authenticated"]
+  - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
+  - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
+  - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
+  - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone",
+    "--staff", "--authenticated"]
+  - ["seo.enable_anonymous_courseware_access", "--create", "--superusers", "--staff",
+    "--authenticated"]
+  - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   edxapp:business_unit: mitxonline
   edxapp:db_password:
     secure: v1:xHUw5WC3aN02zuAj:0BozwDxrtF0OA7wkYuv4R4CCnSHYdgXt+vi6/3eP9zwJgHgQO20+8sQfg7rXPC9SIUobEA==

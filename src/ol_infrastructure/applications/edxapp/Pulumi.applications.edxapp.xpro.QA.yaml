@@ -4,8 +4,7 @@ encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QHxoDDVZ4kHnQtnul
 config:
   aws:region: us-east-1
   consul:address: https://consul-xpro-qa.odl.mit.edu
-  edxapp:additional_waffle_flags:
-  - ["completion.enable_completion_tracking", "--create", "--superusers", "--everyone"]
+  edxapp:waffle_flags:
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
   - ["courseware.courseware_mfe", "--create", "--superusers", "--everyone"]
@@ -18,6 +17,10 @@ config:
   - ["new_core_editors.use_new_video_editor", "--create", "--superusers"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--create", "--superusers", "--everyone"]
+  - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
+  - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
+  - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
+  - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   edxapp:business_unit: mitxpro
   edxapp:db_password:
     secure: v1:+Bcw4dSZUPqWY2cL:g/KKgzrmRlgx2SOuOOB4grCveVaNv5mZVuuFrpGgAGwKEussIqUWTBnFJknEdJ4Hjf5Jw/1W560=
