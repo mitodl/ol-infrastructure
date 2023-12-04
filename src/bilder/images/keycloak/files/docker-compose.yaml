@@ -4,7 +4,7 @@ services:
     image: mitodl/keycloak:${VERSION}
     command:
     - "start --features=preview -Dkeycloak.profile.feature.upload_scripts=enabled\
-      \ --spi-sticky-session-encoder-infinispan-should-attach-route=false"
+      \ --spi-sticky-session-encoder-infinispan-should-attach-route=false --spi-login-provider=ol-freemarker"
     env_file:
     - ./.env
     labels:
