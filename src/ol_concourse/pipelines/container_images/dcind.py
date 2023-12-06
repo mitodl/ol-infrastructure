@@ -2,13 +2,19 @@ import sys
 
 from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.models.pipeline import (
+    AnonymousResource,
+    Command,
     GetStep,
     Identifier,
     Input,
     Job,
+    Output,
     Pipeline,
+    Platform,
     PutStep,
     Resource,
+    TaskConfig,
+    TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, github_release
 
@@ -39,10 +45,6 @@ dcind_release_image = Resource(
     },
 )
 
-build_task = container_build_task(
-    inputs=[Input(name=ol_inf_repo.name)],
-    build_parameters={"CONTEXT": f"{ol_inf_repo.name}/dockerfiles/dcind"},
-)
 
 docker_pipeline = Pipeline(
     resources=[ol_inf_repo, earthly_release, dcind_release_image],
@@ -52,7 +54,40 @@ docker_pipeline = Pipeline(
             plan=[
                 GetStep(get=ol_inf_repo.name, trigger=True),
                 GetStep(get=earthly_release.name, trigger=True),
-                build_task,
+                TaskStep(
+                    task=Identifier("collect-earthly-version"),
+                    config=TaskConfig(
+                        platform=Platform.linux,
+                        image_resource=AnonymousResource(
+                            type="registry-image",
+                            source={
+                                "repository": "alpine",
+                                "tag": "3.18.0",
+                            },
+                        ),
+                        inputs=[Input(name=earthly_release.name)],
+                        outputs=[
+                            Output(name=Identifier("earthly-version")),
+                        ],
+                        run=Command(
+                            path="sh",
+                            args=[
+                                "-xc",
+                                f"""echo "EARTHLY_VERSION=$(cat {earthly_release.name}/tag)" > earthly-version/args_file;""",  # noqa: E501
+                            ],
+                        ),
+                    ),
+                ),
+                container_build_task(
+                    inputs=[
+                        Input(name=ol_inf_repo.name),
+                        Input(name="earthly-version"),
+                    ],
+                    build_parameters={
+                        "CONTEXT": f"{ol_inf_repo.name}/dockerfiles/dcind",
+                        "BUILD_ARGS_FILE": "earthly-version/args_file",
+                    },
+                ),
                 PutStep(
                     put=dcind_release_image.name,
                     params={
