@@ -27,6 +27,7 @@ config:
   edxapp:edx_forum_secrets:
     secure: v1:QSW6gq7cQ6t65Glo:OGJ5X4YYEi2ZdyrpnML25p10mQrodNNLaF5zyV1242ZcQz1TkRsTdpmv9HghIhgHxykYd2NK7kyRkvphd5pfI56xAg/de/8PuHNuPx5kg3IZCrFktYuE2Nyzjxhg7aGHNhA6JQEf95925WPwAG3V
   edxapp:elb_healthcheck_interval: "30"
+  edxapp:default_module_class: xmodule.hidden_module.HiddenDescriptor
   edxapp:web_instance_type: m6a.large
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:

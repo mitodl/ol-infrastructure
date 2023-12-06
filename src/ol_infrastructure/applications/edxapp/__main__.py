@@ -911,6 +911,10 @@ consul_kv_data = {
     "enable_notes": (
         "true" if edxapp_config.get_bool("enable_notes") else "false"
     ),  # intended quoted boolean
+    # TMM 2023-12-06 - This is deprecated and can be removed once Quince makes it to
+    # xPro production
+    "default-module-class": edxapp_config.get("default_module_class")
+    or "xmodule.hidden_block.HiddenBlock",
     "google-analytics-id": edxapp_config.require("google_analytics_id"),
     "lms-domain": edxapp_domains["lms"],
     "marketing-domain": edxapp_config.get("marketing_domain") or "",
