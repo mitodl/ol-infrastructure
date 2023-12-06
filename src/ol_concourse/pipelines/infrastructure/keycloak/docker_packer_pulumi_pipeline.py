@@ -138,6 +138,7 @@ def build_keycloak_pipeline() -> Pipeline:
                             textwrap.dedent(
                                 f"""\
                         mkdir {image_build_context.name}/plugins/
+                        curl -o {image_build_context.name}/plugins/keycloak-scim.jar https://lab.libreho.st/libre.sh/scim/keycloak-scim/-/jobs/artifacts/main/raw/build/libs/keycloak-scim-1.0-SNAPSHOT-all.jar?job=package
                         cp -r {keycloak_customization_repo.name}/* {image_build_context.name}/
                         cp -r {cas_protocol_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {metrics_spi.name}/* {image_build_context.name}/plugins/
