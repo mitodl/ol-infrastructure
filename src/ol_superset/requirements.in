@@ -1,0 +1,7 @@
+apache-superset[cors,thumbnails,prophet,playwright]
+psycopg2
+hvac
+trino
+celery-redbeat
+redis
+duckdb

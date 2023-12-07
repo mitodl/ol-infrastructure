@@ -1,10 +1,12 @@
 import os  # noqa: INP001
 
-import hvac
 from flask_appbuilder.security.manager import AUTH_DB
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
+from vault.aws_auth import get_vault_client
 
-vault_client = hvac.Client()
+vault_addr = os.environ.get("VAULT_ADDR", "http://localhost:8200")
+vault_client = get_vault_client(vault_url=vault_addr, ec2_role="superset")
+
 
 REDIS_TOKEN = vault_client.secrets.kv.v2.read_secret_version(
     path="secret-superset/redis"
@@ -199,6 +201,8 @@ class CeleryConfig:  # pylint: disable=too-few-public-methods
     broker_url = "rediss://superset-redis.service.consul:6379/1"
     imports = ("superset.sql_lab", "superset.tasks.scheduler")
     result_backend = "rediss://superset-redis.service.consul:6379/2"
+    redis_username = "default"
+    redis_password = REDIS_TOKEN
     worker_prefetch_multiplier = 1
     task_acks_late = True
     task_annotations = {  # noqa: RUF012
@@ -206,6 +210,7 @@ class CeleryConfig:  # pylint: disable=too-few-public-methods
             "rate_limit": "100/s",
         },
     }
+    beat_scheduler = "redbeat.RedBeatScheduler"
     beat_schedule = {  # noqa: RUF012
         "reports.scheduler": {
             "task": "reports.scheduler",
