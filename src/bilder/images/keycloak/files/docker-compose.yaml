@@ -23,6 +23,8 @@ services:
     image: traefik:v2.10
     command:
     - "--configFile=/etc/traefik/traefik.yaml"
+    labels:
+    - "traefik.http.middlewares.keycloak-ratelimit.ratelimit.average=10"
     ports:
     - "80:80"
     - "443:443"
