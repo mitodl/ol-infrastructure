@@ -49,16 +49,6 @@ pytest = "^7.1.1"
 pytest-testinfra = "^10.0.0"
 ruff = "^0"
 
-[tool.poetry.group.superset.dependencies]
-apache-superset = "^3.0.2"
-
-[tool.poetry.group.superset-customize.dependencies]
-psycopg2 = "^2.9.9"
-hvac = "^2.0.0"
-trino = "^0.327.0"
-celery-redbeat = "^2.1.1"
-redis = "<5"
-
 [build-system]
 requires = ["poetry_core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
