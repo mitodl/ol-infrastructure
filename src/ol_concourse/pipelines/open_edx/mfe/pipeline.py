@@ -35,25 +35,26 @@ from ol_concourse.lib.resources import git_repo
 
 
 class OpenEdxVars(BaseModel):
+    about_us_url: Optional[str] = None
+    accessibility_url: Optional[str] = None
+    account_settings_url: Optional[str] = None
     contact_url: Optional[str] = None
     deployment_name: OpenEdxDeploymentName
     display_feedback_widget: Optional[str] = None
     environment: str
     environment_stage: EnvStage
     favicon_url: str
+    honor_code_url: Optional[str] = None
     lms_domain: str
     logo_url: str
     marketing_site_domain: str
+    privacy_policy_url: Optional[str] = None
+    schedule_email_section: Optional[str] = None
     site_name: str
     studio_domain: str
     support_url: str
-    schedule_email_section: Optional[str] = None
-    trademark_text: Optional[str] = None
-    honor_code_url: Optional[str] = None
     terms_of_service_url: str
-    accessibility_url: Optional[str] = None
-    about_us_url: Optional[str] = None
-    privacy_policy_url: Optional[str] = None
+    trademark_text: Optional[str] = None
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -66,14 +67,18 @@ def mfe_params(
     open_edx: OpenEdxVars, mfe: OpenEdxApplicationVersion
 ) -> dict[str, Optional[str]]:
     return {
+        "ABOUT_US_URL": open_edx.about_us_url,
+        "ACCESSIBILITY_URL": open_edx.accessibility_url,
         "ACCESS_TOKEN_COOKIE_NAME": (
             f"{open_edx.environment}-edx-jwt-cookie-header-payload"
         ),
+        "ACCOUNT_SETTINGS_URL": open_edx.account_settings_url,
         "BASE_URL": f"https://{open_edx.lms_domain}",
-        "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "CONTACT_URL": open_edx.contact_url,
+        "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "DISPLAY_FEEDBACK_WIDGET": open_edx.display_feedback_widget,
         "FAVICON_URL": open_edx.favicon_url,
+        "HONOR_CODE_URL": open_edx.honor_code_url,
         "LANGUAGE_PREFERENCE_COOKIE_NAME": (
             f"{open_edx.environment}-open-edx-language-preference"
         ),
@@ -86,21 +91,18 @@ def mfe_params(
         "LOGO_WHITE_URL": open_edx.logo_url,
         "MARKETING_SITE_BASE_URL": f"https://{open_edx.marketing_site_domain}",
         "ORDER_HISTORY_URL": None,  # Intentionally left blank to turn off a menu entry
+        "PRIVACY_POLICY_URL": open_edx.privacy_policy_url,
         "PUBLIC_PATH": f"/{mfe.application.path}/",
         "REFRESH_ACCESS_TOKEN_ENDPOINT": f"https://{open_edx.lms_domain}/login_refresh",
+        "SCHEDULE_EMAIL_SECTION": open_edx.schedule_email_section,
         "SEARCH_CATALOG_URL": f"https://{open_edx.lms_domain}/courses",
         "SESSION_COOKIE_DOMAIN": open_edx.lms_domain,
         "SITE_NAME": open_edx.site_name,
         "STUDIO_BASE_URL": f"https://{open_edx.studio_domain}",
         "SUPPORT_URL": f"https://{open_edx.support_url}",
-        "SCHEDULE_EMAIL_SECTION": open_edx.schedule_email_section,
+        "TERMS_OF_SERVICE_URL": open_edx.terms_of_service_url,
         "TRADEMARK_TEXT": open_edx.trademark_text,
         "USER_INFO_COOKIE_NAME": f"{open_edx.environment}-edx-user-info",
-        "HONOR_CODE_URL": open_edx.honor_code_url,
-        "TERMS_OF_SERVICE_URL": open_edx.terms_of_service_url,
-        "ACCESSIBILITY_URL": open_edx.accessibility_url,
-        "ABOUT_US_URL": open_edx.about_us_url,
-        "PRIVACY_POLICY_URL": open_edx.privacy_policy_url,
     }
 
 
