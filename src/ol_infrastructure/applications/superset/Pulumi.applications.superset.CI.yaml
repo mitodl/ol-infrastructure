@@ -1,0 +1,11 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQFI3oulHKX8feahVcHWepBbAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMoNkhako1Oh9vAJaSAgEQgDtyAbC4IkkozXUdFuCaGd3RYLOlzlOrRzaRr04Whhaps212o3vaFOTr7apDxn0APPORq1uoRA44j051RA==
+config:
+  consul:address: https://consul-data-ci.odl.mit.edu
+  superset:db_password:
+    secure: v1:Z8UwtmZDreH29f/a:ExsL1/JkiVIgAI0+cir9IXJuJlH5VomlsxqpLAlbqXZmX9Y5Y59c/lpG9xqa7Cxp24ogbDB4SiNNIOY=
+  superset:domain: bi-ci.ol.mit.edu
+  superset:sender_email_address: ol-data@mit.edu
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
