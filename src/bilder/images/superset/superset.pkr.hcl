@@ -23,7 +23,7 @@ source "amazon-ebs" "superset" {
   ami_description         = "Deployment image for Superset server generated at ${local.timestamp}"
   ami_name                = "superset-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
-  instance_type           = "t3a.medium"
+  instance_type           = "t3a.large"
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
     volume_size           = 25
