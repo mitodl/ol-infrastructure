@@ -15,6 +15,10 @@ from bilder.components.hashicorp.consul.models import (
     ConsulConfig,
 )
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
+from bilder.components.hashicorp.steps import (
+    configure_hashicorp_product,
+    register_services,
+)
 from bilder.components.hashicorp.vault.models import (
     Vault,
     VaultAgentCache,
@@ -28,10 +32,9 @@ from bilder.components.hashicorp.vault.models import (
     VaultListener,
     VaultTCPListener,
 )
-from bilder.components.hashicorp.steps import (
-    configure_hashicorp_product,
-    register_services,
-)
+from bilder.components.traefik.models import traefik_static
+from bilder.components.traefik.models.component import TraefikConfig
+from bilder.components.traefik.steps import configure_traefik
 from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import install_and_configure_vector
 from bilder.facts.has_systemd import HasSystemd
@@ -117,6 +120,39 @@ vault = Vault(
 hashicorp_products = [vault, consul]
 for product in hashicorp_products:
     configure_hashicorp_product(product)
+
+# Configure Traefik
+traefik_config = TraefikConfig(
+    static_configuration=traefik_static.TraefikStaticConfig(
+        log=traefik_static.Log(format="json"),
+        providers=traefik_static.Providers(docker=traefik_static.Docker()),
+        certificates_resolvers={
+            "letsencrypt_resolver": traefik_static.CertificatesResolvers(
+                acme=traefik_static.Acme(
+                    email="odl-devops@mit.edu",
+                    storage="/etc/traefik/acme.json",
+                    dns_challenge=traefik_static.DnsChallenge(provider="route53"),
+                )
+            )
+        },
+        entry_points={
+            "http": traefik_static.EntryPoints(
+                address=":80",
+                http=traefik_static.Http(
+                    redirections=traefik_static.Redirections(
+                        entry_point=traefik_static.EntryPoint(
+                            to="https",
+                            scheme="https",
+                            permanent=True,
+                        )
+                    )
+                ),
+            ),
+            "https": traefik_static.EntryPoints(address=":443"),
+        },
+    ),
+)
+configure_traefik(traefik_config)
 
 # Install and configure vector
 vector_config = VectorConfig(is_docker=True, use_global_log_sink=True)

@@ -85,7 +85,7 @@ superset_iam_policy = iam.Policy(
     description="Policy for granting acces for batch data workflows to AWS resources",
 )
 
-superset_role = iam.Role(
+superset_instance_role = iam.Role(
     "superset-instance-role",
     assume_role_policy=json.dumps(
         {
@@ -105,18 +105,24 @@ superset_role = iam.Role(
 iam.RolePolicyAttachment(
     f"superset-role-policy-{stack_info.env_suffix}",
     policy_arn=superset_iam_policy.arn,
-    role=superset_role.name,
+    role=superset_instance_role.name,
 )
 
 iam.RolePolicyAttachment(
     f"superset-describe-instance-role-policy-{stack_info.env_suffix}",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
-    role=superset_role.name,
+    role=superset_instance_role.name,
+)
+
+iam.RolePolicyAttachment(
+    f"concourse-route53-role-policy-{stack_info.env_suffix}",
+    policy_arn=policy_stack.require_output("iam_policies")["route53_ol_zone_records"],
+    role=superset_instance_role.name,
 )
 
 superset_profile = iam.InstanceProfile(
     f"superset-instance-profile-{stack_info.env_suffix}",
-    role=superset_role.name,
+    role=superset_instance_role.name,
     name=f"superset-instance-profile-{stack_info.env_suffix}",
     path="/ol-data/superset-profile/",
 )
