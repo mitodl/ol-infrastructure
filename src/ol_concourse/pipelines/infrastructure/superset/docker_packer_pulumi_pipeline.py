@@ -17,6 +17,13 @@ from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PA
 
 def build_superset_docker_pipeline() -> Pipeline:
     ol_inf_branch = "deploy_superset"
+
+    upstream_superset_docker_image = registry_image(
+        name=Identifier("upstream-superset-docker-image"),
+        image_repository="apachesuperset.docker.scarf.sh/apache/superset",
+        image_tag="latest",
+    )
+
     docker_code_repo = git_repo(
         Identifier("ol-inf-superset-docker-code"),
         uri="https://github.com/mitodl/ol-infrastructure",
@@ -48,6 +55,7 @@ def build_superset_docker_pipeline() -> Pipeline:
     docker_build_job = Job(
         name="build-superset-image",
         plan=[
+            GetStep(get=upstream_superset_docker_image.name, trigger=True),
             GetStep(get=docker_code_repo.name, trigger=True),
             container_build_task(
                 inputs=[Input(name=docker_code_repo.name)],
@@ -106,6 +114,7 @@ def build_superset_docker_pipeline() -> Pipeline:
             packer_code_repo,
             pulumi_code_repo,
             superset_image,
+            upstream_superset_docker_image,
             *packer_fragment.resources,
             *pulumi_fragment.resources,
         ],
