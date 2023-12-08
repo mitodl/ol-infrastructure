@@ -4,7 +4,7 @@ encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQFI3oulHKX8feahVc
 config:
   consul:address: https://consul-data-ci.odl.mit.edu
   superset:db_password:
-    secure: v1:Z8UwtmZDreH29f/a:ExsL1/JkiVIgAI0+cir9IXJuJlH5VomlsxqpLAlbqXZmX9Y5Y59c/lpG9xqa7Cxp24ogbDB4SiNNIOY=
+    secure: v1:7w1eN6u4DqxJkN6N:tjDBU7Hv+byfy1gVZZqbWXBwH60owOjBFyX8LvLM8jfo3hySRnObe25WMNYtLm9Yz9W3ukF7BNsoBQY=
   superset:domain: bi-ci.ol.mit.edu
   superset:sender_email_address: ol-data@mit.edu
   vault:address: https://vault-ci.odl.mit.edu
