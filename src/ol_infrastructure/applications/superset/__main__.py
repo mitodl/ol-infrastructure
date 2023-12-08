@@ -347,9 +347,9 @@ redis_instance_type = (
 )
 redis_cache_config = OLAmazonRedisConfig(
     encrypt_transit=True,
-    auth_token=read_yaml_secrets(
-        Path(f"superset/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
-    )["redis_auth_token"],
+    auth_token=read_yaml_secrets(Path(f"superset/data.{stack_info.env_suffix}.yaml"))[
+        "redis_auth_token"
+    ],
     cluster_mode_enabled=False,
     encrypted=True,
     engine_version="6.2",
