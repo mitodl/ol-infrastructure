@@ -94,6 +94,14 @@ def build_keycloak_pipeline() -> Pipeline:
         repository="ol-keycloak",
     )
 
+    # Repo: https://github.com/mitodl/keycloak-scim
+    # Use: SCIM client to use Starburst integration
+    scim_spi = github_release(
+        name=Identifier("scim-spi"),
+        owner="mitodl",
+        repository="keycloak-scim",
+    )
+
     # Repo: https://github.com/daniel-frak/keycloak-user-migration
     # Use: Migrating users from open discussions
     user_migration_spi = github_release(
@@ -114,6 +122,7 @@ def build_keycloak_pipeline() -> Pipeline:
             GetStep(get=keycloak_customization_repo.name, trigger=True),
             GetStep(get=metrics_spi.name, trigger=True),
             GetStep(get=ol_spi.name, trigger=True),
+            GetStep(get=scim_spi.name, trigger=True),
             GetStep(get=user_migration_spi.name, trigger=True),
             TaskStep(
                 task=Identifier("collect-artifacts-for-build-context"),
@@ -125,6 +134,7 @@ def build_keycloak_pipeline() -> Pipeline:
                         Input(name=cas_protocol_spi.name),
                         Input(name=metrics_spi.name),
                         Input(name=ol_spi.name),
+                        Input(name=scim_spi.name),
                         Input(name=user_migration_spi.name),
                     ],
                     image_resource=AnonymousResource(
@@ -142,6 +152,7 @@ def build_keycloak_pipeline() -> Pipeline:
                         cp -r {cas_protocol_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {metrics_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {ol_spi.name}/* {image_build_context.name}/plugins/
+                        cp -r {scim_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {user_migration_spi.name}/* {image_build_context.name}/plugins/
                         """  # noqa: E501
                             ),
@@ -182,6 +193,7 @@ def build_keycloak_pipeline() -> Pipeline:
             cas_protocol_spi,
             metrics_spi,
             ol_spi,
+            scim_spi,
             user_migration_spi,
         ],
         jobs=[docker_build_job],
