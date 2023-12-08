@@ -1,8 +1,11 @@
+import base64
 import json
+import textwrap
 from pathlib import Path
 
 import pulumi_consul as consul
 import pulumi_vault as vault
+import yaml
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
@@ -12,12 +15,22 @@ from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, Output, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam, route53, ses
 
+from ol_infrastructure.components.aws.auto_scale_group import (
+    BlockDeviceMapping,
+    OLAutoScaleGroupConfig,
+    OLAutoScaling,
+    OLLaunchTemplateConfig,
+    OLLoadBalancerConfig,
+    OLTargetGroupConfig,
+    TagSpecification,
+)
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -31,6 +44,7 @@ stack_info = parse_stack()
 consul_provider = get_consul_provider(stack_info)
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
+consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")
 vault_infra_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 vault_mount_stack = StackReference(
     f"substructure.vault.static_mounts.{stack_info.name}"
@@ -42,6 +56,7 @@ data_vpc = network_stack.require_output("data_vpc")
 superset_env = f"data-{stack_info.env_suffix}"
 superset_vault_kv_path = vault_mount_stack.require_output("superset_kv")["path"]
 aws_config = AWSBase(tags={"OU": "data", "Environment": superset_env})
+consul_security_groups = consul_stack.require_output("security_groups")
 
 aws_account = get_caller_identity()
 # TEMPORARY VALUES #
@@ -140,7 +155,7 @@ superset_security_group = ec2.SecurityGroup(
 )
 
 # Get the AMI ID for the superset/docker-compose image
-superset_image = ec2.get_ami(
+superset_ami = ec2.get_ami(
     filters=[
         ec2.GetAmiFilterArgs(name="name", values=["superset-server-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
@@ -166,7 +181,7 @@ vault.aws.AuthBackendRole(
     inferred_aws_region=aws_config.region,
     bound_iam_instance_profile_arns=[superset_profile.arn],
     bound_ami_ids=[
-        superset_image.id
+        superset_ami.id
     ],  # Reference the new way of doing stuff, not the old one
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[data_vpc["id"]],
@@ -423,6 +438,236 @@ superset_redis_consul_service = consul.Service(
 )
 
 # Create an auto-scale group for web application servers
+superset_lb_config = OLLoadBalancerConfig(
+    subnets=data_vpc["subnet_ids"],
+    security_groups=[superset_security_group],
+    tags=aws_config.merged_tags({"Name": f"superset-lb-{stack_info.env_suffix}"}),
+)
+
+superset_tg_config = OLTargetGroupConfig(
+    vpc_id=data_vpc["id"],
+    health_check_interval=60,
+    health_check_matcher="200-399",
+    health_check_path="/health",
+    health_check_unhealthy_threshold=3,  # give extra time for airbyte to start up
+    tags=aws_config.merged_tags({"Name": f"superset-tg-{stack_info.env_suffix}"}),
+)
+
+consul_datacenter = consul_stack.require_output("datacenter")
+grafana_credentials = read_yaml_secrets(
+    Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
+)
+
+superset_web_block_device_mappings = [BlockDeviceMapping(volume_size=50)]
+superset_web_tag_specs = [
+    TagSpecification(
+        resource_type="instance",
+        tags=aws_config.merged_tags({"Name": f"superset-web-{stack_info.env_suffix}"}),
+    ),
+    TagSpecification(
+        resource_type="volume",
+        tags=aws_config.merged_tags({"Name": f"superset-web-{stack_info.env_suffix}"}),
+    ),
+]
+
+superset_web_lt_config = OLLaunchTemplateConfig(
+    block_device_mappings=superset_web_block_device_mappings,
+    image_id=superset_ami.id,
+    instance_type=superset_config.get("instance_type")
+    or InstanceTypes.burstable_medium,
+    instance_profile_arn=superset_profile.arn,
+    security_groups=[
+        superset_security_group,
+        consul_security_groups["consul_agent"],
+        data_vpc["security_groups"]["web"],
+    ],
+    tags=aws_config.merged_tags({"Name": f"superset-web-{stack_info.env_suffix}"}),
+    tag_specifications=superset_web_tag_specs,
+    user_data=consul_datacenter.apply(
+        lambda consul_dc: base64.b64encode(
+            "#cloud-config\n{}".format(
+                yaml.dump(
+                    {
+                        "write_files": [
+                            {
+                                "path": "/etc/consul.d/02-autojoin.json",
+                                "content": json.dumps(
+                                    {
+                                        "retry_join": [
+                                            "provider=aws tag_key=consul_env "
+                                            f"tag_value={consul_dc}"
+                                        ],
+                                        "datacenter": consul_dc,
+                                    }
+                                ),
+                                "owner": "consul:consul",
+                            },
+                            {
+                                "path": "/etc/default/vector",
+                                "content": textwrap.dedent(
+                                    f"""\
+                            ENVIRONMENT={consul_dc}
+                            APPLICATION=superset
+                            SERVICE=data-platform
+                            VECTOR_CONFIG_DIR=/etc/vector/
+                            AWS_REGION={aws_config.region}
+                            GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
+                            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
+                            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
+                            """
+                                ),
+                                "owner": "root:root",
+                            },
+                            {
+                                "path": "/etc/default/superset",
+                                "content": f"DOMAIN={superset_config.get('domain')}",
+                            },
+                        ]
+                    },
+                    sort_keys=True,
+                )
+            ).encode("utf8")
+        ).decode("utf8")
+    ),
+)
+
+superset_web_auto_scale_config = superset_config.get_object("web_auto_scale") or {
+    "desired": 1,
+    "min": 1,
+    "max": 2,
+}
+superset_web_asg_config = OLAutoScaleGroupConfig(
+    asg_name=f"superset-web-{superset_env}",
+    aws_config=aws_config,
+    desired_size=superset_web_auto_scale_config["desired"],
+    min_size=superset_web_auto_scale_config["min"],
+    max_size=superset_web_auto_scale_config["max"],
+    vpc_zone_identifiers=data_vpc["subnet_ids"],
+    tags=aws_config.merged_tags({"Name": f"superset-web-{superset_env}"}),
+)
+
+superset_web_asg = OLAutoScaling(
+    asg_config=superset_web_asg_config,
+    lt_config=superset_web_lt_config,
+    tg_config=superset_tg_config,
+    lb_config=superset_lb_config,
+)
 
 
 # Create an auto-scale group for Celery workers
+superset_worker_block_device_mappings = [BlockDeviceMapping(volume_size=50)]
+superset_worker_tag_specs = [
+    TagSpecification(
+        resource_type="instance",
+        tags=aws_config.merged_tags(
+            {"Name": f"superset-worker-{stack_info.env_suffix}"}
+        ),
+    ),
+    TagSpecification(
+        resource_type="volume",
+        tags=aws_config.merged_tags(
+            {"Name": f"superset-worker-{stack_info.env_suffix}"}
+        ),
+    ),
+]
+
+superset_worker_lt_config = OLLaunchTemplateConfig(
+    block_device_mappings=superset_worker_block_device_mappings,
+    image_id=superset_ami.id,
+    instance_type=superset_config.get("instance_type")
+    or InstanceTypes.burstable_medium,
+    instance_profile_arn=superset_profile.arn,
+    security_groups=[
+        superset_security_group,
+        consul_security_groups["consul_agent"],
+    ],
+    tags=aws_config.merged_tags({"Name": f"superset-worker-{stack_info.env_suffix}"}),
+    tag_specifications=superset_worker_tag_specs,
+    user_data=consul_datacenter.apply(
+        lambda consul_dc: base64.b64encode(
+            "#cloud-config\n{}".format(
+                yaml.dump(
+                    {
+                        "write_files": [
+                            {
+                                "path": "/etc/consul.d/02-autojoin.json",
+                                "content": json.dumps(
+                                    {
+                                        "retry_join": [
+                                            "provider=aws tag_key=consul_env "
+                                            f"tag_value={consul_dc}"
+                                        ],
+                                        "datacenter": consul_dc,
+                                    }
+                                ),
+                                "owner": "consul:consul",
+                            },
+                            {
+                                "path": "/etc/default/vector",
+                                "content": textwrap.dedent(
+                                    f"""\
+                            ENVIRONMENT={consul_dc}
+                            APPLICATION=superset
+                            SERVICE=data-platform
+                            VECTOR_CONFIG_DIR=/etc/vector/
+                            AWS_REGION={aws_config.region}
+                            GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
+                            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
+                            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
+                            """
+                                ),
+                                "owner": "root:root",
+                            },
+                            {
+                                "path": "/etc/default/superset",
+                                "content": f"DOMAIN={superset_config.get('domain')}",
+                            },
+                            {
+                                "path": "/etc/default/docker-compose",
+                                "content": "COMPOSE_PROFILES=worker",
+                            },
+                            {
+                                "path": "/etc/profile",
+                                "content": "export COMPOSE_PROFILES=worker",
+                                "append": "true",
+                            },
+                        ]
+                    },
+                    sort_keys=True,
+                )
+            ).encode("utf8")
+        ).decode("utf8")
+    ),
+)
+
+superset_worker_auto_scale_config = superset_config.get_object("worker_auto_scale") or {
+    "desired": 1,
+    "min": 1,
+    "max": 2,
+}
+superset_worker_asg_config = OLAutoScaleGroupConfig(
+    asg_name=f"superset-worker-{superset_env}",
+    aws_config=aws_config,
+    desired_size=superset_worker_auto_scale_config["desired"],
+    min_size=superset_worker_auto_scale_config["min"],
+    max_size=superset_worker_auto_scale_config["max"],
+    vpc_zone_identifiers=data_vpc["subnet_ids"],
+    tags=aws_config.merged_tags({"Name": f"superset-worker-{superset_env}"}),
+)
+
+supserset_worker_asg = OLAutoScaling(
+    asg_config=superset_worker_asg_config,
+    lt_config=superset_worker_lt_config,
+)
+
+
+# Create Route53 DNS records for Superset
+five_minutes = 60 * 5
+route53.Record(
+    "airbyte-server-dns-record",
+    name=superset_config.require("domain"),
+    type="CNAME",
+    ttl=five_minutes,
+    records=[superset_web_asg.load_balancer.dns_name],
+    zone_id=mitol_zone_id,
+)
