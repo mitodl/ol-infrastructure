@@ -53,7 +53,7 @@ superset_bucket_name = f"ol-superset-{stack_info.env_suffix}"
 superset_iam_policy = iam.Policy(
     f"superset-policy-{stack_info.env_suffix}",
     name=f"superset-policy-{stack_info.env_suffix}",
-    path=f"/ol-data/etl-policy-{stack_info.env_suffix}/",
+    path=f"/ol-data/superset-policy-{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         policy_document=json.dumps(
             {
@@ -86,7 +86,7 @@ superset_iam_policy = iam.Policy(
 )
 
 superset_role = iam.Role(
-    "etl-instance-role",
+    "superset-instance-role",
     assume_role_policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -97,7 +97,7 @@ superset_role = iam.Role(
             },
         }
     ),
-    name=f"etl-instance-role-{stack_info.env_suffix}",
+    name=f"superset-instance-role-{stack_info.env_suffix}",
     path="/ol-data/superset-role/",
     tags=aws_config.tags,
 )
@@ -117,8 +117,8 @@ iam.RolePolicyAttachment(
 superset_profile = iam.InstanceProfile(
     f"superset-instance-profile-{stack_info.env_suffix}",
     role=superset_role.name,
-    name=f"etl-instance-profile-{stack_info.env_suffix}",
-    path="/ol-data/etl-profile/",
+    name=f"superset-instance-profile-{stack_info.env_suffix}",
+    path="/ol-data/superset-profile/",
 )
 
 superset_security_group = ec2.SecurityGroup(

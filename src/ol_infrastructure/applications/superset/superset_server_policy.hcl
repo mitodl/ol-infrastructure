@@ -3,7 +3,7 @@ path "secret-superset/*" {
 }
 
 path "secret-operations/sso/superset" {
-  cpabilities = ["read"]
+  capabilities = ["read"]
 }
 
 path "postgres-superset/creds/app" {

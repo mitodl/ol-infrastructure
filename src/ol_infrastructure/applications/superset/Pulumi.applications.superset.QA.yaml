@@ -5,6 +5,7 @@ config:
   consul:address: https://consul-data-qa.odl.mit.edu
   superset:db_password:
     secure: v1:Z8UwtmZDreH29f/a:ExsL1/JkiVIgAI0+cir9IXJuJlH5VomlsxqpLAlbqXZmX9Y5Y59c/lpG9xqa7Cxp24ogbDB4SiNNIOY=
+  superset:domain: bi-qa.ol.mit.edu
   superset:sender_email_address: ol-data@mit.edu
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

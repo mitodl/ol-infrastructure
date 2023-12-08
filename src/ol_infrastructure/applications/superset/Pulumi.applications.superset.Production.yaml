@@ -8,3 +8,4 @@ config:
   superset:sender_email_address: ol-data@mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
+  superset:domain: bi.ol.mit.edu
