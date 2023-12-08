@@ -42,7 +42,11 @@ def build_superset_docker_pipeline() -> Pipeline:
         Identifier("ol-inf-superset-pulumi-code"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch=ol_inf_branch,
-        paths=[*PULUMI_WATCHED_PATHS, "src/ol_infrastructure/applications/superset/"],
+        paths=[
+            *PULUMI_WATCHED_PATHS,
+            "src/ol_infrastructure/applications/superset/",
+            "src/bilder/secrets/superset",
+        ],
     )
 
     superset_image = registry_image(
