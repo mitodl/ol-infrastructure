@@ -1,6 +1,8 @@
+import json
 from pathlib import Path
 
 import pulumi_consul as consul
+import pulumi_vault as vault
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
@@ -8,7 +10,7 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, Output, ResourceOptions, StackReference
-from pulumi_aws import ec2, route53, ses
+from pulumi_aws import ec2, get_caller_identity, iam, route53, ses
 
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -16,6 +18,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
+from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -29,16 +32,83 @@ consul_provider = get_consul_provider(stack_info)
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+policy_stack = StackReference("infrastructure.aws.policies")
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]
 data_vpc = network_stack.require_output("data_vpc")
 superset_env = f"data-{stack_info.env_suffix}"
 aws_config = AWSBase(tags={"OU": "data", "Environment": superset_env})
 
+aws_account = get_caller_identity()
 # TEMPORARY VALUES #
 superset_mail_domain = superset_config.get("mail_domain") or "mail.superset.ol.mit.edu"
 # Create IAM role
 
+superset_bucket_name = f"ol-superset-{stack_info.env_suffix}"
+# Create instance profile for granting access to S3 buckets
+superset_iam_policy = iam.Policy(
+    f"superset-policy-{stack_info.env_suffix}",
+    name=f"superset-policy-{stack_info.env_suffix}",
+    path=f"/ol-data/etl-policy-{stack_info.env_suffix}/",
+    policy=lint_iam_policy(
+        {
+            "Effect": "Allow",
+            "Action": "s3:ListAllMyBuckets",
+            "Resource": "*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket*",
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject*",
+            ],
+            "Resource": [
+                f"arn:aws:s3:::{superset_bucket_name}",
+                f"arn:aws:s3:::{superset_bucket_name}/*",
+            ],
+        },
+        stringify=True,
+    ),
+    description="Policy for granting acces for batch data workflows to AWS resources",
+)
+
+superset_role = iam.Role(
+    "etl-instance-role",
+    assume_role_policy=json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": {
+                "Effect": "Allow",
+                "Action": "sts:AssumeRole",
+                "Principal": {"Service": "ec2.amazonaws.com"},
+            },
+        }
+    ),
+    name=f"etl-instance-role-{stack_info.env_suffix}",
+    path="/ol-data/superset-role/",
+    tags=aws_config.tags,
+)
+
+iam.RolePolicyAttachment(
+    f"superset-role-policy-{stack_info.env_suffix}",
+    policy_arn=superset_iam_policy.arn,
+    role=superset_role.name,
+)
+
+iam.RolePolicyAttachment(
+    f"superset-describe-instance-role-policy-{stack_info.env_suffix}",
+    policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
+    role=superset_role.name,
+)
+
+superset_profile = iam.InstanceProfile(
+    f"superset-instance-profile-{stack_info.env_suffix}",
+    role=superset_role.name,
+    name=f"etl-instance-profile-{stack_info.env_suffix}",
+    path="/ol-data/etl-profile/",
+)
 
 superset_security_group = ec2.SecurityGroup(
     "superset-security-group",
@@ -50,6 +120,40 @@ superset_security_group = ec2.SecurityGroup(
     tags=aws_config.merged_tags(
         {"Name": f"superset-{superset_env}"},
     ),
+)
+
+# Get the AMI ID for the superset/docker-compose image
+superset_image = ec2.get_ami(
+    filters=[
+        ec2.GetAmiFilterArgs(name="name", values=["superset-server-*"]),
+        ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
+        ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
+    ],
+    most_recent=True,
+    owners=[aws_account.account_id],
+)
+
+# Create a vault policy to allow superset to get to the secrets it needs
+superset_server_vault_policy = vault.Policy(
+    "superset-server-vault-policy",
+    name="superset-server",
+    policy=Path(__file__).parent.joinpath("superset_server_policy.hcl").read_text(),
+)
+# Register Superset AMI for Vault AWS auth
+vault.aws.AuthBackendRole(
+    "superset-server-ami-ec2-vault-auth",
+    backend="aws",
+    auth_type="iam",
+    role="superset-server",
+    inferred_entity_type="ec2_instance",
+    inferred_aws_region=aws_config.region,
+    bound_iam_instance_profile_arns=[superset_profile.arn],
+    bound_ami_ids=[
+        superset_image.id
+    ],  # Reference the new way of doing stuff, not the old one
+    bound_account_ids=[aws_account.account_id],
+    bound_vpc_ids=[data_vpc["id"]],
+    token_policies=[superset_server_vault_policy.name],
 )
 
 ########################################
