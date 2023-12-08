@@ -31,12 +31,16 @@ stack_info = parse_stack()
 consul_provider = get_consul_provider(stack_info)
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+vault_infra_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+vault_mount_stack = StackReference(
+    f"substructure.vault.static_mounts.{stack_info.name}"
+)
 policy_stack = StackReference("infrastructure.aws.policies")
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]
 data_vpc = network_stack.require_output("data_vpc")
 superset_env = f"data-{stack_info.env_suffix}"
+superset_vault_kv_path = vault_mount_stack.require_output("superset_kv")["path"]
 aws_config = AWSBase(tags={"OU": "data", "Environment": superset_env})
 
 aws_account = get_caller_identity()
@@ -264,7 +268,7 @@ superset_db_security_group = ec2.SecurityGroup(
             protocol="tcp",
             security_groups=[
                 superset_security_group.id,
-                vault_stack.require_output("vault_server")["security_group"],
+                vault_infra_stack.require_output("vault_server")["security_group"],
             ],
             description="Grant access to RDS from Superset",
         ),
@@ -345,11 +349,17 @@ redis_cluster_security_group = ec2.SecurityGroup(
 redis_instance_type = (
     redis_config.get("instance_type") or defaults(stack_info)["redis"]["instance_type"]
 )
+redis_auth_token = read_yaml_secrets(
+    Path(f"superset/data.{stack_info.env_suffix}.yaml")
+)["redis_auth_token"]
+vault.kv.SecretV2(
+    "superset-redis-auth-toke-vault-storage",
+    mount=superset_vault_kv_path,
+    data_json={"token": redis_auth_token},
+)
 redis_cache_config = OLAmazonRedisConfig(
     encrypt_transit=True,
-    auth_token=read_yaml_secrets(Path(f"superset/data.{stack_info.env_suffix}.yaml"))[
-        "redis_auth_token"
-    ],
+    auth_token=redis_auth_token,
     cluster_mode_enabled=False,
     encrypted=True,
     engine_version="6.2",
