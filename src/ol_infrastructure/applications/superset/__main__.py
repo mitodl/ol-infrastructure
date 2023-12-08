@@ -18,7 +18,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -55,24 +55,31 @@ superset_iam_policy = iam.Policy(
     name=f"superset-policy-{stack_info.env_suffix}",
     path=f"/ol-data/etl-policy-{stack_info.env_suffix}/",
     policy=lint_iam_policy(
-        {
-            "Effect": "Allow",
-            "Action": "s3:ListAllMyBuckets",
-            "Resource": "*",
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:ListBucket*",
-                "s3:GetObject",
-                "s3:PutObject",
-                "s3:DeleteObject*",
-            ],
-            "Resource": [
-                f"arn:aws:s3:::{superset_bucket_name}",
-                f"arn:aws:s3:::{superset_bucket_name}/*",
-            ],
-        },
+        policy_document=json.dumps(
+            {
+                "Version": IAM_POLICY_VERSION,
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "s3:ListAllMyBuckets",
+                        "Resource": "*",
+                    },
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "s3:ListBucket*",
+                            "s3:GetObject",
+                            "s3:PutObject",
+                            "s3:DeleteObject*",
+                        ],
+                        "Resource": [
+                            f"arn:aws:s3:::{superset_bucket_name}",
+                            f"arn:aws:s3:::{superset_bucket_name}/*",
+                        ],
+                    },
+                ],
+            }
+        ),
         stringify=True,
     ),
     description="Policy for granting acces for batch data workflows to AWS resources",
@@ -278,19 +285,20 @@ superset_db_security_group = ec2.SecurityGroup(
 )
 superset_db_config = OLPostgresDBConfig(
     instance_name=f"ol-superset-db-{stack_info.env_suffix}",
-    password=superset_config.require_secret("db_password"),
+    password=superset_config.require("db_password"),
     subnet_group_name=data_vpc["rds_subnet"],
     security_groups=[superset_db_security_group],
     tags=aws_config.tags,
-    db_name="supserset" ** defaults(stack_info)["rds"],
+    db_name="superset",
+    **defaults(stack_info)["rds"],
 )
 superset_db = OLAmazonDB(superset_db_config)
 
 superset_vault_db_config = OLVaultPostgresDatabaseConfig(
     db_name=superset_db_config.db_name,
-    mountpount=f"{superset_db_config.engine}-superset",
+    mount_point=f"{superset_db_config.engine}-superset",
     db_admin_username=superset_db_config.username,
-    db_admin_password=superset_config.require_secret("db_password"),
+    db_admin_password=superset_config.require("db_password"),
     db_host=superset_db.db_instance.address,
 )
 superset_db_vault_backend = OLVaultDatabaseBackend(superset_vault_db_config)
@@ -355,7 +363,7 @@ redis_auth_token = read_yaml_secrets(
 vault.kv.SecretV2(
     "superset-redis-auth-toke-vault-storage",
     mount=superset_vault_kv_path,
-    data_json={"token": redis_auth_token},
+    data_json=json.dumps({"token": redis_auth_token}),
 )
 redis_cache_config = OLAmazonRedisConfig(
     encrypt_transit=True,
