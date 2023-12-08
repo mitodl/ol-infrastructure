@@ -8,7 +8,7 @@ stack_info = parse_stack()
 
 
 superset_vault_kv_mount = vault.Mount(
-    "edxapp-vault-generic-secrets-mount",
+    "superset-vault-kv-secrets-mount",
     path=f"secret-{stack_info.env_prefix}",
     description=("Static secrets storage for Superset"),
     type="kv-v2",
