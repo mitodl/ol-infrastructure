@@ -4,7 +4,7 @@ from pathlib import Path
 
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
-from bridge_secrets.sops import set_env_secrets
+from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files, server
 
@@ -28,7 +28,7 @@ from bilder.components.hashicorp.vault.models import (
     VaultListener,
     VaultTCPListener,
 )
-from bilder.components.hashicrop.steps import (
+from bilder.components.hashicorp.steps import (
     configure_hashicorp_product,
     register_services,
 )

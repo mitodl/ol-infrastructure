@@ -21,7 +21,7 @@ from ol_concourse.lib.resources import git_repo, registry_image
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 def build_superset_docker_pipeline() -> Pipeline:
-    ol_inf_branch = "main"
+    ol_inf_branch = "deploy_superset"
     docker_code_repo = git_repo(
         Identifier("ol-inf-superset-docker-code"),
         uri="https://github.com/mitodl/ol-infrastructure",
@@ -57,7 +57,7 @@ def build_superset_docker_pipeline() -> Pipeline:
             container_build_task(
                 inputs=[Input(name=docker_code_repo.name)],
                 build_parameters={
-                    "CONTEXT": f"{docker_code_repo.name}/ol_superset",
+                    "CONTEXT": f"{docker_code_repo.name}/src/ol_superset",
                 },
                 build_args=[],
             ),
@@ -66,6 +66,7 @@ def build_superset_docker_pipeline() -> Pipeline:
                 inputs="all",
                 params={
                     "image": "image/image.tar",
+                    "additional_tags": f"{docker_code_repo.name}/.git/describe_ref",
                 }
             )
         ]
