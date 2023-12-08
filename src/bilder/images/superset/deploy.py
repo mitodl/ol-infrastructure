@@ -53,7 +53,7 @@ set_env_secrets(Path("consul/consul.env"))
 
 # Preload the superset docker image to accelerate startup
 server.shell(
-    name=f"Preload mitodl/supsert@{SUPERSET_IMAGE_SHA}",
+    name=f"Preload mitodl/superset@{SUPERSET_IMAGE_SHA}",
     commands=[
         f"/usr/bin/docker pull mitodl/superset@{SUPERSET_IMAGE_SHA}",
     ],
