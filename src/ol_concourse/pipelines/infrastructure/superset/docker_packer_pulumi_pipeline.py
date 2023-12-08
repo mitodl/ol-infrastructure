@@ -45,7 +45,7 @@ def build_superset_docker_pipeline() -> Pipeline:
         paths=[
             *PULUMI_WATCHED_PATHS,
             "src/ol_infrastructure/applications/superset/",
-            "src/bilder/secrets/superset",
+            "src/bridge/secrets/superset",
         ],
     )
 
