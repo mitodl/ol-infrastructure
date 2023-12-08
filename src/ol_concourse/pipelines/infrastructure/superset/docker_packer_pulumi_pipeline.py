@@ -4,21 +4,16 @@ from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
-    AnonymousResource,
-    Command,
     GetStep,
     Identifier,
     Input,
     Job,
-    Output,
     Pipeline,
-    Platform,
     PutStep,
-    TaskConfig,
-    TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, registry_image
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+
 
 def build_superset_docker_pipeline() -> Pipeline:
     ol_inf_branch = "deploy_superset"
@@ -33,21 +28,21 @@ def build_superset_docker_pipeline() -> Pipeline:
         Identifier("ol-inf-superset-packer-code"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch=ol_inf_branch,
-        paths=["src/ol_superset/"],
+        paths=["src/bilder/components/", "src/bilder/images/superset/"],
     )
 
     pulumi_code_repo = git_repo(
         Identifier("ol-inf-superset-pulumi-code"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch=ol_inf_branch,
-        paths=["src/ol_superset/"],
+        paths=[*PULUMI_WATCHED_PATHS, "src/ol_infrastructure/applications/superset/"],
     )
 
     superset_image = registry_image(
         name=Identifier("supserset-image"),
         image_repository="mitodl/superset",
         username="((dockerhub.username))",
-        password="((dockerhub.password))",
+        password="((dockerhub.password))",  # noqa: S106
     )
 
     docker_build_job = Job(
@@ -67,9 +62,9 @@ def build_superset_docker_pipeline() -> Pipeline:
                 params={
                     "image": "image/image.tar",
                     "additional_tags": f"{docker_code_repo.name}/.git/describe_ref",
-                }
-            )
-        ]
+                },
+            ),
+        ],
     )
 
     packer_fragment = packer_jobs(
@@ -82,17 +77,17 @@ def build_superset_docker_pipeline() -> Pipeline:
         ],
         image_code=packer_code_repo,
         packer_template_path="src/bilder/images/superset/superset.pkr.hcl",
-        env_vars_from_files={
-            "SUPERSET_IMAGE_SHA": f"{superset_image.name}/digest"
-        },
+        env_vars_from_files={"SUPERSET_IMAGE_SHA": f"{superset_image.name}/digest"},
         extra_packer_params={
             "only": ["amazon-ebs.superset"],
-        }
+        },
     )
 
     pulumi_fragment = pulumi_jobs_chain(
         pulumi_code_repo,
-        stack_names=[f"applications.superset.{stage}" for stage in ("CI", "QA", "Production")],
+        stack_names=[
+            f"applications.superset.{stage}" for stage in ("CI", "QA", "Production")
+        ],
         project_name="ol-infrastructure-superset-server",
         project_source_path=PULUMI_CODE_PATH.joinpath("applications/superset/"),
         dependencies=[
@@ -101,7 +96,7 @@ def build_superset_docker_pipeline() -> Pipeline:
                 trigger=True,
                 passed=[packer_fragment.jobs[-1].name],
             )
-        ]
+        ],
     )
 
     combined_fragment = PipelineFragment(
