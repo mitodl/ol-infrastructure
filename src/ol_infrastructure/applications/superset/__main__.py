@@ -188,6 +188,17 @@ vault.aws.AuthBackendRole(
     token_policies=[superset_server_vault_policy.name],
 )
 
+superset_secrets = read_yaml_secrets(
+    Path(f"superset/data.{stack_info.env_suffix}.yaml")
+)
+for path, data in superset_secrets.items():
+    vault.kv.SecretV2(
+        f"superset-vault-secret-{path}",
+        mount=superset_vault_kv_path,
+        name=path,
+        data_json=json.dumps(data),
+    )
+
 ########################################
 # Create SES Service For superset Emails #
 ########################################
@@ -378,14 +389,7 @@ redis_cluster_security_group = ec2.SecurityGroup(
 redis_instance_type = (
     redis_config.get("instance_type") or defaults(stack_info)["redis"]["instance_type"]
 )
-redis_auth_token = read_yaml_secrets(
-    Path(f"superset/data.{stack_info.env_suffix}.yaml")
-)["redis_auth_token"]
-vault.kv.SecretV2(
-    "superset-redis-auth-toke-vault-storage",
-    mount=superset_vault_kv_path,
-    data_json=json.dumps({"token": redis_auth_token}),
-)
+redis_auth_token = superset_secrets["redis"]["token"]
 redis_cache_config = OLAmazonRedisConfig(
     encrypt_transit=True,
     auth_token=redis_auth_token,

@@ -23,7 +23,7 @@ services:
     - /etc/traefik/:/etc/traefik/
 
   superset:
-    env_file: docker/.env-non-dev
+    env_file: .env
     image: *superset-image
     container_name: superset_app
     command: ["/app/docker/docker-bootstrap.sh", "app-gunicorn"]
@@ -51,7 +51,7 @@ services:
     image: *superset-image
     container_name: superset_init
     command: ["/app/docker/docker-init.sh"]
-    env_file: docker/.env-non-dev
+    env_file: .env
     user: "root"
     volumes: *superset-volumes
     healthcheck:
@@ -63,7 +63,7 @@ services:
     image: *superset-image
     container_name: superset_worker
     command: ["/app/docker/docker-bootstrap.sh", "worker"]
-    env_file: docker/.env-non-dev
+    env_file: .env
     restart: unless-stopped
     user: "root"
     volumes: *superset-volumes
@@ -77,7 +77,7 @@ services:
     image: *superset-image
     container_name: superset_worker_beat
     command: ["/app/docker/docker-bootstrap.sh", "beat"]
-    env_file: docker/.env-non-dev
+    env_file: .env
     restart: unless-stopped
     user: "root"
     volumes: *superset-volumes

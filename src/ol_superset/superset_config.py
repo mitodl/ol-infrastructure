@@ -1,5 +1,6 @@
-import os  # noqa: INP001
+import os
 
+from celery.schedules import crontab
 from flask_appbuilder.security.manager import AUTH_DB
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
 from vault.aws_auth import get_vault_client
@@ -7,10 +8,12 @@ from vault.aws_auth import get_vault_client
 vault_addr = os.environ.get("VAULT_ADDR", "http://localhost:8200")
 vault_client = get_vault_client(vault_url=vault_addr, ec2_role="superset")
 
-
-REDIS_TOKEN = vault_client.secrets.kv.v2.read_secret_version(
-    path="secret-superset/redis"
-)["data"]["data"]["token"]
+SECRET_KEY = vault_client.secrets.kv.v2.read_secret(path="secret-superset/app-config")[
+    "data"
+]["data"]["secret_key"]
+REDIS_TOKEN = vault_client.secrets.kv.v2.read_secret(path="secret-superset/redis")[
+    "data"
+]["data"]["token"]
 
 SUPERSET_WEBSERVER_PROTOCOL = os.environ.get("SUPERSET_WEBSERVER_PROTOCOL", "https")
 SUPERSET_WEBSERVER_ADDRESS = os.environ.get("SUPERSET_WEBSERVER_ADDRESS", "0.0.0.0")  # noqa: S104
@@ -214,12 +217,12 @@ class CeleryConfig:  # pylint: disable=too-few-public-methods
     beat_schedule = {  # noqa: RUF012
         "reports.scheduler": {
             "task": "reports.scheduler",
-            "schedule": crontab(minute="*", hour="*"),  # noqa: F821
+            "schedule": crontab(minute="*", hour="*"),
             "options": {"expires": int(CELERY_BEAT_SCHEDULER_EXPIRES.total_seconds())},  # noqa: F821
         },
         "reports.prune_log": {
             "task": "reports.prune_log",
-            "schedule": crontab(minute=0, hour=0),  # noqa: F821
+            "schedule": crontab(minute=0, hour=0),
         },
     }
 

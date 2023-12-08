@@ -1,4 +1,4 @@
-apache-superset[cors,thumbnails,prophet,playwright]
+apache-superset[cors,thumbnails,prophet]
 psycopg2
 hvac
 trino

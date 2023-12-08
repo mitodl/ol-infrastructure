@@ -8,7 +8,7 @@ alembic==1.13.0
     # via flask-migrate
 amqp==5.2.0
     # via kombu
-apache-superset[cors,playwright,prophet,thumbnails]==3.0.2
+apache-superset[cors,prophet,thumbnails]==3.0.2
     # via -r requirements.in
 apispec[yaml]==6.3.0
     # via
@@ -152,7 +152,7 @@ geographiclib==2.0
     # via geopy
 geopy==2.4.1
     # via apache-superset
-greenlet==3.0.1
+greenlet==3.0.2
     # via sqlalchemy
 gunicorn==21.2.0
     # via apache-superset
