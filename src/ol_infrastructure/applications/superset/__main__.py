@@ -59,8 +59,8 @@ aws_config = AWSBase(tags={"OU": "data", "Environment": superset_env})
 consul_security_groups = consul_stack.require_output("security_groups")
 
 aws_account = get_caller_identity()
-# TEMPORARY VALUES #
-superset_mail_domain = superset_config.get("mail_domain") or "mail.superset.ol.mit.edu"
+superset_domain = superset_config.get("domain")
+superset_mail_domain = f"mail.{superset_domain}"
 # Create IAM role
 
 superset_bucket_name = f"ol-superset-{stack_info.env_suffix}"
@@ -524,7 +524,7 @@ superset_web_lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/default/superset",
-                                "content": f"DOMAIN={superset_config.get('domain')}",
+                                "content": f"DOMAIN={superset_domain}",
                             },
                         ]
                     },
