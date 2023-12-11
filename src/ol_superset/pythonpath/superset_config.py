@@ -1,4 +1,4 @@
-import os
+import os  # noqa: INP001
 
 from celery.schedules import crontab
 from flask_appbuilder.security.manager import AUTH_DB
