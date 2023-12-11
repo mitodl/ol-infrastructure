@@ -26,7 +26,6 @@ services:
     env_file: .env
     image: *superset-image
     container_name: superset_app
-    command: ["/app/docker/docker-bootstrap.sh", "app-gunicorn"]
     user: "root"
     restart: unless-stopped
     ports:
@@ -51,7 +50,7 @@ services:
   superset-init:
     image: *superset-image
     container_name: superset_init
-    command: ["/app/docker/docker-init.sh"]
+    command: ["superset", "db", "upgrade"]
     env_file: .env
     user: "root"
     volumes: *superset-volumes
@@ -63,7 +62,8 @@ services:
   superset-worker:
     image: *superset-image
     container_name: superset_worker
-    command: ["/app/docker/docker-bootstrap.sh", "worker"]
+    command: ["celery", "--app=superset.tasks.celery_app:app", "worker", "-O", "fair",
+      "-l", "INFO"]
     env_file: .env
     restart: unless-stopped
     user: "root"
@@ -77,7 +77,8 @@ services:
   superset-worker-beat:
     image: *superset-image
     container_name: superset_worker_beat
-    command: ["/app/docker/docker-bootstrap.sh", "beat"]
+    command: ["celery", "--app=superset.tasks.celery_app:app", "beat", "-l", "INFO",
+      "-s", '"${SUPERSET_HOME}"/celerybeat-schedule']
     env_file: .env
     restart: unless-stopped
     user: "root"
