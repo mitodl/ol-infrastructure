@@ -98,6 +98,7 @@ class OLLoadBalancerConfig(AWSBase):
     subnets: pulumi.Output[str]
 
     listener_use_acm: bool = True
+    listener_cert_arn: Optional[str | pulumi.Output[str]] = None
     listener_cert_domain: str = "*.odl.mit.edu"
     listener_protocol: str = "HTTPS"
     listener_action_type: str = "forward"
@@ -276,11 +277,14 @@ class OLAutoScaling(pulumi.ComponentResource):
                 tags=lb_config.tags,
             )
             if lb_config.listener_use_acm:
-                listener_args.certificate_arn = get_certificate(
-                    domain=lb_config.listener_cert_domain,
-                    most_recent=True,
-                    statuses=["ISSUED"],
-                ).arn
+                listener_args.certificate_arn = (
+                    lb_config.listener_cert_arn
+                    or get_certificate(
+                        domain=lb_config.listener_cert_domain,
+                        most_recent=True,
+                        statuses=["ISSUED"],
+                    ).arn
+                )
             self.listener = Listener(
                 f"{resource_name_prefix}load-balancer-listener",
                 args=listener_args,

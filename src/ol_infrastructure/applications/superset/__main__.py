@@ -1,6 +1,7 @@
 import base64
 import json
 import textwrap
+from functools import partial
 from pathlib import Path
 
 import pulumi_consul as consul
@@ -13,7 +14,7 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, Output, ResourceOptions, StackReference
-from pulumi_aws import ec2, get_caller_identity, iam, route53, ses
+from pulumi_aws import acm, ec2, get_caller_identity, iam, route53, ses
 
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
@@ -32,6 +33,7 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -442,10 +444,34 @@ superset_redis_consul_service = consul.Service(
 )
 
 # Create an auto-scale group for web application servers
+superset_web_acm_cert = acm.Certificate(
+    "superset-load-balancer-acm-certificate",
+    domain_name=superset_domain,
+    validation_method="DNS",
+    tags=aws_config.tags,
+)
+
+superset_acm_cert_validation_records = (
+    superset_web_acm_cert.domain_validation_options.apply(
+        partial(acm_certificate_validation_records, zone_id=mitol_zone_id)
+    )
+)
+
+superset_web_acm_validated_cert = acm.CertificateValidation(
+    "wait-for-superset-acm-cert-validation",
+    certificate_arn=superset_web_acm_cert.arn,
+    validation_record_fqdns=superset_acm_cert_validation_records.apply(
+        lambda validation_records: [
+            validation_record.fqdn for validation_record in validation_records
+        ]
+    ),
+)
 superset_lb_config = OLLoadBalancerConfig(
     subnets=data_vpc["subnet_ids"],
     security_groups=[superset_security_group],
     tags=aws_config.merged_tags({"Name": f"superset-lb-{stack_info.env_suffix}"}),
+    listener_cert_domain=superset_domain,
+    listener_cert_arn=superset_web_acm_cert.arn,
 )
 
 superset_tg_config = OLTargetGroupConfig(
