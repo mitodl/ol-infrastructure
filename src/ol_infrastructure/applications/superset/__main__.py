@@ -528,7 +528,7 @@ superset_web_lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/docker/compose/.env",
-                                "content": f"DOMAIN={superset_domain}",
+                                "content": f"DOMAIN={superset_domain}\nVAULT_ADDR=https://vault-{stack_info.env_suffix}.odl.mit.edu\n",
                                 "append": True,
                             },
                         ]
@@ -638,6 +638,11 @@ superset_worker_lt_config = OLLaunchTemplateConfig(
                             {
                                 "path": "/etc/profile",
                                 "content": "export COMPOSE_PROFILES=worker",
+                                "append": True,
+                            },
+                            {
+                                "path": "/etc/docker/compose/.env",
+                                "content": f"DOMAIN={superset_domain}\nVAULT_ADDR=https://vault-{stack_info.env_suffix}.odl.mit.edu\n",
                                 "append": True,
                             },
                         ]
