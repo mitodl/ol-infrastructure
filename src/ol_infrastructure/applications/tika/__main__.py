@@ -177,7 +177,7 @@ x_access_token = read_yaml_secrets(Path(f"tika/tika.{stack_info.env_suffix}.yaml
 vault.generic.Secret(
     "tika-server-x-access-token-vault-secret",
     path="secret-operations/tika/access-token",
-    data_json=f'{{"value": "{x_access_token}"}}',
+    data_json=json.dumps({"value": x_access_token}),
 )
 
 block_device_mappings = [BlockDeviceMapping()]
