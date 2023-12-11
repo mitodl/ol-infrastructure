@@ -7,7 +7,6 @@ import requests
 logger = logging.getLogger(__name__)
 
 VAULT_URL = os.getenv("VAULT_ADDR", "https://127.0.0.1:8200")
-VAULT_CERTS = ("/etc/vault.d/ssl/bundle.crt", "/etc/vault.d/ssl/vault.key")
 TOKEN_NONCE_PATH = os.getenv(
     "VAULT_TOKEN_NONCE_PATH", "/app/superset_home/.vault-token-meta-nonce"
 )
@@ -156,8 +155,6 @@ def load_vault_token(vault_client, ec2_role=None):
 
 def get_vault_client(
     vault_url=VAULT_URL,
-    certs=VAULT_CERTS,
-    verify_certs=True,  # noqa: FBT002
     ec2_role=None,
 ):
     """
@@ -175,20 +172,9 @@ def get_vault_client(
     :return: hvac.Client
     """  # noqa: D401
     logger.debug("Retrieving a vault (hvac) client...")
-    if verify_certs:
-        # We use a self-signed certificate for the vault service itself, so we need to include our  # noqa: E501
-        # local ca bundle here for the underlying requests module.
-        os.environ["REQUESTS_CA_BUNDLE"] = "/etc/ssl/certs/ca-certificates.crt"
-        vault_client = hvac.Client(
-            url=vault_url,
-            cert=certs,
-        )
-    else:
-        vault_client = hvac.Client(
-            url=vault_url,
-            verify=False,
-        )
-
+    vault_client = hvac.Client(
+        url=vault_url,
+    )
     vault_client.token = load_vault_token(vault_client, ec2_role=ec2_role)
 
     if not vault_client.is_authenticated():
