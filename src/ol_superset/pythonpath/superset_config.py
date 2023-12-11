@@ -20,7 +20,7 @@ SUPERSET_WEBSERVER_ADDRESS = os.environ.get("SUPERSET_WEBSERVER_ADDRESS", "0.0.0
 SUPERSET_WEBSERVER_PORT = os.environ.get("SUPERSET_WEBSERVER_PORT", "8088")
 postgres_credentials = vault_client.secrets.database.generate_credentials(
     name="app", mount_point="postgres-superset"
-)
+)["data"]
 SQLALCHEMY_DATABASE_URI = f"postgres://{postgres_credentials['username']}:{postgres_credentials['password']}@superset-db.service.consul:5432/superset"
 #
 # The EncryptedFieldTypeAdapter is used whenever we're building SqlAlchemy models
