@@ -26,7 +26,6 @@ services:
     env_file: .env
     image: *superset-image
     container_name: superset_app
-    user: "root"
     restart: unless-stopped
     ports:
     - 8088:8088
@@ -52,7 +51,6 @@ services:
     container_name: superset_init
     command: ["superset", "db", "upgrade"]
     env_file: .env
-    user: "root"
     volumes: *superset-volumes
     healthcheck:
       disable: true
@@ -66,7 +64,6 @@ services:
       "-l", "INFO"]
     env_file: .env
     restart: unless-stopped
-    user: "root"
     volumes: *superset-volumes
     healthcheck:
       test: ["CMD-SHELL", "celery -A superset.tasks.celery_app:app inspect ping -d\
@@ -81,7 +78,6 @@ services:
       "-s", '"${SUPERSET_HOME}"/celerybeat-schedule']
     env_file: .env
     restart: unless-stopped
-    user: "root"
     volumes: *superset-volumes
     healthcheck:
       disable: true
