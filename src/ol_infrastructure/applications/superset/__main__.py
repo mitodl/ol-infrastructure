@@ -481,7 +481,7 @@ superset_web_lt_config = OLLaunchTemplateConfig(
     or InstanceTypes.burstable_medium,
     instance_profile_arn=superset_profile.arn,
     security_groups=[
-        superset_security_group,
+        superset_security_group.id,
         consul_security_groups["consul_agent"],
         data_vpc["security_groups"]["web"],
     ],
@@ -596,7 +596,7 @@ superset_worker_lt_config = OLLaunchTemplateConfig(
     or InstanceTypes.burstable_medium,
     instance_profile_arn=superset_profile.arn,
     security_groups=[
-        superset_security_group,
+        superset_security_group.id,
         consul_security_groups["consul_agent"],
     ],
     tags=aws_config.merged_tags({"Name": f"superset-worker-{stack_info.env_suffix}"}),

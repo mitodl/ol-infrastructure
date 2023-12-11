@@ -18,10 +18,10 @@ REDIS_TOKEN = vault_client.secrets.kv.v2.read_secret(
 SUPERSET_WEBSERVER_PROTOCOL = os.environ.get("SUPERSET_WEBSERVER_PROTOCOL", "https")
 SUPERSET_WEBSERVER_ADDRESS = os.environ.get("SUPERSET_WEBSERVER_ADDRESS", "0.0.0.0")  # noqa: S104
 SUPERSET_WEBSERVER_PORT = os.environ.get("SUPERSET_WEBSERVER_PORT", "8088")
-postgres_credentials = vault_client.secrets.database.generate_credentials(
+pg_creds = vault_client.secrets.database.generate_credentials(
     name="app", mount_point="postgres-superset"
 )["data"]
-SQLALCHEMY_DATABASE_URI = f"postgres://{postgres_credentials['username']}:{postgres_credentials['password']}@superset-db.service.consul:5432/superset"
+SQLALCHEMY_DATABASE_URI = f"postgres://{pg_creds['username']}:{pg_creds['password']}@superset-db.service.consul:5432/superset?sslmode=require"
 #
 # The EncryptedFieldTypeAdapter is used whenever we're building SqlAlchemy models
 # which include sensitive fields that should be app-encrypted BEFORE sending
@@ -163,7 +163,7 @@ FEATURE_FLAGS: dict[str, bool] = {
     # Set to True to replace Selenium with Playwright to execute reports and thumbnails.
     # Unlike Selenium, Playwright reports support deck.gl visualizations
     # Enabling this feature flag requires installing "playwright" pip package
-    "PLAYWRIGHT_REPORTS_AND_THUMBNAILS": True,
+    "PLAYWRIGHT_REPORTS_AND_THUMBNAILS": False,
 }
 
 # Default configurator will consume the LOG_* settings below
