@@ -167,7 +167,7 @@ FEATURE_FLAGS: dict[str, bool] = {
 }
 
 # Default configurator will consume the LOG_* settings below
-LOGGING_CONFIGURATOR = DefaultLoggingConfigurator()  # noqa: F821
+# LOGGING_CONFIGURATOR = DefaultLoggingConfigurator()
 
 # Console Log Settings
 
@@ -218,7 +218,7 @@ class CeleryConfig:  # pylint: disable=too-few-public-methods
         "reports.scheduler": {
             "task": "reports.scheduler",
             "schedule": crontab(minute="*", hour="*"),
-            "options": {"expires": int(CELERY_BEAT_SCHEDULER_EXPIRES.total_seconds())},  # noqa: F821
+            "options": {"expires": 3600},
         },
         "reports.prune_log": {
             "task": "reports.prune_log",
