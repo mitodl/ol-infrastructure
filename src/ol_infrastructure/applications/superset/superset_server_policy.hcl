@@ -2,6 +2,10 @@ path "secret-superset/*" {
   capabilities = ["read"]
 }
 
+path "secret-superset/data/*" {
+  capabilities = ["read"]
+}
+
 path "secret-operations/sso/superset" {
   capabilities = ["read"]
 }

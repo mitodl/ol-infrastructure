@@ -8,12 +8,12 @@ from vault.aws_auth import get_vault_client
 vault_addr = os.environ.get("VAULT_ADDR", "http://localhost:8200")
 vault_client = get_vault_client(vault_url=vault_addr, ec2_role="superset")
 
-SECRET_KEY = vault_client.secrets.kv.v2.read_secret(path="secret-superset/app-config")[
-    "data"
-]["data"]["secret_key"]
-REDIS_TOKEN = vault_client.secrets.kv.v2.read_secret(path="secret-superset/redis")[
-    "data"
-]["data"]["token"]
+SECRET_KEY = vault_client.secrets.kv.v2.read_secret(
+    path="app-config", mount_point="secret-superset"
+)["data"]["data"]["secret_key"]
+REDIS_TOKEN = vault_client.secrets.kv.v2.read_secret(
+    path="redis", mount_point="secret-superset"
+)["data"]["data"]["token"]
 
 SUPERSET_WEBSERVER_PROTOCOL = os.environ.get("SUPERSET_WEBSERVER_PROTOCOL", "https")
 SUPERSET_WEBSERVER_ADDRESS = os.environ.get("SUPERSET_WEBSERVER_ADDRESS", "0.0.0.0")  # noqa: S104

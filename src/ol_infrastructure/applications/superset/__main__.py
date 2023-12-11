@@ -175,9 +175,8 @@ superset_server_vault_policy = vault.Policy(
 vault.aws.AuthBackendRole(
     "superset-server-ami-ec2-vault-auth",
     backend="aws",
-    auth_type="iam",
+    auth_type="ec2",
     role="superset",
-    inferred_entity_type="ec2_instance",
     inferred_aws_region=aws_config.region,
     bound_iam_instance_profile_arns=[superset_profile.arn],
     bound_ami_ids=[
@@ -186,6 +185,7 @@ vault.aws.AuthBackendRole(
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[data_vpc["id"]],
     token_policies=[superset_server_vault_policy.name],
+    opts=ResourceOptions(delete_before_replace=True),
 )
 
 superset_secrets = read_yaml_secrets(
