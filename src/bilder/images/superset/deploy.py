@@ -66,7 +66,9 @@ server.shell(
 # via the helper entrypoint built into the custom superset image.
 files.put(
     name="Setup .env file for docker compose.",
-    src=io.StringIO(f"SUPERSET_IMAGE_SHA={SUPERSET_IMAGE_SHA}"),
+    src=io.StringIO(
+        f"SUPERSET_IMAGE_SHA={SUPERSET_IMAGE_SHA}\nSUPERSET_HOME=/app/superset_home\n"
+    ),
     dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env")),
 )
 watched_docker_compose_files.append(str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env")))
