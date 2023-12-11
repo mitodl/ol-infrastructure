@@ -176,7 +176,7 @@ vault.aws.AuthBackendRole(
     "superset-server-ami-ec2-vault-auth",
     backend="aws",
     auth_type="iam",
-    role="superset-server",
+    role="superset",
     inferred_entity_type="ec2_instance",
     inferred_aws_region=aws_config.region,
     bound_iam_instance_profile_arns=[superset_profile.arn],
