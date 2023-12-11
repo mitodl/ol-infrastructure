@@ -453,7 +453,11 @@ superset_web_acm_cert = acm.Certificate(
 
 superset_acm_cert_validation_records = (
     superset_web_acm_cert.domain_validation_options.apply(
-        partial(acm_certificate_validation_records, zone_id=mitol_zone_id)
+        partial(
+            acm_certificate_validation_records,
+            zone_id=mitol_zone_id,
+            stack_info=stack_info,
+        )
     )
 )
 
