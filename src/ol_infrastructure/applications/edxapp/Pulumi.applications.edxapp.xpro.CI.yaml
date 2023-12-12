@@ -5,6 +5,7 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-xpro-ci.odl.mit.edu
   edxapp:additional_waffle_flags:
+  - ["completion.enable_completion_tracking", "--create", "--superusers", "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
   - ["learner_home_mfe.enabled", "--create", "--superusers", "--everyone"]
