@@ -36,13 +36,9 @@ services:
     labels:
     - "traefik.enable=true"
     - "traefik.http.routers.superset.tls=true"
-    - "traefik.http.routers.superset.priority=1"
     - "traefik.http.routers.superset.entrypoints=https"
-    - "traefik.http.routers.superset.rule=Host(`${DOMAIN:-bi-qa.ol.mit.edu}`)"
-    - "traefik.http.routers.healthcheck.tls=rue"
-    - "traefik.http.routers.healthcheck.priority=2"
-    - "traefik.http.routers.healthcheck.entrypoints=https"
-    - "traefik.http.routers.healthcheck.rule=Path(`/health`)"
+    - "traefik.http.routers.superset.rule=(Host(`${DOMAIN:-bi-qa.ol.mit.edu}`) ||\
+      \ Path(`/health`))"
     profiles:
     - web
 
