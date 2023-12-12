@@ -22,37 +22,6 @@ pg_creds = vault_client.secrets.database.generate_credentials(
     name="app", mount_point="postgres-superset"
 )["data"]
 SQLALCHEMY_DATABASE_URI = f"postgres://{pg_creds['username']}:{pg_creds['password']}@superset-db.service.consul:5432/superset?sslmode=require"
-#
-# The EncryptedFieldTypeAdapter is used whenever we're building SqlAlchemy models
-# which include sensitive fields that should be app-encrypted BEFORE sending
-# to the DB.
-#
-# Note: the default impl leverages SqlAlchemyUtils' EncryptedType, which defaults
-#  to AesEngine that uses AES-128 under the covers using the app's SECRET_KEY  # pragma: allowlist secret  # noqa: E501
-#  as key material. Do note that AesEngine allows for queryability over the
-#  encrypted fields.
-#
-#  To change the default engine you need to define your own adapter:
-#
-# e.g.:
-#
-# class AesGcmEncryptedAdapter(
-#     AbstractEncryptedFieldAdapter
-# ):
-#     def create(
-#         self,
-#         app_config: Optional[Dict[str, Any]],
-#         *args: List[Any],
-#         **kwargs: Optional[Dict[str, Any]],
-#     ) -> TypeDecorator:
-#         if app_config:
-#             return EncryptedType(
-#                 *args, app_config["SECRET_KEY"], engine=AesGcmEngine, **kwargs
-#             )
-#         raise Exception("Missing app_config kwarg")  # noqa: ERA001
-#
-#
-#  SQLALCHEMY_ENCRYPTED_FIELD_TYPE_ADAPTER = AesGcmEncryptedAdapter  # noqa: ERA001
 SQLALCHEMY_ENCRYPTED_FIELD_TYPE_ADAPTER = SQLAlchemyUtilsAdapter
 
 ENABLE_PROXY_FIX = os.environ.get("ENABLE_PROXY_FIX", "True").lower() == "true"
@@ -70,9 +39,6 @@ APP_ICON = "/static/assets/images/superset-logo-horiz.png"
 # AUTH_TYPE = AUTH_OID  # noqa: ERA001
 AUTH_TYPE = AUTH_DB
 # Uncomment to setup OpenID providers example for OpenID authentication
-# OPENID_PROVIDERS = [
-#    { 'name': 'Yahoo', 'url': 'https://open.login.yahoo.com/' },  # noqa: ERA001
-#    { 'name': 'Flickr', 'url': 'https://www.flickr.com/<username>' },  # noqa: ERA001
 
 # Will allow user self registration, allowing to create Flask users from Authorized User
 AUTH_USER_REGISTRATION = True
@@ -167,26 +133,11 @@ FEATURE_FLAGS: dict[str, bool] = {
 }
 
 # Default configurator will consume the LOG_* settings below
-# LOGGING_CONFIGURATOR = DefaultLoggingConfigurator()
-
-# Console Log Settings
-
-LOG_FORMAT = "%(asctime)s:%(levelname)s:%(name)s:%(message)s"
-LOG_LEVEL = "INFO"
 
 
 # Custom logger for auditing queries. This can be used to send ran queries to a
 # structured immutable store for auditing purposes. The function is called for
 # every query ran, in both SQL Lab and charts/dashboards.
-# def QUERY_LOGGER(
-#     database,
-#     query,
-#     schema=None,  # noqa: ERA001
-#     client=None,  # noqa: ERA001
-#     security_manager=None,  # noqa: ERA001
-#     log_params=None,  # noqa: ERA001
-# ):
-#     pass
 QUERY_LOGGER = None
 
 FILTER_STATE_CACHE_CONFIG = {
