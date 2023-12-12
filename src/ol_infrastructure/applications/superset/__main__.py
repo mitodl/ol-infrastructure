@@ -472,7 +472,7 @@ superset_web_acm_validated_cert = acm.CertificateValidation(
 )
 superset_lb_config = OLLoadBalancerConfig(
     subnets=data_vpc["subnet_ids"],
-    security_groups=[superset_security_group],
+    security_groups=[data_vpc["security_groups"]["web"]],
     tags=aws_config.merged_tags({"Name": f"superset-lb-{stack_info.env_suffix}"}),
     listener_cert_domain=superset_domain,
     listener_cert_arn=superset_web_acm_cert.arn,

@@ -94,7 +94,7 @@ class OLLoadBalancerConfig(AWSBase):
     ip_address_type: str = "dualstack"
     load_balancer_type: str = "application"
     port: PositiveInt = PositiveInt(DEFAULT_HTTPS_PORT)
-    security_groups: list[SecurityGroup]
+    security_groups: list[SecurityGroup | str | pulumi.Output[str]]
     subnets: pulumi.Output[str]
 
     listener_use_acm: bool = True
@@ -184,7 +184,7 @@ class OLAutoScaling(pulumi.ComponentResource):
     auto_scale_group: Group = None
     launch_template: LaunchTemplate = None
 
-    def __init__(  # noqa: C901, PLR0913
+    def __init__(  # noqa: C901, PLR0913, PLR0912
         self,
         asg_config: OLAutoScaleGroupConfig,
         lt_config: OLLaunchTemplateConfig,
@@ -247,6 +247,12 @@ class OLAutoScaling(pulumi.ComponentResource):
 
         # Create Load Balancer
         if lb_config:
+            sg_ids = []
+            for group in lb_config.security_groups:
+                if isinstance(group, SecurityGroup):
+                    sg_ids.append(group.id)
+                else:
+                    sg_ids.append(group)
             load_balancer_name = f"{resource_name_prefix}lb"[
                 :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
             ].rstrip("-")
@@ -257,7 +263,7 @@ class OLAutoScaling(pulumi.ComponentResource):
                 ip_address_type=lb_config.ip_address_type,
                 load_balancer_type=lb_config.load_balancer_type,
                 name=load_balancer_name,
-                security_groups=[group.id for group in lb_config.security_groups],
+                security_groups=sg_ids,
                 subnets=lb_config.subnets,
                 tags=lb_config.tags,
                 opts=resource_options,
