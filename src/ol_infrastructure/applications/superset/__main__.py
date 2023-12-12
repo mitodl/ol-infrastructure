@@ -702,6 +702,7 @@ superset_worker_auto_scale_config = superset_config.get_object("worker_auto_scal
 superset_worker_asg_config = OLAutoScaleGroupConfig(
     asg_name=f"superset-worker-{superset_env}",
     aws_config=aws_config,
+    health_check_type="EC2",
     desired_size=superset_worker_auto_scale_config["desired"],
     min_size=superset_worker_auto_scale_config["min"],
     max_size=superset_worker_auto_scale_config["max"],

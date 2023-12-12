@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 import pulumi
 from bridge.lib.magic_numbers import (
@@ -145,7 +145,7 @@ class OLAutoScaleGroupConfig(AWSBase):
     asg_name: str
     desired_size: PositiveInt = PositiveInt(2)
     health_check_grace_period: NonNegativeInt = NonNegativeInt(0)
-    health_check_type: str = "ELB"
+    health_check_type: Literal["ELB", "EC2"] = "ELB"
     max_size: PositiveInt = PositiveInt(2)
     min_size: PositiveInt = PositiveInt(1)
     vpc_zone_identifiers: pulumi.Output[str]
