@@ -57,7 +57,6 @@ OIDC_CLIENT_SECRETS = {
     "redirect_uris": [f"{os.environ['DOMAIN']}/*"],
 }
 OIDC_ID_TOKEN_COOKIE_SECURE = False
-OIDC_REQUIRE_VERIFIED_EMAIL = False
 OIDC_OPENID_REALM = "ol-platform-engineering"
 OIDC_INTROSPECTION_AUTH_METHOD = "client_secret_post"
 CUSTOM_SECURITY_MANAGER = OIDCSecurityManager
