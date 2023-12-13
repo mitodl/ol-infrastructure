@@ -43,7 +43,7 @@ APP_ICON = "/static/assets/images/superset-logo-horiz.png"
 # AUTH_LDAP : Is for LDAP
 # AUTH_REMOTE_USER : Is for using REMOTE_USER from web server
 # AUTH_TYPE = AUTH_OID  # noqa: ERA001
-oidc_creds = vault_client.secrets.kv.v2.read_secret(
+oidc_creds = vault_client.secrets.kv.v1.read_secret(
     path="sso/superset", mount_point="secret-operations"
 )["data"]
 AUTH_TYPE = AUTH_OID
