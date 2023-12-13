@@ -25,6 +25,9 @@ config:
       open-discusions: https://discussions-ci.odl.mit.edu
       open-local: "*"
     realm_name: olapps
+  - client_info:
+      superset: https://bi-ci.ol.mit.edu
+    realm_name: ol-platform-engineering
   keycloak:url: https://sso-ci.odl.mit.edu
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

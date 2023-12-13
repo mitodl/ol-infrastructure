@@ -1,7 +1,8 @@
 import os  # noqa: INP001
 
+from auth.keycloak import OIDCSecurityManager
 from celery.schedules import crontab
-from flask_appbuilder.security.manager import AUTH_DB
+from flask_appbuilder.security.manager import AUTH_OID
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
 from vault.aws_auth import get_vault_client
 
@@ -25,6 +26,11 @@ SQLALCHEMY_DATABASE_URI = f"postgres://{pg_creds['username']}:{pg_creds['passwor
 SQLALCHEMY_ENCRYPTED_FIELD_TYPE_ADAPTER = SQLAlchemyUtilsAdapter
 
 ENABLE_PROXY_FIX = os.environ.get("ENABLE_PROXY_FIX", "True").lower() == "true"
+
+# -------------------------------
+# White Labeling Configurations #
+# --------------------------------
+APP_NAME = "MIT OL Business Intelligence"
 # Specify the App icon. Useful for white-labeling
 APP_ICON = "/static/assets/images/superset-logo-horiz.png"
 
@@ -37,8 +43,24 @@ APP_ICON = "/static/assets/images/superset-logo-horiz.png"
 # AUTH_LDAP : Is for LDAP
 # AUTH_REMOTE_USER : Is for using REMOTE_USER from web server
 # AUTH_TYPE = AUTH_OID  # noqa: ERA001
-AUTH_TYPE = AUTH_DB
-# Uncomment to setup OpenID providers example for OpenID authentication
+oidc_creds = vault_client.secrets.kv.v2.read_secret(
+    path="sso/superset", mount_point="secret-operations"
+)["data"]
+AUTH_TYPE = AUTH_OID
+OIDC_CLIENT_SECRETS = {
+    "issuer": oidc_creds["url"],
+    "client_id": oidc_creds["client_id"],
+    "client_secret": oidc_creds["client_secret"],
+    "auth_uri": f"{oidc_creds['url']}/protocol/openid-connect/auth",
+    "token_uri": f"{oidc_creds['url']}/protocol/openid-connect/token",
+    "userinfo_uri": f"{oidc_creds['url']}/protocol/openid-connect/userinfo",
+    "redirect_uris": [f"{os.environ['DOMAIN']}/*"],
+}
+OIDC_ID_TOKEN_COOKIE_SECURE = False
+OIDC_REQUIRE_VERIFIED_EMAIL = False
+OIDC_OPENID_REALM = "ol-platform-engineering"
+OIDC_INTROSPECTION_AUTH_METHOD = "client_secret_post"
+CUSTOM_SECURITY_MANAGER = OIDCSecurityManager
 
 # Will allow user self registration, allowing to create Flask users from Authorized User
 AUTH_USER_REGISTRATION = True
@@ -75,7 +97,7 @@ FEATURE_FLAGS: dict[str, bool] = {
     "GLOBAL_ASYNC_QUERIES": False,
     "EMBEDDED_SUPERSET": False,
     # Enables Alerts and reports new implementation
-    "ALERT_REPORTS": False,
+    "ALERT_REPORTS": True,
     "DASHBOARD_RBAC": False,  # TMM 2023-11-28 - Apparently this feature doesn't properly work and is not actively supported.  # noqa: E501
     "ENABLE_ADVANCED_DATA_TYPES": False,
     # Enabling ALERTS_ATTACH_REPORTS, the system sends email and slack message
@@ -180,16 +202,21 @@ class CeleryConfig:  # pylint: disable=too-few-public-methods
 
 CELERY_CONFIG = CeleryConfig  # pylint: disable=invalid-name
 
+#########################
+# Notification Settings #
+########################
 # smtp server configuration
-EMAIL_NOTIFICATIONS = False  # all the emails are sent using dryrun
-SMTP_HOST = "localhost"
+EMAIL_NOTIFICATIONS = True  # all the emails are sent using dryrun
+SMTP_HOST = "email.us-east-1.amazonaws.com"
 SMTP_STARTTLS = True
 SMTP_SSL = False
-SMTP_USER = "superset"
-SMTP_PORT = 25
-SMTP_PASSWORD = "superset"  # pragma: allowlist secret  # noqa: S105
-SMTP_MAIL_FROM = "superset@superset.com"
+SMTP_PORT = 587
+SMTP_MAIL_FROM = "ol-data@mit.edu"
 # If True creates a default SSL context with ssl.Purpose.CLIENT_AUTH using the
 # default system root CA certificates.
 SMTP_SSL_SERVER_AUTH = False
 ENABLE_CHUNK_ENCODING = False
+
+SLACK_API_TOKEN = vault_client.secrets.kv.v2.read_secret(
+    path="app-config", mount_point="secret-superset"
+)["data"]["data"]["slack_token"]

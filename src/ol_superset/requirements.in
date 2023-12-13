@@ -1,7 +1,9 @@
 apache-superset[cors,thumbnails,prophet]
-psycopg2
-hvac
-trino
+authlib
 celery-redbeat
-redis
 duckdb
+flask-oidc
+hvac
+psycopg2
+redis
+trino

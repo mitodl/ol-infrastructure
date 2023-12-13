@@ -20,7 +20,11 @@ attrs==23.1.0
     #   outcome
     #   referencing
     #   trio
-babel==2.13.1
+authlib==1.2.1
+    # via
+    #   -r requirements.in
+    #   flask-oidc
+babel==2.14.0
     # via flask-babel
 backoff==2.2.1
     # via apache-superset
@@ -85,6 +89,7 @@ croniter==2.0.1
 cryptography==39.0.2
     # via
     #   apache-superset
+    #   authlib
     #   paramiko
 cycler==0.12.1
     # via matplotlib
@@ -112,6 +117,7 @@ flask==2.2.5
     #   flask-limiter
     #   flask-login
     #   flask-migrate
+    #   flask-oidc
     #   flask-sqlalchemy
     #   flask-wtf
 flask-appbuilder==4.3.10
@@ -124,7 +130,7 @@ flask-compress==1.14
     # via apache-superset
 flask-cors==4.0.0
     # via apache-superset
-flask-jwt-extended==4.5.3
+flask-jwt-extended==4.6.0
     # via flask-appbuilder
 flask-limiter==3.5.0
     # via flask-appbuilder
@@ -134,6 +140,8 @@ flask-login==0.6.3
     #   flask-appbuilder
 flask-migrate==3.1.0
     # via apache-superset
+flask-oidc==2.1.1
+    # via -r requirements.in
 flask-sqlalchemy==2.5.1
     # via
     #   flask-appbuilder
@@ -273,7 +281,7 @@ polyline==2.0.1
     # via apache-superset
 prison==0.2.1
     # via flask-appbuilder
-prompt-toolkit==3.0.41
+prompt-toolkit==3.0.43
     # via click-repl
 prophet==1.1.1
     # via apache-superset
@@ -339,6 +347,7 @@ referencing==0.32.0
     #   jsonschema-specifications
 requests==2.31.0
     # via
+    #   flask-oidc
     #   hvac
     #   trino
 rich==13.7.0
@@ -401,7 +410,7 @@ trio==0.23.1
     #   trio-websocket
 trio-websocket==0.11.1
     # via selenium
-typing-extensions==4.8.0
+typing-extensions==4.9.0
     # via
     #   alembic
     #   apache-superset

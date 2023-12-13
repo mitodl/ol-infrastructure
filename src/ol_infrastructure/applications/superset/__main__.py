@@ -94,6 +94,19 @@ superset_iam_policy = iam.Policy(
                             f"arn:aws:s3:::{superset_bucket_name}/*",
                         ],
                     },
+                    {
+                        "Effect": "Allow",
+                        "Action": ["ses:SendEmail", "ses:SendRawEmail"],
+                        "Resource": [
+                            "arn:*:ses:*:*:identity/*mit.edu",
+                            f"arn:aws:ses:*:*:configuration-set/superset-{superset_env}",
+                        ],
+                    },
+                    {
+                        "Effect": "Allow",
+                        "Action": ["ses:GetSendQuota"],
+                        "Resource": "*",
+                    },
                 ],
             }
         ),
