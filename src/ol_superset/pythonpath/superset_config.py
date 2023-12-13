@@ -48,13 +48,15 @@ oidc_creds = vault_client.secrets.kv.v1.read_secret(
 )["data"]
 AUTH_TYPE = AUTH_OID
 OIDC_CLIENT_SECRETS = {
-    "issuer": oidc_creds["url"],
-    "client_id": oidc_creds["client_id"],
-    "client_secret": oidc_creds["client_secret"],
-    "auth_uri": f"{oidc_creds['url']}/protocol/openid-connect/auth",
-    "token_uri": f"{oidc_creds['url']}/protocol/openid-connect/token",
-    "userinfo_uri": f"{oidc_creds['url']}/protocol/openid-connect/userinfo",
-    "redirect_uris": [f"{os.environ['DOMAIN']}/*"],
+    "web": {
+        "issuer": oidc_creds["url"],
+        "client_id": oidc_creds["client_id"],
+        "client_secret": oidc_creds["client_secret"],
+        "auth_uri": f"{oidc_creds['url']}/protocol/openid-connect/auth",
+        "token_uri": f"{oidc_creds['url']}/protocol/openid-connect/token",
+        "userinfo_uri": f"{oidc_creds['url']}/protocol/openid-connect/userinfo",
+        "redirect_uris": [f"{os.environ['DOMAIN']}/*"],
+    }
 }
 OIDC_ID_TOKEN_COOKIE_SECURE = False
 OIDC_OPENID_REALM = "ol-platform-engineering"
