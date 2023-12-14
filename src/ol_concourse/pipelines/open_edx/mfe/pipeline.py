@@ -66,7 +66,11 @@ class OpenEdxVars(BaseModel):
 def mfe_params(
     open_edx: OpenEdxVars, mfe: OpenEdxApplicationVersion
 ) -> dict[str, Optional[str]]:
-    mfe_base_url = f"https://{open_edx.lms_domain}" if mfe.application.path != "learn" else f"https://{open_edx.lms_domain}/learn"
+
+    mfe_base_url = f"https://{open_edx.lms_domain}"
+    if mfe.application.path == "learn":
+        mfe_base_url = f"https://{open_edx.lms_domain}/learn"
+
     return {
         "ABOUT_US_URL": open_edx.about_us_url,
         "ACCESSIBILITY_URL": open_edx.accessibility_url,
