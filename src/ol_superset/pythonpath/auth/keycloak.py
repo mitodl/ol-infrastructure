@@ -26,7 +26,7 @@ class AuthOIDCView(AuthOIDView):
         sm = self.appbuilder.sm
         oidc = sm.oid
         superset_roles = ["Admin", "Alpha", "Gamma", "Public", "granter", "sql_lab"]
-        default_role = "Public"
+        default_role = "Alpha"
 
         @self.appbuilder.sm.oid.require_login
         def handle_login():
@@ -68,6 +68,6 @@ class AuthOIDCView(AuthOIDView):
 
         return redirect(
             oidc.client_secrets.get("issuer")
-            + "/protocol/openid-connect/logout?redirect_uri="
+            + "/protocol/openid-connect/logout?post_logout_redirect_uri="
             + quote(redirect_url)
         )
