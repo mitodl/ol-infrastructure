@@ -17,7 +17,7 @@ from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import iam, route53, s3
 
-from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
@@ -82,160 +82,329 @@ draft_offline_bucket_arn = f"arn:aws:s3:::{draft_offline_bucket_name}"
 live_offline_bucket_name = f"ocw-content-offline-live-{stack_info.env_suffix}"
 live_offline_bucket_arn = f"arn:aws:s3:::{live_offline_bucket_name}"
 
-draft_bucket = s3.Bucket(
+# Draft bucket
+draft_bucket = s3.BucketV2(
     draft_bucket_name,
     bucket=draft_bucket_name,
     tags=aws_config.tags,
-    acl="public-read",
-    policy=json.dumps(
-        {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Sid": "PublicRead",
-                    "Effect": "Allow",
-                    "Principal": "*",
-                    "Action": ["s3:GetObject"],
-                    "Resource": [f"{draft_bucket_arn}/*"],
-                }
-            ],
-        }
-    ),
-    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
 )
-draft_backup_bucket = s3.Bucket(
-    draft_backup_bucket_name,
-    bucket=draft_backup_bucket_name,
-    tags=aws_config.tags,
-    acl="public-read",
-    policy=json.dumps(
-        {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Sid": "PublicRead",
-                    "Effect": "Allow",
-                    "Principal": "*",
-                    "Action": ["s3:GetObject"],
-                    "Resource": [f"{draft_backup_bucket_arn}/*"],
-                }
-            ],
-        }
+draft_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol-draft-bucket-ownership-controls",
+    bucket=draft_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
     ),
-    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
-    versioning=s3.BucketVersioningArgs(enabled=True),
-    lifecycle_rules=[
-        s3.BucketLifecycleRuleArgs(
-            enabled=True,
-            noncurrent_version_expiration=s3.BucketLifecycleRuleNoncurrentVersionExpirationArgs(
-                days=90,
-            ),
-        )
-    ],
 )
-draft_offline_bucket = s3.Bucket(
-    draft_offline_bucket_name,
-    bucket=draft_offline_bucket_name,
-    tags=aws_config.tags,
-    acl="public-read",
+s3.BucketVersioningV2(
+    "ol-draft-bucket-versioning",
+    bucket=draft_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+draft_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-draft-bucket-public-access",
+    bucket=draft_bucket.id,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+)
+s3.BucketPolicy(
+    "ol-draft-bucket-policy",
+    bucket=draft_bucket.id,
     policy=json.dumps(
         {
-            "Version": "2012-10-17",
+            "Version": IAM_POLICY_VERSION,
             "Statement": [
                 {
-                    "Sid": "PublicRead",
                     "Effect": "Allow",
-                    "Principal": "*",
-                    "Action": ["s3:GetObject"],
-                    "Resource": [f"{draft_offline_bucket_arn}/*"],
+                    "Principal": {"AWS": "*"},
+                    "Action": "s3:GetObject",
+                    "Resource": [
+                        f"arn:aws:s3:::{draft_bucket_name}/images/*",
+                        f"arn:aws:s3:::{draft_bucket_name}/resumes/*",
+                    ],
                 }
             ],
         }
     ),
-    website=s3.BucketWebsiteArgs(
-        index_document="index.html",
-        error_document="error.html",
+    opts=ResourceOptions(
+        depends_on=[
+            draft_bucket_public_access,
+            draft_bucket_ownership_controls,
+        ]
     ),
-    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
 )
 
-live_bucket = s3.Bucket(
+# live bucket
+live_bucket = s3.BucketV2(
     live_bucket_name,
     bucket=live_bucket_name,
     tags=aws_config.tags,
-    acl="public-read",
+)
+live_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol-live-bucket-ownership-controls",
+    bucket=live_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+s3.BucketVersioningV2(
+    "ol-live-bucket-versioning",
+    bucket=live_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+live_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-live-bucket-public-access",
+    bucket=live_bucket.id,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+)
+s3.BucketPolicy(
+    "ol-live-bucket-policy",
+    bucket=live_bucket.id,
     policy=json.dumps(
         {
-            "Version": "2012-10-17",
+            "Version": IAM_POLICY_VERSION,
             "Statement": [
                 {
-                    "Sid": "PublicRead",
                     "Effect": "Allow",
-                    "Principal": "*",
-                    "Action": ["s3:GetObject"],
-                    "Resource": [f"{live_bucket_arn}/*"],
+                    "Principal": {"AWS": "*"},
+                    "Action": "s3:GetObject",
+                    "Resource": [
+                        f"arn:aws:s3:::{live_bucket_name}/images/*",
+                        f"arn:aws:s3:::{live_bucket_name}/resumes/*",
+                    ],
                 }
             ],
         }
     ),
-    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
+    opts=ResourceOptions(
+        depends_on=[
+            live_bucket_public_access,
+            live_bucket_ownership_controls,
+        ]
+    ),
 )
-live_backup_bucket = s3.Bucket(
+
+# draft_backup bucket
+draft_backup_bucket = s3.BucketV2(
+    draft_backup_bucket_name,
+    bucket=draft_backup_bucket_name,
+    tags=aws_config.tags,
+)
+draft_backup_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol-draft_backup-bucket-ownership-controls",
+    bucket=draft_backup_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+s3.BucketVersioningV2(
+    "ol-draft_backup-bucket-versioning",
+    bucket=draft_backup_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+draft_backup_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-draft_backup-bucket-public-access",
+    bucket=draft_backup_bucket.id,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+)
+s3.BucketPolicy(
+    "ol-draft_backup-bucket-policy",
+    bucket=draft_backup_bucket.id,
+    policy=json.dumps(
+        {
+            "Version": IAM_POLICY_VERSION,
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": "*"},
+                    "Action": "s3:GetObject",
+                    "Resource": [
+                        f"arn:aws:s3:::{draft_backup_bucket_name}/images/*",
+                        f"arn:aws:s3:::{draft_backup_bucket_name}/resumes/*",
+                    ],
+                }
+            ],
+        }
+    ),
+    opts=ResourceOptions(
+        depends_on=[
+            draft_backup_bucket_public_access,
+            draft_backup_bucket_ownership_controls,
+        ]
+    ),
+)
+
+# live_backup bucket
+live_backup_bucket = s3.BucketV2(
     live_backup_bucket_name,
     bucket=live_backup_bucket_name,
     tags=aws_config.tags,
-    acl="public-read",
+)
+live_backup_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol-live_backup-bucket-ownership-controls",
+    bucket=live_backup_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+s3.BucketVersioningV2(
+    "ol-live_backup-bucket-versioning",
+    bucket=live_backup_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+live_backup_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-live_backup-bucket-public-access",
+    bucket=live_backup_bucket.id,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+)
+s3.BucketPolicy(
+    "ol-live_backup-bucket-policy",
+    bucket=live_backup_bucket.id,
     policy=json.dumps(
         {
-            "Version": "2012-10-17",
+            "Version": IAM_POLICY_VERSION,
             "Statement": [
                 {
-                    "Sid": "PublicRead",
                     "Effect": "Allow",
-                    "Principal": "*",
-                    "Action": ["s3:GetObject"],
-                    "Resource": [f"{live_backup_bucket_arn}/*"],
+                    "Principal": {"AWS": "*"},
+                    "Action": "s3:GetObject",
+                    "Resource": [
+                        f"arn:aws:s3:::{live_backup_bucket_name}/images/*",
+                        f"arn:aws:s3:::{live_backup_bucket_name}/resumes/*",
+                    ],
                 }
             ],
         }
     ),
-    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
-    versioning=s3.BucketVersioningArgs(enabled=True),
-    lifecycle_rules=[
-        s3.BucketLifecycleRuleArgs(
-            enabled=True,
-            noncurrent_version_expiration=s3.BucketLifecycleRuleNoncurrentVersionExpirationArgs(
-                days=90,
-            ),
-        )
-    ],
+    opts=ResourceOptions(
+        depends_on=[
+            live_backup_bucket_public_access,
+            live_backup_bucket_ownership_controls,
+        ]
+    ),
 )
-live_offline_bucket = s3.Bucket(
+
+# draft_backup bucket
+draft_offline_bucket = s3.BucketV2(
+    draft_offline_bucket_name,
+    bucket=draft_offline_bucket_name,
+    tags=aws_config.tags,
+)
+draft_offline_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol-draft_backup-bucket-ownership-controls",
+    bucket=draft_offline_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+s3.BucketVersioningV2(
+    "ol-draft_backup-bucket-versioning",
+    bucket=draft_offline_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+draft_offline_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-draft_backup-bucket-public-access",
+    bucket=draft_offline_bucket.id,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+)
+s3.BucketPolicy(
+    "ol-draft_backup-bucket-policy",
+    bucket=draft_offline_bucket.id,
+    policy=json.dumps(
+        {
+            "Version": IAM_POLICY_VERSION,
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": "*"},
+                    "Action": "s3:GetObject",
+                    "Resource": [
+                        f"arn:aws:s3:::{draft_offline_bucket_name}/images/*",
+                        f"arn:aws:s3:::{draft_offline_bucket_name}/resumes/*",
+                    ],
+                }
+            ],
+        }
+    ),
+    opts=ResourceOptions(
+        depends_on=[
+            draft_offline_bucket_public_access,
+            draft_offline_bucket_ownership_controls,
+        ]
+    ),
+)
+
+# live_backup bucket
+live_offline_bucket = s3.BucketV2(
     live_offline_bucket_name,
     bucket=live_offline_bucket_name,
     tags=aws_config.tags,
-    acl="public-read",
+)
+live_offline_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol-live_backup-bucket-ownership-controls",
+    bucket=live_offline_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+s3.BucketVersioningV2(
+    "ol-live_backup-bucket-versioning",
+    bucket=live_offline_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+live_offline_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-live_backup-bucket-public-access",
+    bucket=live_offline_bucket.id,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+)
+s3.BucketPolicy(
+    "ol-live_backup-bucket-policy",
+    bucket=live_offline_bucket.id,
     policy=json.dumps(
         {
-            "Version": "2012-10-17",
+            "Version": IAM_POLICY_VERSION,
             "Statement": [
                 {
-                    "Sid": "PublicRead",
                     "Effect": "Allow",
-                    "Principal": "*",
-                    "Action": ["s3:GetObject"],
-                    "Resource": [f"{live_offline_bucket_arn}/*"],
+                    "Principal": {"AWS": "*"},
+                    "Action": "s3:GetObject",
+                    "Resource": [
+                        f"arn:aws:s3:::{live_offline_bucket_name}/images/*",
+                        f"arn:aws:s3:::{live_offline_bucket_name}/resumes/*",
+                    ],
                 }
             ],
         }
     ),
-    website=s3.BucketWebsiteArgs(
-        index_document="index.html",
-        error_document="error.html",
+    opts=ResourceOptions(
+        depends_on=[
+            live_offline_bucket_public_access,
+            live_offline_bucket_ownership_controls,
+        ]
     ),
-    cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
 )
-
 
 policy_description = (
     "Access controls for the CDN to be able to read from the"
