@@ -73,7 +73,7 @@ def mfe_params(
             f"{open_edx.environment}-edx-jwt-cookie-header-payload"
         ),
         "ACCOUNT_SETTINGS_URL": open_edx.account_settings_url,
-        "BASE_URL": f"https://{open_edx.lms_domain}",
+        "BASE_URL": f"https://{open_edx.lms_domain}/{mfe.application.path}",
         "CONTACT_URL": open_edx.contact_url,
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "DISPLAY_FEEDBACK_WIDGET": open_edx.display_feedback_widget,
