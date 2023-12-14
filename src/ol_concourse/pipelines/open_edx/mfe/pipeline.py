@@ -66,6 +66,7 @@ class OpenEdxVars(BaseModel):
 def mfe_params(
     open_edx: OpenEdxVars, mfe: OpenEdxApplicationVersion
 ) -> dict[str, Optional[str]]:
+    mfe_base_url = f"https://{open_edx.lms_domain}" if mfe.application.path != "learn" else f"https://{open_edx.lms_domain}/learn"
     return {
         "ABOUT_US_URL": open_edx.about_us_url,
         "ACCESSIBILITY_URL": open_edx.accessibility_url,
@@ -73,7 +74,7 @@ def mfe_params(
             f"{open_edx.environment}-edx-jwt-cookie-header-payload"
         ),
         "ACCOUNT_SETTINGS_URL": open_edx.account_settings_url,
-        "BASE_URL": f"https://{open_edx.lms_domain}",
+        "BASE_URL": mfe_base_url,
         "CONTACT_URL": open_edx.contact_url,
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "DISPLAY_FEEDBACK_WIDGET": open_edx.display_feedback_widget,
