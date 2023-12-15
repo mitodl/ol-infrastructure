@@ -1409,12 +1409,12 @@ files = [
 
 [[package]]
 name = "pulumi"
-version = "3.95.0"
+version = "3.97.0"
 description = "Pulumi's Python SDK"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi-3.95.0-py3-none-any.whl", hash = "sha256:83152484373ed95250b9acaf19fe968c276a8a4f8b1a1fa6a79de652eb00b30e"},
+    {file = "pulumi-3.97.0-py3-none-any.whl", hash = "sha256:8401e31d92c32b1101932e4ee7ff69c5508292a8c7ad05d88b940eae33e8ebc1"},
 ]
 
 [package.dependencies]
@@ -1427,13 +1427,13 @@ six = ">=1.12,<2.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "6.13.1"
+version = "6.13.3"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_aws-6.13.1-py3-none-any.whl", hash = "sha256:37bcfca5cd495f7804c71db5e2e530cddedfde8fc177716e7d9cbd52deb579bf"},
-    {file = "pulumi_aws-6.13.1.tar.gz", hash = "sha256:84ee4951a3b3ee78e6327fae193f62f5180119832f66de1670284aa77ba2f983"},
+    {file = "pulumi_aws-6.13.3-py3-none-any.whl", hash = "sha256:84bf572b1f24ad9f03744d5bcf9f28350520079389be675cf93460d0ac3c6da2"},
+    {file = "pulumi_aws-6.13.3.tar.gz", hash = "sha256:c83ea52a2af44618fd20de9a37c7d45e518ff20839eb5d95875f0e5d2edca88d"},
 ]
 
 [package.dependencies]
@@ -1475,13 +1475,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "5.22.0"
+version = "5.23.0"
 description = "A Pulumi package for creating and managing github cloud resources."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_github-5.22.0-py3-none-any.whl", hash = "sha256:c1d00843e7ff60f041f6aeeb4cdb7047c9c93001e2479fa43a1c618b395118f2"},
-    {file = "pulumi_github-5.22.0.tar.gz", hash = "sha256:41998bd38c07219ac0951951abd9ef8238844c50608640bef14ab0819bfd833a"},
+    {file = "pulumi_github-5.23.0-py3-none-any.whl", hash = "sha256:4a02e187b5dd80570f7881a0f7f7a21ab0d942cd5fb2524eae28f5e3d71d5be4"},
+    {file = "pulumi_github-5.23.0.tar.gz", hash = "sha256:783ef02640b788b2ce44d35cf34c9da618b1784d3ac163ec86341e195129e71e"},
 ]
 
 [package.dependencies]
