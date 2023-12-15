@@ -10,7 +10,7 @@ def git_repo(  # noqa: PLR0913
     branch: str = "main",
     check_every: str = "60s",
     paths: Optional[list[str]] = None,
-    depth: Optional[int] = None,  # noqa: ARG001
+    depth: Optional[int] = None,
     **kwargs,
 ) -> Resource:
     return Resource(
@@ -18,7 +18,9 @@ def git_repo(  # noqa: PLR0913
         type="git",
         icon="git",
         check_every=check_every,
-        source=Git(uri=uri, branch=branch, paths=paths).model_dump(exclude_none=True),
+        source=Git(uri=uri, branch=branch, paths=paths, depth=depth).model_dump(
+            exclude_none=True
+        ),
         **kwargs,
     )
 

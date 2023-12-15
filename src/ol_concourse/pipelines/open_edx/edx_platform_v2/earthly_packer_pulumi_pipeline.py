@@ -9,7 +9,6 @@ from bridge.settings.openedx.types import (
     OpenEdxSupportedRelease,
 )
 
-from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
@@ -33,14 +32,15 @@ from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PA
 
 
 def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
-    edx_docker_code = git_repo(
+    # This resource will be shared by all releases/deployment combinations
+    earthly_git_resource = git_repo(
         name=Identifier("ol-infrastructure-docker"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
         depth=1,
+        check_every="10m",
         paths=[
             "dockerfiles/openedx-edxapp/",
-            "src/ol_concourse/pipelines/open_edx/edx_platform_v2",
         ],
     )
 
@@ -48,46 +48,54 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
     packer_fragments = []
     pulumi_fragments = []
     group_configs = []
+
     for release_name in releases:
         job_names = []
         for deployment in filter_deployments_by_release(release_name):
+            deployment_name = deployment.deployment_name
+
+            # Theme related resource setup
             theme_git_resources = []
             theme_get_steps = []
-
             theme = fetch_application_version(
-                release_name, deployment.deployment_name, OpenEdxApplication.theme
+                release_name, deployment_name, OpenEdxApplication.theme
             )
             theme_git_resource = git_repo(
-                name=Identifier(f"{release_name}-{deployment.deployment_name}-theme"),
+                name=Identifier(f"{release_name}-{deployment_name}-theme"),
                 uri=theme.git_origin,
                 branch=theme.release_branch,
+                check_every="24h",
             )
             theme_git_resources.append(theme_git_resource)
             theme_get_steps.append(GetStep(get=theme_git_resource.name, trigger=True))
 
+            # edx_platform related resource setup
             edx_platform_git_resources = []
             edx_platform_get_steps = []
             edx_platform = fetch_application_version(
-                release_name, deployment.deployment_name, OpenEdxApplication.edxapp
+                release_name, deployment_name, OpenEdxApplication.edxapp
             )
             edx_platform_git_resource = git_repo(
-                name=Identifier(
-                    f"{release_name}-{deployment.deployment_name}-edx-platform"
-                ),
+                name=Identifier(f"{release_name}-{deployment_name}-edx-platform"),
                 uri=edx_platform.git_origin,
                 branch=edx_platform.release_branch,
+                depth=1,
+                check_every="24h",
             )
             edx_platform_git_resources.append(edx_platform_git_resource)
             edx_platform_get_steps.append(
                 GetStep(get=edx_platform_git_resource.name, trigger=True)
             )
 
+            # AMI code related resource setup
             edx_ami_code = git_repo(
                 name=Identifier(
-                    f"edxapp-custom-image-{deployment.deployment_name}-{release_name}"
+                    f"edxapp-custom-image-{deployment_name}-{release_name}"
                 ),
                 uri="https://github.com/mitodl/ol-infrastructure",
                 branch="main",
+                depth=1,
+                check_every="10m",
                 paths=[
                     "src/bridge/settings/openedx/",
                     "src/bilder/components/",
@@ -95,19 +103,20 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                     "src/bilder/images/edxapp_v2/group_data/",
                     "src/bilder/images/edxapp_v2/files/",
                     "src/bilder/images/edxapp_v2/templates/vector/",
-                    f"src/bilder/images/edxapp_v2/templates/edxapp/{deployment.deployment_name}/",
+                    f"src/bilder/images/edxapp_v2/templates/edxapp/{deployment_name}/",
                     "src/bilder/images/edxapp_v2/custom_install.pkr.hcl",
-                    f"src/bilder/images/edxapp_v2/packer_vars/{deployment.deployment_name}.pkrvars.hcl",
+                    f"src/bilder/images/edxapp_v2/packer_vars/{deployment_name}.pkrvars.hcl",
                     f"src/bilder/images/edxapp_v2/packer_vars/{release_name}.pkrvars.hcl",
                 ],
             )
 
+            # Pulumi code related resource setup
             edx_pulumi_code = git_repo(
-                name=Identifier(
-                    f"edxapp-ol-infrastructure-pulumi-{deployment.deployment_name}"
-                ),
+                name=Identifier(f"edxapp-ol-infrastructure-pulumi-{deployment_name}"),
                 uri="https://github.com/mitodl/ol-infrastructure",
                 branch="main",
+                depth=1,
+                check_every="10m",
                 paths=[
                     *PULUMI_WATCHED_PATHS,
                     "src/ol_infrastructure/applications/edxapp/",
@@ -116,112 +125,120 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                 ],
             )
 
+            # Docker image related resource setup
             edx_registry_image_resource = registry_image(
-                name=Identifier(
-                    f"edxapp-{release_name}-{deployment.deployment_name}-image"
-                ),
+                name=Identifier(f"edxapp-{release_name}-{deployment_name}-image"),
                 image_repository="mitodl/edxapp",
-                image_tag=f"{release_name}-{deployment.deployment_name}",
+                image_tag=f"{release_name}-{deployment_name}",
                 username="((dockerhub.username))",
                 password="((dockerhub.password))",  # noqa: S106
             )
 
-            docker_build_inputs = (
-                [
-                    Input(name=edx_platform_git_resource.name)
-                    for edx_platform_git_resource in edx_platform_git_resources
-                ]
-                + [
-                    Input(name=theme_git_resource.name)
-                    for theme_git_resource in theme_git_resources
-                ]
-                + [Input(name=edx_docker_code.name)]
-            )
-
-            docker_build_job = Job(
-                name=f"build-{release_name}-{deployment.deployment_name}-edxapp-image",
+            # Each earthly build requires several inputs, build that list pre-emptively
+            earthly_build_job = Job(
+                name=f"build-{release_name}-{deployment_name}-edxapp-image",
                 build_log_retention={"builds": 10},
                 max_in_flight=1,
                 plan=[
                     InParallelStep(
                         in_parallel=theme_get_steps
                         + edx_platform_get_steps
-                        + [GetStep(get=edx_docker_code.name, trigger=True)]
+                        + [GetStep(get=earthly_git_resource.name, trigger=True)]
                     ),
                     TaskStep(
-                        task=Identifier("collect-code"),
+                        task=Identifier("build"),
+                        privileged=True,
+                        config=TaskConfig(
+                            platform=Platform.linux,
+                            image_resource=AnonymousResource(
+                                type="registry-image",
+                                source={"repository": "mitodl/dcind", "tag": "latest"},
+                            ),
+                            # Use some cleverness with path to mount resources within
+                            # the earthly git resource so code is where the Earthfile
+                            # expects
+                            inputs=[Input(name=earthly_git_resource.name)],
+                            outputs=[Output(name=Identifier("artifacts"))],
+                            run=Command(
+                                path="bash",
+                                args=[
+                                    "-c",
+                                    f"""source /docker-lib.sh;
+                                    start_docker;
+                                    echo "{release_name}-{deployment_name}-$(cat ol-infrastructure-docker/dockerfiles/openedx-edxapp/edx_platform/.git/short_ref)" > artifacts/tag.txt;
+                                    cd {earthly_git_resource.name}/dockerfiles/openedx-edxapp;
+                                    RELEASE_NAME={release_name};
+                                    DEPLOYMENT_NAME={deployment_name};
+                                    EDX_PLATFORM_GIT_REPO="{edx_platform.git_origin}";
+                                    EDX_PLATFORM_GIT_BRANCH="{edx_platform.release_branch}";
+                                    THEME_GIT_REPO="{theme.git_origin}";
+                                    THEME_GIT_BRANCH="{theme.release_branch}";
+                                    earthly +docker-image --DEPLOYMENT_NAME="$DEPLOYMENT_NAME" --RELEASE_NAME="$RELEASE_NAME" --EDX_PLATFORM_GIT_REPO="$EDX_PLATFORM_GIT_REPO" --EDX_PLATFORM_GIT_BRANCH="$EDX_PLATFORM_GIT_BRANCH" --THEME_GIT_REPO="$THEME_GIT_REPO" --THEME_GIT_BRANCH="$THEME_GIT_BRANCH";
+                                    DIGEST=$(docker inspect --format '{{{{.Id}}}}' mitodl/edxapp-$DEPLOYMENT_NAME-$RELEASE_NAME | cut -d ":" -f2);
+                                    echo "Saving docker image to tar file in the artifacts directory";
+                                    docker save -o ../../../artifacts/image.tar $DIGEST;
+                                    cat ~/.earthly/config.yml
+                                    earthly +build-static-assets-nonprod --DEPLOYMENT_NAME="$DEPLOYMENT_NAME" --RELEASE_NAME="$RELEASE_NAME" --EDX_PLATFORM_GIT_REPO="$EDX_PLATFORM_GIT_REPO" --EDX_PLATFORM_GIT_BRANCH="$EDX_PLATFORM_GIT_BRANCH" --THEME_GIT_REPO="$THEME_GIT_REPO" --THEME_GIT_BRANCH="$THEME_GIT_BRANCH";
+                                    earthly +build-static-assets-production --DEPLOYMENT_NAME="$DEPLOYMENT_NAME" --RELEASE_NAME="$RELEASE_NAME" --EDX_PLATFORM_GIT_REPO="$EDX_PLATFORM_GIT_REPO" --EDX_PLATFORM_GIT_BRANCH="$EDX_PLATFORM_GIT_BRANCH" --THEME_GIT_REPO="$THEME_GIT_REPO" --THEME_GIT_BRANCH="$THEME_GIT_BRANCH";
+                                    echo "Copying staticfiles archives to artifacts directory";
+                                    mv static*.tar.gz ../../../artifacts;""",  # noqa: E501
+                                ],
+                            ),
+                        ),
+                    ),
+                    PutStep(
+                        put=edx_registry_image_resource.name,
+                        inputs=[Identifier("artifacts")],
+                        params={
+                            "image": "artifacts/image.tar",
+                            "additional_tags": "artifacts/tag.txt",
+                        },
+                    ),
+                    TaskStep(
+                        task=Identifier("publish-static-files"),
                         config=TaskConfig(
                             platform=Platform.linux,
                             image_resource=AnonymousResource(
                                 type="registry-image",
                                 source={
-                                    "repository": "alpine",
-                                    "tag": "3.18.0",
+                                    "repository": "amazon/aws-cli",
+                                    "tag": "latest",
                                 },
                             ),
-                            inputs=docker_build_inputs,
-                            outputs=[
-                                Output(name=Identifier("collected_themes")),
-                                Output(name=Identifier("edx_platform")),
-                                Output(name=Identifier("version")),
+                            inputs=[
+                                Input(name="artifacts"),
+                                Input(name=edx_registry_image_resource.name),
                             ],
+                            outputs=[],
                             run=Command(
                                 path="sh",
                                 args=[
                                     "-xc",
-                                    f"""cp -r {release_name}-{deployment.deployment_name}-theme collected_themes/{deployment.deployment_name};
-                                        cp -rT {release_name}-{deployment.deployment_name}-edx-platform edx_platform;
-                                        echo "{release_name}-{deployment.deployment_name}-$(cat edx_platform/.git/short_ref)" > version/tag;""",  # noqa: E501
+                                    f"""RELEASE_NAME={release_name}
+                                    DEPLOYMENT_NAME={deployment_name}
+                                    DIGEST=$(cat {edx_registry_image_resource.name}/digest)
+                                    aws s3 cp artifacts/staticfiles-production.tar.gz s3://ol-eng-artifacts/edx-staticfiles/$DEPLOYMENT_NAME/$RELEASE_NAME/staticfiles-production-$DIGEST.tar.gz
+                                    aws s3 cp artifacts/staticfiles-nonprod.tar.gz s3://ol-eng-artifacts/edx-staticfiles/$DEPLOYMENT_NAME/$RELEASE_NAME/staticfiles-nonprod-$DIGEST.tar.gz""",  # noqa: E501
                                 ],
                             ),
                         ),
                     ),
-                    container_build_task(
-                        inputs=[
-                            Input(name=edx_docker_code.name),
-                            Input(
-                                name=Identifier("collected_themes"),
-                                path=f"{edx_docker_code.name}/dockerfiles/openedx-edxapp/collected_themes",
-                            ),
-                            Input(
-                                name=Identifier("edx_platform"),
-                                path=f"{edx_docker_code.name}/dockerfiles/openedx-edxapp/edx_platform",
-                            ),
-                            Input(name=Identifier("version")),
-                        ],
-                        build_parameters={
-                            "CONTEXT": (
-                                "ol-infrastructure-docker/dockerfiles/openedx-edxapp"
-                            ),
-                            "TARGET": "final",
-                            "BUILD_ARG_RELEASE_NAME": release_name,
-                            "BUILD_ARG_DEPLOYMENT_NAME": deployment.deployment_name,
-                        },
-                        build_args=[],
-                    ),
-                    PutStep(
-                        put=edx_registry_image_resource.name,
-                        params={
-                            "image": "image/image.tar",
-                            "additional_tags": "version/tag",
-                        },
-                    ),
                 ],
             )
 
-            job_names.append(docker_build_job.name)
+            job_names.append(earthly_build_job.name)
 
             container_fragments.append(
                 PipelineFragment(
                     resources=[
-                        edx_docker_code,
+                        earthly_git_resource,
                         edx_registry_image_resource,
                         edx_ami_code,
                         edx_pulumi_code,
                         *theme_git_resources,
                         *edx_platform_git_resources,
                     ],
-                    jobs=[docker_build_job],
+                    jobs=[earthly_build_job],
                 )
             )
 
@@ -231,7 +248,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                         GetStep(
                             get=edx_registry_image_resource.name,
                             trigger=True,
-                            passed=[docker_build_job.name],
+                            passed=[earthly_build_job.name],
                         ),
                     ],
                     image_code=edx_ami_code,
@@ -311,7 +328,7 @@ if __name__ == "__main__":
         {
             "\n",
             (
-                "fly -t <target> set-pipeline -p docker-packer-pulumi-edxapp-global -c"
+                "fly -t pr-inf set-pipeline -p earthly-packer-pulumi-edxapp-global -c"
                 " definition.json"
             ),
         }

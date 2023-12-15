@@ -1109,6 +1109,10 @@ def cloud_init_user_data_func(
     grafana_credentials = read_yaml_secrets(
         Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
     )
+    # Used to switch which staticfiles collection to used
+    environment_tier = (
+        "production" if stack_info.env_suffix == "production" else "nonprod"
+    )
     cloud_config_content = {
         "write_files": [
             {
@@ -1155,6 +1159,10 @@ def cloud_init_user_data_func(
             {
                 "path": "/etc/default/consul-template",
                 "content": f"ENVIRONMENT={consul_env_name}",
+            },
+            {
+                "path": "/etc/default/environment-tier",
+                "content": f"{environment_tier}",
             },
         ]
     }

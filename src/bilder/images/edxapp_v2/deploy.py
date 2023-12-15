@@ -87,6 +87,11 @@ EDX_INSTALLATION_NAME = os.environ.get("EDX_INSTALLATION", "mitxonline")
 DOCKER_REPO_NAME = os.environ.get("DOCKER_REPO_NAME", "mitodl/edxapp")
 DOCKER_IMAGE_DIGEST = os.environ.get("DOCKER_IMAGE_DIGEST")
 
+production_staticfiles_archive_name = (
+    f"staticfiles-production-{DOCKER_IMAGE_DIGEST}.tar.gz"
+)
+nonprod_staticfiles_archive_name = f"staticfiles-nonprod-{DOCKER_IMAGE_DIGEST}.tar.gz"
+
 edx_version = fetch_application_version(
     OPENEDX_RELEASE, EDX_INSTALLATION_NAME, OpenEdxApplication.edxapp
 )
@@ -124,11 +129,50 @@ apt.packages(
     present=False,
 )
 
-# Preload some docker images. This will accelerate the first startup
+# Preload docker image and staticfiles content. This will accelerate the first startup
 server.shell(
     name=f"Preload {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",
     commands=[f"/usr/bin/docker pull {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}"],
 )
+files.directory(
+    name="Create production staticfiles directory",
+    path="/opt/staticfiles-production",
+    user="1000",
+    group="1000",
+    present=True,
+)
+files.directory(
+    name="Create nonprod staticfiles directory",
+    path="/opt/staticfiles-nonprod",
+    user="1000",
+    group="1000",
+    present=True,
+)
+files.download(
+    name=f"Download {production_staticfiles_archive_name}",
+    src=f"https://ol-eng-artifacts.s3.amazonaws.com/edx-staticfiles/{EDX_INSTALLATION_NAME}/{OPENEDX_RELEASE}/{production_staticfiles_archive_name}",
+    dest=f"/tmp/{nonprod_staticfiles_archive_name}",  # noqa: S108
+)
+files.download(
+    name=f"Download {nonprod_staticfiles_archive_name}",
+    src=f"https://ol-eng-artifacts.s3.amazonaws.com/edx-staticfiles/{EDX_INSTALLATION_NAME}/{OPENEDX_RELEASE}/{nonprod_staticfiles_archive_name}",
+    dest=f"/tmp/{production_staticfiles_archive_name}",  # noqa: S108
+)
+server.shell(
+    name=f"Extract {production_staticfiles_archive_name}",
+    commands=[
+        f"/usr/bin/tar -xf /tmp/{production_staticfiles_archive_name} "
+        "--strip-components 2 -C /opt/staticfiles-production"
+    ],
+)
+server.shell(
+    name=f"Extract {nonprod_staticfiles_archive_name}",
+    commands=[
+        f"/usr/bin/tar -xf /tmp/{nonprod_staticfiles_archive_name} "
+        "--strip-components 2 -C /opt/staticfiles-nonprod"
+    ],
+)
+
 
 # Create skeleton directory structures for docker-compose
 data_directory = Path("/opt/data")

@@ -1,0 +1,173 @@
+VERSION 0.7
+FROM python:3.8.12-buster
+
+apt-base:
+  ENV DEBIAN_FRONTEND=noninteractive
+  COPY ./apt-pkg-list /root/
+  COPY ./pip_package_lists /root/pip_package_lists
+  COPY ./pip_package_lists /root/pip_package_overrides
+  RUN apt update \
+    && apt install -y --no-install-recommends $(cat /root/apt-pkg-list) \
+    && apt autoremove -y \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+  SAVE ARTIFACT /root/pip_package_lists
+
+locales:
+  FROM +apt-base
+  ARG OPENEDX_I18N_VERSION="open-release/olive.3"
+  WORKDIR /tmp
+  RUN curl -L -o openedx-i18n.tar.gz https://github.com/openedx/openedx-i18n/archive/$OPENEDX_I18N_VERSION.tar.gz \
+    && tar xzf /tmp/openedx-i18n.tar.gz \
+    && mkdir -p /openedx/locale/contrib \
+    && mv openedx-i18n-*/edx-platform/locale /openedx/locale/contrib
+  CACHE /openedx/locale
+  SAVE ARTIFACT /openedx/locale
+
+get-code:
+  FROM +apt-base
+  # Two required vars to specify the git repo and sha ref the build from.
+  ARG EDX_PLATFORM_GIT_REPO="invalid"
+  ARG EDX_PLATFORM_GIT_BRANCH="invalid"
+  GIT CLONE --branch $EDX_PLATFORM_GIT_BRANCH $EDX_PLATFORM_GIT_REPO /openedx/edx-platform
+  RUN cp /openedx/edx-platform/requirements/edx/base.txt /root/pip_package_lists/edx_base.txt
+  SAVE ARTIFACT /openedx/edx-platform
+
+install-deps:
+  FROM +get-code
+  ARG DEPLOYMENT_NAME="invalid"
+  ARG RELEASE_NAME="invalid"
+  RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_lists/edx_base.txt -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
+  RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_overrides/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
+  IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
+    RUN pip uninstall --yes "edx-name-affirmation"
+  END
+  WORKDIR /openedx/edx-platform
+  ENV PATH /root/.local/bin:/openedx/nodeenv/bin:${PATH}
+  ENV NPM_REGISTRY "https://registry.npmjs.org/"
+  RUN nodeenv /openedx/nodeenv --node=16.14.0 --prebuilt \
+    && npm clean-install -s --registry=$NPM_REGISTRY
+  SAVE ARTIFACT /openedx/edx-platform
+  SAVE ARTIFACT /openedx/nodeenv
+  SAVE ARTIFACT /root/.local
+
+themes:
+  FROM +apt-base
+  ARG THEME_GIT_REPO="invalid"
+  ARG THEME_GIT_BRANCH="invalid"
+  GIT CLONE --branch $THEME_GIT_BRANCH $THEME_GIT_REPO /openedx/themes/$RELEASE_NAME
+  SAVE ARTIFACT /openedx/themes
+
+tutor-utils:
+  FROM +apt-base
+  ARG TUTOR_REPO="https://github.com/overhangio/tutor.git"
+  ARG TUTOR_VERSION="v15.3.4"
+  GIT CLONE --branch $TUTOR_VERSION $TUTOR_REPO /openedx/tutor
+  SAVE ARTIFACT /openedx/tutor/tutor/templates/build/openedx/bin
+
+dockerize:
+  FROM docker.io/powerman/dockerize@sha256:983fd3e74c93b05f34533aec9ca0457f0748f173cd00acb119ec1983cbf6b62d
+  SAVE ARTIFACT /usr/local/bin/dockerize
+
+collected:
+  FROM +apt-base
+  ARG APP_USER_ID=1000
+  RUN if [ "$APP_USER_ID" = 0 ]; then echo "app user may not be root" && false; fi
+  RUN useradd --home-dir /openedx --create-home --shell /bin/bash/ --uid ${APP_USER_ID} app
+  USER ${APP_USER_ID}
+  COPY +dockerize/dockerize /usr/local/bin/dockerize
+  COPY +install-deps/edx-platform /openedx/edx-platform
+  COPY +install-deps/nodeenv /openedx/nodeenv
+  COPY +install-deps/.local /openedx/.local
+  COPY +themes/themes /openedx/themes
+  COPY +tutor-utils/bin /openedx/bin
+  COPY +locales/locale /openedx/locale
+  RUN chmod a+x /openedx/bin/*
+  ENV PATH /openedx/.local/bin:/openedx/bin:/openedx/edx-platform/node_modules/.bin:/openedx/nodeenv/bin:${PATH}
+  WORKDIR /openedx/edx-platform
+  RUN pip install --no-warn-script-location --user --no-cache-dir -e . \
+    && mkdir -p /openedx/config ./lms/envs/mitol ./cms/envs/mitol
+  COPY settings/lms.env.yml /openedx/config/lms.env.yml
+  COPY settings/cms.env.yml /openedx/config/cms.env.yml
+  COPY settings/lms/assets.not_py /openedx/edx-platform/lms/envs/mitol/assets.py
+  COPY settings/lms/i18n.not_py /openedx/edx-platform/lms/envs/mitol/i18n.py
+  COPY settings/cms/assets.not_py /openedx/edx-platform/cms/envs/mitol/assets.py
+  COPY settings/cms/i18n.not_py /openedx/edx-platform/cms/envs/mitol/i18n.py
+  COPY settings/set_waffle_flags.not_py /openedx/edx-platform/set_waffle_flags.py
+  COPY settings/process_scheduled_emails.not_py /openedx/edx-platform/process_scheduled_emails.py
+  ENV REVISION_CFG /openedx/config/revisions.yml
+  ENV LMS_CFG /openedx/config/lms.env.yml
+  ENV CMS_CFG /openedx/config/cms.env.yml
+  ENV DJANGO_SETTINGS_MODULE lms.envs.production
+  ENV NO_PYTHON_UNINSTALL 1
+  ENV NO_PREREQ_INSTALL 0
+
+build-static-assets-nonprod:
+  FROM +collected
+  ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "\"https://verificientstatic-preprod.storage.googleapis.com/cdn/fb_cjs/edx_preprod_cjs.IQEQWWZ2.js\"", "PROCTORTRACK_CONFIG_KEY": "\"1PKRwFPezxXj3TsD\""}'
+  RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
+    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/django-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
+    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/blockstore.git@9d623bc04f479a1af29204d438fa442ea8380fae#egg=blockstore" \
+    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/olxcleaner.git@2f0d6c7f126cbd69c9724b7b57a0b2565330a297#egg=olxcleaner"
+  IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
+    RUN pip install --no-warn-script-location --user --no-cache-dir "edx-proctoring-proctortrack==1.2.1"
+  END
+  ENV NODE_ENV=prod
+  ARG DEPLOYMENT_NAME="invalid"
+  RUN openedx-assets xmodule \
+    && openedx-assets npm \
+    && openedx-assets collect --settings=mitol.assets \
+    && openedx-assets webpack --env=prod 2> /dev/null \
+    && openedx-assets common \
+    && paver compile_sass --theme-dirs /openedx/themes/ --themes $DEPLOYMENT_NAME \
+    && openedx-assets collect --settings=mitol.assets \
+    && rdfind -makesymlinks true -followsymlinks true /openedx/staticfiles/ \
+    && mkdir -p /openedx/data/var/edxapp/course_repos \
+    && mkdir -p /openedx/data/var/log/edx \
+    && ls -ltrah /openedx/staticfiles \
+    && tar czf - /openedx/staticfiles > /openedx/staticfiles-nonprod.tar.gz
+  SAVE ARTIFACT /openedx/staticfiles-nonprod.tar.gz AS LOCAL staticfiles-nonprod.tar.gz
+
+build-static-assets-production:
+  FROM +collected
+  ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "\"https://verificientstatic.storage.googleapis.com/cdn/fb_cjs/edx_us_cjs.IQEQWWZ2.js\"", "PROCTORTRACK_CONFIG_KEY": "\"1PKRwFPezxXj3TsD\""}'
+  RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
+    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/django-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
+    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/blockstore.git@9d623bc04f479a1af29204d438fa442ea8380fae#egg=blockstore" \
+    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/olxcleaner.git@2f0d6c7f126cbd69c9724b7b57a0b2565330a297#egg=olxcleaner"
+  IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
+    RUN pip install --no-warn-script-location --user --no-cache-dir "edx-proctoring-proctortrack==1.2.1"
+  END
+  ENV NODE_ENV=prod
+  ARG DEPLOYMENT_NAME="invalid"
+  RUN openedx-assets xmodule \
+    && openedx-assets npm \
+    && openedx-assets collect --settings=mitol.assets \
+    && openedx-assets webpack --env=prod 2> /dev/null \
+    && openedx-assets common \
+    && paver compile_sass --theme-dirs /openedx/themes/ --themes $DEPLOYMENT_NAME \
+    && openedx-assets collect --settings=mitol.assets \
+    && rdfind -makesymlinks true -followsymlinks true /openedx/staticfiles/ \
+    && mkdir -p /openedx/data/var/edxapp/course_repos \
+    && mkdir -p /openedx/data/var/log/edx \
+    && ls -ltrah /openedx/staticfiles \
+    && tar czf - /openedx/staticfiles > /openedx/staticfiles-production.tar.gz
+  SAVE ARTIFACT /openedx/staticfiles-production.tar.gz AS LOCAL staticfiles-production.tar.gz
+
+docker-image:
+  FROM +collected
+  ARG DEPLOYMENT_NAME="invalid"
+  ARG RELEASE_NAME="invalid"
+  ENV DJANGO_SETTINGS_MODULE="invalid"
+  RUN mkdir /openedx/.ssh \
+    && chown app:app /openedx/.ssh \
+    && chmod 0700 /openedx/.ssh \
+    && ssh-keyscan 'github.com' 'github.mit.edu' >> /openedx/.ssh/known_hosts \
+    && chmod 0600 /openedx/.ssh/known_hosts
+  CMD uwsgi uwsgi.ini
+  SAVE IMAGE mitodl/edxapp-$DEPLOYMENT_NAME-$RELEASE_NAME:latest
+
+all:
+  FROM +docker-image
+  FROM +build-static-assets-production
+  FROM +build-static-assets-nonprod

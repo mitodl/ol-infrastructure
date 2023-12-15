@@ -414,6 +414,12 @@ class PutStep(Step, StepModifierMixin):
             ' create_files:\n      version.txt: "42"\n```'
         ),
     )
+    no_get: Optional[bool] = Field(
+        None,
+        description=(
+            "Skips the get step that usually follows the completion of the put step."
+        ),
+    )
 
 
 class AnonymousResource(BaseModel):
@@ -1841,12 +1847,6 @@ class Job(BaseModel):
         None,
         description=(
             "The name of the job. This should be short; it will show up in URLs."
-        ),
-    )
-    no_get: Optional[bool] = Field(
-        None,
-        description=(
-            "Skips the get step that usually follows the completion of the put step."
         ),
     )
     old_name: Optional[Identifier] = Field(
