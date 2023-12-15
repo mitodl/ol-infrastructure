@@ -36,8 +36,7 @@ services:
     - "traefik.enable=true"
     - "traefik.http.routers.superset.tls=true"
     - "traefik.http.routers.superset.entrypoints=https"
-    - "traefik.http.routers.superset.rule=(Host(`${DOMAIN:-bi-qa.ol.mit.edu}`) ||\
-      \ Path(`/health`))"
+    - "traefik.http.routers.superset.rule=(Host(`${DOMAIN}`) || Path(`/health`))"
     profiles:
     - web
 

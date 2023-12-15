@@ -496,7 +496,7 @@ superset_tg_config = OLTargetGroupConfig(
     health_check_interval=60,
     health_check_matcher="200-399",
     health_check_path="/health",
-    health_check_unhealthy_threshold=3,  # give extra time for airbyte to start up
+    health_check_unhealthy_threshold=3,  # give extra time for Superset to start up
     tags=aws_config.merged_tags({"Name": f"superset-tg-{stack_info.env_suffix}"}),
 )
 
@@ -564,10 +564,6 @@ superset_web_lt_config = OLLaunchTemplateConfig(
                             """
                                 ),
                                 "owner": "root:root",
-                            },
-                            {
-                                "path": "/etc/default/superset",
-                                "content": f"DOMAIN={superset_domain}",
                             },
                             {
                                 "path": "/etc/docker/compose/.env",
@@ -682,10 +678,6 @@ superset_worker_lt_config = OLLaunchTemplateConfig(
                                 "owner": "root:root",
                             },
                             {
-                                "path": "/etc/default/superset",
-                                "content": f"DOMAIN={superset_config.get('domain')}",
-                            },
-                            {
                                 "path": "/etc/default/docker-compose",
                                 "content": "COMPOSE_PROFILES=worker",
                             },
@@ -733,7 +725,7 @@ supserset_worker_asg = OLAutoScaling(
 # Create Route53 DNS records for Superset
 five_minutes = 60 * 5
 route53.Record(
-    "airbyte-server-dns-record",
+    "superset-server-dns-record",
     name=superset_config.require("domain"),
     type="CNAME",
     ttl=five_minutes,
