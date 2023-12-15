@@ -83,7 +83,6 @@ class OpenEdxSupportedRelease(str, Enum):
         return enum_element
 
     master = ("master", "master")
-    olive = ("olive", "open-release/olive.master")
     palm = ("palm", "open-release/palm.master")
     quince = ("quince", "open-release/quince.master")
 
