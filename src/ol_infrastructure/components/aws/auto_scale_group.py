@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 import pulumi
 from bridge.lib.magic_numbers import (
@@ -94,10 +94,11 @@ class OLLoadBalancerConfig(AWSBase):
     ip_address_type: str = "dualstack"
     load_balancer_type: str = "application"
     port: PositiveInt = PositiveInt(DEFAULT_HTTPS_PORT)
-    security_groups: list[SecurityGroup]
+    security_groups: list[SecurityGroup | str | pulumi.Output[str]]
     subnets: pulumi.Output[str]
 
     listener_use_acm: bool = True
+    listener_cert_arn: Optional[str | pulumi.Output[str]] = None
     listener_cert_domain: str = "*.odl.mit.edu"
     listener_protocol: str = "HTTPS"
     listener_action_type: str = "forward"
@@ -144,7 +145,7 @@ class OLAutoScaleGroupConfig(AWSBase):
     asg_name: str
     desired_size: PositiveInt = PositiveInt(2)
     health_check_grace_period: NonNegativeInt = NonNegativeInt(0)
-    health_check_type: str = "ELB"
+    health_check_type: Literal["ELB", "EC2"] = "ELB"
     max_size: PositiveInt = PositiveInt(2)
     min_size: PositiveInt = PositiveInt(1)
     vpc_zone_identifiers: pulumi.Output[str]
@@ -183,7 +184,7 @@ class OLAutoScaling(pulumi.ComponentResource):
     auto_scale_group: Group = None
     launch_template: LaunchTemplate = None
 
-    def __init__(  # noqa: C901, PLR0913
+    def __init__(  # noqa: C901, PLR0913, PLR0912
         self,
         asg_config: OLAutoScaleGroupConfig,
         lt_config: OLLaunchTemplateConfig,
@@ -246,6 +247,12 @@ class OLAutoScaling(pulumi.ComponentResource):
 
         # Create Load Balancer
         if lb_config:
+            sg_ids = []
+            for group in lb_config.security_groups:
+                if isinstance(group, SecurityGroup):
+                    sg_ids.append(group.id)
+                else:
+                    sg_ids.append(group)
             load_balancer_name = f"{resource_name_prefix}lb"[
                 :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
             ].rstrip("-")
@@ -256,7 +263,7 @@ class OLAutoScaling(pulumi.ComponentResource):
                 ip_address_type=lb_config.ip_address_type,
                 load_balancer_type=lb_config.load_balancer_type,
                 name=load_balancer_name,
-                security_groups=[group.id for group in lb_config.security_groups],
+                security_groups=sg_ids,
                 subnets=lb_config.subnets,
                 tags=lb_config.tags,
                 opts=resource_options,
@@ -276,11 +283,14 @@ class OLAutoScaling(pulumi.ComponentResource):
                 tags=lb_config.tags,
             )
             if lb_config.listener_use_acm:
-                listener_args.certificate_arn = get_certificate(
-                    domain=lb_config.listener_cert_domain,
-                    most_recent=True,
-                    statuses=["ISSUED"],
-                ).arn
+                listener_args.certificate_arn = (
+                    lb_config.listener_cert_arn
+                    or get_certificate(
+                        domain=lb_config.listener_cert_domain,
+                        most_recent=True,
+                        statuses=["ISSUED"],
+                    ).arn
+                )
             self.listener = Listener(
                 f"{resource_name_prefix}load-balancer-listener",
                 args=listener_args,

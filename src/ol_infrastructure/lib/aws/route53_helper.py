@@ -3,6 +3,8 @@ import pulumi
 from pulumi_aws import route53
 from pulumi_aws.acm.outputs import CertificateDomainValidationOption
 
+from ol_infrastructure.lib.pulumi_helper import StackInfo
+
 FIVE_MINUTES = 60 * 5
 route53_client = boto3.client("route53")
 
@@ -41,13 +43,15 @@ def zone_opts(domain: str) -> pulumi.ResourceOptions:
 
 
 def acm_certificate_validation_records(
-    validation_options: list[CertificateDomainValidationOption], zone_id: str
+    validation_options: list[CertificateDomainValidationOption],
+    zone_id: str,
+    stack_info: StackInfo,
 ) -> list[route53.Record]:
     records_array = []
     for index, validation in enumerate(validation_options):
         records_array.append(
             route53.Record(
-                f"edxapp-acm-cert-validation-route53-record-{index}",
+                f"{stack_info.env_prefix}-acm-cert-validation-route53-record-{index}",
                 name=validation.resource_record_name,
                 zone_id=zone_id,
                 type=validation.resource_record_type,
