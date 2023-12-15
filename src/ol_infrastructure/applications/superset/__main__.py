@@ -731,4 +731,5 @@ route53.Record(
     ttl=five_minutes,
     records=[superset_web_asg.load_balancer.dns_name],
     zone_id=mitol_zone_id,
+    opts=ResourceOptions(delete_before_replace=True),
 )
