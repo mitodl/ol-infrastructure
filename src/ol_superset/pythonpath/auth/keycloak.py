@@ -71,4 +71,6 @@ class AuthOIDCView(AuthOIDView):
             oidc.client_secrets.get("issuer")
             + "/protocol/openid-connect/logout?post_logout_redirect_uri="
             + quote(redirect_url)
+            + "&id_token_hint="
+            + quote(oidc.id_token)
         )
