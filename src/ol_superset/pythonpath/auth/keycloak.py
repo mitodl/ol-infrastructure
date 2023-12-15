@@ -19,6 +19,7 @@ class OIDCSecurityManager(SupersetSecurityManager):
             self.oid = OpenIDConnect(self.appbuilder.get_app)
         self.authoidview = AuthOIDCView
 
+
 # Reference: https://superset.apache.org/docs/security/
 class AuthOIDCView(AuthOIDView):
     @expose("/login/", methods=["GET", "POST"])
