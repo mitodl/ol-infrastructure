@@ -1,3 +1,5 @@
+# Reference: https://hvac.readthedocs.io/en/stable/usage/auth_methods/aws.html#ec2-authentication
+
 import logging.handlers
 import os
 
