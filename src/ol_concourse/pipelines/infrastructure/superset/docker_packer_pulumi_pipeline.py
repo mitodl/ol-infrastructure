@@ -16,7 +16,7 @@ from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PA
 
 
 def build_superset_docker_pipeline() -> Pipeline:
-    ol_inf_branch = "deploy_superset"
+    ol_inf_branch = "main"
 
     upstream_superset_docker_image = registry_image(
         name=Identifier("upstream-superset-docker-image"),
