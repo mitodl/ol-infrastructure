@@ -429,67 +429,6 @@ ReleaseMap: dict[
             ),
         ],
     },
-    "olive": {
-        "xpro": [
-            OpenEdxApplicationVersion(
-                application="course-authoring",
-                application_type="MFE",
-                release="olive",
-                runtime_version_override="16",
-                branding_overrides=default_branding_overrides,
-            ),
-            OpenEdxApplicationVersion(
-                application="edx-platform",
-                application_type="IDA",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="edxapp_theme",
-                application_type="IDA",
-                release="olive",
-                branch_override="olive",
-                origin_override="https://github.com/mitodl/mitxpro-theme",
-            ),
-            OpenEdxApplicationVersion(
-                application="forum",
-                application_type="IDA",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="gradebook",
-                application_type="MFE",
-                release="olive",
-                runtime_version_override="16",
-            ),
-            OpenEdxApplicationVersion(
-                application="learning",
-                application_type="MFE",
-                release="olive",
-                runtime_version_override="16",
-                branding_overrides=default_branding_overrides,
-            ),
-            OpenEdxApplicationVersion(
-                application="library-authoring",
-                application_type="MFE",
-                release="olive",
-                branch_override="master",
-                runtime_version_override="16",
-                branding_overrides=default_branding_overrides,
-            ),
-            OpenEdxApplicationVersion(
-                application="notes-api",
-                application_type="IDA",
-                release="olive",
-            ),
-            OpenEdxApplicationVersion(
-                application="ora-grading",
-                application_type="MFE",
-                release="olive",
-                runtime_version_override="16",
-                branding_overrides=default_branding_overrides,
-            ),
-        ],
-    },
     "master": {
         "mitxonline": [
             OpenEdxApplicationVersion(
