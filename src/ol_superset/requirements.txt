@@ -288,7 +288,7 @@ prison==0.2.1
     # via flask-appbuilder
 prompt-toolkit==3.0.43
     # via click-repl
-prophet==1.1.1
+prophet==1.1.5
     # via apache-superset
 psycopg2==2.9.9
     # via -r requirements.in
