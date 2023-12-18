@@ -197,28 +197,28 @@ draft_backup_bucket = s3.BucketV2(
     tags=aws_config.tags,
 )
 draft_backup_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-draft_backup-bucket-ownership-controls",
+    "ol-draft-backup-bucket-ownership-controls",
     bucket=draft_backup_bucket.id,
     rule=s3.BucketOwnershipControlsRuleArgs(
         object_ownership="BucketOwnerPreferred",
     ),
 )
 s3.BucketVersioningV2(
-    "ol-draft_backup-bucket-versioning",
+    "ol-draft-backup-bucket-versioning",
     bucket=draft_backup_bucket.id,
     versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
         status="Enabled"
     ),
 )
 draft_backup_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-draft_backup-bucket-public-access",
+    "ol-draft-backup-bucket-public-access",
     bucket=draft_backup_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
 )
 s3.BucketPolicy(
-    "ol-draft_backup-bucket-policy",
+    "ol-draft-backup-bucket-policy",
     bucket=draft_backup_bucket.id,
     policy=json.dumps(
         {
@@ -251,28 +251,28 @@ live_backup_bucket = s3.BucketV2(
     tags=aws_config.tags,
 )
 live_backup_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-live_backup-bucket-ownership-controls",
+    "ol-live-backup-bucket-ownership-controls",
     bucket=live_backup_bucket.id,
     rule=s3.BucketOwnershipControlsRuleArgs(
         object_ownership="BucketOwnerPreferred",
     ),
 )
 s3.BucketVersioningV2(
-    "ol-live_backup-bucket-versioning",
+    "ol-live-backup-bucket-versioning",
     bucket=live_backup_bucket.id,
     versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
         status="Enabled"
     ),
 )
 live_backup_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-live_backup-bucket-public-access",
+    "ol-live-backup-bucket-public-access",
     bucket=live_backup_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
 )
 s3.BucketPolicy(
-    "ol-live_backup-bucket-policy",
+    "ol-live-backup-bucket-policy",
     bucket=live_backup_bucket.id,
     policy=json.dumps(
         {
@@ -305,28 +305,28 @@ draft_offline_bucket = s3.BucketV2(
     tags=aws_config.tags,
 )
 draft_offline_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-draft_backup-bucket-ownership-controls",
+    "ol-offline-backup-bucket-ownership-controls",
     bucket=draft_offline_bucket.id,
     rule=s3.BucketOwnershipControlsRuleArgs(
         object_ownership="BucketOwnerPreferred",
     ),
 )
 s3.BucketVersioningV2(
-    "ol-draft_backup-bucket-versioning",
+    "ol-offline-backup-bucket-versioning",
     bucket=draft_offline_bucket.id,
     versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
         status="Enabled"
     ),
 )
 draft_offline_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-draft_backup-bucket-public-access",
+    "ol-offline-backup-bucket-public-access",
     bucket=draft_offline_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
 )
 s3.BucketPolicy(
-    "ol-draft_backup-bucket-policy",
+    "ol-offline-backup-bucket-policy",
     bucket=draft_offline_bucket.id,
     policy=json.dumps(
         {
@@ -359,28 +359,28 @@ live_offline_bucket = s3.BucketV2(
     tags=aws_config.tags,
 )
 live_offline_bucket_ownership_controls = s3.BucketOwnershipControls(
-    "ol-live_backup-bucket-ownership-controls",
+    "ol-live-offline-bucket-ownership-controls",
     bucket=live_offline_bucket.id,
     rule=s3.BucketOwnershipControlsRuleArgs(
         object_ownership="BucketOwnerPreferred",
     ),
 )
 s3.BucketVersioningV2(
-    "ol-live_backup-bucket-versioning",
+    "ol-live-offline-bucket-versioning",
     bucket=live_offline_bucket.id,
     versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
         status="Enabled"
     ),
 )
 live_offline_bucket_public_access = s3.BucketPublicAccessBlock(
-    "ol-live_backup-bucket-public-access",
+    "ol-live-offline-bucket-public-access",
     bucket=live_offline_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
 )
 s3.BucketPolicy(
-    "ol-live_backup-bucket-policy",
+    "ol-live-offline-bucket-policy",
     bucket=live_offline_bucket.id,
     policy=json.dumps(
         {
