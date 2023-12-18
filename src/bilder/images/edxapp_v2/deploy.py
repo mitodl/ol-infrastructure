@@ -14,6 +14,7 @@ from bridge.secrets.sops import set_env_secrets
 from bridge.settings.openedx.accessors import fetch_application_version
 from bridge.settings.openedx.types import OpenEdxApplication
 from pyinfra import host
+from pyinfra.api.exceptions import PyinfraError
 from pyinfra.operations import apt, files, server
 
 from bilder.components.baseline.steps import service_configuration_watches
@@ -148,30 +149,36 @@ files.directory(
     group="1000",
     present=True,
 )
-files.download(
-    name=f"Download {production_staticfiles_archive_name}",
-    src=f"https://ol-eng-artifacts.s3.amazonaws.com/edx-staticfiles/{EDX_INSTALLATION_NAME}/{OPENEDX_RELEASE}/{production_staticfiles_archive_name}",
-    dest=f"/tmp/{nonprod_staticfiles_archive_name}",  # noqa: S108
-)
-files.download(
-    name=f"Download {nonprod_staticfiles_archive_name}",
-    src=f"https://ol-eng-artifacts.s3.amazonaws.com/edx-staticfiles/{EDX_INSTALLATION_NAME}/{OPENEDX_RELEASE}/{nonprod_staticfiles_archive_name}",
-    dest=f"/tmp/{production_staticfiles_archive_name}",  # noqa: S108
-)
-server.shell(
-    name=f"Extract {production_staticfiles_archive_name}",
-    commands=[
-        f"/usr/bin/tar -xf /tmp/{production_staticfiles_archive_name} "
-        "--strip-components 2 -C /opt/staticfiles-production"
-    ],
-)
-server.shell(
-    name=f"Extract {nonprod_staticfiles_archive_name}",
-    commands=[
-        f"/usr/bin/tar -xf /tmp/{nonprod_staticfiles_archive_name} "
-        "--strip-components 2 -C /opt/staticfiles-nonprod"
-    ],
-)
+try:
+    files.download(
+        name=f"Download {production_staticfiles_archive_name}",
+        src=f"https://ol-eng-artifacts.s3.amazonaws.com/edx-staticfiles/{EDX_INSTALLATION_NAME}/{OPENEDX_RELEASE}/{production_staticfiles_archive_name}",
+        dest=f"/tmp/{nonprod_staticfiles_archive_name}",  # noqa: S108
+    )
+    files.download(
+        name=f"Download {nonprod_staticfiles_archive_name}",
+        src=f"https://ol-eng-artifacts.s3.amazonaws.com/edx-staticfiles/{EDX_INSTALLATION_NAME}/{OPENEDX_RELEASE}/{nonprod_staticfiles_archive_name}",
+        dest=f"/tmp/{production_staticfiles_archive_name}",  # noqa: S108
+    )
+    server.shell(
+        name=f"Extract {production_staticfiles_archive_name}",
+        commands=[
+            f"/usr/bin/tar -xf /tmp/{production_staticfiles_archive_name} "
+            "--strip-components 2 -C /opt/staticfiles-production"
+        ],
+    )
+    server.shell(
+        name=f"Extract {nonprod_staticfiles_archive_name}",
+        commands=[
+            f"/usr/bin/tar -xf /tmp/{nonprod_staticfiles_archive_name} "
+            "--strip-components 2 -C /opt/staticfiles-nonprod"
+        ],
+    )
+except PyinfraError:
+    print(  # noqa: T201
+        "This image doesn't have associated static files. "
+        "This is expected while transitioning to Earthly."
+    )
 
 
 # Create skeleton directory structures for docker-compose
