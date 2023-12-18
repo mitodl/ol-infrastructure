@@ -37,8 +37,10 @@ install-deps:
   FROM +get-code
   ARG DEPLOYMENT_NAME="invalid"
   ARG RELEASE_NAME="invalid"
+  COPY ./ol-openedx-otel-monitoring-0.1.0.tar.gz /root
   RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_lists/edx_base.txt -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
   RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_overrides/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
+  RUN pip install --no-warn-script-location --user --no-cache-dir /root/ol-openedx-otel-monitoring-0.1.0.tar.gz
   IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
     RUN pip uninstall --yes "edx-name-affirmation"
   END
