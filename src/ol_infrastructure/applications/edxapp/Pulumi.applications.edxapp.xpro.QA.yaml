@@ -21,6 +21,7 @@ config:
   edxapp:db_password:
     secure: v1:+Bcw4dSZUPqWY2cL:g/KKgzrmRlgx2SOuOOB4grCveVaNv5mZVuuFrpGgAGwKEussIqUWTBnFJknEdJ4Hjf5Jw/1W560=
   edxapp:dns_zone: xpro
+  edxapp:default_module_class: xmodule.hidden_module.HiddenDescriptor
   edxapp:domains:
     lms: courses-rc.xpro.mit.edu
     preview: preview-rc.xpro.mit.edu
