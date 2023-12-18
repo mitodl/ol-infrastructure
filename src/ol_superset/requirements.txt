@@ -20,7 +20,7 @@ attrs==23.1.0
     #   outcome
     #   referencing
     #   trio
-authlib==1.2.1
+authlib==1.3.0
     # via
     #   -r requirements.in
     #   flask-oidc
