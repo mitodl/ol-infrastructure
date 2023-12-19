@@ -82,7 +82,11 @@ ReleaseMap: dict[
                 application="course-authoring",
                 application_type="MFE",
                 release="quince",
-                branding_overrides={},
+            ),
+            OpenEdxApplicationVersion(
+                application="discussions",
+                application_type="MFE",
+                release="quince",
             ),
             OpenEdxApplicationVersion(
                 application="edx-platform",
@@ -157,7 +161,11 @@ ReleaseMap: dict[
                 application="course-authoring",
                 application_type="MFE",
                 release="quince",
-                branding_overrides={},
+            ),
+            OpenEdxApplicationVersion(
+                application="discussions",
+                application_type="MFE",
+                release="quince",
             ),
             OpenEdxApplicationVersion(
                 application="edx-platform",
@@ -227,7 +235,11 @@ ReleaseMap: dict[
                 application="course-authoring",
                 application_type="MFE",
                 release="quince",
-                branding_overrides={},
+            ),
+            OpenEdxApplicationVersion(
+                application="discussions",
+                application_type="MFE",
+                release="quince",
             ),
             OpenEdxApplicationVersion(
                 application="edx-platform",
@@ -440,7 +452,11 @@ ReleaseMap: dict[
                 application="course-authoring",
                 application_type="MFE",
                 release="master",
-                branding_overrides={},
+            ),
+            OpenEdxApplicationVersion(
+                application="discussions",
+                application_type="MFE",
+                release="master",
             ),
             OpenEdxApplicationVersion(
                 application="edx-platform",

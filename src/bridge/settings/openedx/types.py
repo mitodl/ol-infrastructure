@@ -43,6 +43,11 @@ class OpenEdxMicroFrontend(str, Enum):
         "https://github.com/openedx/frontend-app-course-authoring",
         "course-authoring",
     )
+    discussion = (
+        "discussions",
+        "https://github.com/openedx/frontend-app-discussions",
+        "discuss",
+    )
     gradebook = (
         "gradebook",
         "https://github.com/openedx/frontend-app-gradebook",
