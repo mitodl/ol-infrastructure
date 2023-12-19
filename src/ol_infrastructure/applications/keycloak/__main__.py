@@ -196,7 +196,6 @@ keycloak_db_config = OLPostgresDBConfig(
     or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
     subnet_group_name=target_vpc["rds_subnet"],
     security_groups=[keycloak_database_security_group],
-    parameter_overrides=[],
     db_name="keycloak",
     tags=aws_config.tags,
     **rds_defaults,
