@@ -9,3 +9,5 @@ config:
     live:
     - live-qa.ocw.mit.edu
     - ocwnext-rc.odl.mit.edu
+    test:
+    - test-qa.ocw.mit.edu
