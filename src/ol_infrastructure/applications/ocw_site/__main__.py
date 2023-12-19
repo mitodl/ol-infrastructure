@@ -71,6 +71,8 @@ draft_bucket_name = f"ocw-content-draft-{stack_info.env_suffix}"
 draft_bucket_arn = f"arn:aws:s3:::{draft_bucket_name}"
 live_bucket_name = f"ocw-content-live-{stack_info.env_suffix}"
 live_bucket_arn = f"arn:aws:s3:::{live_bucket_name}"
+test_bucket_name = f"ocw-content-test-{stack_info.env_suffix}"
+test_bucket_arn = f"arn:aws:s3:::{test_bucket_name}"
 
 draft_backup_bucket_name = f"ocw-content-backup-draft-{stack_info.env_suffix}"
 draft_backup_bucket_arn = f"arn:aws:s3:::{draft_backup_bucket_name}"
@@ -81,6 +83,8 @@ draft_offline_bucket_name = f"ocw-content-offline-draft-{stack_info.env_suffix}"
 draft_offline_bucket_arn = f"arn:aws:s3:::{draft_offline_bucket_name}"
 live_offline_bucket_name = f"ocw-content-offline-live-{stack_info.env_suffix}"
 live_offline_bucket_arn = f"arn:aws:s3:::{live_offline_bucket_name}"
+test_offline_bucket_name = f"ocw-content-offline-test-{stack_info.env_suffix}"
+test_offline_bucket_arn = f"arn:aws:s3:::{test_offline_bucket_name}"
 
 # Draft bucket
 draft_bucket = s3.BucketV2(
@@ -132,6 +136,60 @@ s3.BucketPolicy(
         depends_on=[
             draft_bucket_public_access,
             draft_bucket_ownership_controls,
+        ]
+    ),
+)
+
+# test bucket
+test_bucket = s3.BucketV2(
+    test_bucket_name,
+    bucket=test_bucket_name,
+    tags=aws_config.tags,
+)
+test_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol-test-bucket-ownership-controls",
+    bucket=test_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+s3.BucketVersioningV2(
+    "ol-test-bucket-versioning",
+    bucket=test_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+test_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-test-bucket-public-access",
+    bucket=test_bucket.id,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+)
+s3.BucketPolicy(
+    "ol-test-bucket-policy",
+    bucket=test_bucket.id,
+    policy=json.dumps(
+        {
+            "Version": IAM_POLICY_VERSION,
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": "*"},
+                    "Action": "s3:GetObject",
+                    "Resource": [
+                        f"arn:aws:s3:::{test_bucket_name}/images/*",
+                        f"arn:aws:s3:::{test_bucket_name}/resumes/*",
+                    ],
+                }
+            ],
+        }
+    ),
+    opts=ResourceOptions(
+        depends_on=[
+            test_bucket_public_access,
+            test_bucket_ownership_controls,
         ]
     ),
 )
@@ -406,6 +464,60 @@ s3.BucketPolicy(
     ),
 )
 
+# test_backup bucket
+test_offline_bucket = s3.BucketV2(
+    test_offline_bucket_name,
+    bucket=test_offline_bucket_name,
+    tags=aws_config.tags,
+)
+test_offline_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol-test-offline-bucket-ownership-controls",
+    bucket=test_offline_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+s3.BucketVersioningV2(
+    "ol-test-offline-bucket-versioning",
+    bucket=test_offline_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+test_offline_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-test-offline-bucket-public-access",
+    bucket=test_offline_bucket.id,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+)
+s3.BucketPolicy(
+    "ol-test-offline-bucket-policy",
+    bucket=test_offline_bucket.id,
+    policy=json.dumps(
+        {
+            "Version": IAM_POLICY_VERSION,
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": "*"},
+                    "Action": "s3:GetObject",
+                    "Resource": [
+                        f"arn:aws:s3:::{test_offline_bucket_name}/images/*",
+                        f"arn:aws:s3:::{test_offline_bucket_name}/resumes/*",
+                    ],
+                }
+            ],
+        }
+    ),
+    opts=ResourceOptions(
+        depends_on=[
+            test_offline_bucket_public_access,
+            test_offline_bucket_ownership_controls,
+        ]
+    ),
+)
+
 policy_description = (
     "Access controls for the CDN to be able to read from the"
     f"{stack_info.env_suffix} website buckets"
@@ -428,6 +540,10 @@ s3_bucket_iam_policy = iam.Policy(
                     "Resource": [
                         draft_bucket_arn,
                         f"{draft_bucket_arn}/*",
+                        test_bucket_arn,
+                        f"{test_bucket_arn}/*",
+                        live_bucket_arn,
+                        f"{live_bucket_arn}/*",
                         draft_backup_bucket_arn,
                         f"{draft_backup_bucket_arn}/*",
                         draft_offline_bucket_arn,
@@ -438,6 +554,8 @@ s3_bucket_iam_policy = iam.Policy(
                         f"{live_backup_bucket_arn}/*",
                         live_offline_bucket_arn,
                         f"{live_offline_bucket_arn}/*",
+                        test_offline_bucket_arn,
+                        f"{test_offline_bucket_arn}/*",
                     ],
                 }
             ],
@@ -456,7 +574,7 @@ project_dir = Path(__file__).resolve().parent
 snippets_dir = project_dir.joinpath("snippets")
 url_themes_404 = "https://raw.githubusercontent.com/mitodl/ocw-hugo-themes/release/www/layouts/404.html"
 fastly_distributions: dict[str, fastly.ServiceVcl] = {}
-for purpose in ("draft", "live"):
+for purpose in ("draft", "live", "test"):
     if stack_info.env_suffix == "production" and purpose == "live":
         robots_file = "robots.production.txt"
     else:
