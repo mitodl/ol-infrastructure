@@ -62,15 +62,16 @@ class AuthOIDCView(AuthOIDView):
     @expose("/logout/", methods=["GET", "POST"])
     def logout(self):
         oidc = self.appbuilder.sm.oid
-        id_token = session.get("oidc_auth_token", "")
+        if id_token := session.get("oidc_auth_token", ""):
+            id_token_param = "&id_token_hint=" + quote(id_token)
+        else:
+            id_token_param = ""
         oidc.logout()
         super().logout()
         redirect_url = request.url_root.strip("/") + self.appbuilder.get_url_for_login
-
         return redirect(
             oidc.client_secrets.get("issuer")
             + "/protocol/openid-connect/logout?post_logout_redirect_uri="
             + quote(redirect_url)
-            + "&id_token_hint="
-            + quote(id_token)
+            + id_token_param
         )
