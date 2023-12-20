@@ -106,6 +106,28 @@ s3.BucketVersioningV2(
         status="Enabled"
     ),
 )
+
+draft_bucket_cors = s3.BucketCorsConfigurationV2(
+    "ol-draft-bucket-cors",
+    bucket=draft_bucket_name,
+    cors_rules=[
+        s3.BucketCorsConfigurationV2CorsRuleArgs(
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=["*"],
+        )
+    ],
+)
+draft_bucket_website = s3.BucketWebsiteConfigurationV2(
+    "draft_website",
+    bucket=draft_bucket_name,
+    index_document=s3.BucketWebsiteConfigurationV2IndexDocumentArgs(
+        suffix="index.html",
+    ),
+    error_document=s3.BucketWebsiteConfigurationV2ErrorDocumentArgs(
+        key="error.html",
+    ),
+)
+
 draft_bucket_public_access = s3.BucketPublicAccessBlock(
     "ol-draft-bucket-public-access",
     bucket=draft_bucket.id,
@@ -118,9 +140,10 @@ s3.BucketPolicy(
     bucket=draft_bucket.id,
     policy=json.dumps(
         {
-            "Version": IAM_POLICY_VERSION,
+            "Version": "2012-10-17",
             "Statement": [
                 {
+                    "Sid": "PublicRead",
                     "Effect": "Allow",
                     "Principal": "*",
                     "Action": "s3:GetObject",
