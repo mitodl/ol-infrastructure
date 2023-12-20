@@ -44,7 +44,7 @@ config:
   edxapp:sender_email_address: support@edxapp-mail-ci.xpro.mit.edu
   edxapp:web_node_capacity: "1"
   edxapp:worker_node_capacity: "1"
-  edxapp:framework: "docker"
+  edxapp:framework: "earthly"
   mongodb:atlas_project_id: 619395b5ab3fc40d5942a23c
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
