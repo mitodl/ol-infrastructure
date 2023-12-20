@@ -390,11 +390,10 @@ s3.BucketPolicy(
             "Statement": [
                 {
                     "Effect": "Allow",
-                    "Principal": {"AWS": "*"},
+                    "Principal": "*",
                     "Action": "s3:GetObject",
                     "Resource": [
-                        f"arn:aws:s3:::{draft_offline_bucket_name}/images/*",
-                        f"arn:aws:s3:::{draft_offline_bucket_name}/resumes/*",
+                        f"{draft_offline_bucket_arn}/*",
                     ],
                 }
             ],
