@@ -1,7 +1,7 @@
 import logging
 from urllib.parse import quote
 
-from flask import g, redirect, request
+from flask import redirect, request, session
 from flask_appbuilder.security.manager import AUTH_OID
 from flask_appbuilder.security.views import AuthOIDView
 from flask_appbuilder.views import expose
@@ -62,7 +62,7 @@ class AuthOIDCView(AuthOIDView):
     @expose("/logout/", methods=["GET", "POST"])
     def logout(self):
         oidc = self.appbuilder.sm.oid
-        id_token = g.oidc_id_token
+        id_token = session.get("oidc_auth_token", "")
         oidc.logout()
         super().logout()
         redirect_url = request.url_root.strip("/") + self.appbuilder.get_url_for_login
