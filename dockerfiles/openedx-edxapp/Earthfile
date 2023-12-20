@@ -55,7 +55,8 @@ themes:
   FROM +apt-base
   ARG THEME_GIT_REPO="invalid"
   ARG THEME_GIT_BRANCH="invalid"
-  GIT CLONE --branch $THEME_GIT_BRANCH $THEME_GIT_REPO /openedx/themes/$RELEASE_NAME
+  ARG DEPLOYMENT_NAME="invalid"
+  GIT CLONE --branch $THEME_GIT_BRANCH $THEME_GIT_REPO /openedx/themes/$DEPLOYMENT_NAME
   SAVE ARTIFACT /openedx/themes
 
 tutor-utils:
