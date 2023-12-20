@@ -117,17 +117,6 @@ draft_bucket_cors = s3.BucketCorsConfigurationV2(
         )
     ],
 )
-draft_bucket_website = s3.BucketWebsiteConfigurationV2(
-    "draft_website",
-    bucket=draft_bucket_name,
-    index_document=s3.BucketWebsiteConfigurationV2IndexDocumentArgs(
-        suffix="index.html",
-    ),
-    error_document=s3.BucketWebsiteConfigurationV2ErrorDocumentArgs(
-        key="error.html",
-    ),
-)
-
 draft_bucket_public_access = s3.BucketPublicAccessBlock(
     "ol-draft-bucket-public-access",
     bucket=draft_bucket.id,
@@ -167,6 +156,16 @@ test_bucket = s3.BucketV2(
     test_bucket_name,
     bucket=test_bucket_name,
     tags=aws_config.tags,
+)
+test_bucket_cors = s3.BucketCorsConfigurationV2(
+    "ol-test-bucket-cors",
+    bucket=test_bucket_name,
+    cors_rules=[
+        s3.BucketCorsConfigurationV2CorsRuleArgs(
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=["*"],
+        )
+    ],
 )
 test_bucket_ownership_controls = s3.BucketOwnershipControls(
     "ol-test-bucket-ownership-controls",
@@ -221,6 +220,16 @@ live_bucket = s3.BucketV2(
     bucket=live_bucket_name,
     tags=aws_config.tags,
 )
+live_bucket_cors = s3.BucketCorsConfigurationV2(
+    "ol-live-bucket-cors",
+    bucket=live_bucket_name,
+    cors_rules=[
+        s3.BucketCorsConfigurationV2CorsRuleArgs(
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=["*"],
+        )
+    ],
+)
 live_bucket_ownership_controls = s3.BucketOwnershipControls(
     "ol-live-bucket-ownership-controls",
     bucket=live_bucket.id,
@@ -273,6 +282,16 @@ draft_backup_bucket = s3.BucketV2(
     draft_backup_bucket_name,
     bucket=draft_backup_bucket_name,
     tags=aws_config.tags,
+)
+draft_backup_bucket_cors = s3.BucketCorsConfigurationV2(
+    "ol-draft-backup-bucket-cors",
+    bucket=draft_backup_bucket_name,
+    cors_rules=[
+        s3.BucketCorsConfigurationV2CorsRuleArgs(
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=["*"],
+        )
+    ],
 )
 draft_backup_bucket_ownership_controls = s3.BucketOwnershipControls(
     "ol-draft-backup-bucket-ownership-controls",
@@ -328,6 +347,16 @@ live_backup_bucket = s3.BucketV2(
     bucket=live_backup_bucket_name,
     tags=aws_config.tags,
 )
+live_backup_bucket_cors = s3.BucketCorsConfigurationV2(
+    "ol-live-backup-bucket-cors",
+    bucket=live_backup_bucket_name,
+    cors_rules=[
+        s3.BucketCorsConfigurationV2CorsRuleArgs(
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=["*"],
+        )
+    ],
+)
 live_backup_bucket_ownership_controls = s3.BucketOwnershipControls(
     "ol-live-backup-bucket-ownership-controls",
     bucket=live_backup_bucket.id,
@@ -382,6 +411,27 @@ draft_offline_bucket = s3.BucketV2(
     bucket=draft_offline_bucket_name,
     tags=aws_config.tags,
 )
+draft_offline_bucket_cors = s3.BucketCorsConfigurationV2(
+    "ol-draft-offline-bucket-cors",
+    bucket=draft_offline_bucket_name,
+    cors_rules=[
+        s3.BucketCorsConfigurationV2CorsRuleArgs(
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=["*"],
+        )
+    ],
+)
+draft_offline_bucket_website = s3.BucketWebsiteConfigurationV2(
+    "draft-offline-website",
+    bucket=draft_offline_bucket_name,
+    index_document=s3.BucketWebsiteConfigurationV2IndexDocumentArgs(
+        suffix="index.html",
+    ),
+    error_document=s3.BucketWebsiteConfigurationV2ErrorDocumentArgs(
+        key="error.html",
+    ),
+)
+
 draft_offline_bucket_ownership_controls = s3.BucketOwnershipControls(
     "ol-offline-backup-bucket-ownership-controls",
     bucket=draft_offline_bucket.id,
@@ -435,6 +485,27 @@ live_offline_bucket = s3.BucketV2(
     bucket=live_offline_bucket_name,
     tags=aws_config.tags,
 )
+live_offline_bucket_website = s3.BucketWebsiteConfigurationV2(
+    "live-offline-website",
+    bucket=live_offline_bucket_name,
+    index_document=s3.BucketWebsiteConfigurationV2IndexDocumentArgs(
+        suffix="index.html",
+    ),
+    error_document=s3.BucketWebsiteConfigurationV2ErrorDocumentArgs(
+        key="error.html",
+    ),
+)
+
+live_offline_bucket_cors = s3.BucketCorsConfigurationV2(
+    "ol-live-offline-bucket-cors",
+    bucket=live_offline_bucket_name,
+    cors_rules=[
+        s3.BucketCorsConfigurationV2CorsRuleArgs(
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=["*"],
+        )
+    ],
+)
 live_offline_bucket_ownership_controls = s3.BucketOwnershipControls(
     "ol-live-offline-bucket-ownership-controls",
     bucket=live_offline_bucket.id,
@@ -487,6 +558,16 @@ test_offline_bucket = s3.BucketV2(
     test_offline_bucket_name,
     bucket=test_offline_bucket_name,
     tags=aws_config.tags,
+)
+test_offline_bucket_cors = s3.BucketCorsConfigurationV2(
+    "ol-test-offline-bucket-cors",
+    bucket=test_offline_bucket_name,
+    cors_rules=[
+        s3.BucketCorsConfigurationV2CorsRuleArgs(
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=["*"],
+        )
+    ],
 )
 test_offline_bucket_ownership_controls = s3.BucketOwnershipControls(
     "ol-test-offline-bucket-ownership-controls",
