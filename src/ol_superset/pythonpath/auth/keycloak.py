@@ -62,7 +62,8 @@ class AuthOIDCView(AuthOIDView):
     @expose("/logout/", methods=["GET", "POST"])
     def logout(self):
         oidc = self.appbuilder.sm.oid
-        if id_token := session.get("oidc_auth_token", ""):
+        if auth_token := session.get("oidc_auth_token", ""):
+            id_token = auth_token["id_token"]
             id_token_param = "&id_token_hint=" + quote(id_token)
         else:
             id_token_param = ""
