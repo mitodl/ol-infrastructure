@@ -138,8 +138,8 @@ BLOCKSTORE_USE_BLOCKSTORE_APP_API: true
 BUNDLE_ASSET_STORAGE_SETTINGS:
   STORAGE_CLASS: storages.backends.s3boto3.S3Boto3Storage
   STORAGE_KWARGS:
-    bucket: {{ key "edxapp/s3-storage-bucket" }}
     location: blockstore/
+    base_url: /blockstore/
 BLOCK_STRUCTURES_SETTINGS:
     COURSE_PUBLISH_TASK_DELAY: 30
     PRUNING_ACTIVE: true  # MODIFIED
