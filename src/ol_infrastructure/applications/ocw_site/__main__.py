@@ -443,11 +443,10 @@ s3.BucketPolicy(
             "Statement": [
                 {
                     "Effect": "Allow",
-                    "Principal": {"AWS": "*"},
+                    "Principal": "*",
                     "Action": "s3:GetObject",
                     "Resource": [
-                        f"arn:aws:s3:::{live_offline_bucket_name}/images/*",
-                        f"arn:aws:s3:::{live_offline_bucket_name}/resumes/*",
+                        f"{live_offline_bucket_arn}/*",
                     ],
                 }
             ],
