@@ -16,6 +16,7 @@ config:
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
   - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
   - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
+  - ["new_core_editors.use_new_problem_editor", "--create", "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone",
     "--staff", "--authenticated"]
   - ["seo.enable_anonymous_courseware_access", "--create", "--superusers", "--staff",
