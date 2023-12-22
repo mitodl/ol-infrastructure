@@ -5,7 +5,7 @@ apt-base:
   ENV DEBIAN_FRONTEND=noninteractive
   COPY ./apt-pkg-list /root/
   COPY ./pip_package_lists /root/pip_package_lists
-  COPY ./pip_package_lists /root/pip_package_overrides
+  COPY ./pip_package_overrides /root/pip_package_overrides
   RUN apt update \
     && apt install -y --no-install-recommends $(cat /root/apt-pkg-list) \
     && apt autoremove -y \
@@ -27,16 +27,16 @@ locales:
 get-code:
   FROM +apt-base
   # Two required vars to specify the git repo and sha ref the build from.
-  ARG EDX_PLATFORM_GIT_REPO="invalid"
-  ARG EDX_PLATFORM_GIT_BRANCH="invalid"
+  ARG --required EDX_PLATFORM_GIT_REPO
+  ARG --required EDX_PLATFORM_GIT_BRANCH
   GIT CLONE --branch $EDX_PLATFORM_GIT_BRANCH $EDX_PLATFORM_GIT_REPO /openedx/edx-platform
   RUN cp /openedx/edx-platform/requirements/edx/base.txt /root/pip_package_lists/edx_base.txt
   SAVE ARTIFACT /openedx/edx-platform
 
 install-deps:
   FROM +get-code
-  ARG DEPLOYMENT_NAME="invalid"
-  ARG RELEASE_NAME="invalid"
+  ARG --required DEPLOYMENT_NAME
+  ARG --required RELEASE_NAME
   RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_lists/edx_base.txt -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
   RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_overrides/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
   IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
@@ -53,9 +53,9 @@ install-deps:
 
 themes:
   FROM +apt-base
-  ARG THEME_GIT_REPO="invalid"
-  ARG THEME_GIT_BRANCH="invalid"
-  ARG DEPLOYMENT_NAME="invalid"
+  ARG --required THEME_GIT_REPO
+  ARG --required THEME_GIT_BRANCH
+  ARG --required DEPLOYMENT_NAME
   GIT CLONE --branch $THEME_GIT_BRANCH $THEME_GIT_REPO /openedx/themes/$DEPLOYMENT_NAME
   SAVE ARTIFACT /openedx/themes
 
@@ -114,7 +114,7 @@ build-static-assets-nonprod:
     RUN pip install --no-warn-script-location --user --no-cache-dir "edx-proctoring-proctortrack==1.2.1"
   END
   ENV NODE_ENV=prod
-  ARG DEPLOYMENT_NAME="invalid"
+  ARG --required DEPLOYMENT_NAME
   RUN openedx-assets xmodule \
     && openedx-assets npm \
     && openedx-assets collect --settings=mitol.assets \
@@ -140,7 +140,7 @@ build-static-assets-production:
     RUN pip install --no-warn-script-location --user --no-cache-dir "edx-proctoring-proctortrack==1.2.1"
   END
   ENV NODE_ENV=prod
-  ARG DEPLOYMENT_NAME="invalid"
+  ARG --required DEPLOYMENT_NAME
   RUN openedx-assets xmodule \
     && openedx-assets npm \
     && openedx-assets collect --settings=mitol.assets \
@@ -157,8 +157,8 @@ build-static-assets-production:
 
 docker-image:
   FROM +collected
-  ARG DEPLOYMENT_NAME="invalid"
-  ARG RELEASE_NAME="invalid"
+  ARG --required DEPLOYMENT_NAME
+  ARG --required RELEASE_NAME
   ENV DJANGO_SETTINGS_MODULE="invalid"
   RUN mkdir /openedx/.ssh \
     && chown app:app /openedx/.ssh \
