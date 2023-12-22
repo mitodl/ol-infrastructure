@@ -4,6 +4,20 @@ encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQFx9m+5C+NdLferEI
 config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-ci.odl.mit.edu
+  edxapp:waffle_flags:
+  - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
+  - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
+  - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
+  - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
+  - ["learner_home_mfe.enabled", "--create", "--superusers", "--everyone"]
+  - ["learner_recommendations.enable_dashboard_recommendations", "--create", "--superusers",
+    "--everyone"]
+  - ["new_core_editors.use_new_problem_editor", "--create", "--everyone"]
+  - ["new_core_editors.use_new_text_editor", "--create", "--superusers", "--everyone"]
+  - ["new_core_editors.use_new_video_editor", "--create", "--superusers", "--everyone"]
+  - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
+  - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
+  - ["studio.library_authoring_mfe", "--create", "--superusers", "--everyone"]
   edxapp:business_unit: residential
   edxapp:db_password:
     secure: v1:Q1uI9EWaIrq2z2sY:pTBVK/vatuCQXgO3Z2ItArDb4P1QLpN/lP/jT9690boozaKjjJudoQZOyWjkbCFwGLieh+L9auw=
