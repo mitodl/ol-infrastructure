@@ -233,8 +233,10 @@ CREDIT_PROVIDER_SECRET_KEYS: {}
 CROSS_DOMAIN_CSRF_COOKIE_DOMAIN: {{ key "edxapp/lms-domain" }}  # MODIFIED
 CROSS_DOMAIN_CSRF_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edxapp-csrftoken  # MODIFIED
 CSRF_COOKIE_SECURE: true  # MODIFIED
+CSRF_COOKIE_SAMESITE: 'None'
 CSRF_TRUSTED_ORIGINS:  # MODIFIED
   - https://{{ key "edxapp/lms-domain" }}
+  - https://canvas.mit.edu
 DASHBOARD_COURSE_LIMIT: null
 DATA_DIR: /openedx/data  # Filesystem path where edx puts files for course export/import
 DEFAULT_COURSE_VISIBILITY_IN_CATALOG: both
@@ -477,6 +479,9 @@ SERVER_EMAIL: odl-devops@mit.edu # MODIFIED
 # between LMS and Studio (TMM 2021-10-22)
 # UPDATE: The session cookie domain appears to still be required for enabling the
 # preview subdomain to share authentication with LMS (TMM 2021-12-20)
+# Needed for passing user session with the LTI Request
+SESSION_COOKIE_SAMESITE: 'None'
+SESSION_COOKIE_SAMESITE_FORCE_ALL: true
 SESSION_COOKIE_DOMAIN: {{ key "edxapp/session-cookie-domain" }}  # MODIFIED
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
@@ -521,7 +526,8 @@ WIKI_ENABLED: true
 XBLOCK_FS_STORAGE_BUCKET: null
 XBLOCK_FS_STORAGE_PREFIX: null
 XBLOCK_SETTINGS: {}
-X_FRAME_OPTIONS: DENY
+# Needed for showing pages in iframe
+X_FRAME_OPTIONS = "ALLOW-FROM canvas.mit.edu"
 ZENDESK_API_KEY: ''
 ZENDESK_CUSTOM_FIELDS: {}
 ZENDESK_GROUP_ID_MAPPING: {}
