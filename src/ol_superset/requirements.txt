@@ -165,7 +165,7 @@ geographiclib==2.0
     # via geopy
 geopy==2.4.1
     # via apache-superset
-greenlet==3.0.2
+greenlet==3.0.3
     # via sqlalchemy
 gunicorn==21.2.0
     # via apache-superset
