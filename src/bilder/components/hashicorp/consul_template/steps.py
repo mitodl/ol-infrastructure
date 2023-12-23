@@ -11,7 +11,7 @@ from bilder.components.hashicorp.consul_template.models import (
 
 @deploy("Manage consul-template template destination permissions")
 def consul_template_permissions(
-    consul_template_configs: dict[Path, ConsulTemplateConfig]
+    consul_template_configs: dict[Path, ConsulTemplateConfig],
 ):
     apt.packages(
         name="Install ACL package for more granular file permissions",
