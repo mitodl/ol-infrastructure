@@ -188,7 +188,7 @@ idna==3.6
     #   email-validator
     #   requests
     #   trio
-importlib-metadata==7.0.0
+importlib-metadata==7.0.1
     # via apache-superset
 importlib-resources==6.1.1
     # via limits
