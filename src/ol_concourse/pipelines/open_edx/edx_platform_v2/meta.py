@@ -31,11 +31,11 @@ def build_meta_job(pipeline_name: str):
         pipeline_team = "main"
         pipeline_id = "self"
     else:
-        pipeline_definition_path = "src/ol_concourse/pipelines/open_edx/edx_platform_v2/grouped_docker_packer_pulumi_pipeline.py"  # noqa: E501
+        pipeline_definition_path = "src/ol_concourse/pipelines/open_edx/edx_platform_v2/earthly_packer_pulumi_pipeline.py"  # noqa: E501
         pipeline_team = "infrastructure"
         pipeline_id = f"docker-packer-pulumi-edxapp-{pipeline_name}"
     return Job(
-        name=Identifier(f"create-edxapp-{pipeline_name}-docker-pipeline"),
+        name=Identifier(f"create-edxapp-{pipeline_name}-earthly-pipeline"),
         plan=[
             GetStep(get=pipeline_code.name, trigger=True),
             TaskStep(
