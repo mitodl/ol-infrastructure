@@ -88,7 +88,6 @@ class OpenEdxSupportedRelease(str, Enum):
         return enum_element
 
     master = ("master", "master")
-    palm = ("palm", "open-release/palm.master")
     quince = ("quince", "open-release/quince.master")
 
     def __str__(self):
