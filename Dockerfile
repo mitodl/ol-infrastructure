@@ -6,7 +6,7 @@ WORKDIR /home/app/workspace
 ENV PATH /bin:/usr/bin/:/usr/local/bin:/home/app/.local/bin
 RUN pip install --no-cache-dir poetry
 COPY --chown=app:app ./ /home/app/workspace/
-RUN scripts/get-pants.sh -d bin/ &&\
+RUN scripts/get-pants.sh -d bin &&\
     bin/pants package src/bridge:bridge-package &&\
     bin/pants package src/ol_infrastructure:ol-infrastructure-package &&\
     bin/pants package src/ol_concourse:ol-concourse &&\
