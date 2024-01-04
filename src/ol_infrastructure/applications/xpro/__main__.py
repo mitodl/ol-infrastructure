@@ -71,6 +71,25 @@ ocw_storage_bucket_public_access = s3.BucketPublicAccessBlock(
     block_public_policy=False,
     ignore_public_acls=False,
 )
+s3.BucketPolicy(
+    "ol-xpro-app-bucket-policy",
+    bucket=xpro_storage_bucket.id,
+    policy=iam.get_policy_document(
+        statements=[
+            iam.GetPolicyDocumentStatementArgs(
+                effect="Allow",
+                principals=[
+                    iam.GetPolicyDocumentStatementPrincipalArgs(
+                        type="AWS", identifiers=["*"]
+                    )
+                ],
+                actions=["s3:GetObject"],
+                resources=[xpro_storage_bucket.arn.apply("{}/*".format)],
+            )
+        ]
+    ).json,
+)
+
 
 xpro_iam_policy = iam.Policy(
     f"xpro-{stack_info.env_suffix}-policy",
