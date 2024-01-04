@@ -1534,13 +1534,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-tls"
-version = "4.11.1"
+version = "5.0.0"
 description = "A Pulumi package to create TLS resources in Pulumi programs."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_tls-4.11.1-py3-none-any.whl", hash = "sha256:88e9b7a2e5c3f5dae0f0828e203b082d78a9477e61fe286bb2e3c830fb1bc45f"},
-    {file = "pulumi_tls-4.11.1.tar.gz", hash = "sha256:02470a26a437f1e1967b3fdea0597e9e54e1d3575b4df3a677f19b5c82cdfe3e"},
+    {file = "pulumi_tls-5.0.0-py3-none-any.whl", hash = "sha256:e5d50bad815b888f7fc10bfdc2ca3e469f6c8e16b395f025f15296c3e29e73c3"},
+    {file = "pulumi_tls-5.0.0.tar.gz", hash = "sha256:59a7304eaeb622b6c06e55181fc02923ef44b54e34b8dc4b8bd6d37e90b62eb8"},
 ]
 
 [package.dependencies]
@@ -2391,4 +2391,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "f394a200ad4176aa9626dcab16eb657519cf8787610ae589bcf98e8bfdd3d0e0"
+content-hash = "e17a80ccba659d41a28b1924f1690cb9e0a5c8ce3b00f50df42df71e2616e8de"
