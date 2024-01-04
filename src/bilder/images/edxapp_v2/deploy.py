@@ -1,5 +1,8 @@
 import io
+import json
 import os
+import re
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -56,6 +59,7 @@ from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import install_and_configure_vector
 from bilder.facts.has_systemd import HasSystemd
 from bilder.images.edxapp_v2.lib import OPENEDX_RELEASE, WEB_NODE_TYPE, node_type
+from bilder.lib.ami_helpers import build_tags_document
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 from bilder.lib.template_helpers import (
     CONSUL_TEMPLATE_DIRECTORY,
@@ -92,9 +96,6 @@ production_staticfiles_archive_name = (
 )
 nonprod_staticfiles_archive_name = f"staticfiles-nonprod-{DOCKER_IMAGE_DIGEST}.tar.gz"
 
-edx_version = fetch_application_version(
-    OPENEDX_RELEASE, EDX_INSTALLATION_NAME, OpenEdxApplication.edxapp
-)
 files.put(
     name=(
         "Setting the DOCKER_REPO_AND_DIGEST env var to"
@@ -463,6 +464,53 @@ consul_template_permissions(consul_template.configuration)
 
 ## Install and configure vector
 install_and_configure_vector(vector_config)
+
+# Place the tags document
+edx_platform = fetch_application_version(
+    OPENEDX_RELEASE, EDX_INSTALLATION_NAME, OpenEdxApplication.edxapp
+)
+theme = fetch_application_version(
+    OPENEDX_RELEASE, EDX_INSTALLATION_NAME, OpenEdxApplication.theme
+)
+
+edx_platform_subprocess = subprocess.Popen(
+    ["git", "ls-remote", edx_platform.git_origin, edx_platform.release_branch],  # noqa: S603, S607
+    stdout=subprocess.PIPE,
+)
+stdout, stderr = edx_platform_subprocess.communicate()
+edx_platform_sha = re.split(r"\t+", stdout.decode("ascii"))[0]
+
+theme_subprocess = subprocess.Popen(
+    ["git", "ls-remote", theme.git_origin, theme.release_branch],  # noqa: S603, S607
+    stdout=subprocess.PIPE,
+)
+stdout, stderr = theme_subprocess.communicate()
+theme_sha = re.split(r"\t+", stdout.decode("ascii"))[0]
+
+tags_json = json.dumps(
+    build_tags_document(
+        source_tags={
+            "consul_version": VERSIONS["consul"],
+            "consul_template_version": VERSIONS["consul-template"],
+            "vault_version": VERSIONS["vault"],
+            "docker_repo": DOCKER_REPO_NAME,
+            "docker_digest": DOCKER_IMAGE_DIGEST,
+            "edxapp_repo": edx_platform.git_origin,
+            "edxapp_branch": edx_platform.release_branch,
+            "edxapp_sha": edx_platform_sha,
+            "theme_repo": theme.git_origin,
+            "theme_branch": theme.release_branch,
+            "theme_sha": theme_sha,
+        }
+    )
+)
+files.put(
+    name="Place the tags document at /etc/ami_tags.json",
+    src=io.StringIO(tags_json),
+    dest="/etc/ami_tags.json",
+    mode="0644",
+    user="root",
+)
 
 if host.get_fact(HasSystemd):
     register_services(hashicorp_products, start_services_immediately=False)

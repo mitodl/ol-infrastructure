@@ -1,4 +1,6 @@
+import json
 import os
+from io import StringIO
 from pathlib import Path
 
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
@@ -40,6 +42,7 @@ from bilder.components.vector.steps import (
     vector_service,
 )
 from bilder.facts.has_systemd import HasSystemd
+from bilder.lib.ami_helpers import build_tags_document
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 
 VERSIONS = {
@@ -50,6 +53,7 @@ VERSIONS = {
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
 VECTOR_INSTALL_NAME = os.environ.get("VECTOR_LOG_PROXY_NAME", "vector-log-proxy")
+
 
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
@@ -144,6 +148,24 @@ configure_vector(vector_config)
 # Lay down final configuration for hashicorp products
 for product in hashicorp_products:
     configure_hashicorp_product(product)
+
+# Place the tags document
+tags_json = json.dumps(
+    build_tags_document(
+        source_tags={
+            "consul_version": VERSIONS["consul"],
+            "vault_version": VERSIONS["vault"],
+            "traefik_version": VERSIONS["traefik"],
+        }
+    )
+)
+files.put(
+    name="Place the tags document at /etc/ami_tags.json",
+    src=StringIO(tags_json),
+    dest="/etc/ami_tags.json",
+    mode="0644",
+    user="root",
+)
 
 # Setup systemd daemons for everything
 if host.get_fact(HasSystemd):

@@ -122,4 +122,20 @@ build {
       "pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"
     ]
   }
+
+  # Copy the tags json down locally
+  provisioner "shell-local" {
+    inline = ["scp -o StrictHostKeyChecking=no -i /tmp/packer-${build.ID}.pem ${build.User}@${build.Host}:/etc/ami_tags.json /tmp/ami_tags-${build.ID}.json"]
+  }
+
+  # Ref: https://developer.hashicorp.com/packer/docs/post-processors/manifest#example-configuration
+  post-processor "manifest" {
+    output = "/tmp/packer-build-manifest-${build.ID}.json"
+  }
+
+  post-processor "shell-local" {
+    inline = ["AMI_ID=$(jq -r '.builds[-1].artifact_id' /tmp/packer-build-manifest-${build.ID}.json | cut -d \":\" -f2)",
+              "aws ec2 create-tags --resource $AMI_ID --cli-input-json \"$(cat /tmp/ami_tags-${build.ID}.json)\"",
+              "aws --no-cli-pager ec2 describe-images --image-ids $AMI_ID"]
+  }
 }
