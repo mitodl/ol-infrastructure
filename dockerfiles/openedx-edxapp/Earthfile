@@ -96,6 +96,7 @@ collected:
   COPY settings/cms/i18n.not_py /openedx/edx-platform/cms/envs/mitol/i18n.py
   COPY settings/set_waffle_flags.not_py /openedx/edx-platform/set_waffle_flags.py
   COPY settings/process_scheduled_emails.not_py /openedx/edx-platform/process_scheduled_emails.py
+  COPY settings/saml_pull.not_py /openedx/edx-platform/saml_pull.py
   ENV REVISION_CFG /openedx/config/revisions.yml
   ENV LMS_CFG /openedx/config/lms.env.yml
   ENV CMS_CFG /openedx/config/cms.env.yml
@@ -107,7 +108,7 @@ build-static-assets-nonprod:
   FROM +collected
   ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "\"https://verificientstatic-preprod.storage.googleapis.com/cdn/fb_cjs/edx_preprod_cjs.IQEQWWZ2.js\"", "PROCTORTRACK_CONFIG_KEY": "\"1PKRwFPezxXj3TsD\""}'
   RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
-    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/django-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
+    && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedxjango-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/blockstore.git@9d623bc04f479a1af29204d438fa442ea8380fae#egg=blockstore" \
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/olxcleaner.git@2f0d6c7f126cbd69c9724b7b57a0b2565330a297#egg=olxcleaner"
   IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]

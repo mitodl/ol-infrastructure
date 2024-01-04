@@ -206,6 +206,8 @@ services:
     - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
     - /opt/data:/openedx/data
     - /opt/data/media:/openedx/media
+    - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
+    - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
     command: ["python", "saml_pull.py"]
     depends_on:
       lms-permissions:
