@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.8-slim
 
 ARG APP_USER_ID=1000
 RUN apt update && \
