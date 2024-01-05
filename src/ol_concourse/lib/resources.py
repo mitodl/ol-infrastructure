@@ -186,8 +186,8 @@ def pulumi_provisioner(
 def pypi(
     name: Identifier,
     package_name: str,
-    username: str,
-    password: str,
+    username: str = "((pypi_creds.username))",
+    password: str = "((pypi_creds.password))",
     check_every: str = "24h",
 ) -> Resource:
     return Resource(
