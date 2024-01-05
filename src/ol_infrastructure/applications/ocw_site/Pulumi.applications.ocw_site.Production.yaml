@@ -11,3 +11,5 @@ config:
     - ocw.mit.edu
     - www.ocw.mit.edu
     - ocw-preview.odl.mit.edu
+    test:
+    - test.ocw.mit.edu
