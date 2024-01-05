@@ -135,7 +135,7 @@ build {
 
   post-processor "shell-local" {
     inline = ["AMI_ID=$(jq -r '.builds[-1].artifact_id' /tmp/packer-build-manifest-${build.ID}.json | cut -d \":\" -f2)",
-              "aws ec2 create-tags --resource $AMI_ID --cli-input-json \"$(cat /tmp/ami_tags-${build.ID}.json)\"",
-              "aws --no-cli-pager ec2 describe-images --image-ids $AMI_ID"]
+      "aws ec2 create-tags --resource $AMI_ID --cli-input-json \"$(cat /tmp/ami_tags-${build.ID}.json)\"",
+    "aws --no-cli-pager ec2 describe-images --image-ids $AMI_ID"]
   }
 }
