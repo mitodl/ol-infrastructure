@@ -5,6 +5,7 @@
 import base64
 import json
 import textwrap
+from functools import partial
 from itertools import chain
 from pathlib import Path
 
@@ -18,7 +19,7 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_aws import acm, ec2, get_caller_identity, iam, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from ol_infrastructure.components.aws.auto_scale_group import (
@@ -38,6 +39,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
+from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
 from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -66,6 +68,7 @@ target_vpc_id = target_vpc["id"]
 data_vpc = network_stack.require_output("data_vpc")
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]
+keycloak_domain = keycloak_config.get("domain")
 
 # TODO MD 20230206  # noqa: FIX002, TD002, TD003, TD004
 # This might be needed in the future but right now it just causes errors
@@ -279,10 +282,38 @@ keycloak_server_ami = ec2.get_ami(
 
 block_device_mappings = [BlockDeviceMapping()]
 
+# Create an auto-scale group for web application servers
+keycloak_web_acm_cert = acm.Certificate(
+    "keycloak-load-balancer-acm-certificate",
+    domain_name=keycloak_domain,
+    validation_method="DNS",
+    tags=aws_config.tags,
+)
+
+keycloak_acm_cert_validation_records = (
+    keycloak_web_acm_cert.domain_validation_options.apply(
+        partial(
+            acm_certificate_validation_records,
+            zone_id=mitol_zone_id,
+            stack_info=stack_info,
+        )
+    )
+)
+
+keycloak_web_acm_validated_cert = acm.CertificateValidation(
+    "wait-for-keycloak-acm-cert-validation",
+    certificate_arn=keycloak_web_acm_cert.arn,
+    validation_record_fqdns=keycloak_acm_cert_validation_records.apply(
+        lambda validation_records: [
+            validation_record.fqdn for validation_record in validation_records
+        ]
+    ),
+)
 keycloak_lb_config = OLLoadBalancerConfig(
     enable_insecure_http=False,
-    listener_cert_domain="*.odl.mit.edu",
+    listener_cert_domain=keycloak_domain,
     listener_use_acm=True,
+    listener_cert_arn=keycloak_web_acm_cert.arn,
     security_groups=[keycloak_server_security_group],
     subnets=subnets,
     tags=instance_tags,
@@ -450,9 +481,9 @@ keycloak_server_secrets = vault.generic.Secret(
     path=keycloak_server_vault_mount.path.apply("{}/keycloak-secrets".format),
     data_json=json.dumps(secrets),
 )
-domain = keycloak_config.get("domain")
+
 consul_keys = {
-    "keycloak/keycloak_host": domain,
+    "keycloak/keycloak_host": keycloak_domain,
     "keycloak/rds_host": db_address,
 }
 consul.Keys(
@@ -464,8 +495,8 @@ consul.Keys(
 # Create Route53 DNS records
 five_minutes = 60 * 5
 route53.Record(
-    f"keycloak-server-dns-record-{domain}",
-    name=domain,
+    f"keycloak-server-dns-record-{keycloak_domain}",
+    name=keycloak_domain,
     type="CNAME",
     ttl=five_minutes,
     records=[autoscale_setup.load_balancer.dns_name],
