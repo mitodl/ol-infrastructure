@@ -65,7 +65,7 @@ target_vpc_id = target_vpc["id"]
 
 data_vpc = network_stack.require_output("data_vpc")
 
-mitodl_zone_id = dns_stack.require_output("odl_zone_id")
+mitol_zone_id = dns_stack.require_output("ol")["id"]
 
 # TODO MD 20230206  # noqa: FIX002, TD002, TD003, TD004
 # This might be needed in the future but right now it just causes errors
@@ -469,7 +469,7 @@ route53.Record(
     type="CNAME",
     ttl=five_minutes,
     records=[autoscale_setup.load_balancer.dns_name],
-    zone_id=mitodl_zone_id,
+    zone_id=mitol_zone_id,
 )
 
 # TODO MD 20230206 revisit this, probably need to export more things  # noqa: E501, FIX002, TD002, TD003, TD004
