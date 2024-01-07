@@ -451,7 +451,7 @@ wrapt==1.16.0
     # via deprecated
 wsproto==1.2.0
     # via trio-websocket
-wtforms==3.1.1
+wtforms==3.1.2
     # via
     #   apache-superset
     #   flask-appbuilder
