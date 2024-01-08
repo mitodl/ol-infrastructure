@@ -1,4 +1,5 @@
 from ol_concourse.lib.constants import REGISTRY_IMAGE
+from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
@@ -16,6 +17,8 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resource_types import pypi_resource
 from ol_concourse.lib.resources import git_repo, pypi
+
+pypi_type = pypi_resource()
 
 plugin_dict = {
     "src/edx_sysadmin": {
@@ -60,73 +63,73 @@ plugin_dict = {
     },
 }
 
-git_resource_list = []
-pypi_resource_list = []
-job_list = []
+fragments = []
 for path, config in plugin_dict.items():
-    git_resource_list.append(
-        git_repo(
-            Identifier(f"{config['target_name']}-repo"),
-            uri="https://github.com/mitodl/open-edx-plugins",
-            paths=[path],
-            check_every="24h",
-        )
-    )
-    pypi_resource_list.append(
-        pypi(
-            Identifier(f"{config['target_name']}-pypi-package"),
-            package_name=config["pypi_package_name"],
-            username="((pypi_creds.username))",
-            password="((pypi_creds.password))",  # noqa: S106
-        )
-    )
-    job_list.append(
-        Job(
-            name=f"build-{config['target_name']}",
-            plan=[
-                GetStep(
-                    get=git_resource_list[-1].name,
-                    trigger=True,
-                ),
-                TaskStep(
-                    task=Identifier(f"pants-package-{config['target_name']}"),
-                    config=TaskConfig(
-                        platform=Platform.linux,
-                        image_resource=AnonymousResource(
-                            type=REGISTRY_IMAGE,
-                            source=RegistryImage(repository="python", tag="3.9"),
-                        ),
-                        inputs=[Input(name=git_resource_list[-1].name)],
-                        outputs=[Output(name=git_resource_list[-1].name)],
-                        run=Command(
-                            path="sh",
-                            args=[
-                                "-exc",
-                                f"""
-                                    cd {git_resource_list[-1].name};
-                                    ./pants package {path}:{config['target_name']};
-                                """,
-                            ],
-                        ),
-                    ),
-                ),
-                PutStep(
-                    put=pypi_resource_list[-1].name,
-                    inputs=[
-                        git_resource_list[-1].name
-                    ],  # This errors when wrapped in Input() like it should be ?
-                    params={
-                        "glob": f"{git_resource_list[-1].name}/dist/{config['pypi_package_name']}-*.tar.gz",  # noqa: E501
-                    },
-                ),
-            ],
-        )
+    plugin_git_repo = git_repo(
+        Identifier(f"{config['target_name']}-repo"),
+        uri="https://github.com/mitodl/open-edx-plugins",
+        paths=[path],
+        check_every="24h",
     )
 
+    plugin_pypi = pypi(
+        Identifier(f"{config['target_name']}-pypi-package"),
+        package_name=config["pypi_package_name"],
+        username="((pypi_creds.username))",
+        password="((pypi_creds.password))",  # noqa: S106
+    )
+    build_job = Job(
+        name=f"build-{config['target_name']}",
+        plan=[
+            GetStep(
+                get=plugin_git_repo.name,
+                trigger=True,
+            ),
+            TaskStep(
+                task=Identifier(f"pants-package-{config['target_name']}"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    image_resource=AnonymousResource(
+                        type=REGISTRY_IMAGE,
+                        source=RegistryImage(repository="python", tag="3.9"),
+                    ),
+                    inputs=[Input(name=plugin_git_repo.name)],
+                    outputs=[Output(name=plugin_git_repo.name)],
+                    run=Command(
+                        path="sh",
+                        args=[
+                            "-exc",
+                            f"""
+                                cd {plugin_git_repo.name};
+                                ./pants package {path}:{config['target_name']};
+                            """,
+                        ],
+                    ),
+                ),
+            ),
+            PutStep(
+                put=plugin_pypi.name,
+                inputs=[
+                    plugin_git_repo.name
+                ],  # This errors when wrapped in Input() like it should be ?
+                params={
+                    "glob": f"{plugin_git_repo.name}/dist/{config['pypi_package_name']}-*.tar.gz",  # noqa: E501
+                },
+            ),
+        ],
+    )
+    fragment = PipelineFragment(
+        resource_types=[pypi_type],
+        resources=[plugin_git_repo, plugin_pypi],
+        jobs=[build_job],
+    )
+    fragments.append(fragment)
+
+combined_fragment = PipelineFragment.combine_fragments(*fragments)
 pipeline = Pipeline(
-    resource_types=[pypi_resource()],
-    resources=git_resource_list + pypi_resource_list,
-    jobs=job_list,
+    resource_types=combined_fragment.resource_types,
+    resources=combined_fragment.resources,
+    jobs=combined_fragment.jobs,
 )
 
 if __name__ == "__main__":
