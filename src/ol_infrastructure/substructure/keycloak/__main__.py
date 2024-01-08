@@ -274,6 +274,103 @@ ol_platform_engineering_rsa_key = keycloak.RealmKeystoreRsa(
 )
 """
 
+# Create OL Data Platform Realm
+ol_data_platform_realm = keycloak.Realm(
+    "ol-data-platform",
+    access_code_lifespan="30m",
+    access_code_lifespan_user_action="15m",
+    attributes={
+        "business_unit": f"operations-{env_name}",
+    },
+    display_name="OL Data",
+    display_name_html="<b>OL Data</b>",
+    enabled=True,
+    login_theme="keycloak",
+    duplicate_emails_allowed=False,
+    otp_policy=keycloak.RealmOtpPolicyArgs(
+        algorithm="HmacSHA256",
+        digits=6,
+        initial_counter=2,
+        look_ahead_window=1,
+        period=30,
+        type="totp",
+    ),
+    realm="ol-data-platform",
+    reset_password_allowed=True,
+    verify_email=True,
+    password_policy=(  # noqa: S106 # pragma: allowlist secret
+        "length(16) and forceExpiredPasswordChange(365)"
+        "  and notUsername and notEmail"
+    ),
+    security_defenses=keycloak.RealmSecurityDefensesArgs(
+        brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(
+            failure_reset_time_seconds=43200,
+            max_failure_wait_seconds=900,
+            max_login_failures=10,
+            minimum_quick_login_wait_seconds=60,
+            permanent_lockout=False,
+            quick_login_check_milli_seconds=1000,
+            wait_increment_seconds=60,
+        ),
+        headers=keycloak.RealmSecurityDefensesHeadersArgs(
+            content_security_policy=(
+                "frame-src 'self'; frame-ancestors 'self'; object-src 'none';"
+            ),
+            content_security_policy_report_only="",
+            strict_transport_security="max-age=31536000; includeSubDomains",
+            x_content_type_options="nosniff",
+            x_frame_options="DENY",
+            x_robots_tag="none",
+            x_xss_protection="1; mode=block",
+        ),
+    ),
+    smtp_server=keycloak.RealmSmtpServerArgs(
+        auth=keycloak.RealmSmtpServerAuthArgs(
+            password=email_password,
+            username=email_username,
+        ),
+        from_="odl-devops@mit.edu",
+        from_display_name="Identity - OL Data",
+        host=email_host,
+        port="587",
+        reply_to="odl-devops@mit.edu",
+        reply_to_display_name="Identity - OL Data",
+        starttls=True,
+    ),
+    ssl_required="external",
+    offline_session_idle_timeout="168h",
+    sso_session_idle_timeout="2h",
+    sso_session_max_lifespan="24h",
+    opts=resource_options,
+)
+
+required_action_configure_otp = keycloak.RequiredAction(
+    "configure-totp",
+    realm_id=ol_data_platform_realm.realm,
+    alias="CONFIGURE_TOTP",
+    default_action=True,
+    enabled=True,
+    opts=resource_options,
+)
+
+required_action_verify_email = keycloak.RequiredAction(
+    "verify_email",
+    realm_id=ol_data_platform_realm.realm,
+    alias="VERIFY_EMAIL",
+    default_action=True,
+    enabled=True,
+    opts=resource_options,
+)
+
+required_action_update_password = keycloak.RequiredAction(
+    "update_password",
+    realm_id=ol_data_platform_realm.realm,
+    alias="UPDATE_PASSWORD",
+    default_action=True,
+    enabled=True,
+    opts=resource_options,
+)
+
 # Check if any Openid clients exist in config and create them
 for openid_clients in keycloak_config.get_object("openid_clients"):
     realm_name = openid_clients.get("realm_name")
