@@ -263,6 +263,10 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                         "DOCKER_IMAGE_DIGEST": (
                             f"{edx_registry_image_resource.name}/digest"
                         ),
+                        "EDXAPP_COMMIT_SHA": (
+                            f"{edx_platform_git_resource.name}/.git/ref"
+                        ),
+                        "EDX_THEME_COMMIT_SHA": f"{theme_git_resource.name}/.git/ref",
                     },
                     packer_vars={"framework": "earthly"},
                     extra_packer_params={

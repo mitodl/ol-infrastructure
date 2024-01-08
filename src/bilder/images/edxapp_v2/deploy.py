@@ -1,8 +1,6 @@
 import io
 import json
 import os
-import re
-import subprocess
 import tempfile
 from pathlib import Path
 
@@ -472,20 +470,8 @@ edx_platform = fetch_application_version(
 theme = fetch_application_version(
     OPENEDX_RELEASE, EDX_INSTALLATION_NAME, OpenEdxApplication.theme
 )
-
-edx_platform_subprocess = subprocess.Popen(
-    ["git", "ls-remote", edx_platform.git_origin, edx_platform.release_branch],  # noqa: S603, S607
-    stdout=subprocess.PIPE,
-)
-stdout, stderr = edx_platform_subprocess.communicate()
-edx_platform_sha = re.split(r"\t+", stdout.decode("ascii"))[0]
-
-theme_subprocess = subprocess.Popen(
-    ["git", "ls-remote", theme.git_origin, theme.release_branch],  # noqa: S603, S607
-    stdout=subprocess.PIPE,
-)
-stdout, stderr = theme_subprocess.communicate()
-theme_sha = re.split(r"\t+", stdout.decode("ascii"))[0]
+edx_platform_sha = os.environ.get("EDXAPP_COMMIT_SHA", edx_platform.release_branch)
+theme_sha = os.environ.get("EDX_THEME_COMMIT_SHA", theme.release_branch)
 
 tags_json = json.dumps(
     build_tags_document(
