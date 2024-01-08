@@ -181,7 +181,7 @@ holidays==0.40
     #   prophet
 humanize==4.9.0
     # via apache-superset
-hvac==2.0.0
+hvac==2.1.0
     # via -r requirements.in
 idna==3.6
     # via
