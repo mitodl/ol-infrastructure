@@ -97,6 +97,8 @@ COPY --chown=app:app settings/cms/i18n.not_py /openedx/edx-platform/cms/envs/mit
 COPY --chown=app:app settings/set_waffle_flags.not_py /openedx/edx-platform/set_waffle_flags.py
 # Copy in special scheduled email script
 COPY --chown=app:app settings/process_scheduled_emails.not_py /openedx/edx-platform/process_scheduled_emails.py
+# Copy in special saml pull script
+COPY --chown=app:app settings/saml_pull.not_py /openedx/edx-platform/saml_pull.py
 
 FROM collected AS build-static-assets
 

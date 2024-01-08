@@ -96,6 +96,7 @@ collected:
   COPY settings/cms/i18n.not_py /openedx/edx-platform/cms/envs/mitol/i18n.py
   COPY settings/set_waffle_flags.not_py /openedx/edx-platform/set_waffle_flags.py
   COPY settings/process_scheduled_emails.not_py /openedx/edx-platform/process_scheduled_emails.py
+  COPY settings/saml_pull.not_py /openedx/edx-platform/saml_pull.py
   ENV REVISION_CFG /openedx/config/revisions.yml
   ENV LMS_CFG /openedx/config/lms.env.yml
   ENV CMS_CFG /openedx/config/cms.env.yml
