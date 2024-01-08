@@ -58,6 +58,14 @@ def s3_sync() -> ResourceType:
     )
 
 
+def pypi_resource() -> ResourceType:
+    return ResourceType(
+        name=Identifier("pypi"),
+        type=REGISTRY_IMAGE,
+        source=RegistryImage(repository="cfplatformeng/concourse-pypi-resource"),
+    )
+
+
 def pulumi_provisioner_resource() -> ResourceType:
     return ResourceType(
         name=Identifier("pulumi-provisioner"),

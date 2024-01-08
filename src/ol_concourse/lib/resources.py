@@ -183,6 +183,29 @@ def pulumi_provisioner(
     )
 
 
+def pypi(
+    name: Identifier,
+    package_name: str,
+    username: str = "((pypi_creds.username))",
+    password: str = "((pypi_creds.password))",
+    check_every: str = "24h",
+) -> Resource:
+    return Resource(
+        name=name,
+        type="pypi",
+        icon="language-python",
+        check_every=check_every,
+        source={
+            "name": package_name,
+            "packaging": "any",
+            "repository": {
+                "username": username,
+                "password": password,
+            },
+        },
+    )
+
+
 def schedule(name: Identifier, interval: str) -> Resource:
     return Resource(
         name=name,
