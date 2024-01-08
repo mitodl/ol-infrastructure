@@ -278,7 +278,7 @@ parsedatetime==2.6
     # via apache-superset
 pgsanity==0.2.9
     # via apache-superset
-pillow==10.1.0
+pillow==10.2.0
     # via
     #   apache-superset
     #   matplotlib
