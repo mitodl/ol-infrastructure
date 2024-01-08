@@ -345,7 +345,7 @@ ol_data_platform_realm = keycloak.Realm(
 )
 
 required_action_configure_otp = keycloak.RequiredAction(
-    "configure-totp",
+    "ol-data-configure-totp",
     realm_id=ol_data_platform_realm.realm,
     alias="CONFIGURE_TOTP",
     default_action=True,
@@ -354,7 +354,7 @@ required_action_configure_otp = keycloak.RequiredAction(
 )
 
 required_action_verify_email = keycloak.RequiredAction(
-    "verify_email",
+    "ol-data-verify-email",
     realm_id=ol_data_platform_realm.realm,
     alias="VERIFY_EMAIL",
     default_action=True,
@@ -363,7 +363,7 @@ required_action_verify_email = keycloak.RequiredAction(
 )
 
 required_action_update_password = keycloak.RequiredAction(
-    "update_password",
+    "ol-data-update-password",
     realm_id=ol_data_platform_realm.realm,
     alias="UPDATE_PASSWORD",
     default_action=True,
