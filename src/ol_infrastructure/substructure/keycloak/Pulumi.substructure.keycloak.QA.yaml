@@ -22,7 +22,7 @@ config:
   keycloak:okta_single_sign_on_service_url: https://dev-66940844.okta.com/app/dev-66940844_collintestlogin_1/exk8gfblmeePE5uUQ5d7/sso/saml
   keycloak:openid_clients:
   - client_info:
-      open: https://mit-open-rc.odl.mit.edu
+      open: https://mitopen-rc.odl.mit.edu
       open-discussions: https://discussions-rc.odl.mit.edu
     realm_name: olapps
   - client_info:
