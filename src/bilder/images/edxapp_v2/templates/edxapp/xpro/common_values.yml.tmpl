@@ -58,10 +58,10 @@ OTEL_CONFIGS:
     TRACES_EXPORTER: otlphttp
 OTEL_EXPORTER_OTLP_METRICS_PROTOCOL: "http/protobuf"
 OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: {{ .Data.opentelemetry.metrics_endpoint }}
-OTEL_EXPORTER_OTLP_METRICS_HEADERS: {"Authorization": "{{ .Data.opentelemetry.b64_api_token }}"}
+OTEL_EXPORTER_OTLP_METRICS_HEADERS: {"Authorization": "Basic {{ .Data.opentelemetry.b64_api_token }}"}
 OTEL_EXPORTER_OTLP_TRACES_PROTOCOL: "http/protobuf"
 OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: {{ .Data.opentelemetry.traces_endpoint }}
-OTEL_EXPORTER_OTLP_TRACES_HEADERS: {"Authorization": "{{ .Data.opentelemetry.b64_api_token }}"}
+OTEL_EXPORTER_OTLP_TRACES_HEADERS: {"Authorization": "Basic {{ .Data.opentelemetry.b64_api_token }}"}
 OTEL_TRACES_RESOURCE_ATTRIBUTE: {
     'service.name': '{{ env "ENVIRONMENT" }}',
 }
