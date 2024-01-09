@@ -250,6 +250,16 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                             trigger=True,
                             passed=[earthly_build_job.name],
                         ),
+                        GetStep(
+                            get=theme_git_resource.name,
+                            trigger=False,
+                            passed=[earthly_build_job.name],
+                        ),
+                        GetStep(
+                            get=edx_platform_git_resource.name,
+                            trigger=False,
+                            passed=[earthly_build_job.name],
+                        ),
                     ],
                     image_code=edx_ami_code,
                     packer_template_path=(
