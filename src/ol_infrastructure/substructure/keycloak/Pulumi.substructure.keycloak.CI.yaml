@@ -27,7 +27,7 @@ config:
     realm_name: olapps
   - client_info:
       superset: https://bi-ci.ol.mit.edu
-    realm_name: ol-platform-engineering
+    realm_name: ol-data-platform
   keycloak:url: https://sso-ci.ol.mit.edu
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
