@@ -25,8 +25,10 @@ config:
   - client_info:
       airbyte: https://airbyte.odl.mit.edu
       dagster: https://pipelines.odl.mit.edu
-      superset: https://bi.ol.mit.edu
     realm_name: ol-platform-engineering
+  - client_info:
+      superset: https://bi.ol.mit.edu
+    realm_name: ol-data-platform
   keycloak:url: https://sso.ol.mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
