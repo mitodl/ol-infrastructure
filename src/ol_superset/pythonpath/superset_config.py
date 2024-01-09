@@ -59,7 +59,7 @@ OIDC_CLIENT_SECRETS = {
     }
 }
 OIDC_ID_TOKEN_COOKIE_SECURE = False
-OIDC_OPENID_REALM = "ol-platform-engineering"
+OIDC_OPENID_REALM = "ol-data-platform"
 OIDC_INTROSPECTION_AUTH_METHOD = "client_secret_post"
 CUSTOM_SECURITY_MANAGER = OIDCSecurityManager
 
