@@ -371,6 +371,28 @@ required_action_update_password = keycloak.RequiredAction(
     opts=resource_options,
 )
 
+# OL Data - Touchstone SAML
+ol_data_platform_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
+    "ol-data-touchstone-idp",
+    realm=ol_data_platform_realm.id,
+    alias="touchstone-idp",
+    display_name="MIT Touchstone",
+    entity_id=f"{keycloak_url}/realms/ol-data-platform",
+    name_id_policy_format="Unspecified",
+    force_authn=False,
+    post_binding_response=True,
+    post_binding_authn_request=True,
+    principal_type="ATTRIBUTE",
+    principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
+    single_sign_on_service_url="https://idp.mit.edu/idp/profile/SAML2/POST/SSO",
+    trust_email=True,
+    validate_signature=True,
+    signing_certificate=mit_touchstone_cert,
+    want_assertions_encrypted=True,
+    want_assertions_signed=True,
+    opts=resource_options,
+)
+
 # Check if any Openid clients exist in config and create them
 for openid_clients in keycloak_config.get_object("openid_clients"):
     realm_name = openid_clients.get("realm_name")
