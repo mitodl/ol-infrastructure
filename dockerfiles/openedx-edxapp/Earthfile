@@ -87,9 +87,7 @@ collected:
   ENV PATH /openedx/.local/bin:/openedx/bin:/openedx/edx-platform/node_modules/.bin:/openedx/nodeenv/bin:${PATH}
   WORKDIR /openedx/edx-platform
   RUN pip install --no-warn-script-location --user --no-cache-dir -e . \
-    && mkdir -p /openedx/config ./lms/envs/mitol ./cms/envs/mitol \
-    && pip uninstall -y protobuf \
-    && pip install --no-warn-script-location --user --no-cache-dir --no-binary protobuf protobuf
+    && mkdir -p /openedx/config ./lms/envs/mitol ./cms/envs/mitol
   COPY settings/lms.env.yml /openedx/config/lms.env.yml
   COPY settings/cms.env.yml /openedx/config/cms.env.yml
   COPY settings/lms/assets.not_py /openedx/edx-platform/lms/envs/mitol/assets.py
@@ -163,7 +161,6 @@ docker-image:
   ARG --required DEPLOYMENT_NAME
   ARG --required RELEASE_NAME
   ENV DJANGO_SETTINGS_MODULE="invalid"
-  ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION='python'
   RUN mkdir /openedx/.ssh \
     && chown app:app /openedx/.ssh \
     && chmod 0700 /openedx/.ssh \
