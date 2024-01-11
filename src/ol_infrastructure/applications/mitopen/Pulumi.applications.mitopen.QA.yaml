@@ -6,6 +6,38 @@ config:
   heroku:user: "odl-devops"
   heroku:app_id:
     secure: v1:eSvnqne7KQRkHJlu:wTyl9W3aivfxlANqBML2wy4GEHe85VuKll60R5HmGUu1hJTcQBEfzK1cJOyvjlbLgBtXLw==
+  heroku_var:cors_urls:
+  - "https://ocwnext-rc.odl.mit.edu"
+  - "https://ocw-next.netlify.app"
+  - "https://ol-devops-ci.odl.mit.edu"
+  - "https://draft-qa.ocw.mit.edu"
+  - "https://live-qa.ocw.mit.edu"
+  heroku_var:debug: false
+  heroku_var:enable_infitite_corridor: true
+  heroku_var:edx_learning_course_bucket_name: "edxorg-qa-edxapp-courses"
+  heroku_var:ga_g_tracking_id: ""
+  heroku_var:ga_tracking_id: ""
+  heroku_var:indexing_api_username: "od_mm_rc_api"
+  heroku_var:keycloak_base_url: "https://sso-qa.ol.mit.edu"
+  heroku_var:keycloak_realm_name: "olapps"
+  heroku_var:mailgun_sender_domain: "discussions-mail.odl.mit.edu"
+  heroku_var:mitopen_base_url: "https://mit-open-rc.odl.mit.edu"
+  heroku_var:mitopen_cookie_domain: "odl.mit.edu"
+  heroku_var:mitopen_cookie_name: "mitopen-rc"
+  heroku_var:log_level: "INFO"
+  heroku_var:mitopen_support_email: "odl-mitopen-rc-support@mit.edu"
+  heroku_var:ocw_base_url: "https://live-qa.ocw.mit.edu/"
+  heroku_var:ocw_iterator_chunk_size: 300
+  heroku_var:ocw_live_bucket: "ocw-content-live-qa"
+  heroku_var:sso_url: "sso-qa.ol.mit.edu"
+  heroku_var:opensearch_index: "mitxopen-rc"
+  heroku_var:opensearch_shard_count: 2
+  heroku_var:opensearch_url: "https://search-opensearch-mitopen-qa-nvwau2pbr2nek5dgx2o5w3xju4.us-east-1.es.amazonaws.com"
+  heroku_var:pgbouncer_default_pool_size: 50
+  heroku_var:pgbouncer_max_client_conn: 500
+  heroku_var:pgbouncer_min_pool_size: 20
+  heroku_var:tika_server_endpoint: "https://tika-qa.odl.mit.edu"
+  heroku_var:celery_worker_max_memory_per_child: 125000
   mitopen:db_instance_size: "db.t4g.small"
   mitopen:db_password:
     secure: v1:Xk9oxNvxSQAJUAHE:8CdeLN2SlyhyU0iZpqEX5rnHSJ3PClleDJi2UpzoCsVZ4UjNkr7vCOAKY7CvCuB/7CBKJKM=

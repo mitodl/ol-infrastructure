@@ -1,10 +1,13 @@
+# ruff: noqa: TD003, ERA001, FIX002, E501
+
 import json
 from pathlib import Path
 
 import pulumi_vault as vault
+import pulumiverse_heroku as heroku
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT, FIVE_MINUTES
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
 from pulumi.output import Output
 from pulumi_aws import ec2, iam, s3
 
@@ -14,13 +17,18 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
+setup_heroku_provider()
+
 mitopen_config = Config("mitopen")
+heroku_config = Config("heroku")
+heroku_var_config = Config("heroku_var")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
@@ -66,7 +74,7 @@ parliament_config = {
     "RESOURCE_EFFECTIVELY_STAR": {},
 }
 
-# TODO: MD 07312023 Requires review of bucket names  # noqa: FIX002, TD002, TD003
+# TODO @Ardiea: 07312023 Requires review of bucket names
 s3_bucket_permissions = [
     {
         "Action": [
@@ -201,6 +209,220 @@ mitopen_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_host=mitopen_db.db_instance.address,
 )
 mitopen_vault_backend = OLVaultDatabaseBackend(mitopen_vault_backend_config)
+
+# ci, rc, or production
+env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
+cors_urls_list = heroku_var_config.get_object("cors_urls") or []
+cors_urls_json = json.dumps(cors_urls_list)
+
+heroku_vars = {
+    "ACCESS_TOKEN_URL": f"https://{heroku_var_config.require('sso_url')}/realms/olapps/protocol/openid-connect/token",
+    # "ALLOWED_HOSTS": '["*"]',  # TODO @Ardiea: Something is converting this to json automatically? Verify outputs as expected
+    "AUTHORIZATION_URL": f"https://{heroku_var_config.require('sso_url')}/realms/olapps/protocol/openid-connect/auth",
+    "AWS_STORAGE_BUCKET_NAME": f"ol-mitopen-app-storage-{env_name}",
+    "CELERY_WORKER_MAX_MEMORY_PER_CHILD": heroku_var_config.get_int(
+        "celery_worker_max_memory_per_child"
+    )
+    or 125000,
+    # "CORS_ALLOWED_ORIGINS": cors_urls_json,  # TODO @Ardiea: verify this outputs as expected
+    "CORS_ALLOWED_ORIGIN_REGEXES": "['^.+ocw-next.netlify.app$']",
+    "CSAIL_BASE_URL": "https://cap.csail.mit.edu/",
+    "DEBUG": heroku_var_config.get_bool("debug") or False,
+    "DUPLICATE_COURSES_URL": "https://raw.githubusercontent.com/mitodl/open-resource-blacklists/master/duplicate_course",
+    "EDX_API_ACCESS_TOKEN_URL": "https://api.edx.org/oauth2/v1/access_token",
+    "EDX_API_URL": "https://api.edx.org/catalog/v1/catalogs/10/courses",
+    "EDX_LEARNING_COURSE_BUCKET_NAME": heroku_var_config.require(
+        "edx_learning_course_bucket_name"
+    ),
+    "ENABLE_INFINITE_CORRIDOR": heroku_var_config.get_bool("enable_infinite_corridor")
+    or True,
+    "GA_G_TRACKING_ID": heroku_var_config.get("ga_g_tracking_id") or "",
+    "GA_TRACKING_ID": heroku_var_config.get("ga_tracking_id") or "",
+    "INDEXING_API_USERNAME": heroku_var_config.require("indexing_api_username"),
+    "KEYCLOAK_BASE_URL": heroku_var_config.require("keycloak_base_url"),
+    "KEYCLOAK_REALM_NAME": heroku_var_config.require("keycloak_realm_name"),
+    "MAILGUN_FROM_EMAIL": f"'MIT Open <no-reply@{heroku_var_config.require('mailgun_sender_domain')}'",
+    "MAILGUN_SENDER_DOMAIN": heroku_var_config.require("mailgun_sender_domain"),
+    "MAILGUN_URL": "https://api.mailgun.net/v3/{heroku_var_config.require('mailgun_sender_domain')}",
+    # "MICROMASTERS_CATALOG_API_URL": "https://{{ etl_micromasters_host }}/api/v0/catalog/", # TODO @Ardiea: Consul lookup???
+    "MITOPEN_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
+    "MITOPEN_BASE_URL": heroku_var_config.require("mitopen_base_url"),
+    "MITOPEN_COOKIE_DOMAIN": heroku_var_config.require("mitopen_cookie_domain"),
+    "MITOPEN_COOKIE_NAME": heroku_var_config.require("mitopen_cookie_name"),
+    # "MITOPEN_CORS_ORIGIN_WHITELIST": cors_urls_json,  # TODO @Ardiea: verify this outputs as expected
+    "MITOPEN_DB_CONN_MAX_AGE": 0,
+    "MITOPEN_DB_DISABLE_SSL": "True",
+    "MITOPEN_DEFAULT_SITE_KEY": "micromasters",
+    "MITOPEN_EMAIL_PORT": 587,
+    "MITOPEN_EMAIL_TLS": "True",
+    "MITOPEN_ENVIRONMENT": env_name,
+    "MITOPEN_FROM_EMAIL": "MITOpen <mitopen-support@mit.edu>",
+    "MITOPEN_FRONTPAGE_DIGEST_MAX_POSTS": 10,
+    "MITOPEN_LOG_LEVEL": heroku_var_config.get("log_level") or "INFO",
+    "MITOPEN_SUPPORT_EMAIL": heroku_var_config.require("mitopen_support_email"),
+    "MITOPEN_USE_S3": "True",
+    "MITPE_BASE_URL": "https://professional.mit.edu/",
+    "MITX_ONLINE_BASE_URL": "https://mitxonline.mit.edu/",
+    "MITX_ONLINE_COURSES_API_URL": "https://mitxonline.mit.edu/api/courses/",
+    "MITX_ONLINE_LEARNING_COURSE_BUCKET_NAME": "mitx-etl-mitxonline-production",
+    "MITX_ONLINE_PROGRAMS_API_URL": "https://mitxonline.mit.edu/api/programs/",
+    "NEW_RELIC_LOG": "stdout",
+    "NODE_MODULES_CACHE": "False",
+    "OCW_BASE_URL": heroku_var_config.require("ocw_base_url"),
+    "OCW_ITERATOR_CHUNK_SIZE": heroku_var_config.require_int("ocw_iterator_chunk_size"),
+    "OCW_LIVE_BUCKET": heroku_var_config.require("ocw_live_bucket"),
+    "OIDC_ENDPOINT": f"https://{heroku_var_config.require('sso_url')}/realms/olapps",
+    "OLL_ALT_URL": "https://openlearninglibrary.mit.edu/courses/",
+    "OLL_API_ACCESS_TOKEN_URL": "https://openlearninglibrary.mit.edu/oauth2/access_token/",
+    "OLL_API_URL": "https://discovery.openlearninglibrary.mit.edu/api/v1/catalogs/1/courses/",
+    "OLL_BASE_URL": "https://openlearninglibrary.mit.edu/course/",
+    "OPENSEARCH_DEFAULT_TIMEOUT": 30,
+    "OPENSEARCH_INDEX": heroku_var_config.require("opensearch_index"),
+    "OPENSEARCH_INDEXING_CHUNK_SIZE": 75,
+    "OPENSEARCH_SHARD_COUNT": heroku_var_config.get_int("opensearch_shard_count") or 2,
+    "OPENSEARCH_URL": heroku_var_config.require(
+        "opensearch_url"
+    ),  # TODO @Ardiea: Can be a stack ref lookup
+    "PGBOUNCER_DEFAULT_POOL_SIZE": heroku_var_config.get_int(
+        "pgbouncer_default_pool_size"
+    )
+    or 50,
+    "PGBOUNCER_MAX_CLIENT_CONN": heroku_var_config.get_int("pgbouncer_max_client_conn")
+    or 500,
+    "PGBOUNCER_MIN_POOL_SIZE": heroku_var_config.get_int("pgbouncer_min_pool_size")
+    or 20,
+    "PROLEARN_CATALOG_API_URL": "https://prolearn.mit.edu/graphql",
+    "SEE_BASE_URL": "https://executive.mit.edu/",
+    "SOCIAL_AUTH_OL_OIDC_KEY": "ol-open-client",
+    "SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT": f"https://{heroku_var_config.require('sso_url')}/realms/olapps",
+    "TIKA_SERVER_ENDPOINT": heroku_var_config.require(
+        "tika_server_endpoint"
+    ),  # TODO @Ardiea: Can be a stack ref lookup
+    "USERINFO_URL": f"https://{heroku_var_config.require('sso_url')}/realms/olapps/protocol/openid-connect/userinfo",
+    "USE_X_FORWARDED_HOST": "True",
+    "USE_X_FORWARDED_PORT": "True",
+    # "XPRO_CATALOG_API_URL": f"hIttps://{heroku_var_config.require('etl_xpro_host')}/api/programs/",  # TODO @Ardiea: Consul lookup
+    # "XPRO_COURSES_API_URL": "https://{heroku_var_config.require('etl_xpro_host')}/api/courses/",  # TODO @Ardiea: Consul lookup
+    "XPRO_LEARNING_COURSE_BUCKET_NAME": "mitx-etl-xpro-production-mitxpro-production",
+    "YOUTUBE_FETCH_TRANSCRIPT_SCHEDULE_SECONDS": 21600,
+    "YOUTUBE_FETCH_TRANSCRIPT_SLEEP_SECONDS": 20,
+}
+
+# Making these `get_secret_*()` calls children of the seemigly un-related vault mount `secret-mitopen/` tricks
+# them into inheriting the correct vault provider rather than attempting to create their own (which won't work and / or
+# will duplicate the existing vault provider)
+
+# TODO @Ardiea: 01112024 We should be able to use vault.aws.get_access_credentials_output()
+# for this but it doesn't seem to work
+# auth_aws_mitx_creds_ol_mitopen_application = vault.aws.get_access_credentials_output(backend=mitopen_vault_iam_role.backend, role=mitopen_vault_iam_role.name, opts=InvokeOptions(parent=mitopen_vault_mount))  # . TD003
+auth_aws_mitx_creds_ol_mitopen_application = vault.generic.get_secret_output(
+    path="aws-mitx/creds/ol-mitopen-application",
+    with_lease_start_time=True,
+    opts=InvokeOptions(parent=mitopen_vault_mount),
+)
+auth_postgres_mitopen_creds_app = vault.generic.get_secret_output(
+    path="postgres-mitopen/creds/app",
+    with_lease_start_time=True,
+    opts=InvokeOptions(parent=mitopen_vault_mount),
+)
+
+secret_operations_global_embedly = vault.generic.get_secret_output(
+    path="secret-operations/global/embedly",
+    opts=InvokeOptions(parent=mitopen_vault_mount),
+)
+secret_operations_global_odlbot_github_access_token = vault.generic.get_secret_output(
+    path="secret-operations/global/odlbot-github-access-token",
+    opts=InvokeOptions(parent=mitopen_vault_mount),
+)
+secret_operations_global_mailgun_api_key = vault.generic.get_secret_output(
+    path="secret-operations/global/mailgun-api-key",
+    opts=InvokeOptions(parent=mitopen_vault_mount),
+)
+secret_operations_global_mit_smtp = vault.generic.get_secret_output(
+    path="secret-operations/global/mit-smtp",
+    opts=InvokeOptions(parent=mitopen_vault_mount),
+)
+secret_operations_global_update_search_data_webhook_key = (
+    vault.generic.get_secret_output(
+        path="secret-operations/global/update-search-data-webhook-key",
+        opts=InvokeOptions(parent=mitopen_vault_mount),
+    )
+)
+secret_operations_sso_open = vault.generic.get_secret_output(
+    path="secret-operations/sso/open", opts=InvokeOptions(parent=mitopen_vault_mount)
+)
+secret_operations_tika_access_token = vault.generic.get_secret_output(
+    path="secret-operations/tika/access-token",
+    opts=InvokeOptions(parent=mitopen_vault_mount),
+)
+# Gets masked in any console outputs
+sensitive_heroku_vars = {
+    # Vars available from SOPS
+    "CKEDITOR_ENVIRONMENT_ID": mitopen_vault_secrets["ckeditor"]["environment_id"],
+    "CKEDITOR_SECRET_KEY": mitopen_vault_secrets["ckeditor"]["secret_key"],
+    "CKEDITOR_UPLOAD_URL": mitopen_vault_secrets["ckeditor"]["upload_url"],
+    "EDX_API_CLIENT_ID": mitopen_vault_secrets["edx-api-client"]["id"],
+    "EDX_API_CLIENT_SECRET": mitopen_vault_secrets["edx-api-client"]["secret"],
+    "MITOPEN_JWT_SECRET": mitopen_vault_secrets["jwt_secret"],
+    "OLL_API_CLIENT_ID": mitopen_vault_secrets["open-learning-library-client"][
+        "client-id"
+    ],
+    "OLL_API_CLIENT_SECRET": mitopen_vault_secrets["open-learning-library-client"][
+        "client-secret"
+    ],
+    "OPENSEARCH_HTTP_AUTH": mitopen_vault_secrets["opensearch"]["http_auth"],
+    "SECRET_KEY": mitopen_vault_secrets["django-secret-key"],
+    #    "SENTRY_DSN": mitopen_vault_secrets["__vault__::secret-mitopen/data/secrets>data>data>sentry-dsn",  # Sentry not yet configured
+    "STATUS_TOKEN": mitopen_vault_secrets["django-status-token"],
+    "YOUTUBE_DEVELOPER_KEY": mitopen_vault_secrets["youtube-developer-key"],
+    # Vars that require more
+    "AWS_ACCESS_KEY_ID": auth_aws_mitx_creds_ol_mitopen_application.data.apply(
+        lambda data: "{}".format(data["access_key"])
+    ),  # TODO @Ardiea: Does this change every run? Seems like it ...
+    "AWS_SECRET_ACCESS_KEY": auth_aws_mitx_creds_ol_mitopen_application.data.apply(
+        lambda data: "{}".format(data["secret_key"])
+    ),
+    "DATABASE_URL": auth_postgres_mitopen_creds_app.data.apply(
+        lambda data: "postgres://{}:{}@ol-mitopen-db-{}.cbnm7ajau6mi.us-east-1.rds-amazonaws.com".format(
+            data["username"], data["password"], stack_info.name.lower()
+        )
+    ),  # Also seems to change every time ? not great.
+    "EMBEDLY_KEY": secret_operations_global_embedly.data.apply(
+        lambda data: "{}".format(data["key"])
+    ),
+    "GITHUB_ACCESS_TOKEN": secret_operations_global_odlbot_github_access_token.data.apply(
+        lambda data: "{}".format(data["value"])
+    ),
+    "MAILGUN_KEY": secret_operations_global_mailgun_api_key.data.apply(
+        lambda data: "{}".format(data["value"])
+    ),
+    "MITOPEN_EMAIL_HOST": secret_operations_global_mit_smtp.data.apply(
+        lambda data: "{}".format(data["relay_host"])
+    ),
+    "MITOPEN_EMAIL_PASSWORD": secret_operations_global_mit_smtp.data.apply(
+        lambda data: "{}".format(data["relay_password"])
+    ),
+    "MITOPEN_EMAIL_USER": secret_operations_global_mit_smtp.data.apply(
+        lambda data: "{}".format(data["relay_username"])
+    ),
+    "OCW_WEBHOOK_KEY": secret_operations_global_update_search_data_webhook_key.data.apply(
+        lambda data: "{}".format(data["value"])
+    ),
+    "SOCIAL_AUTH_OL_OIDC_SECRET": secret_operations_sso_open.data.apply(
+        lambda data: "{}".format(data["client_secret"])
+    ),
+    "TIKA_ACCESS_TOKEN": secret_operations_tika_access_token.data.apply(
+        lambda data: "{}".format(data["value"])
+    ),
+}
+
+heroku_app_id = heroku_config.require("app_id")
+mitopen_heroku_configassociation = heroku.app.ConfigAssociation(
+    f"ol-mitopen-heroku-configassociation-{stack_info.env_suffix}",
+    app_id=heroku_app_id,
+    sensitive_vars=sensitive_heroku_vars,
+    vars=heroku_vars,
+)
 
 export(
     "mitopen",
