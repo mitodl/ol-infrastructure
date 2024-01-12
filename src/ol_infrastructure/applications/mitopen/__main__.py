@@ -213,11 +213,6 @@ mitopen_vault_backend = OLVaultDatabaseBackend(mitopen_vault_backend_config)
 # ci, rc, or production
 env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 
-opensearch_stack = StackReference(
-    f"infrastructure.aws.opensearch.mitopen.{stack_info.name}"
-)
-opensearch_endpoint = opensearch_stack.require_output("cluster")["endpoint"]
-
 cors_urls_list = heroku_var_config.get_object("cors_urls") or []
 cors_urls_json = json.dumps(cors_urls_list)
 
@@ -234,7 +229,7 @@ heroku_vars = {
     "CORS_ALLOWED_ORIGIN_REGEXES": "['^.+ocw-next.netlify.app$']",
     "CSAIL_BASE_URL": "https://cap.csail.mit.edu/",
     "DEBUG": heroku_var_config.get_bool("debug") or False,
-    "DUPLICATE_COURSES_URL": "https://raw.githubusercontent.com/mitodl/open-resource-blacklists/master/duplicate_course",
+    "DUPLICATE_COURSES_URL": "https://raw.githubusercontent.com/mitodl/open-resource-blacklists/master/duplicate_courses.yml",
     "EDX_API_ACCESS_TOKEN_URL": "https://api.edx.org/oauth2/v1/access_token",
     "EDX_API_URL": "https://api.edx.org/catalog/v1/catalogs/10/courses",
     "EDX_LEARNING_COURSE_BUCKET_NAME": heroku_var_config.require(
@@ -247,34 +242,35 @@ heroku_vars = {
     "INDEXING_API_USERNAME": heroku_var_config.require("indexing_api_username"),
     "KEYCLOAK_BASE_URL": heroku_var_config.require("keycloak_base_url"),
     "KEYCLOAK_REALM_NAME": heroku_var_config.require("keycloak_realm_name"),
-    "MAILGUN_FROM_EMAIL": f"'MIT Open <no-reply@{heroku_var_config.require('mailgun_sender_domain')}'",
+    "MAILGUN_FROM_EMAIL": f"MIT Open <no-reply@{heroku_var_config.require('mailgun_sender_domain')}",
     "MAILGUN_SENDER_DOMAIN": heroku_var_config.require("mailgun_sender_domain"),
-    "MAILGUN_URL": "https://api.mailgun.net/v3/{heroku_var_config.require('mailgun_sender_domain')}",
-    "MICROMASTERS_CATALOG_API_URL": "https://{{ etl_micromasters_host }}/api/v0/catalog/",
+    "MAILGUN_URL": f"https://api.mailgun.net/v3/{heroku_var_config.require('mailgun_sender_domain')}",
+    "MICROMASTERS_CATALOG_API_URL": f"https://{heroku_var_config.require('etl_micromasters_host')}/api/v0/catalog/",
     "MITOPEN_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
     "MITOPEN_BASE_URL": heroku_var_config.require("mitopen_base_url"),
     "MITOPEN_COOKIE_DOMAIN": heroku_var_config.require("mitopen_cookie_domain"),
     "MITOPEN_COOKIE_NAME": heroku_var_config.require("mitopen_cookie_name"),
     "MITOPEN_CORS_ORIGIN_WHITELIST": cors_urls_json,
     "MITOPEN_DB_CONN_MAX_AGE": 0,
-    "MITOPEN_DB_DISABLE_SSL": "True",
+    "MITOPEN_DB_DISABLE_SSL": True,
     "MITOPEN_DEFAULT_SITE_KEY": "micromasters",
     "MITOPEN_EMAIL_PORT": 587,
-    "MITOPEN_EMAIL_TLS": "True",
+    "MITOPEN_EMAIL_TLS": True,
     "MITOPEN_ENVIRONMENT": env_name,
     "MITOPEN_FROM_EMAIL": "MITOpen <mitopen-support@mit.edu>",
     "MITOPEN_FRONTPAGE_DIGEST_MAX_POSTS": 10,
     "MITOPEN_LOG_LEVEL": heroku_var_config.get("log_level") or "INFO",
     "MITOPEN_SUPPORT_EMAIL": heroku_var_config.require("mitopen_support_email"),
-    "MITOPEN_USE_S3": "True",
+    "MITOPEN_USE_S3": True,
     "MITPE_BASE_URL": "https://professional.mit.edu/",
     "MITX_ONLINE_BASE_URL": "https://mitxonline.mit.edu/",
     "MITX_ONLINE_COURSES_API_URL": "https://mitxonline.mit.edu/api/courses/",
     "MITX_ONLINE_LEARNING_COURSE_BUCKET_NAME": "mitx-etl-mitxonline-production",
     "MITX_ONLINE_PROGRAMS_API_URL": "https://mitxonline.mit.edu/api/programs/",
     "NEW_RELIC_LOG": "stdout",
-    "NODE_MODULES_CACHE": "False",
+    "NODE_MODULES_CACHE": False,
     "OCW_BASE_URL": heroku_var_config.require("ocw_base_url"),
+    "OCW_CONTENT_BUCKET_NAME": heroku_var_config.require("ocw_content_bucket_name"),
     "OCW_ITERATOR_CHUNK_SIZE": heroku_var_config.require_int("ocw_iterator_chunk_size"),
     "OCW_LIVE_BUCKET": heroku_var_config.require("ocw_live_bucket"),
     "OIDC_ENDPOINT": f"https://{heroku_var_config.require('sso_url')}/realms/olapps",
@@ -286,7 +282,7 @@ heroku_vars = {
     "OPENSEARCH_INDEX": heroku_var_config.require("opensearch_index"),
     "OPENSEARCH_INDEXING_CHUNK_SIZE": 75,
     "OPENSEARCH_SHARD_COUNT": heroku_var_config.get_int("opensearch_shard_count") or 2,
-    "OPENSEARCH_URL": f"https://{opensearch_endpoint}",
+    "OPENSEARCH_URL": heroku_var_config.require("opensearch_url"),
     "PGBOUNCER_DEFAULT_POOL_SIZE": heroku_var_config.get_int(
         "pgbouncer_default_pool_size"
     )
@@ -301,8 +297,8 @@ heroku_vars = {
     "SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT": f"https://{heroku_var_config.require('sso_url')}/realms/olapps",
     "TIKA_SERVER_ENDPOINT": heroku_var_config.require("tika_server_endpoint"),
     "USERINFO_URL": f"https://{heroku_var_config.require('sso_url')}/realms/olapps/protocol/openid-connect/userinfo",
-    "USE_X_FORWARDED_HOST": "True",
-    "USE_X_FORWARDED_PORT": "True",
+    "USE_X_FORWARDED_HOST": True,
+    "USE_X_FORWARDED_PORT": True,
     "XPRO_CATALOG_API_URL": f"https://{heroku_var_config.require('etl_xpro_host')}/api/programs/",
     "XPRO_COURSES_API_URL": f"https://{heroku_var_config.require('etl_xpro_host')}/api/courses/",
     "XPRO_LEARNING_COURSE_BUCKET_NAME": "mitx-etl-xpro-production-mitxpro-production",

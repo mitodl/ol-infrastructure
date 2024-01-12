@@ -30,6 +30,7 @@ config:
   heroku_var:mitopen_cookie_name: "mitopen-rc"
   heroku_var:mitopen_support_email: "odl-mitopen-rc-support@mit.edu"
   heroku_var:ocw_base_url: "https://live-qa.ocw.mit.edu/"
+  heroku_var:ocw_content_bucket_name: "ocw-content-storage"
   heroku_var:ocw_iterator_chunk_size: 300
   heroku_var:ocw_live_bucket: "ocw-content-live-qa"
   heroku_var:opensearch_index: "mitxopen-rc"
