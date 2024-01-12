@@ -287,17 +287,10 @@ ol_data_platform_realm = keycloak.Realm(
     enabled=True,
     login_theme="keycloak",
     duplicate_emails_allowed=False,
-    otp_policy=keycloak.RealmOtpPolicyArgs(
-        algorithm="HmacSHA256",
-        digits=6,
-        initial_counter=2,
-        look_ahead_window=1,
-        period=30,
-        type="totp",
-    ),
     realm="ol-data-platform",
-    reset_password_allowed=True,
-    verify_email=True,
+    reset_password_allowed=False,
+    verify_email=False,
+    registration_allowed=False,
     password_policy=(  # noqa: S106 # pragma: allowlist secret
         "length(16) and forceExpiredPasswordChange(365)"
         "  and notUsername and notEmail"
@@ -371,6 +364,66 @@ required_action_update_password = keycloak.RequiredAction(
     opts=resource_options,
 )
 
+# OL Data - First login flow [START]
+# Does not require email verification or confirmation to connect with existing account.
+ol_data_touchstone_first_login_flow = keycloak.authentication.Flow(
+    "ol-data-touchstone-first-login-flow",
+    realm_id=ol_data_platform_realm.id,
+    alias="ol-data-first-login-flow",
+    opts=resource_options,
+)
+ol_data_touchstone_first_login_flow_review_profile = keycloak.authentication.Execution(
+    "ol-data-touchstone-first-login-flow-review-profile",
+    realm_id=ol_data_platform_realm.id,
+    parent_flow_alias=ol_data_touchstone_first_login_flow.alias,
+    authenticator="idp-review-profile",
+    requirement="REQUIRED",
+    opts=resource_options,
+)
+ol_data_touchstone_first_login_review_profile_config = (
+    keycloak.authentication.ExecutionConfig(
+        "ol-data-touchstone-first-login-review-profile-config",
+        realm_id=ol_data_platform_realm.id,
+        execution_id=ol_data_touchstone_first_login_flow_review_profile.id,
+        alias="review-profile-config",
+        config={
+            "updateProfileOnFirstLogin": "missing",
+        },
+        opts=resource_options,
+    )
+)
+ol_data_touchstone_user_creation_or_linking_subflow = keycloak.authentication.Subflow(
+    "ol-data-touchstone-user-creation-or-linking-subflow",
+    realm_id=ol_data_platform_realm.id,
+    alias="ol-data-touchstone-first-broker-login-user-creation-or-linking",
+    parent_flow_alias=ol_data_touchstone_first_login_flow.alias,
+    provider_id="basic-flow",
+    requirement="REQUIRED",
+    opts=resource_options,
+)
+ol_data_touchstone_user_creation_or_linking_subflow_create_user_if_unique_step = (
+    keycloak.authentication.Execution(
+        "ol-data-touchstone-create-user-if-unique",
+        realm_id=ol_data_platform_realm.id,
+        parent_flow_alias=ol_data_touchstone_user_creation_or_linking_subflow.alias,
+        authenticator="idp-create-user-if-unique",
+        requirement="ALTERNATIVE",
+        opts=resource_options,
+    )
+)
+ol_data_touchstone_user_creation_or_linking_subflow_automatically_set_existing_user_step = keycloak.authentication.Execution(  # noqa: E501
+    "ol-data-touchstone-automatically-set-existing-user",
+    realm_id=ol_data_platform_realm.id,
+    parent_flow_alias=ol_data_touchstone_user_creation_or_linking_subflow.alias,
+    authenticator="idp-auto-link",
+    requirement="ALTERNATIVE",
+    opts=ResourceOptions(
+        provider=keycloak_provider,
+        depends_on=ol_data_touchstone_user_creation_or_linking_subflow_create_user_if_unique_step,
+    ),
+)
+# OL - First login flow [END]
+
 # OL Data - Touchstone SAML
 ol_data_platform_touchstone_saml_identity_provider = keycloak.saml.IdentityProvider(
     "ol-data-touchstone-idp",
@@ -390,7 +443,44 @@ ol_data_platform_touchstone_saml_identity_provider = keycloak.saml.IdentityProvi
     signing_certificate=mit_touchstone_cert,
     want_assertions_encrypted=True,
     want_assertions_signed=True,
+    first_broker_login_flow_alias=ol_data_touchstone_first_login_flow.alias,
     opts=resource_options,
+)
+
+ol_data_oidc_attribute_importer_identity_provider_mapper = (
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "ol-data-map-touchstone-saml-email-attribute",
+        realm=ol_data_platform_realm.id,
+        attribute_name="mail",
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        user_attribute="email",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    ),
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "ol-data-map-touchstone-saml-last-name-attribute",
+        realm=ol_data_platform_realm.id,
+        attribute_name="sn",
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        user_attribute="lastName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    ),
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "ol-data-map-touchstone-saml-first-name-attribute",
+        realm=ol_data_platform_realm.id,
+        attribute_name="givenName",
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        user_attribute="firstName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    ),
 )
 
 # Check if any Openid clients exist in config and create them
