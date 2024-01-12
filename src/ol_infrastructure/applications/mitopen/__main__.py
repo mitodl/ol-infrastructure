@@ -273,6 +273,11 @@ heroku_vars = {
     "OCW_CONTENT_BUCKET_NAME": heroku_var_config.require("ocw_content_bucket_name"),
     "OCW_ITERATOR_CHUNK_SIZE": heroku_var_config.require_int("ocw_iterator_chunk_size"),
     "OCW_LIVE_BUCKET": heroku_var_config.require("ocw_live_bucket"),
+    "OCW_NEXT_AWS_STORAGE_BUCKET_NAME": heroku_var_config.require(
+        "ocw_next_aws_storage_bucket_name"
+    ),
+    "OCW_NEXT_BASE_URL": heroku_var_config.require("ocw_base_url"),
+    "OCW_UPLOAD_IMAGE_ONLY": True,
     "OIDC_ENDPOINT": f"https://{heroku_var_config.require('sso_url')}/realms/olapps",
     "OLL_ALT_URL": "https://openlearninglibrary.mit.edu/courses/",
     "OLL_API_ACCESS_TOKEN_URL": "https://openlearninglibrary.mit.edu/oauth2/access_token/",
@@ -404,6 +409,9 @@ sensitive_heroku_vars = {
     ),
     "MITOPEN_EMAIL_USER": secret_operations_global_mit_smtp.data.apply(
         lambda data: "{}".format(data["relay_username"])
+    ),
+    "OCW_NEXT_SEARCH_WEBHOOK_KEY": secret_operations_global_update_search_data_webhook_key.data.apply(
+        lambda data: "{}".format(data["value"])
     ),
     "OCW_WEBHOOK_KEY": secret_operations_global_update_search_data_webhook_key.data.apply(
         lambda data: "{}".format(data["value"])

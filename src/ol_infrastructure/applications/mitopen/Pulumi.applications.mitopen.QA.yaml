@@ -33,6 +33,7 @@ config:
   heroku_var:ocw_content_bucket_name: "ocw-content-storage"
   heroku_var:ocw_iterator_chunk_size: 300
   heroku_var:ocw_live_bucket: "ocw-content-live-qa"
+  heroku_var:ocw_next_aws_storage_bucket_name: "ol-ocw-studio-app-qa"
   heroku_var:opensearch_index: "mitxopen-rc"
   heroku_var:opensearch_shard_count: 2
   heroku_var:opensearch_url: "https://search-opensearch-mitopen-qa-nvwau2pbr2nek5dgx2o5w3xju4.us-east-1.es.amazonaws.com"
