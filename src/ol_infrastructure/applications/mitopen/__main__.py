@@ -28,7 +28,8 @@ setup_heroku_provider()
 
 mitopen_config = Config("mitopen")
 heroku_config = Config("heroku")
-heroku_var_config = Config("heroku_var")
+heroku_app_config = Config("heroku_app")
+
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
@@ -213,44 +214,16 @@ mitopen_vault_backend = OLVaultDatabaseBackend(mitopen_vault_backend_config)
 # ci, rc, or production
 env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 
-cors_urls_list = heroku_var_config.get_object("cors_urls") or []
-cors_urls_json = json.dumps(cors_urls_list)
-
+# Values that are generally unchanging across environments
 heroku_vars = {
-    "ACCESS_TOKEN_URL": f"https://{heroku_var_config.require('sso_url')}/realms/olapps/protocol/openid-connect/token",
     "ALLOWED_HOSTS": '["*"]',
-    "AUTHORIZATION_URL": f"https://{heroku_var_config.require('sso_url')}/realms/olapps/protocol/openid-connect/auth",
     "AWS_STORAGE_BUCKET_NAME": f"ol-mitopen-app-storage-{env_name}",
-    "CELERY_WORKER_MAX_MEMORY_PER_CHILD": heroku_var_config.get_int(
-        "celery_worker_max_memory_per_child"
-    )
-    or 125000,
-    "CORS_ALLOWED_ORIGINS": cors_urls_json,
     "CORS_ALLOWED_ORIGIN_REGEXES": "['^.+ocw-next.netlify.app$']",
     "CSAIL_BASE_URL": "https://cap.csail.mit.edu/",
-    "DEBUG": heroku_var_config.get_bool("debug") or False,
     "DUPLICATE_COURSES_URL": "https://raw.githubusercontent.com/mitodl/open-resource-blacklists/master/duplicate_courses.yml",
     "EDX_API_ACCESS_TOKEN_URL": "https://api.edx.org/oauth2/v1/access_token",
     "EDX_API_URL": "https://api.edx.org/catalog/v1/catalogs/10/courses",
-    "EDX_LEARNING_COURSE_BUCKET_NAME": heroku_var_config.require(
-        "edx_learning_course_bucket_name"
-    ),
-    "ENABLE_INFINITE_CORRIDOR": heroku_var_config.get_bool("enable_infinite_corridor")
-    or True,
-    "GA_G_TRACKING_ID": heroku_var_config.get("ga_g_tracking_id") or "",
-    "GA_TRACKING_ID": heroku_var_config.get("ga_tracking_id") or "",
-    "INDEXING_API_USERNAME": heroku_var_config.require("indexing_api_username"),
-    "KEYCLOAK_BASE_URL": heroku_var_config.require("keycloak_base_url"),
-    "KEYCLOAK_REALM_NAME": heroku_var_config.require("keycloak_realm_name"),
-    "MAILGUN_FROM_EMAIL": f"MIT Open <no-reply@{heroku_var_config.require('mailgun_sender_domain')}",
-    "MAILGUN_SENDER_DOMAIN": heroku_var_config.require("mailgun_sender_domain"),
-    "MAILGUN_URL": f"https://api.mailgun.net/v3/{heroku_var_config.require('mailgun_sender_domain')}",
-    "MICROMASTERS_CATALOG_API_URL": f"https://{heroku_var_config.require('etl_micromasters_host')}/api/v0/catalog/",
     "MITOPEN_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
-    "MITOPEN_BASE_URL": heroku_var_config.require("mitopen_base_url"),
-    "MITOPEN_COOKIE_DOMAIN": heroku_var_config.require("mitopen_cookie_domain"),
-    "MITOPEN_COOKIE_NAME": heroku_var_config.require("mitopen_cookie_name"),
-    "MITOPEN_CORS_ORIGIN_WHITELIST": cors_urls_json,
     "MITOPEN_DB_CONN_MAX_AGE": 0,
     "MITOPEN_DB_DISABLE_SSL": True,
     "MITOPEN_DEFAULT_SITE_KEY": "micromasters",
@@ -259,8 +232,6 @@ heroku_vars = {
     "MITOPEN_ENVIRONMENT": env_name,
     "MITOPEN_FROM_EMAIL": "MITOpen <mitopen-support@mit.edu>",
     "MITOPEN_FRONTPAGE_DIGEST_MAX_POSTS": 10,
-    "MITOPEN_LOG_LEVEL": heroku_var_config.get("log_level") or "INFO",
-    "MITOPEN_SUPPORT_EMAIL": heroku_var_config.require("mitopen_support_email"),
     "MITOPEN_USE_S3": True,
     "MITPE_BASE_URL": "https://professional.mit.edu/",
     "MITX_ONLINE_BASE_URL": "https://mitxonline.mit.edu/",
@@ -269,48 +240,49 @@ heroku_vars = {
     "MITX_ONLINE_PROGRAMS_API_URL": "https://mitxonline.mit.edu/api/programs/",
     "NEW_RELIC_LOG": "stdout",
     "NODE_MODULES_CACHE": False,
-    "OCW_BASE_URL": heroku_var_config.require("ocw_base_url"),
-    "OCW_CONTENT_BUCKET_NAME": heroku_var_config.require("ocw_content_bucket_name"),
-    "OCW_ITERATOR_CHUNK_SIZE": heroku_var_config.require_int("ocw_iterator_chunk_size"),
-    "OCW_LIVE_BUCKET": heroku_var_config.require("ocw_live_bucket"),
-    "OCW_NEXT_AWS_STORAGE_BUCKET_NAME": heroku_var_config.require(
-        "ocw_next_aws_storage_bucket_name"
-    ),
-    "OCW_NEXT_BASE_URL": heroku_var_config.require("ocw_base_url"),
     "OCW_UPLOAD_IMAGE_ONLY": True,
-    "OIDC_ENDPOINT": f"https://{heroku_var_config.require('sso_url')}/realms/olapps",
     "OLL_ALT_URL": "https://openlearninglibrary.mit.edu/courses/",
     "OLL_API_ACCESS_TOKEN_URL": "https://openlearninglibrary.mit.edu/oauth2/access_token/",
     "OLL_API_URL": "https://discovery.openlearninglibrary.mit.edu/api/v1/catalogs/1/courses/",
     "OLL_BASE_URL": "https://openlearninglibrary.mit.edu/course/",
     "OPENSEARCH_DEFAULT_TIMEOUT": 30,
-    "OPENSEARCH_INDEX": heroku_var_config.require("opensearch_index"),
     "OPENSEARCH_INDEXING_CHUNK_SIZE": 75,
-    "OPENSEARCH_SHARD_COUNT": heroku_var_config.get_int("opensearch_shard_count") or 2,
-    "OPENSEARCH_URL": heroku_var_config.require("opensearch_url"),
-    "PGBOUNCER_DEFAULT_POOL_SIZE": heroku_var_config.get_int(
-        "pgbouncer_default_pool_size"
-    )
-    or 50,
-    "PGBOUNCER_MAX_CLIENT_CONN": heroku_var_config.get_int("pgbouncer_max_client_conn")
-    or 500,
-    "PGBOUNCER_MIN_POOL_SIZE": heroku_var_config.get_int("pgbouncer_min_pool_size")
-    or 20,
     "PROLEARN_CATALOG_API_URL": "https://prolearn.mit.edu/graphql",
     "SEE_BASE_URL": "https://executive.mit.edu/",
     "SOCIAL_AUTH_OL_OIDC_KEY": "ol-open-client",
-    "SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT": f"https://{heroku_var_config.require('sso_url')}/realms/olapps",
-    "TIKA_SERVER_ENDPOINT": heroku_var_config.require("tika_server_endpoint"),
-    "USERINFO_URL": f"https://{heroku_var_config.require('sso_url')}/realms/olapps/protocol/openid-connect/userinfo",
     "USE_X_FORWARDED_HOST": True,
     "USE_X_FORWARDED_PORT": True,
-    "XPRO_CATALOG_API_URL": f"https://{heroku_var_config.require('etl_xpro_host')}/api/programs/",
-    "XPRO_COURSES_API_URL": f"https://{heroku_var_config.require('etl_xpro_host')}/api/courses/",
     "XPRO_LEARNING_COURSE_BUCKET_NAME": "mitx-etl-xpro-production-mitxpro-production",
     "YOUTUBE_FETCH_TRANSCRIPT_SCHEDULE_SECONDS": 21600,
     "YOUTUBE_FETCH_TRANSCRIPT_SLEEP_SECONDS": 20,
 }
 
+# Values that require interpolation or other special considerations
+interpolation_vars = heroku_app_config.get_object("interpolation_vars")
+
+cors_urls_list = interpolation_vars["cors_urls"] or []
+cors_urls_json = json.dumps(cors_urls_list)
+
+heroku_interoplate_vars = {
+    "ACCESS_TOKEN_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/token",
+    "AUTHORIZATION_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/auth",
+    "CORS_ALLOWED_ORIGINS": cors_urls_json,
+    "KEYCLOAK_BASE_URL": f"https://{interpolation_vars['sso_url']}/",
+    "MAILGUN_FROM_EMAIL": f"MIT Open <no-reply@{interpolation_vars['mailgun_sender_domain']}",
+    "MAILGUN_SENDER_DOMAIN": interpolation_vars["mailgun_sender_domain"],
+    "MAILGUN_URL": f"https://api.mailgun.net/v3/{interpolation_vars['mailgun_sender_domain']}",
+    "MICROMASTERS_CATALOG_API_URL": f"https://{interpolation_vars['etl_micromasters_host']}/api/v0/catalog/",
+    "MITOPEN_CORS_ORIGIN_WHITELIST": cors_urls_json,
+    "OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
+    "SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
+    "USERINFO_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/userinfo",
+    "XPRO_CATALOG_API_URL": f"https://{interpolation_vars['etl_xpro_host']}/api/programs/",
+    "XPRO_COURSES_API_URL": f"https://{interpolation_vars['etl_xpro_host']}/api/courses/",
+}
+
+# Combine two var sources above with values explictly defined in pulumi configuration
+heroku_vars.update(**heroku_interoplate_vars)
+heroku_vars.update(**heroku_app_config.get_object("vars"))
 
 # Making these `get_secret_*()` calls children of the seemigly un-related vault mount `secret-mitopen/` tricks
 # them into inheriting the correct vault provider rather than attempting to create their own (which won't work and / or
