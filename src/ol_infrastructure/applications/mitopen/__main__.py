@@ -263,7 +263,7 @@ interpolation_vars = heroku_app_config.get_object("interpolation_vars")
 cors_urls_list = interpolation_vars["cors_urls"] or []
 cors_urls_json = json.dumps(cors_urls_list)
 
-heroku_interoplate_vars = {
+heroku_interpolated_vars = {
     "ACCESS_TOKEN_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/token",
     "AUTHORIZATION_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/auth",
     "CORS_ALLOWED_ORIGINS": cors_urls_json,
