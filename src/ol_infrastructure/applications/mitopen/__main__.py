@@ -281,7 +281,7 @@ heroku_interoplate_vars = {
 }
 
 # Combine two var sources above with values explictly defined in pulumi configuration
-heroku_vars.update(**heroku_interoplate_vars)
+heroku_vars.update(**heroku_interpolated_vars)
 heroku_vars.update(**heroku_app_config.get_object("vars"))
 
 # Making these `get_secret_*()` calls children of the seemigly un-related vault mount `secret-mitopen/` tricks
