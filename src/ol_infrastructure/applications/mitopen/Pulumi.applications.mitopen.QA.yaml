@@ -3,6 +3,50 @@ secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHg42pDDDGBhpaX14TdtzcK1hbiMYTHsYRH4k5GL5RFpIwEi8MniqKSK7PJ7AIbp17REAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbWm9PEFY6H+jKGYHAgEQgDtAZs04prjkVBGB8O8+C6kjqzMhazPYOAanmLoWdx4WArJXNKxZkv72c6my81/qnCg0xWYdmw6fJxV0dg==
 config:
   consul:address: https://consul-apps-qa.odl.mit.edu
+  heroku:user: "odl-devops"
+  heroku:app_id:
+    secure: v1:eSvnqne7KQRkHJlu:wTyl9W3aivfxlANqBML2wy4GEHe85VuKll60R5HmGUu1hJTcQBEfzK1cJOyvjlbLgBtXLw==
+  heroku_app:vars:
+    CELERY_WORKER_MAX_MEMORY_PER_CHILD: 125000
+    DEBUG: false
+    EDX_LEARNING_COURSE_BUCKET_NAME: "edxorg-qa-edxapp-courses"
+    ENABLE_INFINITE_CORRIDOR: true
+    GA_G_TRACKING_ID: ""
+    GA_TRACKING_ID: ""
+    INDEXING_API_USERNAME: "od_mm_rc_api"
+    KEYCLOAK_BASE_URL: "https://sso-qa.ol.mit.edu"
+    KEYCLOAK_REALM_NAME: "olapps"
+    MITOPEN_BASE_URL: "https://mit-open-rc.odl.mit.edu"
+    MITOPEN_COOKIE_DOMAIN: "odl.mit.edu"
+    MITOPEN_COOKIE_NAME: "mitopen-rc"
+    MITOPEN_LOG_LEVEL: "INFO"
+    MITOPEN_SUPPORT_EMAIL: "odl-mitopen-rc-support@mit.edu"
+    OCW_BASE_URL: "https://live-qa.ocw.mit.edu/"
+    OCW_CONTENT_BUCKET_NAME: "ocw-content-storage"
+    OCW_ITERATOR_CHUNK_SIZE: 300
+    OCW_LIVE_BUCKET: "ocw-content-live-qa"
+    OCW_NEXT_AWS_STORAGE_BUCKET_NAME: "ol-ocw-studio-app-qa"
+    OCW_NEXT_BASE_URL: "https://live-qa.ocw.mit.edu"
+    ODIC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
+    OPENSEARCH_INDEX: "mitopen-rc"
+    OPENSEARCH_SHARD_COUNT: 2
+    OPENSEARCH_URL: "https://search-opensearch-mitopen-qa-nvwau2pbr2nek5dgx2o5w3xju4.us-east-1.es.amazonaws.com"
+    PGBOUNCER_DEFAULT_POOL_SIZE: 50
+    PGBOUNER_MAX_CLIENT_CONN: 500
+    PGBOUNER_MIN_POOL_SIZE: 20
+    SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT:
+    TIKA_SERVER_ENDPOING: "https://tika-qa.odl.mit.edu"
+  heroku_app:interpolation_vars:
+    cors_urls:
+    - "https://ocwnext-rc.odl.mit.edu"
+    - "https://ocw-next.netlify.app"
+    - "https://ol-devops-ci.odl.mit.edu"
+    - "https://draft-qa.ocw.mit.edu"
+    - "https://live-qa.ocw.mit.edu"
+    etl_micromasters_host: "micromasters-rc.odl.mit.edu"
+    etl_xpro_host: "rc.xpro.mit.edu"
+    mailgun_sender_domain: "discussions-mail.odl.mit.edu"
+    sso_url: "sso-qa.ol.mit.edu"
   mitopen:db_instance_size: "db.t4g.small"
   mitopen:db_password:
     secure: v1:Xk9oxNvxSQAJUAHE:8CdeLN2SlyhyU0iZpqEX5rnHSJ3PClleDJi2UpzoCsVZ4UjNkr7vCOAKY7CvCuB/7CBKJKM=
