@@ -187,7 +187,7 @@ def pypi(
     name: Identifier,
     package_name: str,
     username: str = "((pypi_creds.username))",
-    password: str = "((pypi_creds.password))",
+    password: str = "((pypi_creds.password))",  # noqa: S107
     check_every: str = "24h",
 ) -> Resource:
     return Resource(
