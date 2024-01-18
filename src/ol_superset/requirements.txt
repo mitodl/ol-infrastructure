@@ -423,7 +423,7 @@ typing-extensions==4.9.0
     #   apache-superset
     #   flask-limiter
     #   limits
-tzdata==2023.3
+tzdata==2023.4
     # via celery
 tzlocal==5.2
     # via trino
