@@ -360,7 +360,7 @@ sensitive_heroku_vars = {
         lambda data: "{}".format(data["secret_key"])
     ),
     "DATABASE_URL": auth_postgres_mitopen_creds_app.data.apply(
-        lambda data: "postgres://{}:{}@ol-mitopen-db-{}.cbnm7ajau6mi.us-east-1.rds-amazonaws.com:5432/mitopen".format(
+        lambda data: "postgres://{}:{}@ol-mitopen-db-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/mitopen".format(
             data["username"], data["password"], stack_info.name.lower()
         )
     ),  # TODO @Ardiea: This changes every run / preview and creates a mess in the DB.
