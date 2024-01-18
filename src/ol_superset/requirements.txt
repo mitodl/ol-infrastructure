@@ -220,7 +220,7 @@ mako==1.3.0
     # via
     #   alembic
     #   apache-superset
-markdown==3.5.1
+markdown==3.5.2
     # via apache-superset
 markdown-it-py==3.0.0
     # via rich
