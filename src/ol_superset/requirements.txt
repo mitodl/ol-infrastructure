@@ -401,7 +401,7 @@ sshtunnel==0.4.0
     # via apache-superset
 stanio==0.4.0
     # via cmdstanpy
-tabulate==0.8.10
+tabulate==0.9.0
     # via apache-superset
 tenacity==8.2.3
     # via celery-redbeat
