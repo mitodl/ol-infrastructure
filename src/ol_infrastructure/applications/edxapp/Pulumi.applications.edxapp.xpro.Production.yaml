@@ -4,7 +4,7 @@ encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgF4aGd/aPWQE/Xl6+
 config:
   aws:region: us-east-1
   consul:address: https://consul-xpro-production.odl.mit.edu
-  edxapp:additional_waffle_flags:
+  edxapp:waffle_flags:
   - ["completion.enable_completion_tracking", "--create", "--superusers", "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
