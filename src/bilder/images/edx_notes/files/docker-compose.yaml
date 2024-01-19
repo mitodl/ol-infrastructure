@@ -16,7 +16,7 @@ services:
     # https://github.com/openedx/edx-notes-api/blob/master/notesserver/settings/yaml_config.py
     - /etc/docker/compose/edx_notes_settings.yaml:/app/edx-notes-api/edx_notes_api.yml:ro
   traefik:
-    image: traefik:v2.10
+    image: traefik:2.11
     command:
     - "--configFile=/etc/traefik/traefik.yaml"
     ports:
