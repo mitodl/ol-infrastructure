@@ -359,7 +359,7 @@ requests==2.31.0
     #   trino
 rich==13.7.0
     # via flask-limiter
-rpds-py==0.16.2
+rpds-py==0.17.1
     # via
     #   jsonschema
     #   referencing
