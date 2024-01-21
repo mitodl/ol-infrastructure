@@ -10,7 +10,7 @@ amqp==5.2.0
     # via kombu
 apache-superset[cors,prophet,thumbnails]==3.1.0
     # via -r requirements.in
-apispec[yaml]==6.3.1
+apispec[yaml]==6.4.0
     # via
     #   apispec
     #   flask-appbuilder
