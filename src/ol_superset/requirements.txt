@@ -8,7 +8,7 @@ alembic==1.13.1
     # via flask-migrate
 amqp==5.2.0
     # via kombu
-apache-superset[cors,prophet,thumbnails]==3.0.2
+apache-superset[cors,prophet,thumbnails]==3.1.0
     # via -r requirements.in
 apispec[yaml]==6.3.1
     # via
