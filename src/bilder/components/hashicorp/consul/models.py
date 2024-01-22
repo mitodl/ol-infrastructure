@@ -36,11 +36,11 @@ class ConsulDNSConfig(FlexibleBaseModel):
 
 
 class ConsulServiceCheck(FlexibleBaseModel, abc.ABC):
-    id: Optional[str] = None  # noqa: A003
+    id: Optional[str] = None
 
 
 class ConsulServiceTCPCheck(ConsulServiceCheck):
-    id: Optional[str] = None  # noqa: A003
+    id: Optional[str] = None
     name: str
     tcp: str
     interval: Optional[str] = None
@@ -48,7 +48,7 @@ class ConsulServiceTCPCheck(ConsulServiceCheck):
 
 
 class ConsulService(FlexibleBaseModel):
-    id: Optional[str] = None  # noqa: A003
+    id: Optional[str] = None
     tags: Optional[list[str]] = None
     meta: Optional[dict[str, str]] = None
     name: str
