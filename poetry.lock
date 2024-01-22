@@ -1421,12 +1421,12 @@ files = [
 
 [[package]]
 name = "pulumi"
-version = "3.98.0"
+version = "3.102.0"
 description = "Pulumi's Python SDK"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi-3.98.0-py3-none-any.whl", hash = "sha256:7988d01d0d550b1f2fc93ebddd8d49049c345ba122cc0cdc7eab5576b523534b"},
+    {file = "pulumi-3.102.0-py3-none-any.whl", hash = "sha256:478093aadd959d87235f8e0026abe9eebc9a321a8627a6958014b07e45d0c8f7"},
 ]
 
 [package.dependencies]
@@ -1439,13 +1439,13 @@ six = ">=1.12,<2.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "6.15.0"
+version = "6.18.1"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_aws-6.15.0-py3-none-any.whl", hash = "sha256:dff35f57c9d0c99c52f664b2e1c733593a374f8292c5659e9f687e2f71fe519e"},
-    {file = "pulumi_aws-6.15.0.tar.gz", hash = "sha256:b366f286e382a593036b3fb6432fd77dd88f8c5414a31a911d5c91f040968341"},
+    {file = "pulumi_aws-6.18.1-py3-none-any.whl", hash = "sha256:a6c20857755272dc4cd06ca05d5aeb1378f25a6b154e3b86aa602ea9649a75b4"},
+    {file = "pulumi_aws-6.18.1.tar.gz", hash = "sha256:020a29466a30cf8e80593502002cf03a125e4cb10d27a9889745d208794501aa"},
 ]
 
 [package.dependencies]
@@ -1455,13 +1455,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-consul"
-version = "3.11.0"
+version = "3.11.1"
 description = "A Pulumi package for creating and managing consul resources."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_consul-3.11.0-py3-none-any.whl", hash = "sha256:0c3abedeba8bb12f58f18eb00ca40d8170dbe7d68aefe7e7291ea8a7ffc62d0e"},
-    {file = "pulumi_consul-3.11.0.tar.gz", hash = "sha256:b8a6c4a6abce6c3bed8f86c8c69d51f199f44930f326ca5c80be299830b04005"},
+    {file = "pulumi_consul-3.11.1-py3-none-any.whl", hash = "sha256:420e113e2034835a2d423983723a12636b67862eb8363f1541346ec6de0cb11d"},
+    {file = "pulumi_consul-3.11.1.tar.gz", hash = "sha256:56b1ff8303832ccf1bbb13ddb480156ed5796a800c3353dfa5e5d5c0cdc10367"},
 ]
 
 [package.dependencies]
@@ -1471,13 +1471,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-fastly"
-version = "8.4.1"
+version = "8.4.2"
 description = "A Pulumi package for creating and managing fastly cloud resources."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_fastly-8.4.1-py3-none-any.whl", hash = "sha256:4671691d73d1d099ea6d13c3457da0526138c06fe273958447d9bc6de3b6f870"},
-    {file = "pulumi_fastly-8.4.1.tar.gz", hash = "sha256:f3feab8f5c4f8d269074feed9b6dbf7235b6a2109f2085fec6aa6e8d8a7a354d"},
+    {file = "pulumi_fastly-8.4.2-py3-none-any.whl", hash = "sha256:71491009b3b575b7a5346e84b6336a20c8e25823d6a3cb7400183a0d79842104"},
+    {file = "pulumi_fastly-8.4.2.tar.gz", hash = "sha256:ab6290aab340b7986865999a49eee82c32f3db72c39fd7aafdc6f241471b8650"},
 ]
 
 [package.dependencies]
@@ -1487,13 +1487,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "5.23.0"
+version = "5.25.0"
 description = "A Pulumi package for creating and managing github cloud resources."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_github-5.23.0-py3-none-any.whl", hash = "sha256:4a02e187b5dd80570f7881a0f7f7a21ab0d942cd5fb2524eae28f5e3d71d5be4"},
-    {file = "pulumi_github-5.23.0.tar.gz", hash = "sha256:783ef02640b788b2ce44d35cf34c9da618b1784d3ac163ec86341e195129e71e"},
+    {file = "pulumi_github-5.25.0-py3-none-any.whl", hash = "sha256:e9ccb814281354e33ccc5101457a94b37fb7f437d652e10d942cb996ad80203b"},
+    {file = "pulumi_github-5.25.0.tar.gz", hash = "sha256:31c24f28ee479fcc3027ee2204ad0024966bb193c9f9be6ca91049835b663c85"},
 ]
 
 [package.dependencies]
@@ -1503,12 +1503,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-keycloak"
-version = "5.2.1"
+version = "5.3.0"
 description = "A Pulumi package for creating and managing keycloak cloud resources."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_keycloak-5.2.1.tar.gz", hash = "sha256:8d41101ad20053b6c8e727e0d089aaa5294f019b2f5adfd44c470e98263af0e0"},
+    {file = "pulumi_keycloak-5.3.0-py3-none-any.whl", hash = "sha256:44a10df72fe64ea95da3b4a0c0a88bdd54cb5692f8ab66bc230fa4fea5ccd9d2"},
+    {file = "pulumi_keycloak-5.3.0.tar.gz", hash = "sha256:5cb8de07ecb3aa6a1306839bd677fefd35a10b22b1c64e247880d413bf1ec6de"},
 ]
 
 [package.dependencies]
@@ -1518,13 +1519,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-mongodbatlas"
-version = "3.12.1"
+version = "3.13.0"
 description = "A Pulumi package for creating and managing mongodbatlas cloud resources."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pulumi_mongodbatlas-3.12.1-py3-none-any.whl", hash = "sha256:902ac02c38539abb5f1001fabfb3661661b999343e2cd99e18938db089b138d8"},
-    {file = "pulumi_mongodbatlas-3.12.1.tar.gz", hash = "sha256:0a4f132ef7e078c05d8ebc0bf81700a7d8fac0ee0e9dbe63c05d7935045576e5"},
+    {file = "pulumi_mongodbatlas-3.13.0-py3-none-any.whl", hash = "sha256:7a0f926cd737b057f7046ed2e4139ce538e54a93146a0fe9212cdc173c77a177"},
+    {file = "pulumi_mongodbatlas-3.13.0.tar.gz", hash = "sha256:20d7af6b075568cf5c363acb4b0ba69ac69b8a0e322132a856e58e3e34e5029c"},
 ]
 
 [package.dependencies]
