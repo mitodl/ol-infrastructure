@@ -19,9 +19,9 @@ config:
     sso_url: "sso.ol.mit.edu"
   heroku_app:vars:
     CELERY_WORKER_MAX_MEMORY_PER_CHILD: 250000
-    DEBUG: false
+    DEBUG: "false"
     EDX_LEARNING_COURSE_BUCKET_NAME: "edxorg-production-edxapp-courses"
-    ENABLE_INFINITE_CORRIDOR: true
+    ENABLE_INFINITE_CORRIDOR: "true"
     GA_G_TRACKING_ID: ""
     GA_TRACKING_ID: ""
     INDEXING_API_USERNAME: "od_mm_prod_api"
