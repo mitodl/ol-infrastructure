@@ -35,7 +35,7 @@ class VaultAutoAuthAppRole(VaultAutoAuthMethodConfig):
 
 class VaultAutoAuthAWS(VaultAutoAuthMethodConfig):
     # The type of authentication; must be ec2 or iam.
-    type: str = "iam"  # noqa: A003
+    type: str = "iam"
     # The role to authenticate against on Vault.
     role: str
     # In seconds, how frequently the Vault agent should check for new credentials if
@@ -49,7 +49,7 @@ class VaultAutoAuthAWS(VaultAutoAuthMethodConfig):
 
 
 class VaultAutoAuthMethod(FlexibleBaseModel):
-    type: str  # noqa: A003
+    type: str
     mount_path: Optional[str] = None
     namespace: Optional[str] = None
     wrap_ttl: Optional[Union[str, int]] = None
@@ -57,7 +57,7 @@ class VaultAutoAuthMethod(FlexibleBaseModel):
 
 
 class VaultAutoAuthSink(FlexibleBaseModel):
-    type: str  # noqa: A003
+    type: str
     wrap_ttl: Optional[Union[str, int]] = None
     dh_type: Optional[str] = None
     dh_path: Optional[Path] = None

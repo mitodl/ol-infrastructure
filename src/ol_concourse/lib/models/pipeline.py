@@ -207,7 +207,7 @@ class Command(BaseModel):
             " file to execute, e.g. `/bin/bash` ."
         ),
     )
-    dir: Optional[str | Identifier] = Field(  # noqa: A003
+    dir: Optional[str | Identifier] = Field(
         None,
         description=(
             "A directory, relative to the initial working directory, to set as the "
@@ -223,7 +223,7 @@ class Number(RootModel[float]):
 class DummyConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vars: Optional[dict[str, Any]] = Field(  # noqa: A003
+    vars: Optional[dict[str, Any]] = Field(
         None, description="A mapping of var name to var value."
     )
 
@@ -446,7 +446,7 @@ class AnonymousResource(BaseModel):
             " fetched."
         ),
     )
-    type: Optional[str] = Field(  # noqa: A003
+    type: Optional[str] = Field(
         None,
         description=(
             "The type of the resource. Usually `registry-image` .    You can use any"
@@ -602,7 +602,7 @@ class DummyVarSource(VarSource):
             "dummy_config      vars  vars    A mapping of var name to var value."
         ),
     )
-    type: Optional[Literal["dummy"]] = Field(  # noqa: A003
+    type: Optional[Literal["dummy"]] = Field(
         "dummy",
         description=(
             "The `dummy` type supports configuring a static map of vars to values.   "
@@ -817,7 +817,7 @@ class SetPipelineStep(Step, StepModifierMixin):
             " source:\n    uri: https://github.com/concourse/examples.git\n```"
         ),
     )
-    vars: Optional[Vars] = Field(  # noqa: A003
+    vars: Optional[Vars] = Field(
         None,
         description=(
             "A map of template variables to pass to the pipeline config. Unlike   "
@@ -861,7 +861,7 @@ class SetPipelineStep(Step, StepModifierMixin):
 class LoadVarStep(Step, StepModifierMixin):
     model_config = ConfigDict(extra="forbid")
 
-    format: Optional[Format] = Field(  # noqa: A003
+    format: Optional[Format] = Field(
         None,
         description=(
             "The format of the file's content.    If unset, Concourse will try to"
@@ -1054,7 +1054,7 @@ class Resource(BaseModel):
             " `github` ."
         ),
     )
-    type: Optional[str] = Field(  # noqa: A003
+    type: Optional[str] = Field(
         None,
         description="The  resource-types  resource type  implementing the resource.",
     )
@@ -1132,7 +1132,7 @@ class ResourceType(BaseModel):
             " to a worker's network, for example. See also    schema.tags  ."
         ),
     )
-    type: Optional[Union[str, Identifier]] = Field(  # noqa: A003
+    type: Optional[Union[str, Identifier]] = Field(
         None,
         description=(
             "The type of the resource used to provide the resource type's container "
@@ -1309,7 +1309,7 @@ class GetStep(Step, StepModifierMixin):
 class VaultVarSource(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Optional[Literal["vault"]] = Field(  # noqa: A003
+    type: Optional[Literal["vault"]] = Field(
         None,
         description=(
             "The `vault` type supports configuring a    Vault "
@@ -1618,7 +1618,7 @@ class TaskStep(Step, StepModifierMixin):
             " containerized."
         ),
     )
-    vars: Optional[Vars] = Field(  # noqa: A003
+    vars: Optional[Vars] = Field(
         None,
         description=(
             "A map of template variables to pass to an external task. Not to be "

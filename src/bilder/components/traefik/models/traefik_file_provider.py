@@ -983,7 +983,7 @@ class ForwardAuthMiddleware(BaseModel):
     )
     tls: Optional[Tls2] = Field(
         None,
-        dependencies={"caOptional": ["ca"]},
+        dependencies={"caOptional": ["ca"]},  # type: ignore[call-arg]
         description=(
             "The tls option is the TLS configuration from Traefik to the authentication"
             " server."
