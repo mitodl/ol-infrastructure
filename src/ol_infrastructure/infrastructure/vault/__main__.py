@@ -374,7 +374,6 @@ vault_listener_csr = tls.CertRequest(
         "vault.service.consul",
         "vault.query.consul",
     ],
-    key_algorithm=vault_listener_key.algorithm,
     private_key_pem=vault_listener_key.private_key_pem,
     subject=tls.CertRequestSubjectArgs(
         country="US",
