@@ -5,6 +5,7 @@ PULUMI_WATCHED_PATHS = [
     "src/ol_infrastructure/lib/",
     "src/ol_infrastructure/components/",
     "pipelines/infrastructure/scripts/",
+    "src/bridge/secrets/",
 ]
 PACKER_WATCHED_PATHS = [
     "src/bilder/images/packer.pkr.hcl",
