@@ -66,7 +66,14 @@ vault_pulumi_fragment = pulumi_jobs_chain(
 
 substructure_fragments = []
 
-for substructure in ["pki"]:
+for substructure in [
+    "pki",
+    "static_mounts",
+    "auth",
+    "encryption_mounts",
+    "secrets",
+    "setup",
+]:
     substructure_fragments.append(  # noqa: PERF401
         pulumi_jobs_chain(
             vault_pulumi_substructure_code,
