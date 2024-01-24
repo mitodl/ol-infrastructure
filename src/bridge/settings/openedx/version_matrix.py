@@ -125,7 +125,14 @@ ReleaseMap: dict[
                 application="learning",
                 application_type="MFE",
                 release="quince",
-                branding_overrides=default_branding_overrides,
+                branding_overrides={
+                    "@edx/frontend-component-footer@npm": (
+                        "@mitodl/frontend-component-footer-mitol@quince"
+                    ),
+                    "@edx/frontend-component-header@npm": (
+                        "@mitodl/frontend-component-header-mitol@quince"
+                    ),
+                },
             ),
             OpenEdxApplicationVersion(
                 application="library-authoring",
@@ -143,7 +150,14 @@ ReleaseMap: dict[
                 application="ora-grading",
                 application_type="MFE",
                 release="quince",
-                branding_overrides=default_branding_overrides,
+                branding_overrides={
+                    "@edx/frontend-component-footer@npm": (
+                        "@mitodl/frontend-component-footer-mitol@quince"
+                    ),
+                    "@edx/frontend-component-header@npm": (
+                        "@mitodl/frontend-component-header-mitol@quince"
+                    ),
+                },
             ),
             OpenEdxApplicationVersion(
                 application="xqueue",
@@ -195,7 +209,14 @@ ReleaseMap: dict[
                 application="learning",
                 application_type="MFE",
                 release="quince",
-                branding_overrides=default_branding_overrides,
+                branding_overrides={
+                    "@edx/frontend-component-footer@npm": (
+                        "@mitodl/frontend-component-footer-mitol@quince"
+                    ),
+                    "@edx/frontend-component-header@npm": (
+                        "@mitodl/frontend-component-header-mitol@quince"
+                    ),
+                },
             ),
             OpenEdxApplicationVersion(
                 application="learner-dashboard",
@@ -222,7 +243,14 @@ ReleaseMap: dict[
                 application="ora-grading",
                 application_type="MFE",
                 release="quince",
-                branding_overrides=default_branding_overrides,
+                branding_overrides={
+                    "@edx/frontend-component-footer@npm": (
+                        "@mitodl/frontend-component-footer-mitol@quince"
+                    ),
+                    "@edx/frontend-component-header@npm": (
+                        "@mitodl/frontend-component-header-mitol@quince"
+                    ),
+                },
             ),
             OpenEdxApplicationVersion(
                 application="xqueue",
@@ -267,7 +295,14 @@ ReleaseMap: dict[
                 application="learning",
                 application_type="MFE",
                 release="quince",
-                branding_overrides=default_branding_overrides,
+                branding_overrides={
+                    "@edx/frontend-component-footer@npm": (
+                        "@mitodl/frontend-component-footer-mitol@quince"
+                    ),
+                    "@edx/frontend-component-header@npm": (
+                        "@mitodl/frontend-component-header-mitol@quince"
+                    ),
+                },
             ),
             OpenEdxApplicationVersion(
                 application="library-authoring",
@@ -285,7 +320,14 @@ ReleaseMap: dict[
                 application="ora-grading",
                 application_type="MFE",
                 release="quince",
-                branding_overrides=default_branding_overrides,
+                branding_overrides={
+                    "@edx/frontend-component-footer@npm": (
+                        "@mitodl/frontend-component-footer-mitol@quince"
+                    ),
+                    "@edx/frontend-component-header@npm": (
+                        "@mitodl/frontend-component-header-mitol@quince"
+                    ),
+                },
             ),
         ],
     },
