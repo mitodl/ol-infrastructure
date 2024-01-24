@@ -154,7 +154,10 @@ class VaultPKIKeyTypeBits(int, Enum):
 
 @lru_cache
 def get_vault_provider(
-    vault_address: str, vault_env_namespace: str, provider_name: Optional[str] = None
+    vault_address: str,
+    vault_env_namespace: str,
+    provider_name: Optional[str] = None,
+    skip_child_token: Optional[bool] = None,
 ) -> pulumi.ResourceTransformationResult:
     pulumi_vault_creds = read_yaml_secrets(
         Path().joinpath(
@@ -168,6 +171,7 @@ def get_vault_provider(
         provider_name or "vault-provider",
         address=vault_address,
         add_address_to_env=True,
+        skip_child_token=skip_child_token,
         token="",
         auth_login_userpass=pulumi_vault.ProviderAuthLoginUserpassArgs(
             mount="pulumi",
@@ -181,10 +185,13 @@ def set_vault_provider(
     vault_address: str,
     vault_env_namespace: str,
     resource_args: pulumi.ResourceTransformationArgs,
+    skip_child_token: Optional[bool] = None,
 ) -> pulumi.ResourceTransformationResult:
     if resource_args.type_.split(":")[0] == "vault":
         resource_args.opts.provider = get_vault_provider(
-            vault_address, vault_env_namespace
+            vault_address,
+            vault_env_namespace,
+            skip_child_token=skip_child_token,
         )
     return pulumi.ResourceTransformationResult(
         props=resource_args.props,
@@ -192,9 +199,14 @@ def set_vault_provider(
     )
 
 
-def setup_vault_provider():
+def setup_vault_provider(skip_child_token: Optional[bool] = None):
     vault_address = pulumi.Config("vault").require("address")
     vault_env_namespace = pulumi.Config("vault_server").require("env_namespace")
     pulumi.runtime.register_stack_transformation(
-        partial(set_vault_provider, vault_address, vault_env_namespace)
+        partial(
+            set_vault_provider,
+            vault_address,
+            vault_env_namespace,
+            skip_child_token=skip_child_token,
+        )
     )
