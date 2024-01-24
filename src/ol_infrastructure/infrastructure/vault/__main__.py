@@ -389,7 +389,7 @@ vault_listener_cert = acmpca.Certificate(
     certificate_authority_arn=root_ca["arn"],
     certificate_signing_request=vault_listener_csr.cert_request_pem,
     signing_algorithm="SHA512WITHRSA",
-    validity=acmpca.CertificateValidityArgs(type="YEARS", value="1"),
+    validity=acmpca.CertificateValidityArgs(type="YEARS", value="2"),
 )
 
 ###################
