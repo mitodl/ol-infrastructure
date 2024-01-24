@@ -14,6 +14,8 @@ import pulumi
 import pulumi_vault
 from bridge.secrets.sops import read_yaml_secrets
 
+from ol_infrastructure.lib.pulumi_helper import StackInfo
+
 postgres_role_statements = {
     "approle": {
         "create": Template("CREATE ROLE ${app_name};"),
@@ -199,9 +201,17 @@ def set_vault_provider(
     )
 
 
-def setup_vault_provider(skip_child_token: Optional[bool] = None):
-    vault_address = pulumi.Config("vault").require("address")
-    vault_env_namespace = pulumi.Config("vault_server").require("env_namespace")
+def setup_vault_provider(
+    stack_info: Optional[StackInfo] = None,
+    *,
+    skip_child_token: Optional[bool] = None,
+):
+    if stack_info:
+        vault_address = f"https://vault-{stack_info.env_suffix}.odl.mit.edu"
+        vault_env_namespace = f"operations.{stack_info.env_suffix}"
+    else:
+        vault_address = pulumi.Config("vault").require("address")
+        vault_env_namespace = pulumi.Config("vault_server").require("env_namespace")
     pulumi.runtime.register_stack_transformation(
         partial(
             set_vault_provider,
