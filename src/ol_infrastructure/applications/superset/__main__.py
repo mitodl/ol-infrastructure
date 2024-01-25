@@ -49,7 +49,7 @@ dns_stack = StackReference("infrastructure.aws.dns")
 consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")
 vault_infra_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 vault_mount_stack = StackReference(
-    f"substructure.vault.static_mounts.{stack_info.name}"
+    f"substructure.vault.static_mounts.operations.{stack_info.name}"
 )
 policy_stack = StackReference("infrastructure.aws.policies")
 
