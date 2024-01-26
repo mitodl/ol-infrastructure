@@ -410,6 +410,7 @@ class OLVaultPKIIntermediateEnvBackend(ComponentResource):
             depends_on=[
                 backend_config.parent_intermediate_ca.pki_intermediate_ca_default_issuer
             ],
+            delete_before_replace=True,
         ).merge(opts)
 
         # Create the pki-intermediate-{env} endpoint / mount
