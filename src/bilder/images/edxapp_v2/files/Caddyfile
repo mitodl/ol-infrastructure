@@ -68,6 +68,10 @@
     }
 }
 
+:443/status {
+    import proxy "healthcheck:8907"
+}
+
 :443 {
     reverse_proxy "lms:8000"
     tls /etc/caddy/certificate /etc/caddy/key
