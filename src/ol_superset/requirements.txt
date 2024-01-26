@@ -141,7 +141,7 @@ flask-login==0.6.3
     # via
     #   apache-superset
     #   flask-appbuilder
-flask-migrate==3.1.0
+flask-migrate==4.0.5
     # via apache-superset
 flask-oidc==2.1.1
     # via -r requirements.in
