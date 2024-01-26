@@ -14,12 +14,11 @@ TWELVE_MONTHS = 60 * 60 * 24 * 30 * 12
 
 env_config = Config("environment")
 stack_info = parse_stack()
-pki_intermediate_export = {}
 
 root_ca = StackReference("infrastructure.aws.private_ca").require_output("root_ca")
 root_ca_arn = root_ca["arn"]
 
-setup_vault_provider()
+setup_vault_provider(stack_info)
 
 pki_intermediate_ca_config = OLVaultPKIIntermediateCABackendConfig(
     max_ttl=TWELVE_MONTHS * 5,
@@ -51,21 +50,15 @@ pki_intermediate_ca_export_struct = {
 
 for business_unit in BusinessUnit:
     pki_intermediate_env_config = OLVaultPKIIntermediateEnvBackendConfig(
-        max_ttl=TWELVE_MONTHS,
+        max_ttl=TWELVE_MONTHS * 2,
         default_ttl=TWELVE_MONTHS,
-        environment_name=f"{business_unit.value}",
+        environment_name=business_unit.value,
         acmpca_rootca_arn=root_ca_arn,
         parent_intermediate_ca=pki_intermediate_ca,
-        opts=ResourceOptions(
-            parent=pki_intermediate_ca, depends_on=[pki_intermediate_ca]
-        ),
     )
 
     pki_intermediate_env = OLVaultPKIIntermediateEnvBackend(
         backend_config=pki_intermediate_env_config,
-        opts=ResourceOptions(
-            protect=True, parent=pki_intermediate_ca, depends_on=[pki_intermediate_ca]
-        ),
     )
 
     pki_intermediate_env_export_struct = {
@@ -95,13 +88,9 @@ for business_unit in BusinessUnit:
             0
         ],
     }
-    pki_intermediate_export.update(
-        {
-            f"pki_intermediate_{business_unit.value}": (
-                pki_intermediate_env_export_struct
-            ),
-        }
+
+    export(
+        f"pki_intermediate_{business_unit.value}", pki_intermediate_env_export_struct
     )
 
-export("pki_intermediate_export", pki_intermediate_export)
 export("pki_intermediate_ca", pki_intermediate_ca_export_struct)
