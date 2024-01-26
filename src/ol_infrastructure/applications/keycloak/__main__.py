@@ -435,9 +435,7 @@ vault.aws.AuthBackendRole(
     token_policies=[keycloak_server_vault_policy.name],
 )
 
-vault_pki = vault_pki_stack.require_output("pki_intermediate_export")[
-    "pki_intermediate_operations"
-]
+vault_pki = vault_pki_stack.require_output("pki_intermediate_operations")
 
 vault_pki_issuer_server_role_config = OLVaultPKIIntermediateRoleConfig(
     pki_intermediate_backend_mount_path=vault_pki["mount_path"],
