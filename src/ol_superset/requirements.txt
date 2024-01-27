@@ -326,7 +326,7 @@ python-dateutil==2.8.2
     #   pandas
     #   prophet
     #   trino
-python-dotenv==1.0.0
+python-dotenv==1.0.1
     # via apache-superset
 python-geohash==0.8.5
     # via apache-superset
