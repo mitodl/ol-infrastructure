@@ -34,8 +34,6 @@ from ol_infrastructure.components.aws.auto_scale_group import (
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
-    OLVaultPKIIntermediateRole,
-    OLVaultPKIIntermediateRoleConfig,
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
@@ -44,7 +42,7 @@ from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import VaultPKIKeyTypeBits, setup_vault_provider
+from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
 
@@ -433,34 +431,6 @@ vault.aws.AuthBackendRole(
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[target_vpc_id],
     token_policies=[keycloak_server_vault_policy.name],
-)
-
-vault_pki = vault_pki_stack.require_output("pki_intermediate_operations")
-
-vault_pki_issuer_server_role_config = OLVaultPKIIntermediateRoleConfig(
-    pki_intermediate_backend_mount_path=vault_pki["mount_path"],
-    role_name="keycloak-server-issuer",
-    key_config=VaultPKIKeyTypeBits.rsa,
-    allowed_domains=["mit.edu", "ec2.internal", "service.consul"],
-    allow_subdomains=True,
-    cert_type="server",
-    resource_name="keycloak-server-pki-intermediate-operations-server-issuer-role",
-)
-vault_pki_issuer_server_role = OLVaultPKIIntermediateRole(
-    vault_pki_issuer_server_role_config,
-)
-
-vault_pki_issuer_client_role_config = OLVaultPKIIntermediateRoleConfig(
-    pki_intermediate_backend_mount_path=vault_pki["mount_path"],
-    role_name="keycloak-client-issuer",
-    key_config=VaultPKIKeyTypeBits.rsa,
-    allowed_domains=["mit.edu", "ec2.internal", "service.consul"],
-    allow_subdomains=True,
-    cert_type="client",
-    resource_name="keycloak-server-pki-intermediate-operations-client-issuer-role",
-)
-vault_pki_issuer_client_role = OLVaultPKIIntermediateRole(
-    vault_pki_issuer_client_role_config,
 )
 
 # Vault KV2 mount definition
