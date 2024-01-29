@@ -89,10 +89,10 @@ services:
     - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
   # per node healthcheck container
   healthcheck:
-    - image: mitodl/ol-infra-health-checks:latest
-    - ports:
-      "8097:8097"
-    
+    image: mitodl/ol-infra-health-checks:latest
+    ports:
+    - "8097:8097"
+
 
 # Worker definitions
   lms-migrations:
