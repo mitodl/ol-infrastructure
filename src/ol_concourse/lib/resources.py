@@ -91,7 +91,7 @@ def github_issues(  # noqa: PLR0913
     name: Identifier,
     repository: str,
     issue_prefix: str,
-    auth_method: Literal["token", "app"] = "token",
+    auth_method: Literal["token", "app"] = "app",
     access_token: str = "((github.issues_resource_access_token))",  # noqa: S107
     app_id: str = "((github.issues_resource_app_id))",
     app_installation_id: str = "((github.issues_resource_app_installation_id))",
