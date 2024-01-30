@@ -109,7 +109,7 @@
   "/21L-432S03": "307|keep|https://{{AK_HOSTHEADER}}/courses/literature/21l-432-understanding-television-spring-2003/",
   "/21L-432S08": "307|keep|https://{{AK_HOSTHEADER}}/courses/literature/21l-432-understanding-television-spring-2003/",
   "/21L-448JF10": "307|keep|https://{{AK_HOSTHEADER}}/courses/literature/21l-448j-darwin-and-design-fall-2010/",
-  "/21L-705S14": "307|keep|https://{{AK_HOSTHEADER}}/courses/literature/21l-705-major-authors-old-english-and-beowulf-spring-2014/",
+  "/21L-705S14": "301|keep|https://{{AK_HOSTHEADER}}/courses/21l-601j-old-english-and-beowulf-spring-2023/",
   "/21M-235F14": "307|discard|https://{{AK_HOSTHEADER}}/courses/music-and-theater-arts/21m-235-monteverdi-to-mozart-1600-1800-fall-2013/",
   "/21M-250S14": "307|keep|https://{{AK_HOSTHEADER}}/courses/music-and-theater-arts/21m-250-beethoven-to-mahler-spring-2014/",
   "/21M-303S09": "307|keep|https://{{AK_HOSTHEADER}}/courses/music-and-theater-arts/21m-303-writing-in-tonal-forms-i-spring-2009/",
