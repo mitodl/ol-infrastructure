@@ -175,6 +175,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901
     for index, stack_name in enumerate(stack_names):
         if index + 1 < len(stack_names):
             gh_issues_trigger = github_issues(
+                auth_method="app",
                 name=Identifier(f"github-issues-{stack_name.lower()}-trigger"),
                 repository=github_issue_repository or "mitodl/concourse-workflow",
                 issue_title_template=f"[bot] Pulumi {project_name} {stack_name} "
@@ -186,6 +187,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901
             gh_issues_trigger = None
 
         gh_issues_post = github_issues(
+            auth_method="app",
             name=Identifier(f"github-issues-{stack_name.lower()}-post"),
             repository=github_issue_repository or "mitodl/concourse-workflow",
             issue_title_template=f"[bot] Pulumi {project_name} {stack_name} deployed.",

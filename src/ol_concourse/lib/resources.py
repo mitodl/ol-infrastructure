@@ -91,14 +91,18 @@ def github_issues(  # noqa: PLR0913
     name: Identifier,
     repository: str,
     issue_prefix: str,
+    auth_method: Literal["token", "app"] = "app",
     access_token: str = "((github.issues_resource_access_token))",  # noqa: S107
+    app_id: str = "((github.issues_resource_app_id))",
+    app_installation_id: str = "((github.issues_resource_app_installation_id))",
+    private_ssh_key: str = "((github.issues_resource_private_ssh_key))",
     issue_state: Literal["open", "closed"] = "closed",
     labels: Optional[list[str]] = None,
     assignees: Optional[list[str]] = None,
     issue_title_template: Optional[str] = None,
     issue_body_template: Optional[str] = None,
 ) -> Resource:
-    """Generate a github-release resource for the given owner/repository.
+    """Generate a github-issue resource for the given owner/repository.
 
     :param name: The name of the resource.  This will get used across subsequent
         pipeline steps that reference this resource.
@@ -108,12 +112,12 @@ def github_issues(  # noqa: PLR0913
     :param issue_prefix: A string tobe used to match an issue in the repository for
      the workflow to detect or act upon.
 
-    :returns: A configured Concourse resource object that can be used in a pipeline.
+    :returns: A configured Concourse issue object that can be used in a pipeline.
 
     :rtype: Resource
     """
     issue_config = {
-        "access_token": access_token,
+        "auth_method": auth_method,
         "assignees": assignees,
         "issue_body_template": issue_body_template,
         "issue_prefix": issue_prefix,
@@ -122,6 +126,12 @@ def github_issues(  # noqa: PLR0913
         "labels": labels,
         "repository": repository,
     }
+    if auth_method == "token":
+        issue_config["access_token"] = access_token
+    else:
+        issue_config["app_id"] = app_id
+        issue_config["app_installation_id"] = app_installation_id
+        issue_config["private_ssh_key"] = private_ssh_key
     return Resource(
         name=name,
         type="github-issues",
