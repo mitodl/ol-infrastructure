@@ -30,7 +30,7 @@ def build_keycloak_pipeline() -> Pipeline:
     keycloak_upstream_registry_image = registry_image(
         name=Identifier("keycloak-upstream-image"),
         image_repository="quay.io/keycloak/keycloak",
-        image_tag="23.0",
+        image_tag=KEYCLOAK_VERSION,
     )
     keycloak_customization_repo = git_repo(
         Identifier("ol-keycloak-customization"),
