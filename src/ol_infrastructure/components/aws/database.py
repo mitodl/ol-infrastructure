@@ -195,6 +195,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             auto_minor_version_upgrade=True,
             backup_retention_period=db_config.backup_days,
             copy_tags_to_snapshot=True,
+            db_name=db_config.db_name,
             db_subnet_group_name=db_config.subnet_group_name,
             deletion_protection=db_config.prevent_delete,
             engine=db_config.engine,
@@ -206,7 +207,6 @@ class OLAmazonDB(pulumi.ComponentResource):
             instance_class=db_config.instance_size,
             max_allocated_storage=db_config.max_storage,
             multi_az=db_config.multi_az,
-            db_name=db_config.db_name,
             opts=resource_options.merge(
                 pulumi.ResourceOptions(ignore_changes=["engine_version"])
             ),
@@ -233,12 +233,13 @@ class OLAmazonDB(pulumi.ComponentResource):
                 identifier=f"{db_config.instance_name}-replica",
                 instance_class=db_config.read_replica.instance_size,
                 kms_key_id=self.db_instance.kms_key_id,
+                max_allocated_storage=db_config.max_storage,
                 opts=resource_options,
                 publicly_accessible=db_config.read_replica.public_access,
                 replicate_source_db=self.db_instance.identifier,
                 skip_final_snapshot=True,
-                storage_type=db_config.read_replica.storage_type.value,
                 storage_encrypted=True,
+                storage_type=db_config.read_replica.storage_type.value,
                 tags=db_config.tags,
                 vpc_security_group_ids=[
                     group.id
