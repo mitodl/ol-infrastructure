@@ -196,7 +196,7 @@ lt_config = OLLaunchTemplateConfig(
     block_device_mappings=block_device_mappings,
     image_id=tika_server_ami.id,
     instance_type=tika_config.get("instance_type")
-    or InstanceTypes.general_purpose_large,
+    or InstanceTypes.general_purpose_2xlarge,
     instance_profile_arn=tika_server_instance_profile.arn,
     security_groups=[
         tika_server_security_group,
