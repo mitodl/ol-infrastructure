@@ -90,6 +90,9 @@ services:
   # per node healthcheck container
   healthcheck:
     image: mitodl/ol-infra-health-checks:latest
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - /etc/docker/compose:/etc/docker/compose
     ports:
     - "8097:8097"
 
