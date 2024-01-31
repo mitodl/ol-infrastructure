@@ -49,6 +49,7 @@ config:
   edxapp:sender_email_address: support@xpro.mit.edu
   edxapp:web_node_capacity: "5"
   edxapp:worker_node_capacity: "3"
+  edxapp_worker_instance_type: "m7a.medium"
   mongodb:atlas_project_id: 61b727c6b5bd11656741308b
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
