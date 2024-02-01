@@ -94,7 +94,7 @@ class OLAmazonRedisConfig(OLAmazonCacheConfig):
     auth_token: Optional[PulumiString] = None
     encrypted: bool = True
     engine: str = "redis"
-    engine_version: str = "6.x"
+    engine_version: str = "7.1"
     kms_key_id: Optional[PulumiString] = None
     num_instances: conint(ge=1, le=5) = 1  # type: ignore  # noqa: PGH003
     shard_count: PositiveInt = PositiveInt(1)
