@@ -1,0 +1,7 @@
+---
+name: ol-infrastructure-superset-application
+runtime: python
+description: Provision and maintain the infrastructure required to run the Apache
+  Leek celery montoring application.
+backend:
+  url: s3://mitol-pulumi-state/
