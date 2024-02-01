@@ -93,6 +93,8 @@ services:
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - /etc/docker/compose:/etc/docker/compose
+    profiles:
+    - web
     ports:
     - "8097:8097"
 
