@@ -30,3 +30,4 @@ Both of these applications utilize the same two environment variables for storin
 |-------------|-------------|-------------|-----|
 | 20230625    | Open        | Replaced MIT Open certificate, expires 20240625 | MD |
 | 20230928    | OVS         | OVS Cert expired, replaced with Open certificate above, expires 20240625 | MD |
+| 20240201    | Both        | No action. Verified certificates currently in use. Updated reminder in team calendar. | MD |
