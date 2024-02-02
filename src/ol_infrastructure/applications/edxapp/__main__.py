@@ -1632,6 +1632,7 @@ export(
     {
         "mariadb": edxapp_db.db_instance.address,
         "redis": edxapp_redis_cache.address,
+        "redis_token": edxapp_redis_cache.token,
         "mfe_bucket": mfe_bucket_name,
         "load_balancer": {"dns_name": web_lb.dns_name, "arn": web_lb.arn},
         "ses_configuration_set": edxapp_ses_configuration_set.name,

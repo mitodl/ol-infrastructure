@@ -197,7 +197,33 @@ vault.aws.AuthBackendRole(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
+monitored_aws_apps = {
+    "odl_video": read_yaml_secrets(Path(f"leek/data.{stack_info.env_suffix}.yaml")),
+    "edxapp-mitxonline": read_yaml_secrets(Path(f"leek/data.{stack_info.env}")),
+}
+
+
 leek_secrets = read_yaml_secrets(Path(f"leek/data.{stack_info.env_suffix}.yaml"))
+celery_brokers = leek_config.get_object("monitored_brokers", [])
+leek_agent_subscriptions = []
+for broker in celery_brokers:
+    broker_config = {
+        "broker": f"{broker['protocol']}://{[broker['username'], broker['password']]}@{broker['host']}:{broker['port']}",
+        "broker_management_url": "http://mq:15672",
+        "backend": None,
+        "exchange": "celeryev",
+        "queue": "leek.fanout",
+        "routing_key": "#",
+        "org_name": "mono",
+        "app_name": "leek",
+        "app_env": "prod",
+        "prefetch_count": 1000,
+        "concurrency_pool_size": 2,
+        "batch_max_size_in_mb": 1,
+        "batch_max_number_of_messages": 1000,
+        "batch_max_window_in_seconds": 5,
+    }
+    leek_agent_subscriptions.append(broker_config)
 for path, data in leek_secrets.items():
     vault.kv.SecretV2(
         f"leek-vault-secret-{path}",

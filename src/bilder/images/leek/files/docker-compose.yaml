@@ -4,41 +4,8 @@ services:
   # Main app
   app:
     image: kodhive/leek
-    environment:
-      # General
-    - LEEK_API_LOG_LEVEL=WARNING
-    - LEEK_AGENT_LOG_LEVEL=INFO
-      # Components
-    - LEEK_ENABLE_API=true
-    - LEEK_ENABLE_AGENT=true
-    - LEEK_ENABLE_WEB=true
-      # URLs
-    - LEEK_API_URL=http://0.0.0.0:5000
-    - LEEK_WEB_URL=http://0.0.0.0:8000
-      # Authentication
-    - LEEK_API_ENABLE_AUTH=false
-      # Subscriptions
-    - |
-      LEEK_AGENT_SUBSCRIPTIONS=
-      [
-        {
-          "broker": "amqp://admin:admin@mq//",
-          "broker_management_url": "http://mq:15672",
-          "backend": null,
-          "exchange": "celeryev",
-          "queue": "leek.fanout",
-          "routing_key": "#",
-          "org_name": "mono",
-          "app_name": "leek",
-          "app_env": "prod",
-          "prefetch_count": 1000,
-          "concurrency_pool_size": 2,
-          "batch_max_size_in_mb": 1,
-          "batch_max_number_of_messages": 1000,
-          "batch_max_window_in_seconds": 5
-        }
-      ]
-    - LEEK_AGENT_API_SECRET=not-secret
+    env_file:
+    - .env
     ports:
     - 5000:5000
     - 8000:8000
