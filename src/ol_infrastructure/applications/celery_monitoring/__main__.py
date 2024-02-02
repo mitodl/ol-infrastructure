@@ -208,7 +208,7 @@ celery_brokers = leek_config.get_object("monitored_brokers", [])
 leek_agent_subscriptions = []
 for broker in celery_brokers:
     broker_config = {
-        "broker": f"{broker['protocol']}://{[broker['username'], broker['password']]}@{broker['host']}:{broker['port']}",
+        "broker": f"{broker['protocol']}://{[broker['username'] ,broker['password']]}@{broker['host']}:{broker['port']}",  # noqa: E501
         "broker_management_url": "http://mq:15672",
         "backend": None,
         "exchange": "celeryev",
