@@ -2,6 +2,41 @@
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQGajxbkewesj3PCq3IiGvEkAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMLdJMjR0tj3iBnE3zAgEQgDuyIU42lpmTEO6PIHEU1dyNeIx0UiVTdoUqn4nXWcCOsqlRNWM1o7CyByuiATE23j7d9AIOhwEZxCRvew==
 config:
+  heroku:app_id:
+    secure: v1:d1JeftBc68QcCrCH:tQV5P2EU4H/eF7jMjUied4fIcj2Q6d9ujnhvfn5oxJiPbh41oVff6sWQDs9SUl65gQOTWg==
+  heroku:user: "mitx-devops"
+  heroku_app:vars:
+    AWS_STORAGE_BUCKET_NAME: "ol-xpro-app-ci"
+    CYBERSOURCE_REFERENCE_PREFIX: "xpro-ci"
+    CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
+    CYBERSOURCE_WSDL_URL: "https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.154.wsdl"
+    DIGITAL_CREDENTIALS_SUPPORTED_RUNS: ""
+    ENABLE_ORDER_RECEIPTS: "True"
+    GA_TRACKING_ID: "UA-5145472-40"
+    GTM_TRACKING_ID: "GTM-KJHRV6K"
+    HUBSPOT_ENTERPRISE_PAGE_FORM_ID: "de779fe5-c777-4da5-847b-ed2efc39e987"
+    HUBSPOT_FOOTER_FORM_GUID: "3ab7232f-13e3-43b6-aa6a-305f92208109"
+    HUBSPOT_NEW_COURSES_FORM_GUID: "0c3a6036-a8b2-4de7-80a7-1e409322a6aa"
+    HUBSPOT_PORTAL_ID: 23128026
+    LOGOUT_REDIRECT_URL: "https://courses-ci.xpro.mit.edu/logout"
+    MAILGUN_FROM_EMAIL: "MIT xPRO <no-reply@xpro-ci-mail.odl.mit.edu>"
+    MAILGUN_SENDER_DOMAIN: "xpro-ci-mail.odl.mit.edu"
+    MITOL_HUBSPOT_API_ID_PREFIX: "xpro-ci"
+    MITXPRO_BASE_URL: "https://xpro-ci.odl.mit.edu"
+    MITXPRO_ENVIRONMENT: "xpro-ci"
+    MITXPRO_LOG_LEVEL: "INFO"
+    MITXPRO_SECURE_SSL_HOST: "xpro-ci.odl.mit.edu"
+    OPENEDX_API_BASE_URL: "https://courses-ci.xpro.mit.edu"
+    SENTRY_LOG_LEVEL: "ERROR"
+    SHEETS_DEFERRAL_FIRST_ROW: 184
+    SHEETS_MONITORING_FREQUENCY: 86400
+    SHEETS_REFUND_COMPLETED_DATE_COL: 12
+    SHEETS_REFUND_ERROR_COL: 13
+    SHEETS_REFUND_FIRST_ROW: 254
+    SHEETS_REFUND_PROCESSOR_COL: 11
+    SHEETS_REFUND_SKIP_ROW_COL: 14
+    VOUCHER_COMPANY_ID: 1
+    ZENDESK_DOMAIN_VERIFICATION_TAG_VALUE: "o0itxdfh369m1bw4cuz9"
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
   xpro:db_password:
