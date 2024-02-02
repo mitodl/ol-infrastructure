@@ -224,11 +224,15 @@ for key, data in xpro_vault_secrets.items():
     )
 
 # Heroku App configuration
+# env_name is 'ci' 'rc' or 'production'
+env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 
 # Values that are generally unchanging across environments
 heroku_vars = {
+    "AWS_STORAGE_BUCKET_NAME": f"ol-xpro-app-{env_name}",
     "CRON_COURSERUN_SYNC_HOURS": "*",
     "CYBERSOURCE_MERCHANT_ID": "mit_odl_xpro",
+    "CYBERSOURCE_REFERENCE_PREFIX": f"xpro-{env_name}",
     "CERTIFICATE_CREATION_DELAY_IN_HOURS": 48,
     "FEATURE_COUPON_SHEETS": "True",
     "FEATURE_COUPON_SHEETS_TRACK_REQUESTER": "True",
@@ -243,6 +247,7 @@ heroku_vars = {
     "MITXPRO_DB_CONN_MAX_AGE": 0,
     "MITXPRO_DB_DISABLE_SSL": "True",
     "MITXPRO_EMAIL_TLS": "True",
+    "MITXPRO_ENVIRONMENT": env_name,
     "MITXPRO_FROM_EMAIL": "MIT xPRO <support@xpro.mit.edu>",
     "MITXPRO_OAUTH_PROVIDER": "mitxpro-oauth2",
     "MITXPRO_REPLY_TO_ADDRESS": "MIT xPRO <support@xpro.mit.edu>",
