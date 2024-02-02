@@ -2,6 +2,55 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHg42pDDDGBhpaX14TdtzcK1hbiMYTHsYRH4k5GL5RFpIwGkmvWWRjGZVEsaIcDCbAAnAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM0nzLkwr0lwKzMM8uAgEQgDs4M/ioh+ijwiVK9fQ5KTN+GvChiAKQYBUwBv5RQwr5kB6SLAD4cf7YjK+mCjUbHnxvG4veumZkiRGWmw==
 config:
+  heroku:app_id:
+    secure: v1:CwgCINZqs7rxJOiU:xMp2xgeZd+tGV/v10GRE0fJ7Snuwah5tHbKh2ojO3mbTjBhjI77Gqd6PyvUIBe/H8R8DxQ==
+  heroku:user: "mitx-devops"
+  heroku_app:vars:
+    AWS_STORAGE_BUCKET_NAME: "ol-xpro-app-qa"
+    CSRF_TRUSTED_ORIGINS: "rc.xpro.mit.edu,xpro-rc.odl.mit.edu"
+    CYBERSOURCE_REFERENCE_PREFIX: "xpro-rc"
+    CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
+    CYBERSOURCE_WSDL_URL: "https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.154.wsdl"
+    DIGITAL_CREDENTIALS_SUPPORTED_RUNS: "course-v1:xPRO+TestCourse1+R2,course-v1:xPRO+TestCourse2+R2,program-v1:xPRO+TestProgram"
+    ENABLE_ORDER_RECEIPTS: "True"
+    GA_TRACKING_ID: "UA-5145472-40"
+    GTM_TRACKING_ID: "GTM-KJHRV6K"
+    HUBSPOT_ENTERPRISE_PAGE_FORM_ID: "de779fe5-c777-4da5-847b-ed2efc39e987"
+    HUBSPOT_FOOTER_FORM_GUID: "3ab7232f-13e3-43b6-aa6a-305f92208109"
+    HUBSPOT_ID_PREFIX: "xpro-rc"
+    HUBSPOT_NEW_COURSES_FORM_GUID: "0c3a6036-a8b2-4de7-80a7-1e409322a6aa"
+    HUBSPOT_PORTAL_ID: 23128026
+    LOGOUT_REDIRECT_URL: "https://courses-rc.xpro.mit.edu/logout"
+    MAILGUN_FROM_EMAIL: "MIT xPRO <no-reply@xpro-rc-mail.odl.mit.edu>"
+    MAILGUN_SENDER_DOMAIN: "xpro-rc-mail.odl.mit.edu"
+    MITOL_HUBSPOT_API_ID_PREFIX: "xpro-rc"
+    MITXPRO_BASE_URL: "https://rc.xpro.mit.edu"
+    MITXPRO_ENVIRONMENT: "rc"
+    MITXPRO_LOG_LEVEL: "INFO"
+    MITXPRO_SECURE_SSL_HOST: "rc.xpro.mit.edu"
+    MITXPRO_USE_S3: "True"
+    OPENEDX_API_BASE_URL: "https://courses-rc.xpro.mit.edu"
+    PGBOUNCER_MAX_CLIENT_CONN: 200
+    SENTRY_LOG_LEVEL: "ERROR"
+    SHEETS_DEFERRAL_FIRST_ROW: 184
+    SHEETS_MONITORING_FREQUENCY: 43200
+    SHEETS_REFUND_COMPLETED_DATE_COL: 13
+    SHEETS_REFUND_ERROR_COL: 14
+    SHEETS_REFUND_FIRST_ROW: 254
+    SHEETS_REFUND_PROCESSOR_COL: 12
+    SHEETS_REFUND_SKIP_ROW_COL: 15
+    UWSGI_IGNORE_WRITE_ERRORS: "True"
+    UWSGI_LISTEN: 500
+    UWSGI_MAX_REQUESTS: 2000
+    UWSGI_PROCESSES: 3
+    UWSGI_RELOAD_ON_RSS: 300
+    UWSGI_THREADS: 25
+    UWSGI_WORKER_RELOAD_MERCY: 60
+    VOUCHER_COMPANY_ID: 1
+    WAGTAIL_CACHE_MAX_ENTRIES: 500
+    YOUTUBE_FETCH_SCHEDULE_SECONDS: 7200
+    ZENDESK_DOMAIN_VERIFICATION_TAG_VALUE: "o0itxdfh369m1bw4cuz9"
+    ZENDESK_HELP_WIDGET_ENABLED: "True"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
   xpro:db_password:
