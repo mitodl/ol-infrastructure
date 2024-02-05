@@ -229,7 +229,7 @@ env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 
 # Values that are generally unchanging across environments
 heroku_vars = {
-    "AWS_STORAGE_BUCKET_NAME": f"ol-xpro-app-{env_name}",
+    "AWS_STORAGE_BUCKET_NAME": xpro_storage_bucket_name,
     "CRON_COURSERUN_SYNC_HOURS": "*",
     "CYBERSOURCE_MERCHANT_ID": "mit_odl_xpro",
     "CYBERSOURCE_REFERENCE_PREFIX": f"xpro-{env_name}",
