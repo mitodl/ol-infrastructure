@@ -35,7 +35,7 @@ from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
-leek_config = Config("leek")
+celery_monitoring_config = Config("celery_monitoring")
 stack_info = parse_stack()
 consul_provider = get_consul_provider(stack_info)
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -49,22 +49,24 @@ policy_stack = StackReference("infrastructure.aws.policies")
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]
 data_vpc = network_stack.require_output("data_vpc")
-leek_env = f"data-{stack_info.env_suffix}"
-leek_vault_kv_path = vault_mount_stack.require_output("leek_kv")["path"]
-aws_config = AWSBase(tags={"OU": "data", "Environment": leek_env})
+celery_monitoring_env = f"data-{stack_info.env_suffix}"
+celery_monitoring_vault_kv_path = vault_mount_stack.require_output(
+    "celery_monitoring_kv"
+)["path"]
+aws_config = AWSBase(tags={"OU": "data", "Environment": celery_monitoring_env})
 consul_security_groups = consul_stack.require_output("security_groups")
 
 aws_account = get_caller_identity()
-leek_domain = leek_config.get("domain")
-leek_mail_domain = f"mail.{leek_domain}"
+celery_monitoring_domain = celery_monitoring_config.get("domain")
+celery_monitoring_mail_domain = f"mail.{celery_monitoring_domain}"
 # Create IAM role
 
-leek_bucket_name = f"ol-leek-{stack_info.env_suffix}"
+celery_monitoring_bucket_name = f"ol-celery_monitoring-{stack_info.env_suffix}"
 # Create instance profile for granting access to S3 buckets
-leek_iam_policy = iam.Policy(
-    f"leek-policy-{stack_info.env_suffix}",
-    name=f"leek-policy-{stack_info.env_suffix}",
-    path=f"/ol-data/leek-policy-{stack_info.env_suffix}/",
+celery_monitoring_iam_policy = iam.Policy(
+    f"celery_monitoring-policy-{stack_info.env_suffix}",
+    name=f"celery_monitoring-policy-{stack_info.env_suffix}",
+    path=f"/ol-data/celery_monitoring-policy-{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         policy_document=json.dumps(
             {
@@ -84,8 +86,8 @@ leek_iam_policy = iam.Policy(
                             "s3:DeleteObject*",
                         ],
                         "Resource": [
-                            f"arn:aws:s3:::{leek_bucket_name}",
-                            f"arn:aws:s3:::{leek_bucket_name}/*",
+                            f"arn:aws:s3:::{celery_monitoring_bucket_name}",
+                            f"arn:aws:s3:::{celery_monitoring_bucket_name}/*",
                         ],
                     },
                     {
@@ -93,7 +95,7 @@ leek_iam_policy = iam.Policy(
                         "Action": ["ses:SendEmail", "ses:SendRawEmail"],
                         "Resource": [
                             "arn:*:ses:*:*:identity/*mit.edu",
-                            f"arn:aws:ses:*:*:configuration-set/leek-{leek_env}",
+                            f"arn:aws:ses:*:*:configuration-set/celery_monitoring-{celery_monitoring_env}",
                         ],
                     },
                     {
@@ -109,8 +111,8 @@ leek_iam_policy = iam.Policy(
     description="Policy for granting acces for batch data workflows to AWS resources",
 )
 
-leek_instance_role = iam.Role(
-    "leek-instance-role",
+celery_monitoring_instance_role = iam.Role(
+    "celery_monitoring-instance-role",
     assume_role_policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -121,52 +123,52 @@ leek_instance_role = iam.Role(
             },
         }
     ),
-    name=f"leek-instance-role-{stack_info.env_suffix}",
-    path="/ol-data/leek-role/",
+    name=f"celery_monitoring-instance-role-{stack_info.env_suffix}",
+    path="/ol-data/celery_monitoring-role/",
     tags=aws_config.tags,
 )
 
 iam.RolePolicyAttachment(
-    f"leek-role-policy-{stack_info.env_suffix}",
-    policy_arn=leek_iam_policy.arn,
-    role=leek_instance_role.name,
+    f"celery_monitoring-role-policy-{stack_info.env_suffix}",
+    policy_arn=celery_monitoring_iam_policy.arn,
+    role=celery_monitoring_instance_role.name,
 )
 
 iam.RolePolicyAttachment(
-    f"leek-describe-instance-role-policy-{stack_info.env_suffix}",
+    f"celery_monitoring-describe-instance-role-policy-{stack_info.env_suffix}",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
-    role=leek_instance_role.name,
+    role=celery_monitoring_instance_role.name,
 )
 
 iam.RolePolicyAttachment(
     f"concourse-route53-role-policy-{stack_info.env_suffix}",
     policy_arn=policy_stack.require_output("iam_policies")["route53_ol_zone_records"],
-    role=leek_instance_role.name,
+    role=celery_monitoring_instance_role.name,
 )
 
-leek_profile = iam.InstanceProfile(
-    f"leek-instance-profile-{stack_info.env_suffix}",
-    role=leek_instance_role.name,
-    name=f"leek-instance-profile-{stack_info.env_suffix}",
-    path="/ol-data/leek-profile/",
+celery_monitoring_profile = iam.InstanceProfile(
+    f"celery_monitoring-instance-profile-{stack_info.env_suffix}",
+    role=celery_monitoring_instance_role.name,
+    name=f"celery_monitoring-instance-profile-{stack_info.env_suffix}",
+    path="/ol-data/celery_monitoring-profile/",
 )
 
-leek_security_group = ec2.SecurityGroup(
-    "leek-security-group",
-    name_prefix=f"leek-{leek_env}-",
-    description="Allow leek to connect to Elasticache",
+celery_monitoring_security_group = ec2.SecurityGroup(
+    "celery_monitoring-security-group",
+    name_prefix=f"celery_monitoring-{celery_monitoring_env}-",
+    description="Allow celery_monitoring to connect to Elasticache",
     vpc_id=data_vpc["id"],
     ingress=[],
     egress=[],
     tags=aws_config.merged_tags(
-        {"Name": f"leek-{leek_env}"},
+        {"Name": f"celery_monitoring-{celery_monitoring_env}"},
     ),
 )
 
-# Get the AMI ID for the leek/docker-compose image
-leek_ami = ec2.get_ami(
+# Get the AMI ID for the celery_monitoring/docker-compose image
+celery_monitoring_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["leek-server-*"]),
+        ec2.GetAmiFilterArgs(name="name", values=["celery_monitoring-server-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
     ],
@@ -174,48 +176,56 @@ leek_ami = ec2.get_ami(
     owners=[aws_account.account_id],
 )
 
-# Create a vault policy to allow leek to get to the secrets it needs
-leek_server_vault_policy = vault.Policy(
-    "leek-server-vault-policy",
-    name="leek-server",
-    policy=Path(__file__).parent.joinpath("leek_server_policy.hcl").read_text(),
+# Create a vault policy to allow celery_monitoring to get to the secrets it needs
+celery_monitoring_server_vault_policy = vault.Policy(
+    "celery_monitoring-server-vault-policy",
+    name="celery_monitoring-server",
+    policy=Path(__file__)
+    .parent.joinpath("celery_monitoring_server_policy.hcl")
+    .read_text(),
 )
-# Register leek AMI for Vault AWS auth
+# Register celery_monitoring AMI for Vault AWS auth
 vault.aws.AuthBackendRole(
-    "leek-server-ami-ec2-vault-auth",
+    "celery_monitoring-server-ami-ec2-vault-auth",
     backend="aws",
     auth_type="ec2",
-    role="leek",
+    role="celery_monitoring",
     inferred_aws_region=aws_config.region,
-    bound_iam_instance_profile_arns=[leek_profile.arn],
+    bound_iam_instance_profile_arns=[celery_monitoring_profile.arn],
     bound_ami_ids=[
-        leek_ami.id
+        celery_monitoring_ami.id
     ],  # Reference the new way of doing stuff, not the old one
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[data_vpc["id"]],
-    token_policies=[leek_server_vault_policy.name],
+    token_policies=[celery_monitoring_server_vault_policy.name],
     opts=ResourceOptions(delete_before_replace=True),
 )
 
 monitored_aws_apps = {
-    "odl_video": read_yaml_secrets(Path(f"leek/data.{stack_info.env_suffix}.yaml")),
-    "edxapp-mitxonline": read_yaml_secrets(Path(f"leek/data.{stack_info.env}")),
+    "odl_video": read_yaml_secrets(
+        Path(f"celery_monitoring/data.{stack_info.env_suffix}.yaml")
+    ),
+    "edxapp-mitxonline": read_yaml_secrets(
+        Path(f"celery_monitoring/data.{stack_info.env}")
+    ),
 }
 
 
-leek_secrets = read_yaml_secrets(Path(f"leek/data.{stack_info.env_suffix}.yaml"))
-celery_brokers = leek_config.get_object("monitored_brokers", [])
-leek_agent_subscriptions = []
+celery_monitoring_secrets = read_yaml_secrets(
+    Path(f"celery_monitoring/data.{stack_info.env_suffix}.yaml")
+)
+celery_brokers = celery_monitoring_config.get_object("monitored_brokers", [])
+celery_monitoring_agent_subscriptions = []
 for broker in celery_brokers:
     broker_config = {
         "broker": f"{broker['protocol']}://{[broker['username'] ,broker['password']]}@{broker['host']}:{broker['port']}",  # noqa: E501
         "broker_management_url": "http://mq:15672",
         "backend": None,
         "exchange": "celeryev",
-        "queue": "leek.fanout",
+        "queue": "celery_monitoring.fanout",
         "routing_key": "#",
         "org_name": "mono",
-        "app_name": "leek",
+        "app_name": "celery_monitoring",
         "app_env": "prod",
         "prefetch_count": 1000,
         "concurrency_pool_size": 2,
@@ -223,91 +233,92 @@ for broker in celery_brokers:
         "batch_max_number_of_messages": 1000,
         "batch_max_window_in_seconds": 5,
     }
-    leek_agent_subscriptions.append(broker_config)
-for path, data in leek_secrets.items():
+    celery_monitoring_agent_subscriptions.append(broker_config)
+for path, data in celery_monitoring_secrets.items():
     vault.kv.SecretV2(
-        f"leek-vault-secret-{path}",
-        mount=leek_vault_kv_path,
+        f"celery_monitoring-vault-secret-{path}",
+        mount=celery_monitoring_vault_kv_path,
         name=path,
         data_json=json.dumps(data),
     )
 
 ########################################
-# Create SES Service For leek Emails #
+# Create SES Service For celery_monitoring Emails #
 ########################################
 
-leek_ses_domain_identity = ses.DomainIdentity(
-    "leek-ses-domain-identity",
-    domain=leek_mail_domain,
+celery_monitoring_ses_domain_identity = ses.DomainIdentity(
+    "celery_monitoring-ses-domain-identity",
+    domain=celery_monitoring_mail_domain,
 )
-leek_ses_verification_record = route53.Record(
-    "leek-ses-domain-identity-verification-dns-record",
+celery_monitoring_ses_verification_record = route53.Record(
+    "celery_monitoring-ses-domain-identity-verification-dns-record",
     zone_id=mitol_zone_id,
-    name=leek_ses_domain_identity.id.apply("_amazonses.{}".format),
+    name=celery_monitoring_ses_domain_identity.id.apply("_amazonses.{}".format),
     type="TXT",
     ttl=FIVE_MINUTES,
-    records=[leek_ses_domain_identity.verification_token],
+    records=[celery_monitoring_ses_domain_identity.verification_token],
 )
-leek_ses_domain_identity_verification = ses.DomainIdentityVerification(
-    "leek-ses-domain-identity-verification-resource",
-    domain=leek_ses_domain_identity.id,
-    opts=ResourceOptions(depends_on=[leek_ses_verification_record]),
+celery_monitoring_ses_domain_identity_verification = ses.DomainIdentityVerification(
+    "celery_monitoring-ses-domain-identity-verification-resource",
+    domain=celery_monitoring_ses_domain_identity.id,
+    opts=ResourceOptions(depends_on=[celery_monitoring_ses_verification_record]),
 )
-leek_mail_from_domain = ses.MailFrom(
-    "leek-ses-mail-from-domain",
-    domain=leek_ses_domain_identity_verification.domain,
-    mail_from_domain=leek_ses_domain_identity_verification.domain.apply(
+celery_monitoring_mail_from_domain = ses.MailFrom(
+    "celery_monitoring-ses-mail-from-domain",
+    domain=celery_monitoring_ses_domain_identity_verification.domain,
+    mail_from_domain=celery_monitoring_ses_domain_identity_verification.domain.apply(
         "bounce.{}".format
     ),
 )
-leek_mail_from_address = ses.EmailIdentity(
-    "leek-ses-mail-from-identity",
-    email=leek_config.require("sender_email_address"),
+celery_monitoring_mail_from_address = ses.EmailIdentity(
+    "celery_monitoring-ses-mail-from-identity",
+    email=celery_monitoring_config.require("sender_email_address"),
 )
 # Example Route53 MX record
-leek_ses_domain_mail_from_mx = route53.Record(
-    f"leek-ses-mail-from-mx-record-for-{leek_env}",
+celery_monitoring_ses_domain_mail_from_mx = route53.Record(
+    f"celery_monitoring-ses-mail-from-mx-record-for-{celery_monitoring_env}",
     zone_id=mitol_zone_id,
-    name=leek_mail_from_domain.mail_from_domain,
+    name=celery_monitoring_mail_from_domain.mail_from_domain,
     type="MX",
     ttl=FIVE_MINUTES,
     records=["10 feedback-smtp.us-east-1.amazonses.com"],
 )
 ses_domain_mail_from_txt = route53.Record(
-    "leek-ses-domain-mail-from-text-record",
+    "celery_monitoring-ses-domain-mail-from-text-record",
     zone_id=mitol_zone_id,
-    name=leek_mail_from_domain.mail_from_domain,
+    name=celery_monitoring_mail_from_domain.mail_from_domain,
     type="TXT",
     ttl=FIVE_MINUTES,
     records=["v=spf1 include:amazonses.com -all"],
 )
-leek_ses_domain_dkim = ses.DomainDkim(
-    "leek-ses-domain-dkim", domain=leek_ses_domain_identity.domain
+celery_monitoring_ses_domain_dkim = ses.DomainDkim(
+    "celery_monitoring-ses-domain-dkim",
+    domain=celery_monitoring_ses_domain_identity.domain,
 )
 for loop_counter in range(3):
     route53.Record(
-        f"leek-ses-domain-dkim-record-{loop_counter}",
+        f"celery_monitoring-ses-domain-dkim-record-{loop_counter}",
         zone_id=mitol_zone_id,
-        name=leek_ses_domain_dkim.dkim_tokens[loop_counter].apply(
-            lambda dkim_name: f"{dkim_name}._domainkey.{leek_mail_domain}"
+        name=celery_monitoring_ses_domain_dkim.dkim_tokens[loop_counter].apply(
+            lambda dkim_name: f"{dkim_name}._domainkey.{celery_monitoring_mail_domain}"
         ),
         type="CNAME",
         ttl=FIVE_MINUTES,
         records=[
-            leek_ses_domain_dkim.dkim_tokens[loop_counter].apply(
+            celery_monitoring_ses_domain_dkim.dkim_tokens[loop_counter].apply(
                 "{}.dkim.amazonses.com".format
             )
         ],
     )
-leek_ses_configuration_set = ses.ConfigurationSet(
-    "leek-ses-configuration-set",
+celery_monitoring_ses_configuration_set = ses.ConfigurationSet(
+    "celery_monitoring-ses-configuration-set",
     reputation_metrics_enabled=True,
     sending_enabled=True,
-    name=f"leek-{leek_env}",
+    name=f"celery_monitoring-{celery_monitoring_env}",
 )
-leek_ses_event_destintations = ses.EventDestination(
-    "leek-ses-event-destination-routing",
-    configuration_set_name=leek_ses_configuration_set.name,
+celery_monitoring_ses_event_destintations = ses.EventDestination(
+    "celery_monitoring-ses-event-destination-routing",
+    configuration_set_name=celery_monitoring_ses_configuration_set.name,
     enabled=True,
     matching_types=[
         "send",
@@ -322,7 +333,7 @@ leek_ses_event_destintations = ses.EventDestination(
     cloudwatch_destinations=[
         ses.EventDestinationCloudwatchDestinationArgs(
             default_value="default",
-            dimension_name=f"leek-{leek_env}",
+            dimension_name=f"celery_monitoring-{celery_monitoring_env}",
             value_source="emailHeader",
         )
     ],
@@ -331,26 +342,28 @@ leek_ses_event_destintations = ses.EventDestination(
 # Create an Elasticache cluster for Redis caching and Celery broker
 redis_config = Config("redis")
 redis_cluster_security_group = ec2.SecurityGroup(
-    f"leek-redis-cluster-{leek_env}",
-    name_prefix=f"leek-redis-{leek_env}-",
+    f"celery_monitoring-redis-cluster-{celery_monitoring_env}",
+    name_prefix=f"celery_monitoring-redis-{celery_monitoring_env}-",
     description="Grant access to Redis from Open edX",
     ingress=[
         ec2.SecurityGroupIngressArgs(
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
             protocol="tcp",
-            security_groups=[leek_security_group.id],
+            security_groups=[celery_monitoring_security_group.id],
             description="Allow access from edX to Redis for caching and queueing",
         )
     ],
-    tags=aws_config.merged_tags({"Name": f"leek-redis-{leek_env}"}),
+    tags=aws_config.merged_tags(
+        {"Name": f"celery_monitoring-redis-{celery_monitoring_env}"}
+    ),
     vpc_id=data_vpc["id"],
 )
 
 redis_instance_type = (
     redis_config.get("instance_type") or defaults(stack_info)["redis"]["instance_type"]
 )
-redis_auth_token = leek_secrets["redis"]["token"]
+redis_auth_token = celery_monitoring_secrets["redis"]["token"]
 redis_cache_config = OLAmazonRedisConfig(
     encrypt_transit=True,
     auth_token=redis_auth_token,
@@ -362,25 +375,25 @@ redis_cache_config = OLAmazonRedisConfig(
     shard_count=1,
     auto_upgrade=True,
     cluster_description="Redis cluster for edX platform tasks and caching",
-    cluster_name=f"leek-redis-{leek_env}",
+    cluster_name=f"celery_monitoring-redis-{celery_monitoring_env}",
     security_groups=[redis_cluster_security_group.id],
     subnet_group=data_vpc[
         "elasticache_subnet"
     ],  # the name of the subnet group created in the OLVPC component resource
     tags=aws_config.tags,
 )
-leek_redis_cache = OLAmazonCache(redis_cache_config)
-leek_redis_consul_node = consul.Node(
-    "leek-redis-cache-node",
-    name="leek-redis",
-    address=leek_redis_cache.address,
+celery_monitoring_redis_cache = OLAmazonCache(redis_cache_config)
+celery_monitoring_redis_consul_node = consul.Node(
+    "celery_monitoring-redis-cache-node",
+    name="celery_monitoring-redis",
+    address=celery_monitoring_redis_cache.address,
     opts=consul_provider,
 )
 
-leek_redis_consul_service = consul.Service(
-    "leek-redis-consul-service",
-    node=leek_redis_consul_node.name,
-    name="leek-redis",
+celery_monitoring_redis_consul_service = consul.Service(
+    "celery_monitoring-redis-consul-service",
+    node=celery_monitoring_redis_consul_node.name,
+    name="celery_monitoring-redis",
     port=redis_cache_config.port,
     meta={
         "external-node": True,
@@ -388,14 +401,14 @@ leek_redis_consul_service = consul.Service(
     },
     checks=[
         consul.ServiceCheckArgs(
-            check_id="leek-redis",
+            check_id="celery_monitoring-redis",
             interval="10s",
-            name="leek-redis",
+            name="celery_monitoring-redis",
             timeout="1m0s",
             status="passing",
             tcp=Output.all(
-                address=leek_redis_cache.address,
-                port=leek_redis_cache.cache_cluster.port,
+                address=celery_monitoring_redis_cache.address,
+                port=celery_monitoring_redis_cache.cache_cluster.port,
             ).apply(lambda cluster: "{address}:{port}".format(**cluster)),
         )
     ],
@@ -403,45 +416,52 @@ leek_redis_consul_service = consul.Service(
 )
 
 # Create an auto-scale group for web application servers
-leek_web_acm_cert = acm.Certificate(
-    "leek-load-balancer-acm-certificate",
-    domain_name=leek_domain,
+celery_monitoring_web_acm_cert = acm.Certificate(
+    "celery_monitoring-load-balancer-acm-certificate",
+    domain_name=celery_monitoring_domain,
     validation_method="DNS",
     tags=aws_config.tags,
 )
 
-leek_acm_cert_validation_records = leek_web_acm_cert.domain_validation_options.apply(
-    partial(
-        acm_certificate_validation_records,
-        zone_id=mitol_zone_id,
-        stack_info=stack_info,
+celery_monitoring_acm_cert_validation_records = (
+    celery_monitoring_web_acm_cert.domain_validation_options.apply(
+        partial(
+            acm_certificate_validation_records,
+            zone_id=mitol_zone_id,
+            stack_info=stack_info,
+        )
     )
 )
 
-leek_web_acm_validated_cert = acm.CertificateValidation(
-    "wait-for-leek-acm-cert-validation",
-    certificate_arn=leek_web_acm_cert.arn,
-    validation_record_fqdns=leek_acm_cert_validation_records.apply(
+celery_monitoring_web_acm_validated_cert = acm.CertificateValidation(
+    "wait-for-celery_monitoring-acm-cert-validation",
+    certificate_arn=celery_monitoring_web_acm_cert.arn,
+    validation_record_fqdns=celery_monitoring_acm_cert_validation_records.apply(
         lambda validation_records: [
             validation_record.fqdn for validation_record in validation_records
         ]
     ),
 )
-leek_lb_config = OLLoadBalancerConfig(
+celery_monitoring_lb_config = OLLoadBalancerConfig(
     subnets=data_vpc["subnet_ids"],
     security_groups=[data_vpc["security_groups"]["web"]],
-    tags=aws_config.merged_tags({"Name": f"leek-lb-{stack_info.env_suffix}"}),
-    listener_cert_domain=leek_domain,
-    listener_cert_arn=leek_web_acm_cert.arn,
+    tags=aws_config.merged_tags(
+        {"Name": f"celery_monitoring-lb-{stack_info.env_suffix}"}
+    ),
+    listener_cert_domain=celery_monitoring_domain,
+    listener_cert_arn=celery_monitoring_web_acm_cert.arn,
 )
 
-leek_tg_config = OLTargetGroupConfig(
+celery_monitoring_tg_config = OLTargetGroupConfig(
     vpc_id=data_vpc["id"],
     health_check_interval=60,
     health_check_matcher="200-399",
     health_check_path="/health",
-    health_check_unhealthy_threshold=3,  # give extra time for leek to start up
-    tags=aws_config.merged_tags({"Name": f"leek-tg-{stack_info.env_suffix}"}),
+    # give extra time for celery_monitoring to start up
+    health_check_unhealthy_threshold=3,
+    tags=aws_config.merged_tags(
+        {"Name": f"celery_monitoring-tg-{stack_info.env_suffix}"}
+    ),
 )
 
 consul_datacenter = consul_stack.require_output("datacenter")
@@ -449,30 +469,37 @@ grafana_credentials = read_yaml_secrets(
     Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
 )
 
-leek_web_block_device_mappings = [BlockDeviceMapping(volume_size=50)]
-leek_web_tag_specs = [
+celery_monitoring_web_block_device_mappings = [BlockDeviceMapping(volume_size=50)]
+celery_monitoring_web_tag_specs = [
     TagSpecification(
         resource_type="instance",
-        tags=aws_config.merged_tags({"Name": f"leek-web-{stack_info.env_suffix}"}),
+        tags=aws_config.merged_tags(
+            {"Name": f"celery_monitoring-web-{stack_info.env_suffix}"}
+        ),
     ),
     TagSpecification(
         resource_type="volume",
-        tags=aws_config.merged_tags({"Name": f"leek-web-{stack_info.env_suffix}"}),
+        tags=aws_config.merged_tags(
+            {"Name": f"celery_monitoring-web-{stack_info.env_suffix}"}
+        ),
     ),
 ]
 
-leek_web_lt_config = OLLaunchTemplateConfig(
-    block_device_mappings=leek_web_block_device_mappings,
-    image_id=leek_ami.id,
-    instance_type=leek_config.get("instance_type") or InstanceTypes.burstable_medium,
-    instance_profile_arn=leek_profile.arn,
+celery_monitoring_web_lt_config = OLLaunchTemplateConfig(
+    block_device_mappings=celery_monitoring_web_block_device_mappings,
+    image_id=celery_monitoring_ami.id,
+    instance_type=celery_monitoring_config.get("instance_type")
+    or InstanceTypes.burstable_medium,
+    instance_profile_arn=celery_monitoring_profile.arn,
     security_groups=[
-        leek_security_group.id,
+        celery_monitoring_security_group.id,
         consul_security_groups["consul_agent"],
         data_vpc["security_groups"]["web"],
     ],
-    tags=aws_config.merged_tags({"Name": f"leek-web-{stack_info.env_suffix}"}),
-    tag_specifications=leek_web_tag_specs,
+    tags=aws_config.merged_tags(
+        {"Name": f"celery_monitoring-web-{stack_info.env_suffix}"}
+    ),
+    tag_specifications=celery_monitoring_web_tag_specs,
     user_data=consul_datacenter.apply(
         lambda consul_dc: base64.b64encode(
             "#cloud-config\n{}".format(
@@ -497,7 +524,7 @@ leek_web_lt_config = OLLaunchTemplateConfig(
                                 "content": textwrap.dedent(
                                     f"""\
                             ENVIRONMENT={consul_dc}
-                            APPLICATION=leek
+                            APPLICATION=celery_monitoring
                             SERVICE=data-platform
                             VECTOR_CONFIG_DIR=/etc/vector/
                             AWS_REGION={aws_config.region}
@@ -510,7 +537,7 @@ leek_web_lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/docker/compose/.env",
-                                "content": f"DOMAIN={leek_domain}\nVAULT_ADDR=https://vault-{stack_info.env_suffix}.odl.mit.edu\n",
+                                "content": f"DOMAIN={celery_monitoring_domain}\nVAULT_ADDR=https://vault-{stack_info.env_suffix}.odl.mit.edu\n",
                                 "append": True,
                             },
                             {
@@ -531,55 +558,66 @@ leek_web_lt_config = OLLaunchTemplateConfig(
     ),
 )
 
-leek_web_auto_scale_config = leek_config.get_object("web_auto_scale") or {
+celery_monitoring_web_auto_scale_config = celery_monitoring_config.get_object(
+    "web_auto_scale"
+) or {
     "desired": 1,
     "min": 1,
     "max": 2,
 }
-leek_web_asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"leek-web-{leek_env}",
+celery_monitoring_web_asg_config = OLAutoScaleGroupConfig(
+    asg_name=f"celery_monitoring-web-{celery_monitoring_env}",
     aws_config=aws_config,
     health_check_grace_period=120,
     instance_refresh_warmup=120,
-    desired_size=leek_web_auto_scale_config["desired"],
-    min_size=leek_web_auto_scale_config["min"],
-    max_size=leek_web_auto_scale_config["max"],
+    desired_size=celery_monitoring_web_auto_scale_config["desired"],
+    min_size=celery_monitoring_web_auto_scale_config["min"],
+    max_size=celery_monitoring_web_auto_scale_config["max"],
     vpc_zone_identifiers=data_vpc["subnet_ids"],
-    tags=aws_config.merged_tags({"Name": f"leek-web-{leek_env}"}),
+    tags=aws_config.merged_tags(
+        {"Name": f"celery_monitoring-web-{celery_monitoring_env}"}
+    ),
 )
 
-leek_web_asg = OLAutoScaling(
-    asg_config=leek_web_asg_config,
-    lt_config=leek_web_lt_config,
-    tg_config=leek_tg_config,
-    lb_config=leek_lb_config,
+celery_monitoring_web_asg = OLAutoScaling(
+    asg_config=celery_monitoring_web_asg_config,
+    lt_config=celery_monitoring_web_lt_config,
+    tg_config=celery_monitoring_tg_config,
+    lb_config=celery_monitoring_lb_config,
 )
 
 
 # Create an auto-scale group for Celery workers
-leek_worker_block_device_mappings = [BlockDeviceMapping(volume_size=50)]
-leek_worker_tag_specs = [
+celery_monitoring_worker_block_device_mappings = [BlockDeviceMapping(volume_size=50)]
+celery_monitoring_worker_tag_specs = [
     TagSpecification(
         resource_type="instance",
-        tags=aws_config.merged_tags({"Name": f"leek-worker-{stack_info.env_suffix}"}),
+        tags=aws_config.merged_tags(
+            {"Name": f"celery_monitoring-worker-{stack_info.env_suffix}"}
+        ),
     ),
     TagSpecification(
         resource_type="volume",
-        tags=aws_config.merged_tags({"Name": f"leek-worker-{stack_info.env_suffix}"}),
+        tags=aws_config.merged_tags(
+            {"Name": f"celery_monitoring-worker-{stack_info.env_suffix}"}
+        ),
     ),
 ]
 
-leek_worker_lt_config = OLLaunchTemplateConfig(
-    block_device_mappings=leek_worker_block_device_mappings,
-    image_id=leek_ami.id,
-    instance_type=leek_config.get("instance_type") or InstanceTypes.burstable_medium,
-    instance_profile_arn=leek_profile.arn,
+celery_monitoring_worker_lt_config = OLLaunchTemplateConfig(
+    block_device_mappings=celery_monitoring_worker_block_device_mappings,
+    image_id=celery_monitoring_ami.id,
+    instance_type=celery_monitoring_config.get("instance_type")
+    or InstanceTypes.burstable_medium,
+    instance_profile_arn=celery_monitoring_profile.arn,
     security_groups=[
-        leek_security_group.id,
+        celery_monitoring_security_group.id,
         consul_security_groups["consul_agent"],
     ],
-    tags=aws_config.merged_tags({"Name": f"leek-worker-{stack_info.env_suffix}"}),
-    tag_specifications=leek_worker_tag_specs,
+    tags=aws_config.merged_tags(
+        {"Name": f"celery_monitoring-worker-{stack_info.env_suffix}"}
+    ),
+    tag_specifications=celery_monitoring_worker_tag_specs,
     user_data=consul_datacenter.apply(
         lambda consul_dc: base64.b64encode(
             "#cloud-config\n{}".format(
@@ -604,7 +642,7 @@ leek_worker_lt_config = OLLaunchTemplateConfig(
                                 "content": textwrap.dedent(
                                     f"""\
                             ENVIRONMENT={consul_dc}
-                            APPLICATION=leek
+                            APPLICATION=celery_monitoring
                             SERVICE=data-platform
                             VECTOR_CONFIG_DIR=/etc/vector/
                             AWS_REGION={aws_config.region}
@@ -626,7 +664,7 @@ leek_worker_lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/docker/compose/.env",
-                                "content": f"DOMAIN={leek_domain}\nVAULT_ADDR=https://vault-{stack_info.env_suffix}.odl.mit.edu\n",
+                                "content": f"DOMAIN={celery_monitoring_domain}\nVAULT_ADDR=https://vault-{stack_info.env_suffix}.odl.mit.edu\n",
                                 "append": True,
                             },
                         ]
@@ -638,36 +676,40 @@ leek_worker_lt_config = OLLaunchTemplateConfig(
     ),
 )
 
-leek_worker_auto_scale_config = leek_config.get_object("worker_auto_scale") or {
+celery_monitoring_worker_auto_scale_config = celery_monitoring_config.get_object(
+    "worker_auto_scale"
+) or {
     "desired": 1,
     "min": 1,
     "max": 2,
 }
-leek_worker_asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"leek-worker-{leek_env}",
+celery_monitoring_worker_asg_config = OLAutoScaleGroupConfig(
+    asg_name=f"celery_monitoring-worker-{celery_monitoring_env}",
     aws_config=aws_config,
     health_check_type="EC2",
-    desired_size=leek_worker_auto_scale_config["desired"],
-    min_size=leek_worker_auto_scale_config["min"],
-    max_size=leek_worker_auto_scale_config["max"],
+    desired_size=celery_monitoring_worker_auto_scale_config["desired"],
+    min_size=celery_monitoring_worker_auto_scale_config["min"],
+    max_size=celery_monitoring_worker_auto_scale_config["max"],
     vpc_zone_identifiers=data_vpc["subnet_ids"],
-    tags=aws_config.merged_tags({"Name": f"leek-worker-{leek_env}"}),
+    tags=aws_config.merged_tags(
+        {"Name": f"celery_monitoring-worker-{celery_monitoring_env}"}
+    ),
 )
 
 supserset_worker_asg = OLAutoScaling(
-    asg_config=leek_worker_asg_config,
-    lt_config=leek_worker_lt_config,
+    asg_config=celery_monitoring_worker_asg_config,
+    lt_config=celery_monitoring_worker_lt_config,
 )
 
 
-# Create Route53 DNS records for leek
+# Create Route53 DNS records for celery_monitoring
 five_minutes = 60 * 5
 route53.Record(
-    "leek-server-dns-record",
-    name=leek_config.require("domain"),
+    "celery_monitoring-server-dns-record",
+    name=celery_monitoring_config.require("domain"),
     type="CNAME",
     ttl=five_minutes,
-    records=[leek_web_asg.load_balancer.dns_name],
+    records=[celery_monitoring_web_asg.load_balancer.dns_name],
     zone_id=mitol_zone_id,
     opts=ResourceOptions(delete_before_replace=True),
 )
