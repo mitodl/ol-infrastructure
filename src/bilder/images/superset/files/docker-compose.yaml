@@ -1,7 +1,6 @@
 ---
 x-superset-image: &superset-image mitodl/superset@${SUPERSET_IMAGE_SHA:-latest}
 x-superset-volumes: &superset-volumes
-- ./docker:/app/docker
 - superset_home:/app/superset_home
 
 version: "3.8"
