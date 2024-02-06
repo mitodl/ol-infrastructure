@@ -20,7 +20,7 @@ search_config = pulumi.Config("opensearch")
 env_config = pulumi.Config("environment")
 stack_info = parse_stack()
 
-if stack_info.env_prefix in ["open", "mitopen"]:
+if stack_info.env_prefix in ["open", "mitopen", "celery_monitoring"]:
     consul_stack = pulumi.StackReference(
         f"infrastructure.consul.apps.{stack_info.name}"
     )
@@ -122,9 +122,17 @@ if is_secured_cluster:
         enabled=True,
     )
 
+if search_config.get("domain_name"):
+    domain_name = f"opensearch-{search_config.get('domain_name')}"[
+        :SEARCH_DOMAIN_NAME_MAX_LENGTH
+    ]
+else:
+    domain_name = f"opensearch-{environment_name}"[:SEARCH_DOMAIN_NAME_MAX_LENGTH]
+
+
 search_domain = aws.elasticsearch.Domain(
     "opensearch-domain-cluster",
-    domain_name=f"opensearch-{environment_name}"[:SEARCH_DOMAIN_NAME_MAX_LENGTH],
+    domain_name=domain_name,
     elasticsearch_version=search_config.get("engine_version") or "7.10",
     cluster_config=aws.elasticsearch.DomainClusterConfigArgs(
         zone_awareness_enabled=True,
