@@ -50,7 +50,7 @@ config:
   edxapp:sender_email_address: mitx-support@mit.edu
   edxapp:target_vpc: residential_mitx_vpc
   edxapp:web_instance_type: general_purpose_xlarge
-  edxapp:web_node_capacity: "5"
+  edxapp:web_node_capacity: "9"
   edxapp:worker_disk_size: "50"
   edxapp:worker_node_capacity: "5"
   edxapp:worker_instance_type: "c6a.large"
