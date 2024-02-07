@@ -55,6 +55,7 @@ class OpenEdxVars(BaseModel):
     support_url: str
     terms_of_service_url: str
     trademark_text: Optional[str] = None
+    logo_trademark_url: Optional[str] = None
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -86,7 +87,7 @@ def mfe_params(
         "LOGIN_URL": f"https://{open_edx.lms_domain}/login",
         "LOGOUT_URL": f"https://{open_edx.lms_domain}/logout",
         "LOGO_ALT_TEXT": None,
-        "LOGO_TRADEMARK_URL": open_edx.logo_url,
+        "LOGO_TRADEMARK_URL": open_edx.logo_trademark_url or open_edx.logo_url,
         "LOGO_URL": open_edx.logo_url,
         "LOGO_WHITE_URL": open_edx.logo_url,
         "MARKETING_SITE_BASE_URL": f"https://{open_edx.marketing_site_domain}",
