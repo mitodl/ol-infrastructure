@@ -23,7 +23,7 @@ def build_celery_monitoring_pipeline() -> Pipeline:
         branch=packer_code_branch,
     )
 
-    pulumi_code_branch = "main"
+    pulumi_code_branch = "cpatti_setup_leek"
     pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi"),
         uri="https://github.com/mitodl/ol-infrastructure",
