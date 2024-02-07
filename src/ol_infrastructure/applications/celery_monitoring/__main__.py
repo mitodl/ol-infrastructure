@@ -61,12 +61,12 @@ celery_monitoring_domain = celery_monitoring_config.get("domain")
 celery_monitoring_mail_domain = f"mail.{celery_monitoring_domain}"
 # Create IAM role
 
-celery_monitoring_bucket_name = f"ol-celery_monitoring-{stack_info.env_suffix}"
+celery_monitoring_bucket_name = f"ol-celery-monitoring-{stack_info.env_suffix}"
 # Create instance profile for granting access to S3 buckets
 celery_monitoring_iam_policy = iam.Policy(
-    f"celery_monitoring-policy-{stack_info.env_suffix}",
-    name=f"celery_monitoring-policy-{stack_info.env_suffix}",
-    path=f"/ol-data/celery_monitoring-policy-{stack_info.env_suffix}/",
+    f"celery-monitoring-policy-{stack_info.env_suffix}",
+    name=f"celery-monitoring-policy-{stack_info.env_suffix}",
+    path=f"/ol-data/celery-monitoring-policy-{stack_info.env_suffix}/",
     policy=lint_iam_policy(
         policy_document=json.dumps(
             {
@@ -95,7 +95,7 @@ celery_monitoring_iam_policy = iam.Policy(
                         "Action": ["ses:SendEmail", "ses:SendRawEmail"],
                         "Resource": [
                             "arn:*:ses:*:*:identity/*mit.edu",
-                            f"arn:aws:ses:*:*:configuration-set/celery_monitoring-{celery_monitoring_env}",
+                            f"arn:aws:ses:*:*:configuration-set/celery-monitoring-{celery_monitoring_env}",
                         ],
                     },
                     {
@@ -112,7 +112,7 @@ celery_monitoring_iam_policy = iam.Policy(
 )
 
 celery_monitoring_instance_role = iam.Role(
-    "celery_monitoring-instance-role",
+    "celery-monitoring-instance-role",
     assume_role_policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -123,19 +123,19 @@ celery_monitoring_instance_role = iam.Role(
             },
         }
     ),
-    name=f"celery_monitoring-instance-role-{stack_info.env_suffix}",
-    path="/ol-data/celery_monitoring-role/",
+    name=f"celery-monitoring-instance-role-{stack_info.env_suffix}",
+    path="/ol-data/celery-monitoring-role/",
     tags=aws_config.tags,
 )
 
 iam.RolePolicyAttachment(
-    f"celery_monitoring-role-policy-{stack_info.env_suffix}",
+    f"celery-monitoring-role-policy-{stack_info.env_suffix}",
     policy_arn=celery_monitoring_iam_policy.arn,
     role=celery_monitoring_instance_role.name,
 )
 
 iam.RolePolicyAttachment(
-    f"celery_monitoring-describe-instance-role-policy-{stack_info.env_suffix}",
+    f"celery-monitoring-describe-instance-role-policy-{stack_info.env_suffix}",
     policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
     role=celery_monitoring_instance_role.name,
 )
@@ -147,21 +147,21 @@ iam.RolePolicyAttachment(
 )
 
 celery_monitoring_profile = iam.InstanceProfile(
-    f"celery_monitoring-instance-profile-{stack_info.env_suffix}",
+    f"celery-monitoring-instance-profile-{stack_info.env_suffix}",
     role=celery_monitoring_instance_role.name,
-    name=f"celery_monitoring-instance-profile-{stack_info.env_suffix}",
-    path="/ol-data/celery_monitoring-profile/",
+    name=f"celery-monitoring-instance-profile-{stack_info.env_suffix}",
+    path="/ol-data/celery-monitoring-profile/",
 )
 
 celery_monitoring_security_group = ec2.SecurityGroup(
-    "celery_monitoring-security-group",
-    name_prefix=f"celery_monitoring-{celery_monitoring_env}-",
+    "celery-monitoring-security-group",
+    name_prefix=f"celery-monitoring-{celery_monitoring_env}-",
     description="Allow celery_monitoring to connect to Elasticache",
     vpc_id=data_vpc["id"],
     ingress=[],
     egress=[],
     tags=aws_config.merged_tags(
-        {"Name": f"celery_monitoring-{celery_monitoring_env}"},
+        {"Name": f"celery-monitoring-{celery_monitoring_env}"},
     ),
 )
 
@@ -178,15 +178,15 @@ celery_monitoring_ami = ec2.get_ami(
 
 # Create a vault policy to allow celery_monitoring to get to the secrets it needs
 celery_monitoring_server_vault_policy = vault.Policy(
-    "celery_monitoring-server-vault-policy",
-    name="celery_monitoring-server",
+    "celery-monitoring-server-vault-policy",
+    name="celery-monitoring-server",
     policy=Path(__file__)
     .parent.joinpath("celery_monitoring_server_policy.hcl")
     .read_text(),
 )
 # Register celery_monitoring AMI for Vault AWS auth
 vault.aws.AuthBackendRole(
-    "celery_monitoring-server-ami-ec2-vault-auth",
+    "celery-monitoring-server-ami-ec2-vault-auth",
     backend="aws",
     auth_type="ec2",
     role="celery_monitoring",
@@ -239,7 +239,7 @@ for broker in celery_brokers:
 # the leek bilder project at runtime.
 for path, data in celery_monitoring_secrets.items():
     vault.kv.SecretV2(
-        f"celery_monitoring-vault-secret-{path}",
+        f"celery-monitoring-vault-secret-{path}",
         mount=celery_monitoring_vault_kv_path,
         name=path,
         data_json=json.dumps(data),
@@ -250,11 +250,11 @@ for path, data in celery_monitoring_secrets.items():
 ########################################
 
 celery_monitoring_ses_domain_identity = ses.DomainIdentity(
-    "celery_monitoring-ses-domain-identity",
+    "celery-monitoring-ses-domain-identity",
     domain=celery_monitoring_mail_domain,
 )
 celery_monitoring_ses_verification_record = route53.Record(
-    "celery_monitoring-ses-domain-identity-verification-dns-record",
+    "celery-monitoring-ses-domain-identity-verification-dns-record",
     zone_id=mitol_zone_id,
     name=celery_monitoring_ses_domain_identity.id.apply("_amazonses.{}".format),
     type="TXT",
@@ -262,24 +262,24 @@ celery_monitoring_ses_verification_record = route53.Record(
     records=[celery_monitoring_ses_domain_identity.verification_token],
 )
 celery_monitoring_ses_domain_identity_verification = ses.DomainIdentityVerification(
-    "celery_monitoring-ses-domain-identity-verification-resource",
+    "celery-monitoring-ses-domain-identity-verification-resource",
     domain=celery_monitoring_ses_domain_identity.id,
     opts=ResourceOptions(depends_on=[celery_monitoring_ses_verification_record]),
 )
 celery_monitoring_mail_from_domain = ses.MailFrom(
-    "celery_monitoring-ses-mail-from-domain",
+    "celery-monitoring-ses-mail-from-domain",
     domain=celery_monitoring_ses_domain_identity_verification.domain,
     mail_from_domain=celery_monitoring_ses_domain_identity_verification.domain.apply(
         "bounce.{}".format
     ),
 )
 celery_monitoring_mail_from_address = ses.EmailIdentity(
-    "celery_monitoring-ses-mail-from-identity",
+    "celery-monitoring-ses-mail-from-identity",
     email=celery_monitoring_config.require("sender_email_address"),
 )
 # Example Route53 MX record
 celery_monitoring_ses_domain_mail_from_mx = route53.Record(
-    f"celery_monitoring-ses-mail-from-mx-record-for-{celery_monitoring_env}",
+    f"celery-monitoring-ses-mail-from-mx-record-for-{celery_monitoring_env}",
     zone_id=mitol_zone_id,
     name=celery_monitoring_mail_from_domain.mail_from_domain,
     type="MX",
@@ -287,7 +287,7 @@ celery_monitoring_ses_domain_mail_from_mx = route53.Record(
     records=["10 feedback-smtp.us-east-1.amazonses.com"],
 )
 ses_domain_mail_from_txt = route53.Record(
-    "celery_monitoring-ses-domain-mail-from-text-record",
+    "celery-monitoring-ses-domain-mail-from-text-record",
     zone_id=mitol_zone_id,
     name=celery_monitoring_mail_from_domain.mail_from_domain,
     type="TXT",
@@ -295,12 +295,12 @@ ses_domain_mail_from_txt = route53.Record(
     records=["v=spf1 include:amazonses.com -all"],
 )
 celery_monitoring_ses_domain_dkim = ses.DomainDkim(
-    "celery_monitoring-ses-domain-dkim",
+    "celery-monitoring-ses-domain-dkim",
     domain=celery_monitoring_ses_domain_identity.domain,
 )
 for loop_counter in range(3):
     route53.Record(
-        f"celery_monitoring-ses-domain-dkim-record-{loop_counter}",
+        f"celery-monitoring-ses-domain-dkim-record-{loop_counter}",
         zone_id=mitol_zone_id,
         name=celery_monitoring_ses_domain_dkim.dkim_tokens[loop_counter].apply(
             lambda dkim_name: f"{dkim_name}._domainkey.{celery_monitoring_mail_domain}"
@@ -314,13 +314,13 @@ for loop_counter in range(3):
         ],
     )
 celery_monitoring_ses_configuration_set = ses.ConfigurationSet(
-    "celery_monitoring-ses-configuration-set",
+    "celery-monitoring-ses-configuration-set",
     reputation_metrics_enabled=True,
     sending_enabled=True,
-    name=f"celery_monitoring-{celery_monitoring_env}",
+    name=f"celery-monitoring-{celery_monitoring_env}",
 )
 celery_monitoring_ses_event_destintations = ses.EventDestination(
-    "celery_monitoring-ses-event-destination-routing",
+    "celery-monitoring-ses-event-destination-routing",
     configuration_set_name=celery_monitoring_ses_configuration_set.name,
     enabled=True,
     matching_types=[
@@ -336,7 +336,7 @@ celery_monitoring_ses_event_destintations = ses.EventDestination(
     cloudwatch_destinations=[
         ses.EventDestinationCloudwatchDestinationArgs(
             default_value="default",
-            dimension_name=f"celery_monitoring-{celery_monitoring_env}",
+            dimension_name=f"celery-monitoring-{celery_monitoring_env}",
             value_source="emailHeader",
         )
     ],
@@ -345,8 +345,8 @@ celery_monitoring_ses_event_destintations = ses.EventDestination(
 # Create an Elasticache cluster for Redis caching and Celery broker
 redis_config = Config("redis")
 redis_cluster_security_group = ec2.SecurityGroup(
-    f"celery_monitoring-redis-cluster-{celery_monitoring_env}",
-    name_prefix=f"celery_monitoring-redis-{celery_monitoring_env}-",
+    f"celery-monitoring-redis-cluster-{celery_monitoring_env}",
+    name_prefix=f"celery-monitoring-redis-{celery_monitoring_env}-",
     description="Grant access to Redis from Open edX",
     ingress=[
         ec2.SecurityGroupIngressArgs(
@@ -358,7 +358,7 @@ redis_cluster_security_group = ec2.SecurityGroup(
         )
     ],
     tags=aws_config.merged_tags(
-        {"Name": f"celery_monitoring-redis-{celery_monitoring_env}"}
+        {"Name": f"celery-monitoring-redis-{celery_monitoring_env}"}
     ),
     vpc_id=data_vpc["id"],
 )
@@ -378,7 +378,7 @@ redis_cache_config = OLAmazonRedisConfig(
     shard_count=1,
     auto_upgrade=True,
     cluster_description="Redis cluster for edX platform tasks and caching",
-    cluster_name=f"celery_monitoring-redis-{celery_monitoring_env}",
+    cluster_name=f"celery-monitoring-redis-{celery_monitoring_env}",
     security_groups=[redis_cluster_security_group.id],
     subnet_group=data_vpc[
         "elasticache_subnet"
@@ -387,16 +387,16 @@ redis_cache_config = OLAmazonRedisConfig(
 )
 celery_monitoring_redis_cache = OLAmazonCache(redis_cache_config)
 celery_monitoring_redis_consul_node = consul.Node(
-    "celery_monitoring-redis-cache-node",
-    name="celery_monitoring-redis",
+    "celery-monitoring-redis-cache-node",
+    name="celery-monitoring-redis",
     address=celery_monitoring_redis_cache.address,
     opts=consul_provider,
 )
 
 celery_monitoring_redis_consul_service = consul.Service(
-    "celery_monitoring-redis-consul-service",
+    "celery-monitoring-redis-consul-service",
     node=celery_monitoring_redis_consul_node.name,
-    name="celery_monitoring-redis",
+    name="celery-monitoring-redis",
     port=redis_cache_config.port,
     meta={
         "external-node": True,
@@ -404,9 +404,9 @@ celery_monitoring_redis_consul_service = consul.Service(
     },
     checks=[
         consul.ServiceCheckArgs(
-            check_id="celery_monitoring-redis",
+            check_id="celery-monitoring-redis",
             interval="10s",
-            name="celery_monitoring-redis",
+            name="celery-monitoring-redis",
             timeout="1m0s",
             status="passing",
             tcp=Output.all(
@@ -420,7 +420,7 @@ celery_monitoring_redis_consul_service = consul.Service(
 
 # Create an auto-scale group for web application servers
 celery_monitoring_web_acm_cert = acm.Certificate(
-    "celery_monitoring-load-balancer-acm-certificate",
+    "celery-monitoring-load-balancer-acm-certificate",
     domain_name=celery_monitoring_domain,
     validation_method="DNS",
     tags=aws_config.tags,
@@ -437,7 +437,7 @@ celery_monitoring_acm_cert_validation_records = (
 )
 
 celery_monitoring_web_acm_validated_cert = acm.CertificateValidation(
-    "wait-for-celery_monitoring-acm-cert-validation",
+    "wait-for-celery-monitoring-acm-cert-validation",
     certificate_arn=celery_monitoring_web_acm_cert.arn,
     validation_record_fqdns=celery_monitoring_acm_cert_validation_records.apply(
         lambda validation_records: [
@@ -449,7 +449,7 @@ celery_monitoring_lb_config = OLLoadBalancerConfig(
     subnets=data_vpc["subnet_ids"],
     security_groups=[data_vpc["security_groups"]["web"]],
     tags=aws_config.merged_tags(
-        {"Name": f"celery_monitoring-lb-{stack_info.env_suffix}"}
+        {"Name": f"celery-monitoring-lb-{stack_info.env_suffix}"}
     ),
     listener_cert_domain=celery_monitoring_domain,
     listener_cert_arn=celery_monitoring_web_acm_cert.arn,
@@ -463,7 +463,7 @@ celery_monitoring_tg_config = OLTargetGroupConfig(
     # give extra time for celery_monitoring to start up
     health_check_unhealthy_threshold=3,
     tags=aws_config.merged_tags(
-        {"Name": f"celery_monitoring-tg-{stack_info.env_suffix}"}
+        {"Name": f"celery-monitoring-tg-{stack_info.env_suffix}"}
     ),
 )
 
@@ -477,13 +477,13 @@ celery_monitoring_web_tag_specs = [
     TagSpecification(
         resource_type="instance",
         tags=aws_config.merged_tags(
-            {"Name": f"celery_monitoring-web-{stack_info.env_suffix}"}
+            {"Name": f"celery-monitoring-web-{stack_info.env_suffix}"}
         ),
     ),
     TagSpecification(
         resource_type="volume",
         tags=aws_config.merged_tags(
-            {"Name": f"celery_monitoring-web-{stack_info.env_suffix}"}
+            {"Name": f"celery-monitoring-web-{stack_info.env_suffix}"}
         ),
     ),
 ]
@@ -500,7 +500,7 @@ celery_monitoring_web_lt_config = OLLaunchTemplateConfig(
         data_vpc["security_groups"]["web"],
     ],
     tags=aws_config.merged_tags(
-        {"Name": f"celery_monitoring-web-{stack_info.env_suffix}"}
+        {"Name": f"celery-monitoring-web-{stack_info.env_suffix}"}
     ),
     tag_specifications=celery_monitoring_web_tag_specs,
     user_data=consul_datacenter.apply(
@@ -569,7 +569,7 @@ celery_monitoring_web_auto_scale_config = celery_monitoring_config.get_object(
     "max": 2,
 }
 celery_monitoring_web_asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"celery_monitoring-web-{celery_monitoring_env}",
+    asg_name=f"celery-monitoring-web-{celery_monitoring_env}",
     aws_config=aws_config,
     health_check_grace_period=120,
     instance_refresh_warmup=120,
@@ -578,7 +578,7 @@ celery_monitoring_web_asg_config = OLAutoScaleGroupConfig(
     max_size=celery_monitoring_web_auto_scale_config["max"],
     vpc_zone_identifiers=data_vpc["subnet_ids"],
     tags=aws_config.merged_tags(
-        {"Name": f"celery_monitoring-web-{celery_monitoring_env}"}
+        {"Name": f"celery-monitoring-web-{celery_monitoring_env}"}
     ),
 )
 
@@ -596,13 +596,13 @@ celery_monitoring_worker_tag_specs = [
     TagSpecification(
         resource_type="instance",
         tags=aws_config.merged_tags(
-            {"Name": f"celery_monitoring-worker-{stack_info.env_suffix}"}
+            {"Name": f"celery-monitoring-worker-{stack_info.env_suffix}"}
         ),
     ),
     TagSpecification(
         resource_type="volume",
         tags=aws_config.merged_tags(
-            {"Name": f"celery_monitoring-worker-{stack_info.env_suffix}"}
+            {"Name": f"celery-monitoring-worker-{stack_info.env_suffix}"}
         ),
     ),
 ]
@@ -618,7 +618,7 @@ celery_monitoring_worker_lt_config = OLLaunchTemplateConfig(
         consul_security_groups["consul_agent"],
     ],
     tags=aws_config.merged_tags(
-        {"Name": f"celery_monitoring-worker-{stack_info.env_suffix}"}
+        {"Name": f"celery-monitoring-worker-{stack_info.env_suffix}"}
     ),
     tag_specifications=celery_monitoring_worker_tag_specs,
     user_data=consul_datacenter.apply(
@@ -687,7 +687,7 @@ celery_monitoring_worker_auto_scale_config = celery_monitoring_config.get_object
     "max": 2,
 }
 celery_monitoring_worker_asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"celery_monitoring-worker-{celery_monitoring_env}",
+    asg_name=f"celery-monitoring-worker-{celery_monitoring_env}",
     aws_config=aws_config,
     health_check_type="EC2",
     desired_size=celery_monitoring_worker_auto_scale_config["desired"],
@@ -695,7 +695,7 @@ celery_monitoring_worker_asg_config = OLAutoScaleGroupConfig(
     max_size=celery_monitoring_worker_auto_scale_config["max"],
     vpc_zone_identifiers=data_vpc["subnet_ids"],
     tags=aws_config.merged_tags(
-        {"Name": f"celery_monitoring-worker-{celery_monitoring_env}"}
+        {"Name": f"celery-monitoring-worker-{celery_monitoring_env}"}
     ),
 )
 
@@ -708,7 +708,7 @@ supserset_worker_asg = OLAutoScaling(
 # Create Route53 DNS records for celery_monitoring
 five_minutes = 60 * 5
 route53.Record(
-    "celery_monitoring-server-dns-record",
+    "celery-monitoring-server-dns-record",
     name=celery_monitoring_config.require("domain"),
     type="CNAME",
     ttl=five_minutes,
