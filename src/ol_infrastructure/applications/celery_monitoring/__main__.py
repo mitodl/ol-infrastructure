@@ -168,7 +168,7 @@ celery_monitoring_security_group = ec2.SecurityGroup(
 # Get the AMI ID for the celery_monitoring/docker-compose image
 celery_monitoring_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["celery_monitoring-server-*"]),
+        ec2.GetAmiFilterArgs(name="name", values=["celery-monitoring-server-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
     ],
@@ -234,6 +234,9 @@ for broker in celery_brokers:
         "batch_max_window_in_seconds": 5,
     }
     celery_monitoring_agent_subscriptions.append(broker_config)
+# Actually a single write of the consolidated list object
+# That gets written to vault to be read in via consul template from
+# the leek bilder project at runtime.
 for path, data in celery_monitoring_secrets.items():
     vault.kv.SecretV2(
         f"celery_monitoring-vault-secret-{path}",

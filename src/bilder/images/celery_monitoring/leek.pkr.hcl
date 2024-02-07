@@ -1,6 +1,6 @@
 locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
-  app_name  = "leek"
+  app_name  = "celery-monitoring"
 }
 
 variable "build_environment" {
@@ -18,9 +18,9 @@ variable "node_type" {
   default = "server"
 }
 
-source "amazon-ebs" "leek" {
-  ami_description         = "Deployment image for leek application generated at ${local.timestamp}"
-  ami_name                = "leek-${var.node_type}-${local.timestamp}"
+source "amazon-ebs" "celery-monitoring" {
+  ami_description         = "Deployment image for celery-monitoring application generated at ${local.timestamp}"
+  ami_name                = "celery-monitoring-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
   launch_block_device_mappings {
@@ -76,7 +76,7 @@ source "amazon-ebs" "leek" {
 
 build {
   sources = [
-    "source.amazon-ebs.leek",
+    "source.amazon-ebs.celery-monitoring",
   ]
   # Setup the ssh key locally
   provisioner "shell-local" {

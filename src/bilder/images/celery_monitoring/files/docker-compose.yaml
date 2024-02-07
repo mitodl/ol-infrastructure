@@ -17,7 +17,8 @@ services:
     - LEEK_ES_URL=‘elasticsearch.service.consul’
       # Authentication
     - LEEK_API_ENABLE_AUTH=false
-      # Subscriptions to be handled by Pulumi I think? -CAP
+      # Pulumi code needs to generate list of subscriptions, push them into vault,
+      # and then we wire them in here via Consul template.
       # Subscriptions
       # - |
       #   LEEK_AGENT_SUBSCRIPTIONS=
