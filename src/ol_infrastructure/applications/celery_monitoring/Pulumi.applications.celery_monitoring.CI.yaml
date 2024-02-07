@@ -4,3 +4,9 @@ encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQGJ3TnWvhlQQrGyE2
 config:
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
+  consul:address: https://consul-apps-ci.odl.mit.edu
+  consul:scheme: https
+  opensearch:consul_service_name: 'celery_monitoring-opensearch'
+  environment:business_unit: operations
+  environment:target_vpc: applications_vpc
+  opensearch:domain_name: "celerym"
