@@ -15,7 +15,7 @@ def build_celery_monitoring_pipeline() -> Pipeline:
     celery_monitoring_image = registry_image(
         name=Identifier("upstream-leek-image"), image_repository="kodhive/leek"
     )
-    packer_code_branch = "main"
+    packer_code_branch = "cpatti_setup_leek"
     packer_code = git_repo(
         name=Identifier("ol-infrastructure-packer"),
         uri="https://github.com/mitodl/ol-infrastructure",
