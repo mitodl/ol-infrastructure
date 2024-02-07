@@ -9,11 +9,8 @@ config:
     CSRF_TRUSTED_ORIGINS: "xpro.mit.edu,xpro-web.odl.mit.edu"
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://secureacceptance.cybersource.com/pay"
     CYBERSOURCE_WSDL_URL: "https://ics2wsa.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.154.wsdl"
-    DIGITAL_CREDENTIALS_DEEP_LINK_URL: "dccrequest://request"
     DRIVE_WEBHOOK_EXPIRATION_MINUTES: 1440
     DRIVE_WEBHOOK_RENEWAL_PERIOD_MINUTES: 720
-    ENABLE_ORDER_RECEIPTS: "True"
-    FEATURE_COUPON_SHEETS_ALT_PROCESSING: "False"
     FEATURE_ENABLE_ENTERPRISE: "False"
     GA_TRACKING_ID: "UA-5145472-38"
     GTM_TRACKING_ID: "GTM-KG4FR7J"
@@ -32,7 +29,6 @@ config:
     MITXPRO_SECURE_SSL_HOST: "xpro.mit.edu"
     MITXPRO_USE_S3: "True"
     OPENEDX_API_BASE_URL: "https://courses.xpro.mit.edu"
-    #PGBOUNCER_MAX_CLIENT_CONN: 200
     SENTRY_LOG_LEVEL: "WARN"
     SHEETS_DEFERRAL_FIRST_ROW: 234
     SHEETS_MONITORING_FREQUENCY: 3600

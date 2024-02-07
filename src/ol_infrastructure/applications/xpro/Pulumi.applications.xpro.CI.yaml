@@ -9,7 +9,6 @@ config:
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
     CYBERSOURCE_WSDL_URL: "https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.154.wsdl"
     DIGITAL_CREDENTIALS_SUPPORTED_RUNS: ""
-    ENABLE_ORDER_RECEIPTS: "True"
     GA_TRACKING_ID: "UA-5145472-40"
     GTM_TRACKING_ID: "GTM-KJHRV6K"
     HUBSPOT_ENTERPRISE_PAGE_FORM_ID: "de779fe5-c777-4da5-847b-ed2efc39e987"

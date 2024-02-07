@@ -10,7 +10,6 @@ config:
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
     CYBERSOURCE_WSDL_URL: "https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.154.wsdl"
     DIGITAL_CREDENTIALS_SUPPORTED_RUNS: "course-v1:xPRO+TestCourse1+R2,course-v1:xPRO+TestCourse2+R2,program-v1:xPRO+TestProgram"
-    ENABLE_ORDER_RECEIPTS: "True"
     GA_TRACKING_ID: "UA-5145472-40"
     GTM_TRACKING_ID: "GTM-KJHRV6K"
     HUBSPOT_ENTERPRISE_PAGE_FORM_ID: "de779fe5-c777-4da5-847b-ed2efc39e987"
@@ -27,7 +26,6 @@ config:
     MITXPRO_SECURE_SSL_HOST: "rc.xpro.mit.edu"
     MITXPRO_USE_S3: "True"
     OPENEDX_API_BASE_URL: "https://courses-rc.xpro.mit.edu"
-    PGBOUNCER_MAX_CLIENT_CONN: 200
     SENTRY_LOG_LEVEL: "ERROR"
     SHEETS_DEFERRAL_FIRST_ROW: 184
     SHEETS_MONITORING_FREQUENCY: 43200
