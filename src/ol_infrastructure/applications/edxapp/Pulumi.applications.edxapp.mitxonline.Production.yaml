@@ -18,6 +18,7 @@ config:
   - ["seo.enable_anonymous_courseware_access", "--create", "--superusers", "--staff",
     "--authenticated"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
+  - ["teams.enable_teams_app", "--create", "--superusers", "--staff"]
   edxapp:business_unit: mitxonline
   edxapp:db_password:
     secure: v1:Za4LI6RKfAW7jLJh:hlthF86wmGH6VSiBHgehE8mY11hDfOUK/uYZADbodhCVuS8RSXoCoHtrRrBDNMXunQmHLABw4SM=
