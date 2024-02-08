@@ -57,6 +57,15 @@ class OpenLearningOpenEdxDeployment(Enum):
         return deployment.value
 
 
+pinned_branding_overrides = {
+    "@edx/frontend-component-footer@npm": (
+        "git+https://github.com/mitodl/edx-frontend-component-footer-mitol#v12"
+    ),
+    "@edx/frontend-component-header@npm": (
+        "git+https://github.com/mitodl/edx-frontend-component-header-mitol#v4"
+    ),
+}
+
 default_branding_overrides = {
     "@edx/frontend-component-footer@npm": (
         "@mitodl/frontend-component-footer-mitol@latest"
@@ -77,16 +86,19 @@ ReleaseMap: dict[
                 application="communications",
                 application_type="MFE",
                 release="quince",
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="course-authoring",
                 application_type="MFE",
                 release="quince",
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="discussions",
                 application_type="MFE",
                 release="quince",
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="edx-platform",
@@ -111,6 +123,7 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="quince",
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="learner-dashboard",
@@ -118,21 +131,14 @@ ReleaseMap: dict[
                 release="quince",
                 branding_overrides={
                     "@edx/brand@npm": "@mitodl/brand-mitol-residential@latest",
-                    **default_branding_overrides,
+                    **pinned_branding_overrides,
                 },
             ),
             OpenEdxApplicationVersion(
                 application="learning",
                 application_type="MFE",
                 release="quince",
-                branding_overrides={
-                    "@edx/frontend-component-footer@npm": (
-                        "@mitodl/frontend-component-footer-mitol@quince"
-                    ),
-                    "@edx/frontend-component-header@npm": (
-                        "@mitodl/frontend-component-header-mitol@quince"
-                    ),
-                },
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="library-authoring",
@@ -150,14 +156,7 @@ ReleaseMap: dict[
                 application="ora-grading",
                 application_type="MFE",
                 release="quince",
-                branding_overrides={
-                    "@edx/frontend-component-footer@npm": (
-                        "@mitodl/frontend-component-footer-mitol@quince"
-                    ),
-                    "@edx/frontend-component-header@npm": (
-                        "@mitodl/frontend-component-header-mitol@quince"
-                    ),
-                },
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="xqueue",
@@ -170,16 +169,19 @@ ReleaseMap: dict[
                 application="communications",
                 application_type="MFE",
                 release="quince",
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="course-authoring",
                 application_type="MFE",
                 release="quince",
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="discussions",
                 application_type="MFE",
                 release="quince",
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="edx-platform",
@@ -204,19 +206,13 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="quince",
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="learning",
                 application_type="MFE",
                 release="quince",
-                branding_overrides={
-                    "@edx/frontend-component-footer@npm": (
-                        "@mitodl/frontend-component-footer-mitol@quince"
-                    ),
-                    "@edx/frontend-component-header@npm": (
-                        "@mitodl/frontend-component-header-mitol@quince"
-                    ),
-                },
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="learner-dashboard",
@@ -224,7 +220,7 @@ ReleaseMap: dict[
                 release="quince",
                 branding_overrides={
                     "@edx/brand@npm": "@mitodl/brand-mitol-residential@latest",
-                    **default_branding_overrides,
+                    **pinned_branding_overrides,
                 },
             ),
             OpenEdxApplicationVersion(
@@ -232,7 +228,7 @@ ReleaseMap: dict[
                 application_type="MFE",
                 release="quince",
                 branch_override="master",
-                branding_overrides=default_branding_overrides,
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="notes-api",
@@ -243,14 +239,7 @@ ReleaseMap: dict[
                 application="ora-grading",
                 application_type="MFE",
                 release="quince",
-                branding_overrides={
-                    "@edx/frontend-component-footer@npm": (
-                        "@mitodl/frontend-component-footer-mitol@quince"
-                    ),
-                    "@edx/frontend-component-header@npm": (
-                        "@mitodl/frontend-component-header-mitol@quince"
-                    ),
-                },
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="xqueue",
@@ -263,11 +252,13 @@ ReleaseMap: dict[
                 application="course-authoring",
                 application_type="MFE",
                 release="quince",
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="discussions",
                 application_type="MFE",
                 release="quince",
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="edx-platform",
@@ -290,19 +281,13 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="quince",
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="learning",
                 application_type="MFE",
                 release="quince",
-                branding_overrides={
-                    "@edx/frontend-component-footer@npm": (
-                        "@mitodl/frontend-component-footer-mitol@quince"
-                    ),
-                    "@edx/frontend-component-header@npm": (
-                        "@mitodl/frontend-component-header-mitol@quince"
-                    ),
-                },
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="library-authoring",
@@ -320,14 +305,7 @@ ReleaseMap: dict[
                 application="ora-grading",
                 application_type="MFE",
                 release="quince",
-                branding_overrides={
-                    "@edx/frontend-component-footer@npm": (
-                        "@mitodl/frontend-component-footer-mitol@quince"
-                    ),
-                    "@edx/frontend-component-header@npm": (
-                        "@mitodl/frontend-component-header-mitol@quince"
-                    ),
-                },
+                branding_overrides=pinned_branding_overrides,
             ),
         ],
     },
@@ -342,11 +320,13 @@ ReleaseMap: dict[
                 application="course-authoring",
                 application_type="MFE",
                 release="master",
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="discussions",
                 application_type="MFE",
                 release="master",
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="edx-platform",
@@ -370,6 +350,7 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="master",
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="learning",
@@ -377,19 +358,19 @@ ReleaseMap: dict[
                 release="master",
                 branch_override="open-learning",
                 origin_override="https://github.com/mitodl/frontend-app-learning",
-                branding_overrides=default_branding_overrides,
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="library-authoring",
                 application_type="MFE",
                 release="master",
-                branding_overrides=default_branding_overrides,
+                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="ora-grading",
                 application_type="MFE",
                 release="master",
-                branding_overrides=default_branding_overrides,
+                branding_overrides=pinned_branding_overrides,
             ),
         ],
     },
