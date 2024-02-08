@@ -1,1 +1,1 @@
-edx-proctoring-proctortrack==1.2.1
+git+https://github.com/anupdhabarde/edx-proctoring-proctortrack.git@31c6c9923a51c903ae83760ecbbac191363aa2a2#egg=edx_proctoring_proctortrack
