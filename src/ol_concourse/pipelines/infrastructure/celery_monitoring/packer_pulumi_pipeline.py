@@ -47,9 +47,6 @@ def build_celery_monitoring_pipeline() -> Pipeline:
             "DOCKER_REPO_NAME": f"{celery_monitoring_image.name}/repository",
             "DOCKER_IMAGE_DIGEST": f"{celery_monitoring_image.name}/digest",
         },
-        extra_packer_params={
-            "only": ["amazon-ebs.celery_monitoring"],
-        },
     )
 
     pulumi_fragment = pulumi_jobs_chain(
