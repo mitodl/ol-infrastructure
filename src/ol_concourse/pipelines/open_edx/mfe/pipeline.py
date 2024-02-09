@@ -45,6 +45,7 @@ class OpenEdxVars(BaseModel):
     environment_stage: EnvStage
     favicon_url: str
     honor_code_url: Optional[str] = None
+    learning_base_url: Optional[str] = None
     lms_domain: str
     logo_url: str
     marketing_site_domain: str
@@ -84,6 +85,7 @@ def mfe_params(
             f"{open_edx.environment}-open-edx-language-preference"
         ),
         "LMS_BASE_URL": f"https://{open_edx.lms_domain}",
+        "LEARNING_BASE_URL": f"https://{open_edx.learning_base_url}",
         "LOGIN_URL": f"https://{open_edx.lms_domain}/login",
         "LOGOUT_URL": f"https://{open_edx.lms_domain}/logout",
         "LOGO_ALT_TEXT": None,
