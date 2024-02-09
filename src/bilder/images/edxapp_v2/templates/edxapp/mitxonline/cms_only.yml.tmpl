@@ -17,6 +17,9 @@ SOCIAL_AUTH_EDX_OAUTH2_SECRET: {{ .Data.studio_oauth_client.secret }}
 SOCIAL_AUTH_EDX_OAUTH2_URL_ROOT: https://{{ key "edxapp/lms-domain" }}  # possibly same as public LMS root URL
 SOCIAL_AUTH_EDX_OAUTH2_PUBLIC_URL_ROOT: https://{{ key "edxapp/lms-domain" }}
 SESSION_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-studio-sessionid  # MODIFIED
+#################################################################################################
+# Disable `Learn More ...` links that redirect to edx.readthedocs.io in the Authoring MFE cards #
+#################################################################################################
 CALCULATOR_HELP_URL: ''
 DISCUSSIONS_HELP_URL: ''
 EDXNOTES_HELP_URL: ''
