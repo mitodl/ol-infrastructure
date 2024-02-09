@@ -59,10 +59,10 @@ class OpenLearningOpenEdxDeployment(Enum):
 
 pinned_branding_overrides = {
     "@edx/frontend-component-footer@npm": (
-        "git+https://github.com/mitodl/edx-frontend-component-footer-mitol#v12"
+        "@mitodl/frontend-component-footer-mitol@quince"
     ),
     "@edx/frontend-component-header@npm": (
-        "git+https://github.com/mitodl/edx-frontend-component-header-mitol#v4"
+        "@mitodl/frontend-component-header-mitol@quince"
     ),
 }
 
