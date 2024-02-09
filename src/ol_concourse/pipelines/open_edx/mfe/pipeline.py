@@ -85,7 +85,7 @@ def mfe_params(
             f"{open_edx.environment}-open-edx-language-preference"
         ),
         "LMS_BASE_URL": f"https://{open_edx.lms_domain}",
-        "LEARNING_BASE_URL": f"https://{open_edx.learning_base_url}",
+        "LEARNING_BASE_URL": f"https://{open_edx.lms_domain}/learn",
         "LOGIN_URL": f"https://{open_edx.lms_domain}/login",
         "LOGOUT_URL": f"https://{open_edx.lms_domain}/logout",
         "LOGO_ALT_TEXT": None,
