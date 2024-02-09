@@ -9,6 +9,7 @@ from bridge.settings.openedx.types import (
     EnvStage,
     OpenEdxApplicationVersion,
     OpenEdxDeploymentName,
+    OpenEdxMicroFrontend,
     OpenEdxSupportedRelease,
 )
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
@@ -68,6 +69,7 @@ class OpenEdxVars(BaseModel):
 def mfe_params(
     open_edx: OpenEdxVars, mfe: OpenEdxApplicationVersion
 ) -> dict[str, Optional[str]]:
+    learning_mfe_path = OpenEdxMicroFrontend.learn.path
     return {
         "ABOUT_US_URL": open_edx.about_us_url,
         "ACCESSIBILITY_URL": open_edx.accessibility_url,
@@ -85,7 +87,7 @@ def mfe_params(
             f"{open_edx.environment}-open-edx-language-preference"
         ),
         "LMS_BASE_URL": f"https://{open_edx.lms_domain}",
-        "LEARNING_BASE_URL": f"https://{open_edx.lms_domain}/learn",
+        "LEARNING_BASE_URL": f"https://{open_edx.lms_domain}/{learning_mfe_path}",
         "LOGIN_URL": f"https://{open_edx.lms_domain}/login",
         "LOGOUT_URL": f"https://{open_edx.lms_domain}/logout",
         "LOGO_ALT_TEXT": None,
