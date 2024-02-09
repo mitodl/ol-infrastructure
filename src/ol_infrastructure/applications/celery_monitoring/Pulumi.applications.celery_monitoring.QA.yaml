@@ -10,3 +10,4 @@ config:
   environment:business_unit: operations
   environment:target_vpc: applications_vpc
   opensearch:domain_name: "celerym"
+  celery_monitoring:sender_email_address: ol-devops@mit.edu

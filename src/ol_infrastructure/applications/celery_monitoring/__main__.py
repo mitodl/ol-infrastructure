@@ -12,7 +12,7 @@ from bridge.lib.magic_numbers import (
     FIVE_MINUTES,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, ResourceOptions, StackReference
+from pulumi import Config, Output, ResourceOptions, StackReference, log
 from pulumi_aws import acm, ec2, get_caller_identity, iam, route53, ses
 
 from ol_infrastructure.components.aws.auto_scale_group import (
@@ -46,6 +46,17 @@ vault_mount_stack = StackReference(
     f"substructure.vault.static_mounts.operations.{stack_info.name}"
 )
 policy_stack = StackReference("infrastructure.aws.policies")
+
+# Create a dict of Redis cache addresses for each edxapp stack
+redis_addresses = {}
+for edxapp_stack in ["mitx-staging", "mitx", "mitxonline", "xpro"]:
+    redis_urls = []
+    edxapp_stack_ref = StackReference(
+        f"applications.edxapp.{edxapp_stack}.{stack_info.env_suffix.upper()}"
+    )
+    redis_addresses[edxapp_stack] = edxapp_stack_ref.require_output("redis")
+
+log.debug(f"{redis_addresses=}")
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]
 data_vpc = network_stack.require_output("data_vpc")
@@ -201,6 +212,7 @@ vault.aws.AuthBackendRole(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
+"""
 monitored_aws_apps = {
     "odl_video": read_yaml_secrets(
         Path(f"celery_monitoring/data.{stack_info.env_suffix}.yaml")
@@ -214,6 +226,7 @@ monitored_aws_apps = {
 celery_monitoring_secrets = read_yaml_secrets(
     Path(f"celery_monitoring/data.{stack_info.env_suffix}.yaml")
 )
+
 celery_brokers = celery_monitoring_config.get_object("monitored_brokers", [])
 celery_monitoring_agent_subscriptions = []
 for broker in celery_brokers:
@@ -234,6 +247,7 @@ for broker in celery_brokers:
         "batch_max_window_in_seconds": 5,
     }
     celery_monitoring_agent_subscriptions.append(broker_config)
+
 # Actually a single write of the consolidated list object
 # That gets written to vault to be read in via consul template from
 # the leek bilder project at runtime.
@@ -244,6 +258,7 @@ for path, data in celery_monitoring_secrets.items():
         name=path,
         data_json=json.dumps(data),
     )
+"""
 
 ########################################
 # Create SES Service For celery_monitoring Emails #
@@ -366,7 +381,7 @@ redis_cluster_security_group = ec2.SecurityGroup(
 redis_instance_type = (
     redis_config.get("instance_type") or defaults(stack_info)["redis"]["instance_type"]
 )
-redis_auth_token = celery_monitoring_secrets["redis"]["token"]
+# redis_auth_token = celery_monitoring_secrets["redis"]["token"]
 redis_cache_config = OLAmazonRedisConfig(
     encrypt_transit=True,
     auth_token=redis_auth_token,
