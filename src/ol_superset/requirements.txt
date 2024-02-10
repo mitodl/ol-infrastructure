@@ -86,7 +86,7 @@ cron-descriptor==1.4.3
     # via apache-superset
 croniter==2.0.1
     # via apache-superset
-cryptography==42.0.0
+cryptography==42.0.2
     # via
     #   apache-superset
     #   authlib
