@@ -82,7 +82,7 @@ convertdate==2.4.0
     # via
     #   holidays
     #   prophet
-cron-descriptor==1.4.0
+cron-descriptor==1.4.3
     # via apache-superset
 croniter==2.0.1
     # via apache-superset
