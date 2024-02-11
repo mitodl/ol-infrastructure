@@ -405,7 +405,7 @@ tabulate==0.9.0
     # via apache-superset
 tenacity==8.2.3
     # via celery-redbeat
-tqdm==4.66.1
+tqdm==4.66.2
     # via
     #   cmdstanpy
     #   prophet
