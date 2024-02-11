@@ -135,7 +135,7 @@ flask-cors==4.0.0
     # via apache-superset
 flask-jwt-extended==4.6.0
     # via flask-appbuilder
-flask-limiter==3.5.0
+flask-limiter==3.5.1
     # via flask-appbuilder
 flask-login==0.6.3
     # via
