@@ -244,7 +244,7 @@ msgpack==1.0.7
     # via apache-superset
 nh3==0.2.15
     # via apache-superset
-numpy==1.26.3
+numpy==1.26.4
     # via
     #   apache-superset
     #   cmdstanpy
