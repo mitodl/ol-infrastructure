@@ -151,14 +151,12 @@ files.directory(
 files.download(
     name=f"Download {production_staticfiles_archive_name}",
     src=f"https://ol-eng-artifacts.s3.amazonaws.com/edx-staticfiles/{EDX_INSTALLATION_NAME}/{OPENEDX_RELEASE}/{production_staticfiles_archive_name}",
-    dest=f"/tmp/{nonprod_staticfiles_archive_name}",  # noqa: S108
-    _ignore_errors=True,
+    dest=f"/tmp/{production_staticfiles_archive_name}",  # noqa: S108
 )
 files.download(
     name=f"Download {nonprod_staticfiles_archive_name}",
     src=f"https://ol-eng-artifacts.s3.amazonaws.com/edx-staticfiles/{EDX_INSTALLATION_NAME}/{OPENEDX_RELEASE}/{nonprod_staticfiles_archive_name}",
-    dest=f"/tmp/{production_staticfiles_archive_name}",  # noqa: S108
-    _ignore_errors=True,
+    dest=f"/tmp/{nonprod_staticfiles_archive_name}",  # noqa: S108
 )
 server.shell(
     name=f"Extract {production_staticfiles_archive_name}",
@@ -166,7 +164,6 @@ server.shell(
         f"/usr/bin/tar -xf /tmp/{production_staticfiles_archive_name} "
         "--strip-components 2 -C /opt/staticfiles-production"
     ],
-    _ignore_errors=True,
 )
 server.shell(
     name=f"Extract {nonprod_staticfiles_archive_name}",
@@ -174,7 +171,6 @@ server.shell(
         f"/usr/bin/tar -xf /tmp/{nonprod_staticfiles_archive_name} "
         "--strip-components 2 -C /opt/staticfiles-nonprod"
     ],
-    _ignore_errors=True,
 )
 
 
