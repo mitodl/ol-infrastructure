@@ -332,7 +332,7 @@ python-geohash==0.8.5
     # via apache-superset
 python3-openid==3.2.0
     # via flask-openid
-pytz==2023.3.post1
+pytz==2023.4
     # via
     #   croniter
     #   flask-babel
