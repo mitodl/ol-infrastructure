@@ -4,9 +4,42 @@ encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgF/5cQ+OxyJPAkWCu
 config:
   bootcamps:db_password:
     secure: v1:mKQZW5+6rQ82skp3:FZmwFW32OmgD9n/+HGp/aWBvc62lhZvEBopjiJ0NgVJM5x2YkmDdGGgVcFLqke4+kOWSnMBTAxrFe6g=
-  heroku:vars:
+  heroku:app_id:
+    secure: v1:PEN2YUI53TBbith+:UfaNaFZhYZBavtB0ebukH29xw+pxfIQ7fuQkuDv+GO3Y+ntP89THjzvryHdiPqJYunaPZQ==
+  heroku:user: "mitx-devops"
+  heroku_app:vars:
+    ALLOWED_HOSTS: '["bootcamp.mit.edu", "bootcamps.mit.edu", "bootcamp.odl.mit.edu"]'
+    AWS_STORAGE_BUCKET_NAME: "ol-bootcamps-app-production"
+    BOOTCAMP_ECOMMERCE_BASE_URL: "https://bootcamp.odl.mit.edu"
     BOOTCAMP_ECOMMERCE_SAML_BASE_URL: "https://bootcamps.mit.edu"
+    BOOTCAMP_ENVIRONMENT: "production"
+    BOOTCAMP_LOG_LEVEL: "INFO"
+    BOOTCAMP_SUPPORT_EMAIL: "bootcamp@mit.edu"
+    BOOTCAMP_USE_S3: "True"
+    CYBERSOURCE_REFERENCE_PREFIX: "prod"
+    CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://secureacceptance.cybersource.com/pay"
+    CYBERSOURCE_WSDL_URL: "https://ics2wsa.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.154.wsdl"
+    EDXORG_BASE_URL: "https://courses.edx.org"
+    FEATURE_NOVOED_INTEGRATION: "True"
+    GA_TRACKING_ID: "UA-5145472-18"
+    GTM_TRACKING_ID: "GTM-TFSZHVB"
+    HUBSPOT_API_ID_PREFIX: "bootcamp"
+    HUBSPOT_ID_PREFIX: "bootcamp"
+    HUBSPOT_FOOTER_FORM_GUID: "2d798908-c195-4c0c-b075-a10b0c1b08f3"
+    HUBSPOT_PORTAL_ID: "6119748"
+    JOBMA_BASE_URL: "https://www.jobma.com"
+    MAILGUN_FROM_EMAIL: "MIT Bootcamps <no-reply@mail.bootcamp.odl.mit.edu>"
+    MAILGUN_SENDER_DOMAIN: "mail.bootcamp.odl.mit.edu"
+    MAILGUN_URL: "https://api.mailgun.net/v3/mail.bootcamp.odl.mit.edu"
+    MITOL_HUBSPOT_API_ID_PREFIX: "bootcamp"
+    NEW_RELIC_APP_NAME: "Bootcamp production"
+    NOVOED_BASE_URL: "https://mitbootcamps.novoed.com/"
+    NOVOED_SAML_DEBUG: "False"
+    NOVOED_SAML_LOGIN_URL: "https://app.novoed.com/saml/sso?provider=mitbootcamps"
     SESSION_ENGINE_BACKEND: "cache"
+    SITE_NAME: "MIT Bootcamps"
     USE_X_FORWARDED_HOST: "True"
+    UWSGI_THREADS: "25"
+    UWSGI_WORKERS: "3"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
