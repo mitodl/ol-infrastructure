@@ -4,5 +4,9 @@ encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgF/5cQ+OxyJPAkWCu
 config:
   bootcamps:db_password:
     secure: v1:mKQZW5+6rQ82skp3:FZmwFW32OmgD9n/+HGp/aWBvc62lhZvEBopjiJ0NgVJM5x2YkmDdGGgVcFLqke4+kOWSnMBTAxrFe6g=
+  heroku:vars:
+    BOOTCAMP_ECOMMERCE_SAML_BASE_URL: "https://bootcamps.mit.edu"
+    SESSION_ENGINE_BACKEND: "cache"
+    USE_X_FORWARDED_HOST: "True"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

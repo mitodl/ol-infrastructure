@@ -9,9 +9,10 @@ import json
 from pathlib import Path
 
 import pulumi_vault as vault
+import pulumiverse_heroku as heroku
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, iam, s3
 
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
@@ -20,14 +21,19 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 if Config("vault_server").get("env_namespace"):
-    setup_vault_provider()
+    setup_vault_provider(skip_child_token=True)
+setup_heroku_provider()
+
 bootcamps_config = Config("bootcamps")
+heroku_config = Config("heroku")
+heroku_app_config = Config("heroku_app")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
@@ -220,6 +226,129 @@ for key, data in bootcamps_vault_secrets.items():
         mount=bootcamps_secrets,
         data_json=json.dumps(data),
     )
+
+heroku_vars = {
+    "BOOTCAMP_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
+    "BOOTCAMP_DB_DISABLE_SSL": "True",
+    "BOOTCAMP_EMAIL_TLS": "True",
+    "BOOTCAMP_REPLY_TO_ADDRESS": "MIT Bootcamps <bootcamps-support@mit.edu>",
+    "BOOTCAMP_SECURE_SSL_REDIRECT": "True",
+    "BOOTCAMP_USE_S3": "True",
+    "CYBERSOURCE_MERCHANT_ID": "mit_clb_bootcamp",
+    "ENABLE_STUNNEL_AMAZON_RDS_FIX": "True",
+    "FEATURE_ENABLE_CERTIFICATE_USER_VIEW": "True",
+    "FEATURE_SOCIAL_AUTH_API": "True",
+    "FEATURE_CMS_HOME_PAGE": "True",
+    "HUBSPOT_PIPELINE_ID": "75e28846-ad0d-4be2-a027-5e1da6590b98",
+    "JOBMA_LINK_EXPIRATION_DAYS": 13,
+    "MAX_FILE_UPLOAD_MB": 10,
+    "NODE_MODULES_CACHE": "False",
+    "NOVOED_API_BASE_URL": "https://api.novoed.com/",
+    "PGBOUNCER_DEFAULT_POOL_SIZE": 50,
+    "PGBOUNCER_MIN_POOL_SIZE": 5,
+    "ZENDESK_HELP_WIDGET_ENABLED": "True",
+}
+
+sensitive_heroku_vars = {
+    "CYBERSOURCE_ACCESS_KEY": bootcamps_vault_secrets["cybersource"]["access_key"],
+    "CYBERSOURCE_INQUIRY_LOG_NACL_ENCRYPTION_KEY": bootcamps_vault_secrets[
+        "cybersource"
+    ]["inquiry_public_encryption_key"],
+    "CYBERSOURCE_PROFILE_ID": bootcamps_vault_secrets["cybersource"]["profile_id"],
+    "CYBERSOURCE_SECURITY_KEY": bootcamps_vault_secrets["cybersource"]["security_key"],
+    "CYBERSOURCE_TRANSACTION_KEY": bootcamps_vault_secrets["cybersource"][
+        "transaction_key"
+    ],
+    "EDXORG_CLIENT_ID": bootcamps_vault_secrets["edx"]["client_id"],
+    "EDXORG_CLIENT_SECRET": bootcamps_vault_secrets["edx"]["client_secret"],
+    "JOBMA_ACCESS_TOKEN": bootcamps_vault_secrets["jobma"]["access_token"],
+    "JOBMA_WEBHOOK_ACCESS_TOKEN": bootcamps_vault_secrets["jobma"][
+        "webhook_access_token"
+    ],
+    "MITOL_HUBSPOT_API_PRIVATE_TOKEN": bootcamps_vault_secrets["hubspot"][
+        "api_private_token"
+    ],
+    "NOVOED_API_KEY": bootcamps_vault_secrets["novoed"]["api_key"],
+    "NOVOED_API_SECRET": bootcamps_vault_secrets["novoed"]["api_secret"],
+    "NOVOED_SAML_CERT": bootcamps_vault_secrets["novoed"]["saml_cert"],
+    "NOVOED_SAML_KEY": bootcamps_vault_secrets["novoed"]["saml_key"],
+    "RECAPTCHA_SECRET_KEY": bootcamps_vault_secrets["recaptcha"]["secret_key"],
+    "RECAPTCHA_SITE_KEY": bootcamps_vault_secrets["recaptcha"]["site_key"],
+    "SECRET_KEY": bootcamps_vault_secrets["django"]["secret_key"],
+    "SENTRY_DSN": bootcamps_vault_secrets["sentry"]["dsn"],
+    "STATUS_TOKEN": bootcamps_vault_secrets["django"]["status_token"],
+}
+
+auth_aws_mitx_creds_bootcamps_app = vault.generic.get_secret_output(
+    path="aws-mitx/creds/bootcamps-app",
+    with_lease_start_time=False,
+    opts=InvokeOptions(parent=bootcamps_secrets),
+)
+
+sensitive_heroku_vars[
+    "AWS_ACCESS_KEY_ID"
+] = auth_aws_mitx_creds_bootcamps_app.data.apply(
+    lambda data: "{}".format(data["access_key"])
+)
+sensitive_heroku_vars[
+    "AWS_SECRET_ACCESS_KEY"
+] = auth_aws_mitx_creds_bootcamps_app.data.apply(
+    lambda data: "{}".format(data["secret_key"])
+)
+
+auth_postgres_bootcamps_creds_app = vault.generic.get_secret_output(
+    path=f"{bootcamps_vault_backend_config.mount_point}/creds/app",
+    with_lease_start_time=False,
+    opts=InvokeOptions(parent=bootcamps_secrets),
+)
+
+sensitive_heroku_vars["DATABASE_URL"] = auth_postgres_bootcamps_creds_app.data.apply(
+    lambda data: "postgres://{}:{}@bootcamps-db-applications-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/bootcamps".format(
+        data["username"], data["password"], stack_info.env_suffix
+    )
+)
+
+secret_global_mailgun = vault.generic.get_secret_output(
+    path="secret-global/mailgun",
+    opts=InvokeOptions(parent=bootcamps_secrets),
+)
+sensitive_heroku_vars["MAILGUN_KEY"] = secret_global_mailgun.data.apply(
+    lambda data: "{}".format(data["api_key"])
+)
+
+secret_global_mit_smtp = vault.generic.get_secret_output(
+    path="secret-global/mit-smtp",
+    opts=InvokeOptions(parent=bootcamps_secrets),
+)
+
+sensitive_heroku_vars["BOOTCAMP_EMAIL_HOST"] = secret_global_mit_smtp.data.apply(
+    lambda data: "{}".format(data["relay_host"])
+)
+sensitive_heroku_vars["BOOTCAMP_EMAIL_PASSWORD"] = secret_global_mit_smtp.data.apply(
+    lambda data: "{}".format(data["relay_password"])
+)
+sensitive_heroku_vars["BOOTCAMP_EMAIL_USER"] = secret_global_mit_smtp.data.apply(
+    lambda data: "{}".format(data["relay_username"])
+)
+sensitive_heroku_vars["BOOTCAMP_EMAIL_PORT"] = secret_global_mit_smtp.data.apply(
+    lambda data: "{}".format(data["relay_port"])
+)
+
+# Only production has a hirefire token configured
+if stack_info.env_suffix == "production":
+    sensitive_heroku_vars["HIREFIRE_TOKEN"] = bootcamps_vault_secrets["hirefire"][
+        "token"
+    ]
+
+heroku_vars.update(**heroku_app_config.get_object("vars"))
+
+heroku_app_id = heroku_config.require("app_id")
+bootcamps_heroku_configassociation = heroku.app.ConfigAssociation(
+    f"bootcamps-heroku-configassociation-{stack_info.env_suffix}",
+    app_id=heroku_app_id,
+    sensitive_vars=sensitive_heroku_vars,
+    vars=heroku_vars,
+)
 
 export(
     "bootcamps_app",
