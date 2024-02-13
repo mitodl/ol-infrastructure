@@ -17,10 +17,7 @@ from ol_concourse.lib.tasks import (
 environments = ["ci", "qa", "production"]
 node_classes = ["worker-infra", "worker-ocw", "worker-generic", "web"]
 
-# According to Google 08:00 UTC = 03:00 EST.
-build_schedule = schedule(
-    Identifier("build-schedule"), interval="24h", start="08:00", stop="11:00"
-)
+build_schedule = schedule(Identifier("build-schedule"), "24h")
 
 jobs = []
 group_configs = []

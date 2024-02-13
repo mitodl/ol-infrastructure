@@ -216,17 +216,12 @@ def pypi(
     )
 
 
-def schedule(
-    name: Identifier,
-    interval: str,
-    start: Optional[str] = None,
-    stop: Optional[str] = None,
-) -> Resource:
+def schedule(name: Identifier, interval: str) -> Resource:
     return Resource(
         name=name,
         type="time",
         icon="clock",
-        source={"interval": interval, "start": start, "stop": stop},
+        source={"interval": interval},
     )
 
 
