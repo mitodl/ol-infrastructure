@@ -58,7 +58,6 @@ instance_refresh_pipeline = Pipeline(
     groups=group_configs,
 )
 
-
 if __name__ == "__main__":
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(instance_refresh_pipeline.model_dump_json(indent=2))
