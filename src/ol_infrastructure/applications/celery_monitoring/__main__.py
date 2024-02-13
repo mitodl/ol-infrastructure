@@ -52,7 +52,7 @@ redis_addresses = {}
 for edxapp_stack in ["mitx-staging", "mitx", "mitxonline", "xpro"]:
     redis_urls = []
     edxapp_stack_ref = StackReference(
-        f"applications.edxapp.{edxapp_stack}.{stack_info.env_suffix.upper()}"
+        f"applications.edxapp.{edxapp_stack}.{stack_info.name}"
     )
     redis_addresses[edxapp_stack] = edxapp_stack_ref.require_output("redis")
 
@@ -213,21 +213,30 @@ vault.aws.AuthBackendRole(
 )
 
 """
-monitored_aws_apps = {
-    "odl_video": read_yaml_secrets(
-        Path(f"celery_monitoring/data.{stack_info.env_suffix}.yaml")
-    ),
-    "edxapp-mitxonline": read_yaml_secrets(
-        Path(f"celery_monitoring/data.{stack_info.env}")
-    ),
-}
+# The stack references for loop above supplants this.
+# Also, this smells like rabbit. We need a redis shaped config.
+# - like this:
 
+LEEK_AGENT_SUBSCRIPTIONS=
+[
+  {
+    "broker": "redis://:admin@mq:6379/0",
+    "broker_management_url": "http://mq:6379",
+    "backend": null,
+    "exchange": "celeryev",
+    "queue": "leek.fanout",
+    "routing_key": "#",
+    "org_name": "obytes.com",
+    "app_name": "leek",
+    "app_env": "prod",
+    "prefetch_count": 1000,
+    "concurrency_pool_size": 2,
+    "batch_max_size_in_mb": 1,
+    "batch_max_number_of_messages": 1000,
+    "batch_max_window_in_seconds": 5
+  }
+]
 
-celery_monitoring_secrets = read_yaml_secrets(
-    Path(f"celery_monitoring/data.{stack_info.env_suffix}.yaml")
-)
-
-celery_brokers = celery_monitoring_config.get_object("monitored_brokers", [])
 celery_monitoring_agent_subscriptions = []
 for broker in celery_brokers:
     broker_config = {
@@ -251,13 +260,12 @@ for broker in celery_brokers:
 # Actually a single write of the consolidated list object
 # That gets written to vault to be read in via consul template from
 # the leek bilder project at runtime.
-for path, data in celery_monitoring_secrets.items():
-    vault.kv.SecretV2(
-        f"celery-monitoring-vault-secret-{path}",
-        mount=celery_monitoring_vault_kv_path,
-        name=path,
-        data_json=json.dumps(data),
-    )
+vault.kv.SecretV2(
+    f"celery-monitoring-vault-secret-{path}",
+    mount=celery_monitoring_vault_kv_path,
+    name=path,
+    data_json=json.dumps(data),
+)
 """
 
 ########################################
