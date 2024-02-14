@@ -912,6 +912,9 @@ consul_kv_data = {
     "s3-grades-bucket": grades_bucket_name,
     "s3-storage-bucket": storage_bucket_name,
     "sender-email-address": edxapp_config.require("sender_email_address"),
+    "email-use-course-id-from-for-bulk":  (
+        "true" if edxapp_config.get_bool("email_use_course_id_from_for_bulk") else "false"
+    ),
     "ses-configuration-set": f"edxapp-{env_name}",
     "ses-mail-domain": edxapp_mail_domain,
     "session-cookie-domain": ".{}".format(edxapp_domains["lms"].split(".", 1)[-1]),
