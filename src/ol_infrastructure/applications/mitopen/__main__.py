@@ -262,6 +262,10 @@ interpolation_vars = heroku_app_config.get_object("interpolation_vars")
 
 cors_urls_list = interpolation_vars["cors_urls"] or []
 cors_urls_json = json.dumps(cors_urls_list)
+auth_allowed_redirect_hosts_list = (
+    interpolation_vars["auth_allowed_redirect_hosts"] or []
+)
+auth_allowed_redirect_hosts_json = json.dumps(auth_allowed_redirect_hosts_list)
 
 heroku_interpolated_vars = {
     "ACCESS_TOKEN_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/token",
@@ -274,6 +278,7 @@ heroku_interpolated_vars = {
     "MICROMASTERS_CATALOG_API_URL": f"https://{interpolation_vars['etl_micromasters_host']}/api/v0/catalog/",
     "MITOPEN_CORS_ORIGIN_WHITELIST": cors_urls_json,
     "OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
+    "SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS": auth_allowed_redirect_hosts_json,
     "SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
     "USERINFO_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/userinfo",
     "XPRO_CATALOG_API_URL": f"https://{interpolation_vars['etl_xpro_host']}/api/programs/",

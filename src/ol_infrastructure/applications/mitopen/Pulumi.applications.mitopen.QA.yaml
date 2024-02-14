@@ -35,6 +35,8 @@ config:
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT:
     TIKA_SERVER_ENDPOINT: "https://tika-qa.odl.mit.edu"
   heroku_app:interpolation_vars:
+    auth_allowed_redirect_hosts:
+    - "ocwnext-rc.odl.mit.edu"
     cors_urls:
     - "https://ocwnext-rc.odl.mit.edu"
     - "https://ocw-next.netlify.app"
