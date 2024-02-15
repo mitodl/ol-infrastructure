@@ -184,7 +184,8 @@ services:
       lms-migrations:
         condition: service_completed_successfully
       waffle-flags:
-        condition: service_completed_successfully
+        condition: service_started
+        required: false
 
   process-scheduled-emails:
     image: ${DOCKER_REPO_AND_DIGEST}
@@ -247,4 +248,5 @@ services:
       cms-migrations:
         condition: service_completed_successfully
       waffle-flags:
-        condition: service_completed_successfully
+        condition: service_started
+        required: false
