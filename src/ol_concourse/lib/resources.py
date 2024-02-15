@@ -91,12 +91,11 @@ def github_issues(  # noqa: PLR0913
     name: Identifier,
     repository: str,
     issue_prefix: str,
-    base_url: str = "https://github.mit.edu",
     auth_method: Literal["token", "app"] = "app",
-    access_token: str = "((mit-github.issues_resource_access_token))",  # noqa: S107
-    app_id: str = "((mit-github.issues_resource_app_id))",
-    app_installation_id: str = "((mit-github.issues_resource_app_installation_id))",
-    private_ssh_key: str = "((mit-github.issues_resource_private_ssh_key))",
+    access_token: str = "((github.issues_resource_access_token))",  # noqa: S107
+    app_id: str = "((github.issues_resource_app_id))",
+    app_installation_id: str = "((github.issues_resource_app_installation_id))",
+    private_ssh_key: str = "((github.issues_resource_private_ssh_key))",
     issue_state: Literal["open", "closed"] = "closed",
     labels: Optional[list[str]] = None,
     assignees: Optional[list[str]] = None,
@@ -118,7 +117,6 @@ def github_issues(  # noqa: PLR0913
     :rtype: Resource
     """
     issue_config = {
-        "base_url": base_url,
         "auth_method": auth_method,
         "assignees": assignees,
         "issue_body_template": issue_body_template,
