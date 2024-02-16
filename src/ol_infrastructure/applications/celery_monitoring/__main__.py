@@ -42,6 +42,7 @@ network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
 consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")
 vault_infra_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+# TODO [CAP] Actally create this output from the Vault stack.
 vault_mount_stack = StackReference(
     f"substructure.vault.static_mounts.operations.{stack_info.name}"
 )
@@ -58,6 +59,8 @@ for edxapp_stack in ["mitx-staging", "mitx", "mitxonline", "xpro"]:
         {
             "broker": edxapp_stack_ref.require_output("redis")["address"],
             "broker_management_url": "http://mq:15672",
+            # Does this belong here?
+            "broker_redis_token": edxapp_stack_ref.require_output("redis")["token"],
             "backend": None,
             # Does this want to be the exchange of
             # the leek OpenSearch? I'd think we'd want the edxapp one? What IS it?
@@ -75,19 +78,20 @@ for edxapp_stack in ["mitx-staging", "mitx", "mitxonline", "xpro"]:
         }
     )
 
+celery_monitoring_vault_kv_path = vault_mount_stack.require_output(
+    "celery_monitoring_kv"
+)["path"]
+
 vault.kv.SecretV2(
-    f"celery-monitoring-vault-secret-{path}",
+    "celery-monitoring-vault-secret-redis-brokers",
     mount=celery_monitoring_vault_kv_path,
-    name=path,
+    name="redis_brokers",
     data_json=json.dumps(redis_broker_subscriptions),
 )
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]
 data_vpc = network_stack.require_output("data_vpc")
 celery_monitoring_env = f"data-{stack_info.env_suffix}"
-celery_monitoring_vault_kv_path = vault_mount_stack.require_output(
-    "celery_monitoring_kv"
-)["path"]
 aws_config = AWSBase(tags={"OU": "data", "Environment": celery_monitoring_env})
 consul_security_groups = consul_stack.require_output("security_groups")
 
