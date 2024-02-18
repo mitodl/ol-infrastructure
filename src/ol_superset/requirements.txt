@@ -157,7 +157,7 @@ flask-wtf==1.2.1
     # via
     #   apache-superset
     #   flask-appbuilder
-fonttools==4.48.1
+fonttools==4.49.0
     # via matplotlib
 func-timeout==4.3.5
     # via apache-superset
