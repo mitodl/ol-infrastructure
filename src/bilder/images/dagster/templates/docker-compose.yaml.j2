@@ -13,6 +13,7 @@ services:
       - .env
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
+    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.dagit.rule=Host(`${DAGSTER_HOSTNAME}`)"
@@ -27,6 +28,7 @@ services:
       - .env
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
+    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
   traefik:
     image: traefik:latest
     container_name: traefik
