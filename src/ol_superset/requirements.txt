@@ -212,7 +212,7 @@ kombu==5.3.5
     # via celery
 korean-lunar-calendar==0.3.1
     # via holidays
-limits==3.7.0
+limits==3.9.0
     # via flask-limiter
 lunarcalendar==0.0.9
     # via prophet
