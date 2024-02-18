@@ -11,6 +11,8 @@ services:
     - ":3000"
     env_file:
       - .env
+    environment:
+      - DAGSTER_EXECUTION_IMAGE={{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
@@ -26,6 +28,8 @@ services:
     entrypoint: ["poetry", "run", "dagster-daemon", "run", "-w", "/opt/dagster/app/workspace.yaml"]
     env_file:
       - .env
+    environment:
+      - DAGSTER_EXECUTION_IMAGE={{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
