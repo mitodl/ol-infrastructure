@@ -11,6 +11,8 @@ services:
     - ":3000"
     env_file:
       - .env
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.dagit.rule=Host(`${DAGSTER_HOSTNAME}`)"
@@ -23,82 +25,8 @@ services:
     entrypoint: ["poetry", "run", "dagster-daemon", "run", "-w", "/opt/dagster/app/workspace.yaml"]
     env_file:
       - .env
-  edx-pipeline:
-    image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
-    container_name: edx-pipeline
-    restart: unless-stopped
-    entrypoint: ["poetry", "run", "dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "--package-name", "ol_orchestrate.repositories.open_edx"]
-    ports:
-    - "4000"
     volumes:
-    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
-    env_file:
-      - .env
-  lakehouse-assets-graph:
-    image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
-    container_name: lakehouse-assets-graph
-    restart: unless-stopped
-    ports:
-    - "4000"
-    entrypoint: ["poetry", "run", "dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "--package-name", "ol_orchestrate.definitions.lakehouse.elt"]
-    env_file:
-      - .env
-  tracking-log-reprocessing:
-    image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
-    container_name: tracking-log-reprocessing
-    restart: unless-stopped
-    ports:
-    - "4000"
-    entrypoint: ["poetry", "run", "dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "--package-name", "ol_orchestrate.definitions.edx.normalize_tracking_logs"]
-    volumes:
-    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
-    env_file:
-      - .env
-  edxorg-program-credentials:
-    image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
-    container_name: edxorg-program-credentials
-    restart: unless-stopped
-    ports:
-    - "4000"
-    entrypoint: ["poetry", "run", "dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "--package-name", "ol_orchestrate.definitions.edx.sync_program_credential_reports"]
-    volumes:
-    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
-    - /etc/aws/:/etc/aws/:ro
-    env_file:
-      - .env
-  edx-gcs-courses-pipeline:
-    image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
-    container_name: edx-gcs-courses-pipeline
-    restart: unless-stopped
-    ports:
-    - "4000"
-    entrypoint: ["poetry", "run", "dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "--package-name", "ol_orchestrate.repositories.edx_gcs_courses"]
-    volumes:
-    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
-    env_file:
-      - .env
-  edxorg-raw-data-import:
-    image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
-    container_name: edxorg-raw-data-import
-    restart: unless-stopped
-    ports:
-    - "4000"
-    entrypoint: ["poetry", "run", "dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "--package-name", "ol_orchestrate.definitions.edx.retrieve_irx_edx_exports"]
-    volumes:
-    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
-    env_file:
-      - .env
-  openedx-ol-data-exports:
-    image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
-    container_name: openedx-ol-data-exports
-    restart: unless-stopped
-    ports:
-    - "4000"
-    entrypoint: ["poetry", "run", "dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "--package-name", "ol_orchestrate.definitions.edx.openedx_data_extract"]
-    volumes:
-    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
-    env_file:
-      - .env
+    - /var/run/docker.sock:/var/run/docker.sock
   traefik:
     image: traefik:latest
     container_name: traefik
