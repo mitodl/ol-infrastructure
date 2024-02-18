@@ -12,10 +12,11 @@ services:
     env_file:
       - .env
     environment:
-      - DAGSTER_EXECUTION_IMAGE={{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+      - DAGSTER_CURRENT_IMAGE={{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
+    - /etc/aws/:/etc/aws/:ro
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.dagit.rule=Host(`${DAGSTER_HOSTNAME}`)"
@@ -29,10 +30,11 @@ services:
     env_file:
       - .env
     environment:
-      - DAGSTER_EXECUTION_IMAGE={{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+      - DAGSTER_CURRENT_IMAGE={{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
+    - /etc/aws/:/etc/aws/:ro
   traefik:
     image: traefik:latest
     container_name: traefik
