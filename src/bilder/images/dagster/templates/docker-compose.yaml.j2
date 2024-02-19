@@ -14,7 +14,6 @@ services:
     environment:
       - DAGSTER_CURRENT_IMAGE={{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     - /etc/aws/:/etc/aws/:ro
     labels:
@@ -32,7 +31,6 @@ services:
     environment:
       - DAGSTER_CURRENT_IMAGE={{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     - /etc/aws/:/etc/aws/:ro
   traefik:
