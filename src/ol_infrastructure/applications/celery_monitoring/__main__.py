@@ -4,7 +4,6 @@ import textwrap
 from functools import partial
 from pathlib import Path
 
-import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
 from bridge.lib.magic_numbers import (
@@ -12,7 +11,7 @@ from bridge.lib.magic_numbers import (
     FIVE_MINUTES,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, ResourceOptions, StackReference
+from pulumi import Config, ResourceOptions, StackReference
 from pulumi_aws import acm, ec2, get_caller_identity, iam, route53, ses
 
 from ol_infrastructure.components.aws.auto_scale_group import (
@@ -24,14 +23,12 @@ from ol_infrastructure.components.aws.auto_scale_group import (
     OLTargetGroupConfig,
     TagSpecification,
 )
-from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
-from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
@@ -41,11 +38,14 @@ consul_provider = get_consul_provider(stack_info)
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
 consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")
+opensearch_stack = StackReference(
+    f"infrastructure.aws.opensearch.celery_monitoring.{stack_info.name}"
+)
 vault_infra_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-# TODO [CAP] Actally create this output from the Vault stack.
 vault_mount_stack = StackReference(
     f"substructure.vault.static_mounts.operations.{stack_info.name}"
 )
+
 policy_stack = StackReference("infrastructure.aws.policies")
 
 # Create a dict of Redis cache addresses for each edxapp stack
