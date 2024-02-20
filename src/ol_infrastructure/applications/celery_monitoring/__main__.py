@@ -3,6 +3,7 @@ import json
 import textwrap
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 import pulumi_vault as vault
 import yaml
@@ -11,7 +12,7 @@ from bridge.lib.magic_numbers import (
     FIVE_MINUTES,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, Output, ResourceOptions, StackReference
 from pulumi_aws import acm, ec2, get_caller_identity, iam, route53, ses
 
 from ol_infrastructure.components.aws.auto_scale_group import (
@@ -28,7 +29,7 @@ from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_po
 from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import StackInfo, parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
@@ -49,18 +50,17 @@ vault_mount_stack = StackReference(
 policy_stack = StackReference("infrastructure.aws.policies")
 
 # Create a dict of Redis cache addresses for each edxapp stack
-redis_addresses = {}
-redis_broker_subscriptions = []
-for edxapp_stack in ["mitx-staging", "mitx", "mitxonline", "xpro"]:
-    edxapp_stack_ref = StackReference(
-        f"applications.edxapp.{edxapp_stack}.{stack_info.name}"
-    )
-    redis_broker_subscriptions.append(
+def build_broker_subscriptions(*stack_references: tuple[StackInfo, Output]) -> str:
+
+    redis_addresses = {}
+    redis_broker_subscriptions = []
+    for stack, redis_output in stack_references:
+        redis_broker_subscriptions.append(
         {
-            "broker": edxapp_stack_ref.require_output("redis")["address"],
+            "broker": redis_output["address"],
             "broker_management_url": "http://mq:15672",
             # Does this belong here?
-            "broker_redis_token": edxapp_stack_ref.require_output("redis")["token"],
+            "broker_redis_token": redis_output["token"],
             "backend": None,
             # Does this want to be the exchange of
             # the leek OpenSearch? I'd think we'd want the edxapp one? What IS it?
@@ -68,15 +68,28 @@ for edxapp_stack in ["mitx-staging", "mitx", "mitxonline", "xpro"]:
             "queue": "celery_monitoring.fanout",
             "routing_key": "#",
             "org_name": "mono",
-            "app_name": f"{edxapp_stack}",
-            "app_env": f"{edxapp_stack}.{stack_info.name}",
+            "app_name": stack.namespace,
+            "app_env": stack.name,
             "prefetch_count": 1000,
             "concurrency_pool_size": 2,
             "batch_max_size_in_mb": 1,
             "batch_max_number_of_messages": 1000,
             "batch_max_window_in_seconds": 5,
         }
-    )
+        )
+    return json.dumps(redis_broker_subscriptions)
+
+stacks = [
+    f"applications.edxapp.mitxonline.{stack_info.name}",
+    f"applications.edxapp.xpro.{stack_info.name}",
+    f"applications.edxapp.mitx.{stack_info.name}",
+    f"applications.edxapp.mitx-staging.{stack_info.name}",
+]
+stack_tuples = []
+for stack in stacks:
+    stack_tuples.append((stack, StackReference(stack).require_output("redis")))
+
+Output.all(references).apply(build_broker_subscriptions)
 
 celery_monitoring_vault_kv_path = vault_mount_stack.require_output(
     "celery_monitoring_kv"
@@ -86,7 +99,7 @@ vault.kv.SecretV2(
     "celery-monitoring-vault-secret-redis-brokers",
     mount=celery_monitoring_vault_kv_path,
     name="redis_brokers",
-    data_json=json.dumps(redis_broker_subscriptions),
+    data_json=json.dumps(redis_broker_subscriptions)g,
 )
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]
