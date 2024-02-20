@@ -30,6 +30,7 @@ from ol_concourse.lib.resource_types import (
     pulumi_provisioner_resource,
 )
 from ol_concourse.lib.resources import github_issues, pulumi_provisioner
+from ol_concourse.pipelines.constants import GH_ISSUES_DEFAULT_REPOSITORY
 
 
 def packer_jobs(  # noqa: PLR0913
@@ -177,7 +178,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901
             gh_issues_trigger = github_issues(
                 auth_method="app",
                 name=Identifier(f"github-issues-{stack_name.lower()}-trigger"),
-                repository=github_issue_repository or "mitodl/concourse-workflow",
+                repository=github_issue_repository or GH_ISSUES_DEFAULT_REPOSITORY,
                 issue_title_template=f"[bot] Pulumi {project_name} {stack_name} "
                 "deployed.",
                 issue_prefix=f"[bot] Pulumi {project_name} {stack_name} deployed.",
@@ -189,7 +190,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901
         gh_issues_post = github_issues(
             auth_method="app",
             name=Identifier(f"github-issues-{stack_name.lower()}-post"),
-            repository=github_issue_repository or "mitodl/concourse-workflow",
+            repository=github_issue_repository or GH_ISSUES_DEFAULT_REPOSITORY,
             issue_title_template=f"[bot] Pulumi {project_name} {stack_name} deployed.",
             issue_prefix=f"[bot] Pulumi {project_name} {stack_name} deployed.",
             issue_state="open",
