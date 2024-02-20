@@ -91,11 +91,12 @@ def github_issues(  # noqa: PLR0913
     name: Identifier,
     repository: str,
     issue_prefix: str,
-    auth_method: Literal["token", "app"] = "app",
+    auth_method: Literal["token", "app"] = "token",
+    gh_host: Optional[str] = "https://api.github.mit.edu",
     access_token: str = "((github.issues_resource_access_token))",  # noqa: S107
-    app_id: str = "((github.issues_resource_app_id))",
-    app_installation_id: str = "((github.issues_resource_app_installation_id))",
-    private_ssh_key: str = "((github.issues_resource_private_ssh_key))",
+    app_id: Optional[str] = None,
+    app_installation_id: Optional[str] = None,
+    private_ssh_key: Optional[str] = None,
     issue_state: Literal["open", "closed"] = "closed",
     labels: Optional[list[str]] = None,
     assignees: Optional[list[str]] = None,
@@ -126,6 +127,8 @@ def github_issues(  # noqa: PLR0913
         "labels": labels,
         "repository": repository,
     }
+    if gh_host:
+        issue_config["gh_host"] = gh_host
     if auth_method == "token":
         issue_config["access_token"] = access_token
     else:
