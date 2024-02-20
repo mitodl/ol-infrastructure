@@ -235,9 +235,6 @@ services:
     - "traefik.http.routers.public.middlewares=traefik-forward-auth"
     - "traefik.http.routers.public.rule=(Host(`${AIRBYTE_HOSTNAME}`) || Path(`/api/v1/health`))"
     - "traefik.http.routers.public.tls=true"
-    - "traefik.http.middlewares.api.basicauth.users=${DAGSTER_USER_PASS}"
-    - "traefik.http.routers.api.rule=PathPrefix(`/api/v1/`)"
-    - "traefik.http.routers.api.tls=true"
     - "traefik.http.routers.dagster-webapp.rule=Host(`airbyte.service.consul`)"
     - "traefik.http.routers.dagster-webapp.tls=true"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
@@ -311,6 +308,13 @@ services:
     restart: unless-stopped
     ports:
     - "8006"
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.middlewares.api.basicauth.users=${DAGSTER_USER_PASS}"
+    - "traefik.http.routers.api.rule=PathPrefix(`/v1/`)"
+    - "traefik.http.routers.api.tls=true"
+    - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
+    - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
     environment:
     - AIRBYTE_VERSION=${VERSION}
     - DEPLOYMENT_MODE=${DEPLOYMENT_MODE}
