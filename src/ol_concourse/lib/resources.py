@@ -92,7 +92,7 @@ def github_issues(  # noqa: PLR0913
     repository: str,
     issue_prefix: str,
     auth_method: Literal["token", "app"] = "token",
-    gh_host: Optional[str] = "https://api.github.mit.edu",
+    gh_host: Optional[str] = "https://github.mit.edu/api/v3",
     access_token: str = "((github.issues_resource_access_token))",  # noqa: S107
     app_id: Optional[str] = None,
     app_installation_id: Optional[str] = None,

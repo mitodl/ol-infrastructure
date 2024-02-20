@@ -3,7 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Optional
 
-from bridge.settings.github.team_members import DEVOPS
+from bridge.settings.github.team_members import DEVOPS_MIT
 
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.models.fragment import PipelineFragment
@@ -176,7 +176,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901
     for index, stack_name in enumerate(stack_names):
         if index + 1 < len(stack_names):
             gh_issues_trigger = github_issues(
-                auth_method="app",
+                auth_method="token",
                 name=Identifier(f"github-issues-{stack_name.lower()}-trigger"),
                 repository=github_issue_repository or GH_ISSUES_DEFAULT_REPOSITORY,
                 issue_title_template=f"[bot] Pulumi {project_name} {stack_name} "
@@ -188,7 +188,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901
             gh_issues_trigger = None
 
         gh_issues_post = github_issues(
-            auth_method="app",
+            auth_method="token",
             name=Identifier(f"github-issues-{stack_name.lower()}-post"),
             repository=github_issue_repository or GH_ISSUES_DEFAULT_REPOSITORY,
             issue_title_template=f"[bot] Pulumi {project_name} {stack_name} deployed.",
@@ -258,7 +258,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901
             put=gh_issues_post.name,
             params={
                 "labels": github_issue_labels or default_github_issue_labels,
-                "assignees": github_issue_assignees or DEVOPS,
+                "assignees": github_issue_assignees or DEVOPS_MIT,
             },
         )
 
