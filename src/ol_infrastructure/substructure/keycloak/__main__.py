@@ -904,6 +904,7 @@ if stack_info.env_suffix in ["ci", "qa"]:
     # OKTA-DEV [END] # noqa: ERA001
 
 if stack_info.env_suffix == "qa":
+    # User migration plug-in for Open Discussions in RC.
     keycloak.CustomUserFederation(
         "ol-open-discussions-qa-user-migration-federation",
         cache_policy="DEFAULT",
@@ -922,6 +923,56 @@ if stack_info.env_suffix == "qa":
         enabled=True,
         name="Open Discussions",
         provider_id="User migration using a REST client",
+        realm_id=ol_apps_realm.id,
+        opts=resource_options,
+    )
+    # SCIM for MIT-Open in RC.
+    keycloak.CustomUserFederation(
+        "ol-mit-open-qa-scim",
+        config={
+            "user-patchOp": [
+            "false"
+          ],
+          "fullSyncPeriod": [
+            "-1"
+          ],
+          "auth-pass": [
+            keycloak_config.get("mit-open-qa-scim-password")
+          ],
+          "auth-mode": [
+            "BEARER"
+          ],
+          "cachePolicy": [
+            "DEFAULT"
+          ],
+          "sync-import-action": [
+            "CREATE_LOCAL"
+          ],
+          "propagation-user": [
+            "true"
+          ],
+          "enabled": [
+            "true"
+          ],
+          "changedSyncPeriod": [
+            "-1"
+          ],
+          "endpoint": [
+            "https://mit-open-rc.odl.mit.edu/scim/v2/"
+          ],
+          "propagation-group": [
+            "true"
+          ],
+          "content-type": [
+            "application/scim+json"
+          ],
+          "group-patchOp": [
+            "false"
+          ]
+        },
+        enabled=True,
+        name="MIT Open",
+        provider_id="scim",
         realm_id=ol_apps_realm.id,
         opts=resource_options,
     )
