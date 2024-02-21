@@ -930,45 +930,19 @@ if stack_info.env_suffix == "qa":
     keycloak.CustomUserFederation(
         "ol-mit-open-qa-scim",
         config={
-            "user-patchOp": [
-            "false"
-          ],
-          "fullSyncPeriod": [
-            "-1"
-          ],
-          "auth-pass": [
-            keycloak_config.get("mit-open-qa-scim-password")
-          ],
-          "auth-mode": [
-            "BEARER"
-          ],
-          "cachePolicy": [
-            "DEFAULT"
-          ],
-          "sync-import-action": [
-            "CREATE_LOCAL"
-          ],
-          "propagation-user": [
-            "true"
-          ],
-          "enabled": [
-            "true"
-          ],
-          "changedSyncPeriod": [
-            "-1"
-          ],
-          "endpoint": [
-            "https://mit-open-rc.odl.mit.edu/scim/v2/"
-          ],
-          "propagation-group": [
-            "true"
-          ],
-          "content-type": [
-            "application/scim+json"
-          ],
-          "group-patchOp": [
-            "false"
-          ]
+            "user-patchOp": ["false"],
+            "fullSyncPeriod": ["-1"],
+            "auth-pass": [keycloak_config.get("mit-open-qa-scim-password")],
+            "auth-mode": ["BEARER"],
+            "cachePolicy": ["DEFAULT"],
+            "sync-import-action": ["CREATE_LOCAL"],
+            "propagation-user": ["true"],
+            "enabled": ["true"],
+            "changedSyncPeriod": ["-1"],
+            "endpoint": ["https://mit-open-rc.odl.mit.edu/scim/v2/"],
+            "propagation-group": ["true"],
+            "content-type": ["application/scim+json"],
+            "group-patchOp": ["false"],
         },
         enabled=True,
         name="MIT Open",
