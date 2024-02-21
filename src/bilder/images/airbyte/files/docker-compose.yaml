@@ -24,6 +24,7 @@ services:
     depends_on:
     - webapp
     - server
+    - airbyte-api-server
   traefik-forward-auth:
     image: thomseddon/traefik-forward-auth:2
     container_name: traefik-forward-auth
@@ -310,9 +311,9 @@ services:
     - "8006"
     labels:
     - "traefik.enable=true"
-    - "traefik.http.middlewares.api.basicauth.users=${DAGSTER_USER_PASS}"
-    - "traefik.http.routers.api.rule=PathPrefix(`/v1/`)"
-    - "traefik.http.routers.api.tls=true"
+    - "traefik.http.middlewares.airbyte-api.basicauth.users=${DAGSTER_USER_PASS}"
+    - "traefik.http.routers.airbyte-api.rule=(Host(`api-${AIRBYTE_HOSTNAME}`) && PathPrefix(`/v1/`))"
+    - "traefik.http.routers.airbyte-api.tls=true"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
     environment:
