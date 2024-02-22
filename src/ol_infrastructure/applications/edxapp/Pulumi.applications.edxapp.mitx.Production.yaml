@@ -53,7 +53,7 @@ config:
   edxapp:web_node_capacity: "9"
   edxapp:worker_disk_size: "50"
   edxapp:worker_node_capacity: "5"
-  edxapp:worker_instance_type: "c6a.large"
+  edxapp:worker_instance_type: "m7a.xlarge"
   edxapp:framework: "earthly"
   mongodb:atlas_project_id: 61b728704656cb4747e589a0
   redis:instance_type: cache.r6g.2xlarge
