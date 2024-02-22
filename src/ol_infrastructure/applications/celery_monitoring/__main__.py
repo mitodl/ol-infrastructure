@@ -3,7 +3,6 @@ import json
 import textwrap
 from functools import partial
 from pathlib import Path
-from typing import Any
 
 import pulumi_vault as vault
 import yaml
@@ -29,7 +28,7 @@ from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_po
 from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import StackInfo, parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
@@ -49,35 +48,30 @@ vault_mount_stack = StackReference(
 
 policy_stack = StackReference("infrastructure.aws.policies")
 
-# Create a dict of Redis cache addresses for each edxapp stack
-def build_broker_subscriptions(*stack_references: tuple[StackInfo, Output]) -> str:
 
-    redis_addresses = {}
-    redis_broker_subscriptions = []
-    for stack, redis_output in stack_references:
-        redis_broker_subscriptions.append(
-        {
-            "broker": redis_output["address"],
-            "broker_management_url": "http://mq:15672",
-            # Does this belong here?
-            "broker_redis_token": redis_output["token"],
-            "backend": None,
-            # Does this want to be the exchange of
-            # the leek OpenSearch? I'd think we'd want the edxapp one? What IS it?
-            "exchange": "celeryev",
-            "queue": "celery_monitoring.fanout",
-            "routing_key": "#",
-            "org_name": "mono",
-            "app_name": stack.namespace,
-            "app_env": stack.name,
-            "prefetch_count": 1000,
-            "concurrency_pool_size": 2,
-            "batch_max_size_in_mb": 1,
-            "batch_max_number_of_messages": 1000,
-            "batch_max_window_in_seconds": 5,
-        }
-        )
-    return json.dumps(redis_broker_subscriptions)
+# Create a dict of Redis cache addresses for each edxapp stack
+def brild_broker_srbscription(redis_output) -> str:
+    return {
+        "broker": redis_output["address"],
+        "broker_management_url": "http://mq:15672",
+        # Does this belong here?
+        "broker_redis_token": redis_output["token"],
+        "backend": None,
+        # Does this want to be the exchange of
+        # the leek OpenSearch? I'd think we'd want the edxapp one? What IS it?
+        "exchange": "celeryev",
+        "queue": "celery_monitoring.fanout",
+        "routing_key": "#",
+        "org_name": "mono",
+        # "app_name": stack.namespace,
+        # "app_env": stack.name,
+        "prefetch_count": 1000,
+        "concurrency_pool_size": 2,
+        "batch_max_size_in_mb": 1,
+        "batch_max_number_of_messages": 1000,
+        "batch_max_window_in_seconds": 5,
+    }
+
 
 stacks = [
     f"applications.edxapp.mitxonline.{stack_info.name}",
@@ -85,11 +79,14 @@ stacks = [
     f"applications.edxapp.mitx.{stack_info.name}",
     f"applications.edxapp.mitx-staging.{stack_info.name}",
 ]
-stack_tuples = []
-for stack in stacks:
-    stack_tuples.append((stack, StackReference(stack).require_output("redis")))
 
-Output.all(references).apply(build_broker_subscriptions)
+redis_outputs: list[Output] = []
+for stack in stacks:
+    redis_outputs.append(StackReference(stack).require_output("edxapp.redis"))  # noqa: PERF401
+
+redis_broker_subscriptions: Output = Output.all(redis_outputs).apply(
+    build_broker_subscriptions
+)
 
 celery_monitoring_vault_kv_path = vault_mount_stack.require_output(
     "celery_monitoring_kv"
@@ -99,7 +96,7 @@ vault.kv.SecretV2(
     "celery-monitoring-vault-secret-redis-brokers",
     mount=celery_monitoring_vault_kv_path,
     name="redis_brokers",
-    data_json=json.dumps(redis_broker_subscriptions)g,
+    data_json=redis_broker_subscriptions,
 )
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]
@@ -109,7 +106,7 @@ aws_config = AWSBase(tags={"OU": "data", "Environment": celery_monitoring_env})
 consul_security_groups = consul_stack.require_output("security_groups")
 
 aws_account = get_caller_identity()
-celery_monitoring_domain = celery_monitoring_config.get("domain")
+celery_monitoring_domain = celery_monitoring_config.get("web_host_domain")
 celery_monitoring_mail_domain = f"mail.{celery_monitoring_domain}"
 # Create IAM role
 
@@ -372,63 +369,6 @@ redis_cluster_security_group = ec2.SecurityGroup(
     vpc_id=data_vpc["id"],
 )
 
-# I don't know if we need this code since we already h ave an OpenSearch stack built elsewhere? -CAP
-
-# redis_instance_type = (
-#     redis_config.get("instance_type") or defaults(stack_info)["redis"]["instance_type"]
-# )
-# redis_auth_token = celery_monitoring_secrets["redis"]["token"]
-# redis_cache_config = OLAmazonRedisConfig(
-#     encrypt_transit=True,
-#     auth_token=redis_auth_token,
-#     cluster_mode_enabled=False,
-#     encrypted=True,
-#     engine_version="6.2",
-#     instance_type=redis_instance_type,
-#     num_instances=3,
-#     shard_count=1,
-#     auto_upgrade=True,
-#     cluster_description="Redis cluster for edX platform tasks and caching",
-#     cluster_name=f"celery-monitoring-redis-{celery_monitoring_env}",
-#     security_groups=[redis_cluster_security_group.id],
-#     subnet_group=data_vpc[
-#         "elasticache_subnet"
-#     ],  # the name of the subnet group created in the OLVPC component resource
-#     tags=aws_config.tags,
-# )
-# celery_monitoring_redis_cache = OLAmazonCache(redis_cache_config)
-# celery_monitoring_redis_consul_node = consul.Node(
-#     "celery-monitoring-redis-cache-node",
-#     name="celery-monitoring-redis",
-#     address=celery_monitoring_redis_cache.address,
-#     opts=consul_provider,
-# )
-#
-# celery_monitoring_redis_consul_service = consul.Service(
-#     "celery-monitoring-redis-consul-service",
-#     node=celery_monitoring_redis_consul_node.name,
-#     name="celery-monitoring-redis",
-#     port=redis_cache_config.port,
-#     meta={
-#         "external-node": True,
-#         "external-probe": True,
-#     },
-#     checks=[
-#         consul.ServiceCheckArgs(
-#             check_id="celery-monitoring-redis",
-#             interval="10s",
-#             name="celery-monitoring-redis",
-#             timeout="1m0s",
-#             status="passing",
-#             tcp=Output.all(
-#                 address=celery_monitoring_redis_cache.address,
-#                 port=celery_monitoring_redis_cache.cache_cluster.port,
-#             ).apply(lambda cluster: "{address}:{port}".format(**cluster)),
-#         )
-#     ],
-#     opts=consul_provider,
-# )
-#
 # Create an auto-scale group for web application servers
 celery_monitoring_web_acm_cert = acm.Certificate(
     "celery-monitoring-load-balancer-acm-certificate",

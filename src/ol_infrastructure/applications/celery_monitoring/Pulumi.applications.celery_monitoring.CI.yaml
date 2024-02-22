@@ -11,3 +11,11 @@ config:
   environment:target_vpc: applications_vpc
   opensearch:domain_name: "celerym"
   celery_monitoring:sender_email_address: ol-devops@mit.edu
+  aws:region: us-east-1
+  celery_monitoring:auto_scale:
+    desired: 1
+    max: 2
+    min: 1
+  celery_monitorng:business_unit: operations
+  celery_monitoring:target_vpc: applications_vpc
+  celery_monitoring:web_host_domain: celery-monitoring-ci.odl.mit.edu
