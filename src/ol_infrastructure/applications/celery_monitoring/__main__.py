@@ -55,7 +55,6 @@ def build_broker_subscriptions(
     edx_output: Output,
 ) -> dict[str, Output[Any] | str | int | None]:
     """Create a dict of Redis cache configs for each edxapp stack"""
-    log.info(f"build_broker_subscriptions:{edx_output[0][2]['redis_token']}")
     broker_sub = {
         "broker": edx_output[0][2]["redis"],
         "broker_management_url": "http://mq:15672",
@@ -73,7 +72,7 @@ def build_broker_subscriptions(
         "batch_max_number_of_messages": 1000,
         "batch_max_window_in_seconds": 5,
     }
-    log.info(f"{pformat(broker_sub)}")
+    log.info(f"build_broker_subscrpitons: broker_sub={pformat(broker_sub)}")
     return broker_sub
 
 
@@ -91,9 +90,13 @@ redis_outputs: list[Output] = []
 for stack in stacks:
     redis_outputs.append(StackReference(stack).require_output("edxapp"))  # noqa: PERF401
 
-log.info(f"{pformat(redis_outputs)}")
+redis_broker_subscriptions = Output.all(redis_outputs).apply(
+    lambda redis_broker_subscription: build_broker_subscriptions(
+        redis_broker_subscription
+    )
+)
 
-redis_broker_subscriptions = Output.all(redis_outputs).apply(build_broker_subscriptions)
+log.info(f"{pformat(redis_broker_subscriptions)}")
 
 celery_monitoring_vault_kv_path = vault_mount_stack.require_output(
     "celery_monitoring_kv"
