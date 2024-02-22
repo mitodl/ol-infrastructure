@@ -3,6 +3,8 @@ import json
 import textwrap
 from functools import partial
 from pathlib import Path
+from pprint import pformat
+from typing import Any
 
 import pulumi_vault as vault
 import yaml
@@ -11,7 +13,7 @@ from bridge.lib.magic_numbers import (
     FIVE_MINUTES,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, ResourceOptions, StackReference
+from pulumi import Config, Output, ResourceOptions, StackReference, log
 from pulumi_aws import acm, ec2, get_caller_identity, iam, route53, ses
 
 from ol_infrastructure.components.aws.auto_scale_group import (
@@ -49,32 +51,37 @@ vault_mount_stack = StackReference(
 policy_stack = StackReference("infrastructure.aws.policies")
 
 
-# Create a dict of Redis cache addresses for each edxapp stack
-def brild_broker_srbscription(redis_output) -> str:
-    return {
-        "broker": redis_output["address"],
+def build_broker_subscriptions(
+    edx_output: Output,
+) -> dict[str, Output[Any] | str | int | None]:
+    """Create a dict of Redis cache configs for each edxapp stack"""
+    log.info(f"build_broker_subscriptions:{edx_output[0][2]['redis_token']}")
+    broker_sub = {
+        "broker": edx_output[0][2]["redis"],
         "broker_management_url": "http://mq:15672",
         # Does this belong here?
-        "broker_redis_token": redis_output["token"],
+        "broker_redis_token": edx_output[0][2]["redis_token"],
         "backend": None,
-        # Does this want to be the exchange of
-        # the leek OpenSearch? I'd think we'd want the edxapp one? What IS it?
-        "exchange": "celeryev",
+        "exchange": "celeryev",  # Does this want to be the exchange of the leek
+        # OpenSearch? I'd think we'd want the edxapp one?
         "queue": "celery_monitoring.fanout",
         "routing_key": "#",
         "org_name": "mono",
-        # "app_name": stack.namespace,
-        # "app_env": stack.name,
         "prefetch_count": 1000,
         "concurrency_pool_size": 2,
         "batch_max_size_in_mb": 1,
         "batch_max_number_of_messages": 1000,
         "batch_max_window_in_seconds": 5,
     }
+    log.info(f"{pformat(broker_sub)}")
+    return broker_sub
 
 
+"""
+mitxonline CI is not up at the moment.
+f"applications.edxapp.mitxonline.{stack_info.name}",
+"""
 stacks = [
-    f"applications.edxapp.mitxonline.{stack_info.name}",
     f"applications.edxapp.xpro.{stack_info.name}",
     f"applications.edxapp.mitx.{stack_info.name}",
     f"applications.edxapp.mitx-staging.{stack_info.name}",
@@ -82,11 +89,11 @@ stacks = [
 
 redis_outputs: list[Output] = []
 for stack in stacks:
-    redis_outputs.append(StackReference(stack).require_output("edxapp.redis"))  # noqa: PERF401
+    redis_outputs.append(StackReference(stack).require_output("edxapp"))  # noqa: PERF401
 
-redis_broker_subscriptions: Output = Output.all(redis_outputs).apply(
-    build_broker_subscriptions
-)
+log.info(f"{pformat(redis_outputs)}")
+
+redis_broker_subscriptions = Output.all(redis_outputs).apply(build_broker_subscriptions)
 
 celery_monitoring_vault_kv_path = vault_mount_stack.require_output(
     "celery_monitoring_kv"
@@ -96,7 +103,7 @@ vault.kv.SecretV2(
     "celery-monitoring-vault-secret-redis-brokers",
     mount=celery_monitoring_vault_kv_path,
     name="redis_brokers",
-    data_json=redis_broker_subscriptions,
+    data_json=json.dumps(redis_broker_subscriptions),
 )
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]
