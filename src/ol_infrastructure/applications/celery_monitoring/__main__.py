@@ -7,13 +7,9 @@ from pprint import pformat
 
 import pulumi_vault as vault
 import yaml
-from bridge.lib.magic_numbers import (
-    DEFAULT_REDIS_PORT,
-    FIVE_MINUTES,
-)
 from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, Output, ResourceOptions, StackReference, log
-from pulumi_aws import acm, ec2, get_caller_identity, iam, route53, ses
+from pulumi_aws import acm, ec2, get_caller_identity, iam, route53
 
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
@@ -259,124 +255,6 @@ vault.aws.AuthBackendRole(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-
-########################################
-# Create SES Service For celery_monitoring Emails #
-########################################
-
-celery_monitoring_ses_domain_identity = ses.DomainIdentity(
-    "celery-monitoring-ses-domain-identity",
-    domain=celery_monitoring_mail_domain,
-)
-celery_monitoring_ses_verification_record = route53.Record(
-    "celery-monitoring-ses-domain-identity-verification-dns-record",
-    zone_id=mitol_zone_id,
-    name=celery_monitoring_ses_domain_identity.id.apply("_amazonses.{}".format),
-    type="TXT",
-    ttl=FIVE_MINUTES,
-    records=[celery_monitoring_ses_domain_identity.verification_token],
-)
-celery_monitoring_ses_domain_identity_verification = ses.DomainIdentityVerification(
-    "celery-monitoring-ses-domain-identity-verification-resource",
-    domain=celery_monitoring_ses_domain_identity.id,
-    opts=ResourceOptions(depends_on=[celery_monitoring_ses_verification_record]),
-)
-celery_monitoring_mail_from_domain = ses.MailFrom(
-    "celery-monitoring-ses-mail-from-domain",
-    domain=celery_monitoring_ses_domain_identity_verification.domain,
-    mail_from_domain=celery_monitoring_ses_domain_identity_verification.domain.apply(
-        "bounce.{}".format
-    ),
-)
-celery_monitoring_mail_from_address = ses.EmailIdentity(
-    "celery-monitoring-ses-mail-from-identity",
-    email=celery_monitoring_config.require("sender_email_address"),
-)
-# Example Route53 MX record
-celery_monitoring_ses_domain_mail_from_mx = route53.Record(
-    f"celery-monitoring-ses-mail-from-mx-record-for-{celery_monitoring_env}",
-    zone_id=mitol_zone_id,
-    name=celery_monitoring_mail_from_domain.mail_from_domain,
-    type="MX",
-    ttl=FIVE_MINUTES,
-    records=["10 feedback-smtp.us-east-1.amazonses.com"],
-)
-ses_domain_mail_from_txt = route53.Record(
-    "celery-monitoring-ses-domain-mail-from-text-record",
-    zone_id=mitol_zone_id,
-    name=celery_monitoring_mail_from_domain.mail_from_domain,
-    type="TXT",
-    ttl=FIVE_MINUTES,
-    records=["v=spf1 include:amazonses.com -all"],
-)
-celery_monitoring_ses_domain_dkim = ses.DomainDkim(
-    "celery-monitoring-ses-domain-dkim",
-    domain=celery_monitoring_ses_domain_identity.domain,
-)
-for loop_counter in range(3):
-    route53.Record(
-        f"celery-monitoring-ses-domain-dkim-record-{loop_counter}",
-        zone_id=mitol_zone_id,
-        name=celery_monitoring_ses_domain_dkim.dkim_tokens[loop_counter].apply(
-            lambda dkim_name: f"{dkim_name}._domainkey.{celery_monitoring_mail_domain}"
-        ),
-        type="CNAME",
-        ttl=FIVE_MINUTES,
-        records=[
-            celery_monitoring_ses_domain_dkim.dkim_tokens[loop_counter].apply(
-                "{}.dkim.amazonses.com".format
-            )
-        ],
-    )
-celery_monitoring_ses_configuration_set = ses.ConfigurationSet(
-    "celery-monitoring-ses-configuration-set",
-    reputation_metrics_enabled=True,
-    sending_enabled=True,
-    name=f"celery-monitoring-{celery_monitoring_env}",
-)
-celery_monitoring_ses_event_destintations = ses.EventDestination(
-    "celery-monitoring-ses-event-destination-routing",
-    configuration_set_name=celery_monitoring_ses_configuration_set.name,
-    enabled=True,
-    matching_types=[
-        "send",
-        "reject",
-        "bounce",
-        "complaint",
-        "delivery",
-        "open",
-        "click",
-        "renderingFailure",
-    ],
-    cloudwatch_destinations=[
-        ses.EventDestinationCloudwatchDestinationArgs(
-            default_value="default",
-            dimension_name=f"celery-monitoring-{celery_monitoring_env}",
-            value_source="emailHeader",
-        )
-    ],
-)
-
-# Create an Elasticache cluster for Redis caching and Celery broker
-redis_config = Config("redis")
-redis_cluster_security_group = ec2.SecurityGroup(
-    f"celery-monitoring-redis-cluster-{celery_monitoring_env}",
-    name_prefix=f"celery-monitoring-redis-{celery_monitoring_env}-",
-    description="Grant access to Redis from Open edX",
-    ingress=[
-        ec2.SecurityGroupIngressArgs(
-            from_port=DEFAULT_REDIS_PORT,
-            to_port=DEFAULT_REDIS_PORT,
-            protocol="tcp",
-            security_groups=[celery_monitoring_security_group.id],
-            description="Allow access from edX to Redis for caching and queueing",
-        )
-    ],
-    tags=aws_config.merged_tags(
-        {"Name": f"celery-monitoring-redis-{celery_monitoring_env}"}
-    ),
-    vpc_id=data_vpc["id"],
-)
 
 # Create an auto-scale group for web application servers
 celery_monitoring_web_acm_cert = acm.Certificate(
@@ -659,7 +537,7 @@ celery_monitoring_worker_asg_config = OLAutoScaleGroupConfig(
     ),
 )
 
-supserset_worker_asg = OLAutoScaling(
+celery_monitoring_worker_asg = OLAutoScaling(
     asg_config=celery_monitoring_worker_asg_config,
     lt_config=celery_monitoring_worker_lt_config,
 )
