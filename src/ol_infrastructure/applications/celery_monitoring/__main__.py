@@ -4,7 +4,6 @@ import textwrap
 from functools import partial
 from pathlib import Path
 from pprint import pformat
-from typing import Any
 
 import pulumi_vault as vault
 import yaml
@@ -53,7 +52,7 @@ policy_stack = StackReference("infrastructure.aws.policies")
 
 def build_broker_subscriptions(
     edx_output: Output,
-) -> dict[str, Output[Any] | str | int | None]:
+) -> str:
     """Create a dict of Redis cache configs for each edxapp stack"""
     broker_sub = {
         "broker": edx_output[0][2]["redis"],
@@ -73,7 +72,7 @@ def build_broker_subscriptions(
         "batch_max_window_in_seconds": 5,
     }
     log.info(f"build_broker_subscrpitons: broker_sub={pformat(broker_sub)}")
-    return broker_sub
+    return json.dumps(broker_sub)
 
 
 """
@@ -106,7 +105,7 @@ vault.kv.SecretV2(
     "celery-monitoring-vault-secret-redis-brokers",
     mount=celery_monitoring_vault_kv_path,
     name="redis_brokers",
-    data_json=json.dumps(redis_broker_subscriptions),
+    data_json=redis_broker_subscriptions,
 )
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]

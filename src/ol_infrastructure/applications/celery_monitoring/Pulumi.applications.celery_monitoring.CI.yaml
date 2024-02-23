@@ -19,3 +19,4 @@ config:
   celery_monitorng:business_unit: operations
   celery_monitoring:target_vpc: applications_vpc
   celery_monitoring:web_host_domain: celery-monitoring-ci.odl.mit.edu
+  celery_monitoring:domain: celery-monitoring-ci.odl.mit.edu
