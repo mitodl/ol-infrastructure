@@ -363,7 +363,7 @@ rpds-py==0.18.0
     # via
     #   jsonschema
     #   referencing
-selenium==4.16.0
+selenium==4.18.1
     # via apache-superset
 setuptools-git==1.2
     # via prophet
