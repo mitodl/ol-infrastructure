@@ -190,7 +190,7 @@ idna==3.6
     #   trio
 importlib-metadata==7.0.1
     # via apache-superset
-importlib-resources==6.1.1
+importlib-resources==6.1.2
     # via limits
 isodate==0.6.1
     # via apache-superset
