@@ -377,7 +377,7 @@ six==1.16.0
     #   prison
     #   python-dateutil
     #   wtforms-json
-slack-sdk==3.26.2
+slack-sdk==3.27.0
     # via apache-superset
 sniffio==1.3.0
     # via trio
