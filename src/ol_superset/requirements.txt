@@ -409,7 +409,7 @@ tqdm==4.66.2
     # via
     #   cmdstanpy
     #   prophet
-trino==0.327.0
+trino==0.328.0
     # via -r requirements.in
 trio==0.24.0
     # via
