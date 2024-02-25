@@ -459,7 +459,7 @@ wtforms==3.1.2
     #   wtforms-json
 wtforms-json==0.3.5
     # via apache-superset
-xlsxwriter==3.1.9
+xlsxwriter==3.2.0
     # via apache-superset
 zipp==3.17.0
     # via importlib-metadata
