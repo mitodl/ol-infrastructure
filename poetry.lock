@@ -1769,13 +1769,13 @@ files = [
 
 [[package]]
 name = "pyinfra"
-version = "2.9"
+version = "2.9.2"
 description = "pyinfra automates/provisions/manages/deploys infrastructure."
 optional = false
 python-versions = "*"
 files = [
-    {file = "pyinfra-2.9-py2.py3-none-any.whl", hash = "sha256:4904eed188403118a23bda54b75111beacb49ac07c5b470b665b0839753838b4"},
-    {file = "pyinfra-2.9.tar.gz", hash = "sha256:35ca4cac87c6ef952e10f568973307ab040bf5240ac4832f53e16f6d4b5b9bc4"},
+    {file = "pyinfra-2.9.2-py2.py3-none-any.whl", hash = "sha256:20719e88a58af523a83bcd792c2c53bd3e85ad919354c326d87633ddc66feec6"},
+    {file = "pyinfra-2.9.2.tar.gz", hash = "sha256:9539486457175eff8e6da0ecd94445c374e032ed4ce117610f3e05d48e8e37c9"},
 ]
 
 [package.dependencies]
