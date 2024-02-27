@@ -267,7 +267,7 @@ packaging==23.2
     #   limits
     #   marshmallow
     #   matplotlib
-pandas==1.5.3
+pandas==2.2.1
     # via
     #   apache-superset
     #   cmdstanpy
