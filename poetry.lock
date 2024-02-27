@@ -1507,13 +1507,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "5.26.0"
+version = "6.0.0"
 description = "A Pulumi package for creating and managing github cloud resources."
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "pulumi_github-5.26.0-py3-none-any.whl", hash = "sha256:f7e2d51cd73712950835dc72a5e1458654f86a248788d38770e62e42b25534de"},
-    {file = "pulumi_github-5.26.0.tar.gz", hash = "sha256:6e12a2a473209f2f3009c0e018cd835e757aed347affaf67f0e4a887b19f3650"},
+    {file = "pulumi_github-6.0.0-py3-none-any.whl", hash = "sha256:6bc48858f300085ab3d86d790a1ab4f4a2e3e0fc7d71e899764685f65dde44ea"},
+    {file = "pulumi_github-6.0.0.tar.gz", hash = "sha256:b92263066ada822ab1a37ac16f1d587e8f3f173b1ac3c6f128f2a5856e10e85c"},
 ]
 
 [package.dependencies]
@@ -2405,4 +2405,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "6d1e8bee51b1a5c6313a0fd7cf66cf377e198bd81b202a32e34a91be52643fd4"
+content-hash = "bdd88ec0894bcfbbf719cf6648b3811b4149b51d814715664c2d1b13557db4ad"
