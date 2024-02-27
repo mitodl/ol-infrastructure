@@ -234,7 +234,7 @@ marshmallow==3.20.2
     # via
     #   flask-appbuilder
     #   marshmallow-sqlalchemy
-marshmallow-sqlalchemy==0.30.0
+marshmallow-sqlalchemy==1.0.0
     # via flask-appbuilder
 matplotlib==3.8.3
     # via prophet
