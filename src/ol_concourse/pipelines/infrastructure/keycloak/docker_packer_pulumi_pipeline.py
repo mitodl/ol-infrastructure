@@ -60,7 +60,8 @@ def build_keycloak_pipeline() -> Pipeline:
         branch="main",
         paths=[
             *PULUMI_WATCHED_PATHS,
-            PULUMI_CODE_PATH.joinpath("applications/keycloak/"),
+            str(PULUMI_CODE_PATH.joinpath("applications/keycloak/")),
+            "src/ol_infrastructure/substructure/keycloak/",
         ],
     )
 
