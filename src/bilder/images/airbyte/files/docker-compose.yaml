@@ -312,8 +312,9 @@ services:
     labels:
     - "traefik.enable=true"
     - "traefik.http.middlewares.airbyte-api.basicauth.users=${DAGSTER_USER_PASS}"
-    - "traefik.http.routers.airbyte-api.rule=(Host(`api-${AIRBYTE_HOSTNAME}`) && PathPrefix(`/v1/`))"
+    - "traefik.http.routers.airbyte-api.rule=Host(`api-${AIRBYTE_HOSTNAME}`)"
     - "traefik.http.routers.airbyte-api.tls=true"
+    - "traefik.http.services.airbyte-api.loadbalancer.server.port=8006"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
     environment:
