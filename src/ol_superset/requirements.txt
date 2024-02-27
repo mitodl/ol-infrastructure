@@ -42,7 +42,7 @@ celery==5.3.6
     #   celery-redbeat
 celery-redbeat==2.2.0
     # via -r requirements.in
-certifi==2023.11.17
+certifi==2024.2.2
     # via
     #   requests
     #   selenium
