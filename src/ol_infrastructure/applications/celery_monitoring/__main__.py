@@ -1,7 +1,6 @@
 import base64
 import json
 import textwrap
-from functools import partial
 from pathlib import Path
 from pprint import pformat
 
@@ -22,7 +21,6 @@ from ol_infrastructure.components.aws.auto_scale_group import (
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -47,51 +45,52 @@ policy_stack = StackReference("infrastructure.aws.policies")
 
 
 def build_broker_subscriptions(
-    edx_output: Output,
+    edx_outputs: list[Output],
 ) -> str:
     """Create a dict of Redis cache configs for each edxapp stack"""
-    broker_sub = {
-        "broker": edx_output[0][2]["redis"],
-        "broker_management_url": "http://mq:15672",
-        # Does this belong here?
-        "broker_redis_token": edx_output[0][2]["redis_token"],
-        "backend": None,
-        "exchange": "celeryev",  # Does this want to be the exchange of the leek
-        # OpenSearch? I'd think we'd want the edxapp one?
-        "queue": "celery_monitoring.fanout",
-        "routing_key": "#",
-        "org_name": "mono",
-        "prefetch_count": 1000,
-        "concurrency_pool_size": 2,
-        "batch_max_size_in_mb": 1,
-        "batch_max_number_of_messages": 1000,
-        "batch_max_window_in_seconds": 5,
-    }
-    log.info(f"build_broker_subscrpitons: broker_sub={pformat(broker_sub)}")
-    return json.dumps(broker_sub)
+    broker_subs = []
+    for edx_output in edx_outputs:
+        broker_subs.append(  # noqa: PERF401
+            {
+                "broker": edx_output["redis"],
+                "broker_management_url": "http://mq:15672",
+                # Does this belong here?
+                "broker_redis_token": edx_output["redis_token"],
+                "backend": None,
+                "exchange": "celeryev",  # Does this want to be the exchange of the leek
+                # OpenSearch? I'd think we'd want the edxapp one?
+                "queue": "celery_monitoring.fanout",
+                "routing_key": "#",
+                "org_name": "mono",
+                "prefetch_count": 1000,
+                "concurrency_pool_size": 2,
+                "batch_max_size_in_mb": 1,
+                "batch_max_number_of_messages": 1000,
+                "batch_max_window_in_seconds": 5,
+            }
+        )
+    log.info(f"build_broker_subscrpitons: broker_sub={pformat(broker_subs)}")
+    arbitrary_dict = {"broker_subscriptions": broker_subs}
+    return json.dumps(arbitrary_dict)
 
 
-"""
-mitxonline CI is not up at the moment.
-f"applications.edxapp.mitxonline.{stack_info.name}",
-"""
 stacks = [
     f"applications.edxapp.xpro.{stack_info.name}",
     f"applications.edxapp.mitx.{stack_info.name}",
     f"applications.edxapp.mitx-staging.{stack_info.name}",
 ]
+# mitxonline CI is not up at the moment.
+if stack_info.name != "CI":
+    stacks.append(
+        f"applications.edxapp.mitxonline.{stack_info.name}",
+    )
 
 redis_outputs: list[Output] = []
 for stack in stacks:
     redis_outputs.append(StackReference(stack).require_output("edxapp"))  # noqa: PERF401
-
-redis_broker_subscriptions = Output.all(redis_outputs).apply(
-    lambda redis_broker_subscription: build_broker_subscriptions(
-        redis_broker_subscription
-    )
+redis_broker_subscriptions = Output.all(*redis_outputs).apply(
+    build_broker_subscriptions
 )
-
-log.info(f"{pformat(redis_broker_subscriptions)}")
 
 celery_monitoring_vault_kv_path = vault_mount_stack.require_output(
     "celery_monitoring_kv"
@@ -256,32 +255,9 @@ vault.aws.AuthBackendRole(
 )
 
 
-# Create an auto-scale group for web application servers
-celery_monitoring_web_acm_cert = acm.Certificate(
-    "celery-monitoring-load-balancer-acm-certificate",
-    domain_name=celery_monitoring_domain,
-    validation_method="DNS",
-    tags=aws_config.tags,
-)
-
-celery_monitoring_acm_cert_validation_records = (
-    celery_monitoring_web_acm_cert.domain_validation_options.apply(
-        partial(
-            acm_certificate_validation_records,
-            zone_id=mitol_zone_id,
-            stack_info=stack_info,
-        )
-    )
-)
-
-celery_monitoring_web_acm_validated_cert = acm.CertificateValidation(
-    "wait-for-celery-monitoring-acm-cert-validation",
-    certificate_arn=celery_monitoring_web_acm_cert.arn,
-    validation_record_fqdns=celery_monitoring_acm_cert_validation_records.apply(
-        lambda validation_records: [
-            validation_record.fqdn for validation_record in validation_records
-        ]
-    ),
+# ACM lookup of ODL's wildcardcert
+celery_monitoring_web_acm_cert = acm.get_certificate(
+    domain="*.odl.mit.edu", most_recent=True, statuses=["ISSUED"]
 )
 celery_monitoring_lb_config = OLLoadBalancerConfig(
     subnets=data_vpc["subnet_ids"],
