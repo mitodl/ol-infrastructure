@@ -725,7 +725,10 @@ redis_cluster_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
             protocol="tcp",
-            security_groups=[edxapp_security_group.id],
+            security_groups=[
+                edxapp_security_group.id,
+                operations_vpc["security_groups"]["celery_monitoring"],
+            ],
             description="Allow access from edX to Redis for caching and queueing",
         )
     ],

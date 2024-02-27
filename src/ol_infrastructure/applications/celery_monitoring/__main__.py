@@ -104,7 +104,7 @@ vault.kv.SecretV2(
 )
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]
-data_vpc = network_stack.require_output("data_vpc")
+operations_vpc = network_stack.require_output("operations_vpc")
 celery_monitoring_env = f"data-{stack_info.env_suffix}"
 aws_config = AWSBase(tags={"OU": "data", "Environment": celery_monitoring_env})
 consul_security_groups = consul_stack.require_output("security_groups")
@@ -210,7 +210,7 @@ celery_monitoring_security_group = ec2.SecurityGroup(
     "celery-monitoring-security-group",
     name_prefix=f"celery-monitoring-{celery_monitoring_env}-",
     description="Allow celery_monitoring to connect to Elasticache",
-    vpc_id=data_vpc["id"],
+    vpc_id=operations_vpc["id"],
     ingress=[],
     egress=[],
     tags=aws_config.merged_tags(
@@ -249,7 +249,7 @@ vault.aws.AuthBackendRole(
         celery_monitoring_ami.id
     ],  # Reference the new way of doing stuff, not the old one
     bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[data_vpc["id"]],
+    bound_vpc_ids=[operations_vpc["id"]],
     token_policies=[celery_monitoring_server_vault_policy.name],
     opts=ResourceOptions(delete_before_replace=True),
 )
@@ -260,8 +260,8 @@ celery_monitoring_web_acm_cert = acm.get_certificate(
     domain="*.odl.mit.edu", most_recent=True, statuses=["ISSUED"]
 )
 celery_monitoring_lb_config = OLLoadBalancerConfig(
-    subnets=data_vpc["subnet_ids"],
-    security_groups=[data_vpc["security_groups"]["web"]],
+    subnets=operations_vpc["subnet_ids"],
+    security_groups=[operations_vpc["security_groups"]["web"]],
     tags=aws_config.merged_tags(
         {"Name": f"celery-monitoring-lb-{stack_info.env_suffix}"}
     ),
@@ -270,7 +270,7 @@ celery_monitoring_lb_config = OLLoadBalancerConfig(
 )
 
 celery_monitoring_tg_config = OLTargetGroupConfig(
-    vpc_id=data_vpc["id"],
+    vpc_id=operations_vpc["id"],
     health_check_interval=60,
     health_check_matcher="200-399",
     health_check_path="/health",
@@ -311,7 +311,8 @@ celery_monitoring_web_lt_config = OLLaunchTemplateConfig(
     security_groups=[
         celery_monitoring_security_group.id,
         consul_security_groups["consul_agent"],
-        data_vpc["security_groups"]["web"],
+        operations_vpc["security_groups"]["web"],
+        operations_vpc["security_groups"]["celery_monitoring"],
     ],
     tags=aws_config.merged_tags(
         {"Name": f"celery-monitoring-web-{stack_info.env_suffix}"}
@@ -390,7 +391,7 @@ celery_monitoring_web_asg_config = OLAutoScaleGroupConfig(
     desired_size=celery_monitoring_web_auto_scale_config["desired"],
     min_size=celery_monitoring_web_auto_scale_config["min"],
     max_size=celery_monitoring_web_auto_scale_config["max"],
-    vpc_zone_identifiers=data_vpc["subnet_ids"],
+    vpc_zone_identifiers=operations_vpc["subnet_ids"],
     tags=aws_config.merged_tags(
         {"Name": f"celery-monitoring-web-{celery_monitoring_env}"}
     ),

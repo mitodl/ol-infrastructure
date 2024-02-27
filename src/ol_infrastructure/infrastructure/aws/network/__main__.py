@@ -423,6 +423,16 @@ operations_vpc_exports = vpc_exports(
 operations_vpc_exports.update(
     {
         "security_groups": {
+            "celery_monitoring": ec2.SecurityGroup(
+                "operations-celery-monitoring",
+                description="Security group for Leek service for Celery Monitoring",
+                vpc_id=operations_vpc.olvpc.id,
+                ingress=[],
+                egress=[],
+                tags=operations_vpc_config.merged_tags(
+                    {"Name": f"ol-operations-{stack_info.env_suffix}-celery-monitoring"}
+                ),
+            ).id,
             "default": operations_vpc.olvpc.id.apply(default_group).id,
             "web": public_web(operations_vpc_config.vpc_name, operations_vpc.olvpc)(
                 tags=operations_vpc_config.merged_tags(
