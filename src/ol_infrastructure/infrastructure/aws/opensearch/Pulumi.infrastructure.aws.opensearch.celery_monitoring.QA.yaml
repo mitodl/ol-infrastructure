@@ -8,7 +8,7 @@ config:
   opensearch:consul_service_name: 'celery_monitoring-opensearch'
   environment:business_unit: operations
   environment:target_vpc: operations_vpc
-  opensearch:domain_name: "celerym"
+  opensearch:domain_name: "celeryq"
   opensearch:cluster_size: "3"
   opensearch:disk_size_gb: "60"
   opensearch:engine_version: "OpenSearch_2.11"

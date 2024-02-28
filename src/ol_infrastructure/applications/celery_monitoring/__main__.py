@@ -297,7 +297,23 @@ celery_monitoring_web_lt_config = OLLaunchTemplateConfig(
                             },
                             {
                                 "path": "/etc/docker/compose/.env",
-                                "content": f"DOMAIN={celery_monitoring_domain}\nVAULT_ADDR=https://vault-{stack_info.env_suffix}.odl.mit.edu\n",
+                                "content": textwrap.dedent(
+                                    f"""\
+                                DOMAIN={celery_monitoring_domain}
+                                VAULT_ADDR=https://vault-{stack_info.env_suffix}.odl.mit.edu
+                                LEEK_API_LOG_LEVEL=WARNING
+                                LEEK_AGENT_LOG_LEVEL=INFO
+                                LEEK_ENABLE_API=true
+                                LEEK_ENABLE_AGENT=true
+                                LEEK_ENABLE_WEB=true
+                                LEEK_API_URL=http://0.0.0.0:5000
+                                LEEK_WEB_URL=http://0.0.0.0:8000
+                                LEEK_ES_URL=http://es01:9200
+                                LEEK_API_ENABLE_AUTH=false
+                                LEEK_AGENT_SUBSCRIPTIONS={redis_broker_subscriptions}
+                                LEEK_AGENT_API_SECRET=not-secret
+                                """
+                                ),
                                 "append": True,
                             },
                             {

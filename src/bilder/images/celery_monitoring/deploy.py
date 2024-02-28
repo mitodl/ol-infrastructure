@@ -12,6 +12,12 @@ from pyinfra.operations import files, server
 from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models import Consul, ConsulConfig
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
+from bilder.components.hashicorp.consul_template.models import (
+    ConsulTemplate,
+    ConsulTemplateConfig,
+    ConsulTemplateTemplate,
+    ConsulTemplateVaultConfig,
+)
 from bilder.components.hashicorp.steps import (
     configure_hashicorp_product,
     install_hashicorp_products,
@@ -44,6 +50,10 @@ from bilder.components.vector.steps import (
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.ami_helpers import build_tags_document
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
+from bilder.lib.template_helpers import (
+    CONSUL_TEMPLATE_DIRECTORY,
+    place_consul_template_file,
+)
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
@@ -57,6 +67,8 @@ VECTOR_INSTALL_NAME = os.environ.get("VECTOR_LOG_PROXY_NAME", "vector-log-proxy"
 DOCKER_REPO_NAME = os.environ.get("DOCKER_REPO_NAME", "kodhive/leek")
 DOCKER_IMAGE_DIGEST = os.environ.get("DOCKER_IMAGE_DIGEST", "latest")
 
+watched_files: list[Path] = []
+consul_templates: list[ConsulTemplateTemplate] = []
 
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
@@ -79,7 +91,7 @@ vault_config = VaultAgentConfig(
         method=VaultAutoAuthMethod(
             type="aws",
             mount_path="auth/aws",
-            config=VaultAutoAuthAWS(role="leek-server"),
+            config=VaultAutoAuthAWS(role="celery_monitoring"),
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),
@@ -105,6 +117,37 @@ vault = Vault(
     configuration={Path("vault.json"): vault_config},
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
+
+# Configure consul template to add Leek env vars
+
+# Place consul templates, setup consul-template
+dot_env_template = place_consul_template_file(
+    name=".env",
+    repo_path=FILES_DIRECTORY,
+    template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
+    destination_path=DOCKER_COMPOSE_DIRECTORY,
+)
+consul_templates.append(dot_env_template)
+watched_files.append(dot_env_template.destination)
+
+config_file_template = place_consul_template_file(
+    name="edx_notes_settings.yaml",
+    repo_path=FILES_DIRECTORY,
+    template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
+    destination_path=DOCKER_COMPOSE_DIRECTORY,
+)
+consul_templates.append(config_file_template)
+watched_files.append(config_file_template.destination)
+
+consul_template = ConsulTemplate(
+    version=VERSIONS["consul-template"],
+    configuration={
+        Path("00-default.json"): ConsulTemplateConfig(
+            vault=ConsulTemplateVaultConfig(),
+            template=consul_templates,
+        )
+    },
+)
 
 hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)

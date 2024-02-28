@@ -20,7 +20,11 @@ search_config = pulumi.Config("opensearch")
 env_config = pulumi.Config("environment")
 stack_info = parse_stack()
 
-if stack_info.env_prefix in ["open", "mitopen", "celery_monitoring"]:
+if stack_info.env_prefix in ["open", "mitopen"]:
+    consul_stack = pulumi.StackReference(
+        f"infrastructure.consul.apps.{stack_info.name}"
+    )
+elif stack_info.env_prefix == "celery_monitoring":
     consul_stack = pulumi.StackReference(
         f"infrastructure.consul.operations.{stack_info.name}"
     )
@@ -148,6 +152,7 @@ search_domain = aws.elasticsearch.Domain(
         volume_size=disk_size,
     ),
     tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch-cluster"}),
+    opts=pulumi.ResourceOptions(delete_before_replace=True),
     **conditional_kwargs,
 )
 
