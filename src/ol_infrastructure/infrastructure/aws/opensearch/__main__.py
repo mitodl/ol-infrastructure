@@ -22,7 +22,7 @@ stack_info = parse_stack()
 
 if stack_info.env_prefix in ["open", "mitopen", "celery_monitoring"]:
     consul_stack = pulumi.StackReference(
-        f"infrastructure.consul.apps.{stack_info.name}"
+        f"infrastructure.consul.operations.{stack_info.name}"
     )
 else:
     consul_stack = pulumi.StackReference(

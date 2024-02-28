@@ -3,11 +3,11 @@ secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQEfJzwm6HNNRM1QvgrYl15bAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMb90eaFzNa3zYnzIwAgEQgDtTmK1NjMSP7g+43StYkQpL+4d64geNr18dwSZna6y036dgfJsssBHMsNVHZYQtcQSiIlUYN9jP9m6YVA==
 config:
   aws:region: us-east-1
-  consul:address: https://consul-apps-ci.odl.mit.edu
+  consul:address: https://consul-operations-ci.odl.mit.edu
   consul:scheme: https
   opensearch:consul_service_name: 'celery_monitoring-opensearch'
   environment:business_unit: operations
-  environment:target_vpc: applications_vpc
+  environment:target_vpc: operations_vpc
   opensearch:domain_name: "celerym"
   opensearch:cluster_size: "3"
   opensearch:disk_size_gb: "60"
