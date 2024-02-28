@@ -130,15 +130,6 @@ dot_env_template = place_consul_template_file(
 consul_templates.append(dot_env_template)
 watched_files.append(dot_env_template.destination)
 
-config_file_template = place_consul_template_file(
-    name="edx_notes_settings.yaml",
-    repo_path=FILES_DIRECTORY,
-    template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
-    destination_path=DOCKER_COMPOSE_DIRECTORY,
-)
-consul_templates.append(config_file_template)
-watched_files.append(config_file_template.destination)
-
 consul_template = ConsulTemplate(
     version=VERSIONS["consul-template"],
     configuration={
