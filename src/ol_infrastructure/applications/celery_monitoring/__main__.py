@@ -20,7 +20,6 @@ from ol_infrastructure.components.aws.auto_scale_group import (
     TagSpecification,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -32,7 +31,7 @@ stack_info = parse_stack()
 consul_provider = get_consul_provider(stack_info)
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
-consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")
+consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
 opensearch_stack = StackReference(
     f"infrastructure.aws.opensearch.celery_monitoring.{stack_info.name}"
 )
@@ -105,64 +104,13 @@ vault.kv.SecretV2(
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]
 operations_vpc = network_stack.require_output("operations_vpc")
-celery_monitoring_env = f"data-{stack_info.env_suffix}"
-aws_config = AWSBase(tags={"OU": "data", "Environment": celery_monitoring_env})
+celery_monitoring_env = f"operations-{stack_info.env_suffix}"
+aws_config = AWSBase(tags={"OU": "operations", "Environment": celery_monitoring_env})
 consul_security_groups = consul_stack.require_output("security_groups")
 
 aws_account = get_caller_identity()
 celery_monitoring_domain = celery_monitoring_config.get("web_host_domain")
 celery_monitoring_mail_domain = f"mail.{celery_monitoring_domain}"
-# Create IAM role
-
-celery_monitoring_bucket_name = f"ol-celery-monitoring-{stack_info.env_suffix}"
-# Create instance profile for granting access to S3 buckets
-celery_monitoring_iam_policy = iam.Policy(
-    f"celery-monitoring-policy-{stack_info.env_suffix}",
-    name=f"celery-monitoring-policy-{stack_info.env_suffix}",
-    path=f"/ol-data/celery-monitoring-policy-{stack_info.env_suffix}/",
-    policy=lint_iam_policy(
-        policy_document=json.dumps(
-            {
-                "Version": IAM_POLICY_VERSION,
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Action": "s3:ListAllMyBuckets",
-                        "Resource": "*",
-                    },
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "s3:ListBucket*",
-                            "s3:GetObject",
-                            "s3:PutObject",
-                            "s3:DeleteObject*",
-                        ],
-                        "Resource": [
-                            f"arn:aws:s3:::{celery_monitoring_bucket_name}",
-                            f"arn:aws:s3:::{celery_monitoring_bucket_name}/*",
-                        ],
-                    },
-                    {
-                        "Effect": "Allow",
-                        "Action": ["ses:SendEmail", "ses:SendRawEmail"],
-                        "Resource": [
-                            "arn:*:ses:*:*:identity/*mit.edu",
-                            f"arn:aws:ses:*:*:configuration-set/celery-monitoring-{celery_monitoring_env}",
-                        ],
-                    },
-                    {
-                        "Effect": "Allow",
-                        "Action": ["ses:GetSendQuota"],
-                        "Resource": "*",
-                    },
-                ],
-            }
-        ),
-        stringify=True,
-    ),
-    description="Policy for granting acces for batch data workflows to AWS resources",
-)
 
 celery_monitoring_instance_role = iam.Role(
     "celery-monitoring-instance-role",
@@ -177,14 +125,8 @@ celery_monitoring_instance_role = iam.Role(
         }
     ),
     name=f"celery-monitoring-instance-role-{stack_info.env_suffix}",
-    path="/ol-data/celery-monitoring-role/",
+    path="/ol-operations/celery-monitoring-role/",
     tags=aws_config.tags,
-)
-
-iam.RolePolicyAttachment(
-    f"celery-monitoring-role-policy-{stack_info.env_suffix}",
-    policy_arn=celery_monitoring_iam_policy.arn,
-    role=celery_monitoring_instance_role.name,
 )
 
 iam.RolePolicyAttachment(
@@ -203,7 +145,7 @@ celery_monitoring_profile = iam.InstanceProfile(
     f"celery-monitoring-instance-profile-{stack_info.env_suffix}",
     role=celery_monitoring_instance_role.name,
     name=f"celery-monitoring-instance-profile-{stack_info.env_suffix}",
-    path="/ol-data/celery-monitoring-profile/",
+    path="/ol-operations/celery-monitoring-profile/",
 )
 
 celery_monitoring_security_group = ec2.SecurityGroup(
@@ -343,7 +285,7 @@ celery_monitoring_web_lt_config = OLLaunchTemplateConfig(
                                     f"""\
                             ENVIRONMENT={consul_dc}
                             APPLICATION=celery_monitoring
-                            SERVICE=data-platform
+                            SERVICE=celery-monitoring
                             VECTOR_CONFIG_DIR=/etc/vector/
                             AWS_REGION={aws_config.region}
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
