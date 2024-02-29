@@ -38,7 +38,7 @@ celery_monitoring_pulumi_code = git_repo(
 celery_monitoring_ami_fragment = packer_jobs(
     dependencies=[GetStep(get=celery_monitoring_docker_image.name, trigger=True)],
     image_code=celery_monitoring_image_code,
-    packer_template_path="src/bilder/images/celery_monitoring/celery_monitoring.pkr.hcl",
+    packer_template_path="src/bilder/images/celery_monitoring/celery-monitoring.pkr.hcl",
     node_types=["server"],
     extra_packer_params={"only": ["amazon-ebs.celery-monitoring"]},
 )
