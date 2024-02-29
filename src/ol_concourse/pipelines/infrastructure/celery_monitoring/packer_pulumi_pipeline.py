@@ -16,6 +16,7 @@ celery_monitoring_docker_image = registry_image(
 celery_monitoring_image_code = git_repo(
     Identifier("ol-infrastructure-packer"),
     uri="https://github.com/mitodl/ol-infrastructure",
+    branch="cpatti_setup_leek",
     paths=[
         "src/bilder/components/",
         "src/bilder/images/celery_monitoring/",
@@ -27,6 +28,7 @@ celery_monitoring_image_code = git_repo(
 celery_monitoring_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
     uri="https://github.com/mitodl/ol-infrastructure",
+    branch="cpatti_setup_leek",
     paths=[
         *PULUMI_WATCHED_PATHS,
         PULUMI_CODE_PATH.joinpath("applications/celery_monitoring/"),
@@ -38,7 +40,7 @@ celery_monitoring_ami_fragment = packer_jobs(
     image_code=celery_monitoring_image_code,
     packer_template_path="src/bilder/images/celery_monitoring/celery_monitoring.pkr.hcl",
     node_types=["server"],
-    extra_packer_params={"only": ["amazon-ebs.celery_monitoring"]},
+    extra_packer_params={"only": ["amazon-ebs.celery-monitoring"]},
 )
 
 celery_monitoring_pulumi_fragment = pulumi_jobs_chain(
