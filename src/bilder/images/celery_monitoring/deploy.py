@@ -13,10 +13,7 @@ from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models import Consul, ConsulConfig
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
 from bilder.components.hashicorp.consul_template.models import (
-    ConsulTemplate,
-    ConsulTemplateConfig,
     ConsulTemplateTemplate,
-    ConsulTemplateVaultConfig,
 )
 from bilder.components.hashicorp.steps import (
     configure_hashicorp_product,
@@ -129,16 +126,6 @@ dot_env_template = place_consul_template_file(
 )
 consul_templates.append(dot_env_template)
 watched_files.append(dot_env_template.destination)
-
-consul_template = ConsulTemplate(
-    version=VERSIONS["consul-template"],
-    configuration={
-        Path("00-default.json"): ConsulTemplateConfig(
-            vault=ConsulTemplateVaultConfig(),
-            template=consul_templates,
-        )
-    },
-)
 
 hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
