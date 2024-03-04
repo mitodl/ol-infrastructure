@@ -80,9 +80,9 @@ class OLVaultPostgresDatabaseConfig(OLVaultDatabaseConfig):
     # The db_connection strings are passed through the `.format` method so the variables
     # that need to remain in the template to be passed to Vault are wrapped in 4 pairs
     # of braces. TMM 2020-09-01
-    db_connection: (
-        str
-    ) = "postgresql://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/{db_name}"
+    db_connection: str = (
+        "postgresql://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/{db_name}"
+    )
     db_type: str = DBEngines.postgres.value
     role_statements: dict[str, dict[str, Template]] = postgres_role_statements
 
@@ -100,9 +100,9 @@ class OLVaultMongoDatabaseConfig(OLVaultDatabaseConfig):
     """Configuration object for MongoDB instances to register with Vault."""
 
     db_port: int = DEFAULT_MONGODB_PORT
-    db_connection: (
-        str
-    ) = "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
+    db_connection: str = (
+        "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
+    )
     db_type: str = DBEngines.mongodb.value
     role_statements: dict[str, dict[str, Template]] = mongodb_role_statements
 

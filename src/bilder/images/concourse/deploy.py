@@ -167,9 +167,9 @@ concourse_config_map = {
         containerd_network_pool="10.250.0.0/16",
     ),
 }
-concourse_config: Union[
-    ConcourseWebConfig, ConcourseWorkerConfig
-] = concourse_config_map[node_type]()
+concourse_config: Union[ConcourseWebConfig, ConcourseWorkerConfig] = (
+    concourse_config_map[node_type]()
+)
 vault_template_map = {
     CONCOURSE_WEB_NODE_TYPE: [
         partial(

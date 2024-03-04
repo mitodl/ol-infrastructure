@@ -1,6 +1,4 @@
-"""The complete state needed to provision Keycloak running on Docker.
-
-"""
+"""The complete state needed to provision Keycloak running on Docker."""
 
 import base64
 import json

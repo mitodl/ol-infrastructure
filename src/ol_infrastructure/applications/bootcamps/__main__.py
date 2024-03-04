@@ -285,15 +285,15 @@ auth_aws_mitx_creds_bootcamps_app = vault.generic.get_secret_output(
     opts=InvokeOptions(parent=bootcamps_secrets),
 )
 
-sensitive_heroku_vars[
-    "AWS_ACCESS_KEY_ID"
-] = auth_aws_mitx_creds_bootcamps_app.data.apply(
-    lambda data: "{}".format(data["access_key"])
+sensitive_heroku_vars["AWS_ACCESS_KEY_ID"] = (
+    auth_aws_mitx_creds_bootcamps_app.data.apply(
+        lambda data: "{}".format(data["access_key"])
+    )
 )
-sensitive_heroku_vars[
-    "AWS_SECRET_ACCESS_KEY"
-] = auth_aws_mitx_creds_bootcamps_app.data.apply(
-    lambda data: "{}".format(data["secret_key"])
+sensitive_heroku_vars["AWS_SECRET_ACCESS_KEY"] = (
+    auth_aws_mitx_creds_bootcamps_app.data.apply(
+        lambda data: "{}".format(data["secret_key"])
+    )
 )
 
 auth_postgres_bootcamps_creds_app = vault.generic.get_secret_output(

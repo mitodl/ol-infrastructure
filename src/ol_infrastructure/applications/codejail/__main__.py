@@ -1,5 +1,4 @@
-"""Create the resources needed to run a codejail service.  # noqa: D200
-"""
+"""Create the resources needed to run a codejail service.  # noqa: D200"""
 
 import base64
 import json

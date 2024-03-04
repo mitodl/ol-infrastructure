@@ -378,12 +378,12 @@ for tool in ["loki", "cortex", "alertmanager"]:
             command = "cortextool alertmanager load $RESOURCE_NAME/alertmanager.yaml"
             directory = ""
             params["CORTEX_ADDRESS"] = "((cortextool.cortex-amconfig-api-address))"
-            params[
-                "CORTEX_API_USER"
-            ] = f"((cortextool.cortex-amconfig-api-user-{stage}))"
-            params[
-                "CORTEX_TENANT_ID"
-            ] = f"((cortextool.cortex-amconfig-api-user-{stage}))"
+            params["CORTEX_API_USER"] = (
+                f"((cortextool.cortex-amconfig-api-user-{stage}))"
+            )
+            params["CORTEX_TENANT_ID"] = (
+                f"((cortextool.cortex-amconfig-api-user-{stage}))"
+            )
             params["ENVIRONMENT_NAME"] = stage
         params["RULE_DIRECTORY"] = directory
         passed_value = [alerting_jobs[-1].name]
