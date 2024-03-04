@@ -1,54 +1,8 @@
 ---
-version: "2.4"
+version: "3.7"
 services:
-  app:
-    image: kodhive/leek
-    environment:
-      # General
-    - LEEK_API_LOG_LEVEL=WARNING
-    - LEEK_AGENT_LOG_LEVEL=INFO
-      # Components
-    - LEEK_ENABLE_API=true
-    - LEEK_ENABLE_AGENT=true
-    - LEEK_ENABLE_WEB=true
-      # URLs
-    - LEEK_API_URL=http://0.0.0.0:5000
-    - LEEK_WEB_URL=http://0.0.0.0:8000
-    - LEEK_ES_URL=‘elasticsearch.service.consul’
-      # Authentication
-    - LEEK_API_ENABLE_AUTH=false
-      # Pulumi code needs to generate list of subscriptions, push them into vault,
-      # and then we wire them in here via Consul template.
-      # Subscriptions
-      # - |
-      #   LEEK_AGENT_SUBSCRIPTIONS=
-      #   [
-      #     {
-      #       "broker": "redis://:admin@mq:6379/0",
-      #       "broker_management_url": "http://mq:6379",
-      #       "backend": null,
-      #       "exchange": "celeryev",
-      #       "queue": "leek.fanout",
-      #       "routing_key": "#",
-      #       "org_name": "mono",
-      #       "app_name": "leek",
-      #       "app_env": "prod",
-      #       "prefetch_count": 1000,
-      #       "concurrency_pool_size": 2,
-      #       "batch_max_size_in_mb": 1,
-      #       "batch_max_number_of_messages": 1000,
-      #       "batch_max_window_in_seconds": 5
-      #     }
-      #   ]
-    - LEEK_AGENT_API_SECRET=not-secret
-    ports:
-    - 5000:5000
-    - 8000:8000
-    labels:
-    - "traefik.enable=true"
-    - "traefik.http.routers.leek.tls=true"
   traefik:
-    image: traefik:latest
+    image: traefik:2.11
     container_name: traefik
     restart: unless-stopped
     command:
@@ -67,5 +21,15 @@ services:
     volumes:
     - "/etc/traefik/traefik.yaml:/traefik/traefik.yaml:ro"
     - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "/etc/traefik/odl_wildcard.cert:/etc/traefik/star.odl.mit.edu.crt:ro"
-      - "/etc/traefik/odl_wildcard.key:/etc/traefik/star.odl.mit.edu.key:ro"
+    - "/etc/traefik/odl_wildcard.cert:/etc/traefik/star.odl.mit.edu.crt:ro"
+    - "/etc/traefik/odl_wildcard.key:/etc/traefik/star.odl.mit.edu.key:ro"
+  app:
+    image: kodhive/leek
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.leek.tls=true"
+    env_file:
+    - .env
+    ports:
+    - "5000:5000"
+    - "8000:8000"
