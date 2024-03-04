@@ -2,12 +2,11 @@ import base64
 import json
 import textwrap
 from pathlib import Path
-from pprint import pformat
 
 import pulumi_vault as vault
 import yaml
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, ResourceOptions, StackReference, log
+from pulumi import Config, Output, ResourceOptions, StackReference
 from pulumi_aws import acm, ec2, get_caller_identity, iam, route53
 
 from ol_infrastructure.components.aws.auto_scale_group import (
@@ -68,7 +67,6 @@ def build_broker_subscriptions(
                 "batch_max_window_in_seconds": 5,
             }
         )
-    log.info(f"build_broker_subscrpitons: broker_sub={pformat(broker_subs)}")
     arbitrary_dict = {"broker_subscriptions": broker_subs}
     return json.dumps(arbitrary_dict)
 
