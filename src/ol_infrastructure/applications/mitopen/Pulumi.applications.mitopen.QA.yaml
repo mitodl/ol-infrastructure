@@ -36,9 +36,8 @@ config:
     TIKA_SERVER_ENDPOINT: "https://tika-qa.odl.mit.edu"
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
-    - "ocwnext-rc.odl.mit.edu"
+    - "live-qa.ocw.mit.edu"
     cors_urls:
-    - "https://ocwnext-rc.odl.mit.edu"
     - "https://ocw-next.netlify.app"
     - "https://ol-devops-ci.odl.mit.edu"
     - "https://draft-qa.ocw.mit.edu"
