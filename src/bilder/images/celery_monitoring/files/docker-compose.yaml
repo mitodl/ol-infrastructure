@@ -46,8 +46,6 @@ services:
     - 8000:8000
     labels:
     - "traefik.enable=true"
-    - "traefik.http.routers.leek.rule=Host(`${LEEK_HOSTNAME}`)"
-    - "traefik.http.routers.leek.middlewares=traefik-forward-auth"
     - "traefik.http.routers.leek.tls=true"
   traefik:
     image: traefik:latest

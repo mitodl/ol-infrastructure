@@ -102,7 +102,7 @@ vault.kv.SecretV2(
     data_json=redis_broker_subscriptions,
 )
 
-mitol_zone_id = dns_stack.require_output("ol")["id"]
+mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 operations_vpc = network_stack.require_output("operations_vpc")
 celery_monitoring_env = f"operations-{stack_info.env_suffix}"
 aws_config = AWSBase(tags={"OU": "operations", "Environment": celery_monitoring_env})
@@ -349,6 +349,6 @@ route53.Record(
     type="CNAME",
     ttl=five_minutes,
     records=[celery_monitoring_web_asg.load_balancer.dns_name],
-    zone_id=mitol_zone_id,
+    zone_id=mitodl_zone_id,
     opts=ResourceOptions(delete_before_replace=True),
 )
