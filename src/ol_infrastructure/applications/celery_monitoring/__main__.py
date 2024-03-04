@@ -25,9 +25,9 @@ from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-setup_vault_provider()
-celery_monitoring_config = Config("celery_monitoring")
 stack_info = parse_stack()
+setup_vault_provider(stack_info)
+celery_monitoring_config = Config("celery_monitoring")
 consul_provider = get_consul_provider(stack_info)
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
@@ -109,8 +109,7 @@ aws_config = AWSBase(tags={"OU": "operations", "Environment": celery_monitoring_
 consul_security_groups = consul_stack.require_output("security_groups")
 
 aws_account = get_caller_identity()
-celery_monitoring_domain = celery_monitoring_config.get("web_host_domain")
-celery_monitoring_mail_domain = f"mail.{celery_monitoring_domain}"
+celery_monitoring_domain = celery_monitoring_config.get("domain")
 
 celery_monitoring_instance_role = iam.Role(
     "celery-monitoring-instance-role",
@@ -296,27 +295,6 @@ celery_monitoring_web_lt_config = OLLaunchTemplateConfig(
                                 "owner": "root:root",
                             },
                             {
-                                "path": "/etc/docker/compose/.env",
-                                "content": textwrap.dedent(
-                                    f"""\
-                                DOMAIN={celery_monitoring_domain}
-                                VAULT_ADDR=https://vault-{stack_info.env_suffix}.odl.mit.edu
-                                LEEK_API_LOG_LEVEL=WARNING
-                                LEEK_AGENT_LOG_LEVEL=INFO
-                                LEEK_ENABLE_API=true
-                                LEEK_ENABLE_AGENT=true
-                                LEEK_ENABLE_WEB=true
-                                LEEK_API_URL=http://0.0.0.0:5000
-                                LEEK_WEB_URL=http://0.0.0.0:8000
-                                LEEK_ES_URL=http://es01:9200
-                                LEEK_API_ENABLE_AUTH=false
-                                LEEK_AGENT_SUBSCRIPTIONS={redis_broker_subscriptions}
-                                LEEK_AGENT_API_SECRET=not-secret
-                                """
-                                ),
-                                "append": True,
-                            },
-                            {
                                 "path": "/etc/default/docker-compose",
                                 "content": "COMPOSE_PROFILES=web",
                             },
@@ -367,7 +345,7 @@ celery_monitoring_web_asg = OLAutoScaling(
 five_minutes = 60 * 5
 route53.Record(
     "celery-monitoring-server-dns-record",
-    name=celery_monitoring_config.require("domain"),
+    name=celery_monitoring_domain,
     type="CNAME",
     ttl=five_minutes,
     records=[celery_monitoring_web_asg.load_balancer.dns_name],

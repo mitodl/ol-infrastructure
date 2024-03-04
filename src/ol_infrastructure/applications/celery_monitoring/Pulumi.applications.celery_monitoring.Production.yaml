@@ -2,12 +2,11 @@
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgEdGy9xAEuhd2us5xqrOlxoAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMXK6sZZn1tdLfTZF4AgEQgDuzHB/a0s/gLtTCImB7e/shVdAOnQ/PbHwrAz1nhI6M8pc3O8GO+0o4xZwRxIIQA81Ynw6+tuR57IIW1A==
 config:
-  vault:address: https://vault-production.odl.mit.edu
-  vault_server:env_namespace: operations.production
   consul:address: https://consul-apps-production.odl.mit.edu
   consul:scheme: https
   opensearch:consul_service_name: 'celery_monitoring-opensearch'
   environment:business_unit: operations
-  environment:target_vpc: applications_vpc
-  opensearch:domain_name: "celerym"
+  environment:target_vpc: operations_vpc
+  opensearch:domain_name: "celeryp"
   celery_monitoring:sender_email_address: ol-devops@mit.edu
+  celery_monitoring:domain: celery-monitoring.odl.mit.edu

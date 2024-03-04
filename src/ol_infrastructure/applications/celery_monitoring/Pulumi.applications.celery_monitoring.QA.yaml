@@ -2,12 +2,11 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHg42pDDDGBhpaX14TdtzcK1hbiMYTHsYRH4k5GL5RFpIwF2/DtEoBk3QwV16pe6zwFoAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM3iu2yMHQBIuj93iqAgEQgDuF+IIz5NYwrJRmNl9HU9+js6+Ma/bRa02O0UpiL+WJit629gHgFBqhOthl9kfxW0dWS3OTe45zebAqFg==
 config:
-  vault:address: https://vault-qa.odl.mit.edu
-  vault_server:env_namespace: operations.qa
   consul:address: https://consul-apps-qa.odl.mit.edu
   consul:scheme: https
   opensearch:consul_service_name: 'celery_monitoring-opensearch'
   environment:business_unit: operations
-  environment:target_vpc: applications_vpc
-  opensearch:domain_name: "celerym"
+  environment:target_vpc: operations_vpc
+  opensearch:domain_name: "celeryq"
   celery_monitoring:sender_email_address: ol-devops@mit.edu
+  celery_monitoring:domain: celery-monitoring-qa.odl.mit.edu

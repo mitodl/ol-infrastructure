@@ -44,8 +44,30 @@ services:
     ports:
     - 5000:5000
     - 8000:8000
-    # This seems not right. We don't have an mq target defined here? -CAP
-    # depends_on:
-    #   mq:
-    #     condition: service_healthy
-    #
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.leek.rule=Host(`${LEEK_HOSTNAME}`)"
+    - "traefik.http.routers.leek.middlewares=traefik-forward-auth"
+    - "traefik.http.routers.leek.tls=true"
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    restart: unless-stopped
+    command:
+    - "--providers.docker"
+    - "--providers.docker.exposedbydefault=false"
+    - "--entryPoints.http.address=:80"
+    - "--entryPoints.http.http.redirections.entryPoint.to=https"
+    - "--entryPoints.http.http.redirections.entryPoint.scheme=https"
+    - "--entryPoints.https.address=:443"
+    - "--log.level=WARN"
+    - "--accesslog=true"
+    - "--providers.file.filename=/traefik/traefik.yaml"
+    ports:
+    - "80:80"
+    - "443:443"
+    volumes:
+    - "/etc/traefik/traefik.yaml:/traefik/traefik.yaml:ro"
+    - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "/etc/traefik/odl_wildcard.cert:/etc/traefik/star.odl.mit.edu.crt:ro"
+      - "/etc/traefik/odl_wildcard.key:/etc/traefik/star.odl.mit.edu.key:ro"
