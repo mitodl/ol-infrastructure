@@ -13,7 +13,7 @@ def _debian_pkg_repo():
     debian_setup_script_path = "/tmp/vector_debian_setup.sh"  # noqa: S108
     files.download(
         name="Download Debian package setup script",
-        src="https://repositories.timber.io/public/vector/setup.deb.sh",
+        src="https://setup.vector.dev",
         dest=debian_setup_script_path,
         mode="755",
     )
