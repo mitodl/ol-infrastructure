@@ -4,7 +4,12 @@ from io import StringIO
 from pathlib import Path
 
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_VERSION, TRAEFIK_VERSION, VAULT_VERSION
+from bridge.lib.versions import (
+    CONSUL_TEMPLATE_VERSION,
+    CONSUL_VERSION,
+    TRAEFIK_VERSION,
+    VAULT_VERSION,
+)
 from bridge.secrets.sops import set_env_secrets
 from pyinfra.context import host
 from pyinfra.operations import files, server
@@ -13,7 +18,10 @@ from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models import Consul, ConsulConfig
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
 from bilder.components.hashicorp.consul_template.models import (
+    ConsulTemplate,
+    ConsulTemplateConfig,
     ConsulTemplateTemplate,
+    ConsulTemplateVaultConfig,
 )
 from bilder.components.hashicorp.steps import (
     configure_hashicorp_product,
@@ -54,6 +62,9 @@ from bilder.lib.template_helpers import (
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
+    "consul_template": os.environ.get(
+        "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION
+    ),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
     "traefik": os.environ.get("TRAEFIK_VERSION", TRAEFIK_VERSION),
 }
@@ -109,12 +120,6 @@ vault_config = VaultAgentConfig(
         ),
     ],
 )
-vault = Vault(
-    version=VERSIONS["vault"],
-    configuration={Path("vault.json"): vault_config},
-)
-consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
-
 # Configure consul template to add Leek env vars
 
 # Place consul templates, setup consul-template
@@ -127,7 +132,22 @@ dot_env_template = place_consul_template_file(
 consul_templates.append(dot_env_template)
 watched_files.append(dot_env_template.destination)
 
-hashicorp_products = [vault, consul]
+vault = Vault(
+    version=VERSIONS["vault"],
+    configuration={Path("vault.json"): vault_config},
+)
+consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
+consul_template = ConsulTemplate(
+    version=VERSIONS["consul_template"],
+    configuration={
+        Path("00-default.json"): ConsulTemplateConfig(
+            vault=ConsulTemplateVaultConfig(),
+            template=consul_templates,
+        )
+    },
+)
+
+hashicorp_products = [vault, consul, consul_template]
 install_hashicorp_products(hashicorp_products)
 
 # Configure and install traefik
