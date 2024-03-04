@@ -11,7 +11,7 @@ ol-openedx-course-structure-api
 ol-openedx-logging==0.2.0
 ol-openedx-sentry==0.1.2
 openedx-scorm-xblock
-pip==23.3.2
+pip==24.0
 sentry-sdk==1.40.6  # Fix RecursionError
 social-auth-mitxpro==0.6.3
 uwsgi==2.0.24
