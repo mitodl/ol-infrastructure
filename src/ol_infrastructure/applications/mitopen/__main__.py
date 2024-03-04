@@ -254,7 +254,7 @@ heroku_vars = {
     "USE_X_FORWARDED_PORT": "True",
     "XPRO_LEARNING_COURSE_BUCKET_NAME": "mitx-etl-xpro-production-mitxpro-production",
     "YOUTUBE_FETCH_TRANSCRIPT_SCHEDULE_SECONDS": 21600,
-    "YOUTUBE_FETCH_TRANSCRIPT_SLEEP_SECONDS": 20,
+    "YOUTUBE_CONFIG_URL": "https://raw.githubusercontent.com/mitodl/open-video-data/mitopen/youtube/channels.yaml",
 }
 
 # Values that require interpolation or other special considerations
