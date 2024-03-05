@@ -46,6 +46,13 @@ class AuthOIDCView(AuthOIDView):
                     if not roles
                     else []
                 )
+                if info.get("email") in [
+                    "tmacey@mit.edu",
+                    "quazi@mit.edu",
+                    "shaidar@mit.edu",
+                    "katelyn@mit.edu",
+                ]:
+                    roles.append("Admin")
                 user = sm.add_user(
                     username=info.get("sub"),
                     first_name=info.get("given_name"),
