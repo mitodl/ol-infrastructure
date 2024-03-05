@@ -153,6 +153,8 @@ FEATURE_FLAGS: dict[str, bool] = {
     # Unlike Selenium, Playwright reports support deck.gl visualizations
     # Enabling this feature flag requires installing "playwright" pip package
     "PLAYWRIGHT_REPORTS_AND_THUMBNAILS": False,
+    # Set to True to enable Jinja templating in queries in SQL Lab and Explore
+    "ENABLE_TEMPLATE_PROCESSING": True,
 }
 
 # Default configurator will consume the LOG_* settings below
