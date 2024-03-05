@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from string import Template
 
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
@@ -21,7 +22,7 @@ from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
 setup_vault_provider(skip_child_token=True)
 setup_heroku_provider()
@@ -202,12 +203,58 @@ mitopen_db_config.parameter_overrides.append(
 
 mitopen_db = OLAmazonDB(mitopen_db_config)
 
+mitopen_role_statements = postgres_role_statements.copy()
+mitopen_role_statements.pop("app")
+mitopen_role_statements["app"] = {
+    "create": Template(
+        """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+            VALID UNTIL '{{expiration}}' IN ROLE "mitopen" INHERIT;
+          GRANT CREATE ON SCHEMA public TO mitopen WITH GRANT OPTION;
+          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "mitopen"
+            WITH GRANT OPTION;
+          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "mitopen"
+            WITH GRANT OPTION;
+          SET ROLE "mitopen";
+          ALTER DEFAULT PRIVILEGES FOR ROLE "mitopen" IN SCHEMA public
+            GRANT ALL PRIVILEGES ON TABLES TO "mitopen" WITH GRANT OPTION;
+
+          ALTER DEFAULT PRIVILEGES FOR ROLE "mitopen" IN SCHEMA public
+            GRANT ALL PRIVILEGES ON SEQUENCES TO "mitopen" WITH GRANT OPTION;
+
+          CREATE SCHEMA IF NOT EXISTS external;
+
+          GRANT CREATE ON SCHEMA external TO "mitopen" WITH GRANT OPTION;
+          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA external TO "mitopen";
+          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external TO "mitopen"
+            WITH GRANT OPTION;
+          RESET ROLE;
+          ALTER ROLE "{{name}}" SET ROLE "mitopen";"""
+    ),
+    "revoke": Template(
+        """REVOKE "mitopen" FROM "{{name}}";
+          GRANT "{{name}}" TO mitopen WITH ADMIN OPTION;
+          SET ROLE mitopen;
+          REASSIGN OWNED BY "{{name}}" TO "mitopen";
+          RESET ROLE;
+          DROP OWNED BY "{{name}}";
+          REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";
+          REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA external FROM "{{name}}";
+          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
+          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external FROM "{{name}}";
+          REVOKE USAGE ON SCHEMA public FROM "{{name}}";
+          REVOKE USAGE ON SCHEMA external FROM "{{name}}";
+          DROP USER "{{name}}";"""
+    ),
+}
+
+
 mitopen_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=mitopen_db_config.db_name,
     mount_point=f"{mitopen_db_config.engine}-mitopen",
     db_admin_username=mitopen_db_config.username,
     db_admin_password=rds_password,
     db_host=mitopen_db.db_instance.address,
+    role_statements=mitopen_role_statements,
 )
 mitopen_vault_backend = OLVaultDatabaseBackend(mitopen_vault_backend_config)
 
