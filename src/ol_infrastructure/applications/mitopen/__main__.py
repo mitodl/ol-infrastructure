@@ -246,6 +246,28 @@ mitopen_role_statements["app"] = {
           DROP USER "{{name}}";"""
     ),
 }
+mitopen_role_statements["reverse-etl"] = {
+    "create": Template(
+        """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+            VALID UNTIL '{{expiration}}';
+          GRANT CREATE ON SCHEMA external TO "{{name}}" WITH GRANT OPTION;
+          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA external TO "{{name}}";
+          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external TO "{{name}}"
+            WITH GRANT OPTION;
+        """
+    ),
+    "revoke": Template(
+        """GRANT "{{name}}" TO mitopen WITH ADMIN OPTION;
+          SET ROLE mitopen;
+          REASSIGN OWNED BY "{{name}}" TO "mitopen";
+          RESET ROLE;
+          DROP OWNED BY "{{name}}";
+          REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA external FROM "{{name}}";
+          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external FROM "{{name}}";
+          REVOKE USAGE ON SCHEMA external FROM "{{name}}";
+          DROP USER "{{name}}";"""
+    ),
+}
 
 
 mitopen_vault_backend_config = OLVaultPostgresDatabaseConfig(
