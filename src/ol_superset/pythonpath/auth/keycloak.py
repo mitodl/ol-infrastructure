@@ -32,27 +32,25 @@ class AuthOIDCView(AuthOIDView):
         @self.appbuilder.sm.oid.require_login
         def handle_login():
             user = sm.auth_user_oid(oidc.user_getfield("email"))
-            if user is None:
-                info = oidc.user_getinfo(
-                    ["sub", "given_name", "family_name", "email", "roles"]
-                )
-                roles = [
-                    role for role in superset_roles if role in info.get("roles", [])
+            info = oidc.user_getinfo(
+                ["sub", "given_name", "family_name", "email", "roles"]
+            )
+            roles = [role for role in superset_roles if role in info.get("roles", [])]
+            roles += (
+                [
+                    default_role,
                 ]
-                roles += (
-                    [
-                        default_role,
-                    ]
-                    if not roles
-                    else []
-                )
-                if info.get("email") in [
-                    "tmacey@mit.edu",
-                    "quazi@mit.edu",
-                    "shaidar@mit.edu",
-                    "katelyn@mit.edu",
-                ]:
-                    roles.append("Admin")
+                if not roles
+                else []
+            )
+            if info.get("email") in [
+                "tmacey@mit.edu",
+                "quazi@mit.edu",
+                "shaidar@mit.edu",
+                "katelyn@mit.edu",
+            ]:
+                roles.append("Admin")
+            if user is None:
                 user = sm.add_user(
                     username=info.get("sub"),
                     first_name=info.get("given_name"),
@@ -60,7 +58,9 @@ class AuthOIDCView(AuthOIDView):
                     email=info.get("email"),
                     role=[sm.find_role(role) for role in roles],
                 )
-
+            else:
+                user.role = roles
+                sm.update_user(user)
             login_user(user, remember=False)
             return redirect(self.appbuilder.get_url_for_index)
 
