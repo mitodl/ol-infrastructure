@@ -337,33 +337,6 @@ ol_data_platform_realm = keycloak.Realm(
     opts=resource_options,
 )
 
-required_action_configure_otp = keycloak.RequiredAction(
-    "ol-data-configure-totp",
-    realm_id=ol_data_platform_realm.realm,
-    alias="CONFIGURE_TOTP",
-    default_action=True,
-    enabled=True,
-    opts=resource_options,
-)
-
-required_action_verify_email = keycloak.RequiredAction(
-    "ol-data-verify-email",
-    realm_id=ol_data_platform_realm.realm,
-    alias="VERIFY_EMAIL",
-    default_action=True,
-    enabled=True,
-    opts=resource_options,
-)
-
-required_action_update_password = keycloak.RequiredAction(
-    "ol-data-update-password",
-    realm_id=ol_data_platform_realm.realm,
-    alias="UPDATE_PASSWORD",
-    default_action=True,
-    enabled=True,
-    opts=resource_options,
-)
-
 # OL Data - First login flow [START]
 # Does not require email verification or confirmation to connect with existing account.
 ol_data_touchstone_first_login_flow = keycloak.authentication.Flow(
