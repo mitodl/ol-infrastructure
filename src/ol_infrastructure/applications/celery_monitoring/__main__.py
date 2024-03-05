@@ -180,13 +180,12 @@ celery_monitoring_server_vault_policy = vault.Policy(
 vault.aws.AuthBackendRole(
     "celery-monitoring-server-ami-ec2-vault-auth",
     backend="aws",
-    auth_type="ec2",
+    auth_type="iam",
     role="celery_monitoring",
+    inferred_entity_type="ec2_instance",
     inferred_aws_region=aws_config.region,
     bound_iam_instance_profile_arns=[celery_monitoring_profile.arn],
-    bound_ami_ids=[
-        celery_monitoring_ami.id
-    ],  # Reference the new way of doing stuff, not the old one
+    bound_ami_ids=[celery_monitoring_ami.id],
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[operations_vpc["id"]],
     token_policies=[celery_monitoring_server_vault_policy.name],
