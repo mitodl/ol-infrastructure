@@ -59,7 +59,7 @@ class AuthOIDCView(AuthOIDView):
                     role=[sm.find_role(role) for role in roles],
                 )
             else:
-                user.role = roles
+                user.role = [sm.find_role(role) for role in roles]
                 sm.update_user(user)
             login_user(user, remember=False)
             return redirect(self.appbuilder.get_url_for_index)
