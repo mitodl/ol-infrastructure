@@ -5,6 +5,38 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-apps-production.odl.mit.edu
   consul:scheme: https
+  heroku:app_id:
+    secure: v1:OyBLyVBR969L8irG:9FYYzxQpNrYL9VcHWr++92n6Mrz/BJ+YHu9ki6RxYfIvTBIT76xjckeQXu6ZTUxuiTO+2g==
+  heroku_app:vars:
+    ADWORDS_CONVERSION_ID: "935224753"
+    ALLOWED_HOSTS: '["micromasters.mit.edu", "mmfin.mit.edu", "mm.mit.edu"]'
+    AWS_STORAGE_BUCKET_NAME: "ol-micromasters-app-production"
+    CLOUDFRONT_DIST: "d34pclujt4iir0"
+    CYBERSOURCE_REFERENCE_PREFIX: "production"
+    CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://secureacceptance.cybersource.com/pay"
+    EDXORG_BASE_URL: "https://courses.edx.org"
+    EDXORG_CALLBACK_URL: "https://courses.edx.org"
+    FEATURE_EXAMS_CARD_ENABLED: "True"
+    FEATURE_PEARSON_EXAMS_SYNC: "True"
+    GA_TRACKING_ID: "UA-5145472-10"
+    GTM_CONTAINER_ID: "GTM-NB27R8L"
+    MAILGUN_FROM_EMAIL: "no-reply@micromasters.odl.mit.edu"
+    MAILGUN_URL: "https://api.mailgun.net/v3/micromasters.odl.mit.edu"
+    MICROMASTERS_BASE_URL: "https://micromasters.mit.edu"
+    MICROMASTERS_CORS_ORIGIN_WHITELIST: '["open.mit.edu"]'
+    MICROMASTERS_ENVIRONMENT: "production"
+    MICROMASTERS_LOG_LEVEL: "INFO"
+    MIDDLEWARE_FEATURE_FLAG_QS_PREFIX: "XIQ"
+    MITXONLINE_BASE_URL: "https://courses.mitxonline.mit.edu"
+    MITXONLINE_CALLBACK_URL: "https://courses.mitxonline.mit.edu"
+    MITXONLINE_URL: "https://mitxonline.mit.edu/"
+    OPEN_DISCUSSIONS_API_USERNAME: "od_mm_prod_api"
+    OPEN_DISCUSSIONS_BASE_URL: "https://open.mit.edu"
+    OPEN_DISCUSSIONS_COOKIE_DOMAIN: "mit.edu"
+    OPEN_DISCUSSIONS_COOKIE_NAME: "discussionsprod"
+    OPEN_DISCUSSIONS_REDIRECT_URL: "https://open.mit.edu/"
+    PGBOUNCER_DEFAULT_POOL_SIZE: 20
+    PGBOUNCER_MAX_CLIENT_CONN: 500
   micromasters:db_password:
     secure: v1:KuHLKayQ3w6kG9M6:lh+RY/EMrc92HVO60psz6lD6DlYAmf5wWHdWr80yY/Q+L54KMGytwmTLi59lo8xfBZveqwS7S5MyT2U=
   vault:address: https://vault-production.odl.mit.edu
