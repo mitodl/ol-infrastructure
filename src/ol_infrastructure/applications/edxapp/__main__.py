@@ -917,6 +917,9 @@ consul_kv_data = {
         if edxapp_config.get_bool("email_use_course_id_from_for_bulk")
         else "false"
     ),
+    "bulk-email-default-from-email": (
+        edxapp_config.get("bulk_email_default_from_email") or edxapp_config.require("sender_email_address")
+    ),
     "ses-configuration-set": f"edxapp-{env_name}",
     "ses-mail-domain": edxapp_mail_domain,
     "session-cookie-domain": ".{}".format(edxapp_domains["lms"].split(".", 1)[-1]),
