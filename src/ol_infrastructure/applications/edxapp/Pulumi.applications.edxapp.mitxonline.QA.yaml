@@ -47,6 +47,7 @@ config:
   edxapp:proctortrack_url: https://preproduction.verificient.com
   edxapp:sender_email_address: support@edxapp-mail-qa.mitxonline.mit.edu
   edxapp:email_use_course_id_from_for_bulk: "True"
+  edxapp:bulk_email_default_from_email: no-reply@edxapp-mail-qa.mitxonline.mit.edu
   edxapp:framework: "earthly"
   edxapp:web_node_capacity: "3"
   edxapp:worker_node_capacity: "5"
