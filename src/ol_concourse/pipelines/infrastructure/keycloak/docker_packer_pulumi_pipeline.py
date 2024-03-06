@@ -50,6 +50,7 @@ def build_keycloak_pipeline() -> Pipeline:
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
         paths=[
+            "src/bilder/components/",
             "src/bilder/images/keycloak",
         ],
     )
