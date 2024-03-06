@@ -918,7 +918,8 @@ consul_kv_data = {
         else "false"
     ),
     "bulk-email-default-from-email": (
-        edxapp_config.get("bulk_email_default_from_email") or edxapp_config.require("sender_email_address")
+        edxapp_config.get("bulk_email_default_from_email")
+        or edxapp_config.require("sender_email_address")
     ),
     "ses-configuration-set": f"edxapp-{env_name}",
     "ses-mail-domain": edxapp_mail_domain,
