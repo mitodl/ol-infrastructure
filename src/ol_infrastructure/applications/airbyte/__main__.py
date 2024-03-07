@@ -15,7 +15,7 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from ol_infrastructure.components.aws.auto_scale_group import (
@@ -87,6 +87,14 @@ consul_provider = get_consul_provider(stack_info)
 ##     General Resources     ##
 ###############################
 
+# S3 State Storage for Airbyte logs and system state
+airbyte_bucket_name = f"ol-airbyte-{stack_info.env_suffix}"
+s3.BucketV2(
+    "airbyte-state-storage-bucket",
+    bucket=airbyte_bucket_name,
+    tags=aws_config.tags,
+)
+
 # IAM and instance profile
 airbyte_server_instance_role = iam.Role(
     f"airbyte-server-instance-role-{env_name}",
@@ -112,6 +120,38 @@ parliament_config = {
     },
     "UNKNOWN_ACTION": {"ignore_locations": []},
 }
+
+airbyte_app_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject*",
+                "s3:PutObject*",
+                "s3:DeleteObject",
+            ],
+            "Resource": [f"arn:aws:s3:::{airbyte_bucket_name}/*"],
+        },
+        {
+            "Effect": "Allow",
+            "Action": "s3:ListBucket",
+            "Resource": f"arn:aws:s3:::{airbyte_bucket_name}",
+        },
+    ],
+}
+airbyte_app_policy = iam.Policy(
+    "airbyte-app-instance-iam-policy",
+    path=f"/ol-applications/airbyte-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    description=(
+        "Grant access to AWS resources for the operation of the Airbyte application."
+    ),
+    policy=lint_iam_policy(
+        airbyte_app_policy_document, stringify=True, parliament_config=parliament_config
+    ),
+    tags=aws_config.tags,
+)
+
 data_lake_policy_document = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
@@ -247,6 +287,11 @@ iam.RolePolicyAttachment(
 iam.RolePolicyAttachment(
     f"airbyte-server-s3-source-access-polic-{env_name}",
     policy_arn=s3_source_policy.arn,
+    role=airbyte_server_instance_role.name,
+)
+iam.RolePolicyAttachment(
+    "airbyte-app-instance-policy-attachement",
+    policy_arn=airbyte_app_policy.arn,
     role=airbyte_server_instance_role.name,
 )
 
@@ -480,6 +525,7 @@ consul.Keys(
                 else "letsencrypt_resolver"
             ),
         ),
+        consul.KeysKeyArgs(path="airbyte/env-stage", value=stack_info.env_suffix),
     ],
     opts=consul_provider,
 )
