@@ -63,6 +63,12 @@ OIDC_OPENID_REALM = "ol-data-platform"
 OIDC_INTROSPECTION_AUTH_METHOD = "client_secret_post"
 CUSTOM_SECURITY_MANAGER = OIDCSecurityManager
 
+# Testing out Keycloak role mapping to Superset
+# https://superset.apache.org/docs/installation/configuring-superset#mapping-ldap-or-oauth-groups-to-superset-roles
+AUTH_ROLES_MAPPING = {
+    "superset_admin": ["Admin"],
+}
+
 # Will allow user self registration, allowing to create Flask users from Authorized User
 AUTH_USER_REGISTRATION = True
 
