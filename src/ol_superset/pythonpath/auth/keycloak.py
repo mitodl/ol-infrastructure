@@ -43,7 +43,7 @@ class AuthOIDCView(AuthOIDView):
                 if not roles
                 else []
             )
-            if info.get("email") in [
+            if info.get("email", "").lower() in [
                 "tmacey@mit.edu",
                 "quazi@mit.edu",
                 "shaidar@mit.edu",
