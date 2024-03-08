@@ -1640,6 +1640,7 @@ export(
         "load_balancer": {"dns_name": web_lb.dns_name, "arn": web_lb.arn},
         "ses_configuration_set": edxapp_ses_configuration_set.name,
         "edx_notes_iam_role": edxapp_notes_iam_role.arn,
+        "deployment": stack_info.env_prefix,
     },
 )
 

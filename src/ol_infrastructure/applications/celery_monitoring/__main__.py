@@ -50,21 +50,14 @@ def build_broker_subscriptions(
     for edx_output in edx_outputs:
         broker_subs.append(  # noqa: PERF401
             {
-                "broker": edx_output["redis"],
-                "broker_management_url": "http://mq:15672",
-                # Does this belong here?
-                "broker_redis_token": edx_output["redis_token"],
-                "backend": None,
-                "exchange": "celeryev",  # Does this want to be the exchange of the leek
-                # OpenSearch? I'd think we'd want the edxapp one?
-                "queue": "celery_monitoring.fanout",
-                "routing_key": "#",
-                "org_name": "mono",
-                "prefetch_count": 1000,
-                "concurrency_pool_size": 2,
-                "batch_max_size_in_mb": 1,
-                "batch_max_number_of_messages": 1000,
-                "batch_max_window_in_seconds": 5,
+                "broker": f"rediss://default:{edx_output['redis_token']}@{edx_output['redis']}",
+                "broker_management_url": None,
+                "exchange": None,
+                "queue": "1",
+                "routing_key": None,
+                "org_name": "MIT Open Learning Engineering",
+                "app_name": edx_output["deployment"],
+                "app_env": stack_info.env_suffix,
             }
         )
     arbitrary_dict = {"broker_subscriptions": broker_subs}
