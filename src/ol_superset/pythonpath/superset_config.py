@@ -1,8 +1,7 @@
 import os  # noqa: INP001
 
-from auth.keycloak import OIDCSecurityManager
 from celery.schedules import crontab
-from flask_appbuilder.security.manager import AUTH_OID
+from flask_appbuilder.security.manager import AUTH_OAUTH
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
 from vault.aws_auth import get_vault_client
 
@@ -46,28 +45,32 @@ APP_ICON = "/static/assets/images/superset-logo-horiz.png"
 oidc_creds = vault_client.secrets.kv.v1.read_secret(
     path="sso/superset", mount_point="secret-operations"
 )["data"]
-AUTH_TYPE = AUTH_OID
-OIDC_CLIENT_SECRETS = {
-    "web": {
-        "issuer": oidc_creds["url"],
-        "client_id": oidc_creds["client_id"],
-        "client_secret": oidc_creds["client_secret"],
-        "auth_uri": f"{oidc_creds['url']}/protocol/openid-connect/auth",
-        "token_uri": f"{oidc_creds['url']}/protocol/openid-connect/token",
-        "userinfo_uri": f"{oidc_creds['url']}/protocol/openid-connect/userinfo",
-        "redirect_uris": [f"{os.environ['DOMAIN']}/*"],
-    }
-}
-OIDC_ID_TOKEN_COOKIE_SECURE = False
-OIDC_OPENID_REALM = "ol-data-platform"
-OIDC_INTROSPECTION_AUTH_METHOD = "client_secret_post"
-CUSTOM_SECURITY_MANAGER = OIDCSecurityManager
+AUTH_TYPE = AUTH_OAUTH
+OAUTH_PROVIDERS = [
+    {
+        "name": "OL SSO",
+        "icon": "fa-key",
+        "token_key": "access_token",
+        "remote_app": {
+            "client_id": oidc_creds["client_id"],
+            "client_secret": oidc_creds["client_secret"],
+            "api_base_url": f"{oidc_creds['url']}/protocol/openid-connect",
+            "client_kwargs": {"scope": "email profile"},
+            "access_token_url": f"{oidc_creds['domain_realm']}/protocol/openid-connect/token",  # noqa: E501
+            "authorize_url": f"{oidc_creds['domain_realm']}/protocol/openid-connect/auth",  # noqa: E501
+            "request_token_url": None,
+        },
+    },
+]
 
 # Testing out Keycloak role mapping to Superset
 # https://superset.apache.org/docs/installation/configuring-superset#mapping-ldap-or-oauth-groups-to-superset-roles
 AUTH_ROLES_MAPPING = {
     "superset_admin": ["Admin"],
 }
+
+# if we should replace ALL the user's roles each login, or only on registration
+AUTH_ROLES_SYNC_AT_LOGIN = True
 
 # Will allow user self registration, allowing to create Flask users from Authorized User
 AUTH_USER_REGISTRATION = True
