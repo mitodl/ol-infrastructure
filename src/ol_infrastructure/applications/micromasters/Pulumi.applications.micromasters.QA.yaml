@@ -7,6 +7,7 @@ config:
   consul:http_auth:
     secure: v1:cFN5rfbLYKJOLKko:EbolfR0aA+3QNuLKU4ixNwZVdSuSB5UIl0gAPICG4mrprmQSDFabC/VkxrJGDgaAbELMxpskbvN0qj2y9SMX0IlKJYD2JHUZsfYqd8FX1QcxAxeSL00jJ5Zkks+mP8c=
   consul:scheme: https
+  heroku:user: "mitx-devops"
   heroku:app_id:
     secure: v1:C6kSQ0x/E2q9yf+C:1BS59SvECNdYkFelQxTQPGbzII+msTL4OXGXP3Mag0/mDRWgwcmnpHaLVbMCksB+ZEbcOA==
   heroku_app:vars:

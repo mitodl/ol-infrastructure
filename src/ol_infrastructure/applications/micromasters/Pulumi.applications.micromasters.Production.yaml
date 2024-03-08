@@ -5,6 +5,7 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-apps-production.odl.mit.edu
   consul:scheme: https
+  heroku:user: "mitx-devops"
   heroku:app_id:
     secure: v1:OyBLyVBR969L8irG:9FYYzxQpNrYL9VcHWr++92n6Mrz/BJ+YHu9ki6RxYfIvTBIT76xjckeQXu6ZTUxuiTO+2g==
   heroku_app:vars:
