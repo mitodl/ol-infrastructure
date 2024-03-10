@@ -1441,12 +1441,12 @@ files = [
 
 [[package]]
 name = "pulumi"
-version = "3.108.1"
+version = "3.109.0"
 description = "Pulumi's Python SDK"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pulumi-3.108.1-py3-none-any.whl", hash = "sha256:58118884fe7d6fb3344af8323881e9d04dc99c9ca4b088a498e363ddbd2cb7c0"},
+    {file = "pulumi-3.109.0-py3-none-any.whl", hash = "sha256:7af108068f183d68b05a1ba5a1b33a6aed3b54aeb25458859c2c2b3f3bceb1b0"},
 ]
 
 [package.dependencies]
@@ -1459,13 +1459,13 @@ six = ">=1.12,<2.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "6.24.1"
+version = "6.25.0"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pulumi_aws-6.24.1-py3-none-any.whl", hash = "sha256:31880e648a00a148fce19c12891ff92ebfb664b763fafcb005732c3d8690bbee"},
-    {file = "pulumi_aws-6.24.1.tar.gz", hash = "sha256:fef31a7ebf987b00ed7c375eaedb9862db5bf54441db8afae9f7f50d98e15a0c"},
+    {file = "pulumi_aws-6.25.0-py3-none-any.whl", hash = "sha256:b34b58b6aa60b6b78c8dd49d40dd8ce34abb3e5bdbdfda8b33c37affef870987"},
+    {file = "pulumi_aws-6.25.0.tar.gz", hash = "sha256:88303a77133723ebc0c0c68b89f504518c500b53bfd771afa833d46877ffa8ff"},
 ]
 
 [package.dependencies]
@@ -1491,13 +1491,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-fastly"
-version = "8.4.2"
+version = "8.5.0"
 description = "A Pulumi package for creating and managing fastly cloud resources."
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "pulumi_fastly-8.4.2-py3-none-any.whl", hash = "sha256:71491009b3b575b7a5346e84b6336a20c8e25823d6a3cb7400183a0d79842104"},
-    {file = "pulumi_fastly-8.4.2.tar.gz", hash = "sha256:ab6290aab340b7986865999a49eee82c32f3db72c39fd7aafdc6f241471b8650"},
+    {file = "pulumi_fastly-8.5.0-py3-none-any.whl", hash = "sha256:27ede1c56b9900fc4f9ad619d89c8a2c9ec6f96f4ec3b873e85c8ec82ac0f5c6"},
+    {file = "pulumi_fastly-8.5.0.tar.gz", hash = "sha256:fd5b68dc51369830085bc1efd6ec3d841de674e7bcfd4e1a8659547991014879"},
 ]
 
 [package.dependencies]
@@ -1507,13 +1507,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "6.0.0"
+version = "6.0.1"
 description = "A Pulumi package for creating and managing github cloud resources."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pulumi_github-6.0.0-py3-none-any.whl", hash = "sha256:6bc48858f300085ab3d86d790a1ab4f4a2e3e0fc7d71e899764685f65dde44ea"},
-    {file = "pulumi_github-6.0.0.tar.gz", hash = "sha256:b92263066ada822ab1a37ac16f1d587e8f3f173b1ac3c6f128f2a5856e10e85c"},
+    {file = "pulumi_github-6.0.1-py3-none-any.whl", hash = "sha256:a5a18949948432f8c11f08cf14c975388756ae4e9125d09a9c5f24e85c4a79a0"},
+    {file = "pulumi_github-6.0.1.tar.gz", hash = "sha256:8351e5a188796b0427c7cc8242c78087e7cd8c64826da8dca8de4c112ddecf42"},
 ]
 
 [package.dependencies]
