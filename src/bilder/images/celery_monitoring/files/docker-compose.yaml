@@ -28,6 +28,7 @@ services:
     labels:
     - "traefik.enable=true"
     - "traefik.http.routers.leek.tls=true"
+    - "traefik.http.services.leek.loadbalancer.server.port=8000"
     env_file:
     - .env
     ports:
