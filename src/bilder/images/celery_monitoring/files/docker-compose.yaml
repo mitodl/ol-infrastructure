@@ -27,8 +27,12 @@ services:
     image: kodhive/leek
     labels:
     - "traefik.enable=true"
-    - "traefik.http.routers.leek.tls=true"
-    - "traefik.http.services.leek.loadbalancer.server.port=8000"
+    - "traefik.http.routers.leek-web.tls=true"
+    - "traefik.http.routers.leek-web.rule=Host(`${LEEK_HOSTNAME}`)"
+    - "traefik.http.services.leek-web.loadbalancer.server.port=8000"
+    - "traefik.http.routers.leek-api.tls=true"
+    - "traefik.http.routers.leek-web.rule=Host(`api-${LEEK_HOSTNAME}`)"
+    - "traefik.http.services.leek-api.loadbalancer.server.port=5000"
     env_file:
     - .env
     ports:
