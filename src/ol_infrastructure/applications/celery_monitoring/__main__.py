@@ -1,5 +1,6 @@
 import base64
 import json
+import re
 import textwrap
 from pathlib import Path
 
@@ -56,7 +57,7 @@ def build_broker_subscriptions(
                 "queue": "1",
                 "routing_key": None,
                 "org_name": "MIT Open Learning Engineering",
-                "app_name": edx_output["deployment"],
+                "app_name": re.sub(r"[^a-zA-Z]", "", edx_output["deployment"]),
                 "app_env": stack_info.env_suffix,
             }
         )
