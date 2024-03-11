@@ -53,7 +53,7 @@ OAUTH_PROVIDERS = [
         "token_key": "access_token",
         "remote_app": {
             "client_id": oidc_creds["client_id"],
-            "client_kwargs": {"scope": "email roles profile"},
+            "client_kwargs": {"scope": "openid email roles profile"},
             "client_secret": oidc_creds["client_secret"],
             "server_metadata_url": f"{oidc_creds['url']}/.well-known/openid-configuration",  # noqa: E501
         },
