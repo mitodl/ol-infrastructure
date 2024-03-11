@@ -29,9 +29,11 @@ services:
     - "traefik.enable=true"
     - "traefik.http.routers.leek-web.tls=true"
     - "traefik.http.routers.leek-web.rule=Host(`${LEEK_HOSTNAME}`)"
+    - "traefik.http.routers.leek-web.service=leek-web"
     - "traefik.http.services.leek-web.loadbalancer.server.port=8000"
     - "traefik.http.routers.leek-api.tls=true"
-    - "traefik.http.routers.leek-web.rule=Host(`api-${LEEK_HOSTNAME}`)"
+    - "traefik.http.routers.leek-api.rule=Host(`api-${LEEK_HOSTNAME}`)"
+    - "traefik.http.routers.leek-api.service=leek-api"
     - "traefik.http.services.leek-api.loadbalancer.server.port=5000"
     env_file:
     - .env
