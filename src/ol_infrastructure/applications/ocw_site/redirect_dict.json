@@ -479,5 +479,6 @@
   "/courses/intro-programming": "307|keep|https://{{AK_HOSTHEADER}}/collections/introductory-programming/",
   "/courses/transportation-courses": "307|keep|https://{{AK_HOSTHEADER}}/collections/transportation/",
   "/courses/ocw-scholar": "307|keep|https://{{AK_HOSTHEADER}}/course-lists/scholar-courses/",
-  "/fairuse": "301|keep|https://mitocw.zendesk.com/hc/en-us/articles/4414756181403-How-is-all-rights-reserved-content-different-from-the-rest-of-OCW-content/"
+  "/fairuse": "301|keep|https://mitocw.zendesk.com/hc/en-us/articles/4414756181403-How-is-all-rights-reserved-content-different-from-the-rest-of-OCW-content/",
+  "/ans7870/featured/mitx-courses-on-edx.htm": "301|discard|https://openlearning.mit.edu/courses-programs/mitx-courses/"
 }
