@@ -48,17 +48,15 @@ oidc_creds = vault_client.secrets.kv.v1.read_secret(
 AUTH_TYPE = AUTH_OAUTH
 OAUTH_PROVIDERS = [
     {
-        "name": "OL SSO",
+        "name": "OL-SSO",
         "icon": "fa-key",
         "token_key": "access_token",
         "remote_app": {
             "client_id": oidc_creds["client_id"],
-            "client_secret": oidc_creds["client_secret"],
-            "api_base_url": f"{oidc_creds['url']}/protocol/openid-connect",
             "client_kwargs": {"scope": "email profile"},
-            "access_token_url": f"{oidc_creds['domain_realm']}/protocol/openid-connect/token",  # noqa: E501
-            "authorize_url": f"{oidc_creds['domain_realm']}/protocol/openid-connect/auth",  # noqa: E501
+            "client_secret": oidc_creds["client_secret"],
             "request_token_url": None,
+            "server_metadata_url": f"{oidc_creds['url']}/.well-known/openid-configuration",  # noqa: E501
         },
     },
 ]

@@ -484,6 +484,8 @@ for openid_clients in keycloak_config.get_object("openid_clients"):
                 # It requires a random secret value to be present which is independent
                 # of the OAuth credentials.
                 secret=secrets.token_urlsafe(),
+                realm_id=openid_client.realm_id,
+                realm_name=realm_name,
             ).apply(json.dumps),
         )
 
