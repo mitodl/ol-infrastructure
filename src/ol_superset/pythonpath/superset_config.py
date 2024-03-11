@@ -46,6 +46,7 @@ oidc_creds = vault_client.secrets.kv.v1.read_secret(
     path="sso/superset", mount_point="secret-operations"
 )["data"]
 AUTH_TYPE = AUTH_OAUTH
+LOGOUT_REDIRECT_URL = f"{oidc_creds['url']}/protocol/openid-connect/logout"
 OAUTH_PROVIDERS = [
     {
         "name": "keycloak",
@@ -53,11 +54,14 @@ OAUTH_PROVIDERS = [
         "token_key": "access_token",
         "remote_app": {
             "client_id": oidc_creds["client_id"],
-            "client_kwargs": {"scope": "openid email roles profile"},
             "client_secret": oidc_creds["client_secret"],
+            "client_kwargs": {
+                "scope": "openid profile email",
+            },
             "server_metadata_url": f"{oidc_creds['url']}/.well-known/openid-configuration",  # noqa: E501
+            "api_base_url": f"{oidc_creds['url']}/protocol/",
         },
-    },
+    }
 ]
 
 # Testing out Keycloak role mapping to Superset
