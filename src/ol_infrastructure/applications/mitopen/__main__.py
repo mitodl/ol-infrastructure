@@ -423,7 +423,7 @@ sensitive_heroku_vars = {
     ],
     "OPENSEARCH_HTTP_AUTH": mitopen_vault_secrets["opensearch"]["http_auth"],
     "SECRET_KEY": mitopen_vault_secrets["django-secret-key"],
-    # "SENTRY_DSN": mitopen_vault_secrets["__vault__::secret-mitopen/data/secrets>data>data>sentry-dsn",
+    "SENTRY_DSN": mitopen_vault_secrets["sentry-dsn"],
     "STATUS_TOKEN": mitopen_vault_secrets["django-status-token"],
     "YOUTUBE_DEVELOPER_KEY": mitopen_vault_secrets["youtube-developer-key"],
     # Vars that require more
