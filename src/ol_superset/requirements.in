@@ -1,4 +1,4 @@
-apache-superset[cors,thumbnails,prophet]
+apache-superset[cors,thumbnails,prophet,trino]
 authlib
 celery-redbeat
 duckdb
@@ -7,4 +7,3 @@ flask-oidc
 hvac
 psycopg2
 redis
-trino
