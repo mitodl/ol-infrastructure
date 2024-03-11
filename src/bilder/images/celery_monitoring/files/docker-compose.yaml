@@ -32,9 +32,10 @@ services:
     - "traefik.http.routers.leek-web.service=leek-web"
     - "traefik.http.services.leek-web.loadbalancer.server.port=8000"
     - "traefik.http.routers.leek-api.tls=true"
-    - "traefik.http.routers.leek-api.rule=Host(`api-${LEEK_HOSTNAME}`)"
+    - "traefik.http.routers.leek-api.rule=Host(`${LEEK_HOSTNAME}`) && PathPrefix(`/api`)"
     - "traefik.http.routers.leek-api.service=leek-api"
     - "traefik.http.services.leek-api.loadbalancer.server.port=5000"
+    - "traefik.http.middlewares.leek-api.stripprefix.prefixes=/api"
     env_file:
     - .env
     ports:
