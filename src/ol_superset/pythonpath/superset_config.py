@@ -48,7 +48,7 @@ oidc_creds = vault_client.secrets.kv.v1.read_secret(
 AUTH_TYPE = AUTH_OAUTH
 OAUTH_PROVIDERS = [
     {
-        "name": "OL-SSO",
+        "name": "keycloak",
         "icon": "fa-key",
         "token_key": "access_token",
         "remote_app": {
