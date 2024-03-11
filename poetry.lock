@@ -1507,13 +1507,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "6.0.1"
+version = "6.1.0"
 description = "A Pulumi package for creating and managing github cloud resources."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pulumi_github-6.0.1-py3-none-any.whl", hash = "sha256:a5a18949948432f8c11f08cf14c975388756ae4e9125d09a9c5f24e85c4a79a0"},
-    {file = "pulumi_github-6.0.1.tar.gz", hash = "sha256:8351e5a188796b0427c7cc8242c78087e7cd8c64826da8dca8de4c112ddecf42"},
+    {file = "pulumi_github-6.1.0-py3-none-any.whl", hash = "sha256:d7896ddd08a0db410d2f61a12a7a92185f35a1362b119c090e3104d04cba4680"},
+    {file = "pulumi_github-6.1.0.tar.gz", hash = "sha256:b3ca1b73aa55ec3785257f01a260e21e4adbe9fa650089a00693f6f618bddbef"},
 ]
 
 [package.dependencies]
@@ -1523,13 +1523,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-keycloak"
-version = "5.3.0"
+version = "5.3.1"
 description = "A Pulumi package for creating and managing keycloak cloud resources."
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "pulumi_keycloak-5.3.0-py3-none-any.whl", hash = "sha256:44a10df72fe64ea95da3b4a0c0a88bdd54cb5692f8ab66bc230fa4fea5ccd9d2"},
-    {file = "pulumi_keycloak-5.3.0.tar.gz", hash = "sha256:5cb8de07ecb3aa6a1306839bd677fefd35a10b22b1c64e247880d413bf1ec6de"},
+    {file = "pulumi_keycloak-5.3.1-py3-none-any.whl", hash = "sha256:edbe1f3e2c003985f6dd2292915ed6e36adc8a5803df4dd60a6768e0e5c19ec2"},
+    {file = "pulumi_keycloak-5.3.1.tar.gz", hash = "sha256:8b799d3c314a01eadca5b9efd9bc1173fa9dbac188265fe6d8b54ce15dc46b56"},
 ]
 
 [package.dependencies]
