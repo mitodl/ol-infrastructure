@@ -15,7 +15,11 @@ from pyinfra.context import host
 from pyinfra.operations import files, server
 
 from bilder.components.baseline.steps import service_configuration_watches
-from bilder.components.hashicorp.consul.models import Consul, ConsulConfig
+from bilder.components.hashicorp.consul.models import (
+    Consul,
+    ConsulAddresses,
+    ConsulConfig,
+)
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
 from bilder.components.hashicorp.consul_template.models import (
     ConsulTemplate,
@@ -80,7 +84,12 @@ consul_templates: list[ConsulTemplateTemplate] = []
 
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
-consul_configuration = {Path("00-default.json"): ConsulConfig()}
+consul_configuration = {
+    Path("00-default.json"): ConsulConfig(
+        addresses=ConsulAddresses(dns="127.0.0.1", http="127.0.0.1"),
+        advertise_addr='{{ GetInterfaceIP "ens5" }}',
+    )
+}
 vector_config = VectorConfig(is_proxy=False)
 vault_config = VaultAgentConfig(
     cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
