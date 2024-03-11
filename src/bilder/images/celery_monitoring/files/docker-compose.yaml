@@ -36,6 +36,7 @@ services:
     - "traefik.http.routers.leek-api.service=leek-api"
     - "traefik.http.services.leek-api.loadbalancer.server.port=5000"
     - "traefik.http.middlewares.leek-api.stripprefix.prefixes=/api"
+    - "traefik.http.routers.leek-api.middlewares=leek-api@docker"
     env_file:
     - .env
     ports:
