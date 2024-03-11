@@ -193,6 +193,7 @@ consul_provider = consul.Provider(
 opensearch_node = consul.Node(
     "aws-opensearch-consul-node",
     address=search_domain.endpoint,
+    name=consul_service_name,
     opts=pulumi.ResourceOptions(provider=consul_provider),
 )
 opensearch_service = consul.Service(
