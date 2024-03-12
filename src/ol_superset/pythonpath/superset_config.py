@@ -61,7 +61,7 @@ OAUTH_PROVIDERS = [
                 "scope": "openid profile email roles",
             },
             "server_metadata_url": f"{oidc_creds['url']}/.well-known/openid-configuration",  # noqa: E501
-            "api_base_url": f"{oidc_creds['url']}/protocol/openid-connect/",
+            "api_base_url": f"{oidc_creds['url']}/protocol/",
         },
     }
 ]
@@ -84,10 +84,17 @@ AUTH_USER_REGISTRATION_ROLE = "Public"
 
 class CustomSsoSecurityManager(SupersetSecurityManager):
     def oauth_user_info(self, provider, response=None):  # noqa: ARG002
-        logging.debug("Oauth2 provider: %s.", provider)  #
-        me = self.appbuilder.sm.oauth_remotes[provider].get("userinfo")
-        logging.debug("user_data: %s", me)
-        return me
+        me = self.appbuilder.sm.oauth_remotes[provider].get("openid-connect/userinfo")
+        me.raise_for_status()
+        data = me.json()
+        logging.debug("User info from Keycloak: %s", data)
+        return {
+            "username": data.get("preferred_username", ""),
+            "first_name": data.get("given_name", ""),
+            "last_name": data.get("family_name", ""),
+            "email": data.get("email", ""),
+            "role_keys": data.get("role_keys", []),
+        }
 
 
 CUSTOM_SECURITY_MANAGER = CustomSsoSecurityManager
