@@ -61,7 +61,7 @@ OAUTH_PROVIDERS = [
                 "scope": "openid profile email roles",
             },
             "server_metadata_url": f"{oidc_creds['url']}/.well-known/openid-configuration",  # noqa: E501
-            "api_base_url": f"{oidc_creds['url']}/protocol/",
+            "api_base_url": f"{oidc_creds['url']}/protocol/openid-connect/",
         },
     }
 ]
@@ -85,7 +85,7 @@ AUTH_USER_REGISTRATION_ROLE = "Public"
 class CustomSsoSecurityManager(SupersetSecurityManager):
     def oauth_user_info(self, provider, response=None):  # noqa: ARG002
         logging.debug("Oauth2 provider: %s.", provider)  #
-        me = self.appbuilder.sm.oauth_remotes[provider].get("userDetails")
+        me = self.appbuilder.sm.oauth_remotes[provider].get("userinfo")
         logging.debug("user_data: %s", me)
         return me
 
