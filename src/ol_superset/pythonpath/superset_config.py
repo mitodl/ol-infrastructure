@@ -1,7 +1,9 @@
-import os  # noqa: INP001
+import logging
+import os
 
 from celery.schedules import crontab
 from flask_appbuilder.security.manager import AUTH_OAUTH
+from superset.security import SupersetSecurityManager
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
 from vault.aws_auth import get_vault_client
 
@@ -78,6 +80,17 @@ AUTH_USER_REGISTRATION = True
 
 # The default user self registration role
 AUTH_USER_REGISTRATION_ROLE = "Public"
+
+
+class CustomSsoSecurityManager(SupersetSecurityManager):
+    def oauth_user_info(self, provider, response=None):  # noqa: ARG002
+        logging.debug("Oauth2 provider: %s.", provider)  #
+        me = self.appbuilder.sm.oauth_remotes[provider].get("userDetails").data
+        logging.debug("user_data: %s", me)
+        return me
+
+
+CUSTOM_SECURITY_MANAGER = CustomSsoSecurityManager
 
 # ---------------------------------------------------
 # Feature flags
