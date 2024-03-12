@@ -74,7 +74,6 @@ VERSIONS = {
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
-VECTOR_INSTALL_NAME = os.environ.get("VECTOR_LOG_PROXY_NAME", "vector-log-proxy")
 
 DOCKER_REPO_NAME = os.environ.get("DOCKER_REPO_NAME", "kodhive/leek")
 DOCKER_IMAGE_DIGEST = os.environ.get("DOCKER_IMAGE_DIGEST", "latest")
