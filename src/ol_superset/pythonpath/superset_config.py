@@ -85,7 +85,7 @@ AUTH_USER_REGISTRATION_ROLE = "Public"
 class CustomSsoSecurityManager(SupersetSecurityManager):
     def oauth_user_info(self, provider, response=None):  # noqa: ARG002
         logging.debug("Oauth2 provider: %s.", provider)  #
-        me = self.appbuilder.sm.oauth_remotes[provider].get("userDetails").data
+        me = self.appbuilder.sm.oauth_remotes[provider].get("userDetails")
         logging.debug("user_data: %s", me)
         return me
 
