@@ -725,7 +725,10 @@ redis_cluster_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
             protocol="tcp",
-            security_groups=[edxapp_security_group.id],
+            security_groups=[
+                edxapp_security_group.id,
+                operations_vpc["security_groups"]["celery_monitoring"],
+            ],
             description="Allow access from edX to Redis for caching and queueing",
         )
     ],
@@ -1632,10 +1635,12 @@ export(
     {
         "mariadb": edxapp_db.db_instance.address,
         "redis": edxapp_redis_cache.address,
+        "redis_token": edxapp_redis_cache.cache_cluster.auth_token,
         "mfe_bucket": mfe_bucket_name,
         "load_balancer": {"dns_name": web_lb.dns_name, "arn": web_lb.arn},
         "ses_configuration_set": edxapp_ses_configuration_set.name,
         "edx_notes_iam_role": edxapp_notes_iam_role.arn,
+        "deployment": stack_info.env_prefix,
     },
 )
 

@@ -1,0 +1,44 @@
+---
+version: "3.7"
+services:
+  traefik:
+    image: traefik:2.11
+    container_name: traefik
+    restart: unless-stopped
+    command:
+    - "--providers.docker"
+    - "--providers.docker.exposedbydefault=false"
+    - "--entryPoints.http.address=:80"
+    - "--entryPoints.http.http.redirections.entryPoint.to=https"
+    - "--entryPoints.http.http.redirections.entryPoint.scheme=https"
+    - "--entryPoints.https.address=:443"
+    - "--log.level=WARN"
+    - "--accesslog=true"
+    - "--providers.file.filename=/traefik/traefik.yaml"
+    ports:
+    - "80:80"
+    - "443:443"
+    volumes:
+    - "/etc/traefik/traefik.yaml:/traefik/traefik.yaml:ro"
+    - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    - "/etc/traefik/odl_wildcard.cert:/etc/traefik/star.odl.mit.edu.crt:ro"
+    - "/etc/traefik/odl_wildcard.key:/etc/traefik/star.odl.mit.edu.key:ro"
+  app:
+    image: kodhive/leek
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.leek-web.tls=true"
+    - "traefik.http.routers.leek-web.rule=Host(`${LEEK_HOSTNAME}`)"
+    - "traefik.http.routers.leek-web.service=leek-web"
+    - "traefik.http.services.leek-web.loadbalancer.server.port=8000"
+    - "traefik.http.routers.leek-api.tls=true"
+    - "traefik.http.routers.leek-api.rule=Host(`${LEEK_HOSTNAME}`) && PathPrefix(`/api`)"
+    - "traefik.http.routers.leek-api.service=leek-api"
+    - "traefik.http.services.leek-api.loadbalancer.server.port=5000"
+    - "traefik.http.middlewares.leek-api.stripprefix.prefixes=/api"
+    - "traefik.http.routers.leek-api.middlewares=leek-api@docker"
+    env_file:
+    - .env
+    ports:
+    - "5000:5000"
+    - "8000:8000"

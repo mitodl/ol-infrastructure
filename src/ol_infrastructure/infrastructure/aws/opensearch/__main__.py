@@ -24,6 +24,10 @@ if stack_info.env_prefix in ["open", "mitopen"]:
     consul_stack = pulumi.StackReference(
         f"infrastructure.consul.apps.{stack_info.name}"
     )
+elif stack_info.env_prefix == "celery_monitoring":
+    consul_stack = pulumi.StackReference(
+        f"infrastructure.consul.operations.{stack_info.name}"
+    )
 else:
     consul_stack = pulumi.StackReference(
         f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
@@ -122,9 +126,17 @@ if is_secured_cluster:
         enabled=True,
     )
 
+if search_config.get("domain_name"):
+    domain_name = f"opensearch-{search_config.get('domain_name')}"[
+        :SEARCH_DOMAIN_NAME_MAX_LENGTH
+    ]
+else:
+    domain_name = f"opensearch-{environment_name}"[:SEARCH_DOMAIN_NAME_MAX_LENGTH]
+
+
 search_domain = aws.elasticsearch.Domain(
     "opensearch-domain-cluster",
-    domain_name=f"opensearch-{environment_name}"[:SEARCH_DOMAIN_NAME_MAX_LENGTH],
+    domain_name=domain_name,
     elasticsearch_version=search_config.get("engine_version") or "7.10",
     cluster_config=aws.elasticsearch.DomainClusterConfigArgs(
         zone_awareness_enabled=True,
@@ -140,6 +152,7 @@ search_domain = aws.elasticsearch.Domain(
         volume_size=disk_size,
     ),
     tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch-cluster"}),
+    opts=pulumi.ResourceOptions(delete_before_replace=True),
     **conditional_kwargs,
 )
 
@@ -180,6 +193,7 @@ consul_provider = consul.Provider(
 opensearch_node = consul.Node(
     "aws-opensearch-consul-node",
     address=search_domain.endpoint,
+    name=consul_service_name,
     opts=pulumi.ResourceOptions(provider=consul_provider),
 )
 opensearch_service = consul.Service(
