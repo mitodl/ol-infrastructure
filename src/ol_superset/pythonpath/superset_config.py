@@ -1,8 +1,10 @@
 import logging
 import os
+from typing import Optional
 
 from celery.schedules import crontab
 from flask_appbuilder.security.manager import AUTH_OAUTH
+from flask import g
 from superset.security import SupersetSecurityManager
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
 from vault.aws_auth import get_vault_client
@@ -260,3 +262,25 @@ ENABLE_CHUNK_ENCODING = False
 SLACK_API_TOKEN = vault_client.secrets.kv.v2.read_secret(
     path="app-config", mount_point="secret-superset"
 )["data"]["data"]["slack_token"]
+
+#############################
+# Custom Template Processors #
+############################
+# Enable usage of current_user_email() macro until Superset releases that feature
+
+
+def current_user_email() -> Optional[str]:
+    """
+    Get the email (if defined) associated with the current user.
+
+    :returns: The email
+    """
+
+    try:
+        return g.user.email
+    except Exception:  # pylint: disable=broad-except
+        return None
+
+JINJA_CONTEXT_ADDONS = {
+    'current_user_email': current_user_email()
+}
