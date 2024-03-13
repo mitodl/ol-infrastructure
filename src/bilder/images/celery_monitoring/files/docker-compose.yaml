@@ -23,6 +23,17 @@ services:
     - "/var/run/docker.sock:/var/run/docker.sock:ro"
     - "/etc/traefik/odl_wildcard.cert:/etc/traefik/star.odl.mit.edu.crt:ro"
     - "/etc/traefik/odl_wildcard.key:/etc/traefik/star.odl.mit.edu.key:ro"
+  traefik-forward-auth:
+    image: thomseddon/traefik-forward-auth:2
+    container_name: traefik-forward-auth
+    restart: unless-stopped
+    env_file:
+    - .env_traefik_forward_auth
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.middlewares.traefik-forward-auth.forwardauth.address=http://traefik-forward-auth:4181"
+    - "traefik.http.middlewares.traefik-forward-auth.forwardauth.authResponseHeaders=X-Forwarded-User"
+    - "traefik.http.services.traefik-forward-auth.loadbalancer.server.port=4181"
   app:
     image: kodhive/leek
     labels:
@@ -32,6 +43,7 @@ services:
     - "traefik.http.routers.leek-web.service=leek-web"
     - "traefik.http.services.leek-web.loadbalancer.server.port=8000"
     - "traefik.http.routers.leek-api.tls=true"
+    - "traefik.http.routers.leek-api.middlewares=traefik-forward-auth"
     - "traefik.http.routers.leek-api.rule=Host(`${LEEK_HOSTNAME}`) && PathPrefix(`/api`)"
     - "traefik.http.routers.leek-api.service=leek-api"
     - "traefik.http.services.leek-api.loadbalancer.server.port=5000"
