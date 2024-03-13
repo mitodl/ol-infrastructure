@@ -263,9 +263,9 @@ SLACK_API_TOKEN = vault_client.secrets.kv.v2.read_secret(
     path="app-config", mount_point="secret-superset"
 )["data"]["data"]["slack_token"]
 
-#############################
-# Custom Template Processors #
-############################
+#######################
+# Custom Jinja Macros #
+#######################
 # Enable usage of current_user_email() macro until Superset releases that feature
 
 
