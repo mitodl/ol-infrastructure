@@ -3,8 +3,8 @@ import os
 from typing import Optional
 
 from celery.schedules import crontab
-from flask_appbuilder.security.manager import AUTH_OAUTH
 from flask import g
+from flask_appbuilder.security.manager import AUTH_OAUTH
 from superset.security import SupersetSecurityManager
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
 from vault.aws_auth import get_vault_client
@@ -281,6 +281,5 @@ def current_user_email() -> Optional[str]:
     except Exception:  # pylint: disable=broad-except
         return None
 
-JINJA_CONTEXT_ADDONS = {
-    'current_user_email': current_user_email()
-}
+
+JINJA_CONTEXT_ADDONS = {"current_user_email": current_user_email()}
