@@ -195,12 +195,19 @@ FEATURE_FLAGS: dict[str, bool] = {
 # every query ran, in both SQL Lab and charts/dashboards.
 QUERY_LOGGER = None
 
-FILTER_STATE_CACHE_CONFIG = {
+# Caching Settings
+cache_base = {
     "CACHE_TYPE": "RedisCache",
     "CACHE_DEFAULT_TIMEOUT": 86400,
-    "CACHE_KEY_PREFIX": "superset_filter_cache",
-    "CACHE_REDIS_URL": "rediss://superset-redis.service.consul:6379/0",
+    "CACHE_REDIS_URL": f"rediss://default:{REDIS_TOKEN}@superset-redis.service.consul:6379/0",
 }
+FILTER_STATE_CACHE_CONFIG = {"CACHE_KEY_PREFIX": "superset_filter_cache", **cache_base}
+EXPLORE_FORM_DATA_CACHE_CONFIG = {
+    "CACHE_KEY_PREFIX": "superset_form_cache",
+    **cache_base,
+}
+CACHE_CONFIG = {"CACHE_KEY_PREFIX": "superset_metadata_cache", **cache_base}
+DATA_CACHE_CONFIG = {"CACHE_KEY_PREFIX": "superset_chart_cache", **cache_base}
 
 # Set this API key to enable Mapbox visualizations
 MAPBOX_API_KEY = os.environ.get("MAPBOX_API_KEY", "")
