@@ -141,6 +141,15 @@ dot_env_template = place_consul_template_file(
 consul_templates.append(dot_env_template)
 watched_files.append(dot_env_template.destination)
 
+traefik_dot_env_template = place_consul_template_file(
+    name=".env_traefik_forward_auth",
+    repo_path=FILES_DIRECTORY,
+    template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
+    destination_path=DOCKER_COMPOSE_DIRECTORY,
+)
+consul_templates.append(traefik_dot_env_template)
+watched_files.append(traefik_dot_env_template.destination)
+
 vault = Vault(
     version=VERSIONS["vault"],
     configuration={Path("vault.json"): vault_config},
