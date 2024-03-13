@@ -29,6 +29,9 @@ config:
   - client_info:
       superset: https://bi.ol.mit.edu
     realm_name: ol-data-platform
+  - client_info:
+      leek: https://celery-monitoring-qa.odl.mit.edu
+    realm_name: ol-platform-engineering
   keycloak:url: https://sso.ol.mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
