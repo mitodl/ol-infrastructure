@@ -263,6 +263,7 @@ SLACK_API_TOKEN = vault_client.secrets.kv.v2.read_secret(
     path="app-config", mount_point="secret-superset"
 )["data"]["data"]["slack_token"]
 
+
 #######################
 # Custom Jinja Macros #
 #######################
@@ -279,6 +280,7 @@ def current_user_email() -> Optional[str]:
         return g.user.email
     except Exception:  # pylint: disable=broad-except
         return None
+
 
 # Adding macros to enable usage in the jinja_context for Superset
 JINJA_CONTEXT_ADDONS = {"current_user_email": current_user_email}
