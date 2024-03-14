@@ -430,7 +430,7 @@ operations_vpc_exports.update(
                 ingress=[],
                 egress=[],
                 tags=operations_vpc_config.merged_tags(
-                    {"Name": f"ol-operations-{stack_info.env_suffix}-celery-monitoring"}
+                    {"Name": f"operations-{stack_info.env_suffix}-celery-monitoring"}
                 ),
             ).id,
             "default": operations_vpc.olvpc.id.apply(default_group).id,
