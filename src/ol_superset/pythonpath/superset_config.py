@@ -266,9 +266,8 @@ SLACK_API_TOKEN = vault_client.secrets.kv.v2.read_secret(
 #######################
 # Custom Jinja Macros #
 #######################
-# Enable usage of current_user_email() macro until Superset releases that feature
-
-
+# Temporarily add a current_user_email() macro until Superset releases that feature
+# Macro function that returns the current user's email
 def current_user_email() -> Optional[str]:
     """
     Get the email (if defined) associated with the current user.
@@ -281,5 +280,5 @@ def current_user_email() -> Optional[str]:
     except Exception:  # pylint: disable=broad-except
         return None
 
-
+# Adding macros to enable usage in the jinja_context for Superset
 JINJA_CONTEXT_ADDONS = {"current_user_email": current_user_email}
