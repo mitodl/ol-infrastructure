@@ -282,4 +282,4 @@ def current_user_email() -> Optional[str]:
         return None
 
 
-JINJA_CONTEXT_ADDONS = {"current_user_email": current_user_email()}
+JINJA_CONTEXT_ADDONS = {"current_user_email": current_user_email}
