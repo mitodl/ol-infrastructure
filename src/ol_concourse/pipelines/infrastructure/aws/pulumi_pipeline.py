@@ -12,7 +12,7 @@ for service in ["kms", "network"]:
     simple_pulumi_code = git_repo(
         name=Identifier(f"ol-infrastructure-pulumi-{service}"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        paths=[*PULUMI_WATCHED_PATHS, f"src/ol-infrastructure/aws/{service}"],
+        paths=[*PULUMI_WATCHED_PATHS, f"src/ol_infrastructure/aws/{service}"],
     )
 
     simple_pulumi_chain = pulumi_jobs_chain(
@@ -50,7 +50,7 @@ for service in ["dns", "policies"]:
     oneoff_pulumi_code = git_repo(
         name=Identifier(f"ol-infrastructure-pulumi-{service}"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        paths=[*PULUMI_WATCHED_PATHS, f"src/ol-infrastructure/aws/{service}"],
+        paths=[*PULUMI_WATCHED_PATHS, f"src/ol_infrastructure/aws/{service}"],
     )
 
     oneoff_pulumi_chain = pulumi_jobs_chain(
