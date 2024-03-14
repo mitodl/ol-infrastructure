@@ -278,7 +278,7 @@ def current_user_email() -> Optional[str]:
 
     try:
         return g.user.email
-    except Exception:  # noqa: BLE001 
+    except Exception:  # noqa: BLE001
         logging.debug("Could not get email for : %s", g.user)
         return None
 
