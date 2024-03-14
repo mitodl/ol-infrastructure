@@ -278,7 +278,7 @@ def current_user_email() -> Optional[str]:
 
     try:
         return g.user.email
-    except Exception:  # pylint: disable=broad-except
+    except Exception:  # noqa: BLE001 
         logging.debug("Could not get email for : %s", g.user)
         return None
 
