@@ -22,7 +22,7 @@ config:
   dagster:edx_pipeline_xpro_edx_bucket_name: dagster-data-qa
   dagster:edx_pipeline_xpro_edx_course_bucket_name: xpro-qa-edxapp-courses
   dagster:edx_pipeline_xpro_edx_xpro_purpose: mitx-etl-xpro-qa
-  dagster:instance_type: m7a.xlarge
+  dagster:instance_type: m6a.xlarge
   dagster:disk_size_gb: 2000
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
