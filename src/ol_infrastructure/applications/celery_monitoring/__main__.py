@@ -311,7 +311,7 @@ celery_monitoring_web_auto_scale_config = celery_monitoring_config.get_object(
     "max": 2,
 }
 celery_monitoring_web_asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"celery-monitoring-web-{celery_monitoring_env}",
+    asg_name=f"leek-web-{celery_monitoring_env}",
     aws_config=aws_config,
     health_check_grace_period=120,
     instance_refresh_warmup=120,
