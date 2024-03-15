@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
 
-from ol_concourse.lib.models.pipeline import Job, Resource, ResourceType
+from ol_concourse.lib.models.pipeline import Job, Pipeline, Resource, ResourceType
 
 
 class PipelineFragment(BaseModel):
@@ -80,4 +80,11 @@ class PipelineFragment(BaseModel):
                 resource for fragment in fragments for resource in fragment.resources
             ],
             jobs=[job for fragment in fragments for job in fragment.jobs],
+        )
+
+    def to_pipeline(self) -> Pipeline:
+        return Pipeline(
+            resource_types=self.resource_types,
+            resources=self.resources,
+            jobs=self.jobs,
         )

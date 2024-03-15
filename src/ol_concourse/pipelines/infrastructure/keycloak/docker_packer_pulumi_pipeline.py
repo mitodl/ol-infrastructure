@@ -15,7 +15,6 @@ from ol_concourse.lib.models.pipeline import (
     Input,
     Job,
     Output,
-    Pipeline,
     Platform,
     PutStep,
     RegistryImage,
@@ -26,7 +25,29 @@ from ol_concourse.lib.resources import git_repo, github_release, registry_image
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 
-def build_keycloak_pipeline() -> Pipeline:
+def build_keycloak_substructure_pipeline() -> PipelineFragment:
+    keycloak_pulumi_code = git_repo(
+        name=Identifier("ol-infrastructure-pulumi-substructure"),
+        uri="https://github.com/mitodl/ol-infrastructure",
+        branch="main",
+        paths=[
+            *PULUMI_WATCHED_PATHS,
+            str(PULUMI_CODE_PATH.joinpath("substructure/keycloak/")),
+        ],
+    )
+    substructure_fragment = pulumi_jobs_chain(
+        pulumi_code=keycloak_pulumi_code,
+        stack_names=[
+            f"substructure.keycloak.{env}" for env in ("CI", "QA", "Production")
+        ],
+        project_name="ol-infrastructure-substructure-keycloak",
+        project_source_path=PULUMI_CODE_PATH.joinpath("substructure/keycloak/"),
+    )
+    substructure_fragment.resources.append(keycloak_pulumi_code)
+    return substructure_fragment
+
+
+def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
     keycloak_upstream_registry_image = registry_image(
         name=Identifier("keycloak-upstream-image"),
         image_repository="quay.io/keycloak/keycloak",
@@ -62,7 +83,6 @@ def build_keycloak_pipeline() -> Pipeline:
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath("applications/keycloak/")),
-            "src/ol_infrastructure/substructure/keycloak/",
         ],
     )
 
@@ -251,7 +271,7 @@ def build_keycloak_pipeline() -> Pipeline:
         ami_fragment,
         pulumi_fragment,
     )
-    return Pipeline(
+    return PipelineFragment(
         resource_types=combined_fragments.resource_types,
         resources=[
             *combined_fragments.resources,
@@ -264,9 +284,12 @@ def build_keycloak_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
+    pipeline = PipelineFragment.combine_fragments(
+        build_keycloak_infrastructure_pipeline(), build_keycloak_substructure_pipeline()
+    ).to_pipeline()
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(build_keycloak_pipeline().model_dump_json(indent=2))
-    sys.stdout.write(build_keycloak_pipeline().model_dump_json(indent=2))
+        definition.write(pipeline.model_dump_json(indent=2))
+    sys.stdout.write(pipeline.model_dump_json(indent=2))
     sys.stdout.writelines(
         ("\n", "fly -t pr-inf sp -p docker-packer-pulumi-keycloak -c definition.json")
     )
