@@ -205,7 +205,7 @@ celery_monitoring_tg_config = OLTargetGroupConfig(
     vpc_id=operations_vpc["id"],
     health_check_interval=60,
     health_check_matcher="200-399",
-    health_check_path="/health",
+    health_check_path="/api/v1/manage/hc",
     # give extra time for celery_monitoring to start up
     health_check_unhealthy_threshold=3,
     tags=aws_config.merged_tags(
