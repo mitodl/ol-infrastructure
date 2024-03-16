@@ -1441,12 +1441,12 @@ files = [
 
 [[package]]
 name = "pulumi"
-version = "3.109.0"
+version = "3.111.1"
 description = "Pulumi's Python SDK"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pulumi-3.109.0-py3-none-any.whl", hash = "sha256:7af108068f183d68b05a1ba5a1b33a6aed3b54aeb25458859c2c2b3f3bceb1b0"},
+    {file = "pulumi-3.111.1-py3-none-any.whl", hash = "sha256:70c1b384545897833ed50d25d6362d7ee44811f377a31a1333c31924d397a3c4"},
 ]
 
 [package.dependencies]
@@ -1459,13 +1459,13 @@ six = ">=1.12,<2.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "6.25.0"
+version = "6.25.1"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pulumi_aws-6.25.0-py3-none-any.whl", hash = "sha256:b34b58b6aa60b6b78c8dd49d40dd8ce34abb3e5bdbdfda8b33c37affef870987"},
-    {file = "pulumi_aws-6.25.0.tar.gz", hash = "sha256:88303a77133723ebc0c0c68b89f504518c500b53bfd771afa833d46877ffa8ff"},
+    {file = "pulumi_aws-6.25.1-py3-none-any.whl", hash = "sha256:a8dfa0125c2210b5e8d4965fc2335ae4d36e97a90c5f113b67eb3e75a971744f"},
+    {file = "pulumi_aws-6.25.1.tar.gz", hash = "sha256:606c5a7f8d036d4045523329480cb2cc5e75f2ed8b89bc0a568f03f47eda5a56"},
 ]
 
 [package.dependencies]
