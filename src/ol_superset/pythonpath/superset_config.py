@@ -71,7 +71,8 @@ OAUTH_PROVIDERS = [
 # Testing out Keycloak role mapping to Superset
 # https://superset.apache.org/docs/installation/configuring-superset#mapping-ldap-or-oauth-groups-to-superset-roles
 AUTH_ROLES_MAPPING = {
-    "superset_admin": ["Admin"], "superset_alpha": ["Alpha"],
+    "superset_admin": ["Admin"],
+    "superset_alpha": ["Alpha"],
 }
 
 # if we should replace ALL the user's roles each login, or only on registration
