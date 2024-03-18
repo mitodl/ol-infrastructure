@@ -34,9 +34,7 @@ def install_traefik_binary(traefik_config: TraefikConfig):
     file_download = f"traefik_v{traefik_config.version}_linux_{cpu_arch}.tar.gz"
     file_hashes = (
         httpx.get(
-            "https://github.com/traefik/traefik/releases/download/v{0}/traefik_v{0}_checksums.txt".format(
-                traefik_config.version
-            ),
+            f"https://github.com/traefik/traefik/releases/download/v{traefik_config.version}/traefik_v{traefik_config.version}_checksums.txt",
             follow_redirects=True,
         )
         .read()
