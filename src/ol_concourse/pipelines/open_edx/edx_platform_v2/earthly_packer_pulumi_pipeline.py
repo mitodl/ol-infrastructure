@@ -180,8 +180,8 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                                     echo "Saving docker image to tar file in the artifacts directory";
                                     docker save -o ../../../artifacts/image.tar $DIGEST;
                                     cat ~/.earthly/config.yml
-                                    earthly +build-static-assets-nonprod --DEPLOYMENT_NAME="$DEPLOYMENT_NAME" --RELEASE_NAME="$RELEASE_NAME" --EDX_PLATFORM_GIT_REPO="$EDX_PLATFORM_GIT_REPO" --EDX_PLATFORM_GIT_BRANCH="$EDX_PLATFORM_GIT_BRANCH" --THEME_GIT_REPO="$THEME_GIT_REPO" --THEME_GIT_BRANCH="$THEME_GIT_BRANCH";
-                                    earthly +build-static-assets-production --DEPLOYMENT_NAME="$DEPLOYMENT_NAME" --RELEASE_NAME="$RELEASE_NAME" --EDX_PLATFORM_GIT_REPO="$EDX_PLATFORM_GIT_REPO" --EDX_PLATFORM_GIT_BRANCH="$EDX_PLATFORM_GIT_BRANCH" --THEME_GIT_REPO="$THEME_GIT_REPO" --THEME_GIT_BRANCH="$THEME_GIT_BRANCH";
+                                    earthly +build-static-assets-nonprod --DEPLOYMENT_NAME="$DEPLOYMENT_NAME" --RELEASE_NAME="$RELEASE_NAME" --EDX_PLATFORM_DIR="$EDX_PLATFORM_DIR" --THEME_DIR="$THEME_DIR";
+                                    earthly +build-static-assets-production --DEPLOYMENT_NAME="$DEPLOYMENT_NAME" --RELEASE_NAME="$RELEASE_NAME" --EDX_PLATFORM_DIR="$EDX_PLATFORM_DIR" --THEME_DIR="$THEME_DIR";
                                     echo "Copying staticfiles archives to artifacts directory";
                                     mv static*.tar.gz ../../../artifacts;""",  # noqa: E501
                                 ],
