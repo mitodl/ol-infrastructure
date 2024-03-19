@@ -34,6 +34,7 @@ config:
     PGBOUNER_MIN_POOL_SIZE: 20
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT:
     TIKA_SERVER_ENDPOINT: "https://tika-qa.odl.mit.edu"
+    MICROMASTERS_CMS_API_URL: "https://micromasters-rc.odl.mit.edu/api/v0/wagtail/"
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "live-qa.ocw.mit.edu"
