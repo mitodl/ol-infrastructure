@@ -1,9 +1,9 @@
 import base64
 import json
-import re
 import textwrap
 from pathlib import Path
 
+import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
 from bridge.secrets.sops import read_yaml_secrets
@@ -48,6 +48,14 @@ def build_broker_subscriptions(
 ) -> str:
     """Create a dict of Redis cache configs for each edxapp stack"""
     broker_subs = []
+
+    deployment_name_map = {
+        "mitx": "mitxlive",
+        "mitxonline": "mitxonline",
+        "mitx-staging": "mitxstaging",
+        "xpro": "xpro",
+    }
+
     for edx_output in edx_outputs:
         broker_subs.append(  # noqa: PERF401
             {
@@ -57,7 +65,7 @@ def build_broker_subscriptions(
                 "queue": "1",
                 "routing_key": None,
                 "org_name": "MIT Open Learning Engineering",
-                "app_name": re.sub(r"[^a-zA-Z]", "", edx_output["deployment"]),
+                "app_name": deployment_name_map[edx_output["deployment"]],
                 "app_env": stack_info.env_suffix,
             }
         )
@@ -101,7 +109,20 @@ aws_config = AWSBase(tags={"OU": "operations", "Environment": celery_monitoring_
 consul_security_groups = consul_stack.require_output("security_groups")
 
 aws_account = get_caller_identity()
+
+
 celery_monitoring_domain = celery_monitoring_config.get("domain")
+
+consul.Keys(
+    "celery-monitoring-consul-template-data",
+    keys=[
+        consul.KeysKeyArgs(
+            path="celery-monitoring/domain",
+            value=celery_monitoring_domain,
+        ),
+    ],
+    opts=consul_provider,
+)
 
 celery_monitoring_instance_role = iam.Role(
     "celery-monitoring-instance-role",
