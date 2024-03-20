@@ -184,7 +184,7 @@ xpro = [
         favicon_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/favicon.ico",
         honor_code_url="https://xpro.mit.edu/honor-code/",
         lms_domain="courses.xpro.mit.edu",
-        logo_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.png",
+        logo_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.svg",
         marketing_site_domain="xpro.mit.edu",
         privacy_policy_url="https://xpro.mit.edu/privacy-policy/",
         site_name="MIT xPRO",
@@ -192,6 +192,7 @@ xpro = [
         support_url="xpro.zendesk.com/hc",
         terms_of_service_url="https://xpro.mit.edu/terms-of-service/",
         trademark_text="© MIT xPRO. All rights reserved except where noted.",
+        logo_trademark_url="https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/mit-ol-logo.svg",
     ),
 ]
 
