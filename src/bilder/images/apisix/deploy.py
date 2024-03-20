@@ -17,7 +17,11 @@ from pyinfra import host
 from pyinfra.operations import files, server
 
 from bilder.components.baseline.steps import service_configuration_watches
-from bilder.components.hashicorp.consul.models import Consul, ConsulConfig
+from bilder.components.hashicorp.consul.models import (
+    Consul,
+    ConsulAddresses,
+    ConsulConfig,
+)
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
 from bilder.components.hashicorp.steps import (
     configure_hashicorp_product,
@@ -63,7 +67,13 @@ FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
 
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
-consul_configuration = {Path("00-default.json"): ConsulConfig()}
+consul_configuration = {
+    Path("00-default.json"): ConsulConfig(
+        addresses=ConsulAddresses(dns="127.0.0.1", http="127.0.0.1"),
+        advertise_addr='{{ GetInterfaceIP "ens5" }}',
+        services=[],
+    )
+}
 vector_config = VectorConfig(is_proxy=False)
 vault_config = VaultAgentConfig(
     cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
@@ -89,7 +99,7 @@ vault_config = VaultAgentConfig(
     template=[
         # Puts the token needed for talking to api7 where the cloud-cli service expects it
         VaultTemplate(
-            contents='{{ with secret "secret-operations/apisix" }}API7_ACCESS_TOKEN={{ .Data.api7_access_token }}{{ end }}'
+            contents='{{ with secret "secret-operations/apisix" }}API7_ACCESS_TOKEN={{ .Data.api7_access_token }}{{ end }}\n'
             f'APISIX_VERSION={VERSIONS["apisix"]}',
             destination=Path("/etc/default/cloud-cli"),
         )
@@ -133,9 +143,21 @@ server.shell(
 )
 
 files.put(
-    name="Place the cloud-cli service definition.",
-    src=str(FILES_DIRECTORY.joinpath("cloud-cli.service")),
-    dest="/usr/lib/systemd/system/cloud-cli.service",
+    name="Place the cloud-cli-configure service definition.",
+    src=str(FILES_DIRECTORY.joinpath("cloud-cli-configure.service")),
+    dest="/usr/lib/systemd/system/cloud-cli-configure.service",
+    mode="644",
+)
+files.put(
+    name="Place the cloud-cli-deploy service definition.",
+    src=str(FILES_DIRECTORY.joinpath("cloud-cli-deploy.service")),
+    dest="/usr/lib/systemd/system/cloud-cli-deploy.service",
+    mode="644",
+)
+files.put(
+    name="Place supplemental configuration file.",
+    src=str(FILES_DIRECTORY.joinpath("supplemental_config.yaml")),
+    dest="/etc/docker/config.yaml",
     mode="644",
 )
 
@@ -185,8 +207,14 @@ if host.get_fact(HasSystemd):
     )
 
     server.service(
-        name="Ensure the cloud-cli service is enabled",
-        service="cloud-cli",
+        name="Ensure the cloud-cli-configure service is enabled",
+        service="cloud-cli-configure",
+        enabled=True,
+        running=False,
+    )
+    server.service(
+        name="Ensure the cloud-cli-deploy service is enabled",
+        service="cloud-cli-deploy",
         enabled=True,
         running=False,
     )

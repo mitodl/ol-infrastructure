@@ -1,0 +1,4 @@
+---
+apisix:
+  ssl:
+    fallback_sni: "*.odl.mit.edu"

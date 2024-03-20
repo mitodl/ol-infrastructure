@@ -1,0 +1,28 @@
+[Unit]
+Description=Excute the api7 cloud-cli utility at startup."
+After=network.target
+After=docker.service
+Wants=vault.service
+After=vault.service
+Wants=consul.service
+After=consul.service
+After=cloud-cli-configure.service
+
+[Service]
+User=apisix
+Group=apisix
+Type=forking
+Restart=always
+EnvironmentFile=-/etc/default/cloud-cli
+ExecStart=/usr/local/bin/cloud-cli deploy docker --apisix-image apache/apisix:${APISIX_VERSION}-debian \
+                                                 --apisix-config /etc/docker/config.yaml \
+                                                 --name "%H" \
+                                                 --http-host-port 80 \
+                                                 --https-host-port 443 \
+                                                 --docker-run-arg --rm \
+                                                 --docker-run-arg --platform=linux/amd64
+ExecStop=/usr/local/bin/cloud-cli stop docker --name "%H"
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -15,7 +15,7 @@ variable "business_unit" {
 
 variable "node_type" {
   type    = string
-  default = "server"
+  default = "gateway"
 }
 
 source "amazon-ebs" "apisix" {

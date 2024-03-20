@@ -1,0 +1,16 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHg42pDDDGBhpaX14TdtzcK1hbiMYTHsYRH4k5GL5RFpIwGrUool8MyXIc6/iP0y/7U8AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMY6bPj02yHR0bWkfyAgEQgDtezHo0XpSB4z+XuC0APXs/VRVxYf9GtBOiiJkJVe9X0nlquFnDsYWNjiq1Tko9C/fIZ6m2Y6Gaqrsz+g==
+config:
+  apisix:api_gateway_domain_name: "api-mitopen-rc.odl.mit.edu"
+  apisix:api7_access_token:
+    secure: v1:S7t0v+GcgFKHlzJY:zXBM4VIS7bSXcc+/X4uneKKz/fJ1l8yrDJTjM7c7dOKufTP4wEhFsoMyRS0fZYtLsyEh5QNODZ+Zy4Y4hU3u0thwMNcDuHbLsgxJnL+psWbVdAQNnVvfW09wKBVXJeFHztaDxBmOiMahdrdZt8hOcMC2EPEQZtw8vOhXrZkmQv/saJDqOpMvOGVZtTdw1m0RWw735dKYjCq3jlFxJ6TtyAp3sKZxvLeNvF/dqA4wNmY8mqzObi1v5e2RBwqoI4i+QuFX/KVbqk+LuC4+4vpDMavLybVSAusmnkjP5lsM07V3qNko1a2gDpJQaw==
+  apisix:auto_scale:
+    desired: 1
+    max: 2
+    min: 1
+  apisix:target_vpc: applications_vpc
+  aws:region: us-east-1
+  consul:address: https://consul-opps-qa.odl.mit.edu
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa
