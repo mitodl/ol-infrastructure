@@ -15,6 +15,7 @@ Type=oneshot
 EnvironmentFile=-/etc/default/cloud-cli
 ExecStart=/bin/sleep 20
 ExecStart=/usr/local/bin/cloud-cli configure --token ${API7_ACCESS_TOKEN}
+ExecStart=/bin/bash -c "echo \"HOSTNAME=$(/usr/bin/hostname)\" > /home/apisix/hostname"
 RemainAfterExit=yes
 
 [Install]

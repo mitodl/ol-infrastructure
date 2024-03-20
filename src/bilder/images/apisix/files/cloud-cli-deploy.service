@@ -13,10 +13,11 @@ User=apisix
 Group=apisix
 Type=forking
 Restart=always
-EnvironmentFile=-/etc/default/cloud-cli
+EnvironmentFile=/etc/default/cloud-cli
+EnvironmentFile=/home/apisix/hostname
 ExecStart=/usr/local/bin/cloud-cli deploy docker --apisix-image apache/apisix:${APISIX_VERSION}-debian \
                                                  --apisix-config /etc/docker/config.yaml \
-                                                 --name "%H" \
+                                                 --name "${HOSTNAME}" \
                                                  --http-host-port 80 \
                                                  --https-host-port 443 \
                                                  --docker-run-arg --rm \

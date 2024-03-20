@@ -172,6 +172,7 @@ tg_config = OLTargetGroupConfig(
     health_check_path="/",
     health_check_port=str(DEFAULT_HTTPS_PORT),
     health_check_matcher="404",
+    health_check_interval=30,
     tags=aws_config.merged_tags({"Name": apisix_gateway_tag}),
 )
 
