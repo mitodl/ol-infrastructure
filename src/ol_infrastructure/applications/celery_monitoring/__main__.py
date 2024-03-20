@@ -59,7 +59,7 @@ def build_broker_subscriptions(
     for edx_output in edx_outputs:
         broker_subs.append(  # noqa: PERF401
             {
-                "broker": f"rediss://default:{edx_output['redis_token']}@{edx_output['redis']}:6379/1",
+                "broker": f"rediss://default:{edx_output['redis_token']}@{edx_output['redis']}:6379/1?ssl=true&ssl_cert_reqs=required",
                 "broker_management_url": None,
                 "exchange": "celeryev",
                 "queue": "leek.fanout",
