@@ -59,11 +59,11 @@ def build_broker_subscriptions(
     for edx_output in edx_outputs:
         broker_subs.append(  # noqa: PERF401
             {
-                "broker": f"rediss://default:{edx_output['redis_token']}@{edx_output['redis']}",
+                "broker": f"rediss://default:{edx_output['redis_token']}@{edx_output['redis']}:6379/1",
                 "broker_management_url": None,
-                "exchange": None,
-                "queue": "1",
-                "routing_key": None,
+                "exchange": "celeryev",
+                "queue": "leek.fanout",
+                "routing_key": "#",
                 "org_name": "MIT Open Learning Engineering",
                 "app_name": deployment_name_map[edx_output["deployment"]],
                 "app_env": stack_info.env_suffix,
