@@ -5,7 +5,7 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-operations-production.odl.mit.edu
   consul:scheme: https
-  opensearch:consul_service_name: 'celery-monitoring-opensearch'
+  opensearch:consul_service_name: 'celery_monitoring-opensearch'
   environment:business_unit: operations
   environment:target_vpc: operations_vpc
   opensearch:domain_name: "celeryp"
