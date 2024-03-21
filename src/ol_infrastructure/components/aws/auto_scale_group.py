@@ -97,6 +97,7 @@ class OLLoadBalancerConfig(AWSBase):
     security_groups: list[SecurityGroup | str | pulumi.Output[str]]
     subnets: pulumi.Output[str]
 
+    idle_timeout_seconds: Optional[int] = 60
     listener_use_acm: bool = True
     listener_cert_arn: Optional[str | pulumi.Output[str]] = None
     listener_cert_domain: str = "*.odl.mit.edu"
@@ -267,6 +268,7 @@ class OLAutoScaling(pulumi.ComponentResource):
                 subnets=lb_config.subnets,
                 tags=lb_config.tags,
                 opts=resource_options,
+                idle_timeout=lb_config.idle_timeout_seconds or 60,
             )
 
             # Create Load Balancer Listener (requires load balancer + target group first)  # noqa: E501

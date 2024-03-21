@@ -536,6 +536,8 @@ consul.Keys(
 lb_config = OLLoadBalancerConfig(
     subnets=target_vpc["subnet_ids"],
     security_groups=[airbyte_server_security_group],
+    # Give extra time for discover_schema calls in connection setup
+    idle_timeout_seconds=60 * 5,
     tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
 )
 
