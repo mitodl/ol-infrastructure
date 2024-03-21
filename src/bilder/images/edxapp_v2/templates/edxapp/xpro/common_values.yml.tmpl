@@ -372,8 +372,8 @@ LOGIN_REDIRECT_WHITELIST:  # MODIFIED
   - {{ key "edxapp/preview-domain" }}
   - {{ key "edxapp/marketing-domain" }}
 LOG_DIR: /openedx/data/var/log/edx
-LOGO_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.svg
-LOGO_TRADEMARK_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/mit-ol-logo.svg
+LOGO_URL: https://{{ key "edxapp/lms-domain" }}/static/xpro/images/logo.svg
+LOGO_TRADEMARK_URL: https://{{ key "edxapp/lms-domain" }}/static/xpro/images/mit-ol-logo.svg
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MARKETING_SITE_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support xpro-theme
 XPRO_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support xpro-theme
