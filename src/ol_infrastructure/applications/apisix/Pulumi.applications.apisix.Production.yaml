@@ -11,6 +11,6 @@ config:
     min: 2
   apisix:target_vpc: applications_vpc
   aws:region: us-east-1
-  consul:address: https://consul-opps-production.odl.mit.edu
+  consul:address: https://consul-apps-production.odl.mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
