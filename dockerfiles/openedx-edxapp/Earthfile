@@ -97,7 +97,9 @@ collected:
   COPY +install-deps/.local /openedx/.local
   COPY +themes/theme /openedx/themes/$DEPLOYMENT_NAME
   COPY +tutor-utils/bin /openedx/bin
-  COPY +locales/locale /openedx/locale
+  IF [ "$DEPLOYMENT_NAME" != "mitxonline"]
+    COPY +locales/locale /openedx/locale
+  END
   RUN chmod a+x /openedx/bin/*
   ENV PATH /openedx/.local/bin:/openedx/bin:/openedx/edx-platform/node_modules/.bin:/openedx/nodeenv/bin:${PATH}
   WORKDIR /openedx/edx-platform
