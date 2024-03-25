@@ -283,6 +283,19 @@ def current_user_email() -> Optional[str]:
         logging.debug("Could not get email for : %s", g.user)
         return None
 
+# Macro function that returns a list of the current user's roles
+def current_user_roles() -> list[str]:
+    """
+    Get the roles assigned to the current user.
+
+    :returns: A list of roles
+    """
+
+    try:
+        return g.user.roles
+    except Exception:  # noqa: BLE001
+        logging.debug("Could not get roles for : %s", g.user)
+        return None
 
 # Adding macros to enable usage in the jinja_context for Superset
 JINJA_CONTEXT_ADDONS = {"current_user_email": current_user_email}
