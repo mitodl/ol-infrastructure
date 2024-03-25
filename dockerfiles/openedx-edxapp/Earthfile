@@ -133,16 +133,16 @@ fetch-translations:
     ## pull xblock translations via atlas
     python manage.py lms pull_xblock_translations $OPENEDX_ATLAS_OPTIONS && \
     python manage.py lms compile_xblock_translations && \
-    python manage.py cms compile_xblock_translations && \
     ## pull translations via atlas
     atlas pull $OPENEDX_ATLAS_OPTIONS \
       translations/edx-platform/conf/locale:conf/locale \
-      translations/studio-frontend/src/i18n/messages:conf/plugins-locale/studio-frontend && \
     python manage.py lms compilemessages && \
     python manage.py lms compilejsi18n && \
-    python manage.py cms compilejsi18n && \
-    python manage.py lms collectstatic && \
-    python manage.py cms collectstatic
+  ENV DJANGO_SETTINGS_MODULE cms.envs.mitol.i18n
+  RUN python manage.py cms compile_xblock_translations && \
+    atlas pull $OPENEDX_ATLAS_OPTIONS \
+      translations/studio-frontend/src/i18n/messages:conf/plugins-locale/studio-frontend && \
+    python manage.py cms compilejsi18n
   ENV DJANGO_SETTINGS_MODULE lms.envs.production
   SAVE ARTIFACT /openedx/edx-platform /edx-platform
 
