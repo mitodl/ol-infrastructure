@@ -140,7 +140,9 @@ fetch-translations:
       translations/studio-frontend/src/i18n/messages:conf/plugins-locale/studio-frontend && \
     python manage.py lms compilemessages && \
     python manage.py lms compilejsi18n && \
-    python manage.py cms compilejsi18n
+    python manage.py cms compilejsi18n && \
+    python manage.py lms collectstatic && \
+    python manage.py cms collectstatic
   ENV DJANGO_SETTINGS_MODULE lms.envs.production
   SAVE ARTIFACT /openedx/edx-platform /edx-platform
 
