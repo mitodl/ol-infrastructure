@@ -15,7 +15,7 @@ apt-base:
 
 locales:
   FROM +apt-base
-  ARG OPENEDX_I18N_VERSION="open-release/olive.3"
+  ARG OPENEDX_I18N_VERSION="open-release/quince.1"
   WORKDIR /tmp
   RUN curl -L -o openedx-i18n.tar.gz https://github.com/openedx/openedx-i18n/archive/$OPENEDX_I18N_VERSION.tar.gz \
     && tar xzf /tmp/openedx-i18n.tar.gz \
@@ -147,7 +147,11 @@ fetch-translations:
   SAVE ARTIFACT /openedx/edx-platform /edx-platform
 
 build-static-assets-nonprod:
-  FROM +fetch-translations
+  IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
+    FROM +fetch-translations
+  ELSE
+    FROM +collected
+  END
   # ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "\"https://verificientstatic-preprod.storage.googleapis.com/cdn/fb_cjs/edx_preprod_cjs.IQEQWWZ2.js\"", "PROCTORTRACK_CONFIG_KEY": "\"1PKRwFPezxXj3TsD\""}'
   ENV JS_ENV_EXTRA_CONFIG='{"PROCTORTRACK_CDN_URL":"\"\"","PROCTORTRACK_CONFIG_KEY":"\"\""}'
   RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
