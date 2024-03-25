@@ -58,6 +58,15 @@ node_image = Resource(
     },
 )
 
+npm_package = Resource(
+    name=Identifier("npm-package"),
+    type="npm",
+    source={
+        "package": "open-api-clients",
+        "scope": "mitodl",
+    },
+)
+
 mit_open_repository = git_repo(
     name=Identifier("mit-open"),
     uri="https://github.com/mitodl/mit-open",
@@ -173,6 +182,10 @@ create_release_job = Job(
         PutStep(
             put=mit_open_api_clients_repository.name,
             params={"repository": mit_open_api_clients_repository.name},
+        ),
+        # Publish to NPM
+        PutStep(
+            put=npm_package.name,
         ),
     ],
 )
