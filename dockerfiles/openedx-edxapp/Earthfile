@@ -15,7 +15,7 @@ apt-base:
 
 locales:
   FROM +apt-base
-  ARG OPENEDX_I18N_VERSION="open-release/quince.1"
+  ARG OPENEDX_I18N_VERSION="open-release/palm.4"
   WORKDIR /tmp
   RUN curl -L -o openedx-i18n.tar.gz https://github.com/openedx/openedx-i18n/archive/$OPENEDX_I18N_VERSION.tar.gz \
     && tar xzf /tmp/openedx-i18n.tar.gz \
@@ -139,7 +139,7 @@ fetch-translations:
     atlas pull $OPENEDX_ATLAS_OPTIONS \
       translations/edx-platform/conf/locale:conf/locale \
     python manage.py lms compilemessages && \
-    python manage.py lms compilejsi18n && \
+    python manage.py lms compilejsi18n
   ENV DJANGO_SETTINGS_MODULE cms.envs.mitol.i18n
   RUN python manage.py cms compile_xblock_translations && \
     atlas pull $OPENEDX_ATLAS_OPTIONS \
