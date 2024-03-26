@@ -16,7 +16,6 @@ from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files, server
 
-from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models import (
     Consul,
     ConsulAddresses,
@@ -51,7 +50,6 @@ from bilder.components.vector.steps import (
 )
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.ami_helpers import build_tags_document
-from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
@@ -217,11 +215,4 @@ if host.get_fact(HasSystemd):
         service="cloud-cli-deploy",
         enabled=True,
         running=False,
-    )
-
-    watched_docker_compose_files = [
-        DOCKER_COMPOSE_DIRECTORY.joinpath(".env"),
-    ]
-    service_configuration_watches(
-        service_name="docker-compose", watched_files=watched_docker_compose_files
     )
