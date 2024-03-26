@@ -58,7 +58,7 @@ node_image = Resource(
     },
 )
 
-npm_package = Resource(
+openapi_clients_npm_package = Resource(
     name=Identifier("npm-package"),
     type="npm-package",
     source={
@@ -215,7 +215,7 @@ publish_job = Job(
         ),
         # Publish to NPM
         PutStep(
-            put=npm_package.name,
+            put=openapi_clients_npm_package.name,
         ),
     ],
 )
