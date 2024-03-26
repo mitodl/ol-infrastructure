@@ -259,7 +259,6 @@ def slack_notification(name: Identifier, url: str) -> Resource:
     )
 
 
-# The resource supports custom package registries too but we don't need them for the moment.
 def npm_package(package: Identifier, scope: Identifier) -> Resource:
     return Resource(
         name=package,
