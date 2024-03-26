@@ -444,11 +444,6 @@ auth_aws_mitx_creds_ocw_studio_app_env = vault.generic.get_secret_output(
     opts=InvokeOptions(parent=ocw_studio_secrets),
 )
 
-auth_postgres_ocw_studio_applications_env_creds_app = vault.generic.get_secret_output(
-    path=f"postgres-ocw-studio-applications-{stack_info.env_suffix}/creds/app",
-    with_lease_start_time=False,
-    opts=InvokeOptions(parent=ocw_studio_secrets),
-)
 
 secret_operations_global_mailgun_api_key = vault.generic.get_secret_output(
     path="secret-operations/global/mailgun-api-key",
@@ -470,11 +465,6 @@ sensitive_heroku_vars = {
     ),
     "AWS_SECRET_ACCESS_KEY": auth_aws_mitx_creds_ocw_studio_app_env.data.apply(
         lambda data: "{}".format(data["secret_key"])
-    ),
-    "DATABASE_URL": auth_postgres_ocw_studio_applications_env_creds_app.data.apply(
-        lambda data: "postgres://{}:{}@ocw-studio-db-applications-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/ocw_studio".format(
-            data["username"], data["password"], stack_info.env_suffix
-        )
     ),
     "MAILGUN_KEY": secret_operations_global_mailgun_api_key.data.apply(
         lambda data: "{}".format(data["value"])
@@ -504,6 +494,22 @@ sensitive_heroku_vars = {
     "GITHUB_APP_PRIVATE_KEY": vault_secrets["github"]["app_private_key"],
     "GITHUB_WEBHOOK_KEY": vault_secrets["github"]["shared_secret"],
 }
+
+if stack_info.env_suffix.lower() != "ci":
+    auth_postgres_ocw_studio_applications_env_creds_app = (
+        vault.generic.get_secret_output(
+            path=f"postgres-ocw-studio-applications-{stack_info.env_suffix}/creds/app",
+            with_lease_start_time=False,
+            opts=InvokeOptions(parent=ocw_studio_secrets),
+        )
+    )
+    sensitive_heroku_vars["DATABASE_URL"] = (
+        auth_postgres_ocw_studio_applications_env_creds_app.data.apply(
+            lambda data: "postgres://{}:{}@ocw-studio-db-applications-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/ocw_studio".format(
+                data["username"], data["password"], stack_info.env_suffix
+            )
+        ),
+    )
 
 heroku_app_id = heroku_config.require("app_id")
 ocw_studio_heroku_configassociation = heroku.app.ConfigAssociation(
