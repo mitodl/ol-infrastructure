@@ -183,10 +183,6 @@ create_release_job = Job(
             put=mit_open_api_clients_repository.name,
             params={"repository": mit_open_api_clients_repository.name},
         ),
-        # Publish to NPM
-        PutStep(
-            put=npm_package.name,
-        ),
     ],
 )
 
@@ -217,6 +213,10 @@ publish_job = Job(
                 ),
             ),
         ),
+        # Publish to NPM
+        PutStep(
+            put=npm_package.name,
+        ),
     ],
 )
 
@@ -228,6 +228,7 @@ build_pipeline = Pipeline(
         node_image,
         mit_open_repository,
         mit_open_api_clients_repository,
+        npm_package,
     ],
     jobs=[
         generate_clients_job,

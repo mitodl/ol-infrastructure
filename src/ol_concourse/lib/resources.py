@@ -265,5 +265,12 @@ def npm_package(package: Identifier, scope: Identifier) -> Resource:
         name=package,
         type="npm-package",
         icon="language-javascript",
-        source={"package": package, "scope": scope},
+        source={
+            "package": package,
+            "scope": scope,
+            "registry": {
+                "uri": "https://registry.npmjs.org",
+                "token": "{{npmjs.concourse_token}}",
+            },
+        },
     )
