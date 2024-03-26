@@ -1,4 +1,4 @@
-VERSION 0.7
+VERSION 0.8
 FROM python:3.8-bookworm
 
 apt-base:
@@ -218,6 +218,6 @@ docker-image:
   SAVE IMAGE mitodl/edxapp-$DEPLOYMENT_NAME-$RELEASE_NAME:latest
 
 all:
-  FROM +docker-image
-  FROM +build-static-assets-production
-  FROM +build-static-assets-nonprod
+  BUILD +docker-image
+  BUILD +build-static-assets-production
+  BUILD +build-static-assets-nonprod
