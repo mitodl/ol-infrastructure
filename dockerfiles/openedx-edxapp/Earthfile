@@ -76,7 +76,7 @@ themes:
 tutor-utils:
   FROM +apt-base
   ARG TUTOR_REPO="https://github.com/overhangio/tutor.git"
-  ARG TUTOR_VERSION="v15.3.4"
+  ARG TUTOR_VERSION="v17.0.3"
   GIT CLONE --branch $TUTOR_VERSION $TUTOR_REPO /openedx/tutor
   SAVE ARTIFACT /openedx/tutor/tutor/templates/build/openedx/bin
 

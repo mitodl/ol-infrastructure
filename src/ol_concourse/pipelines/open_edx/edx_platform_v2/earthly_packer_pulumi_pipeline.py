@@ -169,7 +169,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                                     "-c",
                                     f"""source /docker-lib.sh;
                                     start_docker;
-                                    echo "{release_name}-{deployment_name}-$(cat ol-infrastructure-docker/dockerfiles/openedx-edxapp/edx_platform/.git/short_ref)" > artifacts/tag.txt;
+                                    echo "{release_name}-{deployment_name}-$(cat {edx_platform_git_resource.name}/.git/short_ref)" > artifacts/tag.txt;
                                     cd {earthly_git_resource.name}/dockerfiles/openedx-edxapp;
                                     RELEASE_NAME={release_name};
                                     DEPLOYMENT_NAME={deployment_name};
