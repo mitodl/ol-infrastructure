@@ -124,36 +124,34 @@ collected:
 
 fetch-translations:
   FROM +collected
-  ARG OPENEDX_TRANSLATIONS_REPOSITORY=openedx/openedx-translations
-  ARG OPENEDX_TRANSLATIONS_BRANCH=main
-  ARG OPENEDX_ATLAS_OPTIONS="--repository $OPENEDX_TRANSLATIONS_REPOSITORY --revision $OPENEDX_TRANSLATIONS_BRANCH"
+  IF [ -e "/openedx/edx-platform/openedx/core/djangoapps/plugins/management/commands/pull_plugin_translations.py" ]
+    ARG OPENEDX_TRANSLATIONS_REPOSITORY=openedx/openedx-translations
+    ARG OPENEDX_TRANSLATIONS_BRANCH=main
+    ARG OPENEDX_ATLAS_OPTIONS="--repository $OPENEDX_TRANSLATIONS_REPOSITORY --revision $OPENEDX_TRANSLATIONS_BRANCH"
    ## Pull translations for edx_django_utils.plugins for both lms and cms
-  ENV DJANGO_SETTINGS_MODULE lms.envs.mitol.i18n
-  WORKDIR /openedx/edx-platform
-  RUN python manage.py lms pull_plugin_translations $OPENEDX_ATLAS_OPTIONS && \
-    python manage.py lms compile_plugin_translations && \
-    ## pull xblock translations via atlas
-    python manage.py lms pull_xblock_translations $OPENEDX_ATLAS_OPTIONS && \
-    python manage.py lms compile_xblock_translations && \
-    ## pull translations via atlas
-    atlas pull $OPENEDX_ATLAS_OPTIONS \
-      translations/edx-platform/conf/locale:conf/locale \
-    python manage.py lms compilemessages && \
-    python manage.py lms compilejsi18n
-  ENV DJANGO_SETTINGS_MODULE cms.envs.mitol.i18n
-  RUN python manage.py cms compile_xblock_translations && \
-    atlas pull $OPENEDX_ATLAS_OPTIONS \
-      translations/studio-frontend/src/i18n/messages:conf/plugins-locale/studio-frontend && \
-    python manage.py cms compilejsi18n
-  ENV DJANGO_SETTINGS_MODULE lms.envs.production
+    ENV DJANGO_SETTINGS_MODULE lms.envs.mitol.i18n
+    WORKDIR /openedx/edx-platform
+    RUN python manage.py lms pull_plugin_translations $OPENEDX_ATLAS_OPTIONS && \
+      python manage.py lms compile_plugin_translations && \
+      ## pull xblock translations via atlas
+      python manage.py lms pull_xblock_translations $OPENEDX_ATLAS_OPTIONS && \
+      python manage.py lms compile_xblock_translations && \
+      ## pull translations via atlas
+      atlas pull $OPENEDX_ATLAS_OPTIONS \
+        translations/edx-platform/conf/locale:conf/locale \
+      python manage.py lms compilemessages && \
+      python manage.py lms compilejsi18n
+    ENV DJANGO_SETTINGS_MODULE cms.envs.mitol.i18n
+    RUN python manage.py cms compile_xblock_translations && \
+      atlas pull $OPENEDX_ATLAS_OPTIONS \
+        translations/studio-frontend/src/i18n/messages:conf/plugins-locale/studio-frontend && \
+      python manage.py cms compilejsi18n
+    ENV DJANGO_SETTINGS_MODULE lms.envs.production
+  END
   SAVE ARTIFACT /openedx/edx-platform /edx-platform
 
 build-static-assets-nonprod:
-  IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
-    FROM +fetch-translations
-  ELSE
-    FROM +collected
-  END
+  FROM +fetch-translations
   # ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "\"https://verificientstatic-preprod.storage.googleapis.com/cdn/fb_cjs/edx_preprod_cjs.IQEQWWZ2.js\"", "PROCTORTRACK_CONFIG_KEY": "\"1PKRwFPezxXj3TsD\""}'
   ENV JS_ENV_EXTRA_CONFIG='{"PROCTORTRACK_CDN_URL":"\"\"","PROCTORTRACK_CONFIG_KEY":"\"\""}'
   RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
