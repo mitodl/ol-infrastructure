@@ -49,7 +49,7 @@ ol_platform_engineering_realm = keycloak.Realm(
     login_theme="keycloak",
     duplicate_emails_allowed=False,
     otp_policy=keycloak.RealmOtpPolicyArgs(
-        algorithm="HmacSHA256",
+        algorithm="HmacSHA1",
         digits=6,
         initial_counter=2,
         look_ahead_window=1,
@@ -914,7 +914,7 @@ if stack_info.env_suffix == "qa":
             "propagation-user": "true",
             "enabled": "true",
             "changedSyncPeriod": "-1",
-            "endpoint": "https://mit-open-rc.odl.mit.edu/scim/v2/",
+            "endpoint": "https://mitopen-rc.odl.mit.edu/scim/v2/",
             "propagation-group": "true",
             "content-type": "application/scim+json",
             "group-patchOp": "false",

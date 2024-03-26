@@ -21,7 +21,7 @@ from ol_concourse.lib.resources import git_repo, github_release
 ol_inf_repo = git_repo(
     name=Identifier("ol-infrastructure-repository"),
     uri="https://github.com/mitodl/ol-infrastructure",
-    branch="md/issue_1881",
+    branch="main",
     check_every="24h",
     paths=["dockerfiles/dcind/"],
 )

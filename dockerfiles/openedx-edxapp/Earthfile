@@ -1,5 +1,5 @@
 VERSION 0.7
-FROM python:3.8.12-buster
+FROM python:3.8-bookworm
 
 apt-base:
   ENV DEBIAN_FRONTEND=noninteractive
@@ -15,7 +15,7 @@ apt-base:
 
 locales:
   FROM +apt-base
-  ARG OPENEDX_I18N_VERSION="open-release/olive.3"
+  ARG OPENEDX_I18N_VERSION="open-release/palm.4"
   WORKDIR /tmp
   RUN curl -L -o openedx-i18n.tar.gz https://github.com/openedx/openedx-i18n/archive/$OPENEDX_I18N_VERSION.tar.gz \
     && tar xzf /tmp/openedx-i18n.tar.gz \
@@ -25,18 +25,26 @@ locales:
   SAVE ARTIFACT /openedx/locale
 
 get-code:
-  FROM +apt-base
+  ARG EDX_PLATFORM_DIR=thereisnosuchdirectoryasthisone
+  LOCALLY
+  IF [ -d $EDX_PLATFORM_DIR ]
   # Two required vars to specify the git repo and sha ref the build from.
-  ARG --required EDX_PLATFORM_GIT_REPO
-  ARG --required EDX_PLATFORM_GIT_BRANCH
-  GIT CLONE --branch $EDX_PLATFORM_GIT_BRANCH $EDX_PLATFORM_GIT_REPO /openedx/edx-platform
-  RUN cp /openedx/edx-platform/requirements/edx/base.txt /root/pip_package_lists/edx_base.txt
-  SAVE ARTIFACT /openedx/edx-platform
+    SAVE ARTIFACT $EDX_PLATFORM_DIR /edx-platform
+  ELSE
+    FROM +apt-base
+    ARG --required EDX_PLATFORM_GIT_REPO
+    ARG --required EDX_PLATFORM_GIT_BRANCH
+    GIT CLONE --branch $EDX_PLATFORM_GIT_BRANCH $EDX_PLATFORM_GIT_REPO /openedx/edx-platform
+    SAVE ARTIFACT /openedx/edx-platform /edx-platform
+  END
 
 install-deps:
-  FROM +get-code
+  FROM +apt-base
   ARG --required DEPLOYMENT_NAME
   ARG --required RELEASE_NAME
+  COPY +get-code/edx-platform /openedx/edx-platform
+  RUN cp /openedx/edx-platform/requirements/edx/base.txt /root/pip_package_lists/edx_base.txt
+  RUN ls -l /root/pip_package_lists/
   RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_lists/edx_base.txt -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
   RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_overrides/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
   IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
@@ -52,12 +60,18 @@ install-deps:
   SAVE ARTIFACT /root/.local
 
 themes:
-  FROM +apt-base
-  ARG --required THEME_GIT_REPO
-  ARG --required THEME_GIT_BRANCH
+  ARG THEME_DIR=thereisnosuchdirectoryasthisone
   ARG --required DEPLOYMENT_NAME
-  GIT CLONE --branch $THEME_GIT_BRANCH $THEME_GIT_REPO /openedx/themes/$DEPLOYMENT_NAME
-  SAVE ARTIFACT /openedx/themes
+  LOCALLY
+  IF [ -d $THEME_DIR ]
+    SAVE ARTIFACT $THEME_DIR /theme
+  ELSE
+    FROM +apt-base
+    ARG --required THEME_GIT_REPO
+    ARG --required THEME_GIT_BRANCH
+    GIT CLONE --branch $THEME_GIT_BRANCH $THEME_GIT_REPO /openedx/themes/$DEPLOYMENT_NAME
+    SAVE ARTIFACT /openedx/themes/$DEPLOYMENT_NAME /theme
+  END
 
 tutor-utils:
   FROM +apt-base
@@ -73,6 +87,7 @@ dockerize:
 collected:
   FROM +apt-base
   ARG APP_USER_ID=1000
+  ARG --required DEPLOYMENT_NAME
   RUN if [ "$APP_USER_ID" = 0 ]; then echo "app user may not be root" && false; fi
   RUN useradd --home-dir /openedx --create-home --shell /bin/bash/ --uid ${APP_USER_ID} app
   USER ${APP_USER_ID}
@@ -80,9 +95,11 @@ collected:
   COPY +install-deps/edx-platform /openedx/edx-platform
   COPY +install-deps/nodeenv /openedx/nodeenv
   COPY +install-deps/.local /openedx/.local
-  COPY +themes/themes /openedx/themes
+  COPY +themes/theme /openedx/themes/$DEPLOYMENT_NAME
   COPY +tutor-utils/bin /openedx/bin
-  COPY +locales/locale /openedx/locale
+  IF [ "$DEPLOYMENT_NAME" != "mitxonline"]
+    COPY +locales/locale /openedx/locale
+  END
   RUN chmod a+x /openedx/bin/*
   ENV PATH /openedx/.local/bin:/openedx/bin:/openedx/edx-platform/node_modules/.bin:/openedx/nodeenv/bin:${PATH}
   WORKDIR /openedx/edx-platform
@@ -104,8 +121,39 @@ collected:
   ENV NO_PYTHON_UNINSTALL 1
   ENV NO_PREREQ_INSTALL 0
 
-build-static-assets-nonprod:
+
+fetch-translations:
   FROM +collected
+  ARG OPENEDX_TRANSLATIONS_REPOSITORY=openedx/openedx-translations
+  ARG OPENEDX_TRANSLATIONS_BRANCH=main
+  ARG OPENEDX_ATLAS_OPTIONS="--repository $OPENEDX_TRANSLATIONS_REPOSITORY --revision $OPENEDX_TRANSLATIONS_BRANCH"
+   ## Pull translations for edx_django_utils.plugins for both lms and cms
+  ENV DJANGO_SETTINGS_MODULE lms.envs.mitol.i18n
+  WORKDIR /openedx/edx-platform
+  RUN python manage.py lms pull_plugin_translations $OPENEDX_ATLAS_OPTIONS && \
+    python manage.py lms compile_plugin_translations && \
+    ## pull xblock translations via atlas
+    python manage.py lms pull_xblock_translations $OPENEDX_ATLAS_OPTIONS && \
+    python manage.py lms compile_xblock_translations && \
+    ## pull translations via atlas
+    atlas pull $OPENEDX_ATLAS_OPTIONS \
+      translations/edx-platform/conf/locale:conf/locale \
+    python manage.py lms compilemessages && \
+    python manage.py lms compilejsi18n
+  ENV DJANGO_SETTINGS_MODULE cms.envs.mitol.i18n
+  RUN python manage.py cms compile_xblock_translations && \
+    atlas pull $OPENEDX_ATLAS_OPTIONS \
+      translations/studio-frontend/src/i18n/messages:conf/plugins-locale/studio-frontend && \
+    python manage.py cms compilejsi18n
+  ENV DJANGO_SETTINGS_MODULE lms.envs.production
+  SAVE ARTIFACT /openedx/edx-platform /edx-platform
+
+build-static-assets-nonprod:
+  IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
+    FROM +fetch-translations
+  ELSE
+    FROM +collected
+  END
   # ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "\"https://verificientstatic-preprod.storage.googleapis.com/cdn/fb_cjs/edx_preprod_cjs.IQEQWWZ2.js\"", "PROCTORTRACK_CONFIG_KEY": "\"1PKRwFPezxXj3TsD\""}'
   ENV JS_ENV_EXTRA_CONFIG='{"PROCTORTRACK_CDN_URL":"\"\"","PROCTORTRACK_CONFIG_KEY":"\"\""}'
   RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
@@ -132,7 +180,7 @@ build-static-assets-nonprod:
   SAVE ARTIFACT /openedx/staticfiles-nonprod.tar.gz AS LOCAL staticfiles-nonprod.tar.gz
 
 build-static-assets-production:
-  FROM +collected
+  FROM +fetch-translations
   # ENV JS_ENV_EXTRA_CONFIG '{"PROCTORTRACK_CDN_URL": "\"https://verificientstatic.storage.googleapis.com/cdn/fb_cjs/edx_us_cjs.IQEQWWZ2.js\"", "PROCTORTRACK_CONFIG_KEY": "\"1PKRwFPezxXj3TsD\""}'
   ENV JS_ENV_EXTRA_CONFIG='{"PROCTORTRACK_CDN_URL":"\"\"","PROCTORTRACK_CONFIG_KEY":"\"\""}'
   RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
@@ -159,7 +207,7 @@ build-static-assets-production:
   SAVE ARTIFACT /openedx/staticfiles-production.tar.gz AS LOCAL staticfiles-production.tar.gz
 
 docker-image:
-  FROM +collected
+  FROM +fetch-translations
   ARG --required DEPLOYMENT_NAME
   ARG --required RELEASE_NAME
   ENV DJANGO_SETTINGS_MODULE="invalid"

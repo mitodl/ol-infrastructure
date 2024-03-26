@@ -1,7 +1,11 @@
-import os  # noqa: INP001
+import logging
+import os
+from typing import Optional
 
 from celery.schedules import crontab
+from flask import g
 from flask_appbuilder.security.manager import AUTH_OAUTH
+from superset.security import SupersetSecurityManager
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
 from vault.aws_auth import get_vault_client
 
@@ -68,6 +72,7 @@ OAUTH_PROVIDERS = [
 # https://superset.apache.org/docs/installation/configuring-superset#mapping-ldap-or-oauth-groups-to-superset-roles
 AUTH_ROLES_MAPPING = {
     "superset_admin": ["Admin"],
+    "superset_alpha": ["Alpha"],
 }
 
 # if we should replace ALL the user's roles each login, or only on registration
@@ -78,6 +83,24 @@ AUTH_USER_REGISTRATION = True
 
 # The default user self registration role
 AUTH_USER_REGISTRATION_ROLE = "Public"
+
+
+class CustomSsoSecurityManager(SupersetSecurityManager):
+    def oauth_user_info(self, provider, response=None):  # noqa: ARG002
+        me = self.appbuilder.sm.oauth_remotes[provider].get("openid-connect/userinfo")
+        me.raise_for_status()
+        data = me.json()
+        logging.debug("User info from Keycloak: %s", data)
+        return {
+            "username": data.get("preferred_username", ""),
+            "first_name": data.get("given_name", ""),
+            "last_name": data.get("family_name", ""),
+            "email": data.get("email", ""),
+            "role_keys": data.get("role_keys", []),
+        }
+
+
+CUSTOM_SECURITY_MANAGER = CustomSsoSecurityManager
 
 # ---------------------------------------------------
 # Feature flags
@@ -175,12 +198,19 @@ FEATURE_FLAGS: dict[str, bool] = {
 # every query ran, in both SQL Lab and charts/dashboards.
 QUERY_LOGGER = None
 
-FILTER_STATE_CACHE_CONFIG = {
+# Caching Settings
+cache_base = {
     "CACHE_TYPE": "RedisCache",
     "CACHE_DEFAULT_TIMEOUT": 86400,
-    "CACHE_KEY_PREFIX": "superset_filter_cache",
-    "CACHE_REDIS_URL": "rediss://superset-redis.service.consul:6379/0",
+    "CACHE_REDIS_URL": f"rediss://default:{REDIS_TOKEN}@superset-redis.service.consul:6379/0",
 }
+FILTER_STATE_CACHE_CONFIG = {"CACHE_KEY_PREFIX": "superset_filter_cache", **cache_base}
+EXPLORE_FORM_DATA_CACHE_CONFIG = {
+    "CACHE_KEY_PREFIX": "superset_form_cache",
+    **cache_base,
+}
+CACHE_CONFIG = {"CACHE_KEY_PREFIX": "superset_metadata_cache", **cache_base}
+DATA_CACHE_CONFIG = {"CACHE_KEY_PREFIX": "superset_chart_cache", **cache_base}
 
 # Set this API key to enable Mapbox visualizations
 MAPBOX_API_KEY = os.environ.get("MAPBOX_API_KEY", "")
@@ -233,3 +263,26 @@ ENABLE_CHUNK_ENCODING = False
 SLACK_API_TOKEN = vault_client.secrets.kv.v2.read_secret(
     path="app-config", mount_point="secret-superset"
 )["data"]["data"]["slack_token"]
+
+
+#######################
+# Custom Jinja Macros #
+#######################
+# Temporarily add a current_user_email() macro until Superset releases that feature
+# Macro function that returns the current user's email
+def current_user_email() -> Optional[str]:
+    """
+    Get the email (if defined) associated with the current user.
+
+    :returns: The email
+    """
+
+    try:
+        return g.user.email
+    except Exception:  # noqa: BLE001
+        logging.debug("Could not get email for : %s", g.user)
+        return None
+
+
+# Adding macros to enable usage in the jinja_context for Superset
+JINJA_CONTEXT_ADDONS = {"current_user_email": current_user_email}

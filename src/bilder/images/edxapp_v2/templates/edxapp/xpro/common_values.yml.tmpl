@@ -186,6 +186,8 @@ CELERY_EVENT_QUEUE_TTL: null
 # - edx.lms.core.high
 # - edx.lms.core.high_mem
 CELERY_TIMEZONE: UTC
+CELERY_TASK_TRACK_STARTED: true
+CELERY_TASK_SEND_SENT_EVENT: true
 CERTIFICATE_TEMPLATE_LANGUAGES:
     en: English
     es: Español
@@ -370,8 +372,9 @@ LOGIN_REDIRECT_WHITELIST:  # MODIFIED
   - {{ key "edxapp/preview-domain" }}
   - {{ key "edxapp/marketing-domain" }}
 LOG_DIR: /openedx/data/var/log/edx
-LOGO_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/logo.svg
-LOGO_TRADEMARK_URL: https://raw.githubusercontent.com/mitodl/mitxpro-theme/master/lms/static/images/mit-ol-logo.svg
+LOGO_URL: https://{{ key "edxapp/lms-domain" }}/static/xpro/images/logo.svg
+LOGO_URL_PNG_FOR_EMAIL: https://{{ key "edxapp/lms-domain" }}/static/xpro/images/logo.png
+LOGO_TRADEMARK_URL: https://{{ key "edxapp/lms-domain" }}/static/xpro/images/mit-ol-logo.svg
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MARKETING_SITE_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support xpro-theme
 XPRO_BASE_URL: https://{{ key "edxapp/marketing-domain" }}/ # ADDED - to support xpro-theme

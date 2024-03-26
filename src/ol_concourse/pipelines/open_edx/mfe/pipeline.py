@@ -129,7 +129,7 @@ def mfe_job(
     )
     branding_overrides = "\n".join(
         (
-            f"npm install {component}:{override} --legacy-peer-deps"
+            f"npm install {component}:{override}"
             for component, override in (mfe.branding_overrides or {}).items()
         )
     )
@@ -163,17 +163,14 @@ def mfe_job(
                         dir=mfe_repo.name,
                         args=[
                             "-exc",
-                            # This uses the --legacy-peer-deps flag to allow for
-                            # mismatched versions of react defined in tertiary
-                            # dependencies https://stackoverflow.com/a/66620869
                             # Ensure that webpack is installed (TMM 2023-06-27)
                             textwrap.dedent(
                                 f"""\
                                 apt-get update
                                 apt-get install -q -y python3 python-is-python3 build-essential
-                                npm install --legacy-peer-deps
+                                npm install
                                 {branding_overrides}
-                                npm install webpack --legacy-peer-deps
+                                npm install webpack
                                 NODE_ENV=production npm run build
                                 """  # noqa: E501
                             ),

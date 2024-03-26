@@ -152,9 +152,7 @@ class OLFargateService(pulumi.ComponentResource):
 
         if config.cluster:
             pulumi.log.debug(
-                "using existing ECS Cluster '{}' provided in arguments".format(
-                    config.cluster.id
-                )
+                f"using existing ECS Cluster '{config.cluster.id}' provided in arguments"  # noqa: E501
             )
             self.cluster = config.cluster
         else:

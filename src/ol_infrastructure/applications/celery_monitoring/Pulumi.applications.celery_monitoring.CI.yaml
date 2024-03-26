@@ -2,9 +2,9 @@
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQGJ3TnWvhlQQrGyE2EnakrrAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMLHRA6TjX63WMbvebAgEQgDvYwi1/1THyTliMz0gtC5QFMM5n3CEegQjUf4ex2KMBS2cfl45cyxYnMRC30v/+rl+oTap57E0YNCks7A==
 config:
-  consul:address: https://consul-apps-ci.odl.mit.edu
+  consul:address: https://consul-operations-ci.odl.mit.edu
   consul:scheme: https
-  opensearch:consul_service_name: 'celery_monitoring-opensearch'
+  opensearch:consul_service_name: 'celery-monitoring-opensearch'
   environment:business_unit: operations
   environment:target_vpc: operations_vpc
   opensearch:domain_name: "celeryc"

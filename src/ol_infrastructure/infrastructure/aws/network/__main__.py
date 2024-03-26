@@ -430,7 +430,7 @@ operations_vpc_exports.update(
                 ingress=[],
                 egress=[],
                 tags=operations_vpc_config.merged_tags(
-                    {"Name": f"ol-operations-{stack_info.env_suffix}-celery-monitoring"}
+                    {"Name": f"operations-{stack_info.env_suffix}-celery-monitoring"}
                 ),
             ).id,
             "default": operations_vpc.olvpc.id.apply(default_group).id,
@@ -467,14 +467,12 @@ data_to_mitx_online_peer = OLVPCPeeringConnection(
     mitx_online_vpc,
 )
 data_to_mitx_peer = OLVPCPeeringConnection(
-    "ol-data-{0}-to-residential-mitx-{0}-vpc-peer".format(stack_info.env_suffix),
+    f"ol-data-{stack_info.env_suffix}-to-residential-mitx-{stack_info.env_suffix}-vpc-peer",
     data_vpc,
     residential_mitx_vpc,
 )
 data_to_mitx_staging_peer = OLVPCPeeringConnection(
-    "ol-data-{0}-to-residential-mitx-staging-{0}-vpc-peer".format(
-        stack_info.env_suffix
-    ),
+    f"ol-data-{stack_info.env_suffix}-to-residential-mitx-staging-{stack_info.env_suffix}-vpc-peer",
     data_vpc,
     residential_mitx_staging_vpc,
 )
@@ -489,7 +487,7 @@ data_to_xpro_peer = OLVPCPeeringConnection(
     xpro_vpc,
 )
 operations_to_applications_peer = OLVPCPeeringConnection(
-    "ol-operations-{0}-to-applications-{0}-vpc-peer".format(stack_info.env_suffix),
+    f"ol-operations-{stack_info.env_suffix}-to-applications-{stack_info.env_suffix}-vpc-peer",
     operations_vpc,
     applications_vpc,
 )
@@ -499,19 +497,17 @@ operations_to_data_peer = OLVPCPeeringConnection(
     data_vpc,
 )
 operations_to_mitx_online_peer = OLVPCPeeringConnection(
-    "ol-operations-{0}-to-mitx-online-{0}-vpc-peer".format(stack_info.env_suffix),
+    f"ol-operations-{stack_info.env_suffix}-to-mitx-online-{stack_info.env_suffix}-vpc-peer",
     operations_vpc,
     mitx_online_vpc,
 )
 operations_to_mitx_peer = OLVPCPeeringConnection(
-    "ol-operations-{0}-to-residential-mitx-{0}-vpc-peer".format(stack_info.env_suffix),
+    f"ol-operations-{stack_info.env_suffix}-to-residential-mitx-{stack_info.env_suffix}-vpc-peer",
     operations_vpc,
     residential_mitx_vpc,
 )
 operations_to_mitx_staging_peer = OLVPCPeeringConnection(
-    "ol-operations-{0}-to-residential-mitx-staging-{0}-vpc-peer".format(
-        stack_info.env_suffix
-    ),
+    f"ol-operations-{stack_info.env_suffix}-to-residential-mitx-staging-{stack_info.env_suffix}-vpc-peer",
     operations_vpc,
     residential_mitx_staging_vpc,
 )

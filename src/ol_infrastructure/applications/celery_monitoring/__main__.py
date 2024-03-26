@@ -1,9 +1,9 @@
 import base64
 import json
-import re
 import textwrap
 from pathlib import Path
 
+import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
 from bridge.secrets.sops import read_yaml_secrets
@@ -48,16 +48,24 @@ def build_broker_subscriptions(
 ) -> str:
     """Create a dict of Redis cache configs for each edxapp stack"""
     broker_subs = []
+
+    deployment_name_map = {
+        "mitx": "mitxlive",
+        "mitxonline": "mitxonline",
+        "mitx-staging": "mitxstaging",
+        "xpro": "xpro",
+    }
+
     for edx_output in edx_outputs:
         broker_subs.append(  # noqa: PERF401
             {
-                "broker": f"rediss://default:{edx_output['redis_token']}@{edx_output['redis']}",
+                "broker": f"rediss://default:{edx_output['redis_token']}@{edx_output['redis']}:6379/1?ssl_cert_reqs=required",
                 "broker_management_url": None,
-                "exchange": None,
-                "queue": "1",
-                "routing_key": None,
+                "exchange": "celeryev",
+                "queue": "leek.fanout",
+                "routing_key": "#",
                 "org_name": "MIT Open Learning Engineering",
-                "app_name": re.sub(r"[^a-zA-Z]", "", edx_output["deployment"]),
+                "app_name": deployment_name_map[edx_output["deployment"]],
                 "app_env": stack_info.env_suffix,
             }
         )
@@ -101,7 +109,20 @@ aws_config = AWSBase(tags={"OU": "operations", "Environment": celery_monitoring_
 consul_security_groups = consul_stack.require_output("security_groups")
 
 aws_account = get_caller_identity()
+
+
 celery_monitoring_domain = celery_monitoring_config.get("domain")
+
+consul.Keys(
+    "celery-monitoring-consul-template-data",
+    keys=[
+        consul.KeysKeyArgs(
+            path="celery-monitoring/domain",
+            value=celery_monitoring_domain,
+        ),
+    ],
+    opts=consul_provider,
+)
 
 celery_monitoring_instance_role = iam.Role(
     "celery-monitoring-instance-role",
@@ -205,7 +226,7 @@ celery_monitoring_tg_config = OLTargetGroupConfig(
     vpc_id=operations_vpc["id"],
     health_check_interval=60,
     health_check_matcher="200-399",
-    health_check_path="/health",
+    health_check_path="/api/v1/manage/hc",
     # give extra time for celery_monitoring to start up
     health_check_unhealthy_threshold=3,
     tags=aws_config.merged_tags(
@@ -311,7 +332,7 @@ celery_monitoring_web_auto_scale_config = celery_monitoring_config.get_object(
     "max": 2,
 }
 celery_monitoring_web_asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"celery-monitoring-web-{celery_monitoring_env}",
+    asg_name=f"leek-web-{celery_monitoring_env}",
     aws_config=aws_config,
     health_check_grace_period=120,
     instance_refresh_warmup=120,

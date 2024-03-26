@@ -77,9 +77,7 @@ class AWSBase(BaseModel):
     @classmethod
     def enforce_tags(cls, tags: dict[str, str]) -> dict[str, str]:
         if not REQUIRED_TAGS.issubset(tags.keys()):
-            msg = "Not all required tags have been specified. Missing tags: {}".format(
-                REQUIRED_TAGS.difference(tags.keys())
-            )
+            msg = f"Not all required tags have been specified. Missing tags: {REQUIRED_TAGS.difference(tags.keys())}"  # noqa: E501
             raise ValueError(msg)
         try:
             BusinessUnit(tags["OU"])
