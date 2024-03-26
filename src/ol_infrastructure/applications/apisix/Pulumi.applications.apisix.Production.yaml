@@ -1,0 +1,16 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgEildebZ6qqrRn2MeT1S7YzAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMd/Puwhq4jU82RmSSAgEQgDvFS740Urvxgv13XbvObOmWBwoAKeoRTM8uTm6suGrHFkUX1DFx79boRcuILUFHwZ6qUROVoH1JeVNoag==
+config:
+  apisix:api_gateway_domain_name: "api-mitopen.odl.mit.edu"
+  apisix:api7_access_token:
+    secure: v1:40v929JwUq3bJ82f:Nv/cqwtCnKkYmkO06BuFPGmfxvazJ0HanhuPxAGkUzepJfB+M3teKAM82wQUwrB65NO8JASDMmVWKErxpm9+gMf6XImE/EjPNUKrB7jw21z6+PmiqmSjRrE63n1HoFl2vBrXq3qXc+3alkq9Eq5zp3KYHedpyOK/J3sfGRqraffMyY6sM/sIw08xc+Vps5kuPyrPp7ktI71rXv/AegiFl/DLccqJP6/P+uW1/Ec/7WjGux4VfrpT+2lLfmxBbADyySkAU7FLZfyR3VKDTbeBdKeFMh+1EvKbWDAOaY7rcga7g1tCMy6zLItmuA==
+  apisix:auto_scale:
+    desired: 2
+    max: 3
+    min: 2
+  apisix:target_vpc: applications_vpc
+  aws:region: us-east-1
+  consul:address: https://consul-apps-production.odl.mit.edu
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
