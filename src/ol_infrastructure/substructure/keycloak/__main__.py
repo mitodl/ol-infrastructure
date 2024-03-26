@@ -914,7 +914,7 @@ if stack_info.env_suffix == "qa":
             "propagation-user": "true",
             "enabled": "true",
             "changedSyncPeriod": "-1",
-            "endpoint": "https://mit-open-rc.odl.mit.edu/scim/v2/",
+            "endpoint": "https://mitopen-rc.odl.mit.edu/scim/v2/",
             "propagation-group": "true",
             "content-type": "application/scim+json",
             "group-patchOp": "false",
