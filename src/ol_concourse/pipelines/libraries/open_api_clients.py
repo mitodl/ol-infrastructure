@@ -15,7 +15,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resources import git_repo, ssh_git_repo
+from ol_concourse.lib.resources import git_repo, ssh_git_repo, npm_package
 
 
 def _read_script(script_name: str) -> str:
@@ -60,7 +60,7 @@ node_image = Resource(
 
 npm_package = Resource(
     name=Identifier("npm-package"),
-    type="npm",
+    type="npm-package",
     source={
         "package": "open-api-clients",
         "scope": "mitodl",
