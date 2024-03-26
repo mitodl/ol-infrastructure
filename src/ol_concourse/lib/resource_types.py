@@ -1,12 +1,14 @@
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.models.pipeline import Identifier, RegistryImage, ResourceType
 
+
 def npm_package_resource() -> ResourceType:
     return ResourceType(
         name=Identifier("npm_package"),
         type=REGISTRY_IMAGE,
         source=RegistryImage(repository="timotto/concourse-npm-resource"),
     )
+
 
 def github_issues_resource() -> ResourceType:
     return ResourceType(
