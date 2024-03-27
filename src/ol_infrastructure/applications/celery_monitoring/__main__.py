@@ -298,6 +298,7 @@ celery_monitoring_web_lt_config = OLLaunchTemplateConfig(
                             APPLICATION=celery_monitoring
                             SERVICE=celery-monitoring
                             VECTOR_CONFIG_DIR=/etc/vector/
+                            VECTOR_STRICT_ENV_VARS=false
                             AWS_REGION={aws_config.region}
                             GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
                             GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
