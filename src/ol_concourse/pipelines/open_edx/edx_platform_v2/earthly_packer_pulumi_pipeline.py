@@ -152,7 +152,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                             platform=Platform.linux,
                             image_resource=AnonymousResource(
                                 type="registry-image",
-                                source={"repository": "mitodl/dcind", "tag": "latest"},
+                                source={"repository": "mitodl/dcind", "tag": "0.7.22"},
                             ),
                             # Use some cleverness with path to mount resources within
                             # the earthly git resource so code is where the Earthfile
