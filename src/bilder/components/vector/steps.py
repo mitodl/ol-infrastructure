@@ -138,7 +138,7 @@ def configure_vector(vector_config: VectorConfig):
     # this entirely. Vector now offers unit tests so perhaps we can use that.
     server.shell(
         name="Run vector validate",
-        commands=["/usr/bin/vector validate --no-environment --strict-env-vars=false"],
+        commands=["/usr/bin/vector validate --no-environment"],
         _env={
             "VECTOR_CONFIG_DIR": "/etc/vector",
             "AWS_REGION": "us-east-1",
@@ -151,6 +151,7 @@ def configure_vector(vector_config: VectorConfig):
             "HOSTNAME": "placeholder",
             "HEROKU_PROXY_PASSWORD": "placeholder",  # pragma: allowlist secret
             "HEROKU_PROXY_USERNAME": "placeholder",
+            "VECTOR_STRICT_ENV_VARS": "false",
         },
     )
 

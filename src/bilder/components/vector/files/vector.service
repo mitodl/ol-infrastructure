@@ -15,9 +15,9 @@ After=network-online.target
 [Service]
 User=vector
 Group=vector
-ExecStartPre=/usr/bin/vector validate ---strict-env-vars=false
-ExecStart=/usr/bin/vector --strict-env-vars=false
-ExecReload=/usr/bin/vector validate --strict-env-vars=false
+ExecStartPre=/usr/bin/vector validate
+ExecStart=/usr/bin/vector
+ExecReload=/usr/bin/vector validate
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 AmbientCapabilities=CAP_NET_BIND_SERVICE
