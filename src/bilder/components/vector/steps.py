@@ -138,7 +138,7 @@ def configure_vector(vector_config: VectorConfig):
     # this entirely. Vector now offers unit tests so perhaps we can use that.
     server.shell(
         name="Run vector validate",
-        commands=["/usr/bin/vector validate --no-environment"],
+        commands=["/usr/bin/vector validate --no-environment --strict-env-vars"],
         _env={
             "VECTOR_CONFIG_DIR": "/etc/vector",
             "AWS_REGION": "us-east-1",
