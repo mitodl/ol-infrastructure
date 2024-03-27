@@ -53,6 +53,14 @@ application_storage_bucket = s3.Bucket(
     tags=aws_config.tags,
 )
 
+application_storage_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-mitopen-app-storage-bucket-public-access",
+    bucket=application_storage_bucket.id,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+)
+
 course_data_bucket_name = f"ol-mitopen-course-data-{app_env_suffix}"
 course_data_bucket = s3.Bucket(
     f"ol_mitopen_course_data_bucket_{stack_info.env_suffix}",
