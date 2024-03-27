@@ -77,7 +77,7 @@ mit_open_api_clients_repository = ssh_git_repo(
     name=Identifier("mit-open-api-clients"),
     uri="git@github.com/mitodl/open-api-clients.git",
     branch="main",
-    private_key="((git-private-key))",
+    private_key="((github.odlbot_openapiclients_ssh))",
 )
 
 generate_clients_job = Job(
