@@ -508,7 +508,7 @@ if stack_info.env_suffix.lower() != "ci":
             lambda data: "postgres://{}:{}@ocw-studio-db-applications-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/ocw_studio".format(
                 data["username"], data["password"], stack_info.env_suffix
             )
-        ),
+        )
     )
 
 heroku_app_id = heroku_config.require("app_id")
