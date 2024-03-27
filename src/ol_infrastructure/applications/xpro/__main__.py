@@ -269,6 +269,7 @@ heroku_vars = {
     "SHOW_UNREDEEMED_COUPON_ON_DASHBOARD": "True",
     "SITE_NAME": "MIT xPRO",
     "USE_X_FORWARDED_HOST": "True",
+    "ZENDESK_HELP_WIDGET_KEY": "4bde85d7-9202-4a71-9a35-d9295e7a5b3d",
 }
 
 # Combine var source above with values explictly defined in pulumi configuration file
