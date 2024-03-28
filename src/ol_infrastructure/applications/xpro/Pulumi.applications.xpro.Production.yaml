@@ -46,7 +46,7 @@ config:
     #WAGTAIL_CACHE_MAX_ENTRIES: 500
     #YOUTUBE_FETCH_SCHEDULE_SECONDS: 7200
     ZENDESK_DOMAIN_VERIFICATION_TAG_VALUE: "o0itxdfh369m1bw4cuz9"
-    ZENDESK_HELP_WIDGET_ENABLED: "False"
+    ZENDESK_HELP_WIDGET_ENABLED: "True"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   xpro:db_password:
