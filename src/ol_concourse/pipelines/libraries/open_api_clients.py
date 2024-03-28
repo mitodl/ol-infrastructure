@@ -15,7 +15,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resources import git_repo, ssh_git_repo
+from ol_concourse.lib.resources import git_repo, npm_package, ssh_git_repo
 
 
 def _read_script(script_name: str) -> str:
@@ -58,6 +58,15 @@ node_image = Resource(
     },
 )
 
+openapi_clients_npm_package = Resource(
+    name=Identifier("npm-package"),
+    type="npm-package",
+    source={
+        "package": "open-api-clients",
+        "scope": "mitodl",
+    },
+)
+
 mit_open_repository = git_repo(
     name=Identifier("mit-open"),
     uri="https://github.com/mitodl/mit-open",
@@ -68,7 +77,7 @@ mit_open_api_clients_repository = ssh_git_repo(
     name=Identifier("mit-open-api-clients"),
     uri="git@github.com/mitodl/open-api-clients.git",
     branch="main",
-    private_key="((git-private-key))",
+    private_key="((github.odlbot_openapiclients_ssh))",
 )
 
 generate_clients_job = Job(
@@ -204,6 +213,10 @@ publish_job = Job(
                 ),
             ),
         ),
+        # Publish to NPM
+        PutStep(
+            put=openapi_clients_npm_package.name,
+        ),
     ],
 )
 
@@ -215,6 +228,7 @@ build_pipeline = Pipeline(
         node_image,
         mit_open_repository,
         mit_open_api_clients_repository,
+        npm_package,
     ],
     jobs=[
         generate_clients_job,
