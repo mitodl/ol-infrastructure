@@ -7,20 +7,20 @@ config:
     desired: 2
     max: 3
     min: 1
-  ovs:default_domain: odl-video-service-ci.odl.mit.edu
+  ovs:default_domain: video-ci.odl.mit.edu
   ovs:domains:
-  - odl-video-service-ci.odl.mit.edu
-  ovs:edx_base_url: https://courses-rc.xpro/mit.edu
+  - video-ci.odl.mit.edu
+  ovs:edx_base_url: https://courses-ci.xpro.mit.edu
   ovs:log_level: INFO
   ovs:rds_password:
     secure: v1:CFR8W+XpCttoYTa/:IRecvFvHJMZmf4hzMvWrJ00puDMFht2ArQSk/FDCZGnc7rQM42e7HtJwEeN1YI/W
   ovs:route53_managed_domains:
-  - odl-video-service-ci.odl.mit.edu
-  ovs:s3_bucket_name: odl-video-service-rc
-  ovs:s3_subtitle_bucket_name: odl-video-service-subtitles-rc
-  ovs:s3_thumbnail_bucket_name: odl-video-service-thumbnail-rc
-  ovs:s3_transcode_bucket_name: odl-video-service-transcode-rc
-  ovs:s3_watch_bucket_name: odl-video-service-watch-rc
+  - video-ci.odl.mit.edu
+  ovs:s3_bucket_name: odl-video-service-ci
+  ovs:s3_subtitle_bucket_name: odl-video-service-subtitles-ci
+  ovs:s3_thumbnail_bucket_name: odl-video-service-thumbnail-ci
+  ovs:s3_transcode_bucket_name: odl-video-service-transcode-ci
+  ovs:s3_watch_bucket_name: odl-video-service-watch-ci
   ovs:target_vpc: applications_vpc
   ovs:use_shibboleth: "False"
   redis:max_connections: "30"
