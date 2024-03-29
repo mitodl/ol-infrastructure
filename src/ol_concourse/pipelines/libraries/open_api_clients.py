@@ -68,7 +68,7 @@ mit_open_api_clients_repository = ssh_git_repo(
     name=Identifier("mit-open-api-clients"),
     uri="git@github.com/mitodl/open-api-clients.git",
     branch="main",
-    private_key="((git-private-key))",
+    private_key="((odlbot_private_ssh_key))",
 )
 
 generate_clients_job = Job(
@@ -196,7 +196,7 @@ publish_job = Job(
             config=TaskConfig(
                 platform="linux",
                 inputs=[Input(name=mit_open_api_clients_repository.name)],
-                params={"NPM_TOKEN": "((npm.auth_token))"},
+                params={"NPM_TOKEN": "((npmjs_token))"},
                 run=Command(
                     path="/bin/bash",
                     dir="open-api-clients/src/typescript/mit-open-api-axios",
