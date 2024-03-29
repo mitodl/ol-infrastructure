@@ -15,7 +15,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resources import git_repo, npm_package, ssh_git_repo
+from ol_concourse.lib.resources import git_repo, ssh_git_repo
 
 
 def _read_script(script_name: str) -> str:
