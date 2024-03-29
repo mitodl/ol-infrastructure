@@ -98,7 +98,7 @@ generate_clients_job = Job(
                 run=Command(
                     path="/bin/bash",
                     args=[
-                        "((mit_open_api_clients_repository.name))/scripts/generate-inner.sh"
+                        f"{mit_open_api_clients_repository.name}/scripts/generate-inner.sh"
                     ],
                 ),
             ),
@@ -118,7 +118,7 @@ generate_clients_job = Job(
                     args=[
                         "-exc",
                         (
-                            "{mit_open_api_clients_repository.name}/scripts/open-api-clients-commit-changes.sh"
+                            f"{mit_open_api_clients_repository.name}/scripts/open-api-clients-commit-changes.sh"
                         ),
                     ],
                 ),
@@ -157,7 +157,7 @@ create_release_job = Job(
                     args=[
                         "-exc",
                         (
-                            "{mit_open_api_clients_repository.name}/scripts/open-api-clients-bumpver.sh"
+                            f"{mit_open_api_clients_repository.name}/scripts/open-api-clients-bumpver.sh"
                         ),
                     ],
                 ),
@@ -178,7 +178,7 @@ create_release_job = Job(
                     args=[
                         "-exc",
                         (
-                            "{mit_open_api_clients_repository.name}/scripts/open-api-clients-tag-release.sh"
+                            f"{mit_open_api_clients_repository.name}/scripts/open-api-clients-tag-release.sh"
                         ),
                     ],
                 ),
