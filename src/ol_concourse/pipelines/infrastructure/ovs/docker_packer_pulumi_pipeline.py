@@ -54,15 +54,14 @@ def build_ovs_pipeline() -> Pipeline:
     ovs_packer_code = git_repo(
         name=Identifier("ol-infrastructure-packer-build"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="misc/issue_1372",
-        # branch="main",
+        ranch="main",
         paths=["src/bilder/images/odl_video_service", *PACKER_WATCHED_PATHS],
     )
 
     ovs_pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi-build"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="misc/issue_1372",
+        branch="main",
         paths=[
             *PULUMI_WATCHED_PATHS,
             PULUMI_CODE_PATH.joinpath("applications/odl_video_service/"),
