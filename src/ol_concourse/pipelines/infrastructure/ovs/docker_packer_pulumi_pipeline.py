@@ -20,8 +20,15 @@ from ol_concourse.pipelines.constants import (
 
 
 def build_ovs_pipeline() -> Pipeline:
+    ovs_m_branch = "master"
     ovs_rc_branch = "release-candidate"
     ovs_r_branch = "release"
+
+    ovs_m_repo = git_repo(
+        Identifier("odl-video-service-master"),
+        uri="https://github.com/mitodl/odl-video-service",
+        branch=ovs_m_branch,
+    )
 
     ovs_rc_repo = git_repo(
         Identifier("odl-video-service-rc"),
@@ -62,8 +69,74 @@ def build_ovs_pipeline() -> Pipeline:
         ],
     )
 
-    docker_build_job = Job(
-        name="build-ovs-image",
+    m_docker_build_job = Job(
+        name="build-ovs-image-from-master",
+        build_log_retention={"builds": 10},
+        plan=[
+            GetStep(get=ovs_m_repo.name, trigger=True),
+            container_build_task(
+                inputs=[Input(name=ovs_m_repo.name)],
+                build_parameters={
+                    "CONTEXT": ovs_m_repo.name,
+                    "TARGET": "production",
+                },
+                build_args=[],
+            ),
+            PutStep(
+                put=ovs_registry_image.name,
+                params={
+                    "image": "image/image.tar",
+                    "additional_tags": f"./{ovs_m_repo.name}/.git/describe_ref",
+                },
+            ),
+        ],
+    )
+
+    m_container_fragment = PipelineFragment(
+        resources=[ovs_m_repo, ovs_registry_image],
+        jobs=[m_docker_build_job],
+    )
+
+    m_ami_fragment = packer_jobs(
+        dependencies=[
+            GetStep(
+                get=ovs_registry_image.name,
+                trigger=True,
+                passed=[m_docker_build_job.name],
+            ),
+            GetStep(get=ovs_m_repo.name, trigger=False),
+        ],
+        image_code=ovs_packer_code,
+        packer_template_path=(
+            "src/bilder/images/odl_video_service/odl_video_service.pkr.hcl"
+        ),
+        env_vars_from_files={"OVS_VERSION": f"{ovs_m_repo.name}/.git/describe_ref"},
+        job_name_suffix="ovs-master",
+    )
+
+    m_pulumi_fragment = pulumi_jobs_chain(
+        ovs_pulumi_code,
+        stack_names=[f"applications.odl_video_service.{stage}" for stage in ["CI"]],
+        project_name="ol-infrastrcuture-ovs-server",
+        project_source_path=PULUMI_CODE_PATH.joinpath(
+            "applications/odl_video_service/"
+        ),
+        dependencies=[
+            GetStep(
+                get=m_ami_fragment.resources[-1].name,
+                trigger=True,
+                passed=[m_ami_fragment.jobs[-1].name],
+            ),
+        ],
+        enable_github_issue_resource=False,
+    )
+
+    m_combined_fragments = PipelineFragment.combine_fragments(
+        m_container_fragment, m_ami_fragment, m_pulumi_fragment
+    )
+
+    rc_docker_build_job = Job(
+        name="build-ovs-image-from-rc",
         build_log_retention={"builds": 10},
         plan=[
             GetStep(get=ovs_rc_repo.name, trigger=True),
@@ -85,17 +158,17 @@ def build_ovs_pipeline() -> Pipeline:
         ],
     )
 
-    container_fragment = PipelineFragment(
+    rc_container_fragment = PipelineFragment(
         resources=[ovs_rc_repo, ovs_registry_image],
-        jobs=[docker_build_job],
+        jobs=[rc_docker_build_job],
     )
 
-    ami_fragment = packer_jobs(
+    rc_ami_fragment = packer_jobs(
         dependencies=[
             GetStep(
                 get=ovs_registry_image.name,
                 trigger=True,
-                passed=[docker_build_job.name],
+                passed=[rc_docker_build_job.name],
             ),
             GetStep(get=ovs_rc_repo.name, trigger=False),
         ],
@@ -104,10 +177,10 @@ def build_ovs_pipeline() -> Pipeline:
             "src/bilder/images/odl_video_service/odl_video_service.pkr.hcl"
         ),
         env_vars_from_files={"OVS_VERSION": f"{ovs_rc_repo.name}/.git/describe_ref"},
-        job_name_suffix="ovs",
+        job_name_suffix="ovs-rc",
     )
 
-    pulumi_fragment = pulumi_jobs_chain(
+    rc_pulumi_fragment = pulumi_jobs_chain(
         ovs_pulumi_code,
         stack_names=[
             f"applications.odl_video_service.{stage}" for stage in ["QA", "Production"]
@@ -118,9 +191,9 @@ def build_ovs_pipeline() -> Pipeline:
         ),
         dependencies=[
             GetStep(
-                get=ami_fragment.resources[-1].name,
+                get=rc_ami_fragment.resources[-1].name,
                 trigger=True,
-                passed=[ami_fragment.jobs[-1].name],
+                passed=[rc_ami_fragment.jobs[-1].name],
             ),
         ],
         custom_dependencies={
@@ -128,7 +201,7 @@ def build_ovs_pipeline() -> Pipeline:
                 GetStep(
                     get=ovs_rc_repo.name,
                     trigger=False,
-                    passed=[ami_fragment.jobs[-1].name],
+                    passed=[rc_ami_fragment.jobs[-1].name],
                 )
             ],
             # Need to ensure the resource below is included when returning the pipeline
@@ -142,8 +215,12 @@ def build_ovs_pipeline() -> Pipeline:
         },
     )
 
+    rc_combined_fragments = PipelineFragment.combine_fragments(
+        rc_container_fragment, rc_ami_fragment, rc_pulumi_fragment
+    )
+
     combined_fragments = PipelineFragment.combine_fragments(
-        container_fragment, ami_fragment, pulumi_fragment
+        m_combined_fragments, rc_combined_fragments
     )
     return Pipeline(
         resource_types=combined_fragments.resource_types,
@@ -152,6 +229,7 @@ def build_ovs_pipeline() -> Pipeline:
             ovs_packer_code,
             ovs_pulumi_code,
             ovs_r_repo,
+            # ovs_m_repo,
         ],
         jobs=combined_fragments.jobs,
     )
