@@ -259,9 +259,8 @@ def slack_notification(name: Identifier, url: str) -> Resource:
     )
 
 
-def npm_package(package: Identifier, scope: Identifier) -> Resource:
+def npm_package(package: Identifier, npmjs_token: str, scope: Identifier) -> Resource:
     return Resource(
-        name=package,
         type="npm-package",
         icon="language-javascript",
         source={
@@ -269,7 +268,7 @@ def npm_package(package: Identifier, scope: Identifier) -> Resource:
             "scope": scope,
             "registry": {
                 "uri": "https://registry.npmjs.org",
-                "token": "{{npmjs.concourse_token}}",
+                "token": npmjs_token,
             },
         },
     )

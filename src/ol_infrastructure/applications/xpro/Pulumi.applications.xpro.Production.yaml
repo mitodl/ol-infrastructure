@@ -6,7 +6,7 @@ config:
     secure: v1:sflDJ1/1qixNMWt8:zni8/Aoc3kXrp6nBAU2oTyCcCcHrQl/yLYswzg49KlQlrg07oB4FoV/4Fr6PsCcTZ39ttw==
   heroku:user: "mitx-devops"
   heroku_app:vars:
-    CSRF_TRUSTED_ORIGINS: "xpro.mit.edu,xpro-web.odl.mit.edu"
+    CSRF_TRUSTED_ORIGINS: "https://xpro.mit.edu,https://xpro-web.odl.mit.edu"
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://secureacceptance.cybersource.com/pay"
     CYBERSOURCE_WSDL_URL: "https://ics2wsa.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.154.wsdl"
     DRIVE_WEBHOOK_EXPIRATION_MINUTES: 1440
@@ -46,7 +46,7 @@ config:
     #WAGTAIL_CACHE_MAX_ENTRIES: 500
     #YOUTUBE_FETCH_SCHEDULE_SECONDS: 7200
     ZENDESK_DOMAIN_VERIFICATION_TAG_VALUE: "o0itxdfh369m1bw4cuz9"
-    ZENDESK_HELP_WIDGET_ENABLED: "False"
+    ZENDESK_HELP_WIDGET_ENABLED: "True"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   xpro:db_password:

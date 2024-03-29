@@ -152,7 +152,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                             platform=Platform.linux,
                             image_resource=AnonymousResource(
                                 type="registry-image",
-                                source={"repository": "mitodl/dcind", "tag": "latest"},
+                                source={"repository": "mitodl/dcind", "tag": "0.7.22"},
                             ),
                             # Use some cleverness with path to mount resources within
                             # the earthly git resource so code is where the Earthfile
@@ -169,19 +169,16 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                                     "-c",
                                     f"""source /docker-lib.sh;
                                     start_docker;
-                                    echo "{release_name}-{deployment_name}-$(cat ol-infrastructure-docker/dockerfiles/openedx-edxapp/edx_platform/.git/short_ref)" > artifacts/tag.txt;
+                                    echo "{release_name}-{deployment_name}-$(cat {edx_platform_git_resource.name}/.git/short_ref)" > artifacts/tag.txt;
                                     cd {earthly_git_resource.name}/dockerfiles/openedx-edxapp;
                                     RELEASE_NAME={release_name};
                                     DEPLOYMENT_NAME={deployment_name};
                                     EDX_PLATFORM_DIR="../../../{edx_platform_git_resource.name}"
                                     THEME_DIR="../../../{theme_git_resource.name}"
-                                    earthly +docker-image --DEPLOYMENT_NAME="$DEPLOYMENT_NAME" --RELEASE_NAME="$RELEASE_NAME" --EDX_PLATFORM_DIR="$EDX_PLATFORM_DIR" --THEME_DIR="$THEME_DIR";
+                                    earthly +all --DEPLOYMENT_NAME="$DEPLOYMENT_NAME" --RELEASE_NAME="$RELEASE_NAME" --EDX_PLATFORM_DIR="$EDX_PLATFORM_DIR" --THEME_DIR="$THEME_DIR";
                                     DIGEST=$(docker inspect --format '{{{{.Id}}}}' mitodl/edxapp-$DEPLOYMENT_NAME-$RELEASE_NAME | cut -d ":" -f2);
                                     echo "Saving docker image to tar file in the artifacts directory";
                                     docker save -o ../../../artifacts/image.tar $DIGEST;
-                                    cat ~/.earthly/config.yml
-                                    earthly +build-static-assets-nonprod --DEPLOYMENT_NAME="$DEPLOYMENT_NAME" --RELEASE_NAME="$RELEASE_NAME" --EDX_PLATFORM_DIR="$EDX_PLATFORM_DIR" --THEME_DIR="$THEME_DIR";
-                                    earthly +build-static-assets-production --DEPLOYMENT_NAME="$DEPLOYMENT_NAME" --RELEASE_NAME="$RELEASE_NAME" --EDX_PLATFORM_DIR="$EDX_PLATFORM_DIR" --THEME_DIR="$THEME_DIR";
                                     echo "Copying staticfiles archives to artifacts directory";
                                     mv static*.tar.gz ../../../artifacts;""",  # noqa: E501
                                 ],

@@ -1,3 +1,4 @@
+# ruff: noqa: E501, S604
 import json
 import os
 from io import StringIO
@@ -5,28 +6,22 @@ from pathlib import Path
 
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import (
-    CONSUL_TEMPLATE_VERSION,
+    APISIX_CLOUD_CLI_VERSION,
+    APISIX_VERSION,
     CONSUL_VERSION,
     TRAEFIK_VERSION,
     VAULT_VERSION,
 )
 from bridge.secrets.sops import set_env_secrets
-from pyinfra.context import host
+from pyinfra import host
 from pyinfra.operations import files, server
 
-from bilder.components.baseline.steps import service_configuration_watches
 from bilder.components.hashicorp.consul.models import (
     Consul,
     ConsulAddresses,
     ConsulConfig,
 )
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
-from bilder.components.hashicorp.consul_template.models import (
-    ConsulTemplate,
-    ConsulTemplateConfig,
-    ConsulTemplateTemplate,
-    ConsulTemplateVaultConfig,
-)
 from bilder.components.hashicorp.steps import (
     configure_hashicorp_product,
     install_hashicorp_products,
@@ -47,9 +42,6 @@ from bilder.components.hashicorp.vault.models import (
     VaultTemplate,
 )
 from bilder.components.hashicorp.vault.steps import vault_template_permissions
-from bilder.components.traefik.models import traefik_static
-from bilder.components.traefik.models.component import TraefikConfig
-from bilder.components.traefik.steps import configure_traefik
 from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import (
     configure_vector,
@@ -58,28 +50,18 @@ from bilder.components.vector.steps import (
 )
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.ami_helpers import build_tags_document
-from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
-from bilder.lib.template_helpers import (
-    CONSUL_TEMPLATE_DIRECTORY,
-    place_consul_template_file,
-)
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
-    "consul_template": os.environ.get(
-        "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION
-    ),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
     "traefik": os.environ.get("TRAEFIK_VERSION", TRAEFIK_VERSION),
+    "apisix": os.environ.get("APISIX_VERSION", APISIX_VERSION),
+    "apisix-cloud-cli": os.environ.get(
+        "APISIX_CLOUD_CLI_VERSION", APISIX_CLOUD_CLI_VERSION
+    ),
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
-
-DOCKER_REPO_NAME = os.environ.get("DOCKER_REPO_NAME", "kodhive/leek")
-DOCKER_IMAGE_DIGEST = os.environ.get("DOCKER_IMAGE_DIGEST", "latest")
-
-watched_files: list[Path] = []
-consul_templates: list[ConsulTemplateTemplate] = []
 
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
@@ -87,6 +69,7 @@ consul_configuration = {
     Path("00-default.json"): ConsulConfig(
         addresses=ConsulAddresses(dns="127.0.0.1", http="127.0.0.1"),
         advertise_addr='{{ GetInterfaceIP "ens5" }}',
+        services=[],
     )
 }
 vector_config = VectorConfig(is_proxy=False)
@@ -107,95 +90,79 @@ vault_config = VaultAgentConfig(
         method=VaultAutoAuthMethod(
             type="aws",
             mount_path="auth/aws",
-            config=VaultAutoAuthAWS(role="celery_monitoring"),
+            config=VaultAutoAuthAWS(role="apisix-gateway"),
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),
     template=[
+        # Puts the token needed for talking to api7 where the cloud-cli service expects it
         VaultTemplate(
-            contents=(
-                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-                "{{ printf .Data.key }}{{ end }}"
-            ),
-            destination=Path("/etc/traefik/odl_wildcard.key"),
-        ),
-        VaultTemplate(
-            contents=(
-                '{{ with secret "secret-operations/global/odl_wildcard_cert" }}'
-                "{{ printf .Data.value }}{{ end }}"
-            ),
-            destination=Path("/etc/traefik/odl_wildcard.cert"),
-        ),
+            contents='{{ with secret "secret-operations/apisix" }}API7_ACCESS_TOKEN={{ .Data.api7_access_token }}{{ end }}\n'
+            f'APISIX_VERSION={VERSIONS["apisix"]}',
+            destination=Path("/etc/default/cloud-cli"),
+        )
     ],
 )
-# Configure consul template to add Leek env vars
-
-# Place consul templates, setup consul-template
-dot_env_template = place_consul_template_file(
-    name=".env",
-    repo_path=FILES_DIRECTORY,
-    template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
-    destination_path=DOCKER_COMPOSE_DIRECTORY,
-)
-consul_templates.append(dot_env_template)
-watched_files.append(dot_env_template.destination)
-
-traefik_dot_env_template = place_consul_template_file(
-    name=".env_traefik_forward_auth",
-    repo_path=FILES_DIRECTORY,
-    template_path=Path(CONSUL_TEMPLATE_DIRECTORY),
-    destination_path=DOCKER_COMPOSE_DIRECTORY,
-)
-consul_templates.append(traefik_dot_env_template)
-watched_files.append(traefik_dot_env_template.destination)
-
 vault = Vault(
     version=VERSIONS["vault"],
     configuration={Path("vault.json"): vault_config},
 )
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
-consul_template = ConsulTemplate(
-    version=VERSIONS["consul_template"],
-    configuration={
-        Path("00-default.json"): ConsulTemplateConfig(
-            vault=ConsulTemplateVaultConfig(),
-            template=consul_templates,
-        )
-    },
-)
 
-hashicorp_products = [vault, consul, consul_template]
+hashicorp_products = [vault, consul]
 install_hashicorp_products(hashicorp_products)
 
-# Configure and install traefik
-traefik_static_config = traefik_static.TraefikStaticConfig(
-    log=traefik_static.Log(
-        level="DEBUG", format="json", filePath="/var/log/traefik_log"
-    ),
-    providers=traefik_static.Providers(docker=traefik_static.Docker()),
-    entry_points={
-        "https": traefik_static.EntryPoints(address=":443"),
-    },
+server.user(
+    name="Create apisix user.",
+    user="apisix",
+    groups=["docker"],
+    home="/home/apisix",
+    create_home=True,
+    system=False,
+    ensure_home=True,
+    shell="/bin/bash",
+    uid="1001",
 )
-traefik_config = TraefikConfig(
-    static_configuration=traefik_static_config, version=VERSIONS["traefik"]
+
+# Download and install cloud-cli
+files.download(
+    name="Download the apisix cloud-cli binary",
+    src=f"https://github.com/api7/cloud-cli/releases/download/{VERSIONS['apisix-cloud-cli']}/cloud-cli-linux-amd64-{VERSIONS['apisix-cloud-cli']}.gz",
+    dest=f"/opt/cloud-cli-linux-amd64-{VERSIONS['apisix-cloud-cli']}.gz",
+    mode="0644",
 )
-traefik_conf_directory = traefik_config.configuration_directory
-configure_traefik(traefik_config)
+
+server.shell(
+    name="Install apisix cloud-cli binary",
+    commands=[
+        f"/usr/bin/gunzip -c /opt/cloud-cli-linux-amd64-{VERSIONS['apisix-cloud-cli']}.gz > /usr/local/bin/cloud-cli",
+        "chmod a+x /usr/local/bin/cloud-cli",
+    ],
+)
 
 files.put(
-    name="Place the leek docker-compose.yaml file",
-    src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml")),
-    dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
-    mode="0664",
+    name="Place the cloud-cli-configure service definition.",
+    src=str(FILES_DIRECTORY.joinpath("cloud-cli-configure.service")),
+    dest="/usr/lib/systemd/system/cloud-cli-configure.service",
+    mode="644",
 )
+files.put(
+    name="Place the cloud-cli-deploy service definition.",
+    src=str(FILES_DIRECTORY.joinpath("cloud-cli-deploy.service")),
+    dest="/usr/lib/systemd/system/cloud-cli-deploy.service",
+    mode="644",
+)
+files.put(
+    name="Place supplemental configuration file.",
+    src=str(FILES_DIRECTORY.joinpath("supplemental_config.yaml")),
+    dest="/etc/docker/config.yaml",
+    mode="644",
+)
+
 
 vault_template_permissions(vault_config)
 
 # Install vector
-vector_config.configuration_templates[
-    TEMPLATES_DIRECTORY.joinpath("vector", "leek-logs.yaml.j2")
-] = {}
 install_vector(vector_config)
 configure_vector(vector_config)
 
@@ -210,6 +177,8 @@ tags_json = json.dumps(
             "consul_version": VERSIONS["consul"],
             "vault_version": VERSIONS["vault"],
             "traefik_version": VERSIONS["traefik"],
+            "apisix_version": VERSIONS["apisix"],
+            "apisix_cloud_cli_version": VERSIONS["apisix-cloud-cli"],
         }
     )
 )
@@ -229,15 +198,21 @@ if host.get_fact(HasSystemd):
     proxy_consul_dns()
 
     server.service(
-        name="Ensure docker compose service is enabled",
+        name="Ensure docker compose service is disabled",
         service="docker-compose",
+        enabled=False,  # We won't actually use docker-compose to run this service
         running=False,
-        enabled=True,
     )
 
-    watched_docker_compose_files = [
-        DOCKER_COMPOSE_DIRECTORY.joinpath(".env"),
-    ]
-    service_configuration_watches(
-        service_name="docker-compose", watched_files=watched_docker_compose_files
+    server.service(
+        name="Ensure the cloud-cli-configure service is enabled",
+        service="cloud-cli-configure",
+        enabled=True,
+        running=False,
+    )
+    server.service(
+        name="Ensure the cloud-cli-deploy service is enabled",
+        service="cloud-cli-deploy",
+        enabled=True,
+        running=False,
     )

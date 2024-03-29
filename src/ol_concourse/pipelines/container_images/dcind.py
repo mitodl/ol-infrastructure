@@ -62,7 +62,7 @@ docker_pipeline = Pipeline(
                             type="registry-image",
                             source={
                                 "repository": "alpine",
-                                "tag": "3.18.0",
+                                "tag": "3",
                             },
                         ),
                         inputs=[Input(name=earthly_release.name)],

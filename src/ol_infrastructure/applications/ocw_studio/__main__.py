@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Create the infrastructure and services needed to support the OCW Studio application.
 
 - Create a Redis instance in AWS Elasticache
@@ -10,6 +11,7 @@ from pathlib import Path
 
 import pulumi_github as github
 import pulumi_vault as vault
+import pulumiverse_heroku as heroku
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
@@ -21,12 +23,14 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-setup_vault_provider()
+setup_vault_provider(skip_child_token=True)
+setup_heroku_provider()
 github_provider = github.Provider(
     "github-provider",
     owner=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))["owner"],  # noqa: F541
@@ -46,6 +50,8 @@ aws_config = AWSBase(
         "Application": "ocw_studio",
     }
 )
+heroku_config = Config("heroku")
+heroku_app_config = Config("heroku_app")
 
 # Create S3 buckets
 
@@ -179,7 +185,7 @@ ocw_studio_iam_policy = iam.Policy(
                 {
                     "Effect": "Allow",
                     "Action": "iam:PassRole",
-                    "Resource": f"arn:aws:iam::610119931565:role/service-role-mediaconvert-ocw-studio-{stack_info.env_suffix}",  # noqa: E501
+                    "Resource": f"arn:aws:iam::610119931565:role/service-role-mediaconvert-ocw-studio-{stack_info.env_suffix}",
                 },
                 # Temporary permissions until video archives are synced via management
                 # command. TMM 2023-04-19
@@ -308,15 +314,16 @@ ocw_studio_secrets = vault.Mount(
     type="kv-v2",
     description="Static secrets storage for the OCW Studio application",
 )
-
 vault_secrets = read_yaml_secrets(
     Path(f"ocw_studio/ocw_studio.{stack_info.env_suffix}.yaml")
-)
+)["collected_secrets"]
 vault.generic.Secret(
     "ocw-studio-vault-secrets",
-    path=ocw_studio_secrets.path.apply("{}/app-config".format),
+    path=ocw_studio_secrets.path.apply("{}/collected".format),
     data_json=json.dumps(vault_secrets),
 )
+
+
 gh_repo = github.get_repository(
     full_name="mitodl/ocw-hugo-projects", opts=InvokeOptions(provider=github_provider)
 )
@@ -330,7 +337,7 @@ ocw_starter_webhook = github.RepositoryWebhook(
             ocw_studio_config.require("app_domain")
         ),
         content_type="json",
-        secret=vault_secrets["github_shared_secret"],
+        secret=vault_secrets["github"]["shared_secret"],
     ),
     opts=github_options,
 )
@@ -380,6 +387,136 @@ ocw_studio_mediaconvert_cloudwatch_target = cloudwatch.EventTarget(
     "ocw-studio-mediaconvert-cloudwatch-eventtarget",
     rule=ocw_studio_mediaconvert_cloudwatch_rule.name,
     arn=ocw_studio_sns_topic.arn,
+)
+
+env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
+
+heroku_vars = {
+    "ALLOWED_HOSTS": '["*"]',
+    "AWS_ACCOUNT_ID": "610119931565",
+    "AWS_ARTIFACTS_BUCKET_NAME": "ol-eng-artifacts",
+    "AWS_MAX_CONCURRENT_CONNECTIONS": 100,
+    "AWS_OFFLINE_PREVIEW_BUCKET_NAME": f"ocw-content-offline-draft-{stack_info.env_suffix}",
+    "AWS_OFFLINE_PUBLISH_BUCKET_NAME": f"ocw-content-offline-live-{stack_info.env_suffix}",
+    "AWS_OFFLINE_TEST_BUCKET_NAME": f"ocw-content-offline-test-{stack_info.env_suffix}",
+    "AWS_PREVIEW_BUCKET_NAME": f"ocw-content-draft-{stack_info.env_suffix}",
+    "AWS_PUBLISH_BUCKET_NAME": f"ocw-content-live-{stack_info.env_suffix}",
+    "AWS_REGION": "us-east-1",
+    "AWS_ROLE_NAME": f"service-role-mediaconvert-ocw-studio-{stack_info.env_suffix}",
+    "AWS_STORAGE_BUCKET_NAME": f"ol-ocw-studio-app-{stack_info.env_suffix}",
+    "AWS_TEST_BUCKET_NAME": f"ocw-content-test-{stack_info.env_suffix}",
+    "CONCOURSE_USERNAME": "oldevops",
+    "CONTENT_SYNC_BACKEND": "content_sync.backends.github.GithubBackend",
+    "CONTENT_SYNC_PIPELINE": "content_sync.pipelines.concourse.ConcourseGithubPipeline",
+    "CONTENT_SYNC_THEME_PIPELINE": "content_sync.pipelines.concourse.ThemeAssetsPipeline",
+    "ENV_NAME": env_name,
+    "GIT_DOMAIN": "github.mit.edu",
+    "GIT_API_URL": "https://github.mit.edu/api/v3",
+    "GIT_DEFAULT_USER_NAME": "OCW Studio Bot",
+    "MITOL_MAIL_FROM_EMAIL": "ocw-prod-support@mit.edu",
+    "MITOL_MAIL_REPLY_TO_ADDRESS": "ocw-prod-support@mit.edu",
+    "OCW_COURSE_TEST_SLUG": "ocw-ci-test-course",
+    "OCW_STUDIO_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
+    "OCW_STUDIO_DB_CONN_MAX_AGE": 0,
+    "OCW_STUDIO_DB_DISABLE_SSL": "True",
+    "OCW_STUDIO_ENVIRONMENT": env_name,
+    "OCW_STUDIO_USE_S3": "True",
+    "OCW_WWW_TEST_SLUG": "ocw-ci-test-www",
+    "PREPUBLISH_ACTIONS": "videos.tasks.update_transcripts_for_website,videos.youtube.update_youtube_metadata,content_sync.tasks.update_website_in_root_website",
+    "SOCIAL_AUTH_SAML_CONTACT_NAME": "Open Learning Support",
+    "SOCIAL_AUTH_SAML_IDP_ATTRIBUTE_EMAIL": "urn:oid:0.9.2342.19200300.100.1.3",
+    "SOCIAL_AUTH_SAML_IDP_ATTRIBUTE_NAME": "urn:oid:2.16.840.1.113730.3.1.241",
+    "SOCIAL_AUTH_SAML_IDP_ATTRIBUTE_PERM_ID": "urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
+    "SOCIAL_AUTH_SAML_IDP_ENTITY_ID": "https://idp.mit.edu/shibboleth",
+    "SOCIAL_AUTH_SAML_IDP_URL": "https://idp.mit.edu/idp/profile/SAML2/Redirect/SSO",
+    "SOCIAL_AUTH_SAML_LOGIN_URL": "https://idp.mit.edu/idp/profile/SAML2/Redirect/SSO",
+    "SOCIAL_AUTH_SAML_ORG_DISPLAYNAME": "MIT Open Learning",
+    "SOCIAL_AUTH_SAML_SECURITY_ENCRYPTED": "True",
+    "USE_X_FORWARDED_PORT": "True",
+    "VIDEO_S3_TRANSCODE_PREFIX": "aws_mediaconvert_transcodes",
+}
+
+heroku_vars.update(**heroku_app_config.get_object("vars"))
+
+auth_aws_mitx_creds_ocw_studio_app_env = vault.generic.get_secret_output(
+    path=f"aws-mitx/creds/ocw-studio-app-{stack_info.env_suffix}",
+    with_lease_start_time=False,
+    opts=InvokeOptions(parent=ocw_studio_secrets),
+)
+
+
+secret_operations_global_mailgun_api_key = vault.generic.get_secret_output(
+    path="secret-operations/global/mailgun-api-key",
+    opts=InvokeOptions(parent=ocw_studio_secrets),
+)
+
+secret_concourse_ocw_api_bearer_token = vault.generic.get_secret_output(
+    path="secret-concourse/ocw/api-bearer-token",
+    opts=InvokeOptions(parent=ocw_studio_secrets),
+)
+
+secret_concourse_web = vault.generic.get_secret_output(
+    path="secret-concourse/web", opts=InvokeOptions(parent=ocw_studio_secrets)
+)
+
+sensitive_heroku_vars = {
+    "AWS_ACCESS_KEY_ID": auth_aws_mitx_creds_ocw_studio_app_env.data.apply(
+        lambda data: "{}".format(data["access_key"])
+    ),
+    "AWS_SECRET_ACCESS_KEY": auth_aws_mitx_creds_ocw_studio_app_env.data.apply(
+        lambda data: "{}".format(data["secret_key"])
+    ),
+    "MAILGUN_KEY": secret_operations_global_mailgun_api_key.data.apply(
+        lambda data: "{}".format(data["value"])
+    ),
+    "API_BEARER_TOKEN": secret_concourse_ocw_api_bearer_token.data.apply(
+        lambda data: "{}".format(data["value"])
+    ),
+    "CONCOURSE_PASSWORD": secret_concourse_web.data.apply(
+        lambda data: "{}".format(data["admin_password"])
+    ),
+    "DRIVE_SERVICE_ACCOUNT_CREDS": vault_secrets["google"]["drive_service_json"],
+    "GIT_TOKEN": vault_secrets["github"]["user_token"],
+    "OPEN_CATALOG_WEBHOOK_KEY": vault_secrets["open_catalog_webhook_key"],
+    "SECRET_KEY": vault_secrets["django"]["secret_key"],
+    "SENTRY_DSN": vault_secrets["sentry_dsn"],
+    "SOCIAL_AUTH_SAML_IDP_X509": vault_secrets["saml"]["idp_x509"],
+    "SOCIAL_AUTH_SAML_SP_PRIVATE_KEY": vault_secrets["saml"]["sp_private_key"],
+    "SOCIAL_AUTH_SAML_SP_PUBLIC_CERT": vault_secrets["saml"]["sp_public_cert"],
+    "STATUS_TOKEN": vault_secrets["django"]["status_token"],
+    "THREEPLAY_API_KEY": vault_secrets["threeplay"]["api_key"],
+    "THREEPLAY_CALLBACK_KEY": vault_secrets["threeplay"]["callback_key"],
+    "YT_ACCESS_TOKEN": vault_secrets["youtube"]["access_token"],
+    "YT_CLIENT_ID": vault_secrets["youtube"]["client_id"],
+    "YT_CLIENT_SECRET": vault_secrets["youtube"]["client_secret"],
+    "YT_REFRESH_TOKEN": vault_secrets["youtube"]["refresh_token"],
+    "VIDEO_S3_TRANSCODE_ENDPOINT": vault_secrets["transcode_endpoint"],
+    "GITHUB_APP_PRIVATE_KEY": vault_secrets["github"]["app_private_key"],
+    "GITHUB_WEBHOOK_KEY": vault_secrets["github"]["shared_secret"],
+}
+
+if stack_info.env_suffix.lower() != "ci":
+    auth_postgres_ocw_studio_applications_env_creds_app = (
+        vault.generic.get_secret_output(
+            path=f"postgres-ocw-studio-applications-{stack_info.env_suffix}/creds/app",
+            with_lease_start_time=False,
+            opts=InvokeOptions(parent=ocw_studio_secrets),
+        )
+    )
+    sensitive_heroku_vars["DATABASE_URL"] = (
+        auth_postgres_ocw_studio_applications_env_creds_app.data.apply(
+            lambda data: "postgres://{}:{}@ocw-studio-db-applications-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/ocw_studio".format(
+                data["username"], data["password"], stack_info.env_suffix
+            )
+        )
+    )
+
+heroku_app_id = heroku_config.require("app_id")
+ocw_studio_heroku_configassociation = heroku.app.ConfigAssociation(
+    f"ocw-studio-heroku-configassociation-{stack_info.env_suffix}",
+    app_id=heroku_app_id,
+    sensitive_vars=sensitive_heroku_vars,
+    vars=heroku_vars,
 )
 
 export(
