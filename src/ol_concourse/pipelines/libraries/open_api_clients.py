@@ -69,7 +69,7 @@ mit_open_repository = git_repo(
 )
 mit_open_api_clients_repository = ssh_git_repo(
     name=Identifier("mit-open-api-clients"),
-    uri="https://github.com/mitodl/open-api-clients.git",
+    uri="git@github.com:mitodl/open-api-clients.git",
     branch="main",
     private_key="((open_api_clients.odlbot_private_ssh_key))",
 )
@@ -97,28 +97,7 @@ generate_clients_job = Job(
                 outputs=[Output(name=mit_open_api_clients_repository.name)],
                 run=Command(
                     path="/bin/bash",
-                    dir="mit-open-api-clients",
-                    args=["scripts/generate-inner.sh"],
-                ),
-            ),
-        ),
-        TaskStep(
-            task="git-commit",
-            image=git_image.name,
-            config=TaskConfig(
-                platform="linux",
-                inputs=[
-                    Input(name=mit_open_repository.name),
-                    Input(name=mit_open_api_clients_repository.name),
-                ],
-                outputs=[Output(name=mit_open_api_clients_repository.name)],
-                run=Command(
-                    path="/bin/bash",
-                    dir="mit-open-api-clients",
-                    args=[
-                        "-exc",
-                        ("scripts/open-api-clients-commit-changes.sh"),
-                    ],
+                    args=["mit-open-api-clients/scripts/generate-inner.sh"],
                 ),
             ),
         ),
@@ -152,10 +131,9 @@ create_release_job = Job(
                 outputs=[Output(name=mit_open_api_clients_repository.name)],
                 run=Command(
                     path="/bin/bash",
-                    dir="mit-open-api-clients",
                     args=[
                         "-exc",
-                        ("scripts/open-api-clients-bumpver.sh"),
+                        ("mit-open-api-clients/scripts/open-api-clients-bumpver.sh"),
                     ],
                 ),
             ),
@@ -172,10 +150,11 @@ create_release_job = Job(
                 outputs=[Output(name=mit_open_api_clients_repository.name)],
                 run=Command(
                     path="/bin/bash",
-                    dir="mit-open-api-clients",
                     args=[
                         "-exc",
-                        ("scripts/open-api-clients-tag-release.sh"),
+                        (
+                            "mit-open-api-clients/scripts/open-api-clients-tag-release.sh"
+                        ),
                     ],
                 ),
             ),
