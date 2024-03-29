@@ -54,14 +54,15 @@ def build_ovs_pipeline() -> Pipeline:
     ovs_packer_code = git_repo(
         name=Identifier("ol-infrastructure-packer-build"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="main",
+        branch="misc/issue_1372",
+        # branch="main",
         paths=["src/bilder/images/odl_video_service", *PACKER_WATCHED_PATHS],
     )
 
     ovs_pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi-build"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="main",
+        branch="misc/issue_1372",
         paths=[
             *PULUMI_WATCHED_PATHS,
             PULUMI_CODE_PATH.joinpath("applications/odl_video_service/"),
@@ -110,6 +111,7 @@ def build_ovs_pipeline() -> Pipeline:
         packer_template_path=(
             "src/bilder/images/odl_video_service/odl_video_service.pkr.hcl"
         ),
+        packer_vars={"branch": ovs_m_branch},
         env_vars_from_files={"OVS_VERSION": f"{ovs_m_repo.name}/.git/describe_ref"},
         job_name_suffix="ovs-master",
     )
@@ -176,6 +178,7 @@ def build_ovs_pipeline() -> Pipeline:
         packer_template_path=(
             "src/bilder/images/odl_video_service/odl_video_service.pkr.hcl"
         ),
+        packer_vars={"branch": ovs_rc_branch},
         env_vars_from_files={"OVS_VERSION": f"{ovs_rc_repo.name}/.git/describe_ref"},
         job_name_suffix="ovs-rc",
     )

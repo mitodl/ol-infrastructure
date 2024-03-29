@@ -472,11 +472,17 @@ instance_tags = aws_config.merged_tags(
     {"Name": f"odl-video-service-{stack_info.env_suffix}"}
 )
 
+branch_tag = ovs_config.get("ami_branch_tag") or "master"
+
 ovs_server_ami = ec2.get_ami(
     filters=[
         {
             "name": "tag:Name",
             "values": ["odl_video_service-server"],
+        },
+        {
+            "name": "tag:branch",
+            "values": [branch_tag],
         },
         {
             "name": "virtualization-type",

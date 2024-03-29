@@ -3,6 +3,7 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gHIy40RMK2Doz2O0eU9V4w9AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM4gA0XSwe3GCIYvbqAgEQgDtqu1VEShSes4yhlvMBNdSshCr5VE/wXl53nc05sJQ+HdzAlZ4K59qEvfNTTtMGveMWZSf4Lj7eGWFZrg==
 config:
   consul:address: https://consul-apps-production.odl.mit.edu
+  ovs:ami_branch_tag: "release-candidate"
   ovs:auto_scale:
     desired: 2
     max: 3

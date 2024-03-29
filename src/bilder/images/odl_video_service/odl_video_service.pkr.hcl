@@ -18,6 +18,11 @@ variable "node_type" {
   default = "server"
 }
 
+variable "branch" {
+  type    = string
+  default = "master"
+}
+
 source "amazon-ebs" "odl_video_service" {
   ami_description         = "Deployment image for ODL Video Serviceserver generated at ${local.timestamp}"
   ami_name                = "odl_video_service-${var.node_type}-${local.timestamp}"
@@ -71,6 +76,7 @@ source "amazon-ebs" "odl_video_service" {
     OU      = var.business_unit
     app     = local.app_name
     purpose = "${local.app_name}-${var.node_type}"
+    branch  = var.branch
   }
 }
 
