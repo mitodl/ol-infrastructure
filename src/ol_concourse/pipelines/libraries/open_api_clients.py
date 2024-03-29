@@ -1,5 +1,4 @@
 import sys
-from pathlib import Path
 
 from ol_concourse.lib.models.pipeline import (
     Command,
@@ -16,11 +15,6 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, ssh_git_repo
-
-
-def _read_script(script_name: str) -> str:
-    return (Path(__file__).parent / "scripts" / script_name).read_text()
-
 
 git_image = Resource(
     name=Identifier("git-image"),
@@ -103,7 +97,9 @@ generate_clients_job = Job(
                 outputs=[Output(name=mit_open_api_clients_repository.name)],
                 run=Command(
                     path="/bin/bash",
-                    args=["open-api-clients/scripts/generate-inner.sh"],
+                    args=[
+                        "((mit_open_api_clients_repository.name))/scripts/generate-inner.sh"
+                    ],
                 ),
             ),
         ),
@@ -121,7 +117,9 @@ generate_clients_job = Job(
                     path="/bin/bash",
                     args=[
                         "-exc",
-                        _read_script("open-api-clients-commit-changes.sh"),
+                        (
+                            "{mit_open_api_clients_repository.name}/scripts/open-api-clients-commit-changes.sh"
+                        ),
                     ],
                 ),
             ),
@@ -156,7 +154,12 @@ create_release_job = Job(
                 outputs=[Output(name=mit_open_api_clients_repository.name)],
                 run=Command(
                     path="/bin/bash",
-                    args=["-exc", _read_script("open-api-clients-bumpver.sh")],
+                    args=[
+                        "-exc",
+                        (
+                            "{mit_open_api_clients_repository.name}/scripts/open-api-clients-bumpver.sh"
+                        ),
+                    ],
                 ),
             ),
         ),
@@ -174,7 +177,9 @@ create_release_job = Job(
                     path="/bin/bash",
                     args=[
                         "-exc",
-                        _read_script("open-api-clients-tag-release.sh"),
+                        (
+                            "{mit_open_api_clients_repository.name}/scripts/open-api-clients-tag-release.sh"
+                        ),
                     ],
                 ),
             ),
@@ -199,21 +204,6 @@ publish_job = Job(
                 ),
             ]
         ),
-        TaskStep(
-            task="publish-node",
-            image=node_image.name,
-            config=TaskConfig(
-                platform="linux",
-                inputs=[Input(name=mit_open_api_clients_repository.name)],
-                params={"NPM_TOKEN": "((npmjs_token))"},
-                run=Command(
-                    path="/bin/bash",
-                    dir="open-api-clients/src/typescript/mit-open-api-axios",
-                    args=["-exc", _read_script("open-api-clients-publish-node.sh")],
-                ),
-            ),
-        ),
-        # Publish to NPM
         PutStep(
             put=openapi_clients_npm_package.name,
         ),
