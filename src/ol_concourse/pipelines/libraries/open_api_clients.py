@@ -97,9 +97,8 @@ generate_clients_job = Job(
                 outputs=[Output(name=mit_open_api_clients_repository.name)],
                 run=Command(
                     path="/bin/bash",
-                    args=[
-                        f"{mit_open_api_clients_repository.name}/scripts/generate-inner.sh"
-                    ],
+                    dir="mit-open-api-clients",
+                    args=["scripts/generate-inner.sh"],
                 ),
             ),
         ),
@@ -115,11 +114,10 @@ generate_clients_job = Job(
                 outputs=[Output(name=mit_open_api_clients_repository.name)],
                 run=Command(
                     path="/bin/bash",
+                    dir="mit-open-api-clients",
                     args=[
                         "-exc",
-                        (
-                            f"{mit_open_api_clients_repository.name}/scripts/open-api-clients-commit-changes.sh"
-                        ),
+                        ("scripts/open-api-clients-commit-changes.sh"),
                     ],
                 ),
             ),
@@ -154,11 +152,10 @@ create_release_job = Job(
                 outputs=[Output(name=mit_open_api_clients_repository.name)],
                 run=Command(
                     path="/bin/bash",
+                    dir="mit-open-api-clients",
                     args=[
                         "-exc",
-                        (
-                            f"{mit_open_api_clients_repository.name}/scripts/open-api-clients-bumpver.sh"
-                        ),
+                        ("scripts/open-api-clients-bumpver.sh"),
                     ],
                 ),
             ),
@@ -175,11 +172,10 @@ create_release_job = Job(
                 outputs=[Output(name=mit_open_api_clients_repository.name)],
                 run=Command(
                     path="/bin/bash",
+                    dir="mit-open-api-clients",
                     args=[
                         "-exc",
-                        (
-                            f"{mit_open_api_clients_repository.name}/scripts/open-api-clients-tag-release.sh"
-                        ),
+                        ("scripts/open-api-clients-tag-release.sh"),
                     ],
                 ),
             ),
