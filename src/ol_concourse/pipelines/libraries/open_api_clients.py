@@ -228,7 +228,7 @@ build_pipeline = Pipeline(
         node_image,
         mit_open_repository,
         mit_open_api_clients_repository,
-        npm_package,
+        openapi_clients_npm_package,
     ],
     jobs=[
         generate_clients_job,
