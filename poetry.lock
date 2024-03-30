@@ -1441,12 +1441,12 @@ files = [
 
 [[package]]
 name = "pulumi"
-version = "3.111.1"
+version = "3.112.0"
 description = "Pulumi's Python SDK"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pulumi-3.111.1-py3-none-any.whl", hash = "sha256:70c1b384545897833ed50d25d6362d7ee44811f377a31a1333c31924d397a3c4"},
+    {file = "pulumi-3.112.0-py3-none-any.whl", hash = "sha256:83543b13df444259d0709ab00d00c94ad4ad6ca84851b3623d30cd3a9503757d"},
 ]
 
 [package.dependencies]
@@ -1459,13 +1459,13 @@ six = ">=1.12,<2.0"
 
 [[package]]
 name = "pulumi-aws"
-version = "6.27.0"
+version = "6.28.2"
 description = "A Pulumi package for creating and managing Amazon Web Services (AWS) cloud resources."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pulumi_aws-6.27.0-py3-none-any.whl", hash = "sha256:f8ce36e21653f6d513fd2fb8dfe14cd94f08a2ce6b69043edb12c25c9c8d313c"},
-    {file = "pulumi_aws-6.27.0.tar.gz", hash = "sha256:577b85e5b9efd7527804d085b3f5f62e45a824267b95cc8a404c2a16995330a3"},
+    {file = "pulumi_aws-6.28.2-py3-none-any.whl", hash = "sha256:81d626e991d788416c351911b2e40437aa14ed18d3fd3b3650f3b4f381edef2e"},
+    {file = "pulumi_aws-6.28.2.tar.gz", hash = "sha256:fcca5320848a9bac3437ca05521e62926cd357e0e9c489ac62efb3ebcc886f1c"},
 ]
 
 [package.dependencies]
@@ -1507,13 +1507,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-github"
-version = "6.1.0"
+version = "6.2.0"
 description = "A Pulumi package for creating and managing github cloud resources."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pulumi_github-6.1.0-py3-none-any.whl", hash = "sha256:d7896ddd08a0db410d2f61a12a7a92185f35a1362b119c090e3104d04cba4680"},
-    {file = "pulumi_github-6.1.0.tar.gz", hash = "sha256:b3ca1b73aa55ec3785257f01a260e21e4adbe9fa650089a00693f6f618bddbef"},
+    {file = "pulumi_github-6.2.0-py3-none-any.whl", hash = "sha256:40d539ef7d7bd4d470df607861aea5293a7b9b2a4fbceba52661241c4ba1a8a3"},
+    {file = "pulumi_github-6.2.0.tar.gz", hash = "sha256:e92522da60ad0716be6b2182c894a7ffd6f7429fdff9bfd50943e7f31e916838"},
 ]
 
 [package.dependencies]
@@ -1555,13 +1555,13 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-tls"
-version = "5.0.1"
+version = "5.0.2"
 description = "A Pulumi package to create TLS resources in Pulumi programs."
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "pulumi_tls-5.0.1-py3-none-any.whl", hash = "sha256:8f15fe6c79729329b799c7a36396f87d9040174b4017985d956bc9297c9a788c"},
-    {file = "pulumi_tls-5.0.1.tar.gz", hash = "sha256:8f41cecfbbd33180170fea92a39be5cc78491a87159ffb456c736a2194bcda26"},
+    {file = "pulumi_tls-5.0.2-py3-none-any.whl", hash = "sha256:f348a444f0b7f28498e87fe65faee391ea6c9849cbfe91fe95629b3aa8d92cb0"},
+    {file = "pulumi_tls-5.0.2.tar.gz", hash = "sha256:3a1ef283dbe4b8a69cfcb8f0b78027c7f7d33be3364ebf59bfe68adcef20b675"},
 ]
 
 [package.dependencies]
