@@ -260,6 +260,7 @@ def slack_notification(name: Identifier, url: str) -> Resource:
 
 
 def npm_package(
+    name: Identifier,
     package: Identifier,
     npmjs_token: Identifier,
     scope: Identifier,

@@ -56,6 +56,7 @@ openapi_clients_npm_package = npm_package(
     name=Identifier("openapi-clients-npm-package"),
     package="open-api-clients",
     scope="mitodl",
+    npmjs_token="((open_api_clients.npmjs_token))",
 )
 
 mit_open_repository = git_repo(
