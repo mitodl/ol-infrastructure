@@ -139,11 +139,12 @@ def packer_jobs(  # noqa: PLR0913
     )
 
 
-def pulumi_jobs_chain(  # noqa: PLR0913, C901
+def pulumi_jobs_chain(  # noqa: PLR0912, PLR0913, C901
     pulumi_code: Resource,
     stack_names: list[str],
     project_name: str,
     project_source_path: Path,
+    enable_github_issue_resource: bool = True,  # noqa: FBT001, FBT002
     custom_dependencies: Optional[dict[int, list[GetStep]]] = None,
     dependencies: Optional[list[GetStep]] = None,
     github_issue_assignees: Optional[list[str]] = None,
@@ -175,26 +176,28 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901
     previous_job = None
     for index, stack_name in enumerate(stack_names):
         if index + 1 < len(stack_names):
-            gh_issues_trigger = github_issues(
-                auth_method="token",
-                name=Identifier(f"github-issues-{stack_name.lower()}-trigger"),
-                repository=github_issue_repository or GH_ISSUES_DEFAULT_REPOSITORY,
-                issue_title_template=f"[bot] Pulumi {project_name} {stack_name} "
-                "deployed.",
-                issue_prefix=f"[bot] Pulumi {project_name} {stack_name} deployed.",
-                issue_state="closed",
-            )
+            if enable_github_issue_resource:
+                gh_issues_trigger = github_issues(
+                    auth_method="token",
+                    name=Identifier(f"github-issues-{stack_name.lower()}-trigger"),
+                    repository=github_issue_repository or GH_ISSUES_DEFAULT_REPOSITORY,
+                    issue_title_template=f"[bot] Pulumi {project_name} {stack_name} "
+                    "deployed.",
+                    issue_prefix=f"[bot] Pulumi {project_name} {stack_name} deployed.",
+                    issue_state="closed",
+                )
         else:
             gh_issues_trigger = None
 
-        gh_issues_post = github_issues(
-            auth_method="token",
-            name=Identifier(f"github-issues-{stack_name.lower()}-post"),
-            repository=github_issue_repository or GH_ISSUES_DEFAULT_REPOSITORY,
-            issue_title_template=f"[bot] Pulumi {project_name} {stack_name} deployed.",
-            issue_prefix=f"[bot] Pulumi {project_name} {stack_name} deployed.",
-            issue_state="open",
-        )
+        if enable_github_issue_resource:
+            gh_issues_post = github_issues(
+                auth_method="token",
+                name=Identifier(f"github-issues-{stack_name.lower()}-post"),
+                repository=github_issue_repository or GH_ISSUES_DEFAULT_REPOSITORY,
+                issue_title_template=f"[bot] Pulumi {project_name} {stack_name} deployed.",  # noqa: E501
+                issue_prefix=f"[bot] Pulumi {project_name} {stack_name} deployed.",
+                issue_state="open",
+            )
 
         production_stack = stack_name.lower().endswith("production")
         qa_stack = stack_name.lower().endswith("qa")
@@ -217,7 +220,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901
         ]
         # Needed to duplicate if conditional because otherwise it messes with the
         # sequencing of dependencies and whether they had to pass previous stacks.
-        if index != 0:
+        if index != 0 and enable_github_issue_resource:
             # We don't want the current stage, we want the previous one so that it will
             # trigger the current stack. This ensures that we are triggering on the
             # notification that the previous step has been deployed.
@@ -254,20 +257,22 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901
         elif production_stack:
             default_github_issue_labels.append("finalized-deployment")
 
-        create_gh_issue = PutStep(
-            put=gh_issues_post.name,
-            params={
-                "labels": github_issue_labels or default_github_issue_labels,
-                "assignees": github_issue_assignees or DEVOPS_MIT,
-            },
-        )
+        if enable_github_issue_resource:
+            create_gh_issue = PutStep(
+                put=gh_issues_post.name,
+                params={
+                    "labels": github_issue_labels or default_github_issue_labels,
+                    "assignees": github_issue_assignees or DEVOPS_MIT,
+                },
+            )
+            chain_fragment.resources.append(gh_issues_post)
+            step_fragment.jobs[0].on_success = create_gh_issue
 
-        step_fragment.jobs[0].on_success = create_gh_issue
         chain_fragment.resource_types = (
             chain_fragment.resource_types + step_fragment.resource_types
         )
         chain_fragment.resources = chain_fragment.resources + step_fragment.resources
-        chain_fragment.resources.append(gh_issues_post)
+
         if gh_issues_trigger:
             chain_fragment.resources.append(gh_issues_trigger)
         chain_fragment.jobs.extend(step_fragment.jobs)
