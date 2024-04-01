@@ -54,7 +54,7 @@ def build_ovs_pipeline() -> Pipeline:
     ovs_packer_code = git_repo(
         name=Identifier("ol-infrastructure-packer-build"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        ranch="main",
+        branch="main",
         paths=["src/bilder/images/odl_video_service", *PACKER_WATCHED_PATHS],
     )
 
