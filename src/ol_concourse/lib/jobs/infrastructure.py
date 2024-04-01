@@ -144,7 +144,7 @@ def pulumi_jobs_chain(  # noqa: PLR0912, PLR0913, C901
     stack_names: list[str],
     project_name: str,
     project_source_path: Path,
-    enable_github_issue_resource: bool = True,  # noqa: FBT002
+    enable_github_issue_resource: bool = True,  # noqa: FBT001, FBT002
     custom_dependencies: Optional[dict[int, list[GetStep]]] = None,
     dependencies: Optional[list[GetStep]] = None,
     github_issue_assignees: Optional[list[str]] = None,
