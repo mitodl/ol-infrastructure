@@ -259,7 +259,7 @@ def slack_notification(name: Identifier, url: str) -> Resource:
     )
 
 
-def npm_package(package: Identifier, npmjs_token: str, scope: Identifier) -> Resource:
+def npm_package(package: Identifier, uri: Identifier, npmjs_token: Identifier, scope: Identifier) -> Resource:
     return Resource(
         type="npm-package",
         icon="language-javascript",
@@ -270,5 +270,39 @@ def npm_package(package: Identifier, npmjs_token: str, scope: Identifier) -> Res
                 "uri": "https://registry.npmjs.org",
                 "token": npmjs_token,
             },
+        },
+    )
+
+# This resource type also supports s3, gcs and others. We can create those later.
+def git_semver(name: str,
+               initial_version: str = "0.0.0",
+               uri: str,
+               branch: str,
+               file: str,
+               private_key: str = None,
+               username: str = None,
+               password: str = None,
+               git_user: str = None,
+               depth: int = None,
+               skip_ssl_verification: bool = False,
+               commit_message: str = None,
+    ) -> Resource:
+    return Resource(
+        name=name,
+        type="semver",
+        icon="version",
+        source={
+            "initial_version": initial_version,
+            "driver": "git",
+            "uri": uri,
+            "branch": branch,
+            "file": file,
+            "private_key": private_key,
+            "username": username,
+            "password": password,
+            "git_user": git_user,
+            "depth": depth,
+            "skip_ssl_verification": skip_ssl_verification,
+            "commit_message": commit_message,
         },
     )

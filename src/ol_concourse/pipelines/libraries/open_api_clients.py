@@ -14,7 +14,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resources import git_repo, ssh_git_repo
+from ol_concourse.lib.resources import git_repo, ssh_git_repo, git_semver, npm_package
 
 git_image = Resource(
     name=Identifier("git-image"),
@@ -52,13 +52,17 @@ node_image = Resource(
     },
 )
 
-openapi_clients_npm_package = Resource(
-    name=Identifier("npm-package"),
-    type="npm-package",
-    source={
-        "package": "open-api-clients",
-        "scope": "mitodl",
-    },
+openapi_clients_npm_package = npm_package(
+    name=Identifier("openapi-clients-npm-package"),
+    package="open-api-clients",
+    scope="mitodl",
+)
+
+openapi_clients_semver = git_semver(    # noqa: F821
+    name=Identifier("open-api-clients-semver"),
+    uri=mit_open_repository.uri,
+    branch="main",
+    file="openapi/specs/version.yaml",
 )
 
 mit_open_repository = git_repo(
@@ -67,6 +71,7 @@ mit_open_repository = git_repo(
     branch="release",
     paths=["openapi/specs/*.yaml"],
 )
+
 mit_open_api_clients_repository = ssh_git_repo(
     name=Identifier("mit-open-api-clients"),
     uri="git@github.com:mitodl/open-api-clients.git",
@@ -122,46 +127,20 @@ create_release_job = Job(
                 ),
             ]
         ),
-        TaskStep(
-            task="bump-version",
-            image=python_image.name,
-            config=TaskConfig(
-                platform="linux",
-                inputs=[Input(name=mit_open_api_clients_repository.name)],
-                outputs=[Output(name=mit_open_api_clients_repository.name)],
-                run=Command(
-                    path="/bin/bash",
-                    args=[
-                        "-exc",
-                        ("mit-open-api-clients/scripts/open-api-clients-bumpver.sh"),
-                    ],
-                ),
-            ),
-        ),
-        TaskStep(
-            task="git-commit-and-tag",
-            image=git_image.name,
-            config=TaskConfig(
-                platform="linux",
-                inputs=[
-                    Input(name=mit_open_repository.name),
-                    Input(name=mit_open_api_clients_repository.name),
-                ],
-                outputs=[Output(name=mit_open_api_clients_repository.name)],
-                run=Command(
-                    path="/bin/bash",
-                    args=[
-                        "-exc",
-                        (
-                            "mit-open-api-clients/scripts/open-api-clients-tag-release.sh"
-                        ),
-                    ],
-                ),
-            ),
-        ),
         PutStep(
             put=mit_open_api_clients_repository.name,
-            params={"repository": mit_open_api_clients_repository.name},
+            params={
+                "repository": mit_open_api_clients_repository.name,
+                "tag": "mit_open_api_clients/VERSION",
+            },
+        ),
+        PutStep(
+            put=openapi_clients_semver.name,
+            params={
+                "file": "mit_open_api_clients/VERSION",
+                "branch": "main",
+                "private_key": "((open_api_clients.odlbot_private_ssh_key))",
+            },
         ),
     ],
 )
