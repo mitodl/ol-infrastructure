@@ -51,6 +51,21 @@ application_storage_bucket = s3.Bucket(
     bucket=app_storage_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
+    acl="public-read",
+    policy=json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "PublicRead",
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": ["s3:GetObject"],
+                    "Resource": [f"arn:aws:s3:::{app_storage_bucket_name}/*"],
+                }
+            ],
+        }
+    ),
 )
 
 course_data_bucket_name = f"ol-mitopen-course-data-{app_env_suffix}"
