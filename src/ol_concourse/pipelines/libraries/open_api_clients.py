@@ -54,11 +54,18 @@ node_image = Resource(
     },
 )
 
+openapi_clients_semver = git_semver(
+    name=Identifier("openapi-clients-semver"),
+    uri=mit_open_repository_uri,
+    branch="main",
+    file="openapi/specs/version.yaml",
+)
+
 openapi_clients_npm_package = npm_package(
     name=Identifier("openapi-clients-npm-package"),
     package="open-api-clients",
     scope="mitodl",
-    npmjs_token="((open_api_clients.npmjs_token))",
+    npmjs_token="((open_api_clients.npmjs_token))",  # noqa: S106
 )
 
 mit_open_repository = git_repo(
@@ -66,13 +73,6 @@ mit_open_repository = git_repo(
     uri=mit_open_repository_uri,
     branch="release",
     paths=["openapi/specs/*.yaml"],
-)
-
-openapi_clients_semver = git_semver(
-    name=Identifier("open-api-clients-semver"),
-    uri=mit_open_repository_uri,
-    branch="main",
-    file="openapi/specs/version.yaml",
 )
 
 mit_open_api_clients_repository = ssh_git_repo(
