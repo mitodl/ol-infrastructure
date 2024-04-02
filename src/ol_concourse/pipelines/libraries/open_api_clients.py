@@ -16,6 +16,8 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo, git_semver, npm_package, ssh_git_repo
 
+mit_open_repository_uri = "https://github.com/mitodl/mit-open"
+
 git_image = Resource(
     name=Identifier("git-image"),
     type="docker-image",
@@ -61,14 +63,14 @@ openapi_clients_npm_package = npm_package(
 
 mit_open_repository = git_repo(
     name=Identifier("mit-open"),
-    uri="https://github.com/mitodl/mit-open",
+    uri=mit_open_repository_uri,
     branch="release",
     paths=["openapi/specs/*.yaml"],
 )
 
 openapi_clients_semver = git_semver(
     name=Identifier("open-api-clients-semver"),
-    uri=mit_open_repository.uri,
+    uri=mit_open_repository_uri,
     branch="main",
     file="openapi/specs/version.yaml",
 )
