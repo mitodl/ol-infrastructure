@@ -71,6 +71,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
         paths=[
+            "src/bridge/lib/versions.py",
             "src/bilder/components/",
             "src/bilder/images/keycloak",
         ],
