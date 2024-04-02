@@ -266,6 +266,7 @@ def npm_package(
     scope: Identifier,
 ) -> Resource:
     return Resource(
+        name=name,
         type="npm-package",
         icon="language-javascript",
         source={
