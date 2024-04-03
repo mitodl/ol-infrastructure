@@ -12,7 +12,7 @@ def semver_resource() -> ResourceType:
 
 def npm_package_resource() -> ResourceType:
     return ResourceType(
-        name=Identifier("npm_package"),
+        name=Identifier("npm-package"),
         type=REGISTRY_IMAGE,
         source=RegistryImage(repository="timotto/concourse-npm-resource"),
     )

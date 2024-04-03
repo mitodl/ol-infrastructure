@@ -4,7 +4,6 @@ from ol_concourse.lib.models.pipeline import (
     Command,
     GetStep,
     Identifier,
-    InParallelStep,
     Input,
     Job,
     Output,
@@ -14,9 +13,11 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
+from ol_concourse.lib.resource_types import npm_package_resource, semver_resource
 from ol_concourse.lib.resources import git_repo, git_semver, npm_package, ssh_git_repo
 
 mit_open_repository_uri = "https://github.com/mitodl/mit-open"
+ssh_mit_open_repository_uri = "git@github.com:mitodl/mit-open.git"
 
 git_image = Resource(
     name=Identifier("git-image"),
@@ -56,14 +57,15 @@ node_image = Resource(
 
 openapi_clients_semver = git_semver(
     name=Identifier("openapi-clients-semver"),
-    uri=mit_open_repository_uri,
+    uri=ssh_mit_open_repository_uri,
+    private_key="((open_api_clients.odlbot_private_ssh_key))",
     branch="main",
     file="openapi/specs/version.yaml",
 )
 
 openapi_clients_npm_package = npm_package(
     name=Identifier("openapi-clients-npm-package"),
-    package="open-api-clients",
+    package="@mitodl/open-api-axios",
     scope="mitodl",
     npmjs_token="((open_api_clients.npmjs_token))",  # noqa: S106
 )
@@ -85,14 +87,9 @@ mit_open_api_clients_repository = ssh_git_repo(
 generate_clients_job = Job(
     name=Identifier("generate-clients"),
     plan=[
-        InParallelStep(
-            in_parallel=[
-                GetStep(get=git_image.name),
-                GetStep(get=openapi_generator_image.name),
-                GetStep(get=mit_open_repository.name, trigger=True),
-                GetStep(get=mit_open_api_clients_repository.name, trigger=True),
-            ]
-        ),
+        GetStep(get=mit_open_repository.name, trigger=True),
+        GetStep(get=mit_open_api_clients_repository.name, trigger=True),
+        GetStep(get=openapi_generator_image.name, trigger=True),
         TaskStep(
             task=Identifier("generate-apis"),
             image=openapi_generator_image.name,
@@ -119,30 +116,24 @@ generate_clients_job = Job(
 create_release_job = Job(
     name="create-release",
     plan=[
-        InParallelStep(
-            in_parallel=[
-                GetStep(get=git_image.name),
-                GetStep(get=python_image.name),
-                GetStep(
-                    get=mit_open_api_clients_repository.name,
-                    passed=[generate_clients_job.name],
-                    trigger=True,
-                ),
-            ]
+        GetStep(
+            get=mit_open_api_clients_repository.name,
+            passed=[generate_clients_job.name],
+            trigger=True,
+        ),
+        PutStep(
+            put=openapi_clients_semver.name,
+            params={
+                "file": "mit-open-api-clients/VERSION",
+                "branch": "main",
+                "private_key": "((open_api_clients.odlbot_private_ssh_key))",
+            },
         ),
         PutStep(
             put=mit_open_api_clients_repository.name,
             params={
                 "repository": mit_open_api_clients_repository.name,
-                "tag": "mit_open_api_clients/VERSION",
-            },
-        ),
-        PutStep(
-            put=openapi_clients_semver.name,
-            params={
-                "file": "mit_open_api_clients/VERSION",
-                "branch": "main",
-                "private_key": "((open_api_clients.odlbot_private_ssh_key))",
+                "tag": "mit-open-api-clients/VERSION",
             },
         ),
     ],
@@ -151,31 +142,31 @@ create_release_job = Job(
 publish_job = Job(
     name="publish",
     plan=[
-        InParallelStep(
-            in_parallel=[
-                GetStep(get=node_image.name),
-                GetStep(
-                    get=mit_open_api_clients_repository.name,
-                    passed=[create_release_job.name],
-                    trigger=True,
-                ),
-            ]
+        GetStep(
+            get=mit_open_api_clients_repository.name,
+            passed=[create_release_job.name],
+            trigger=True,
         ),
         PutStep(
             put=openapi_clients_npm_package.name,
+            params={
+                "path": "mit-open-api-clients/src/typescript/mit-open-api-axios",
+            },
         ),
     ],
 )
 
 build_pipeline = Pipeline(
     resources=[
-        git_image,
-        openapi_generator_image,
-        python_image,
-        node_image,
         mit_open_repository,
         mit_open_api_clients_repository,
+        openapi_generator_image,
         openapi_clients_npm_package,
+        openapi_clients_semver,
+    ],
+    resource_types=[
+        semver_resource(),
+        npm_package_resource(),
     ],
     jobs=[
         generate_clients_job,
