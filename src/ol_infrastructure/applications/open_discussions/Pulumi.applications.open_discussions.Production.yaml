@@ -3,5 +3,63 @@ secretsprovider: awskms://alias/PulumiSecrets
 encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQFyMNsni/CiuQ7OAMJotsmZAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMff+vqQR+DaZXFdIYAgEQgDs3S7BzLrSpp+h6dXGtR2uFbMJR1mjd//RPmVnOnZBirQ0iqTZJxoI6v7C7FdUHCc5Ne18J0zpkn28+cg==
 config:
   aws:region: us-east-1
+  heroku:app_id:
+    secure: v1:yPt4i/3wBnxmyseV:SBEvtUSJM7+nZYMweOnxlKAHa3vDjU7yXopxMewbJiTp9AOxb3e7688v9pCpXDHypItk2Q==
+  heroku_app:vars:
+    ACCESS_TOKEN_URL: "https://sso.ol.mit.edu/realms/olapps/protocol/openid-connect/token"
+    AUTHORIZATION_URL: "https://sso.ol.mit.edu/realms/olapps/protocol/openid-connect/auth"
+    AWS_STORAGE_BUCKET_NAME: 'odl-discussions-production'
+    CELERY_WORKER_MAX_MEMORY_PER_CHILD: "250000"
+    CLOUDFRONT_DIST: "d2mcnjhkvrfuy2"
+    CORS_ALLOWED_ORIGINS: '["https://micromasters.mit.edu", "https://ocwnext.odl.mit.edu",
+      "https://ocw-beta.odl.mit.edu", "https://ocw-preview.odl.mit.edu", "https://ocw-published.odl.mit.edu",
+      "https://draft.ocw.mit.edu", "https://www.ocw.mit.edu", "https://ocw.mit.edu",
+      "https://live.ocw.mit.edu"]'
+    DEBUG: "False"
+    EDX_LEARNING_COURSE_BUCKET_NAME: "edxorg-production-edxapp-courses"
+    ENABLE_INFINITE_CORRIDOR: "False"
+    FEATURE_COURSE_UI: "False"
+    FEATURE_KEYCLOAK_ENABLED: "False"
+    GA_G_TRACKING_ID: "G-5L2PYSTC4H"
+    GA_TRACKING_ID: "UA-5145472-30"
+    INDEXING_API_USERNAME: "od_mm_prod_api"
+    KEYCLOAK_BASE_URL: ""
+    KEYCLOAK_REALM_NAME: ""
+    MAILGUN_FROM_EMAIL: 'MIT Open <no-reply@mail.open.mit.edu'
+    MICROMASTERS_CATALOG_API_URL: "https://micromasters.mit.edu/api/v0/catalog/"
+    MICROMASTERS_COURSE_URL: "https://micromasters.mit.edu/api/v0/courseruns/"
+    MAILGUN_SENDER_DOMAIN: "mail.open.mit.edu"
+    MAILGUN_URL: "https://api.mailgun.net/v3/mail.open.mit.edu"
+    MICROMASTERS_BASE_URL: "https://micromasters.mit.edu"
+    MICROMASTERS_EXTERNAL_LOGIN_URL: "https://micromasters.mit.edu/discussions"
+    NEW_RELIC_APP_NAME: "discussions-production"
+    OCW_ITERATOR_CHUNK_SIZE: "300"
+    OCW_LEARNING_COURSE_BUCKET_NAME: "open-learning-course-data-production"
+    OCW_NEXT_AWS_STORAGE_BUCKET_NAME: "ol-ocw-studio-app-production"
+    OCW_NEXT_BASE_URL: "https://ocw.mit.edu/"
+    OCW_NEXT_LIVE_BUCKET: "ocw-content-live-production"
+    OCW_UPLOAD_IMAGE_ONLY: "False"
+    OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
+    OPEN_DISCUSSIONS_BASE_URL: "https://open.mit.edu"
+    OPEN_DISCUSSIONS_COOKIE_NAME: "discussionsprod"
+    OPEN_DISCUSSIONS_COOKIE_DOMAIN: "mit.edu"
+    OPEN_DISCUSSIONS_CORS_ORIGIN_WHITELIST: '["https://micromasters.mit.edu", "https://ocwnext.odl.mit.edu",
+      "https://ocw-beta.odl.mit.edu", "https://ocw-preview.odl.mit.edu", "https://ocw-published.odl.mit.edu",
+      "https://draft.ocw.mit.edu", "https://www.ocw.mit.edu", "https://ocw.mit.edu",
+      "https://live.ocw.mit.edu"]'
+    OPEN_DISCUSSIONS_ENVIRONMENT: "production"
+    OPEN_DISCUSSIONS_LOG_LEVEL: "INFO"
+    OPEN_DISCUSSIONS_SUPPORT_EMAIL: "odl-discussions-support@mit.edu"
+    OPENSEARCH_INDEX: "discussions"
+    OPENSEARCH_SHARD_COUNT: "3"
+    OPENSEARCH_URL: 'https://search-opensearch-open-production-dg3wjt3eud45psxdrw3lz3k2ie.us-east-1.es.amazonaws.com'
+    PGBOUNCER_DEFAULT_POOL_SIZE: "50"
+    PGBOUNCER_MAX_CLIENT_CONN: "500"
+    PGBOUNCER_MIN_POOL_SIZE: "20"
+    SOCIAL_AUTH_MICROMASTERS_LOGIN_URL: "https://micromasters.mit.edu/login/edxorg/?next=/discussions/"
+    SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
+    SOCIAL_AUTH_SAML_SP_ENTITY_ID: "https://discussions.odl.mit.edu/saml/metadata"
+    TIKA_SERVER_ENDPOINT: "https://tika-production.odl.mit.edu"
+    USERINFO_URL: "https://sso.ol.mit.edu/realms/olapps/protocol/openid-connect/userinfo"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
