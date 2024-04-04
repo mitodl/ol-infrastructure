@@ -22,14 +22,14 @@ config:
   keycloak:okta_single_sign_on_service_url: https://dev-66940844.okta.com/app/dev-66940844_mitci_1/exkcshk0uw4gnJILX5d7/sso/saml
   keycloak:openid_clients:
   - client_info:
-      open-discusions: https://discussions-ci.odl.mit.edu
+      open-discusions: ["https://discussions-ci.odl.mit.edu"]
       open-local: "*"
     realm_name: olapps
   - client_info:
-      superset: https://bi-ci.ol.mit.edu
+      superset: ["https://bi-ci.ol.mit.edu", superset_admin, superset_alpha]
     realm_name: ol-data-platform
   - client_info:
-      leek: https://celery-monitoring-ci.odl.mit.edu
+      leek: ["https://celery-monitoring-ci.odl.mit.edu"]
     realm_name: ol-platform-engineering
   keycloak:url: https://sso-ci.ol.mit.edu
   vault:address: https://vault-ci.odl.mit.edu

@@ -455,21 +455,51 @@ ol_data_oidc_attribute_importer_identity_provider_mapper = (
         },
         opts=resource_options,
     ),
+    # Map Moira group membership to superset role
+    # ol-eng-data -> superset_admin
+    keycloak.AttributeToRoleIdentityMapper(
+        "ol-data-saml-superset-admin-ol-eng-data",
+        realm=ol_data_platform_realm.id,
+        attribute_friendly_name="mitMoiraMemberOf",
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        attribute_value="ol-eng-data",
+        role="ol-superset-client.superset_admin",
+        extra_config={
+            "syncMode": "FORCE",
+        },
+        opts=resource_options,
+    ),
+    # Map Moira group membership to superset role
+    # ol-eng-finance -> superset_alpha
+    keycloak.AttributeToRoleIdentityMapper(
+        "ol-data-saml-superset-alpha-ol-eng-finance",
+        realm=ol_data_platform_realm.id,
+        attribute_friendly_name="mitMoiraMemberOf",
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        attribute_value="ol-eng-finance",
+        role="ol-superset-client.superset_alpha",
+        extra_config={
+            "syncMode": "FORCE",
+        },
+        opts=resource_options,
+    ),
 )
 
 # Check if any Openid clients exist in config and create them
 for openid_clients in keycloak_config.get_object("openid_clients"):
     realm_name = openid_clients.get("realm_name")
     client_details = openid_clients.get("client_info")
-    for client_name, client_url in client_details.items():
+    for client_name, client_detail in client_details.items():
+        url = client_detail[0]
         openid_client = keycloak.openid.Client(
             f"{realm_name}-{client_name}-client",
+            name=f"ol-{client_name}-client",
             realm_id=realm_name,
             client_id=f"ol-{client_name}-client",
             enabled=True,
             access_type="CONFIDENTIAL",
             standard_flow_enabled=True,
-            valid_redirect_uris=[f"{client_url}/*"],
+            valid_redirect_uris=[f"{url}/*"],
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
         )
         vault.generic.Secret(
@@ -489,6 +519,15 @@ for openid_clients in keycloak_config.get_object("openid_clients"):
                 realm_name=realm_name,
             ).apply(json.dumps),
         )
+        if len(client_detail) > 1:
+            for role in client_detail[1:]:
+                openid_client_role = keycloak.Role(
+                    role,
+                    name=role,
+                    client_id=openid_client.id,
+                    realm_id=realm_name,
+                    opts=resource_options,
+                )
 
 # OL - First login flow [START]
 # Does not require email verification or confirmation to connect with existing account.
