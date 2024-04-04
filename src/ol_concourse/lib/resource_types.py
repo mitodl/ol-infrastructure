@@ -14,7 +14,7 @@ def npm_package_resource() -> ResourceType:
     return ResourceType(
         name=Identifier("npm-package"),
         type=REGISTRY_IMAGE,
-        source=RegistryImage(repository="timotto/concourse-npm-resource"),
+        source=RegistryImage(repository="mitodl/concourse-npm-resource"),
     )
 
 

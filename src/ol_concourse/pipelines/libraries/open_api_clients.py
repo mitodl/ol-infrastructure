@@ -13,8 +13,8 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resource_types import npm_package_resource, semver_resource
-from ol_concourse.lib.resources import git_repo, git_semver, npm_package, ssh_git_repo
+from ol_concourse.lib.resource_types import npm_package_resource
+from ol_concourse.lib.resources import git_repo, npm_package, ssh_git_repo
 
 mit_open_repository_uri = "https://github.com/mitodl/mit-open"
 ssh_mit_open_repository_uri = "git@github.com:mitodl/mit-open.git"
@@ -53,14 +53,6 @@ node_image = Resource(
         "repository": "node",
         "tag": "18-slim",
     },
-)
-
-openapi_clients_semver = git_semver(
-    name=Identifier("openapi-clients-semver"),
-    uri=ssh_mit_open_repository_uri,
-    private_key="((open_api_clients.odlbot_private_ssh_key))",
-    branch="main",
-    file="openapi/specs/version.yaml",
 )
 
 openapi_clients_npm_package = npm_package(
@@ -116,18 +108,27 @@ generate_clients_job = Job(
 create_release_job = Job(
     name="create-release",
     plan=[
+        TaskStep(
+            task="bump-version",
+            image=python_image.name,
+            config=TaskConfig(
+                platform="linux",
+                inputs=[Input(name=mit_open_api_clients_repository.name)],
+                outputs=[Output(name=mit_open_api_clients_repository.name)],
+                run=Command(
+                    path="/bin/bash",
+                    dir="mit-open-api-clients",
+                    args=[
+                        "-exc",
+                        ("scripts/open-api-clients-bumpver.sh"),
+                    ],
+                ),
+            ),
+        ),
         GetStep(
             get=mit_open_api_clients_repository.name,
             passed=[generate_clients_job.name],
             trigger=True,
-        ),
-        PutStep(
-            put=openapi_clients_semver.name,
-            params={
-                "file": "mit-open-api-clients/VERSION",
-                "branch": "main",
-                "private_key": "((open_api_clients.odlbot_private_ssh_key))",
-            },
         ),
         PutStep(
             put=mit_open_api_clients_repository.name,
@@ -162,10 +163,8 @@ build_pipeline = Pipeline(
         mit_open_api_clients_repository,
         openapi_generator_image,
         openapi_clients_npm_package,
-        openapi_clients_semver,
     ],
     resource_types=[
-        semver_resource(),
         npm_package_resource(),
     ],
     jobs=[
