@@ -5,7 +5,7 @@ config:
   consul:address: https://consul-apps-production.odl.mit.edu
   heroku:app_id:
     secure: v1:mdVwWs7IkyH7o5j7:49eMfOoVshilsOCouixsxdQSGehSeqRHF3DhPWp2UIiE1clEoyoKqOodkpBQ27rik/MIDg==
-  heroku:user: "ol-engineering-finance"
+  heroku:user: "odl-devops"
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "ocw.mit.edu"
