@@ -10,14 +10,6 @@ def semver_resource() -> ResourceType:
     )
 
 
-def npm_package_resource() -> ResourceType:
-    return ResourceType(
-        name=Identifier("npm-package"),
-        type=REGISTRY_IMAGE,
-        source=RegistryImage(repository="mitodl/concourse-npm-resource"),
-    )
-
-
 def github_issues_resource() -> ResourceType:
     return ResourceType(
         name=Identifier("github-issues"),

@@ -259,27 +259,6 @@ def slack_notification(name: Identifier, url: str) -> Resource:
     )
 
 
-def npm_package(
-    name: Identifier,
-    package: Identifier,
-    npmjs_token: Identifier,
-    scope: Identifier,
-) -> Resource:
-    return Resource(
-        name=name,
-        type="npm-package",
-        icon="language-javascript",
-        source={
-            "package": package,
-            "scope": scope,
-            "registry": {
-                "uri": "https://registry.npmjs.org",
-                "token": npmjs_token,
-            },
-        },
-    )
-
-
 # This resource type also supports s3, gcs and others. We can create those later.
 def git_semver(  # noqa: PLR0913
     name: str,
