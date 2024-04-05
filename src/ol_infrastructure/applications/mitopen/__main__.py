@@ -327,6 +327,7 @@ heroku_vars = {
     "NEW_RELIC_LOG": "stdout",
     "NODE_MODULES_CACHE": "False",
     "OCW_UPLOAD_IMAGE_ONLY": "True",
+    "OCW_LIVE_BUCKET": "ocw-content-live-production",
     "OLL_ALT_URL": "https://openlearninglibrary.mit.edu/courses/",
     "OLL_API_ACCESS_TOKEN_URL": "https://openlearninglibrary.mit.edu/oauth2/access_token/",
     "OLL_API_URL": "https://discovery.openlearninglibrary.mit.edu/api/v1/catalogs/1/courses/",

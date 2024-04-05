@@ -36,7 +36,6 @@ config:
     OCW_BASE_URL: "https://ocw.mit.edu/"
     OCW_CONTENT_BUCKET_NAME: "ocw-content-storage"
     OCW_ITERATOR_CHUNK_SIZE: 300
-    OCW_LIVE_BUCKET: "ocw-content-live-production"
     OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
     OPENSEARCH_INDEX: "mitopen"
     OPENSEARCH_SHARD_COUNT: 3

@@ -24,7 +24,6 @@ config:
     OCW_BASE_URL: "https://live-qa.ocw.mit.edu/"
     OCW_CONTENT_BUCKET_NAME: "ocw-content-storage"
     OCW_ITERATOR_CHUNK_SIZE: 300
-    OCW_LIVE_BUCKET: "ocw-content-live-qa"
     OIDC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
     OPENSEARCH_INDEX: "mitopen-rc"
     OPENSEARCH_SHARD_COUNT: 2
