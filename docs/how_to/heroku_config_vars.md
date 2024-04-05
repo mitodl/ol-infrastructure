@@ -5,6 +5,10 @@
 
 The resource/mechanism we are using to manage config vars in Heroku is called a 'ConfigAssociation' which is documented (here)[https://www.pulumi.com/registry/packages/heroku/api-docs/app/configassociation/]. A `ConfigAssociation` takes in an application ID and two sets of variable maps: `sensitive_vars` and `vars`. The only difference being that `sensitive_vars` will not be output during `up` operations.
 
+#### Required config for the pulumi provider
+
+The `pulumiverse_heroku` provider requries a configuration item in the pulumi stacks named `heroku:apiKey`. We don't want to have to encrypt that api key in two dozen different stacks so we wrapped our provider config with a `setup_heroku_provider()` function much the same way we do vault. This can be seen (here)[https://github.com/mitodl/ol-infrastructure/blob/main/src/ol_infrastructure/lib/heroku.py]. In lieu of setting `heroku:apiKey` in ever stack, we can set `heroku:user` which this function will then do a lookup in the backgroun out of sops config to get the apporpriate apiKey value.
+
 ### Four Flavors of Vars
 
 While we don't yet have a component resource or abstraction available for setting up Config Vars in a simpler fashion, we do have a basic blueprint available with the MITOpen application.
