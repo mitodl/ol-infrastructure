@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 # publish the npm package to npmjs.org
 
 yarn install --immutable
