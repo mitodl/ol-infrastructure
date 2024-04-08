@@ -499,7 +499,7 @@ for openid_clients in keycloak_config.get_object("openid_clients"):
             enabled=True,
             access_type="CONFIDENTIAL",
             standard_flow_enabled=True,
-            valid_redirect_uris=[f"{url}/*"],
+            valid_redirect_uris=[f"{url}"],
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
         )
         vault.generic.Secret(
@@ -519,15 +519,14 @@ for openid_clients in keycloak_config.get_object("openid_clients"):
                 realm_name=realm_name,
             ).apply(json.dumps),
         )
-        if len(client_detail) > 1:
-            for role in client_detail[1:]:
-                openid_client_role = keycloak.Role(
-                    role,
-                    name=role,
-                    client_id=openid_client.id,
-                    realm_id=realm_name,
-                    opts=resource_options,
-                )
+        for role in client_detail[1:]:
+            openid_client_role = keycloak.Role(
+                role,
+                name=role,
+                client_id=openid_client.id,
+                realm_id=realm_name,
+                opts=resource_options,
+            )
 
 # OL - First login flow [START]
 # Does not require email verification or confirmation to connect with existing account.
