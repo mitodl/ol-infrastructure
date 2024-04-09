@@ -2,14 +2,6 @@ from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.models.pipeline import Identifier, RegistryImage, ResourceType
 
 
-def npm_package_resource() -> ResourceType:
-    return ResourceType(
-        name=Identifier("npm-package"),
-        type=REGISTRY_IMAGE,
-        source=RegistryImage(repository="mitodl/concourse-npm-resource"),
-    )
-
-
 def semver_resource() -> ResourceType:
     return ResourceType(
         name=Identifier("semver"),
