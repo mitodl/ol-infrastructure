@@ -14,7 +14,8 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resources import git_repo, ssh_git_repo
+from ol_concourse.lib.resource_types import npm_package_resource
+from ol_concourse.lib.resources import git_repo, npm_package, ssh_git_repo
 
 mit_open_repository_uri = "https://github.com/mitodl/mit-open"
 
@@ -22,6 +23,14 @@ mit_open_repository_uri = "https://github.com/mitodl/mit-open"
 def _read_script(script_name: str) -> str:
     return (Path(__file__).parent / "scripts" / script_name).read_text()
 
+
+openapi_clients_npm_package = npm_package(
+    name=Identifier("openapi-clients-npm-package"),
+    package="@mitodl/open-api-axios",
+    scope="mitodl",
+    package_manager="yarn",
+    npmjs_token="((open_api_clients.npmjs_token))",  # noqa: S106
+)
 
 git_image = Resource(
     name=Identifier("git-image"),
@@ -147,19 +156,11 @@ publish_job = Job(
             passed=[create_release_job.name],
             trigger=True,
         ),
-        TaskStep(
-            task="publish-node",
-            image=node_image.name,
-            config=TaskConfig(
-                platform="linux",
-                inputs=[Input(name=mit_open_api_clients_repository.name)],
-                params={"NPM_TOKEN": "((open_api_clients.npmjs_token))"},
-                run=Command(
-                    path="sh",
-                    dir="mit-open-api-clients/src/typescript/mit-open-api-axios",
-                    args=["-xc", _read_script("open-api-clients-publish-node.sh")],
-                ),
-            ),
+        PutStep(
+            put=openapi_clients_npm_package.name,
+            params={
+                "path": "mit-open-api-clients/src/typescript/mit-open-api-axios",
+            },
         ),
     ],
 )
@@ -171,7 +172,9 @@ build_pipeline = Pipeline(
         openapi_generator_image,
         python_image,
         node_image,
+        openapi_clients_npm_package,
     ],
+    resource_types=[npm_package_resource()],
     jobs=[
         generate_clients_job,
         create_release_job,
