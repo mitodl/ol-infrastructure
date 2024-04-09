@@ -24,16 +24,16 @@ config:
   keycloak:okta_single_sign_on_service_url: https://dev-66940844.okta.com/app/dev-66940844_collintestlogin_1/exk8gfblmeePE5uUQ5d7/sso/saml
   keycloak:openid_clients:
   - client_info:
-      open: https://mitopen-rc.odl.mit.edu
-      open-discussions: https://discussions-rc.odl.mit.edu
+      open: ["https://mitopen-rc.odl.mit.edu/*"]
+      open-discussions: ["https://discussions-rc.odl.mit.edu/*"]
     realm_name: olapps
   - client_info:
-      airbyte: https://airbyte-qa.odl.mit.edu
-      dagster: https://pipelines-qa.odl.mit.edu
-      leek: https://celery-monitoring-qa.odl.mit.edu
+      airbyte: ["https://airbyte-qa.odl.mit.edu/*"]
+      dagster: ["https://pipelines-qa.odl.mit.edu/*"]
+      leek: ["https://celery-monitoring-qa.odl.mit.edu/*"]
     realm_name: ol-platform-engineering
   - client_info:
-      superset: https://bi-qa.ol.mit.edu
+      superset: ["https://bi-qa.ol.mit.edu/*", "superset_admin", "superset_alpha"]
     realm_name: ol-data-platform
   keycloak:url: https://sso-qa.ol.mit.edu
   keycloak:user_migration_open_discussions_bearer_token:
