@@ -35,7 +35,7 @@ ENABLE_PROXY_FIX = os.environ.get("ENABLE_PROXY_FIX", "True").lower() == "true"
 # --------------------------------
 APP_NAME = "MIT OL Business Intelligence"
 # Specify the App icon. Useful for white-labeling
-APP_ICON = "/static/assets/images/superset-logo-horiz.png"
+APP_ICON = "../static/assets/images/OL_sub-brand_lockup_one-line_rgb_black.png"
 
 # ----------------------------------------------------
 # AUTHENTICATION CONFIG
