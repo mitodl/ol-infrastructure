@@ -257,3 +257,39 @@ def slack_notification(name: Identifier, url: str) -> Resource:
     return Resource(
         name=name, type="slack-notification", source={"url": url, "disabled": False}
     )
+
+
+# This resource type also supports s3, gcs and others. We can create those later.
+def git_semver(  # noqa: PLR0913
+    name: str,
+    uri: str,
+    branch: str,
+    file: str,
+    private_key: Optional[str] = None,
+    username: Optional[str] = None,
+    password: Optional[str] = None,
+    git_user: Optional[str] = None,
+    depth: Optional[int] = None,
+    skip_ssl_verification: bool = False,  # noqa: FBT001, FBT002
+    commit_message: Optional[str] = None,
+    initial_version: str = "0.0.0",
+) -> Resource:
+    return Resource(
+        name=name,
+        type="semver",
+        icon="version",
+        source={
+            "initial_version": initial_version,
+            "driver": "git",
+            "uri": uri,
+            "branch": branch,
+            "file": file,
+            "private_key": private_key,
+            "username": username,
+            "password": password,
+            "git_user": git_user,
+            "depth": depth,
+            "skip_ssl_verification": skip_ssl_verification,
+            "commit_message": commit_message,
+        },
+    )

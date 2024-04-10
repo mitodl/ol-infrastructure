@@ -2,6 +2,14 @@ from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.models.pipeline import Identifier, RegistryImage, ResourceType
 
 
+def semver_resource() -> ResourceType:
+    return ResourceType(
+        name=Identifier("semver"),
+        type=REGISTRY_IMAGE,
+        source=RegistryImage(repository="concourse/semver-resource"),
+    )
+
+
 def github_issues_resource() -> ResourceType:
     return ResourceType(
         name=Identifier("github-issues"),
