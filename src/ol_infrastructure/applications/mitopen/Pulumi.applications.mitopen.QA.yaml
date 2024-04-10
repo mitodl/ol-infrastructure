@@ -21,8 +21,6 @@ config:
     MITOPEN_COOKIE_NAME: "mitopen-rc"
     MITOPEN_LOG_LEVEL: "INFO"
     MITOPEN_SUPPORT_EMAIL: "odl-mitopen-rc-support@mit.edu"
-    OCW_BASE_URL: "https://live-qa.ocw.mit.edu/"
-    OCW_CONTENT_BUCKET_NAME: "ocw-content-storage"
     OCW_ITERATOR_CHUNK_SIZE: 300
     OIDC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
     OPENSEARCH_INDEX: "mitopen-rc"

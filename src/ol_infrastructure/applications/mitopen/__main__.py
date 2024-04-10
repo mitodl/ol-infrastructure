@@ -326,6 +326,8 @@ heroku_vars = {
     "MITX_ONLINE_PROGRAMS_API_URL": "https://mitxonline.mit.edu/api/programs/",
     "NEW_RELIC_LOG": "stdout",
     "NODE_MODULES_CACHE": "False",
+    "OCW_BASE_URL": "https://ocw.mit.edu/",
+    "OCW_CONTENT_BUCKET_NAME": "ocw-content-storage",
     "OCW_UPLOAD_IMAGE_ONLY": "True",
     "OCW_LIVE_BUCKET": "ocw-content-live-production",
     "OLL_ALT_URL": "https://openlearninglibrary.mit.edu/courses/",
