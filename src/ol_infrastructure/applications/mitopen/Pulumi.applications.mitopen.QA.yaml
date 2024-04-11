@@ -21,10 +21,7 @@ config:
     MITOPEN_COOKIE_NAME: "mitopen-rc"
     MITOPEN_LOG_LEVEL: "INFO"
     MITOPEN_SUPPORT_EMAIL: "odl-mitopen-rc-support@mit.edu"
-    OCW_BASE_URL: "https://live-qa.ocw.mit.edu/"
-    OCW_CONTENT_BUCKET_NAME: "ocw-content-storage"
     OCW_ITERATOR_CHUNK_SIZE: 300
-    OCW_LIVE_BUCKET: "ocw-content-live-qa"
     OIDC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
     OPENSEARCH_INDEX: "mitopen-rc"
     OPENSEARCH_SHARD_COUNT: 2
@@ -34,7 +31,6 @@ config:
     PGBOUNER_MIN_POOL_SIZE: 20
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT:
     TIKA_SERVER_ENDPOINT: "https://tika-qa.odl.mit.edu"
-    MICROMASTERS_CMS_API_URL: "https://micromasters-rc.odl.mit.edu/api/v0/wagtail/"
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "live-qa.ocw.mit.edu"
@@ -43,8 +39,6 @@ config:
     - "https://ol-devops-ci.odl.mit.edu"
     - "https://draft-qa.ocw.mit.edu"
     - "https://live-qa.ocw.mit.edu"
-    etl_micromasters_host: "micromasters-rc.odl.mit.edu"
-    etl_xpro_host: "rc.xpro.mit.edu"
     mailgun_sender_domain: "discussions-mail.odl.mit.edu"
     sso_url: "sso-qa.ol.mit.edu"
   mitopen:db_instance_size: "db.t4g.small"
