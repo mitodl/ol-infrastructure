@@ -1,0 +1,549 @@
+repo_name: mitodl/ol-infrastructure
+report_id: b82281eec53b6be1df92df593662abe4
+version: 0.1
+repo_type: Public
+timestamp: '2024-04-11T19:08:54+00:00'
+requested_by: blarghmatey
+provider: github
+branch: main
+detected_tools_count: 42
+tools:
+- name: Golang
+  description: An open source programming language that makes it easy to build simple,
+    reliable, and efficient software
+  website_url: http://golang.org/
+  license: BSD-3-Clause
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Languages
+  image_url: https://img.stackshare.io/service/1005/O6AczwfV_400x400.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/tika/files/docker-compose.yaml
+  detection_source: src/bilder/images/tika/files/docker-compose.yaml
+  last_updated_by: Chris Patti
+  last_updated_on: 2023-09-08 20:51:53.000000000 Z
+- name: Python
+  description: A clear and powerful object-oriented programming language, comparable
+    to Perl, Ruby, Scheme, or Java.
+  website_url: https://www.python.org
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Languages
+  image_url: https://img.stackshare.io/service/993/pUBY5pVj.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure
+  detection_source: Repo Metadata
+- name: ".NET"
+  description: A free, cross-platform, open source developer platform for building
+    many different types of applications
+  website_url: http://www.microsoft.com/net/
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Frameworks (Full Stack)
+  image_url: https://img.stackshare.io/service/1014/IoPy1dce_400x400.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Ardiea
+  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+- name: Node.js
+  description: A platform built on Chrome's JavaScript runtime for easily building
+    fast, scalable network applications
+  website_url: http://nodejs.org/
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Frameworks (Full Stack)
+  image_url: https://img.stackshare.io/service/1011/n1JRsFeB_400x400.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/dockerfiles/ocw/node-hugo/Dockerfile
+  detection_source: dockerfiles/ocw/node-hugo/Dockerfile
+  last_updated_by: Mark Breedlove
+  last_updated_on: 2021-05-19 18:45:54.000000000 Z
+- name: Apache Ignite
+  description: An open-source distributed database, caching and processing platform
+  website_url: http://ignite.apache.org/
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Data Stores
+  sub_category: In-Memory Databases
+  image_url: https://img.stackshare.io/service/6053/xTBxO73F_200x200.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/tika/files/docker-compose.yaml
+  detection_source: src/bilder/images/tika/files/docker-compose.yaml
+  last_updated_by: renovate[bot]
+  last_updated_on: 2024-04-06 04:14:09.000000000 Z
+- name: Celery
+  description: Distributed task queue
+  website_url: http://www.celeryproject.org/
+  open_source: true
+  hosted_saas: false
+  category: Data Stores
+  sub_category: Message Queue
+  image_url: https://img.stackshare.io/service/1075/celery.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/superset/files/docker-compose.yaml
+  detection_source: src/bilder/images/superset/files/docker-compose.yaml
+  last_updated_by: Tobias Macey
+  last_updated_on: 2023-12-15 18:42:55.000000000 Z
+- name: Compose
+  description: 'We host databases for busy devs: production-ready, cloud-hosted, open
+    source.'
+  website_url: https://www.compose.io/
+  open_source: false
+  hosted_saas: true
+  category: Data Stores
+  sub_category: MongoDB Hosting
+  image_url: https://img.stackshare.io/service/201/reB72Lh4.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Ardiea
+  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+- name: Cron
+  description: Background-only application
+  website_url: https://directory.fsf.org/wiki/Cron
+  open_source: false
+  hosted_saas: false
+  category: Data Stores
+  sub_category: Background Processing
+  image_url: https://img.stackshare.io/service/2416/default_274ed9bcc98502018f007cfcd8c09f3514d3d319.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Tobias Macey
+  last_updated_on: 2022-09-16 20:05:45.000000000 Z
+- name: DB
+  description: 'Version control for databases: save, restore, and archive snapshots
+    of your database from the command line'
+  website_url: https://github.com/infostreams/db
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Data Stores
+  sub_category: Database Tools
+  image_url: https://img.stackshare.io/service/11593/no-img.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Ardiea
+  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+- name: MongoDB
+  description: The database for giant ideas
+  website_url: http://www.mongodb.com/
+  open_source: true
+  hosted_saas: false
+  category: Data Stores
+  sub_category: Databases
+  image_url: https://img.stackshare.io/service/1030/leaf-360x360.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/ol_concourse/pipelines/infrastructure/mongodb_atlas/pulumi_pipeline.py
+  detection_source: src/ol_concourse/pipelines/infrastructure/mongodb_atlas/pulumi_pipeline.py
+  last_updated_by: Ardiea
+  last_updated_on: 2023-10-04 12:33:32.000000000 Z
+- name: PostgreSQL
+  description: A powerful, open source object-relational database system
+  website_url: http://www.postgresql.org/
+  open_source: true
+  hosted_saas: false
+  category: Data Stores
+  sub_category: Databases
+  image_url: https://img.stackshare.io/service/1028/ASOhU5xJ.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Ardiea
+  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+- name: Redis
+  description: Open source (BSD licensed), in-memory data structure store
+  website_url: http://redis.io/
+  license: BSD-3-Clause
+  open_source: true
+  hosted_saas: false
+  category: Data Stores
+  sub_category: In-Memory Databases
+  image_url: https://img.stackshare.io/service/1031/default_cbce472cd134adc6688572f999e9122b9657d4ba.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/ol_superset/docker-compose.yaml
+  detection_source: src/ol_superset/docker-compose.yaml
+  last_updated_by: Tobias Macey
+  last_updated_on: 2023-12-15 18:42:55.000000000 Z
+- name: Serverless AppSync
+  description: Easily and quickly deploy GraphQL APIs on AWS
+  website_url: https://github.com/serverless-components/aws-app-sync
+  open_source: false
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: GraphQL Tools
+  image_url: https://img.stackshare.io/service/11394/appsync.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Tobias Macey
+  last_updated_on: 2024-03-29 21:27:25.000000000 Z
+- name: Consul
+  description: A tool for service discovery, monitoring and configuration
+  website_url: http://www.consul.io/
+  license: MPL-2.0
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Open Source Service Discovery
+  image_url: https://img.stackshare.io/service/747/consul-logo-grad_teaser.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Sar
+  last_updated_on: 2023-08-08 14:05:55.000000000 Z
+- name: Docker
+  description: Enterprise Container Platform for High-Velocity Innovation.
+  website_url: https://www.docker.com/
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Virtual Machine Platforms & Containers
+  image_url: https://img.stackshare.io/service/586/n4u37v9t_400x400.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure
+  detection_source: Repo Metadata
+- name: Git
+  description: Fast, scalable, distributed revision control system
+  website_url: http://git-scm.com/
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Version Control System
+  image_url: https://img.stackshare.io/service/1046/git.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure
+  detection_source: Repo Metadata
+  last_updated_by: Ardiea
+  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+- name: GitHub Actions
+  description: Automate your workflow from idea to production
+  website_url: https://github.com/features/actions
+  open_source: false
+  hosted_saas: true
+  category: Build, Test, Deploy
+  sub_category: Continuous Integration
+  image_url: https://img.stackshare.io/service/11563/actions.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/.github/workflows/project_automation.yaml
+  detection_source: ".github/workflows/project_automation.yaml"
+  last_updated_by: renovate[bot]
+  last_updated_on: 2024-04-11 16:03:47.000000000 Z
+- name: NGINX
+  description: A high performance free open source web server powering busiest sites
+    on the Internet.
+  website_url: http://nginx.org
+  open_source: false
+  hosted_saas: false
+  category: Application Hosting
+  sub_category: Web Servers
+  image_url: https://img.stackshare.io/service/1052/YMxUfyWf.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Ardiea
+  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+- name: NuGet
+  description: The package manager for .NET
+  website_url: https://www.nuget.org/
+  open_source: false
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Package Managers
+  image_url: https://img.stackshare.io/service/2637/6I3oEOP4_400x400.jpg
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Ardiea
+  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+- name: PyPI
+  description: A repository of software for the Python programming language
+  website_url: https://pypi.org/
+  open_source: false
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Hosted Package Repository
+  image_url: https://img.stackshare.io/service/12572/-RIWgodF_400x400.jpg
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/pyproject.toml
+  detection_source: pyproject.toml
+  last_updated_by: Tobias Macey
+  last_updated_on: 2020-05-26 20:26:41.000000000 Z
+- name: Traefik
+  description: The Cloud Native Edge Router
+  website_url: https://traefik.io/
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Load Balancer / Reverse Proxy
+  image_url: https://img.stackshare.io/service/5126/default_0a34be001ec8247c641508aa468564fb386bc50c.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Tobias Macey
+  last_updated_on: 2024-03-29 21:27:25.000000000 Z
+- name: Vagrant
+  description: A tool for building and distributing development environments
+  website_url: http://www.vagrantup.com/
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Virtual Machine Management
+  image_url: https://img.stackshare.io/service/768/150px-Vagrant.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/Vagrantfile
+  detection_source: Vagrantfile
+  last_updated_by: Tobias Macey
+  last_updated_on: 2021-02-25 00:08:52.000000000 Z
+- name: hub
+  description: Wraps Git with extra features that make working with GitHub easier
+    (by GitHub)
+  website_url: http://hub.github.com/
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Git Tools
+  image_url: https://img.stackshare.io/no-img-open-source.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Ardiea
+  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+- name: IronWorker
+  description: High-Scale Async Task Processing
+  website_url: http://www.iron.io/worker
+  open_source: false
+  hosted_saas: false
+  category: Application Hosting
+  sub_category: Serverless / Task Processing
+  image_url: https://img.stackshare.io/service/2221/default_ff2de42167808184b0a4ec1075adb5bcb0aa3206.jpg
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Ardiea
+  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+- name: Alpine Linux
+  description: Security-oriented, lightweight Linux distribution based on musl libc
+    and busybox
+  website_url: https://www.alpinelinux.org/
+  open_source: false
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Operating Systems
+  image_url: https://img.stackshare.io/service/6429/alpine_linux.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/dockerfiles/dcind/Dockerfile
+  detection_source: dockerfiles/dcind/Dockerfile
+  last_updated_by: Mike Davidson
+  last_updated_on: 2023-12-15 20:40:42.000000000 Z
+- name: Alt
+  description: A library for managing data within JavaScript applications
+  website_url: https://alt.js.org/
+  open_source: false
+  hosted_saas: false
+  category: Libraries
+  sub_category: Javascript Utilities & Libraries
+  image_url: https://img.stackshare.io/service/3649/default_01276c9c0c79674b16f9b29216bd8cc7ce9b894d.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Ardiea
+  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+- name: Apache Tika
+  description: A content analysis toolkit
+  website_url: https://tika.apache.org/
+  open_source: false
+  hosted_saas: false
+  category: Support, Sales, and Marketing
+  sub_category: Self-Hosted Blogging / CMS
+  image_url: https://img.stackshare.io/service/6978/default_2d2d8e8ebcd90a047782f44f9cd4174535c47857.jpg
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/tika/files/docker-compose.yaml
+  detection_source: src/bilder/images/tika/files/docker-compose.yaml
+  last_updated_by: renovate[bot]
+  last_updated_on: 2024-04-06 04:14:09.000000000 Z
+- name: Base
+  description: All-in-one sales and customer management platform
+  website_url: https://getbase.com/
+  open_source: false
+  hosted_saas: false
+  category: Support, Sales, and Marketing
+  sub_category: CRM
+  image_url: https://img.stackshare.io/service/3633/ZBMmmvP1_400x400.jpg
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Ardiea
+  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+- name: Keycloak
+  description: An open source identity and access management solution
+  website_url: https://www.keycloak.org/
+  open_source: false
+  hosted_saas: false
+  category: Application Utilities
+  sub_category: User Management and Authentication
+  image_url: https://img.stackshare.io/service/5439/oAC05cEB_400x400.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/keycloak/files/docker-compose.yaml
+  detection_source: src/bilder/images/keycloak/files/docker-compose.yaml
+  last_updated_by: Sar
+  last_updated_on: 2023-12-07 18:43:12.000000000 Z
+- name: Shell
+  description: A shell is a text-based terminal, used for manipulating programs and
+    files. Shell scripts typically manage program execution.
+  website_url: https://en.wikipedia.org/wiki/Shell_script
+  open_source: false
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Languages
+  image_url: https://img.stackshare.io/service/4631/default_c2062d40130562bdc836c13dbca02d318205a962.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure
+  detection_source: Repo Metadata
+- name: Threads Forum
+  description: A modern forum for work where focused discussions and decisions take
+    place
+  website_url: https://threads.com/
+  open_source: false
+  hosted_saas: false
+  category: Support, Sales, and Marketing
+  sub_category: Forums
+  image_url: https://img.stackshare.io/service/40086/default_59bcc62db430e8c139a408a9551b7ed43c15004d.jpg
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/forum/files/docker-compose.yaml
+  detection_source: src/bilder/images/forum/files/docker-compose.yaml
+  last_updated_by: Tobias Macey
+  last_updated_on: 2022-12-06 16:29:37.000000000 Z
+- name: Ubuntu
+  description: The leading OS for PC, tablet, phone and cloud
+  website_url: http://www.ubuntu.com/
+  open_source: false
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Operating Systems
+  image_url: https://img.stackshare.io/service/3511/cof_orange_hex.jpg
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/dockerfiles/openedx-codejail/Dockerfile
+  detection_source: dockerfiles/openedx-codejail/Dockerfile
+  last_updated_by: Angelo
+  last_updated_on: 2022-08-30 17:15:36.000000000 Z
+- name: User
+  description: A real-time marketing automation tool for companies to turn every visitor
+    into a happy customer
+  website_url: https://user.com/en/
+  open_source: false
+  hosted_saas: false
+  category: Support, Sales, and Marketing
+  sub_category: Marketing Automation
+  image_url: https://img.stackshare.io/service/6519/Y6VD3lCR_400x400.jpg
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
+  detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
+  last_updated_by: Sar
+  last_updated_on: 2023-08-08 14:05:55.000000000 Z
+- name: bcrypt
+  description: Modern password hashing for your software and your servers
+  package_url: https://pypi.org/project/bcrypt
+  version: 4.1.2
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/20031/default_242158225818ea25f0ab9031a46e17f8ff8246cb.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
+  detection_source: pyproject.toml
+  last_updated_by: renovate[bot]
+  last_updated_on: 2022-08-30 20:37:23.000000000 Z
+- name: boto3
+  description: The AWS SDK for Python
+  package_url: https://pypi.org/project/boto3
+  version: 1.34.79
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/19840/default_1c41e593803157c668b26f27387160254f0f5371.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
+  detection_source: pyproject.toml
+  last_updated_by: dependabot[bot]
+  last_updated_on: 2022-06-14 12:46:41.000000000 Z
+- name: httpx
+  description: The next generation HTTP client
+  package_url: https://pypi.org/project/httpx
+  version: 0.27.0
+  license: BSD-3-Clause
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/20315/default_5f4e928dbcb1c4db4050881fc2e0229785fc931c.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
+  detection_source: pyproject.toml
+  last_updated_by: renovate[bot]
+  last_updated_on: 2024-02-26 10:06:27.000000000 Z
+- name: hvac
+  description: HashiCorp Vault API client
+  package_url: https://pypi.org/project/hvac
+  version: 2.1.0
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/20271/default_847617f8273bac4dd5921370b0684f29c3397a68.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
+  detection_source: pyproject.toml
+  last_updated_by: renovate[bot]
+  last_updated_on: 2023-10-24 17:19:26.000000000 Z
+- name: mypy
+  description: Optional static typing for Python
+  package_url: https://pypi.org/project/mypy
+  version: 1.9.0
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/20219/default_d4dd0466552a9776ca8535b869e22a3362790c94.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
+  detection_source: pyproject.toml
+  last_updated_by: Tobias Macey
+  last_updated_on: 2023-09-19 18:14:59.000000000 Z
+- name: pre-commit
+  description: A framework for managing and maintaining multi-language pre-commit
+    hooks
+  package_url: https://pypi.org/project/pre-commit
+  version: 3.7.0
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/20560/default_d975dcf643a054134f39226d51d4a5fea9320efe.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
+  detection_source: pyproject.toml
+  last_updated_by: Tobias Macey
+  last_updated_on: 2023-09-07 21:48:34.000000000 Z
+- name: pulumi
+  description: Pulumi's Python SDK
+  package_url: https://pypi.org/project/pulumi
+  version: 3.112.0
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/20241/default_25418c262a2428f30b41a859b534faa2f4a93ce4.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
+  detection_source: pyproject.toml
+  last_updated_by: renovate[bot]
+  last_updated_on: 2024-02-27 19:30:11.000000000 Z
+- name: pydantic
+  description: Data validation and settings management using python 3.6 type hinting
+  package_url: https://pypi.org/project/pydantic
+  version: 2.6.4
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/20022/default_b0d1a54f127d7017fce41c15f5e85568fb7019ed.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
+  detection_source: pyproject.toml
+  last_updated_by: Tobias Macey
+  last_updated_on: 2023-08-02 19:26:28.000000000 Z
+- name: pytest
+  description: 'Pytest: simple powerful testing with Python'
+  package_url: https://pypi.org/project/pytest
+  version: 8.1.1
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/19843/default_4604ff5dcb7f4d9c7b3833591c2142493951b19c.png
+  detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
+  detection_source: pyproject.toml
+  last_updated_by: renovate[bot]
+  last_updated_on: 2024-03-04 09:14:05.000000000 Z
