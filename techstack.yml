@@ -1,3 +1,4 @@
+---
 repo_name: mitodl/ol-infrastructure
 report_id: b82281eec53b6be1df92df593662abe4
 version: 0.1
@@ -21,7 +22,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/tika/files/docker-compose.yaml
   detection_source: src/bilder/images/tika/files/docker-compose.yaml
   last_updated_by: Chris Patti
-  last_updated_on: 2023-09-08 20:51:53.000000000 Z
+  last_updated_on: 2023-09-08 20:51:53
 - name: Python
   description: A clear and powerful object-oriented programming language, comparable
     to Perl, Ruby, Scheme, or Java.
@@ -46,7 +47,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Ardiea
-  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+  last_updated_on: 2022-06-02 18:59:25
 - name: Node.js
   description: A platform built on Chrome's JavaScript runtime for easily building
     fast, scalable network applications
@@ -59,7 +60,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/dockerfiles/ocw/node-hugo/Dockerfile
   detection_source: dockerfiles/ocw/node-hugo/Dockerfile
   last_updated_by: Mark Breedlove
-  last_updated_on: 2021-05-19 18:45:54.000000000 Z
+  last_updated_on: 2021-05-19 18:45:54
 - name: Apache Ignite
   description: An open-source distributed database, caching and processing platform
   website_url: http://ignite.apache.org/
@@ -72,7 +73,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/tika/files/docker-compose.yaml
   detection_source: src/bilder/images/tika/files/docker-compose.yaml
   last_updated_by: renovate[bot]
-  last_updated_on: 2024-04-06 04:14:09.000000000 Z
+  last_updated_on: 2024-04-06 04:14:09
 - name: Celery
   description: Distributed task queue
   website_url: http://www.celeryproject.org/
@@ -84,7 +85,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/superset/files/docker-compose.yaml
   detection_source: src/bilder/images/superset/files/docker-compose.yaml
   last_updated_by: Tobias Macey
-  last_updated_on: 2023-12-15 18:42:55.000000000 Z
+  last_updated_on: 2023-12-15 18:42:55
 - name: Compose
   description: 'We host databases for busy devs: production-ready, cloud-hosted, open
     source.'
@@ -97,7 +98,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Ardiea
-  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+  last_updated_on: 2022-06-02 18:59:25
 - name: Cron
   description: Background-only application
   website_url: https://directory.fsf.org/wiki/Cron
@@ -109,7 +110,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Tobias Macey
-  last_updated_on: 2022-09-16 20:05:45.000000000 Z
+  last_updated_on: 2022-09-16 20:05:45
 - name: DB
   description: 'Version control for databases: save, restore, and archive snapshots
     of your database from the command line'
@@ -123,7 +124,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Ardiea
-  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+  last_updated_on: 2022-06-02 18:59:25
 - name: MongoDB
   description: The database for giant ideas
   website_url: http://www.mongodb.com/
@@ -135,7 +136,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/ol_concourse/pipelines/infrastructure/mongodb_atlas/pulumi_pipeline.py
   detection_source: src/ol_concourse/pipelines/infrastructure/mongodb_atlas/pulumi_pipeline.py
   last_updated_by: Ardiea
-  last_updated_on: 2023-10-04 12:33:32.000000000 Z
+  last_updated_on: 2023-10-04 12:33:32
 - name: PostgreSQL
   description: A powerful, open source object-relational database system
   website_url: http://www.postgresql.org/
@@ -147,7 +148,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Ardiea
-  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+  last_updated_on: 2022-06-02 18:59:25
 - name: Redis
   description: Open source (BSD licensed), in-memory data structure store
   website_url: http://redis.io/
@@ -160,7 +161,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/ol_superset/docker-compose.yaml
   detection_source: src/ol_superset/docker-compose.yaml
   last_updated_by: Tobias Macey
-  last_updated_on: 2023-12-15 18:42:55.000000000 Z
+  last_updated_on: 2023-12-15 18:42:55
 - name: Serverless AppSync
   description: Easily and quickly deploy GraphQL APIs on AWS
   website_url: https://github.com/serverless-components/aws-app-sync
@@ -172,7 +173,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Tobias Macey
-  last_updated_on: 2024-03-29 21:27:25.000000000 Z
+  last_updated_on: 2024-03-29 21:27:25
 - name: Consul
   description: A tool for service discovery, monitoring and configuration
   website_url: http://www.consul.io/
@@ -185,7 +186,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Sar
-  last_updated_on: 2023-08-08 14:05:55.000000000 Z
+  last_updated_on: 2023-08-08 14:05:55
 - name: Docker
   description: Enterprise Container Platform for High-Velocity Innovation.
   website_url: https://www.docker.com/
@@ -208,7 +209,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure
   detection_source: Repo Metadata
   last_updated_by: Ardiea
-  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+  last_updated_on: 2022-06-02 18:59:25
 - name: GitHub Actions
   description: Automate your workflow from idea to production
   website_url: https://github.com/features/actions
@@ -220,7 +221,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/.github/workflows/project_automation.yaml
   detection_source: ".github/workflows/project_automation.yaml"
   last_updated_by: renovate[bot]
-  last_updated_on: 2024-04-11 16:03:47.000000000 Z
+  last_updated_on: 2024-04-11 16:03:47
 - name: NGINX
   description: A high performance free open source web server powering busiest sites
     on the Internet.
@@ -233,7 +234,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Ardiea
-  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+  last_updated_on: 2022-06-02 18:59:25
 - name: NuGet
   description: The package manager for .NET
   website_url: https://www.nuget.org/
@@ -245,7 +246,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Ardiea
-  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+  last_updated_on: 2022-06-02 18:59:25
 - name: PyPI
   description: A repository of software for the Python programming language
   website_url: https://pypi.org/
@@ -257,7 +258,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/pyproject.toml
   detection_source: pyproject.toml
   last_updated_by: Tobias Macey
-  last_updated_on: 2020-05-26 20:26:41.000000000 Z
+  last_updated_on: 2020-05-26 20:26:41
 - name: Traefik
   description: The Cloud Native Edge Router
   website_url: https://traefik.io/
@@ -270,7 +271,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Tobias Macey
-  last_updated_on: 2024-03-29 21:27:25.000000000 Z
+  last_updated_on: 2024-03-29 21:27:25
 - name: Vagrant
   description: A tool for building and distributing development environments
   website_url: http://www.vagrantup.com/
@@ -283,7 +284,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/Vagrantfile
   detection_source: Vagrantfile
   last_updated_by: Tobias Macey
-  last_updated_on: 2021-02-25 00:08:52.000000000 Z
+  last_updated_on: 2021-02-25 00:08:52
 - name: hub
   description: Wraps Git with extra features that make working with GitHub easier
     (by GitHub)
@@ -297,7 +298,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Ardiea
-  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+  last_updated_on: 2022-06-02 18:59:25
 - name: IronWorker
   description: High-Scale Async Task Processing
   website_url: http://www.iron.io/worker
@@ -309,7 +310,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Ardiea
-  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+  last_updated_on: 2022-06-02 18:59:25
 - name: Alpine Linux
   description: Security-oriented, lightweight Linux distribution based on musl libc
     and busybox
@@ -322,7 +323,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/dockerfiles/dcind/Dockerfile
   detection_source: dockerfiles/dcind/Dockerfile
   last_updated_by: Mike Davidson
-  last_updated_on: 2023-12-15 20:40:42.000000000 Z
+  last_updated_on: 2023-12-15 20:40:42
 - name: Alt
   description: A library for managing data within JavaScript applications
   website_url: https://alt.js.org/
@@ -334,7 +335,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Ardiea
-  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+  last_updated_on: 2022-06-02 18:59:25
 - name: Apache Tika
   description: A content analysis toolkit
   website_url: https://tika.apache.org/
@@ -346,7 +347,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/tika/files/docker-compose.yaml
   detection_source: src/bilder/images/tika/files/docker-compose.yaml
   last_updated_by: renovate[bot]
-  last_updated_on: 2024-04-06 04:14:09.000000000 Z
+  last_updated_on: 2024-04-06 04:14:09
 - name: Base
   description: All-in-one sales and customer management platform
   website_url: https://getbase.com/
@@ -358,7 +359,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Ardiea
-  last_updated_on: 2022-06-02 18:59:25.000000000 Z
+  last_updated_on: 2022-06-02 18:59:25
 - name: Keycloak
   description: An open source identity and access management solution
   website_url: https://www.keycloak.org/
@@ -370,7 +371,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/keycloak/files/docker-compose.yaml
   detection_source: src/bilder/images/keycloak/files/docker-compose.yaml
   last_updated_by: Sar
-  last_updated_on: 2023-12-07 18:43:12.000000000 Z
+  last_updated_on: 2023-12-07 18:43:12
 - name: Shell
   description: A shell is a text-based terminal, used for manipulating programs and
     files. Shell scripts typically manage program execution.
@@ -394,7 +395,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/forum/files/docker-compose.yaml
   detection_source: src/bilder/images/forum/files/docker-compose.yaml
   last_updated_by: Tobias Macey
-  last_updated_on: 2022-12-06 16:29:37.000000000 Z
+  last_updated_on: 2022-12-06 16:29:37
 - name: Ubuntu
   description: The leading OS for PC, tablet, phone and cloud
   website_url: http://www.ubuntu.com/
@@ -406,7 +407,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/dockerfiles/openedx-codejail/Dockerfile
   detection_source: dockerfiles/openedx-codejail/Dockerfile
   last_updated_by: Angelo
-  last_updated_on: 2022-08-30 17:15:36.000000000 Z
+  last_updated_on: 2022-08-30 17:15:36
 - name: User
   description: A real-time marketing automation tool for companies to turn every visitor
     into a happy customer
@@ -419,7 +420,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/src/bilder/images/airbyte/files/docker-compose.yaml
   detection_source: src/bilder/images/airbyte/files/docker-compose.yaml
   last_updated_by: Sar
-  last_updated_on: 2023-08-08 14:05:55.000000000 Z
+  last_updated_on: 2023-08-08 14:05:55
 - name: bcrypt
   description: Modern password hashing for your software and your servers
   package_url: https://pypi.org/project/bcrypt
@@ -433,7 +434,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
   detection_source: pyproject.toml
   last_updated_by: renovate[bot]
-  last_updated_on: 2022-08-30 20:37:23.000000000 Z
+  last_updated_on: 2022-08-30 20:37:23
 - name: boto3
   description: The AWS SDK for Python
   package_url: https://pypi.org/project/boto3
@@ -447,7 +448,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
   detection_source: pyproject.toml
   last_updated_by: dependabot[bot]
-  last_updated_on: 2022-06-14 12:46:41.000000000 Z
+  last_updated_on: 2022-06-14 12:46:41
 - name: httpx
   description: The next generation HTTP client
   package_url: https://pypi.org/project/httpx
@@ -461,7 +462,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
   detection_source: pyproject.toml
   last_updated_by: renovate[bot]
-  last_updated_on: 2024-02-26 10:06:27.000000000 Z
+  last_updated_on: 2024-02-26 10:06:27
 - name: hvac
   description: HashiCorp Vault API client
   package_url: https://pypi.org/project/hvac
@@ -475,7 +476,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
   detection_source: pyproject.toml
   last_updated_by: renovate[bot]
-  last_updated_on: 2023-10-24 17:19:26.000000000 Z
+  last_updated_on: 2023-10-24 17:19:26
 - name: mypy
   description: Optional static typing for Python
   package_url: https://pypi.org/project/mypy
@@ -489,7 +490,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
   detection_source: pyproject.toml
   last_updated_by: Tobias Macey
-  last_updated_on: 2023-09-19 18:14:59.000000000 Z
+  last_updated_on: 2023-09-19 18:14:59
 - name: pre-commit
   description: A framework for managing and maintaining multi-language pre-commit
     hooks
@@ -504,7 +505,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
   detection_source: pyproject.toml
   last_updated_by: Tobias Macey
-  last_updated_on: 2023-09-07 21:48:34.000000000 Z
+  last_updated_on: 2023-09-07 21:48:34
 - name: pulumi
   description: Pulumi's Python SDK
   package_url: https://pypi.org/project/pulumi
@@ -518,7 +519,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
   detection_source: pyproject.toml
   last_updated_by: renovate[bot]
-  last_updated_on: 2024-02-27 19:30:11.000000000 Z
+  last_updated_on: 2024-02-27 19:30:11
 - name: pydantic
   description: Data validation and settings management using python 3.6 type hinting
   package_url: https://pypi.org/project/pydantic
@@ -532,7 +533,7 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
   detection_source: pyproject.toml
   last_updated_by: Tobias Macey
-  last_updated_on: 2023-08-02 19:26:28.000000000 Z
+  last_updated_on: 2023-08-02 19:26:28
 - name: pytest
   description: 'Pytest: simple powerful testing with Python'
   package_url: https://pypi.org/project/pytest
@@ -546,4 +547,4 @@ tools:
   detection_source_url: https://github.com/mitodl/ol-infrastructure/blob/main/poetry.lock
   detection_source: pyproject.toml
   last_updated_by: renovate[bot]
-  last_updated_on: 2024-03-04 09:14:05.000000000 Z
+  last_updated_on: 2024-03-04 09:14:05
