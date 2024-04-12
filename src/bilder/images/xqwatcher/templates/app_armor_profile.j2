@@ -1,0 +1,9 @@
+#include <tunables/global>
+
+{{ shared_context.XQWATCHER_GRADER_VENVS_DIR }}/{{ grader_context.grader_short_name }}/bin/python {
+    #include <abstractions/base>
+    {{ shared_context.XQWATCHER_GRADER_VENVS_DIR }}/{{ grader_context.grader_short_name }}/** mr,
+    /tmp/codejail-*/ rix,
+    /tmp/codejail-*/** wrix,
+    /proc/*/mounts r,
+}

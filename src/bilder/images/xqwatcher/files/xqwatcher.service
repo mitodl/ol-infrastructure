@@ -1,0 +1,8 @@
+[Unit]
+Description=xqwatcher process that executes student code via course author defined graders.
+After=multi-user.target
+
+[Service]
+type=simple
+Restart=always
+ExecStart=/home/xqwatcher/xqwatcher/.venv/bin/python3 -m xqueue_watcher -d /home/xqwatcher/xqwatcher
