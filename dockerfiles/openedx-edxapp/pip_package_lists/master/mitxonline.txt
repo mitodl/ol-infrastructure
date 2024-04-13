@@ -14,5 +14,5 @@ openedx-scorm-xblock
 pip==24.0
 sentry-sdk==1.45.0  # Fix RecursionError
 social-auth-mitxpro==0.6.3
-uwsgi==2.0.24
+uwsgi==2.0.25
 wheel==0.43.0
