@@ -753,6 +753,7 @@ redis_cache_config = OLAmazonRedisConfig(
     auto_upgrade=True,
     cluster_description="Redis cluster for edX platform tasks and caching",
     cluster_name=f"edxapp-redis-{env_name}",
+    parameter_overrides={"maxmemory-policy": "allkeys-lru"},
     security_groups=[redis_cluster_security_group.id],
     subnet_group=edxapp_vpc[
         "elasticache_subnet"
