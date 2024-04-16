@@ -46,12 +46,37 @@ app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
 ]
 
 app_storage_bucket_name = f"ol-mitopen-app-storage-{app_env_suffix}"
-application_storage_bucket = s3.Bucket(
+application_storage_bucket = s3.BucketV2(
     f"ol_mitopen_app_storage_bucket_{stack_info.env_suffix}",
     bucket=app_storage_bucket_name,
-    versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
-    acl="public-read",
+)
+
+s3.BucketVersioningV2(
+    "ol-mitopen-bucket-versioning",
+    bucket=application_storage_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+app_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol-mitopen-bucket-ownership-controls",
+    bucket=application_storage_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+app_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-mitopen-bucket-public-access",
+    bucket=application_storage_bucket.id,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+)
+
+s3.BucketPolicy(
+    "ol-mitopen-bucket-policy",
+    bucket=application_storage_bucket.id,
     policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -65,6 +90,9 @@ application_storage_bucket = s3.Bucket(
                 }
             ],
         }
+    ),
+    opts=ResourceOptions(
+        depends_on=[app_bucket_public_access, app_bucket_ownership_controls]
     ),
 )
 
