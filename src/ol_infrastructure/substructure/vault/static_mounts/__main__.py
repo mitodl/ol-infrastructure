@@ -29,6 +29,17 @@ celery_monitoring_vault_kv_mount = vault.Mount(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
+xqwatcher_vault_kv_mount = vault.Mount(
+    "xqwatcher-vault-kv-secrets-mount",
+    path="secret-xqwatcher",
+    description=("Static secrets storage for xqwatcher"),
+    type="kv-v2",
+    options={
+        "version": 2,
+    },
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
 export(
     "superset_kv",
     {
@@ -42,5 +53,13 @@ export(
     {
         "path": celery_monitoring_vault_kv_mount.path,
         "type": celery_monitoring_vault_kv_mount.type,
+    },
+)
+
+export(
+    "xqwatcher_kv",
+    {
+        "path": xqwatcher_vault_kv_mount.path,
+        "type": xqwatcher_vault_kv_mount.type,
     },
 )
