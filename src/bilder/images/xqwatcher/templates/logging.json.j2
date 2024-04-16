@@ -13,7 +13,7 @@
     },
     "rotatingfile": {
       "class": "logging.handlers.RotatingFileHandler",
-      "filename": "{{ context.XQWATCHER_LOG_DIR }}/xqwatcher.log",
+      "filename": "{{ shared_context.XQWATCHER_LOG_DIR }}/xqwatcher.log",
       "formatter": "default",
       "level": "DEBUG",
       "maxBytes": 10485760

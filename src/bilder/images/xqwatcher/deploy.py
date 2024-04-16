@@ -1,19 +1,19 @@
+# ruff: noqa: E501
+
 import os
-from io import StringIO
 from pathlib import Path
 
 from bridge.lib.magic_numbers import VAULT_HTTP_PORT
 from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
 from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
-from pyinfra.operations import files, server, apt, git
+from pyinfra.operations import apt, files, git, server
 
+from bilder.components.baseline.steps import install_baseline_packages
 from bilder.components.hashicorp.consul.models import (
     Consul,
     ConsulAddresses,
     ConsulConfig,
-    ConsulService,
-    ConsulServiceTCPCheck,
 )
 from bilder.components.hashicorp.consul.steps import proxy_consul_dns
 from bilder.components.hashicorp.consul_template.models import (
@@ -26,7 +26,7 @@ from bilder.components.hashicorp.consul_template.steps import (
     consul_template_permissions,
 )
 from bilder.components.hashicorp.steps import (
-    configure_hashicorp_product,
+    configure_hashicorp_products,
     install_hashicorp_products,
     register_services,
 )
@@ -43,16 +43,13 @@ from bilder.components.hashicorp.vault.models import (
     VaultListener,
     VaultTCPListener,
 )
-from bilder.components.vector.models import VectorConfig
-from bilder.components.vector.steps import install_and_configure_vector
 from bilder.facts.has_systemd import HasSystemd
-from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
-
-from bilder.components.baseline.steps import install_baseline_packages
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
-    "consul-template": os.environ.get("CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION),
+    "consul-template": os.environ.get(
+        "CONSUL_TEMPLATE_VERSION", CONSUL_TEMPLATE_VERSION
+    ),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
 }
 
@@ -113,7 +110,7 @@ server.user(
     ensure_home=True,
     home=str(XQWATCHER_HOME),
     present=True,
-    shell="/bin/bash",
+    shell="/bin/bash",  # noqa: S604
     user=XQWATCHER_USER,
 )
 
@@ -134,7 +131,9 @@ server.shell(
 
 server.shell(
     name="Install xqwatcher requirements into the virtual environment",
-    commands=[f"{XQWATCHER_VENV_DIR.joinpath('bin/pip3')} install -r {XQWATCHER_INSTALL_DIR.joinpath('requirements/production.txt')} --exists-action w"],
+    commands=[
+        f"{XQWATCHER_VENV_DIR.joinpath('bin/pip3')} install -r {XQWATCHER_INSTALL_DIR.joinpath('requirements/production.txt')} --exists-action w"
+    ],
 )
 
 files.directory(
@@ -143,6 +142,7 @@ files.directory(
     user=XQWATCHER_USER,
     group=XQWATCHER_USER,
     present=True,
+    force=True,  # Will remove the existing conf.d dir and example files
     mode="0750",
 )
 
@@ -156,7 +156,7 @@ files.directory(
 
 files.template(
     name="Create logging configuration file",
-    src=FILES_DIRECTORY.joinpath("logging.json.j2"),
+    src=TEMPLATES_DIRECTORY.joinpath("logging.json.j2"),
     dest=str(XQWATCHER_LOGGING_CONFIG_FILE),
     user=XQWATCHER_USER,
     group=XQWATCHER_USER,
@@ -174,7 +174,7 @@ files.directory(
 
 files.directory(
     name="Create grader venvs directory",
-    path=str(XQWATCHER_GRADER_VENV_DIR),
+    path=str(XQWATCHER_GRADER_VENVS_DIR),
     user=XQWATCHER_USER,
     group=XQWATCHER_USER,
     mode="0750",
@@ -192,7 +192,7 @@ consul_configuration = {
     Path("00-default.json"): ConsulConfig(
         addresses=ConsulAddresses(dns="127.0.0.1", http="127.0.0.1"),
         advertise_addr='{{ GetInterfaceIP "ens5" }}',
-        services=[]
+        services=[],
     ),
 }
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)
@@ -205,20 +205,26 @@ consul_template_configuration = {
             ConsulTemplateTemplate(
                 contents=(
                     '{{ with secret "secret-xqwatcher/grader-config" }}'
-                    '{{ printf .Data.data.confd_json }}{{ end }}'
+                    "{{ printf .Data.data.confd_json }}{{ end }}"
                 ),
                 destination=XQWATCHER_CONF_DIR.joinpath("grader_config.json"),
+                user=XQWATCHER_USER,
+                group=XQWATCHER_USER,
+                perms="0600",
             ),
             ConsulTemplateTemplate(
                 contents=(
                     '{{ with secret "secret-xqwatcher/grader-config" }}'
-                    '{{ printf .Data.data.xqwatcher-grader-code-ssh-identity }}{{ end }}'
+                    "{{ printf .Data.data.xqwatcher_grader_code_ssh_identity }}{{ end }}"
                 ),
-                destination=XQWATCHER_SSH_DIR.joinpath("xqwatcher-grader-code-ssh-identity"),
+                destination=XQWATCHER_SSH_DIR.joinpath(
+                    "xqwatcher-grader-code-ssh-identity"
+                ),
+                user=XQWATCHER_USER,
+                group=XQWATCHER_USER,
+                perms="0600",
             ),
-            ConsulTemplateTemplate(
-            ),
-        ]
+        ],
     ),
 }
 consul_template = ConsulTemplate(
@@ -228,7 +234,7 @@ consul_template = ConsulTemplate(
 
 vault_configuration = {
     Path("agent.json"): VaultAgentConfig(
-        cache=VaultAgentCache(use_auto_auth_token="force"),
+        cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
         listener=[
             VaultListener(
                 tcp=VaultTCPListener(
@@ -254,7 +260,7 @@ vault = Vault(version=VERSIONS["vault"], configuration=vault_configuration)
 
 hashicorp_products = [consul, consul_template, vault]
 install_hashicorp_products(hashicorp_products)
-configure_hashicorp_product(hashicorp_products)
+configure_hashicorp_products(hashicorp_products)
 
 consul_template_permissions(consul_template.configuration)
 

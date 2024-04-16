@@ -64,7 +64,7 @@ source "amazon-ebs" "xqwatcher" {
     app             = "${local.app_name}"
     purpose         = "${local.app_name}"
   }
-  
+
   # Base all builds off of the most recent Debian 12 image built by the Debian organization.
   source_ami_filter {
     filters = {
