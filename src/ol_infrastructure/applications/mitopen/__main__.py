@@ -449,8 +449,8 @@ sensitive_heroku_vars = {
     "SENTRY_DSN": mitopen_vault_secrets["sentry-dsn"],
     "STATUS_TOKEN": mitopen_vault_secrets["django-status-token"],
     "YOUTUBE_DEVELOPER_KEY": mitopen_vault_secrets["youtube-developer-key"],
-    "POSTHOG_PROJECT_API_KEY": mitopen_vault_secrets["posthog-project-api-key"],
-    "POSTHOG_PERSONAL_API_KEY": mitopen_vault_secrets["posthog-personal-api-key"],
+    "POSTHOG_PROJECT_API_KEY": mitopen_vault_secrets["posthog"]["project-api-key"],
+    "POSTHOG_PERSONAL_API_KEY": mitopen_vault_secrets["posthog"]["personal-api-key"],
     # Vars that require more
     "AWS_ACCESS_KEY_ID": auth_aws_mitx_creds_ol_mitopen_application.data.apply(
         lambda data: "{}".format(data["access_key"])
