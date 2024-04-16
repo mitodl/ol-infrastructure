@@ -346,6 +346,10 @@ heroku_vars = {
     "XPRO_LEARNING_COURSE_BUCKET_NAME": "mitx-etl-xpro-production-mitxpro-production",
     "YOUTUBE_FETCH_TRANSCRIPT_SCHEDULE_SECONDS": 21600,
     "YOUTUBE_CONFIG_URL": "https://raw.githubusercontent.com/mitodl/open-video-data/mitopen/youtube/channels.yaml",
+    "POSTHOG_ENABLED": "True",
+    "POSTHOG_TIMEOUT_MS": 1000,
+    "POSTHOG_API_HOST": "https://app.posthog.com",
+    "POSTHOG_PROJECT_ID": 63497,
 }
 
 # Values that require interpolation or other special considerations
@@ -445,6 +449,8 @@ sensitive_heroku_vars = {
     "SENTRY_DSN": mitopen_vault_secrets["sentry-dsn"],
     "STATUS_TOKEN": mitopen_vault_secrets["django-status-token"],
     "YOUTUBE_DEVELOPER_KEY": mitopen_vault_secrets["youtube-developer-key"],
+    "POSTHOG_PROJECT_API_KEY": mitopen_vault_secrets["posthog-project-api-key"],
+    "POSTHOG_PERSONAL_API_KEY": mitopen_vault_secrets["posthog-personal-api-key"],
     # Vars that require more
     "AWS_ACCESS_KEY_ID": auth_aws_mitx_creds_ol_mitopen_application.data.apply(
         lambda data: "{}".format(data["access_key"])
