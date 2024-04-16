@@ -128,3 +128,9 @@ def configure_hashicorp_product(product: HashicorpProduct):
             )
         )
         temp_src.close()
+
+
+# Helper function to allow configuring to follow the same pattern as installing
+def configure_hashicorp_products(hashicorp_products: list[HashicorpProduct]):
+    for product in hashicorp_products:
+        configure_hashicorp_product(product)
