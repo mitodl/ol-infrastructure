@@ -38,6 +38,7 @@ config:
   edxapp:enabled_mfes:
     communications: communications
     course_authoring: course-authoring
+    discussions: discuss
     gradebook: gradebook
     learning: learn
     library_authoring: library-authoring
