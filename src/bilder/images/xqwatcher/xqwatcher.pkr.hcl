@@ -40,10 +40,10 @@ source "amazon-ebs" "xqwatcher" {
   ami_description         = "Deployment image for xqwatcher server generated at ${local.timestamp}"
   ami_name                = "open-edx-xqwatcher-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
-  instance_type           = "t3a.medium"
+  instance_type           = "c6a.large"  # AMI build does a lot of compling from source, so dedicated CPU is needed
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
-    volume_size           = 25
+    volume_size           = 50
     delete_on_termination = true
   }
   run_tags = {

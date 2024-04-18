@@ -60,17 +60,22 @@ TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 
 install_baseline_packages(
     packages=[
+        "build-essential",
         "curl",
+        "gfortran",
         "git",
+        "jq",
+        "libatlas-base-dev",
+        "libopenblas64-0",
+        "liblapack-dev",
+        "libmariadb-dev",
+        "libopenblas-dev",
+        "libssl-dev",
+        "pkg-config",
         "python3",
         "python3-dev",
         "python3-pip",
         "python3-virtualenv",
-        "libmariadb-dev",
-        "libmariadb-dev-compat",
-        "libssl-dev",
-        "libopenblas-dev",
-        "liblapack-dev",
     ],
     upgrade_system=True,
 )
@@ -94,7 +99,7 @@ XQWATCHER_LOG_DIR = XQWATCHER_INSTALL_DIR.joinpath("log")
 XQWATCHER_GRADER_DIR = XQWATCHER_INSTALL_DIR.joinpath("graders")
 XQWATCHER_GRADER_VENVS_DIR = XQWATCHER_INSTALL_DIR.joinpath("grader_venvs")
 XQWATCHER_LOGGING_CONFIG_FILE = XQWATCHER_INSTALL_DIR.joinpath("logging.json")
-XQWATCHER_SSH_DIR = XQWATCHER_INSTALL_DIR.joinpath(".ssh")
+XQWATCHER_SSH_DIR = XQWATCHER_HOME.joinpath(".ssh")
 XQWATCHER_BRANCH = "master"
 XQWATCHER_GIT_REPO = "https://github.com/mitodl/xqueue-watcher.git"
 XQWATCHER_USER = "xqwatcher"
@@ -132,7 +137,7 @@ server.shell(
 server.shell(
     name="Install xqwatcher requirements into the virtual environment",
     commands=[
-        f"{XQWATCHER_VENV_DIR.joinpath('bin/pip3')} install -r {XQWATCHER_INSTALL_DIR.joinpath('requirements/production.txt')} --exists-action w"
+        f"{XQWATCHER_VENV_DIR.joinpath('bin/pip3')} install -r {XQWATCHER_INSTALL_DIR.joinpath('requirements/production.txt')} --no-cache-dir --exists-action w"
     ],
 )
 
@@ -188,6 +193,30 @@ files.directory(
     mode="0700",
 )
 
+# Grader virtual environment setup
+grader_venvs = ["mit-600x", "mit-686x-mooc", "mit-686x", "mit-6S082", "mit-940"]
+for grader_venv in grader_venvs:
+    GRADER_VENV_DIR = XQWATCHER_GRADER_VENVS_DIR.joinpath(grader_venv)
+    GRADER_REQS_FILE = GRADER_VENV_DIR.joinpath("requirements.txt")
+    server.shell(
+        name=f"Install grader {grader_venv} : Create virtual environment",
+        commands=[f"/usr/bin/virtualenv {GRADER_VENV_DIR}"],
+    )
+    files.put(
+        name=f"Install grader {grader_venv} : create requirements file",
+        src=str(FILES_DIRECTORY.joinpath(f"grader_reqs/{grader_venv}.txt")),
+        dest=str(GRADER_REQS_FILE),
+        mode="0664",
+        user="xqwatcher",
+        group="xqwatcher",
+    )
+    server.shell(
+        name=f"Install grader {grader_venv} : install requirements",
+        commands=[
+            f"{GRADER_VENV_DIR.joinpath('bin/pip3')} install -r {GRADER_REQS_FILE} --no-cache-dir --exists-action w"
+        ],
+    )
+
 consul_configuration = {
     Path("00-default.json"): ConsulConfig(
         addresses=ConsulAddresses(dns="127.0.0.1", http="127.0.0.1"),
@@ -205,7 +234,7 @@ consul_template_configuration = {
             ConsulTemplateTemplate(
                 contents=(
                     '{{ with secret "secret-xqwatcher/grader-config" }}'
-                    "{{ printf .Data.data.confd_json }}{{ end }}"
+                    "{{ .Data.data.confd_json | toJSONPretty }}{{ end }}"
                 ),
                 destination=XQWATCHER_CONF_DIR.joinpath("grader_config.json"),
                 user=XQWATCHER_USER,
