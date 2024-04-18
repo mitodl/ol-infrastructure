@@ -39,9 +39,6 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
 stack_info = parse_stack()
-data_warehouse_stack = StackReference(
-    f"infrastructure.aws.data_warehouse.{stack_info.name}"
-)
 dns_stack = StackReference("infrastructure.aws.dns")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
@@ -50,7 +47,6 @@ consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
-athena_warehouse = data_warehouse_stack.require_output("athena_data_warehouse")
 dagster_environment = f"data-{stack_info.env_suffix}"
 aws_config = AWSBase(
     tags={"OU": "data", "Environment": dagster_environment},

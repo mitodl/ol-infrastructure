@@ -46,12 +46,37 @@ app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
 ]
 
 app_storage_bucket_name = f"ol-mitopen-app-storage-{app_env_suffix}"
-application_storage_bucket = s3.Bucket(
+application_storage_bucket = s3.BucketV2(
     f"ol_mitopen_app_storage_bucket_{stack_info.env_suffix}",
     bucket=app_storage_bucket_name,
-    versioning=s3.BucketVersioningArgs(enabled=True),
     tags=aws_config.tags,
-    acl="public-read",
+)
+
+s3.BucketVersioningV2(
+    "ol-mitopen-bucket-versioning",
+    bucket=application_storage_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+app_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol-mitopen-bucket-ownership-controls",
+    bucket=application_storage_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+app_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-mitopen-bucket-public-access",
+    bucket=application_storage_bucket.id,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+)
+
+s3.BucketPolicy(
+    "ol-mitopen-bucket-policy",
+    bucket=application_storage_bucket.id,
     policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -65,6 +90,9 @@ application_storage_bucket = s3.Bucket(
                 }
             ],
         }
+    ),
+    opts=ResourceOptions(
+        depends_on=[app_bucket_public_access, app_bucket_ownership_controls]
     ),
 )
 
@@ -307,6 +335,8 @@ heroku_vars = {
     "DUPLICATE_COURSES_URL": "https://raw.githubusercontent.com/mitodl/open-resource-blacklists/master/duplicate_courses.yml",
     "EDX_API_ACCESS_TOKEN_URL": "https://api.edx.org/oauth2/v1/access_token",
     "EDX_API_URL": "https://api.edx.org/catalog/v1/catalogs/10/courses",
+    "MICROMASTERS_CATALOG_API_URL": "https://micromasters.mit.edu/api/v0/catalog/",
+    "MICROMASTERS_CMS_API_URL": "https://micromasters.mit.edu/api/v0/wagtail/",
     "MITOPEN_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
     "MITOPEN_DB_CONN_MAX_AGE": 0,
     "MITOPEN_DB_DISABLE_SSL": "True",
@@ -324,7 +354,10 @@ heroku_vars = {
     "MITX_ONLINE_PROGRAMS_API_URL": "https://mitxonline.mit.edu/api/programs/",
     "NEW_RELIC_LOG": "stdout",
     "NODE_MODULES_CACHE": "False",
+    "OCW_BASE_URL": "https://ocw.mit.edu/",
+    "OCW_CONTENT_BUCKET_NAME": "ocw-content-storage",
     "OCW_UPLOAD_IMAGE_ONLY": "True",
+    "OCW_LIVE_BUCKET": "ocw-content-live-production",
     "OLL_ALT_URL": "https://openlearninglibrary.mit.edu/courses/",
     "OLL_API_ACCESS_TOKEN_URL": "https://openlearninglibrary.mit.edu/oauth2/access_token/",
     "OLL_API_URL": "https://discovery.openlearninglibrary.mit.edu/api/v1/catalogs/1/courses/",
@@ -336,9 +369,15 @@ heroku_vars = {
     "SOCIAL_AUTH_OL_OIDC_KEY": "ol-open-client",
     "USE_X_FORWARDED_HOST": "True",
     "USE_X_FORWARDED_PORT": "True",
+    "XPRO_CATALOG_API_URL": "https://xpro.mit.edu/api/programs/",
+    "XPRO_COURSES_API_URL": "https://xpro.mit.edu/api/courses/",
     "XPRO_LEARNING_COURSE_BUCKET_NAME": "mitx-etl-xpro-production-mitxpro-production",
     "YOUTUBE_FETCH_TRANSCRIPT_SCHEDULE_SECONDS": 21600,
     "YOUTUBE_CONFIG_URL": "https://raw.githubusercontent.com/mitodl/open-video-data/mitopen/youtube/channels.yaml",
+    "POSTHOG_ENABLED": "True",
+    "POSTHOG_TIMEOUT_MS": 1000,
+    "POSTHOG_API_HOST": "https://app.posthog.com",
+    "POSTHOG_PROJECT_ID": 63497,
 }
 
 # Values that require interpolation or other special considerations
@@ -359,14 +398,11 @@ heroku_interpolated_vars = {
     "MAILGUN_FROM_EMAIL": f"MIT Open <no-reply@{interpolation_vars['mailgun_sender_domain']}",
     "MAILGUN_SENDER_DOMAIN": interpolation_vars["mailgun_sender_domain"],
     "MAILGUN_URL": f"https://api.mailgun.net/v3/{interpolation_vars['mailgun_sender_domain']}",
-    "MICROMASTERS_CATALOG_API_URL": f"https://{interpolation_vars['etl_micromasters_host']}/api/v0/catalog/",
     "MITOPEN_CORS_ORIGIN_WHITELIST": cors_urls_json,
     "OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
     "SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS": auth_allowed_redirect_hosts_json,
     "SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
     "USERINFO_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/userinfo",
-    "XPRO_CATALOG_API_URL": f"https://{interpolation_vars['etl_xpro_host']}/api/programs/",
-    "XPRO_COURSES_API_URL": f"https://{interpolation_vars['etl_xpro_host']}/api/courses/",
 }
 
 # Combine two var sources above with values explictly defined in pulumi configuration
@@ -441,6 +477,8 @@ sensitive_heroku_vars = {
     "SENTRY_DSN": mitopen_vault_secrets["sentry-dsn"],
     "STATUS_TOKEN": mitopen_vault_secrets["django-status-token"],
     "YOUTUBE_DEVELOPER_KEY": mitopen_vault_secrets["youtube-developer-key"],
+    "POSTHOG_PROJECT_API_KEY": mitopen_vault_secrets["posthog"]["project_api_key"],
+    "POSTHOG_PERSONAL_API_KEY": mitopen_vault_secrets["posthog"]["personal_api_key"],
     # Vars that require more
     "AWS_ACCESS_KEY_ID": auth_aws_mitx_creds_ol_mitopen_application.data.apply(
         lambda data: "{}".format(data["access_key"])

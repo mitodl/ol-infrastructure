@@ -224,6 +224,8 @@ class CeleryConfig:  # pylint: disable=too-few-public-methods
     redis_password = REDIS_TOKEN
     worker_prefetch_multiplier = 1
     task_acks_late = True
+    task_track_started = True
+    task_send_sent_event = True
     task_annotations = {  # noqa: RUF012
         "sql_lab.get_sql_results": {
             "rate_limit": "100/s",
