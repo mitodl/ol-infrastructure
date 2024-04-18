@@ -88,7 +88,8 @@ if stack_info.name != "CI":
 
 redis_outputs: list[Output] = []
 for stack in stacks:
-    redis_outputs.append(StackReference(stack).require_output("edxapp"))  # noqa: PERF401
+    project = stack.split(".")[1]
+    redis_outputs.append(StackReference(stack).require_output(project))
 redis_broker_subscriptions = Output.all(*redis_outputs).apply(
     build_broker_subscriptions
 )

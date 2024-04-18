@@ -739,6 +739,7 @@ route53.Record(
 export(
     "superset",
     {
+        "deployment": stack_info.env_prefix,
         "redis": superset_redis_cache.address,
         "redis_token": redis_auth_token,
     },
