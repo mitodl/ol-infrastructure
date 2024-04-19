@@ -159,7 +159,7 @@ vault.kv.SecretV2(
     data_json=json.dumps(vault_secrets),
 )
 
-block_device_mappings = [BlockDeviceMapping()]
+block_device_mappings = [BlockDeviceMapping(volume_size=50)]
 tag_specs = [
     TagSpecification(
         resource_type="instance",

@@ -98,6 +98,7 @@ XQWATCHER_CONF_DIR = XQWATCHER_INSTALL_DIR.joinpath("conf.d")
 XQWATCHER_LOG_DIR = XQWATCHER_INSTALL_DIR.joinpath("log")
 XQWATCHER_GRADER_DIR = XQWATCHER_INSTALL_DIR.joinpath("graders")
 XQWATCHER_GRADER_VENVS_DIR = XQWATCHER_INSTALL_DIR.joinpath("grader_venvs")
+XQWATCHER_GRADER_CONFIG_FILE = XQWATCHER_INSTALL_DIR.joinpath("grader_config.yaml")
 XQWATCHER_LOGGING_CONFIG_FILE = XQWATCHER_INSTALL_DIR.joinpath("logging.json")
 XQWATCHER_SSH_DIR = XQWATCHER_HOME.joinpath(".ssh")
 XQWATCHER_BRANCH = "master"
@@ -107,6 +108,8 @@ XQWATCHER_USER = "xqwatcher"
 shared_template_context = {
     "XQWATCHER_LOG_DIR": str(XQWATCHER_LOG_DIR),
     "XQWATCHER_GRADER_VENVS_DIR": str(XQWATCHER_GRADER_VENVS_DIR),
+    "XQWATCHER_GRADER_DIR": str(XQWATCHER_GRADER_DIR),
+    "XQWATCHER_GRADER_CONFIG_FILE": str(XQWATCHER_GRADER_CONFIG_FILE),
 }
 
 server.user(
@@ -134,20 +137,33 @@ server.shell(
     commands=[f"/usr/bin/virtualenv {XQWATCHER_VENV_DIR}"],
 )
 
+files.put(
+    name="Place custom xqwatcher requirements file.",
+    src=str(FILES_DIRECTORY.joinpath("requirements.txt")),
+    dest=str(XQWATCHER_INSTALL_DIR.joinpath("requirements.txt")),
+    mode="0664",
+    user="xqwatcher",
+    group="xqwatcher",
+)
+
 server.shell(
     name="Install xqwatcher requirements into the virtual environment",
     commands=[
-        f"{XQWATCHER_VENV_DIR.joinpath('bin/pip3')} install -r {XQWATCHER_INSTALL_DIR.joinpath('requirements/production.txt')} --no-cache-dir --exists-action w"
+        f"{XQWATCHER_VENV_DIR.joinpath('bin/pip3')} install -r {XQWATCHER_INSTALL_DIR.joinpath('requirements.txt')} --no-cache-dir --exists-action w"
     ],
+)
+files.directory(
+    name="Remove the existing conf.d directory for xqwatcher configurations",
+    path=str(XQWATCHER_CONF_DIR),
+    present=False,
 )
 
 files.directory(
-    name="Create the conf.d directory for xqwatcher configurations",
+    name="Create a new conf.d directory for xqwatcher configurations",
     path=str(XQWATCHER_CONF_DIR),
     user=XQWATCHER_USER,
     group=XQWATCHER_USER,
     present=True,
-    force=True,  # Will remove the existing conf.d dir and example files
     mode="0750",
 )
 
@@ -166,6 +182,16 @@ files.template(
     user=XQWATCHER_USER,
     group=XQWATCHER_USER,
     mode="0664",
+    shared_context=shared_template_context,
+)
+
+files.template(
+    name="Create grader fetch script",
+    src=TEMPLATES_DIRECTORY.joinpath("fetch_graders.py.j2"),
+    dest=str(XQWATCHER_INSTALL_DIR.joinpath("fetch_graders.py")),
+    user=XQWATCHER_USER,
+    group=XQWATCHER_USER,
+    mode="0754",
     shared_context=shared_template_context,
 )
 
@@ -233,7 +259,7 @@ consul_template_configuration = {
             # https://github.com/mitodl/xqueue-watcher?tab=readme-ov-file#running-xqueue-watcher
             ConsulTemplateTemplate(
                 contents=(
-                    '{{ with secret "secret-xqwatcher/grader-config" }}'
+                    '{{- with secret "secret-xqwatcher/grader-config" -}}'
                     "{{ .Data.data.confd_json | toJSONPretty }}{{ end }}"
                 ),
                 destination=XQWATCHER_CONF_DIR.joinpath("grader_config.json"),
@@ -243,12 +269,22 @@ consul_template_configuration = {
             ),
             ConsulTemplateTemplate(
                 contents=(
-                    '{{ with secret "secret-xqwatcher/grader-config" }}'
+                    '{{- with secret "secret-xqwatcher/grader-config" -}}'
                     "{{ printf .Data.data.xqwatcher_grader_code_ssh_identity }}{{ end }}"
                 ),
                 destination=XQWATCHER_SSH_DIR.joinpath(
                     "xqwatcher-grader-code-ssh-identity"
                 ),
+                user=XQWATCHER_USER,
+                group=XQWATCHER_USER,
+                perms="0600",
+            ),
+            ConsulTemplateTemplate(
+                contents=(
+                    '{{ with secret "secret-xqwatcher/grader-config" }}'
+                    "{{ .Data.data.graders_yaml | toYAML }}{{ end }}"
+                ),
+                destination=XQWATCHER_GRADER_CONFIG_FILE,
                 user=XQWATCHER_USER,
                 group=XQWATCHER_USER,
                 perms="0600",
