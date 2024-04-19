@@ -52,6 +52,9 @@ vault_mount_stack = StackReference(
     f"substructure.vault.static_mounts.operations.{stack_info.name}"
 )
 policy_stack = StackReference("infrastructure.aws.policies")
+celery_monitoring_stack = StackReference(
+    f"applications.celery_monitoring.{stack_info.name}"
+)
 
 mitol_zone_id = dns_stack.require_output("ol")["id"]
 data_vpc = network_stack.require_output("data_vpc")
@@ -393,8 +396,14 @@ redis_cluster_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
             protocol="tcp",
-            security_groups=[superset_security_group.id],
-            description="Allow access from edX to Redis for caching and queueing",
+            security_groups=[
+                superset_security_group.id,
+                celery_monitoring_stack.require_output("celery_monitoring")[
+                    "security_group"
+                ],
+            ],
+            description="Allow access from edX & celery monitoring to Redis for"
+            "caching and queueing",
         )
     ],
     tags=aws_config.merged_tags({"Name": f"superset-redis-{superset_env}"}),
