@@ -52,8 +52,8 @@ vault_mount_stack = StackReference(
     f"substructure.vault.static_mounts.operations.{stack_info.name}"
 )
 policy_stack = StackReference("infrastructure.aws.policies")
-
 mitol_zone_id = dns_stack.require_output("ol")["id"]
+operations_vpc = network_stack.require_output("operations_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 superset_env = f"data-{stack_info.env_suffix}"
 superset_vault_kv_path = vault_mount_stack.require_output("superset_kv")["path"]
@@ -393,8 +393,12 @@ redis_cluster_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
             protocol="tcp",
-            security_groups=[superset_security_group.id],
-            description="Allow access from edX to Redis for caching and queueing",
+            security_groups=[
+                superset_security_group.id,
+                operations_vpc["security_groups"]["celery_monitoring"],
+            ],
+            description="Allow access from edX & celery monitoring to Redis for"
+            "caching and queueing",
         )
     ],
     tags=aws_config.merged_tags({"Name": f"superset-redis-{superset_env}"}),
