@@ -44,7 +44,7 @@ policy_stack = StackReference("infrastructure.aws.policies")
 
 
 def build_broker_subscriptions(
-    edx_outputs: list[Output],
+    project_outputs: list[Output],
 ) -> str:
     """Create a dict of Redis cache configs for each edxapp stack"""
     broker_subs = []
@@ -54,18 +54,19 @@ def build_broker_subscriptions(
         "mitxonline": "mitxonline",
         "mitx-staging": "mitxstaging",
         "xpro": "xpro",
+        "superset": "superset",
     }
 
-    for edx_output in edx_outputs:
+    for project_output in project_outputs:
         broker_subs.append(  # noqa: PERF401
             {
-                "broker": f"rediss://default:{edx_output['redis_token']}@{edx_output['redis']}:6379/1?ssl_cert_reqs=required",
+                "broker": f"rediss://default:{project_output['redis_token']}@{project_output['redis']}:6379/1?ssl_cert_reqs=required",
                 "broker_management_url": None,
                 "exchange": "celeryev",
                 "queue": "leek.fanout",
                 "routing_key": "#",
                 "org_name": "MIT Open Learning Engineering",
-                "app_name": deployment_name_map[edx_output["deployment"]],
+                "app_name": deployment_name_map[project_output["deployment"]],
                 "app_env": stack_info.env_suffix,
             }
         )
@@ -77,6 +78,7 @@ stacks = [
     f"applications.edxapp.xpro.{stack_info.name}",
     f"applications.edxapp.mitx.{stack_info.name}",
     f"applications.edxapp.mitx-staging.{stack_info.name}",
+    f"applications.superset.{stack_info.name}",
 ]
 # mitxonline CI is not up at the moment.
 if stack_info.name != "CI":
@@ -86,7 +88,8 @@ if stack_info.name != "CI":
 
 redis_outputs: list[Output] = []
 for stack in stacks:
-    redis_outputs.append(StackReference(stack).require_output("edxapp"))  # noqa: PERF401
+    project = stack.split(".")[1]
+    redis_outputs.append(StackReference(stack).require_output(project))
 redis_broker_subscriptions = Output.all(*redis_outputs).apply(
     build_broker_subscriptions
 )

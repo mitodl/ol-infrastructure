@@ -13,7 +13,7 @@ from bridge.lib.magic_numbers import (
     FIVE_MINUTES,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, ResourceOptions, StackReference
+from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import acm, ec2, get_caller_identity, iam, route53, ses
 
 from ol_infrastructure.components.aws.auto_scale_group import (
@@ -734,4 +734,13 @@ route53.Record(
     records=[superset_web_asg.load_balancer.dns_name],
     zone_id=mitol_zone_id,
     opts=ResourceOptions(delete_before_replace=True),
+)
+
+export(
+    "superset",
+    {
+        "deployment": stack_info.env_prefix,
+        "redis": superset_redis_cache.address,
+        "redis_token": redis_auth_token,
+    },
 )
