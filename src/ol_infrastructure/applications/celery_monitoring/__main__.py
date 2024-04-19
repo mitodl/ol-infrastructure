@@ -7,7 +7,7 @@ import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, StackReference
 from pulumi_aws import acm, ec2, get_caller_identity, iam, route53
 
 from ol_infrastructure.components.aws.auto_scale_group import (
@@ -367,9 +367,4 @@ route53.Record(
     records=[celery_monitoring_web_asg.load_balancer.dns_name],
     zone_id=mitodl_zone_id,
     opts=ResourceOptions(delete_before_replace=True),
-)
-
-export(
-    "celery_monitoring",
-    {"security_group": celery_monitoring_security_group.id},
 )
