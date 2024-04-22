@@ -140,7 +140,7 @@ concourse_config_map = {
         lidar_scanner_interval="15s",
         max_checks_per_second="30",
         enable_across_step=True,
-        enable_p2p_volume_streaming=True,
+        enable_p2p_volume_streaming=False,
         prometheus_bind_ip=IPv4Address("127.0.0.1"),
         prometheus_bind_port=CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
         secret_cache_duration="1m",  # pragma: allowlist secret # noqa: S106
@@ -158,8 +158,6 @@ concourse_config_map = {
         ),
         baggageclaim_bind_ip="0.0.0.0",  # noqa: S104
         baggageclaim_driver="overlay",
-        baggageclaim_p2p_interface_family="4",
-        baggageclaim_p2p_interface_name_pattern="ens5",
         bind_ip="0.0.0.0",  # noqa: S104
         container_runtime="containerd",
         containerd_dns_server="8.8.8.8",
