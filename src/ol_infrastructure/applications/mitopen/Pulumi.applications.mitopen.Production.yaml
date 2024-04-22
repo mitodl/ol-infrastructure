@@ -28,7 +28,7 @@ config:
     INDEXING_API_USERNAME: "od_mm_prod_api"
     KEYCLOAK_BASE_URL: "https://sso.ol.mit.edu"
     KEYCLOAK_REALM_NAME: "olapps"
-    MITOPEN_BASE_URL: "https://open.mit.edu"
+    MITOPEN_BASE_URL: "https://mitopen.odl.mit.edu"
     MITOPEN_COOKIE_DOMAIN: "mit.edu"
     MITOPEN_COOKIE_NAME: "mitopen"
     MITOPEN_LOG_LEVEL: "INFO"
