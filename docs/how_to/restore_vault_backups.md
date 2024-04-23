@@ -50,7 +50,7 @@ securely distribute the key shares printed above.
 ```
 7. The message says those recovery keys are important but they aren't in this case. You don't need to save them. What you do need is the initial root token. Export that into env var: `export VAULT_TOKEN=<token value including hvs. from prev command output>`
 8. Do the restore: `vault operator raft snapshot restore <path to .snapshot file>`. It doesn't actually output anything.
-9. Do a vault status: ```vault status` and it should look something like this:
+9. Unset VAULT_TOKEN with `unset VAULT_TOKEN` (because that token was tied the shortlived cluster that existed before running the restore). Then do a vault status: `vault status` and it should look something like this:
 ```
 Key                      Value
 ---                      -----
