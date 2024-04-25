@@ -1,8 +1,8 @@
 #include <tunables/global>
 
-{{ shared_context.XQWATCHER_GRADER_VENVS_DIR }}/{{ grader_context.grader_short_name }}/bin/python {
+{{ context.GRADER_VENV_DIR }}/bin/python {
     #include <abstractions/base>
-    {{ shared_context.XQWATCHER_GRADER_VENVS_DIR }}/{{ grader_context.grader_short_name }}/** mr,
+    {{ context.GRADER_VENV_DIR }}/** mr,
     /tmp/codejail-*/ rix,
     /tmp/codejail-*/** wrix,
     /proc/*/mounts r,

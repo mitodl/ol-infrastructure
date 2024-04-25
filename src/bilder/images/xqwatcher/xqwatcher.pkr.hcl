@@ -43,7 +43,7 @@ source "amazon-ebs" "xqwatcher" {
   instance_type           = "c6a.large"  # AMI build does a lot of compling from source, so dedicated CPU is needed
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
-    volume_size           = 50
+    volume_size           = 25
     delete_on_termination = true
   }
   run_tags = {

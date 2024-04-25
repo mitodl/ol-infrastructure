@@ -7,7 +7,7 @@ from yaml import safe_load
 #
 # Format:
 # graders:
-# - name: <directory name within XQWATCHER_GRADER_DIR for this grader>
+# - name: <directory name within XQWATCHER_GRADERS_DIR for this grader>
 #   git_ref: <the brnach or tag to checkout>
 #   address: <address of the git repo>
 #   env:
@@ -16,10 +16,10 @@ from yaml import safe_load
 # The env dict is primary used for passing a custom `GIT_SSH_COMMAND` value
 # which can be used to specify a specific identity file / other SSH options.
 
-with open("{{ shared_context.XQWATCHER_GRADER_CONFIG_FILE }}", 'r') as config_file:
+with open("{{ shared_context.XQWATCHER_FETCH_GRADERS_CONFIG_FILE }}", 'r') as config_file:
     grader_configs = safe_load(config_file)
 
-graders_root = Path("{{ shared_context.XQWATCHER_GRADER_DIR }}")
+graders_root = Path("{{ shared_context.XQWATCHER_GRADERS_DIR }}")
 
 for grader_config in grader_configs["graders"]:
 
