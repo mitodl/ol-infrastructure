@@ -75,6 +75,7 @@ install_baseline_packages(
         "libmariadb-dev",
         "libopenblas-dev",
         "libssl-dev",
+        "logrotate",
         "pkg-config",
         "python3",
         "python3-dev",
@@ -124,6 +125,7 @@ shared_template_context = {
     "XQWATCHER_GRADERS_VENVS_DIR": str(XQWATCHER_GRADERS_VENVS_DIR),
     "XQWATCHER_INSTALL_DIR": str(XQWATCHER_INSTALL_DIR),
     "XQWATCHER_LOG_DIR": str(XQWATCHER_LOG_DIR),
+    "XQWATCHER_USER": str(XQWATCHER_USER),
     "XQWATCHER_VENV_DIR": str(XQWATCHER_VENV_DIR),
 }
 
@@ -200,6 +202,16 @@ files.template(
     user=XQWATCHER_USER,
     group=XQWATCHER_USER,
     mode="0664",
+    shared_context=shared_template_context,
+)
+
+files.template(
+    name="Create logrotate.d configuration",
+    src=str(TEMPLATES_DIRECTORY.joinpath("logrotate.xqwatcher.j2")),
+    dest="/etc/logrotate.d/xqwatcher",
+    user="root",
+    group="root",
+    mode="0644",
     shared_context=shared_template_context,
 )
 
