@@ -1,7 +1,8 @@
 import sys
 
 from ol_concourse.lib.models.fragment import PipelineFragment
-from ol_concourse.lib.models.pipeline import GroupConfig, Job, Pipeline
+from ol_concourse.lib.models.pipeline import GetStep, GroupConfig, Job, Pipeline
+from ol_concourse.lib.resources import Identifier, schedule
 from ol_concourse.lib.tasks import (
     block_for_instance_refresh_task,
     instance_refresh_task,
@@ -9,6 +10,10 @@ from ol_concourse.lib.tasks import (
 
 environments = ["ci", "qa", "production"]
 node_classes = ["worker-infra", "worker-ocw", "worker-generic", "web"]
+
+build_schedule = schedule(
+    Identifier("build-schedule"), interval="24h", start="08:00", stop="11:00"
+)
 
 jobs = []
 group_configs = []
@@ -20,6 +25,7 @@ for env in environments:
         refresh_job = Job(
             name=f"{env}-{node_class}-instance-refresh",
             plan=[
+                GetStep(get="build-schedule", trigger=True),
                 instance_refresh_task(filters=filter_template, queries=query),
                 block_for_instance_refresh_task(
                     filters=filter_template, queries=query, check_freq=10
