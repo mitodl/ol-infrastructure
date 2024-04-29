@@ -125,14 +125,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         repository="keycloak-scim",
     )
 
-    # Repo: https://github.com/daniel-frak/keycloak-user-migration
-    # Use: Migrating users from open discussions
-    user_migration_spi = github_release(
-        name=Identifier("user-migration-spi"),
-        owner="daniel-frak",
-        repository="keycloak-user-migration",
-    )
-
     #############################################
     image_build_context = Output(name=Identifier("image-build-context"))
 
@@ -146,7 +138,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
             GetStep(get=metrics_spi.name, trigger=True),
             GetStep(get=ol_spi.name, trigger=True),
             GetStep(get=scim_spi.name, trigger=True),
-            GetStep(get=user_migration_spi.name, trigger=True),
             TaskStep(
                 task=Identifier("collect-artifacts-for-build-context"),
                 config=TaskConfig(
@@ -158,7 +149,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                         Input(name=metrics_spi.name),
                         Input(name=ol_spi.name),
                         Input(name=scim_spi.name),
-                        Input(name=user_migration_spi.name),
                     ],
                     image_resource=AnonymousResource(
                         type=REGISTRY_IMAGE,
@@ -176,7 +166,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                         cp -r {metrics_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {ol_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {scim_spi.name}/* {image_build_context.name}/plugins/
-                        cp -r {user_migration_spi.name}/* {image_build_context.name}/plugins/
                         """  # noqa: E501
                             ),
                         ],
@@ -217,7 +206,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
             metrics_spi,
             ol_spi,
             scim_spi,
-            user_migration_spi,
         ],
         jobs=[docker_build_job],
     )
