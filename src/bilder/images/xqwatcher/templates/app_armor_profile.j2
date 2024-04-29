@@ -1,8 +1,8 @@
 #include <tunables/global>
 
-{{ context.GRADER_VENV_DIR }}/bin/python {
+{{ grader_context.GRADER_VENV_DIR }}/bin/python {
     #include <abstractions/base>
-    {{ context.GRADER_VENV_DIR }}/** mr,
+    {{ grader_context.GRADER_VENV_DIR }}/** mr,
     /tmp/codejail-*/ rix,
     /tmp/codejail-*/** wrix,
     /proc/*/mounts r,

@@ -35,12 +35,13 @@ openedx_version_tag = xqueue_config.get("openedx_version_tag")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
+xqwatcher_stack = StackReference(f"applications.xqwatcher.operations.{stack_info.name}")
 consul_stack = StackReference(
     f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
 )
 
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-edxapp = StackReference(
+edxapp_stack = StackReference(
     f"applications.edxapp.{stack_info.env_prefix}.{stack_info.name}"
 )
 
@@ -153,7 +154,10 @@ xqueue_server_security_group = ec2.SecurityGroup(
             protocol="tcp",
             from_port=XQUEUE_SERVICE_PORT,
             to_port=XQUEUE_SERVICE_PORT,
-            security_groups=[edxapp.get_output("edxapp_security_group")],
+            security_groups=[
+                edxapp_stack.get_output("edxapp_security_group"),
+                xqwatcher_stack.get_output("xqwatcher_security_group"),
+            ],
             cidr_blocks=[target_vpc["cidr"]],
             description=(
                 f"Allow traffic to the xqueue server on port {XQUEUE_SERVICE_PORT}"

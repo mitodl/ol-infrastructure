@@ -1,5 +1,8 @@
 """Create the resources needed to run a xqwatcher server.  # noqa: D200"""
 
+# Note: This stack has a silent dependency on an peering connection between the VPC
+# that it is installed in and the VPC(s) that contain the xqueue instances.
+
 import base64
 import json
 import textwrap

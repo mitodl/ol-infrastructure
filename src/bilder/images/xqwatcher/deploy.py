@@ -115,7 +115,8 @@ XQWATCHER_FETCH_GRADERS_SCRIPT_FILE = XQWATCHER_INSTALL_DIR.joinpath("fetch_grad
 XQWATCHER_LOGGING_CONFIG_FILE = XQWATCHER_INSTALL_DIR.joinpath("logging.json")
 
 XQWATCHER_SERVICE_FILE = Path("/usr/lib/systemd/system/xqwatcher.service")
-XQWATCHER_BRANCH = "master"
+# Change back to 'master' once https://github.com/mitodl/xqueue-watcher/pull/13 is merged
+XQWATCHER_BRANCH = "md/issue_2326"
 XQWATCHER_GIT_REPO = "https://github.com/mitodl/xqueue-watcher.git"
 XQWATCHER_USER = "xqwatcher"
 
@@ -277,6 +278,16 @@ files.put(
 )
 
 # Grader virtual environment setup
+files.template(
+    name="Create grader shared sudoers entries",
+    src=str(TEMPLATES_DIRECTORY.joinpath("99-xqwatcher-shared.j2")),
+    dest="/etc/sudoers.d/99-xqwatcher-shared",
+    user="root",
+    group="root",
+    mode="0600",
+    shared_context=shared_template_context,
+)
+
 grader_venvs = ["mit-600x", "mit-686x-mooc", "mit-686x", "mit-6S082", "mit-940"]
 for grader_venv in grader_venvs:
     GRADER_VENV_DIR = XQWATCHER_GRADERS_VENVS_DIR.joinpath(grader_venv)
@@ -300,7 +311,17 @@ for grader_venv in grader_venvs:
         user="root",
         group="root",
         mode="0644",
-        context={"GRADER_VENV_DIR": str(GRADER_VENV_DIR)},
+        grader_context={"GRADER_VENV_DIR": str(GRADER_VENV_DIR)},
+    )
+    files.template(
+        name="Create grader sudoer entry",
+        src=str(TEMPLATES_DIRECTORY.joinpath("99-xqwatcher-grader.j2")),
+        dest=f"/etc/sudoers.d/99-xqwatcher-{grader_venv}",
+        user="root",
+        group="root",
+        mode="0600",
+        shared_context=shared_template_context,
+        grader_context={"GRADER_VENV_DIR": str(GRADER_VENV_DIR)},
     )
     server.shell(
         name=f"Install grader {grader_venv} : install requirements",
