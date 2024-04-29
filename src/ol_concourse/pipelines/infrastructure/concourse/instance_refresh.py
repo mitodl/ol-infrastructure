@@ -43,7 +43,7 @@ for env in environments:
 
 instance_refresh_pipeline_fragment = PipelineFragment(
     resource_types=[],
-    resources=[],
+    resources=[build_schedule],
     jobs=jobs,
 )
 
