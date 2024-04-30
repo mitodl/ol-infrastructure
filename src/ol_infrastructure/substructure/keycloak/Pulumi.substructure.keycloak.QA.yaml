@@ -36,7 +36,5 @@ config:
       superset: ["https://bi-qa.ol.mit.edu/*", "superset_admin", "superset_alpha"]
     realm_name: ol-data-platform
   keycloak:url: https://sso-qa.ol.mit.edu
-  keycloak:user_migration_open_discussions_bearer_token:
-    secure: v1:JlslYpQlva2/fWrn:2sYWwNCeNRNERF4wYmxpnw1+YF1sHp3hBNg6F9upUVH+el+XWc0XrgZ6NEVU8dC4SLc2Hd1r8gg=
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
