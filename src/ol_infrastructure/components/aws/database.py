@@ -340,5 +340,5 @@ class OLAmazonDB(pulumi.ComponentResource):
         }
         return dict(
             **global_profiles,
-            **(monitoring_profiles[profile_name]),  # type:ignore[dict-item]
+            **(monitoring_profiles[profile_name]),
         )

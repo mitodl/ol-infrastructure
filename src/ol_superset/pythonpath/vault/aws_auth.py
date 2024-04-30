@@ -25,7 +25,7 @@ def load_aws_ec2_pkcs7_string(metadata_url_base=EC2_METADATA_URL_BASE):
     """
 
     metadata_pkcs7_url = f"{metadata_url_base}/latest/dynamic/instance-identity/pkcs7"
-    logger.debug("load_aws_ec2_pkcs7_string connecting to %s" % metadata_pkcs7_url)  # noqa: G002
+    logger.debug("load_aws_ec2_pkcs7_string connecting to %s", metadata_pkcs7_url)
 
     response = requests.get(url=metadata_pkcs7_url)  # noqa: S113
     response.raise_for_status()
@@ -46,18 +46,18 @@ def load_aws_ec2_nonce_from_disk(token_nonce_path=TOKEN_NONCE_PATH):
     :return: string, a previously stored "token_meta_nonce"
     """  # noqa: D401
     logger.debug(
-        "Attempting to load vault token meta nonce from path: %s" % token_nonce_path  # noqa: G002
+        "Attempting to load vault token meta nonce from path: %s", token_nonce_path
     )
     try:
         with open(token_nonce_path) as nonce_file:  # noqa: PTH123
             nonce = nonce_file.readline()
     except OSError:
         logger.warning(
-            "Unable to load vault token meta nonce at path: %s" % token_nonce_path  # noqa: G002
+            "Unable to load vault token meta nonce at path: %s", token_nonce_path
         )
         nonce = None
 
-    logger.debug("Nonce loaded: %s" % nonce)  # noqa: G002
+    logger.debug("Nonce loaded: %s", nonce)
     return nonce
 
 
@@ -74,7 +74,7 @@ def write_aws_ec2_nonce_to_disk(token_meta_nonce, token_nonce_path=TOKEN_NONCE_P
 
     :return: None
     """  # noqa: D401
-    logger.debug(f'Writing nonce "{token_meta_nonce}" to file "{token_nonce_path}".')  # noqa: G004
+    logger.debug('Writing nonce "%s" to file "%s".', token_meta_nonce, token_nonce_path)
     with open(token_nonce_path, "w") as nonce_file:  # noqa: PTH123
         nonce_file.write(token_meta_nonce)
 
@@ -122,8 +122,8 @@ def auth_ec2(  # noqa: PLR0913
         token_meta_nonce = auth_ec2_resp["auth"]["metadata"].get("nonce")
         if token_meta_nonce is not None:
             logger.debug(
-                "token_meta_nonce received back from auth_ec2 call: %s"  # noqa: G002
-                % token_meta_nonce
+                "token_meta_nonce received back from auth_ec2 call: %s",
+                token_meta_nonce,
             )
             write_aws_ec2_nonce_to_disk(token_meta_nonce)
         else:
