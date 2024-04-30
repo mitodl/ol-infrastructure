@@ -234,7 +234,6 @@ heroku_vars = {
     "CRON_COURSERUN_SYNC_HOURS": "*",
     "CYBERSOURCE_MERCHANT_ID": "mit_odl_xpro",
     "CYBERSOURCE_REFERENCE_PREFIX": f"xpro-{env_name}",
-    "ENABLE_ORDER_RECEIPTS": "True",
     "FEATURE_COUPON_SHEETS": "True",
     "FEATURE_COUPON_SHEETS_TRACK_REQUESTER": "True",
     "FEATURE_COURSE_DROPDOWN": "True",
