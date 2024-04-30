@@ -4,6 +4,8 @@ from collections import defaultdict
 from itertools import chain, product
 from typing import Optional
 
+from pydantic import BaseModel
+
 from bridge.settings.openedx.accessors import fetch_applications_by_type
 from bridge.settings.openedx.types import (
     EnvStage,
@@ -13,8 +15,6 @@ from bridge.settings.openedx.types import (
     OpenEdxSupportedRelease,
 )
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
-from pydantic import BaseModel
-
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -70,6 +70,7 @@ def mfe_params(
     open_edx: OpenEdxVars, mfe: OpenEdxApplicationVersion
 ) -> dict[str, Optional[str]]:
     learning_mfe_path = OpenEdxMicroFrontend.learn.path
+    discussion_mfe_path = OpenEdxMicroFrontend.discussion.path
     return {
         "ABOUT_US_URL": open_edx.about_us_url,
         "ACCESSIBILITY_URL": open_edx.accessibility_url,
@@ -81,6 +82,7 @@ def mfe_params(
         "CONTACT_URL": open_edx.contact_url,
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "DISPLAY_FEEDBACK_WIDGET": open_edx.display_feedback_widget,
+        "DISCUSSIONS_MFE_BASE_URL": f"https://{open_edx.lms_domain}/{discussion_mfe_path}",
         "FAVICON_URL": open_edx.favicon_url,
         "HONOR_CODE_URL": open_edx.honor_code_url,
         "LANGUAGE_PREFERENCE_COOKIE_NAME": (
