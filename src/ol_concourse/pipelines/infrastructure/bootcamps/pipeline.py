@@ -2,7 +2,7 @@ from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 bootcamps_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi-bootcamps"),
@@ -10,8 +10,8 @@ bootcamps_pulumi_code = git_repo(
     branch="main",
     paths=[
         "src/ol_infrastructure/applications/bootcamps/",
-        "src/ol_infrastructure/lib/",
         "src/bridge/lib/",
+        *PULUMI_WATCHED_PATHS,
     ],
 )
 
