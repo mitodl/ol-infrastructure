@@ -2,7 +2,7 @@ from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 xpro_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi-xpro"),
@@ -11,8 +11,8 @@ xpro_pulumi_code = git_repo(
     paths=[
         "src/ol_infrastructure/applications/xpro/",
         "src/ol_infrastructure/lib/",
-        "src/bridge/lib/",
         "src/bridge/secrets/xpro",
+        *PULUMI_WATCHED_PATHS,
     ],
 )
 
