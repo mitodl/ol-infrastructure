@@ -12,4 +12,4 @@ config:
   mongodb_atlas:instance_size: M20
   mongodb_atlas:organization_id: 611ab793e07f5965c7b9e4f6
   mongodb_atlas:ready_for_traffic: 'true'
-  mongodb_atlas:version: '4.4'
+  mongodb_atlas:version: '7.0'
