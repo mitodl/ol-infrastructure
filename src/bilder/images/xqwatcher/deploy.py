@@ -46,6 +46,11 @@ from bilder.components.hashicorp.vault.models import (
     VaultListener,
     VaultTCPListener,
 )
+from bilder.components.vector.models import VectorConfig
+from bilder.components.vector.steps import (
+    install_and_configure_vector,
+    vector_service,
+)
 from bilder.facts.has_systemd import HasSystemd
 
 VERSIONS = {
@@ -115,8 +120,7 @@ XQWATCHER_FETCH_GRADERS_SCRIPT_FILE = XQWATCHER_INSTALL_DIR.joinpath("fetch_grad
 XQWATCHER_LOGGING_CONFIG_FILE = XQWATCHER_INSTALL_DIR.joinpath("logging.json")
 
 XQWATCHER_SERVICE_FILE = Path("/usr/lib/systemd/system/xqwatcher.service")
-# Change back to 'master' once https://github.com/mitodl/xqueue-watcher/pull/13 is merged
-XQWATCHER_BRANCH = "md/issue_2326"
+XQWATCHER_BRANCH = "master"
 XQWATCHER_GIT_REPO = "https://github.com/mitodl/xqueue-watcher.git"
 XQWATCHER_USER = "xqwatcher"
 
@@ -160,7 +164,7 @@ files.directory(
 
 server.shell(
     name="Create virtual environment for xqwatcher",
-    commands=[f"/usr/bin/virtualenv {XQWATCHER_VENV_DIR}"],
+    commands=[f"/usr/bin/virtualenv {XQWATCHER_VENV_DIR} --copies"],
 )
 
 files.put(
@@ -294,7 +298,7 @@ for grader_venv in grader_venvs:
     GRADER_REQS_FILE = GRADER_VENV_DIR.joinpath("requirements.txt")
     server.shell(
         name=f"Install grader {grader_venv} : Create virtual environment",
-        commands=[f"/usr/bin/virtualenv {GRADER_VENV_DIR}"],
+        commands=[f"/usr/bin/virtualenv {GRADER_VENV_DIR} --copies"],
     )
     files.put(
         name=f"Install grader {grader_venv} : create requirements file",
@@ -416,7 +420,17 @@ configure_hashicorp_products(hashicorp_products)
 
 consul_template_permissions(consul_template.configuration)
 
+# Install Vector
+vector_config = VectorConfig(is_proxy=False)
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "xqwatcher-logs.yaml.j2")
+] = {}
+install_and_configure_vector(vector_config)
+
+
 if host.get_fact(HasSystemd):
+    vector_service(vector_config)
+
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
 

@@ -1,0 +1,43 @@
+---
+sources:
+  collect_xqwatcher_logs:
+    type: journald
+    include_units:
+    - python3
+    current_boot_only: true
+
+transforms:
+  parse_xqwatcher_logs:
+    type: remap
+    inputs:
+    - 'collect_xqwatcher_logs'
+    source: |
+      event, err = parse_json(.message)
+      if event != null {
+        .,err = merge(., event)
+        .environment = "${ENVIRONMENT}"
+      }
+
+  enrich_xqwatcher_logs:
+    type: aws_ec2_metadata
+    inputs:
+    - 'parse_xqwatcher_logs'
+    namespace: ec2
+
+sinks:
+  ship_xqwatcher_logs_to_grafana_cloud:
+    inputs:
+    - 'enrich_xqwatcher_logs'
+    type: loki
+    auth:
+      strategy: basic
+      password: ${GRAFANA_CLOUD_API_KEY}
+      user: "${GRAFANA_CLOUD_LOKI_API_USER}"
+    endpoint: https://logs-prod-us-central1.grafana.net
+    encoding:
+      codec: json
+    labels:
+      environment: ${ENVIRONMENT}
+      application: xqwatcher
+      service: xqwatcher
+    out_of_order_action: rewrite_timestamp
