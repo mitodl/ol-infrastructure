@@ -1,5 +1,6 @@
 VERSION 0.7
-FROM python:3.8-bookworm
+ARG PYTHON_VERSION="3.8"
+FROM python:$PYTHON_VERSION"-bookworm"
 
 apt-base:
   ENV DEBIAN_FRONTEND=noninteractive
@@ -42,6 +43,7 @@ install-deps:
   FROM +apt-base
   ARG --required DEPLOYMENT_NAME
   ARG --required RELEASE_NAME
+  ARG NODE_VERSION="16.14.0"
   COPY +get-code/edx-platform /openedx/edx-platform
   RUN cp /openedx/edx-platform/requirements/edx/base.txt /root/pip_package_lists/edx_base.txt
   RUN ls -l /root/pip_package_lists/
@@ -53,7 +55,7 @@ install-deps:
   WORKDIR /openedx/edx-platform
   ENV PATH /root/.local/bin:/openedx/nodeenv/bin:${PATH}
   ENV NPM_REGISTRY "https://registry.npmjs.org/"
-  RUN nodeenv /openedx/nodeenv --node=16.20.2 --prebuilt \
+  RUN nodeenv /openedx/nodeenv --node=$NODE_VERSION --prebuilt \
     && npm clean-install -s --registry=$NPM_REGISTRY
   SAVE ARTIFACT /openedx/edx-platform
   SAVE ARTIFACT /openedx/nodeenv
