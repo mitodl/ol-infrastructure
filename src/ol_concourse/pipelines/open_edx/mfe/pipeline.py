@@ -135,6 +135,7 @@ def mfe_job(
             for component, override in (mfe.branding_overrides or {}).items()
         )
     )
+    translation_overrides = "\n".join(cmd for cmd in mfe.translation_overrides or [])
     if previous_job and mfe_repo.name == previous_job.plan[0].get:
         clone_git_repo.passed = [previous_job.name]
     mfe_job_definition = Job(
@@ -169,9 +170,11 @@ def mfe_job(
                             textwrap.dedent(
                                 f"""\
                                 apt-get update
-                                apt-get install -q -y python3 python-is-python3 build-essential
+                                apt-get install -q -y python3 python-is-python3 build-essential git
                                 npm install
+                                npm install -g @edx/openedx-atlas
                                 {branding_overrides}
+                                {translation_overrides}
                                 npm install webpack
                                 NODE_ENV=production npm run build
                                 """  # noqa: E501

@@ -355,9 +355,9 @@ ReleaseMap: dict[
                 application="learning",
                 application_type="MFE",
                 release="master",
-                branch_override="open-learning",
-                origin_override="https://github.com/mitodl/frontend-app-learning",
-                branding_overrides=pinned_branding_overrides,
+                translation_overrides=[
+                    "atlas pull -r mitodl/mitxonline-translations -n main translations/frontend-app-learning/src/i18n/messages:src/i18n/messages/",  # noqa: E501
+                ],
             ),
             OpenEdxApplicationVersion(
                 application="library-authoring",
