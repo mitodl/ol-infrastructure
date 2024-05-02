@@ -391,7 +391,6 @@ concourse_db_config = OLPostgresDBConfig(
     security_groups=[concourse_db_security_group],
     tags=aws_config.tags,
     db_name="concourse",
-    engine_version="12.14",
     **rds_defaults,
 )
 concourse_db = OLAmazonDB(concourse_db_config)
