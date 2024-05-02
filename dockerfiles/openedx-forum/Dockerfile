@@ -1,12 +1,13 @@
-FROM docker.io/ruby:3.3-slim-bullseye
+ARG DOCKER_IMAGE_TAG=3.0-slim-bullseye
+FROM docker.io/ruby:$DOCKER_IMAGE_TAG
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update && \
   apt upgrade -y && \
-  apt install -y git wget autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm-dev
+  apt install -y git wget autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm-dev libxml2-dev libxslt-dev
 
 # Install dockerize to wait for mongodb/elasticsearch availability
 ARG DOCKERIZE_VERSION=v0.6.1
-ARG OPENEDX_COMMON_VERSION=open-release/olive.3
+ARG OPENEDX_COMMON_VERSION=open-release/quince.master
 ARG OPENEDX_FORUM_REPOSITORY=https://github.com/openedx/cs_comments_service
 
 RUN wget -O /tmp/dockerize.tar.gz https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
@@ -25,15 +26,15 @@ ENV PATH :${PATH}
 USER app
 
 # Install rake and bundler
-ENV PATH "/app/bin:/app/.gem/ruby/3.0.4/bin:$PATH"
-RUN gem install --user-install bundler --version 1.17.3
-RUN gem install --user-install rake --version 13.0.6
+ENV PATH "/app/bin:/app/.gem/ruby/3.3.0/bin:/app/.local/share/gem/ruby/3.3.0/bin:$PATH"
+RUN gem install --user-install bundler \
+    && gem install --user-install rake
 
 # Install forum
 ENV BUNDLE_GEMFILE Gemfile3
 RUN git clone $OPENEDX_FORUM_REPOSITORY --branch $OPENEDX_COMMON_VERSION --depth 1 /app/cs_comments_service
 WORKDIR /app/cs_comments_service
-RUN bundle install --deployment
+RUN bundle config set deployment true && bundle install
 
 ENTRYPOINT ["/app/bin/docker-entrypoint.sh"]
 
