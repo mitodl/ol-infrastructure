@@ -2,14 +2,17 @@ import sys
 from pathlib import Path
 
 from ol_concourse.lib.models.pipeline import (
+    AnonymousResource,
     Command,
     GetStep,
     Identifier,
     Input,
     Job,
+    LoadVarStep,
     Output,
     Pipeline,
     PutStep,
+    RegistryImage,
     Resource,
     TaskConfig,
     TaskStep,
@@ -105,11 +108,20 @@ generate_clients_job = Job(
 create_release_job = Job(
     name="create-release",
     plan=[
-        GetStep(get=python_image.name, trigger=True),
         GetStep(
             get=mit_open_api_clients_repository.name,
             passed=[generate_clients_job.name],
             trigger=True,
+        ),
+        GetStep(
+            get=mit_open_repository.name,
+            passed=[generate_clients_job.name],
+            trigger=True,
+        ),
+        LoadVarStep(
+            load_var=Identifier("mitopen-git-rev"),
+            file=f"{mit_open_repository.name}/.git/refs/heads/{mit_open_repository.source['branch']}",
+            reveal=True,
         ),
         TaskStep(
             task="bump-version",
@@ -120,11 +132,29 @@ create_release_job = Job(
                 outputs=[Output(name=mit_open_api_clients_repository.name)],
                 run=Command(
                     path="sh",
-                    dir="mit-open-api-clients",
+                    dir=mit_open_api_clients_repository.name,
                     args=[
                         "-xc",
                         _read_script("open-api-clients-bumpver.sh"),
                     ],
+                ),
+            ),
+        ),
+        TaskStep(
+            task="commit-changes",
+            config=TaskConfig(
+                inputs=[Input(name=mit_open_api_clients_repository.name)],
+                outputs=[Output(name=mit_open_api_clients_repository.name)],
+                image_resource=AnonymousResource(
+                    source=RegistryImage(repository="concourse/buildroot", tag="git"),
+                    type="registry-image",
+                ),
+                platform="linux",
+                params={"OPEN_REV": "((.:mitopen-git-rev))"},
+                run=Command(
+                    path="sh",
+                    dir=mit_open_api_clients_repository.name,
+                    args=["-xc", _read_script("open-api-clients-commit-changes.sh")],
                 ),
             ),
         ),
