@@ -79,9 +79,10 @@ mit_open_api_clients_repository = ssh_git_repo(
 generate_clients_job = Job(
     name=Identifier("generate-clients"),
     plan=[
+        GetStep(get=python_image.name),
         GetStep(get=mit_open_repository.name, trigger=True),
         GetStep(get=mit_open_api_clients_repository.name, trigger=True),
-        GetStep(get=openapi_generator_image.name, trigger=True),
+        GetStep(get=openapi_generator_image.name),
         TaskStep(
             task=Identifier("generate-apis"),
             image=openapi_generator_image.name,
@@ -97,26 +98,6 @@ generate_clients_job = Job(
                     args=["mit-open-api-clients/scripts/generate-inner.sh"],
                 ),
             ),
-        ),
-        PutStep(
-            put=mit_open_api_clients_repository.name,
-            params={"repository": mit_open_api_clients_repository.name},
-        ),
-    ],
-)
-
-create_release_job = Job(
-    name="create-release",
-    plan=[
-        GetStep(
-            get=mit_open_api_clients_repository.name,
-            passed=[generate_clients_job.name],
-            trigger=True,
-        ),
-        GetStep(
-            get=mit_open_repository.name,
-            passed=[generate_clients_job.name],
-            trigger=True,
         ),
         LoadVarStep(
             load_var=Identifier("mitopen-git-rev"),
@@ -174,7 +155,7 @@ publish_job = Job(
         GetStep(get=node_image.name, trigger=True),
         GetStep(
             get=mit_open_api_clients_repository.name,
-            passed=[create_release_job.name],
+            passed=[generate_clients_job.name],
             trigger=True,
         ),
         TaskStep(
@@ -204,7 +185,6 @@ build_pipeline = Pipeline(
     ],
     jobs=[
         generate_clients_job,
-        create_release_job,
         publish_job,
     ],
 )
