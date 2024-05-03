@@ -26,7 +26,8 @@ config:
       open-local: "*"
     realm_name: olapps
   - client_info:
-      superset: ["https://bi-ci.ol.mit.edu/*", "superset_admin", "superset_alpha"]
+      superset: ["https://bi-ci.ol.mit.edu/*", "superset_admin", "superset_alpha",
+        "superset_gamma"]
     realm_name: ol-data-platform
   - client_info:
       leek: ["https://celery-monitoring-ci.odl.mit.edu/*"]

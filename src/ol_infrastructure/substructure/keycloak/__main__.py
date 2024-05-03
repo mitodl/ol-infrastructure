@@ -470,14 +470,28 @@ ol_data_oidc_attribute_importer_identity_provider_mapper = (
         opts=resource_options,
     ),
     # Map Moira group membership to superset role
-    # ol-eng-finance -> superset_alpha
+    # ol-eng-developer -> superset_alpha
     keycloak.AttributeToRoleIdentityMapper(
-        "ol-data-saml-superset-alpha-ol-eng-finance",
+        "ol-data-saml-superset-alpha-ol-eng-developer",
         realm=ol_data_platform_realm.id,
         attribute_friendly_name="mitMoiraMemberOf",
         identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
-        attribute_value="ol-eng-finance",
+        attribute_value="ol-eng-developer",
         role="ol-superset-client.superset_alpha",
+        extra_config={
+            "syncMode": "FORCE",
+        },
+        opts=resource_options,
+    ),
+    # Map Moira group membership to superset role
+    # ol-eng-reporter -> superset_gamma
+    keycloak.AttributeToRoleIdentityMapper(
+        "ol-data-saml-superset-gamma-ol-eng-reporter",
+        realm=ol_data_platform_realm.id,
+        attribute_friendly_name="mitMoiraMemberOf",
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        attribute_value="ol-eng-reporter",
+        role="ol-superset-client.superset_gamma",
         extra_config={
             "syncMode": "FORCE",
         },

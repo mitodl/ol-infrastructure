@@ -33,7 +33,8 @@ config:
       leek: ["https://celery-monitoring-qa.odl.mit.edu/*"]
     realm_name: ol-platform-engineering
   - client_info:
-      superset: ["https://bi-qa.ol.mit.edu/*", "superset_admin", "superset_alpha"]
+      superset: ["https://bi-qa.ol.mit.edu/*", "superset_admin", "superset_alpha",
+        "superset_gamma"]
     realm_name: ol-data-platform
   keycloak:url: https://sso-qa.ol.mit.edu
   vault:address: https://vault-qa.odl.mit.edu
