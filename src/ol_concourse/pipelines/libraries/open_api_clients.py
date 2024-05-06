@@ -81,7 +81,7 @@ generate_clients_job = Job(
     plan=[
         GetStep(get=python_image.name),
         GetStep(get=mit_open_repository.name, trigger=True),
-        GetStep(get=mit_open_api_clients_repository.name, trigger=True),
+        GetStep(get=mit_open_api_clients_repository.name, trigger=False),
         GetStep(get=openapi_generator_image.name),
         TaskStep(
             task=Identifier("generate-apis"),
