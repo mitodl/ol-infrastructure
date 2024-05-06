@@ -1,4 +1,4 @@
-FROM ubuntu:noble
+FROM ubuntu:focal
 
 RUN apt update && \
   apt-get install -y software-properties-common && \
