@@ -3,6 +3,7 @@
 {{ grader_context.GRADER_VENV_DIR }}/bin/python {
     #include <abstractions/base>
     {{ grader_context.GRADER_VENV_DIR }}/** mr,
+    /usr/local/lib/python3.11/dist-packages/** mr,
     /tmp/codejail-*/ rix,
     /tmp/codejail-*/** wrix,
     /proc/*/mounts r,

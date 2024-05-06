@@ -1,1 +1,4 @@
-xqwatcher ALL=({{ shared_context.XQWATCHER_USER }}) SETENV:NOPASSWD:{{ grader_context.GRADER_VENV_DIR }}/bin/python
+xqwatcher ALL=({{ grader_context.GRADER_USER }}) SETENV:NOPASSWD:{{ grader_context.GRADER_VENV_DIR }}/bin/python
+xqwatcher ALL=({{ grader_context.GRADER_USER }}) NOPASSWD:/usr/bin/find
+xqwatcher ALL=({{ grader_context.GRADER_USER }}) NOPASSWD:/bin/kill
+xqwatcher ALL=({{ grader_context.GRADER_USER }}) NOPASSWD:/usr/bin/pkill

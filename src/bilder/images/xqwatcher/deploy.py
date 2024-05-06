@@ -140,7 +140,7 @@ server.user(
     ensure_home=True,
     home=str(XQWATCHER_HOME),
     present=True,
-    shell="/bin/bash",  # noqa: S604
+    shell="/bin/false",  # noqa: S604
     user=XQWATCHER_USER,
 )
 
@@ -164,7 +164,7 @@ files.directory(
 
 server.shell(
     name="Create virtual environment for xqwatcher",
-    commands=[f"/usr/bin/virtualenv {XQWATCHER_VENV_DIR} --copies"],
+    commands=[f"/usr/bin/virtualenv {XQWATCHER_VENV_DIR} --always-copy"],
 )
 
 files.put(
@@ -281,24 +281,22 @@ files.put(
     mode="0644",
 )
 
-# Grader virtual environment setup
-files.template(
-    name="Create grader shared sudoers entries",
-    src=str(TEMPLATES_DIRECTORY.joinpath("99-xqwatcher-shared.j2")),
-    dest="/etc/sudoers.d/99-xqwatcher-shared",
-    user="root",
-    group="root",
-    mode="0600",
-    shared_context=shared_template_context,
-)
-
 grader_venvs = ["mit-600x", "mit-686x-mooc", "mit-686x", "mit-6S082", "mit-940"]
 for grader_venv in grader_venvs:
     GRADER_VENV_DIR = XQWATCHER_GRADERS_VENVS_DIR.joinpath(grader_venv)
     GRADER_REQS_FILE = GRADER_VENV_DIR.joinpath("requirements.txt")
+    server.user(
+        name=f"Install grader {grader_venv} : Create user",
+        home="/dev/null",
+        ensure_home=False,
+        create_home=False,
+        present=True,
+        shell="/bin/false",  # noqa: S604
+        user=grader_venv,
+    )
     server.shell(
         name=f"Install grader {grader_venv} : Create virtual environment",
-        commands=[f"/usr/bin/virtualenv {GRADER_VENV_DIR} --copies"],
+        commands=[f"/usr/bin/virtualenv {GRADER_VENV_DIR} --always-copy"],
     )
     files.put(
         name=f"Install grader {grader_venv} : create requirements file",
@@ -318,20 +316,26 @@ for grader_venv in grader_venvs:
         grader_context={"GRADER_VENV_DIR": str(GRADER_VENV_DIR)},
     )
     files.template(
-        name="Create grader sudoer entry",
+        name=f"Install grader {grader_venv} : Create sudoer entry",
         src=str(TEMPLATES_DIRECTORY.joinpath("99-xqwatcher-grader.j2")),
         dest=f"/etc/sudoers.d/99-xqwatcher-{grader_venv}",
         user="root",
         group="root",
         mode="0600",
-        shared_context=shared_template_context,
-        grader_context={"GRADER_VENV_DIR": str(GRADER_VENV_DIR)},
+        grader_context={
+            "GRADER_VENV_DIR": str(GRADER_VENV_DIR),
+            "GRADER_USER": grader_venv,
+        },
     )
     server.shell(
         name=f"Install grader {grader_venv} : install requirements",
         commands=[
             f"{GRADER_VENV_DIR.joinpath('bin/pip3')} install -r {GRADER_REQS_FILE} --no-cache-dir --exists-action w"
         ],
+    )
+    server.shell(
+        name=f"Install grader {grader_venv} : chown venv",
+        commands=[f"/usr/bin/chown -R {grader_venv} {GRADER_VENV_DIR}"],
     )
 
 consul_configuration = {
