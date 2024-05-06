@@ -21,10 +21,11 @@ class DBInstanceTypes(str, Enum):
 
 @lru_cache
 def db_engines() -> dict[str, list[str]]:
-    """Generate a list of database engines and their currently available versions
-        on RDS.
+    """Generate a list of database engines and their currently available versions on
+    RDS.
 
     :returns: Dictionary of engine names and the list of available versions
+
     :rtype: Dict[str, List[str]]
     """
     all_engines_paginator = rds_client.get_paginator("describe_db_engine_versions")
@@ -33,6 +34,28 @@ def db_engines() -> dict[str, list[str]]:
         for engine in engines_page["DBEngineVersions"]:
             engines_versions[engine["Engine"]].append(engine["EngineVersion"])
     return dict(engines_versions)
+
+
+def max_minor_version(engine: str, major_version: int | str) -> str:
+    """
+    Given a database egine and the major version, determine the current maximum minor
+    version.
+
+    :param engine: The database engine being targeted
+    :param major_version: The major version of the engine
+
+    :returns: The full version string of the current highest minor version
+    """
+    versions = db_engines().get(engine)
+    if not versions:
+        msg = "The specified engine does not have any available versions"
+        raise ValueError(msg)
+    major_versions = defaultdict(list)
+    for version in versions:
+        major, minor_and_patch = version.split(".", maxsplit=1)
+        major_versions[major].append(minor_and_patch)
+    highest_minor = sorted(major_versions[str(major_version)])[-1]
+    return f"{major_version}.{highest_minor}"
 
 
 @lru_cache
