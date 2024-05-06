@@ -1,4 +1,4 @@
-FROM ubuntu:focal
+FROM ubuntu:noble
 SHELL ["/bin/bash", "-c"]
 
 ENV DEBIAN_FRONTEND=noninteractive
