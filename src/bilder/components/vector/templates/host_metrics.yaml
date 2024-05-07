@@ -64,5 +64,5 @@ sinks:
     healthcheck: false
     auth:
       strategy: basic
-      user: "${GRAFANA_CLOUD_PROMETHEUS_API_USER}"
+      user: "${GRAFANA_CLOUD_PROMETHEUS_API_USER-prometheus}"
       password: ${GRAFANA_CLOUD_API_KEY}

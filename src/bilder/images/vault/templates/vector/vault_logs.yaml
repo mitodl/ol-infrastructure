@@ -75,7 +75,7 @@ sinks:
     auth:
       strategy: basic
       password: ${GRAFANA_CLOUD_API_KEY}
-      user: "${GRAFANA_CLOUD_LOKI_API_USER}"
+      user: "${GRAFANA_CLOUD_LOKI_API_USER-loki}"
     endpoint: https://logs-prod-us-central1.grafana.net
     encoding:
       codec: json
