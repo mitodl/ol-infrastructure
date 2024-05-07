@@ -5,6 +5,7 @@
 * [Bootcamp Ecommerce](#bootcamp-ecommerce)
 * [OpenEdX Residential MITx](#openedx-residential-mitx)
 * [XPro](#xpro)
+* [MITXOnline](#mitxonline)
 
 
 # Introduction
@@ -400,3 +401,26 @@ invocation.
 
 Be sure to inform the requester of what you see for output and add it to the
 ticket for this issue if there is one.
+
+## MITXOnline
+
+### Grading Celery Task Failed (STUB entry. Needs love)
+
+_Diagnosis_
+
+Usually we'll get reports from our users telling us that grading tasks have
+failed.
+
+At that point we should surf to [celery
+monitoring](https://celery-monitoring.odl.mit.edu/) and login with your
+Keycloak Platform Engineering realm credentials.
+
+Then, get the course ID for the failed grading tasks and search for it in
+Celery Monitoring by entering the course key in the kwargs input, surrounded
+by {*' and '*}, for example {*'course-v1:MITxT+14.310x+1T2024'*}.
+
+
+_Mitigation_
+
+You may well be asked to run the `compute_graded` management command on the LMS
+for mitxonline. (TODO: Needs details. How do we get there? etc.)
