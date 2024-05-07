@@ -371,3 +371,32 @@ for details.
 Once that's complete, you should have mitigated this issue. Keep checking that
 Sentry page to ensure that the Last Seen value reflects something appropriately
 long ago and you can resolve this ticket.
+
+If you are asked to run a sync to Hubspot:
+- Inform the requester, preferably on the #product-xpro Slack that the process
+will take quite a long time. If this is time critical they may ask you to run
+only parts of the sync. You can find documentation on the command you'll run
+[here](https://github.com/mitodl/mitxpro/blob/master/hubspot_xpro/management/commands/sync_db_to_hubspot.py).
+
+Since XPro runs on Heroku, you'll need to get a Heroku console shell to run the
+management command. You can get to that shell by logging into heroku with the
+Heroku CLI and running:
+
+```
+heroku run /bin/bash -a xpro-production
+```
+
+It takes a while but you will eventually get your shell prompt.
+
+From there, run the following commands. To sync all variants:
+
+```
+./manage.py sync_db_to_hubspot create
+```
+
+If you're asked to run only one, for example deals, you can consult the
+documentation linked above and see that you should add the `--deals` flag to the
+invocation.
+
+Be sure to inform the requester of what you see for output and add it to the
+ticket for this issue if there is one.
