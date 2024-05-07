@@ -180,6 +180,7 @@ xpro_db_config = OLPostgresDBConfig(
     password=xpro_config.require("db_password"),
     subnet_group_name=apps_vpc["rds_subnet"],
     security_groups=[xpro_db_security_group],
+    engine_major_version="15",
     tags=aws_config.tags,
     db_name="xpro",
     public_access=True,

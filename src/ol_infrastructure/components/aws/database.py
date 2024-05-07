@@ -20,9 +20,10 @@ from pydantic import (
     ConfigDict,
     PositiveInt,
     SecretStr,
-    ValidationInfo,
+    computed_field,
     conint,
     field_validator,
+    model_validator,
 )
 
 from ol_infrastructure.components.aws.cloudwatch import (
@@ -32,6 +33,7 @@ from ol_infrastructure.components.aws.cloudwatch import (
 from ol_infrastructure.lib.aws.rds_helper import (
     DBInstanceTypes,
     db_engines,
+    max_minor_version,
     parameter_group_family,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -61,7 +63,8 @@ class OLDBConfig(AWSBase):
     """Configuration object for defining the interface to create an RDS instance with sane defaults."""  # noqa: E501
 
     engine: str
-    engine_version: str
+    engine_full_version: Optional[str] = None
+    engine_major_version: Optional[str | int] = None
     instance_name: str  # The name of the RDS instance
     password: SecretStr
     parameter_overrides: list[dict[str, Union[str, bool, int, float]]]
@@ -92,10 +95,29 @@ class OLDBConfig(AWSBase):
             raise ValueError(msg)
         return engine
 
-    @field_validator("engine_version")
-    @classmethod
-    def is_valid_version(cls, engine_version: str, info: ValidationInfo) -> str:
-        engine = info.data["engine"]
+    @model_validator(mode="after")
+    def engine_version_is_set(self):
+        if all((self.engine_full_version, self.engine_major_version)):
+            msg = (
+                "Only one of 'engine_full_version' and 'engine_major-version' can "
+                "be set at the same time. Please set one or the other depending on "
+                "your preferred behavior."
+            )
+            raise ValueError(msg)
+        if self.engine_full_version is None and self.engine_major_version is None:
+            msg = (
+                "You must specify either the major version or the full version of the "
+                "database engine."
+            )
+            raise ValueError(msg)
+        return self
+
+    # @field_validator("engine_version")
+    # @classmethod
+    def is_valid_version(
+        self, engine_version: str
+    ) -> str:  # , info: ValidationInfo) -> str:
+        engine = self.engine
         engines_map = db_engines()
         if engine_version not in engines_map.get(engine, []):
             msg = (
@@ -113,12 +135,20 @@ class OLDBConfig(AWSBase):
             raise ValueError(msg)
         return monitoring_profile_name
 
+    @computed_field  # type: ignore[misc]
+    @property
+    def engine_version(self) -> str:
+        return self.is_valid_version(
+            self.engine_full_version
+            or max_minor_version(self.engine, self.engine_major_version)
+        )
+
 
 class OLPostgresDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to Postgres."""
 
     engine: str = "postgres"
-    engine_version: str = "15.6"
+    engine_major_version: str | int = "16"
     port: PositiveInt = PositiveInt(5432)
     parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [  # noqa: RUF012
         {"name": "client_encoding", "value": "UTF-8"},
@@ -132,7 +162,7 @@ class OLMariaDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to MariaDB."""
 
     engine: str = "mariadb"
-    engine_version: str = "10.6.12"
+    engine_major_version: str | int = "11"
     port: PositiveInt = PositiveInt(3306)
     parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [  # noqa: RUF012
         {"name": "character_set_client", "value": "utf8mb4"},
@@ -192,7 +222,7 @@ class OLAmazonDB(pulumi.ComponentResource):
         self.db_instance = rds.Instance(
             f"{db_config.instance_name}-{db_config.engine}-instance",
             allocated_storage=db_config.storage,
-            auto_minor_version_upgrade=True,
+            allow_major_version_upgrade=True,
             backup_retention_period=db_config.backup_days,
             copy_tags_to_snapshot=True,
             db_name=db_config.db_name,
@@ -207,9 +237,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             instance_class=db_config.instance_size,
             max_allocated_storage=db_config.max_storage,
             multi_az=db_config.multi_az,
-            opts=resource_options.merge(
-                pulumi.ResourceOptions(ignore_changes=["engine_version"])
-            ),
+            opts=resource_options,
             parameter_group_name=self.parameter_group.name,
             password=db_config.password.get_secret_value(),
             port=db_config.port,

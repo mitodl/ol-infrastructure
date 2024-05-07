@@ -139,6 +139,7 @@ semantic_db_config = OLPostgresDBConfig(
     security_groups=[semantic_database_security_group],
     storage=semantic_config.get("db_capacity")
     or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
+    engine_major_version="15",
     tags=aws_config.tags,
     db_name="semantic",
     **defaults(stack_info)["rds"],
