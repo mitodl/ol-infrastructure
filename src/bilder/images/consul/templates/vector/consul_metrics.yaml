@@ -14,7 +14,7 @@ transforms:
     - 'collect_consul_metrics'
     source: |
       ## Any metrics that match these prefixes or names will be dropped entirely
-      abort_name_match, err = match_any(.name, [r'^consul_raft_replication_heartbeat_.*', r'^consul_raft_replication_appendEntries_rpc_.*', r'^consul_raft_replication_appendEntries_logs_.*', r'^consul_raft_replication_installSnapshot_.*'])
+      abort_name_match, err = match_any(.name, [r'^consul_raft_replication_heartbeat_.*', r'^consul_raft_replication_appendEntries_rpc_.*', r'^consul_raft_replication_appendEntries_logs_.*', r'^consul_raft_replication_installSnapshot_.*', r'^consul_api_http$', r'^consul_api_http_count$', r'^consul_api_http_sum$'])
       if abort_name_match {
         abort
       }
