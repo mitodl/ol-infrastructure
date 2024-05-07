@@ -64,7 +64,7 @@ class OLDBConfig(AWSBase):
 
     engine: str
     engine_full_version: Optional[str] = None
-    engine_major_version: Optional[str | int] = None
+    engine_major_version: str | int
     instance_name: str  # The name of the RDS instance
     password: SecretStr
     parameter_overrides: list[dict[str, Union[str, bool, int, float]]]
@@ -214,7 +214,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             opts=resource_options.merge(
                 pulumi.ResourceOptions(ignore_changes=["family"])
             ),
-            name=f"{db_config.instance_name}-{db_config.engine}-parameter-group",
+            name=f"{db_config.instance_name}-{db_config.engine}-{db_config.engine_major_version}-parameter-group",
             tags=db_config.tags,
             parameters=db_config.parameter_overrides,
         )
