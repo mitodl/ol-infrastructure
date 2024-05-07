@@ -4,6 +4,7 @@
 * [OVS](#ovs)
 * [Bootcamp Ecommerce](#bootcamp-ecommerce)
 * [OpenEdX Residential MITx](#openedx-residential-mitx)
+* [XPro](#xpro)
 
 
 # Introduction
@@ -311,3 +312,62 @@ Monitor the instance refresh to ensure it completes successfully. If you have
 been receiving multiple similar pages, they should stop coming in. If they
 continue, please escalate this incident as this problem is user visible and thus
 high impact to customers.
+
+## XPro
+
+### ApiException hubspot_xpro.tasks.sync_contact_with_hubspot
+
+_Diagnosis_
+
+This error is thrown when the Hubspot API key has expired.
+
+You'll see an error similar to this one in
+[Sentry](https://mit-office-of-digital-learning.sentry.io/issues/3925327041/?environment=production&project=1413655&query=is%3Aunresolved+issue.priority%3A[high%2C+medium]+hubspot&referrer=issue-stream&statsPeriod=14d&stream_index=0).
+
+_Mitigation_
+
+The fix for this is to generate a new API key in Hubspot and then get that key
+into Vault, triggering the appropriate pipeline deployment afterwards.
+
+First, generate a new API key in Hubspot. You can do this by logging into
+Hubspot,
+
+You can do this using the username/password and TOTP token found in
+[Vault](https://vault-production.odl.mit.edu/ui/vault/secrets/platform-secrets/kv/hubspot/details?version=1.
+
+Once you're logged in, click "Open" next to "MIT XPro" in the Accounts list.
+
+Then, click on the gear icon in the upper right corner of the page and select
+"Integrations" -> "Private Apps" in the sidebar on the left.
+
+You should then see the XPRo private app and beneath that a link for "View
+Access Token". Click that, then click on the "Manage Token" link.
+
+On this screen, you should see a "Rotate" button, click that to generate a new
+API key.
+
+Now that you've generated your new API token, you'll need to get that token into
+Vault using SOPS. You can find the right secrets file for this in Github
+[here](https://github.com/mitodl/ol-infrastructure/blob/main/src/bridge/secrets/xpro/secrets.production.yaml).
+
+The process for deploying secrets deserves its own document, so after adding the
+new API token to the SOPS decrypted secrets file you just generated, commit it
+to Github, ensure it runs through the appropriate pipelines and ends up in
+Vault.
+
+You can find the ultimate home of the XPro Hubspot API key in Vault
+[here](https://vault-production.odl.mit.edu/ui/vault/secrets/secret-mitxpro/show/hubspot-api-private-token).
+
+Once the new API token is in the correct spot, you'll need to ensure that new
+token gets deployed to production in Heroku by tracking its progress in
+[this](https://cicd.odl.mit.edu/teams/infrastructure/pipelines/pulumi-xpro)
+pipeline.
+
+You will likely need to close Concourse Github workflow issues to make this
+happen. See [its users
+guide](https://github.com/mitodl/ol-infrastructure/blob/main/docs/how_to/concourse_github_issues_user_guide.md)
+for details.
+
+Once that's complete, you should have mitigated this issue. Keep checking that
+Sentry page to ensure that the Last Seen value reflects something appropriately
+long ago and you can resolve this ticket.
