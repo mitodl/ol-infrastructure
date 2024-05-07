@@ -395,9 +395,9 @@ LOGIN_REDIRECT_WHITELIST:  # MODIFIED
   - {{ key "edxapp/lms-domain" }}
   - {{ key "edxapp/preview-domain" }}
 LOG_DIR: /openedx/data/var/log/edx
-LOGO_URL: https://{{ key "edxapp/lms-domain" }}/static/mitx/images/logo.svg
-LOGO_URL_PNG_FOR_EMAIL: https://{{ key "edxapp/lms-domain" }}/static/mitx/images/logo.png
-LOGO_TRADEMARK_URL: https://{{ key "edxapp/lms-domain" }}/static/mitx/images/mit-ol-logo.svg
+LOGO_URL: https://{{ key "edxapp/lms-domain" }}/static/mitx-staging/images/logo.svg
+LOGO_URL_PNG_FOR_EMAIL: https://{{ key "edxapp/lms-domain" }}/static/mitx-staging/images/logo.png
+LOGO_TRADEMARK_URL: https://{{ key "edxapp/lms-domain" }}/static/mitx-staging/images/mit-ol-logo.svg
 MAINTENANCE_BANNER_TEXT: Sample banner message
 MEDIA_ROOT: media/  # MODIFIED - with s3 storage backend this is the path within the bucket. No leading / allowed
 MEDIA_URL: /media/
