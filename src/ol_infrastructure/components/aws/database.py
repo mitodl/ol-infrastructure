@@ -64,7 +64,7 @@ class OLDBConfig(AWSBase):
 
     engine: str
     engine_full_version: Optional[str] = None
-    engine_major_version: Optional[str] = None
+    engine_major_version: Optional[str | int] = None
     instance_name: str  # The name of the RDS instance
     password: SecretStr
     parameter_overrides: list[dict[str, Union[str, bool, int, float]]]
@@ -148,7 +148,7 @@ class OLPostgresDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to Postgres."""
 
     engine: str = "postgres"
-    engine_major_version: str = "15"
+    engine_major_version: str | int = "15"
     port: PositiveInt = PositiveInt(5432)
     parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [  # noqa: RUF012
         {"name": "client_encoding", "value": "UTF-8"},
@@ -162,7 +162,7 @@ class OLMariaDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to MariaDB."""
 
     engine: str = "mariadb"
-    engine_major_version: str = "10"
+    engine_major_version: str | int = "10"
     port: PositiveInt = PositiveInt(3306)
     parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [  # noqa: RUF012
         {"name": "character_set_client", "value": "utf8mb4"},
@@ -222,7 +222,7 @@ class OLAmazonDB(pulumi.ComponentResource):
         self.db_instance = rds.Instance(
             f"{db_config.instance_name}-{db_config.engine}-instance",
             allocated_storage=db_config.storage,
-            allow_major_version_upgrades=True,
+            allow_major_version_upgrade=True,
             backup_retention_period=db_config.backup_days,
             copy_tags_to_snapshot=True,
             db_name=db_config.db_name,

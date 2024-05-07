@@ -235,6 +235,7 @@ mitopen_db_config = OLPostgresDBConfig(
     password=rds_password,
     subnet_group_name=apps_vpc["rds_subnet"],
     security_groups=[mitopen_db_security_group],
+    engine_major_version="15",
     tags=aws_config.tags,
     db_name="mitopen",
     public_access=True,
