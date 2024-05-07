@@ -54,7 +54,7 @@ def max_minor_version(engine: str, major_version: int | str) -> str:
     for version in versions:
         major, minor_and_patch = version.split(".", maxsplit=1)
         major_versions[major].append(minor_and_patch)
-    highest_minor = sorted(major_versions[str(major_version)])[-1]
+    highest_minor = sorted(major_versions[str(major_version)], key=float)[-1]
     return f"{major_version}.{highest_minor}"
 
 
