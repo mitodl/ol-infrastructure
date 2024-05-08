@@ -107,7 +107,6 @@ for r_name, r_def in roles.items():
         auth=auth,
         data=json.dumps(r_def),
     )
-    print(response.text)  # noqa: T201
 
 for u_name, u_def in users.items():
     url = f"https://{cluster['endpoint']}/_plugins/_security/api/internalusers/{u_name}"
@@ -117,7 +116,6 @@ for u_name, u_def in users.items():
         auth=auth,
         data=json.dumps(u_def),
     )
-    print(response.text)  # noqa: T201
 
 for r_name, rm in role_mappings.items():
     url = f"https://{cluster['endpoint']}/_plugins/_security/api/rolesmapping/{r_name}"
@@ -127,4 +125,3 @@ for r_name, rm in role_mappings.items():
         auth=auth,
         data=json.dumps(rm),
     )
-    print(response.text)  # noqa: T201
