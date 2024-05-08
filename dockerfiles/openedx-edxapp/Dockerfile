@@ -125,7 +125,7 @@ RUN openedx-assets xmodule \
     && openedx-assets webpack --env=prod \
     && openedx-assets common
 
-RUN mkdir -p /openedx/data/var/edxapp/course_repos \
+RUN mkdir -p /openedx/data/export_course_repos \
     && mkdir -p /openedx/data/var/log/edx
 
 ARG DEPLOYMENT_NAME="invalid"

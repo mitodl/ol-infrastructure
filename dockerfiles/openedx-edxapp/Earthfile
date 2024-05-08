@@ -173,7 +173,7 @@ build-static-assets-nonprod:
     && paver compile_sass --theme-dirs /openedx/themes/ --themes $DEPLOYMENT_NAME \
     && openedx-assets collect --settings=mitol.assets \
     && rdfind -makesymlinks true -followsymlinks true /openedx/staticfiles/ \
-    && mkdir -p /openedx/data/var/edxapp/course_repos \
+    && mkdir -p /openedx/data/export_course_repos \
     && mkdir -p /openedx/data/var/log/edx \
     && ls -ltrah /openedx/staticfiles \
     && tar czf - /openedx/staticfiles > /openedx/staticfiles-nonprod.tar.gz
@@ -200,7 +200,7 @@ build-static-assets-production:
     && paver compile_sass --theme-dirs /openedx/themes/ --themes $DEPLOYMENT_NAME \
     && openedx-assets collect --settings=mitol.assets \
     && rdfind -makesymlinks true -followsymlinks true /openedx/staticfiles/ \
-    && mkdir -p /openedx/data/var/edxapp/course_repos \
+    && mkdir -p /openedx/data/export_course_repos \
     && mkdir -p /openedx/data/var/log/edx \
     && ls -ltrah /openedx/staticfiles \
     && tar czf - /openedx/staticfiles > /openedx/staticfiles-production.tar.gz
