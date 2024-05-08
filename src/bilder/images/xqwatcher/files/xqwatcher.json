@@ -1,0 +1,6 @@
+{
+    "FOLLOW_CLIENT_REDIRECTS": true,
+    "POLL_INTERVAL": 10,
+    "POLL_TIME": 10,
+    "REQUESTS_TIMEOUT": 10
+}

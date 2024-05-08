@@ -1,0 +1,35 @@
+from git import NoSuchPathError, Repo
+from pathlib import Path
+from yaml import safe_load
+
+# Expects a yaml file containing configuration used to retrieve grader code
+# from git repositories
+#
+# Format:
+# graders:
+# - name: <directory name within XQWATCHER_GRADERS_DIR for this grader>
+#   git_ref: <the brnach or tag to checkout>
+#   address: <address of the git repo>
+#   env:
+#     <dict containing env var names+vals to pass to the git command(s)>
+#
+# The env dict is primary used for passing a custom `GIT_SSH_COMMAND` value
+# which can be used to specify a specific identity file / other SSH options.
+
+with open("{{ shared_context.XQWATCHER_FETCH_GRADERS_CONFIG_FILE }}", 'r') as config_file:
+    grader_configs = safe_load(config_file)
+
+graders_root = Path("{{ shared_context.XQWATCHER_GRADERS_DIR }}")
+
+for grader_config in grader_configs["graders"]:
+
+    grader_path = graders_root.joinpath(grader_config["name"])
+    git_env = grader_config["env"]  or {}
+
+    # Check if a local copy of the repo already exists
+    try:
+        repo = Repo(grader_path)
+    except NoSuchPathError:
+        repo = Repo.clone_from(url=grader_config["address"],to_path=str(grader_path),env=git_env)
+    repo.git.checkout(grader_config["git_ref"])
+    repo.remotes.origin.pull(grader_config["git_ref"], env=git_env)

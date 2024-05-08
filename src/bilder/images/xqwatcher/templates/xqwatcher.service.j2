@@ -1,0 +1,23 @@
+[Unit]
+Description=xqwatcher process that executes student code via course author defined graders.
+Documentation=https://github.com/mitodl/xqueue-watcher
+After=multi-user.target
+Wants=vault.service
+After=vault.service
+Wants=consul.service
+After=consul.service
+Wants=consul-template.service
+After=consul-template.service
+
+[Service]
+Type=exec
+Restart=always
+User=xqwatcher
+Group=xqwatcher
+WorkingDirectory={{ shared_context.XQWATCHER_INSTALL_DIR }}
+ExecStartPre=/usr/bin/sleep 5
+ExecStartPre={{ shared_context.XQWATCHER_VENV_DIR }}/bin/python3 {{ shared_context.XQWATCHER_INSTALL_DIR }}/fetch_graders.py
+ExecStart={{ shared_context.XQWATCHER_VENV_DIR }}/bin/python3 -m xqueue_watcher -d /home/xqwatcher/xqwatcher
+
+[Install]
+WantedBy=multi-user.target

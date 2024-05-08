@@ -1,0 +1,15 @@
+numpy==1.26.4
+pandas==2.2.2
+scikit-image==0.23.1
+scikit-learn==1.4.2
+scipy==1.13.0
+matplotlib==3.8.4
+pytz==2024.1
+networkx==3.3
+cycler==0.12.1
+decorator==5.1.1
+pillow==10.3.0
+pyparsing==3.1.2
+PyWavelets==1.6.0
+six==1.16.0
+torch==2.2.2
