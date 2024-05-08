@@ -402,6 +402,11 @@ invocation.
 Be sure to inform the requester of what you see for output and add it to the
 ticket for this issue if there is one.
 
+If you see the command fail with an exception, note the HTTP response code. In
+particular a 401 means that the API key is likely out of date. A 409 signals a
+conflict (e.g. dupe email) that will likely be handled by conflict resolution
+code and thus can probably be ignored.
+
 ## MITXOnline
 
 ### Grading Celery Task Failed (STUB entry. Needs love)
