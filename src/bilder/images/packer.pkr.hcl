@@ -85,11 +85,11 @@ build {
   }
 }
 
-build {
-  sources = ["source.docker.concourse"]
+#build {
+#  sources = ["source.docker.concourse"]
 
-  provisioner "shell-local" {
-    only   = ["docker.concourse"]
-    inline = ["pyinfra @docker/${build.ID} ${path.root}/${var.app_name}/deploy.py"]
-  }
-}
+#  provisioner "shell-local" {
+#    only   = ["docker.concourse"]
+#    inline = ["pyinfra @docker/${build.ID} ${path.root}/${var.app_name}/deploy.py"]
+#  }
+#}
