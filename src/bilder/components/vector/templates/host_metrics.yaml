@@ -44,7 +44,7 @@ transforms:
       # Remove the 'host' label because it is just a duplicate of 'instance'
       del(.tags.host)
       # Concourse creates lots of mount points for the same filesystem underneath
-      abort_name_match, err = match_any(mountpoint, [r'^\/var\/concourse\/worker\/volumes\/.*$'])
+      abort_name_match, err = match_any(.mountpoint, [r'^\/var\/concourse\/worker\/volumes\/.*$'])
       if abort_name_match {
         abort
       }
