@@ -89,6 +89,7 @@ class OpenEdxSupportedRelease(str, Enum):
 
     master = ("master", "master")
     quince = ("quince", "open-release/quince.master")
+    redwood = ("redwood", "open-release/redwood.master")
 
     def __str__(self):
         return self.value
