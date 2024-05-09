@@ -258,6 +258,8 @@ class OLAmazonDB(pulumi.ComponentResource):
             self.db_replica = rds.Instance(
                 f"{db_config.instance_name}-{db_config.engine}-replica",
                 identifier=f"{db_config.instance_name}-replica",
+                allow_major_version_upgrade=True,
+                apply_immediately=True,
                 instance_class=db_config.read_replica.instance_size,
                 kms_key_id=self.db_instance.kms_key_id,
                 max_allocated_storage=db_config.max_storage,
