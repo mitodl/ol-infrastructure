@@ -52,9 +52,9 @@ def max_minor_version(engine: str, major_version: int | str) -> str:
         raise ValueError(msg)
     major_versions = defaultdict(list)
     for version in versions:
-        major, minor_and_patch = version.split(".", maxsplit=1)
+        major, minor_and_patch = version.rsplit(".", maxsplit=1)
         major_versions[major].append(minor_and_patch)
-    highest_minor = sorted(major_versions[str(major_version)], key=float)[-1]
+    highest_minor = sorted(major_versions[str(major_version)], key=int)[-1]
     return f"{major_version}.{highest_minor}"
 
 
