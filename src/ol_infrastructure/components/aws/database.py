@@ -221,6 +221,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             f"{db_config.instance_name}-{db_config.engine}-instance",
             allocated_storage=db_config.storage,
             allow_major_version_upgrade=True,
+            apply_immediately=True,
             backup_retention_period=db_config.backup_days,
             copy_tags_to_snapshot=True,
             db_name=db_config.db_name,
