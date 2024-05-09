@@ -169,19 +169,19 @@ ReleaseMap: dict[
                 application="communications",
                 application_type="MFE",
                 release="redwood",
-                branding_overrides=pinned_branding_overrides,
+                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="course-authoring",
                 application_type="MFE",
                 release="redwood",
-                branding_overrides=pinned_branding_overrides,
+                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="discussions",
                 application_type="MFE",
                 release="redwood",
-                branding_overrides=pinned_branding_overrides,
+                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="edx-platform",
