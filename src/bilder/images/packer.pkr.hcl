@@ -51,16 +51,6 @@ source "amazon-ebs" "third-party" {
   }
 }
 
-source "docker" "concourse" {
-  image  = "debian:bookworm"
-  commit = true
-  changes = [
-    "USER concourse",
-    "WORKDIR /opt/concourse",
-    "ENTRYPOINT /opt/concourse/bin/concourse ${var.node_type}"
-  ]
-}
-
 build {
   sources = ["source.amazon-ebs.third-party"]
 
@@ -84,12 +74,3 @@ build {
     inline = ["sudo mv /tmp/vault_env_script.sh /var/lib/cloud/scripts/per-instance/vault_env_script.sh"]
   }
 }
-
-#build {
-#  sources = ["source.docker.concourse"]
-
-#  provisioner "shell-local" {
-#    only   = ["docker.concourse"]
-#    inline = ["pyinfra @docker/${build.ID} ${path.root}/${var.app_name}/deploy.py"]
-#  }
-#}
