@@ -389,7 +389,7 @@ concourse_db_config = OLPostgresDBConfig(
     storage=concourse_config.get("db_capacity"),
     subnet_group_name=target_vpc["rds_subnet"],
     security_groups=[concourse_db_security_group],
-    engine_major_version="15",
+    engine_major_version="13",
     tags=aws_config.tags,
     db_name="concourse",
     **rds_defaults,
