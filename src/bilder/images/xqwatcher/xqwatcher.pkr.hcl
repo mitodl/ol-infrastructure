@@ -11,6 +11,7 @@ packer {
   }
 }
 
+
 locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
   app_name  = "open-edx-xqwatcher-server"
@@ -40,7 +41,7 @@ source "amazon-ebs" "xqwatcher" {
   ami_description         = "Deployment image for xqwatcher server generated at ${local.timestamp}"
   ami_name                = "open-edx-xqwatcher-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
-  instance_type           = "c6a.large"  # AMI build does a lot of compling from source, so dedicated CPU is needed
+  instance_type           = "c6a.large" # AMI build does a lot of compling from source, so dedicated CPU is needed
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
     volume_size           = 25
@@ -59,10 +60,10 @@ source "amazon-ebs" "xqwatcher" {
     purpose = "${local.app_name}"
   }
   snapshot_tags = {
-    Name            = "${local.app_name}-ami"
-    OU              = "${var.business_unit}"
-    app             = "${local.app_name}"
-    purpose         = "${local.app_name}"
+    Name    = "${local.app_name}-ami"
+    OU      = "${var.business_unit}"
+    app     = "${local.app_name}"
+    purpose = "${local.app_name}"
   }
 
   # Base all builds off of the most recent Debian 12 image built by the Debian organization.
@@ -84,11 +85,11 @@ source "amazon-ebs" "xqwatcher" {
     random = true
   }
   tags = {
-    Name            = "${local.app_name}"
-    OU              = var.business_unit
-    app             = local.app_name
-    purpose         = "${local.app_name}"
-    framework       = "native"
+    Name      = "${local.app_name}"
+    OU        = var.business_unit
+    app       = local.app_name
+    purpose   = "${local.app_name}"
+    framework = "native"
   }
 }
 
