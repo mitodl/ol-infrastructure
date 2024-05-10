@@ -36,6 +36,10 @@ def db_engines() -> dict[str, list[str]]:
     return dict(engines_versions)
 
 
+def engine_major_version(engine_version: str) -> str:
+    return engine_version.rsplit(".", maxsplit=1)[0]
+
+
 def max_minor_version(engine: str, major_version: int | str) -> str:
     """
     Given a database egine and the major version, determine the current maximum minor
