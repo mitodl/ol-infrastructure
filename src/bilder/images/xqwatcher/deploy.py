@@ -293,6 +293,7 @@ for grader_venv in grader_venvs:
         present=True,
         shell="/bin/false",  # noqa: S604
         user=grader_venv,
+        groups=[XQWATCHER_USER],
     )
     server.shell(
         name=f"Install grader {grader_venv} : Create virtual environment",
