@@ -281,6 +281,16 @@ files.put(
     mode="0644",
 )
 
+files.template(
+    name="Install xqwatcher-pkill sudoer entry",
+    src=str(TEMPLATES_DIRECTORY.joinpath("98-xqwatcher-pkill.j2")),
+    dest="/etc/sudoers.d/98-xqwatcher-pkill",
+    user="root",
+    group="root",
+    mode="0600",
+    shared_context=shared_template_context,
+)
+
 grader_venvs = ["mit-600x", "mit-686x-mooc", "mit-686x", "mit-6S082", "mit-940"]
 for grader_venv in grader_venvs:
     GRADER_VENV_DIR = XQWATCHER_GRADERS_VENVS_DIR.joinpath(grader_venv)
@@ -323,6 +333,7 @@ for grader_venv in grader_venvs:
         user="root",
         group="root",
         mode="0600",
+        shared_context=shared_template_context,
         grader_context={
             "GRADER_VENV_DIR": str(GRADER_VENV_DIR),
             "GRADER_USER": grader_venv,
