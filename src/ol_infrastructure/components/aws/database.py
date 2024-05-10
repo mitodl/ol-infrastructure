@@ -33,6 +33,7 @@ from ol_infrastructure.components.aws.cloudwatch import (
 from ol_infrastructure.lib.aws.rds_helper import (
     DBInstanceTypes,
     db_engines,
+    engine_major_version,
     max_minor_version,
     parameter_group_family,
 )
@@ -201,6 +202,33 @@ class OLAmazonDB(pulumi.ComponentResource):
 
         resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
 
+        # In order to update the minor versions of an RDS instance with a read replica,
+        # the replica has to be upgraded prior to the primary. This block of logic
+        # allows us to introspect the state of the primary/replica version and apply the
+        # changes to the replica first. This necessitates the program being applied
+        # twice in order to update the patch release on the primary.
+        primary_engine_version = replica_engine_version = db_config.engine_version
+        if db_config.read_replica:
+            current_db_state = rds.get_instance(
+                db_instance_identifier=db_config.instance_name
+            )
+            replica_identifier = f"{db_config.instance_name}-replica"
+            current_replica_state = rds.get_instance(
+                db_instance_identifier=replica_identifier
+            )
+            if (
+                db_config.engine_version
+                not in (
+                    current_db_state.engine_version,
+                    current_replica_state.engine_version,
+                )
+                and engine_major_version(db_config.engine_version)
+                == current_db_state.engine_version
+            ):
+                # Keep the primary engine version pinned while the replica is upgraded
+                # first.
+                primary_engine_version = current_db_state.engine_version
+
         if db_config.read_replica and db_config.engine == "postgres":
             # Necessary to allow for long-running sync queries from the replica
             # https://docs.airbyte.com/integrations/sources/postgres/#sync-data-from-postgres-hot-standby-server
@@ -208,6 +236,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             db_config.parameter_overrides.append(
                 {"name": "hot_standby_feedback", "value": 1}
             )
+
         self.parameter_group = rds.ParameterGroup(
             f"{db_config.instance_name}-{db_config.engine}-parameter-group",
             family=parameter_group_family(db_config.engine, db_config.engine_version),
@@ -228,7 +257,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             db_subnet_group_name=db_config.subnet_group_name,
             deletion_protection=db_config.prevent_delete,
             engine=db_config.engine,
-            engine_version=db_config.engine_version,
+            engine_version=primary_engine_version,
             final_snapshot_identifier=(
                 f"{db_config.instance_name}-{db_config.engine}-final-snapshot"
             ),
@@ -259,8 +288,8 @@ class OLAmazonDB(pulumi.ComponentResource):
                 f"{db_config.instance_name}-{db_config.engine}-replica",
                 allow_major_version_upgrade=True,
                 apply_immediately=True,
-                engine_version=db_config.engine_version,
-                identifier=f"{db_config.instance_name}-replica",
+                engine_version=replica_engine_version,
+                identifier=replica_identifier,
                 instance_class=db_config.read_replica.instance_size,
                 kms_key_id=self.db_instance.kms_key_id,
                 max_allocated_storage=db_config.max_storage,
