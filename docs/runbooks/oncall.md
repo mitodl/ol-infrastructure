@@ -6,6 +6,7 @@
 * [OpenEdX Residential MITx](#openedx-residential-mitx)
 * [XPro](#xpro)
 * [MITXOnline](#mitxonline)
+* [Reddit](#reddit)
 
 
 # Introduction
@@ -429,3 +430,31 @@ _Mitigation_
 
 You may well be asked to run the `compute_graded` management command on the LMS
 for mitxonline. (TODO: Needs details. How do we get there? etc.)
+
+## Reddit
+
+### [Prometheus]: [FIRING:1] DiskUsageWarning production-apps (reddit filesystem /dev/nvme0n1p1 ext4 ip-10-13-1-59 integrations/linux_
+### [Pingdom] Open Discussions production home page has an alert
+
+_Diagnosis_
+
+We often get low disk errors on our reddit nodes, but in this case the low disk
+alert was paired with a pingdom alert on open-discussions.  This may mean that
+pgbouncer is in trouble on reddit, likely because its credentials are out of
+date.
+
+You can get a view into what's happening by logging into the node cited in the
+disk usage ticket and typing:
+
+```
+salt reddit-production* state.sls reddit.config,pgbouncer
+```
+
+_Mitigation_
+
+Once you've determined that pgbouncer is indeed sad, you can try a restart /
+credential refresh with the following command:
+
+```
+salt reddit-production* state.sls reddit.config
+```
