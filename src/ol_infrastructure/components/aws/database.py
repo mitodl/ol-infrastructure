@@ -216,15 +216,12 @@ class OLAmazonDB(pulumi.ComponentResource):
             current_replica_state = rds.get_instance(
                 db_instance_identifier=replica_identifier
             )
-            if (
+            if db_config.engine_version not in (
+                current_db_state.engine_version,
+                current_replica_state.engine_version,
+            ) and engine_major_version(
                 db_config.engine_version
-                not in (
-                    current_db_state.engine_version,
-                    current_replica_state.engine_version,
-                )
-                and engine_major_version(db_config.engine_version)
-                == current_db_state.engine_version
-            ):
+            ) == engine_major_version(current_db_state.engine_version):
                 # Keep the primary engine version pinned while the replica is upgraded
                 # first.
                 primary_engine_version = current_db_state.engine_version
