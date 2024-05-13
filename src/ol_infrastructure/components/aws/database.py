@@ -291,6 +291,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 kms_key_id=self.db_instance.kms_key_id,
                 max_allocated_storage=db_config.max_storage,
                 opts=resource_options,
+                parameter_group_name=self.parameter_group.name,
                 publicly_accessible=db_config.read_replica.public_access,
                 replicate_source_db=self.db_instance.identifier,
                 skip_final_snapshot=True,
