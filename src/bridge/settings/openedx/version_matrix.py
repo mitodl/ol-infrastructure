@@ -13,7 +13,7 @@ class OpenLearningOpenEdxDeployment(Enum):
     mitx = DeploymentEnvRelease(
         deployment_name="mitx",
         env_release_map=[
-            EnvRelease("CI", OpenEdxSupportedRelease["quince"]),
+            EnvRelease("CI", OpenEdxSupportedRelease["redwood"]),
             EnvRelease("QA", OpenEdxSupportedRelease["quince"]),
             EnvRelease("Production", OpenEdxSupportedRelease["quince"]),
         ],
@@ -21,7 +21,7 @@ class OpenLearningOpenEdxDeployment(Enum):
     mitx_staging = DeploymentEnvRelease(
         deployment_name="mitx-staging",
         env_release_map=[
-            EnvRelease("CI", OpenEdxSupportedRelease["quince"]),
+            EnvRelease("CI", OpenEdxSupportedRelease["redwood"]),
             EnvRelease("QA", OpenEdxSupportedRelease["quince"]),
             EnvRelease("Production", OpenEdxSupportedRelease["quince"]),
         ],
@@ -80,6 +80,174 @@ ReleaseMap: dict[
     OpenEdxSupportedRelease,
     dict[OpenEdxDeploymentName, list[OpenEdxApplicationVersion]],
 ] = {
+    "redwood": {
+        "mitx": [
+            OpenEdxApplicationVersion(
+                application="communications",
+                application_type="MFE",
+                release="redwood",
+                branding_overrides=default_branding_overrides,
+            ),
+            OpenEdxApplicationVersion(
+                application="course-authoring",
+                application_type="MFE",
+                release="redwood",
+                branding_overrides=default_branding_overrides,
+            ),
+            OpenEdxApplicationVersion(
+                application="discussions",
+                application_type="MFE",
+                release="redwood",
+                branding_overrides=default_branding_overrides,
+            ),
+            OpenEdxApplicationVersion(
+                application="edx-platform",
+                application_type="IDA",
+                release="redwood",
+                branch_override="mitx/redwood",
+                origin_override="https://github.com/mitodl/edx-platform",
+            ),
+            OpenEdxApplicationVersion(
+                application="edxapp_theme",
+                application_type="IDA",
+                release="redwood",
+                branch_override="redwood",
+                origin_override="https://github.com/mitodl/mitx-theme",
+            ),
+            OpenEdxApplicationVersion(
+                application="forum",
+                application_type="IDA",
+                release="redwood",
+            ),
+            OpenEdxApplicationVersion(
+                application="gradebook",
+                application_type="MFE",
+                release="redwood",
+                branding_overrides=default_branding_overrides,
+            ),
+            OpenEdxApplicationVersion(
+                application="learner-dashboard",
+                application_type="MFE",
+                release="redwood",
+                branding_overrides={
+                    "@edx/brand@npm": "@mitodl/brand-mitol-residential@latest",
+                    **default_branding_overrides,
+                },
+            ),
+            OpenEdxApplicationVersion(
+                application="learning",
+                application_type="MFE",
+                release="redwood",
+                branding_overrides=default_branding_overrides,
+            ),
+            OpenEdxApplicationVersion(
+                application="library-authoring",
+                application_type="MFE",
+                release="redwood",
+                branch_override="master",
+                branding_overrides=default_branding_overrides,
+            ),
+            OpenEdxApplicationVersion(
+                application="notes-api",
+                application_type="IDA",
+                release="redwood",
+            ),
+            OpenEdxApplicationVersion(
+                application="ora-grading",
+                application_type="MFE",
+                release="redwood",
+                branding_overrides=default_branding_overrides,
+            ),
+            OpenEdxApplicationVersion(
+                application="xqueue",
+                application_type="IDA",
+                release="redwood",
+            ),
+        ],
+        "mitx-staging": [
+            OpenEdxApplicationVersion(
+                application="communications",
+                application_type="MFE",
+                release="redwood",
+                branding_overrides=default_branding_overrides,
+            ),
+            OpenEdxApplicationVersion(
+                application="course-authoring",
+                application_type="MFE",
+                release="redwood",
+                branding_overrides=default_branding_overrides,
+            ),
+            OpenEdxApplicationVersion(
+                application="discussions",
+                application_type="MFE",
+                release="redwood",
+                branding_overrides=default_branding_overrides,
+            ),
+            OpenEdxApplicationVersion(
+                application="edx-platform",
+                application_type="IDA",
+                release="redwood",
+                branch_override="mitx/redwood",
+                origin_override="https://github.com/mitodl/edx-platform",
+            ),
+            OpenEdxApplicationVersion(
+                application="edxapp_theme",
+                application_type="IDA",
+                release="redwood",
+                branch_override="redwood",
+                origin_override="https://github.com/mitodl/mitx-theme",
+            ),
+            OpenEdxApplicationVersion(
+                application="forum",
+                application_type="IDA",
+                release="redwood",
+            ),
+            OpenEdxApplicationVersion(
+                application="gradebook",
+                application_type="MFE",
+                release="redwood",
+                branding_overrides=default_branding_overrides,
+            ),
+            OpenEdxApplicationVersion(
+                application="learning",
+                application_type="MFE",
+                release="redwood",
+                branding_overrides=default_branding_overrides,
+            ),
+            OpenEdxApplicationVersion(
+                application="learner-dashboard",
+                application_type="MFE",
+                release="redwood",
+                branding_overrides={
+                    "@edx/brand@npm": "@mitodl/brand-mitol-residential@latest",
+                    **default_branding_overrides,
+                },
+            ),
+            OpenEdxApplicationVersion(
+                application="library-authoring",
+                application_type="MFE",
+                release="redwood",
+                branch_override="master",
+                branding_overrides=pinned_branding_overrides,
+            ),
+            OpenEdxApplicationVersion(
+                application="notes-api",
+                application_type="IDA",
+                release="redwood",
+            ),
+            OpenEdxApplicationVersion(
+                application="ora-grading",
+                application_type="MFE",
+                release="redwood",
+                branding_overrides=default_branding_overrides,
+            ),
+            OpenEdxApplicationVersion(
+                application="xqueue",
+                application_type="IDA",
+                release="redwood",
+            ),
+        ],
+    },
     "quince": {
         "mitx": [
             OpenEdxApplicationVersion(
