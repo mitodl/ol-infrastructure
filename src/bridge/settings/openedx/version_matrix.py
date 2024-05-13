@@ -86,19 +86,19 @@ ReleaseMap: dict[
                 application="communications",
                 application_type="MFE",
                 release="redwood",
-                branding_overrides=pinned_branding_overrides,
+                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="course-authoring",
                 application_type="MFE",
                 release="redwood",
-                branding_overrides=pinned_branding_overrides,
+                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="discussions",
                 application_type="MFE",
                 release="redwood",
-                branding_overrides=pinned_branding_overrides,
+                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="edx-platform",
@@ -123,7 +123,7 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="redwood",
-                branding_overrides=pinned_branding_overrides,
+                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="learner-dashboard",
@@ -131,14 +131,14 @@ ReleaseMap: dict[
                 release="redwood",
                 branding_overrides={
                     "@edx/brand@npm": "@mitodl/brand-mitol-residential@latest",
-                    **pinned_branding_overrides,
+                    **default_branding_overrides,
                 },
             ),
             OpenEdxApplicationVersion(
                 application="learning",
                 application_type="MFE",
                 release="redwood",
-                branding_overrides=pinned_branding_overrides,
+                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="library-authoring",
@@ -156,7 +156,7 @@ ReleaseMap: dict[
                 application="ora-grading",
                 application_type="MFE",
                 release="redwood",
-                branding_overrides=pinned_branding_overrides,
+                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="xqueue",
@@ -206,13 +206,13 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="redwood",
-                branding_overrides=pinned_branding_overrides,
+                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="learning",
                 application_type="MFE",
                 release="redwood",
-                branding_overrides=pinned_branding_overrides,
+                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="learner-dashboard",
@@ -220,7 +220,7 @@ ReleaseMap: dict[
                 release="redwood",
                 branding_overrides={
                     "@edx/brand@npm": "@mitodl/brand-mitol-residential@latest",
-                    **pinned_branding_overrides,
+                    **default_branding_overrides,
                 },
             ),
             OpenEdxApplicationVersion(
@@ -239,7 +239,7 @@ ReleaseMap: dict[
                 application="ora-grading",
                 application_type="MFE",
                 release="redwood",
-                branding_overrides=pinned_branding_overrides,
+                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="xqueue",
