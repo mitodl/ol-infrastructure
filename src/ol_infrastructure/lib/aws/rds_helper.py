@@ -13,10 +13,10 @@ class DBInstanceTypes(str, Enum):
     medium = "db.t4g.medium"
     large = "db.t4g.large"
     xlarge = "db.t4g.xlarge"
-    general_purpose_large = "db.m6g.large"
-    general_purpose_xlarge = "db.m6g.xlarge"
-    high_mem_regular = "db.r6g.large"
-    high_mem_xlarge = "db.r6g.xlarge"
+    general_purpose_large = "db.m7g.large"
+    general_purpose_xlarge = "db.m7g.xlarge"
+    high_mem_regular = "db.r7g.large"
+    high_mem_xlarge = "db.r7g.xlarge"
 
 
 @lru_cache
