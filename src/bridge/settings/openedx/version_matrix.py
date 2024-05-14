@@ -524,7 +524,8 @@ ReleaseMap: dict[
                 application_type="MFE",
                 release="master",
                 translation_overrides=[
-                    "atlas pull -r mitodl/mitxonline-translations -n main translations/frontend-app-learning/src/i18n/messages:src/i18n/messages/",  # noqa: E501
+                    "atlas pull -r mitodl/mitxonline-translations -n main translations/frontend-app-learning/src/i18n/messages:src/i18n/messages/frontend-app-learning",  # noqa: E501
+                    "node_modules/@edx/frontend-platform/i18n/scripts/intl-imports.js frontend-app-learning",  # noqa: E501
                 ],
             ),
             OpenEdxApplicationVersion(
