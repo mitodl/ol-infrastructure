@@ -260,13 +260,11 @@ services:
     labels:
     - "traefik.enable=true"
     - "traefik.http.middlewares.dagster-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
-    - "traefik.http.routers.dagster-webapp.priority=10"
     - "traefik.http.routers.dagster-webapp.rule=PathPrefix(`/api/v1`)"
     - "traefik.http.routers.dagster-webapp.service=public"
     - "traefik.http.routers.dagster-webapp.tls=true"
     - "traefik.http.routers.dagster-webapp.middlewares=dagster-auth"
     - "traefik.http.routers.public.middlewares=traefik-forward-auth"
-    - "traefik.http.routers.public.priority=5"
     - "traefik.http.routers.public.rule=(Host(`${AIRBYTE_HOSTNAME}`) || Path(`/api/public/health`))"
     - "traefik.http.routers.public.service=public"
     - "traefik.http.routers.public.tls=true"
