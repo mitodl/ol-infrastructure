@@ -259,7 +259,7 @@ services:
     - KEYCLOAK_INTERNAL_HOST=localhost   # placeholder to ensure the webapp's nginx config is valid
     labels:
     - "traefik.enable=true"
-    - "traefik.http.middlewares.dagster-auth.basicauth.users=${DAGSTER_USER_PASS}"
+    - "traefik.http.middlewares.dagster-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
     - "traefik.http.routers.dagster-webapp.priority=10"
     - "traefik.http.routers.dagster-webapp.rule=PathPrefix(`/api/v1`)"
     - "traefik.http.routers.dagster-webapp.service=public"
@@ -348,9 +348,10 @@ services:
     - "8006"
     labels:
     - "traefik.enable=true"
-    - "traefik.http.middlewares.airbyte-api.basicauth.users=${DAGSTER_USER_PASS}"
+    - "traefik.http.middlewares.airbyte-api.basicauth.users=dagster:${DAGSTER_USER_PASS}"
     - "traefik.http.routers.airbyte-api.rule=PathPrefix(`/api/public/v1`)"
     - "traefik.http.routers.airbyte-api.tls=true"
+    - "traefik.http.routers.airbyte-api.middlewares=airbyte-api"
     - "traefik.http.services.airbyte-api.loadbalancer.server.port=8006"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
