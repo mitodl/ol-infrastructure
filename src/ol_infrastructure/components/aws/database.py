@@ -208,6 +208,9 @@ class OLAmazonDB(pulumi.ComponentResource):
         # changes to the replica first. This necessitates the program being applied
         # twice in order to update the patch release on the primary.
         primary_engine_version = replica_engine_version = db_config.engine_version
+        primary_parameter_group_family = replica_parameter_group_family = (
+            parameter_group_family(db_config.engine, db_config.engine_version)
+        )
         if db_config.read_replica:
             current_db_state = rds.get_instance(
                 db_instance_identifier=db_config.instance_name
@@ -225,6 +228,9 @@ class OLAmazonDB(pulumi.ComponentResource):
                 # Keep the primary engine version pinned while the replica is upgraded
                 # first.
                 primary_engine_version = current_db_state.engine_version
+                primary_parameter_group_family = parameter_group_family(
+                    db_config.engine, primary_engine_version
+                )
 
         if db_config.read_replica and db_config.engine == "postgres":
             # Necessary to allow for long-running sync queries from the replica
@@ -234,9 +240,9 @@ class OLAmazonDB(pulumi.ComponentResource):
                 {"name": "hot_standby_feedback", "value": 1}
             )
 
-        self.parameter_group = rds.ParameterGroup(
+        self.parameter_group = primary_parameter_group = rds.ParameterGroup(
             f"{db_config.instance_name}-{db_config.engine}-parameter-group",
-            family=parameter_group_family(db_config.engine, db_config.engine_version),
+            family=primary_parameter_group_family,
             opts=resource_options,
             name_prefix=f"{db_config.instance_name}-{db_config.engine}-",
             tags=db_config.tags,
@@ -263,7 +269,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             max_allocated_storage=db_config.max_storage,
             multi_az=db_config.multi_az,
             opts=resource_options,
-            parameter_group_name=self.parameter_group.name,
+            parameter_group_name=primary_parameter_group.name,
             password=db_config.password.get_secret_value(),
             port=db_config.port,
             publicly_accessible=db_config.public_access,
@@ -281,6 +287,17 @@ class OLAmazonDB(pulumi.ComponentResource):
         }
 
         if db_config.read_replica:
+            if primary_parameter_group_family != replica_parameter_group_family:
+                replica_parameter_group = rds.ParameterGroup(
+                    f"{db_config.instance_name}-{db_config.engine}-replica-parameter-group",
+                    family=replica_parameter_group_family,
+                    opts=resource_options,
+                    name_prefix=f"{db_config.instance_name}-{db_config.engine}-replica-",
+                    tags=db_config.tags,
+                    parameters=db_config.parameter_overrides,
+                )
+            else:
+                replica_parameter_group = self.parameter_group
             self.db_replica = rds.Instance(
                 f"{db_config.instance_name}-{db_config.engine}-replica",
                 allow_major_version_upgrade=True,
@@ -291,7 +308,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 kms_key_id=self.db_instance.kms_key_id,
                 max_allocated_storage=db_config.max_storage,
                 opts=resource_options,
-                parameter_group_name=self.parameter_group.name,
+                parameter_group_name=replica_parameter_group.name,
                 publicly_accessible=db_config.read_replica.public_access,
                 replicate_source_db=self.db_instance.identifier,
                 skip_final_snapshot=True,
