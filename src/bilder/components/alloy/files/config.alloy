@@ -1,0 +1,61 @@
+otelcol.receiver.otlp "grafana_cloud_otel" {
+  grpc {
+    endpoint = "172.17.0.1:4317"
+  }
+  http {
+    endpoint = "172.17.0.1:4318"
+  }
+  output {
+    logs = [otelcol.processor.batch.otel_processor.input]
+    traces = [otelcol.processor.batch.otel_processor.input]
+    metrics = [otelcol.processor.batch.otel_processor.input]
+  }
+}
+
+otelcol.processor.batch "otel_processor" {
+  output {
+    logs = [otelcol.exporter.loki.grafana_cloud_loki.input]
+    traces = [otelcol.exporter.otlp.grafana_cloud_tempo.input]
+    metrics = [otelcol.exporter.prometheus.grafana_cloud_mimir.input]
+  }
+}
+
+otelcol.exporter.loki "grafana_cloud_loki" {
+  forward_to = [loki.write.grafana_cloud_loki.receiver]
+}
+
+loki.write "grafana_cloud_loki" {
+  endpoint {
+    url = env("GRAFANA_LOKI_ENDPOINT")
+    basic_auth {
+      username = env("GRAFANA_LOKI_USER")
+      password = env("GRAFANA_LOKI_PASSWORD")
+    }
+  }
+}
+
+otelcol.exporter.otlp "grafana_cloud_tempo" {
+  client {
+    endpoint = env("GRAFANA_TEMPO_ENDPOINT")
+    auth = otelcol.auth.basic.grafana_cloud_tempo.handler
+  }
+}
+
+otelcol.auth.basic "grafana_cloud_tempo" {
+  username = env("GRAFANA_TEMPO_USERNAME")
+  password = env("GRAFANA_TEMPO_PASSWORD")
+}
+
+otelcol.exporter.prometheus "grafana_cloud_mimir" {
+  forward_to = [prometheus.remote_write.grafana_cloud_mimir.receiver]
+}
+
+prometheus.remote_write "grafana_cloud_mimir" {
+  endpoint {
+    url = env("GRAFANA_MIMIR_ENDPOINT")
+    basic_auth {
+      username = env("GRAFANA_MIMIR_USERNAME")
+      password = env("GRAFANA_MIMIR_PASSWORD")
+    }
+  }
+}
