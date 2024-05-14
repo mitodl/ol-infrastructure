@@ -265,7 +265,7 @@ services:
     - "traefik.http.routers.public.tls=true"
     - "traefik.http.routers.public.service=public"
     - "traefik.http.services.public.loadbalancer.server.port=8080"
-    - "traefik.http.routers.dagster-webapp.rule=PathPrefix('/api/v1')"
+    - "traefik.http.routers.dagster-webapp.rule=PathPrefix(`/api/v1`)"
     - "traefik.http.routers.dagster-webapp.tls=true"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
@@ -345,7 +345,7 @@ services:
     labels:
     - "traefik.enable=true"
     - "traefik.http.middlewares.airbyte-api.basicauth.users=${DAGSTER_USER_PASS}"
-    - "traefik.http.routers.airbyte-api.rule=(Host(`${AIRBYTE_HOSTNAME}`) && PathPrefix('/api/public/v1'))"
+    - "traefik.http.routers.airbyte-api.rule=(Host(`${AIRBYTE_HOSTNAME}`) && PathPrefix(`/api/public/v1`))"
     - "traefik.http.routers.airbyte-api.tls=true"
     - "traefik.http.services.airbyte-api.loadbalancer.server.port=8006"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
