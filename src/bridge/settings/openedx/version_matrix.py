@@ -106,6 +106,7 @@ ReleaseMap: dict[
                 release="redwood",
                 branch_override="mitx/redwood",
                 origin_override="https://github.com/mitodl/edx-platform",
+                runtime_version_override="3.11",
             ),
             OpenEdxApplicationVersion(
                 application="edxapp_theme",
@@ -189,6 +190,7 @@ ReleaseMap: dict[
                 release="redwood",
                 branch_override="mitx/redwood",
                 origin_override="https://github.com/mitodl/edx-platform",
+                runtime_version_override="3.11",
             ),
             OpenEdxApplicationVersion(
                 application="edxapp_theme",
