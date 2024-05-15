@@ -176,3 +176,30 @@ application in the `ReleaseMap` at the appropriate location.
   be necessary to manually ensure that all database migrations are run properly. It will
   be attempted automatically on deployment, but there are often conflicts between the
   existing database state and the migration logic that require intervention.
+
+## Troubleshooting
+
+### OpenEdX Redwood
+With each new OpenEdX release, inevitably there will be problems. For instance,
+in the Redwood release, we noticed that login for MITX CI was failing with a 500
+response code.
+
+So we ran the following Grafana query using the query builder:
+
+```
+{environment="mitx-ci", application="edxapp"} |= `` | json | line_format `{{.message}}
+```
+
+That yielded a problem with JWT signing keys as the exception cited a signing
+failure.
+
+So we had to log onto an EC2 instance appropriate to MITX CI and run the
+following command from the lms container shell:
+
+```
+manage.py generate_jwt_signing_key
+```
+
+That produced public and private signing key JSON blobs, which we could then add
+to SOPS and then through the pipeline into Vault where they'll be picked up as
+Redwood deploys to the various apps and environments.
