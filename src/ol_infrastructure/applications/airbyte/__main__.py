@@ -546,7 +546,7 @@ tg_config = OLTargetGroupConfig(
     vpc_id=vpc_id,
     health_check_interval=60,
     health_check_matcher="200-399",
-    health_check_path="/api/v1/health",
+    health_check_path="/api/health",
     health_check_unhealthy_threshold=6,  # give extra time for airbyte to start up
     tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
 )
