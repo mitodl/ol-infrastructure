@@ -658,6 +658,14 @@ route53.Record(
     zone_id=mitodl_zone_id,
 )
 route53.Record(
+    "airbyte-api-server-dns-record",
+    name=f"api-{airbyte_config.require('web_host_domain')}",
+    type="CNAME",
+    ttl=five_minutes,
+    records=[as_setup.load_balancer.dns_name],
+    zone_id=mitodl_zone_id,
+)
+route53.Record(
     "airbyte-auth-dns-record",
     name=airbyte_config.require("auth_domain"),
     type="CNAME",

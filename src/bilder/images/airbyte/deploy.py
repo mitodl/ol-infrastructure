@@ -218,6 +218,15 @@ consul_configuration = {
                     interval="10s",
                 ),
             ),
+            ConsulService(
+                name="airbyte-api",
+                port=DEFAULT_HTTPS_PORT,
+                check=ConsulServiceTCPCheck(
+                    name="airbyte-https",
+                    tcp="localhost:8006",
+                    interval="10s",
+                ),
+            ),
         ],
     )
 }
