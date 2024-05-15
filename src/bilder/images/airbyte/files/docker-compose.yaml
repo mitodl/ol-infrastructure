@@ -260,7 +260,7 @@ services:
     labels:
     - "traefik.enable=true"
     - "traefik.http.routers.public.middlewares=traefik-forward-auth"
-    - "traefik.http.routers.public.rule=Host(`${AIRBYTE_HOSTNAME}`)"
+    - "traefik.http.routers.public.rule=(Host(`${AIRBYTE_HOSTNAME}`) || Path(`/api/health`))"
     - "traefik.http.routers.public.service=public"
     - "traefik.http.routers.public.tls=true"
     - "traefik.http.services.public.loadbalancer.server.port=8080"
@@ -343,7 +343,8 @@ services:
     - "traefik.enable=true"
     - "traefik.http.middlewares.airbyte-api.basicauth.users=dagster:${DAGSTER_USER_PASS}"
     - "traefik.http.middlewares.airbyte-api.stripprefix.prefixes=/api"
-    - "traefik.http.routers.airbyte-api.rule=(PathPrefix(`/api/v1`) || Path(`/api/health`))"
+    - "traefik.http.routers.airbyte-api.rule=((Host(`airbyte.service.consul`) || Host(`${AIRBYTE_HOSTNAME}))\
+      \ && PathPrefix(`/api/v1`))"
     - "traefik.http.routers.airbyte-api.tls=true"
     - "traefik.http.routers.airbyte-api.middlewares=airbyte-api"
     - "traefik.http.services.airbyte-api.loadbalancer.server.port=8006"
