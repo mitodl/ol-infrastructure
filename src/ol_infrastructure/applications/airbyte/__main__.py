@@ -507,7 +507,7 @@ consul.Keys(
         consul.KeysKeyArgs(path="airbyte/database-port", value=db_port),
         consul.KeysKeyArgs(path="airbyte/database-name", value=db_name),
         consul.KeysKeyArgs(
-            path=f"airbyte/database-connection-string",  # noqa: F541
+            path="airbyte/database-connection-string",
             value=connection_string,
         ),
         consul.KeysKeyArgs(
@@ -660,6 +660,14 @@ route53.Record(
 route53.Record(
     "airbyte-api-server-dns-record",
     name=f"api-{airbyte_config.require('web_host_domain')}",
+    type="CNAME",
+    ttl=five_minutes,
+    records=[as_setup.load_balancer.dns_name],
+    zone_id=mitodl_zone_id,
+)
+route53.Record(
+    "airbyte-config-api-dns-record",
+    name=f"config-{airbyte_config.require('web_host_domain')}",
     type="CNAME",
     ttl=five_minutes,
     records=[as_setup.load_balancer.dns_name],

@@ -259,6 +259,11 @@ services:
     - KEYCLOAK_INTERNAL_HOST=localhost   # placeholder to ensure the webapp's nginx config is valid
     labels:
     - "traefik.enable=true"
+    - "traefik.http.middlewares.dagster-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
+    - "traefik.http.routers.dagster.middlewares=dagster-auth"
+    - "traefik.http.routers.dagster.rule=((Host(`airbyte.service.consul`) || Host(config-`${AIRBYTE_HOSTNAME}`))\
+      \ && PathPrefix(`/api/v1`))"
+    - "traefik.http.routers.dagster.tls=true"
     - "traefik.http.routers.public.middlewares=traefik-forward-auth"
     - "traefik.http.routers.public.rule=(Host(`${AIRBYTE_HOSTNAME}`) || Path(`/api/health`))"
     - "traefik.http.routers.public.service=public"
@@ -341,12 +346,12 @@ services:
     - "8006"
     labels:
     - "traefik.enable=true"
-    - "traefik.http.middlewares.airbyte-api.basicauth.users=dagster:${DAGSTER_USER_PASS}"
-    - "traefik.http.middlewares.airbyte-api.stripprefix.prefixes=/api"
+    - "traefik.http.middlewares.airbyte-api-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
+    - "traefik.http.middlewares.airbyte-api-prefix.stripprefix.prefixes=/api"
     - "traefik.http.routers.airbyte-api.rule=((Host(`airbyte-api.service.consul`)\
-      \ || Host(`api-${AIRBYTE_HOSTNAME})) && PathPrefix(`/api/v1`))"
+      \ || Host(`api-${AIRBYTE_HOSTNAME}`)) && PathPrefix(`/api/v1`))"
     - "traefik.http.routers.airbyte-api.tls=true"
-    - "traefik.http.routers.airbyte-api.middlewares=airbyte-api"
+    - "traefik.http.routers.airbyte-api.middlewares=airbyte-api-auth,airbyte-api-prefix"
     - "traefik.http.services.airbyte-api.loadbalancer.server.port=8006"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
