@@ -261,7 +261,7 @@ services:
     - "traefik.enable=true"
     - "traefik.http.middlewares.dagster-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
     - "traefik.http.routers.dagster.middlewares=dagster-auth"
-    - "traefik.http.routers.dagster.rule=((Host(`airbyte.service.consul`) || Host(config-`${AIRBYTE_HOSTNAME}`))\
+    - "traefik.http.routers.dagster.rule=((Host(`airbyte.service.consul`) || Host(`config-${AIRBYTE_HOSTNAME}`))\
       \ && PathPrefix(`/api/v1`))"
     - "traefik.http.routers.dagster.tls=true"
     - "traefik.http.routers.public.middlewares=traefik-forward-auth"
