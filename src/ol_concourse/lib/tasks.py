@@ -8,6 +8,7 @@ from ol_concourse.lib.models.pipeline import Command, Identifier, TaskConfig, Ta
 def instance_refresh_task(
     filters: str,
     queries: str,
+    node_class: str,
 ) -> TaskStep:
     return TaskStep(
         task=Identifier("instance-refresh"),
@@ -23,7 +24,7 @@ def instance_refresh_task(
                 path="bash",
                 args=[
                     "-ec",
-                    f"""ASG_NAME=$(aws autoscaling describe-auto-scaling-groups --color on --no-cli-auto-prompt --no-cli-pager --filters {filters} --query "{queries}" --output text);
+                    f"""ASG_NAME=$(aws autoscaling describe-auto-scaling-groups --color on --no-cli-auto-prompt --no-cli-pager --filters {filters} --query "{queries}" --output text | grep {node_class});
                     aws autoscaling start-instance-refresh --color on --no-cli-auto-prompt --no-cli-pager --auto-scaling-group-name $ASG_NAME --preferences MinHealthyPercentage=50,InstanceWarmup=120""",  # noqa: E501
                 ],
             ),
@@ -38,6 +39,7 @@ def instance_refresh_task(
 def block_for_instance_refresh_task(
     filters: str,
     queries: str,
+    node_class: str,
     check_freq: int = 10,
 ) -> TaskStep:
     return TaskStep(
@@ -54,7 +56,7 @@ def block_for_instance_refresh_task(
                 path="bash",
                 args=[
                     "-ec",
-                    f""" ASG_NAME=$(aws autoscaling describe-auto-scaling-groups --color on --no-cli-auto-prompt --no-cli-pager --filters {filters} --query "{queries}" --output text);
+                    f""" ASG_NAME=$(aws autoscaling describe-auto-scaling-groups --color on --no-cli-auto-prompt --no-cli-pager --filters {filters} --query "{queries}" --output text | grep {node_class});
                     status="InProgress"
                     while [ "$status" = "InProgress" ] || [ "$status" == "Pending" ] || [ "$status" == "Canceling" ]
                     do

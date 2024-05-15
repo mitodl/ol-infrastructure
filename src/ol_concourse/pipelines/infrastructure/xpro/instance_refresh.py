@@ -9,6 +9,7 @@ from ol_concourse.lib.tasks import (
 )
 
 product = "edxapp"
+project = "xpro"
 # environments = ["ci", "qa", "production"] # noqa: ERA001
 environments = ["ci"]
 node_classes = ["worker-xpro", "web-xpro"]
@@ -20,15 +21,20 @@ group_configs = []
 for env in environments:
     job_names = []
     for node_class in node_classes:
-        filter_template = f"Name=tag:Name,Values={product}-{node_class} Name=tag:Environment,Values={product}-{env}"  # noqa: E501
+        filter_template = f"Name=tag:Application,Values={product} Name=tag:Environment,Values={project}-{env}"  # noqa: E501
         query = "AutoScalingGroups[*].AutoScalingGroupName"
         refresh_job = Job(
             name=f"{env}-{node_class}-instance-refresh",
             plan=[
                 GetStep(get="build-schedule", trigger=True),
-                instance_refresh_task(filters=filter_template, queries=query),
+                instance_refresh_task(
+                    filters=filter_template, node_class=node_class, queries=query
+                ),
                 block_for_instance_refresh_task(
-                    filters=filter_template, queries=query, check_freq=10
+                    filters=filter_template,
+                    queries=query,
+                    node_class=node_class,
+                    check_freq=10,
                 ),
             ],
         )
