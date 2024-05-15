@@ -343,8 +343,8 @@ services:
     - "traefik.enable=true"
     - "traefik.http.middlewares.airbyte-api.basicauth.users=dagster:${DAGSTER_USER_PASS}"
     - "traefik.http.middlewares.airbyte-api.stripprefix.prefixes=/api"
-    - "traefik.http.routers.airbyte-api.rule=((Host(`airbyte.service.consul`) || Host(`${AIRBYTE_HOSTNAME}))\
-      \ && PathPrefix(`/api/v1`))"
+    - "traefik.http.routers.airbyte-api.rule=((Host(`airbyte-api.service.consul`)\
+      \ || Host(`api-${AIRBYTE_HOSTNAME})) && PathPrefix(`/api/v1`))"
     - "traefik.http.routers.airbyte-api.tls=true"
     - "traefik.http.routers.airbyte-api.middlewares=airbyte-api"
     - "traefik.http.services.airbyte-api.loadbalancer.server.port=8006"
