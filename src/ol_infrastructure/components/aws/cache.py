@@ -41,7 +41,7 @@ class OLAmazonCacheConfig(AWSBase):
     kms_key_id: Optional[str] = None
     snapshot_retention_days: Optional[int] = None
     auto_upgrade: bool = True  # Automatically perform ugprades of minor versions
-    apply_immediately: bool = False
+    apply_immediately: bool = True
     cluster_description: str
     cluster_name: str
     engine: str
