@@ -35,7 +35,11 @@ from pulumi_aws.lb import (
 )
 from pydantic import BaseModel, ConfigDict, NonNegativeInt, PositiveInt, field_validator
 
-from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, InstanceTypes
+from ol_infrastructure.lib.aws.ec2_helper import (
+    DiskTypes,
+    InstanceTypes,
+    is_valid_instance_type,
+)
 from ol_infrastructure.lib.ol_types import AWSBase
 
 
@@ -132,12 +136,25 @@ class OLLaunchTemplateConfig(AWSBase):
     block_device_mappings: list[BlockDeviceMapping]
     image_id: str
     instance_profile_arn: Union[str, pulumi.Output[str]]
-    instance_type: InstanceTypes = InstanceTypes.burstable_medium
+    instance_type: str = InstanceTypes.burstable_medium
     key_name: str = "oldevops"
     security_groups: list[Union[SecurityGroup, pulumi.Output]]
     tag_specifications: list[TagSpecification]
     user_data: Optional[Union[str, pulumi.Output[str]]]
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_validator("instance_type")
+    @classmethod
+    def is_valid_instance_type(cls, instance_type: str) -> str:
+        if is_valid_instance_type(instance_type):
+            return instance_type
+        else:
+            msg = (
+                "The declared instance type is not a valid specifier. "
+                "Refer to https://instances.vantage.sh/ to find a supported "
+                "instance type."
+            )
+            raise ValueError(msg)
 
 
 class OLAutoScaleGroupConfig(AWSBase):
