@@ -47,10 +47,11 @@ class InstanceTypes(str, Enum):
     general_purpose_intel_large = "m6i.large"
     general_purpose_intel_xlarge = "m6i.xlarge"
     general_purpose_intel_2xlarge = "m6i.2xlarge"
-    high_mem_regular = "r6a.large"
-    high_mem_xlarge = "r6a.xlarge"
-    high_mem_2xlarge = "r6a.2xlarge"
-    high_mem_4xlarge = "r6a.4xlarge"
+    high_mem_regular = "r7a.large"
+    high_mem_xlarge = "r7a.xlarge"
+    high_mem_2xlarge = "r7a.2xlarge"
+    high_mem_4xlarge = "r7a.4xlarge"
+    high_mem_8xlarge = "r7a.8xlarge"
 
     @classmethod
     def dereference(cls, instance_specifier) -> str:

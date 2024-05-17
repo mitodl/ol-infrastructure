@@ -9,7 +9,7 @@ config:
     min: 1
   airbyte:business_unit: operations
   airbyte:db_capacity: "334"
-  airbyte:instance_type: r6a.xlarge
+  airbyte:instance_type: r7a.xlarge
   airbyte:rds_password:
     secure: v1:+8cXtPmd87pI6W34:JMqgjAAso2QgEcIeh2DtYiu52+Z+j4prhAMJRSBGYjFdG9N4QxyPr7zOO0aIh3iGC/9LDB5Q9qNXFIudw7JzaQ==
   airbyte:target_vpc: data_vpc
