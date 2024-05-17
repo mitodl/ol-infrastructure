@@ -119,15 +119,67 @@ parliament_config = {
     "RESOURCE_EFFECTIVELY_STAR": {},
 }
 
+gh_workflow_s3_bucket_permissions = [
+    {
+        "Action": [
+            "s3:ListBucket*",
+        ],
+        "Effect": "Allow",
+        "Resource": [
+            f"arn:aws:s3:::{app_storage_bucket_name}",
+        ],
+    },
+    {
+        "Action": [
+            "s3:GetObject*",
+            "s3:PutObject",
+            "s3:PutObjectAcl",
+            "s3:DeleteObject",
+        ],
+        "Effect": "Allow",
+        "Resource": [
+            f"arn:aws:s3:::{app_storage_bucket_name}/frontend/*",
+        ],
+    },
+]
+
+gh_workflow_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": gh_workflow_s3_bucket_permissions,
+}
+
+gh_workflow_iam_policy = iam.Policy(
+    f"ol_mitopen_gh_workflow_iam_permissions_{stack_info.env_suffix}",
+    name=f"ol-mitopen-gh-workflow-permissions-{stack_info.env_suffix}",
+    path=f"/ol-applications/mitopen/{stack_info.env_suffix}/",
+    policy=lint_iam_policy(
+        gh_workflow_policy_document, stringify=True, parliament_config=parliament_config
+    ),
+)
+
+# Just create a static user for now. Some day refactor to use
+# https://github.com/hashicorp/vault-action
+gh_workflow_user = iam.User(
+    f"ol_mitopen_gh_workflow_user_{stack_info.env_suffix}",
+    name=f"mitopen-gh-workflow-{stack_info.env_suffix}",
+    tags=aws_config.tags,
+)
+iam.PolicyAttachment(
+    f"ol_mitopen_gh_workflow_user_{stack_info.env_suffix}",
+    policy_arn=gh_workflow_iam_policy.arn,
+    users=[gh_workflow_user.name],
+)
+
+
 # TODO @Ardiea: 07312023 Requires review of bucket names
-s3_bucket_permissions = [
+application_s3_bucket_permissions = [
     {
         "Action": [
             "s3:GetObject*",
             "s3:ListBucket*",
             "s3:PutObject",
             "s3:PutObjectAcl",
-            "S3:DeleteObject",
+            "s3:DeleteObject",
         ],
         "Effect": "Allow",
         "Resource": [
@@ -160,9 +212,9 @@ s3_bucket_permissions = [
     },
 ]
 
-open_policy_document = {
+application_policy_document = {
     "Version": IAM_POLICY_VERSION,
-    "Statement": s3_bucket_permissions,
+    "Statement": application_s3_bucket_permissions,
 }
 
 mitopen_iam_policy = iam.Policy(
@@ -170,9 +222,10 @@ mitopen_iam_policy = iam.Policy(
     name=f"ol-mitopen-application-permissions-{stack_info.env_suffix}",
     path=f"/ol-applications/mitopen/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
-        open_policy_document, stringify=True, parliament_config=parliament_config
+        application_policy_document, stringify=True, parliament_config=parliament_config
     ),
 )
+
 
 mitopen_vault_iam_role = vault.aws.SecretBackendRole(
     f"ol-mitopen-iam-permissions-vault-policy-{stack_info.env_suffix}",
