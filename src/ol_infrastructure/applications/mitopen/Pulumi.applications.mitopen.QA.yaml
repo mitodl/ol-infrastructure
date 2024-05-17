@@ -48,5 +48,6 @@ config:
   mitopen:db_instance_size: "db.t4g.medium"
   mitopen:db_password:
     secure: v1:Xk9oxNvxSQAJUAHE:8CdeLN2SlyhyU0iZpqEX5rnHSJ3PClleDJi2UpzoCsVZ4UjNkr7vCOAKY7CvCuB/7CBKJKM=
+  mitopen:domain: testing.odl.mit.edu
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

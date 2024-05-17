@@ -1,16 +1,23 @@
 # ruff: noqa: TD003, ERA001, FIX002, E501
 
+import base64
 import json
 from pathlib import Path
 from string import Template
 
+import pulumi_fastly as fastly
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
-from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT, FIVE_MINUTES
+from bridge.lib.magic_numbers import (
+    DEFAULT_HTTPS_PORT,
+    DEFAULT_POSTGRES_PORT,
+    FIVE_MINUTES,
+    ONE_MEGABYTE_BYTE,
+)
 from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
 from pulumi.output import Output
-from pulumi_aws import ec2, iam, s3
+from pulumi_aws import ec2, iam, route53, s3
 
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -18,6 +25,10 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.fastly import (
+    build_fastly_log_format_string,
+    get_fastly_provider,
+)
 from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -26,6 +37,7 @@ from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_pr
 
 setup_vault_provider(skip_child_token=True)
 setup_heroku_provider()
+fastly_provider = get_fastly_provider()
 
 mitopen_config = Config("mitopen")
 heroku_config = Config("heroku")
@@ -34,6 +46,13 @@ heroku_app_config = Config("heroku_app")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
+vector_log_proxy_stack = StackReference(
+    f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
+)
+monitoring_stack = StackReference("infrastructure.monitoring")
+dns_stack = StackReference("infrastructure.aws.dns")
+mitodl_zone_id = dns_stack.require_output("odl_zone_id")
+
 aws_config = AWSBase(
     tags={
         "OU": "mit-open",
@@ -378,6 +397,90 @@ mitopen_vault_backend_config = OLVaultPostgresDatabaseConfig(
     role_statements=mitopen_role_statements,
 )
 mitopen_vault_backend = OLVaultDatabaseBackend(mitopen_vault_backend_config)
+
+vector_log_proxy_secrets = read_yaml_secrets(
+    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
+)
+fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
+encoded_fastly_proxy_credentials = base64.b64encode(
+    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
+).decode("utf8")
+vector_log_proxy_fqdn = vector_log_proxy_stack.require_output("vector_log_proxy")[
+    "fqdn"
+]
+
+fastly_access_logging_bucket = monitoring_stack.require_output(
+    "fastly_access_logging_bucket"
+)
+fastly_access_logging_iam_role = monitoring_stack.require_output(
+    "fastly_access_logging_iam_role"
+)
+
+# Ref: https://github.com/mitodl/mit-open/blob/main/config/nginx.conf
+mitopen_fastly_service = fastly.ServiceVcl(
+    f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
+    name=f"MIT Open {stack_info.env_suffix}",
+    comment="Managed by Pulumi",
+    backends=[
+        fastly.ServiceVclBackendArgs(
+            address=application_storage_bucket.bucket_domain_name,
+            name="MIT Frontend",
+            override_host=application_storage_bucket.bucket_domain_name,
+            port=DEFAULT_HTTPS_PORT,
+            request_condition="frontend path",
+            ssl_cert_hostname=application_storage_bucket.bucket_domain_name,
+            ssl_sni_hostname=application_storage_bucket.bucket_domain_name,
+            use_ssl=True,
+        )
+    ],
+    cache_settings=[],
+    conditions=[
+        fastly.ServiceVclConditionArgs(
+            name="Frontend Path",
+            statement="????",
+            type="REQUEST",
+        )
+    ],
+    dictionaries=[],
+    domains=[
+        fastly.ServiceVclDomainArgs(
+            comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application Frontend",
+            name=mitopen_config.require("domain"),
+        )
+    ],
+    headers=[],
+    request_settings=[],
+    snippets=[],
+    logging_https=[
+        fastly.ServiceVclLoggingHttpArgs(
+            url=Output.all(fqdn=vector_log_proxy_fqdn).apply(
+                lambda fqdn: "https://{fqdn}".format(**fqdn)
+            ),
+            name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-https-logging-args",
+            content_type="application/json",
+            format=build_fastly_log_format_string(additional_static_fields={}),
+            format_version=2,
+            header_name="Authorization",
+            header_value=f"Basic {encoded_fastly_proxy_credentials}",
+            json_format="0",
+            method="POST",
+            request_max_bytes=ONE_MEGABYTE_BYTE,
+        )
+    ],
+    opts=fastly_provider,
+)
+
+five_minutes = 60 * 5
+route53.Record(
+    "ol-mitopen-frontend-dns-record",
+    name=mitopen_config.require("domain"),
+    type="CNAME",
+    ttl=five_minutes,
+    records=["j.sni.global.fastly.net"],
+    zone_id=mitodl_zone_id,
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
 
 # ci, rc, or production
 env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
