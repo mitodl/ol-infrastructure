@@ -2,6 +2,7 @@
 
 import base64
 import json
+import textwrap
 from pathlib import Path
 from string import Template
 
@@ -424,33 +425,60 @@ mitopen_fastly_service = fastly.ServiceVcl(
     backends=[
         fastly.ServiceVclBackendArgs(
             address=application_storage_bucket.bucket_domain_name,
-            name="MIT Frontend",
+            name="MITOpen Frontend",
             override_host=application_storage_bucket.bucket_domain_name,
             port=DEFAULT_HTTPS_PORT,
             request_condition="frontend path",
             ssl_cert_hostname=application_storage_bucket.bucket_domain_name,
             ssl_sni_hostname=application_storage_bucket.bucket_domain_name,
             use_ssl=True,
-        )
+        ),
+        fastly.ServiceVclBackendArgs(
+            address=mitopen_config.require("heroku_domain"),
+            name="MITOpen API",
+            override_host=mitopen_config.require("heroku_domain"),
+            port=DEFAULT_HTTPS_PORT,
+            request_condition="api path",
+            ssl_cert_hostname=mitopen_config.require("heroku_domain"),
+            ssl_sni_hostname=mitopen_config.require("heroku_domain"),
+            use_ssl=True,
+        ),
     ],
     cache_settings=[],
     conditions=[
         fastly.ServiceVclConditionArgs(
-            name="Frontend Path",
-            statement="????",
+            name="api path",
+            statement='req.url ~ "^/api/"',
             type="REQUEST",
-        )
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="frontend path",
+            statement='req.url ~ "^/"',
+            type="REQUEST",
+        ),
     ],
     dictionaries=[],
     domains=[
         fastly.ServiceVclDomainArgs(
-            comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application Frontend",
+            comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
             name=mitopen_config.require("domain"),
         )
     ],
     headers=[],
     request_settings=[],
-    snippets=[],
+    snippets=[
+        fastly.ServiceVclSnippetArgs(
+            name="Strip headers to s3 backend",
+            content=textwrap.dedent(
+                """ \
+                if (req.url.path ~ "^/") {{
+                   set req.url = req.url.path;
+                   unset req.http.Cookies;
+                }}"""
+            ),
+            type="recv",
+        )
+    ],
     logging_https=[
         fastly.ServiceVclLoggingHttpArgs(
             url=Output.all(fqdn=vector_log_proxy_fqdn).apply(
