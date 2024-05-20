@@ -7,6 +7,7 @@ from pathlib import Path
 from string import Template
 
 import pulumi_fastly as fastly
+import pulumi_github as github
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
 from bridge.lib.magic_numbers import (
@@ -39,6 +40,11 @@ from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_pr
 setup_vault_provider(skip_child_token=True)
 setup_heroku_provider()
 fastly_provider = get_fastly_provider()
+github_provider = github.Provider(
+    "github-provider",
+    owner=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["owner"],
+    token=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["token"],
+)
 
 mitopen_config = Config("mitopen")
 heroku_config = Config("heroku")
@@ -188,6 +194,29 @@ iam.PolicyAttachment(
     f"ol_mitopen_gh_workflow_user_{stack_info.env_suffix}",
     policy_arn=gh_workflow_iam_policy.arn,
     users=[gh_workflow_user.name],
+)
+gh_workflow_accesskey = iam.AccessKey(
+    f"ol_mitopen_gh_workflow_accesskey-{stack_info.env_suffix}",
+    user=gh_workflow_user.name,
+    status="Active",
+)
+
+env_var_suffix = "RC" if stack_info.env_suffix == "QA" else "PROD"
+
+gh_repo = github.get_repository(
+    full_name="mitodl/mit-open", opts=InvokeOptions(provider=github_provider)
+)
+gh_workflow_accesskey_id_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_accesskey_id_env_secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"AWS_ACCESS_KEY_ID_{env_var_suffix}",
+    plaintext_value=gh_workflow_accesskey.id,
+)
+gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_secretaccesskey_env_secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"AWS_SECRET_ACCESS_KEY_{env_var_suffix}",
+    plaintext_value=gh_workflow_accesskey.secret,
 )
 
 
