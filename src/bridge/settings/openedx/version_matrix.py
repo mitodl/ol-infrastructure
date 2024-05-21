@@ -434,6 +434,8 @@ ReleaseMap: dict[
                 application="edx-platform",
                 application_type="IDA",
                 release="quince",
+                branch_override="xpro/quince",
+                origin_override="https://github.com/mitodl/edx-platform",
             ),
             OpenEdxApplicationVersion(
                 application="edxapp_theme",
