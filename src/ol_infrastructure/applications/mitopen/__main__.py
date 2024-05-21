@@ -1,16 +1,25 @@
 # ruff: noqa: TD003, ERA001, FIX002, E501
 
+import base64
 import json
+import textwrap
 from pathlib import Path
 from string import Template
 
+import pulumi_fastly as fastly
+import pulumi_github as github
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
-from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT, FIVE_MINUTES
+from bridge.lib.magic_numbers import (
+    DEFAULT_HTTPS_PORT,
+    DEFAULT_POSTGRES_PORT,
+    FIVE_MINUTES,
+    ONE_MEGABYTE_BYTE,
+)
 from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
 from pulumi.output import Output
-from pulumi_aws import ec2, iam, s3
+from pulumi_aws import ec2, iam, route53, s3
 
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -18,6 +27,10 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.fastly import (
+    build_fastly_log_format_string,
+    get_fastly_provider,
+)
 from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -26,6 +39,12 @@ from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_pr
 
 setup_vault_provider(skip_child_token=True)
 setup_heroku_provider()
+fastly_provider = get_fastly_provider()
+github_provider = github.Provider(
+    "github-provider",
+    owner=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["owner"],
+    token=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["token"],
+)
 
 mitopen_config = Config("mitopen")
 heroku_config = Config("heroku")
@@ -34,6 +53,13 @@ heroku_app_config = Config("heroku_app")
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
+vector_log_proxy_stack = StackReference(
+    f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
+)
+monitoring_stack = StackReference("infrastructure.monitoring")
+dns_stack = StackReference("infrastructure.aws.dns")
+mitodl_zone_id = dns_stack.require_output("odl_zone_id")
+
 aws_config = AWSBase(
     tags={
         "OU": "mit-open",
@@ -119,15 +145,92 @@ parliament_config = {
     "RESOURCE_EFFECTIVELY_STAR": {},
 }
 
+gh_workflow_s3_bucket_permissions = [
+    {
+        "Action": [
+            "s3:ListBucket*",
+        ],
+        "Effect": "Allow",
+        "Resource": [
+            f"arn:aws:s3:::{app_storage_bucket_name}",
+        ],
+    },
+    {
+        "Action": [
+            "s3:GetObject*",
+            "s3:PutObject",
+            "s3:PutObjectAcl",
+            "s3:DeleteObject",
+        ],
+        "Effect": "Allow",
+        "Resource": [
+            f"arn:aws:s3:::{app_storage_bucket_name}/frontend/*",
+        ],
+    },
+]
+
+gh_workflow_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": gh_workflow_s3_bucket_permissions,
+}
+
+gh_workflow_iam_policy = iam.Policy(
+    f"ol_mitopen_gh_workflow_iam_permissions_{stack_info.env_suffix}",
+    name=f"ol-mitopen-gh-workflow-permissions-{stack_info.env_suffix}",
+    path=f"/ol-applications/mitopen/{stack_info.env_suffix}/",
+    policy=lint_iam_policy(
+        gh_workflow_policy_document, stringify=True, parliament_config=parliament_config
+    ),
+)
+
+# Just create a static user for now. Some day refactor to use
+# https://github.com/hashicorp/vault-action
+gh_workflow_user = iam.User(
+    f"ol_mitopen_gh_workflow_user_{stack_info.env_suffix}",
+    name=f"mitopen-gh-workflow-{stack_info.env_suffix}",
+    tags=aws_config.tags,
+)
+iam.PolicyAttachment(
+    f"ol_mitopen_gh_workflow_user_{stack_info.env_suffix}",
+    policy_arn=gh_workflow_iam_policy.arn,
+    users=[gh_workflow_user.name],
+)
+gh_workflow_accesskey = iam.AccessKey(
+    f"ol_mitopen_gh_workflow_accesskey-{stack_info.env_suffix}",
+    user=gh_workflow_user.name,
+    status="Active",
+)
+
+env_var_suffix = "RC" if stack_info.env_suffix == "qa" else "PROD"
+
+gh_repo = github.get_repository(
+    full_name="mitodl/mit-open", opts=InvokeOptions(provider=github_provider)
+)
+gh_workflow_accesskey_id_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_accesskey_id_env_secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"AWS_ACCESS_KEY_ID_{env_var_suffix}",
+    plaintext_value=gh_workflow_accesskey.id,
+    opts=ResourceOptions(provider=github_provider),
+)
+gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_secretaccesskey_env_secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"AWS_SECRET_ACCESS_KEY_{env_var_suffix}",
+    plaintext_value=gh_workflow_accesskey.secret,
+    opts=ResourceOptions(provider=github_provider),
+)
+
+
 # TODO @Ardiea: 07312023 Requires review of bucket names
-s3_bucket_permissions = [
+application_s3_bucket_permissions = [
     {
         "Action": [
             "s3:GetObject*",
             "s3:ListBucket*",
             "s3:PutObject",
             "s3:PutObjectAcl",
-            "S3:DeleteObject",
+            "s3:DeleteObject",
         ],
         "Effect": "Allow",
         "Resource": [
@@ -160,9 +263,9 @@ s3_bucket_permissions = [
     },
 ]
 
-open_policy_document = {
+application_policy_document = {
     "Version": IAM_POLICY_VERSION,
-    "Statement": s3_bucket_permissions,
+    "Statement": application_s3_bucket_permissions,
 }
 
 mitopen_iam_policy = iam.Policy(
@@ -170,9 +273,10 @@ mitopen_iam_policy = iam.Policy(
     name=f"ol-mitopen-application-permissions-{stack_info.env_suffix}",
     path=f"/ol-applications/mitopen/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
-        open_policy_document, stringify=True, parliament_config=parliament_config
+        application_policy_document, stringify=True, parliament_config=parliament_config
     ),
 )
+
 
 mitopen_vault_iam_role = vault.aws.SecretBackendRole(
     f"ol-mitopen-iam-permissions-vault-policy-{stack_info.env_suffix}",
@@ -325,6 +429,135 @@ mitopen_vault_backend_config = OLVaultPostgresDatabaseConfig(
     role_statements=mitopen_role_statements,
 )
 mitopen_vault_backend = OLVaultDatabaseBackend(mitopen_vault_backend_config)
+
+vector_log_proxy_secrets = read_yaml_secrets(
+    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
+)
+fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
+encoded_fastly_proxy_credentials = base64.b64encode(
+    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
+).decode("utf8")
+vector_log_proxy_fqdn = vector_log_proxy_stack.require_output("vector_log_proxy")[
+    "fqdn"
+]
+
+fastly_access_logging_bucket = monitoring_stack.require_output(
+    "fastly_access_logging_bucket"
+)
+fastly_access_logging_iam_role = monitoring_stack.require_output(
+    "fastly_access_logging_iam_role"
+)
+open_api_paths = list(mitopen_config.require_object("api_paths"))
+api_regex = "^/({})".format("|".join(open_api_paths))
+# Ref: https://github.com/mitodl/mit-open/blob/main/config/nginx.conf
+mitopen_fastly_service = fastly.ServiceVcl(
+    f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
+    name=f"MIT Open {stack_info.env_suffix}",
+    comment="Managed by Pulumi",
+    backends=[
+        fastly.ServiceVclBackendArgs(
+            address=application_storage_bucket.bucket_domain_name,
+            name="MITOpen Frontend",
+            override_host=application_storage_bucket.bucket_domain_name,
+            port=DEFAULT_HTTPS_PORT,
+            request_condition="frontend path",
+            ssl_cert_hostname=application_storage_bucket.bucket_domain_name,
+            ssl_sni_hostname=application_storage_bucket.bucket_domain_name,
+            use_ssl=True,
+        ),
+        fastly.ServiceVclBackendArgs(
+            address=mitopen_config.require("heroku_domain"),
+            name="MITOpen API",
+            override_host=mitopen_config.require("domain"),
+            port=DEFAULT_HTTPS_PORT,
+            request_condition="api path",
+            ssl_cert_hostname=mitopen_config.require("domain"),
+            ssl_sni_hostname=mitopen_config.require("domain"),
+            use_ssl=True,
+        ),
+    ],
+    cache_settings=[],
+    conditions=[
+        fastly.ServiceVclConditionArgs(
+            name="api path",
+            statement=f'req.url ~ "{api_regex}/"',
+            type="REQUEST",
+        ),
+        fastly.ServiceVclConditionArgs(
+            name="frontend path",
+            statement=f'req.url !~ "{api_regex}/"',
+            type="REQUEST",
+        ),
+    ],
+    dictionaries=[],
+    domains=[
+        fastly.ServiceVclDomainArgs(
+            comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
+            name=mitopen_config.require("domain"),
+        ),
+    ],
+    headers=[
+        fastly.ServiceVclHeaderArgs(
+            action="set",
+            destination="http.Strict-Transport-Security",
+            name="Generated by force TLS and enable HSTS",
+            source='"max-age=300"',
+            type="response",
+        ),
+    ],
+    request_settings=[],
+    snippets=[
+        fastly.ServiceVclSnippetArgs(
+            name="Rewrite requests to root s3",
+            content=textwrap.dedent(
+                rf""" \
+                if (req.url.path !~ "{api_regex}") {{
+                   set req.http.orig-req-url = req.url;
+                   set req.url = "/frontend" + req.url;
+                }}
+                if (req.http.retry-for-dir) {{
+                  set req.url = req.url + "/";
+                }}
+
+                # Fetch the index page if the request is for a directory
+                if (req.url ~ "\/$" && req.url !~ "{api_regex}") {{
+                  set req.url = req.url + "index.html";
+                }}
+                """
+            ),
+            type="recv",
+        )
+    ],
+    logging_https=[
+        fastly.ServiceVclLoggingHttpArgs(
+            url=Output.all(fqdn=vector_log_proxy_fqdn).apply(
+                lambda fqdn: "https://{fqdn}".format(**fqdn)
+            ),
+            name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-https-logging-args",
+            content_type="application/json",
+            format=build_fastly_log_format_string(additional_static_fields={}),
+            format_version=2,
+            header_name="Authorization",
+            header_value=f"Basic {encoded_fastly_proxy_credentials}",
+            json_format="0",
+            method="POST",
+            request_max_bytes=ONE_MEGABYTE_BYTE,
+        )
+    ],
+    opts=fastly_provider,
+)
+
+five_minutes = 60 * 5
+route53.Record(
+    "ol-mitopen-frontend-dns-record",
+    name=mitopen_config.require("domain"),
+    type="CNAME",
+    ttl=five_minutes,
+    records=["d.sni.global.fastly.net"],
+    zone_id=mitodl_zone_id,
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
 
 # ci, rc, or production
 env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
