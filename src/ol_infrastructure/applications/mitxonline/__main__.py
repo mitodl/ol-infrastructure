@@ -203,6 +203,7 @@ heroku_vars = {
     "USE_X_FORWARDED_HOST": "True",
     "ZENDESK_HELP_WIDGET_ENABLED": "True",
     "POSTHOG_API_HOST": "https://app.posthog.com",
+    "POSTHOG_ENABLED": "True",
 }
 
 # All of the secrets for this app must be obtained with async incantations
@@ -395,7 +396,7 @@ sensitive_heroku_vars = {
     "OPEN_EXCHANGE_RATES_APP_ID": secret_mitxonline_open_exchange_rates.data.apply(
         lambda data: "{}".format(data["app_id"])
     ),
-    "POSTHOG_API_TOKEN": secret_mitxonline_posthog_credentials.data.apply(
+    "POSTHOG_PROJECT_API_KEY": secret_mitxonline_posthog_credentials.data.apply(
         lambda data: "{}".format(data["api-token"])
     ),
     "RECAPTCHA_SECRET_KEY": secret_mitxonline_recaptcha_keys.data.apply(
