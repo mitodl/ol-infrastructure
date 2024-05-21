@@ -80,16 +80,26 @@ OpenEdxDeploymentName = Literal["mitx", "mitx-staging", "mitxonline", "xpro"]
 
 class OpenEdxSupportedRelease(str, Enum):
     branch: str
+    python_version: str
+    node_version: str
 
-    def __new__(cls, release_name: str, release_branch: str):
+    def __new__(
+        cls,
+        release_name: str,
+        release_branch: str,
+        python_version: str,
+        node_version: str,
+    ):
         enum_element = str.__new__(cls, release_name)
         enum_element._value_ = release_name
         enum_element.branch = release_branch
+        enum_element.python_version = python_version
+        enum_element.node_version = node_version
         return enum_element
 
-    master = ("master", "master")
-    quince = ("quince", "open-release/quince.master")
-    redwood = ("redwood", "open-release/redwood.master")
+    master = ("master", "master", "3.11", "18")
+    quince = ("quince", "open-release/quince.master", "3.8", "18")
+    redwood = ("redwood", "open-release/redwood.master", "3.11", "18")
 
     def __str__(self):
         return self.value
@@ -139,7 +149,11 @@ class OpenEdxApplicationVersion(BaseModel):
     @property
     def runtime_version(self) -> str:
         # Default to Python 3.8 for IDAs and Node 16 for MFEs
-        app_type_runtime = "3.8" if self.application_type == "IDA" else "18"
+        app_type_runtime = (
+            self.release.python_version
+            if self.application_type == "IDA"
+            else self.release.node_version
+        )
         return self.runtime_version_override or app_type_runtime
 
     @property
