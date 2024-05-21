@@ -23,7 +23,8 @@ def build_codejail_pipeline(
     release_name: str,
     edx_deployments: list[DeploymentEnvRelease],  # noqa: ARG001
 ):
-    openedx_branch = OpenEdxSupportedRelease[release_name].branch
+    openedx_release = OpenEdxSupportedRelease[release_name]
+    openedx_branch = openedx_release.branch
     codejail_repo = git_repo(
         name=Identifier("openedx-codejail-code"),
         uri="https://github.com/eduNEXT/codejailservice",
@@ -80,6 +81,7 @@ def build_codejail_pipeline(
                         f"{codejail_dockerfile_repo.name}/dockerfiles/openedx-codejail/"
                     ),
                     "BUILD_ARG_OPENEDX_BRANCH": openedx_branch,
+                    "BUILD_ARG_PYTHON_VERSION": openedx_release.python_version,
                 },
                 build_args=[
                     "-t $(cat ./codejail-release/commit_sha)",
