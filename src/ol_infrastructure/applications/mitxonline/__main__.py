@@ -399,6 +399,9 @@ sensitive_heroku_vars = {
     "POSTHOG_PROJECT_API_KEY": secret_mitxonline_posthog_credentials.data.apply(
         lambda data: "{}".format(data["api-token"])
     ),
+    "POSTHOG_API_TOKEN": secret_mitxonline_posthog_credentials.data.apply(
+        lambda data: "{}".format(data["api-token"])
+    ),
     "RECAPTCHA_SECRET_KEY": secret_mitxonline_recaptcha_keys.data.apply(
         lambda data: "{}".format(data["secret_key"])
     ),
