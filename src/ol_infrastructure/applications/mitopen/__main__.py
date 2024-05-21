@@ -513,7 +513,7 @@ mitopen_fastly_service = fastly.ServiceVcl(
                 rf""" \
                 if (req.url.path !~ "{api_regex}") {{
                    set req.http.orig-req-url = req.url;
-                   set req.url = "/frontends/mit-open/build" + req.url;
+                   set req.url = "/frontend" + req.url;
                 }}
                 if (req.http.retry-for-dir) {{
                   set req.url = req.url + "/";
