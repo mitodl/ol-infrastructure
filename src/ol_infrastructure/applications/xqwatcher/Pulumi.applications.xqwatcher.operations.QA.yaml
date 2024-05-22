@@ -8,7 +8,7 @@ config:
     desired: 1
     max: 2
     min: 1
-  xqwatcher:instance_type: t3a.small
+  xqwatcher:instance_type: r5a.large
   xqwatcher:business_unit: residential
   xqwatcher:target_vpc: operations_vpc
   vault:address: https://vault-qa.odl.mit.edu
