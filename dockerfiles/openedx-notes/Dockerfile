@@ -1,4 +1,5 @@
-FROM python:3.8-slim
+ARG PYTHON_VERSION=3.8
+FROM python:${PYTHON_VERSION}-slim
 
 ARG APP_USER_ID=1000
 RUN apt update && \

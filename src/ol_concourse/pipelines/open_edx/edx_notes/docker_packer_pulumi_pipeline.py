@@ -27,7 +27,8 @@ def build_notes_pipeline(
     release_name: str,
     edx_deployments: list[DeploymentEnvRelease],  # noqa: ARG001
 ):
-    notes_branch = OpenEdxSupportedRelease[release_name].branch
+    openedx_release = OpenEdxSupportedRelease[release_name]
+    notes_branch = openedx_release.branch
     notes_repo = git_repo(
         name=Identifier("openedx-notes-code"),
         uri="https://github.com/openedx/edx-notes-api",
@@ -86,6 +87,7 @@ def build_notes_pipeline(
                         f"{notes_dockerfile_repo.name}/dockerfiles/openedx-notes/"
                     ),
                     "BUILD_ARG_OPENEDX_COMMON_VERSION": notes_branch,
+                    "BUILD_ARG_PYTHON_VERSION": openedx_release.python_version,
                 },
                 build_args=[
                     "-t $(cat ./notes-release/commit_sha)",
