@@ -61,6 +61,7 @@ vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}
 target_vpc_name = ovs_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
 target_vpc = network_stack.require_output(target_vpc_name)
 target_vpc_id = target_vpc["id"]
+data_vpc = network_stack.require_output("data_vpc")
 
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
@@ -335,6 +336,7 @@ ovs_database_security_group = ec2.SecurityGroup(
                 ovs_server_security_group.id,
                 consul_stack.require_output("security_groups")["consul_server"],
                 vault_stack.require_output("vault_server")["security_group"],
+                data_vpc["security_groups"]["integrator"],
             ],
             cidr_blocks=[target_vpc["cidr"]],
             protocol="tcp",
