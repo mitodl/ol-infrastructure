@@ -366,7 +366,9 @@ consul_template_configuration = {
             # https://github.com/mitodl/xqueue-watcher?tab=readme-ov-file#running-xqueue-watcher
             ConsulTemplateTemplate(
                 contents=(
-                    '{{- with secret "secret-xqwatcher/grader-config" -}}'
+                    '{{- $env_prefix := env "ENV_PREFIX" -}}'
+                    '{{- $vault_path := printf "secret-xqwatcher/%s-grader-config" -}}'
+                    "{{- with secret $vault_path -}}"
                     "{{ .Data.data.confd_json | toJSONPretty }}{{ end }}"
                 ),
                 destination=XQWATCHER_CONF_DIR.joinpath("grader_config.json"),
@@ -376,7 +378,9 @@ consul_template_configuration = {
             ),
             ConsulTemplateTemplate(
                 contents=(
-                    '{{- with secret "secret-xqwatcher/grader-config" -}}'
+                    '{{- $env_prefix := env "ENV_PREFIX" -}}'
+                    '{{- $vault_path := printf "secret-xqwatcher/%s-grader-config" -}}'
+                    "{{- with secret $vault_path -}}"
                     "{{ printf .Data.data.xqwatcher_grader_code_ssh_identity }}{{ end }}"
                 ),
                 destination=XQWATCHER_SSH_DIR.joinpath(
@@ -388,7 +392,9 @@ consul_template_configuration = {
             ),
             ConsulTemplateTemplate(
                 contents=(
-                    '{{ with secret "secret-xqwatcher/grader-config" }}'
+                    '{{- $env_prefix := env "ENV_PREFIX" -}}'
+                    '{{- $vault_path := printf "secret-xqwatcher/%s-grader-config" -}}'
+                    "{{- with secret $vault_path -}}"
                     "{{ .Data.data.graders_yaml | toYAML }}{{ end }}"
                 ),
                 destination=XQWATCHER_FETCH_GRADERS_CONFIG_FILE,

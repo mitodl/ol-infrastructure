@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgHzGaCdqKWGOJ49SaKpOTIJAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMolKUc2XHdg9utgvHAgEQgDt45yPejgGlntgwIkd0Eu0ButJHb8w1TpovLlcZAowgytdZ2JXjqvmRyncU1GOtcf7/NYjfjqj5WE5iSg==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-mitxonline-qa.odl.mit.edu
+  xqwatcher:auto_scale:
+    desired: 1
+    max: 2
+    min: 1
+  xqwatcher:instance_type: t3a.small
+  xqwatcher:business_unit: mitxonline
+  xqwatcher:target_vpc: mitxonline_vpc
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

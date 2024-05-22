@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQHQ1nYxdMdGpUV3lkCYkPCCAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMsqc+FPq0+d14aeiEAgEQgDtOLAH8o/ueXOQKwFgUIv0reMzktDtSL+DF4pec6zPtl0qaaP7mXGY9WECr4y4YGaZ6uHtgh1pHncqqIQ==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-mitx-ci.odl.mit.edu
+  xqwatcher:auto_scale:
+    desired: 1
+    max: 2
+    min: 1
+  xqwatcher:instance_type: t3a.small
+  xqwatcher:business_unit: residential
+  xqwatcher:target_vpc: residential_mitx_vpc
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

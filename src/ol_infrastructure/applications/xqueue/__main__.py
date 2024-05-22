@@ -35,7 +35,9 @@ openedx_version_tag = xqueue_config.get("openedx_version_tag")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
-xqwatcher_stack = StackReference(f"applications.xqwatcher.operations.{stack_info.name}")
+xqwatcher_stack = StackReference(
+    f"applications.xqwatcher.{stack_info.env_prefix}.{stack_info.name}"
+)
 consul_stack = StackReference(
     f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
 )

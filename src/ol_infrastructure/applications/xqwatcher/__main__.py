@@ -110,13 +110,16 @@ xqwatcher_server_instance_profile = iam.InstanceProfile(
 
 # Vault policy definition
 xqwatcher_server_vault_policy = vault.Policy(
-    "xqwatcher-server-vault-policy",
+    "xqwatcher-server-vault-policy-{env_name}",
     name="xqwatcher-server",
-    policy=Path(__file__).parent.joinpath("xqwatcher_server_policy.hcl").read_text(),
+    policy=Path(__file__)
+    .parent.joinpath("xqwatcher_server_policy.hcl")
+    .read_text()
+    .replace("ENV_PREFIX", f"{stack_info.env_prefix}"),
 )
 # Register xqwatcher AMI for Vault AWS auth
 vault.aws.AuthBackendRole(
-    "xqwatcher-server-ami-ec2-vault-auth",
+    f"xqwatcher-server-ami-ec2-vault-auth-{env_name}",
     backend="aws",
     auth_type="iam",
     role="xqwatcher-server",
@@ -152,13 +155,13 @@ grafana_credentials = read_yaml_secrets(
 )
 
 vault_secrets = read_yaml_secrets(
-    Path(f"xqwatcher/secrets.{stack_info.env_suffix}.yaml")
+    Path(f"xqwatcher/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
 )
 xqwatcher_vault_mount_name = vault_mount_stack.require_output("xqwatcher_kv")["path"]
 vault.kv.SecretV2(
-    "xqwatcher-grader-static-secrets",
+    f"xqwatcher-{env_name}-grader-static-secrets",
     mount=xqwatcher_vault_mount_name,
-    name="grader-config",
+    name=f"{stack_info.env_prefix}-grader-config",
     data_json=json.dumps(vault_secrets),
 )
 
@@ -206,11 +209,15 @@ lt_config = OLLaunchTemplateConfig(
                                 "owner": "consul:consul",
                             },
                             {
+                                "path": "/etc/default/consul-template",
+                                "content": f"ENV_PREFIX={stack_info.env_prefix}",
+                            },
+                            {
                                 "path": "/etc/default/vector",
                                 "content": textwrap.dedent(
                                     f"""\
                             ENVIRONMENT={consul_dc}
-                            APPLICATION=xqwatcher
+                            APPLICATION=xqwatcher-{stack_info.env_prefix}
                             VECTOR_CONFIG_DIR=/etc/vector/
                             VECTOR_STRICT_ENV_VARS=false
                             AWS_REGION={aws_config.region}
