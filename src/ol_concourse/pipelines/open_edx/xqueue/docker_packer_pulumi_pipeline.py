@@ -19,7 +19,8 @@ from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PA
 
 
 def build_xqueue_pipeline(release_name: str):
-    xqueue_branch = OpenEdxSupportedRelease[release_name].branch
+    openedx_release = OpenEdxSupportedRelease[release_name]
+    xqueue_branch = openedx_release.branch
     xqueue_repo = git_repo(
         name=Identifier("openedx-xqueue-code"),
         uri="https://github.com/openedx/xqueue",
@@ -76,6 +77,7 @@ def build_xqueue_pipeline(release_name: str):
                         f"{xqueue_dockerfile_repo.name}/dockerfiles/openedx-xqueue"
                     ),
                     "BUILD_ARG_OPENEDX_COMMON_VERSION": xqueue_branch,
+                    "BUILD_ARG_PYTHON_VERSION": openedx_release.python_version,
                 },
                 build_args=[
                     "-t $(cat ./xqueue-release/commit_sha)",
