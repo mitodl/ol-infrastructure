@@ -1,16 +1,13 @@
-FROM ubuntu:focal
+ARG PYTHON_VERSION=3.8
+FROM python:${PYTHON_VERSION}-slim-bookworm
 
 RUN apt update && \
   apt-get install -y software-properties-common && \
-  apt-add-repository -y ppa:deadsnakes/ppa && apt-get update && \
-  apt-get install git-core language-pack-en python3-pip libmysqlclient-dev ntp libssl-dev python3.8-dev python3.8-venv pkg-config -qy && \
+  apt-get install git-core language-pack-en libmysqlclient-dev ntp libssl-dev pkg-config -qy && \
   rm -rf /var/lib/apt/lists/*
 
-ARG OPENEDX_COMMON_VERSION=open-release/olive.master
-ENV VIRTUAL_ENV=/venv
+ARG OPENEDX_COMMON_VERSION=open-release/quince.master
 ENV DJANGO_SETTINGS_MODULE=xqueue.production
-RUN python3.8 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 RUN locale-gen en_US.UTF-8
 ENV LANG en_US.UTF-8
