@@ -544,6 +544,11 @@ ReleaseMap: dict[
                 release="master",
                 branding_overrides=default_branding_overrides,
             ),
+            OpenEdxApplicationVersion(
+                application="xqueue",
+                application_type="IDA",
+                release="master",
+            ),
         ],
     },
 }
