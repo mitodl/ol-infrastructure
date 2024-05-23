@@ -110,8 +110,8 @@ xqwatcher_server_instance_profile = iam.InstanceProfile(
 
 # Vault policy definition
 xqwatcher_server_vault_policy = vault.Policy(
-    "xqwatcher-server-vault-policy-{env_name}",
-    name="xqwatcher-server",
+    f"xqwatcher-server-vault-policy-{env_name}",
+    name=f"xqwatcher-server-{env_name}",
     policy=Path(__file__)
     .parent.joinpath("xqwatcher_server_policy.hcl")
     .read_text()
