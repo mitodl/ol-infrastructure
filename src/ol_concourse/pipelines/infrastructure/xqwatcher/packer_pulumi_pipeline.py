@@ -40,9 +40,13 @@ xqwatcher_pulumi_fragment = pulumi_jobs_chain(
     xqwatcher_pulumi_code,
     project_name="ol-infrastructure-xqwatcher-server",
     stack_names=[
-        f"applications.xqwatcher.operations.{stage}"
+        f"applications.xqwatcher.mitx.{stage}" for stage in ("CI", "QA", "Production")
+    ]
+    + [
+        f"applications.xqwatcher.mitx-staging.{stage}"
         for stage in ("CI", "QA", "Production")
-    ],
+    ]
+    + [f"applications.xqwatcher.mitxonline.{stage}" for stage in ("QA", "Production")],
     project_source_path=PULUMI_CODE_PATH.joinpath("applications/xqwatcher/"),
     dependencies=[
         GetStep(
