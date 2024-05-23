@@ -367,7 +367,7 @@ consul_template_configuration = {
             ConsulTemplateTemplate(
                 contents=(
                     '{{- $env_prefix := env "ENV_PREFIX" -}}'
-                    '{{- $vault_path := printf "secret-xqwatcher/%s-grader-config" -}}'
+                    '{{- $vault_path := printf "secret-xqwatcher/%s-grader-config" $env_prefix -}}'
                     "{{- with secret $vault_path -}}"
                     "{{ .Data.data.confd_json | toJSONPretty }}{{ end }}"
                 ),
@@ -379,7 +379,7 @@ consul_template_configuration = {
             ConsulTemplateTemplate(
                 contents=(
                     '{{- $env_prefix := env "ENV_PREFIX" -}}'
-                    '{{- $vault_path := printf "secret-xqwatcher/%s-grader-config" -}}'
+                    '{{- $vault_path := printf "secret-xqwatcher/%s-grader-config" $env_prefix -}}'
                     "{{- with secret $vault_path -}}"
                     "{{ printf .Data.data.xqwatcher_grader_code_ssh_identity }}{{ end }}"
                 ),
@@ -393,7 +393,7 @@ consul_template_configuration = {
             ConsulTemplateTemplate(
                 contents=(
                     '{{- $env_prefix := env "ENV_PREFIX" -}}'
-                    '{{- $vault_path := printf "secret-xqwatcher/%s-grader-config" -}}'
+                    '{{- $vault_path := printf "secret-xqwatcher/%s-grader-config" $env_prefix -}}'
                     "{{- with secret $vault_path -}}"
                     "{{ .Data.data.graders_yaml | toYAML }}{{ end }}"
                 ),
