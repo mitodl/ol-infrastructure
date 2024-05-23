@@ -24,6 +24,7 @@ def build_superset_docker_pipeline() -> Pipeline:
         owner="apache",
         repository="superset",
         tag_filter="^4",
+        order_by="time",
     )
 
     docker_code_repo = git_repo(
