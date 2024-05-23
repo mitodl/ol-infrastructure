@@ -1,0 +1,9 @@
+apache-superset[cors,thumbnails,prophet,trino]>=4.0,<5
+authlib
+celery-redbeat
+duckdb
+flask-openid
+flask-oidc
+hvac
+psycopg2
+redis

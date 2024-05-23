@@ -8,20 +8,22 @@ from ol_concourse.lib.models.pipeline import (
     Identifier,
     Input,
     Job,
+    LoadVarStep,
     Pipeline,
     PutStep,
 )
-from ol_concourse.lib.resources import git_repo, registry_image
+from ol_concourse.lib.resources import git_repo, github_release, registry_image
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 
 def build_superset_docker_pipeline() -> Pipeline:
     ol_inf_branch = "main"
 
-    upstream_superset_docker_image = registry_image(
-        name=Identifier("upstream-superset-docker-image"),
-        image_repository="apachesuperset.docker.scarf.sh/apache/superset",
-        image_tag="latest",
+    superset_release = github_release(
+        name=Identifier("superset-release"),
+        owner="apache",
+        repository="superset",
+        tag_filter="^4",
     )
 
     docker_code_repo = git_repo(
@@ -59,12 +61,18 @@ def build_superset_docker_pipeline() -> Pipeline:
     docker_build_job = Job(
         name="build-superset-image",
         plan=[
-            GetStep(get=upstream_superset_docker_image.name, trigger=True),
+            GetStep(get=superset_release.name, trigger=True),
             GetStep(get=docker_code_repo.name, trigger=True),
+            LoadVarStep(
+                load_var="superset_tag",
+                reveal=True,
+                file=f"{superset_release.name}/tag",
+            ),
             container_build_task(
                 inputs=[Input(name=docker_code_repo.name)],
                 build_parameters={
                     "CONTEXT": f"{docker_code_repo.name}/src/ol_superset",
+                    "BUILD_ARG_SUPERSET_TAG": "((.:superset_tag))",
                 },
                 build_args=[],
             ),
@@ -118,7 +126,7 @@ def build_superset_docker_pipeline() -> Pipeline:
             packer_code_repo,
             pulumi_code_repo,
             superset_image,
-            upstream_superset_docker_image,
+            superset_release,
             *packer_fragment.resources,
             *pulumi_fragment.resources,
         ],
