@@ -3,7 +3,7 @@ FROM python:${PYTHON_VERSION}-slim-bookworm
 
 RUN apt update && \
   apt-get install -y software-properties-common && \
-  apt-get install git-core language-pack-en mariadb-client default-libmysqlclient-dev ntp libssl-dev pkg-config -qy && \
+  apt-get install git-core mariadb-client default-libmysqlclient-dev ntp libssl-dev pkg-config -qy && \
   rm -rf /var/lib/apt/lists/*
 
 ARG OPENEDX_COMMON_VERSION=open-release/quince.master
