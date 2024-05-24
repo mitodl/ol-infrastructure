@@ -9,11 +9,6 @@ RUN apt update && \
 ARG OPENEDX_COMMON_VERSION=open-release/quince.master
 ENV DJANGO_SETTINGS_MODULE=xqueue.production
 
-RUN locale-gen en_US.UTF-8
-ENV LANG en_US.UTF-8
-ENV LANGUAGE en_US:en
-ENV LC_ALL en_US.UTF-8
-
 RUN useradd -m --shell /bin/false app
 RUN mkdir -p /edx/app/log/
 RUN touch /edx/app/log/edx.log
