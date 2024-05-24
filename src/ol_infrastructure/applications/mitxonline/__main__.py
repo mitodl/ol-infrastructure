@@ -166,6 +166,9 @@ mitxonline_db_config = OLPostgresDBConfig(
     public_access=True,
     **defaults(stack_info)["rds"],
 )
+mitxonline_db_config.parameter_overrides.append(
+    {"name": "password_encryption", "value": "md5"}
+)
 mitxonline_db = OLAmazonDB(mitxonline_db_config)
 
 mitxonline_vault_backend_config = OLVaultPostgresDatabaseConfig(

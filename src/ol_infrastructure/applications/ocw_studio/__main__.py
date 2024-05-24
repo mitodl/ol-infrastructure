@@ -292,6 +292,9 @@ ocw_studio_db_config = OLPostgresDBConfig(
     public_access=True,
     **defaults(stack_info)["rds"],
 )
+ocw_studio_db_config.parameter_overrides.append(
+    {"name": "password_encryption", "value": "md5"}
+)
 ocw_studio_db = OLAmazonDB(ocw_studio_db_config)
 
 ocw_studio_vault_backend_config = OLVaultPostgresDatabaseConfig(
