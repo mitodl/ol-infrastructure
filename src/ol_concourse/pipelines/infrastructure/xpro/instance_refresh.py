@@ -8,8 +8,8 @@ from ol_concourse.lib.tasks import (
     instance_refresh_task,
 )
 
-product = "edxapp"
-project = "xpro"
+application = "edxapp"
+product = "xpro"
 # environments = ["ci", "qa", "production"] # noqa: ERA001
 environments = ["ci"]
 node_classes = ["worker-xpro", "web-xpro"]
@@ -21,7 +21,7 @@ group_configs = []
 for env in environments:
     job_names = []
     for node_class in node_classes:
-        filter_template = f"Name=tag:Application,Values={product} Name=tag:Environment,Values={project}-{env}"  # noqa: E501
+        filter_template = f"Name=tag:Name,Values={application}-{node_class} Name=tag:Environment,Values={product}-{env}"  # noqa: E501
         query = "AutoScalingGroups[*].AutoScalingGroupName"
         refresh_job = Job(
             name=f"{env}-{node_class}-instance-refresh",
@@ -66,5 +66,5 @@ if __name__ == "__main__":
     sys.stdout.write(instance_refresh_pipeline.model_dump_json(indent=2))
     print()  # noqa: T201
     print(  # noqa: T201
-        "fly -t pr-inf sp -p instance-refresh-xpro -c definition.json"
+        "fly -t infra-prod sp -p instance-refresh-xpro -c definition.json"
     )  # noqa: RUF100, T201
