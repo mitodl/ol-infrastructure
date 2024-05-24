@@ -11,6 +11,7 @@ from pathlib import Path
 import pulumi_vault as vault
 import yaml
 from bridge.secrets.sops import read_yaml_secrets
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from pulumi import Config, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam
 
@@ -67,11 +68,20 @@ aws_config = AWSBase(
 )
 xqwatcher_server_tag = f"open-edx-xqwatcher-server-{env_name}"
 
+openedx_release = (
+    OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
+    .release_by_env(stack_info.name)
+    .value
+)
 xqwatcher_server_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["open-edx-xqwatcher-server-*"]),
+        ec2.GetAmiFilterArgs(
+            name="name", values=[f"open-edx-xqwatcher-server-{stack_info.env_prefix}-*"]
+        ),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
+        ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
+        ec2.GetAmiFilterArgs(name="tag:openedx_release", values=[openedx_release]),
     ],
     most_recent=True,
     owners=[aws_account.account_id],
@@ -111,16 +121,16 @@ xqwatcher_server_instance_profile = iam.InstanceProfile(
 # Vault policy definition
 xqwatcher_server_vault_policy = vault.Policy(
     f"xqwatcher-server-vault-policy-{env_name}",
-    name=f"xqwatcher-server-{env_name}",
+    name=f"xqwatcher-server-{stack_info.env_prefix}",
     policy=Path(__file__)
     .parent.joinpath("xqwatcher_server_policy.hcl")
     .read_text()
-    .replace("ENV_PREFIX", f"{stack_info.env_prefix}"),
+    .replace("DEPLOYMENT", f"{stack_info.env_prefix}"),
 )
 # Register xqwatcher AMI for Vault AWS auth
 vault.aws.AuthBackendRole(
     f"xqwatcher-server-ami-ec2-vault-auth-{env_name}",
-    backend="aws",
+    backend=f"aws-{stack_info.env_prefix}",
     auth_type="iam",
     role="xqwatcher-server",
     inferred_entity_type="ec2_instance",
@@ -207,10 +217,6 @@ lt_config = OLLaunchTemplateConfig(
                                     }
                                 ),
                                 "owner": "consul:consul",
-                            },
-                            {
-                                "path": "/etc/default/consul-template",
-                                "content": f"ENV_PREFIX={stack_info.env_prefix}",
                             },
                             {
                                 "path": "/etc/default/vector",

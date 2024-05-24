@@ -53,6 +53,11 @@ from bilder.components.vector.steps import (
 )
 from bilder.facts.has_systemd import HasSystemd
 
+DEPLOYMENT = os.environ["DEPLOYMENT"]
+if DEPLOYMENT not in ["mitxonline", "mitx", "mitx-staging", "xpro"]:
+    msg = "DEPLOYMENT should be set to one of these values: 'mitxonline', 'mitx', 'mitx-staging', 'xpro'"
+    raise ValueError(msg)
+
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "consul-template": os.environ.get(
@@ -60,7 +65,6 @@ VERSIONS = {
     ),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
 }
-
 set_env_secrets(Path("consul/consul.env"))
 
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
@@ -366,9 +370,7 @@ consul_template_configuration = {
             # https://github.com/mitodl/xqueue-watcher?tab=readme-ov-file#running-xqueue-watcher
             ConsulTemplateTemplate(
                 contents=(
-                    '{{- $env_prefix := env "ENV_PREFIX" -}}'
-                    '{{- $vault_path := printf "secret-xqwatcher/%s-grader-config" $env_prefix -}}'
-                    "{{- with secret $vault_path -}}"
+                    f'{{{{- with secret "secret-xqwatcher/{DEPLOYMENT}-grader-config" -}}}}'
                     "{{ .Data.data.confd_json | toJSONPretty }}{{ end }}"
                 ),
                 destination=XQWATCHER_CONF_DIR.joinpath("grader_config.json"),
@@ -378,9 +380,7 @@ consul_template_configuration = {
             ),
             ConsulTemplateTemplate(
                 contents=(
-                    '{{- $env_prefix := env "ENV_PREFIX" -}}'
-                    '{{- $vault_path := printf "secret-xqwatcher/%s-grader-config" $env_prefix -}}'
-                    "{{- with secret $vault_path -}}"
+                    f'{{{{- with secret "secret-xqwatcher/{DEPLOYMENT}-grader-config" -}}}}'
                     "{{ printf .Data.data.xqwatcher_grader_code_ssh_identity }}{{ end }}"
                 ),
                 destination=XQWATCHER_SSH_DIR.joinpath(
@@ -392,9 +392,7 @@ consul_template_configuration = {
             ),
             ConsulTemplateTemplate(
                 contents=(
-                    '{{- $env_prefix := env "ENV_PREFIX" -}}'
-                    '{{- $vault_path := printf "secret-xqwatcher/%s-grader-config" $env_prefix -}}'
-                    "{{- with secret $vault_path -}}"
+                    f'{{{{- with secret "secret-xqwatcher/{DEPLOYMENT}-grader-config" -}}}}'
                     "{{ .Data.data.graders_yaml | toYAML }}{{ end }}"
                 ),
                 destination=XQWATCHER_FETCH_GRADERS_CONFIG_FILE,
@@ -427,7 +425,7 @@ vault_configuration = {
         auto_auth=VaultAutoAuthConfig(
             method=VaultAutoAuthMethod(
                 type="aws",
-                mount_path="auth/aws",
+                mount_path=f"auth/aws-{DEPLOYMENT}",
                 config=VaultAutoAuthAWS(role="xqwatcher-server"),
             ),
             sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
