@@ -12,7 +12,7 @@ application = "edxapp"
 product = "xpro"
 # environments = ["ci", "qa", "production"] # noqa: ERA001
 environments = ["ci"]
-node_classes = ["worker-xpro", "web-xpro"]
+node_classes = ["worker", "web"]
 
 build_schedule = schedule(Identifier("build-schedule"), interval="480h")
 
@@ -21,7 +21,7 @@ group_configs = []
 for env in environments:
     job_names = []
     for node_class in node_classes:
-        filter_template = f"Name=tag:Name,Values={application}-{node_class} Name=tag:Environment,Values={product}-{env}"  # noqa: E501
+        filter_template = f"Name=tag:edxapp_node_type,Values={node_class} Name=tag:Environment,Values={product}-{env}"  # noqa: E501
         query = "AutoScalingGroups[*].AutoScalingGroupName"
         refresh_job = Job(
             name=f"{env}-{node_class}-instance-refresh",

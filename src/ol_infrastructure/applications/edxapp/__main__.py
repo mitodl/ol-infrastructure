@@ -1252,7 +1252,7 @@ web_asg = autoscaling.Group(
             propagate_at_launch=True,
         )
         for key_name, key_value in aws_config.merged_tags(
-            {"ami_id": edxapp_web_ami.id}
+            {"ami_id": edxapp_web_ami.id, "edxapp_node_type": "web"},
         ).items()
     ],
 )
@@ -1395,7 +1395,7 @@ worker_asg = autoscaling.Group(
             propagate_at_launch=True,
         )
         for key_name, key_value in aws_config.merged_tags(
-            {"ami_id": edxapp_worker_ami.id}
+            {"ami_id": edxapp_worker_ami.id, "edxapp_node_type": "worker"},
         ).items()
     ],
 )
