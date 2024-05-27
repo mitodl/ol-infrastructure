@@ -49,7 +49,7 @@ repos:
     - src/ol_infrastructure/applications/ocw_site/redirect_dict
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.4.4'
+  rev: 'v0.4.5'
   hooks:
   - id: ruff-format
   - id: ruff
