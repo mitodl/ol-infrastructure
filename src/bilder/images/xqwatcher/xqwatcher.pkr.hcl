@@ -21,7 +21,7 @@ variable "deployment" {
   type = string
 }
 
-variable "openedx-release" {
+variable "openedx_release" {
   type = string
 }
 
