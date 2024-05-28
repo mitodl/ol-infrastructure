@@ -151,6 +151,9 @@ micromasters_db_config = OLPostgresDBConfig(
     public_access=True,
     **defaults(stack_info)["rds"],
 )
+micromasters_db_config.parameter_overrides.append(
+    {"name": "password_encryption", "value": "md5"}
+)
 micromasters_db = OLAmazonDB(micromasters_db_config)
 
 micromasters_vault_backend_config = OLVaultPostgresDatabaseConfig(

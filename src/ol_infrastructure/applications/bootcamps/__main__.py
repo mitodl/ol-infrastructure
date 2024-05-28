@@ -192,6 +192,9 @@ bootcamps_db_config = OLPostgresDBConfig(
     public_access=True,
     **defaults(stack_info)["rds"],
 )
+bootcamps_db_config.parameter_overrides.append(
+    {"name": "password_encryption", "value": "md5"}
+)
 bootcamps_db = OLAmazonDB(bootcamps_db_config)
 
 bootcamps_vault_backend_config = OLVaultPostgresDatabaseConfig(

@@ -160,11 +160,14 @@ mitxonline_db_config = OLPostgresDBConfig(
     password=mitxonline_config.require("db_password"),
     subnet_group_name=mitxonline_vpc["rds_subnet"],
     security_groups=[mitxonline_db_security_group],
-    engine_major_version="12",
+    engine_major_version="13",
     tags=aws_config.tags,
     db_name="mitxonline",
     public_access=True,
     **defaults(stack_info)["rds"],
+)
+mitxonline_db_config.parameter_overrides.append(
+    {"name": "password_encryption", "value": "md5"}
 )
 mitxonline_db = OLAmazonDB(mitxonline_db_config)
 
