@@ -10,8 +10,7 @@ from ol_concourse.lib.tasks import (
 
 application = "edxapp"
 product = "xpro"
-# environments = ["ci", "qa", "production"] # noqa: ERA001
-environments = ["ci"]
+environments = ["ci", "qa", "production"]
 node_classes = ["worker", "web"]
 
 build_schedule = schedule(Identifier("build-schedule"), interval="480h")
@@ -27,13 +26,10 @@ for env in environments:
             name=f"{env}-{node_class}-instance-refresh",
             plan=[
                 GetStep(get="build-schedule", trigger=True),
-                instance_refresh_task(
-                    filters=filter_template, node_class=node_class, queries=query
-                ),
+                instance_refresh_task(filters=filter_template, queries=query),
                 block_for_instance_refresh_task(
                     filters=filter_template,
                     queries=query,
-                    node_class=node_class,
                     check_freq=10,
                 ),
             ],
