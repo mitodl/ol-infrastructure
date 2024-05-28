@@ -2,7 +2,6 @@
 {{ with secret "secret-xpro/edxapp" }}
 SOCIAL_AUTH_OAUTH_SECRETS:
   mitxpro-oauth2: {{ .Data.xpro_oauth_secret }}
-EDX_API_KEY: {{ .Data.edxapp_api_key }}  # DEPRECATED SETTING
 {{ end }}
 
 ACCOUNT_MICROFRONTEND_URL: null

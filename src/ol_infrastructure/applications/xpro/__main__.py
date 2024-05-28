@@ -342,7 +342,6 @@ sensitive_heroku_vars = {
     "OPENEDX_API_CLIENT_SECRET": xpro_vault_secrets["openedx-api-client"][
         "client_secret"
     ],
-    "OPENEDX_API_KEY": xpro_vault_secrets["openedx"]["edxapp_api_key"],
     "OPENEDX_GRADES_API_TOKEN": xpro_vault_secrets["openedx"]["grades_api_token"],
     "OPENEDX_SERVICE_WORKER_API_TOKEN": xpro_vault_secrets["openedx"][
         "service_worker_api_token"
