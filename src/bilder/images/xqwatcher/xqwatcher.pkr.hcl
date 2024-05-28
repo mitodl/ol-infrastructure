@@ -93,7 +93,7 @@ source "amazon-ebs" "xqwatcher" {
     random = true
   }
   tags = {
-    Name            = "${local.app_name}"
+    Name            = "${local.app_name}-${var.deployment}"
     OU              = var.business_unit
     app             = local.app_name
     purpose         = "${local.app_name}"
