@@ -41,7 +41,7 @@ def build_meta_job(release_name):
             "src/ol_concourse/pipelines/open_edx/xqwatcher/packer_pulumi_pipeline.py"
         )
         pipeline_team = "infrastructure"
-        pipeline_id = f"docker-packer-pulumi-xqwatcher-{release_name}"
+        pipeline_id = f"packer-pulumi-xqwatcher-{release_name}"
     return Job(
         name=Identifier(f"create-xqwatcher-{release_name}-pipeline"),
         plan=[
@@ -90,5 +90,5 @@ if __name__ == "__main__":
         definition.write(meta_pipeline.model_dump_json(indent=2))
     sys.stdout.write(meta_pipeline.model_dump_json(indent=2))
     sys.stdout.write(
-        "\nfly -t <target> set-pipeline -p docker-packer-pulumi-xqwatcher-meta -c definition.json"  # noqa: E501
+        "\nfly -t <target> set-pipeline -p packer-pulumi-xqwatcher-meta -c definition.json"  # noqa: E501
     )
