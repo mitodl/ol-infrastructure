@@ -24,7 +24,7 @@ def instance_refresh_task(
                 args=[
                     "-ec",
                     f"""ASG_NAME=$(aws autoscaling describe-auto-scaling-groups --color on --no-cli-auto-prompt --no-cli-pager --filters {filters} --query "{queries}" --output text);
-                    aws autoscaling start-instance-refresh --color on --no-cli-auto-prompt --no-cli-pager --auto-scaling-group-name $ASG_NAME --preferences MinHealthyPercentage=50,InstanceWarmup=120""",  # noqa: E501
+                    aws autoscaling start-instance-refresh --color on --no-cli-auto-prompt --no-cli-pager --auto-scaling-group-name "$ASG_NAME" --preferences MinHealthyPercentage=50,InstanceWarmup=120""",  # noqa: E501
                 ],
             ),
         ),
@@ -53,13 +53,13 @@ def block_for_instance_refresh_task(
             run=Command(
                 path="bash",
                 args=[
-                    "-ec",
+                    "-evc",
                     f""" ASG_NAME=$(aws autoscaling describe-auto-scaling-groups --color on --no-cli-auto-prompt --no-cli-pager --filters {filters} --query "{queries}" --output text);
                     status="InProgress"
                     while [ "$status" = "InProgress" ] || [ "$status" == "Pending" ] || [ "$status" == "Canceling" ]
                     do
                         sleep {check_freq}
-                        status=$(aws autoscaling describe-instance-refreshes --color on --no-cli-auto-prompt --no-cli-pager --auto-scaling-group-name $ASG_NAME --query "sort_by(InstanceRefreshes, &StartTime)[].{{Status: Status}}" --output text | tail -n 1)
+                        status=$(aws autoscaling describe-instance-refreshes --color on --no-cli-auto-prompt --no-cli-pager --auto-scaling-group-name "$ASG_NAME" --query "sort_by(InstanceRefreshes, &StartTime)[].{{Status: Status}}" --output text | tail -n 1)
                         aws autoscaling describe-instance-refreshes --color on --no-cli-auto-prompt --no-cli-pager --auto-scaling-group-name $ASG_NAME --query "sort_by(InstanceRefreshes, &StartTime)[].{{InstanceRefreshId: InstanceRefreshId, StartTime: StartTime, Status: Status}}" --output text | tail -n 1
                     done""",  # noqa: E501
                 ],
