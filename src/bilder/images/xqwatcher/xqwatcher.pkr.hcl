@@ -17,6 +17,14 @@ locals {
   app_name  = "open-edx-xqwatcher-server"
 }
 
+variable "deployment" {
+  type = string
+}
+
+variable "openedx_release" {
+  type = string
+}
+
 variable "build_environment" {
   type    = string
   default = "operations-ci"
@@ -38,8 +46,8 @@ variable "ol_ansible_branch" {
 }
 
 source "amazon-ebs" "xqwatcher" {
-  ami_description         = "Deployment image for xqwatcher server generated at ${local.timestamp}"
-  ami_name                = "open-edx-xqwatcher-${var.node_type}-${local.timestamp}"
+  ami_description         = "Deployment image for xqwatcher ${var.deployment} server generated at ${local.timestamp}"
+  ami_name                = "${local.app_name}-${var.deployment}-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "c6a.large" # AMI build does a lot of compling from source, so dedicated CPU is needed
   launch_block_device_mappings {
@@ -48,22 +56,22 @@ source "amazon-ebs" "xqwatcher" {
     delete_on_termination = true
   }
   run_tags = {
-    Name    = "${local.app_name}-packer-builder"
+    Name    = "${local.app_name}-${var.deployment}-packer-builder"
     OU      = "${var.business_unit}"
     app     = "${local.app_name}"
-    purpose = "${local.app_name}"
+    purpose = "${local.app_name}-${var.deployment}"
   }
   run_volume_tags = {
-    Name    = "${local.app_name}-packer-builder"
+    Name    = "${local.app_name}-${var.deployment}-packer-builder"
     OU      = "${var.business_unit}"
     app     = "${local.app_name}"
-    purpose = "${local.app_name}"
+    purpose = "${local.app_name}-${var.deployment}"
   }
   snapshot_tags = {
     Name    = "${local.app_name}-ami"
     OU      = "${var.business_unit}"
     app     = "${local.app_name}"
-    purpose = "${local.app_name}"
+    purpose = "${local.app_name}-${var.deployment}"
   }
 
   # Base all builds off of the most recent Debian 12 image built by the Debian organization.
@@ -85,11 +93,13 @@ source "amazon-ebs" "xqwatcher" {
     random = true
   }
   tags = {
-    Name      = "${local.app_name}"
-    OU        = var.business_unit
-    app       = local.app_name
-    purpose   = "${local.app_name}"
-    framework = "native"
+    Name            = "${local.app_name}-${var.deployment}"
+    OU              = var.business_unit
+    app             = local.app_name
+    purpose         = "${local.app_name}"
+    deployment      = var.deployment
+    openedx_release = var.openedx_release
+    framework       = "native"
   }
 }
 
@@ -107,6 +117,9 @@ build {
 
   # Run the pre-ansible configuration / setup via py-infra
   provisioner "shell-local" {
+    environment_vars = [
+      "DEPLOYMENT=${var.deployment}"
+    ]
     inline = ["pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"]
   }
 }

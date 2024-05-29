@@ -53,6 +53,11 @@ from bilder.components.vector.steps import (
 )
 from bilder.facts.has_systemd import HasSystemd
 
+DEPLOYMENT = os.environ["DEPLOYMENT"]
+if DEPLOYMENT not in ["mitxonline", "mitx", "mitx-staging", "xpro"]:
+    msg = "DEPLOYMENT should be set to one of these values: 'mitxonline', 'mitx', 'mitx-staging', 'xpro'"
+    raise ValueError(msg)
+
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
     "consul-template": os.environ.get(
@@ -60,7 +65,6 @@ VERSIONS = {
     ),
     "vault": os.environ.get("VAULT_VERSION", VAULT_VERSION),
 }
-
 set_env_secrets(Path("consul/consul.env"))
 
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
@@ -291,7 +295,7 @@ files.template(
     shared_context=shared_template_context,
 )
 
-grader_venvs = ["mit-600x", "mit-686x-mooc", "mit-686x", "mit-6S082", "mit-940"]
+grader_venvs = ["mit-600x", "mit-686x-mooc", "mit-686x"]
 for grader_venv in grader_venvs:
     GRADER_VENV_DIR = XQWATCHER_GRADERS_VENVS_DIR.joinpath(grader_venv)
     GRADER_REQS_FILE = GRADER_VENV_DIR.joinpath("requirements.txt")
@@ -366,7 +370,7 @@ consul_template_configuration = {
             # https://github.com/mitodl/xqueue-watcher?tab=readme-ov-file#running-xqueue-watcher
             ConsulTemplateTemplate(
                 contents=(
-                    '{{- with secret "secret-xqwatcher/grader-config" -}}'
+                    f'{{{{- with secret "secret-xqwatcher/{DEPLOYMENT}-grader-config" -}}}}'
                     "{{ .Data.data.confd_json | toJSONPretty }}{{ end }}"
                 ),
                 destination=XQWATCHER_CONF_DIR.joinpath("grader_config.json"),
@@ -376,7 +380,7 @@ consul_template_configuration = {
             ),
             ConsulTemplateTemplate(
                 contents=(
-                    '{{- with secret "secret-xqwatcher/grader-config" -}}'
+                    f'{{{{- with secret "secret-xqwatcher/{DEPLOYMENT}-grader-config" -}}}}'
                     "{{ printf .Data.data.xqwatcher_grader_code_ssh_identity }}{{ end }}"
                 ),
                 destination=XQWATCHER_SSH_DIR.joinpath(
@@ -388,7 +392,7 @@ consul_template_configuration = {
             ),
             ConsulTemplateTemplate(
                 contents=(
-                    '{{ with secret "secret-xqwatcher/grader-config" }}'
+                    f'{{{{- with secret "secret-xqwatcher/{DEPLOYMENT}-grader-config" -}}}}'
                     "{{ .Data.data.graders_yaml | toYAML }}{{ end }}"
                 ),
                 destination=XQWATCHER_FETCH_GRADERS_CONFIG_FILE,
@@ -421,7 +425,7 @@ vault_configuration = {
         auto_auth=VaultAutoAuthConfig(
             method=VaultAutoAuthMethod(
                 type="aws",
-                mount_path="auth/aws",
+                mount_path=f"auth/aws-{DEPLOYMENT}",
                 config=VaultAutoAuthAWS(role="xqwatcher-server"),
             ),
             sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],

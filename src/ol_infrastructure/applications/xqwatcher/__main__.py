@@ -11,6 +11,7 @@ from pathlib import Path
 import pulumi_vault as vault
 import yaml
 from bridge.secrets.sops import read_yaml_secrets
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from pulumi import Config, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam
 
@@ -67,11 +68,20 @@ aws_config = AWSBase(
 )
 xqwatcher_server_tag = f"open-edx-xqwatcher-server-{env_name}"
 
+openedx_release = (
+    OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
+    .release_by_env(stack_info.name)
+    .value
+)
 xqwatcher_server_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["open-edx-xqwatcher-server-*"]),
+        ec2.GetAmiFilterArgs(
+            name="name", values=[f"open-edx-xqwatcher-server-{stack_info.env_prefix}-*"]
+        ),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
+        ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
+        ec2.GetAmiFilterArgs(name="tag:openedx_release", values=[openedx_release]),
     ],
     most_recent=True,
     owners=[aws_account.account_id],
@@ -110,14 +120,17 @@ xqwatcher_server_instance_profile = iam.InstanceProfile(
 
 # Vault policy definition
 xqwatcher_server_vault_policy = vault.Policy(
-    "xqwatcher-server-vault-policy",
-    name="xqwatcher-server",
-    policy=Path(__file__).parent.joinpath("xqwatcher_server_policy.hcl").read_text(),
+    f"xqwatcher-server-vault-policy-{env_name}",
+    name=f"xqwatcher-server-{stack_info.env_prefix}",
+    policy=Path(__file__)
+    .parent.joinpath("xqwatcher_server_policy.hcl")
+    .read_text()
+    .replace("DEPLOYMENT", f"{stack_info.env_prefix}"),
 )
 # Register xqwatcher AMI for Vault AWS auth
 vault.aws.AuthBackendRole(
-    "xqwatcher-server-ami-ec2-vault-auth",
-    backend="aws",
+    f"xqwatcher-server-ami-ec2-vault-auth-{env_name}",
+    backend=f"aws-{stack_info.env_prefix}",
     auth_type="iam",
     role="xqwatcher-server",
     inferred_entity_type="ec2_instance",
@@ -152,13 +165,13 @@ grafana_credentials = read_yaml_secrets(
 )
 
 vault_secrets = read_yaml_secrets(
-    Path(f"xqwatcher/secrets.{stack_info.env_suffix}.yaml")
+    Path(f"xqwatcher/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
 )
 xqwatcher_vault_mount_name = vault_mount_stack.require_output("xqwatcher_kv")["path"]
 vault.kv.SecretV2(
-    "xqwatcher-grader-static-secrets",
+    f"xqwatcher-{env_name}-grader-static-secrets",
     mount=xqwatcher_vault_mount_name,
-    name="grader-config",
+    name=f"{stack_info.env_prefix}-grader-config",
     data_json=json.dumps(vault_secrets),
 )
 
@@ -210,7 +223,7 @@ lt_config = OLLaunchTemplateConfig(
                                 "content": textwrap.dedent(
                                     f"""\
                             ENVIRONMENT={consul_dc}
-                            APPLICATION=xqwatcher
+                            APPLICATION=xqwatcher-{stack_info.env_prefix}
                             VECTOR_CONFIG_DIR=/etc/vector/
                             VECTOR_STRICT_ENV_VARS=false
                             AWS_REGION={aws_config.region}
