@@ -73,14 +73,10 @@ openedx_release = (
     .release_by_env(stack_info.name)
     .value
 )
+
 xqwatcher_server_ami = ec2.get_ami(
     filters=[
-        ec2.GetAmiFilterArgs(
-            name="name",
-            values=[
-                f"open-edx-xqwatcher-server-{stack_info.env_prefix}-{openedx_release}-*"
-            ],
-        ),
+        ec2.GetAmiFilterArgs(name="name", values=["open-edx-xqwatcher-server-*"]),
         ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
         ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
         ec2.GetAmiFilterArgs(name="tag:deployment", values=[stack_info.env_prefix]),
