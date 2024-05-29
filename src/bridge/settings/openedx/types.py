@@ -19,7 +19,7 @@ class OpenEdxApplication(str, Enum):
     notes = ("notes-api", "https://github.com/openedx/edx-notes-api")
     theme = ("edxapp_theme", "")
     xqueue = ("xqueue", "https://github.com/openedx/xqueue")
-    xqueue_watcher = ("xqueue-watcher", "https://github.com/openedx/xqueue-watcher")
+    xqwatcher = ("xqwatcher", "https://github.com/openedx/xqueue-watcher")
 
 
 class OpenEdxMicroFrontend(str, Enum):
