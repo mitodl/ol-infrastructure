@@ -93,10 +93,10 @@ source "amazon-ebs" "xqwatcher" {
     random = true
   }
   tags = {
-    Name            = "${local.app_name}-${var.deployment}"
+    Name            = "${local.app_name}-${var.deployment}-${var.openedx_release}"
     OU              = var.business_unit
     app             = local.app_name
-    purpose         = "${local.app_name}"
+    purpose         = "${local.app_name}-${var.deployment}-${var.openedx_release}"
     deployment      = var.deployment
     openedx_release = var.openedx_release
     framework       = "native"
