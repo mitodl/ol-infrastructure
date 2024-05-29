@@ -17,6 +17,18 @@ config:
   - ["new_core_editors.use_new_video_editor", "--create", "--superusers", "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_advanced_settings_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_files_uploads_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_updates_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_export_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_import_page", "--create", "--superusers",
+    "--everyone"]
+  - ["new_studio_mfe.use_tagging_taxonomy_list_page", "--create", "--superusers",
+    "--everyone"]
   edxapp:business_unit: residential-staging
   edxapp:db_password:
     secure: "v1:ZB90id7gJ0z4NB/r:S3dGQ6OhdFOl1VdJ8cMOyLTc1L/T36F3ULUBvwMi5XOpyCbRDSyPhxb1DXZQ75DMS8R54Qa8pYE="

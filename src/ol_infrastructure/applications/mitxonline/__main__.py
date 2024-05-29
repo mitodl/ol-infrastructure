@@ -20,6 +20,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -155,6 +156,9 @@ mitxonline_db_security_group = ec2.SecurityGroup(
     vpc_id=mitxonline_vpc["id"],
 )
 
+db_defaults = {**defaults(stack_info)["rds"]}
+if stack_info.name == "QA":
+    db_defaults["instance_size"] = DBInstanceTypes.general_purpose_largeg
 mitxonline_db_config = OLPostgresDBConfig(
     instance_name=f"mitxonline-{stack_info.env_suffix}-app-db",
     password=mitxonline_config.require("db_password"),
@@ -164,7 +168,7 @@ mitxonline_db_config = OLPostgresDBConfig(
     tags=aws_config.tags,
     db_name="mitxonline",
     public_access=True,
-    **defaults(stack_info)["rds"],
+    **db_defaults,
 )
 mitxonline_db_config.parameter_overrides.append(
     {"name": "password_encryption", "value": "md5"}
