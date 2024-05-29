@@ -122,6 +122,7 @@ def packer_jobs(  # noqa: PLR0913
                             "env_vars": {
                                 "AWS_REGION": "us-east-1",
                                 "PYTHONPATH": f"${{PYTHONPATH}}:{image_code.name}/src",
+                                "PACKER_GITHUB_API_TOKEN": "((github.public_repo_access_token))",  # noqa: E501
                             },
                             "env_vars_from_files": env_vars_from_files or {},
                             **(extra_packer_params or {}),
