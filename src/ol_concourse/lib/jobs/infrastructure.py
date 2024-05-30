@@ -348,6 +348,7 @@ def pulumi_job(  # noqa: PLR0913
                         "PYTHONPATH": (
                             f"/usr/lib/:/tmp/build/put/{pulumi_code.name}/src/"
                         ),
+                        "GITHUB_TOKEN": "((github.public_repo_access_token))",
                     },
                     "stack_name": stack_name,
                 },
