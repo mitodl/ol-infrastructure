@@ -61,6 +61,10 @@ plugin_dict = {
         "target_name": "sentry_package",
         "pypi_package_name": "ol-openedx-sentry",
     },
+    "src/openedx_companion_auth": {
+        "target_name": "openedx_companion_auth_package",
+        "pypi_package_name": "openedx-companion-auth",
+    },
 }
 
 fragments = []
