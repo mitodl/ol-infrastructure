@@ -510,7 +510,7 @@ mitopen_fastly_service = fastly.ServiceVcl(
         fastly.ServiceVclSnippetArgs(
             name="Rewrite requests to root s3",
             content=textwrap.dedent(
-                rf""" \
+                rf"""
                 if (req.url.path !~ "{api_regex}") {{
                    set req.http.orig-req-url = req.url;
                    set req.url = "/frontend" + req.url;
