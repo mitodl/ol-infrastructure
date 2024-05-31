@@ -201,26 +201,6 @@ gh_workflow_accesskey = iam.AccessKey(
     status="Active",
 )
 
-env_var_suffix = "RC" if stack_info.env_suffix == "qa" else "PROD"
-
-gh_repo = github.get_repository(
-    full_name="mitodl/mit-open", opts=InvokeOptions(provider=github_provider)
-)
-gh_workflow_accesskey_id_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_accesskey_id_env_secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"AWS_ACCESS_KEY_ID_{env_var_suffix}",
-    plaintext_value=gh_workflow_accesskey.id,
-    opts=ResourceOptions(provider=github_provider),
-)
-gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_secretaccesskey_env_secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"AWS_SECRET_ACCESS_KEY_{env_var_suffix}",
-    plaintext_value=gh_workflow_accesskey.secret,
-    opts=ResourceOptions(provider=github_provider),
-)
-
 
 # TODO @Ardiea: 07312023 Requires review of bucket names
 application_s3_bucket_permissions = [
@@ -767,6 +747,35 @@ mitopen_heroku_configassociation = heroku.app.ConfigAssociation(
     app_id=heroku_app_id,
     sensitive_vars=sensitive_heroku_vars,
     vars=heroku_vars,
+)
+
+env_var_suffix = "RC" if stack_info.env_suffix == "qa" else "PROD"
+
+gh_repo = github.get_repository(
+    full_name="mitodl/mit-open", opts=InvokeOptions(provider=github_provider)
+)
+gh_workflow_accesskey_id_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_accesskey_id_env_secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"AWS_ACCESS_KEY_ID_{env_var_suffix}",
+    plaintext_value=gh_workflow_accesskey.id,
+    opts=ResourceOptions(provider=github_provider),
+)
+gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_secretaccesskey_env_secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"AWS_SECRET_ACCESS_KEY_{env_var_suffix}",
+    plaintext_value=gh_workflow_accesskey.secret,
+    opts=ResourceOptions(provider=github_provider),
+)
+gh_workflow_embedlykey_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_embedlykey_env_secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"EMBEDLY_KEY_{env_var_suffix}",
+    plaintext_value=secret_operations_global_embedly.data.apply(
+        lambda data: "{}".format(data["key"])
+    ),
+    opts=ResourceOptions(provider=github_provider),
 )
 
 export(
