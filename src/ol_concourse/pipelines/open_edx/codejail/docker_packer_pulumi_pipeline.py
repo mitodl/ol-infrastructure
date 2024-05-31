@@ -43,7 +43,7 @@ def build_codejail_pipeline(
         name=Identifier("codejail-dockerfile"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
-        paths=["dockerfiles/openedx-codejail/Dockerfile"],
+        paths=["dockerfiles/openedx-codejail/"],
     )
 
     codejail_packer_code = git_repo(
