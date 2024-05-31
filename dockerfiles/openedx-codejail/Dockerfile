@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y python3-virtual
 ENV CODEJAIL_GROUP=sandbox
 ENV CODEJAIL_SANDBOX_CALLER=debian
 ENV CODEJAIL_USER=sandbox
-ENV CODEJAIL_VENV=/sandbox/venv/
+ENV CODEJAIL_VENV=/sandbox/venv
 ARG OPENEDX_BRANCH=master
 ENV OPEN_EDX_BRANCH=$OPENEDX_BRANCH
 
