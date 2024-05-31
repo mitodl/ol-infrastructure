@@ -5,6 +5,17 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-ci.odl.mit.edu
   edxapp:waffle_flags:
+  - ["block_structure.storage_backing_for_cache", "--create", "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_advanced_settings_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_export_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_files_uploads_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_import_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_updates_page", "--create", "--superusers",
+    "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
   - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
@@ -15,21 +26,11 @@ config:
   - ["new_core_editors.use_new_problem_editor", "--create", "--everyone"]
   - ["new_core_editors.use_new_text_editor", "--create", "--superusers", "--everyone"]
   - ["new_core_editors.use_new_video_editor", "--create", "--superusers", "--everyone"]
+  - ["new_studio_mfe.use_tagging_taxonomy_list_page", "--create", "--superusers",
+    "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--create", "--superusers", "--everyone"]
-  - ["contentstore.new_studio_mfe.use_new_advanced_settings_page", "--create", "--superusers",
-    "--everyone"]
-  - ["contentstore.new_studio_mfe.use_new_files_uploads_page", "--create", "--superusers",
-    "--everyone"]
-  - ["contentstore.new_studio_mfe.use_new_updates_page", "--create", "--superusers",
-    "--everyone"]
-  - ["contentstore.new_studio_mfe.use_new_export_page", "--create", "--superusers",
-    "--everyone"]
-  - ["contentstore.new_studio_mfe.use_new_import_page", "--create", "--superusers",
-    "--everyone"]
-  - ["new_studio_mfe.use_tagging_taxonomy_list_page", "--create", "--superusers",
-    "--everyone"]
   edxapp:business_unit: residential
   edxapp:db_password:
     secure: v1:Q1uI9EWaIrq2z2sY:pTBVK/vatuCQXgO3Z2ItArDb4P1QLpN/lP/jT9690boozaKjjJudoQZOyWjkbCFwGLieh+L9auw=
