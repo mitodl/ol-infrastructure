@@ -1536,6 +1536,18 @@ edxapp_fastly_service = fastly.ServiceVcl(
         ),
         fastly.ServiceVclSnippetArgs(
             content=textwrap.dedent(
+                """\
+                if (req.url.path ~ "^/asset-v1:") {
+                  set beresp.ttl = 30;
+                  return (deliver)
+                }
+                """
+            ),
+            name="Shorten the TTL for assets uploaded in studio",
+            type="fetch",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent(
                 f"""\
                 if (beresp.status == 404 && req.url.path ~ "{mfe_regex}") {{
                   error 600 "### Custom Response";
