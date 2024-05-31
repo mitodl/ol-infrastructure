@@ -47,6 +47,7 @@ config:
     sso_url: "sso-qa.ol.mit.edu"
   mitopen:api_paths:
   - "api"
+  - "search"
   - "login"
   - "complete/ol-oidc"
   - "logout"

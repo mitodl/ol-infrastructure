@@ -50,7 +50,20 @@ config:
   mitopen:api_paths:
   - "api"
   - "search"
+  - "login"
+  - "complete/ol-oidc"
+  - "logout"
   - "admin"
+  - "static/admin"
+  - "static/rest_framework"
+  - "static/hijack"
+  - "_/features/"
+  - "scim/|o/|disconnect/"
+  - "podcasts/rss_feed"
+  - "__debug__/"
+  - "media/"
+  - "profile/"
+  - "program_letter/([0-9]+)/"
   mitopen:db_password:
     secure: v1:siGmu4+ZCOqekx7l:4Pdgv4fKZIjWJPAcZDBdpvZ0mUW10SUcX/9ZatsnZbR/euYoklo8dTTFu4i/5kTnJHHYot1QK3xS+gk++lHZfneBoC9qBR+l2qzlvvNBoN8=
   mitopen:domain: mitopen.odl.mit.edu
