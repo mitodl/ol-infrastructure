@@ -35,7 +35,7 @@ RUN git clone https://github.com/eduNEXT/codejailservice/ --branch main --depth 
 RUN pip install --no-cache-dir -r requirements/base.txt  && \
     pip install --no-cache-dir gunicorn && \
     source $CODEJAIL_VENV/bin/activate && \
-    pip install --no-cache-dir -r https://raw.githubusercontent.com/openedx/edx-platform/$OPEN_EDX_BRANCH/requirements/edx-sandbox/py38.txt  && \
+    pip install --no-cache-dir -r https://raw.githubusercontent.com/openedx/edx-platform/master/requirements/edx-sandbox/base.txt  && \
     deactivate
 
 # Setup sudoers file
