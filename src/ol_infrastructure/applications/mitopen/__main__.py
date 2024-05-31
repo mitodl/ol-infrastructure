@@ -460,12 +460,12 @@ mitopen_fastly_service = fastly.ServiceVcl(
     conditions=[
         fastly.ServiceVclConditionArgs(
             name="api path",
-            statement=f'req.url ~ "{api_regex}/"',
+            statement=f'req.url ~ "{api_regex}"',
             type="REQUEST",
         ),
         fastly.ServiceVclConditionArgs(
             name="frontend path",
-            statement=f'req.url !~ "{api_regex}/"',
+            statement=f'req.url !~ "{api_regex}"',
             type="REQUEST",
         ),
     ],
@@ -491,17 +491,20 @@ mitopen_fastly_service = fastly.ServiceVcl(
             name="Rewrite requests to root s3",
             content=textwrap.dedent(
                 rf"""
+                if (req.http.retry-for-dir) {{
+                  set req.url = req.url + "/";
+                }}
                 if (req.url.path !~ "{api_regex}") {{
                    set req.http.orig-req-url = req.url;
                    set req.url = "/frontend" + req.url;
                 }}
-                if (req.http.retry-for-dir) {{
-                  set req.url = req.url + "/";
-                }}
-
                 # Fetch the index page if the request is for a directory
                 if (req.url ~ "\/$" && req.url !~ "{api_regex}") {{
                   set req.url = req.url + "index.html";
+                }}
+                if (resp.status == 404 && req.url !~ "/$" && !req.http.retry-for-dir) {{
+                    set req.http.retry-for-dir = "1";
+                    restart;
                 }}
                 """
             ),
