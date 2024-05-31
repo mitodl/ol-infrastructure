@@ -12,7 +12,6 @@ config:
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone",
     "--staff", "--authenticated"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--staff"]
-  - ["discussions.enable_discussions_mfe", "--create", "--everyone"]
   - ["grades.bulk_management", "--create", "--superusers", "--everyone", "--staff",
     "--authenticated"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
