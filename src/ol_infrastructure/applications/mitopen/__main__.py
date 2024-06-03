@@ -488,13 +488,25 @@ mitopen_fastly_service = fastly.ServiceVcl(
     request_settings=[],
     snippets=[
         fastly.ServiceVclSnippetArgs(
+            name="Retry 404 with trailing slash",
+            content=textwrap.dedent(
+                """
+                if (beresp.status == 404 && req.url !~ "/$" && !req.http.retry-for-dir) {
+                    set req.http.retry-for-dir = "1";
+                    restart;
+                }
+                """
+            ),
+            type="fetch",
+        ),
+        fastly.ServiceVclSnippetArgs(
             name="Rewrite requests to root s3",
             content=textwrap.dedent(
                 rf"""
                 if (req.http.retry-for-dir) {{
                   set req.url = req.url + "/";
                 }}
-                if (req.url.path !~ "{api_regex}") {{
+                if (req.url.path !~ "{api_regex}" && req.url.path !~ "^/frontend") {{
                    set req.http.orig-req-url = req.url;
                    set req.url = "/frontend" + req.url;
                 }}
@@ -502,14 +514,10 @@ mitopen_fastly_service = fastly.ServiceVcl(
                 if (req.url ~ "\/$" && req.url !~ "{api_regex}") {{
                   set req.url = req.url + "index.html";
                 }}
-                if (resp.status == 404 && req.url !~ "/$" && !req.http.retry-for-dir) {{
-                    set req.http.retry-for-dir = "1";
-                    restart;
-                }}
                 """
             ),
             type="recv",
-        )
+        ),
     ],
     logging_https=[
         fastly.ServiceVclLoggingHttpArgs(
