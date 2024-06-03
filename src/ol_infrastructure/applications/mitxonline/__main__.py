@@ -279,11 +279,6 @@ secret_mitxonline_env_openedx_api_client = vault.generic.get_secret_output(
     opts=InvokeOptions(parent=mitxonline_vault_backend_role),
 )
 
-secret_mitxonline_openedx_env_edx_api_key = vault.generic.get_secret_output(
-    path=f"secret-mitxonline/{openedx_environment}/edx-api-key",
-    opts=InvokeOptions(parent=mitxonline_vault_backend_role),
-)
-
 secret_mitxonline_env_openedx_service_worker_api_token = (
     vault.generic.get_secret_output(
         path=f"secret-mitxonline/{env_name}/openedx-service-worker-api-token",
@@ -387,9 +382,6 @@ sensitive_heroku_vars = {
     ),
     "OPENEDX_API_CLIENT_SECRET": secret_mitxonline_env_openedx_api_client.data.apply(
         lambda data: "{}".format(data["client-secret"])
-    ),
-    "OPENEDX_API_KEY": secret_mitxonline_openedx_env_edx_api_key.data.apply(
-        lambda data: "{}".format(data["value"])
     ),
     "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID": secret_mitxonline_openedx_retirement_service_worker.data.apply(
         lambda data: "{}".format(data["client_id"])
