@@ -653,8 +653,8 @@ secret_operations_global_odlbot_github_access_token = vault.generic.get_secret_o
     path="secret-operations/global/odlbot-github-access-token",
     opts=InvokeOptions(parent=mitopen_vault_mount),
 )
-secret_operations_global_mailgun_api_key = vault.generic.get_secret_output(
-    path="secret-operations/global/mailgun-api-key",
+secret_global_mailgun_api_key = vault.generic.get_secret_output(
+    path="secret-global/mailgun",
     opts=InvokeOptions(parent=mitopen_vault_mount),
 )
 secret_operations_global_mit_smtp = vault.generic.get_secret_output(
@@ -715,8 +715,8 @@ sensitive_heroku_vars = {
     "GITHUB_ACCESS_TOKEN": secret_operations_global_odlbot_github_access_token.data.apply(
         lambda data: "{}".format(data["value"])
     ),
-    "MAILGUN_KEY": secret_operations_global_mailgun_api_key.data.apply(
-        lambda data: "{}".format(data["value"])
+    "MAILGUN_KEY": secret_global_mailgun_api_key.data.apply(
+        lambda data: "{}".format(data["api_key"])
     ),
     "MITOPEN_EMAIL_HOST": secret_operations_global_mit_smtp.data.apply(
         lambda data: "{}".format(data["relay_host"])

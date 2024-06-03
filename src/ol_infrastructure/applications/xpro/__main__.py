@@ -285,8 +285,8 @@ auth_postgres_xpro_creds_app = vault.generic.get_secret_output(
     with_lease_start_time=False,
     opts=InvokeOptions(parent=xpro_vault_backend_role),
 )
-secret_operations_global_mailgun_api_key = vault.generic.get_secret_output(
-    path="secret-operations/global/mailgun-api-key",
+secret_global_mailgun_api_key = vault.generic.get_secret_output(
+    path="secret-global/mailgun",
     opts=InvokeOptions(parent=xpro_vault_backend_role),
 )
 
@@ -382,8 +382,8 @@ sensitive_heroku_vars = {
         )
     ),
     # Static secrets that require something more involved
-    "MAILGUN_KEY": secret_operations_global_mailgun_api_key.data.apply(
-        lambda data: "{}".format(data["value"])
+    "MAILGUN_KEY": secret_global_mailgun_api_key.data.apply(
+        lambda data: "{}".format(data["api_key"])
     ),
 }
 

@@ -248,7 +248,7 @@ secret_micromasters_cybersource = vault.generic.get_secret_output(
     path="secret-micromasters/cybersource",
     opts=InvokeOptions(parent=micromasters_vault_backend_role),
 )
-secret_operations_mailgun = vault.generic.get_secret_output(
+secret_mailgun = vault.generic.get_secret_output(
     path="secret-operations/mailgun",
     opts=InvokeOptions(parent=micromasters_vault_backend_role),
 )
@@ -278,9 +278,7 @@ sensitive_heroku_vars = {
             data["username"], data["password"], stack_info.env_suffix.lower()
         )
     ),
-    "MAILGUN_KEY": secret_operations_mailgun.data.apply(
-        lambda data: "{}".format(data["api_key"])
-    ),
+    "MAILGUN_KEY": secret_mailgun.data.apply(lambda data: "{}".format(data["api_key"])),
     "MICROMASTERS_EMAIL_HOST": secret_operations_mit_smtp.data.apply(
         lambda data: "{}".format(data["relay_host"])
     ),

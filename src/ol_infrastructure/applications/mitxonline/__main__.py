@@ -305,8 +305,8 @@ secret_mitxonline_hubspot = vault.generic.get_secret_output(
     path="secret-mitxonline/hubspot",
     opts=InvokeOptions(parent=mitxonline_vault_backend_role),
 )
-secret_operations_global_mailgun_api_key = vault.generic.get_secret_output(
-    path="secret-operations/global/mailgun-api-key",
+secret_global_mailgun_api_key = vault.generic.get_secret_output(
+    path="secret-global/mailgun",
     opts=InvokeOptions(parent=mitxonline_vault_backend_role),
 )
 secret_operations_global_mitxonline_sentry_dsn = vault.generic.get_secret_output(
@@ -332,8 +332,8 @@ sensitive_heroku_vars = {
     "HUBSPOT_PORTAL_ID": secret_mitxonline_hubspot.data.apply(
         lambda data: "{}".format(data["portalId"])
     ),
-    "MAILGUN_KEY": secret_operations_global_mailgun_api_key.data.apply(
-        lambda data: "{}".format(data["value"])
+    "MAILGUN_KEY": secret_global_mailgun_api_key.data.apply(
+        lambda data: "{}".format(data["api_key"])
     ),
     "MITOL_GOOGLE_SHEETS_DRIVE_API_PROJECT_ID": secret_mitxonline_google_sheets_refunds.data.apply(
         lambda data: "{}".format(data["drive-api-project-id"])
