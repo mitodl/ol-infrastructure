@@ -5,7 +5,6 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-staging-ci.odl.mit.edu
   edxapp:waffle_flags:
-  - ["block_structure.storage_backing_for_cache", "--create", "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_advanced_settings_page", "--create", "--superusers",
     "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_export_page", "--create", "--superusers",
