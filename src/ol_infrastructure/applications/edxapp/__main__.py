@@ -1539,7 +1539,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
                 """\
                 if (req.url.path ~ "^/asset-v1:") {
                   set beresp.ttl = 30s;
-                  return (deliver)
+                  return (deliver);
                 }
                 """
             ),
