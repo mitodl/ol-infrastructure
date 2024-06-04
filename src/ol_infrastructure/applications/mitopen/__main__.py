@@ -2,6 +2,7 @@
 
 import base64
 import json
+import textwrap
 from pathlib import Path
 from string import Template
 
@@ -462,7 +463,22 @@ mitopen_fastly_service = fastly.ServiceVcl(
         ),
     ],
     request_settings=[],
-    snippets=[],
+    snippets=[
+        fastly.ServiceVclSnippetArgs(
+            name="Rewrite requests to root s3",
+            content=textwrap.dedent(
+                r"""
+                # Fetch the index page if the request is for a directory
+                if (req.url ~ "\/$") {
+                  set req.url = req.url + "index.html";
+                }
+                set req.http.orig-req-url = req.url;
+                set req.url = "/frontend" + req.url;
+                """
+            ),
+            type="recv",
+        ),
+    ],
     logging_https=[
         fastly.ServiceVclLoggingHttpArgs(
             url=Output.all(fqdn=vector_log_proxy_fqdn).apply(
