@@ -469,7 +469,7 @@ mitopen_fastly_service = fastly.ServiceVcl(
             content=textwrap.dedent(
                 r"""
                 # Fetch the index page if the request is for a directory
-                if (req.url ~ "\/$") {
+                if (req.url ~ "/$") {
                   set req.url = req.url + "index.html";
                 }
                 set req.http.orig-req-url = req.url;
