@@ -2,7 +2,6 @@
 
 import base64
 import json
-import textwrap
 from pathlib import Path
 from string import Template
 
@@ -427,9 +426,7 @@ fastly_access_logging_bucket = monitoring_stack.require_output(
 fastly_access_logging_iam_role = monitoring_stack.require_output(
     "fastly_access_logging_iam_role"
 )
-open_api_paths = list(mitopen_config.require_object("api_paths"))
-api_regex = "^/({})".format("|".join(open_api_paths))
-# Ref: https://github.com/mitodl/mit-open/blob/main/config/nginx.conf
+
 mitopen_fastly_service = fastly.ServiceVcl(
     f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
     name=f"MIT Open {stack_info.env_suffix}",
@@ -445,35 +442,14 @@ mitopen_fastly_service = fastly.ServiceVcl(
             ssl_sni_hostname=application_storage_bucket.bucket_domain_name,
             use_ssl=True,
         ),
-        fastly.ServiceVclBackendArgs(
-            address=mitopen_config.require("heroku_domain"),
-            name="MITOpen API",
-            override_host=mitopen_config.require("domain"),
-            port=DEFAULT_HTTPS_PORT,
-            request_condition="api path",
-            ssl_cert_hostname=mitopen_config.require("domain"),
-            ssl_sni_hostname=mitopen_config.require("domain"),
-            use_ssl=True,
-        ),
     ],
     cache_settings=[],
-    conditions=[
-        fastly.ServiceVclConditionArgs(
-            name="api path",
-            statement=f'req.url ~ "{api_regex}"',
-            type="REQUEST",
-        ),
-        fastly.ServiceVclConditionArgs(
-            name="frontend path",
-            statement=f'req.url !~ "{api_regex}"',
-            type="REQUEST",
-        ),
-    ],
+    conditions=[],
     dictionaries=[],
     domains=[
         fastly.ServiceVclDomainArgs(
             comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
-            name=mitopen_config.require("domain"),
+            name=mitopen_config.require("frontend_domain"),
         ),
     ],
     headers=[
@@ -486,39 +462,7 @@ mitopen_fastly_service = fastly.ServiceVcl(
         ),
     ],
     request_settings=[],
-    snippets=[
-        fastly.ServiceVclSnippetArgs(
-            name="Retry 404 with trailing slash",
-            content=textwrap.dedent(
-                """
-                if (beresp.status == 404 && req.url !~ "/$" && !req.http.retry-for-dir) {
-                    set req.http.retry-for-dir = "1";
-                    restart;
-                }
-                """
-            ),
-            type="fetch",
-        ),
-        fastly.ServiceVclSnippetArgs(
-            name="Rewrite requests to root s3",
-            content=textwrap.dedent(
-                rf"""
-                if (req.http.retry-for-dir) {{
-                  set req.url = req.url + "/";
-                }}
-                if (req.url.path !~ "{api_regex}" && req.url.path !~ "^/frontend") {{
-                   set req.http.orig-req-url = req.url;
-                   set req.url = "/frontend" + req.url;
-                }}
-                # Fetch the index page if the request is for a directory
-                if (req.url ~ "\/$" && req.url !~ "{api_regex}") {{
-                  set req.url = req.url + "index.html";
-                }}
-                """
-            ),
-            type="recv",
-        ),
-    ],
+    snippets=[],
     logging_https=[
         fastly.ServiceVclLoggingHttpArgs(
             url=Output.all(fqdn=vector_log_proxy_fqdn).apply(
@@ -541,10 +485,19 @@ mitopen_fastly_service = fastly.ServiceVcl(
 five_minutes = 60 * 5
 route53.Record(
     "ol-mitopen-frontend-dns-record",
-    name=mitopen_config.require("domain"),
+    name=mitopen_config.require("frontend_domain"),
     type="CNAME",
     ttl=five_minutes,
-    records=["d.sni.global.fastly.net"],
+    records=[mitopen_config.require("fastly_domain")],
+    zone_id=mitodl_zone_id,
+    opts=ResourceOptions(delete_before_replace=True),
+)
+route53.Record(
+    "ol-mitopen-api-dns-record",
+    name=mitopen_config.require("api_domain"),
+    type="CNAME",
+    ttl=five_minutes,
+    records=[mitopen_config.require("heroku_domain")],
     zone_id=mitodl_zone_id,
     opts=ResourceOptions(delete_before_replace=True),
 )

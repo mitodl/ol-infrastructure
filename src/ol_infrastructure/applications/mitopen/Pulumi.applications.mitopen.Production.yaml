@@ -47,28 +47,11 @@ config:
     POSTHOG_API_HOST: "https://app.posthog.com"
     POSTHOG_TIMEOUT_MS: 1000
     POSTHOG_PROJECT_ID: "63497"
-  mitopen:api_paths:
-  - "_/features/"
-  - "__debug__/"
-  - "admin"
-  - "api"
-  - "complete/ol-oidc"
-  - "departments"
-  - "login"
-  - "logout"
-  - "media/"
-  - "podcasts/rss_feed"
-  - "profile/"
-  - "program_letter/([0-9]+)/"
-  - "scim/|o/|disconnect/"
-  - "search"
-  - "static/admin"
-  - "static/hijack"
-  - "static/rest_framework"
-  - "topics"
   mitopen:db_password:
     secure: v1:siGmu4+ZCOqekx7l:4Pdgv4fKZIjWJPAcZDBdpvZ0mUW10SUcX/9ZatsnZbR/euYoklo8dTTFu4i/5kTnJHHYot1QK3xS+gk++lHZfneBoC9qBR+l2qzlvvNBoN8=
-  mitopen:domain: mitopen.odl.mit.edu
+  mitopen:api_domain: "api.mitopen.odl.mit.edu"
+  mitopen:frontend_domain: "mitopen.odl.mit.edu"
+  mitopen:fastly_domain: "d.sni.global.fastly.net"
   mitopen:heroku_domain: "octagonal-tangelo-bunb9jcnzj7yzait8qy15iyy.herokudns.com"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
