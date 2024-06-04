@@ -39,6 +39,7 @@ config:
     auth_allowed_redirect_hosts:
     - "live-qa.ocw.mit.edu"
     cors_urls:
+    - "https://mitopen-rc.odl.mit.edu"
     - "https://ocw-next.netlify.app"
     - "https://ol-devops-ci.odl.mit.edu"
     - "https://draft-qa.ocw.mit.edu"
@@ -51,6 +52,6 @@ config:
   mitopen:api_domain: "api.mitopen-rc.odl.mit.edu"
   mitopen:frontend_domain: "mitopen-rc.odl.mit.edu"
   mitopen:fastly_domain: "d.sni.global.fastly.net"
-  mitopen:heroku_domain: "quiet-dusk-3shr6jj9nqnqn7ca79bvwe7v.herokudns.com"
+  mitopen:heroku_domain: "shaped-mullberry-fz35pvbrtc1qo8ahvcalp9ai.herokudns.com"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
