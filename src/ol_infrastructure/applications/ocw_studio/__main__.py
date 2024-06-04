@@ -449,8 +449,8 @@ auth_aws_mitx_creds_ocw_studio_app_env = vault.generic.get_secret_output(
 )
 
 
-secret_operations_global_mailgun_api_key = vault.generic.get_secret_output(
-    path="secret-operations/global/mailgun-api-key",
+secret_global_mailgun_api_key = vault.generic.get_secret_output(
+    path="secret-global/mailgun",
     opts=InvokeOptions(parent=ocw_studio_secrets),
 )
 
@@ -470,8 +470,8 @@ sensitive_heroku_vars = {
     "AWS_SECRET_ACCESS_KEY": auth_aws_mitx_creds_ocw_studio_app_env.data.apply(
         lambda data: "{}".format(data["secret_key"])
     ),
-    "MAILGUN_KEY": secret_operations_global_mailgun_api_key.data.apply(
-        lambda data: "{}".format(data["value"])
+    "MAILGUN_KEY": secret_global_mailgun_api_key.data.apply(
+        lambda data: "{}".format(data["api_key"])
     ),
     "API_BEARER_TOKEN": secret_concourse_ocw_api_bearer_token.data.apply(
         lambda data: "{}".format(data["value"])

@@ -303,8 +303,8 @@ auth_aws_mitx_creds_mit_open_application_env = vault.generic.get_secret_output(
 )
 
 # secret-operations
-secret_operations_global_mailgun_api_key = vault.generic.get_secret_output(
-    path="secret-operations/global/mailgun-api-key",
+secret_global_mailgun_api_key = vault.generic.get_secret_output(
+    path="secret-global/mailgun",
     opts=InvokeOptions(parent=mit_open_vault_iam_role),
 )
 secret_operations_global_mit_smtp = vault.generic.get_secret_output(
@@ -435,8 +435,8 @@ sensitive_heroku_vars = {
     "GITHUB_ACCESS_TOKEN": secret_mit_open_global_odlbot_github_access_token.data.apply(
         lambda data: "{}".format(data["value"])
     ),
-    "MAILGUN_KEY": secret_operations_global_mailgun_api_key.data.apply(
-        lambda data: "{}".format(data["value"])
+    "MAILGUN_KEY": secret_global_mailgun_api_key.data.apply(
+        lambda data: "{}".format(data["api_key"])
     ),
     "MIT_WS_CERTIFICATE": secret_mit_open_global_mit_application_certificate.data.apply(
         lambda data: "{}".format(data["certificate"])
