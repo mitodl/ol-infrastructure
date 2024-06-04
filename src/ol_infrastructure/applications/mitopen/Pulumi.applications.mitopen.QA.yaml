@@ -45,27 +45,12 @@ config:
     - "https://live-qa.ocw.mit.edu"
     mailgun_sender_domain: "discussions-mail.odl.mit.edu"
     sso_url: "sso-qa.ol.mit.edu"
-  mitopen:api_paths:
-  - "api"
-  - "search"
-  - "login"
-  - "complete/ol-oidc"
-  - "logout"
-  - "admin"
-  - "static/admin"
-  - "static/rest_framework"
-  - "static/hijack"
-  - "_/features/"
-  - "scim/|o/|disconnect/"
-  - "podcasts/rss_feed"
-  - "__debug__/"
-  - "media/"
-  - "profile/"
-  - "program_letter/([0-9]+)/"
   mitopen:db_instance_size: "db.t4g.medium"
   mitopen:db_password:
     secure: v1:Xk9oxNvxSQAJUAHE:8CdeLN2SlyhyU0iZpqEX5rnHSJ3PClleDJi2UpzoCsVZ4UjNkr7vCOAKY7CvCuB/7CBKJKM=
-  mitopen:domain: mitopen-rc.odl.mit.edu
+  mitopen:api_domain: "api.mitopen-rc.odl.mit.edu"
+  mitopen:frontend_domain: "mitopen-rc.odl.mit.edu"
+  mitopen:fastly_domain: "d.sni.global.fastly.net"
   mitopen:heroku_domain: "quiet-dusk-3shr6jj9nqnqn7ca79bvwe7v.herokudns.com"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
