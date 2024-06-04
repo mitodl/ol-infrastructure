@@ -141,6 +141,11 @@ BLOCK_STRUCTURES_SETTINGS:
     PRUNING_ACTIVE: true  # MODIFIED
     TASK_DEFAULT_RETRY_DELAY: 30
     TASK_MAX_RETRIES: 5
+    STORAGE_CLASS: storages.backends.s3boto3.S3Boto3Storage
+    DIRECTORY_PREFIX: coursestructure/
+    STORAGE_KWARGS:
+      bucket_name: {{ key "edxapp/s3-storage-bucket" }}
+      default_acl: public-read
 BRANCH_IO_KEY: ''
 BUGS_EMAIL: odl-devops@mit.edu  # MODIFIED
 BULK_EMAIL_EMAILS_PER_TASK: 500
