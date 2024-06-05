@@ -52,6 +52,6 @@ config:
   mitopen:api_domain: "api.mitopen.odl.mit.edu"
   mitopen:frontend_domain: "mitopen.odl.mit.edu"
   mitopen:fastly_domain: "d.sni.global.fastly.net"
-  mitopen:heroku_domain: "octagonal-tangelo-bunb9jcnzj7yzait8qy15iyy.herokudns.com"
+  mitopen:heroku_domain: "triangular-stingray-y0p9lbcns5zorm8392pou8sy.herokudns.com"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
