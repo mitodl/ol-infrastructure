@@ -10,12 +10,13 @@ config:
     auth_allowed_redirect_hosts:
     - "ocw.mit.edu"
     cors_urls:
-    - "https://ocw-preview.odl.mit.edu"
     - "https://draft.ocw.mit.edu"
-    - "https://www.ocw.mit.edu"
-    - "https://ocw.mit.edu"
-    - "https://live.ocw.mit.edu"
     - "https://live-qa.ocw.mit.edu"
+    - "https://live.ocw.mit.edu"
+    - "https://mitopen.odl.mit.edu"
+    - "https://ocw-preview.odl.mit.edu"
+    - "https://ocw.mit.edu"
+    - "https://www.ocw.mit.edu"
     mailgun_sender_domain: "discussions-mail.odl.mit.edu"
     sso_url: "sso.ol.mit.edu"
   heroku_app:vars:
