@@ -471,18 +471,6 @@ mitopen_fastly_service = fastly.ServiceVcl(
     ],
     snippets=[
         fastly.ServiceVclSnippetArgs(
-            name="Retry 404 with trailing slash",
-            content=textwrap.dedent(
-                """
-                if (beresp.status == 404 && req.url !~ "/$" && !req.http.retry-for-dir) {
-                    set req.http.retry-for-dir = "1";
-                    restart;
-                }
-                """
-            ),
-            type="fetch",
-        ),
-        fastly.ServiceVclSnippetArgs(
             name="Rewrite requests to root s3",
             content=textwrap.dedent(
                 r"""
@@ -490,20 +478,42 @@ mitopen_fastly_service = fastly.ServiceVcl(
                 declare local var.org_qs STRING;
                 set var.org_qs = req.url.qs;
 
-                if (req.http.retry-for-dir) {
-                  set req.url = req.url + "/";
+                # If the request does not end in a slash and does not contain a period, error to redirect
+                if (req.url.path !~ "\/$" && req.url.basename !~ "\." ) {
+                  error 618 "redirect";
                 }
-                # Fetch the index page if the request is for a directory
-                if (req.url.path ~ "\/$") {
+
+                # Return the ROOT index page if the request is for ANY directory
+                if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {
                   set req.url = "/index.html";
                 }
+
+                # If the request originally included a query string, put it back on
                 if (var.org_qs != "") {
                   set req.url = req.url + "?" + var.org_qs;
                 }
-                set req.url = "/frontend" + req.url;
+
+                # Don't keep pre-pending '/frontend' over and over
+                if (req.url !~ "^\/frontend") {
+                  set req.url = "/frontend" + req.url;
+                }
                 """
             ),
             type="recv",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            name="Redirect for directory",
+            content=textwrap.dedent(
+                r"""
+                # redirect to the same path + trailing slash + include any qs if present
+                if (obj.status == 618 && obj.response == "redirect") {
+                  set obj.status = 302;
+                  set obj.http.Location = req.url.path + "/" + if (req.url.qs, "?" + req.url.qs, "");
+                  return (deliver);
+                }
+                """
+            ),
+            type="error",
         ),
     ],
     logging_https=[
