@@ -794,6 +794,20 @@ gh_workflow_embedlykey_env_secret = github.ActionsSecret(
     ),
     opts=ResourceOptions(provider=github_provider),
 )
+gh_workflow_fastly_api_key_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_fastly_api_key_env_secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"FASTLY_API_KEY_{env_var_suffix}",  # pragma: allowlist secret
+    plaintext_value=mitopen_vault_secrets["fastly"]["api_key"],
+    opts=ResourceOptions(provider=github_provider),
+)
+gh_workflow_fastly_service_id_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_fastly_service_id_env_secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"FASTLY_SERVICE_ID_{env_var_suffix}",  # pragma: allowlist secret
+    plaintext_value=mitopen_fastly_service.id,
+    opts=ResourceOptions(provider=github_provider),
+)
 
 export(
     "mitopen",
