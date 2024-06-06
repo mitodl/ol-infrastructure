@@ -15,7 +15,7 @@ class AlloyConfig(OLBaseSettings):
     clear_default_config: bool = True
     configuration_directory: Path = Path("/etc/alloy")
     configuration_templates: dict[Path, dict[str, Any]] = {  # noqa: RUF012
-        Path(__file__).resolve().parent.joinpath("files", "otel-collector.config"): {},
+        Path(__file__).resolve().parent.joinpath("files", "config.alloy"): {},
     }
     gpg_key_url: str = "https://apt.grafana.com/gpg.key"
     install_method: AlloyInstallMethod = AlloyInstallMethod.method
