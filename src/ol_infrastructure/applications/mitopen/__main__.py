@@ -618,6 +618,7 @@ heroku_vars = {
 # Values that require interpolation or other special considerations
 interpolation_vars = heroku_app_config.get_object("interpolation_vars")
 
+csrf_origins_list = interpolation_vars["csrf_domains"] or []
 cors_urls_list = interpolation_vars["cors_urls"] or []
 cors_urls_json = json.dumps(cors_urls_list)
 auth_allowed_redirect_hosts_list = (
@@ -629,6 +630,7 @@ heroku_interpolated_vars = {
     "ACCESS_TOKEN_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/token",
     "AUTHORIZATION_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/auth",
     "CORS_ALLOWED_ORIGINS": cors_urls_json,
+    "CSRF_TRUSTED_ORIGINS": json.dumps(csrf_origins_list),
     "KEYCLOAK_BASE_URL": f"https://{interpolation_vars['sso_url']}/",
     "MAILGUN_FROM_EMAIL": f"MIT Open <no-reply@{interpolation_vars['mailgun_sender_domain']}",
     "MAILGUN_SENDER_DOMAIN": interpolation_vars["mailgun_sender_domain"],

@@ -38,6 +38,9 @@ config:
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "live-qa.ocw.mit.edu"
+    csrf_domains:
+    - "https://api.mitopen-rc.odl.mit.edu"
+    - "https://mitopen-rc.odl.mit.edu"
     cors_urls:
     - "https://mitopen-rc.odl.mit.edu"
     - "https://ocw-next.netlify.app"
