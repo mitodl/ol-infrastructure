@@ -38,6 +38,7 @@ config:
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "live-qa.ocw.mit.edu"
+    - "mitopen-rc.odl.mit.edu"
     session_cookie_domain: ".mitopen-rc.odl.mit.edu"
     csrf_domains:
     - "https://api.mitopen-rc.odl.mit.edu"
