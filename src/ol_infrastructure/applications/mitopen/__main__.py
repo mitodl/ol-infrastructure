@@ -579,8 +579,6 @@ heroku_vars = {
     "MITOPEN_ENVIRONMENT": env_name,
     "MITOPEN_FROM_EMAIL": "MITOpen <mitopen-support@mit.edu>",
     "MITOPEN_FRONTPAGE_DIGEST_MAX_POSTS": 10,
-    "MITOPEN_LOGIN_REDIRECT_URL": f"https://{mitopen_config.get('frontend_domain')}/",
-    "MITOPEN_LOGOUT_REDIRECT_URL": f"https://{mitopen_config.get('frontend_domain')}/",
     "MITOPEN_USE_S3": "True",
     "MITPE_BASE_URL": "https://professional.mit.edu/",
     "MITX_ONLINE_BASE_URL": "https://mitxonline.mit.edu/",
