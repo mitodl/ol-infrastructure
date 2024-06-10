@@ -9,6 +9,7 @@ config:
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "ocw.mit.edu"
+    session_cookie_domain: ".mitopen.odl.mit.edu"
     csrf_domains:
     - "https://api.mitopen.odl.mit.edu"
     - "https://mitopen.odl.mit.edu"

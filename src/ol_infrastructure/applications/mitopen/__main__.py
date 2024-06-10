@@ -600,6 +600,7 @@ heroku_vars = {
     "OPENSEARCH_DEFAULT_TIMEOUT": 30,
     "OPENSEARCH_INDEXING_CHUNK_SIZE": 75,
     "PROLEARN_CATALOG_API_URL": "https://prolearn.mit.edu/graphql",
+    "SECURE_CROSS_ORIGIN_OPENER_POLICY": "None",
     "SEE_BASE_URL": "https://executive.mit.edu/",
     "SOCIAL_AUTH_OL_OIDC_KEY": "ol-open-client",
     "USE_X_FORWARDED_HOST": "True",
@@ -619,6 +620,7 @@ heroku_vars = {
 interpolation_vars = heroku_app_config.get_object("interpolation_vars")
 
 csrf_origins_list = interpolation_vars["csrf_domains"] or []
+session_cookie_domain = interpolation_vars["session_cookie_domain"] or ""
 cors_urls_list = interpolation_vars["cors_urls"] or []
 cors_urls_json = json.dumps(cors_urls_list)
 auth_allowed_redirect_hosts_list = (
@@ -637,6 +639,7 @@ heroku_interpolated_vars = {
     "MAILGUN_URL": f"https://api.mailgun.net/v3/{interpolation_vars['mailgun_sender_domain']}",
     "MITOPEN_CORS_ORIGIN_WHITELIST": cors_urls_json,
     "OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
+    "SESSION_COOKIE_DOMAIN": session_cookie_domain,
     "SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS": auth_allowed_redirect_hosts_json,
     "SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
     "USERINFO_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/userinfo",
