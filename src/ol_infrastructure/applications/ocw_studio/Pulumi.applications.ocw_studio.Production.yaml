@@ -35,7 +35,7 @@ config:
     OCW_STUDIO_LIVE_URL: https://ocw.mit.edu/
     OCW_STUDIO_LOG_LEVEL: INFO
     OCW_STUDIO_SUPPORT_EMAIL: 'ocw-studio-support@mit.edu'
-    OPEN_CATALOG_URLS: 'https://open.mit.edu/api/v0/ocw_next_webhook/,https://mitopen.odl.mit.edu/api/v1/ocw_next_webhook/'
+    OPEN_CATALOG_URLS: 'https://open.mit.edu/api/v0/ocw_next_webhook/,https://api.mitopen.odl.mit.edu/api/v1/ocw_next_webhook/'
     SEARCH_API_URL: 'https://open.mit.edu/api/v0/search/'
     SENTRY_LOG_LEVEL: 'WARN'
     SITEMAP_DOMAIN: 'ocw.mit.edu'
