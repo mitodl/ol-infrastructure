@@ -110,16 +110,18 @@ configure_traefik(traefik_config)
 
 
 # Preload some docker images. This will accelerate the first startup
+# but prolong the image build.
 docker_repo_names = [
     "airbyte/airbyte-api-server",
-    "airbyte/worker",
-    "airbyte/webapp",
-    "airbyte/temporal",
-    "airbyte/server",
+    "airbyte/bootloader",
     "airbyte/connector-builder-server",
     "airbyte/cron",
     "airbyte/init",
-    "airbyte/bootloader",
+    "airbyte/metrics-reporter",
+    "airbyte/server",
+    "airbyte/temporal",
+    "airbyte/webapp",
+    "airbyte/worker",
 ]
 for repo_name in docker_repo_names:
     server.shell(

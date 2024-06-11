@@ -403,6 +403,8 @@ services:
         condition: service_completed_successfully
     env_file:
     - ./.env
+  # There is nothing listening at OTEL_COLLECTOR_ENDPOINT at the moment
+  # but having the the reporter in place won't hurt anything.
   metrics-reporter:
     image: airbyte/metrics-reporter:${VERSION}
     container_name: metrics-reporter
