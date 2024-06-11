@@ -1,4 +1,61 @@
-otelcol.receiver.otlp "grafana_cloud_otel" {
+// Expose metrics about ourselves (through in-memory operations)
+prometheus.exporter.self "integrations_alloy" { }
+
+// Standarize the labels on the metrics we collect about alloy above
+discovery.relabel "integrations_alloy" {
+  targets = prometheus.exporter.self.integrations_alloy.targets
+
+  rule {
+    target_label = "instance"
+    replacement  = constants.hostname
+  }
+
+  rule {
+    target_label = "alloy_hostname"
+    replacement  = constants.hostname
+  }
+
+  rule {
+    target_label = "job"
+    replacement  = "integrations/alloy-check"
+  }
+}
+
+// Actually scrape the metris about ourselves
+prometheus.scrape "integrations_alloy" {
+  targets    = discovery.relabel.integrations_alloy.output
+  forward_to = [prometheus.relabel.integrations_alloy.receiver]
+  scrape_interval = "60s"
+}
+
+// Send the metrics about ourselves to the same receiver we use for OTEL stuff below
+// After cleaning up the labels some more.
+prometheus.relabel "integrations_alloy" {
+  forward_to = [prometheus.remote_write.grafana_cloud_mimir.receiver]
+  rule {
+    source_labels = ["__name__"]
+    regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+    action        = "keep"
+  }
+}
+
+// Listen for otel metrics on localhost
+otelcol.receiver.otlp "grafana_cloud_otel_localhost" {
+  grpc {
+    endpoint = "127.0.0.1:4317"
+  }
+  http {
+    endpoint = "127.0.0.1:4318"
+  }
+  output {
+    logs = [otelcol.processor.resourcedetection.grafana_cloud_otel.input]
+    metrics = [otelcol.processor.resourcedetection.grafana_cloud_otel.input]
+    traces = [otelcol.processor.resourcedetection.grafana_cloud_otel.input]
+  }
+}
+
+// Listen for otel metrics on the docker host IP
+otelcol.receiver.otlp "grafana_cloud_otel_docker" {
   grpc {
     endpoint = "172.17.0.1:4317"
   }
@@ -6,13 +63,57 @@ otelcol.receiver.otlp "grafana_cloud_otel" {
     endpoint = "172.17.0.1:4318"
   }
   output {
-    logs = [otelcol.processor.batch.otel_processor.input]
-    traces = [otelcol.processor.batch.otel_processor.input]
-    metrics = [otelcol.processor.batch.otel_processor.input]
+    logs = [otelcol.processor.resourcedetection.grafana_cloud_otel.input]
+    metrics = [otelcol.processor.resourcedetection.grafana_cloud_otel.input]
+    traces = [otelcol.processor.resourcedetection.grafana_cloud_otel.input]
   }
 }
 
-otelcol.processor.batch "otel_processor" {
+otelcol.processor.resourcedetection "grafana_cloud_otel" {
+	detectors = ["env", "system", "ec2"]
+	system {
+		hostname_sources = ["os"]
+	}
+	output {
+		metrics = [otelcol.processor.transform.add_resource_attributes_as_metric_attributes.input]
+		logs    = [otelcol.processor.batch.grafana_cloud_otel.input]
+		traces  = [
+      otelcol.processor.batch.grafana_cloud_otel.input,
+			otelcol.connector.host_info.grafana_cloud_otel.input,
+		]
+	}
+}
+
+// Traces stop 1
+otelcol.connector.host_info "grafana_cloud_otel" {
+	host_identifiers = ["host.name"]
+
+	output {
+		metrics = [otelcol.processor.batch.grafana_cloud_otel.input]
+	}
+}
+
+// Metrics stop 1
+otelcol.processor.transform "add_resource_attributes_as_metric_attributes" {
+	error_mode = "ignore"
+
+	metric_statements {
+		context    = "datapoint"
+		statements = [
+			"set(attributes[\"deployment.environment\"], resource.attributes[\"deployment.environment\"])",
+			"set(attributes[\"service.version\"], resource.attributes[\"service.version\"])",
+		]
+	}
+
+	output {
+		metrics = [otelcol.processor.batch.grafana_cloud_otel.input]
+	}
+}
+
+// Traces stop 2
+// Metics stop 2
+// Logs stop 1
+otelcol.processor.batch "grafana_cloud_otel" {
   output {
     logs = [otelcol.exporter.loki.grafana_cloud_loki.input]
     traces = [otelcol.exporter.otlp.grafana_cloud_tempo.input]

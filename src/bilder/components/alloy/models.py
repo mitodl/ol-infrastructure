@@ -1,6 +1,7 @@
 from enum import Enum
 from pathlib import Path
-from typing import Any
+
+from pydantic_settings import SettingsConfigDict
 
 from bilder.lib.model_helpers import OLBaseSettings
 
@@ -11,12 +12,11 @@ class AlloyInstallMethod(str, Enum):
 
 
 class AlloyConfig(OLBaseSettings):
+    model_config = SettingsConfigDict(env_prefix="alloy_")
     apt_repo_url: str = "https://apt.grafana.com"
     clear_default_config: bool = True
     configuration_directory: Path = Path("/etc/alloy")
-    configuration_templates: dict[Path, dict[str, Any]] = {  # noqa: RUF012
-        Path(__file__).resolve().parent.joinpath("files", "config.alloy"): {},
-    }
+    configuration_file: Path = configuration_directory.joinpath("config.alloy")
     gpg_key_url: str = "https://apt.grafana.com/gpg.key"
     install_method: AlloyInstallMethod = AlloyInstallMethod.method
     keyring_path: Path = Path("/etc/apt/keyrings/grafana.gpg")

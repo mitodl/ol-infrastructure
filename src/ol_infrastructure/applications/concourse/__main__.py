@@ -574,6 +574,26 @@ web_launch_config = ec2.LaunchTemplate(
                                 ),
                                 "owner": "root:root",
                             },
+                            {
+                                "path": "/etc/default/alloy",
+                                "content": textwrap.dedent(
+                                    f"""
+                                    CONFIG_FILE="/etc/alloy/config.alloy"
+                                    CUSTOM_ARGS=""
+                                    RESTART_ON_UPGRADE=true
+                                    GRAFANA_LOKI_ENDPOINT="{grafana_credentials['loki_endpoint']}"
+                                    GRAFANA_LOKI_PASSWORD="{grafana_credentials['loki_api_key']}"
+                                    GRAFANA_LOKI_USER="{grafana_credentials['loki_user_id']}"
+                                    GRAFANA_MIMIR_ENDPOINT="{grafana_credentials['prometheus_endpoint']}"
+                                    GRAFANA_MIMIR_PASSWORD="{grafana_credentials['prometheus_api_key']}"
+                                    GRAFANA_MIMIR_USERNAME="{grafana_credentials['prometheus_user_id']}"
+                                    GRAFANA_TEMPO_ENDPOINT="{grafana_credentials['tempo_endpoint']}"
+                                    GRAFANA_TEMPO_PASSWORD="{grafana_credentials['tempo_api_key']}"
+                                    GRAFANA_TEMPO_USERNAME="{grafana_credentials['tempo_user_id']}"
+                                    """
+                                ),
+                                "owner": "root:root",
+                            },
                         ]
                     },
                     sort_keys=True,

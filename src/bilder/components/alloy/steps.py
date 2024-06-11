@@ -1,14 +1,21 @@
 # ruff: noqa: E501
+from pathlib import Path
 
 from pyinfra import host
 from pyinfra.api import deploy
-from pyinfra.operations import files, server, systemd
+from pyinfra.operations import apt, files, server, systemd
 
 from bilder.components.alloy.models import AlloyConfig
 from bilder.facts.has_systemd import HasSystemd
 
 
 def _debian_pkg_repo(alloy_config: AlloyConfig):
+    apt.packages(
+        name="Install gpg package",
+        packages=["gpg"],
+        present=True,
+    )
+
     server.shell(
         name="Setup grafana apt gpg key",
         commands=[
@@ -25,10 +32,11 @@ def _debian_pkg_repo(alloy_config: AlloyConfig):
 
 def _install_from_package(alloy_config: AlloyConfig):
     _debian_pkg_repo(alloy_config)
-    server.packages(
+    apt.packages(
         name="Install Alloy package",
         packages=["alloy"],
         present=True,
+        update=True,
     )
     if alloy_config.clear_default_config:
         files.directory(
@@ -56,18 +64,17 @@ def install_alloy(alloy_config: AlloyConfig):
 
 @deploy("Configure Alloy.")
 def configure_alloy(alloy_config: AlloyConfig):
-    for fpath, context in alloy_config.configuration_templates.items():
-        files.template(
-            name=f"Upload Alloy configuration file {fpath}",
-            src=str(fpath),
-            dest=str(
-                alloy_config.configuration_directory.joinpath(
-                    fpath.name.removesuffix(".j2")
-                )
-            ),
-            user=alloy_config.user,
-            context=context,
-        )
+    # At the moment alloy only supports the one configuration file
+    # /etc/alloy/config.alloy
+    # and it is not currently templated
+    files.put(
+        name=f"Create alloy configuration file {alloy_config.configuration_file}",
+        src=str(Path(__file__).resolve().parent.joinpath("files", "config.alloy")),
+        dest=str(alloy_config.configuration_file),
+        user=alloy_config.user,
+        group=alloy_config.user,
+        mode="0644",
+    )
 
 
 @deploy("Configure Alloy: Setup systemd service")
