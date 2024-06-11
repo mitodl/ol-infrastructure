@@ -571,6 +571,7 @@ heroku_vars = {
     "MICROMASTERS_CATALOG_API_URL": "https://micromasters.mit.edu/api/v0/catalog/",
     "MICROMASTERS_CMS_API_URL": "https://micromasters.mit.edu/api/v0/wagtail/",
     "MITOPEN_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
+    "MITOPEN_AXIOS_BASE_PATH": f"https://{mitopen_config.get('frontend_domain')}",
     "MITOPEN_DB_CONN_MAX_AGE": 0,
     "MITOPEN_DB_DISABLE_SSL": "True",
     "MITOPEN_DEFAULT_SITE_KEY": "micromasters",
