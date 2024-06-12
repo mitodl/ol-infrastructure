@@ -53,7 +53,6 @@ config:
     gradebook: gradebook
     learner_dashboard: dashboard
     learning: learn
-    library_authoring: library-authoring
     ora_grading: ora-grading
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-qa.mitx.mit.edu

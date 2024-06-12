@@ -142,13 +142,6 @@ ReleaseMap: dict[
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="library-authoring",
-                application_type="MFE",
-                release="redwood",
-                branch_override="master",
-                branding_overrides=default_branding_overrides,
-            ),
-            OpenEdxApplicationVersion(
                 application="notes-api",
                 application_type="IDA",
                 release="redwood",
@@ -231,13 +224,6 @@ ReleaseMap: dict[
                     "@edx/brand@npm": "@mitodl/brand-mitol-residential@latest",
                     **default_branding_overrides,
                 },
-            ),
-            OpenEdxApplicationVersion(
-                application="library-authoring",
-                application_type="MFE",
-                release="redwood",
-                branch_override="master",
-                branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="notes-api",
@@ -325,13 +311,6 @@ ReleaseMap: dict[
                 branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="library-authoring",
-                application_type="MFE",
-                release="quince",
-                branch_override="master",
-                branding_overrides=default_branding_overrides,
-            ),
-            OpenEdxApplicationVersion(
                 application="notes-api",
                 application_type="IDA",
                 release="quince",
@@ -415,13 +394,6 @@ ReleaseMap: dict[
                 },
             ),
             OpenEdxApplicationVersion(
-                application="library-authoring",
-                application_type="MFE",
-                release="quince",
-                branch_override="master",
-                branding_overrides=pinned_branding_overrides,
-            ),
-            OpenEdxApplicationVersion(
                 application="notes-api",
                 application_type="IDA",
                 release="quince",
@@ -490,13 +462,6 @@ ReleaseMap: dict[
                 branding_overrides=pinned_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="library-authoring",
-                application_type="MFE",
-                release="quince",
-                branch_override="master",
-                branding_overrides=default_branding_overrides,
-            ),
-            OpenEdxApplicationVersion(
                 application="notes-api",
                 application_type="IDA",
                 release="quince",
@@ -559,12 +524,6 @@ ReleaseMap: dict[
                     "atlas pull -r mitodl/mitxonline-translations -n main translations/frontend-app-learning/src/i18n/messages:src/i18n/messages/frontend-app-learning",  # noqa: E501
                     "node_modules/@edx/frontend-platform/i18n/scripts/intl-imports.js frontend-app-learning",  # noqa: E501
                 ],
-            ),
-            OpenEdxApplicationVersion(
-                application="library-authoring",
-                application_type="MFE",
-                release="master",
-                branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
                 application="ora-grading",

@@ -40,7 +40,6 @@ config:
     course_authoring: course-authoring
     gradebook: gradebook
     learning: learn
-    library_authoring: library-authoring
     ora_grading: ora-grading
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-qa.xpro.mit.edu

@@ -39,7 +39,6 @@ config:
     course_authoring: course-authoring
     gradebook: gradebook
     learning: learn
-    library_authoring: library-authoring
     ora_grading: ora-grading
   edxapp:google_analytics_id: UA-5145472-38
   edxapp:framework: "earthly"

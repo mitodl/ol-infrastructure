@@ -59,11 +59,6 @@ class OpenEdxMicroFrontend(str, Enum):
         "https://github.com/openedx/frontend-app-learner-dashboard",
         "dashboard",
     )
-    library_authoring = (
-        "library-authoring",
-        "https://github.com/openedx/frontend-app-library-authoring",
-        "library-authoring",
-    )
     ora_grading = (
         "ora-grading",
         "https://github.com/openedx/frontend-app-ora-grading",
