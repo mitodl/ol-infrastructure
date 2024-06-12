@@ -88,7 +88,7 @@ def build_forum_pipeline(
         forum_registry_image = registry_image(
             name=Identifier(f"openedx-forum-container-{repo_owner}"),
             image_repository="mitodl/forum",
-            image_tag=forum_tag,
+            image_tag=release_name,
             username="((dockerhub.username))",
             password="((dockerhub.password))",  # noqa: S106
         )
@@ -116,14 +116,12 @@ def build_forum_pipeline(
                     build_args=[
                         "-t $(cat ./forum-release/commit_sha)",
                         f"-t {forum_tag}",
-                        f"-t {release_name}",
                     ],
                 ),
                 PutStep(
                     put=forum_registry_image.name,
                     params={
                         "image": "image/image.tar",
-                        "version": release_name,
                         "additional_tags": f"./{forum_repo.name}/.git/describe_ref",
                     },
                 ),
