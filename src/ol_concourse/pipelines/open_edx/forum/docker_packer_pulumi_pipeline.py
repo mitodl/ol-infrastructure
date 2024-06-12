@@ -123,6 +123,7 @@ def build_forum_pipeline(
                     put=forum_registry_image.name,
                     params={
                         "image": "image/image.tar",
+                        "version": release_name,
                         "additional_tags": f"./{forum_repo.name}/.git/describe_ref",
                     },
                 ),
