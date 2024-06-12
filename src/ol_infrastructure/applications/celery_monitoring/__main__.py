@@ -5,9 +5,10 @@ from pathlib import Path
 
 import pulumi_consul as consul
 import pulumi_vault as vault
+import pulumiverse_heroku as heroku
 import yaml
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, ResourceOptions, StackReference
+from pulumi import Config, InvokeOptions, Output, ResourceOptions, StackReference
 from pulumi_aws import acm, ec2, get_caller_identity, iam, route53
 
 from ol_infrastructure.components.aws.auto_scale_group import (
@@ -21,6 +22,7 @@ from ol_infrastructure.components.aws.auto_scale_group import (
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes
 from ol_infrastructure.lib.consul import get_consul_provider
+from ol_infrastructure.lib.heroku import get_heroku_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -70,6 +72,26 @@ def build_broker_subscriptions(
                 "app_env": stack_info.env_suffix,
             }
         )
+
+    heroku_app_map = celery_monitoring_config.require_object("heroku_map")
+    for heroku_owner, app_list in heroku_app_map.items():
+        heroku_provider = get_heroku_provider(heroku_owner)
+        for app in app_list:
+            heroku_app = heroku.app.get_app(
+                name=app, opts=InvokeOptions(provider=heroku_provider)
+            )
+            broker_subs.append(
+                {
+                    "broker": f"{heroku_app.config_vars['REDISCLOUD_URL']}/0",
+                    "broker_management_url": None,
+                    "exchange": "celeryev",
+                    "queue": "leek.fanout",
+                    "routing_key": "#",
+                    "org_name": "MIT Open Learning Engineering",
+                    "app_name": f"heroku{app.replace('-', '')}",
+                    "app_env": stack_info.env_suffix,
+                }
+            )
     arbitrary_dict = {"broker_subscriptions": broker_subs}
     return json.dumps(arbitrary_dict)
 

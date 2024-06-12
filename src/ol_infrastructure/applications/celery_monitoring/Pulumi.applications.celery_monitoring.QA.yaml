@@ -2,11 +2,22 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHg42pDDDGBhpaX14TdtzcK1hbiMYTHsYRH4k5GL5RFpIwF2/DtEoBk3QwV16pe6zwFoAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM3iu2yMHQBIuj93iqAgEQgDuF+IIz5NYwrJRmNl9HU9+js6+Ma/bRa02O0UpiL+WJit629gHgFBqhOthl9kfxW0dWS3OTe45zebAqFg==
 config:
+  celery_monitoring:domain: celery-monitoring-qa.odl.mit.edu
+  celery_monitoring:sender_email_address: ol-devops@mit.edu
   consul:address: https://consul-operations-qa.odl.mit.edu
   consul:scheme: https
-  opensearch:consul_service_name: 'celery-monitoring-opensearch'
   environment:business_unit: operations
   environment:target_vpc: operations_vpc
+  opensearch:consul_service_name: 'celery-monitoring-opensearch'
   opensearch:domain_name: "celeryq"
-  celery_monitoring:sender_email_address: ol-devops@mit.edu
-  celery_monitoring:domain: celery-monitoring-qa.odl.mit.edu
+  celery_monitoring:heroku_map:
+    mitx-devops:
+    - bootcamp-ecommerce-rc
+    - micromasters-rc
+    - ocw-studio-rc
+    - xpro-rc
+    odl-devops:
+    - mitxonline-rc
+    - odl-open-discussions-rc
+    ol-engineering-finance:
+    - mitopen-rc
