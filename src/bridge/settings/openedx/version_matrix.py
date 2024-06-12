@@ -119,6 +119,7 @@ ReleaseMap: dict[
                 application="forum",
                 application_type="IDA",
                 release="redwood",
+                branch_override="ahtisham/INF-1420",
             ),
             OpenEdxApplicationVersion(
                 application="gradebook",
@@ -203,6 +204,7 @@ ReleaseMap: dict[
                 application="forum",
                 application_type="IDA",
                 release="redwood",
+                branch_override="ahtisham/INF-1420",
             ),
             OpenEdxApplicationVersion(
                 application="gradebook",
@@ -509,6 +511,7 @@ ReleaseMap: dict[
                 application="forum",
                 application_type="IDA",
                 release="master",
+                branch_override="ahtisham/INF-1420",
             ),
             OpenEdxApplicationVersion(
                 application="gradebook",
