@@ -108,8 +108,11 @@ def build_forum_pipeline(
                             f"{forum_dockerfile_repo.name}/dockerfiles/openedx-forum"
                         ),
                         "BUILD_ARG_DOCKER_IMAGE_TAG": "3.3-slim-bullseye"
-                        if branch == "master"
+                        if release_name in ["master", "redwood"]
                         else "3.0-slim-bullseye",
+                        "BUILD_ARG_GEMFILE_FILE": "Gemfile"
+                        if release_name in ["master", "redwood"]
+                        else "Gemfile3",
                         "BUILD_ARG_OPENEDX_COMMON_VERSION": branch,
                         "BUILD_ARG_OPENEDX_FORUM_REPOSITORY": origin,
                     },

@@ -31,7 +31,8 @@ RUN gem install --user-install bundler \
     && gem install --user-install rake
 
 # Install forum
-ENV BUNDLE_GEMFILE Gemfile3
+ARG GEMFILE_FILE=Gemfile3
+ENV BUNDLE_GEMFILE ${GEMFILE_FILE}
 RUN git clone $OPENEDX_FORUM_REPOSITORY --branch $OPENEDX_COMMON_VERSION --depth 1 /app/cs_comments_service
 WORKDIR /app/cs_comments_service
 RUN bundle config set deployment true && bundle install
