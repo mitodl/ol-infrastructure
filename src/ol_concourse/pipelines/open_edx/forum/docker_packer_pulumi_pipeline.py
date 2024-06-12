@@ -116,6 +116,7 @@ def build_forum_pipeline(
                     build_args=[
                         "-t $(cat ./forum-release/commit_sha)",
                         f"-t {forum_tag}",
+                        f"-t {release_name}",
                     ],
                 ),
                 PutStep(
