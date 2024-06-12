@@ -19,7 +19,7 @@ config:
   - ["new_core_editors.use_new_text_editor", "--create", "--superusers", "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
-  - ["studio.library_authoring_mfe", "--create", "--superusers", "--everyone"]
+  - ["studio.library_authoring_mfe", "--disable"]
   edxapp:business_unit: residential
   edxapp:db_max_storage_gb: "1000"
   edxapp:db_password:
