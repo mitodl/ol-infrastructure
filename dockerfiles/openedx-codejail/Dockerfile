@@ -36,7 +36,7 @@ RUN pip install --no-cache-dir -r requirements/base.txt  && \
     pip install --no-cache-dir gunicorn && \
     source $CODEJAIL_VENV/bin/activate && \
     pip install --no-cache-dir -r https://raw.githubusercontent.com/openedx/edx-platform/master/requirements/edx-sandbox/base.txt  && \
-    deactivate
+    pip install 'numpy<1.24.0' && deactivate
 
 # Setup sudoers file
 COPY sudoers-file/01-sandbox /etc/sudoers.d/01-sandbox
