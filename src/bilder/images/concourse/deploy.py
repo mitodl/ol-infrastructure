@@ -21,6 +21,8 @@ from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.api.util import get_template
 
+from bilder.components.alloy.models import AlloyConfig
+from bilder.components.alloy.steps import install_and_configure_alloy
 from bilder.components.baseline.steps import (
     install_baseline_packages,
     service_configuration_watches,
@@ -145,6 +147,8 @@ concourse_config_map = {
         prometheus_bind_port=CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
         secret_cache_duration="1m",  # pragma: allowlist secret # noqa: S106
         secret_cache_enabled=True,  # pragma: allowlist secret
+        tracing_otlp_address="localhost:4317",
+        tracing_otlp_use_tls=False,
         vault_client_token="token-gets-overridden-by-vault-agent",  # noqa: S106
         vault_insecure_skip_verify=True,
         vault_path_prefix="/secret-concourse",
@@ -240,6 +244,7 @@ consul_configuration = {Path("00-default.json"): ConsulConfig()}
 
 vector_config = VectorConfig()
 
+
 if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: SLF001
     # Setting this attribute after instantiating the object to bypass validation
     concourse_config.encryption_key = (
@@ -293,6 +298,12 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: SLF001
         TEMPLATES_DIRECTORY.joinpath("vector", "concourse_metrics.yaml")
     ] = {"concourse_prometheus_port": concourse_config.prometheus_bind_port}
 
+    # I have no idea why but apparently we need to specify 'user' here as the
+    # default from AlloyConfig isn't getting picked up
+    alloy_config = AlloyConfig()
+    # Install alloy
+    install_and_configure_alloy(alloy_config)
+
 # Install Consul and Vault Agent
 vault_config = VaultAgentConfig(
     cache=VaultAgentCache(use_auto_auth_token="force"),  # noqa: S106
@@ -342,6 +353,7 @@ vault_template_permissions(vault_config)
 
 # Install vector
 install_and_configure_vector(vector_config)
+
 
 for product in hashicorp_products:
     configure_hashicorp_product(product)
