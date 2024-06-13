@@ -170,7 +170,7 @@ services:
     environment:
       SERVICE_VARIANT: lms
       DJANGO_SETTINGS_MODULE: lms.envs.production
-    command: celery --app=lms.celery worker --loglevel=info --hostname=edx.lms.core.default.%%h
+    command: celery -E --app=lms.celery worker --loglevel=info --hostname=edx.lms.core.default.%%h
       --max-tasks-per-child=100 --exclude-queues=edx.cms.core.default
     restart: unless-stopped
     volumes:
@@ -234,7 +234,7 @@ services:
     environment:
       SERVICE_VARIANT: cms
       DJANGO_SETTINGS_MODULE: cms.envs.production
-    command: celery --app=cms.celery worker --loglevel=info --hostname=edx.cms.core.default.%%h
+    command: celery -E --app=cms.celery worker --loglevel=info --hostname=edx.cms.core.default.%%h
       --max-tasks-per-child 100 --exclude-queues=edx.lms.core.default
     restart: unless-stopped
     volumes:
