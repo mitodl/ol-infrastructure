@@ -565,7 +565,6 @@ heroku_vars = {
     "AWS_STORAGE_BUCKET_NAME": f"ol-mitopen-app-storage-{env_name}",
     "CORS_ALLOWED_ORIGIN_REGEXES": "['^.+ocw-next.netlify.app$']",
     "CSAIL_BASE_URL": "https://cap.csail.mit.edu/",
-    "DUPLICATE_COURSES_URL": "https://raw.githubusercontent.com/mitodl/open-resource-blacklists/master/duplicate_courses.yml",
     "EDX_API_ACCESS_TOKEN_URL": "https://api.edx.org/oauth2/v1/access_token",
     "EDX_API_URL": "https://api.edx.org/catalog/v1/catalogs/10/courses",
     "MICROMASTERS_CATALOG_API_URL": "https://micromasters.mit.edu/api/v0/catalog/",
