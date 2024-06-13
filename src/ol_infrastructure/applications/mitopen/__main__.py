@@ -705,20 +705,20 @@ sensitive_heroku_vars = {
     "CKEDITOR_ENVIRONMENT_ID": mitopen_vault_secrets["ckeditor"]["environment_id"],
     "CKEDITOR_SECRET_KEY": mitopen_vault_secrets["ckeditor"]["secret_key"],
     "CKEDITOR_UPLOAD_URL": mitopen_vault_secrets["ckeditor"]["upload_url"],
-    "EDX_API_CLIENT_ID": mitopen_vault_secrets["edx-api-client"]["id"],
-    "EDX_API_CLIENT_SECRET": mitopen_vault_secrets["edx-api-client"]["secret"],
+    "EDX_API_CLIENT_ID": mitopen_vault_secrets["edx_api_client"]["id"],
+    "EDX_API_CLIENT_SECRET": mitopen_vault_secrets["edx_api_client"]["secret"],
     "MITOPEN_JWT_SECRET": mitopen_vault_secrets["jwt_secret"],
-    "OLL_API_CLIENT_ID": mitopen_vault_secrets["open-learning-library-client"][
-        "client-id"
+    "OLL_API_CLIENT_ID": mitopen_vault_secrets["open_learning_library_client"][
+        "client_id"
     ],
-    "OLL_API_CLIENT_SECRET": mitopen_vault_secrets["open-learning-library-client"][
-        "client-secret"
+    "OLL_API_CLIENT_SECRET": mitopen_vault_secrets["open_learning_library_client"][
+        "client_secret"
     ],
     "OPENSEARCH_HTTP_AUTH": mitopen_vault_secrets["opensearch"]["http_auth"],
-    "SECRET_KEY": mitopen_vault_secrets["django-secret-key"],
-    "SENTRY_DSN": mitopen_vault_secrets["sentry-dsn"],
-    "STATUS_TOKEN": mitopen_vault_secrets["django-status-token"],
-    "YOUTUBE_DEVELOPER_KEY": mitopen_vault_secrets["youtube-developer-key"],
+    "SECRET_KEY": mitopen_vault_secrets["django_secret_key"],
+    "SENTRY_DSN": mitopen_vault_secrets["sentry_dsn"],
+    "STATUS_TOKEN": mitopen_vault_secrets["django_status_token"],
+    "YOUTUBE_DEVELOPER_KEY": mitopen_vault_secrets["youtube_developer_key"],
     "POSTHOG_PROJECT_API_KEY": mitopen_vault_secrets["posthog"]["project_api_key"],
     "POSTHOG_PERSONAL_API_KEY": mitopen_vault_secrets["posthog"]["personal_api_key"],
     # Vars that require more
