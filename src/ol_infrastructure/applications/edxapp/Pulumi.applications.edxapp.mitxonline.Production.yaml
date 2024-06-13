@@ -8,6 +8,7 @@ config:
     secure: v1:aOXMA7B3yJEu1Csf:rdNjtg5pbPnVrlDdbkAdwAE3Cw2vzAoY0uh/yu/yqgNX/bRySO53cv+LFgYRm26JUu3Eu7/i7qny8Sd5F9DFxOowNCkzUS9YOCuDeA+TnSp9R626c47iMlklo5dNrhGlFw==
   consul:scheme: https
   edxapp:waffle_flags:
+  - ["content_tagging.disabled", "--create", "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone",
     "--staff", "--authenticated"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--staff"]
@@ -37,6 +38,7 @@ config:
   edxapp:enabled_mfes:
     communications: communications
     course_authoring: course-authoring
+    discussions: discuss
     gradebook: gradebook
     learning: learn
     ora_grading: ora-grading
