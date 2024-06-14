@@ -9,6 +9,7 @@ config:
     max: 3
     min: 1
   keycloak:db_capacity: "50"
+  keycloak:instance_type: burstable_medium
   keycloak:domain: sso-ci.ol.mit.edu
   keycloak:rds_password:
     secure: v1:PUfBZ4RNoYON7yXj:31owK3ufKfYy24UFKh4pqIGn0ziPM/jpVIuCnMio9xHL5XaBv/02UmpgYe35GgYuiVoOwTfVamP0a+Lb+cLbbNrmRkBfDSoUEKMjFRwe2ps=
