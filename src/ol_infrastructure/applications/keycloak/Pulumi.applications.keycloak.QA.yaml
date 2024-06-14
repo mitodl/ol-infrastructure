@@ -10,6 +10,7 @@ config:
     min: 1
   keycloak:db_capacity: "50"
   keycloak:domain: sso-qa.ol.mit.edu
+  keycloak:instance_type: burstable_medium
   keycloak:rds_password:
     secure: v1:YMizvIx441k8sgrg:bS5HC/DC3vM8GkwzwTXuBPd9A4xznaxN5GjSF3IdSnJ99D1gOI3M4JevsdJTR2ZGdLwnOy0OULBGuPpxy6bsrOsMXZCEqeVEBlu0VAuhibo=
   keycloak:target_vpc: operations_vpc

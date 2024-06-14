@@ -248,7 +248,7 @@ keycloak_db_consul_service = Service(
 
 # Provision EC2 resources
 instance_type_name = keycloak_config.get(
-    "instance_type", InstanceTypes.burstable_medium.name
+    "instance_type", InstanceTypes.general_purpose_large.name
 )
 instance_type = InstanceTypes.dereference(instance_type_name)
 
