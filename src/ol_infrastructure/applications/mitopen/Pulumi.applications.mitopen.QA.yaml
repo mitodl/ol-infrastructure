@@ -20,6 +20,7 @@ config:
     MITOPEN_COOKIE_DOMAIN: "odl.mit.edu"
     MITOPEN_COOKIE_NAME: "mitopen-rc"
     MITOPEN_LOG_LEVEL: "INFO"
+    MITOPEN_NEW_USER_LOGIN_URL: "https://mitopen-rc.odl.mit.edu/onboarding"
     MITOPEN_SUPPORT_EMAIL: "odl-mitopen-rc-support@mit.edu"
     OCW_ITERATOR_CHUNK_SIZE: 300
     OIDC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
