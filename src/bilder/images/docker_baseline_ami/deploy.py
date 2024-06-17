@@ -54,6 +54,8 @@ vault_config = VaultAgentConfig(
         address=f"https://active.vault.service.consul:{VAULT_HTTP_PORT}",
         tls_skip_verify=True,
     ),
+    restart_period="5d",
+    restart_jitter="12h",
 )
 vault = Vault(
     version=VERSIONS["vault"],

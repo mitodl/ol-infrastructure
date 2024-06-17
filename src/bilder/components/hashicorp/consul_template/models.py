@@ -1,7 +1,8 @@
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Self, Union
 
+from pydantic import field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from bilder.components.hashicorp.models import (
@@ -9,6 +10,7 @@ from bilder.components.hashicorp.models import (
     HashicorpConfig,
     HashicorpProduct,
 )
+from bilder.lib.model_helpers import parse_simple_duration_string
 
 
 class ConsulTemplateVaultConfig(FlexibleBaseModel):
@@ -233,6 +235,31 @@ class ConsulTemplateConfig(HashicorpConfig):
     vault_agent_token_file: Optional[Path] = None
     vault: Optional[ConsulTemplateVaultConfig] = None
     consul: Optional[ConsulTemplateConsulConfig] = ConsulTemplateConsulConfig()
+    restart_period: Optional[str] = None
+    restart_jitter: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_restart_settings(self) -> Self:
+        if self.restart_period is not None and self.restart_jitter is None:
+            msg = "If restart_period is set then a restart_jitter must be supplied."
+            raise ValueError(msg)
+        return self
+
+    @field_validator("restart_period")
+    @classmethod
+    def validate_restart_period(cls, restart_period) -> str:
+        if restart_period and not parse_simple_duration_string(restart_period):
+            msg = f"Invalid restart_period duration: {restart_period}"
+            raise ValueError(msg)
+        return restart_period
+
+    @field_validator("restart_jitter")
+    @classmethod
+    def validate_restart_jitter(cls, restart_jitter) -> str:
+        if restart_jitter and not parse_simple_duration_string(restart_jitter):
+            msg = f"Invalid restart_jitter duration: {restart_jitter}"
+            raise ValueError(msg)
+        return restart_jitter
 
 
 class ConsulTemplate(HashicorpProduct):
@@ -251,5 +278,9 @@ class ConsulTemplate(HashicorpProduct):
         for fpath, config in self.configuration.items():
             yield (
                 self.configuration_directory.joinpath(fpath),
-                config.model_dump_json(exclude_none=True, indent=2),
+                config.model_dump_json(
+                    exclude_none=True,
+                    exclude={"restart_period", "restart_jitter"},
+                    indent=2,
+                ),
             )

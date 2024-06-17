@@ -254,6 +254,8 @@ vault_config = VaultAgentConfig(
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),
+    restart_period="5d",
+    restart_jitter="12h",
 )
 vault = Vault(
     version=VERSIONS["vault"],
@@ -283,6 +285,8 @@ consul_template = ConsulTemplate(
         Path("00-default.json"): ConsulTemplateConfig(
             vault=ConsulTemplateVaultConfig(),
             template=consul_templates,
+            restart_period="7d",
+            restart_jitter="12h",
         )
     },
 )
