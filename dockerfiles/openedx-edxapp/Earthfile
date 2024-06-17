@@ -83,7 +83,7 @@ tutor-utils:
   SAVE ARTIFACT /openedx/tutor/tutor/templates/build/openedx/bin
 
 dockerize:
-  FROM docker.io/powerman/dockerize@sha256:983fd3e74c93b05f34533aec9ca0457f0748f173cd00acb119ec1983cbf6b62d
+  FROM docker.io/powerman/dockerize@sha256:dcad65f02c9915897ca63630c1a5e416ca28ad227f4b71736b706fed14a1779a
   SAVE ARTIFACT /usr/local/bin/dockerize
 
 collected:
