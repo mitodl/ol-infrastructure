@@ -401,6 +401,8 @@ consul_template_configuration = {
                 perms="0600",
             ),
         ],
+        restart_period="7d",
+        restart_jitter="12h",
     ),
 }
 consul_template = ConsulTemplate(
