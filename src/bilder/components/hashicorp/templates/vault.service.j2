@@ -25,6 +25,10 @@ KillMode=process
 KillSignal=SIGINT
 Restart=on-failure
 RestartSec=5
+{% if context.mode == "agent" and context.restart_period %}
+RuntimeMaxSec={{ context.restart_period }}
+RuntimeRandomizedExtraSec={{ context.restart_jitter }}
+{% endif %}
 TimeoutStopSec=30
 StartLimitInterval=60
 StartLimitBurst=3

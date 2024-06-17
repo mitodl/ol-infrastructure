@@ -1,9 +1,9 @@
 import abc
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Annotated, Optional, Union
+from typing import Annotated, Optional, Self, Union
 
-from pydantic import Field, SerializeAsAny, field_validator
+from pydantic import Field, SerializeAsAny, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from bilder.components.hashicorp.models import (
@@ -11,6 +11,7 @@ from bilder.components.hashicorp.models import (
     HashicorpConfig,
     HashicorpProduct,
 )
+from bilder.lib.model_helpers import parse_simple_duration_string
 
 
 class VaultAutoAuthMethodConfig(FlexibleBaseModel, abc.ABC):
@@ -231,6 +232,31 @@ class VaultAgentConfig(HashicorpConfig):
     exit_after_auth: bool = False
     template: Optional[list[VaultTemplate]] = None
     listener: Optional[list[VaultListener]] = None
+    restart_period: Optional[str] = None
+    restart_jitter: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_restart_settings(self) -> Self:
+        if self.restart_period is not None and self.restart_jitter is None:
+            msg = "If restart_period is set then a restart_jitter must be supplied."
+            raise ValueError(msg)
+        return self
+
+    @field_validator("restart_period")
+    @classmethod
+    def validate_restart_period(cls, restart_period) -> str:
+        if restart_period and not parse_simple_duration_string(restart_period):
+            msg = f"Invalid restart_period duration: {restart_period}"
+            raise ValueError(msg)
+        return restart_period
+
+    @field_validator("restart_jitter")
+    @classmethod
+    def validate_restart_jitter(cls, restart_jitter) -> str:
+        if restart_jitter and not parse_simple_duration_string(restart_jitter):
+            msg = f"Invalid restart_jitter duration: {restart_jitter}"
+            raise ValueError(msg)
+        return restart_jitter
 
 
 class VaultServerConfig(HashicorpConfig):
@@ -287,12 +313,23 @@ class Vault(HashicorpProduct):
             "configuration_directory": self.configuration_directory,
         }
         if self.operating_mode() == "agent":
-            context_dict["configuration_file"] = next(iter(self.configuration.keys()))
+            conf_path = next(iter(self.configuration.keys()))
+            context_dict["configuration_file"] = conf_path
+            context_dict["restart_period"] = self.configuration[
+                conf_path
+            ].restart_period
+            context_dict["restart_jitter"] = self.configuration[
+                conf_path
+            ].restart_jitter
         return context_dict
 
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
         for fpath, config in self.configuration.items():
             yield (
                 self.configuration_directory.joinpath(fpath),
-                config.model_dump_json(exclude_none=True, indent=2),
+                config.model_dump_json(
+                    exclude_none=True,
+                    exclude={"restart_period", "restart_jitter"},
+                    indent=2,
+                ),
             )
