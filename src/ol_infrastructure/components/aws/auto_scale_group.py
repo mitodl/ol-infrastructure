@@ -41,6 +41,7 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     is_valid_instance_type,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
 class BlockDeviceMapping(BaseModel):
@@ -48,6 +49,8 @@ class BlockDeviceMapping(BaseModel):
 
     delete_on_termination: bool = True
     device_name: str = "/dev/xvda"
+    encrypted: bool = True
+    kms_key_arn: Optional[pulumi.Output[str] | str] = None
     volume_size: PositiveInt = PositiveInt(25)
     volume_type: DiskTypes = DiskTypes.ssd
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -337,13 +340,28 @@ class OLAutoScaling(pulumi.ComponentResource):
 
         # Build list of block devices for launch template
         block_device_mappings = []
+        stack_info = parse_stack()
+        kms_stack = pulumi.StackReference(
+            name="asg_kms_stack_reference",
+            stack_name=f"infrastructure.aws.kms.{stack_info.name}",
+        )
         for bdm in lt_config.block_device_mappings:
+            if bdm.encrypted:
+                kms_key_id = (
+                    bdm.kms_key_arn
+                    if bdm.kms_key_arn is not None
+                    else kms_stack.require_output("kms_ec2_ebs_key")["arn"]
+                )
+            else:
+                kms_key_id = None
             block_device_mapping = LaunchTemplateBlockDeviceMappingArgs(
                 device_name=bdm.device_name,
                 ebs=LaunchTemplateBlockDeviceMappingEbsArgs(
                     volume_size=bdm.volume_size,
                     volume_type=bdm.volume_type,
                     delete_on_termination=bdm.delete_on_termination,
+                    encrypted=bdm.encrypted,
+                    kms_key_id=kms_key_id,
                 ),
             )
             block_device_mappings.append(block_device_mapping)
