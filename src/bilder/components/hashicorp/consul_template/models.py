@@ -272,7 +272,12 @@ class ConsulTemplate(HashicorpProduct):
 
     @property
     def systemd_template_context(self):
-        return self
+        conf_path = next(iter(self.configuration.keys()))
+        return {
+            "configuration_directory": self.configuration_directory,
+            "restart_period": self.configuration[conf_path].restart_period,
+            "restart_jitter": self.configuration[conf_path].restart_jitter,
+        }
 
     def render_configuration_files(self) -> Iterable[tuple[Path, str]]:
         for fpath, config in self.configuration.items():
