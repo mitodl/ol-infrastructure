@@ -342,7 +342,7 @@ class OLAutoScaling(pulumi.ComponentResource):
         block_device_mappings = []
         stack_info = parse_stack()
         kms_stack = pulumi.StackReference(
-            name="asg_kms_stack_reference",
+            name=f"asg_kms_stack_reference_{asg_config.asg_name}",
             stack_name=f"infrastructure.aws.kms.{stack_info.name}",
         )
         for bdm in lt_config.block_device_mappings:
