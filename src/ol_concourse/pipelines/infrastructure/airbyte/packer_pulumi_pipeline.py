@@ -2,13 +2,18 @@ from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo, github_release
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+from ol_concourse.pipelines.constants import (
+    PACKER_WATCHED_PATHS,
+    PULUMI_CODE_PATH,
+    PULUMI_WATCHED_PATHS,
+)
 
 airbyte_release = github_release(Identifier("airbyte-release"), "airbytehq", "airbyte")
 airbyte_image_code = git_repo(
     Identifier("ol-infrastructure-packer"),
     uri="https://github.com/mitodl/ol-infrastructure",
     paths=[
+        *PACKER_WATCHED_PATHS,
         "src/bilder/components/",
         "src/bilder/images/airbyte/",
     ],

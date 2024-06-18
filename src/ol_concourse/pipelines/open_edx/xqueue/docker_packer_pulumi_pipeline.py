@@ -48,6 +48,7 @@ def build_xqueue_pipeline(release_name: str):
         paths=[
             "src/bridge/settings/openedx/",
             "src/bilder/images/xqueue/",
+            "src/bilder/components/",
         ],
     )
 

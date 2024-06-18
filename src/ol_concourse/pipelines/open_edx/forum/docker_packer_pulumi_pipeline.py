@@ -56,6 +56,7 @@ def build_forum_pipeline(
         paths=[
             "src/bridge/settings/openedx/",
             "src/bilder/images/forum/",
+            "src/bilder/components/",
         ],
     )
 

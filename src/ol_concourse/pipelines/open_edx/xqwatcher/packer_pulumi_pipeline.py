@@ -20,6 +20,7 @@ def build_xqwatcher_pipeline(release_name: str):
         paths=[
             "src/bridge/settings/openedx/",
             "src/bilder/images/xqwatcher/",
+            "src/bilder/components/",
         ],
     )
 

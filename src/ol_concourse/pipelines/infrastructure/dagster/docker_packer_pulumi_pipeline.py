@@ -18,7 +18,11 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, registry_image
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
+from ol_concourse.pipelines.constants import (
+    PACKER_WATCHED_PATHS,
+    PULUMI_CODE_PATH,
+    PULUMI_WATCHED_PATHS,
+)
 
 
 def build_dagster_docker_pipeline() -> Pipeline:
@@ -39,7 +43,11 @@ def build_dagster_docker_pipeline() -> Pipeline:
     packer_code = git_repo(
         name=Identifier("ol-infrastructure-packer"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        paths=["src/bilder/components/", "src/bilder/images/dagster/"],
+        paths=[
+            *PACKER_WATCHED_PATHS,
+            "src/bilder/components/",
+            "src/bilder/images/dagster/",
+        ],
         branch=packer_code_branch,
     )
 
