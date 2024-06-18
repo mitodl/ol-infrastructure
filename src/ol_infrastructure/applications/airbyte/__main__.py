@@ -44,9 +44,8 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 ##    Setup + Config Retrival   ##
 ##################################
 
-if Config("vault_server").get("env_namespace"):
-    setup_vault_provider()
 stack_info = parse_stack()
+setup_vault_provider(stack_info)
 airbyte_config = Config("airbyte")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
