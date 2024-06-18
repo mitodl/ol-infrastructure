@@ -9,7 +9,7 @@ Restart=on-failure
 ExecStart=/usr/local/bin/consul-template -config={{ context.configuration_directory }}
 ExecReload=/bin/kill -HUP $MAINPID
 KillSignal=SIGTERM
-{% if context.mode == "agent" and context.restart_period %}
+{% if context.restart_period %}
 RuntimeMaxSec={{ context.restart_period }}
 RuntimeRandomizedExtraSec={{ context.restart_jitter }}
 {% endif %}
