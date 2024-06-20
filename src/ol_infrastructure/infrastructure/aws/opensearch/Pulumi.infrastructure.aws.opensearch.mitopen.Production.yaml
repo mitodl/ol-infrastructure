@@ -9,8 +9,8 @@ config:
   environment:target_vpc: applications_vpc
   opensearch:cluster_size: "3"
   opensearch:consul_service_name: 'mitopen-opensearch'
-  opensearch:disk_size_gb: "60"
+  opensearch:disk_size_gb: "120"
   opensearch:engine_version: "OpenSearch_2.11"
-  opensearch:instance_type: t3.medium.elasticsearch
+  opensearch:instance_type: m5.large.elasticsearch
   opensearch:public_web: "true"
   opensearch:secured_cluster: "true"
