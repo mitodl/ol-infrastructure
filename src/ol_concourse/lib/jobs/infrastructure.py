@@ -140,7 +140,7 @@ def packer_jobs(  # noqa: PLR0913
     )
 
 
-def pulumi_jobs_chain(  # noqa: PLR0912, PLR0913, C901
+def pulumi_jobs_chain(  # noqa: PLR0913, C901
     pulumi_code: Resource,
     stack_names: list[str],
     project_name: str,
@@ -175,20 +175,18 @@ def pulumi_jobs_chain(  # noqa: PLR0912, PLR0913, C901
 
     chain_fragment = PipelineFragment(resource_types=[github_issues_resource()])
     previous_job = None
+    gh_issues_trigger = None
     for index, stack_name in enumerate(stack_names):
-        if index + 1 < len(stack_names):
-            if enable_github_issue_resource:
-                gh_issues_trigger = github_issues(
-                    auth_method="token",
-                    name=Identifier(f"github-issues-{stack_name.lower()}-trigger"),
-                    repository=github_issue_repository or GH_ISSUES_DEFAULT_REPOSITORY,
-                    issue_title_template=f"[bot] Pulumi {project_name} {stack_name} "
-                    "deployed.",
-                    issue_prefix=f"[bot] Pulumi {project_name} {stack_name} deployed.",
-                    issue_state="closed",
-                )
-        else:
-            gh_issues_trigger = None
+        if index + 1 < len(stack_names) and enable_github_issue_resource:
+            gh_issues_trigger = github_issues(
+                auth_method="token",
+                name=Identifier(f"github-issues-{stack_name.lower()}-trigger"),
+                repository=github_issue_repository or GH_ISSUES_DEFAULT_REPOSITORY,
+                issue_title_template=f"[bot] Pulumi {project_name} {stack_name} "
+                "deployed.",
+                issue_prefix=f"[bot] Pulumi {project_name} {stack_name} deployed.",
+                issue_state="closed",
+            )
 
         if enable_github_issue_resource:
             gh_issues_post = github_issues(

@@ -1,6 +1,6 @@
 from ol_concourse.lib.jobs.infrastructure import pulumi_job
 from ol_concourse.lib.models.fragment import PipelineFragment
-from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline, Resource
+from ol_concourse.lib.models.pipeline import Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
@@ -16,46 +16,33 @@ app_list = [
 ]
 
 shared_pulumi_code_resource = git_repo(
-    name=Identifier("shared-opensearch-pulumi-code"),
+    name=Identifier("ol-infrastructure-pulumiopensearch"),
     uri="https://github.com/mitodl/ol-infrastructure",
-    branch="md/issue_2358",
+    branch="main",
     paths=[
         *PULUMI_WATCHED_PATHS,
-        "src/ol_infrastructure/infrastructure/aws/opensearch/__main__.py",
+        "src/ol_infrastructure/infrastructure/aws/opensearch/",
     ],
 )
 
-local_resources: list[Resource] = []
 local_fragments: list[PipelineFragment] = []
 for app in app_list:
     for env in ["CI", "QA", "Production"]:
-        local_pulumi_code_resource = git_repo(
-            name=Identifier(f"pulumi-{app}-{env.lower()}-opensearch-code"),
-            uri="https://github.com/mitodl/ol-infrastructure",
-            branch="md/issue_2358",
-            paths=[
-                f"src/ol_infrastructure/infrastructure/aws/opensearch/Pulumi.infrastructure.aws.opensearch.{app}.{env}.yaml"
-            ],
-        )
-        shared_code_get_step = GetStep(
-            get=shared_pulumi_code_resource.name, trigger=True
-        )
         local_pulumi_fragment = pulumi_job(
-            pulumi_code=local_pulumi_code_resource,
+            pulumi_code=shared_pulumi_code_resource,
             stack_name=f"infrastructure.aws.opensearch.{app}.{env}",
-            project_name=f"{app}-{env.lower()}-opensearch-code",
-            dependencies=[shared_code_get_step],
+            project_name="ol-infrastructure-opensearch",
+            dependencies=[],
             project_source_path=PULUMI_CODE_PATH.joinpath(
                 "infrastructure/aws/opensearch/"
             ),
         )
-        local_resources.append(local_pulumi_code_resource)
         local_fragments.append(local_pulumi_fragment)
 
 combined_fragments = PipelineFragment.combine_fragments(*local_fragments)
 aws_opensearch_pipeline = Pipeline(
-    resources=[*local_resources, shared_pulumi_code_resource],
-    resource_types=[],
+    resources=[*combined_fragments.resources, shared_pulumi_code_resource],
+    resource_types=combined_fragments.resource_types,
     jobs=combined_fragments.jobs,
 )
 
