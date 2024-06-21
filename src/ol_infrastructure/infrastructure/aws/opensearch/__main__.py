@@ -199,7 +199,6 @@ search_domain_policy = aws.elasticsearch.DomainPolicy(
             stringify=True,
         )
     ),
-    opts=pulumi.ResourceOptions(retain_on_delete=True),
 )
 
 # search_domain_policy = aws.opensearch.DomainPolicy(
