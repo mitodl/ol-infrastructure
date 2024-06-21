@@ -1,3 +1,5 @@
+# ruff: noqa: ERA001, E501
+
 from pathlib import Path
 
 import pulumi
@@ -152,9 +154,31 @@ search_domain = aws.elasticsearch.Domain(
         volume_size=disk_size,
     ),
     tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch-cluster"}),
-    opts=pulumi.ResourceOptions(delete_before_replace=True),
+    opts=pulumi.ResourceOptions(delete_before_replace=True, retain_on_delete=True),
     **conditional_kwargs,
 )
+
+# search_domain = aws.opensearch.Domain(
+#    "opensearch-v2-domain-cluster",
+#    domain_name=domain_name,
+#    engine_version=search_config.get("engine_version") or "7.10",
+#    cluster_config=aws.opensearch.DomainClusterConfigArgs(
+#        zone_awareness_enabled=True,
+#        zone_awareness_config=aws.opensearch.DomainClusterConfigZoneAwarenessConfigArgs(
+#            availability_zone_count=3
+#        ),
+#        instance_count=cluster_size,
+#        instance_type=cluster_instance_type,
+#    ),
+#    ebs_options=aws.opensearch.DomainEbsOptionsArgs(
+#        ebs_enabled=True,
+#        volume_type="gp2",
+#        volume_size=disk_size,
+#    ),
+#    tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch-cluster"}),
+#    opts=pulumi.ResourceOptions(delete_before_replace=True, retain_on_delete=True, import_=domain_name),
+#    **conditional_kwargs,
+# )
 
 search_domain_policy = aws.elasticsearch.DomainPolicy(
     "opensearch-domain-cluster-access-policy",
