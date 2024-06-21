@@ -105,7 +105,7 @@ mitxonline = [
         favicon_url="https://courses-qa.mitxonline.mit.edu/static/mitxonline/images/favicon.ico",
         honor_code_url="https://rc.mitxonline.mit.edu/honor-code/",
         lms_domain="courses-qa.mitxonline.mit.edu",
-        logo_url="https://courses-qa.mitxonline.mit.edu/static/mitxonline/images/logo.png",
+        logo_url="https://courses-qa.mitxonline.mit.edu/static/mitxonline/images/logo.svg",
         marketing_site_domain="rc.mitxonline.mit.edu",
         privacy_policy_url="https://rc.mitxonline.mit.edu/privacy-policy/",
         schedule_email_section="true",  # Because the communication MFE treats this boolean as string  # noqa: E501
@@ -114,6 +114,7 @@ mitxonline = [
         support_url="mitxonline.zendesk.com/hc/",
         terms_of_service_url="https://rc.mitxonline.mit.edu/terms-of-service/",
         trademark_text="© MITx Online. All rights reserved except where noted.",
+        logo_trademark_url="https://courses-qa.mitxonline.mit.edu/static/mitxonline/images/mit-ol-logo.svg",
     ),
     OpenEdxVars(
         about_us_url="https://mitxonline.mit.edu/about-us/",
@@ -127,7 +128,7 @@ mitxonline = [
         favicon_url="https://courses.mitxonline.mit.edu/static/mitxonline/images/favicon.ico",
         honor_code_url="https://mitxonline.mit.edu/honor-code/",
         lms_domain="courses.mitxonline.mit.edu",
-        logo_url="https://courses.mitxonline.mit.edu/static/mitxonline/images/logo.png",
+        logo_url="https://courses.mitxonline.mit.edu/static/mitxonline/images/logo.svg",
         marketing_site_domain="mitxonline.mit.edu",
         privacy_policy_url="https://mitxonline.mit.edu/privacy-policy/",
         schedule_email_section="true",  # Because the communication MFE treats this boolean as string  # noqa: E501
@@ -136,6 +137,7 @@ mitxonline = [
         support_url="mitxonline.zendesk.com/hc/",
         terms_of_service_url="https://mitxonline.mit.edu/terms-of-service/",
         trademark_text="© MITx Online. All rights reserved except where noted.",
+        logo_trademark_url="https://courses.mitxonline.mit.edu/static/mitxonline/images/mit-ol-logo.svg",
     ),
 ]
 
