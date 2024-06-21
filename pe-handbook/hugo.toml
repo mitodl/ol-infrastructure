@@ -1,0 +1,4 @@
+baseURL = 'https://pe.ol.mit.edu'
+languageCode = 'en-us'
+title = 'MIT Online Learning Platform Engineering Site'
+theme = "doks"
