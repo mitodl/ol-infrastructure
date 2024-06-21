@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Moving a Heroku Managed Postgres DB to Pulumi Managed AWS RDS # Preparation # You will need to gather some information about the Heroku managed application and its database before you start. You&rsquo;ll need the Heroku CLI with auehenticated access to the application in question to continue.
+You&rsquo;ll also need the postgresql tools, specifically the pg_dump and psql tools.
+Record the following information somewhere persistent that you&rsquo;ll be able to refer back to through this process.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#343a40">
+<meta name="color-scheme" content="light dark"><meta property="og:url" content="http://localhost:1313/docs/how_to/transition_heroku_postgres_db_to_rds/">
+  <meta property="og:site_name" content="MIT Online Learning Platform Engineering Site">
+  <meta property="og:title" content="MIT Online Learning Platform Engineering Site">
+  <meta property="og:description" content="Moving a Heroku Managed Postgres DB to Pulumi Managed AWS RDS # Preparation # You will need to gather some information about the Heroku managed application and its database before you start. You’ll need the Heroku CLI with auehenticated access to the application in question to continue.
+You’ll also need the postgresql tools, specifically the pg_dump and psql tools.
+Record the following information somewhere persistent that you’ll be able to refer back to through this process.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="docs">
+<title>Transition Heroku Postgres Db to Rds | MIT Online Learning Platform Engineering Site</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/favicon.png" >
+<link rel="canonical" href="http://localhost:1313/docs/how_to/transition_heroku_postgres_db_to_rds/">
+<link rel="stylesheet" href="/book.min.309b7ed028807cdb68d8d61e26d609f48369c098dbf5e4d8c0dcf4cdf49feafc.css" integrity="sha256-MJt&#43;0CiAfNto2NYeJtYJ9INpwJjb9eTYwNz0zfSf6vw=" crossorigin="anonymous">
+  <script defer src="/fuse.min.js"></script>
+  <script defer src="/en.search.min.eeb2a911d69074471e43b7b65efd70f2acb2e54b48008caf568df0be47dddc2d.js" integrity="sha256-7rKpEdaQdEceQ7e2Xv1w8qyy5UtIAIyvVo3wvkfd3C0=" crossorigin="anonymous"></script>
+
+  
+
+<!--
+Made with Book Theme
+https://github.com/alex-shpak/hugo-book
+-->
+  
+</head>
+<body dir="ltr">
+  <input type="checkbox" class="hidden toggle" id="menu-control" />
+  <input type="checkbox" class="hidden toggle" id="toc-control" />
+  <main class="container flex">
+    <aside class="book-menu">
+      <div class="book-menu-content">
+        
+  <nav>
+<h2 class="book-brand">
+  <a class="flex align-center" href="/"><span>MIT Online Learning Platform Engineering Site</span>
+  </a>
+</h2>
+
+
+<div class="book-search hidden">
+  <input type="text" id="book-search-input" placeholder="Search" aria-label="Search" maxlength="64" data-hotkeys="s/" />
+  <div class="book-search-spinner hidden"></div>
+  <ul id="book-search-results"></ul>
+</div>
+<script>document.querySelector(".book-search").classList.remove("hidden")</script>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/discoveries/fargate_service_discovery/" class="">Fargate Service Discovery</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/access_openedx_djange_manage/" class="">Access Openedx Djange Manage</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/concourse_github_issues_user_guide/" class="">Concourse Github Issues User Guide</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/consul_incantations/" class="">Consul Incantations</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/deploying_concourse/" class="">Deploying Concourse</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/enable_rapid_response_edxapp/" class="">Enable Rapid Response Edxapp</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/faking_it_with_consul_and_vault/" class="">Faking It With Consul and Vault</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/getting_started_with_concourse/" class="">Getting Started With Concourse</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/heroku_config_vars/" class="">Heroku Config Vars</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/import_existing_resources_with_pulumi/" class="">Import Existing Resources With Pulumi</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/mitol_devops_patterns_cookbook/" class="">Mitol Devops Patterns Cookbook</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/mitol_openedx_retirement_pipeline/" class="">Mitol Openedx Retirement Pipeline</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/moira_certificates/" class="">Moira Certificates</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/openedx/release_upgrades/" class="">Release Upgrades</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/publish_to_npm/" class="">Publish to Npm</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/pulumi_aws_classic_5_to_6_upgrade/" class="">Pulumi Aws Classic 5 to 6 Upgrade</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/recaptcha/" class="">Recaptcha</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/restore_vault_backups/" class="">Restore Vault Backups</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/retire_an_openedx_user/" class="">Retire an Openedx User</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/tagging_amis_with_installed_software_metadata/" class="">Tagging Amis With Installed Software Metadata</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/test_and_deploy_pulumi_packer_projects/" class="">Test and Deploy Pulumi Packer Projects</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/transition_heroku_postgres_db_to_rds/" class="active">Transition Heroku Postgres Db to Rds</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/inventory/" class="">Inventory</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/key_labels/" class="">Key Labels</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/overview/" class="">Overview</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/post-mortems/20231030_xpro_outage/" class="">20231030 Xpro Outage</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/runbooks/oncall/" class="">Oncall</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</nav>
+
+
+
+
+  <script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script>
+
+
+ 
+      </div>
+    </aside>
+
+    <div class="book-page">
+      <header class="book-header">
+        
+  <div class="flex align-center justify-between">
+  <label for="menu-control">
+    <img src="/svg/menu.svg" class="book-icon" alt="Menu" />
+  </label>
+
+  <strong>Transition Heroku Postgres Db to Rds</strong>
+
+  <label for="toc-control">
+    
+    <img src="/svg/toc.svg" class="book-icon" alt="Table of Contents" />
+    
+  </label>
+</div>
+
+
+  
+  <aside class="hidden clearfix">
+    
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#preparation">Preparation</a></li>
+    <li><a href="#building-the-infrastructure-with-pulumi">Building the Infrastructure with Pulumi</a></li>
+    <li><a href="#construct-a-new-database_url">Construct A New DATABASE_URL</a></li>
+    <li><a href="#put-the-heroku-app-into-maintenance-mode">Put the Heroku App Into Maintenance Mode</a></li>
+    <li><a href="#dump-heroku-managed-db">Dump Heroku Managed DB</a></li>
+    <li><a href="#restore-dump-into-aws-rds-db">Restore Dump Into AWS RDS DB</a></li>
+    <li><a href="#take-heroku-application-out-of-maintenance-mode">Take Heroku application out of maintenance mode</a></li>
+    <li><a href="#coordinate-transition">Coordinate Transition</a></li>
+    <li><a href="#perform-the-final-transition">Perform The Final Transition</a>
+      <ul>
+        <li><a href="#create-an-additional-db-attachment">Create An Additional DB Attachment</a></li>
+        <li><a href="#detach-the-current-database">Detach The Current Database</a></li>
+        <li><a href="#change-the-database_url-to-the-new-rds-instance">Change the DATABASE_URL to the New RDS Instance</a></li>
+      </ul>
+    </li>
+    <li><a href="#test-your-work">Test Your Work</a></li>
+    <li><a href="#how-to-roll-back">How To Roll Back</a></li>
+    <li><a href="#s3-buckets">S3 Buckets</a></li>
+    <li><a href="#saltstack--cloudfront">Saltstack &amp; Cloudfront</a></li>
+  </ul>
+</nav>
+
+
+
+  </aside>
+  
+ 
+      </header>
+
+      
+      
+  <article class="markdown book-article"><h1 id="moving-a-heroku-managed-postgres-db-to-pulumi-managed-aws-rds">
+  Moving a Heroku Managed Postgres DB to Pulumi Managed AWS RDS
+  <a class="anchor" href="#moving-a-heroku-managed-postgres-db-to-pulumi-managed-aws-rds">#</a>
+</h1>
+<h2 id="preparation">
+  Preparation
+  <a class="anchor" href="#preparation">#</a>
+</h2>
+<p>You will need to gather some information about the Heroku managed application and its database before you start. You&rsquo;ll need the
+<a href="https://devcenter.heroku.com/articles/heroku-cli">Heroku CLI</a> with auehenticated access to the application in question to continue.</p>
+<p>You&rsquo;ll also need the postgresql tools, specifically the <code>pg_dump</code> and <code>psql</code> tools.</p>
+<p>Record the following information somewhere persistent that you&rsquo;ll be able to refer back to through this process. I like using my <a href="https://joplinapp.org/">notes</a>.</p>
+<ul>
+<li>The Heroku application&rsquo;s name. Our convention is generally <!-- raw HTML omitted -->-<!-- raw HTML omitted --> so for the CI environment of the micromasters
+application, you&rsquo;d use <code>micromasters-ci</code>.</li>
+<li>The applications&rsquo;s <code>DATABASE_URL</code>. You can obtain this with the following invocation: <code>heroku config:get DATABASE_URL -a &lt;your app&gt;</code></li>
+<li>The currently attached Heroku database name as well as the alias they have assigned to it by default. You can get this with:
+<code>heroku addons -a &lt;application&gt; | grep -i postgres</code> for example:</li>
+</ul>
+<pre tabindex="0"><code>╰ ➤ heroku addons -a micromasters-ci | grep -i postgres
+heroku-postgresql (postgresql-rigid-71273)  mini   $5/month   created
+ └─ as HEROKU_POSTGRES_YELLOW
+</code></pre><p>so in this case we see that postgresql-rigid-71273 is attached as HEROKU_POSTGRES_YELLOW</p>
+<ul>
+<li>A set of URLs to browse when the transition is done to ensure everything is working properly. You should also browse them before the transition to note how
+everything looks.</li>
+</ul>
+<h2 id="building-the-infrastructure-with-pulumi">
+  Building the Infrastructure with Pulumi
+  <a class="anchor" href="#building-the-infrastructure-with-pulumi">#</a>
+</h2>
+<!-- raw HTML omitted -->
+<p>Describing in detail how to code the necessary resources to build the AWS RDS Postgres instance and associated S3 bucket, IAM rules, VPC peerings
+etc. is beyond the scope of this ducument. You can see what I did in my <a href="https://github.com/mitodl/ol-infrastructure/tree/cpatti_micromasters_pulumi">Github branch</a>.</p>
+<p>Once the infrastructure is properly built, you&rsquo;ll need to record the new AWS RDS Postgres instance&rsquo;s endpoint. You can do this from within
+the directory for the application you&rsquo;re working on. For my current project, that&rsquo;s <code>ol-infrastructure/src/ol_infrastructure/applications/micromasters</code>
+with this: &lsquo;poetry run pulumi stack export -s applications.micromasters.CI | grep -i endpoint&rsquo; but obviously sub your app in for micromasters.</p>
+<p>You&rsquo;ll also need to retrieve the database password from Vault using Pulumi. You can do that with the following invocation:
+<code>poetry run pulumi config get  &quot;micromasters:db_password&quot;</code></p>
+<h2 id="construct-a-new-database_url">
+  Construct A New DATABASE_URL
+  <a class="anchor" href="#construct-a-new-database_url">#</a>
+</h2>
+<p>I suggest doing this in a text file you can source easily since you&rsquo;ll be working with this database a bit for this project. I keep such things in an &rsquo;envsnips&rsquo; folder
+in my home directory.</p>
+<p>The file should look something like:</p>
+<pre tabindex="0"><code>export DATABASE_URL=postgresql://oldevops:&lt;password you pulled from Pulumi config&gt;@micromasters-ci-app-db.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/micromasters
+</code></pre><p>Make sure the URL has the following components:</p>
+<ul>
+<li><code>postgresql://</code> is the protocol identifier followed by a :.</li>
+<li>&lsquo;oldevops&rsquo; is the database user, then another :.</li>
+<li>the database password we pulled from Pulumi above, followed by an @ sign.</li>
+<li>The endpoint hostname we retrieved from Pulumi earlier, followed by a :.</li>
+<li>The port number. We usually use 5432. Then a /.</li>
+<li>The database name.</li>
+</ul>
+<p>If your URL is missing any of these it will not work. Once you&rsquo;ve finished write out your file and source it in your shell.</p>
+<p>Now, test that you can connect using the URL you just built with:</p>
+<p><code>psql $DATABASE_URL</code></p>
+<p>If you get an access denied message, make sure you got the correct password for the app and environment (e.g. CI, QA or production) and check the
+other components.</p>
+<p>We&rsquo;ll assume $DATABASE_URL is set to to the new RDS database we&rsquo;ve created for the rest of the runbook.</p>
+<h2 id="put-the-heroku-app-into-maintenance-mode">
+  Put the Heroku App Into Maintenance Mode
+  <a class="anchor" href="#put-the-heroku-app-into-maintenance-mode">#</a>
+</h2>
+<p>In order to ensure database consistency during the transition we need to put the
+Heroku application into maintenance mode.</p>
+<pre tabindex="0"><code>heroku maintenance:on -a &lt;app&gt;
+</code></pre><p><strong>CAUTION</strong> customers will see a notice about ongoing maintenance until you
+take the app out of maintenance mode, so be mindful of the wall clock time!</p>
+<h2 id="dump-heroku-managed-db">
+  Dump Heroku Managed DB
+  <a class="anchor" href="#dump-heroku-managed-db">#</a>
+</h2>
+<p>Use something like the following invocation to dump the contents of the current application database.</p>
+<p><code>pg_dump -x -O $(heroku config:get DATABASE_URL -a micromasters-rc) &gt; micromasters_qa_db_dump.sql</code></p>
+<p>Obviously, substitute your app for micromasters and your environment for rc/qa.</p>
+<p>(Aside: We use rc and qa interchangably here).</p>
+<p>Examine the dump in your editor (read-only to be safe) and ensure that all the necessary components are present: Schema, data, foreign keys, and the like.</p>
+<h2 id="restore-dump-into-aws-rds-db">
+  Restore Dump Into AWS RDS DB
+  <a class="anchor" href="#restore-dump-into-aws-rds-db">#</a>
+</h2>
+<p>Using the DATABASE_URL we just created and tested, we can now restore the data we dumped in the prior step into the new DB:</p>
+<p><code>psql $DATABASE_URL &lt; micromasters_qa_db_dump.sql</code></p>
+<p>You will see a lot of output representing each statement as it&rsquo;s processed by the DB. You shouldn&rsquo;t see any errors here.</p>
+<h2 id="take-heroku-application-out-of-maintenance-mode">
+  Take Heroku application out of maintenance mode
+  <a class="anchor" href="#take-heroku-application-out-of-maintenance-mode">#</a>
+</h2>
+<pre tabindex="0"><code>heroku maintenance:off -a &lt;app&gt;
+</code></pre><p>At this point, the application will resume normal operation and be available to
+customers.</p>
+<h2 id="coordinate-transition">
+  Coordinate Transition
+  <a class="anchor" href="#coordinate-transition">#</a>
+</h2>
+<p>In the process of changing the database out from under a running application, there will be some small period of down time, so it&rsquo;s important to coordinate with
+all the appropriate stakeholders and leadership before you do.</p>
+<h2 id="perform-the-final-transition">
+  Perform The Final Transition
+  <a class="anchor" href="#perform-the-final-transition">#</a>
+</h2>
+<p>At the time, it&rsquo;s important that you perform the following steps quickly in succession, because once you detach the current DB, the application will be down.
+Keep this as brief as possible.</p>
+<p>You may wish to cue up the commands you want to run in a text file somewhere you can eaily review them, and then cut and paste them into your shell when the
+time comes.</p>
+<h3 id="create-an-additional-db-attachment">
+  Create An Additional DB Attachment
+  <a class="anchor" href="#create-an-additional-db-attachment">#</a>
+</h3>
+<p>You&rsquo;ll need to create an additional attachment for the current DB:
+<code>heroku addons:attach postgresql-amorphous-36035 --as HEROKU_POSTGRES_DB</code></p>
+<p>Substitute your db instance you gathered above. HEROKU_POSTGRES_DB is just an alias we can use if we should need to roll back.</p>
+<h3 id="detach-the-current-database">
+  Detach The Current Database
+  <a class="anchor" href="#detach-the-current-database">#</a>
+</h3>
+<p>This is where you&rsquo;ll need to use the Heroku managed database instance above, along with the Heroku application name we collected. Substitute accordingly
+into the following invocation:</p>
+<p><code>heroku addons:detach postgresql-amorphous-36035 -a micromasters-rc</code></p>
+<h3 id="change-the-database_url-to-the-new-rds-instance">
+  Change the DATABASE_URL to the New RDS Instance
+  <a class="anchor" href="#change-the-database_url-to-the-new-rds-instance">#</a>
+</h3>
+<p>Ensuring that your DATABASE_URL environment variable is properly set to your new RDS from the above steps, use it to set DATABASE_URL in the heroku app:</p>
+<p><code>heroku config:set -a micromasters-rc DATABASE_URL=$DATABASE_URL</code></p>
+<p>Now immediately print out the value you just set to ensure that all looks good:
+<code>heroku config:get -a micromasters-rc DATABASE_URL</code></p>
+<h2 id="test-your-work">
+  Test Your Work
+  <a class="anchor" href="#test-your-work">#</a>
+</h2>
+<p>You should carefully test the application you just transitioned to ensure everything works using the set of URLs you gathered at the beginning.</p>
+<ul>
+<li>Do the pages have all the elements they should?</li>
+<li>Are images loading?</li>
+</ul>
+<h2 id="how-to-roll-back">
+  How To Roll Back
+  <a class="anchor" href="#how-to-roll-back">#</a>
+</h2>
+<p>If something goes wrong and you need to roll back, don&rsquo;t panic!</p>
+<p>All you need to do is promote the old Heroku managed DB back into use:</p>
+<p><code>heroku pg:promote --app micromasters-ci postgresql-rigid-71273</code></p>
+<p>Obviously substitute your db and application for the ones above.</p>
+<p>Re-run your tests as defined above to make sure everything&rsquo;s working right post-rollback.</p>
+<h2 id="s3-buckets">
+  S3 Buckets
+  <a class="anchor" href="#s3-buckets">#</a>
+</h2>
+<p>Our applications use S3 buckets for CMS asset storage and backup among other things.</p>
+<p>You will need to either continue using the existing buckets by using <code>pulumi import</code> or creating new onnes. You should create
+new ones if the old ones don&rsquo;t conform to naming conventions. You&rsquo;ll also need to ensure that IAM permissions are properly
+set in your Pulumi code.</p>
+<p>To sync the bucket contents, use the <a href="https://docs.aws.amazon.com/cli/latest/reference/s3/sync.html">AWS CLI</a> <code>aws s3 sync</code> command.</p>
+<p>For example, the command we used to sync the old micromasters S3 bucket to the new one which conforms to our desired naming
+conventions is:</p>
+<pre tabindex="0"><code>aws s3 sync s3://odl-micromasters-production s3://ol-micromasters-app-production
+</code></pre><h2 id="saltstack--cloudfront">
+  Saltstack &amp; Cloudfront
+  <a class="anchor" href="#saltstack--cloudfront">#</a>
+</h2>
+<p>Currently, we are using Saltstack to configure some aspects of our Heroku applications, including which S3 bucket to use and which
+CloudFront distribution we&rsquo;re fronting the app with.</p>
+<p><strong>TODO</strong>: This section needs to be way less of a hand wave and include actual detail as to how to operate the Saltstack side or
+whatever we replace it with.</p>
+</article>
+ 
+      
+
+      <footer class="book-footer">
+        
+  <div class="flex flex-wrap justify-between">
+
+
+
+
+
+</div>
+
+
+
+  <script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){if(window.getSelection().toString())return;e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script>
+
+
+ 
+        
+      </footer>
+
+      
+  
+  <div class="book-comments">
+
+</div>
+  
+ 
+
+      <label for="menu-control" class="hidden book-menu-overlay"></label>
+    </div>
+
+    
+    <aside class="book-toc">
+      <div class="book-toc-content">
+        
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#preparation">Preparation</a></li>
+    <li><a href="#building-the-infrastructure-with-pulumi">Building the Infrastructure with Pulumi</a></li>
+    <li><a href="#construct-a-new-database_url">Construct A New DATABASE_URL</a></li>
+    <li><a href="#put-the-heroku-app-into-maintenance-mode">Put the Heroku App Into Maintenance Mode</a></li>
+    <li><a href="#dump-heroku-managed-db">Dump Heroku Managed DB</a></li>
+    <li><a href="#restore-dump-into-aws-rds-db">Restore Dump Into AWS RDS DB</a></li>
+    <li><a href="#take-heroku-application-out-of-maintenance-mode">Take Heroku application out of maintenance mode</a></li>
+    <li><a href="#coordinate-transition">Coordinate Transition</a></li>
+    <li><a href="#perform-the-final-transition">Perform The Final Transition</a>
+      <ul>
+        <li><a href="#create-an-additional-db-attachment">Create An Additional DB Attachment</a></li>
+        <li><a href="#detach-the-current-database">Detach The Current Database</a></li>
+        <li><a href="#change-the-database_url-to-the-new-rds-instance">Change the DATABASE_URL to the New RDS Instance</a></li>
+      </ul>
+    </li>
+    <li><a href="#test-your-work">Test Your Work</a></li>
+    <li><a href="#how-to-roll-back">How To Roll Back</a></li>
+    <li><a href="#s3-buckets">S3 Buckets</a></li>
+    <li><a href="#saltstack--cloudfront">Saltstack &amp; Cloudfront</a></li>
+  </ul>
+</nav>
+
+
+ 
+      </div>
+    </aside>
+    
+  </main>
+
+  
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Misbehaving consul cluster incident from 20231004-20231905 # Overview # At some point operations-production consul cluster fell over and stopped being useful. The root cause was not immediately know but was almost definitely related to an upgrade to 1.16.2 from ??? (no good record indication what the cluster was on before all this went down&hellip;)
+Key takeaway from the logs was this cryptic message about being unable to restore snapshot:">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#343a40">
+<meta name="color-scheme" content="light dark"><meta property="og:url" content="http://localhost:1313/docs/how_to/consul_incantations/">
+  <meta property="og:site_name" content="MIT Online Learning Platform Engineering Site">
+  <meta property="og:title" content="MIT Online Learning Platform Engineering Site">
+  <meta property="og:description" content="Misbehaving consul cluster incident from 20231004-20231905 # Overview # At some point operations-production consul cluster fell over and stopped being useful. The root cause was not immediately know but was almost definitely related to an upgrade to 1.16.2 from ??? (no good record indication what the cluster was on before all this went down…)
+Key takeaway from the logs was this cryptic message about being unable to restore snapshot:">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="docs">
+<title>Consul Incantations | MIT Online Learning Platform Engineering Site</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/favicon.png" >
+<link rel="canonical" href="http://localhost:1313/docs/how_to/consul_incantations/">
+<link rel="stylesheet" href="/book.min.309b7ed028807cdb68d8d61e26d609f48369c098dbf5e4d8c0dcf4cdf49feafc.css" integrity="sha256-MJt&#43;0CiAfNto2NYeJtYJ9INpwJjb9eTYwNz0zfSf6vw=" crossorigin="anonymous">
+  <script defer src="/fuse.min.js"></script>
+  <script defer src="/en.search.min.eeb2a911d69074471e43b7b65efd70f2acb2e54b48008caf568df0be47dddc2d.js" integrity="sha256-7rKpEdaQdEceQ7e2Xv1w8qyy5UtIAIyvVo3wvkfd3C0=" crossorigin="anonymous"></script>
+
+  
+
+<!--
+Made with Book Theme
+https://github.com/alex-shpak/hugo-book
+-->
+  
+</head>
+<body dir="ltr">
+  <input type="checkbox" class="hidden toggle" id="menu-control" />
+  <input type="checkbox" class="hidden toggle" id="toc-control" />
+  <main class="container flex">
+    <aside class="book-menu">
+      <div class="book-menu-content">
+        
+  <nav>
+<h2 class="book-brand">
+  <a class="flex align-center" href="/"><span>MIT Online Learning Platform Engineering Site</span>
+  </a>
+</h2>
+
+
+<div class="book-search hidden">
+  <input type="text" id="book-search-input" placeholder="Search" aria-label="Search" maxlength="64" data-hotkeys="s/" />
+  <div class="book-search-spinner hidden"></div>
+  <ul id="book-search-results"></ul>
+</div>
+<script>document.querySelector(".book-search").classList.remove("hidden")</script>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/discoveries/fargate_service_discovery/" class="">Fargate Service Discovery</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/access_openedx_djange_manage/" class="">Access Openedx Djange Manage</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/concourse_github_issues_user_guide/" class="">Concourse Github Issues User Guide</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/consul_incantations/" class="active">Consul Incantations</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/deploying_concourse/" class="">Deploying Concourse</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/enable_rapid_response_edxapp/" class="">Enable Rapid Response Edxapp</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/faking_it_with_consul_and_vault/" class="">Faking It With Consul and Vault</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/getting_started_with_concourse/" class="">Getting Started With Concourse</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/heroku_config_vars/" class="">Heroku Config Vars</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/import_existing_resources_with_pulumi/" class="">Import Existing Resources With Pulumi</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/mitol_devops_patterns_cookbook/" class="">Mitol Devops Patterns Cookbook</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/mitol_openedx_retirement_pipeline/" class="">Mitol Openedx Retirement Pipeline</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/moira_certificates/" class="">Moira Certificates</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/openedx/release_upgrades/" class="">Release Upgrades</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/publish_to_npm/" class="">Publish to Npm</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/pulumi_aws_classic_5_to_6_upgrade/" class="">Pulumi Aws Classic 5 to 6 Upgrade</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/recaptcha/" class="">Recaptcha</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/restore_vault_backups/" class="">Restore Vault Backups</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/retire_an_openedx_user/" class="">Retire an Openedx User</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/tagging_amis_with_installed_software_metadata/" class="">Tagging Amis With Installed Software Metadata</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/test_and_deploy_pulumi_packer_projects/" class="">Test and Deploy Pulumi Packer Projects</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/transition_heroku_postgres_db_to_rds/" class="">Transition Heroku Postgres Db to Rds</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/inventory/" class="">Inventory</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/key_labels/" class="">Key Labels</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/overview/" class="">Overview</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/post-mortems/20231030_xpro_outage/" class="">20231030 Xpro Outage</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/runbooks/oncall/" class="">Oncall</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</nav>
+
+
+
+
+  <script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script>
+
+
+ 
+      </div>
+    </aside>
+
+    <div class="book-page">
+      <header class="book-header">
+        
+  <div class="flex align-center justify-between">
+  <label for="menu-control">
+    <img src="/svg/menu.svg" class="book-icon" alt="Menu" />
+  </label>
+
+  <strong>Consul Incantations</strong>
+
+  <label for="toc-control">
+    
+    <img src="/svg/toc.svg" class="book-icon" alt="Table of Contents" />
+    
+  </label>
+</div>
+
+
+  
+  <aside class="hidden clearfix">
+    
+  
+<nav id="TableOfContents"></nav>
+
+
+
+  </aside>
+  
+ 
+      </header>
+
+      
+      
+  <article class="markdown book-article"><h1 id="misbehaving-consul-cluster-incident-from-20231004-20231905">
+  Misbehaving consul cluster incident from 20231004-20231905
+  <a class="anchor" href="#misbehaving-consul-cluster-incident-from-20231004-20231905">#</a>
+</h1>
+<h1 id="overview">
+  Overview
+  <a class="anchor" href="#overview">#</a>
+</h1>
+<p>At some point <code>operations-production</code> consul cluster fell over and stopped being useful. The root cause was not immediately know but was almost definitely related to an upgrade to <code>1.16.2</code> from <code>???</code> (no good record indication what the cluster was on before all this went down&hellip;)</p>
+<p>Key takeaway from the logs was this cryptic message about being unable to restore snapshot:</p>
+<pre tabindex="0"><code>{&#34;@level&#34;:&#34;error&#34;,&#34;@message&#34;:&#34;failed to restore snapshot&#34;,&#34;@module&#34;:&#34;agent.server.raft&#34;,&#34;@timestamp&#34;:&#34;2023-10-04T14:17:40.200037Z&#34;,&#34;error&#34;:&#34;failed to restore snapshot 1156-86945697-1696429059987: failed inserting acl token: missing value for index &#39;accessor&#39;&#34;}
+</code></pre><p>This is something that happens anytime a consul server restarts, it gets a copy of the raft from the other servers currently running and restores it. But, it is failing to do that and crashing.</p>
+<h1 id="initial-response">
+  Initial Response
+  <a class="anchor" href="#initial-response">#</a>
+</h1>
+<p>Tobias was able to revive the cluster by downgrading it to 1.14.10 and it was then able to restore the snapshot it received from other nodes / on the filesystem (unclear how broken the cluster was at this time).</p>
+<h1 id="research">
+  Research
+  <a class="anchor" href="#research">#</a>
+</h1>
+<p>Looking up that message returned <a href="https://discuss.hashicorp.com/t/consul-accessorid-is-empty-in-one-of-remote-clusters/53191">one very-not-promising result</a> from the hashicorp forums.</p>
+<h1 id="resolution">
+  Resolution
+  <a class="anchor" href="#resolution">#</a>
+</h1>
+<p>Ultimitely spent a lot of time reading and pursuing dead ends but what <em>I believe</em> ulimitely resolved the issue was the following:</p>
+<ol>
+<li>Step through each consul server in the cluster and ensure:
+a. it is on version 1.14.10
+b. It has this acl stanza in <code>00-default.json</code>: <code>&quot;acl&quot;: {&quot;enabled&quot;:  true, &quot;default_policy&quot;: &quot;allow&quot;, &quot;enable_token_persistence&quot;: false}</code>
+c. Restart the servers one at a time to ensure the quorum never drops below 3 (or 2 if you&rsquo;re in non-prod).</li>
+<li>Now you should be able to issue <code>acl</code> commands using the consul cli.
+a. They won&rsquo;t work though because you don&rsquo;t have a token and in this particular case the cluster says it is not elgible for bootstrapping.
+b. At some point in history this very special cluster had ACLs enabled and then disabled? Possibly?</li>
+<li>We need to reset/recover the ACL master token. Follow the procedure <a href="https://github.com/hashicorp/consul/issues/5331#issuecomment-462772868">here</a>.</li>
+<li>The output of that command should be &ldquo;Bootstrap Token (Global Management)&rdquo; an <code>AccessorID</code> and <code>SecretID</code>. Export the secret ID in your terminal as <code>CONSUL_HTTP_TOKEN</code>.</li>
+<li>Then you can do <code>consul acl token list</code> and one of them should be labeled &ldquo;Master Token&rdquo;.
+a. export the <code>SecretID</code> from the Master Token as <code>CONSUL_HTTP_TOKEN</code> or just save it off somewhere.</li>
+<li>Repeat step 1, loop through all the servers and remove the <code>acl</code> stanza, restarting one at a time to ensure quorum.</li>
+<li>Once all nodes are running again and ACL is disabled, start upgrading the nodes. one at a time, to 1.16.2.</li>
+</ol>
+<pre tabindex="0"><code>wget https://releases.hashicorp.com/consul/1.16.2/consul_1.16.2_linux_amd64.zip
+unzip consul_1.16.2_linux_amd64.zip
+mv consul consul_1_16_2
+systemctl stop consul
+cp consul_1_16_2 /usr/local/bin/consul
+cd /var/lib
+cp -r consul consul_bak
+cd consul
+rm -rf serf/ raft/ server_metadata.json checkpoint-signature
+systemctl start consul
+</code></pre><ol start="8">
+<li>Verify quorum: <code>consul operator raft list-peers</code></li>
+<li>Verify version: <code>consul members</code> and <code>consul version</code></li>
+</ol>
+</article>
+ 
+      
+
+      <footer class="book-footer">
+        
+  <div class="flex flex-wrap justify-between">
+
+
+
+
+
+</div>
+
+
+
+  <script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){if(window.getSelection().toString())return;e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script>
+
+
+ 
+        
+      </footer>
+
+      
+  
+  <div class="book-comments">
+
+</div>
+  
+ 
+
+      <label for="menu-control" class="hidden book-menu-overlay"></label>
+    </div>
+
+    
+    <aside class="book-toc">
+      <div class="book-toc-content">
+        
+  
+<nav id="TableOfContents"></nav>
+
+
+ 
+      </div>
+    </aside>
+    
+  </main>
+
+  
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+

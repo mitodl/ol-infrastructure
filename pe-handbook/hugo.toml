@@ -1,4 +1,9 @@
 baseURL = 'https://pe.ol.mit.edu'
 languageCode = 'en-us'
 title = 'MIT Online Learning Platform Engineering Site'
-theme = "doks"
+
+[module]
+[[module.imports]]
+path = 'github.com/alex-shpak/hugo-book'
+
+theme = 'hugo-book'

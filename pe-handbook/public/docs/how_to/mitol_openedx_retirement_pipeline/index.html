@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Setting Up The Retirement Pipeline For A New MIT OL OpenEdX Application # Getting Set Up # First, follow the instructions in the Setting Up User Retirement In The LMS document.
+You&rsquo;ll need to ssh into an edx-worker for the appropriate environment you&rsquo;re working in.
+Run sudo su - edxapp -s /bin/bash and then source edxapp_env to get to where you need to be to run the Django manage application.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#343a40">
+<meta name="color-scheme" content="light dark"><meta property="og:url" content="http://localhost:1313/docs/how_to/mitol_openedx_retirement_pipeline/">
+  <meta property="og:site_name" content="MIT Online Learning Platform Engineering Site">
+  <meta property="og:title" content="MIT Online Learning Platform Engineering Site">
+  <meta property="og:description" content="Setting Up The Retirement Pipeline For A New MIT OL OpenEdX Application # Getting Set Up # First, follow the instructions in the Setting Up User Retirement In The LMS document.
+You’ll need to ssh into an edx-worker for the appropriate environment you’re working in.
+Run sudo su - edxapp -s /bin/bash and then source edxapp_env to get to where you need to be to run the Django manage application.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="docs">
+<title>Mitol Openedx Retirement Pipeline | MIT Online Learning Platform Engineering Site</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/favicon.png" >
+<link rel="canonical" href="http://localhost:1313/docs/how_to/mitol_openedx_retirement_pipeline/">
+<link rel="stylesheet" href="/book.min.309b7ed028807cdb68d8d61e26d609f48369c098dbf5e4d8c0dcf4cdf49feafc.css" integrity="sha256-MJt&#43;0CiAfNto2NYeJtYJ9INpwJjb9eTYwNz0zfSf6vw=" crossorigin="anonymous">
+  <script defer src="/fuse.min.js"></script>
+  <script defer src="/en.search.min.eeb2a911d69074471e43b7b65efd70f2acb2e54b48008caf568df0be47dddc2d.js" integrity="sha256-7rKpEdaQdEceQ7e2Xv1w8qyy5UtIAIyvVo3wvkfd3C0=" crossorigin="anonymous"></script>
+
+  
+
+<!--
+Made with Book Theme
+https://github.com/alex-shpak/hugo-book
+-->
+  
+</head>
+<body dir="ltr">
+  <input type="checkbox" class="hidden toggle" id="menu-control" />
+  <input type="checkbox" class="hidden toggle" id="toc-control" />
+  <main class="container flex">
+    <aside class="book-menu">
+      <div class="book-menu-content">
+        
+  <nav>
+<h2 class="book-brand">
+  <a class="flex align-center" href="/"><span>MIT Online Learning Platform Engineering Site</span>
+  </a>
+</h2>
+
+
+<div class="book-search hidden">
+  <input type="text" id="book-search-input" placeholder="Search" aria-label="Search" maxlength="64" data-hotkeys="s/" />
+  <div class="book-search-spinner hidden"></div>
+  <ul id="book-search-results"></ul>
+</div>
+<script>document.querySelector(".book-search").classList.remove("hidden")</script>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/discoveries/fargate_service_discovery/" class="">Fargate Service Discovery</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/access_openedx_djange_manage/" class="">Access Openedx Djange Manage</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/concourse_github_issues_user_guide/" class="">Concourse Github Issues User Guide</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/consul_incantations/" class="">Consul Incantations</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/deploying_concourse/" class="">Deploying Concourse</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/enable_rapid_response_edxapp/" class="">Enable Rapid Response Edxapp</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/faking_it_with_consul_and_vault/" class="">Faking It With Consul and Vault</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/getting_started_with_concourse/" class="">Getting Started With Concourse</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/heroku_config_vars/" class="">Heroku Config Vars</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/import_existing_resources_with_pulumi/" class="">Import Existing Resources With Pulumi</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/mitol_devops_patterns_cookbook/" class="">Mitol Devops Patterns Cookbook</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/mitol_openedx_retirement_pipeline/" class="active">Mitol Openedx Retirement Pipeline</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/moira_certificates/" class="">Moira Certificates</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/openedx/release_upgrades/" class="">Release Upgrades</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/publish_to_npm/" class="">Publish to Npm</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/pulumi_aws_classic_5_to_6_upgrade/" class="">Pulumi Aws Classic 5 to 6 Upgrade</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/recaptcha/" class="">Recaptcha</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/restore_vault_backups/" class="">Restore Vault Backups</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/retire_an_openedx_user/" class="">Retire an Openedx User</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/tagging_amis_with_installed_software_metadata/" class="">Tagging Amis With Installed Software Metadata</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/test_and_deploy_pulumi_packer_projects/" class="">Test and Deploy Pulumi Packer Projects</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/transition_heroku_postgres_db_to_rds/" class="">Transition Heroku Postgres Db to Rds</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/inventory/" class="">Inventory</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/key_labels/" class="">Key Labels</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/overview/" class="">Overview</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/post-mortems/20231030_xpro_outage/" class="">20231030 Xpro Outage</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/runbooks/oncall/" class="">Oncall</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</nav>
+
+
+
+
+  <script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script>
+
+
+ 
+      </div>
+    </aside>
+
+    <div class="book-page">
+      <header class="book-header">
+        
+  <div class="flex align-center justify-between">
+  <label for="menu-control">
+    <img src="/svg/menu.svg" class="book-icon" alt="Menu" />
+  </label>
+
+  <strong>Mitol Openedx Retirement Pipeline</strong>
+
+  <label for="toc-control">
+    
+    <img src="/svg/toc.svg" class="book-icon" alt="Table of Contents" />
+    
+  </label>
+</div>
+
+
+  
+  <aside class="hidden clearfix">
+    
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#getting-set-up">Getting Set Up</a></li>
+    <li><a href="#retirement-states-creation">Retirement States Creation</a></li>
+    <li><a href="#retirement-user-creation">Retirement User Creation</a></li>
+    <li><a href="#retirement-dot-application-creation">Retirement DOT Application Creation</a></li>
+    <li><a href="#we-keep-secrets-in-the-vault-duh-">We Keep Secrets In The Vault, Duh :)</a></li>
+    <li><a href="#start-the-rube-goldberg-device-building-the-pipeline-itself">START THE RUBE GOLDBERG DEVICE! Building The Pipeline Itself</a></li>
+  </ul>
+</nav>
+
+
+
+  </aside>
+  
+ 
+      </header>
+
+      
+      
+  <article class="markdown book-article"><h1 id="setting-up-the-retirement-pipeline-for-a-new-mit-ol-openedx-application">
+  Setting Up The Retirement Pipeline For A New MIT OL OpenEdX Application
+  <a class="anchor" href="#setting-up-the-retirement-pipeline-for-a-new-mit-ol-openedx-application">#</a>
+</h1>
+<h2 id="getting-set-up">
+  Getting Set Up
+  <a class="anchor" href="#getting-set-up">#</a>
+</h2>
+<p>First, follow the instructions in the <a href="https://github.com/openedx/edx-documentation/blob/master/en_us/install_operations/source/configuration/user_retire/service_setup.rst">Setting Up User Retirement In The LMS</a> document.</p>
+<p>You&rsquo;ll need to ssh into an edx-worker for the appropriate environment you&rsquo;re working in.</p>
+<p>Run <code>sudo su - edxapp -s /bin/bash</code> and then <code>source edxapp_env</code> to get to where you need to be to run the Django manage application.</p>
+<p>You can follow the doc verbatim with the exception that:</p>
+<ul>
+<li>The manage.py executable is located in the edx-platform folder, so you&rsquo;d start your invocations with <code>python edx-platform/manage.py</code></li>
+<li>Ignore the <code>--settings &lt;your settings&gt;</code> option as we already have our settings defined in the LMS configuration.</li>
+</ul>
+<p>Be sure that the retirement tates, user and application creation invocations exit without throwing any fatal errors. ALL these scripts unfortunately
+print a number of warnings, which can be ignored.</p>
+<p>Here&rsquo;s what the output of each section should look approxiately like:</p>
+<h2 id="retirement-states-creation">
+  Retirement States Creation
+  <a class="anchor" href="#retirement-states-creation">#</a>
+</h2>
+<pre tabindex="0"><code>States have been synchronized. Differences:
+   Added: {&#39;COMPLETE&#39;, &#39;FORUMS_COMPLETE&#39;, &#39;ENROLLMENTS_COMPLETE&#39;, &#39;RETIRING_LMS_MISC&#39;, &#39;RETIRING_LMS&#39;, &#39;NOTES_COMPLETE&#39;, &#39;RETIRING_ENROLLMENTS&#39;, &#39;PENDING&#39;, &#39;RETIRING_NOTES&#39;, &#39;PROCTORING_COMPLETE&#39;, &#39;RETIRING_FORUMS&#39;, &#39;ABORTED&#39;, &#39;ERRORED&#39;, &#39;LMS_MISC_COMPLETE&#39;, &#39;RETIRING_PROCTORING&#39;, &#39;LMS_COMPLETE&#39;}
+   Removed: set()
+   Remaining: set()
+States updated successfully. Current states:
+PENDING (step 1)
+RETIRING_FORUMS (step 11)
+FORUMS_COMPLETE (step 21)
+RETIRING_ENROLLMENTS (step 31)
+ENROLLMENTS_COMPLETE (step 41)
+RETIRING_NOTES (step 51)
+NOTES_COMPLETE (step 61)
+RETIRING_PROCTORING (step 71)
+PROCTORING_COMPLETE (step 81)
+RETIRING_LMS_MISC (step 91)
+LMS_MISC_COMPLETE (step 101)
+RETIRING_LMS (step 111)
+LMS_COMPLETE (step 121)
+ERRORED (step 131)
+ABORTED (step 141)
+COMPLETE (step 151)
+edxapp@ip-10-22-2-49:~$
+</code></pre><h2 id="retirement-user-creation">
+  Retirement User Creation
+  <a class="anchor" href="#retirement-user-creation">#</a>
+</h2>
+<pre tabindex="0"><code>Created new user: &#34;retirement_service_worker&#34;
+Setting is_staff for user &#34;retirement_service_worker&#34; to &#34;True&#34;
+Setting is_superuser for user &#34;retirement_service_worker&#34; to &#34;True&#34;
+Adding user &#34;retirement_service_worker&#34; to groups []
+Removing user &#34;retirement_service_worker&#34; from groups []
+2023-04-28 21:10:00,691 INFO 69935 [common.djangoapps.student.models.user] [user None] [ip None] user.py:782 - Created new profile for user: retirement_service_worker
+</code></pre><h2 id="retirement-dot-application-creation">
+  Retirement DOT Application Creation
+  <a class="anchor" href="#retirement-dot-application-creation">#</a>
+</h2>
+<pre tabindex="0"><code>None] [ip None] create_dot_application.py:82 - Created retirement application with id: 10, client_id: XXXXXXXXXXXXXXXXXXXXXXXX, and client_secret: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+</code></pre><p>You&rsquo;ll need to save this client_id and secret somewhere because you&rsquo;ll need to use it in the next step!</p>
+<h2 id="we-keep-secrets-in-the-vault-duh-">
+  We Keep Secrets In The Vault, Duh :)
+  <a class="anchor" href="#we-keep-secrets-in-the-vault-duh-">#</a>
+</h2>
+<p>Next, we&rsquo;ll need to make these secrets accessible to the pipeline so they can be consumed by the various retirement worker scripts.</p>
+<p>In order to do that, we&rsquo;ll use a utility called <a href="https://github.com/mozilla/sops">sops</a> to encrypt the secrets so we can safely store them in Github and conveyed to Vault.</p>
+<p>Unfortunately setting yourself up to use sops is a bit of a process in and of itself and it outside the scope of this document.</p>
+<p>Once you&rsquo;ve got sops squared away, use it on the appropriate operational configuration file. Here&rsquo;s the one for <a href="https://github.com/mitodl/ol-infrastructure/blob/main/src/bridge/secrets/concourse/operations.qa.yaml">QA</a>.</p>
+<p>So you&rsquo;d invoke: <code>sops operations.qa.yml</code>. At that point, sops will decrypt the file and open your editor of choice with its contents.</p>
+<p>Now, we want to add the necessary secrets we copied in the previous step, as well as the LMS host for this environment. You can find the
+LMS hosts for the various environments listed in the <a href="https://github.mit.edu/odl-engineering/project-status/wiki/App-Links">App Links</a> Wiki page.</p>
+<p>If you&rsquo;re unsure, ask an old hand for help. Disambiguating the various environments can be tricky, and better safe than sorry!</p>
+<p>Here&rsquo;s an example of what I added for mitxonline qa:</p>
+<pre tabindex="0"><code>  mitxonline/tubular_oauth_client:
+    id: CLIENTIDUNENCRYPTEDSECRETSAREFUNYESTHEYARE
+    secret: EVENMORESLIGHTLYLONGERGIBBERISHTHATISYOURUNENCRYPTEDSECRET
+    host: https://courses-qa.mitxonline.mit.edu
+</code></pre><p>Once you&rsquo;ve made your additions, save the file and quit your editor. sops will now do its magic and re-encrypt those values.</p>
+<p><strong>BE SURE NOT TO COMMIT UNENDCRYPTED SECRETS TO GITHUB</strong>.</p>
+<p>Now create a pull request and get these changes merged. If this is for production, you&rsquo;ll also need to kick off <a href="https://cicd.odl.mit.edu/teams/infrastructure/pipelines/packer-pulumi-concourse">this pipeline</a> manually.</p>
+<p>At this point, your secrets should be in vault and available to the pipeline we&rsquo;re about to build.</p>
+<h2 id="start-the-rube-goldberg-device-building-the-pipeline-itself">
+  START THE RUBE GOLDBERG DEVICE! Building The Pipeline Itself
+  <a class="anchor" href="#start-the-rube-goldberg-device-building-the-pipeline-itself">#</a>
+</h2>
+<p>In order to get this done, you&rsquo;ll need to have the <a href="https://concourse-ci.org/">Concourse</a> <code>fly</code> CLI command installed and an appropriate target for your
+Concourse server and team defined.</p>
+<p>I like to keep my target names reasonably short, so for the target I created for mitxonline QA, I ran:</p>
+<p><code>fly login --target mo-qa --team-name=mitxonline --concourse-url https://cicd-qa.odl.mit.edu</code></p>
+<p>Once we have a suitable target defined, we can use it to actually create our pipeline for real:</p>
+<ul>
+<li>From a checked out mitodl/ol-infrastructure repository, change directory to the <code>src/ol_concourse/pipelines/open_edx/tubular</code> folder.</li>
+<li>Run <code>poetry run python tubular.py</code> - This should print a reasonable looking blob of JSON to the screen with a fly command to run at the bottom.</li>
+<li>Go ahead and run that command! For example, given the mo-qa target I defined above, I ran: <code>fly -t mo-qa sp -p misc-cloud-tubular -c definition.json</code>.
+<ul>
+<li>At this point fly should show you the pipeline definition and will ask you if you want to actually make the change. Answer yes.</li>
+</ul>
+</li>
+<li>Assuming there were no errors, your pipeline definition should be in place and we&rsquo;re ready to get the ball rolling!</li>
+<li>You can either use the fly unpause-pipeline or else, in the Concourse web UI, click the little Play icon at the very top right of the screen. <!-- raw HTML omitted --></li>
+<li>The build is set to run once a week, so once you unpause the pipeline, you may noeed to click the + icon in order to actually kick off a build.</li>
+</ul>
+<p>That&rsquo;s it! Obviously keep an eye out on the pipeline for any failures.</p>
+</article>
+ 
+      
+
+      <footer class="book-footer">
+        
+  <div class="flex flex-wrap justify-between">
+
+
+
+
+
+</div>
+
+
+
+  <script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){if(window.getSelection().toString())return;e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script>
+
+
+ 
+        
+      </footer>
+
+      
+  
+  <div class="book-comments">
+
+</div>
+  
+ 
+
+      <label for="menu-control" class="hidden book-menu-overlay"></label>
+    </div>
+
+    
+    <aside class="book-toc">
+      <div class="book-toc-content">
+        
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#getting-set-up">Getting Set Up</a></li>
+    <li><a href="#retirement-states-creation">Retirement States Creation</a></li>
+    <li><a href="#retirement-user-creation">Retirement User Creation</a></li>
+    <li><a href="#retirement-dot-application-creation">Retirement DOT Application Creation</a></li>
+    <li><a href="#we-keep-secrets-in-the-vault-duh-">We Keep Secrets In The Vault, Duh :)</a></li>
+    <li><a href="#start-the-rube-goldberg-device-building-the-pipeline-itself">START THE RUBE GOLDBERG DEVICE! Building The Pipeline Itself</a></li>
+  </ul>
+</nav>
+
+
+ 
+      </div>
+    </aside>
+    
+  </main>
+
+  
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+

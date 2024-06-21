@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="How To Test And Deploy MIT OL Pulumi/Packer Projects # The way we build images here at MIT OL is complicated and involves a number of components with various moving parts, so it can be difficult to understand where to start, what to change, and moreover how to safely test your changes without breaking production. This document will address these issues.
+The Pipeline # Each MIT OL project that uses this technique has an accompanying Concourse pipeline that builds the Packer image, then deploys that image to the appropriate stage&rsquo;s AWS EC2 launch profile where new instances will be launched by instance refresh to deploy the new code / configuration into the wild.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#343a40">
+<meta name="color-scheme" content="light dark"><meta property="og:url" content="http://localhost:1313/docs/how_to/test_and_deploy_pulumi_packer_projects/">
+  <meta property="og:site_name" content="MIT Online Learning Platform Engineering Site">
+  <meta property="og:title" content="MIT Online Learning Platform Engineering Site">
+  <meta property="og:description" content="How To Test And Deploy MIT OL Pulumi/Packer Projects # The way we build images here at MIT OL is complicated and involves a number of components with various moving parts, so it can be difficult to understand where to start, what to change, and moreover how to safely test your changes without breaking production. This document will address these issues.
+The Pipeline # Each MIT OL project that uses this technique has an accompanying Concourse pipeline that builds the Packer image, then deploys that image to the appropriate stage’s AWS EC2 launch profile where new instances will be launched by instance refresh to deploy the new code / configuration into the wild.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="docs">
+<title>Test and Deploy Pulumi Packer Projects | MIT Online Learning Platform Engineering Site</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/favicon.png" >
+<link rel="canonical" href="http://localhost:1313/docs/how_to/test_and_deploy_pulumi_packer_projects/">
+<link rel="stylesheet" href="/book.min.309b7ed028807cdb68d8d61e26d609f48369c098dbf5e4d8c0dcf4cdf49feafc.css" integrity="sha256-MJt&#43;0CiAfNto2NYeJtYJ9INpwJjb9eTYwNz0zfSf6vw=" crossorigin="anonymous">
+  <script defer src="/fuse.min.js"></script>
+  <script defer src="/en.search.min.eeb2a911d69074471e43b7b65efd70f2acb2e54b48008caf568df0be47dddc2d.js" integrity="sha256-7rKpEdaQdEceQ7e2Xv1w8qyy5UtIAIyvVo3wvkfd3C0=" crossorigin="anonymous"></script>
+
+  
+
+<!--
+Made with Book Theme
+https://github.com/alex-shpak/hugo-book
+-->
+  
+</head>
+<body dir="ltr">
+  <input type="checkbox" class="hidden toggle" id="menu-control" />
+  <input type="checkbox" class="hidden toggle" id="toc-control" />
+  <main class="container flex">
+    <aside class="book-menu">
+      <div class="book-menu-content">
+        
+  <nav>
+<h2 class="book-brand">
+  <a class="flex align-center" href="/"><span>MIT Online Learning Platform Engineering Site</span>
+  </a>
+</h2>
+
+
+<div class="book-search hidden">
+  <input type="text" id="book-search-input" placeholder="Search" aria-label="Search" maxlength="64" data-hotkeys="s/" />
+  <div class="book-search-spinner hidden"></div>
+  <ul id="book-search-results"></ul>
+</div>
+<script>document.querySelector(".book-search").classList.remove("hidden")</script>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/discoveries/fargate_service_discovery/" class="">Fargate Service Discovery</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/access_openedx_djange_manage/" class="">Access Openedx Djange Manage</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/concourse_github_issues_user_guide/" class="">Concourse Github Issues User Guide</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/consul_incantations/" class="">Consul Incantations</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/deploying_concourse/" class="">Deploying Concourse</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/enable_rapid_response_edxapp/" class="">Enable Rapid Response Edxapp</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/faking_it_with_consul_and_vault/" class="">Faking It With Consul and Vault</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/getting_started_with_concourse/" class="">Getting Started With Concourse</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/heroku_config_vars/" class="">Heroku Config Vars</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/import_existing_resources_with_pulumi/" class="">Import Existing Resources With Pulumi</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/mitol_devops_patterns_cookbook/" class="">Mitol Devops Patterns Cookbook</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/mitol_openedx_retirement_pipeline/" class="">Mitol Openedx Retirement Pipeline</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/moira_certificates/" class="">Moira Certificates</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/openedx/release_upgrades/" class="">Release Upgrades</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/publish_to_npm/" class="">Publish to Npm</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/pulumi_aws_classic_5_to_6_upgrade/" class="">Pulumi Aws Classic 5 to 6 Upgrade</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/recaptcha/" class="">Recaptcha</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/restore_vault_backups/" class="">Restore Vault Backups</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/retire_an_openedx_user/" class="">Retire an Openedx User</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/tagging_amis_with_installed_software_metadata/" class="">Tagging Amis With Installed Software Metadata</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/test_and_deploy_pulumi_packer_projects/" class="active">Test and Deploy Pulumi Packer Projects</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/transition_heroku_postgres_db_to_rds/" class="">Transition Heroku Postgres Db to Rds</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/inventory/" class="">Inventory</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/key_labels/" class="">Key Labels</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/overview/" class="">Overview</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/post-mortems/20231030_xpro_outage/" class="">20231030 Xpro Outage</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/runbooks/oncall/" class="">Oncall</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</nav>
+
+
+
+
+  <script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script>
+
+
+ 
+      </div>
+    </aside>
+
+    <div class="book-page">
+      <header class="book-header">
+        
+  <div class="flex align-center justify-between">
+  <label for="menu-control">
+    <img src="/svg/menu.svg" class="book-icon" alt="Menu" />
+  </label>
+
+  <strong>Test and Deploy Pulumi Packer Projects</strong>
+
+  <label for="toc-control">
+    
+    <img src="/svg/toc.svg" class="book-icon" alt="Table of Contents" />
+    
+  </label>
+</div>
+
+
+  
+  <aside class="hidden clearfix">
+    
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#packer-stage">Packer Stage</a>
+      <ul>
+        <li><a href="#testing">Testing</a></li>
+      </ul>
+    </li>
+    <li><a href="#deploy-stage">Deploy Stage</a></li>
+  </ul>
+</nav>
+
+
+
+  </aside>
+  
+ 
+      </header>
+
+      
+      
+  <article class="markdown book-article"><h1 id="how-to-test-and-deploy-mit-ol-pulumipacker-projects">
+  How To Test And Deploy MIT OL Pulumi/Packer Projects
+  <a class="anchor" href="#how-to-test-and-deploy-mit-ol-pulumipacker-projects">#</a>
+</h1>
+<p>The way we build images here at MIT OL is complicated and involves a number of
+components with various moving parts, so it can be difficult to understand where
+to start, what to change, and moreover how to safely test your changes without
+breaking production. This document will address these issues.</p>
+<h1 id="the-pipeline">
+  The Pipeline
+  <a class="anchor" href="#the-pipeline">#</a>
+</h1>
+<p>Each MIT OL project that uses this technique has an accompanying
+<a href="https://concourse.io">Concourse</a> pipeline that builds the Packer image, then
+deploys that image to the appropriate stage&rsquo;s AWS EC2 launch profile where new
+instances will be launched by instance refresh to deploy the new code /
+configuration into the wild.</p>
+<p>One such project is <a href="https://tika.apache.org/">Tika</a>. It&rsquo;s a data transformation
+service used in our data platform. <a href="https://cicd.odl.mit.edu/teams/infrastructure/pipelines/packer-pulumi-tika/">Here is its
+pipeline</a>.</p>
+<h2 id="packer-stage">
+  Packer Stage
+  <a class="anchor" href="#packer-stage">#</a>
+</h2>
+<p>The first couple stages are reasonable self explanatory:</p>
+<ul>
+<li>Validate the packer template for any syntax errors and the like</li>
+<li>Actually run packer build on the template, invoking pyinfra and packer,
+producing an AMI.</li>
+</ul>
+<p>You can find the pyinfra sources in ol-infrastructure
+src/bilder/images/<!-- raw HTML omitted -->. Here is the pyinfra folder for
+<a href="https://github.com/mitodl/ol-infrastructure/tree/main/src/bilder/images/tika">Tika</a>.</p>
+<h3 id="testing">
+  Testing
+  <a class="anchor" href="#testing">#</a>
+</h3>
+<p>If you want to test the pyinfra portion locally, you can use the following
+invocation:</p>
+<pre tabindex="0"><code># cpatti @ rocinante in ~/src/mit/ol-infrastructure/src/bilder/images/tika on git:main o [17:11:31] C:1
+$ pr pyinfra @docker/debian:latest deploy.py
+</code></pre><p>You should see output similar to the following:</p>
+<p><em>TODO: Is there a base image we can use that won&rsquo;t whine about curl/wget and say
+no hosts remaining?</em></p>
+<pre tabindex="0"><code>--&gt; Loading config...
+
+--&gt; Loading inventory...
+
+--&gt; Connecting to hosts...
+    [@docker/debian:latest] Connected
+
+--&gt; Preparing Operations...
+    Loading: deploy.py
+    [@docker/debian:latest] Ready: deploy.py
+
+--&gt; Proposed changes:
+    Groups: @docker
+    [@docker/debian:latest]   Operations: 32   Change: 32   No change: 0
+
+
+--&gt; Beginning operation run...
+--&gt; Starting operation: Install Hashicorp Products | Ensure unzip is installed
+    [@docker/debian:latest] Success
+
+--&gt; Starting operation: Install Hashicorp Products | Create system user for vault
+    [@docker/debian:latest] Success
+
+--&gt; Starting operation: Install Hashicorp Products | Download vault archive
+    [@docker/debian:latest] sh: 1: curl: not found
+    [@docker/debian:latest] sh: 1: wget: not found
+    [@docker/debian:latest] Error: executed 0/3 commands
+    [@docker/debian:latest] docker build complete, image ID: cc0b00b971bd
+--&gt; pyinfra error: No hosts remaining!
+</code></pre><p>When you&rsquo;re satisfied that your pyinfra build will at least build correctly, you
+can trigger a local packer image build that the CI deployment stage can consume
+to get your changes into CI. Note that this can take a while, so be prepared for
+it to chug for 15-20 minutes. Great time to go get a beverage :)</p>
+<p>You can kick this off with an invocation like the following:</p>
+<pre tabindex="0"><code>poetry run packer build  src/bilder/images/tika/tika.pkr.hcl
+</code></pre><p>Note that obviously your path will change if the project you&rsquo;re building is
+different.</p>
+<p>Note also that you may require a slightly different invocation for different
+projects. In Tika&rsquo;s case we require a custom Packer template as specified above,
+but in the case of other projects which use the default Packer template, you
+might use an invocation like the one we use to build Concourse&rsquo;s image:</p>
+<pre tabindex="0"><code>poetry run packer build -on-error=ask -var node_type=web -var app_name=concourse -only amazon-ebs.third-party src/bilder/images
+</code></pre><p>Note the node_type and app_name variable declarations above. For Concourse, we
+can build either a web image or a worker image, so it&rsquo;s important we include
+node_type in our invocation.</p>
+<h2 id="deploy-stage">
+  Deploy Stage
+  <a class="anchor" href="#deploy-stage">#</a>
+</h2>
+<p>The remaining boxes in the pipeline are deployment stages. One per environment
+stage e.g. CI, QA and Production.</p>
+<p>Each of these deployment stages basically runs the equivalent of a <code>pulumi up</code>
+on the Pulumi stack associated with the application in question. Here&rsquo;s the one
+for
+<a href="https://github.com/mitodl/ol-infrastructure/tree/main/src/ol_infrastructure/applications/tika">Tika</a>.</p>
+<p>Let&rsquo;s take a look at the output from a build of this stage:</p>
+<pre tabindex="0"><code>INFO:root:@ updating....
+
+8&lt; snip for brevity 8&lt;
+
+INFO:root:    aws:ec2:LaunchTemplate tika-server-tika-ci-launch-template  [diff: ~blockDeviceMappings]
+
+INFO:root:    aws:autoscaling:Group tika-server-tika-ci-auto-scale-group  [diff: ~instanceRefresh,tags,vpcZoneIdentifiers]
+
+INFO:root:@ updating....
+
+INFO:root:    pulumi:pulumi:Stack ol-infrastructure-tika-server-applications.tika.CI
+
+INFO:root:    ol:infrastructure:aws:auto_scale_group:OLAutoScaleGroup tika-server-tika-ci
+
+INFO:root:
+
+INFO:root:Resources:
+
+INFO:root:    17 unchanged
+</code></pre><p>From this rather verbose blurb we can see that Pulumi updated the ASG and all
+associated resources like the Launch template. This is the mechanism which seeds
+the updated image into our EC2 environment where instance refresh safely cycles
+the old instances out and the ones with our updated code in.</p>
+</article>
+ 
+      
+
+      <footer class="book-footer">
+        
+  <div class="flex flex-wrap justify-between">
+
+
+
+
+
+</div>
+
+
+
+  <script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){if(window.getSelection().toString())return;e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script>
+
+
+ 
+        
+      </footer>
+
+      
+  
+  <div class="book-comments">
+
+</div>
+  
+ 
+
+      <label for="menu-control" class="hidden book-menu-overlay"></label>
+    </div>
+
+    
+    <aside class="book-toc">
+      <div class="book-toc-content">
+        
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#packer-stage">Packer Stage</a>
+      <ul>
+        <li><a href="#testing">Testing</a></li>
+      </ul>
+    </li>
+    <li><a href="#deploy-stage">Deploy Stage</a></li>
+  </ul>
+</nav>
+
+
+ 
+      </div>
+    </aside>
+    
+  </main>
+
+  
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+

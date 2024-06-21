@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="How to Publish an MIT OL Package to NPM # Note: This is a VERY rough document. We hate the current process, but I&rsquo;m a big believer in not allowing the perfect to be the enemy of the good :)
+Pre-Requisites # You will need Vault access for production. You&rsquo;ll need to know which Github repository needs publhsing Setup # Git # Check out the Git repository that equates to the NPM module that needs publishing.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#343a40">
+<meta name="color-scheme" content="light dark"><meta property="og:url" content="http://localhost:1313/docs/how_to/publish_to_npm/">
+  <meta property="og:site_name" content="MIT Online Learning Platform Engineering Site">
+  <meta property="og:title" content="MIT Online Learning Platform Engineering Site">
+  <meta property="og:description" content="How to Publish an MIT OL Package to NPM # Note: This is a VERY rough document. We hate the current process, but I’m a big believer in not allowing the perfect to be the enemy of the good :)
+Pre-Requisites # You will need Vault access for production. You’ll need to know which Github repository needs publhsing Setup # Git # Check out the Git repository that equates to the NPM module that needs publishing.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="docs">
+<title>Publish to Npm | MIT Online Learning Platform Engineering Site</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/favicon.png" >
+<link rel="canonical" href="http://localhost:1313/docs/how_to/publish_to_npm/">
+<link rel="stylesheet" href="/book.min.309b7ed028807cdb68d8d61e26d609f48369c098dbf5e4d8c0dcf4cdf49feafc.css" integrity="sha256-MJt&#43;0CiAfNto2NYeJtYJ9INpwJjb9eTYwNz0zfSf6vw=" crossorigin="anonymous">
+  <script defer src="/fuse.min.js"></script>
+  <script defer src="/en.search.min.eeb2a911d69074471e43b7b65efd70f2acb2e54b48008caf568df0be47dddc2d.js" integrity="sha256-7rKpEdaQdEceQ7e2Xv1w8qyy5UtIAIyvVo3wvkfd3C0=" crossorigin="anonymous"></script>
+
+  
+
+<!--
+Made with Book Theme
+https://github.com/alex-shpak/hugo-book
+-->
+  
+</head>
+<body dir="ltr">
+  <input type="checkbox" class="hidden toggle" id="menu-control" />
+  <input type="checkbox" class="hidden toggle" id="toc-control" />
+  <main class="container flex">
+    <aside class="book-menu">
+      <div class="book-menu-content">
+        
+  <nav>
+<h2 class="book-brand">
+  <a class="flex align-center" href="/"><span>MIT Online Learning Platform Engineering Site</span>
+  </a>
+</h2>
+
+
+<div class="book-search hidden">
+  <input type="text" id="book-search-input" placeholder="Search" aria-label="Search" maxlength="64" data-hotkeys="s/" />
+  <div class="book-search-spinner hidden"></div>
+  <ul id="book-search-results"></ul>
+</div>
+<script>document.querySelector(".book-search").classList.remove("hidden")</script>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/discoveries/fargate_service_discovery/" class="">Fargate Service Discovery</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/access_openedx_djange_manage/" class="">Access Openedx Djange Manage</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/concourse_github_issues_user_guide/" class="">Concourse Github Issues User Guide</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/consul_incantations/" class="">Consul Incantations</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/deploying_concourse/" class="">Deploying Concourse</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/enable_rapid_response_edxapp/" class="">Enable Rapid Response Edxapp</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/faking_it_with_consul_and_vault/" class="">Faking It With Consul and Vault</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/getting_started_with_concourse/" class="">Getting Started With Concourse</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/heroku_config_vars/" class="">Heroku Config Vars</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/import_existing_resources_with_pulumi/" class="">Import Existing Resources With Pulumi</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/mitol_devops_patterns_cookbook/" class="">Mitol Devops Patterns Cookbook</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/mitol_openedx_retirement_pipeline/" class="">Mitol Openedx Retirement Pipeline</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/moira_certificates/" class="">Moira Certificates</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/openedx/release_upgrades/" class="">Release Upgrades</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/publish_to_npm/" class="active">Publish to Npm</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/pulumi_aws_classic_5_to_6_upgrade/" class="">Pulumi Aws Classic 5 to 6 Upgrade</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/recaptcha/" class="">Recaptcha</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/restore_vault_backups/" class="">Restore Vault Backups</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/retire_an_openedx_user/" class="">Retire an Openedx User</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/tagging_amis_with_installed_software_metadata/" class="">Tagging Amis With Installed Software Metadata</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/test_and_deploy_pulumi_packer_projects/" class="">Test and Deploy Pulumi Packer Projects</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/how_to/transition_heroku_postgres_db_to_rds/" class="">Transition Heroku Postgres Db to Rds</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/inventory/" class="">Inventory</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/key_labels/" class="">Key Labels</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/monitoring/overview/" class="">Overview</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/post-mortems/20231030_xpro_outage/" class="">20231030 Xpro Outage</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/runbooks/oncall/" class="">Oncall</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</nav>
+
+
+
+
+  <script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script>
+
+
+ 
+      </div>
+    </aside>
+
+    <div class="book-page">
+      <header class="book-header">
+        
+  <div class="flex align-center justify-between">
+  <label for="menu-control">
+    <img src="/svg/menu.svg" class="book-icon" alt="Menu" />
+  </label>
+
+  <strong>Publish to Npm</strong>
+
+  <label for="toc-control">
+    
+    <img src="/svg/toc.svg" class="book-icon" alt="Table of Contents" />
+    
+  </label>
+</div>
+
+
+  
+  <aside class="hidden clearfix">
+    
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#pre-requisites">Pre-Requisites</a></li>
+    <li><a href="#setup">Setup</a>
+      <ul>
+        <li><a href="#git">Git</a></li>
+        <li><a href="#npm-login">npm login</a></li>
+      </ul>
+    </li>
+    <li><a href="#doing-the-actual-publishing">Doing The Actual Publishing</a></li>
+  </ul>
+</nav>
+
+
+
+  </aside>
+  
+ 
+      </header>
+
+      
+      
+  <article class="markdown book-article"><h1 id="how-to-publish-an-mit-ol-package-to-npm">
+  How to Publish an MIT OL Package to NPM
+  <a class="anchor" href="#how-to-publish-an-mit-ol-package-to-npm">#</a>
+</h1>
+<p><strong>Note</strong>: This is a VERY rough document. We hate the current
+process, but I&rsquo;m a big believer in not allowing the perfect
+to be the enemy of the good :)</p>
+<h2 id="pre-requisites">
+  Pre-Requisites
+  <a class="anchor" href="#pre-requisites">#</a>
+</h2>
+<ul>
+<li>You will need Vault access for production.</li>
+<li>You&rsquo;ll need to know which Github repository needs publhsing</li>
+</ul>
+<h2 id="setup">
+  Setup
+  <a class="anchor" href="#setup">#</a>
+</h2>
+<h3 id="git">
+  Git
+  <a class="anchor" href="#git">#</a>
+</h3>
+<p>Check out the Git repository that equates to the NPM module
+that needs publishing. Usually the dev asking for help can
+give you this if it&rsquo;s not obvious.</p>
+<h3 id="npm-login">
+  npm login
+  <a class="anchor" href="#npm-login">#</a>
+</h3>
+<h4 id="fun-with-vaults-web-ui">
+  Fun with Vault&rsquo;s Web UI
+  <a class="anchor" href="#fun-with-vaults-web-ui">#</a>
+</h4>
+<p>Now login to npm from the command line. You&rsquo;ll need to have
+npm and node installed in order for this to work. If you&rsquo;re
+on a Mac, you can use homebrew <code>brew install npm</code> but YMMV.</p>
+<p>You&rsquo;ll need the username and TOTP code we use for this. Get
+from the production <a href="https://vault-production.odl.mit.edu">Vault instance</a>.</p>
+<p>Navigate to &ldquo;platform-secrets&rdquo; and look for the &rsquo;npmjs&rsquo; entry.</p>
+<p>This will get you the username and password. Now you&rsquo;ll need
+the TOTP code.</p>
+<p>Click the eye icon to reveal the contents of the &rsquo;totp-path-mitx-devops'
+entry.</p>
+<p>Now click the icon to the left of the eye to copy the command you&rsquo;ll
+need to run to your local clipboard.</p>
+<p>Open the CLI by clicking on the little black box with the &lsquo;&gt;&rsquo; in it in the
+very upper right of the screen. Now paste the contents if your
+clipboard into the bottom section of the screen where you can
+enter commands. This will get you the TOTP code you&rsquo;ll need.</p>
+<h4 id="to-the-cli">
+  To the CLI!
+  <a class="anchor" href="#to-the-cli">#</a>
+</h4>
+<p>To login to npm on the command line and complete setup, run:
+<code>npm login mitx-devops</code> and hit return.</p>
+<p>This will prompt to open a web page. You&rsquo;ll need to supply the
+password and TOTP code you got in the previous step. If it&rsquo;s been
+too long since you gathered the TOTP code, you may need to hit
+up-arrow in the Vault web UI CLI and get a fresh TOTP code.</p>
+<p>If you&rsquo;re successful you should see something like:
+<code>Logged in on https://registry.npmjs.org/.</code></p>
+<h2 id="doing-the-actual-publishing">
+  Doing The Actual Publishing
+  <a class="anchor" href="#doing-the-actual-publishing">#</a>
+</h2>
+<p>Now change directory to the Git repo you checked our earlier and type:</p>
+<p><code>npm publish</code>.</p>
+<p>If it blows up, check the <code>packages.json</code> file and ensure the the
+organization is set correctly. It should be &lsquo;mitodl&rsquo;. See
+<a href="https://github.com/mitodl/brand-mitol-residential/commit/8c998e6cc87f4d020b5011be5a8cdf3b003660de">this commit</a> for
+an example fix.</p>
+</article>
+ 
+      
+
+      <footer class="book-footer">
+        
+  <div class="flex flex-wrap justify-between">
+
+
+
+
+
+</div>
+
+
+
+  <script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){if(window.getSelection().toString())return;e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script>
+
+
+ 
+        
+      </footer>
+
+      
+  
+  <div class="book-comments">
+
+</div>
+  
+ 
+
+      <label for="menu-control" class="hidden book-menu-overlay"></label>
+    </div>
+
+    
+    <aside class="book-toc">
+      <div class="book-toc-content">
+        
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#pre-requisites">Pre-Requisites</a></li>
+    <li><a href="#setup">Setup</a>
+      <ul>
+        <li><a href="#git">Git</a></li>
+        <li><a href="#npm-login">npm login</a></li>
+      </ul>
+    </li>
+    <li><a href="#doing-the-actual-publishing">Doing The Actual Publishing</a></li>
+  </ul>
+</nav>
+
+
+ 
+      </div>
+    </aside>
+    
+  </main>
+
+  
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+

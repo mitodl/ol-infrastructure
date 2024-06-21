@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Docs on MIT Online Learning Platform Engineering Site</title>
+    <link>http://localhost:1313/docs/</link>
+    <description>Recent content in Docs on MIT Online Learning Platform Engineering Site</description>
+    <generator>Hugo</generator>
+    <language>en-us</language>
+    <atom:link href="http://localhost:1313/docs/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/discoveries/fargate_service_discovery/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/discoveries/fargate_service_discovery/</guid>
+      <description>Integrating Fargate Services Into Our Existing Systems Architecture # The Goal # We want to start using ECS Fargate from AWS as a low-complexity way of running containerized workloads. It allows us to specify a set of containers that we would like to run as a single task, with simple autoscaling and resource allocation, and no need to manage the underlying servers. At face value this is a great option, even with the slight cost markup that it brings.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/access_openedx_djange_manage/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/access_openedx_djange_manage/</guid>
+      <description>How To Access An OpenEdX Django Admin manage.py # Pre-requisites # You will need the following pieces of information to get started:&#xA;The product you want to access e.g. mitxonline, ocw-studio, xpro, mitx The environment you want - one of ci, qa, or production. Valid credentials to login to the MIT Open Learning AWS Account You should most likely have been given these as a part of your onboarding. The MIT oldevops AWS key file - oldevops.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/concourse_github_issues_user_guide/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/concourse_github_issues_user_guide/</guid>
+      <description>The Problem # Here at MIT OL we use Concourse CI. It&amp;rsquo;s an incredibly powerful package for managing complex continuous integration workflows, and we leverage its power in all kinds of interesting ways.&#xA;What that means for you, the developer however is that our pipelines can be difficult to get one&amp;rsquo;s head around and understand. As an example, this is our edx platform meta-pipeline.&#xA;The Ask # Most of the time, there are exactly two questions software developers wants answered when it comes to deploying their software:</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/consul_incantations/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/consul_incantations/</guid>
+      <description>Misbehaving consul cluster incident from 20231004-20231905 # Overview # At some point operations-production consul cluster fell over and stopped being useful. The root cause was not immediately know but was almost definitely related to an upgrade to 1.16.2 from ??? (no good record indication what the cluster was on before all this went down&amp;hellip;)&#xA;Key takeaway from the logs was this cryptic message about being unable to restore snapshot:</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/deploying_concourse/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/deploying_concourse/</guid>
+      <description>Summary # This document will detail the best practice we use to develop and deploy changes to our Concourse pipeline web and worker servers.&#xA;Developing # As with most projects here at MIT OL&amp;rsquo;s Devops team, you&amp;rsquo;ll want to start by checking out the ol-infrastructure project to your local workspace.&#xA;As usual, be sure to run poetry install so all the right dependencies will be cached and ready to run your newly changed pyinfra code.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/enable_rapid_response_edxapp/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/enable_rapid_response_edxapp/</guid>
+      <description>Reference # https://github.com/mitodl/rapid-response-xblock/blob/master/README.md&#xA;How-To # Common env.yaml file must have FEATURES:ALLOW_ALL_ADVANCED_COMPONENTS: True Common env.yaml file must have ENABLE_RAPID_RESPONSE_AUTHOR_VIEW: True Rapid-response package pip packages must be installed in the image rapid-response-xblock and ol-openedx-rapid-response-reports. Refer to existing package listings in the openedx docker configs. In the LMS Admin UI -&amp;gt; /admin/lms_xblock/xblockasidesconfig/ create an enabled record. In the CMS Admin UI -&amp;gt; /admin/xblock_config/studioconfig/ create an &amp;rsquo;enabled&amp;rsquo; record. Verify via studio on a test/demo course, find an existing multiple choice problem or create a new one.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/faking_it_with_consul_and_vault/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/faking_it_with_consul_and_vault/</guid>
+      <description>Faking it with Consul and Vault # Why? # Sometimes you want to test an AMI build process without all all the supporting stuff that allows an EC2 instance to talk to vault and consul like a good little box. All that supporting stuff typically happens are instance start time and rides in on user_data which you don&amp;rsquo;t have if you fired up an EC2 by hand just to see what your AMI looks like so far.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/getting_started_with_concourse/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/getting_started_with_concourse/</guid>
+      <description>Getting Started Building Concourse Pipelines in Python # Getting Set Up # Use the Tutorial on the Concourse website under Docs-&amp;gt;Getting Started to get set up. Do NOT use any other tutorials you find linked elsewhere. Some are out of date and the failure modes can be incredibly hard to debug! If you&amp;rsquo;re using an Arm64 Mac (e.g. M1, M2, etc.) just substitute this platform specific image for the one cited in the tutorial.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/heroku_config_vars/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/heroku_config_vars/</guid>
+      <description>Managing Heroku Config Vars with Pulumi # heroku.app.ConfigAssociation # The resource/mechanism we are using to manage config vars in Heroku is called a &amp;lsquo;ConfigAssociation&amp;rsquo; which is documented (here)[https://www.pulumi.com/registry/packages/heroku/api-docs/app/configassociation/]. A ConfigAssociation takes in an application ID and two sets of variable maps: sensitive_vars and vars. The only difference being that sensitive_vars will not be output during up operations.&#xA;Required config for the pulumi provider # The pulumiverse_heroku provider requries a configuration item in the pulumi stacks named heroku:apiKey.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/import_existing_resources_with_pulumi/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/import_existing_resources_with_pulumi/</guid>
+      <description>Importing Resources That Already Exist Into Your Pulumi Stack # Summary # There are several ways to skin this particular cat but Tobias has shown me one that works really well so that&amp;rsquo;s what we&amp;rsquo;ll outline here.&#xA;There&amp;rsquo;s another approach using the pulumi import CLI command but in my experience that brings in a bunch of extra attributes we don&amp;rsquo;t want. (There may be ways to tune this, I just don&amp;rsquo;t know them.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/mitol_devops_patterns_cookbook/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/mitol_devops_patterns_cookbook/</guid>
+      <description>Summary # This document will serve as a place to put patterns and best practices.&#xA;The goal is to ease the path for both new builders and experienced builders by helping narrow down the bevvy of choices and present a workable best practice solution to a given problem.&#xA;There are many potential ways to organize a document like this, but for now I intend to start with the recipes broken down by infrastructure components.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/mitol_openedx_retirement_pipeline/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/mitol_openedx_retirement_pipeline/</guid>
+      <description>Setting Up The Retirement Pipeline For A New MIT OL OpenEdX Application # Getting Set Up # First, follow the instructions in the Setting Up User Retirement In The LMS document.&#xA;You&amp;rsquo;ll need to ssh into an edx-worker for the appropriate environment you&amp;rsquo;re working in.&#xA;Run sudo su - edxapp -s /bin/bash and then source edxapp_env to get to where you need to be to run the Django manage application.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/moira_certificates/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/moira_certificates/</guid>
+      <description>Moira Certificates # There are two services in our porfolio that interact with Moira.&#xA;MIT Open / OpenDiscussions ODL-Video-Service Both of these services authenticate against Moira with certificates issued by ca.mit.edu which is also the provider of MIT Personal Certificates. There is no web interface for requesting an application certificate from ca.mit.edu, so you need to email mitcert@mit.edu with the CSR in the body of the email and a clear request that you&amp;rsquo;re asking for a certificate issued from ca.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/openedx/release_upgrades/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/openedx/release_upgrades/</guid>
+      <description>How To Update The Release Version Of An Open edX Deployment # Open edX Releases # Open edX cuts new named releases approximately every 6 months. Each of our deployments needs to be able to independently upgrade the respective version on their own schedule. MITx Residential upgrades twice per year, roughly aligned with the release timing of the upstream Open edX platform, whereas xPro has typically upgraded on an annual basis in the December timeframe.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/publish_to_npm/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/publish_to_npm/</guid>
+      <description>How to Publish an MIT OL Package to NPM # Note: This is a VERY rough document. We hate the current process, but I&amp;rsquo;m a big believer in not allowing the perfect to be the enemy of the good :)&#xA;Pre-Requisites # You will need Vault access for production. You&amp;rsquo;ll need to know which Github repository needs publhsing Setup # Git # Check out the Git repository that equates to the NPM module that needs publishing.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/pulumi_aws_classic_5_to_6_upgrade/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/pulumi_aws_classic_5_to_6_upgrade/</guid>
+      <description>So, this is roughly what I believe is happening. So you guys can know too.&#xA;I updated / tested a bunch of stacks, mostly CI or sometimes QA, yesterday with the pulumi-aws 6.5.0 upgrade. That is a two part thing. Python package but also provider. Part of that upgrade, pulumi changed some of the state/stack structures and they are no longer backwards compatible, in particular those around RDS instances. So I, by hand, upgraded a bunch of stacks to the new provider, they migrate nicely everything is good.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/recaptcha/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/recaptcha/</guid>
+      <description>reCAPTCHA Errors # ERROR for site owner: Invalid domain for site key. Need to login to google with the mitx devops username and password (vault-production -&amp;gt; platform-secrets/google). It will need to do an email verification code to one of our lists if you don&amp;rsquo;t have an active session. Make your way to the reCAPTCHA console located here. There is a dropdown on the top left that lets you see which site/application configuration that you&amp;rsquo;re working with.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/restore_vault_backups/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/restore_vault_backups/</guid>
+      <description>So you broke vault? # Symptoms # The vault UI or CLI reports that the cluster is sealed and there is no amount of coaxing to get it out of that state. There may be other symptoms. Add to this list as needed. root@ip-172-16-0-82:/etc/vault# VAULT_SKIP_VERIFY=true vault status Key Value --- ----- Recovery Seal Type awskms Initialized false &amp;lt;&amp;lt;&amp;lt;&amp;lt;&amp;lt; Ahh! Bad! Sealed true &amp;lt;&amp;lt;&amp;lt;&amp;lt;&amp;lt; Sealed! Total Recovery Shares 0 Threshold 0 Unseal Progress 0/0 &amp;lt;&amp;lt;&amp;lt;&amp;lt;&amp;lt; This node knowns nothing about any other nodes Unseal Nonce n/a Version 1.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/retire_an_openedx_user/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/retire_an_openedx_user/</guid>
+      <description>How To Retire An MIT Online Learning OpenEdX User # Pre-Requisites # You&amp;rsquo;ll need the email address the user registered under. e.g. cpatti@mit.edu You&amp;rsquo;ll need the pre-requisites defined in How To Access An MIT OL OpenEdX Django Admin manage.py. Look Up This User&amp;rsquo;s username # You&amp;rsquo;ll need to have Django admin and superuser access to the product you&amp;rsquo;re looking to retire users for.&#xA;Anyone who has the requisite access already can help.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/tagging_amis_with_installed_software_metadata/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/tagging_amis_with_installed_software_metadata/</guid>
+      <description>Tagging AMIs with Installed Software Metadata # Background # We are looking to start a new pattern where each AMI we produce is tagged with metadata about the software installed on it. This included 3rd party software such as Hashicorp products as well as information our applications. Recently we&amp;rsquo;ve been asked &amp;lsquo;What version of X is running in production right now?&amp;quot; and it was a surprisingly difficult question to answer.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/test_and_deploy_pulumi_packer_projects/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/test_and_deploy_pulumi_packer_projects/</guid>
+      <description>How To Test And Deploy MIT OL Pulumi/Packer Projects # The way we build images here at MIT OL is complicated and involves a number of components with various moving parts, so it can be difficult to understand where to start, what to change, and moreover how to safely test your changes without breaking production. This document will address these issues.&#xA;The Pipeline # Each MIT OL project that uses this technique has an accompanying Concourse pipeline that builds the Packer image, then deploys that image to the appropriate stage&amp;rsquo;s AWS EC2 launch profile where new instances will be launched by instance refresh to deploy the new code / configuration into the wild.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/how_to/transition_heroku_postgres_db_to_rds/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/how_to/transition_heroku_postgres_db_to_rds/</guid>
+      <description>Moving a Heroku Managed Postgres DB to Pulumi Managed AWS RDS # Preparation # You will need to gather some information about the Heroku managed application and its database before you start. You&amp;rsquo;ll need the Heroku CLI with auehenticated access to the application in question to continue.&#xA;You&amp;rsquo;ll also need the postgresql tools, specifically the pg_dump and psql tools.&#xA;Record the following information somewhere persistent that you&amp;rsquo;ll be able to refer back to through this process.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/monitoring/inventory/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/monitoring/inventory/</guid>
+      <description>Tools # Sentry Purpose: Detailed application monitoring and error logging. Healthchecks.io Purpose: Absence of alerting detection. For determining when other alerting tools may have failed or become unresponsive. GrafanaCloud Purpose: Collecting and storing metric and log data from applications and infrastructure. Subcomponents: Grafana: Visualization and alerting on metric and log data. Cortex: Backend for storing metric data. Loki: Backend for storing log data Pingdom Purpose: External synthetic and HTTP monitoring.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/monitoring/key_labels/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/monitoring/key_labels/</guid>
+      <description> Key Labels used by ODL # environment : The &amp;rsquo;tier&amp;rsquo;. For example, dev, QA, Production. service : The product provided. FOr example, &amp;lsquo;MITx&amp;rsquo;, &amp;lsquo;Residential&amp;rsquo;, &amp;lsquo;OCW&amp;rsquo; application : The application within the service, for example, edxapp, django, consul There may be multiple instances (environments) of a service. A service is comprised of applications.&#xA;Environments # ci production qa Services # bootcamps micromasters mitx-online mitx-residential ocw open xpro Applications # concourse consul django edxapp elasticsearch heroku-app nginx redis vault </description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/monitoring/overview/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/monitoring/overview/</guid>
+      <description>Monitoring Overview # We primarily use Vector for collecting both metrics and logs from our applications. Vector is pretty flexible and offers sources and sinks to/from many different systems.&#xA;Metrics # Ultimately we utilize Prometheus, but our stack is a little non-traditional.&#xA;For our applications in EC2, we use Vector as a middleman to perform the &amp;lsquo;prometheus-scrape&amp;rsquo; action, rather than performing the scrape with an actual prometheus instance that we would have to run.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/post-mortems/20231030_xpro_outage/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/post-mortems/20231030_xpro_outage/</guid>
+      <description>xPro Outage - October 30, 2023 # Timeline # Undetermined date within the past 6 months:&#xA;AWS RDS config updated to default new credentials to use SCRAM rather than md5 Monday, October 30th 2023&#xA;3:45PM - Configuration update deployed xPro Production Heroku stack via Salt. 3:51PM - Pingdom alerts DevOps on-call. 3:51PM - Alert Acknowledged by DevOps on-call (Mike Davidson). 3:52PM - Verified that site was non-responsive. 3:52PM - Begin detailed investigation.</description>
+    </item>
+    <item>
+      <title></title>
+      <link>http://localhost:1313/docs/runbooks/oncall/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>http://localhost:1313/docs/runbooks/oncall/</guid>
+      <description>Style Guide SaltStack XQueueWatcher OVS Bootcamp Ecommerce OpenEdX Residential MITx XPro MITXOnline Reddit Introduction # This document is meant to be one stop shopping for your MIT OL Devops oncall needs.&#xA;Please update this doc as you handle incidents whenever you&amp;rsquo;re oncall.&#xA;Style Guide # There should be a table of contents at the top of the document with links to each product heading. Your editor likely has a plugin to make this automatic.</description>
+    </item>
+  </channel>
+</rss>
