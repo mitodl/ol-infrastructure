@@ -199,8 +199,29 @@ search_domain_policy = aws.elasticsearch.DomainPolicy(
             stringify=True,
         )
     ),
+    opts=pulumi.ResourceOptions(retain_on_delete=True),
 )
 
+# search_domain_policy = aws.opensearch.DomainPolicy(
+#    "opensearch-domain-cluster-access-policy",
+#    domain_name=search_domain.domain_name,
+#    access_policies=search_domain.arn.apply(
+#        lambda arn: lint_iam_policy(
+#            {
+#                "Version": IAM_POLICY_VERSION,
+#                "Statement": [
+#                    {
+#                        "Effect": "Allow",
+#                        "Principal": {"AWS": "*"},
+#                        "Action": "es:ESHttp*",
+#                        "Resource": f"{arn}/*",
+#                    }
+#                ],
+#            },
+#            stringify=True,
+#        )
+#    ),
+# )
 
 # Consul Service
 consul_config = pulumi.Config("consul")

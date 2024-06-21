@@ -28,16 +28,19 @@ shared_pulumi_code_resource = git_repo(
 local_fragments: list[PipelineFragment] = []
 for app in app_list:
     for env in ["CI", "QA", "Production"]:
-        local_pulumi_fragment = pulumi_job(
-            pulumi_code=shared_pulumi_code_resource,
-            stack_name=f"infrastructure.aws.opensearch.{app}.{env}",
-            project_name="ol-infrastructure-opensearch",
-            dependencies=[],
-            project_source_path=PULUMI_CODE_PATH.joinpath(
-                "infrastructure/aws/opensearch/"
-            ),
-        )
-        local_fragments.append(local_pulumi_fragment)
+        if app in ["mitxonline", "mitopen"] and env == "CI":
+            pass
+        else:
+            local_pulumi_fragment = pulumi_job(
+                pulumi_code=shared_pulumi_code_resource,
+                stack_name=f"infrastructure.aws.opensearch.{app}.{env}",
+                project_name="ol-infrastructure-opensearch",
+                dependencies=[],
+                project_source_path=PULUMI_CODE_PATH.joinpath(
+                    "infrastructure/aws/opensearch/"
+                ),
+            )
+            local_fragments.append(local_pulumi_fragment)
 
 combined_fragments = PipelineFragment.combine_fragments(*local_fragments)
 aws_opensearch_pipeline = Pipeline(
