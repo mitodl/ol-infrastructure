@@ -26,7 +26,7 @@ concurrency:
 # Default to bash
 defaults:
   run:
-    working-directory: ./pe-handbook
+    working-directory: pe-handbook
     shell: bash
 
 jobs:
