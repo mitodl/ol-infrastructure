@@ -136,51 +136,75 @@ else:
     domain_name = f"opensearch-{environment_name}"[:SEARCH_DOMAIN_NAME_MAX_LENGTH]
 
 
-search_domain = aws.elasticsearch.Domain(
-    "opensearch-domain-cluster",
-    domain_name=domain_name,
-    elasticsearch_version=search_config.get("engine_version") or "7.10",
-    cluster_config=aws.elasticsearch.DomainClusterConfigArgs(
-        zone_awareness_enabled=True,
-        zone_awareness_config=aws.elasticsearch.DomainClusterConfigZoneAwarenessConfigArgs(
-            availability_zone_count=3
-        ),
-        instance_count=cluster_size,
-        instance_type=cluster_instance_type,
-    ),
-    ebs_options=aws.elasticsearch.DomainEbsOptionsArgs(
-        ebs_enabled=True,
-        volume_type="gp2",
-        volume_size=disk_size,
-    ),
-    tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch-cluster"}),
-    opts=pulumi.ResourceOptions(delete_before_replace=True, retain_on_delete=True),
-    **conditional_kwargs,
-)
-
-# search_domain = aws.opensearch.Domain(
-#    "opensearch-v2-domain-cluster",
+# search_domain = aws.elasticsearch.Domain(
+#    "opensearch-domain-cluster",
 #    domain_name=domain_name,
-#    engine_version=search_config.get("engine_version") or "7.10",
-#    cluster_config=aws.opensearch.DomainClusterConfigArgs(
+#    elasticsearch_version=search_config.get("engine_version") or "7.10",
+#    cluster_config=aws.elasticsearch.DomainClusterConfigArgs(
 #        zone_awareness_enabled=True,
-#        zone_awareness_config=aws.opensearch.DomainClusterConfigZoneAwarenessConfigArgs(
+#        zone_awareness_config=aws.elasticsearch.DomainClusterConfigZoneAwarenessConfigArgs(
 #            availability_zone_count=3
 #        ),
 #        instance_count=cluster_size,
 #        instance_type=cluster_instance_type,
 #    ),
-#    ebs_options=aws.opensearch.DomainEbsOptionsArgs(
+#    ebs_options=aws.elasticsearch.DomainEbsOptionsArgs(
 #        ebs_enabled=True,
 #        volume_type="gp2",
 #        volume_size=disk_size,
 #    ),
 #    tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch-cluster"}),
-#    opts=pulumi.ResourceOptions(delete_before_replace=True, retain_on_delete=True, import_=domain_name),
+#    opts=pulumi.ResourceOptions(delete_before_replace=True, retain_on_delete=True),
 #    **conditional_kwargs,
 # )
 
-search_domain_policy = aws.elasticsearch.DomainPolicy(
+search_domain = aws.opensearch.Domain(
+    "opensearch-v2-domain-cluster",
+    domain_name=domain_name,
+    engine_version=search_config.get("engine_version") or "Elasticsearch_7.10",
+    cluster_config=aws.opensearch.DomainClusterConfigArgs(
+        zone_awareness_enabled=True,
+        zone_awareness_config=aws.opensearch.DomainClusterConfigZoneAwarenessConfigArgs(
+            availability_zone_count=3
+        ),
+        instance_count=cluster_size,
+        instance_type=cluster_instance_type,
+    ),
+    ebs_options=aws.opensearch.DomainEbsOptionsArgs(
+        ebs_enabled=True,
+        volume_type="gp2",
+        volume_size=disk_size,
+    ),
+    tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch-cluster"}),
+    opts=pulumi.ResourceOptions(
+        delete_before_replace=True, retain_on_delete=True, import_=domain_name
+    ),
+    **conditional_kwargs,
+)
+
+# search_domain_policy = aws.elasticsearch.DomainPolicy(
+#    "opensearch-domain-cluster-access-policy",
+#    domain_name=search_domain.domain_name,
+#    access_policies=search_domain.arn.apply(
+#        lambda arn: lint_iam_policy(
+#            {
+#                "Version": IAM_POLICY_VERSION,
+#                "Statement": [
+#                    {
+#                        "Effect": "Allow",
+#                        "Principal": {"AWS": "*"},
+#                        "Action": "es:ESHttp*",
+#                        "Resource": f"{arn}/*",
+#                    }
+#                ],
+#            },
+#            stringify=True,
+#        )
+#    ),
+#    opts=pulumi.ResourceOptions(retain_on_delete=True),
+# )
+
+search_domain_policy = aws.opensearch.DomainPolicy(
     "opensearch-domain-cluster-access-policy",
     domain_name=search_domain.domain_name,
     access_policies=search_domain.arn.apply(
@@ -200,27 +224,6 @@ search_domain_policy = aws.elasticsearch.DomainPolicy(
         )
     ),
 )
-
-# search_domain_policy = aws.opensearch.DomainPolicy(
-#    "opensearch-domain-cluster-access-policy",
-#    domain_name=search_domain.domain_name,
-#    access_policies=search_domain.arn.apply(
-#        lambda arn: lint_iam_policy(
-#            {
-#                "Version": IAM_POLICY_VERSION,
-#                "Statement": [
-#                    {
-#                        "Effect": "Allow",
-#                        "Principal": {"AWS": "*"},
-#                        "Action": "es:ESHttp*",
-#                        "Resource": f"{arn}/*",
-#                    }
-#                ],
-#            },
-#            stringify=True,
-#        )
-#    ),
-# )
 
 # Consul Service
 consul_config = pulumi.Config("consul")
