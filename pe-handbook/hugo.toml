@@ -7,8 +7,3 @@ title = 'MIT Online Learning Platform Engineering Site'
 path = 'github.com/alex-shpak/hugo-book'
 
 theme = 'hugo-book'
-
-# Hugo Book theme
-[params]
-  BookRepo = "https://github.com/mitodl/ol-infrastructure/pe-handbook"
-  BookTheme = "dark"
