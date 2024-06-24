@@ -7,12 +7,11 @@ ENV PATH /bin:/usr/bin/:/usr/local/bin:/home/app/.local/bin
 RUN pip install --no-cache-dir poetry
 COPY --chown=app:app ./ /home/app/workspace/
 RUN scripts/get-pants.sh -d bin &&\
-    # bin/pants package src/bridge:bridge-package &&\
-    # bin/pants package src/ol_infrastructure:ol-infrastructure-package &&\
-    # bin/pants package src/ol_concourse:ol-concourse &&\
-    # bin/pants package src/ol_concourse/pipelines:ol-concourse-pipelines &&\
-    # pip install --force-reinstall dist/*.whl &&\
-    poetry install &&\
+    bin/pants package src/bridge:bridge-package &&\
+    bin/pants package src/ol_infrastructure:ol-infrastructure-package &&\
+    bin/pants package src/ol_concourse:ol-concourse &&\
+    bin/pants package src/ol_concourse/pipelines:ol-concourse-pipelines &&\
+    pip install --force-reinstall dist/*.whl &&\
     poetry export --without-hashes -o requirements.txt &&\
     pip install --no-cache-dir -r requirements.txt
 
