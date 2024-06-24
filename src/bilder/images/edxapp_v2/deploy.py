@@ -432,6 +432,8 @@ vault_config = VaultAgentConfig(
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
     ),
     template=None,  # Thou shalt not use vault-template
+    restart_period="5d",
+    restart_jitter="12h",
 )
 vault = Vault(
     version=VERSIONS["vault"],
