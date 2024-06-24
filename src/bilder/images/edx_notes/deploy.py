@@ -143,6 +143,8 @@ vault_config = VaultAgentConfig(
             config=VaultAutoAuthAWS(role="edx-notes-server"),
         ),
         sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
+        restart_period="7d",
+        restart_jitter="12h",
     ),
 )
 vault = Vault(

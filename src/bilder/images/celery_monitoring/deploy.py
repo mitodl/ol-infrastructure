@@ -127,6 +127,8 @@ vault_config = VaultAgentConfig(
             destination=Path("/etc/traefik/odl_wildcard.cert"),
         ),
     ],
+    restart_period="5d",
+    restart_jitter="12h",
 )
 # Configure consul template to add Leek env vars
 

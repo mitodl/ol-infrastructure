@@ -432,6 +432,8 @@ vault_configuration = {
             ),
             sink=[VaultAutoAuthSink(type="file", config=[VaultAutoAuthFileSink()])],
         ),
+        restart_period="5h",
+        restart_jitter="12h",
     ),
 }
 vault = Vault(version=VERSIONS["vault"], configuration=vault_configuration)
