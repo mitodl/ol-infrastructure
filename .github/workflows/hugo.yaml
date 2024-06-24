@@ -26,8 +26,8 @@ concurrency:
 # Default to bash
 defaults:
   run:
-    shell: bash
     working-directory: ./pe-handbook
+    shell: bash
 
 jobs:
   # Build job
