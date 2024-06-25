@@ -11,12 +11,20 @@ config:
     secure: v1:mbdWdrtlOrf/yMPw:4cu91sZzAKkYUkyxQBEtClJ49/uRp/f9nuW4uDakdRV7RW57Yf1EIqd71ovo0+TZ
   keycloak:clients:
     dagster: https://pipelines.odl.mit.edu
-  keycloak:email_host:
-    secure: v1:uUNy9qLfg9qhJMlW:mVTX4cHT2+WytQptDuB+uzIpA+UO4CSjVlDW4iHcF9E=
-  keycloak:email_password:
-    secure: v1:h2Nlf0N1QtabfvGs:VMm0V5UvkXyjNpJ0gQfcqCVcw35XHF7an1omtVfLqg==
-  keycloak:email_username:
-    secure: v1:qw0/egOdCOUJi9Vy:CtyFmcodURyRrv9pG9o9wY9J+N2r6IoC
+  keycloak:mailgun_email_host:
+    secure: v1:sSbWnWxXFSf0IGt0:WFZOoW1b6Z1R2Dp9LKF/f1NARkWwNvX36muNnzAkDOw=
+  keycloak:mailgun_email_password:
+    secure: v1:4zg9rULAY0Cy86vL:Z+gnZt4zF4IRcbQJRJOwuSoL2UoDmx8ig8iTvxtjor6jfFdMOfJsL99S5xtOTMz3PZhUe1osk2zkDr+Aq9f9fZjP
+  keycloak:mailgun_email_username:
+    secure: v1:yCLJk0qifFGbaNIL:QpsJLdhmb/HCpA3LJsRdnR3lJuKXpqnCSfSqCFF4R5jpL7BW7132iQO47LLPAg==
+  keycloak:mailgun_reply_to_address:
+    secure: v1:k6AjXnlCnWLqwVhx:NHhS0Yt9Flc/vc0hcLJmfuE/CNCe92U8WbllT/KyyeouZ8UO8bAJSCTLp5Q=
+  keycloak:mit_email_host:
+    secure: v1:1gyJ6yq3akZxkYYu:EEHQNf1bF5ScW9XFFDcW932EQZOK2wWm48OBftAr1SE=
+  keycloak:mit_email_password:
+    secure: v1:iwlNVKpViup/xmjh:1nzhVf0/XBinQsI78YdpTcBZQiHgr9heAg+qv9T0rw==
+  keycloak:mit_email_username:
+    secure: v1:ixrI5oZwMK2WCpQr:NaqM67NVCRDfOCsTlyrnN4tNmrPXcSOs
   keycloak:openid_clients:
   - client_info:
       open: ["https://api.mitopen.odl.mit.edu/*"]
