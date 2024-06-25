@@ -125,11 +125,11 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         repository="keycloak-scim",
     )
 
-    # Repo: https://github.com/keycloakify/keycloakify-starter
+    # Repo: https://github.com/mitodl/keycloakify-starter
     # Use: Keycloak Starter Theme
     keycloakify_spi = github_release(
         name=Identifier("keycloakify-spi"),
-        owner="keycloakify",
+        owner="mitodl",
         repository="keycloakify-starter",
     )
 
