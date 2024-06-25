@@ -24,6 +24,7 @@ jobs:
           # extended: true
 
       - name: Build
+        working-directory: pe-handbook
         run: hugo --minify
 
       - name: Deploy
