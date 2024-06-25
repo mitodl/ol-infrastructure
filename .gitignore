@@ -14,4 +14,3 @@ venv/
 *.swp
 pyinfra-debug.log
 .vscode/
-pe-handbook/public/
