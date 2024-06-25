@@ -99,6 +99,15 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
             "role_keys": data.get("role_keys", []),
         }
 
+    def load_user_jwt(self, _jwt_header, jwt_data):
+        username = jwt_data["preferred_username"]
+        user = self.find_user(username=username)
+        if user.is_active:
+            # Set flask g.user to JWT user, we can't do it on before request
+            g.user = user
+            return user
+        return None
+
 
 CUSTOM_SECURITY_MANAGER = CustomSsoSecurityManager
 
