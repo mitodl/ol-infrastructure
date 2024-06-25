@@ -1,4 +1,4 @@
-# ruff: noqa: ERA001, E501
+# ruff: noqa: E501
 
 from pathlib import Path
 
@@ -47,7 +47,7 @@ target_vpc = network_stack.require_output(env_config.require("target_vpc"))
 business_unit = env_config.get("business_unit") or "operations"
 aws_config = AWSBase(tags={"OU": business_unit, "Environment": environment_name})
 cluster_size = search_config.get_int("cluster_size") or 3
-cluster_instance_type = search_config.get("instance_type") or "t3.medium.elasticsearch"
+cluster_instance_type = search_config.get("instance_type") or "t3.medium.search"
 disk_size = search_config.get_int("disk_size_gb") or 30
 is_public_web = search_config.get_bool("public_web") or False
 is_secured_cluster = search_config.get_bool("secured_cluster") or False
@@ -97,34 +97,34 @@ if is_public_web:
         )
     )["master_user_password"]
     conditional_kwargs["advanced_security_options"] = (
-        aws.elasticsearch.DomainAdvancedSecurityOptionsArgs(
+        aws.opensearch.DomainAdvancedSecurityOptionsArgs(
             enabled=True,
             internal_user_database_enabled=True,
-            master_user_options=aws.elasticsearch.DomainAdvancedSecurityOptionsMasterUserOptionsArgs(
+            master_user_options=aws.opensearch.DomainAdvancedSecurityOptionsMasterUserOptionsArgs(
                 master_user_name="opensearch",
                 master_user_password=master_user_password,
             ),
         )
     )
 else:
-    conditional_kwargs["vpc_options"] = aws.elasticsearch.DomainVpcOptionsArgs(
+    conditional_kwargs["vpc_options"] = aws.opensearch.DomainVpcOptionsArgs(
         subnet_ids=target_vpc["subnet_ids"][:3],
         security_group_ids=[search_security_group.id],
     )
 
 if is_secured_cluster:
     conditional_kwargs["domain_endpoint_options"] = (
-        aws.elasticsearch.DomainDomainEndpointOptionsArgs(
+        aws.opensearch.DomainDomainEndpointOptionsArgs(
             enforce_https=True,
             tls_security_policy="Policy-Min-TLS-1-2-2019-07",
         )
     )
     conditional_kwargs["node_to_node_encryption"] = (
-        aws.elasticsearch.DomainNodeToNodeEncryptionArgs(
+        aws.opensearch.DomainNodeToNodeEncryptionArgs(
             enabled=True,
         )
     )
-    conditional_kwargs["encrypt_at_rest"] = aws.elasticsearch.DomainEncryptAtRestArgs(
+    conditional_kwargs["encrypt_at_rest"] = aws.opensearch.DomainEncryptAtRestArgs(
         enabled=True,
     )
 
@@ -135,52 +135,32 @@ if search_config.get("domain_name"):
 else:
     domain_name = f"opensearch-{environment_name}"[:SEARCH_DOMAIN_NAME_MAX_LENGTH]
 
-
-search_domain = aws.elasticsearch.Domain(
-    "opensearch-domain-cluster",
+search_domain = aws.opensearch.Domain(
+    "opensearch-v2-domain-cluster",
     domain_name=domain_name,
-    elasticsearch_version=search_config.get("engine_version") or "7.10",
-    cluster_config=aws.elasticsearch.DomainClusterConfigArgs(
+    engine_version=search_config.get("engine_version") or "Elasticsearch_7.10",
+    cluster_config=aws.opensearch.DomainClusterConfigArgs(
         zone_awareness_enabled=True,
-        zone_awareness_config=aws.elasticsearch.DomainClusterConfigZoneAwarenessConfigArgs(
+        zone_awareness_config=aws.opensearch.DomainClusterConfigZoneAwarenessConfigArgs(
             availability_zone_count=3
         ),
         instance_count=cluster_size,
         instance_type=cluster_instance_type,
     ),
-    ebs_options=aws.elasticsearch.DomainEbsOptionsArgs(
+    ebs_options=aws.opensearch.DomainEbsOptionsArgs(
         ebs_enabled=True,
         volume_type="gp2",
         volume_size=disk_size,
     ),
     tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch-cluster"}),
-    opts=pulumi.ResourceOptions(delete_before_replace=True, retain_on_delete=True),
+    opts=pulumi.ResourceOptions(
+        delete_before_replace=True,
+    ),
     **conditional_kwargs,
 )
 
-# search_domain = aws.opensearch.Domain(
-#    "opensearch-v2-domain-cluster",
-#    domain_name=domain_name,
-#    engine_version=search_config.get("engine_version") or "7.10",
-#    cluster_config=aws.opensearch.DomainClusterConfigArgs(
-#        zone_awareness_enabled=True,
-#        zone_awareness_config=aws.opensearch.DomainClusterConfigZoneAwarenessConfigArgs(
-#            availability_zone_count=3
-#        ),
-#        instance_count=cluster_size,
-#        instance_type=cluster_instance_type,
-#    ),
-#    ebs_options=aws.opensearch.DomainEbsOptionsArgs(
-#        ebs_enabled=True,
-#        volume_type="gp2",
-#        volume_size=disk_size,
-#    ),
-#    tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch-cluster"}),
-#    opts=pulumi.ResourceOptions(delete_before_replace=True, retain_on_delete=True, import_=domain_name),
-#    **conditional_kwargs,
-# )
 
-search_domain_policy = aws.elasticsearch.DomainPolicy(
+search_domain_policy = aws.opensearch.DomainPolicy(
     "opensearch-domain-cluster-access-policy",
     domain_name=search_domain.domain_name,
     access_policies=search_domain.arn.apply(
@@ -201,80 +181,59 @@ search_domain_policy = aws.elasticsearch.DomainPolicy(
     ),
 )
 
-# search_domain_policy = aws.opensearch.DomainPolicy(
-#    "opensearch-domain-cluster-access-policy",
-#    domain_name=search_domain.domain_name,
-#    access_policies=search_domain.arn.apply(
-#        lambda arn: lint_iam_policy(
-#            {
-#                "Version": IAM_POLICY_VERSION,
-#                "Statement": [
-#                    {
-#                        "Effect": "Allow",
-#                        "Principal": {"AWS": "*"},
-#                        "Action": "es:ESHttp*",
-#                        "Resource": f"{arn}/*",
-#                    }
-#                ],
-#            },
-#            stringify=True,
-#        )
-#    ),
-# )
-
-# Consul Service
-consul_config = pulumi.Config("consul")
-consul_provider = consul.Provider(
-    "consul-provider",
-    address=consul_config.require("address"),
-    scheme="https",
-    http_auth="pulumi:{}".format(
-        read_yaml_secrets(Path(f"pulumi/consul.{stack_info.env_suffix}.yaml"))[
-            "basic_auth_password"
-        ]
-    ),
-)
-opensearch_node = consul.Node(
-    "aws-opensearch-consul-node",
-    address=search_domain.endpoint,
-    name=consul_service_name,
-    opts=pulumi.ResourceOptions(provider=consul_provider),
-)
-opensearch_service = consul.Service(
-    "aws-opensearch-consul-service",
-    node=opensearch_node.name,
-    name=consul_service_name,
-    port=DEFAULT_HTTPS_PORT,
-    meta={
-        "external-node": True,
-        "external-probe": True,
-    },
-    checks=[
-        consul.ServiceCheckArgs(
-            check_id=consul_service_name,
-            interval="10s",
-            name=consul_service_name,
-            timeout="1m0s",
-            status="passing",
-            tcp=pulumi.Output.all(
-                address=search_domain.endpoint, port=DEFAULT_HTTPS_PORT
-            ).apply(lambda es: "{address}:{port}".format(**es)),
-        )
-    ],
-    opts=pulumi.ResourceOptions(provider=consul_provider),
-)
-
-consul.Keys(
-    "elasticsearch",
-    keys=[
-        consul.KeysKeyArgs(
-            path="elasticsearch/host",
-            delete=True,
-            value=search_domain.endpoint,
+if not search_config.get("disable_consul_components"):
+    consul_config = pulumi.Config("consul")
+    consul_provider = consul.Provider(
+        "consul-provider",
+        address=consul_config.require("address"),
+        scheme="https",
+        http_auth="pulumi:{}".format(
+            read_yaml_secrets(Path(f"pulumi/consul.{stack_info.env_suffix}.yaml"))[
+                "basic_auth_password"
+            ]
         ),
-    ],
-    opts=pulumi.ResourceOptions(provider=consul_provider),
-)
+    )
+    opensearch_node = consul.Node(
+        "aws-opensearch-consul-node",
+        address=search_domain.endpoint,
+        name=consul_service_name,
+        opts=pulumi.ResourceOptions(provider=consul_provider),
+    )
+    opensearch_service = consul.Service(
+        "aws-opensearch-consul-service",
+        node=opensearch_node.name,
+        name=consul_service_name,
+        port=DEFAULT_HTTPS_PORT,
+        meta={
+            "external-node": True,
+            "external-probe": True,
+        },
+        checks=[
+            consul.ServiceCheckArgs(
+                check_id=consul_service_name,
+                interval="10s",
+                name=consul_service_name,
+                timeout="1m0s",
+                status="passing",
+                tcp=pulumi.Output.all(
+                    address=search_domain.endpoint, port=DEFAULT_HTTPS_PORT
+                ).apply(lambda es: "{address}:{port}".format(**es)),
+            )
+        ],
+        opts=pulumi.ResourceOptions(provider=consul_provider),
+    )
+
+    consul.Keys(
+        "elasticsearch",
+        keys=[
+            consul.KeysKeyArgs(
+                path="elasticsearch/host",
+                delete=True,
+                value=search_domain.endpoint,
+            ),
+        ],
+        opts=pulumi.ResourceOptions(provider=consul_provider),
+    )
 
 
 # Export Resources for shared use
