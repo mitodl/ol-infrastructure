@@ -241,6 +241,7 @@ heroku_vars = {
     "FEATURE_ENABLE_BLOG": "True",
     "FEATURE_ENABLE_ENTERPRISE": "True",
     "FEATURE_ENABLE_TAXES_DISPLAY": "True",
+    "FEATURE_ENABLE_EXTERNAL_COURSE_SYNC": "True",
     "FEATURE_WEBINARS": "True",
     "HUBSPOT_PIPELINE_ID": "75e28846-ad0d-4be2-a027-5e1da6590b98",
     "MITOL_DIGITAL_CREDENTIALS_AUTH_TYPE": "code",
@@ -317,6 +318,7 @@ sensitive_heroku_vars = {
         "service_account_creds"
     ],
     "DRIVE_SHARED_ID": xpro_vault_secrets["google-sheets"]["drive_shared_id"],
+    "EMERITUS_API_KEY": xpro_vault_secrets["emeritus"]["api_key"],
     "ENROLLMENT_CHANGE_SHEET_ID": xpro_vault_secrets["google-sheets"][
         "enroll_change_sheet_id"
     ],
