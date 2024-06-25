@@ -30,9 +30,13 @@ keycloak_provider = keycloak.Provider(
 resource_options = ResourceOptions(provider=keycloak_provider)
 captcha_secret_key = keycloak_config.require("captcha_secret_key")
 captcha_site_key = keycloak_config.require("captcha_site_key")
-email_host = keycloak_config.require("email_host")
-email_password = keycloak_config.require("email_password")
-email_username = keycloak_config.require("email_username")
+mit_email_host = keycloak_config.require("mit_email_host")
+mit_email_password = keycloak_config.require("mit_email_password")
+mit_email_username = keycloak_config.require("mit_email_username")
+mailgun_email_host = keycloak_config.require("mailgun_email_host")
+mailgun_email_password = keycloak_config.require("mailgun_email_password")
+mailgun_email_username = keycloak_config.require("mailgun_email_username")
+mailgun_reply_to_address = keycloak_config.require("mailgun_reply_to_address")
 keycloak_url = keycloak_config.get("url")
 mit_touchstone_cert = "MIIDCDCCAfCgAwIBAgIJAK/yS5ltGi7MMA0GCSqGSIb3DQEBBQUAMBYxFDASBgNVBAMTC2lkcC5taXQuZWR1MB4XDTEyMDczMDIxNTAxN1oXDTMyMDcyNTIxNTAxN1owFjEUMBIGA1UEAxMLaWRwLm1pdC5lZHUwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDgC5Y2mM/VMThzTWrZ2uyv3Gw0mWU9NgQpWN1HQ/lLBxH1H6pMc5+fGpOdrvxH/Nepdg6uAJwZrclTDAHHpG/THb7K063NRtic8h9UYSqwxIWUCXI8qNijcWA2bW6PFEy4yIP611J+IzQxzD/ZiR+89ouzdjNBrPHzoaIoMwflftYnFc4L/qu4DxE/NWgANYPGEJfWUFTVpfNV1Iet60904zl+O7T79mwaQwwOMUWwk/DEQyvG6bf2uWL4aFx4laBOekrA+5rSHUXAFlhCreTnzZMkVoxSGqYlc5uZuZmpFCXZn+tNpsVYz+c4Hve3WOZwhx/7bMGCwlx7oovoQWQ5AgMBAAGjWTBXMDYGA1UdEQQvMC2CC2lkcC5taXQuZWR1hh5odHRwczovL2lkcC5taXQuZWR1L3NoaWJib2xldGgwHQYDVR0OBBYEFF5aINzhvMR+pOijYHtr3yCKsrMSMA0GCSqGSIb3DQEBBQUAA4IBAQDfVpscchXXa4Al/l9NGNwQ1shpQ8d+k+NpX2Q976jau9DhVHa42F8bfl1EeHLMFlN79aUxFZb3wvr0h5pq3a8F9aWHyKe+0R10ikVueDcAmg0V7MWthFdsyMwHPbnCdSXo2wh0GhjeIF3f3+hZZwrZ4sZqjX2RmsYnyXgS1r5mzuu4W447Q1fbC5BeZTefUhJcfHQ56ztIFtLJdRuHHnqj09CaQVMD1FtovM86vYwVMwMsgOgkN3c7tW6kXHHBHeEA31xUJsqXGTRlwMSyJTju3SFvhXI/8ZIxshTzWURBo+vf6A6QQvSvJAju4zVLZy83YB/cvAFsV3BexZ4xzuQD"  # pragma: allowlist secret # noqa: E501
 # Create OL Platform Engineering Realm
@@ -87,12 +91,12 @@ ol_platform_engineering_realm = keycloak.Realm(
     ),
     smtp_server=keycloak.RealmSmtpServerArgs(
         auth=keycloak.RealmSmtpServerAuthArgs(
-            password=email_password,
-            username=email_username,
+            password=mit_email_password,
+            username=mit_email_username,
         ),
         from_="odl-devops@mit.edu",
         from_display_name="Identity - OL PLatform Engineering",
-        host=email_host,
+        host=mit_email_host,
         port="587",
         reply_to="odl-devops@mit.edu",
         reply_to_display_name="Identity - OL Platform Engineering",
@@ -203,15 +207,16 @@ ol_apps_realm = keycloak.Realm(
     ),
     smtp_server=keycloak.RealmSmtpServerArgs(
         auth=keycloak.RealmSmtpServerAuthArgs(
-            password=email_password,
-            username=email_username,
+            password=mailgun_email_password,
+            username=mailgun_email_username,
         ),
-        from_="odl-devops@mit.edu",
-        from_display_name="Identity - Open Learning Platform Engineering",
-        host=email_host,
-        port="587",
-        reply_to="odl-devops@mit.edu",
-        reply_to_display_name="Identity - Open Learning Platform Engineering",
+        from_=mailgun_email_username,
+        from_display_name="Identity - Open Learning",
+        host=mailgun_email_host,
+        port="465",
+        reply_to=mailgun_reply_to_address,
+        reply_to_display_name="Identity - Open Learning",
+        ssl=True,
         starttls=True,
     ),
     ssl_required="external",
@@ -320,12 +325,12 @@ ol_data_platform_realm = keycloak.Realm(
     ),
     smtp_server=keycloak.RealmSmtpServerArgs(
         auth=keycloak.RealmSmtpServerAuthArgs(
-            password=email_password,
-            username=email_username,
+            password=mit_email_password,
+            username=mit_email_username,
         ),
         from_="odl-devops@mit.edu",
         from_display_name="Identity - OL Data",
-        host=email_host,
+        host=mit_email_host,
         port="587",
         reply_to="odl-devops@mit.edu",
         reply_to_display_name="Identity - OL Data",
