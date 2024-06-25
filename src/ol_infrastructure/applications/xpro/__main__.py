@@ -317,6 +317,7 @@ sensitive_heroku_vars = {
         "service_account_creds"
     ],
     "DRIVE_SHARED_ID": xpro_vault_secrets["google-sheets"]["drive_shared_id"],
+    "EMERITUS_API_KEY": xpro_vault_secrets["emeritus"]["api_key"],
     "ENROLLMENT_CHANGE_SHEET_ID": xpro_vault_secrets["google-sheets"][
         "enroll_change_sheet_id"
     ],
