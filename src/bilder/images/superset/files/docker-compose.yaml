@@ -6,7 +6,7 @@ x-superset-volumes: &superset-volumes
 version: "3.8"
 services:
   traefik:
-    image: traefik:2.11
+    image: traefik:v3.0
     restart: unless-stopped
     command:
     - "--configFile=/etc/traefik/traefik.yaml"
