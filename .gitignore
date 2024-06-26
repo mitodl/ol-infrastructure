@@ -14,3 +14,6 @@ venv/
 *.swp
 pyinfra-debug.log
 .vscode/
+pe-handbook/output/
+pe-handbook/cache/
+pe-handbook/.doit.*

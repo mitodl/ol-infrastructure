@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "pe-handbook"
+version = "0.1.0"
+description = "Platform Engineering Handbook site, driven by Nikola"
+authors = ["Chris Patti <feoh@feoh.org>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.12.4"
+nikola = {version = "^8.3.1", extras = ["extras"]}
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
