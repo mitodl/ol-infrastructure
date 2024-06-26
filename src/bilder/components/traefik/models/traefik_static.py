@@ -297,10 +297,20 @@ class Docker(FieldModel):
     exposed_by_default: Optional[bool] = Field(None, alias="exposedByDefault")
     http_client_timeout: Optional[str] = Field(None, alias="httpClientTimeout")
     network: Optional[str] = None
-    swarm_mode: Optional[bool] = Field(None, alias="swarmMode")
-    swarm_mode_refresh_seconds: Optional[str] = Field(
-        None, alias="swarmModeRefreshSeconds"
-    )
+    tls: Optional[Tls2] = None
+    use_bind_port_ip: Optional[bool] = Field(None, alias="useBindPortIP")
+    watch: Optional[bool] = None
+
+
+class Swarm(FieldModel):
+    allow_empty_services: Optional[bool] = Field(None, alias="allowEmptyServices")
+    constraints: Optional[str] = None
+    default_rule: Optional[str] = Field(None, alias="defaultRule")
+    endpoint: Optional[str] = None
+    exposed_by_default: Optional[bool] = Field(None, alias="exposedByDefault")
+    http_client_timeout: Optional[str] = Field(None, alias="httpClientTimeout")
+    network: Optional[str] = None
+    refresh_seconds: Optional[str] = Field(None, alias="refreshSeconds")
     tls: Optional[Tls2] = None
     use_bind_port_ip: Optional[bool] = Field(None, alias="useBindPortIP")
     watch: Optional[bool] = None
