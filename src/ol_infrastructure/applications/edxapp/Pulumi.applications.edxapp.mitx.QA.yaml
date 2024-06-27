@@ -5,6 +5,7 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-mitx-qa.odl.mit.edu
   edxapp:waffle_flags:
+  - ["content_tagging.disabled", "--create", "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_advanced_settings_page", "--create", "--superusers",
     "--everyone"]
