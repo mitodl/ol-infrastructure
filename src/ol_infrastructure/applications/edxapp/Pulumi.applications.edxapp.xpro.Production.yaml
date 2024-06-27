@@ -1,0 +1,54 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgF4aGd/aPWQE/Xl6+yg2i3QAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQML9B70uczH/BrDBcvAgEQgDvj4qpjZtDzwWyzwS//9PivKEIscFC5isQm6YJKeBcTP7pxVAxiGSEdeOf/6KANIcQX4RYoroRw6WYMXA==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-xpro-production.odl.mit.edu
+  edxapp:waffle_flags:
+  - ["completion.enable_completion_tracking", "--create", "--superusers", "--everyone"]
+  - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
+  - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
+  - ["courseware.courseware_mfe", "--create", "--superusers", "--everyone"]
+  - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
+  - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
+  - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
+  - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
+  - ["learner_home_mfe.enabled", "--create", "--superusers", "--everyone"]
+  - ["learner_recommendations.enable_dashboard_recommendations", "--create", "--superusers",
+    "--everyone"]
+  - ["new_core_editors.use_new_problem_editor", "--create", "--deactivate"]
+  - ["new_core_editors.use_new_text_editor", "--create", "--superusers", "--deactivate"]
+  - ["new_core_editors.use_new_video_editor", "--create", "--superusers", "--deactivate"]
+  - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
+  - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
+  - ["studio.library_authoring_mfe", "--deactivate"]
+  edxapp:business_unit: mitxpro
+  edxapp:db_password:
+    secure: v1:U83x0i6WAndxuOLK:XsAILALTGbtjCqGJllcqg3EaOM0FF/SNmuiMAK2r3E9X5joW26kjOQzYUcKr0slkHBv8RUEr3xA=
+  edxapp:dns_zone: xpro
+  edxapp:default_module_class: xmodule.hidden_block.HiddenBlock
+  edxapp:domains:
+    lms: courses.xpro.mit.edu
+    preview: preview.xpro.mit.edu
+    studio: studio.xpro.mit.edu
+  edxapp:marketing_domain: xpro.mit.edu
+  edxapp:edx_forum_secrets:
+    secure: v1:YHqAWSdn7TNUn7d+:IBgiGsl4r8vymID8NV43rnfJy+qsJSXm/jXaWWALUfF9zXqRO4zJZhLS0d+etijGVwaZnF8v5zXlo+EczFrCe7ICHpS85zHgifbfDcw=
+  edxapp:enable_notes: "True"
+  edxapp:enabled_mfes:
+    course_authoring: course-authoring
+    gradebook: gradebook
+    learning: learn
+    ora_grading: ora-grading
+  edxapp:google_analytics_id: UA-5145472-38
+  edxapp:framework: "earthly"
+  edxapp:mail_domain: edxapp-mail-production.xpro.mit.edu
+  edxapp:min_web_nodes: "3"
+  edxapp:min_worker_nodes: "2"
+  edxapp:sender_email_address: support@xpro.mit.edu
+  edxapp:web_node_capacity: "5"
+  edxapp:worker_node_capacity: "3"
+  edxapp:worker_instance_type: "m7a.medium"
+  mongodb:atlas_project_id: 61b727c6b5bd11656741308b
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

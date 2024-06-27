@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gEHdDDBAuz/HQf5vKvq4DvlAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM2ABrX9XSqfZRfGOvAgEQgDsOLERVPhzZao/GXKGOsZD/LPicaeGXPHRVJYyuciZ62BTZfHdKX1CU+AtzTrO9q0cdHcRmFY1dRmnJLA==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-data-production.odl.mit.edu
+  redash:db_password:
+    secure: v1:SJO39Gf7npOo2aOg:GvBxTGcXeF4ef6II6cegWWdsaXBFU1uQoSsI8RqsDmLIXHE4Ov/mjScE2lp5k7Yjb7csiUYdMR9yCQyBxg2F8UbVUTgpF5GNweikZR+XlX6nVzxVx1BwrIAHyogD4YEokG/m
+  redash:domain: bi.odl.mit.edu
+  redash:instance_type: burstable_medium
+  redash:manage_datasources: "true"
+  redis:auth_token:
+    secure: v1:/kVVH8iAK5byo/ba:6SOi4Ujt3GUGgaJgwftWAdc5Tkfb0JVxPDQKUlxVzcQwtv2n1f6Zzw+o5jTPIMGi/et4+EJS+Z4coIuzwboO/zqM3w3SDJROB++w+YdsHrkQFQVDkzLSz2WYEos/XA==
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

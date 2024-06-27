@@ -1,0 +1,29 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQH+6+5vJN0oRL26AlGpZxeZAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMk5PG2rZHL4/ftd1wAgEQgDtjxxfTYkCIIoqCW+BquaGmShSp5bNk0fo2zvujw7eVo1Jkm5qWBxp4F6n3YYFPMpk04QW8L0s7CHyxRA==
+config:
+  consul:address: https://consul-apps-ci.odl.mit.edu
+  ovs:ami_branch_tag: "master"
+  ovs:auto_scale:
+    desired: 2
+    max: 3
+    min: 1
+  ovs:default_domain: video-ci.odl.mit.edu
+  ovs:domains:
+  - video-ci.odl.mit.edu
+  ovs:edx_base_url: https://courses-ci.xpro.mit.edu
+  ovs:log_level: INFO
+  ovs:rds_password:
+    secure: v1:CFR8W+XpCttoYTa/:IRecvFvHJMZmf4hzMvWrJ00puDMFht2ArQSk/FDCZGnc7rQM42e7HtJwEeN1YI/W
+  ovs:route53_managed_domains:
+  - video-ci.odl.mit.edu
+  ovs:s3_bucket_name: odl-video-service-ci
+  ovs:s3_subtitle_bucket_name: odl-video-service-subtitles-ci
+  ovs:s3_thumbnail_bucket_name: odl-video-service-thumbnail-ci
+  ovs:s3_transcode_bucket_name: odl-video-service-transcode-ci
+  ovs:s3_watch_bucket_name: odl-video-service-watch-ci
+  ovs:target_vpc: applications_vpc
+  ovs:use_shibboleth: "False"
+  redis:max_connections: "30"
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

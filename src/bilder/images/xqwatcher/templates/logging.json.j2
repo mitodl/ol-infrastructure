@@ -1,0 +1,32 @@
+{
+  "disable_existing_loggers": false,
+  "formatters": {
+    "default": {
+      "format": "%(asctime)s - %(filename)s:%(lineno)d -- %(funcName)s [%(levelname)s]: %(message)s"
+    }
+  },
+  "handlers": {
+    "console": {
+      "class": "logging.StreamHandler",
+      "formatter": "default",
+      "level": "DEBUG"
+    },
+    "rotatingfile": {
+      "class": "logging.handlers.RotatingFileHandler",
+      "filename": "{{ shared_context.XQWATCHER_LOG_DIR }}/xqwatcher.log",
+      "formatter": "default",
+      "level": "DEBUG",
+      "maxBytes": 10485760
+    }
+  },
+  "loggers": {
+    "": {
+      "handlers": [
+        "rotatingfile",
+        "console"
+      ],
+      "level": "DEBUG"
+    }
+  },
+  "version": 1
+}

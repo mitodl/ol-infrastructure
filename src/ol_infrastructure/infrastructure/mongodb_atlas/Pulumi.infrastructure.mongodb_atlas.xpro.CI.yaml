@@ -1,0 +1,16 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjEYf3gV5ZTnviCJcHwGnUuLzld5EuYumgMrRde6bvXUgFgGZeArfQo1LpHurAj3nXYAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbQMdaKCI2y5lzPGAAgEQgDsiEAO0cRhHo8gelnWYuCfhS5Zr24/y6BqMGg9qa7IKLM0IjtQWREKcrLG8VZWTd0YNDZjAVJtXS0J82A==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-xpro-ci.odl.mit.edu
+  consul:scheme: https
+  environment:business_unit: mitxpro
+  environment:target_vpc: xpro_vpc
+  mongodb_atlas:disk_autoscale_max_gb: "100"
+  mongodb_atlas:enable_cloud_backup: "false"
+  mongodb_atlas:enable_point_in_time_recovery: "false"
+  mongodb_atlas:instance_size: M10
+  mongodb_atlas:organization_id: 611ab793e07f5965c7b9e4f6
+  mongodb_atlas:ready_for_traffic: "true"
+  mongodb_atlas:version: "7.0"

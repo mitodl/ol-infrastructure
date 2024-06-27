@@ -1,0 +1,11 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHg42pDDDGBhpaX14TdtzcK1hbiMYTHsYRH4k5GL5RFpIwHiXbI/j44wGsuOXHMYTWQlAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMAMBk4M/7bS+WyhlTAgEQgDvBHREcmWBg2c0gCFvvV0gtdfuEplA00aiti7+F0JD9CcL2P1YbRt5AvYXn0O89FmD7a5NIXLa+AnlHpA==
+config:
+  consul:address: https://consul-data-qa.odl.mit.edu
+  superset:db_password:
+    secure: v1:Z8UwtmZDreH29f/a:ExsL1/JkiVIgAI0+cir9IXJuJlH5VomlsxqpLAlbqXZmX9Y5Y59c/lpG9xqa7Cxp24ogbDB4SiNNIOY=
+  superset:domain: bi-qa.ol.mit.edu
+  superset:sender_email_address: ol-data@mit.edu
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

@@ -1,0 +1,5 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHi+npazf3LfzV9oCtcYyCMYLOzaQhbo9xt6lJVVpz9tkQFrsqiIA/j+XqvdCliMyS7ZAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM/FSZ/IlGDuSn9kUVAgEQgDu/kft9z5DJomTOet025FQoDJ21QfVynb62TZM/NXQEwDdvW9guspRGmKCI9fEthPzkN6lJBfoiOfV26w==
+config:
+  consul:address: https://consul-operations-ci.odl.mit.edu

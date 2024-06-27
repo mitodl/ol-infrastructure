@@ -1,0 +1,11 @@
+{{ shared_context.XQWATCHER_LOG_DIR }}/xqwatcher.log
+{
+	compress
+	copytruncate
+	daily
+	delaycompress
+	missingok
+	notifempty
+	rotate 90
+	su {{ shared_context.XQWATCHER_USER }} {{ shared_context.XQWATCHER_USER }}
+}

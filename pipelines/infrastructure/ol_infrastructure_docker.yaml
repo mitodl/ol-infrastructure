@@ -1,0 +1,51 @@
+---
+resources:
+- name: ol-infrastructure
+  type: git
+  icon: github
+  source:
+    uri: https://github.com/mitodl/ol-infrastructure
+    branch: main
+    paths:
+    - pants.toml
+    - pyproject.toml
+    - poetry.lock
+    - Dockerfile
+    - src/bridge
+    - src/ol_concourse
+
+- name: ol-infrastructure-image
+  type: registry-image
+  icon: docker
+  source:
+    tag: latest
+    repository: mitodl/ol-infrastructure
+    username: ((dockerhub.username))
+    password: ((dockerhub.password))
+
+jobs:
+- name: build-and-publish-container
+  public: true
+  plan:
+  - get: ol-infrastructure
+    trigger: true
+  - task: build-image
+    privileged: true
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: vito/oci-build-task
+      inputs:
+      - name: ol-infrastructure
+      outputs:
+      - name: image
+      run:
+        path: build
+      params:
+        CONTEXT: ol-infrastructure
+  - put: ol-infrastructure-image
+    params:
+      image: image/image.tar
+      additional_tags: ol-infrastructure/.git/ref

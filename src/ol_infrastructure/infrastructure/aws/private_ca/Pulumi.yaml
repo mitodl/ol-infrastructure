@@ -1,0 +1,7 @@
+---
+name: ol-infrastructure-private-ca
+runtime: python
+description: Creation and maintenance of a private certificate authority managed by
+  AWS
+backend:
+  url: s3://mitol-pulumi-state/

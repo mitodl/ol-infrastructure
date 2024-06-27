@@ -1,0 +1,10 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgFkQEnRPcfUvgTUOD4wi1JBAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMAYcezP6YDqBrBvcJAgEQgDsSTF48mLbyKmEA+aqC99ZLJsigI8s+91Js6TWAUkaLkZVTlE4rlWu4HGjVAX7elk64HnO/W13PSeklcA==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-xpro-production.odl.mit.edu
+  consul:scheme: https
+  environment:business_unit: mitxpro
+  environment:target_vpc: xpro_vpc
+  opensearch:instance_type: t3.medium.search

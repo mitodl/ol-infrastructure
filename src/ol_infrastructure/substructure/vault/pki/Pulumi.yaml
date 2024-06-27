@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-vault-pki
+runtime: python
+description: Pulumi project for managing Vault PKI
+backend:
+  url: s3://mitol-pulumi-state/

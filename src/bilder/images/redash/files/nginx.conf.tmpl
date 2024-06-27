@@ -1,0 +1,75 @@
+server {
+  listen 80;
+  server_name  {{ keyOrDefault "redash/frontend_host" "redash.odl.mit.edu" }};
+
+  location /ping {
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_pass       http://redash_servers;
+  }
+
+  location / {
+    return 301 https://$host$request_uri;
+  }
+}
+
+server {
+    listen 443 ssl default_server;
+    server_name  {{ keyOrDefault "redash/frontend_host" "redash.odl.mit.edu" }};
+    ssl_certificate /etc/nginx/nginx.pem;
+    ssl_certificate_key /etc/nginx/nginx-key.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers "EECDH+AESGCM:EDH+AESGCM:ECDHE-RSA-AES128-GCM-SHA256:AES256+EECDH:DHE-RSA-AES128-GCM-SHA256:AES256+EDH:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA:ECDHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES256-GCM-SHA384:AES128-GCM-SHA256:AES256-SHA256:AES128-SHA256:AES256-SHA:AES128-SHA:DES-CBC3-SHA:HIGH:!aNULL:!eNULL:!EXPORT:!DES:!MD5:!PSK:!RC4";
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+    resolver 8.8.8.8;
+
+    gzip on;
+    gzip_types *;
+    gzip_proxied any;
+
+    location = /shibauthorizer {
+        internal;
+        include fastcgi_params;
+        include shib_fastcgi_params;
+        fastcgi_pass unix:/opt/shibboleth/shibauthorizer.sock;
+    }
+
+    location /Shibboleth.sso {
+        include fastcgi_params;
+        include shib_fastcgi_params;
+        fastcgi_pass unix:/opt/shibboleth/shibresponder.sock;
+    }
+
+    location /remote_user/login {
+        include shib_clear_headers;
+        shib_request /shibauthorizer;
+        include shib_fastcgi_params;
+        shib_request_use_headers on;
+        proxy_set_header MAIL $shib_mail;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_pass       http://redash_servers;
+        proxy_redirect   off;
+    }
+
+    location / {
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_pass       http://redash_servers;
+        proxy_redirect   off;
+    }
+}
+
+upstream redash_servers {
+  server server:5000;
+}

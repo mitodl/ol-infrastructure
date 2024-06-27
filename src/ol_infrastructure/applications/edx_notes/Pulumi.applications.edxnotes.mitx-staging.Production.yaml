@@ -1,0 +1,17 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gFhzYvzz16fZbvcD0XB4K3JAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM/1VMn02w6+GjNq8JAgEQgDsayKldg/eabwVW4UlmseCU9Pe+lHK6qmZX1dizbS9RuAOdDEXWxgAds9fQZCzIQidVikOsamlRCWYPfA==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-mitx-staging-production.odl.mit.edu
+  edxnotes:acm_cert_domain: '*.mitx.mit.edu'
+  edxnotes:auto_scale:
+    desired: 2
+    max: 3
+    min: 1
+  edxnotes:business_unit: residential-staging
+  edxnotes:dns_zone: mitx
+  edxnotes:domain: staging-notes.mitx.mit.edu
+  edxnotes:target_vpc: residential_mitx_staging_vpc
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

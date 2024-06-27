@@ -1,0 +1,16 @@
+bin/pants
+__pycache__/*
+.mypy_cache/
+/.pants.d/
+.pids/
+.vagrant/
+dist/
+*.pyc
+venv/
+.venv/
+*.egg-info/
+.DS_Store
+.idea/
+*.swp
+pyinfra-debug.log
+.vscode/

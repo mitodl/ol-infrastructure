@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQHAJhm9A8+QCxlIc9kvWIeUAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMWgk3XpNyfVg/ICiIAgEQgDs4Zvc15mYMmCWH88SGzxMjDjZQSBDvdShVOCbyKEtglsiDvGhu8xvd6kObreD9f1QcO10KJBsHetIYRw==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-operations-ci.odl.mit.edu
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
+  vector_log_proxy:business_unit: operations
+  vector_log_proxy:fastly_service_id_sha256sums:
+    xpro_ci_edx: b5bd478bafb3a5e7537bc0c4e18b506b0e7257652e8f1c328b90b5392a63042a  # pragma: allowlist secret
+    mitx_staging_ci_edx: 0015f78108f4396c46b3a466f9bb47b863a6952fce847a879feb8cc7caa2590c  # pragma: allowlist secret
+    mitx_ci_edx: 3c51b1b5964591394eca3b88286416b83893871caf8ed4f72530085e2a9c1ec8  # pragma: allowlist secret
+  vector_log_proxy:target_vpc: operations_vpc
+  vector_log_proxy:web_host_domain: log-proxy-ci.odl.mit.edu

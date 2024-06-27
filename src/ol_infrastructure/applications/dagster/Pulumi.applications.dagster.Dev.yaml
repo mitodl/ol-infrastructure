@@ -1,0 +1,12 @@
+---
+secretsprovider: awskms://alias/PulumiSecrets
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQGXfBNyWWlPAah6zUsey4HgAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMlfIiNDyNxACGE0zSAgEQgDvy7MuG/z+z/lUxiT6ULv3OpXAmxTc38a9I5001vHd28NcZNPcyDuk+PO/+HxC9i8r3vmcSO9oH8Ne9ZA==
+backend:
+  url: s3://mitol-pulumi-state-dev/
+config:
+  aws:region: us-east-1
+  dagster:instance_type: t3a.small
+  dagster:db_password:
+    secure: v1:JVrdNTvsikv/jnYz:SXZ9iAiSkXwOYHL4Oe6rdrKcrpaQq1EEoVKmihPInFyg
+  vault:address: active.vault.service.consul
+  vault:skip_tls_verify: 'true'

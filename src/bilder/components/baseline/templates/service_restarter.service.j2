@@ -1,0 +1,10 @@
+[Unit]
+Description=Restart {{ service_name }} when watched files change
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart={{ onchange_command }}
+
+[Install]
+WantedBy=multi-user.target

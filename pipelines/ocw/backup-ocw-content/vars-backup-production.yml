@@ -1,0 +1,6 @@
+---
+env_name: production
+draft_source_bucket_name: ocw-content-draft-production
+draft_destination_bucket_name: ocw-content-backup-draft-production
+live_source_bucket_name: ocw-content-live-production
+live_destination_bucket_name: ocw-content-backup-live-production

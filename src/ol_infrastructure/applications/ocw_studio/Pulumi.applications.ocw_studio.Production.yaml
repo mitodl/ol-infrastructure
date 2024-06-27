@@ -1,0 +1,50 @@
+---
+secretsprovider: awskms://alias/PulumiSecrets
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQFSJFasGKTNtp/+YAP5nr9fAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMV1/grNZ9n1dQIkXxAgEQgDv4cLkj6Mxn0N0YbbZUnreJdfdgDXntO3DQycSVhyR6uq0qe8jb7f2mpxRLZW9RVj+InAxeXFRUoNMTrw==
+config:
+  aws:region: us-east-1
+  heroku:app_id:
+    secure: v1:9f+SPlbozlidUlab:2/1hLfxjWi0aVMGlMwQoeB197SuxZtV051gRztBjja9pWoS60s5JnwWFUveKkm7uZmDyOA==
+  heroku_app:vars:
+    CONCOURSE_URL: https://cicd.odl.mit.edu
+    CONTENT_FILE_SEARCH_API_URL: 'https://mitopen.odl.mit.edu/api/v1/content_file_search/'
+    COURSE_SEARCH_API_URL: 'https://mitopen.odl.mit.edu/api/v1/learning_resources_search/'
+    DRIVE_SHARED_ID: 0AIZerpz9jimTUk9PVA
+    DRIVE_UPLOADS_PARENT_FOLDER_ID: ''
+    FEATURE_SELECT_FIELD_INFINITE_SCROLL: "True"
+    FEATURE_SORTABLE_SELECT_HIDE_SELECTED: "True"
+    FEATURE_SORTABLE_SELECT_PRESERVE_SEARCH_TEXT: "True"
+    FEATURE_SORTABLE_SELECT_QUICK_ADD: "True"
+    FEATURE_USE_LOCAL_STARTERS: "False"
+    GIT_ORGANIZATION: "mitocwcontent"
+    GITHUB_APP_ID: 13
+    GITHUB_RATE_LIMIT_CHECK: "False"
+    GITHUB_WEBHOOK_BRANCH: 'release'
+    GTM_ACCOUNT_ID: GTM-MQCSLSQ
+    MAILGUN_FROM_EMAIL: 'MIT OCW <no-reply@ocw.mail.odl.mit.edu'
+    MAILGUN_SENDER_DOMAIN: 'ocw.mail.odl.mit.edu'
+    MAILGUN_URL: https://api.mailgun.net/v3/ocw.mail.odl.mit.edu
+    OCW_COURSE_STARTER_SLUG: ocw-course-v2
+    OCW_GTM_ACCOUNT_ID: GTM-NMQZ25T
+    OCW_HUGO_THEMES_SENTRY_DSN: 'https://eee58f41dda54d2b814296e12dced4b7@o48788.ingest.sentry.io/5304953'
+    OCW_IMPORT_STARTER_SLUG: ocw-course
+    OCW_MASS_BUILD_BATCH_SIZE: '160'
+    OCW_MASS_BUILD_MAX_IN_FLIGHT: '20'
+    OCW_STUDIO_BASE_URL: https://ocw-studio.odl.mit.edu/
+    OCW_STUDIO_DRAFT_URL: https://draft.ocw.mit.edu/
+    OCW_STUDIO_LIVE_URL: https://ocw.mit.edu/
+    OCW_STUDIO_LOG_LEVEL: INFO
+    OCW_STUDIO_SUPPORT_EMAIL: 'ocw-studio-support@mit.edu'
+    OPEN_CATALOG_URLS: 'https://open.mit.edu/api/v0/ocw_next_webhook/,https://api.mitopen.odl.mit.edu/api/v1/ocw_next_webhook/'
+    SEARCH_API_URL: 'https://open.mit.edu/api/v0/search/'
+    SENTRY_LOG_LEVEL: 'WARN'
+    SITEMAP_DOMAIN: 'ocw.mit.edu'
+    SOCIAL_AUTH_SAML_SP_ENTITY_ID: 'https://ocw-studio.odl.mit.edu/saml/metadata'
+    STATIC_API_BASE_URL_TEST: 'https://test.ocw.mit.edu/'
+    VIDEO_TRANSCODE_QUEUE: 'ocw-studio-mediaconvert-queue-production'
+    YT_PROJECT_ID: 'ocw-studio-qa'
+  ocw_studio:app_domain: ocw-studio.odl.mit.edu
+  ocw_studio:db_password:
+    secure: v1:KkTvlMKkKDXJiaQM:W+vNsxirVQXnvf1FvsokCi49hercEQP+1nmCGvhuOfQZYEqYvPW/Y+eraoQ71t2THGB3xtvwf55DmHVqD87Gf+CvZCPnSMEYGIRmouZZ6xlnXRK1Ph0e/rbO
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

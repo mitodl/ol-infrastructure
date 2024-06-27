@@ -1,0 +1,64 @@
+---
+resource_types:
+- name: http-api
+  type: docker-image
+  source:
+    repository: aequitas/http-api-resource
+    tag: latest
+
+resources:
+- name: build-schedule
+  type: time
+  icon: clock
+  source:
+    interval: 6h
+    initial_version: true
+- name: healthchecks-io-draft-webhook
+  type: http-api
+  check_every: never
+  source:
+    uri: https://hc-ping.com/((healthchecks-io-draft-uuid))
+    method: GET
+- name: healthchecks-io-live-webhook
+  type: http-api
+  check_every: never
+  source:
+    uri: https://hc-ping.com/((healthchecks-io-live-uuid))
+    method: GET
+
+jobs:
+- name: backup-((env_name))-content
+  plan:
+  - get: build-schedule
+    trigger: true
+  - in_parallel:
+    - task: backup-draft
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source: {repository: amazon/aws-cli}
+        run:
+          path: sh
+          args:
+          - -exc
+          - |
+            aws s3 sync s3://((draft_source_bucket_name)) s3://((draft_destination_bucket_name))
+      on_success:
+        try:
+          put: healthchecks-io-draft-webhook
+    - task: backup-live
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source: {repository: amazon/aws-cli}
+        run:
+          path: sh
+          args:
+          - -exc
+          - |
+            aws s3 sync s3://((live_source_bucket_name)) s3://((live_destination_bucket_name))
+      on_success:
+        try:
+          put: healthchecks-io-live-webhook

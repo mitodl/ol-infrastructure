@@ -1,0 +1,7 @@
+from pulumi import Config, export
+
+from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.pulumi_helper import parse_stack
+
+{{ _copier_answers.project_name }}_config = Config("{{ _copier_answers.project_name }}")
+stack_info = parse_stack()

@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQHTURJpNG3IB5G++68lwVwGAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbX7efqjkv27nVy2vAgEQgDvSWKARFdhosWwyRnBu4cDJsaCecVHLqvDtkTYoLPK1txNeA6cDESzAhyx6TNSMbdiGYnj9snC67PZ0dg==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-apps-ci.odl.mit.edu
+  tika:auto_scale:
+    desired: 1
+    max: 2
+    min: 1
+  tika:business_unit: operations
+  tika:target_vpc: applications_vpc
+  tika:web_host_domain: tika-ci.odl.mit.edu
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

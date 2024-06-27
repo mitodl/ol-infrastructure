@@ -1,0 +1,17 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "local>mitodl/.github:renovate-config"
+  ],
+  "packageRules": [
+    {
+      "matchPackagePrefixes": [
+        "pulumi"
+      ],
+      "groupName": "pulumi-plugins"
+    }
+  ],
+  "pip_requirements": {
+    "fileMatch": "dockerfiles/openedx-edxapp/pip_package_lists/.*?/.*.txt"
+  }
+}

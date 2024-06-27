@@ -1,0 +1,14 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgGS9UkGtHI7d/QvSpEygzlWAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMq8bP4tsuMoL+vwfdAgEQgDszWyX31b83rAElLuQ9e18tPwOyvGM7wwlmZJWD7pT27S+FK7icJd1JnASFZuX47LGdnON8C+E9lGA13w==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-mitx-staging-qa.odl.mit.edu
+  xqueue:auto_scale:
+    desired: 1
+    max: 2
+    min: 1
+  xqueue:business_unit: residential-staging
+  xqueue:target_vpc: residential_mitx_staging_vpc
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

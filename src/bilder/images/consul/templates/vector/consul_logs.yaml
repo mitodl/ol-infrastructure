@@ -1,0 +1,80 @@
+---
+log_schema:
+  timestamp_key: vector_timestamp
+  host_key: log_host
+
+sources:
+  collect_consul_auth_logs:
+    type: file
+    file_key: log_file
+    include:
+    - /var/log/auth.log
+
+  collect_consul_journald_logs:
+    type: journald
+    current_boot_only: true
+    include_units:
+    - consul
+    - traefik
+
+transforms:
+  parse_consul_journald_logs:
+    type: remap
+    inputs:
+    - 'collect_consul_journald_logs'
+    source: |
+      event, err = parse_json(.message)
+      if event != null {
+        ., err = merge(., event)
+        .environment = "${ENVIRONMENT}"
+      }
+
+  enrich_consul_journald_logs:
+    type: aws_ec2_metadata
+    inputs:
+    - 'parse_consul_journald_logs'
+    namespace: ec2
+
+  parse_consul_auth_logs:
+    inputs:
+    - 'collect_consul_auth_logs'
+    type: remap
+    source: |
+      parsed, err = parse_syslog(.message)
+      if parsed != null {
+        . = merge(., parsed)
+        .log_process = "authlog"
+        .environment = "${ENVIRONMENT}"
+      }
+
+  filter_malformed_message_consul_auth_logs:
+    inputs:
+    - 'parse_consul_auth_logs'
+    type: filter
+    condition: .malformed != true
+
+  filter_cron_consul_auth_logs:
+    inputs:
+    - 'filter_malformed_message_consul_auth_logs'
+    type: filter
+    condition: .appname != "CRON"
+
+sinks:
+  ship_consul_logs_to_grafana_cloud:
+    inputs:
+    - 'filter_cron_consul_auth_logs'
+    - 'enrich_consul_journald_logs'
+    type: loki
+    auth:
+      strategy: basic
+      password: ${GRAFANA_CLOUD_API_KEY}
+      user: "${GRAFANA_CLOUD_LOKI_API_USER-loki}"
+    endpoint: https://logs-prod-us-central1.grafana.net
+    encoding:
+      codec: json
+    labels:
+      environment: ${ENVIRONMENT}
+      application: consul
+      service: consul
+      hostname: ${HOSTNAME}
+    out_of_order_action: rewrite_timestamp

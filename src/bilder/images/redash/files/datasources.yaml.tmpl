@@ -1,0 +1,88 @@
+{{ $environment := env "ENVIRONMENT" }}
+managed_datasources:
+{{ if eq $environment "data-qa" }}
+- name: "MITx Online RC"
+  type: pg
+  options:
+    dbname: "mitxonline"
+    host: '{{ keyOrDefault "redash/datasource_configs/mitxonline-rc/db_host" "missing" }}'
+    password: '{{ with secret "postgres-mitxonline/creds/readonly" }}{{ .Data.password }}'
+    port: 5432
+    sslmode: "require"
+    user: '{{ .Data.username }}{{ end }}'
+
+{{ end }}
+{{ if eq $environment "data-production" }}
+- name: "MITx Online Production"
+  type: pg
+  options:
+    dbname: "mitxonline"
+    host: '{{ keyOrDefault "redash/datasource_configs/mitxonline-production/db_host" "missing" }}'
+    password: '{{ with secret "postgres-mitxonline/creds/readonly" }}{{ .Data.password }}'
+    port: 5432
+    sslmode: "require"
+    user: '{{ .Data.username }}{{ end }}'
+- name: "Open Discussions Reddit"
+  type: "pg"
+  options:
+    dbname: "reddit"
+    host: 'production-apps-rds-postgresql-reddit.cbnm7ajau6mi.us-east-1.rds.amazonaws.com'
+    password: '{{ with secret "postgres-production-apps-reddit/creds/readonly" }}{{ .Data.password }}'
+    port: 5432
+    sslmode: "require"
+    user: '{{ .Data.username }}{{ end }}'
+- name: "Open Discussions"
+  type: "pg"
+  options:
+    dbname: "opendiscussions"
+    host: 'production-apps-rds-postgresql-opendiscussions.cbnm7ajau6mi.us-east-1.rds.amazonaws.com'
+    password: '{{ with secret "postgres-production-apps-opendiscussions/creds/readonly" }}{{ .Data.password }}'
+    port: 5432
+    sslmode: "require"
+    user: '{{ .Data.username }}{{ end }}'
+- name: "ODL Video Service"
+  type: pg
+  options:
+    dbname: "odlvideo"
+    host: '{{ keyOrDefault "redash/datasource_configs/odl-video-service-production/db_host" "missing" }}'
+    password: '{{ with secret "postgres-odl-video-service/creds/readonly" }}{{ .Data.password }}'
+    port: 5432
+    sslmode: "require"
+    user: '{{ .Data.username }}{{ end }}'
+- name: "OCW Studio Production"
+  type: pg
+  options:
+    dbname: "ocw_studio"
+    host: '{{ keyOrDefault "redash/datasource_configs/ocw-studio-production/db_host" "missing" }}'
+    password: '{{ with secret "postgres-ocw-studio-applications-production/creds/readonly" }}{{ .Data.password }}'
+    port: 5432
+    sslmode: "require"
+    user: '{{ .Data.username }}{{ end }}'
+- name: "MITxPro Production"
+  type: pg
+  options:
+    dbname: "mitxpro"
+    host: '{{ keyOrDefault "redash/datasource_configs/xpro-pg-production/db_host" "missing" }}'
+    password: '{{ with secret "postgres-production-apps-mitxpro/creds/readonly" }}{{ .Data.password }}'
+    port: 5432
+    sslmode: "require"
+    user: '{{ .Data.username }}{{ end }}'
+- name: "Bootcamp Ecommerce"
+  type: pg
+  options:
+    dbname: "bootcamps"
+    host: '{{ keyOrDefault "redash/datasource_configs/bootcamps-pg-production/db_host" "missing" }}'
+    password: '{{ with secret "postgres-bootcamps/creds/readonly" }}{{ .Data.password }}'
+    port: 5432
+    sslmode: "require"
+    user: '{{ .Data.username }}{{ end }}'
+- name: "MicroMasters"
+  type: pg
+  options:
+    dbname: "micromasters"
+    host: '{{ keyOrDefault "redash/datasource_configs/micromasters-pg-production/db_host" "missing" }}'
+    password: '{{ with secret "postgres-micromasters/creds/readonly" }}{{ .Data.password }}'
+    port: 5432
+    sslmode: "require"
+    user: '{{ .Data.username }}{{ end }}'
+{{ end }}

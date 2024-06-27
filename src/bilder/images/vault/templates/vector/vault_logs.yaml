@@ -1,0 +1,87 @@
+---
+log_schema:
+  timestamp_key: vector_timestamp
+  host_key: log_host
+
+sources:
+  collect_vault_auth_logs:
+    type: file
+    file_key: log_file
+    include:
+    - /var/log/auth.log
+
+  collect_vault_journald_logs:
+    type: journald
+    current_boot_only: true
+    include_units:
+    - vault
+    - traefik
+    - cron
+
+transforms:
+  parse_vault_journald_logs:
+    type: remap
+    drop_on_abort: true
+    inputs:
+    - 'collect_vault_journald_logs'
+    source: |
+      event, err = parse_json(.message)
+      if event != null {
+        ., err = merge(., event)
+        .environment = "${ENVIRONMENT}"
+      }
+      # Only want to hear about the raft_backup job from cron
+      if ._SYSTEMD_UNIT == "cron.service" && .SYSLOG_IDENTIFIER != "raft_backup" {
+        abort
+      }
+
+
+  enrich_vault_journald_logs:
+    type: aws_ec2_metadata
+    inputs:
+    - 'parse_vault_journald_logs'
+    namespace: ec2
+
+  parse_vault_auth_logs:
+    inputs:
+    - 'collect_vault_auth_logs'
+    type: remap
+    source: |
+      parsed, err = parse_syslog(.message)
+      if parsed != null {
+        . = merge(., parsed)
+        .log_process = "authlog"
+        .environment = "${ENVIRONMENT}"
+      }
+
+  filter_malformed_message_vault_auth_logs:
+    inputs:
+    - 'parse_vault_auth_logs'
+    type: filter
+    condition: .malformed != true
+
+  filter_cron_vault_auth_logs:
+    inputs:
+    - 'filter_malformed_message_vault_auth_logs'
+    type: filter
+    condition: .appname != "CRON"
+
+sinks:
+  ship_vault_logs_to_grafana_cloud:
+    inputs:
+    - 'filter_cron_vault_auth_logs'
+    - 'enrich_vault_journald_logs'
+    type: loki
+    auth:
+      strategy: basic
+      password: ${GRAFANA_CLOUD_API_KEY}
+      user: "${GRAFANA_CLOUD_LOKI_API_USER-loki}"
+    endpoint: https://logs-prod-us-central1.grafana.net
+    encoding:
+      codec: json
+    labels:
+      environment: ${ENVIRONMENT}
+      application: vault
+      service: vault
+      hostname: ${HOSTNAME}
+    out_of_order_action: rewrite_timestamp

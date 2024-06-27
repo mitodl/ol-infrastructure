@@ -1,0 +1,5 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjs8ajWpT7YRhWXwI//wPkHX53RHlo0DjkgQOwCBTUBwQFqNE/lNU3iJFoV+oWLh1K4AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMG1DEVnQqWWJokdU5AgEQgDvaG7bznYxt3Tj7S/cmuk+lKnMhd8JEWICdgw5SadBsabAVChrg7YHfjZrTaV2VBvdap/UMPVNxxc70rw==
+config:
+  consul:address: https://consul-mitx-staging-ci.odl.mit.edu

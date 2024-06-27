@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-keycloak-application
+runtime: python
+description: A project to manage the resources and deployment of Keycloak
+backend:
+  url: s3://mitol-pulumi-state/

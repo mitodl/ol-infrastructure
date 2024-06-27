@@ -1,0 +1,16 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgHaqhCB4gQ+HYiLvz/aKRP0AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMl1vJF/TBEE45B8e2AgEQgDsPrCuTFSxjk8dePvHJte7jAWeeKaD9syLMCtcFWFj7Eu/WEZp9NsT7zVa53oxBA8GlU2ioBDCSsFCRqA==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-apps-production.odl.mit.edu
+  consul:scheme: https
+  environment:business_unit: operations
+  environment:target_vpc: applications_vpc
+  opensearch:cluster_size: "3"
+  opensearch:disable_consul_components: true
+  opensearch:disk_size_gb: "60"
+  opensearch:engine_version: OpenSearch_1.1
+  opensearch:instance_type: t3.medium.search
+  opensearch:public_web: "true"
+  opensearch:secured_cluster: "true"

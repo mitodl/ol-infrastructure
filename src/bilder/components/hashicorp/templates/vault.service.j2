@@ -1,0 +1,39 @@
+[Unit]
+Description="HashiCorp Vault - A tool for managing secrets"
+Documentation=https://www.vaultproject.io/docs/
+Requires=network-online.target
+After=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+User=vault
+Group=vault
+# When set to "full" or "strict" this prevents the agent from rendering templates in /etc/
+ProtectSystem={% if context.mode == "agent" %}true{% else %}full{% endif %}
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+SecureBits=keep-caps
+AmbientCapabilities=CAP_IPC_LOCK
+CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
+NoNewPrivileges=yes
+ExecStart=/usr/local/bin/vault {{ context.mode }} -config={{ context.configuration_directory }}/{% if context.mode == "agent" %}{{ context.configuration_file }}{% endif %}
+ExecReload=/bin/kill --signal HUP $MAINPID
+EnvironmentFile=-/etc/default/vault
+KillMode=process
+KillSignal=SIGINT
+Restart=on-failure
+RestartSec=5
+{% if context.mode == "agent" and context.restart_period %}
+RuntimeMaxSec={{ context.restart_period }}
+RuntimeRandomizedExtraSec={{ context.restart_jitter }}
+{% endif %}
+TimeoutStopSec=30
+StartLimitInterval=60
+StartLimitBurst=3
+LimitNOFILE=65536
+LimitMEMLOCK=infinity
+
+[Install]
+WantedBy=multi-user.target

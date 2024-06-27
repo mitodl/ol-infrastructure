@@ -1,0 +1,24 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQGJ3TnWvhlQQrGyE2EnakrrAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMLHRA6TjX63WMbvebAgEQgDvYwi1/1THyTliMz0gtC5QFMM5n3CEegQjUf4ex2KMBS2cfl45cyxYnMRC30v/+rl+oTap57E0YNCks7A==
+config:
+  aws:region: us-east-1
+  celery_monitoring:auto_scale:
+    desired: 1
+    max: 2
+    min: 1
+  celery_monitoring:domain: celery-monitoring-ci.odl.mit.edu
+  celery_monitoring:sender_email_address: ol-devops@mit.edu
+  celery_monitoring:target_vpc: operations_vpc
+  celery_monitorng:business_unit: operations
+  consul:address: https://consul-operations-ci.odl.mit.edu
+  consul:scheme: https
+  environment:business_unit: operations
+  environment:target_vpc: operations_vpc
+  opensearch:consul_service_name: 'celery-monitoring-opensearch'
+  opensearch:domain_name: "celeryc"
+  celery_monitoring:heroku_map:
+    mitx-devops:
+    - ocw-studio-ci
+    odl-devops:
+    - odl-open-discussions-ci

@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QEla+OdP68/Tfch6vKE6qu6AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMwwafVPMCBWD25o01AgEQgDvlmAFcrMc0KSMbhu8aeiAQ0eUI0z04hT4wFZdof2pgqMH3Ga3jllRHd9NjeFmFU1njonAHNKz/HeDOZQ==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-xpro-qa.odl.mit.edu
+  consul:scheme: https
+  environment:business_unit: mitxpro
+  environment:target_vpc: xpro_vpc
+  mongodb_atlas:disk_autoscale_max_gb: "100"
+  mongodb_atlas:instance_size: M10
+  mongodb_atlas:organization_id: 611ab793e07f5965c7b9e4f6
+  mongodb_atlas:ready_for_traffic: "true"
+  mongodb_atlas:version: "7.0"
+  data_vpc_access:create_privatelink_to_datavpc: "true"

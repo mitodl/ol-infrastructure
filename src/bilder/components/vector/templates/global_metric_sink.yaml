@@ -1,0 +1,13 @@
+---
+sinks:
+  ship_host_metrics_to_grafana_cloud:
+    inputs:
+    # Expects the final step of ALL metric pipelines to be named 'noop_metric_global_funnel'
+    - 'noop_metric_global_funnel'
+    type: prometheus_remote_write
+    endpoint: https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom/push
+    healthcheck: false
+    auth:
+      strategy: basic
+      user: "${GRAFANA_CLOUD_PROMETHEUS_API_USER-prometheus}"
+      password: ${GRAFANA_CLOUD_API_KEY}

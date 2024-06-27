@@ -1,0 +1,70 @@
+# -*- mode: yaml -*-
+version: "3.7"
+
+services:
+  dagster-webserver:
+    image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+    container_name: dagster-webserver
+    restart: unless-stopped
+    entrypoint: ["poetry", "run", "dagster-webserver", "-w", "/opt/dagster/app/workspace.yaml", "-h", "0.0.0.0", "-p", "3000"]
+    ports:
+    - ":3000"
+    env_file:
+      - .env
+    environment:
+      - DAGSTER_CURRENT_IMAGE={{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+    volumes:
+    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
+    - /etc/aws/:/etc/aws/:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dagit.rule=Host(`${DAGSTER_HOSTNAME}`)"
+      - "traefik.http.routers.dagit.middlewares=traefik-forward-auth"
+      - "traefik.http.routers.dagit.tls=true"
+  dagster-daemon:
+    image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+    container_name: dagster-daemon
+    restart: unless-stopped
+    entrypoint: ["poetry", "run", "dagster-daemon", "run", "-w", "/opt/dagster/app/workspace.yaml"]
+    env_file:
+      - .env
+    environment:
+      - DAGSTER_CURRENT_IMAGE={{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+    volumes:
+    - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
+    - /etc/aws/:/etc/aws/:ro
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entryPoints.http.address=:80"
+      - "--entryPoints.http.http.redirections.entryPoint.to=https"
+      - "--entryPoints.http.http.redirections.entryPoint.scheme=https"
+      - "--entryPoints.https.address=:443"
+      - "--log.level=WARN"
+      - "--accesslog=true"
+      - "--providers.file.filename=/traefik/traefik.yaml"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "{{ context.traefik_directory}}/traefik.yaml:/traefik/traefik.yaml:ro"
+      - "{{ context.certificate_file }}:/etc/traefik/star.odl.mit.edu.crt:ro"
+      - "{{ context.certificate_key_file }}:/etc/traefik/star.odl.mit.edu.key:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+  traefik-forward-auth:
+    image: thomseddon/traefik-forward-auth:2
+    container_name: traefik-forward-auth
+    restart: unless-stopped
+    env_file:
+      - .env_traefik_forward_auth
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.traefik-forward-auth.forwardauth.address=http://traefik-forward-auth:4181"
+      - "traefik.http.middlewares.traefik-forward-auth.forwardauth.authResponseHeaders=X-Forwarded-User"
+      - "traefik.http.services.traefik-forward-auth.loadbalancer.server.port=4181"

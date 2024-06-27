@@ -1,0 +1,14 @@
+---
+version: "3.7"
+services:
+  xqueue:
+    container_name: xqueue
+    image: mitodl/xqueue:${OPENEDX_RELEASE}
+    environment:
+    - XQUEUE_CFG=/etc/xqueue/xqueue.yaml
+    ports:
+    - 8040:8040
+    volumes:
+    - /etc/xqueue/xqueue.yaml:/etc/xqueue/xqueue.yaml
+    env_file:
+    - .env

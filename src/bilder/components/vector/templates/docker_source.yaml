@@ -1,0 +1,21 @@
+---
+sources:
+  collect_docker_stdout_stderr:
+    type: docker_logs
+
+transforms:
+  parse_docker_stdout_stderr:
+    type: remap
+    inputs:
+    - 'collect_docker_stdout_stderr'
+    source: |
+      # This will replace all '.' characters in field names with '_' characters
+      . = map_keys(., recursive: true) -> |key| { replace(key, ".", "_") }
+
+      # Map the docker-compose service name to just .service
+      .service = .label.com_docker_compose_service
+
+      # Remove the rest of the labels and other kruft
+      del(.label)
+      del(.container_id)
+      del(.container_created_at)

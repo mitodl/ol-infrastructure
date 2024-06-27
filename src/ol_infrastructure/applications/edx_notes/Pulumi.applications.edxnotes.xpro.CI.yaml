@@ -1,0 +1,17 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHi+npazf3LfzV9oCtcYyCMYLOzaQhbo9xt6lJVVpz9tkQEOfZW7Lszokf7t4moLEPmiAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMKk7SWdrCkFm2OsiNAgEQgDshLXK7pAMEANiI0/L1oM7xXSzg6ibx1UZQ1AdIX697ck0VMfjt8cTXpbb3xgHbtlrck4JG8KuHQBcTXA==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-xpro-ci.odl.mit.edu
+  edxnotes:acm_cert_domain: '*.xpro.mit.edu'
+  edxnotes:auto_scale:
+    desired: 1
+    max: 2
+    min: 1
+  edxnotes:business_unit: mitxpro
+  edxnotes:dns_zone: xpro
+  edxnotes:domain: xpro-notes-ci.xpro.mit.edu
+  edxnotes:target_vpc: xpro_vpc
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

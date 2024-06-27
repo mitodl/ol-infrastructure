@@ -1,0 +1,23 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgEdGy9xAEuhd2us5xqrOlxoAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMXK6sZZn1tdLfTZF4AgEQgDuzHB/a0s/gLtTCImB7e/shVdAOnQ/PbHwrAz1nhI6M8pc3O8GO+0o4xZwRxIIQA81Ynw6+tuR57IIW1A==
+config:
+  celery_monitoring:domain: celery-monitoring.odl.mit.edu
+  celery_monitoring:sender_email_address: ol-devops@mit.edu
+  consul:address: https://consul-operations-production.odl.mit.edu
+  consul:scheme: https
+  environment:business_unit: operations
+  environment:target_vpc: operations_vpc
+  opensearch:consul_service_name: 'celery-monitoring-opensearch'
+  opensearch:domain_name: "celeryp"
+  celery_monitoring:heroku_map:
+    mitx-devops:
+    - bootcamp-ecommerce
+    - micromasters
+    - ocw-studio
+    - xpro-production
+    odl-devops:
+    - mitxonline-production
+    - odl-open-discussions
+    ol-engineering-finance:
+    - mitopen-production

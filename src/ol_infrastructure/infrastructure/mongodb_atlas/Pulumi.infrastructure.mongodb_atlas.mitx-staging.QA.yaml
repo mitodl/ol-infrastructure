@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QH2A6PnHsHnYW0C/BYCK6uFAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMNFbl4znx8Miko9D0AgEQgDuq7PNl0v225H8QtEBmiV9I6W5x8RW/m/veT33HraczaZdrwRwSNAeg6OaISPJtcJeGawxD5IUWLH2zfg==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-mitx-staging-qa.odl.mit.edu
+  consul:scheme: https
+  environment:business_unit: residential-staging
+  environment:target_vpc: residential_mitx_staging_vpc
+  mongodb_atlas:disk_autoscale_max_gb: '200'
+  mongodb_atlas:disk_size_gb: '100'
+  mongodb_atlas:instance_size: M20
+  mongodb_atlas:organization_id: 611ab793e07f5965c7b9e4f6
+  mongodb_atlas:ready_for_traffic: 'true'
+  mongodb_atlas:version: '7.0'

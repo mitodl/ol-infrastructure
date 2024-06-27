@@ -1,0 +1,3 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QGMy4yIannSd/lzkrjExmbaAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMRoeZfasDehG5AcrtAgEQgDvOsnwTDAZrd6xg7FQjOcT8onJyrpUcL9r4WsBRqifRGolaRMEVohz4EbNnqmE0kxybvS6CKoiC0f16EA==

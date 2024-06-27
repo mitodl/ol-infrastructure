@@ -1,0 +1,49 @@
+---
+policies:
+- name: find-mitodl-ec2-instances
+  resource: aws.ec2
+  description: |
+    Find all the running ec2 instances that were spawned by an asg, belong of mitodl, and do not belong to ike. Take no action. Output used for next filter.
+  filters:
+  - and:
+    - State.Name: running
+    - "tag:OU": present
+    - "tag:aws:autoscaling:groupName": present
+    - not:
+      - "tag:OU": "ike"
+
+- name: find-and-propagate-tags-mitodl-ebs-volumes
+  resource: aws.ebs
+  description: |
+    Finds and propagates tags from ec2 instances found in the previous policy and adds those tags to the block devices on each instance.
+  filters:
+  - type: value
+    key: "VolumeId"
+    op: in
+    value_from:
+      url: file:find-mitodl-ec2-instances/resources.json
+      format: json
+      expr: "[].BlockDeviceMappings[].Ebs.VolumeId"
+  actions:
+  - type: copy-instance-tags
+    tags:
+    - '*'
+
+- name: find-and-propagate-tags-mitodl-ebs-snapshots
+  resource: aws.ebs-snapshot
+  description: |
+    Finds and propagates tags from volumes found in the previous policy and addes those tags to the associated snapshots.
+  filters:
+  - type: value
+    key: "SnapshotId"
+    op: in
+    value_from:
+      url: file:find-and-propagate-tags-mitodl-ebs-volumes/resources.json
+      format: json
+      expr: "[].SnapshotId"
+  actions:
+  - type: copy-related-tag
+    resource: ebs
+    skip_missing: true
+    key: VolumeId
+    tags: '*'

@@ -1,0 +1,16 @@
+---
+secretsprovider: awskms://alias/PulumiSecrets
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEiEmUCipB1ftXUOvoLMZ8yAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMA6tLc8foujPj0ZUmAgEQgDsHdLwSAHZxusx5FN6fBtwA1RHmSIesTlzLMYebSIjYTAcdlt1npRXtLnkYj3oEl//IX7RKYgxyhBD08w==
+config:
+  apps_vpc:cidr_block: 10.13.0.0/16
+  aws:region: us-east-1
+  data_vpc:cidr_block: 10.3.0.0/16
+  k8s_vpc:cidr_block: 172.29.0.0/16
+  k8s_vpc:k8s_service_subnet: 172.29.48.0/20
+  mitx_online_vpc:cidr_block: 10.22.0.0/16
+  operations_vpc:cidr_block: 10.0.0.0/16
+  operations_vpc:name: operations
+  residential_staging_vpc:cidr_block: 10.31.0.0/16
+  residential_vpc:cidr_block: 10.7.0.0/16
+  xpro_vpc:cidr_block: 10.8.0.0/16
+  xpro_vpc:name: mitxpro-production

@@ -1,0 +1,69 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QHu2G/FW4u/U5Mp8aTRLJeWAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMdB8kGMGowYQAC3ApAgEQgDt0MEeCrQrnWpiTFSBChBGs/9oayfWkynSljhyzjHpEKhj6+Km58XIEXGNAweJWGzLEXfQ188zRq/+8IQ==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-mitx-qa.odl.mit.edu
+  edxapp:waffle_flags:
+  - ["content_tagging.disabled", "--create", "--everyone"]
+  - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_advanced_settings_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_export_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_files_uploads_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_import_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_updates_page", "--create", "--superusers",
+    "--everyone"]
+  - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
+  - ["grades.bulk_management", "--create", "--superusers", "--everyone"]
+  - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
+  - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
+  - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
+  - ["learner_home_mfe.enabled", "--create", "--superusers", "--everyone"]
+  - ["learner_recommendations.enable_dashboard_recommendations", "--create", "--superusers",
+    "--everyone"]
+  - ["new_core_editors.use_new_problem_editor", "--create", "--everyone"]
+  - ["new_core_editors.use_new_text_editor", "--create", "--superusers", "--everyone"]
+  - ["new_core_editors.use_new_video_editor", "--create", "--superusers", "--everyone"]
+  - ["new_studio_mfe.use_tagging_taxonomy_list_page", "--create", "--superusers",
+    "--everyone"]
+  - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
+  - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
+  - ["studio.library_authoring_mfe", "--deactivate"]
+  edxapp:business_unit: residential
+  edxapp:db_password:
+    secure: v1:xglzNDR1j+CDTk3s:4TyRALK3e/ncPRhuFTUQQqRBSTwyrCWWcTn/Y6G9XjG+ms/biXjoKbleFdMo0omPC83nGiI5mBc=
+  edxapp:db_storage_gb: "200"
+  edxapp:dns_zone: mitx
+  edxapp:domains:
+    lms: mitx-qa.mitx.mit.edu
+    preview: preview-mitx-qa.mitx.mit.edu
+    studio: studio-mitx-qa.mitx.mit.edu
+  edxapp:edx_forum_secrets:
+    secure: v1:0/vZ/fZAoI9JRgrT:spK/nul4YYGNS+fn3dgRpOewZPmN5X6esiAJaJqgRY4CTjLrjSBC6VMZsXjJoDCIgVSAOoY3ClPFge6kYy02EAJMORtlHhuuBxxl2wY=
+  edxapp:edx_xqueue_secrets:
+    secure: v1:8gxklYODxX1veWAk:hMnDmIkA5pDq3fdkWCKpNUdF/XDhbjoGKtcffutGdgWfjZVGrRrcpIEZoDvxI/YWPB3oL12c8mpYsE75yJupx3tijTYU33Ym5+++ZauQGBlxnsbgEA4SmWHm1bPmKjQieAWt+lKcLvvkAYMS5qTalYHpTrdf9ud9CYMd8bFgT3za/RDaAEGEaw9qOqUbdJQDWA==
+  edxapp:elb_healthcheck_interval: "30"
+  edxapp:enable_notes: "True"
+  edxapp:enabled_mfes:
+    communications: communications
+    course_authoring: course-authoring
+    gradebook: gradebook
+    learner_dashboard: dashboard
+    learning: learn
+    ora_grading: ora-grading
+  edxapp:google_analytics_id: ""
+  edxapp:mail_domain: edxapp-mail-qa.mitx.mit.edu
+  edxapp:min_web_nodes: "1"
+  edxapp:min_worker_nodes: "1"
+  edxapp:sender_email_address: mitx-support+qa@mit.edu
+  edxapp:target_vpc: residential_mitx_vpc
+  edxapp:web_node_capacity: "2"
+  edxapp:worker_node_capacity: "1"
+  edxapp:framework: "earthly"
+  mongodb:atlas_project_id: 61a8f2d2c263e144f50f13b4
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

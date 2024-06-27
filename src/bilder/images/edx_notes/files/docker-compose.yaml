@@ -1,0 +1,28 @@
+---
+services:
+  notes_api:
+    image: mitodl/openedx-notes:${OPENEDX_RELEASE}
+    ports:
+    - 8000
+    env_file:
+    - ./.env
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.notes_api.rule=Host(`${NOTES_API_HOST}`)"
+    - "traefik.http.routers.notes_api.tls.certresolver=letsencrypt_resolver"
+    - "traefik.http.routers.notes_api.entrypoints=https"
+    volumes:
+    # Ref: CONFIG_ROOT
+    # https://github.com/openedx/edx-notes-api/blob/master/notesserver/settings/yaml_config.py
+    - /etc/docker/compose/edx_notes_settings.yaml:/app/edx-notes-api/edx_notes_api.yml:ro
+  traefik:
+    image: traefik:v3.0
+    command:
+    - "--configFile=/etc/traefik/traefik.yaml"
+    ports:
+    - "80:80"
+    - "443:443"
+    volumes:
+      # So that Traefik can listen to the Docker events
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - /etc/traefik/:/etc/traefik/

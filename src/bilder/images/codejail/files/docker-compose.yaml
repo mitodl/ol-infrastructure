@@ -1,0 +1,11 @@
+---
+version: "3.7"
+services:
+  codejail:
+    container_name: codejail
+    image: mitodl/codejail:${OPENEDX_RELEASE}
+    environment:
+      FLASK_CODEJAILSERVICE_HOST: "0.0.0.0"
+      FLASK_CODEJAILSERVICE_PORT: "8000"
+    ports:
+    - 8000:8000

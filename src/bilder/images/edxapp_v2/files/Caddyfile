@@ -1,0 +1,78 @@
+# Heavily inspired by and lifted from tutor
+# https://github.com/overhangio/tutor/blob/2e276cbb09c47e177bca6c0bcd44aee53bb5a0b6/tutor/templates/apps/caddy/Caddyfile
+#
+# This file and other files adapted from Tutor are covered by and subject to the AGPL-3
+# as a clause 5 'aggregate'.
+
+{
+    auto_https off
+}
+
+# proxy directive snippet (with logging) to be used as follows:
+#
+#     import proxy "containername:port"
+(proxy) {
+    log {
+        output stdout
+        format filter {
+            wrap json
+            fields {
+                common_log delete
+                request>headers delete
+                resp_headers delete
+            }
+        }
+    }
+    encode gzip
+    reverse_proxy {args.0} {
+        header_up X-Forwarded-Port 443
+    }
+    tls /etc/caddy/certificate /etc/caddy/key
+}
+
+{$EDXAPP_LMS_URL}:443, {$EDXAPP_LMS_PREVIEW_URL}:443 {
+    @favicon_matcher {
+        path_regexp ^/favicon.ico$
+    }
+    rewrite @favicon_matcher /theming/asset/images/favicon.ico
+
+    # Limit profile image upload size
+    handle_path /api/profile_images/*/*/upload {
+        request_body {
+            max_size 1MB
+        }
+    }
+
+    import proxy "lms:8000"
+
+    handle_path /* {
+        request_body {
+            max_size 4MB
+        }
+    }
+}
+
+{$EDXAPP_CMS_URL}:443 {
+    @favicon_matcher {
+        path_regexp ^/favicon.ico$
+    }
+    rewrite @favicon_matcher /theming/asset/images/favicon.ico
+
+    import proxy "cms:8000"
+
+    # allow large uploads in the CMS
+    handle_path /* {
+        request_body {
+            max_size 250MB
+        }
+    }
+}
+
+:443/status {
+    import proxy "healthcheck:8907"
+}
+
+:443 {
+    reverse_proxy "lms:8000"
+    tls /etc/caddy/certificate /etc/caddy/key
+}

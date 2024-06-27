@@ -1,0 +1,130 @@
+---
+resources:
+- name: build-schedule
+  type: time
+  icon: clock
+  source:
+    interval: 1h
+- name: gitrepo
+  type: git
+  icon: github
+  source:
+    branch: main
+    uri: git@github.com:mitodl/grafana-dashboards.git
+    private_key: ((grizzly.ssh_key))
+jobs:
+- name: commit-managed-dashboards-from-ci
+  build_log_retention:
+    days: 2
+  plan:
+  - get: build-schedule
+    trigger: true
+  - get: gitrepo
+    trigger: false
+  - task: get-managed-dashboards-from-ci
+    config:
+      inputs:
+      - name: gitrepo
+      outputs:
+      - name: changed-repo
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: grafana/grizzly
+          tag: 0.2.0-beta3-amd64
+      run:
+        path: sh
+        args:
+        - -exc
+        - |
+          export GRAFANA_TOKEN="((grizzly.ci_token))"
+          export GRAFANA_URL="((grizzly.ci_url))"
+          grr pull -d ((grafana-folder-name)) -t 'DashboardFolder/((grafana-folder-uid))'
+          grr pull -d ((grafana-folder-name)) -t 'Dashboard/*'
+          cp -Rv gitrepo/. changed-repo
+          mkdir -p changed-repo/((grafana-folder-name))/folders
+          mkdir -p changed-repo/((grafana-folder-name))/dashboards/((grafana-folder-uid))
+          cp -Rv ((grafana-folder-name))/folders/. changed-repo/((grafana-folder-name))/folders
+          cp -Rv ((grafana-folder-name))/dashboards/((grafana-folder-uid))/. changed-repo/((grafana-folder-name))/dashboards/((grafana-folder-uid))
+  - task: commit-managed-dashboards-from-ci
+    config:
+      inputs:
+      - name: changed-repo
+      outputs:
+      - name: changed-repo
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: bitnami/git
+          tag: 2.35.1
+      run:
+        path: bash
+        args:
+        - -xc
+        - |
+          cd changed-repo
+          git config user.name "concourse"
+          git config user.email "odl-devops@mit.edu"
+          UNTRACKED_FILES=`git ls-files --other --exclude-standard --directory`
+          git diff --exit-code
+          if [ $? != 0 ] || [ "$UNTRACKED_FILES" != "" ]; then
+            git add .
+            git commit -m "Automated git sync for grafana-ci"
+          else
+            echo "Nothing to commit."
+          fi
+  - put: gitrepo
+    params:
+      repository: changed-repo
+- name: apply-managed-dashboards-to-qa
+  build_log_retention:
+    days: 2
+  plan:
+  - get: gitrepo
+    trigger: true
+    passed: [commit-managed-dashboards-from-ci]
+  - task: apply-managed-dashboards-to-qa
+    config:
+      inputs:
+      - name: gitrepo
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: grafana/grizzly
+          tag: 0.2.0-beta3-amd64
+      run:
+        path: sh
+        args:
+        - -exc
+        - |
+          export GRAFANA_TOKEN="((grizzly.qa_token))"
+          export GRAFANA_URL="((grizzly.qa_url))"
+          grr apply -d gitrepo/((grafana-folder-name)) -t '*'
+- name: apply-managed-dashboards-to-production
+  build_log_retention:
+    days: 2
+  plan:
+  - get: gitrepo
+    trigger: true
+    passed: [apply-managed-dashboards-to-qa]
+  - task: apply-managed-dashboards-to-production
+    config:
+      inputs:
+      - name: gitrepo
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: grafana/grizzly
+          tag: 0.2.0-beta3-amd64
+      run:
+        path: sh
+        args:
+        - -exc
+        - |
+          export GRAFANA_TOKEN="((grizzly.production_token))"
+          export GRAFANA_URL="((grizzly.production_url))"
+          grr apply -d gitrepo/((grafana-folder-name)) -t '*'

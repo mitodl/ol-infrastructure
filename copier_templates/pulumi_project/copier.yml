@@ -1,0 +1,15 @@
+---
+project_name:
+  type: str
+  help: The name of the Pulumi project/module to generate
+
+project_type:
+  type: str
+  choices:
+  - application
+  - substructure
+  - infrastructure
+
+project_description:
+  type: str
+  help: Descriptive string to include in Pulumi.yaml

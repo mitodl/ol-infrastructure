@@ -1,0 +1,58 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QGxrnJ+jhHLuJokM5S8zndOAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMo53bqUNDbCTvBcF/AgEQgDsAe8gB0NwcmYHRW5FQhRokmUaBcfKWMa0mocOIQnaLrZ/jjXsfgIuGFd3cnQeytgce4vOEMB7zR27yvQ==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-mitxonline-qa.odl.mit.edu
+  consul:http_auth:
+    secure: v1:Fa4X7VjchQQhRf6+:LxDvDXBPZUPOgMpcqvo9PxwjMK2lDKrnmJGbaJA7e0i5sVsUyQXTLYpa7lDmC5d1QddyLLkjyQjK5Hi/fEeoJle5986uRKVHXNyjRpcJqx8sN2SbFPHrCDpWQfrsz38=
+  consul:scheme: https
+  edxapp:waffle_flags:
+  - ["content_tagging.disabled", "--create", "--everyone"]
+  - ["course_experience.relative_dates", "--create", "--superusers", "--everyone",
+    "--staff", "--authenticated"]
+  - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--staff"]
+  - ["grades.bulk_management", "--create", "--superusers", "--everyone", "--staff",
+    "--authenticated"]
+  - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
+  - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
+  - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
+  - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone",
+    "--staff", "--authenticated"]
+  - ["seo.enable_anonymous_courseware_access", "--create", "--superusers", "--staff",
+    "--authenticated"]
+  - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
+  - ["teams.enable_teams_app", "--create", "--superusers", "--staff"]
+  edxapp:business_unit: mitxonline
+  edxapp:db_password:
+    secure: v1:xHUw5WC3aN02zuAj:0BozwDxrtF0OA7wkYuv4R4CCnSHYdgXt+vi6/3eP9zwJgHgQO20+8sQfg7rXPC9SIUobEA==
+  edxapp:dns_zone: mitxonline
+  edxapp:domains:
+    lms: courses-qa.mitxonline.mit.edu
+    preview: preview-qa.mitxonline.mit.edu
+    studio: studio-qa.mitxonline.mit.edu
+  edxapp:marketing_domain: rc.mitxonline.mit.edu
+  edxapp:edx_forum_secrets:
+    secure: v1:IqXRArQveCV+9lkE:cRaraFuN2dDmI29PD4QifOU7MrRFdszOoaUb7o3pDJordt4TSjw8fIxldWfMzNhZRLC+NS291DorO1IuN6ASdCbt5d53aMvHVt+3hA6wyuI11OFjk7U=
+  edxapp:elb_healthcheck_interval: "30"
+  edxapp:enable_notes: "True"
+  edxapp:enabled_mfes:
+    communications: communications
+    course_authoring: course-authoring
+    discussions: discuss
+    gradebook: gradebook
+    learning: learn
+    ora_grading: ora-grading
+  edxapp:google_analytics_id: UA-5145472-46
+  edxapp:mail_domain: edxapp-mail-qa.mitxonline.mit.edu
+  edxapp:proctortrack_url: https://preproduction.verificient.com
+  edxapp:sender_email_address: support@edxapp-mail-qa.mitxonline.mit.edu
+  edxapp:email_use_course_id_from_for_bulk: "True"
+  edxapp:bulk_email_default_from_email: no-reply@edxapp-mail-qa.mitxonline.mit.edu
+  edxapp:framework: "earthly"
+  edxapp:web_node_capacity: "3"
+  edxapp:worker_node_capacity: "5"
+  redis:instance_type: cache.r6g.large
+  mongodb:atlas_project_id: 61a8fd80284fd30a660f2699
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

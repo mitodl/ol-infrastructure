@@ -1,0 +1,35 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgF5Ng6l1tyRzv4IhBNbNhf+AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMPuaxehljv+ExkboRAgEQgDtWc5o/ttux0c8wqWwehuZ3vtpUd8gBOU0R5tMufDS2YERIyzZYOifA8qWq0onJh6JcNqmlFyXRR5lBsA==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-mitxonline-production.odl.mit.edu
+  consul:http_auth:
+    secure: v1:RNlPmxc0q/5pq3c8:pXsI73JRWV2rdfxwCJGDunjn6a3qOEmhJzSJ+Y0sIRe3DyRYcAGIkwtlCdkeS1+pY8YFsZlSSUJbzKC03ZwZXkSwcOqsnEcIjTkJ4xLCfHYQx0eXF9SvWXshLMHpDRK1yQ==
+  consul:scheme: https
+  heroku:app_id:
+    secure: v1:pR0Rve/LoKSnrjSl:KTPyUma7Q6HO2ZEv/n7cqwwBtjXviC+xTEL2EYAGIxZ/72itycpuOKhemhvfpb83E0/O5w==
+  heroku_app:vars:
+    AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-production"
+    CRON_COURSE_CERTIFICATES_HOURS: "18"
+    GA_TRACKING_ID: "UA-5145472-48"
+    GTM_TRACKING_ID: "GTM-M47BLXN"
+    LOGOUT_REDIRECT_URL: "https://courses.mitxonline.mit.edu/logout"
+    MAILGUN_FROM_EMAIL: "MITx Online <no-reply@mail.mitxonline.mit.edu>"
+    MAILGUN_SENDER_DOMAIN: "mail.mitxonline.mit.edu"
+    MITOL_GOOGLE_SHEETS_PROCESSOR_APP_NAME: "MITx Online (production)"
+    MITOL_GOOGLE_SHEETS_REFUNDS_FIRST_ROW: "4"
+    MITOL_GOOGLE_SHEETS_REFUNDS_REQUEST_WORKSHEET_ID: "0"
+    MITOL_HUBSPOT_API_ID_PREFIX: "mitxonline"
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT: "api.cybersource.com"
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://secureacceptance.cybersource.com/pay"
+    MITX_ONLINE_BASE_URL: "https://mitxonline.mit.edu"
+    MITX_ONLINE_ENVIRONMENT: "production"
+    MITX_ONLINE_LOG_LEVEL: "INFO"
+    MITX_ONLINE_SECURE_SSL_HOST: "mitxonline.mit.edu"
+    OPENEDX_API_BASE_URL: "https://courses.mitxonline.mit.edu"
+    SENTRY_LOG_LEVEL: "ERROR"
+  mitxonline:db_password:
+    secure: v1:1SGxkH66kKNXMVc0:P9FztYdyzfxIrapGHU3pD5gz9ZkW6Of/zTqhaZf4O+L+Y8yAbcissYxogKfyDMxSJYSSUxI12K0=
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

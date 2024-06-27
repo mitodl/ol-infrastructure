@@ -1,0 +1,17 @@
+---
+creation_rules:
+- path_regex: (ci.env$|\.ci\.ya?ml$|\.ci\.json$)
+  kms: arn:aws:kms:us-east-1:610119931565:alias/infrastructure-secrets-ci
+  pgp: dfd1205a98269f34c43c9221d6260c616bd0fa33,B905F0256A801D3F1D15B5126A1D27A4BE75B1C2,07083D36FD5986B0C99700944E9B358045C1B176,3582AE9F12CE295BDAF545ED17A5F53F11681446
+  hc_vault_transit_uri: https://vault-ci.odl.mit.edu/v1/infrastructure/keys/sops
+- path_regex: (qa.env$|qa\.ya?ml$|rc.env$|rc\.ya?ml$|qa\.json$|rc\.json$)
+  kms: arn:aws:kms:us-east-1:610119931565:alias/infrastructure-secrets-qa
+  pgp: dfd1205a98269f34c43c9221d6260c616bd0fa33,B905F0256A801D3F1D15B5126A1D27A4BE75B1C2,07083D36FD5986B0C99700944E9B358045C1B176,3582AE9F12CE295BDAF545ED17A5F53F11681446
+  hc_vault_transit_uri: https://vault-qa.odl.mit.edu/v1/infrastructure/keys/sops
+- path_regex: (production.env$|production\.ya?ml$|production\.json$)
+  kms: arn:aws:kms:us-east-1:610119931565:alias/infrastructure-secrets-production
+  pgp: dfd1205a98269f34c43c9221d6260c616bd0fa33,B905F0256A801D3F1D15B5126A1D27A4BE75B1C2,07083D36FD5986B0C99700944E9B358045C1B176,3582AE9F12CE295BDAF545ED17A5F53F11681446
+  hc_vault_transit_uri: https://vault-production.odl.mit.edu/v1/infrastructure/keys/sops
+- kms: arn:aws:kms:us-east-1:610119931565:alias/infrastructure-secrets-production
+  pgp: dfd1205a98269f34c43c9221d6260c616bd0fa33,B905F0256A801D3F1D15B5126A1D27A4BE75B1C2,07083D36FD5986B0C99700944E9B358045C1B176,3582AE9F12CE295BDAF545ED17A5F53F11681446
+  hc_vault_transit_uri: https://vault-production.odl.mit.edu/v1/infrastructure/keys/sops

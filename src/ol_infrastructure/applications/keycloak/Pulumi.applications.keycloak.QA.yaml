@@ -1,0 +1,18 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgHt3EmKiORMnsrUqOAcvssaAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM+uBCngCIuP3luGZhAgEQgDuCiIQ8KaihLzmQC5zKAtoms52eTnQEF5JGVpkULKskNdI9xl8fWo8SfcMudGULKVBOSZTMeSoKiwIdUg==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-operations-qa.odl.mit.edu
+  keycloak:auto_scale:
+    desired: 2
+    max: 3
+    min: 1
+  keycloak:db_capacity: "50"
+  keycloak:domain: sso-qa.ol.mit.edu
+  keycloak:instance_type: burstable_medium
+  keycloak:rds_password:
+    secure: v1:YMizvIx441k8sgrg:bS5HC/DC3vM8GkwzwTXuBPd9A4xznaxN5GjSF3IdSnJ99D1gOI3M4JevsdJTR2ZGdLwnOy0OULBGuPpxy6bsrOsMXZCEqeVEBlu0VAuhibo=
+  keycloak:target_vpc: operations_vpc
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

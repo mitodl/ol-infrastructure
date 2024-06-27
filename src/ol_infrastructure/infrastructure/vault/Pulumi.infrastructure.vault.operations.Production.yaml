@@ -1,0 +1,14 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgFlw/+s87LoA/OVc5mcJmIzAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMeaCbHbb2aNoXKZkQAgEQgDvoa2Lfv7bTNiWLWwe6agHwm9FCubZjjqbQ8vsW0vY7k9h8T9xGS2x792iG+E94nrjDQ9ZZqcx2lslT+g==
+config:
+  aws:region: us-east-1
+  vault:backup_bucket: ol-infra-production-vault-backups
+  vault:backup_cron: 10 0,3,6,9,12,15,18,21 * * *
+  vault:backup_healthcheck_id:
+    secure: v1:M7uiw39MwsFgrrA+:C1MwgoG9V1w1zgCqaa/BqtHtuydPthLornh/8Utg5vy1iIGlNhCjL8wmT1mOsVzO2BHXSw==
+  vault:business_unit: operations
+  vault:cluster_size: "5"
+  vault:domain: vault-production.odl.mit.edu
+  vault:storage_disk_capacity: "200"
+  vault:target_vpc: operations

@@ -1,0 +1,37 @@
+---
+resources:
+- name: ol-infrastructure
+  type: git
+  source:
+    uri: https://github.com/mitodl/ol-infrastructure.git
+    branch: ((ol-infrastructure-git-ref))
+    paths:
+    - dockerfiles/ocw/node-hugo/Dockerfile
+- name: node-image
+  type: docker-image
+  check_every: 1h
+  source:
+    repository: node
+    tag: 14-buster-slim
+- name: ocw-course-publisher-image
+  type: docker-image
+  source:
+    username: ((dockerhub.username))
+    password: ((dockerhub.password))
+    repository: mitodl/ocw-course-publisher
+    tag: latest
+
+jobs:
+- name: publish
+  public: true
+  serial: true
+  plan:
+  - get: node-image
+    trigger: true
+    params: {skip_download: true}
+  - get: ol-infrastructure
+    trigger: true
+  - put: ocw-course-publisher-image
+    params:
+      build: ol-infrastructure/dockerfiles/ocw/node-hugo
+      additional_tags: ol-infrastructure/dockerfiles/ocw/node-hugo/tag

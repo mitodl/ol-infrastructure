@@ -1,0 +1,32 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gHIy40RMK2Doz2O0eU9V4w9AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM4gA0XSwe3GCIYvbqAgEQgDtqu1VEShSes4yhlvMBNdSshCr5VE/wXl53nc05sJQ+HdzAlZ4K59qEvfNTTtMGveMWZSf4Lj7eGWFZrg==
+config:
+  consul:address: https://consul-apps-production.odl.mit.edu
+  ovs:ami_branch_tag: "release-candidate"
+  ovs:auto_scale:
+    desired: 2
+    max: 3
+    min: 1
+  ovs:default_domain: video.odl.mit.edu
+  ovs:domains:
+  - video.odl.mit.edu
+  - techtv.mit.edu
+  - ttv.mit.edu
+  ovs:edx_base_url: https://courses.xpro.mit.edu
+  ovs:feature_annotations: "False"
+  ovs:log_level: INFO
+  ovs:rds_password:
+    secure: v1:ZuLd0v6/Z6KPbt70:d6d57OUpQy6Mxk4GAEowidVhkN8tXSDRvNG9MXu4hCwMbJfvY7QmvmOie0ElGjWDh354ssuERYFOEoqWDCPD2N2yNLtcA9BB1q2UVlUyuGM=
+  ovs:route53_managed_domains:
+  - video.odl.mit.edu
+  ovs:s3_bucket_name: odl-video-service
+  ovs:s3_subtitle_bucket_name: odl-video-service-subtitles
+  ovs:s3_thumbnail_bucket_name: odl-video-service-thumbnails
+  ovs:s3_transcode_bucket_name: odl-video-service-transcoded
+  ovs:s3_watch_bucket_name: odl-video-service-uploaded
+  ovs:target_vpc: applications_vpc
+  ovs:use_shibboleth: "True"
+  redis:max_connections: "30"
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

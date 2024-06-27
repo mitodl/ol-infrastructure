@@ -1,0 +1,64 @@
+---
+version: '2.1'
+services:
+  nginx:
+    image: pennlabs/shibboleth-sp-nginx:latest
+    volumes:
+    - ${NGINX_CONFIG_FILE_PATH}:/etc/nginx/conf.d/odl-video.conf:ro
+    - /etc/nginx/shib_fastcgi_params:/etc/nginx/shib_fastcgi_params:ro
+    - /etc/nginx/fastcgi_params:/etc/nginx/fastcgi_params:ro
+    - /etc/nginx/shib_clear_headers:/etc/nginx/shib_clear_headers:ro
+    - /etc/nginx/uwsgi_params:/etc/nginx/uwsgi_params:ro
+    - /etc/nginx/shib_params:/etc/nginx/shib_params:ro
+    - /etc/nginx/logging.conf:/etc/nginx/loggings.conf:ro
+    - /etc/nginx/star.odl.mit.edu.crt:/etc/nginx/ssl/ovs_web_cert.crt:ro
+    - /etc/nginx/star.odl.mit.edu.key:/etc/nginx/ssl/ovs_web_cert.key:ro
+    - /etc/shibboleth/attribute-map.xml:/etc/shibboleth/attribute-map.xml:ro
+    - /etc/shibboleth/shibboleth2.xml:/etc/shibboleth/shibboleth2.xml:ro
+    - /etc/shibboleth/sp-cert.pem:/etc/shibboleth/sp-cert.pem:ro
+    - /etc/shibboleth/sp-key.pem:/etc/shibboleth/sp-key.pem:ro
+    - /etc/shibboleth/mit-md-cert.pem:/etc/shibboleth/mit-md-cert.pem:ro
+    ports:
+    - "443:443"
+    - "80:80"
+    links:
+    - app
+  init-app:
+    image: mitodl/ovs-app:${VERSION}
+    env_file: .env
+    command: >
+      /bin/bash -c '
+      rm -rf /src/staticfiles/* &&
+      python3 manage.py migrate --noinput &&
+      python3 manage.py collectstatic --noinput'
+    volumes:
+    - /etc/docker/compose/staticfiles:/src/staticfiles:rw
+    - /var/log:/var/log:rw
+  app:
+    image: mitodl/ovs-app:${VERSION}
+    env_file: .env
+    ports:
+    - "8087:8087"
+    command: >
+      /bin/bash -c '
+      sleep 3 &&
+      uwsgi uwsgi.ini'
+    depends_on:
+      init-app:
+        condition: service_completed_successfully
+    volumes:
+    - /var/log:/var/log:rw
+    - /etc/docker/compose/staticfiles:/src/staticfiles:rw
+
+  celery:
+    image: mitodl/ovs-app:${VERSION}
+    env_file: .env
+    command: >
+      /bin/bash -c '
+      sleep 3 &&
+      celery -A odl_video worker -B -l {{ keyOrDefault "ovs/log_level" "INFO" }}'
+    depends_on:
+      init-app:
+        condition: service_completed_successfully
+    volumes:
+    - /var/log:/var/log:rw

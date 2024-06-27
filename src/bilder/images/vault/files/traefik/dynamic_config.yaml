@@ -1,0 +1,22 @@
+---
+http:
+  routers:
+    vault-router:
+      rule: Host("{{ env "DOMAIN"}}")
+      service: vault-service
+      tls:
+        certResolver: letsencrypt_resolver
+    vault-healthcheck:
+      rule: PathPrefix("/v1/sys/health")
+      service: vault-service
+      tls:
+        certResolver: letsencrypt_resolver
+  services:
+    vault-service:
+      loadBalancer:
+        serversTransport: vault-transport
+        servers:
+        - url: https://localhost:8200
+  serversTransports:
+    vault-transport:
+      insecureSkipVerify: true

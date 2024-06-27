@@ -1,0 +1,7 @@
+---
+name: ol-infrastructure-concourse-application
+runtime: python
+description: A project to manage the resources and deployment for the Concourse CI/CD
+  system
+backend:
+  url: s3://mitol-pulumi-state/

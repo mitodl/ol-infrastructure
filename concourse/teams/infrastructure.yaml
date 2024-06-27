@@ -1,0 +1,13 @@
+---
+roles:
+- name: owner
+  github:
+    teams:
+    - mitodl:devops
+  local:
+    users:
+    - oldevops
+- name: viewer
+  github:
+    orgs:
+    - mitodl

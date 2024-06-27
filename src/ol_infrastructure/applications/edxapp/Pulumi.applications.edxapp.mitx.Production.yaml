@@ -1,0 +1,74 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgFwrf3LY2FAJ/ptzj6nEyJ4AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMZyJ4U8ydHpIfI09WAgEQgDsQYAf7wRNA+mNWpXSYh3e2+nliD/V4X0qdY6PIeMiWnaYGBrse5H7T9f31bVWWg4cVFiFYrFRelQwQ8A==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-mitx-production.odl.mit.edu
+  edxapp:waffle_flags:
+  - ["content_tagging.disabled", "--create", "--everyone"]
+  - ["blockstore.use_blockstore_app_api", "--create", "--superusers", "--everyone"]
+  - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_advanced_settings_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_export_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_files_uploads_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_import_page", "--create", "--superusers",
+    "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_updates_page", "--create", "--superusers",
+    "--everyone"]
+  - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
+  - ["grades.bulk_management", "--create", "--superusers", "--everyone"]
+  - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
+  - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
+  - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
+  - ["learner_home_mfe.enabled", "--create", "--superusers", "--everyone"]
+  - ["learner_recommendations.enable_dashboard_recommendations", "--create", "--superusers",
+    "--everyone"]
+  - ["new_core_editors.use_new_problem_editor", "--create", "--everyone"]
+  - ["new_core_editors.use_new_text_editor", "--create", "--superusers", "--everyone"]
+  - ["new_core_editors.use_new_video_editor", "--create", "--superusers", "--everyone"]
+  - ["new_studio_mfe.use_tagging_taxonomy_list_page", "--create", "--superusers",
+    "--everyone"]
+  - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]
+  - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
+  - ["studio.library_authoring_mfe", "--deactivate"]
+  edxapp:business_unit: residential
+  edxapp:db_max_storage_gb: "1000"
+  edxapp:db_password:
+    secure: v1:vkG4n/X+C+SBaMf7:W/zi1Bxqkab0Hx1HAAiVhZuj/8WOJ7v94lxfERa5YIF5dD037uuULgPxIt+3zzHVur26pBcVIk4=
+  edxapp:db_storage_gb: "500"
+  edxapp:dns_zone: mitx
+  edxapp:domains:
+    lms: lms.mitx.mit.edu
+    preview: preview.mitx.mit.edu
+    studio: studio.mitx.mit.edu
+  edxapp:edx_forum_secrets:
+    secure: v1:abC4Zew/4Q9nzIm8:ntKKmUgT7z8jIEgKV2EkTbSJ6zcckEH2YHHInsBo8WOGqPNydNkxidhKYZ/bXy8y8E3iBOFF0uRROTyuHhrmzcbGygu01zYGFIBe+v8=
+  edxapp:edx_xqueue_secrets:
+    secure: v1:MSer6cBbKNVi/Pas:v5XAeVblUaT5pyxdhhk9wn9cVjadZcHscOWhN1nlPHBsCD8/HgEtsvAjtTOWnW/yVMYaMzlIjOxoKvEw0/qNESQj0M7bFKC7/dtfU+qlrWyI0PJEVVmiz9QPLAOvl4rA8In2hJTAmN+BAREDqSRFM9YiOKmdOuoDssTGv+fD1+oC5EcFz4BKPUnbZDQ1
+  edxapp:enable_notes: "True"
+  edxapp:enabled_mfes:
+    communications: communications
+    course_authoring: course-authoring
+    gradebook: gradebook
+    learner_dashboard: dashboard
+    learning: learn
+    ora_grading: ora-grading
+  edxapp:google_analytics_id: UA-5145472-4
+  edxapp:mail_domain: edxapp-mail-production.mitx.mit.edu
+  edxapp:min_web_nodes: "5"
+  edxapp:min_worker_nodes: "2"
+  edxapp:sender_email_address: mitx-support@mit.edu
+  edxapp:target_vpc: residential_mitx_vpc
+  edxapp:web_instance_type: general_purpose_xlarge
+  edxapp:web_node_capacity: "9"
+  edxapp:worker_disk_size: "50"
+  edxapp:worker_node_capacity: "5"
+  edxapp:worker_instance_type: "m7a.xlarge"
+  edxapp:framework: "earthly"
+  mongodb:atlas_project_id: 61b728704656cb4747e589a0
+  redis:instance_type: cache.r6g.2xlarge
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

@@ -1,0 +1,3 @@
+---
+secretsprovider: awskms://alias/PulumiSecrets
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQESdD/beMjxgOOoi1j+ueX0AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMxsG2KMYT99XvBabQAgEQgDuB8Q1lRzVq1pYkcyTbQMv0XkjYE2njvf/tVljCC6p9fmzwlGKGsYTOGTXcn2ZLCefqgXjj03AUFJ2J2A==

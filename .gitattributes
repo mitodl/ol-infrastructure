@@ -1,0 +1,12 @@
+poetry.lock binary linguist-generated
+yarn.lock binary linguist-generated
+requirements.txt binary linguist-generated
+black.lockfile binary linguist-generated
+build-support-bin.lockfile binary linguist-generated
+flake8.lockfile binary linguist-generated
+ipython.lockfile binary linguist-generated
+isort.lockfile binary linguist-generated
+mypy.lockfile binary linguist-generated
+pytest.lockfile binary linguist-generated
+python-default.lockfile binary linguist-generated
+testing.lockfile binary linguist-generated

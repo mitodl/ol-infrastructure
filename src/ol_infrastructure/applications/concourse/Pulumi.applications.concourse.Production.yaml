@@ -1,0 +1,70 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgFY9u5ocQG+o+sndf23MIlyAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMTUkwVa0Z1Qyk+S5BAgEQgDspkXL/TSxU8EhflHb1ANICwEE4O+k5t1yQArv1+UG+s3C14Wh+UeWPu93RDnAV9xI6FwkSwX0ea7vo/w==
+config:
+  aws:region: us-east-1
+  concourse:consul_credentials:
+    secure: v1:odRZcznoHvnBu/tX:eJ0FHmofwnccKwNWNGwbGV/EoZPG6btyd8irQ4M1DZ6OX/4VWPD8LOp9n/gNHeeYw9S4hnoej1gB9ljUHrim
+  concourse:db_capacity: "334"
+  concourse:db_instance_size: db.m7g.xlarge
+  concourse:db_password:
+    secure: v1:MVLu2ciX/IoD8sgo:Jgmo9VuyRaTNqVBdX0vQtBmI2cMQ5dbrSJ6AWReAw9mh6BRFs4M3mWdOlLha7P2FJz1i+zyiy4z8s0/LHvYtJBDJuvDvn6OEAt58zF+F1LMyr3k3+H7/Vryg
+  concourse:target_vpc: operations_vpc
+  concourse:web_auto_scale:
+    desired: 5
+    max: 8
+    min: 3
+  concourse:web_host_domain: cicd.odl.mit.edu
+  concourse:web_iam_policies:
+  - base
+  - ocw
+  - operations
+  concourse:web_instance_type: general_purpose_large
+  concourse:workers:
+  - auto_scale:
+      desired: 5
+      max: 8
+      min: 3
+    aws_tags:
+      OU: open-courseware
+    concourse_team: ocw
+    disk_size_gb: 1000
+    disk_throughput: 600
+    disk_iops: 3000
+    iam_policies:
+    - base
+    - ocw
+    instance_type: general_purpose_xlarge
+    name: ocw
+  - auto_scale:
+      desired: 3
+      max: 5
+      min: 2
+    aws_tags:
+      OU: operations
+    concourse_team: infrastructure
+    disk_size_gb: 300
+    disk_throughput: 300
+    disk_iops: 4000
+    iam_policies:
+    - base
+    - infra
+    - operations
+    - cloud_custodian
+    instance_type: c7a.2xlarge
+    name: infra
+  - auto_scale:
+      desired: 2
+      max: 3
+      min: 2
+    aws_tags:
+      OU: operations
+    disk_size_gb: 100
+    iam_policies:
+    - base
+    - operations
+    instance_type: t3a.xlarge
+    name: generic
+  consul:address: https://consul-operations-production.odl.mit.edu
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

@@ -1,0 +1,21 @@
+---
+## Dynamic configuration
+http:
+  routers:
+    concourse-router:
+      rule: Host("{{env "DOMAIN"}}")
+      service: concourse-service
+      tls: {}
+    concourse-healthcheck:
+      rule: Path("/api/v1/info")
+      service: concourse-service
+      tls: {}
+  services:
+    concourse-service:
+      loadBalancer:
+        servers:
+        - url: http://localhost:8080
+tls:
+  certificates:
+  - certFile: /etc/traefik/odl_wildcard.cert
+    keyFile: /etc/traefik/odl_wildcard.key

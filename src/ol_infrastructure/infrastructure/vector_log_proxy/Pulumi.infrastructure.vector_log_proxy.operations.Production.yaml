@@ -1,0 +1,13 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgFILwleBy7ygORfoGO6VA7vAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM2cYa5W1swVP6rjG4AgEQgDveu6a6q1yh2BDpM1uU4WnJu46uLJ7XKnX5oFkZGP0eFmu8wicYF5yvaQ5CYIgBPT5mpFHgXXGHVg+sYg==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-operations-production.odl.mit.edu
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
+  vector_log_proxy:target_vpc: operations_vpc
+  vector_log_proxy:web_host_domain: log-proxy.odl.mit.edu
+  vector_log_proxy:fastly_service_id_sha256sums:
+    ocw_draft_production: c5775b67b4b2dbbf99233ef493f471f2d420160702041fdc3695cb5ab66ae28b  # pragma: allowlist secret
+    ocw_live_production: 267abb9b8b4ace0b3335447c354e709ad8cd3f5871d88b5e017a0bd9b7a1d974  # pragma: allowlist secret

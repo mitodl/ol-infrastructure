@@ -1,0 +1,28 @@
+---
+http:
+  middlewares:
+    pulumi-auth:
+      basicAuth:
+        usersFile: /etc/traefik/.htpasswd
+  routers:
+    consul-router:
+      rule: Host("{{ env "DOMAIN" }}")
+      service: consul-service
+      tls:
+        certResolver: letsencrypt_resolver
+      middlewares:
+      - pulumi-auth
+    consul-healthcheck:
+      rule: PathPrefix("/v1/agent/host")
+      service: consul-service
+      tls:
+        certResolver: letsencrypt_resolver
+  services:
+    consul-service:
+      loadBalancer:
+        serversTransport: consul-transport
+        servers:
+        - url: http://localhost:8500
+  serversTransports:
+    consul-transport:
+      insecureSkipVerify: true

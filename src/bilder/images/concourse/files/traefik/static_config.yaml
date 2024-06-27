@@ -1,0 +1,14 @@
+---
+entryPoints:
+  http:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: "concourse"
+          scheme: "https"
+  concourse:
+    address: ":443"
+providers:
+  file:
+    filename: /etc/traefik/concourse.yaml

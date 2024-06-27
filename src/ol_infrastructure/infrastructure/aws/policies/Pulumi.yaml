@@ -1,0 +1,7 @@
+---
+name: ol-infrastructure-aws-policies
+runtime: python
+description: Pulumi project for managing common policy definitions to be used across
+  other projects.
+backend:
+  url: s3://mitol-pulumi-state/

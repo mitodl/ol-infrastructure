@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjEYf3gV5ZTnviCJcHwGnUuLzld5EuYumgMrRde6bvXUgElCzjL1CHQjowms0oGAmkRAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMvj42wDfaQ9tzQYe0AgEQgDt2PpqdJWf/5bCKhJZLAjvWAgsm6yBKldZRfN7LR+o18d1CZVABk7Iyzm9R03KwmH6zilGyEjlhAgGPNA==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-mitxonline-ci.odl.mit.edu
+  consul:scheme: https
+  environment:business_unit: mitxonline
+  environment:target_vpc: mitxonline_vpc
+  mongodb_atlas:disk_autoscale_max_gb: "100"
+  mongodb_atlas:instance_size: M10
+  mongodb_atlas:organization_id: 611ab793e07f5965c7b9e4f6
+  mongodb_atlas:version: "7.0"
+  mongodb_atlas:enable_cloud_backup: false
+  mongodb_atlas:enable_point_in_time_recovery: false

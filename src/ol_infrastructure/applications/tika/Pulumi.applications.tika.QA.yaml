@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgFHfBkhf0VwBzMaAlYw5Fa8AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMj0pJ4xtPbXk04ytqAgEQgDsyPUHMaPnjAknfZasYfot33jpT9txvpePPqbDn8k95hIGwLeJ77lNvvdR/CkaQ2l1R7AJ0Dx+zgSYjTQ==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-apps-qa.odl.mit.edu
+  tika:auto_scale:
+    desired: 2
+    max: 3
+    min: 2
+  tika:business_unit: operations
+  tika:target_vpc: applications_vpc
+  tika:web_host_domain: tika-qa.odl.mit.edu
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

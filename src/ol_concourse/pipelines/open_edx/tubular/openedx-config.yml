@@ -1,0 +1,7 @@
+---
+retirement_pipeline:
+- ["RETIRING_FORUMS", "FORUMS_COMPLETE", "LMS", "retirement_retire_forum"]
+- ["RETIRING_ENROLLMENTS", "ENROLLMENTS_COMPLETE", "LMS", "retirement_unenroll"]
+- ["RETIRING_NOTES", "NOTES_COMPLETE", "LMS", "retirement_retire_notes"]
+- ["RETIRING_LMS_MISC", "LMS_MISC_COMPLETE", "LMS", "retirement_lms_retire_misc"]
+- ["RETIRING_LMS", "LMS_COMPLETE", "LMS", "retirement_lms_retire"]

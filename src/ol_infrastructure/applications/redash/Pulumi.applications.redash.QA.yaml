@@ -1,0 +1,15 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgHlSPK2oENmqBo+/yt2BlFZAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMKrqeMwQZZ2mu0e1AAgEQgDtVCYcqaHEekjIe6P1fnYgkiohftAsOVqLVVQqkd3LlgHALjUIQUeRB8k3F+TQcdXYpxGep9i0AtNC2zQ==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-data-qa.odl.mit.edu
+  redash:db_password:
+    secure: v1:b44G6KmdW/E+8N+s:ULodKrq6k7fZxlJPmzcLuUhMSfgs5DhT8gqPH1Yk/qU7OyJNzOSTs3Xumr4N4box1M0n1/EApSHgeHWerGDfflSZV6trAsp1mMiO1IEcy7hU0C1AZT09cbqd
+  redash:domain: bi-qa.odl.mit.edu
+  redash:instance_type: burstable_medium
+  redash:manage_datasources: "true"
+  redis:auth_token:
+    secure: v1:DETMhJf83zA9ZcE3:O7kAn1GQTR7ygADCPGa1bYGv28LWO8rdlgQP0pUR+0i9kso7X+UgnuDsgwG4hlCzeheIuTSJy/SEmKaXDvhNYQu4k9aYHZfs0qN5qUy/Y0UUTfI6+gUreWwvnA==
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

@@ -1,0 +1,8 @@
+---
+secretsprovider: awskms://alias/PulumiSecrets
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQE5JVlRpVbYeiNKFwqxSeLFAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMCnctp6kjfnFHFrOCAgEQgDukpJ8nxbBFRMGqo5VuudSbWHeCV5XzBVj28cgetVPMBOlbke4WOClmQi4cYkKYfAKWgSvDmQUtAb7rUg== # pragma: allowlist secret
+config:
+  aws:region: us-east-1
+  data_vpc:cidr_block: 10.200.0.0/16
+  operations_vpc:cidr_block: 10.201.0.0/16
+  operations_vpc:name: operations-dev
