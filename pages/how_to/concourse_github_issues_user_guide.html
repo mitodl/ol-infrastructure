@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>concourse_github_issues_user_guide | Platform Engineering Site</title>
+<link href="../../assets/css/all-nocdn.css" rel="stylesheet" type="text/css">
+<link href="https://fonts.googleapis.com/css?family=Playfair+Display:700,900" rel="stylesheet">
+<meta name="theme-color" content="#5670d4">
+<meta name="generator" content="Nikola (getnikola.com)">
+<link rel="alternate" type="application/rss+xml" title="RSS" hreflang="en" href="../../rss.xml">
+<link rel="canonical" href="https://pe.ol.mit.edu/pages/how_to/concourse_github_issues_user_guide.html">
+<!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="MIT Online Learning Platform Engineering">
+<meta property="og:site_name" content="Platform Engineering Site">
+<meta property="og:title" content="concourse_github_issues_user_guide">
+<meta property="og:url" content="https://pe.ol.mit.edu/pages/how_to/concourse_github_issues_user_guide.html">
+<meta property="og:description" content="The Problem
+Here at MIT OL we use Concourse CI. It's an
+incredibly powerful package for managing complex continuous integration
+workflows, and we leverage its power in all kinds of interesting ways.
+W">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2024-06-27T16:57:52-04:00">
+</head>
+<body>
+<a href="#content" class="sr-only sr-only-focusable">Skip to main content</a>
+
+<!-- Header and menu bar -->
+<div class="container">
+      <header class="blog-header py-3"><div class="row nbb-header align-items-center">
+          <div class="col-md-3 col-xs-2 col-sm-2" style="width: auto;">
+            <button class="navbar-toggler navbar-light bg-light nbb-navbar-toggler" type="button" data-toggle="collapse" data-target=".bs-nav-collapsible" aria-controls="bs-navbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse bs-nav-collapsible bootblog4-search-form-holder">
+                
+            </div>
+        </div>
+          <div class="col-md-6 col-xs-10 col-sm-10 bootblog4-brand" style="width: auto;">
+            <a class="navbar-brand blog-header-logo text-dark" href="../../">
+
+            <span id="blog-title">Platform Engineering Site</span>
+        </a>
+          </div>
+            <div class="col-md-3 justify-content-end align-items-center bs-nav-collapsible collapse flex-collapse bootblog4-right-nav">
+            <nav class="navbar navbar-light bg-white"><ul class="navbar-nav bootblog4-right-nav">
+<li class="nav-item">
+    <a href="concourse_github_issues_user_guide.md" id="sourcelink" class="nav-link">Source</a>
+    </li>
+
+
+                    
+            </ul></nav>
+</div>
+    </div>
+</header><nav class="navbar navbar-expand-md navbar-light bg-white static-top"><div class="collapse navbar-collapse bs-nav-collapsible" id="bs-navbar">
+            <ul class="navbar-nav nav-fill d-flex w-100"><li class="nav-item dropdown">
+<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Pages</a>
+            <div class="dropdown-menu">
+                    <a href="../runbooks/" class="dropdown-item">Runbooks</a>
+                    <a href="../discoveries/" class="dropdown-item">Discoveries</a>
+                    <a href="." class="dropdown-item">How To</a>
+                    <a href="../post-mortems/" class="dropdown-item">Post Mortems</a>
+            </div>
+
+                
+            </li></ul>
+</div>
+<!-- /.navbar-collapse -->
+</nav>
+</div>
+
+<div class="container" id="content" role="main">
+    <div class="body-content">
+        <!--Body content-->
+        
+        
+        
+<article class="post-text storypage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="p-name entry-title" itemprop="headline name"><a href="#" class="u-url">concourse_github_issues_user_guide</a></h1>
+
+        
+
+    </header><div class="e-content entry-content" itemprop="articleBody text">
+    <h2>The Problem</h2>
+<p>Here at MIT OL we use <a href="https://concourse-ci.org/">Concourse CI</a>. It's an
+incredibly powerful package for managing complex continuous integration
+workflows, and we leverage its power in all kinds of interesting ways.</p>
+<p>What that means for you, the developer however is that our pipelines can be
+difficult to get one's head around and understand. As an example,
+<a href="https://cicd.odl.mit.edu/teams/infrastructure/pipelines/docker-packer-pulumi-edxapp-global">this</a>
+is our edx platform meta-pipeline.</p>
+<h2>The Ask</h2>
+<p>Most of the time, there are exactly two questions software developers wants
+answered when it comes to deploying their software:</p>
+<ol>
+<li>How can I tell when my code has been deployed to $X?</li>
+<li>How can I trigger my code to be deployed to $X?</li>
+</ol>
+<h2>The Solution</h2>
+<p>Thankfully, our director Tobias came up with an excellent and novel solution.
+What's one of the most common non code mechanism developers use to govern their work?</p>
+<p>Github Issues!</p>
+<h3>A Traffic Light For Deploys</h3>
+<p>Now that you've indulged me with a full page of setup. Let's get down to brass
+tacks and answer those two most common questions devs have about their deploys:</p>
+<ol>
+<li>How can I tell when my code has been deployed to $X?</li>
+</ol>
+<p>We're currently keeping the Github Issues that govern our pipelines on MIT's
+internal Github, because the public one has throttles that were shooting us in
+the foot :)</p>
+<p>So, take a look at the issues for the
+<a href="https://github.mit.edu/ol-platform-eng/concourse-workflow/issues">concourse-workflow</a> repo.</p>
+<p>Right now, that page looks something like this (simplified view):</p>
+<div class="code"><pre class="code literal-block"><span class="o">[</span><span class="n">bot</span><span class="o">]</span><span class="w"> </span><span class="n">Pulumi</span><span class="w"> </span><span class="n">ol</span><span class="o">-</span><span class="n">infrastructure</span><span class="o">-</span><span class="n">vault</span><span class="o">-</span><span class="n">encryption_mounts</span><span class="w"> </span><span class="n">substructure</span><span class="p">.</span><span class="n">vault</span><span class="p">.</span><span class="n">encryption_mounts</span><span class="p">.</span><span class="n">operations</span><span class="p">.</span><span class="n">Production</span><span class="w"> </span><span class="n">deployed</span><span class="p">.</span><span class="w"> </span><span class="n">DevOps</span><span class="w"> </span><span class="n">finalized</span><span class="o">-</span><span class="n">deployment</span><span class="w"> </span><span class="n">pipeline</span><span class="o">-</span><span class="n">workflow</span><span class="w"> </span><span class="nl">product</span><span class="p">:</span><span class="n">infrastructure</span>
+<span class="n">#1427</span><span class="w"> </span><span class="n">opened</span><span class="w"> </span><span class="n">yesterday</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">tmacey</span>
+<span class="o">[</span><span class="n">bot</span><span class="o">]</span><span class="w"> </span><span class="n">Pulumi</span><span class="w"> </span><span class="n">ol</span><span class="o">-</span><span class="n">infrastructure</span><span class="o">-</span><span class="n">forum</span><span class="o">-</span><span class="n">server</span><span class="w"> </span><span class="n">applications</span><span class="p">.</span><span class="n">forum</span><span class="p">.</span><span class="n">xpro</span><span class="p">.</span><span class="n">Production</span><span class="w"> </span><span class="n">deployed</span><span class="p">.</span><span class="w"> </span><span class="n">DevOps</span><span class="w"> </span><span class="n">finalized</span><span class="o">-</span><span class="n">deployment</span><span class="w"> </span><span class="n">pipeline</span><span class="o">-</span><span class="n">workflow</span><span class="w"> </span><span class="nl">product</span><span class="p">:</span><span class="n">infrastructure</span>
+<span class="n">#1426</span><span class="w"> </span><span class="n">opened</span><span class="w"> </span><span class="n">yesterday</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">tmacey</span>
+<span class="o">[</span><span class="n">bot</span><span class="o">]</span><span class="w"> </span><span class="n">Pulumi</span><span class="w"> </span><span class="n">ol</span><span class="o">-</span><span class="n">infrastructure</span><span class="o">-</span><span class="n">dagster</span><span class="o">-</span><span class="n">server</span><span class="w"> </span><span class="n">applications</span><span class="p">.</span><span class="n">dagster</span><span class="p">.</span><span class="n">QA</span><span class="w"> </span><span class="n">deployed</span><span class="p">.</span><span class="w"> </span><span class="n">DevOps</span><span class="w"> </span><span class="n">pipeline</span><span class="o">-</span><span class="n">workflow</span><span class="w"> </span><span class="nl">product</span><span class="p">:</span><span class="n">infrastructure</span><span class="w"> </span><span class="n">promotion</span><span class="o">-</span><span class="k">to</span><span class="o">-</span><span class="n">production</span>
+<span class="n">#1425</span><span class="w"> </span><span class="n">opened</span><span class="w"> </span><span class="n">yesterday</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">tmacey</span>
+</pre></div>
+
+<p>Let's say I'm someone on the data platform team and I'm wondering whether or not
+my changes have been deployed in the Dagster project. Aha! I look down the list
+and see that the Dagster project has been deployed to QA, but not to production.</p>
+<p>Let's click on <a href="https://github.mit.edu/ol-platform-eng/concourse-workflow/issues/1425">that
+issue</a>
+and take a look.</p>
+<p>At the time of this writing, this issue is Open, which means concourse Github
+issues is waiting for us to tell it that we're ready to deploy these changes to
+production. We can see everything this deployment would contain because for each
+Concourse build that's happened since this issue was created, a comment was
+added along with the build log.</p>
+<p>If we're ready to move these changes to production, we just Close this issue.
+That's all there is to it!</p>
+<p>If you want to watch your change's progress, just click one of those build log
+links which will bring you to the pipeline where that's happening. You should
+see a new build in progress. Just click that tab to see the details.</p>
+<p>And that's all there is to know! It's a simple system for busy people.</p>
+<p>If you have any questions, don't hesitate to reach out to @sre on slack or send
+us E-mail at oldevops@mit.edu</p>
+<p>Thanks for taking the time to read this doc! Obviously feel free to suggest any
+improvements or let me know if anything's unclear.</p>
+    </div>
+    
+
+</article><!--End of body content--><footer id="footer">
+            Contents © 2024         <a href="mailto:ol-devops@mit.edu">MIT Online Learning Platform Engineering</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         
+            
+            
+        </footer>
+</div>
+</div>
+
+
+        <script src="../../assets/js/all-nocdn.js"></script><script>
+    baguetteBox.run('div#content', {
+        ignoreClass: 'islink',
+        captions: function(element){var i=element.getElementsByTagName('img')[0];return i===undefined?'':i.alt;}});
+    </script>
+</body>
+</html>

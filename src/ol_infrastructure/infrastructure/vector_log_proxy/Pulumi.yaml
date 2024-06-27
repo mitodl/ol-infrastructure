@@ -1,6 +1,0 @@
----
-name: ol-infrastructure-vector-log-proxy-server
-runtime: python
-description: Manage deployment of a vector-log-proxy server for routing logs to Grafana
-backend:
-  url: s3://mitol-pulumi-state/

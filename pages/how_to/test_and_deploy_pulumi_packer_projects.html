@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>test_and_deploy_pulumi_packer_projects | Platform Engineering Site</title>
+<link href="../../assets/css/all-nocdn.css" rel="stylesheet" type="text/css">
+<link href="https://fonts.googleapis.com/css?family=Playfair+Display:700,900" rel="stylesheet">
+<meta name="theme-color" content="#5670d4">
+<meta name="generator" content="Nikola (getnikola.com)">
+<link rel="alternate" type="application/rss+xml" title="RSS" hreflang="en" href="../../rss.xml">
+<link rel="canonical" href="https://pe.ol.mit.edu/pages/how_to/test_and_deploy_pulumi_packer_projects.html">
+<!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="MIT Online Learning Platform Engineering">
+<meta property="og:site_name" content="Platform Engineering Site">
+<meta property="og:title" content="test_and_deploy_pulumi_packer_projects">
+<meta property="og:url" content="https://pe.ol.mit.edu/pages/how_to/test_and_deploy_pulumi_packer_projects.html">
+<meta property="og:description" content="How To Test And Deploy MIT OL Pulumi/Packer Projects
+The way we build images here at MIT OL is complicated and involves a number of
+components with various moving parts, so it can be difficult to unde">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2024-06-27T16:57:52-04:00">
+</head>
+<body>
+<a href="#content" class="sr-only sr-only-focusable">Skip to main content</a>
+
+<!-- Header and menu bar -->
+<div class="container">
+      <header class="blog-header py-3"><div class="row nbb-header align-items-center">
+          <div class="col-md-3 col-xs-2 col-sm-2" style="width: auto;">
+            <button class="navbar-toggler navbar-light bg-light nbb-navbar-toggler" type="button" data-toggle="collapse" data-target=".bs-nav-collapsible" aria-controls="bs-navbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse bs-nav-collapsible bootblog4-search-form-holder">
+                
+            </div>
+        </div>
+          <div class="col-md-6 col-xs-10 col-sm-10 bootblog4-brand" style="width: auto;">
+            <a class="navbar-brand blog-header-logo text-dark" href="../../">
+
+            <span id="blog-title">Platform Engineering Site</span>
+        </a>
+          </div>
+            <div class="col-md-3 justify-content-end align-items-center bs-nav-collapsible collapse flex-collapse bootblog4-right-nav">
+            <nav class="navbar navbar-light bg-white"><ul class="navbar-nav bootblog4-right-nav">
+<li class="nav-item">
+    <a href="test_and_deploy_pulumi_packer_projects.md" id="sourcelink" class="nav-link">Source</a>
+    </li>
+
+
+                    
+            </ul></nav>
+</div>
+    </div>
+</header><nav class="navbar navbar-expand-md navbar-light bg-white static-top"><div class="collapse navbar-collapse bs-nav-collapsible" id="bs-navbar">
+            <ul class="navbar-nav nav-fill d-flex w-100"><li class="nav-item dropdown">
+<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Pages</a>
+            <div class="dropdown-menu">
+                    <a href="../runbooks/" class="dropdown-item">Runbooks</a>
+                    <a href="../discoveries/" class="dropdown-item">Discoveries</a>
+                    <a href="." class="dropdown-item">How To</a>
+                    <a href="../post-mortems/" class="dropdown-item">Post Mortems</a>
+            </div>
+
+                
+            </li></ul>
+</div>
+<!-- /.navbar-collapse -->
+</nav>
+</div>
+
+<div class="container" id="content" role="main">
+    <div class="body-content">
+        <!--Body content-->
+        
+        
+        
+<article class="post-text storypage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="p-name entry-title" itemprop="headline name"><a href="#" class="u-url">test_and_deploy_pulumi_packer_projects</a></h1>
+
+        
+
+    </header><div class="e-content entry-content" itemprop="articleBody text">
+    <h2>How To Test And Deploy MIT OL Pulumi/Packer Projects</h2>
+<p>The way we build images here at MIT OL is complicated and involves a number of
+components with various moving parts, so it can be difficult to understand where
+to start, what to change, and moreover how to safely test your changes without
+breaking production. This document will address these issues.</p>
+<h2>The Pipeline</h2>
+<p>Each MIT OL project that uses this technique has an accompanying
+<a href="https://concourse.io">Concourse</a> pipeline that builds the Packer image, then
+deploys that image to the appropriate stage's AWS EC2 launch profile where new
+instances will be launched by instance refresh to deploy the new code /
+configuration into the wild.</p>
+<p>One such project is <a href="https://tika.apache.org/">Tika</a>. It's a data transformation
+service used in our data platform. <a href="https://cicd.odl.mit.edu/teams/infrastructure/pipelines/packer-pulumi-tika/">Here is its
+pipeline</a>.</p>
+<h3>Packer Stage</h3>
+<p>The first couple stages are reasonable self explanatory:</p>
+<ul>
+<li>Validate the packer template for any syntax errors and the like</li>
+<li>Actually run packer build on the template, invoking pyinfra and packer,
+producing an AMI.</li>
+</ul>
+<p>You can find the pyinfra sources in ol-infrastructure
+src/bilder/images/<projectr>. Here is the pyinfra folder for
+<a href="https://github.com/mitodl/ol-infrastructure/tree/main/src/bilder/images/tika">Tika</a>.</projectr></p>
+<h4>Testing</h4>
+<p>If you want to test the pyinfra portion locally, you can use the following
+invocation:</p>
+<div class="code"><pre class="code literal-block"><span class="err">#</span><span class="w"> </span><span class="n">cpatti</span><span class="w"> </span><span class="err">@</span><span class="w"> </span><span class="n">rocinante</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="o">~/</span><span class="n">src</span><span class="o">/</span><span class="n">mit</span><span class="o">/</span><span class="n">ol</span><span class="o">-</span><span class="n">infrastructure</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">bilder</span><span class="o">/</span><span class="n">images</span><span class="o">/</span><span class="n">tika</span><span class="w"> </span><span class="k">on</span><span class="w"> </span><span class="nl">git</span><span class="p">:</span><span class="n">main</span><span class="w"> </span><span class="n">o</span><span class="w"> </span><span class="o">[</span><span class="n">17:11:31</span><span class="o">]</span><span class="w"> </span><span class="nl">C</span><span class="p">:</span><span class="mi">1</span>
+<span class="err">$</span><span class="w"> </span><span class="n">pr</span><span class="w"> </span><span class="n">pyinfra</span><span class="w"> </span><span class="nv">@docker</span><span class="o">/</span><span class="nl">debian</span><span class="p">:</span><span class="n">latest</span><span class="w"> </span><span class="n">deploy</span><span class="p">.</span><span class="n">py</span>
+</pre></div>
+
+<p>You should see output similar to the following:</p>
+<p><em>TODO: Is there a base image we can use that won't whine about curl/wget and say
+no hosts remaining?</em></p>
+<div class="code"><pre class="code literal-block"><span class="o">--&gt;</span><span class="w"> </span><span class="n">Loading</span><span class="w"> </span><span class="n">config</span><span class="o">...</span>
+
+<span class="o">--&gt;</span><span class="w"> </span><span class="n">Loading</span><span class="w"> </span><span class="n">inventory</span><span class="o">...</span>
+
+<span class="o">--&gt;</span><span class="w"> </span><span class="n">Connecting</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">hosts</span><span class="o">...</span>
+<span class="w">    </span><span class="p">[</span><span class="err">@</span><span class="n">docker</span><span class="o">/</span><span class="n">debian</span><span class="p">:</span><span class="n">latest</span><span class="p">]</span><span class="w"> </span><span class="n">Connected</span>
+
+<span class="o">--&gt;</span><span class="w"> </span><span class="n">Preparing</span><span class="w"> </span><span class="n">Operations</span><span class="o">...</span>
+<span class="w">    </span><span class="n">Loading</span><span class="p">:</span><span class="w"> </span><span class="n">deploy</span><span class="o">.</span><span class="n">py</span>
+<span class="w">    </span><span class="p">[</span><span class="err">@</span><span class="n">docker</span><span class="o">/</span><span class="n">debian</span><span class="p">:</span><span class="n">latest</span><span class="p">]</span><span class="w"> </span><span class="n">Ready</span><span class="p">:</span><span class="w"> </span><span class="n">deploy</span><span class="o">.</span><span class="n">py</span>
+
+<span class="o">--&gt;</span><span class="w"> </span><span class="n">Proposed</span><span class="w"> </span><span class="n">changes</span><span class="p">:</span>
+<span class="w">    </span><span class="n">Groups</span><span class="p">:</span><span class="w"> </span><span class="err">@</span><span class="n">docker</span>
+<span class="w">    </span><span class="p">[</span><span class="err">@</span><span class="n">docker</span><span class="o">/</span><span class="n">debian</span><span class="p">:</span><span class="n">latest</span><span class="p">]</span><span class="w">   </span><span class="n">Operations</span><span class="p">:</span><span class="w"> </span><span class="mi">32</span><span class="w">   </span><span class="n">Change</span><span class="p">:</span><span class="w"> </span><span class="mi">32</span><span class="w">   </span><span class="n">No</span><span class="w"> </span><span class="n">change</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+
+
+<span class="o">--&gt;</span><span class="w"> </span><span class="n">Beginning</span><span class="w"> </span><span class="n">operation</span><span class="w"> </span><span class="n">run</span><span class="o">...</span>
+<span class="o">--&gt;</span><span class="w"> </span><span class="n">Starting</span><span class="w"> </span><span class="n">operation</span><span class="p">:</span><span class="w"> </span><span class="n">Install</span><span class="w"> </span><span class="n">Hashicorp</span><span class="w"> </span><span class="n">Products</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Ensure</span><span class="w"> </span><span class="n">unzip</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="n">installed</span>
+<span class="w">    </span><span class="p">[</span><span class="err">@</span><span class="n">docker</span><span class="o">/</span><span class="n">debian</span><span class="p">:</span><span class="n">latest</span><span class="p">]</span><span class="w"> </span><span class="n">Success</span>
+
+<span class="o">--&gt;</span><span class="w"> </span><span class="n">Starting</span><span class="w"> </span><span class="n">operation</span><span class="p">:</span><span class="w"> </span><span class="n">Install</span><span class="w"> </span><span class="n">Hashicorp</span><span class="w"> </span><span class="n">Products</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Create</span><span class="w"> </span><span class="n">system</span><span class="w"> </span><span class="n">user</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">vault</span>
+<span class="w">    </span><span class="p">[</span><span class="err">@</span><span class="n">docker</span><span class="o">/</span><span class="n">debian</span><span class="p">:</span><span class="n">latest</span><span class="p">]</span><span class="w"> </span><span class="n">Success</span>
+
+<span class="o">--&gt;</span><span class="w"> </span><span class="n">Starting</span><span class="w"> </span><span class="n">operation</span><span class="p">:</span><span class="w"> </span><span class="n">Install</span><span class="w"> </span><span class="n">Hashicorp</span><span class="w"> </span><span class="n">Products</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Download</span><span class="w"> </span><span class="n">vault</span><span class="w"> </span><span class="n">archive</span>
+<span class="w">    </span><span class="p">[</span><span class="err">@</span><span class="n">docker</span><span class="o">/</span><span class="n">debian</span><span class="p">:</span><span class="n">latest</span><span class="p">]</span><span class="w"> </span><span class="n">sh</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">:</span><span class="w"> </span><span class="n">curl</span><span class="p">:</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="n">found</span>
+<span class="w">    </span><span class="p">[</span><span class="err">@</span><span class="n">docker</span><span class="o">/</span><span class="n">debian</span><span class="p">:</span><span class="n">latest</span><span class="p">]</span><span class="w"> </span><span class="n">sh</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">:</span><span class="w"> </span><span class="n">wget</span><span class="p">:</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="n">found</span>
+<span class="w">    </span><span class="p">[</span><span class="err">@</span><span class="n">docker</span><span class="o">/</span><span class="n">debian</span><span class="p">:</span><span class="n">latest</span><span class="p">]</span><span class="w"> </span><span class="n">Error</span><span class="p">:</span><span class="w"> </span><span class="n">executed</span><span class="w"> </span><span class="mi">0</span><span class="o">/</span><span class="mi">3</span><span class="w"> </span><span class="n">commands</span>
+<span class="w">    </span><span class="p">[</span><span class="err">@</span><span class="n">docker</span><span class="o">/</span><span class="n">debian</span><span class="p">:</span><span class="n">latest</span><span class="p">]</span><span class="w"> </span><span class="n">docker</span><span class="w"> </span><span class="n">build</span><span class="w"> </span><span class="n">complete</span><span class="p">,</span><span class="w"> </span><span class="n">image</span><span class="w"> </span><span class="n">ID</span><span class="p">:</span><span class="w"> </span><span class="n">cc0b00b971bd</span>
+<span class="o">--&gt;</span><span class="w"> </span><span class="n">pyinfra</span><span class="w"> </span><span class="n">error</span><span class="p">:</span><span class="w"> </span><span class="n">No</span><span class="w"> </span><span class="n">hosts</span><span class="w"> </span><span class="n">remaining</span><span class="o">!</span>
+</pre></div>
+
+<p>When you're satisfied that your pyinfra build will at least build correctly, you
+can trigger a local packer image build that the CI deployment stage can consume
+to get your changes into CI. Note that this can take a while, so be prepared for
+it to chug for 15-20 minutes. Great time to go get a beverage :)</p>
+<p>You can kick this off with an invocation like the following:</p>
+<div class="code"><pre class="code literal-block">poetry run packer build  src/bilder/images/tika/tika.pkr.hcl
+</pre></div>
+
+<p>Note that obviously your path will change if the project you're building is
+different.</p>
+<p>Note also that you may require a slightly different invocation for different
+projects. In Tika's case we require a custom Packer template as specified above,
+but in the case of other projects which use the default Packer template, you
+might use an invocation like the one we use to build Concourse's image:</p>
+<div class="code"><pre class="code literal-block"><span class="n">poetry</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="n">packer</span><span class="w"> </span><span class="n">build</span><span class="w"> </span><span class="o">-</span><span class="n">on</span><span class="o">-</span><span class="n">error</span><span class="o">=</span><span class="n">ask</span><span class="w"> </span><span class="o">-</span><span class="k">var</span><span class="w"> </span><span class="n">node_type</span><span class="o">=</span><span class="n">web</span><span class="w"> </span><span class="o">-</span><span class="k">var</span><span class="w"> </span><span class="n">app_name</span><span class="o">=</span><span class="n">concourse</span><span class="w"> </span><span class="o">-</span><span class="n">only</span><span class="w"> </span><span class="n">amazon</span><span class="o">-</span><span class="n">ebs</span><span class="o">.</span><span class="n">third</span><span class="o">-</span><span class="n">party</span><span class="w"> </span><span class="n">src</span><span class="o">/</span><span class="n">bilder</span><span class="o">/</span><span class="n">images</span>
+</pre></div>
+
+<p>Note the node_type and app_name variable declarations above. For Concourse, we
+can build either a web image or a worker image, so it's important we include
+node_type in our invocation.</p>
+<h3>Deploy Stage</h3>
+<p>The remaining boxes in the pipeline are deployment stages. One per environment
+stage e.g. CI, QA and Production.</p>
+<p>Each of these deployment stages basically runs the equivalent of a <code>pulumi up</code>
+on the Pulumi stack associated with the application in question. Here's the one
+for
+<a href="https://github.com/mitodl/ol-infrastructure/tree/main/src/ol_infrastructure/applications/tika">Tika</a>.</p>
+<p>Let's take a look at the output from a build of this stage:</p>
+<div class="code"><pre class="code literal-block"><span class="n">INFO</span><span class="o">:</span><span class="n">root</span><span class="o">:</span><span class="err">@</span><span class="w"> </span><span class="n">updating</span><span class="o">....</span>
+
+<span class="mi">8</span><span class="o">&lt;</span><span class="w"> </span><span class="n">snip</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">brevity</span><span class="w"> </span><span class="mi">8</span><span class="o">&lt;</span>
+
+<span class="n">INFO</span><span class="o">:</span><span class="n">root</span><span class="o">:</span><span class="w">    </span><span class="n">aws</span><span class="o">:</span><span class="n">ec2</span><span class="o">:</span><span class="n">LaunchTemplate</span><span class="w"> </span><span class="n">tika</span><span class="o">-</span><span class="n">server</span><span class="o">-</span><span class="n">tika</span><span class="o">-</span><span class="n">ci</span><span class="o">-</span><span class="n">launch</span><span class="o">-</span><span class="n">template</span><span class="w">  </span><span class="o">[</span><span class="n">diff</span><span class="o">:</span><span class="w"> </span><span class="o">~</span><span class="n">blockDeviceMappings</span><span class="o">]</span>
+
+<span class="n">INFO</span><span class="o">:</span><span class="n">root</span><span class="o">:</span><span class="w">    </span><span class="n">aws</span><span class="o">:</span><span class="n">autoscaling</span><span class="o">:</span><span class="n">Group</span><span class="w"> </span><span class="n">tika</span><span class="o">-</span><span class="n">server</span><span class="o">-</span><span class="n">tika</span><span class="o">-</span><span class="n">ci</span><span class="o">-</span><span class="n">auto</span><span class="o">-</span><span class="n">scale</span><span class="o">-</span><span class="n">group</span><span class="w">  </span><span class="o">[</span><span class="n">diff</span><span class="o">:</span><span class="w"> </span><span class="o">~</span><span class="n">instanceRefresh</span><span class="o">,</span><span class="n">tags</span><span class="o">,</span><span class="n">vpcZoneIdentifiers</span><span class="o">]</span>
+
+<span class="n">INFO</span><span class="o">:</span><span class="n">root</span><span class="o">:</span><span class="err">@</span><span class="w"> </span><span class="n">updating</span><span class="o">....</span>
+
+<span class="n">INFO</span><span class="o">:</span><span class="n">root</span><span class="o">:</span><span class="w">    </span><span class="n">pulumi</span><span class="o">:</span><span class="n">pulumi</span><span class="o">:</span><span class="n">Stack</span><span class="w"> </span><span class="n">ol</span><span class="o">-</span><span class="n">infrastructure</span><span class="o">-</span><span class="n">tika</span><span class="o">-</span><span class="n">server</span><span class="o">-</span><span class="n">applications</span><span class="o">.</span><span class="na">tika</span><span class="o">.</span><span class="na">CI</span>
+
+<span class="n">INFO</span><span class="o">:</span><span class="n">root</span><span class="o">:</span><span class="w">    </span><span class="n">ol</span><span class="o">:</span><span class="n">infrastructure</span><span class="o">:</span><span class="n">aws</span><span class="o">:</span><span class="n">auto_scale_group</span><span class="o">:</span><span class="n">OLAutoScaleGroup</span><span class="w"> </span><span class="n">tika</span><span class="o">-</span><span class="n">server</span><span class="o">-</span><span class="n">tika</span><span class="o">-</span><span class="n">ci</span>
+
+<span class="n">INFO</span><span class="o">:</span><span class="n">root</span><span class="o">:</span>
+
+<span class="n">INFO</span><span class="o">:</span><span class="n">root</span><span class="o">:</span><span class="n">Resources</span><span class="o">:</span>
+
+<span class="n">INFO</span><span class="o">:</span><span class="n">root</span><span class="o">:</span><span class="w">    </span><span class="mi">17</span><span class="w"> </span><span class="n">unchanged</span>
+</pre></div>
+
+<p>From this rather verbose blurb we can see that Pulumi updated the ASG and all
+associated resources like the Launch template. This is the mechanism which seeds
+the updated image into our EC2 environment where instance refresh safely cycles
+the old instances out and the ones with our updated code in.</p>
+    </div>
+    
+
+</article><!--End of body content--><footer id="footer">
+            Contents © 2024         <a href="mailto:ol-devops@mit.edu">MIT Online Learning Platform Engineering</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         
+            
+            
+        </footer>
+</div>
+</div>
+
+
+        <script src="../../assets/js/all-nocdn.js"></script><script>
+    baguetteBox.run('div#content', {
+        ignoreClass: 'islink',
+        captions: function(element){var i=element.getElementsByTagName('img')[0];return i===undefined?'':i.alt;}});
+    </script>
+</body>
+</html>

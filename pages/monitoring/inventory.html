@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>inventory | Platform Engineering Site</title>
+<link href="../../assets/css/all-nocdn.css" rel="stylesheet" type="text/css">
+<link href="https://fonts.googleapis.com/css?family=Playfair+Display:700,900" rel="stylesheet">
+<meta name="theme-color" content="#5670d4">
+<meta name="generator" content="Nikola (getnikola.com)">
+<link rel="alternate" type="application/rss+xml" title="RSS" hreflang="en" href="../../rss.xml">
+<link rel="canonical" href="https://pe.ol.mit.edu/pages/monitoring/inventory.html">
+<!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="MIT Online Learning Platform Engineering">
+<meta property="og:site_name" content="Platform Engineering Site">
+<meta property="og:title" content="inventory">
+<meta property="og:url" content="https://pe.ol.mit.edu/pages/monitoring/inventory.html">
+<meta property="og:description" content="Tools
+
+Sentry
+Purpose: Detailed application monitoring and error logging.
+Healthchecks.io
+Purpose: Absence of alerting detection. For determining when other alerting tools may have failed or become un">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2024-06-27T16:57:52-04:00">
+</head>
+<body>
+<a href="#content" class="sr-only sr-only-focusable">Skip to main content</a>
+
+<!-- Header and menu bar -->
+<div class="container">
+      <header class="blog-header py-3"><div class="row nbb-header align-items-center">
+          <div class="col-md-3 col-xs-2 col-sm-2" style="width: auto;">
+            <button class="navbar-toggler navbar-light bg-light nbb-navbar-toggler" type="button" data-toggle="collapse" data-target=".bs-nav-collapsible" aria-controls="bs-navbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse bs-nav-collapsible bootblog4-search-form-holder">
+                
+            </div>
+        </div>
+          <div class="col-md-6 col-xs-10 col-sm-10 bootblog4-brand" style="width: auto;">
+            <a class="navbar-brand blog-header-logo text-dark" href="../../">
+
+            <span id="blog-title">Platform Engineering Site</span>
+        </a>
+          </div>
+            <div class="col-md-3 justify-content-end align-items-center bs-nav-collapsible collapse flex-collapse bootblog4-right-nav">
+            <nav class="navbar navbar-light bg-white"><ul class="navbar-nav bootblog4-right-nav">
+<li class="nav-item">
+    <a href="inventory.md" id="sourcelink" class="nav-link">Source</a>
+    </li>
+
+
+                    
+            </ul></nav>
+</div>
+    </div>
+</header><nav class="navbar navbar-expand-md navbar-light bg-white static-top"><div class="collapse navbar-collapse bs-nav-collapsible" id="bs-navbar">
+            <ul class="navbar-nav nav-fill d-flex w-100"><li class="nav-item dropdown">
+<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Pages</a>
+            <div class="dropdown-menu">
+                    <a href="../runbooks/" class="dropdown-item">Runbooks</a>
+                    <a href="../discoveries/" class="dropdown-item">Discoveries</a>
+                    <a href="../how_to/" class="dropdown-item">How To</a>
+                    <a href="../post-mortems/" class="dropdown-item">Post Mortems</a>
+            </div>
+
+                
+            </li></ul>
+</div>
+<!-- /.navbar-collapse -->
+</nav>
+</div>
+
+<div class="container" id="content" role="main">
+    <div class="body-content">
+        <!--Body content-->
+        
+        
+        
+<article class="post-text storypage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="p-name entry-title" itemprop="headline name"><a href="#" class="u-url">inventory</a></h1>
+
+        
+
+    </header><div class="e-content entry-content" itemprop="articleBody text">
+    <h2>Tools</h2>
+<ul>
+<li>Sentry</li>
+<li>Purpose: Detailed application monitoring and error logging.</li>
+<li>Healthchecks.io</li>
+<li>Purpose: Absence of alerting detection. For determining when other alerting tools may have failed or become unresponsive.</li>
+<li>GrafanaCloud</li>
+<li>Purpose: Collecting and storing metric and log data from applications and infrastructure.</li>
+<li>Subcomponents:<ul>
+<li>Grafana: Visualization and alerting on metric and log data.</li>
+<li>Cortex: Backend for storing metric data.</li>
+<li>Loki: Backend for storing log data</li>
+</ul>
+</li>
+<li>Pingdom</li>
+<li>Purpose: External synthetic and HTTP monitoring.</li>
+</ul>
+<h2>Usage Matrix</h2>
+<table>
+<thead><tr>
+<th>ODL App / Component / Process</th>
+<th>Sentry</th>
+<th>HealthChecks.io</th>
+<th>Grafana Metrics</th>
+<th>Grafana Logs</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>OCW Studio (webapp)</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>OCW Site (static content)</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>OCW Site Backup (process)</td>
+<td>N/A</td>
+<td>Yes</td>
+<td>N/A</td>
+<td>No</td>
+</tr>
+<tr>
+<td>MITx (webapp)</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>MITx (openEdx)</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>MITx (infrastructure)</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>xPro (webapp)</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>xPro (openEdx)</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>xPro (infrastructure)</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Residential (openEdx)</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Residential (infrastructure)</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>MIT Open (webapp)</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>MIT Open Discussions (webapp)</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>MIT Open Reddit (webapp)</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>odl-video (webapp)</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Bootcamps (webapp)</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>MicroMasters (webapp)</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h2>Synthetic Monitoring</h2>
+<table>
+<thead><tr>
+<th>ODL App / Component / Process</th>
+<th>URL</th>
+<th>Pingdom</th>
+<th>Grafana</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Bootcamp production</td>
+<td>bootcamp.odl.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>MITx CAS</td>
+<td>cas.mitx.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>MITx Online Production Application</td>
+<td>nitxonline.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>MITx Online Production edX</td>
+<td>courses.mitxonline.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>MITx Online QA edX Application</td>
+<td>courses-qa.mitxonline.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>MITx Online RC Application</td>
+<td>rc.mitxonline.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>MITx QA CMS</td>
+<td>studio-mitx-qa.mitx.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>MITx QA LMS</td>
+<td>mitx-qa.mitx.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>MITx current QA preview</td>
+<td>preview-mitx-qa.mitx.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>MITx production CMS</td>
+<td>studio.mitx.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>MITx production CMS draft</td>
+<td>studio-staging.mitx.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>MITx production LMS</td>
+<td>lms.mitx.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>MITx production LMS draft</td>
+<td>staging.mitx.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>MITx production preview</td>
+<td>preview.mitx.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>MITx production preview draft</td>
+<td>preview.mitx.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>Micromasters CI</td>
+<td>micromasters-ci.odl.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>Micromasters RC</td>
+<td>micromasters-rc.odl.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>Micromasters production</td>
+<td>micromasters.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>OCW Production (Fastly)</td>
+<td>ocw.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>OCW production CMS 1</td>
+<td>ocwcms.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>OCW production CMS 2</td>
+<td>ocw-production-cms-2.odl.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>OCW production origin server</td>
+<td>ocw-origin.odl.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>ODL Video RC</td>
+<td>video-rc.odl.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>ODL Video production</td>
+<td>video.odl.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>Open Discussions production</td>
+<td>open.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>xPro CMS RC</td>
+<td>studio-rc.xpro.mit.edu/heartbeat</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>xPro CMS production</td>
+<td>studio.xpro.mit.edu/heartbeat</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>xPro LMS RC</td>
+<td>courses-rc.xpro.mit.edu/heartbeat</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>xPro LMS production</td>
+<td>courses.xpro.mit.edu/heartbeat</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>xPro RC</td>
+<td>xpro-rc.odl.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>xPro preview RC</td>
+<td>preview-rc.xpro.mit.edu/heartbeat</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>xPro preview production</td>
+<td>preview.xpro.mit.edu/heartbeat</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>xPro production</td>
+<td>xpro.mit.edu</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+</tbody>
+</table>
+</div>
+    
+
+</article><!--End of body content--><footer id="footer">
+            Contents © 2024         <a href="mailto:ol-devops@mit.edu">MIT Online Learning Platform Engineering</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         
+            
+            
+        </footer>
+</div>
+</div>
+
+
+        <script src="../../assets/js/all-nocdn.js"></script><script>
+    baguetteBox.run('div#content', {
+        ignoreClass: 'islink',
+        captions: function(element){var i=element.getElementsByTagName('img')[0];return i===undefined?'':i.alt;}});
+    </script>
+</body>
+</html>

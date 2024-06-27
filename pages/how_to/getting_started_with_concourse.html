@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>getting_started_with_concourse | Platform Engineering Site</title>
+<link href="../../assets/css/all-nocdn.css" rel="stylesheet" type="text/css">
+<link href="https://fonts.googleapis.com/css?family=Playfair+Display:700,900" rel="stylesheet">
+<meta name="theme-color" content="#5670d4">
+<meta name="generator" content="Nikola (getnikola.com)">
+<link rel="alternate" type="application/rss+xml" title="RSS" hreflang="en" href="../../rss.xml">
+<link rel="canonical" href="https://pe.ol.mit.edu/pages/how_to/getting_started_with_concourse.html">
+<!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="MIT Online Learning Platform Engineering">
+<meta property="og:site_name" content="Platform Engineering Site">
+<meta property="og:title" content="getting_started_with_concourse">
+<meta property="og:url" content="https://pe.ol.mit.edu/pages/how_to/getting_started_with_concourse.html">
+<meta property="og:description" content="Getting Started Building Concourse Pipelines in Python
+Getting Set Up
+
+Use the Tutorial on the Concourse website under Docs-&gt;Getting Started to get set up.
+Do NOT use any other tutorials you find link">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2024-06-27T16:57:52-04:00">
+</head>
+<body>
+<a href="#content" class="sr-only sr-only-focusable">Skip to main content</a>
+
+<!-- Header and menu bar -->
+<div class="container">
+      <header class="blog-header py-3"><div class="row nbb-header align-items-center">
+          <div class="col-md-3 col-xs-2 col-sm-2" style="width: auto;">
+            <button class="navbar-toggler navbar-light bg-light nbb-navbar-toggler" type="button" data-toggle="collapse" data-target=".bs-nav-collapsible" aria-controls="bs-navbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse bs-nav-collapsible bootblog4-search-form-holder">
+                
+            </div>
+        </div>
+          <div class="col-md-6 col-xs-10 col-sm-10 bootblog4-brand" style="width: auto;">
+            <a class="navbar-brand blog-header-logo text-dark" href="../../">
+
+            <span id="blog-title">Platform Engineering Site</span>
+        </a>
+          </div>
+            <div class="col-md-3 justify-content-end align-items-center bs-nav-collapsible collapse flex-collapse bootblog4-right-nav">
+            <nav class="navbar navbar-light bg-white"><ul class="navbar-nav bootblog4-right-nav">
+<li class="nav-item">
+    <a href="getting_started_with_concourse.md" id="sourcelink" class="nav-link">Source</a>
+    </li>
+
+
+                    
+            </ul></nav>
+</div>
+    </div>
+</header><nav class="navbar navbar-expand-md navbar-light bg-white static-top"><div class="collapse navbar-collapse bs-nav-collapsible" id="bs-navbar">
+            <ul class="navbar-nav nav-fill d-flex w-100"><li class="nav-item dropdown">
+<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Pages</a>
+            <div class="dropdown-menu">
+                    <a href="../runbooks/" class="dropdown-item">Runbooks</a>
+                    <a href="../discoveries/" class="dropdown-item">Discoveries</a>
+                    <a href="." class="dropdown-item">How To</a>
+                    <a href="../post-mortems/" class="dropdown-item">Post Mortems</a>
+            </div>
+
+                
+            </li></ul>
+</div>
+<!-- /.navbar-collapse -->
+</nav>
+</div>
+
+<div class="container" id="content" role="main">
+    <div class="body-content">
+        <!--Body content-->
+        
+        
+        
+<article class="post-text storypage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="p-name entry-title" itemprop="headline name"><a href="#" class="u-url">getting_started_with_concourse</a></h1>
+
+        
+
+    </header><div class="e-content entry-content" itemprop="articleBody text">
+    <h2>Getting Started Building Concourse Pipelines in Python</h2>
+<h3>Getting Set Up</h3>
+<ul>
+<li>Use the <a href="https://concourse-ci.org/getting-started.html">Tutorial</a> on the Concourse website under Docs-&gt;Getting Started to get set up.</li>
+<li>Do NOT use any other tutorials you find linked elsewhere. Some are out of date and the failure modes can be incredibly hard to debug!</li>
+<li>If you're using an Arm64 Mac (e.g. M1, M2, etc.) just substitute <a href="https://github.com/robinhuiser/concourse-arm64">this</a> platform specific image for the one cited in the tutorial. So the first line of your docker-compose.yml should look something like this: <code>image: rdclda/concourse:7.7.1</code>
+</li>
+<li>Nota Bene: You should probably use the latest version of this. At the time of this writing the latest has a bug but that will likely be fixed by the time anyone reads this.</li>
+<li>You'll also need to install Docker Desktop for Mac.</li>
+<li>Be sure that at the end of this process you have a Concourse instance running locally in your Docker install. If you
+    didn't end up running <code>docker-compose up -d</code> or similar then you may have missed something. Watch for errors and check that your newly launched Concourse is healthy and that you can browse to the localhost URL cited in the tutorial which should get you the Concourse main page with the giant spinning turbine blade icon.</li>
+</ul>
+<h3>Now We're Cooking with Gas! Learning How Concourse Works By Building Pipelines</h3>
+<ul>
+<li>Work through the entire tutorial including building and actually creating pipelines from all the examples. This is critical so
+you'll have an understanding of what all the component parts are and how they fit together as you code your Python in later steps.</li>
+<li>Actually make a point of working with some of the later examples involving Git repos. Commit some chnges to your test repo and
+watch them flow through the pipeline. Pretty neat eh?</li>
+<li>You may notice that some of the later examples get pretty unwieldy and become difficult to get right. It can be tricky figuring
+out what level of indentation is correct just by eyeballing it. You might find the <a href="https://github.com/adrienverge/yamllint">yamllint</a>
+utility helpful for this as it will tell you when there are syntax errors. Ignore its whining about improper indent levels and
+focus on the errors :)</li>
+</ul>
+<h3>It Gets Easier - Building Pipelines in Python</h3>
+<p>Thankfully, we have been spared the pain of coding pipelines in YAML by virtue of a <a href="https://github.com/mitodl/ol-infrastructure/tree/main/src/ol_concourse">Python wrapper</a>
+that Tobias Macey wrote.</p>
+<p>Each YAML section is wrapped in a Python object. It's a 1 to 1 mapping because the Python models are auto-generated from the
+schema defined by Concourse.</p>
+<p>Tahe a look at the simplest hello-world tutorial example converted into Python <a href="#">here</a>. I've put the explanatory comments inline
+to make it easier to understand what's going on.</p>
+<h3>Actually Building a Pipeline From Your Python</h3>
+<p>Our Concourse pipeline Python build scripts, like everything else we maintain, is managed by <a href="https://python-poetry.org/">Poetry</a>.</p>
+<p>So, to actually invoke our hello world script and get ready to actually create the pipeline, we run:
+<code>poetry run python3 ./hello.py</code></p>
+<p>This will emit the JSON our Python produces, along with an actual Concourse <code>fly</code> invocation at the end. This assumes you're
+already properly logged into your Concourse instance. For our purposes use the same one you set up previously to run through the
+tutorials.</p>
+<p>The output should look something like this:</p>
+<div class="code"><pre class="code literal-block"><span class="p">{</span>
+<span class="w">  </span><span class="nt">"jobs"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"build_logs_to_retain"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"max_in_flight"</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"serial"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"old_name"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"on_success"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"ensure"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"on_error"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"disable_manual_trigger"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"serial_groups"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"build_log_retention"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"deploy-hello-world"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"plan"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">"image_resource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">              </span><span class="nt">"source"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">"repository"</span><span class="p">:</span><span class="w"> </span><span class="s2">"busybox"</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">"tag"</span><span class="p">:</span><span class="w"> </span><span class="s2">"latest"</span>
+<span class="w">              </span><span class="p">},</span>
+<span class="w">              </span><span class="nt">"params"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">              </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">              </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"registry-image"</span>
+<span class="w">            </span><span class="p">},</span>
+<span class="w">            </span><span class="nt">"caches"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"run"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">              </span><span class="nt">"args"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">                </span><span class="s2">"Hello, World!"</span>
+<span class="w">              </span><span class="p">],</span>
+<span class="w">              </span><span class="nt">"user"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">              </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"echo"</span><span class="p">,</span>
+<span class="w">              </span><span class="nt">"dir"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">            </span><span class="p">},</span>
+<span class="w">            </span><span class="nt">"inputs"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"platform"</span><span class="p">:</span><span class="w"> </span><span class="s2">"linux"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"params"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"container_limits"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"outputs"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"rootfs_uri"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">          </span><span class="p">},</span>
+<span class="w">          </span><span class="nt">"file"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">"params"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">"task"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hello-task"</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">"privileged"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">"vars"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">"output_mapping"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">"image"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">"input_mapping"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">"container_limits"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">],</span>
+<span class="w">      </span><span class="nt">"interruptible"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"public"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"on_failure"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"on_abort"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"groups"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"resource_types"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"var_sources"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"display"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"resources"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="p">}</span>
+</pre></div>
+
+<div class="code"><pre class="code literal-block">fly<span class="w"> </span>-t<span class="w"> </span>pr-inf<span class="w"> </span>sp<span class="w"> </span>-p<span class="w"> </span>misc-cloud-hello<span class="w"> </span>-c<span class="w"> </span>definition.json
+</pre></div>
+
+<p>Since we'll be using fly to create our pipeline in the tutorial Concourse instance, use -t tutorial rather than pr-inf and make
+any other necessary substitutions according to your environment.</p>
+<p>That's it! You should now have the basic Hello World pipeline created from your Python source and operating properly, printing
+that famous phrase as a result.</p>
+<p><em>TODO</em> Add a more meaty example like the the-artifact example so we get to show inputs and outputs.</p>
+    </div>
+    
+
+</article><!--End of body content--><footer id="footer">
+            Contents © 2024         <a href="mailto:ol-devops@mit.edu">MIT Online Learning Platform Engineering</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         
+            
+            
+        </footer>
+</div>
+</div>
+
+
+        <script src="../../assets/js/all-nocdn.js"></script><script>
+    baguetteBox.run('div#content', {
+        ignoreClass: 'islink',
+        captions: function(element){var i=element.getElementsByTagName('img')[0];return i===undefined?'':i.alt;}});
+    </script>
+</body>
+</html>

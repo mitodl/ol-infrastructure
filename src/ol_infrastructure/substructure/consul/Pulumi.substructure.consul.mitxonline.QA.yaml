@@ -1,8 +1,0 @@
----
-secretsprovider: awskms://alias/infrastructure-secrets-qa
-encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QFRiO1usaweJdChbqXiOE0EAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMwHkJPeUExeAXvaS3AgEQgDsnh6mVrzBOHrs8gbP5P4CYeY1m9OaseOhvczGA8aQNRJTkLiJ6UDxhQAiGrOcPBCqLs+yz3lzK+1XiqQ==
-config:
-  consul:address: https://consul-mitxonline-qa.odl.mit.edu
-  consul:http_auth:
-    secure: v1:m+H/DXjUbZgxV2IO:EuUs9f5UffoPIQRiJ7YI9B0/YwZEpjzpIfCKQ2RefpNzhRYtzPOuwFqDShV8OuwQyegmPyryye3dP988LBk0FRevMH7jOBKNxJZ9XtE6WyidvfF/UCsUwT/jE67lwOE=
-  consul:scheme: https

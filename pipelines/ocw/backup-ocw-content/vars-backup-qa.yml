@@ -1,6 +1,0 @@
----
-env_name: qa
-draft_source_bucket_name: ocw-content-draft-qa
-draft_destination_bucket_name: ocw-content-backup-draft-qa
-live_source_bucket_name: ocw-content-live-qa
-live_destination_bucket_name: ocw-content-backup-live-qa

@@ -1,6 +1,0 @@
----
-name: ol-infrastructure-xqwatcher-server
-runtime: python
-description: Manage deployment of a xqwatcher server
-backend:
-  url: s3://mitol-pulumi-state/

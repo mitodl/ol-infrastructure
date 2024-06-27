@@ -1,6 +1,0 @@
----
-name: ol-infrastructure-forum-server
-runtime: python
-description: Manage deployment of an forum server
-backend:
-  url: s3://mitol-pulumi-state/

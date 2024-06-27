@@ -1,9 +1,0 @@
----
-secretsprovider: awskms://alias/PulumiSecrets
-encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQHJIeIGtFZd1Eb8TBgStqbcAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMxrfSAn/LOysTcxIiAgEQgDu5tjKVx+PqjBgo/SnRzvuRWnW9F7U+tZISmPOp4skA1OKG3BHqVet9eawN3T6I6Pjouz//IHrfSfxdsg==
-config:
-  aws:region: us-east-1
-  data-lake-query-engine:aws-account-id:
-    secure: v1:n1k5lQSysFqjA6Z0:QUuhbK4akeEoshLZ1OnLDexExYDLkd4pV8+C8w==
-  data-lake-query-engine:aws-external-id:
-    secure: v1:XV7Qa9liqrqQ/KOH:3v+cSd5awXFfVf9m9vuG1EogXRG00nOVOZMW2VF2pE6Z1q6nyR2nV8nHLfvbjJ3b

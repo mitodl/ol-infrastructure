@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>oncall | Platform Engineering Site</title>
+<link href="../../assets/css/all-nocdn.css" rel="stylesheet" type="text/css">
+<link href="https://fonts.googleapis.com/css?family=Playfair+Display:700,900" rel="stylesheet">
+<meta name="theme-color" content="#5670d4">
+<meta name="generator" content="Nikola (getnikola.com)">
+<link rel="alternate" type="application/rss+xml" title="RSS" hreflang="en" href="../../rss.xml">
+<link rel="canonical" href="https://pe.ol.mit.edu/pages/runbooks/oncall.html">
+<!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="MIT Online Learning Platform Engineering">
+<meta property="og:site_name" content="Platform Engineering Site">
+<meta property="og:title" content="oncall">
+<meta property="og:url" content="https://pe.ol.mit.edu/pages/runbooks/oncall.html">
+<meta property="og:description" content="Style Guide
+SaltStack
+XQueueWatcher
+OVS
+Bootcamp Ecommerce
+OpenEdX Residential MITx
+XPro
+MITXOnline
+Reddit
+
+Introduction
+This document is meant to be one stop shopping for your MIT OL Devops oncall ne">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2024-06-27T16:57:52-04:00">
+</head>
+<body>
+<a href="#content" class="sr-only sr-only-focusable">Skip to main content</a>
+
+<!-- Header and menu bar -->
+<div class="container">
+      <header class="blog-header py-3"><div class="row nbb-header align-items-center">
+          <div class="col-md-3 col-xs-2 col-sm-2" style="width: auto;">
+            <button class="navbar-toggler navbar-light bg-light nbb-navbar-toggler" type="button" data-toggle="collapse" data-target=".bs-nav-collapsible" aria-controls="bs-navbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse bs-nav-collapsible bootblog4-search-form-holder">
+                
+            </div>
+        </div>
+          <div class="col-md-6 col-xs-10 col-sm-10 bootblog4-brand" style="width: auto;">
+            <a class="navbar-brand blog-header-logo text-dark" href="../../">
+
+            <span id="blog-title">Platform Engineering Site</span>
+        </a>
+          </div>
+            <div class="col-md-3 justify-content-end align-items-center bs-nav-collapsible collapse flex-collapse bootblog4-right-nav">
+            <nav class="navbar navbar-light bg-white"><ul class="navbar-nav bootblog4-right-nav">
+<li class="nav-item">
+    <a href="oncall.md" id="sourcelink" class="nav-link">Source</a>
+    </li>
+
+
+                    
+            </ul></nav>
+</div>
+    </div>
+</header><nav class="navbar navbar-expand-md navbar-light bg-white static-top"><div class="collapse navbar-collapse bs-nav-collapsible" id="bs-navbar">
+            <ul class="navbar-nav nav-fill d-flex w-100"><li class="nav-item dropdown">
+<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Pages</a>
+            <div class="dropdown-menu">
+                    <a href="." class="dropdown-item">Runbooks</a>
+                    <a href="../discoveries/" class="dropdown-item">Discoveries</a>
+                    <a href="../how_to/" class="dropdown-item">How To</a>
+                    <a href="../post-mortems/" class="dropdown-item">Post Mortems</a>
+            </div>
+
+                
+            </li></ul>
+</div>
+<!-- /.navbar-collapse -->
+</nav>
+</div>
+
+<div class="container" id="content" role="main">
+    <div class="body-content">
+        <!--Body content-->
+        
+        
+        
+<article class="post-text storypage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="p-name entry-title" itemprop="headline name"><a href="#" class="u-url">oncall</a></h1>
+
+        
+
+    </header><div class="e-content entry-content" itemprop="articleBody text">
+    <ul>
+<li><a href="oncall.html#style-guide">Style Guide</a></li>
+<li><a href="oncall.html#saltstack">SaltStack</a></li>
+<li><a href="oncall.html#xqueuewatcher">XQueueWatcher</a></li>
+<li><a href="oncall.html#ovs">OVS</a></li>
+<li><a href="oncall.html#bootcamp-ecommerce">Bootcamp Ecommerce</a></li>
+<li><a href="oncall.html#openedx-residential-mitx">OpenEdX Residential MITx</a></li>
+<li><a href="oncall.html#xpro">XPro</a></li>
+<li><a href="oncall.html#mitxonline">MITXOnline</a></li>
+<li><a href="oncall.html#reddit">Reddit</a></li>
+</ul>
+<h2>Introduction</h2>
+<p>This document is meant to be one stop shopping for your MIT OL Devops oncall needs.</p>
+<p>Please update this doc as you handle incidents whenever you're oncall.</p>
+<h3>Style Guide</h3>
+<p>There should be a table of contents at the top of the document with links to
+each product heading. Your editor likely has a plugin to make this automatic.</p>
+<p>Each product gets its own top level heading.</p>
+<p>Entries that are keyed to a specific alert should have the relevant text in a
+second level heading under the product. Boil the alert down to the most relevant
+searchable text and omit specifics that will vary. For instance:</p>
+<div class="code"><pre class="code literal-block"><span class="ss">"[Prometheus]: [FIRING:1] DiskUsageWarning mitx-production (xqwatcher filesystem /dev/root ext4 ip-10-7-0-78 integrations/linux_hos"</span>
+</pre></div>
+
+<p>would boil down to <code>DiskUsageWarning xqwatcher</code> because the rest will change and
+make finding the right entry more difficult.</p>
+<p>Each entry should have at least two sections, Diagnosis and Mitigation. Use
+<em>bold face</em> for the section title.
+This will allow the oncall to get only as much Diagnosis in as required to
+identify the issue and focus on putting out the fire.</p>
+<h2>Products</h2>
+<h3>SaltStack</h3>
+<h4>MemoryUsageWarning operations-<environment></environment>
+</h4>
+<p><em>Diagnosis</em></p>
+<p>You get an alert like: <code>[Prometheus]: [FIRING:1] MemoryUsageWarning operations-qa (memory ip-10-1-3-33 integrations/linux_host warning)</code>.</p>
+<p>You'll need an account and ssh key set up on the saltstack master hosts. This should happen when you join the team.</p>
+<p>Now, ssh into the salt master appropriate to the environment you received the alert for. The IP address is cited in the alert. So, for the above:</p>
+<p>(Substitute your username and the appropriate environment if not qa, e.g. production)</p>
+<div class="code"><pre class="code literal-block">ssh -l cpatti salt-qa.odl.mit.edu
+</pre></div>
+
+<p>Next, check free memory:</p>
+<div class="code"><pre class="code literal-block"><span class="n">mdavidson</span><span class="nv">@ip</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">1</span><span class="o">-</span><span class="mi">3</span><span class="o">-</span><span class="mi">33</span><span class="err">:</span><span class="o">~</span><span class="err">$</span><span class="w"> </span><span class="k">free</span><span class="w"> </span><span class="o">-</span><span class="n">h</span>
+<span class="w">              </span><span class="n">total</span><span class="w">        </span><span class="n">used</span><span class="w">        </span><span class="k">free</span><span class="w">      </span><span class="n">shared</span><span class="w">  </span><span class="n">buff</span><span class="o">/</span><span class="n">cache</span><span class="w">   </span><span class="n">available</span>
+<span class="nl">Mem</span><span class="p">:</span><span class="w">           </span><span class="mf">7.5</span><span class="n">G</span><span class="w">        </span><span class="mf">7.2</span><span class="n">G</span><span class="w">        </span><span class="mi">120</span><span class="n">M</span><span class="w">         </span><span class="mi">79</span><span class="n">M</span><span class="w">        </span><span class="mi">237</span><span class="n">M</span><span class="w">         </span><span class="mi">66</span><span class="n">M</span>
+<span class="nl">Swap</span><span class="p">:</span><span class="w">            </span><span class="mi">0</span><span class="n">B</span><span class="w">          </span><span class="mi">0</span><span class="n">B</span><span class="w">          </span><span class="mi">0</span><span class="n">B</span>
+</pre></div>
+
+<p>In this case, the machine only has 120M free which isn't great.</p>
+<p><em>Mitigation</em></p>
+<p>We probably need to restart the Salt master service. Use the systemctl command for that:</p>
+<div class="code"><pre class="code literal-block"><span class="n">root</span><span class="nv">@ip</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">1</span><span class="o">-</span><span class="mi">3</span><span class="o">-</span><span class="mi">33</span><span class="err">:</span><span class="o">~</span><span class="err">#</span><span class="w">  </span><span class="n">systemctl</span><span class="w"> </span><span class="n">restart</span><span class="w"> </span><span class="n">salt</span><span class="o">-</span><span class="n">master</span>
+</pre></div>
+
+<p>Now, wait a minute and then check free memory again. There should be significantly more available:</p>
+<div class="code"><pre class="code literal-block"><span class="n">root</span><span class="nv">@ip</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">1</span><span class="o">-</span><span class="mi">3</span><span class="o">-</span><span class="mi">33</span><span class="err">:</span><span class="o">~</span><span class="err">#</span><span class="w"> </span><span class="k">free</span><span class="w"> </span><span class="o">-</span><span class="n">h</span>
+<span class="w">              </span><span class="n">total</span><span class="w">        </span><span class="n">used</span><span class="w">        </span><span class="k">free</span><span class="w">      </span><span class="n">shared</span><span class="w">  </span><span class="n">buff</span><span class="o">/</span><span class="n">cache</span><span class="w">   </span><span class="n">available</span>
+<span class="nl">Mem</span><span class="p">:</span><span class="w">           </span><span class="mf">7.5</span><span class="n">G</span><span class="w">        </span><span class="mf">1.9</span><span class="n">G</span><span class="w">        </span><span class="mf">5.3</span><span class="n">G</span><span class="w">         </span><span class="mi">80</span><span class="n">M</span><span class="w">        </span><span class="mi">280</span><span class="n">M</span><span class="w">        </span><span class="mf">5.3</span><span class="n">G</span>
+<span class="nl">Swap</span><span class="p">:</span><span class="w">            </span><span class="mi">0</span><span class="n">B</span><span class="w">          </span><span class="mi">0</span><span class="n">B</span><span class="w">          </span><span class="mi">0</span><span class="n">B</span>
+</pre></div>
+
+<p>If what you see is something like the above, you're good to go. Problem solved (for now!)</p>
+<h3>XQueueWatcher</h3>
+<h4>DiskUsageWarning xqwatcher</h4>
+<p><em>Diagnosis</em></p>
+<p>This happens every few months if the xqueue watcher nodes hang around for that
+long.</p>
+<p><em>Mitigation</em></p>
+<div class="code"><pre class="code literal-block"><span class="go">From salt-pr master:</span>
+
+<span class="go">sudo ssh -i /etc/salt/keys/aws/salt-production.pem ubuntu@10.7.0.78</span>
+<span class="go">sudo su -</span>
+
+<span class="gp">root@ip-10-7-0-78:~# </span>df<span class="w"> </span>-h
+<span class="go">Filesystem      Size  Used Avail Use% Mounted on</span>
+<span class="go">/dev/root        20G   16G  3.9G  81% /           &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt; offending filesystem</span>
+<span class="go">devtmpfs        1.9G     0  1.9G   0% /dev</span>
+<span class="go">tmpfs           1.9G  560K  1.9G   1% /dev/shm</span>
+<span class="go">tmpfs           389M  836K  389M   1% /run</span>
+<span class="go">tmpfs           5.0M     0  5.0M   0% /run/lock</span>
+<span class="go">tmpfs           1.9G     0  1.9G   0% /sys/fs/cgroup</span>
+<span class="go">/dev/loop1       56M   56M     0 100% /snap/core18/2751</span>
+<span class="go">/dev/loop2       25M   25M     0 100% /snap/amazon-ssm-agent/6312</span>
+<span class="go">/dev/loop0       25M   25M     0 100% /snap/amazon-ssm-agent/6563</span>
+<span class="go">/dev/loop3       54M   54M     0 100% /snap/snapd/19361</span>
+<span class="go">/dev/loop4       64M   64M     0 100% /snap/core20/1950</span>
+<span class="go">/dev/loop6       56M   56M     0 100% /snap/core18/2785</span>
+<span class="go">/dev/loop5       54M   54M     0 100% /snap/snapd/19457</span>
+<span class="go">/dev/loop7       92M   92M     0 100% /snap/lxd/24061</span>
+<span class="go">/dev/loop8       92M   92M     0 100% /snap/lxd/23991</span>
+<span class="go">/dev/loop10      64M   64M     0 100% /snap/core20/1974</span>
+<span class="go">tmpfs           389M     0  389M   0% /run/user/1000</span>
+
+<span class="gp">root@ip-10-7-0-78:~# </span><span class="nb">cd</span><span class="w"> </span>/edx/var<span class="w">           </span><span class="o">&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</span>&lt;<span class="w"> </span>intuition<span class="w"> </span>/<span class="w"> </span>memory
+
+<span class="gp">root@ip-10-7-0-78:/edx/var# </span>du<span class="w"> </span>-h<span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-hr<span class="w"> </span><span class="p">|</span><span class="w"> </span>head
+<span class="go">8.8G    .</span>
+<span class="go">8.7G    ./log</span>
+<span class="go">8.2G    ./log/xqwatcher         &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt; Offender</span>
+<span class="go">546M    ./log/supervisor</span>
+<span class="go">8.0K    ./supervisor</span>
+<span class="go">4.0K    ./xqwatcher</span>
+<span class="go">4.0K    ./log/aws</span>
+<span class="go">4.0K    ./aws</span>
+<span class="gp">root@ip-10-7-0-78:/edx/var# </span><span class="nb">cd</span><span class="w"> </span>log/xqwatcher/
+<span class="gp">root@ip-10-7-0-78:/edx/var/log/xqwatcher# </span>ls<span class="w"> </span>-tlrha
+<span class="go">total 8.2G</span>
+<span class="go">drwxr-xr-x 2 www-data xqwatcher 4.0K Mar 11 08:35 .</span>
+<span class="go">drwxr-xr-x 5 syslog   syslog    4.0K Jul 14 00:00 ..</span>
+<span class="go">-rw-r--r-- 1 www-data www-data  8.2G Jul 14 14:12 xqwatcher.log             &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt; big file</span>
+
+<span class="gp">root@ip-10-7-0-78:/edx/var/log/xqwatcher# </span>rm<span class="w"> </span>xqwatcher.log
+
+<span class="gp">root@ip-10-7-0-78:/edx/var/log/xqwatcher# </span>systemctl<span class="w"> </span>restart<span class="w"> </span>supervisor.service
+<span class="go">Job for supervisor.service failed because the control process exited with error code.</span>
+<span class="go">See "systemctl status supervisor.service" and "journalctl -xe" for details.</span>
+<span class="gp">root@ip-10-7-0-78:/edx/var/log/xqwatcher# </span>systemctl<span class="w"> </span>restart<span class="w"> </span>supervisor.service<span class="w">       </span><span class="o">&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</span><span class="w">  </span>Restart<span class="w"> </span>it<span class="w"> </span>twice<span class="w"> </span>because<span class="w"> </span>???
+
+<span class="gp">root@ip-10-7-0-78:/edx/var/log/xqwatcher# </span>systemctl<span class="w"> </span>status<span class="w"> </span>supervisor.service
+<span class="go">● supervisor.service - supervisord - Supervisor process control system</span>
+<span class="go">     Loaded: loaded (/etc/systemd/system/supervisor.service; enabled; vendor preset: enabled)</span>
+<span class="go">     Active: active (running) since Fri 2023-07-14 14:12:51 UTC; 4min 48s ago</span>
+<span class="go">       Docs: http://supervisord.org</span>
+<span class="go">    Process: 1114385 ExecStart=/edx/app/supervisor/venvs/supervisor/bin/supervisord --configuration /edx/app/supervisor/supervisord.conf (code=exited, status=0/SUCCESS)</span>
+<span class="go">   Main PID: 1114387 (supervisord)</span>
+<span class="go">      Tasks: 12 (limit: 4656)</span>
+<span class="go">     Memory: 485.8M</span>
+<span class="go">     CGroup: /system.slice/supervisor.service</span>
+<span class="go">             ├─1114387 /edx/app/supervisor/venvs/supervisor/bin/python /edx/app/supervisor/venvs/supervisor/bin/supervisord --configuration /edx/app/supervisor/supervisord.conf</span>
+<span class="go">             └─1114388 /edx/app/xqwatcher/venvs/xqwatcher/bin/python -m xqueue_watcher -d /edx/app/xqwatcher</span>
+
+<span class="gp">root@ip-10-7-0-78:/edx/var/log/xqwatcher# </span>ls<span class="w"> </span>-lthra
+<span class="go">total 644K</span>
+<span class="go">drwxr-xr-x 5 syslog   syslog    4.0K Jul 14 00:00 ..</span>
+<span class="go">drwxr-xr-x 2 www-data xqwatcher 4.0K Jul 14 14:12 .</span>
+<span class="go">-rw-r--r-- 1 www-data www-data  636K Jul 14 14:17 xqwatcher.log                &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt; New file being written to</span>
+<span class="gp">root@ip-10-7-0-78:/edx/var/log/xqwatcher# </span>df<span class="w"> </span>-h<span class="w"> </span>.
+<span class="go">Filesystem      Size  Used Avail Use% Mounted on</span>
+<span class="go">/dev/root        20G  7.4G   12G  38%                  &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt; acceptable utilization</span>
+</pre></div>
+
+<h3>OVS</h3>
+<h4>[Prometheus]: [FIRING:1] InvalidAccessKeyProduction apps-production (odl-video-service critical)</h4>
+<p><em>Diagnosis</em></p>
+<p>This happens sometimes when the applications's instance S3 credentials become out of date.</p>
+<p><em>Mitigation</em></p>
+<p>Use the AWS EC2 web console and navigate to the EC2 -&gt; Auto Scaling Group pane. Search on:
+<code>odl-video-service-production</code></p>
+<p>Once you have the right ASG, click on the "Instance Refresh" tab and then click
+the "Start Instance Refresh" button.</p>
+<p><em>Be sure to un-check the "Enable Skip Matching" box</em>, or your instance refresh
+will most likely not do anything at all.</p>
+<h4>Request by deeveloper to add videos</h4>
+<p><em>Diagnosis</em></p>
+<p>N/A - developer request</p>
+<p><em>Mitigation</em></p>
+<p>Use the AWS EC2 web console and find instances of type
+<code>odl-video-service-production</code> - detailed instructions for accessing the
+instance can be found
+<a href="https://github.com/mitodl/ol-infrastructure/blob/main/docs/how_to/access_openedx_djange_manage.md">here</a>.</p>
+<p>The only difference in this case is that the user is <code>admin</code> rather than
+<code>ubuntu</code>. Stop when you get a shell prompt and rejoin this document.</p>
+<p>First, run:</p>
+<p><code>sudo docker compose ps</code> to see a list of running processes. In our case, we're
+looking for <code>app</code>. This isn't strictly necessary here as we know what we're
+looking for, but good to look before you leap anyway.</p>
+<p>You should see something like:</p>
+<div class="code"><pre class="code literal-block"><span class="gp">admin@ip-10-13-3-50:/etc/docker/compose$ </span>sudo<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>ps
+<span class="go">NAME                IMAGE                                 COMMAND                  SERVICE             CREATED             STATUS              PORTS</span>
+<span class="go">compose-app-1       mitodl/ovs-app:v0.69.0-5-gf76af37     "/bin/bash -c ' slee…"   app                 3 weeks ago         Up 3 weeks          0.0.0.0:8087-&gt;8087/tcp, :::8087-&gt;8087/tcp, 8089/tcp</span>
+<span class="go">compose-celery-1    mitodl/ovs-app:v0.69.0-5-gf76af37     "/bin/bash -c ' slee…"   celery              3 weeks ago         Up 3 weeks          8089/tcp</span>
+<span class="go">compose-nginx-1     pennlabs/shibboleth-sp-nginx:latest   "/usr/bin/supervisor…"   nginx               3 weeks ago         Up 3 weeks          0.0.0.0:80-&gt;80/tcp, :::80-&gt;80/tcp, 0.0.0.0:443-&gt;443/tcp, :::443-&gt;443/tcp</span>
+</pre></div>
+
+<p>Now run:</p>
+<p><code>sudo docker compose exec -it app /bin/bash</code> which should get you a new, less
+colorful shell prompt.</p>
+<p>At this point you can run the manage.py command the developer gave you in slack.
+In my case, this is what I ran and the output I got:</p>
+<div class="code"><pre class="code literal-block"><span class="gp">mitodl@486c7fbba98b:/src$ </span>python<span class="w"> </span>./manage.py<span class="w"> </span>add_hls_video_to_edx<span class="w"> </span>--edx-course-id<span class="w"> </span>course-v1:xPRO+DECA_Boeing+SPOC_R0
+<span class="go">Attempting to post video(s) to edX...</span>
+<span class="go">Video successfully added to edX – VideoFile: CCADE_V11JW_Hybrid_Data_Formats_v1.mp4 (105434), edX url: https://courses.xpro.mit.edu/api/val/v0/videos/</span>
+</pre></div>
+
+<p>You're all set!</p>
+<h3>Bootcamp Ecommerce</h3>
+<h4>[Prometheus]: [FIRING:1] AlternateInvalidAccessKeyProduction production (bootcamp-ecommerce critical)</h4>
+<p><em>Diagnosis</em></p>
+<p>N/A</p>
+<p><em>Mitigation</em></p>
+<p>You need to refresh the credentials the salt-proxy is using for Heroku to manage this app.</p>
+<ul>
+<li>ssh to the salt production server: <code>ssh salt-production.odl.mit.edu</code>
+</li>
+<li>Run the salt proxy command to refresh creds: <code>salt proxy-bootcamps-production state.sls heroku.update_heroku_config</code>. You should see output similar to the following:</li>
+</ul>
+<div class="code"><pre class="code literal-block"><span class="n">cpatti</span><span class="err">@</span><span class="n">ip</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">0</span><span class="o">-</span><span class="mi">2</span><span class="o">-</span><span class="mi">195</span><span class="p">:</span><span class="o">~$</span><span class="w"> </span><span class="n">sudo</span><span class="w"> </span><span class="n">salt</span><span class="w"> </span><span class="n">proxy</span><span class="o">-</span><span class="n">bootcamps</span><span class="o">-</span><span class="n">production</span><span class="w"> </span><span class="n">state</span><span class="o">.</span><span class="n">sls</span><span class="w"> </span><span class="n">heroku</span><span class="o">.</span><span class="n">update_heroku_config</span>
+<span class="n">proxy</span><span class="o">-</span><span class="n">bootcamps</span><span class="o">-</span><span class="n">production</span><span class="p">:</span>
+<span class="o">----------</span>
+<span class="w">          </span><span class="n">ID</span><span class="p">:</span><span class="w"> </span><span class="n">update_heroku_bootcamp</span><span class="o">-</span><span class="n">ecommerce_config</span>
+<span class="w">    </span><span class="n">Function</span><span class="p">:</span><span class="w"> </span><span class="n">heroku</span><span class="o">.</span><span class="n">update_app_config_vars</span>
+<span class="w">        </span><span class="n">Name</span><span class="p">:</span><span class="w"> </span><span class="n">bootcamp</span><span class="o">-</span><span class="n">ecommerce</span>
+<span class="w">      </span><span class="n">Result</span><span class="p">:</span><span class="w"> </span><span class="n">True</span>
+<span class="w">     </span><span class="n">Comment</span><span class="p">:</span>
+<span class="w">     </span><span class="n">Started</span><span class="p">:</span><span class="w"> </span><span class="mi">14</span><span class="p">:</span><span class="mi">43</span><span class="p">:</span><span class="mf">58.916128</span>
+<span class="w">    </span><span class="n">Duration</span><span class="p">:</span><span class="w"> </span><span class="mf">448.928</span><span class="w"> </span><span class="n">ms</span>
+<span class="w">     </span><span class="n">Changes</span><span class="p">:</span>
+<span class="w">              </span><span class="o">----------</span>
+<span class="w">              </span><span class="n">new</span><span class="p">:</span>
+<span class="w">                  </span><span class="o">----------</span>
+
+<span class="o">**</span><span class="w"> </span><span class="mi">8</span><span class="o">&lt;</span><span class="w"> </span><span class="n">snip</span><span class="w"> </span><span class="mi">8</span><span class="o">&lt;</span><span class="w"> </span><span class="n">secret</span><span class="w"> </span><span class="n">squirrel</span><span class="w"> </span><span class="n">content</span><span class="w"> </span><span class="n">elided</span><span class="w"> </span><span class="o">**</span>
+
+<span class="n">Summary</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">proxy</span><span class="o">-</span><span class="n">bootcamps</span><span class="o">-</span><span class="n">production</span>
+<span class="o">------------</span>
+<span class="n">Succeeded</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">(</span><span class="n">changed</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">Failed</span><span class="p">:</span><span class="w">    </span><span class="mi">0</span>
+<span class="o">------------</span>
+<span class="n">Total</span><span class="w"> </span><span class="n">states</span><span class="w"> </span><span class="n">run</span><span class="p">:</span><span class="w">     </span><span class="mi">1</span>
+<span class="n">Total</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="n">time</span><span class="p">:</span><span class="w"> </span><span class="mf">448.928</span><span class="w"> </span><span class="n">ms</span>
+<span class="n">cpatti</span><span class="err">@</span><span class="n">ip</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">0</span><span class="o">-</span><span class="mi">2</span><span class="o">-</span><span class="mi">195</span><span class="p">:</span><span class="o">~$</span>
+</pre></div>
+
+<h3>OpenEdX Residential MITx</h3>
+<h4>Task handler raised error: "OperationalError(1045, "Access denied for user 'v-edxa-fmT0KbL5X'@'10.7.0.237' (using password: YES)</h4>
+<p><em>Diagnosis</em></p>
+<p>If the oncall receives this page, instances credentials to access Vault and the
+secrets it contains have lapsed.</p>
+<p><em>Mitigation</em></p>
+<p>Fixing this issue currently requires an instance refresh, as the newly launched
+instances will have all the necessary credentials.</p>
+<p>From the EC2 console, on the left hand side, click "Auto Scaling Groups", then
+type 'edxapp-web-mitx-<environment>' e.g. 'edxapp-web-mitx-production'. This
+should yield 1 result with something like 'edxapp-web-autoscaling-group-XXXX' in
+the 'Name' column. Click that.</environment></p>
+<p>Now click the "Instance Refresh" tab.</p>
+<p>Click "Start instance refresh".</p>
+<p><em>Be sure to un-check the "Enable Skip Matching" box</em>, or your instance refresh
+will most likely not do anything at all.</p>
+<p>Monitor the instance refresh to ensure it completes successfully. If you have
+been receiving multiple similar pages, they should stop coming in. If they
+continue, please escalate this incident as this problem is user visible and thus
+high impact to customers.</p>
+<h3>XPro</h3>
+<h4>ApiException hubspot_xpro.tasks.sync_contact_with_hubspot</h4>
+<p><em>Diagnosis</em></p>
+<p>This error is thrown when the Hubspot API key has expired.</p>
+<p>You'll see an error similar to this one in
+<a href="https://mit-office-of-digital-learning.sentry.io/issues/3925327041/?environment=production&amp;project=1413655&amp;query=is%3Aunresolved+issue.priority%3A[high%2C+medium]+hubspot&amp;referrer=issue-stream&amp;statsPeriod=14d&amp;stream_index=0">Sentry</a>.</p>
+<p><em>Mitigation</em></p>
+<p>The fix for this is to generate a new API key in Hubspot and then get that key
+into Vault, triggering the appropriate pipeline deployment afterwards.</p>
+<p>First, generate a new API key in Hubspot. You can do this by logging into
+Hubspot,</p>
+<p>You can do this using the username/password and TOTP token found in
+[Vault](https://vault-production.odl.mit.edu/ui/vault/secrets/platform-secrets/kv/hubspot/details?version=1.</p>
+<p>Once you're logged in, click "Open" next to "MIT XPro" in the Accounts list.</p>
+<p>Then, click on the gear icon in the upper right corner of the page and select
+"Integrations" -&gt; "Private Apps" in the sidebar on the left.</p>
+<p>You should then see the XPRo private app and beneath that a link for "View
+Access Token". Click that, then click on the "Manage Token" link.</p>
+<p>On this screen, you should see a "Rotate" button, click that to generate a new
+API key.</p>
+<p>Now that you've generated your new API token, you'll need to get that token into
+Vault using SOPS. You can find the right secrets file for this in Github
+<a href="https://github.com/mitodl/ol-infrastructure/blob/main/src/bridge/secrets/xpro/secrets.production.yaml">here</a>.</p>
+<p>The process for deploying secrets deserves its own document, so after adding the
+new API token to the SOPS decrypted secrets file you just generated, commit it
+to Github, ensure it runs through the appropriate pipelines and ends up in
+Vault.</p>
+<p>You can find the ultimate home of the XPro Hubspot API key in Vault
+<a href="https://vault-production.odl.mit.edu/ui/vault/secrets/secret-mitxpro/show/hubspot-api-private-token">here</a>.</p>
+<p>Once the new API token is in the correct spot, you'll need to ensure that new
+token gets deployed to production in Heroku by tracking its progress in
+<a href="https://cicd.odl.mit.edu/teams/infrastructure/pipelines/pulumi-xpro">this</a>
+pipeline.</p>
+<p>You will likely need to close Concourse Github workflow issues to make this
+happen. See <a href="https://github.com/mitodl/ol-infrastructure/blob/main/docs/how_to/concourse_github_issues_user_guide.md">its users
+guide</a>
+for details.</p>
+<p>Once that's complete, you should have mitigated this issue. Keep checking that
+Sentry page to ensure that the Last Seen value reflects something appropriately
+long ago and you can resolve this ticket.</p>
+<p>If you are asked to run a sync to Hubspot:
+- Inform the requester, preferably on the #product-xpro Slack that the process
+will take quite a long time. If this is time critical they may ask you to run
+only parts of the sync. You can find documentation on the command you'll run
+<a href="https://github.com/mitodl/mitxpro/blob/master/hubspot_xpro/management/commands/sync_db_to_hubspot.py">here</a>.</p>
+<p>Since XPro runs on Heroku, you'll need to get a Heroku console shell to run the
+management command. You can get to that shell by logging into heroku with the
+Heroku CLI and running:</p>
+<div class="code"><pre class="code literal-block">heroku run /bin/bash -a xpro-production
+</pre></div>
+
+<p>It takes a while but you will eventually get your shell prompt.</p>
+<p>From there, run the following commands. To sync all variants:</p>
+<div class="code"><pre class="code literal-block">./manage.py sync_db_to_hubspot create
+</pre></div>
+
+<p>If you're asked to run only one, for example deals, you can consult the
+documentation linked above and see that you should add the <code>--deals</code> flag to the
+invocation.</p>
+<p>Be sure to inform the requester of what you see for output and add it to the
+ticket for this issue if there is one.</p>
+<p>If you see the command fail with an exception, note the HTTP response code. In
+particular a 401 means that the API key is likely out of date. A 409 signals a
+conflict (e.g. dupe email) that will likely be handled by conflict resolution
+code and thus can probably be ignored.</p>
+<h3>MITXOnline</h3>
+<h4>Grading Celery Task Failed (STUB entry. Needs love)</h4>
+<p><em>Diagnosis</em></p>
+<p>Usually we'll get reports from our users telling us that grading tasks have
+failed.</p>
+<p>At that point we should surf to <a href="https://celery-monitoring.odl.mit.edu/">celery
+monitoring</a> and login with your
+Keycloak Platform Engineering realm credentials.</p>
+<p>Then, get the course ID for the failed grading tasks and search for it in
+Celery Monitoring by entering the course key in the kwargs input, surrounded
+by {<em>' and '</em>}, for example {<em>'course-v1:MITxT+14.310x+1T2024'</em>}.</p>
+<p><em>Mitigation</em></p>
+<p>You may well be asked to run the <code>compute_graded</code> management command on the LMS
+for mitxonline. (TODO: Needs details. How do we get there? etc.)</p>
+<h3>Reddit</h3>
+<h4>[Prometheus]: [FIRING:1] DiskUsageWarning production-apps (reddit filesystem /dev/nvme0n1p1 ext4 ip-10-13-1-59 integrations/linux_</h4>
+<h4>[Pingdom] Open Discussions production home page has an alert</h4>
+<p><em>Diagnosis</em></p>
+<p>We often get low disk errors on our reddit nodes, but in this case the low disk
+alert was paired with a pingdom alert on open-discussions.  This may mean that
+pgbouncer is in trouble on reddit, likely because its credentials are out of
+date.</p>
+<p>You can get a view into what's happening by logging into the node cited in the
+disk usage ticket and typing:</p>
+<div class="code"><pre class="code literal-block">salt reddit-production* state.sls reddit.config,pgbouncer
+</pre></div>
+
+<p><em>Mitigation</em></p>
+<p>Once you've determined that pgbouncer is indeed sad, you can try a restart /
+credential refresh with the following command:</p>
+<div class="code"><pre class="code literal-block">salt reddit-production* state.sls reddit.config
+</pre></div>
+    </div>
+    
+
+</article><!--End of body content--><footer id="footer">
+            Contents © 2024         <a href="mailto:ol-devops@mit.edu">MIT Online Learning Platform Engineering</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         
+            
+            
+        </footer>
+</div>
+</div>
+
+
+        <script src="../../assets/js/all-nocdn.js"></script><script>
+    baguetteBox.run('div#content', {
+        ignoreClass: 'islink',
+        captions: function(element){var i=element.getElementsByTagName('img')[0];return i===undefined?'':i.alt;}});
+    </script>
+</body>
+</html>

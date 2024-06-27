@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>publish_to_npm | Platform Engineering Site</title>
+<link href="../../assets/css/all-nocdn.css" rel="stylesheet" type="text/css">
+<link href="https://fonts.googleapis.com/css?family=Playfair+Display:700,900" rel="stylesheet">
+<meta name="theme-color" content="#5670d4">
+<meta name="generator" content="Nikola (getnikola.com)">
+<link rel="alternate" type="application/rss+xml" title="RSS" hreflang="en" href="../../rss.xml">
+<link rel="canonical" href="https://pe.ol.mit.edu/pages/how_to/publish_to_npm.html">
+<!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="MIT Online Learning Platform Engineering">
+<meta property="og:site_name" content="Platform Engineering Site">
+<meta property="og:title" content="publish_to_npm">
+<meta property="og:url" content="https://pe.ol.mit.edu/pages/how_to/publish_to_npm.html">
+<meta property="og:description" content="How to Publish an MIT OL Package to NPM
+Note: This is a VERY rough document. We hate the current
+process, but I'm a big believer in not allowing the perfect
+to be the enemy of the good :)
+Pre-Requisit">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2024-06-27T16:57:52-04:00">
+</head>
+<body>
+<a href="#content" class="sr-only sr-only-focusable">Skip to main content</a>
+
+<!-- Header and menu bar -->
+<div class="container">
+      <header class="blog-header py-3"><div class="row nbb-header align-items-center">
+          <div class="col-md-3 col-xs-2 col-sm-2" style="width: auto;">
+            <button class="navbar-toggler navbar-light bg-light nbb-navbar-toggler" type="button" data-toggle="collapse" data-target=".bs-nav-collapsible" aria-controls="bs-navbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse bs-nav-collapsible bootblog4-search-form-holder">
+                
+            </div>
+        </div>
+          <div class="col-md-6 col-xs-10 col-sm-10 bootblog4-brand" style="width: auto;">
+            <a class="navbar-brand blog-header-logo text-dark" href="../../">
+
+            <span id="blog-title">Platform Engineering Site</span>
+        </a>
+          </div>
+            <div class="col-md-3 justify-content-end align-items-center bs-nav-collapsible collapse flex-collapse bootblog4-right-nav">
+            <nav class="navbar navbar-light bg-white"><ul class="navbar-nav bootblog4-right-nav">
+<li class="nav-item">
+    <a href="publish_to_npm.md" id="sourcelink" class="nav-link">Source</a>
+    </li>
+
+
+                    
+            </ul></nav>
+</div>
+    </div>
+</header><nav class="navbar navbar-expand-md navbar-light bg-white static-top"><div class="collapse navbar-collapse bs-nav-collapsible" id="bs-navbar">
+            <ul class="navbar-nav nav-fill d-flex w-100"><li class="nav-item dropdown">
+<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Pages</a>
+            <div class="dropdown-menu">
+                    <a href="../runbooks/" class="dropdown-item">Runbooks</a>
+                    <a href="../discoveries/" class="dropdown-item">Discoveries</a>
+                    <a href="." class="dropdown-item">How To</a>
+                    <a href="../post-mortems/" class="dropdown-item">Post Mortems</a>
+            </div>
+
+                
+            </li></ul>
+</div>
+<!-- /.navbar-collapse -->
+</nav>
+</div>
+
+<div class="container" id="content" role="main">
+    <div class="body-content">
+        <!--Body content-->
+        
+        
+        
+<article class="post-text storypage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="p-name entry-title" itemprop="headline name"><a href="#" class="u-url">publish_to_npm</a></h1>
+
+        
+
+    </header><div class="e-content entry-content" itemprop="articleBody text">
+    <h2>How to Publish an MIT OL Package to NPM</h2>
+<p><strong>Note</strong>: This is a VERY rough document. We hate the current
+process, but I'm a big believer in not allowing the perfect
+to be the enemy of the good :)</p>
+<h3>Pre-Requisites</h3>
+<ul>
+<li>You will need Vault access for production.</li>
+<li>You'll need to know which Github repository needs publhsing</li>
+</ul>
+<h3>Setup</h3>
+<h4>Git</h4>
+<p>Check out the Git repository that equates to the NPM module
+that needs publishing. Usually the dev asking for help can
+give you this if it's not obvious.</p>
+<h4>npm login</h4>
+<h5>Fun with Vault's Web UI</h5>
+<p>Now login to npm from the command line. You'll need to have
+npm and node installed in order for this to work. If you're
+on a Mac, you can use homebrew <code>brew install npm</code> but YMMV.</p>
+<p>You'll need the username and TOTP code we use for this. Get
+from the production <a href="https://vault-production.odl.mit.edu">Vault instance</a>.</p>
+<p>Navigate to "platform-secrets" and look for the 'npmjs' entry.</p>
+<p>This will get you the username and password. Now you'll need
+the TOTP code.</p>
+<p>Click the eye icon to reveal the contents of the 'totp-path-mitx-devops'
+entry.</p>
+<p>Now click the icon to the left of the eye to copy the command you'll
+need to run to your local clipboard.</p>
+<p>Open the CLI by clicking on the little black box with the '&gt;' in it in the
+very upper right of the screen. Now paste the contents if your
+clipboard into the bottom section of the screen where you can
+enter commands. This will get you the TOTP code you'll need.</p>
+<h5>To the CLI!</h5>
+<p>To login to npm on the command line and complete setup, run:
+<code>npm login mitx-devops</code> and hit return.</p>
+<p>This will prompt to open a web page. You'll need to supply the
+password and TOTP code you got in the previous step. If it's been
+too long since you gathered the TOTP code, you may need to hit
+up-arrow in the Vault web UI CLI and get a fresh TOTP code.</p>
+<p>If you're successful you should see something like:
+<code>Logged in on https://registry.npmjs.org/.</code></p>
+<h3>Doing The Actual Publishing</h3>
+<p>Now change directory to the Git repo you checked our earlier and type:</p>
+<p><code>npm publish</code>.</p>
+<p>If it blows up, check the <code>packages.json</code> file and ensure the the
+organization is set correctly. It should be 'mitodl'. See
+<a href="https://github.com/mitodl/brand-mitol-residential/commit/8c998e6cc87f4d020b5011be5a8cdf3b003660de">this commit</a> for
+an example fix.</p>
+    </div>
+    
+
+</article><!--End of body content--><footer id="footer">
+            Contents © 2024         <a href="mailto:ol-devops@mit.edu">MIT Online Learning Platform Engineering</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         
+            
+            
+        </footer>
+</div>
+</div>
+
+
+        <script src="../../assets/js/all-nocdn.js"></script><script>
+    baguetteBox.run('div#content', {
+        ignoreClass: 'islink',
+        captions: function(element){var i=element.getElementsByTagName('img')[0];return i===undefined?'':i.alt;}});
+    </script>
+</body>
+</html>

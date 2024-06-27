@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>access_openedx_djange_manage | Platform Engineering Site</title>
+<link href="../../assets/css/all-nocdn.css" rel="stylesheet" type="text/css">
+<link href="https://fonts.googleapis.com/css?family=Playfair+Display:700,900" rel="stylesheet">
+<meta name="theme-color" content="#5670d4">
+<meta name="generator" content="Nikola (getnikola.com)">
+<link rel="alternate" type="application/rss+xml" title="RSS" hreflang="en" href="../../rss.xml">
+<link rel="canonical" href="https://pe.ol.mit.edu/pages/how_to/access_openedx_djange_manage.html">
+<!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="MIT Online Learning Platform Engineering">
+<meta property="og:site_name" content="Platform Engineering Site">
+<meta property="og:title" content="access_openedx_djange_manage">
+<meta property="og:url" content="https://pe.ol.mit.edu/pages/how_to/access_openedx_djange_manage.html">
+<meta property="og:description" content="How To Access An OpenEdX Django Admin manage.py
+Pre-requisites
+You will need the following pieces of information to get started:
+- The product you want to access e.g. mitxonline, ocw-studio, xpro, mit">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2024-06-27T16:57:52-04:00">
+</head>
+<body>
+<a href="#content" class="sr-only sr-only-focusable">Skip to main content</a>
+
+<!-- Header and menu bar -->
+<div class="container">
+      <header class="blog-header py-3"><div class="row nbb-header align-items-center">
+          <div class="col-md-3 col-xs-2 col-sm-2" style="width: auto;">
+            <button class="navbar-toggler navbar-light bg-light nbb-navbar-toggler" type="button" data-toggle="collapse" data-target=".bs-nav-collapsible" aria-controls="bs-navbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse bs-nav-collapsible bootblog4-search-form-holder">
+                
+            </div>
+        </div>
+          <div class="col-md-6 col-xs-10 col-sm-10 bootblog4-brand" style="width: auto;">
+            <a class="navbar-brand blog-header-logo text-dark" href="../../">
+
+            <span id="blog-title">Platform Engineering Site</span>
+        </a>
+          </div>
+            <div class="col-md-3 justify-content-end align-items-center bs-nav-collapsible collapse flex-collapse bootblog4-right-nav">
+            <nav class="navbar navbar-light bg-white"><ul class="navbar-nav bootblog4-right-nav">
+<li class="nav-item">
+    <a href="access_openedx_djange_manage.md" id="sourcelink" class="nav-link">Source</a>
+    </li>
+
+
+                    
+            </ul></nav>
+</div>
+    </div>
+</header><nav class="navbar navbar-expand-md navbar-light bg-white static-top"><div class="collapse navbar-collapse bs-nav-collapsible" id="bs-navbar">
+            <ul class="navbar-nav nav-fill d-flex w-100"><li class="nav-item dropdown">
+<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Pages</a>
+            <div class="dropdown-menu">
+                    <a href="../runbooks/" class="dropdown-item">Runbooks</a>
+                    <a href="../discoveries/" class="dropdown-item">Discoveries</a>
+                    <a href="." class="dropdown-item">How To</a>
+                    <a href="../post-mortems/" class="dropdown-item">Post Mortems</a>
+            </div>
+
+                
+            </li></ul>
+</div>
+<!-- /.navbar-collapse -->
+</nav>
+</div>
+
+<div class="container" id="content" role="main">
+    <div class="body-content">
+        <!--Body content-->
+        
+        
+        
+<article class="post-text storypage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="p-name entry-title" itemprop="headline name"><a href="#" class="u-url">access_openedx_djange_manage</a></h1>
+
+        
+
+    </header><div class="e-content entry-content" itemprop="articleBody text">
+    <h2>How To Access An OpenEdX Django Admin manage.py</h2>
+<h3>Pre-requisites</h3>
+<p>You will need the following pieces of information to get started:
+- The product you want to access e.g. mitxonline, ocw-studio, xpro, mitx
+- The environment you want - one of ci, qa, or production.
+- Valid credentials to login to the MIT Open Learning AWS Account
+  - You should most likely have been given these as a part of your onboarding.
+- The MIT oldevops AWS key file - oldevops.pem which at the time of this document's
+  writing can be accessed from (TBD: I forget and have asaked my team to remind me.)</p>
+<h3>Finding The Right EC2 Instance</h3>
+<ol>
+<li>Log into the AWS console / web UI with your MIT issued credentials.</li>
+<li>Click the service selector (the tightly grouped bunch of white square boxes in the upper left) and choose EC2.</li>
+<li>Now click "Instances (running)"</li>
+<li>You will now see a text box with the prompt "Find instances by attribute..."</li>
+<li>In this box, type 'edxapp-worker-<product>-<environment>' - for instance, for mitxonline production you would type
+   'edxapp-worker-mitxonline-production' and hit enter/return.</environment></product>
+</li>
+<li>You should now see a list of instances named edxapp-worker-mitxonline-production</li>
+<li>You'll need to temporarily add ssh access to the security group for your instance. Right click on the first instance
+   in the list and pick Security, then Change Security Groups. Type 'ssh' into the 'add security groups' text box. You
+   should see a group appropriate to your product, in the case of mitxonline-production I see mitxonline-production-public-ssh.
+   Select that group and click "Add security group" then click the orange Save button at the bottom of the page.</li>
+<li>Now, left click on the first instance in the list which should expand into instance detail. Click the little square within a
+   square Copy icon next to the "Public IPV4 Address".</li>
+</ol>
+<h3>Making The Connection</h3>
+<p>From your laptop, use the oldevops.pem key to ssh to the ubuntu user on the machine whose IP you copied from the previous step.</p>
+<p>So for instance:</p>
+<p><code>ssh -i oldevops.pem ubuntu@34.204.173.109</code></p>
+<p>At this point you should be good to go and should see a prompt that looks something like:</p>
+<p><code>ubuntu@ip-10-22-3-162:~$</code></p>
+    </div>
+    
+
+</article><!--End of body content--><footer id="footer">
+            Contents © 2024         <a href="mailto:ol-devops@mit.edu">MIT Online Learning Platform Engineering</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         
+            
+            
+        </footer>
+</div>
+</div>
+
+
+        <script src="../../assets/js/all-nocdn.js"></script><script>
+    baguetteBox.run('div#content', {
+        ignoreClass: 'islink',
+        captions: function(element){var i=element.getElementsByTagName('img')[0];return i===undefined?'':i.alt;}});
+    </script>
+</body>
+</html>

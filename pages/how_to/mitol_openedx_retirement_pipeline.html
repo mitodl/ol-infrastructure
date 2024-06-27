@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mitol_openedx_retirement_pipeline | Platform Engineering Site</title>
+<link href="../../assets/css/all-nocdn.css" rel="stylesheet" type="text/css">
+<link href="https://fonts.googleapis.com/css?family=Playfair+Display:700,900" rel="stylesheet">
+<meta name="theme-color" content="#5670d4">
+<meta name="generator" content="Nikola (getnikola.com)">
+<link rel="alternate" type="application/rss+xml" title="RSS" hreflang="en" href="../../rss.xml">
+<link rel="canonical" href="https://pe.ol.mit.edu/pages/how_to/mitol_openedx_retirement_pipeline.html">
+<!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="MIT Online Learning Platform Engineering">
+<meta property="og:site_name" content="Platform Engineering Site">
+<meta property="og:title" content="mitol_openedx_retirement_pipeline">
+<meta property="og:url" content="https://pe.ol.mit.edu/pages/how_to/mitol_openedx_retirement_pipeline.html">
+<meta property="og:description" content="Setting Up The Retirement Pipeline For A New MIT OL OpenEdX Application
+Getting Set Up
+First, follow the instructions in the Setting Up User Retirement In The LMS document.
+You'll need to ssh into an ">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2024-06-27T16:57:52-04:00">
+</head>
+<body>
+<a href="#content" class="sr-only sr-only-focusable">Skip to main content</a>
+
+<!-- Header and menu bar -->
+<div class="container">
+      <header class="blog-header py-3"><div class="row nbb-header align-items-center">
+          <div class="col-md-3 col-xs-2 col-sm-2" style="width: auto;">
+            <button class="navbar-toggler navbar-light bg-light nbb-navbar-toggler" type="button" data-toggle="collapse" data-target=".bs-nav-collapsible" aria-controls="bs-navbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse bs-nav-collapsible bootblog4-search-form-holder">
+                
+            </div>
+        </div>
+          <div class="col-md-6 col-xs-10 col-sm-10 bootblog4-brand" style="width: auto;">
+            <a class="navbar-brand blog-header-logo text-dark" href="../../">
+
+            <span id="blog-title">Platform Engineering Site</span>
+        </a>
+          </div>
+            <div class="col-md-3 justify-content-end align-items-center bs-nav-collapsible collapse flex-collapse bootblog4-right-nav">
+            <nav class="navbar navbar-light bg-white"><ul class="navbar-nav bootblog4-right-nav">
+<li class="nav-item">
+    <a href="mitol_openedx_retirement_pipeline.md" id="sourcelink" class="nav-link">Source</a>
+    </li>
+
+
+                    
+            </ul></nav>
+</div>
+    </div>
+</header><nav class="navbar navbar-expand-md navbar-light bg-white static-top"><div class="collapse navbar-collapse bs-nav-collapsible" id="bs-navbar">
+            <ul class="navbar-nav nav-fill d-flex w-100"><li class="nav-item dropdown">
+<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Pages</a>
+            <div class="dropdown-menu">
+                    <a href="../runbooks/" class="dropdown-item">Runbooks</a>
+                    <a href="../discoveries/" class="dropdown-item">Discoveries</a>
+                    <a href="." class="dropdown-item">How To</a>
+                    <a href="../post-mortems/" class="dropdown-item">Post Mortems</a>
+            </div>
+
+                
+            </li></ul>
+</div>
+<!-- /.navbar-collapse -->
+</nav>
+</div>
+
+<div class="container" id="content" role="main">
+    <div class="body-content">
+        <!--Body content-->
+        
+        
+        
+<article class="post-text storypage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="p-name entry-title" itemprop="headline name"><a href="#" class="u-url">mitol_openedx_retirement_pipeline</a></h1>
+
+        
+
+    </header><div class="e-content entry-content" itemprop="articleBody text">
+    <h2>Setting Up The Retirement Pipeline For A New MIT OL OpenEdX Application</h2>
+<h3>Getting Set Up</h3>
+<p>First, follow the instructions in the <a href="https://github.com/openedx/edx-documentation/blob/master/en_us/install_operations/source/configuration/user_retire/service_setup.rst">Setting Up User Retirement In The LMS</a> document.</p>
+<p>You'll need to ssh into an edx-worker for the appropriate environment you're working in.</p>
+<p>Run <code>sudo su - edxapp -s /bin/bash</code> and then <code>source edxapp_env</code> to get to where you need to be to run the Django manage application.</p>
+<p>You can follow the doc verbatim with the exception that:
+* The manage.py executable is located in the edx-platform folder, so you'd start your invocations with <code>python edx-platform/manage.py</code>
+* Ignore the <code>--settings &lt;your settings&gt;</code> option as we already have our settings defined in the LMS configuration.</p>
+<p>Be sure that the retirement tates, user and application creation invocations exit without throwing any fatal errors. ALL these scripts unfortunately
+print a number of warnings, which can be ignored.</p>
+<p>Here's what the output of each section should look approxiately like:</p>
+<h3>Retirement States Creation</h3>
+<div class="code"><pre class="code literal-block"><span class="n">States</span><span class="w"> </span><span class="n">have</span><span class="w"> </span><span class="n">been</span><span class="w"> </span><span class="n">synchronized</span><span class="p">.</span><span class="w"> </span><span class="nl">Differences</span><span class="p">:</span>
+<span class="w">   </span><span class="nl">Added</span><span class="p">:</span><span class="w"> </span><span class="err">{</span><span class="s1">'COMPLETE'</span><span class="p">,</span><span class="w"> </span><span class="s1">'FORUMS_COMPLETE'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ENROLLMENTS_COMPLETE'</span><span class="p">,</span><span class="w"> </span><span class="s1">'RETIRING_LMS_MISC'</span><span class="p">,</span><span class="w"> </span><span class="s1">'RETIRING_LMS'</span><span class="p">,</span><span class="w"> </span><span class="s1">'NOTES_COMPLETE'</span><span class="p">,</span><span class="w"> </span><span class="s1">'RETIRING_ENROLLMENTS'</span><span class="p">,</span><span class="w"> </span><span class="s1">'PENDING'</span><span class="p">,</span><span class="w"> </span><span class="s1">'RETIRING_NOTES'</span><span class="p">,</span><span class="w"> </span><span class="s1">'PROCTORING_COMPLETE'</span><span class="p">,</span><span class="w"> </span><span class="s1">'RETIRING_FORUMS'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ABORTED'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ERRORED'</span><span class="p">,</span><span class="w"> </span><span class="s1">'LMS_MISC_COMPLETE'</span><span class="p">,</span><span class="w"> </span><span class="s1">'RETIRING_PROCTORING'</span><span class="p">,</span><span class="w"> </span><span class="s1">'LMS_COMPLETE'</span><span class="err">}</span>
+<span class="w">   </span><span class="nl">Removed</span><span class="p">:</span><span class="w"> </span><span class="k">set</span><span class="p">()</span>
+<span class="w">   </span><span class="nl">Remaining</span><span class="p">:</span><span class="w"> </span><span class="k">set</span><span class="p">()</span>
+<span class="n">States</span><span class="w"> </span><span class="n">updated</span><span class="w"> </span><span class="n">successfully</span><span class="p">.</span><span class="w"> </span><span class="k">Current</span><span class="w"> </span><span class="nl">states</span><span class="p">:</span>
+<span class="n">PENDING</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+<span class="n">RETIRING_FORUMS</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">11</span><span class="p">)</span>
+<span class="n">FORUMS_COMPLETE</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">21</span><span class="p">)</span>
+<span class="n">RETIRING_ENROLLMENTS</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">31</span><span class="p">)</span>
+<span class="n">ENROLLMENTS_COMPLETE</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">41</span><span class="p">)</span>
+<span class="n">RETIRING_NOTES</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">51</span><span class="p">)</span>
+<span class="n">NOTES_COMPLETE</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">61</span><span class="p">)</span>
+<span class="n">RETIRING_PROCTORING</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">71</span><span class="p">)</span>
+<span class="n">PROCTORING_COMPLETE</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">81</span><span class="p">)</span>
+<span class="n">RETIRING_LMS_MISC</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">91</span><span class="p">)</span>
+<span class="n">LMS_MISC_COMPLETE</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">101</span><span class="p">)</span>
+<span class="n">RETIRING_LMS</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">111</span><span class="p">)</span>
+<span class="n">LMS_COMPLETE</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">121</span><span class="p">)</span>
+<span class="n">ERRORED</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">131</span><span class="p">)</span>
+<span class="n">ABORTED</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">141</span><span class="p">)</span>
+<span class="n">COMPLETE</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="w"> </span><span class="mi">151</span><span class="p">)</span>
+<span class="n">edxapp</span><span class="nv">@ip</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">22</span><span class="o">-</span><span class="mi">2</span><span class="o">-</span><span class="mi">49</span><span class="err">:</span><span class="o">~</span><span class="err">$</span>
+</pre></div>
+
+<h3>Retirement User Creation</h3>
+<div class="code"><pre class="code literal-block"><span class="n">Created</span><span class="w"> </span><span class="n">new</span><span class="w"> </span><span class="n">user</span><span class="o">:</span><span class="w"> </span><span class="s">"retirement_service_worker"</span>
+<span class="n">Setting</span><span class="w"> </span><span class="n">is_staff</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">user</span><span class="w"> </span><span class="s">"retirement_service_worker"</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="s">"True"</span>
+<span class="n">Setting</span><span class="w"> </span><span class="n">is_superuser</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">user</span><span class="w"> </span><span class="s">"retirement_service_worker"</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="s">"True"</span>
+<span class="n">Adding</span><span class="w"> </span><span class="n">user</span><span class="w"> </span><span class="s">"retirement_service_worker"</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">groups</span><span class="w"> </span><span class="p">[]</span>
+<span class="n">Removing</span><span class="w"> </span><span class="n">user</span><span class="w"> </span><span class="s">"retirement_service_worker"</span><span class="w"> </span><span class="n">from</span><span class="w"> </span><span class="n">groups</span><span class="w"> </span><span class="p">[]</span>
+<span class="mi">2023</span><span class="mo">-04</span><span class="mi">-28</span><span class="w"> </span><span class="mi">21</span><span class="o">:</span><span class="mi">10</span><span class="o">:</span><span class="mo">00</span><span class="p">,</span><span class="mi">691</span><span class="w"> </span><span class="n">INFO</span><span class="w"> </span><span class="mi">69935</span><span class="w"> </span><span class="p">[</span><span class="n">common</span><span class="p">.</span><span class="n">djangoapps</span><span class="p">.</span><span class="n">student</span><span class="p">.</span><span class="n">models</span><span class="p">.</span><span class="n">user</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="n">user</span><span class="w"> </span><span class="n">None</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="n">ip</span><span class="w"> </span><span class="n">None</span><span class="p">]</span><span class="w"> </span><span class="n">user</span><span class="p">.</span><span class="n">py</span><span class="o">:</span><span class="mi">782</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">Created</span><span class="w"> </span><span class="n">new</span><span class="w"> </span><span class="n">profile</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">user</span><span class="o">:</span><span class="w"> </span><span class="n">retirement_service_worker</span>
+</pre></div>
+
+<h3>Retirement DOT Application Creation</h3>
+<div class="code"><pre class="code literal-block"><span class="n">None</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="n">ip</span><span class="w"> </span><span class="n">None</span><span class="p">]</span><span class="w"> </span><span class="n">create_dot_application</span><span class="p">.</span><span class="n">py</span><span class="o">:</span><span class="mi">82</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">Created</span><span class="w"> </span><span class="n">retirement</span><span class="w"> </span><span class="n">application</span><span class="w"> </span><span class="n">with</span><span class="w"> </span><span class="kt">id</span><span class="o">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="n">client_id</span><span class="o">:</span><span class="w"> </span><span class="n">XXXXXXXXXXXXXXXXXXXXXXXX</span><span class="p">,</span><span class="w"> </span><span class="n">and</span><span class="w"> </span><span class="n">client_secret</span><span class="o">:</span><span class="w"> </span><span class="n">XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</span>
+</pre></div>
+
+<p>You'll need to save this client_id and secret somewhere because you'll need to use it in the next step!</p>
+<h3>We Keep Secrets In The Vault, Duh :)</h3>
+<p>Next, we'll need to make these secrets accessible to the pipeline so they can be consumed by the various retirement worker scripts.</p>
+<p>In order to do that, we'll use a utility called <a href="https://github.com/mozilla/sops">sops</a> to encrypt the secrets so we can safely store them in Github and conveyed to Vault.</p>
+<p>Unfortunately setting yourself up to use sops is a bit of a process in and of itself and it outside the scope of this document.</p>
+<p>Once you've got sops squared away, use it on the appropriate operational configuration file. Here's the one for <a href="https://github.com/mitodl/ol-infrastructure/blob/main/src/bridge/secrets/concourse/operations.qa.yaml">QA</a>.</p>
+<p>So you'd invoke: <code>sops operations.qa.yml</code>. At that point, sops will decrypt the file and open your editor of choice with its contents.</p>
+<p>Now, we want to add the necessary secrets we copied in the previous step, as well as the LMS host for this environment. You can find the
+LMS hosts for the various environments listed in the <a href="https://github.mit.edu/odl-engineering/project-status/wiki/App-Links">App Links</a> Wiki page.</p>
+<p>If you're unsure, ask an old hand for help. Disambiguating the various environments can be tricky, and better safe than sorry!</p>
+<p>Here's an example of what I added for mitxonline qa:</p>
+<div class="code"><pre class="code literal-block">  mitxonline/tubular_oauth_client:
+    id: CLIENTIDUNENCRYPTEDSECRETSAREFUNYESTHEYARE
+    secret: EVENMORESLIGHTLYLONGERGIBBERISHTHATISYOURUNENCRYPTEDSECRET
+    host: https://courses-qa.mitxonline.mit.edu
+</pre></div>
+
+<p>Once you've made your additions, save the file and quit your editor. sops will now do its magic and re-encrypt those values.</p>
+<p><strong>BE SURE NOT TO COMMIT UNENDCRYPTED SECRETS TO GITHUB</strong>.</p>
+<p>Now create a pull request and get these changes merged. If this is for production, you'll also need to kick off <a href="https://cicd.odl.mit.edu/teams/infrastructure/pipelines/packer-pulumi-concourse">this pipeline</a> manually.</p>
+<p>At this point, your secrets should be in vault and available to the pipeline we're about to build.</p>
+<h3>START THE RUBE GOLDBERG DEVICE! Building The Pipeline Itself</h3>
+<p>In order to get this done, you'll need to have the <a href="https://concourse-ci.org/">Concourse</a> <code>fly</code> CLI command installed and an appropriate target for your
+Concourse server and team defined.</p>
+<p>I like to keep my target names reasonably short, so for the target I created for mitxonline QA, I ran:</p>
+<p><code>fly login --target mo-qa --team-name=mitxonline --concourse-url https://cicd-qa.odl.mit.edu</code></p>
+<p>Once we have a suitable target defined, we can use it to actually create our pipeline for real:</p>
+<ul>
+<li>From a checked out mitodl/ol-infrastructure repository, change directory to the <code>src/ol_concourse/pipelines/open_edx/tubular</code> folder.</li>
+<li>Run <code>poetry run python tubular.py</code> - This should print a reasonable looking blob of JSON to the screen with a fly command to run at the bottom.</li>
+<li>Go ahead and run that command! For example, given the mo-qa target I defined above, I ran: <code>fly -t mo-qa sp -p misc-cloud-tubular -c definition.json</code>.</li>
+<li>At this point fly should show you the pipeline definition and will ask you if you want to actually make the change. Answer yes.</li>
+<li>Assuming there were no errors, your pipeline definition should be in place and we're ready to get the ball rolling!</li>
+<li>You can either use the fly unpause-pipeline or else, in the Concourse web UI, click the little Play icon at the very top right of the screen. <!-- TODO add screenshot -->
+</li>
+<li>The build is set to run once a week, so once you unpause the pipeline, you may noeed to click the + icon in order to actually kick off a build.</li>
+</ul>
+<p>That's it! Obviously keep an eye out on the pipeline for any failures.</p>
+    </div>
+    
+
+</article><!--End of body content--><footer id="footer">
+            Contents © 2024         <a href="mailto:ol-devops@mit.edu">MIT Online Learning Platform Engineering</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         
+            
+            
+        </footer>
+</div>
+</div>
+
+
+        <script src="../../assets/js/all-nocdn.js"></script><script>
+    baguetteBox.run('div#content', {
+        ignoreClass: 'islink',
+        captions: function(element){var i=element.getElementsByTagName('img')[0];return i===undefined?'':i.alt;}});
+    </script>
+</body>
+</html>

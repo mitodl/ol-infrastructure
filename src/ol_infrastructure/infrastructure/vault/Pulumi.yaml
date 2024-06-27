@@ -1,7 +1,0 @@
----
-name: ol-infrastructure-vault-server
-runtime: python
-description: Manage deployment of a Vault server cluster using autoscale groups and
-  AWS KMS auto-unseal
-backend:
-  url: s3://mitol-pulumi-state/

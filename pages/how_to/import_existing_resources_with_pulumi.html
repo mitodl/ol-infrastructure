@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>import_existing_resources_with_pulumi | Platform Engineering Site</title>
+<link href="../../assets/css/all-nocdn.css" rel="stylesheet" type="text/css">
+<link href="https://fonts.googleapis.com/css?family=Playfair+Display:700,900" rel="stylesheet">
+<meta name="theme-color" content="#5670d4">
+<meta name="generator" content="Nikola (getnikola.com)">
+<link rel="alternate" type="application/rss+xml" title="RSS" hreflang="en" href="../../rss.xml">
+<link rel="canonical" href="https://pe.ol.mit.edu/pages/how_to/import_existing_resources_with_pulumi.html">
+<!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="MIT Online Learning Platform Engineering">
+<meta property="og:site_name" content="Platform Engineering Site">
+<meta property="og:title" content="import_existing_resources_with_pulumi">
+<meta property="og:url" content="https://pe.ol.mit.edu/pages/how_to/import_existing_resources_with_pulumi.html">
+<meta property="og:description" content="Importing Resources That Already Exist Into Your Pulumi Stack
+Summary
+There are several ways to skin this particular cat but Tobias has shown me one
+that works really well so that's what we'll outline">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2024-06-27T16:57:52-04:00">
+</head>
+<body>
+<a href="#content" class="sr-only sr-only-focusable">Skip to main content</a>
+
+<!-- Header and menu bar -->
+<div class="container">
+      <header class="blog-header py-3"><div class="row nbb-header align-items-center">
+          <div class="col-md-3 col-xs-2 col-sm-2" style="width: auto;">
+            <button class="navbar-toggler navbar-light bg-light nbb-navbar-toggler" type="button" data-toggle="collapse" data-target=".bs-nav-collapsible" aria-controls="bs-navbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse bs-nav-collapsible bootblog4-search-form-holder">
+                
+            </div>
+        </div>
+          <div class="col-md-6 col-xs-10 col-sm-10 bootblog4-brand" style="width: auto;">
+            <a class="navbar-brand blog-header-logo text-dark" href="../../">
+
+            <span id="blog-title">Platform Engineering Site</span>
+        </a>
+          </div>
+            <div class="col-md-3 justify-content-end align-items-center bs-nav-collapsible collapse flex-collapse bootblog4-right-nav">
+            <nav class="navbar navbar-light bg-white"><ul class="navbar-nav bootblog4-right-nav">
+<li class="nav-item">
+    <a href="import_existing_resources_with_pulumi.md" id="sourcelink" class="nav-link">Source</a>
+    </li>
+
+
+                    
+            </ul></nav>
+</div>
+    </div>
+</header><nav class="navbar navbar-expand-md navbar-light bg-white static-top"><div class="collapse navbar-collapse bs-nav-collapsible" id="bs-navbar">
+            <ul class="navbar-nav nav-fill d-flex w-100"><li class="nav-item dropdown">
+<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Pages</a>
+            <div class="dropdown-menu">
+                    <a href="../runbooks/" class="dropdown-item">Runbooks</a>
+                    <a href="../discoveries/" class="dropdown-item">Discoveries</a>
+                    <a href="." class="dropdown-item">How To</a>
+                    <a href="../post-mortems/" class="dropdown-item">Post Mortems</a>
+            </div>
+
+                
+            </li></ul>
+</div>
+<!-- /.navbar-collapse -->
+</nav>
+</div>
+
+<div class="container" id="content" role="main">
+    <div class="body-content">
+        <!--Body content-->
+        
+        
+        
+<article class="post-text storypage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="p-name entry-title" itemprop="headline name"><a href="#" class="u-url">import_existing_resources_with_pulumi</a></h1>
+
+        
+
+    </header><div class="e-content entry-content" itemprop="articleBody text">
+    <h2>Importing Resources That Already Exist Into Your Pulumi Stack</h2>
+<h3>Summary</h3>
+<p>There are several ways to skin this particular cat but Tobias has shown me one
+that works really well so that's what we'll outline here.</p>
+<p>There's another approach using the <a href="https://www.pulumi.com/docs/cli/commands/pulumi_import/">pulumi import CLI command</a>
+but in my experience that brings in a bunch of extra attributes we don't want.
+(There may be ways to tune this, I just don't know them.)</p>
+<h3>Whole Cloth</h3>
+<p>Before you start importing, code your resources the same way you always would.</p>
+<p>For example, if you need an S3 bucket, use all the usual Pulumi code -
+s3.Bucket etc.</p>
+<p>You want to code such that in a disaster recovery scenario, if we were staring from
+scratch, the resources would get build 100% correctly and the applications they
+support would pass all monitoring checks and smoke tests and function normally.</p>
+<h3>Bring On The Special (Import) Sauce</h3>
+<p>If you know you want to keep existing resources while having Pulumi create the
+rest, you should tell it to import these resources by passing in a
+ResourceOptions object at resource creation time. Here's an example of our S3
+bucket:</p>
+<div class="code"><pre class="code literal-block"><span class="n">bootcamps_storage_bucket_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"ol-bootcamps-app-</span><span class="si">{</span><span class="n">stack_info</span><span class="o">.</span><span class="n">env_suffix</span><span class="si">}</span><span class="s2">"</span>
+<span class="n">bootcamps_storage_bucket</span> <span class="o">=</span> <span class="n">s3</span><span class="o">.</span><span class="n">Bucket</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">"ol-bootcamps-app-</span><span class="si">{</span><span class="n">stack_info</span><span class="o">.</span><span class="n">env_suffix</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+    <span class="c1">### ****THIS LINE IS THE IMPORT CLAUSE****</span>
+    <span class="n">opts</span><span class="o">=</span><span class="n">ResourceOptions</span><span class="p">(</span><span class="n">import_</span><span class="o">=</span><span class="n">bootcamps_storage_bucket_name</span><span class="p">,</span><span class="n">ignore_changes</span><span class="o">=</span><span class="p">[]),</span>
+    <span class="n">bucket</span><span class="o">=</span><span class="n">bootcamps_storage_bucket_name</span><span class="p">,</span>
+    <span class="c1"># ...</span>
+</pre></div>
+
+<p>Note that obviously the object you're creating will differ if it's not an S3 bucket,
+for example a Vault mount point.</p>
+<h3>Tuning</h3>
+<p>After having added the above code, go ahead and run pulumi up on your stack. At this
+stage DO NOT SAY YES to finalizing these changes if there are any diagnostic warnigns
+displayed.</p>
+<p>Here's an example of something like what we'd expect:</p>
+<div class="code"><pre class="code literal-block"><span class="err">#</span><span class="w"> </span><span class="nx">cpatti</span><span class="w"> </span><span class="err">@</span><span class="w"> </span><span class="nx">rocinante</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="o">~/</span><span class="nx">src</span><span class="o">/</span><span class="nx">mit</span><span class="o">/</span><span class="nx">ol</span><span class="o">-</span><span class="nx">infrastructure</span><span class="o">/</span><span class="nx">src</span><span class="o">/</span><span class="nx">ol_infrastructure</span><span class="o">/</span><span class="nx">applications</span><span class="o">/</span><span class="nx">bootcamps</span><span class="w"> </span><span class="nx">on</span><span class="w"> </span><span class="nx">git</span><span class="p">:</span><span class="nx">cpatti_pulumi_bootcamp</span><span class="w"> </span><span class="nx">x</span><span class="w"> </span><span class="nx">ol</span><span class="o">-</span><span class="nx">infrastructure</span><span class="o">-</span><span class="nx">yqmQEgvq</span><span class="o">-</span><span class="nx">py3</span><span class="m m-Double">.11</span><span class="w"> </span><span class="p">[</span><span class="mi">14</span><span class="p">:</span><span class="mi">31</span><span class="p">:</span><span class="mi">28</span><span class="p">]</span>
+<span class="err">$</span><span class="w"> </span><span class="nx">pulumi</span><span class="w"> </span><span class="nx">up</span><span class="w">  </span><span class="o">-</span><span class="nx">s</span><span class="w"> </span><span class="nx">applications</span><span class="p">.</span><span class="nx">bootcamps_ecommerce</span><span class="p">.</span><span class="nx">Production</span>
+<span class="nx">Previewing</span><span class="w"> </span><span class="nx">update</span><span class="w"> </span><span class="p">(</span><span class="nx">applications</span><span class="p">.</span><span class="nx">bootcamps_ecommerce</span><span class="p">.</span><span class="nx">Production</span><span class="p">):</span>
+<span class="w">     </span><span class="nx">Type</span><span class="w">                                                      </span><span class="nx">Name</span><span class="w">                                                                                           </span><span class="nx">Plan</span><span class="w">       </span><span class="nx">Info</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="nx">pulumi</span><span class="p">:</span><span class="nx">pulumi</span><span class="p">:</span><span class="nx">Stack</span><span class="w">                                       </span><span class="nx">ol</span><span class="o">-</span><span class="nx">infrastructure</span><span class="o">-</span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">ecommerce</span><span class="o">-</span><span class="nx">application</span><span class="o">-</span><span class="nx">applications</span><span class="p">.</span><span class="nx">bootcamps_ecommerce</span><span class="p">.</span><span class="nx">Production</span><span class="w">  </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">├─</span><span class="w"> </span><span class="nx">ol</span><span class="p">:</span><span class="nx">infrastructure</span><span class="p">:</span><span class="nx">aws</span><span class="p">:</span><span class="nx">database</span><span class="p">:</span><span class="nx">OLAmazonDB</span><span class="w">              </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="w">                                                           </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">  </span><span class="err">├─</span><span class="w"> </span><span class="nx">aws</span><span class="p">:</span><span class="nx">rds</span><span class="p">:</span><span class="nx">ParameterGroup</span><span class="w">                              </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">postgres</span><span class="o">-</span><span class="nx">parameter</span><span class="o">-</span><span class="nx">group</span><span class="w">                                  </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">  </span><span class="err">├─</span><span class="w"> </span><span class="nx">aws</span><span class="p">:</span><span class="nx">rds</span><span class="p">:</span><span class="nx">Instance</span><span class="w">                                    </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">postgres</span><span class="o">-</span><span class="nx">instance</span><span class="w">                                         </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">  </span><span class="err">└─</span><span class="w"> </span><span class="nx">aws</span><span class="p">:</span><span class="nx">rds</span><span class="p">:</span><span class="nx">Instance</span><span class="w">                                    </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">postgres</span><span class="o">-</span><span class="nx">replica</span><span class="w">                                          </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">├─</span><span class="w"> </span><span class="nx">ol</span><span class="p">:</span><span class="nx">infrastructure</span><span class="p">.</span><span class="nx">aws</span><span class="p">.</span><span class="nx">cloudwatch</span><span class="p">.</span><span class="nx">OLCloudWatchAlarmRDS</span><span class="w">  </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">CPUUtilization</span><span class="o">-</span><span class="nx">OLCloudWatchAlarmSimpleRDSConfig</span><span class="w">           </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">  </span><span class="err">└─</span><span class="w"> </span><span class="nx">aws</span><span class="p">:</span><span class="nx">cloudwatch</span><span class="p">:</span><span class="nx">MetricAlarm</span><span class="w">                          </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">CPUUtilization</span><span class="o">-</span><span class="nx">simple</span><span class="o">-</span><span class="nx">rds</span><span class="o">-</span><span class="nx">alarm</span><span class="w">                           </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">├─</span><span class="w"> </span><span class="nx">ol</span><span class="p">:</span><span class="nx">infrastructure</span><span class="p">.</span><span class="nx">aws</span><span class="p">.</span><span class="nx">cloudwatch</span><span class="p">.</span><span class="nx">OLCloudWatchAlarmRDS</span><span class="w">  </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">WriteLatency</span><span class="o">-</span><span class="nx">OLCloudWatchAlarmSimpleRDSConfig</span><span class="w">             </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">  </span><span class="err">└─</span><span class="w"> </span><span class="nx">aws</span><span class="p">:</span><span class="nx">cloudwatch</span><span class="p">:</span><span class="nx">MetricAlarm</span><span class="w">                          </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">WriteLatency</span><span class="o">-</span><span class="nx">simple</span><span class="o">-</span><span class="nx">rds</span><span class="o">-</span><span class="nx">alarm</span><span class="w">                             </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">├─</span><span class="w"> </span><span class="nx">ol</span><span class="p">:</span><span class="nx">infrastructure</span><span class="p">.</span><span class="nx">aws</span><span class="p">.</span><span class="nx">cloudwatch</span><span class="p">.</span><span class="nx">OLCloudWatchAlarmRDS</span><span class="w">  </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">FreeStorageSpace</span><span class="o">-</span><span class="nx">OLCloudWatchAlarmSimpleRDSConfig</span><span class="w">         </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">  </span><span class="err">└─</span><span class="w"> </span><span class="nx">aws</span><span class="p">:</span><span class="nx">cloudwatch</span><span class="p">:</span><span class="nx">MetricAlarm</span><span class="w">                          </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">FreeStorageSpace</span><span class="o">-</span><span class="nx">simple</span><span class="o">-</span><span class="nx">rds</span><span class="o">-</span><span class="nx">alarm</span><span class="w">                         </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">├─</span><span class="w"> </span><span class="nx">ol</span><span class="p">:</span><span class="nx">infrastructure</span><span class="p">.</span><span class="nx">aws</span><span class="p">.</span><span class="nx">cloudwatch</span><span class="p">.</span><span class="nx">OLCloudWatchAlarmRDS</span><span class="w">  </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">EBSIOBlance</span><span class="o">-</span><span class="nx">OLCloudWatchAlarmSimpleRDSConfig</span><span class="w">              </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">  </span><span class="err">└─</span><span class="w"> </span><span class="nx">aws</span><span class="p">:</span><span class="nx">cloudwatch</span><span class="p">:</span><span class="nx">MetricAlarm</span><span class="w">                          </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">EBSIOBalance</span><span class="o">%-</span><span class="nx">simple</span><span class="o">-</span><span class="nx">rds</span><span class="o">-</span><span class="nx">alarm</span><span class="w">                            </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">├─</span><span class="w"> </span><span class="nx">ol</span><span class="p">:</span><span class="nx">infrastructure</span><span class="p">.</span><span class="nx">aws</span><span class="p">.</span><span class="nx">cloudwatch</span><span class="p">.</span><span class="nx">OLCloudWatchAlarmRDS</span><span class="w">  </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">DiskQueueDepth</span><span class="o">-</span><span class="nx">OLCloudWatchAlarmSimpleRDSConfig</span><span class="w">           </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">  </span><span class="err">└─</span><span class="w"> </span><span class="nx">aws</span><span class="p">:</span><span class="nx">cloudwatch</span><span class="p">:</span><span class="nx">MetricAlarm</span><span class="w">                          </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">DiskQueueDepth</span><span class="o">-</span><span class="nx">simple</span><span class="o">-</span><span class="nx">rds</span><span class="o">-</span><span class="nx">alarm</span><span class="w">                           </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">├─</span><span class="w"> </span><span class="nx">ol</span><span class="p">:</span><span class="nx">infrastructure</span><span class="p">.</span><span class="nx">aws</span><span class="p">.</span><span class="nx">cloudwatch</span><span class="p">.</span><span class="nx">OLCloudWatchAlarmRDS</span><span class="w">  </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">ReadLatency</span><span class="o">-</span><span class="nx">OLCloudWatchAlarmSimpleRDSConfig</span><span class="w">              </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">  </span><span class="err">└─</span><span class="w"> </span><span class="nx">aws</span><span class="p">:</span><span class="nx">cloudwatch</span><span class="p">:</span><span class="nx">MetricAlarm</span><span class="w">                          </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">applications</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">ReadLatency</span><span class="o">-</span><span class="nx">simple</span><span class="o">-</span><span class="nx">rds</span><span class="o">-</span><span class="nx">alarm</span><span class="w">                              </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">├─</span><span class="w"> </span><span class="nx">ol</span><span class="p">:</span><span class="nx">services</span><span class="p">:</span><span class="nx">Vault</span><span class="p">:</span><span class="nx">DatabaseBackend</span><span class="p">:</span><span class="nx">postgresql</span><span class="w">           </span><span class="nx">bootcamps</span><span class="w">                                                                                      </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">  </span><span class="err">└─</span><span class="w"> </span><span class="nx">vault</span><span class="p">:</span><span class="nx">index</span><span class="p">:</span><span class="nx">Mount</span><span class="w">                                   </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">mount</span><span class="o">-</span><span class="nx">point</span><span class="w">                                                                          </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">     </span><span class="err">└─</span><span class="w"> </span><span class="nx">vault</span><span class="p">:</span><span class="nx">database</span><span class="p">:</span><span class="nx">SecretBackendConnection</span><span class="w">           </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">database</span><span class="o">-</span><span class="nx">connection</span><span class="w">                                                                  </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">        </span><span class="err">├─</span><span class="w"> </span><span class="nx">vault</span><span class="p">:</span><span class="nx">database</span><span class="p">:</span><span class="nx">SecretBackendRole</span><span class="w">              </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">database</span><span class="o">-</span><span class="nx">role</span><span class="o">-</span><span class="nx">approle</span><span class="w">                                                                </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">        </span><span class="err">├─</span><span class="w"> </span><span class="nx">vault</span><span class="p">:</span><span class="nx">database</span><span class="p">:</span><span class="nx">SecretBackendRole</span><span class="w">              </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">database</span><span class="o">-</span><span class="nx">role</span><span class="o">-</span><span class="nx">admin</span><span class="w">                                                                  </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">        </span><span class="err">├─</span><span class="w"> </span><span class="nx">vault</span><span class="p">:</span><span class="nx">database</span><span class="p">:</span><span class="nx">SecretBackendRole</span><span class="w">              </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">database</span><span class="o">-</span><span class="nx">role</span><span class="o">-</span><span class="nx">readonly</span><span class="w">                                                               </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">│</span><span class="w">        </span><span class="err">└─</span><span class="w"> </span><span class="nx">vault</span><span class="p">:</span><span class="nx">database</span><span class="p">:</span><span class="nx">SecretBackendRole</span><span class="w">              </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">database</span><span class="o">-</span><span class="nx">role</span><span class="o">-</span><span class="nx">app</span><span class="w">                                                                    </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">├─</span><span class="w"> </span><span class="nx">pulumi</span><span class="p">:</span><span class="nx">providers</span><span class="p">:</span><span class="nx">vault</span><span class="w">                                 </span><span class="nx">vault</span><span class="o">-</span><span class="nx">provider</span><span class="w">                                                                                 </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">├─</span><span class="w"> </span><span class="nx">aws</span><span class="p">:</span><span class="nx">iam</span><span class="p">:</span><span class="nx">Policy</span><span class="w">                                         </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">production</span><span class="o">-</span><span class="nx">policy</span><span class="w">                                                                    </span><span class="nx">create</span>
+<span class="w"> </span><span class="p">=</span><span class="w">   </span><span class="err">├─</span><span class="w"> </span><span class="nx">aws</span><span class="p">:</span><span class="nx">s3</span><span class="p">:</span><span class="nx">Bucket</span><span class="w">                                          </span><span class="nx">ol</span><span class="o">-</span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">app</span><span class="o">-</span><span class="nx">production</span><span class="w">                                                                    </span><span class="kn">import</span><span class="w">     </span><span class="p">[</span><span class="nx">diff</span><span class="p">:</span><span class="w"> </span><span class="o">-</span><span class="nx">tagsAll</span><span class="o">~</span><span class="nx">tags</span><span class="p">];</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="nx">warning</span>
+<span class="w"> </span><span class="p">=</span><span class="w">   </span><span class="err">├─</span><span class="w"> </span><span class="nx">vault</span><span class="p">:</span><span class="nx">index</span><span class="p">:</span><span class="nx">Mount</span><span class="w">                                      </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">vault</span><span class="o">-</span><span class="nx">secrets</span><span class="o">-</span><span class="nx">storage</span><span class="w">                                                                </span><span class="kn">import</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">├─</span><span class="w"> </span><span class="nx">aws</span><span class="p">:</span><span class="nx">ec2</span><span class="p">:</span><span class="nx">SecurityGroup</span><span class="w">                                  </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">db</span><span class="o">-</span><span class="nx">access</span><span class="o">-</span><span class="nx">production</span><span class="w">                                                                 </span><span class="nx">create</span>
+<span class="w"> </span><span class="o">+</span><span class="w">   </span><span class="err">└─</span><span class="w"> </span><span class="nx">vault</span><span class="p">:</span><span class="nx">aws</span><span class="p">:</span><span class="nx">SecretBackendRole</span><span class="w">                            </span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">app</span><span class="o">-</span><span class="nx">production</span><span class="w">                                                                       </span><span class="nx">create</span>
+
+
+<span class="nx">Diagnostics</span><span class="p">:</span>
+<span class="w">  </span><span class="nx">aws</span><span class="p">:</span><span class="nx">s3</span><span class="p">:</span><span class="nx">Bucket</span><span class="w"> </span><span class="p">(</span><span class="nx">ol</span><span class="o">-</span><span class="nx">bootcamps</span><span class="o">-</span><span class="nx">app</span><span class="o">-</span><span class="nx">production</span><span class="p">):</span>
+<span class="w">    </span><span class="nx">warning</span><span class="p">:</span><span class="w"> </span><span class="nx">inputs</span><span class="w"> </span><span class="nx">to</span><span class="w"> </span><span class="kn">import</span><span class="w"> </span><span class="nx">do</span><span class="w"> </span><span class="k">not</span><span class="w"> </span><span class="k">match</span><span class="w"> </span><span class="nx">the</span><span class="w"> </span><span class="nx">existing</span><span class="w"> </span><span class="nx">resource</span><span class="p">;</span><span class="w"> </span><span class="nx">importing</span><span class="w"> </span><span class="nx">this</span><span class="w"> </span><span class="nx">resource</span><span class="w"> </span><span class="nx">will</span><span class="w"> </span><span class="nx">fail</span>
+
+<span class="nx">Outputs</span><span class="p">:</span>
+<span class="w">    </span><span class="nx">bootcamps_app</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">rds_host</span><span class="p">:</span><span class="w"> </span><span class="nx">output</span><span class="p">&lt;</span><span class="kt">string</span><span class="p">&gt;</span>
+<span class="w">    </span><span class="p">}</span>
+</pre></div>
+
+<p>The two key bits of output to focus on here are the diagnostic warning towards the end:</p>
+<div class="code"><pre class="code literal-block"><span class="n">Diagnostics</span><span class="p">:</span>
+<span class="w">  </span><span class="n">aws</span><span class="p">:</span><span class="n">s3</span><span class="p">:</span><span class="n">Bucket</span><span class="w"> </span><span class="p">(</span><span class="n">ol</span><span class="o">-</span><span class="n">bootcamps</span><span class="o">-</span><span class="n">app</span><span class="o">-</span><span class="n">production</span><span class="p">):</span>
+<span class="w">    </span><span class="n">warning</span><span class="p">:</span><span class="w"> </span><span class="n">inputs</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="kn">import</span><span class="w"> </span><span class="nn">do</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="n">match</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">existing</span><span class="w"> </span><span class="n">resource</span><span class="p">;</span><span class="w"> </span><span class="n">importing</span><span class="w"> </span><span class="n">this</span><span class="w"> </span><span class="n">resource</span><span class="w"> </span><span class="n">will</span><span class="w"> </span><span class="n">fail</span>
+</pre></div>
+
+<p>This tells us that Pulumi has detected a critical difference between the
+resource's state in the real world and Pulumi's model of what's there and
+what needs to change to arrive at the desired state.</p>
+<p>The next most important bit is nestled amongst Pulumi telling us what changes it plans to make:</p>
+<p><code>=   ├─ aws:s3:Bucket                                          ol-bootcamps-app-production                                                                    import     [diff: -tagsAll~tags]; 1 warning</code></p>
+<p>This tells us that an attribute, in this case the tags that we're specifying the
+S3 bucket should have in our Pulumi source disagrees with what's actually
+sitting out there on EC2.</p>
+<p>In order to fix this discrepancy, we go back to our ResourceOptions line we added,
+adding the tags attribute into it to tell Pulumi to leave the current tags alone
+and not complain that they differ:</p>
+<p><code>opts=ResourceOptions(import_=bootcamps_storage_bucket_name,ignore_changes=["policy","tags"]),</code></p>
+<p>You'll also note that "policy" is in that attributes list. That's needed because
+Pulumi signalled a mismatch on a previous run.</p>
+<p>After these additions, your pulumi up should succeed and all the resources should be
+created with no further warnings.</p>
+<h3>Cleaning Up</h3>
+<p>After you've successfully built your environment with Pulumi and imported the
+existing resources, you'll want to remove all those ResourceOptions lines
+from your Pulumi model source as the import should only be done once.</p>
+    </div>
+    
+
+</article><!--End of body content--><footer id="footer">
+            Contents © 2024         <a href="mailto:ol-devops@mit.edu">MIT Online Learning Platform Engineering</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         
+            
+            
+        </footer>
+</div>
+</div>
+
+
+        <script src="../../assets/js/all-nocdn.js"></script><script>
+    baguetteBox.run('div#content', {
+        ignoreClass: 'islink',
+        captions: function(element){var i=element.getElementsByTagName('img')[0];return i===undefined?'':i.alt;}});
+    </script>
+</body>
+</html>

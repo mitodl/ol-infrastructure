@@ -1,6 +1,0 @@
----
-name: ol-infrastructure-monitoring
-runtime: python
-description: Manage various resources needed by for monitoring activities
-backend:
-  url: s3://mitol-pulumi-state/

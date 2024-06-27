@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>retire_an_openedx_user | Platform Engineering Site</title>
+<link href="../../assets/css/all-nocdn.css" rel="stylesheet" type="text/css">
+<link href="https://fonts.googleapis.com/css?family=Playfair+Display:700,900" rel="stylesheet">
+<meta name="theme-color" content="#5670d4">
+<meta name="generator" content="Nikola (getnikola.com)">
+<link rel="alternate" type="application/rss+xml" title="RSS" hreflang="en" href="../../rss.xml">
+<link rel="canonical" href="https://pe.ol.mit.edu/pages/how_to/retire_an_openedx_user.html">
+<!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="MIT Online Learning Platform Engineering">
+<meta property="og:site_name" content="Platform Engineering Site">
+<meta property="og:title" content="retire_an_openedx_user">
+<meta property="og:url" content="https://pe.ol.mit.edu/pages/how_to/retire_an_openedx_user.html">
+<meta property="og:description" content="How To Retire An MIT Online Learning OpenEdX User
+Pre-Requisites
+
+You'll need the email address the user registered under. e.g. cpatti@mit.edu
+You'll need the pre-requisites defined in How To Access A">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2024-06-27T16:57:52-04:00">
+</head>
+<body>
+<a href="#content" class="sr-only sr-only-focusable">Skip to main content</a>
+
+<!-- Header and menu bar -->
+<div class="container">
+      <header class="blog-header py-3"><div class="row nbb-header align-items-center">
+          <div class="col-md-3 col-xs-2 col-sm-2" style="width: auto;">
+            <button class="navbar-toggler navbar-light bg-light nbb-navbar-toggler" type="button" data-toggle="collapse" data-target=".bs-nav-collapsible" aria-controls="bs-navbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse bs-nav-collapsible bootblog4-search-form-holder">
+                
+            </div>
+        </div>
+          <div class="col-md-6 col-xs-10 col-sm-10 bootblog4-brand" style="width: auto;">
+            <a class="navbar-brand blog-header-logo text-dark" href="../../">
+
+            <span id="blog-title">Platform Engineering Site</span>
+        </a>
+          </div>
+            <div class="col-md-3 justify-content-end align-items-center bs-nav-collapsible collapse flex-collapse bootblog4-right-nav">
+            <nav class="navbar navbar-light bg-white"><ul class="navbar-nav bootblog4-right-nav">
+<li class="nav-item">
+    <a href="retire_an_openedx_user.md" id="sourcelink" class="nav-link">Source</a>
+    </li>
+
+
+                    
+            </ul></nav>
+</div>
+    </div>
+</header><nav class="navbar navbar-expand-md navbar-light bg-white static-top"><div class="collapse navbar-collapse bs-nav-collapsible" id="bs-navbar">
+            <ul class="navbar-nav nav-fill d-flex w-100"><li class="nav-item dropdown">
+<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Pages</a>
+            <div class="dropdown-menu">
+                    <a href="../runbooks/" class="dropdown-item">Runbooks</a>
+                    <a href="../discoveries/" class="dropdown-item">Discoveries</a>
+                    <a href="." class="dropdown-item">How To</a>
+                    <a href="../post-mortems/" class="dropdown-item">Post Mortems</a>
+            </div>
+
+                
+            </li></ul>
+</div>
+<!-- /.navbar-collapse -->
+</nav>
+</div>
+
+<div class="container" id="content" role="main">
+    <div class="body-content">
+        <!--Body content-->
+        
+        
+        
+<article class="post-text storypage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="p-name entry-title" itemprop="headline name"><a href="#" class="u-url">retire_an_openedx_user</a></h1>
+
+        
+
+    </header><div class="e-content entry-content" itemprop="articleBody text">
+    <h2>How To Retire An MIT Online Learning OpenEdX User</h2>
+<h3>Pre-Requisites</h3>
+<ul>
+<li>You'll need the email address the user registered under. e.g. cpatti@mit.edu</li>
+<li>You'll need the pre-requisites defined in <a href="https://github.com/mitodl/ol-infrastructure/blob/main/docs/how_to/access_openedx_djange_manage.md">How To Access An MIT OL OpenEdX Django Admin manage.py</a>.</li>
+</ul>
+<h3>Look Up This User's username</h3>
+<p>You'll need to have Django admin and superuser access to the product you're looking to retire users for.</p>
+<p>Anyone who has the requisite access already can help. pdpinch@ and the Devops team are good folks to ask.</p>
+<p>Next, you'll need to login to the admin web UI for the application we'll be working with. You can find that
+URL from the <a href="https://github.mit.edu/odl-engineering/project-status/wiki/App-Links">Application Links Page</a>.</p>
+<p>Find the product in question (e.g. mitxonline) and choose the LMS url for the environment you want (e.g. production) as a base.
+Then add /admin on to the end. Ensure there's only one slash before /admin or things will go awry.</p>
+<p>In our case, since we are looking to retire users from mitxonline, we'll use https://courses.mitxonline.mit.edu/admin</p>
+<p>Find the Users link on that page, click it. Now type the email address into the search box and click Search.</p>
+<p>This should yield the user's username. Copy that off into a safe place as we'll need it for the next section.</p>
+<h3>Get Yourself Connected</h3>
+<p>First, follow the step by step instructions defined in <a href="https://github.com/mitodl/ol-infrastructure/blob/main/docs/how_to/access_openedx_djange_manage.md">How To Access An MIT OL OpenEdX Django Admin manage.py</a>.</p>
+<p>This will land you at a shell prompt of the OpenEdX worker for the product in question.</p>
+<p>It should look something like:</p>
+<p><code>ubuntu@ip-10-22-3-162:~$</code></p>
+<h3>Prepare Your Environment</h3>
+<p>Next you'll need to prepare your UNIX shell's environment to be able to run the manage.py command.</p>
+<p>Type: <code>sudo su - edxapp -s /bin/bash</code></p>
+<p>Then type <code>source edxapp_env</code>.</p>
+<p>At this point you should be ready to run the user retirement command.</p>
+<h3>Get To The Retiring Already!</h3>
+<h4>The Invocation</h4>
+<p>Here's the command you'll use to retire a user.</p>
+<p><code>python edx-platform/manage.py lms retire_user --user_email &lt;user email&gt; --username '&lt;username&gt;'</code></p>
+<p>The single quotes around username are important in case there are any spaces in there. Otherwise the shell will mis-parse the command and throw an error.</p>
+<p>So for example if I wanted to retire myself from mitxonline production, I'd use:</p>
+<p><code>python edx-platform/manage.py lms retire_user --user_email cpatti@mit.edu --username 'ChrisPatti'</code></p>
+<p>You should see a bunch of very voluminous output. Most of it is honestly garbage for our purposes. We'll focus on the bits we care about at the end:</p>
+<p><code>2023-06-21 16:07:20,714 INFO 186970 [openedx.core.djangoapps.user_api.management.commands.retire_user] [user None] [ip None] retire_user.py:173 - User succesfully moved to the retirment pipeline</code></p>
+<p>The None here isn't anything to worry about. It's the system trying to prevent us from leaking PII (personally identifiable information) into the logs.</p>
+<p>At this point if all went well, we're done with our edx worker shell prompt for now so we can log out. Always be super careful to not leave production shells open
+unnecessarily. You'd be surprised how many systems have been brought down by someone not realizing they're in the wrong terminal :)</p>
+<h4>Priming The Pump (Well, Pipeline In This Case)</h4>
+<p>Now that we've successfully staged our user for retirement, we need to tell the retirement pipeline to actually retire the user.</p>
+<ul>
+<li>Surf to the appropriate concourse URL for the entironment you're working with:</li>
+<li><a href="https://cicd-ci.odl.mit.edu">CI</a></li>
+<li><a href="https://cicd-qa.odl.mit.edu/">QA</a></li>
+<li><a href="https://cicd.odl.mit.edu">Production</a></li>
+</ul>
+<p>and search for 'tubular'. You'll want the tubular pipeline in the group associated with whichever product you're working with. In our case, it'd be
+  the <a href="https://cicd.odl.mit.edu/teams/mitxonline/pipelines/misc-cloud-tubular">misc-cloud-tubular pipeline in the mitxonline group</a>.
+- Click the green + icon with a circle around it in the upper right of your screen. This will trigger a run of this pipeline.
+- If all goes well, you should see each stage go green one by one. You can click on any stage to see more detail around what that stage is doing.
+  You can see an example of a successful pipeline run <a href="https://cicd.odl.mit.edu/teams/mitxonline/pipelines/misc-cloud-tubular/jobs/deploy-tubular-world/builds/26">here</a></p>
+<p>At this point, if the pipeline is green, congratulations are in order! This user had been retired!</p>
+    </div>
+    
+
+</article><!--End of body content--><footer id="footer">
+            Contents © 2024         <a href="mailto:ol-devops@mit.edu">MIT Online Learning Platform Engineering</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         
+            
+            
+        </footer>
+</div>
+</div>
+
+
+        <script src="../../assets/js/all-nocdn.js"></script><script>
+    baguetteBox.run('div#content', {
+        ignoreClass: 'islink',
+        captions: function(element){var i=element.getElementsByTagName('img')[0];return i===undefined?'':i.alt;}});
+    </script>
+</body>
+</html>

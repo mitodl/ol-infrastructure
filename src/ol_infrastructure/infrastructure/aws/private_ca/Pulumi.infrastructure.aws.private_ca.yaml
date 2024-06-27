@@ -1,5 +1,0 @@
----
-secretsprovider: awskms://alias/infrastructure-secrets-production
-encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgEDGYvEPRhoW7TiYvmcnruCAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMjNisVYmsc7vD2/GTAgEQgDtkMy7zGSV1MUIqMSETlURbdRm+dJ4cYVt8DchwMZ2kJbb69YS46wtyzgFgieCC7ZPQQR0Dvh34CEr7PA==
-config:
-  aws:region: us-east-1

@@ -1,7 +1,0 @@
----
-name: ol-infrastructure-substructure-vault-encryption-mounts
-runtime: python
-description: Creation and configuration of Vault mounts that facilitate encryption
-  operations
-backend:
-  url: s3://mitol-pulumi-state/

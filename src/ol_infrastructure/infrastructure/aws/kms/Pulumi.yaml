@@ -1,6 +1,0 @@
----
-name: ol-infrastructure-aws-kms
-runtime: python
-description: Pulumi project for managing KMS CMKs
-backend:
-  url: s3://mitol-pulumi-state/

@@ -1,7 +1,0 @@
----
-name: ol-infrastructure-networking
-runtime: python
-description: Pulumi project for managing foundational network infrastructure used
-  by Open Learning managed services.
-backend:
-  url: s3://mitol-pulumi-state/

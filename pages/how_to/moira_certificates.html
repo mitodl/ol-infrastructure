@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>moira_certificates | Platform Engineering Site</title>
+<link href="../../assets/css/all-nocdn.css" rel="stylesheet" type="text/css">
+<link href="https://fonts.googleapis.com/css?family=Playfair+Display:700,900" rel="stylesheet">
+<meta name="theme-color" content="#5670d4">
+<meta name="generator" content="Nikola (getnikola.com)">
+<link rel="alternate" type="application/rss+xml" title="RSS" hreflang="en" href="../../rss.xml">
+<link rel="canonical" href="https://pe.ol.mit.edu/pages/how_to/moira_certificates.html">
+<!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="MIT Online Learning Platform Engineering">
+<meta property="og:site_name" content="Platform Engineering Site">
+<meta property="og:title" content="moira_certificates">
+<meta property="og:url" content="https://pe.ol.mit.edu/pages/how_to/moira_certificates.html">
+<meta property="og:description" content="Moira Certificates
+There are two services in our porfolio that interact with Moira.
+
+MIT Open / OpenDiscussions
+ODL-Video-Service
+
+Both of these services authenticate against Moira with certificates i">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2024-06-27T16:57:52-04:00">
+</head>
+<body>
+<a href="#content" class="sr-only sr-only-focusable">Skip to main content</a>
+
+<!-- Header and menu bar -->
+<div class="container">
+      <header class="blog-header py-3"><div class="row nbb-header align-items-center">
+          <div class="col-md-3 col-xs-2 col-sm-2" style="width: auto;">
+            <button class="navbar-toggler navbar-light bg-light nbb-navbar-toggler" type="button" data-toggle="collapse" data-target=".bs-nav-collapsible" aria-controls="bs-navbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse bs-nav-collapsible bootblog4-search-form-holder">
+                
+            </div>
+        </div>
+          <div class="col-md-6 col-xs-10 col-sm-10 bootblog4-brand" style="width: auto;">
+            <a class="navbar-brand blog-header-logo text-dark" href="../../">
+
+            <span id="blog-title">Platform Engineering Site</span>
+        </a>
+          </div>
+            <div class="col-md-3 justify-content-end align-items-center bs-nav-collapsible collapse flex-collapse bootblog4-right-nav">
+            <nav class="navbar navbar-light bg-white"><ul class="navbar-nav bootblog4-right-nav">
+<li class="nav-item">
+    <a href="moira_certificates.md" id="sourcelink" class="nav-link">Source</a>
+    </li>
+
+
+                    
+            </ul></nav>
+</div>
+    </div>
+</header><nav class="navbar navbar-expand-md navbar-light bg-white static-top"><div class="collapse navbar-collapse bs-nav-collapsible" id="bs-navbar">
+            <ul class="navbar-nav nav-fill d-flex w-100"><li class="nav-item dropdown">
+<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Pages</a>
+            <div class="dropdown-menu">
+                    <a href="../runbooks/" class="dropdown-item">Runbooks</a>
+                    <a href="../discoveries/" class="dropdown-item">Discoveries</a>
+                    <a href="." class="dropdown-item">How To</a>
+                    <a href="../post-mortems/" class="dropdown-item">Post Mortems</a>
+            </div>
+
+                
+            </li></ul>
+</div>
+<!-- /.navbar-collapse -->
+</nav>
+</div>
+
+<div class="container" id="content" role="main">
+    <div class="body-content">
+        <!--Body content-->
+        
+        
+        
+<article class="post-text storypage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="p-name entry-title" itemprop="headline name"><a href="#" class="u-url">moira_certificates</a></h1>
+
+        
+
+    </header><div class="e-content entry-content" itemprop="articleBody text">
+    <h2>Moira Certificates</h2>
+<p>There are two services in our porfolio that interact with <a href="https://ist.mit.edu/email-lists">Moira</a>.</p>
+<ol>
+<li>MIT Open / OpenDiscussions</li>
+<li>ODL-Video-Service</li>
+</ol>
+<p>Both of these services authenticate against Moira with certificates issued by <a href="https://ca.mit.edu/ca/">ca.mit.edu</a> which is also the provider of MIT Personal Certificates. There is no web interface for requesting an application certificate from ca.mit.edu, so you need to email mitcert@mit.edu with the CSR in the body of the email and a clear request that you're asking for a certificate issued from ca.mit.edu and NOT InCommon/Internet2 which is where most MIT certificates now come from.</p>
+<p>Both of these applications utilize the same two environment variables for storing and accessing this key/cert pair.</p>
+<ul>
+<li><strong>MIT_WS_CERTIFICATE</strong></li>
+<li><strong>MIT_WS_PRIVATE_KEY</strong></li>
+</ul>
+<h3>MITOpen Vault Locations</h3>
+<ul>
+<li>In all vault environments: <code>secret-mit-open/global/mit-application-certificate</code>
+</li>
+<li>Maintained by hand.</li>
+</ul>
+<h3>ODL Video Service Vault Location</h3>
+<ul>
+<li>In all vault environments: <code>secret-odl-video-service/ovs/secrets</code>
+</li>
+<li>Inside a single JSON structure at <code>misc.mit_ws_certificate</code> and <code>misc.mit_ws_private_key</code>
+</li>
+<li>Maintained automatically by pulumi.</li>
+<li>
+<code>sr/bridge/secrets/odl_video_service</code> or <a href="https://github.com/mitodl/ol-infrastructure/tree/main/src/bridge/secrets/odl_video_service">here</a>
+</li>
+</ul>
+<h3>Certificate Usage and Expiration Tracking</h3>
+<table>
+<thead><tr>
+<th>Action Date</th>
+<th>Application</th>
+<th>Description</th>
+<th>Who</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>20230625</td>
+<td>Open</td>
+<td>Replaced MIT Open certificate, expires 20240625</td>
+<td>MD</td>
+</tr>
+<tr>
+<td>20230928</td>
+<td>OVS</td>
+<td>OVS Cert expired, replaced with Open certificate above, expires 20240625</td>
+<td>MD</td>
+</tr>
+<tr>
+<td>20240201</td>
+<td>Both</td>
+<td>No action. Verified certificates currently in use. Updated reminder in team calendar.</td>
+<td>MD</td>
+</tr>
+<tr>
+<td>20240613</td>
+<td>Both</td>
+<td>Replaced both certificates with 2024-2025 versions. Reminder sent to team calendar.</td>
+<td>MD</td>
+</tr>
+</tbody>
+</table>
+</div>
+    
+
+</article><!--End of body content--><footer id="footer">
+            Contents © 2024         <a href="mailto:ol-devops@mit.edu">MIT Online Learning Platform Engineering</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         
+            
+            
+        </footer>
+</div>
+</div>
+
+
+        <script src="../../assets/js/all-nocdn.js"></script><script>
+    baguetteBox.run('div#content', {
+        ignoreClass: 'islink',
+        captions: function(element){var i=element.getElementsByTagName('img')[0];return i===undefined?'':i.alt;}});
+    </script>
+</body>
+</html>

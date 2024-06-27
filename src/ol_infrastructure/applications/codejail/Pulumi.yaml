@@ -1,6 +1,0 @@
----
-name: ol-infrastructure-codejail-server
-runtime: python
-description: Manage deployment of an codejail server
-backend:
-  url: s3://mitol-pulumi-state/

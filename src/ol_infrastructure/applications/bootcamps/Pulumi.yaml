@@ -1,7 +1,0 @@
----
-name: ol-infrastructure-bootcamps-ecommerce-application
-runtime: python
-description: Pulumi project to manage the infrastructure resources needed by the bootcamps
-  ecommerce application
-backend:
-  url: s3://mitol-pulumi-state/

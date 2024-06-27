@@ -1,7 +1,0 @@
----
-secretsprovider: awskms://alias/infrastructure-secrets-qa
-encryptedkey: AQICAHijXuVxVlAL6bY9xCOrzO3YYhFlQBPt6jNyJGkhYu+q4QHtoktUQmX78UHX+0XFAlaMAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMtwTtyIu612lya3pDAgEQgDv+q9HmLgGu1wMDOn6om5wfhiKF7aTNU3v3mTjND8Y7R86mmFRiktiMExhxDoiARogAQlPSjHqRKPNbNg==
-config:
-  aws:region: us-east-1
-  environment:business_unit: residential-staging
-  environment:vpc_reference: residential_mitx_staging_vpc

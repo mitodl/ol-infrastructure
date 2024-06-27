@@ -1,7 +1,0 @@
----
-name: ol-infrastructure-aws-s3
-runtime: python
-description: Pulumi project for handling S3 buckets that are independent of specific
-  applications.
-backend:
-  url: s3://mitol-pulumi-state/

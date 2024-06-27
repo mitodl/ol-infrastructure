@@ -1,6 +1,0 @@
----
-env_name: ci
-draft_source_bucket_name: ocw-content-draft-ci
-draft_destination_bucket_name: ocw-content-backup-draft-ci
-live_source_bucket_name: ocw-content-live-ci
-live_destination_bucket_name: ocw-content-backup-live-ci

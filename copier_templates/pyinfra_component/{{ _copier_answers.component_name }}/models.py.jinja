@@ -1,6 +1,0 @@
-from pydantic_settings import SettingsConfigDict
-from ol_configuration_management.lib.model_helpers import OLBaseSettings
-
-
-class {{ _copier_answers.component_name|capitalize }}Config(OLBaseSettings):
-    model_config = SettingsConfigDict(env_prefix="{{_copier_answers.component_name }}_")

@@ -1,6 +1,0 @@
----
-name: ol-infrastructure-edx-notes-application
-runtime: python
-description: Create and manage resources for running the edx_notes add on
-backend:
-  url: s3://mitol-pulumi-state/

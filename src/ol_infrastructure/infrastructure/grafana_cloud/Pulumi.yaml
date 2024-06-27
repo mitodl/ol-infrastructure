@@ -1,7 +1,0 @@
----
-name: ol-infrastructure-grafana-cloud
-runtime: python
-description: Manage AWS resources needed by Grafana Cloud. Primarily to allow GC ->
-  CloudWatch
-backend:
-  url: s3://mitol-pulumi-state/

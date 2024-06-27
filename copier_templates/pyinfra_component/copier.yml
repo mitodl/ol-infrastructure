@@ -1,8 +1,0 @@
----
-component_name:
-  type: str
-  help: The name of the PyInfra component to generate
-
-project_description:
-  type: str
-  help: Brief description of what this component does

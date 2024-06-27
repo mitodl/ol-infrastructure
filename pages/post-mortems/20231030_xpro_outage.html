@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>20231030_xpro_outage | Platform Engineering Site</title>
+<link href="../../assets/css/all-nocdn.css" rel="stylesheet" type="text/css">
+<link href="https://fonts.googleapis.com/css?family=Playfair+Display:700,900" rel="stylesheet">
+<meta name="theme-color" content="#5670d4">
+<meta name="generator" content="Nikola (getnikola.com)">
+<link rel="alternate" type="application/rss+xml" title="RSS" hreflang="en" href="../../rss.xml">
+<link rel="canonical" href="https://pe.ol.mit.edu/pages/post-mortems/20231030_xpro_outage.html">
+<!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="MIT Online Learning Platform Engineering">
+<meta property="og:site_name" content="Platform Engineering Site">
+<meta property="og:title" content="20231030_xpro_outage">
+<meta property="og:url" content="https://pe.ol.mit.edu/pages/post-mortems/20231030_xpro_outage.html">
+<meta property="og:description" content="xPro Outage - October 30, 2023
+Timeline
+Undetermined date within the past 6 months:
+
+AWS RDS config updated to default new credentials to use SCRAM rather than md5
+
+Monday, October 30th 2023
+- 3:45PM ">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2024-06-27T16:57:52-04:00">
+</head>
+<body>
+<a href="#content" class="sr-only sr-only-focusable">Skip to main content</a>
+
+<!-- Header and menu bar -->
+<div class="container">
+      <header class="blog-header py-3"><div class="row nbb-header align-items-center">
+          <div class="col-md-3 col-xs-2 col-sm-2" style="width: auto;">
+            <button class="navbar-toggler navbar-light bg-light nbb-navbar-toggler" type="button" data-toggle="collapse" data-target=".bs-nav-collapsible" aria-controls="bs-navbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse bs-nav-collapsible bootblog4-search-form-holder">
+                
+            </div>
+        </div>
+          <div class="col-md-6 col-xs-10 col-sm-10 bootblog4-brand" style="width: auto;">
+            <a class="navbar-brand blog-header-logo text-dark" href="../../">
+
+            <span id="blog-title">Platform Engineering Site</span>
+        </a>
+          </div>
+            <div class="col-md-3 justify-content-end align-items-center bs-nav-collapsible collapse flex-collapse bootblog4-right-nav">
+            <nav class="navbar navbar-light bg-white"><ul class="navbar-nav bootblog4-right-nav">
+<li class="nav-item">
+    <a href="20231030_xpro_outage.md" id="sourcelink" class="nav-link">Source</a>
+    </li>
+
+
+                    
+            </ul></nav>
+</div>
+    </div>
+</header><nav class="navbar navbar-expand-md navbar-light bg-white static-top"><div class="collapse navbar-collapse bs-nav-collapsible" id="bs-navbar">
+            <ul class="navbar-nav nav-fill d-flex w-100"><li class="nav-item dropdown">
+<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Pages</a>
+            <div class="dropdown-menu">
+                    <a href="../runbooks/" class="dropdown-item">Runbooks</a>
+                    <a href="../discoveries/" class="dropdown-item">Discoveries</a>
+                    <a href="../how_to/" class="dropdown-item">How To</a>
+                    <a href="." class="dropdown-item">Post Mortems</a>
+            </div>
+
+                
+            </li></ul>
+</div>
+<!-- /.navbar-collapse -->
+</nav>
+</div>
+
+<div class="container" id="content" role="main">
+    <div class="body-content">
+        <!--Body content-->
+        
+        
+        
+<article class="post-text storypage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="p-name entry-title" itemprop="headline name"><a href="#" class="u-url">20231030_xpro_outage</a></h1>
+
+        
+
+    </header><div class="e-content entry-content" itemprop="articleBody text">
+    <h2>xPro Outage - October 30, 2023</h2>
+<h3>Timeline</h3>
+<p>Undetermined date within the past 6 months:</p>
+<ul>
+<li>AWS RDS config updated to default new credentials to use SCRAM rather than md5</li>
+</ul>
+<p>Monday, October 30th 2023
+- 3:45PM - Configuration update deployed xPro Production Heroku stack via Salt.
+- 3:51PM - <a href="https://mitodl.app.opsgenie.com/alert/detail/909993c0-72e7-4433-9e9e-30a2196e8f87-1698695490940/details">Pingdom alerts DevOps on-call</a>.
+- 3:51PM - Alert Acknowledged by DevOps on-call (Mike Davidson).
+- 3:52PM - Verified that site was non-responsive.
+- 3:52PM - Begin detailed investigation.
+- ~3:53PM - Confirm log messages in Heroku regarding failed database logins:</p>
+<div class="code"><pre class="code literal-block"><span class="n">LOG</span><span class="w"> </span><span class="n">C</span><span class="mh">-0x55cb586d2540</span><span class="o">:</span><span class="w"> </span><span class="n">db1</span><span class="o">/</span><span class="n">v</span><span class="o">-</span><span class="n">aws</span><span class="o">-</span><span class="n">mitxpro</span><span class="o">-</span><span class="n">OC7crfPS2rL3jSryzvHE</span><span class="mi">-1698696728</span><span class="mf">@127.0.0.1</span><span class="o">:</span><span class="mi">55038</span><span class="w"> </span><span class="n">login</span><span class="w"> </span><span class="n">attempt</span><span class="o">:</span><span class="w"> </span><span class="n">db</span><span class="o">=</span><span class="n">db1</span><span class="w"> </span><span class="n">user</span><span class="o">=</span><span class="n">v</span><span class="o">-</span><span class="n">aws</span><span class="o">-</span><span class="n">mitxpro</span><span class="o">-</span><span class="n">OC7crfPS2rL3jSryzvHE</span><span class="mi">-1698696728</span><span class="w"> </span><span class="n">tls</span><span class="o">=</span><span class="n">no</span>
+<span class="n">ERROR</span><span class="w"> </span><span class="n">S</span><span class="mh">-0x55cb586d5580</span><span class="o">:</span><span class="w"> </span><span class="n">db1</span><span class="o">/</span><span class="n">v</span><span class="o">-</span><span class="n">aws</span><span class="o">-</span><span class="n">mitxpro</span><span class="o">-</span><span class="n">OC7crfPS2rL3jSryzvHE</span><span class="mi">-1698696728</span><span class="mf">@3.209.36.28</span><span class="o">:</span><span class="mi">5432</span><span class="w"> </span><span class="n">cannot</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="n">SCRAM</span><span class="w"> </span><span class="n">authentication</span><span class="o">:</span><span class="w"> </span><span class="n">wrong</span><span class="w"> </span><span class="n">password</span><span class="w"> </span><span class="n">type</span>
+<span class="n">LOG</span><span class="w"> </span><span class="n">C</span><span class="mh">-0x55cb586d2e00</span><span class="o">:</span><span class="w"> </span><span class="n">db1</span><span class="o">/</span><span class="n">v</span><span class="o">-</span><span class="n">aws</span><span class="o">-</span><span class="n">mitxpro</span><span class="o">-</span><span class="n">OC7crfPS2rL3jSryzvHE</span><span class="mi">-1698696728</span><span class="mf">@127.0.0.1</span><span class="o">:</span><span class="mi">52474</span><span class="w"> </span><span class="n">closing</span><span class="w"> </span><span class="n">because</span><span class="o">:</span><span class="w"> </span><span class="n">server</span><span class="w"> </span><span class="n">login</span><span class="w"> </span><span class="n">failed</span><span class="o">:</span><span class="w"> </span><span class="n">wrong</span><span class="w"> </span><span class="n">password</span><span class="w"> </span><span class="n">type</span><span class="w"> </span><span class="p">(</span><span class="n">age</span><span class="o">=</span><span class="mi">14</span><span class="n">s</span><span class="p">)</span>
+</pre></div>
+
+<ul>
+<li>~3:55PM Determined this matches the fingerprint of a previously encountered issue seen when setting up the new MITOpen environments.</li>
+<li>3:56PM Found <a href="https://github.com/mitodl/ol-infrastructure/pull/1703">previous PR</a> that addressed this for MITOpen:</li>
+<li>3:56PM Started looking for code location for make the above modification.</li>
+<li>3:58PM Tobias finds <a href="https://github.com/pgbouncer/pgbouncer/issues/787#issuecomment-1374848819">a possible alternative resolution</a>.</li>
+<li>4:00PM Unable to locate code for this environment. Determined it is not managed by pulumi.</li>
+<li>4:03PM Started a zoom call. Attendees: Mike, Tobias, Sar</li>
+<li>4:05PM Decided making the database parameter group configuration will possibly take longer than is desirable. Opt for trying the alternative resolution.</li>
+<li>~4:07PM Role definition in vault is modified and verified to still generate credentials via the Vault UI.</li>
+<li>4:09PM Cached credentials are cleared and Heroku configuration is re-applied via Salt.</li>
+<li>~4:10PM Verified the issue is not resolved.</li>
+<li>4:12PM Cleared cached credentials again and Heroku configuration is re-applied via Salt.</li>
+<li>4:14PM Verified the issue is not resolved and that the credentials applied via Salt are truely different.</li>
+<li>4:15PM Decided alternative solution did not work. Begin implementing database parameter group fix known to work.</li>
+<li>~4:20PM A new database parameter group is created and applied to the running database.</li>
+<li>~4:23PM The database is listed as Available in the RDS web console.</li>
+<li>4:24PM Cleared cached credentials again and Heroku configuration is re-applied via Salt.</li>
+<li>4:25PM Verified the site is now available again and login/other database interactions work.</li>
+<li>4:25PM Pingdom automatically closes the OpsGenie alert.</li>
+</ul>
+<h3>Root Cause:</h3>
+<p>At some point in the last 6 months, the default behavior of the underlying RDS instance for xPro production was transitioned to using SCRAM password authentication rather than MD5 password authentication. Further information about this is documented <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.Roles.html">here</a>. The <a href="https://github.com/heroku/heroku-buildpack-pgbouncer/issues/155">buildpack</a> we use in Heroku for pgbouncer does not support SCRAM.</p>
+<p>When managing configuration items for applications deployed in Heroku, we invoke Vault via SaltStack to generate database credentials. These credentials are then cached on the Salt Master. Vault tracks the credentials it generates via internal objects known as 'leases'. When Salt checked + applied the configuration at 3:45PM, it saw that the lease was due to expire soon and was not eligible for renewal. This triggered Vault generating new credentials, however these new credentials were generated with the new default SCRAM configuration rather than the MD5 configuration supported by pgbouncer.</p>
+<p>When attempting to establish a pool of database connections, pgbouncer was rejected by the RDS instance for sending the wrong password type. It sent an MD5 password hash while the database expected SCRAM for the newly generated credential. Being unable to establish a connection to the database is a fatal error for the application and it was not able to finish starting up and serving requests.</p>
+<h3>Action Items</h3>
+<ul>
+<li><a href="https://github.com/mitodl/ol-infrastructure/issues/1886">Migrate management of XPro resources into Pulumi</a></li>
+<li>One of the key factors delaying the resolution of the outage was the fact that none, or nearly none, of the configuration for this stack was managed as code. In particular the RDS instance and its associated resources. Additionally, the RDS instance was using an instance of the default parameter group provided by AWS, which cannot be modified. As such, we were required to duplicate this default parameter group definitions, make the required modifications, and then associate the newly created group with the instance. This is a more time consuming task than modifying a parameter configuration on an already associated parameter group. All of this would have been mitigated if the resources were managed with pulumi, where we do not utilize AWS sourced default parameter groups.</li>
+</ul>
+</div>
+    
+
+</article><!--End of body content--><footer id="footer">
+            Contents © 2024         <a href="mailto:ol-devops@mit.edu">MIT Online Learning Platform Engineering</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         
+            
+            
+        </footer>
+</div>
+</div>
+
+
+        <script src="../../assets/js/all-nocdn.js"></script><script>
+    baguetteBox.run('div#content', {
+        ignoreClass: 'islink',
+        captions: function(element){var i=element.getElementsByTagName('img')[0];return i===undefined?'':i.alt;}});
+    </script>
+</body>
+</html>

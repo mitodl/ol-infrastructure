@@ -1,6 +1,0 @@
----
-name: ol-infrastructure-edxapp-application
-runtime: python
-description: Create and manage resources for powering the Open edX application
-backend:
-  url: s3://mitol-pulumi-state/

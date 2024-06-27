@@ -1,8 +1,0 @@
----
-secretsprovider: awskms://alias/infrastructure-secrets-production
-encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgH45slhRv/f6Ng+LX1j+8QuAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM1ZJlY6noV1e2AXkKAgEQgDulaWifrctUor8aq/tne8V8fIBaTqCpD/McDc4CMkzgSbQBlTZvgdbvrbQMXX5Weq8EbnH9+c48tkCVig==
-config:
-  consul:address: https://consul-mitxonline-production.odl.mit.edu
-  consul:http_auth:
-    secure: v1:TwL5a3tWPnJJQA5E:C5KSl2aal86pJ5aSgassDKJZ93JGZayfa971uAWGFcod1zypASKH4y6mMQKUEif76yCWfxeuzOBYR7DUGxnSQRem/MTvlteX4h1L632/m5KxJypfZNpIUBsG7Skj0KUPIw==
-  consul:scheme: https
