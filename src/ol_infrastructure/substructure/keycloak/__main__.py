@@ -460,6 +460,13 @@ ol_data_oidc_attribute_importer_identity_provider_mapper = (
         },
         opts=resource_options,
     ),
+    keycloak.UserTemplateImporterIdentityProviderMapper(
+        "ol-data-map-touchstone-saml-username-attribute",
+        name="username-formatter",
+        realm=ol_data_platform_realm.id,
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        template="${ATTRIBUTE.mail | localpart}",
+    ),
     # Map Moira group membership to superset role
     # ol-eng-data -> superset_admin
     keycloak.AttributeToRoleIdentityMapper(
