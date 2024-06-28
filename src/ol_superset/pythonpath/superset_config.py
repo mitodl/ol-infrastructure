@@ -1,5 +1,7 @@
+import json
 import logging
 import os
+import urllib.request
 from typing import Optional
 
 from celery.schedules import crontab
@@ -67,6 +69,33 @@ OAUTH_PROVIDERS = [
         },
     }
 ]
+
+# ----------------------------------------------------------
+# Required config to get Keycloak token for Superset API use
+# ----------------------------------------------------------
+JWT_ALGORITHM = "RS256"
+# URL to the JWKS endpoint
+jwks_url = f"{oidc_creds['url']}/protocol/openid-connect/certs"
+
+
+def fetch_keycloak_rs256_public_cert():
+    with urllib.request.urlopen(jwks_url) as response:  # noqa: S310
+        jwks = json.load(response)
+    x5c = None
+    for key in jwks["keys"]:
+        if key["alg"] == "RS256":
+            x5c = key["x5c"][0]
+            break
+
+    if x5c:
+        pem_lines = ["-----BEGIN CERTIFICATE-----", x5c, "-----END CERTIFICATE-----"]
+        cert_pem = "\n".join(pem_lines)
+    else:
+        cert_pem = "No cert found"
+    return cert_pem
+
+
+JWT_PUBLIC_KEY = fetch_keycloak_rs256_public_cert()
 
 # Testing out Keycloak role mapping to Superset
 # https://superset.apache.org/docs/installation/configuring-superset#mapping-ldap-or-oauth-groups-to-superset-roles
