@@ -22,7 +22,6 @@ from typing import Any
 import pulumi_tls as tls
 import yaml
 from bridge.lib.magic_numbers import (
-    DEFAULT_HTTPS_PORT,
     DEFAULT_RSA_KEY_SIZE,
     FIVE_MINUTES,
     IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
@@ -30,19 +29,25 @@ from bridge.lib.magic_numbers import (
     VAULT_HTTP_PORT,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Config, Output, StackReference, export
 from pulumi_aws import (
-    acm,
     acmpca,
-    autoscaling,
     ec2,
     get_caller_identity,
     iam,
-    lb,
     route53,
     s3,
 )
 
+from ol_infrastructure.components.aws.auto_scale_group import (
+    BlockDeviceMapping,
+    OLAutoScaleGroupConfig,
+    OLAutoScaling,
+    OLLaunchTemplateConfig,
+    OLLoadBalancerConfig,
+    OLTargetGroupConfig,
+    TagSpecification,
+)
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -305,60 +310,6 @@ vault_security_group = ec2.SecurityGroup(
     vpc_id=target_vpc["id"],
 )
 
-#################
-# Load Balancer #
-#################
-# Create load balancer for Edxapp web nodes
-web_lb = lb.LoadBalancer(
-    "vault-web-load-balancer",
-    name_prefix=f"vault-server-{env_name}-"[:6],
-    ip_address_type="dualstack",
-    load_balancer_type="application",
-    enable_http2=True,
-    subnets=target_vpc["subnet_ids"],
-    security_groups=[
-        target_vpc["security_groups"]["web"],
-    ],
-    tags=aws_config.merged_tags({"Name": f"vault-server-{env_name}"}),
-)
-
-TARGET_GROUP_NAME_MAX_LENGTH = 32
-vault_web_lb_target_group = lb.TargetGroup(
-    "vault-web-alb-target-group",
-    vpc_id=target_vpc["id"],
-    target_type="instance",
-    port=DEFAULT_HTTPS_PORT,
-    protocol="HTTPS",
-    health_check=lb.TargetGroupHealthCheckArgs(
-        healthy_threshold=3,
-        timeout=3,
-        interval=10,
-        path="/v1/sys/health?uninitcode=499",
-        port=str(DEFAULT_HTTPS_PORT),
-        protocol="HTTPS",
-        matcher="200,429,499",
-    ),
-    name_prefix=f"vault-{stack_info.env_suffix}-"[:6],
-    tags=aws_config.tags,
-)
-odl_wildcard_cert = acm.get_certificate(
-    domain="*.odl.mit.edu", most_recent=True, statuses=["ISSUED"]
-)
-vault_web_alb_listener = lb.Listener(
-    "vault-web-alb-listener",
-    certificate_arn=odl_wildcard_cert.arn,
-    load_balancer_arn=web_lb.arn,
-    port=DEFAULT_HTTPS_PORT,
-    protocol="HTTPS",
-    default_actions=[
-        lb.ListenerDefaultActionArgs(
-            type="forward",
-            target_group_arn=vault_web_lb_target_group.arn,
-        )
-    ],
-    opts=ResourceOptions(delete_before_replace=True),
-)
-
 ##########################
 # Certificate Management #
 ##########################
@@ -392,9 +343,27 @@ vault_listener_cert = acmpca.Certificate(
     validity=acmpca.CertificateValidityArgs(type="YEARS", value="2"),
 )
 
-###################
-# Autoscale Group #
-###################
+#################
+# Load Balancer #
+#################
+
+ol_vault_lb_config = OLLoadBalancerConfig(
+    listener_use_acm=True,
+    listener_cert_domain="*.odl.mit.edu",
+    subnets=target_vpc["subnet_ids"],
+    security_groups=[target_vpc["security_groups"]["web"]],
+    tags=aws_config.merged_tags({"Name": f"vault-server-{env_name}"}),
+)
+
+ol_vault_tg_config = OLTargetGroupConfig(
+    vpc_id=target_vpc["id"],
+    health_check_healthy_threshold=3,
+    health_check_interval=10,
+    health_check_matcher="200,429,499",
+    health_check_path="/v1/sys/health?uninitcode=499",
+    health_check_timeout=3,
+    tags=aws_config.tags,
+)
 
 
 def cloud_init_user_data(  # noqa: PLR0913
@@ -513,102 +482,79 @@ def cloud_init_user_data(  # noqa: PLR0913
     return base64.b64encode(cloud_config).decode("utf8")
 
 
-cloud_init_param = Output.all(
-    vpc_id=target_vpc["id"],
-    key_id=vault_unseal_key["id"],
-    tls_key=vault_listener_key.private_key_pem,
-    tls_cert=vault_listener_cert.certificate,
-    ca_cert=root_ca["certificate"],
-).apply(
-    lambda init_inputs: cloud_init_user_data(
-        init_inputs["key_id"],
-        init_inputs["vpc_id"],
-        env_name,
-        vault_domain,
-        init_inputs["tls_key"],
-        init_inputs["tls_cert"],
-        init_inputs["ca_cert"],
-    )
-)
-
 vault_instance_type = (
     vault_config.get("instance_type") or InstanceTypes.general_purpose_intel_large.name
 )
-vault_launch_config = ec2.LaunchTemplate(
-    "vault-server-launch-template",
-    name_prefix=f"vault-{env_name}-",
-    description="Launch template for deploying Vault server nodes",
-    iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
-        arn=vault_instance_profile.arn,
-    ),
-    image_id=vault_ami.id,
-    user_data=cloud_init_param,
+ol_vault_lt_config = OLLaunchTemplateConfig(
     block_device_mappings=[
-        ec2.LaunchTemplateBlockDeviceMappingArgs(
+        BlockDeviceMapping(
+            volume_size=vault_config.get_int("storage_disk_capacity") or 100,
+            volume_type=DiskTypes.ssd,  # gp3
             device_name=vault_ami.root_device_name,
-            ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=vault_config.get_int("storage_disk_capacity") or 100,
-                volume_type=DiskTypes.ssd,
-                delete_on_termination=True,
-                encrypted=True,
-                kms_key_id=kms_ebs["arn"],
-            ),
-        ),
+            kms_key_arn=kms_ebs["arn"],
+        )
     ],
-    vpc_security_group_ids=[
+    image_id=vault_ami.id,
+    instance_type=InstanceTypes[vault_instance_type].value,
+    security_groups=[
         vault_security_group.id,
         target_vpc["security_groups"]["web"],
         consul_stack.require_output("security_groups")["consul_agent"],
     ],
-    instance_type=InstanceTypes[vault_instance_type].value,
-    key_name="oldevops",
+    tags=aws_config.tags,
     tag_specifications=[
-        ec2.LaunchTemplateTagSpecificationArgs(
+        TagSpecification(
             resource_type="instance",
             tags=aws_config.merged_tags(
                 {"Name": f"vault-server-{env_name}", "vault_env": target_vpc["id"]}
             ),
         ),
-        ec2.LaunchTemplateTagSpecificationArgs(
+        TagSpecification(
             resource_type="volume",
             tags=aws_config.merged_tags(
                 {"Name": f"vault-server-{env_name}", "vault_env": target_vpc["id"]}
             ),
         ),
     ],
-    tags=aws_config.tags,
+    user_data=Output.all(
+        vpc_id=target_vpc["id"],
+        key_id=vault_unseal_key["id"],
+        tls_key=vault_listener_key.private_key_pem,
+        tls_cert=vault_listener_cert.certificate,
+        ca_cert=root_ca["certificate"],
+    ).apply(
+        lambda init_inputs: cloud_init_user_data(
+            init_inputs["key_id"],
+            init_inputs["vpc_id"],
+            env_name,
+            vault_domain,
+            init_inputs["tls_key"],
+            init_inputs["tls_cert"],
+            init_inputs["ca_cert"],
+        )
+    ),
 )
+
 # Valid values are 3, 5, or 7
 cluster_count = vault_config.get_int("cluster_size") or 3
-vault_asg = autoscaling.Group(
-    "vault-server-autoscaling-group",
-    desired_capacity=cluster_count,
+
+ol_vault_asg_config = OLAutoScaleGroupConfig(
+    asg_name=f"vault-server-asg-{env_name}",
+    aws_config=aws_config,
+    desired_size=cluster_count,
     min_size=cluster_count,
     max_size=cluster_count,
-    health_check_type="EC2",
     vpc_zone_identifiers=target_vpc["subnet_ids"],
-    launch_template=autoscaling.GroupLaunchTemplateArgs(
-        id=vault_launch_config.id, version="$Latest"
-    ),
-    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
-        strategy="Rolling",
-        preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=90,
-            instance_warmup=FIVE_MINUTES * 3,
-        ),
-        triggers=["tag"],
-    ),
-    target_group_arns=[vault_web_lb_target_group.arn],
-    tags=[
-        autoscaling.GroupTagArgs(
-            key=key_name,
-            value=key_value,
-            propagate_at_launch=True,
-        )
-        for key_name, key_value in aws_config.merged_tags(
-            {"ami_id": vault_ami.id}
-        ).items()
-    ],
+    instance_refresh_warmup=FIVE_MINUTES * 3,
+    instance_refresh_min_healthy_percentage=90,
+    tags=aws_config.merged_tags({"ami_id": vault_ami.id}),
+)
+
+ol_vault_as_setup = OLAutoScaling(
+    asg_config=ol_vault_asg_config,
+    lt_config=ol_vault_lt_config,
+    tg_config=ol_vault_tg_config,
+    lb_config=ol_vault_lb_config,
 )
 
 vault_public_dns = route53.Record(
@@ -616,7 +562,7 @@ vault_public_dns = route53.Record(
     name=vault_config.require("domain"),
     type="CNAME",
     ttl=FIVE_MINUTES,
-    records=[web_lb.dns_name],
+    records=[ol_vault_as_setup.load_balancer.dns_name],
     zone_id=odl_zone_id,
 )
 #################
