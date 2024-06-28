@@ -74,21 +74,20 @@ OAUTH_PROVIDERS = [
 # Required config to get Keycloak token for Superset API use
 # ----------------------------------------------------------
 JWT_ALGORITHM = "RS256"
-# URL to the JWKS endpoint
-jwks_url = f"{oidc_creds['url']}/protocol/openid-connect/certs"
+# URL to the public key endpoint
+public_key_url = f"{oidc_creds['url']}/"
 
 
 def fetch_keycloak_rs256_public_cert():
-    with urllib.request.urlopen(jwks_url) as response:  # noqa: S310
-        jwks = json.load(response)
-    x5c = None
-    for key in jwks["keys"]:
-        if key["alg"] == "RS256":
-            x5c = key["x5c"][0]
-            break
-
-    if x5c:
-        pem_lines = ["-----BEGIN CERTIFICATE-----", x5c, "-----END CERTIFICATE-----"]
+    with urllib.request.urlopen(public_key_url) as response:  # noqa: S310
+        public_key_url_response = json.load(response)
+    public_key = public_key_url_response["public_key"]
+    if public_key:
+        pem_lines = [
+            "-----BEGIN PUBLIC KEY-----",
+            public_key,
+            "-----END PUBLIC KEY-----",
+        ]
         cert_pem = "\n".join(pem_lines)
     else:
         cert_pem = "No cert found"
