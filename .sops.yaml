@@ -1,4 +1,11 @@
 ---
+stores:
+  json:
+    indent: 2
+  json_binary:
+    indent: 2
+  yaml:
+    indent: 2
 creation_rules:
 - path_regex: (ci.env$|\.ci\.ya?ml$|\.ci\.json$)
   kms: arn:aws:kms:us-east-1:610119931565:alias/infrastructure-secrets-ci
