@@ -170,7 +170,7 @@ notes_security_group = ec2.SecurityGroup(
     tags=aws_config.merged_tags({"Name": notes_server_tag}),
 )
 lb_config = OLLoadBalancerConfig(
-    listener_user_acm=True,
+    listener_use_acm=True,
     listener_cert_domain=notes_config.require("acm_cert_domain"),
     subnets=target_vpc["subnet_ids"],
     security_groups=[notes_security_group],
