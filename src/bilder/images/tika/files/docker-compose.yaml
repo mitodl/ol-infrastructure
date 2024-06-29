@@ -52,7 +52,7 @@ services:
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
   traefik:
-    image: traefik:v3.0
+    image: traefik:v3.1
     command:
     - "--configFile=/etc/traefik/traefik.yaml"
     env_file:
