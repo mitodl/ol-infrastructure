@@ -54,7 +54,7 @@ config:
     - "https://live-qa.ocw.mit.edu"
     mailgun_sender_domain: "discussions-mail.odl.mit.edu"
     sso_url: "sso-qa.ol.mit.edu"
-  mitopen:db_instance_size: "db.t4g.medium"
+  mitopen:db_instance_size: db.m7g.xlarge
   mitopen:db_password:
     secure: v1:Xk9oxNvxSQAJUAHE:8CdeLN2SlyhyU0iZpqEX5rnHSJ3PClleDJi2UpzoCsVZ4UjNkr7vCOAKY7CvCuB/7CBKJKM=
   mitopen:api_domain: "api.mitopen-rc.odl.mit.edu"
