@@ -14,11 +14,11 @@ from bilder.lib.linux_helpers import linux_family
 
 
 def _ensure_traefik_user(traefik_config: TraefikConfig):
-    server.user(
+    server.user(  # noqa: S604
         name="Create system user for Traefik",
         user=traefik_config.user,
         system=True,
-        shell="/bin/false",  # noqa: S604
+        shell="/bin/false",
     )
 
 

@@ -138,13 +138,13 @@ shared_template_context = {
     "XQWATCHER_VENV_DIR": str(XQWATCHER_VENV_DIR),
 }
 
-server.user(
+server.user(  # noqa: S604
     name="Create xqwatcher user and home directory",
     create_home=True,
     ensure_home=True,
     home=str(XQWATCHER_HOME),
     present=True,
-    shell="/bin/false",  # noqa: S604
+    shell="/bin/false",
     user=XQWATCHER_USER,
 )
 
@@ -299,13 +299,13 @@ grader_venvs = ["mit-600x", "mit-686x-mooc", "mit-686x"]
 for grader_venv in grader_venvs:
     GRADER_VENV_DIR = XQWATCHER_GRADERS_VENVS_DIR.joinpath(grader_venv)
     GRADER_REQS_FILE = GRADER_VENV_DIR.joinpath("requirements.txt")
-    server.user(
+    server.user(  # noqa: S604
         name=f"Install grader {grader_venv} : Create user",
         home="/dev/null",
         ensure_home=False,
         create_home=False,
         present=True,
-        shell="/bin/false",  # noqa: S604
+        shell="/bin/false",
         user=grader_venv,
         groups=[XQWATCHER_USER],
     )
