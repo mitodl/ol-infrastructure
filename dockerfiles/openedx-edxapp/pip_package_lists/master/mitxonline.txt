@@ -9,10 +9,9 @@ ol-openedx-checkout-external
 ol-openedx-course-export==0.1.2
 ol-openedx-course-structure-api
 ol-openedx-logging==0.2.0
-ol-openedx-sentry==0.1.2
+ol-openedx-sentry==0.2.0
 openedx-scorm-xblock
 pip==24.1.1
-sentry-sdk==1.45.0  # Fix RecursionError
 social-auth-mitxpro==0.7.0
 uwsgi==2.0.26
 wheel==0.43.0
