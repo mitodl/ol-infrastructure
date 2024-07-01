@@ -42,10 +42,10 @@ source "amazon-ebs" "semantic" {
     purpose = "${local.app_name}-POC"
   }
   snapshot_tags = {
-    Name            = "${local.app_name}-ami"
-    OU              = "${var.business_unit}"
-    app             = "${local.app_name}"
-    purpose         = "${local.app_name}-POC"
+    Name    = "${local.app_name}-ami"
+    OU      = "${var.business_unit}"
+    app     = "${local.app_name}"
+    purpose = "${local.app_name}-POC"
   }
   # Base all builds off of the most recent docker_baseline_ami built by us, based of Debian 11
 
@@ -68,10 +68,10 @@ source "amazon-ebs" "semantic" {
     random = true
   }
   tags = {
-    Name            = "${local.app_name}"
-    OU              = "${var.business_unit}"
-    app             = local.app_name
-    purpose         = "${local.app_name}"
+    Name    = "${local.app_name}"
+    OU      = "${var.business_unit}"
+    app     = local.app_name
+    purpose = "${local.app_name}"
   }
 }
 

@@ -18,13 +18,13 @@ from bilder.components.concourse.models import (
 @deploy("Install Concourse")
 def install_concourse(concourse_config: ConcourseBaseConfig):
     # Create a Concourse system user
-    server.user(
+    server.user(  # noqa: S604
         name="Create the Concourse system user",
         user=concourse_config.user,
         present=True,
         home=concourse_config.deploy_directory,
         ensure_home=False,
-        shell="/bin/false",  # noqa: S604
+        shell="/bin/false",
         system=True,
     )
     installation_directory = (
