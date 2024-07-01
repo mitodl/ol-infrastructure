@@ -410,6 +410,20 @@ code and thus can probably be ignored.
 
 ## MITXOnline
 
+### Cybersource credentials potentially out of date
+
+_Diagnosis_
+
+Often we will get a report like [this](https://github.com/mitodl/hq/issues/4052)
+indicating that one of our Cybersource credentials is out of date.
+
+_Mitigation_
+
+Since we have no access to the Cybersource web UI, we must send E-mail
+to: <sbmit@mit.edu> to validate the status of the current credential
+or request a new one.
+
+
 ### Grading Celery Task Failed (STUB entry. Needs love)
 
 _Diagnosis_
