@@ -13,6 +13,7 @@ env_config = Config("environment")
 stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 keycloak_config = Config("keycloak")
+keycloak_realm_config = Config("keycloak_realm")
 setup_vault_provider()
 
 # Create a Keycloak provider cause we ran into an issue with pulumi reading
@@ -28,16 +29,15 @@ keycloak_provider = keycloak.Provider(
 )
 
 resource_options = ResourceOptions(provider=keycloak_provider)
-captcha_secret_key = keycloak_config.require("captcha_secret_key")
-captcha_site_key = keycloak_config.require("captcha_site_key")
-mit_email_host = keycloak_config.require("mit_email_host")
-mit_email_password = keycloak_config.require("mit_email_password")
-mit_email_username = keycloak_config.require("mit_email_username")
-mailgun_email_host = keycloak_config.require("mailgun_email_host")
-mailgun_email_password = keycloak_config.require("mailgun_email_password")
-mailgun_email_username = keycloak_config.require("mailgun_email_username")
-mailgun_reply_to_address = keycloak_config.require("mailgun_reply_to_address")
-keycloak_url = keycloak_config.get("url")
+captcha_secret_key = keycloak_realm_config.require("captcha_secret_key")
+captcha_site_key = keycloak_realm_config.require("captcha_site_key")
+mit_email_host = keycloak_realm_config.require("mit_email_host")
+mit_email_password = keycloak_realm_config.require("mit_email_password")
+mit_email_username = keycloak_realm_config.require("mit_email_username")
+mailgun_email_host = keycloak_realm_config.require("mailgun_email_host")
+mailgun_email_password = keycloak_realm_config.require("mailgun_email_password")
+mailgun_email_username = keycloak_realm_config.require("mailgun_email_username")
+mailgun_reply_to_address = keycloak_realm_config.require("mailgun_reply_to_address")
 mit_touchstone_cert = "MIIDCDCCAfCgAwIBAgIJAK/yS5ltGi7MMA0GCSqGSIb3DQEBBQUAMBYxFDASBgNVBAMTC2lkcC5taXQuZWR1MB4XDTEyMDczMDIxNTAxN1oXDTMyMDcyNTIxNTAxN1owFjEUMBIGA1UEAxMLaWRwLm1pdC5lZHUwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDgC5Y2mM/VMThzTWrZ2uyv3Gw0mWU9NgQpWN1HQ/lLBxH1H6pMc5+fGpOdrvxH/Nepdg6uAJwZrclTDAHHpG/THb7K063NRtic8h9UYSqwxIWUCXI8qNijcWA2bW6PFEy4yIP611J+IzQxzD/ZiR+89ouzdjNBrPHzoaIoMwflftYnFc4L/qu4DxE/NWgANYPGEJfWUFTVpfNV1Iet60904zl+O7T79mwaQwwOMUWwk/DEQyvG6bf2uWL4aFx4laBOekrA+5rSHUXAFlhCreTnzZMkVoxSGqYlc5uZuZmpFCXZn+tNpsVYz+c4Hve3WOZwhx/7bMGCwlx7oovoQWQ5AgMBAAGjWTBXMDYGA1UdEQQvMC2CC2lkcC5taXQuZWR1hh5odHRwczovL2lkcC5taXQuZWR1L3NoaWJib2xldGgwHQYDVR0OBBYEFF5aINzhvMR+pOijYHtr3yCKsrMSMA0GCSqGSIb3DQEBBQUAA4IBAQDfVpscchXXa4Al/l9NGNwQ1shpQ8d+k+NpX2Q976jau9DhVHa42F8bfl1EeHLMFlN79aUxFZb3wvr0h5pq3a8F9aWHyKe+0R10ikVueDcAmg0V7MWthFdsyMwHPbnCdSXo2wh0GhjeIF3f3+hZZwrZ4sZqjX2RmsYnyXgS1r5mzuu4W447Q1fbC5BeZTefUhJcfHQ56ztIFtLJdRuHHnqj09CaQVMD1FtovM86vYwVMwMsgOgkN3c7tW6kXHHBHeEA31xUJsqXGTRlwMSyJTju3SFvhXI/8ZIxshTzWURBo+vf6A6QQvSvJAju4zVLZy83YB/cvAFsV3BexZ4xzuQD"  # pragma: allowlist secret # noqa: E501
 # Create OL Platform Engineering Realm
 ol_platform_engineering_realm = keycloak.Realm(
@@ -512,7 +512,7 @@ ol_data_oidc_attribute_importer_identity_provider_mapper = (
 )
 
 # Check if any Openid clients exist in config and create them
-for openid_clients in keycloak_config.get_object("openid_clients"):
+for openid_clients in keycloak_realm_config.get_object("openid_clients"):
     realm_name = openid_clients.get("realm_name")
     client_details = openid_clients.get("client_info")
     for client_name, client_detail in client_details.items():
@@ -691,8 +691,8 @@ ol_registration_flow_recaptcha_step_config = keycloak.authentication.ExecutionCo
     execution_id=ol_registration_flow_recaptcha_step.id,
     alias="google-recaptcha-v2",
     config={
-        "recaptchaSiteKey": keycloak_config.get(captcha_site_key),
-        "recaptchaSiteSecret": keycloak_config.get(captcha_secret_key),
+        "recaptchaSiteKey": keycloak_realm_config.get(captcha_site_key),
+        "recaptchaSiteSecret": keycloak_realm_config.get(captcha_secret_key),
     },
     opts=resource_options,
 )
@@ -829,12 +829,12 @@ if stack_info.env_suffix in ["ci", "qa"]:
         post_binding_response=True,
         post_binding_authn_request=True,
         principal_type="SUBJECT",
-        single_sign_on_service_url=keycloak_config.get(
+        single_sign_on_service_url=keycloak_realm_config.get(
             "fake_touchstone_single_sign_on_service_url"
         ),
         trust_email=True,
         validate_signature=True,
-        signing_certificate=keycloak_config.get("fake_touchstone_sig_cert"),
+        signing_certificate=keycloak_realm_config.get("fake_touchstone_sig_cert"),
         want_assertions_encrypted=True,
         want_assertions_signed=True,
         opts=resource_options,
@@ -890,14 +890,14 @@ if stack_info.env_suffix in ["ci", "qa"]:
         entity_id=f"{keycloak_url}/realms/olapps",
         authn_context_comparison_type="exact",
         sync_mode="IMPORT",
-        single_sign_on_service_url=keycloak_config.get(
+        single_sign_on_service_url=keycloak_realm_config.get(
             "okta_single_sign_on_service_url"
         ),
         want_assertions_signed=False,
         gui_order="50",
         validate_signature=False,
         hide_on_login_page=False,
-        signing_certificate=keycloak_config.get("okta_sig_cert"),
+        signing_certificate=keycloak_realm_config.get("okta_sig_cert"),
         name_id_policy_format="Email",
         want_assertions_encrypted=False,
         post_binding_authn_request=True,
@@ -950,7 +950,7 @@ if stack_info.env_suffix == "qa":
         config={
             "user-patchOp": "false",
             "fullSyncPeriod": "-1",
-            "auth-pass": keycloak_config.get("mit-open-qa-scim-password"),
+            "auth-pass": keycloak_realm_config.get("mit-open-qa-scim-password"),
             "auth-mode": "BEARER",
             "cachePolicy": "DEFAULT",
             "sync-import-action": "CREATE_LOCAL",

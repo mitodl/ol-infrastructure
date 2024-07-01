@@ -2,30 +2,30 @@
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgF6LD3AC9aDhHZ8J3SdTKTrAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM7UqV4xkz6mym2LbAAgEQgDt2BFqcsnYAUr+fyvsAmQKTBuYpEHcraW8xU6+UrD/++MwqrkxANEP5lwmE4EnM+xuIb7KntcacHB9tgw==
 config:
-  keycloak:captcha_secret_key:
+  keycloak_realm:captcha_secret_key:
     secure: v1:+2lwPPgixsEOH7Jm:YdY9hefdk89jlxKxSZ0zRDLR9KBur8s1b/RRtWLomgvlGuBQoE4KpVh/s+fl5lshzM+EN+VceaM=
-  keycloak:captcha_site_key:
+  keycloak_realm:captcha_site_key:
     secure: v1:qDXb5a4r5u14p5+0:tQYSp96mFiMQU4+20B7g2w9mBlq21WaIPI1A9XSIHSM7cNCoGmyujm9OFnu+CWoOcSiGI8LCVr4=
   keycloak:client_id: pulumi
   keycloak:client_secret:
     secure: v1:mbdWdrtlOrf/yMPw:4cu91sZzAKkYUkyxQBEtClJ49/uRp/f9nuW4uDakdRV7RW57Yf1EIqd71ovo0+TZ
-  keycloak:clients:
+  keycloak_realm:clients:
     dagster: https://pipelines.odl.mit.edu
-  keycloak:mailgun_email_host:
+  keycloak_realm:mailgun_email_host:
     secure: v1:sSbWnWxXFSf0IGt0:WFZOoW1b6Z1R2Dp9LKF/f1NARkWwNvX36muNnzAkDOw=
-  keycloak:mailgun_email_password:
+  keycloak_realm:mailgun_email_password:
     secure: v1:4zg9rULAY0Cy86vL:Z+gnZt4zF4IRcbQJRJOwuSoL2UoDmx8ig8iTvxtjor6jfFdMOfJsL99S5xtOTMz3PZhUe1osk2zkDr+Aq9f9fZjP
-  keycloak:mailgun_email_username:
+  keycloak_realm:mailgun_email_username:
     secure: v1:yCLJk0qifFGbaNIL:QpsJLdhmb/HCpA3LJsRdnR3lJuKXpqnCSfSqCFF4R5jpL7BW7132iQO47LLPAg==
-  keycloak:mailgun_reply_to_address:
+  keycloak_realm:mailgun_reply_to_address:
     secure: v1:k6AjXnlCnWLqwVhx:NHhS0Yt9Flc/vc0hcLJmfuE/CNCe92U8WbllT/KyyeouZ8UO8bAJSCTLp5Q=
-  keycloak:mit_email_host:
+  keycloak_realm:mit_email_host:
     secure: v1:1gyJ6yq3akZxkYYu:EEHQNf1bF5ScW9XFFDcW932EQZOK2wWm48OBftAr1SE=
-  keycloak:mit_email_password:
+  keycloak_realm:mit_email_password:
     secure: v1:iwlNVKpViup/xmjh:1nzhVf0/XBinQsI78YdpTcBZQiHgr9heAg+qv9T0rw==
-  keycloak:mit_email_username:
+  keycloak_realm:mit_email_username:
     secure: v1:ixrI5oZwMK2WCpQr:NaqM67NVCRDfOCsTlyrnN4tNmrPXcSOs
-  keycloak:openid_clients:
+  keycloak_realm:openid_clients:
   - client_info:
       open: ["https://api.mitopen.odl.mit.edu/*", "https://mitopen.odl.mit.edu/*"]
       open-discussions: ["https://open.mit.edu/*"]
