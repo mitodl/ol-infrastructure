@@ -600,6 +600,7 @@ heroku_vars = {
     "OLL_LEARNING_COURSE_BUCKET_PREFIX": "open-learning-library/courses/",
     "OPENSEARCH_DEFAULT_TIMEOUT": 30,
     "OPENSEARCH_INDEXING_CHUNK_SIZE": 75,
+    "PROFESSIONAL_EDUCATION_API_URL": "https://professional.mit.edu/jsonapi/node/course",
     "PROLEARN_CATALOG_API_URL": "https://prolearn.mit.edu/graphql",
     "SECURE_CROSS_ORIGIN_OPENER_POLICY": "None",
     "SEE_BASE_URL": "https://executive.mit.edu/",
