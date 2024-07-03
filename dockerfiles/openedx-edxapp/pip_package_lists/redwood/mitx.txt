@@ -10,7 +10,7 @@ ol-openedx-course-export==0.1.2
 ol-openedx-course-structure-api
 ol-openedx-logging==0.2.0
 ol-openedx-rapid-response-reports==0.3.0
-ol-openedx-sentry==0.2.0
+ol-openedx-sentry==0.2.1
 openedx-scorm-xblock>=18.0.0,<18.1.0
 pip==24.1.1
 rapid-response-xblock==0.9.1
