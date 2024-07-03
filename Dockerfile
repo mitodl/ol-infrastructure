@@ -12,7 +12,7 @@ RUN scripts/get-pants.sh -d bin &&\
     bin/pants package src/ol_concourse:ol-concourse &&\
     bin/pants package src/ol_concourse/pipelines:ol-concourse-pipelines &&\
     pip install --force-reinstall dist/*.whl &&\
-    poetry export --without-hashes -o requirements.txt &&\
+    poetry export --without-hashes --without=dev -o requirements.txt &&\
     pip install --no-cache-dir -r requirements.txt
 
 FROM python:3.11-slim
