@@ -462,7 +462,6 @@ ol_web_target_group_config = OLTargetGroupConfig(
     vpc_id=ops_vpc_id,
     health_check_interval=10,
     health_check_healthy_threshold=2,
-    health_check_matcher="404",
     health_check_path="/api/v1/info",
     health_check_port=str(DEFAULT_HTTPS_PORT),
     health_check_protocol="HTTPS",
@@ -731,7 +730,7 @@ for worker_def in concourse_config.get_object("workers") or []:
             },
         ),
     )
-    ol_web_as_setup = OLAutoScaling(
+    ol_worker_as_setup = OLAutoScaling(
         lb_config=ol_worker_lb_config,
         tg_config=ol_worker_target_group_config,
         asg_config=ol_worker_asg_config,
