@@ -51,6 +51,8 @@ class BlockDeviceMapping(BaseModel):
     device_name: str = "/dev/xvda"
     encrypted: bool = True
     kms_key_arn: Optional[pulumi.Output[str] | str] = None
+    iops: Optional[int] = None
+    throughput: Optional[int] = None
     volume_size: PositiveInt = PositiveInt(25)
     volume_type: DiskTypes = DiskTypes.ssd
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -60,7 +62,7 @@ class TagSpecification(BaseModel):
     """Container for describing a tag specification for an EC2 launch template"""
 
     resource_type: str
-    tags: dict[str, str]
+    tags: Union[pulumi.Output[dict[str, str]], dict[str, str]]
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -359,6 +361,8 @@ class OLAutoScaling(pulumi.ComponentResource):
                 ebs=LaunchTemplateBlockDeviceMappingEbsArgs(
                     volume_size=bdm.volume_size,
                     volume_type=bdm.volume_type,
+                    iops=bdm.iops,
+                    throughput=bdm.throughput,
                     delete_on_termination=bdm.delete_on_termination,
                     encrypted=bdm.encrypted,
                     kms_key_id=kms_key_id,

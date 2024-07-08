@@ -23,9 +23,18 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, Output, StackReference
-from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53
+from pulumi_aws import ec2, get_caller_identity, iam, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
+from ol_infrastructure.components.aws.auto_scale_group import (
+    BlockDeviceMapping,
+    OLAutoScaleGroupConfig,
+    OLAutoScaling,
+    OLLaunchTemplateConfig,
+    OLLoadBalancerConfig,
+    OLTargetGroupConfig,
+    TagSpecification,
+)
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -442,51 +451,21 @@ concourse_db_consul_service = Service(
 ###################################
 
 # Create load balancer for Concourse web nodes
-web_lb = lb.LoadBalancer(
-    "concourse-web-load-balancer",
-    name=concourse_web_tag,
-    ip_address_type="dualstack",
-    load_balancer_type="application",
-    enable_http2=True,
+ol_web_lb_config = OLLoadBalancerConfig(
     subnets=target_vpc["subnet_ids"],
-    security_groups=[
-        target_vpc["security_groups"]["web"],
-    ],
+    security_groups=[target_vpc["security_groups"]["web"]],
     tags=aws_config.merged_tags({"Name": concourse_web_tag}),
 )
 
 TARGET_GROUP_NAME_MAX_LENGTH = 32
-web_lb_target_group = lb.TargetGroup(
-    "concourse-web-alb-target-group",
+ol_web_target_group_config = OLTargetGroupConfig(
     vpc_id=ops_vpc_id,
-    target_type="instance",
-    port=DEFAULT_HTTPS_PORT,
-    protocol="HTTPS",
-    health_check=lb.TargetGroupHealthCheckArgs(
-        healthy_threshold=2,
-        interval=10,
-        path="/api/v1/info",
-        port=str(DEFAULT_HTTPS_PORT),
-        protocol="HTTPS",
-    ),
-    name=concourse_web_tag[:TARGET_GROUP_NAME_MAX_LENGTH],
+    health_check_interval=10,
+    health_check_healthy_threshold=2,
+    health_check_path="/api/v1/info",
+    health_check_port=str(DEFAULT_HTTPS_PORT),
+    health_check_protocol="HTTPS",
     tags=aws_config.tags,
-)
-concourse_web_acm_cert = acm.get_certificate(
-    domain="*.odl.mit.edu", most_recent=True, statuses=["ISSUED"]
-)
-concourse_web_alb_listener = lb.Listener(
-    "concourse-web-alb-listener",
-    certificate_arn=concourse_web_acm_cert.arn,
-    load_balancer_arn=web_lb.arn,
-    port=DEFAULT_HTTPS_PORT,
-    protocol="HTTPS",
-    default_actions=[
-        lb.ListenerDefaultActionArgs(
-            type="forward",
-            target_group_arn=web_lb_target_group.arn,
-        )
-    ],
 )
 
 # Create auto scale group and launch configs for Concourse web and worker
@@ -495,43 +474,31 @@ web_instance_type = (
 )
 consul_datacenter = consul_stack.require_output("datacenter")
 
-
-web_launch_config = ec2.LaunchTemplate(
-    "concourse-web-launch-template",
-    name_prefix=f"concourse-web-{stack_info.env_suffix}-",
-    description="Launch template for deploying Concourse web nodes",
-    iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
-        arn=concourse_instance_profile.arn,
-    ),
-    image_id=concourse_web_ami.id,
+ol_web_launch_config = OLLaunchTemplateConfig(
     block_device_mappings=[
-        ec2.LaunchTemplateBlockDeviceMappingArgs(
-            device_name="/dev/xvda",
-            ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                volume_size=concourse_config.get_int("web_disk_size") or 25,
-                volume_type=DiskTypes.ssd,
-                delete_on_termination=True,
-            ),
+        BlockDeviceMapping(
+            volume_size=(concourse_config.get_int("web_disk_size") or 25)
         )
     ],
-    vpc_security_group_ids=[
+    image_id=concourse_web_ami.id,
+    instance_type=InstanceTypes[web_instance_type].value,
+    instance_profile_arn=concourse_instance_profile.arn,
+    security_groups=[
         concourse_web_security_group.id,
         target_vpc["security_groups"]["web"],
         consul_security_groups["consul_agent"],
     ],
-    instance_type=InstanceTypes[web_instance_type].value,
-    key_name="oldevops",
+    tags=aws_config.tags,
     tag_specifications=[
-        ec2.LaunchTemplateTagSpecificationArgs(
+        TagSpecification(
             resource_type="instance",
             tags=aws_config.merged_tags({"Name": concourse_web_tag}),
         ),
-        ec2.LaunchTemplateTagSpecificationArgs(
+        TagSpecification(
             resource_type="volume",
             tags=aws_config.merged_tags({"Name": concourse_web_tag}),
         ),
     ],
-    tags=aws_config.tags,
     user_data=consul_datacenter.apply(
         lambda consul_dc: base64.b64encode(
             "#cloud-config\n{}".format(
@@ -604,34 +571,22 @@ web_launch_config = ec2.LaunchTemplate(
 )
 
 web_asg_config = concourse_config.get_object("web_auto_scale")
-web_asg = autoscaling.Group(
-    "concourse-web-autoscaling-group",
-    desired_capacity=web_asg_config["desired"] or 1,
+
+ol_web_asg_config = OLAutoScaleGroupConfig(
+    asg_name=f"concourse-web-{stack_info.env_suffix}",
+    aws_config=aws_config,
+    desired_size=web_asg_config["desired"] or 1,
     min_size=web_asg_config["min"] or 1,
     max_size=web_asg_config["max"] or 5,
-    health_check_type="ELB",
     vpc_zone_identifiers=target_vpc["subnet_ids"],
-    launch_template=autoscaling.GroupLaunchTemplateArgs(
-        id=web_launch_config.id, version="$Latest"
-    ),
-    instance_refresh=autoscaling.GroupInstanceRefreshArgs(
-        strategy="Rolling",
-        preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-            min_healthy_percentage=50
-        ),
-        triggers=["tag"],
-    ),
-    target_group_arns=[web_lb_target_group.arn],
-    tags=[
-        autoscaling.GroupTagArgs(
-            key=key_name,
-            value=key_value,
-            propagate_at_launch=True,
-        )
-        for key_name, key_value in aws_config.merged_tags(
-            {"ami_id": concourse_web_ami.id, "concourse_type": "web"}
-        ).items()
-    ],
+    tags=aws_config.merged_tags({"Name": concourse_web_tag}),
+)
+
+ol_web_as_setup = OLAutoScaling(
+    lb_config=ol_web_lb_config,
+    tg_config=ol_web_target_group_config,
+    asg_config=ol_web_asg_config,
+    lt_config=ol_web_launch_config,
 )
 
 
@@ -687,61 +642,41 @@ for worker_def in concourse_config.get_object("workers") or []:
         "instance_type", InstanceTypes.burstable_large.name
     )
     worker_instance_type = InstanceTypes.dereference(worker_instance_type_name)
-    worker_launch_config = ec2.LaunchTemplate(
-        f"concourse-worker-{worker_class_name}-launch-template",
-        name_prefix=f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}-",
-        description=(
-            f"Launch template for deploying concourse worker-{worker_class_name} nodes."
-        ),
-        iam_instance_profile=ec2.LaunchTemplateIamInstanceProfileArgs(
-            arn=concourse_worker_instance_profile.arn,
-        ),
-        image_id=concourse_worker_ami.id,
+
+    worker_name_tag = f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}"
+
+    ol_worker_launch_config = OLLaunchTemplateConfig(
         block_device_mappings=[
-            ec2.LaunchTemplateBlockDeviceMappingArgs(
-                device_name="/dev/xvda",
-                ebs=ec2.LaunchTemplateBlockDeviceMappingEbsArgs(
-                    iops=worker_def.get("disk_iops", 3000),
-                    throughput=worker_def.get("disk_throughput", 125),
-                    volume_size=worker_def.get("disk_size_gb", 250),
-                    volume_type=DiskTypes.ssd,
-                    delete_on_termination=True,
-                ),
+            BlockDeviceMapping(
+                volume_type=DiskTypes.ssd,  # gp3
+                volume_size=worker_def.get("disk_size_gb", 3000),
+                throughput=worker_def.get("disk_throughput", 125),
+                iops=worker_def.get("disk_iops", 3000),
+                delete_on_termination=True,
             )
         ],
-        vpc_security_group_ids=[
+        image_id=concourse_worker_ami.id,
+        instance_type=worker_instance_type,
+        instance_profile_arn=concourse_worker_instance_profile.arn,
+        security_groups=[
             concourse_worker_security_group.id,
             consul_security_groups["consul_agent"],
         ],
-        instance_type=worker_instance_type,
-        key_name="oldevops",
-        metadata_options=ec2.LaunchTemplateMetadataOptionsArgs(
-            http_endpoint="enabled",
-            http_tokens="optional",
-            http_put_response_hop_limit=5,
-            instance_metadata_tags="enabled",
-        ),
+        tags=aws_config.merged_tags({"Name": worker_name_tag}, worker_def["aws_tags"]),
         tag_specifications=[
-            ec2.LaunchTemplateTagSpecificationArgs(
+            TagSpecification(
                 resource_type="instance",
                 tags=aws_config.merged_tags(
-                    {
-                        "Name": f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}"  # noqa: E501
-                    },
-                    worker_def["aws_tags"],
+                    {"Name": worker_name_tag}, worker_def["aws_tags"]
                 ),
             ),
-            ec2.LaunchTemplateTagSpecificationArgs(
+            TagSpecification(
                 resource_type="volume",
                 tags=aws_config.merged_tags(
-                    {
-                        "Name": f"concourse-worker-{worker_class_name}-{stack_info.env_suffix}"  # noqa: E501
-                    },
-                    worker_def["aws_tags"],
+                    {"Name": worker_name_tag}, worker_def["aws_tags"]
                 ),
             ),
         ],
-        tags=aws_config.merged_tags(worker_def["aws_tags"]),
         user_data=consul_datacenter.apply(build_worker_user_data_partial),
     )
 
@@ -749,86 +684,59 @@ for worker_def in concourse_config.get_object("workers") or []:
     # aws's ability to do healthchecks and automatically swap out stalled
     # concourse workers.
     # We will never actually interact with workers via these resources.
-    worker_lb = lb.LoadBalancer(
-        f"concourse-worker-{worker_class_name}-load-balancer",
+    ol_worker_lb_config = OLLoadBalancerConfig(
         internal=True,
-        ip_address_type="dualstack",
-        load_balancer_type="application",
-        name=(
-            f"concourse-worker-alb-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}"
-        ),
-        security_groups=[concourse_worker_security_group.id],
         subnets=target_vpc["subnet_ids"],
-        tags=aws_config.merged_tags({}),
+        security_groups=[concourse_worker_security_group.id],
+        tags=aws_config.merged_tags({"Name": worker_name_tag}, worker_def["aws_tags"]),
     )
-
-    worker_target_group = lb.TargetGroup(
-        f"concourse-worker-{worker_class_name}-target-group",
+    ol_worker_target_group_config = OLTargetGroupConfig(
         vpc_id=ops_vpc_id,
-        port=CONCOURSE_WORKER_HEALTHCHECK_PORT,
-        protocol="HTTP",
-        health_check=lb.TargetGroupHealthCheckArgs(
-            healthy_threshold=2,
-            interval=60,
-            matcher="200",
-            path="/",
-            port=CONCOURSE_WORKER_HEALTHCHECK_PORT,
-            protocol="HTTP",
-            timeout=20,
-            unhealthy_threshold=5,
-        ),
-        name=f"concourse-worker-tg-{worker_class_name[:3]}-{stack_info.env_suffix[:2]}"[
-            :TARGET_GROUP_NAME_MAX_LENGTH
-        ],
-        tags=aws_config.merged_tags(worker_def["aws_tags"]),
+        health_check_interval=60,
+        health_check_healthy_threshold=2,
+        health_check_matcher="200",
+        health_check_path="/",
+        health_check_port=str(CONCOURSE_WORKER_HEALTHCHECK_PORT),
+        health_check_protocol="HTTP",
+        health_check_timeout=20,
+        health_check_unhealthy_threshold=5,
+        tags=aws_config.merged_tags({"Name": worker_name_tag}, worker_def["aws_tags"]),
     )
 
-    worker_lb_alb_listener = lb.Listener(
-        f"concourse-worker-{worker_class_name}-alb-listener",
-        load_balancer_arn=worker_lb.arn,
-        port=CONCOURSE_WORKER_HEALTHCHECK_PORT,
-        protocol="HTTP",
-        default_actions=[
-            lb.ListenerDefaultActionArgs(
-                type="forward",
-                target_group_arn=worker_target_group.arn,
-            )
-        ],
+    ol_web_asg_config = OLAutoScaleGroupConfig(
+        asg_name=f"concourse-web-{stack_info.env_suffix}",
+        aws_config=aws_config,
+        desired_size=web_asg_config["desired"] or 1,
+        min_size=web_asg_config["min"] or 1,
+        max_size=web_asg_config["max"] or 5,
+        vpc_zone_identifiers=target_vpc["subnet_ids"],
+        tags=aws_config.merged_tags({"Name": concourse_web_tag}),
     )
 
     auto_scale_config = worker_def["auto_scale"]
-    worker_asg = autoscaling.Group(
-        f"concourse-worker-{worker_class_name}-autoscaling-group",
-        desired_capacity=auto_scale_config["desired"] or 1,
+    ol_worker_asg_config = OLAutoScaleGroupConfig(
+        asg_name=f"concourse-worker-{worker_class_name}-alb",
+        aws_config=aws_config,
+        desired_size=auto_scale_config["desired"] or 1,
         min_size=auto_scale_config["min"] or 1,
-        max_size=auto_scale_config["max"] or 50,
-        health_check_type="ELB",
+        max_size=auto_scale_config["max"] or 5,
         vpc_zone_identifiers=target_vpc["subnet_ids"],
-        launch_template=autoscaling.GroupLaunchTemplateArgs(
-            id=worker_launch_config.id, version="$Latest"
+        tags=aws_config.merged_tags(
+            {"Name": worker_name_tag},
+            worker_def["aws_tags"],
+            {
+                "ami_id": concourse_worker_ami.id,
+                "concourse_type": f"worker-{worker_class_name}",
+            },
         ),
-        instance_refresh=autoscaling.GroupInstanceRefreshArgs(
-            strategy="Rolling",
-            preferences=autoscaling.GroupInstanceRefreshPreferencesArgs(
-                min_healthy_percentage=50,
-            ),
-            triggers=["tag"],
-        ),
-        tags=[
-            autoscaling.GroupTagArgs(
-                key=key_name,
-                value=key_value,
-                propagate_at_launch=True,
-            )
-            for key_name, key_value in aws_config.merged_tags(
-                {
-                    "ami_id": concourse_worker_ami.id,
-                    "concourse_type": f"worker-{worker_class_name}",
-                },
-            ).items()
-        ],
-        target_group_arns=[worker_target_group.arn],
     )
+    ol_worker_as_setup = OLAutoScaling(
+        lb_config=ol_worker_lb_config,
+        tg_config=ol_worker_target_group_config,
+        asg_config=ol_worker_asg_config,
+        lt_config=ol_worker_launch_config,
+    )
+
 
 vault.aws.AuthBackendRole(
     "concourse-worker-ami-ec2-vault-auth",
@@ -877,6 +785,6 @@ route53.Record(
     name=concourse_config.require("web_host_domain"),
     type="CNAME",
     ttl=five_minutes,
-    records=[web_lb.dns_name],
+    records=[ol_web_as_setup.load_balancer.dns_name],
     zone_id=mitodl_zone_id,
 )
