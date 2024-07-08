@@ -1,4 +1,5 @@
 * [Style Guide](#style-guide)
+* [ODL Open Discussions](#odl-open-discussions)
 * [SaltStack](#saltstack)
 * [XQueueWatcher](#xqueuewatcher)
 * [OVS](#ovs)
@@ -38,6 +39,23 @@ This will allow the oncall to get only as much Diagnosis in as required to
 identify the issue and focus on putting out the fire.
 
 # Products
+
+## ODL Open Discussions
+
+### InvalidAccessKeyNonProd qa (odl-open-discussions warning)
+
+_Diagnosis_
+
+You get an alert like "[Prometheus]: [FIRING:1] InvalidAccessKeyNonProd qa
+(odl-open-discussions warning)".
+
+_Mitigation_
+
+In the [mitodl/ol-infrastructure](https://github.com/mitodl/ol-infrastructure)
+Github repository, change directory to
+`src/mit/ol-infrastructure/src/ol_infrastructure/applications/open_discussions`
+and run `pulumi up'.
+
 
 ## SaltStack
 
