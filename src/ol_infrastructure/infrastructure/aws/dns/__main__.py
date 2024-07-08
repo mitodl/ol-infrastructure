@@ -76,6 +76,42 @@ ocw_dns_zone = route53.Zone(
     opts=ocw_opts,
 )
 
+learn_dns_name = "learn.mit.edu"
+learn_opts = zone_opts(learn_dns_name)
+learn_dns_zone = route53.Zone(
+    "learn_subdomain",
+    name=learn_dns_name,
+    comment="DNS Zone used for mitopen resources",
+    tags=AWSBase(
+        tags={"OU": BusinessUnit.mit_open, "Environment": Environment.applications}
+    ).tags,
+    opts=learn_opts,
+)
+
+podcasts_dns_name = "podcasts.mit.edu"
+podcasts_opts = zone_opts(podcasts_dns_name)
+podcasts_dns_zone = route53.Zone(
+    "podcasts_subdomain",
+    name=podcasts_dns_name,
+    comment="DNS Zone used for mitopen resources",
+    tags=AWSBase(
+        tags={"OU": BusinessUnit.mit_open, "Environment": Environment.applications}
+    ).tags,
+    opts=podcasts_opts,
+)
+
+podcast_dns_name = "podcast.mit.edu"
+podcast_opts = zone_opts(podcast_dns_name)
+podcast_dns_zone = route53.Zone(
+    "podcast_subdomain",
+    name=podcast_dns_name,
+    comment="DNS Zone used for mitopen resources",
+    tags=AWSBase(
+        tags={"OU": BusinessUnit.mit_open, "Environment": Environment.applications}
+    ).tags,
+    opts=podcast_opts,
+)
+
 export("mitxpro_legacy_zone_id", mitxpro_legacy_dns_zone.id)
 export("odl_zone_id", odl_dns_zone.id)
 export("mitxonline", {"id": mitxonline_dns_zone.id, "domain": mitxonline_dns_zone.name})
