@@ -2,6 +2,7 @@
 
 import base64
 import json
+import mimetypes
 import textwrap
 from pathlib import Path
 from string import Template
@@ -427,7 +428,25 @@ fastly_access_logging_bucket = monitoring_stack.require_output(
 fastly_access_logging_iam_role = monitoring_stack.require_output(
     "fastly_access_logging_iam_role"
 )
-
+gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
+for k, v in mimetypes.types_map.items():
+    if k in (
+        ".json",
+        ".pdf",
+        ".jpeg",
+        ".jpg",
+        ".html",
+        ".css",
+        ".js",
+        ".svg",
+        ".png",
+        ".gif",
+        ".xml",
+        ".vtt",
+        ".srt",
+    ):
+        gzip_settings["extensions"].add(k.strip("."))
+        gzip_settings["content_types"].add(v)
 mitopen_fastly_service = fastly.ServiceVcl(
     f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}",
     name=f"MIT Open {stack_info.env_suffix}",
@@ -444,6 +463,16 @@ mitopen_fastly_service = fastly.ServiceVcl(
             use_ssl=True,
         ),
     ],
+    gzips=[
+        fastly.ServiceVclGzipArgs(
+            name="enable-gzip-compression",
+            extensions=list(gzip_settings["extensions"]),
+            content_types=list(gzip_settings["content_types"]),
+        )
+    ],
+    product_enablement=fastly.ServiceVclProductEnablementArgs(
+        brotli_compression=True,
+    ),
     cache_settings=[],
     conditions=[],
     dictionaries=[],
