@@ -1,12 +1,11 @@
+from ol_infrastructure.lib.consul import get_consul_provider
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 from pulumi import ResourceOptions, StackReference
 from pulumi_consul import (
     PreparedQuery,
     PreparedQueryFailoverArgs,
     PreparedQueryTemplateArgs,
 )
-
-from ol_infrastructure.lib.consul import get_consul_provider
-from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
