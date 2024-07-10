@@ -1,10 +1,9 @@
 from typing import Literal, Union
 
-from pulumi import Config, StackReference
-from pulumi_aws import route53
-
 from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+from pulumi import Config, StackReference
+from pulumi_aws import route53
 
 xpro_dns_config = Config("xpro_dns")
 stack_info = parse_stack()

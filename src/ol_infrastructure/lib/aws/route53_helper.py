@@ -1,3 +1,5 @@
+from typing import Optional
+
 import boto3
 import pulumi
 from pulumi_aws import route53
@@ -47,20 +49,23 @@ def zone_opts(domain: str) -> pulumi.ResourceOptions:
 
 def acm_certificate_validation_records(
     validation_options: list[CertificateDomainValidationOption],
+    cert_name: str,
     zone_id: str,
     stack_info: StackInfo,
+    opts: Optional[pulumi.ResourceOptions] = None,
 ) -> list[route53.Record]:
     records_array = []
     for index, validation in enumerate(validation_options):
         records_array.append(
             route53.Record(
-                f"{stack_info.env_prefix}-acm-cert-validation-route53-record-{index}",
+                f"{cert_name}{stack_info.env_prefix}-acm-cert-validation-route53-record-{index}",
                 name=validation.resource_record_name,
                 zone_id=zone_id,
                 type=validation.resource_record_type,
                 records=[validation.resource_record_value],
                 ttl=FIVE_MINUTES,
                 allow_overwrite=True,
+                opts=opts,
             )
         )
     return records_array

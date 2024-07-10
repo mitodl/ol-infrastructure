@@ -4,10 +4,9 @@ import secrets
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from bridge.lib.magic_numbers import SECONDS_IN_ONE_DAY
-from pulumi import Config, Output, ResourceOptions
-
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
+from pulumi import Config, Output, ResourceOptions
 
 env_config = Config("environment")
 stack_info = parse_stack()
