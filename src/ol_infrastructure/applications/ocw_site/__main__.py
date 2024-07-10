@@ -889,6 +889,11 @@ for purpose in ("draft", "live", "test"):
                 name="Segmented Caching",
                 type="recv",
             ),
+            fastly.ServiceVclSnippetArgs(
+                content=snippets_dir.joinpath("strip_cookies.vcl").read_text(),
+                name="Strip cookies.",
+                type="recv",
+            ),
         ],
         logging_https=[
             fastly.ServiceVclLoggingHttpArgs(
