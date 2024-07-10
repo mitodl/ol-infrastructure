@@ -14,6 +14,7 @@ from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from pulumi import Config, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 
+from ol_infrastructure.components.aws.acm import ACMCertificate, ACMCertificateConfig
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
@@ -169,9 +170,17 @@ notes_security_group = ec2.SecurityGroup(
     vpc_id=vpc_id,
     tags=aws_config.merged_tags({"Name": notes_server_tag}),
 )
+
+cert_config = ACMCertificateConfig(
+    certificate_domain=notes_config.require("acm_cert_domain"),
+    certificate_zone_id=dns_zone_id,
+    certificate_tags=aws_config.tags,
+)
+notes_certificate = ACMCertificate(name="edx-notes", cert_config=cert_config)
+
 lb_config = OLLoadBalancerConfig(
     listener_use_acm=True,
-    listener_cert_domain=notes_config.require("acm_cert_domain"),
+    listener_cert_arn=notes_certificate.validated_certificate.certificate_arn,
     subnets=target_vpc["subnet_ids"],
     security_groups=[notes_security_group],
     tags=aws_config.merged_tags({"Name": notes_server_tag}),

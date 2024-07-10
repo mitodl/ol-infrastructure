@@ -1021,6 +1021,7 @@ edxapp_acm_cert_validation_records = (
     edxapp_web_acm_cert.domain_validation_options.apply(
         partial(
             acm_certificate_validation_records,
+            cert_name="edx-platform",
             zone_id=edxapp_zone_id,
             stack_info=stack_info,
         )

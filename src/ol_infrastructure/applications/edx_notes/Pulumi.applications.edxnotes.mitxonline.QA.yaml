@@ -4,7 +4,7 @@ encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgHMxGt/KjhBHNA7kH
 config:
   aws:region: us-east-1
   consul:address: https://consul-mitxonline-qa.odl.mit.edu
-  edxnotes:acm_cert_domain: '*.mitxonline.mit.edu'
+  edxnotes:acm_cert_domain: 'notes-qa.mitxonline.mit.edu'
   edxnotes:auto_scale:
     desired: 1
     max: 2
