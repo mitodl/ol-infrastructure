@@ -345,12 +345,14 @@ ol_consul_lt_config = OLLaunchTemplateConfig(
     tag_specifications=[
         TagSpecification(
             resource_type="instance",
-            tags=aws_config.merged_tags(
-                {
-                    "Name": f"consul-{env_name}",
-                    "consul_env": env_name,
-                    "consul_vpc": vpc_id,
-                }
+            tags=vpc_id.apply(
+                lambda v_id: aws_config.merged_tags(
+                    {
+                        "Name": f"consul-{env_name}",
+                        "consul_env": env_name,
+                        "consul_vpc": f"{v_id}",
+                    }
+                )
             ),
         ),
         TagSpecification(
