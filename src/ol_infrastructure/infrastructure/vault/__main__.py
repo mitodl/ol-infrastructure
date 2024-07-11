@@ -496,6 +496,7 @@ ol_vault_lt_config = OLLaunchTemplateConfig(
     ],
     image_id=vault_ami.id,
     instance_type=InstanceTypes[vault_instance_type].value,
+    instance_profile_arn=vault_instance_profile.arn,
     security_groups=[
         vault_security_group.id,
         target_vpc["security_groups"]["web"],
@@ -505,14 +506,18 @@ ol_vault_lt_config = OLLaunchTemplateConfig(
     tag_specifications=[
         TagSpecification(
             resource_type="instance",
-            tags=aws_config.merged_tags(
-                {"Name": f"vault-server-{env_name}", "vault_env": target_vpc["id"]}
+            tags=target_vpc.apply(
+                lambda t_vpc: aws_config.merged_tags(
+                    {"Name": f"vault-server-{env_name}", "vault_env": t_vpc["id"]}
+                )
             ),
         ),
         TagSpecification(
             resource_type="volume",
-            tags=aws_config.merged_tags(
-                {"Name": f"vault-server-{env_name}", "vault_env": target_vpc["id"]}
+            tags=target_vpc.apply(
+                lambda t_vpc: aws_config.merged_tags(
+                    {"Name": f"vault-server-{env_name}", "vault_env": t_vpc["id"]}
+                )
             ),
         ),
     ],
