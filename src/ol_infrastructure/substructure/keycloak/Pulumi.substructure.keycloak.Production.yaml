@@ -2,21 +2,22 @@
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHiiGjYUolrtj8PCnScLM7oLAdMl8nJrLjQjnqyl1LykYgF6LD3AC9aDhHZ8J3SdTKTrAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM7UqV4xkz6mym2LbAAgEQgDt2BFqcsnYAUr+fyvsAmQKTBuYpEHcraW8xU6+UrD/++MwqrkxANEP5lwmE4EnM+xuIb7KntcacHB9tgw==
 config:
+  keycloak:client_id: pulumi
+  keycloak:client_secret:
+    secure: v1:mbdWdrtlOrf/yMPw:4cu91sZzAKkYUkyxQBEtClJ49/uRp/f9nuW4uDakdRV7RW57Yf1EIqd71ovo0+TZ
+  keycloak:url: https://sso.ol.mit.edu
   keycloak_realm:captcha_secret_key:
     secure: v1:+2lwPPgixsEOH7Jm:YdY9hefdk89jlxKxSZ0zRDLR9KBur8s1b/RRtWLomgvlGuBQoE4KpVh/s+fl5lshzM+EN+VceaM=
   keycloak_realm:captcha_site_key:
     secure: v1:qDXb5a4r5u14p5+0:tQYSp96mFiMQU4+20B7g2w9mBlq21WaIPI1A9XSIHSM7cNCoGmyujm9OFnu+CWoOcSiGI8LCVr4=
-  keycloak:client_id: pulumi
-  keycloak:client_secret:
-    secure: v1:mbdWdrtlOrf/yMPw:4cu91sZzAKkYUkyxQBEtClJ49/uRp/f9nuW4uDakdRV7RW57Yf1EIqd71ovo0+TZ
   keycloak_realm:clients:
     dagster: https://pipelines.odl.mit.edu
   keycloak_realm:mailgun_email_host:
     secure: v1:sSbWnWxXFSf0IGt0:WFZOoW1b6Z1R2Dp9LKF/f1NARkWwNvX36muNnzAkDOw=
   keycloak_realm:mailgun_email_password:
-    secure: v1:4zg9rULAY0Cy86vL:Z+gnZt4zF4IRcbQJRJOwuSoL2UoDmx8ig8iTvxtjor6jfFdMOfJsL99S5xtOTMz3PZhUe1osk2zkDr+Aq9f9fZjP
+    secure: v1:szLW/8z8wFWWoKg5:1P+ydXEaokdzXZ/b7hYEStrR3q9bMB//UH2FhlU116O7OXdg9CUZ0em9OaLi1jCVjoBc0zOQJYVq8DZVD785yE4G
   keycloak_realm:mailgun_email_username:
-    secure: v1:yCLJk0qifFGbaNIL:QpsJLdhmb/HCpA3LJsRdnR3lJuKXpqnCSfSqCFF4R5jpL7BW7132iQO47LLPAg==
+    secure: v1:j07wuh/TTLkO473J:NZ/98PovITQ5SjTXJV2gF7L4J8FMMNKlk+aboNb64u46GgBZ09wtrHeRUuU=
   keycloak_realm:mailgun_reply_to_address:
     secure: v1:k6AjXnlCnWLqwVhx:NHhS0Yt9Flc/vc0hcLJmfuE/CNCe92U8WbllT/KyyeouZ8UO8bAJSCTLp5Q=
   keycloak_realm:mit_email_host:
@@ -38,6 +39,5 @@ config:
   - client_info:
       superset: ["https://bi.ol.mit.edu/*", "superset_admin", "superset_alpha", "superset_gamma"]
     realm_name: ol-data-platform
-  keycloak:url: https://sso.ol.mit.edu
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

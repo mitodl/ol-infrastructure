@@ -2,22 +2,23 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgETHpUoPHq8nk5V5ShbAMblAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM/6mAXRBgS3I1VQlGAgEQgDvak3BSMtx3oePo+tc1MB9+b7JL+Wg0mkYgtcnDSE4lKh8a2pyC0F5r1SnrCk07qeE5X+ILCCVeKXMxMA==
 config:
-  keycloak_realm:captcha_secret_key:
-    secure: v1:0rzny4yCmScyk1pd:NEIDV3vOiMk/LIEhX8zNQKQ4LvJRnxisIW2PHkmDBzelbv4OLKn1dEjGlL1JVYl46x5wNQeB+bg=
-  keycloak_realm:captcha_site_key:
-    secure: v1:aENSMQV0vjeQN08n:NmNlETb+0/25uHoO87KKMC4olyRSQXuUY8UWl8rdRcYsfC5vQ1zbhC8ki8DIVVGQZgMriIuzJIM=
   keycloak:client_id:
     secure: v1:BkWbaZVoElrjHJm7:Ti69EMKQfvYtLDcrKJZTankVy12gSw==
   keycloak:client_secret:
     secure: v1:ewmG5VqfRwLxrPmA:IcEVxEohrtStaYX4xkr3B3QLVM592Kej6XKky+XWZrRTtzXgzoSfE+BfQ1hmi9Ij
+  keycloak:url: https://sso-qa.ol.mit.edu
+  keycloak_realm:captcha_secret_key:
+    secure: v1:0rzny4yCmScyk1pd:NEIDV3vOiMk/LIEhX8zNQKQ4LvJRnxisIW2PHkmDBzelbv4OLKn1dEjGlL1JVYl46x5wNQeB+bg=
+  keycloak_realm:captcha_site_key:
+    secure: v1:aENSMQV0vjeQN08n:NmNlETb+0/25uHoO87KKMC4olyRSQXuUY8UWl8rdRcYsfC5vQ1zbhC8ki8DIVVGQZgMriIuzJIM=
   keycloak_realm:fake_touchstone_sig_cert: MIIDqDCCApCgAwIBAgIGAYs/J+MfMA0GCSqGSIb3DQEBCwUAMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTAeFw0yMzEwMTcxOTQwMDBaFw0zMzEwMTcxOTQxMDBaMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALDoKB8rTJG0QcSZdGasCXOdZOfj7o5XQcEks3KyWWrGpqLl2zQE5ZX79Tn+vpx8nse55u3uW9v9aqPv4V2Ou7GL+koCBdnyA2ogvT8vAw4IKfniz5/B42eoLjG/hX4L0qdsCLX/4Xd3TDNw018P6dkro7jierBz1vs7P1gAEmgh8qulDKEG+fZIU73hFG7QUMHEVqwEz+us/0rPq0LHr1/enXlltuQGwGoC7eoEmA1lNdQwUKl4lAMjNal/PcOfIIkbP9VZyqKRt59wCwDgd9bs/Gq5wTWqegA1jBhyuwgklVlwXLcGBIiQ1Kx3PQYonHgjj4Njgtt9Uh2MTJ/f5I0CAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAFXMr24C5awhD0XBgA1f+YtZUmt5i461L9uoLm8KVStVqDgwrKXmMc3zcrugw0i5SAwtrUfEKAI9jpkRcha/ve1GKcbnFnmpclE6igdbCeDWNRlGa2JjaznqYIDsnJyn41JRNnu69IaQ/2V3MGbxcF9BfqPl1NHkfGFYJgq4e48zW+AMuQkvSRF5SaQvWm+66L/Q7TnY8wlzgR4rrWd0DKKaJy81ucBottzB1n8h13phEgqznH7bfjG6oHXfGxf+R8o/vj2EbfHg8A4Jgh90NSsN1Cb2e86pDq24qT+yso/3mh0GX0ge+PD+YH5aC5h0fbxJbGlf5G7e9N3TRne0ckQ== # pragma: allowlist secret # noqa: E501
   keycloak_realm:fake_touchstone_single_sign_on_service_url: https://dev-66940844.okta.com/app/dev-66940844_oldevtouchstoneqa_1/exkcta3wbyYMdAMAP5d7/sso/saml
   keycloak_realm:mailgun_email_host:
     secure: v1:AzBV96IWvDteok9U:mHNiirRpuQpeO7jC0oS0Tl88hF5fOaqn4f/+xyct+yI=
   keycloak_realm:mailgun_email_password:
-    secure: v1:fTHlR+nfiP6STZlG:UTG6u4CUIG3DCkxDfNvIuaH2Hhs9zkqkE7tkeGVVP1/zr4cJZwggxrqyr4B2xUsaqHOcA9gE2tCqjC0YQSjsE0WS
+    secure: v1:GK8CdR+fMwG8SUHU:NQst2z606Csyc+kjqvbrqx6AmgJhf6asRVxn8QlO9GsI1laph24QnBCXeB18bubi1u2wqRA67RyLzAwfO4qaOGFi
   keycloak_realm:mailgun_email_username:
-    secure: v1:TB4igRgfdRp1Y8qr:1bFY5MyTO6MBlwihuNlOgM1xBAPu6/6P+IfmTR/2ZRsWolm2tn5mXU+vMTq3QPFMLQ==
+    secure: v1:TfpaJKet+1dR7zPW:uH/rZTfcHuW/+DmQNzeowgCQk8uw3Fi31ZN+UZkUBXnBYbUCZZGjYxYxMuSvuY4=
   keycloak_realm:mailgun_reply_to_address:
     secure: v1:uRDOLOjIW6qFgbcO:kyGfXZcMIUw0IQ36MEL0ujQoYDJdNCAaljl9j7uI1k5LCWVQm/cz5S7mOkz/+68=
   keycloak_realm:mit-open-qa-scim-password:
@@ -44,6 +45,5 @@ config:
       superset: ["https://bi-qa.ol.mit.edu/*", "superset_admin", "superset_alpha",
         "superset_gamma"]
     realm_name: ol-data-platform
-  keycloak:url: https://sso-qa.ol.mit.edu
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
