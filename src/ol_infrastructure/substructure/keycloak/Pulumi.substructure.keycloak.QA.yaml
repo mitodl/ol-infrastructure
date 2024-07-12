@@ -6,10 +6,6 @@ config:
     secure: v1:BkWbaZVoElrjHJm7:Ti69EMKQfvYtLDcrKJZTankVy12gSw==
   keycloak:client_secret:
     secure: v1:ewmG5VqfRwLxrPmA:IcEVxEohrtStaYX4xkr3B3QLVM592Kej6XKky+XWZrRTtzXgzoSfE+BfQ1hmi9Ij
-  keycloak:mailgun_email_password:
-    secure: v1:5a90Mv/M4e0CwnNx:GPpfbltq+CoJm4gcsOFKdC5QANngDRfVlRPh4zsH4n1scAkZWqIYZE2lkiZHwJ7x2gxwSRP4eYFSC5liouYVWCYz
-  keycloak:mailgun_email_username:
-    secure: v1:5fy1Vo9FCoT5Uk8Z:XuxQjPFxTZ+0GZFGVNUf0F6AjAMTqMmh856l2GPqIZu5iDe3T7IeZ341owb27CE=
   keycloak:url: https://sso-qa.ol.mit.edu
   keycloak_realm:captcha_secret_key:
     secure: v1:0rzny4yCmScyk1pd:NEIDV3vOiMk/LIEhX8zNQKQ4LvJRnxisIW2PHkmDBzelbv4OLKn1dEjGlL1JVYl46x5wNQeB+bg=
@@ -20,9 +16,9 @@ config:
   keycloak_realm:mailgun_email_host:
     secure: v1:AzBV96IWvDteok9U:mHNiirRpuQpeO7jC0oS0Tl88hF5fOaqn4f/+xyct+yI=
   keycloak_realm:mailgun_email_password:
-    secure: v1:fTHlR+nfiP6STZlG:UTG6u4CUIG3DCkxDfNvIuaH2Hhs9zkqkE7tkeGVVP1/zr4cJZwggxrqyr4B2xUsaqHOcA9gE2tCqjC0YQSjsE0WS
+    secure: v1:GK8CdR+fMwG8SUHU:NQst2z606Csyc+kjqvbrqx6AmgJhf6asRVxn8QlO9GsI1laph24QnBCXeB18bubi1u2wqRA67RyLzAwfO4qaOGFi
   keycloak_realm:mailgun_email_username:
-    secure: v1:TB4igRgfdRp1Y8qr:1bFY5MyTO6MBlwihuNlOgM1xBAPu6/6P+IfmTR/2ZRsWolm2tn5mXU+vMTq3QPFMLQ==
+    secure: v1:TfpaJKet+1dR7zPW:uH/rZTfcHuW/+DmQNzeowgCQk8uw3Fi31ZN+UZkUBXnBYbUCZZGjYxYxMuSvuY4=
   keycloak_realm:mailgun_reply_to_address:
     secure: v1:uRDOLOjIW6qFgbcO:kyGfXZcMIUw0IQ36MEL0ujQoYDJdNCAaljl9j7uI1k5LCWVQm/cz5S7mOkz/+68=
   keycloak_realm:mit-open-qa-scim-password:

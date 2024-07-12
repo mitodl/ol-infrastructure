@@ -5,10 +5,6 @@ config:
   keycloak:client_id: pulumi
   keycloak:client_secret:
     secure: v1:mbdWdrtlOrf/yMPw:4cu91sZzAKkYUkyxQBEtClJ49/uRp/f9nuW4uDakdRV7RW57Yf1EIqd71ovo0+TZ
-  keycloak:mailgun_email_password:
-    secure: v1:FSbXwQ1CxlTHTdYx:6MeC7MT3fTFR52qVTBxXBf6Ic2WbwCAxjWQSgr4Sf8GB0zfYtFJpGi7mK54idUivKC7H4qJoMX8xt30SOBP8stbU
-  keycloak:mailgun_email_username:
-    secure: v1:gtHzgnPCwsxt+URU:Z6jI+P2sao5cVwHcZ0TSbJsO/HAqJ6k8GDjXCN5iqUsV5EGst0eXX+Y2c3Q=
   keycloak:url: https://sso.ol.mit.edu
   keycloak_realm:captcha_secret_key:
     secure: v1:+2lwPPgixsEOH7Jm:YdY9hefdk89jlxKxSZ0zRDLR9KBur8s1b/RRtWLomgvlGuBQoE4KpVh/s+fl5lshzM+EN+VceaM=
@@ -19,9 +15,9 @@ config:
   keycloak_realm:mailgun_email_host:
     secure: v1:sSbWnWxXFSf0IGt0:WFZOoW1b6Z1R2Dp9LKF/f1NARkWwNvX36muNnzAkDOw=
   keycloak_realm:mailgun_email_password:
-    secure: v1:4zg9rULAY0Cy86vL:Z+gnZt4zF4IRcbQJRJOwuSoL2UoDmx8ig8iTvxtjor6jfFdMOfJsL99S5xtOTMz3PZhUe1osk2zkDr+Aq9f9fZjP
+    secure: v1:szLW/8z8wFWWoKg5:1P+ydXEaokdzXZ/b7hYEStrR3q9bMB//UH2FhlU116O7OXdg9CUZ0em9OaLi1jCVjoBc0zOQJYVq8DZVD785yE4G
   keycloak_realm:mailgun_email_username:
-    secure: v1:yCLJk0qifFGbaNIL:QpsJLdhmb/HCpA3LJsRdnR3lJuKXpqnCSfSqCFF4R5jpL7BW7132iQO47LLPAg==
+    secure: v1:j07wuh/TTLkO473J:NZ/98PovITQ5SjTXJV2gF7L4J8FMMNKlk+aboNb64u46GgBZ09wtrHeRUuU=
   keycloak_realm:mailgun_reply_to_address:
     secure: v1:k6AjXnlCnWLqwVhx:NHhS0Yt9Flc/vc0hcLJmfuE/CNCe92U8WbllT/KyyeouZ8UO8bAJSCTLp5Q=
   keycloak_realm:mit_email_host:
