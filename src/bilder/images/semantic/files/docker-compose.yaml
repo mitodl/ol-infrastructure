@@ -19,7 +19,7 @@ services:
     - 8000:8000
     env_file: .env
   watch:
-    image: node:20.15.0@sha256:93d2e801dabc677ea0b30b47d3d729fab63ecb20be7ac0ab204cc3c65731297a
+    image: node:20.15.1@sha256:786005cf39792f7046bcd66491056c26d2dbcc669c072d1a1e4ef4fcdddd26eb
     working_dir: /app
     command: >
       /bin/bash -c 'npm install && npm run start'
