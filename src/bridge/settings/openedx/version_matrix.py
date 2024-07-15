@@ -520,6 +520,7 @@ ReleaseMap: dict[
                 application="learning",
                 application_type="MFE",
                 release="master",
+                branding_overrides=default_branding_overrides,
                 translation_overrides=[
                     "atlas pull -r mitodl/mitxonline-translations -n main translations/frontend-app-learning/src/i18n/messages:src/i18n/messages/frontend-app-learning",  # noqa: E501
                     "node_modules/@edx/frontend-platform/i18n/scripts/intl-imports.js frontend-app-learning",  # noqa: E501
