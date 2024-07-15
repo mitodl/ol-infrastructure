@@ -162,15 +162,14 @@ build-static-assets-nonprod:
   IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
     RUN pip install --no-warn-script-location --user --no-cache-dir "edx-proctoring-proctortrack==1.2.1"
   END
+  ENV STATIC_ROOT_LMS="/openedx/staticfiles"
   ENV NODE_ENV=prod
   ARG --required DEPLOYMENT_NAME
-  RUN openedx-assets xmodule \
-    && openedx-assets npm \
-    && openedx-assets collect --settings=mitol.assets \
-    && openedx-assets webpack --env=prod 2> /dev/null \
-    && openedx-assets common \
-    && paver compile_sass --theme-dirs /openedx/themes/ --themes $DEPLOYMENT_NAME \
-    && openedx-assets collect --settings=mitol.assets \
+  RUN npm run postinstall \
+    && npm run webpack 2> /dev/null \
+    && npm run compile-sass -- --theme-dir /openedx/themes/ --theme $DEPLOYMENT_NAME \
+    && python manage.py lms collectstatic --noinput --settings=mitol.assets \
+    && python manage.py cms collectstatic --noinput --settings=mitol.assets \
     && rdfind -makesymlinks true -followsymlinks true /openedx/staticfiles/ \
     && mkdir -p /openedx/data/export_course_repos \
     && mkdir -p /openedx/data/var/log/edx \
@@ -188,15 +187,14 @@ build-static-assets-production:
   IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
     RUN pip install --no-warn-script-location --user --no-cache-dir "edx-proctoring-proctortrack==1.2.1"
   END
+  ENV STATIC_ROOT_LMS="/openedx/staticfiles"
   ENV NODE_ENV=prod
   ARG --required DEPLOYMENT_NAME
-  RUN openedx-assets xmodule \
-    && openedx-assets npm \
-    && openedx-assets collect --settings=mitol.assets \
-    && openedx-assets webpack --env=prod 2> /dev/null \
-    && openedx-assets common \
-    && paver compile_sass --theme-dirs /openedx/themes/ --themes $DEPLOYMENT_NAME \
-    && openedx-assets collect --settings=mitol.assets \
+  RUN npm run postinstall \
+    && npm run webpack 2> /dev/null \
+    && npm run compile-sass -- --theme-dir /openedx/themes/ --theme $DEPLOYMENT_NAME \
+    && python manage.py lms collectstatic --noinput --settings=mitol.assets \
+    && python manage.py cms collectstatic --noinput --settings=mitol.assets \
     && rdfind -makesymlinks true -followsymlinks true /openedx/staticfiles/ \
     && mkdir -p /openedx/data/export_course_repos \
     && mkdir -p /openedx/data/var/log/edx \
