@@ -715,7 +715,7 @@ for worker_def in concourse_config.get_object("workers") or []:
 
     auto_scale_config = worker_def["auto_scale"]
     ol_worker_asg_config = OLAutoScaleGroupConfig(
-        asg_name=f"concourse-worker-{worker_class_name}-alb",
+        asg_name=f"concourse-worker-{stack_info.env_suffix}-{worker_class_name}-alb",
         aws_config=aws_config,
         desired_size=auto_scale_config["desired"] or 1,
         min_size=auto_scale_config["min"] or 1,
