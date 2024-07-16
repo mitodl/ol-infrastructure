@@ -18,7 +18,20 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 postgres_role_statements = {
     "approle": {
-        "create": Template("CREATE ROLE ${app_name};"),
+        "create": Template(
+            """CREATE ROLE ${app_name};
+          GRANT CREATE ON SCHEMA public TO ${app_name} WITH GRANT OPTION;
+          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${app_name}"
+             WITH GRANT OPTION;
+          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "${app_name}"
+             WITH GRANT OPTION;
+          SET ROLE "${app_name}";
+          ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA public
+            GRANT ALL PRIVILEGES ON TABLES TO "${app_name}" WITH GRANT OPTION;
+          ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA public
+            GRANT ALL PRIVILEGES ON SEQUENCES TO "${app_name}" WITH GRANT OPTION;
+          RESET ROLE;"""
+        ),
         "revoke": Template("DROP ROLE ${app_name};"),
     },
     "admin": {
@@ -49,17 +62,6 @@ postgres_role_statements = {
         "create": Template(
             """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
             VALID UNTIL '{{expiration}}' IN ROLE "${app_name}" INHERIT;
-          GRANT CREATE ON SCHEMA public TO ${app_name} WITH GRANT OPTION;
-          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${app_name}"
-             WITH GRANT OPTION;
-          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "${app_name}"
-             WITH GRANT OPTION;
-          SET ROLE "${app_name}";
-          ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA public
-            GRANT ALL PRIVILEGES ON TABLES TO "${app_name}" WITH GRANT OPTION;
-          ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA public
-            GRANT ALL PRIVILEGES ON SEQUENCES TO "${app_name}" WITH GRANT OPTION;
-          RESET ROLE;
           ALTER ROLE "{{name}}" SET ROLE "${app_name}";"""
         ),
         "revoke": Template(
