@@ -19,7 +19,7 @@ services:
   ## Apache Tika Server
   tika:
     # We can't use the antideluvian version we had as it's not docker compatible.
-    image: apache/tika:2.9.2.1-full@sha256:ae0b86d3c4d06d8997407fcb08f31a7259fff91c43e0c1d7fffdad1e9ade3fe8
+    image: {{ context.DOCKER_REPO_NAME }}@{{ context.DOCKER_IMAGE_DIGEST }}
     # Use custom script as entrypoint to go fetch models and setup recognisers
     restart: on-failure
     ports:

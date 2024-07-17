@@ -53,6 +53,17 @@ VERSIONS = {
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
 
+DOCKER_REPO_NAME = os.environ.get("DOCKER_REPO_NAME", "apache/tika")
+DOCKER_IMAGE_DIGEST = os.environ.get("DOCKER_IMAGE_DIGEST")
+
+# Preload the docker image
+server.shell(
+    name=f"Preload {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",
+    commands=[
+        f"/usr/bin/docker pull {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",
+    ],
+)
+
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
@@ -127,11 +138,15 @@ traefik_config = TraefikConfig(
 traefik_conf_directory = traefik_config.configuration_directory
 configure_traefik(traefik_config)
 
-files.put(
+files.template(
     name="Place the Tika docker-compose.yaml file",
-    src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml")),
+    src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml.j2")),
     dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
     mode="0664",
+    context={
+        "DOCKER_REPO_NAME": DOCKER_REPO_NAME,
+        "DOCKER_IMAGE_DIGEST": DOCKER_IMAGE_DIGEST,
+    },
 )
 
 vault_template_permissions(vault_config)
