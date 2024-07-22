@@ -207,7 +207,7 @@ class OLAutoScaling(pulumi.ComponentResource):
     auto_scale_group: Group = None
     launch_template: LaunchTemplate = None
 
-    def __init__(  # noqa: C901, PLR0913, PLR0912
+    def __init__(  # noqa: C901, PLR0912
         self,
         asg_config: OLAutoScaleGroupConfig,
         lt_config: OLLaunchTemplateConfig,
