@@ -13,6 +13,7 @@ from enum import Enum
 from string import Template
 from typing import Optional, Union
 
+import pulumi_postgresql
 from bridge.lib.magic_numbers import (
     DEFAULT_MONGODB_PORT,
     DEFAULT_MYSQL_PORT,
@@ -158,6 +159,50 @@ class OLVaultDatabaseBackend(ComponentResource):
             data=credentials_dict,
             **{db_config.db_type: db_option_dict},
         )
+
+        if db_config.db_type == DBEngines.postgres:
+            postgres_provider = pulumi_postgresql.Provider(
+                opts=resource_opts.merge(ResourceOptions(parent=self.db_connection)),
+                database=db_config.db_name,
+                username=db_config.db_admin_username,
+                password=db_config.db_admin_password,
+                host=db_config.db_host,
+                max_connections=1,
+                port=db_config.db_port,
+            )
+            application_role = pulumi_postgresql.Role(
+                name="application",
+                login=False,
+                inherit=True,
+                opts=resource_opts.merge(
+                    ResourceOptions(
+                        parent=postgres_provider, provider=postgres_provider
+                    )
+                ),
+            )
+            admin_role = pulumi_postgresql.Role(
+                name="adminrole",
+                login=False,
+                superuser=True,
+                roles=["rds_superuser"],
+                inherit=True,
+                opts=resource_opts.merge(
+                    ResourceOptions(
+                        parent=postgres_provider, provider=postgres_provider
+                    )
+                ),
+            )
+            read_only_role = pulumi_postgresql.Role(
+                name="readonly",
+                login=False,
+                inherit=True,
+                opts=resource_opts.merge(
+                    ResourceOptions(
+                        parent=postgres_provider, provider=postgres_provider
+                    )
+                ),
+            )
+            # Create the roles
 
         self.db_roles = {}
         for role_name, role_defs in db_config.role_statements.items():
