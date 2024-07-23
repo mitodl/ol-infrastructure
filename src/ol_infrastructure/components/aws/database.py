@@ -13,6 +13,7 @@ from enum import Enum
 from typing import Optional, Union
 
 import pulumi
+import pulumi_postgresql
 from pulumi_aws import rds
 from pulumi_aws.ec2 import SecurityGroup
 from pydantic import (
@@ -36,6 +37,7 @@ from ol_infrastructure.lib.aws.rds_helper import (
     engine_major_version,
     max_minor_version,
     parameter_group_family,
+    postgres_role_structure,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 
@@ -176,6 +178,61 @@ class OLMariaDBConfig(OLDBConfig):
         {"name": "collation_connection", "value": "utf8mb4_unicode_ci"},
         {"name": "time_zone", "value": "UTC"},
     ]
+
+
+class OLPostgresDatabaseRoles(pulumi.ComponentResource):
+    """Component resource for creating role resources within postgresql datbases"""
+
+    def __init__(
+        self,
+        db_config: OLDBConfig,
+        db_instance: rds.Instance,
+        opts: Optional[pulumi.ResourceOptions] = None,
+    ):
+        super().__init__(
+            f"ol:infrastructure:aws:{db_config.engine}:db-roles",
+            f"{db_config.instance_name}-{db_config.engine}-database-roles",
+            None,
+            opts,
+        )
+        resource_opts = pulumi.ResourceOptions.merge(
+            pulumi.ResourceOptions(parent=self), opts
+        )
+        postgres_provider = pulumi_postgresql.Provider(
+            f"{db_config.instance_name}-{db_config.engine}-postgres-provider",
+            opts=resource_opts.merge(pulumi.ResourceOptions(parent=self)),
+            database=db_config.db_name,
+            username=db_config.username,
+            password=db_config.password.get_secret_value(),
+            host=db_instance.address.apply(lambda address: f"{address}"),
+            max_connections=1,
+            port=db_config.port,
+        )
+        for role_name, grants in postgres_role_structure.items():
+            role = pulumi_postgresql.Role(
+                f"{db_config.instance_name}-{db_config.engine}-postgres-role-{role_name}",
+                name=role_name,
+                login=False,
+                inherit=True,
+                opts=resource_opts.merge(
+                    pulumi.ResourceOptions(
+                        provider=postgres_provider,
+                        parent=postgres_provider,
+                    )
+                ),
+            )
+            for grant_args in grants:
+                pulumi_postgresql.Grant(
+                    database=postgres_provider.database,
+                    role=role.name,
+                    opts=resource_opts.merge(
+                        pulumi.ResourceOptions(
+                            provider=postgres_provider,
+                            parent=role,
+                        )
+                    ),
+                    **grant_args,
+                )
 
 
 class OLAmazonDB(pulumi.ComponentResource):
@@ -338,6 +395,13 @@ class OLAmazonDB(pulumi.ComponentResource):
                     **alarm_args,
                 )
                 OLCloudWatchAlarmSimpleRDS(alarm_config=alarm_config)
+
+        if db_config.engine == "postgres":
+            OLPostgresDatabaseRoles(
+                db_config=db_config,
+                db_instance=self.db_instance,
+                opts=resource_options,
+            )
 
     def _get_default_monitoring_profile(self, profile_name: str):
         if profile_name == "disabled":

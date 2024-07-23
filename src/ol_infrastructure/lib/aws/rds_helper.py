@@ -81,3 +81,33 @@ def parameter_group_family(engine: str, engine_version: str) -> str:
         Engine=engine, EngineVersion=engine_version
     )
     return engine_details["DBEngineVersions"][0]["DBParameterGroupFamily"]
+
+
+"""
+dict[str, List[dict[kwargs to GrantArgs, Any]]]
+"""
+postgres_role_structure = {
+    "application-role": [
+        {
+            "resource_name": "application-role-grant-create-on-schema-public",
+            "object_type": "schema",
+            "privileges": ["CREATE"],
+            "schema": "public",
+            "with_grant_option": True,
+        },
+        {
+            "resource_name": "application-role-grant-all-on-tables",
+            "object_type": "table",
+            "privileges": ["ALL"],
+            "schema": "public",
+            "with_grant_option": True,
+        },
+        {
+            "resource_name": "application-role-grant-all-on-sequences",
+            "object_type": "sequence",
+            "privileges": ["ALL"],
+            "schema": "public",
+            "with_grant_option": True,
+        },
+    ],
+}
