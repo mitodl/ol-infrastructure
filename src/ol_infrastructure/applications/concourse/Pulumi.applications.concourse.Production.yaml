@@ -37,8 +37,8 @@ config:
     instance_type: general_purpose_xlarge
     name: ocw
   - auto_scale:
-      desired: 3
-      max: 5
+      desired: 5
+      max: 10
       min: 2
     aws_tags:
       OU: operations
