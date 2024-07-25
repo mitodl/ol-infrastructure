@@ -121,7 +121,13 @@ server.shell(
     name=f"Preload Airbyte containers for version {VERSIONS['airbyte']}",
     commands=["/usr/bin/docker compose pull"],
     _chdir=DOCKER_COMPOSE_DIRECTORY,
-    _env={"AIRBYTE_VERSION": VERSIONS["airbyte"]},
+    _env={
+        "VERSION": VERSIONS["airbyte"],
+        "WORKSPACE_ROOT": "/tmp/workspace",  # noqa: S108
+        "WORKSPACE_DOCKER_MOUNT": "airbyte_workspace",
+        "LOCAL_ROOT": "/tmp/airbyte_local",  # noqa: S108
+        "CONFIG_ROOT": "/data",
+    },
 )
 
 files.put(
