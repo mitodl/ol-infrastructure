@@ -136,7 +136,7 @@ class OLDBConfig(AWSBase):
             raise ValueError(msg)
         return monitoring_profile_name
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def engine_version(self) -> str:
         return self.is_valid_version(

@@ -2182,7 +2182,7 @@ class ConcourseWorkerConfig(ConcourseBaseConfig):
     def serialize_tags(self, tags: list[str]) -> str:
         return ",".join(tags)
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def additional_resource_types_directory(self) -> Path:
         """The sub-path to use underneat the configured deploy_directory."""
