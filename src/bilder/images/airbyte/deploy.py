@@ -121,6 +121,12 @@ files.file(
     touch=True,
 )
 
+files.file(
+    name="Create dummy .env_traefik_forward_auth file for image pulling",
+    path=DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth"),
+    touch=True,
+)
+
 # Preload some docker images. This will accelerate the first startup
 # but prolong the image build.
 server.shell(
