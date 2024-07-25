@@ -115,6 +115,12 @@ files.put(
     mode="0664",
 )
 
+files.file(
+    name="Create dummy .env file for image pulling",
+    path=DOCKER_COMPOSE_DIRECTORY.joinpath(".env"),
+    touch=True,
+)
+
 # Preload some docker images. This will accelerate the first startup
 # but prolong the image build.
 server.shell(
