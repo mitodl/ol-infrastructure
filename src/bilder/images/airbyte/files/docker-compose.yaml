@@ -24,7 +24,6 @@ services:
     depends_on:
     - webapp
     - server
-    - airbyte-api-server
   traefik-forward-auth:
     image: thomseddon/traefik-forward-auth:2
     container_name: traefik-forward-auth
@@ -138,20 +137,14 @@ services:
     - LOCAL_ROOT=${LOCAL_ROOT}
     - LOG_CONNECTOR_MESSAGES=${LOG_CONNECTOR_MESSAGES}
     - LOG_LEVEL=${LOG_LEVEL}
-    - MAX_CHECK_WORKERS=${MAX_CHECK_WORKERS}
-    - MAX_DISCOVER_WORKERS=${MAX_DISCOVER_WORKERS}
     - MAX_NOTIFY_WORKERS=${MAX_NOTIFY_WORKERS}
-    - MAX_SPEC_WORKERS=${MAX_SPEC_WORKERS}
+    - MAX_CHECK_WORKERS=${MAX_CHECK_WORKERS}
     - MAX_SYNC_WORKERS=${MAX_SYNC_WORKERS}
     - METRIC_CLIENT=${METRIC_CLIENT}
     - MICROMETER_METRICS_ENABLED=${MICROMETER_METRICS_ENABLED}
     - MICROMETER_METRICS_STATSD_FLAVOR=${MICROMETER_METRICS_STATSD_FLAVOR}
     - MICRONAUT_ENVIRONMENTS=${WORKERS_MICRONAUT_ENVIRONMENTS}
     - MICRONAUT_SERVER_MAX_REQUEST_SIZE=31457280 # 30 Megabytes
-    - NORMALIZATION_JOB_MAIN_CONTAINER_CPU_LIMIT=${NORMALIZATION_JOB_MAIN_CONTAINER_CPU_LIMIT}
-    - NORMALIZATION_JOB_MAIN_CONTAINER_CPU_REQUEST=${NORMALIZATION_JOB_MAIN_CONTAINER_CPU_REQUEST}
-    - NORMALIZATION_JOB_MAIN_CONTAINER_MEMORY_LIMIT=${NORMALIZATION_JOB_MAIN_CONTAINER_MEMORY_LIMIT}
-    - NORMALIZATION_JOB_MAIN_CONTAINER_MEMORY_REQUEST=${NORMALIZATION_JOB_MAIN_CONTAINER_MEMORY_REQUEST}
     - OTEL_COLLECTOR_ENDPOINT=${OTEL_COLLECTOR_ENDPOINT}
     - PUBLISH_METRICS=${PUBLISH_METRICS}
     - SECRET_PERSISTENCE=${SECRET_PERSISTENCE}
@@ -227,8 +220,8 @@ services:
     - MAX_NOTIFY_WORKERS=5
     - MICROMETER_METRICS_ENABLED=${MICROMETER_METRICS_ENABLED}
     - MICROMETER_METRICS_STATSD_FLAVOR=${MICROMETER_METRICS_STATSD_FLAVOR}
-    - MICRONAUT_SERVER_MAX_REQUEST_SIZE=15728640 # 15 Megabytes
     - MICRONAUT_ENVIRONMENTS=${SERVER_MICRONAUT_ENVIRONMENTS}
+    - MICRONAUT_SERVER_MAX_REQUEST_SIZE=31457280 # 30 Megabytes
     - NEW_SCHEDULER=${NEW_SCHEDULER}
     - PUBLISH_METRICS=${PUBLISH_METRICS}
     - SECRET_PERSISTENCE=${SECRET_PERSISTENCE}
@@ -278,7 +271,12 @@ services:
     - KEYCLOAK_INTERNAL_HOST=localhost   # placeholder to ensure the webapp's nginx config is valid
     labels:
     - "traefik.enable=true"
+    - "traefik.http.middlewares.airbyte-api-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
     - "traefik.http.middlewares.dagster-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
+    - "traefik.http.routers.airbyte-api.middlewares=airbyte-api-auth"
+    - "traefik.http.routers.airbyte-api.rule=((Host(`airbyte-api.service.consul`)\
+      \ || Host(`api-${AIRBYTE_HOSTNAME}`)) && PathPrefix(`/v1`))"
+    - "traefik.http.routers.airbyte-api.tls=true"
     - "traefik.http.routers.dagster.middlewares=dagster-auth"
     - "traefik.http.routers.dagster.rule=((Host(`airbyte.service.consul`) || Host(`config-${AIRBYTE_HOSTNAME}`))\
       \ && PathPrefix(`/api/v1`))"
@@ -287,6 +285,8 @@ services:
     - "traefik.http.routers.public.rule=(Host(`${AIRBYTE_HOSTNAME}`) || Path(`/api/health`))"
     - "traefik.http.routers.public.service=public"
     - "traefik.http.routers.public.tls=true"
+    - "traefik.http.services.airbyte-api.loadbalancer.server.port=8080"
+    - "traefik.http.services.dagster.loadbalancer.server.port=8080"
     - "traefik.http.services.public.loadbalancer.server.port=8080"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
@@ -344,7 +344,7 @@ services:
     - MICROMETER_METRICS_ENABLED=${MICROMETER_METRICS_ENABLED}
     - MICROMETER_METRICS_STATSD_FLAVOR=${MICROMETER_METRICS_STATSD_FLAVOR}
     - MICRONAUT_ENVIRONMENTS=${CRON_MICRONAUT_ENVIRONMENTS}
-    - MICRONAUT_SERVER_MAX_REQUEST_SIZE=15728640 # 15 Megabytes
+    - MICRONAUT_SERVER_MAX_REQUEST_SIZE=31457280 # 30 Megabytes
     - PUBLISH_METRICS=${PUBLISH_METRICS}
     - SEGMENT_WRITE_KEY=${SEGMENT_WRITE_KEY}
     - STATSD_HOST=${STATSD_HOST}
@@ -361,49 +361,6 @@ services:
     - flags
     volumes:
     - workspace:${WORKSPACE_ROOT}
-    networks:
-    - airbyte_internal
-    depends_on:
-      bootloader:
-        condition: service_completed_successfully
-    env_file:
-    - ./.env
-  airbyte-api-server:
-    image: airbyte/airbyte-api-server:${VERSION}
-    logging: *default-logging
-    container_name: airbyte-api-server
-    restart: unless-stopped
-    ports:
-    - "8006"
-    labels:
-    - "traefik.enable=true"
-    - "traefik.http.middlewares.airbyte-api-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
-    - "traefik.http.middlewares.airbyte-api-prefix.stripprefix.prefixes=/api"
-    - "traefik.http.routers.airbyte-api.rule=((Host(`airbyte-api.service.consul`)\
-      \ || Host(`api-${AIRBYTE_HOSTNAME}`)) && PathPrefix(`/api/v1`))"
-    - "traefik.http.routers.airbyte-api.tls=true"
-    - "traefik.http.routers.airbyte-api.middlewares=airbyte-api-auth,airbyte-api-prefix"
-    - "traefik.http.services.airbyte-api.loadbalancer.server.port=8006"
-    - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
-    - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
-    environment:
-    - AIRBYTE_API_HOST=${AIRBYTE_API_HOST}
-    - AIRBYTE_VERSION=${VERSION}
-    - DEPLOYMENT_MODE=${DEPLOYMENT_MODE}
-    - INTERNAL_API_HOST=${INTERNAL_API_HOST}   # Non-ideal, but the existing URL can't have https:// added because it's used for nginx conf
-    - LOG_LEVEL=${LOG_LEVEL}
-    - MICROMETER_METRICS_ENABLED=${MICROMETER_METRICS_ENABLED}
-    - MICROMETER_METRICS_STATSD_FLAVOR=${MICROMETER_METRICS_STATSD_FLAVOR}
-    - SEGMENT_WRITE_KEY=${SEGMENT_WRITE_KEY}
-    - STATSD_HOST=${STATSD_HOST}
-    - STATSD_PORT=${STATSD_PORT}
-    - TRACKING_STRATEGY=${TRACKING_STRATEGY}
-    - DD_LOGS_INJECTION=${DD_LOGS_INJECTION}
-    - JAVA_OPTS=${JAVA_OPTS}
-    - CONTAINER_ORCHESTRATOR_JAVA_OPTS=${CONTAINER_ORCHESTRATOR_JAVA_OPTS}
-    - DD_DOGSTATSD_PORT=${DD_DOGSTATSD_PORT}
-    - DD_TRACE_AGENT_PORT=${DD_TRACE_AGENT_PORT}
-    - DD_AGENT_HOST=${DD_AGENT_HOST}
     networks:
     - airbyte_internal
     depends_on:
