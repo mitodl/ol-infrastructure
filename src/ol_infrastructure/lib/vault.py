@@ -45,6 +45,32 @@ postgres_role_statements = {
           DROP USER "{{name}}";"""
         ),
     },
+    "application-user": {
+        "create": Template(
+            """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+            VALID UNTIL '{{expiration}}' IN ROLE "application-role" INHERIT;
+            """
+        ),
+        "revoke": Template(
+            """REVOKE "application-role" FROM "{{name}}";
+            REVOKE USAGE ON SCHEMA public FROM "{{name}}";
+            DROP USER "{{name}}";
+            """
+        ),
+    },
+    "readonly-user": {
+        "create": Template(
+            """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+             VALID UNTIL '{{expiration}}' IN ROLE "readonly-role" INHERIT;
+             """
+        ),
+        "revoke": Template(
+            """REVOKE "readonly-role" FROM "{{name}}";
+            REVOKE USAGE ON SCHEMA public FROM "{{name}}";
+            DROP USER "{{name}}";
+            """
+        ),
+    },
     "app": {
         "create": Template(
             """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'

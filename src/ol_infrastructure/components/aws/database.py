@@ -180,7 +180,7 @@ class OLMariaDBConfig(OLDBConfig):
     ]
 
 
-class OLPostgresDatabaseRoles(pulumi.ComponentResource):
+class OLPostgresDBRoles(pulumi.ComponentResource):
     """Component resource for creating role resources within postgresql datbases"""
 
     def __init__(
@@ -208,7 +208,7 @@ class OLPostgresDatabaseRoles(pulumi.ComponentResource):
             max_connections=1,
             port=db_config.port,
         )
-        for role_name, grants in postgres_role_structure.items():
+        for role_name, permissions in postgres_role_structure.items():
             role = pulumi_postgresql.Role(
                 f"{db_config.instance_name}-{db_config.engine}-postgres-role-{role_name}",
                 name=role_name,
@@ -221,7 +221,7 @@ class OLPostgresDatabaseRoles(pulumi.ComponentResource):
                     )
                 ),
             )
-            for grant_args in grants:
+            for grant_args in permissions["grants"]:
                 pulumi_postgresql.Grant(
                     database=postgres_provider.database,
                     role=role.name,
@@ -232,6 +232,21 @@ class OLPostgresDatabaseRoles(pulumi.ComponentResource):
                         )
                     ),
                     **grant_args,
+                )
+            for default_privilege_args in permissions["default_privileges"]:
+                (
+                    pulumi_postgresql.DefaultPrivileges(
+                        database=postgres_provider.database,
+                        owner=role.name,
+                        role=role.name,
+                        opts=resource_opts.merge(
+                            pulumi.ResourceOptions(
+                                provider=postgres_provider,
+                                parent=role,
+                            )
+                        ),
+                        **default_privilege_args,
+                    ),
                 )
 
 
@@ -397,10 +412,12 @@ class OLAmazonDB(pulumi.ComponentResource):
                 OLCloudWatchAlarmSimpleRDS(alarm_config=alarm_config)
 
         if db_config.engine == "postgres":
-            OLPostgresDatabaseRoles(
+            OLPostgresDBRoles(
                 db_config=db_config,
                 db_instance=self.db_instance,
-                opts=resource_options,
+                opts=resource_options.merge(
+                    pulumi.ResourceOptions(parent=self.db_instance)
+                ),
             )
 
     def _get_default_monitoring_profile(self, profile_name: str):

@@ -1,3 +1,5 @@
+# ruff: noqa: E501
+
 from collections import defaultdict
 from enum import Enum, unique
 from functools import lru_cache
@@ -87,27 +89,79 @@ def parameter_group_family(engine: str, engine_version: str) -> str:
 dict[str, List[dict[kwargs to GrantArgs, Any]]]
 """
 postgres_role_structure = {
-    "application-role": [
-        {
-            "resource_name": "application-role-grant-create-on-schema-public",
-            "object_type": "schema",
-            "privileges": ["CREATE"],
-            "schema": "public",
-            "with_grant_option": True,
-        },
-        {
-            "resource_name": "application-role-grant-all-on-tables",
-            "object_type": "table",
-            "privileges": ["ALL"],
-            "schema": "public",
-            "with_grant_option": True,
-        },
-        {
-            "resource_name": "application-role-grant-all-on-sequences",
-            "object_type": "sequence",
-            "privileges": ["ALL"],
-            "schema": "public",
-            "with_grant_option": True,
-        },
-    ],
+    "application-role": {
+        "grants": [
+            {
+                "resource_name": "application-role-grant-create-on-schema-public",
+                "object_type": "schema",
+                "privileges": ["CREATE"],
+                "schema": "public",
+                "with_grant_option": True,
+            },
+            {
+                "resource_name": "application-role-grant-all-on-tables-schema-public",
+                "object_type": "table",
+                "privileges": ["ALL"],
+                "schema": "public",
+                "with_grant_option": True,
+            },
+            {
+                "resource_name": "application-role-grant-all-on-sequences-schema-public",
+                "object_type": "sequence",
+                "privileges": ["ALL"],
+                "schema": "public",
+                "with_grant_option": True,
+            },
+        ],
+        "default_privileges": [
+            {
+                "resource_name": "application-role-def-privs-all-on-tables-schema-public",
+                "object_type": "table",
+                "privileges": ["ALL"],
+                "schema": "public",
+                "with_grant_option": True,
+            },
+            {
+                "resource_name": "application-role-def-privs-all-on-sequences-schema-public",
+                "object_type": "sequence",
+                "privileges": ["ALL"],
+                "schema": "public",
+                "with_grant_option": True,
+            },
+        ],
+    },
+    "readonly-role": {
+        "default_privileges": [
+            {
+                "resource_name": "readonly-role-def-privs-select-on-tables-schema-public",
+                "object_type": "table",
+                "privileges": ["SELECT"],
+                "schema": "public",
+                "with_grant_option": True,
+            },
+            {
+                "resource_name": "readonly-role-def-privs-select-on-sequences-schema-public",
+                "object_type": "sequence",
+                "privileges": ["SELECT"],
+                "schema": "public",
+                "with_grant_option": True,
+            },
+        ],
+        "grants": [
+            {
+                "resource_name": "readonly-role-grant-select-on-all-tables-schema-public",
+                "object_type": "schema",
+                "privileges": ["SELECT"],
+                "schema": "public",
+                "with_grant_option": True,
+            },
+            {
+                "resource_name": "readonly-role-grant-select-on-all-sequences-schema-public",
+                "object_type": "table",
+                "privileges": ["SELECT"],
+                "schema": "public",
+                "with_grant_option": True,
+            },
+        ],
+    },
 }
