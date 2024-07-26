@@ -506,6 +506,7 @@ mitopen_fastly_service = fastly.ServiceVcl(
                 set req.http.orig-req-url = req.url;
                 declare local var.org_qs STRING;
                 set var.org_qs = req.url.qs;
+                unset req.http.Cookie;
 
                 # If the request does not end in a slash and does not contain a period, error to redirect
                 if (req.url.path !~ "\/$" && req.url.basename !~ "\." ) {
