@@ -7,7 +7,7 @@ GitPython==3.1.43
 idna==3.7
 newrelic==8.11.0
 numpy==1.26.4
-path==16.14.0
+path==16.15.0
 path.py==12.5.0
 PyYAML==6.0.1
 requests==2.32.3
