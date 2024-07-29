@@ -1,6 +1,7 @@
+# ruff: noqa: E501, S604
 """Creation and revocation statements used for Vault role definitions."""
 
-# These strings are passed through the `.format` method so the variables that need to remain in the template  # noqa: E501
+# These strings are passed through the `.format` method so the variables that need to remain in the template
 # to be passed to Vault are wrapped in 4 pairs of braces. TMM 2020-09-01
 
 import json
@@ -17,11 +18,81 @@ from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 postgres_role_statements = {
-    "approle": {
-        "create": Template("CREATE ROLE ${app_name};"),
-        "revoke": Template("DROP ROLE ${app_name};"),
+    "bootstrap": {
+        "create": Template(
+            """
+            -- Create application role and assign privs
+            CREATE ROLE application_role;
+            GRANT CREATE ON SCHEMA public TO application_role WITH GRANT OPTION;
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "application_role"
+               WITH GRANT OPTION;
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "application_role"
+               WITH GRANT OPTION;
+            SET ROLE "application_role";
+            ALTER DEFAULT PRIVILEGES FOR ROLE "application_role" IN SCHEMA public
+                GRANT ALL PRIVILEGES ON TABLES TO "application_role" WITH GRANT OPTION;
+            ALTER DEFAULT PRIVILEGES FOR ROLE "application_role" IN SCHEMA public
+                GRANT ALL PRIVILEGES ON SEQUENCES TO "application_role" WITH GRANT OPTION;
+            RESET ROLE;
+            -- Create read-only role and assign privs
+            CREATE ROLE read_only_role;
+            GRANT SELECT ON ALL TABLES IN SCHEMA public TO "read_only_role";
+            GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO "read_only_role";
+            SET ROLE "read_only_role";
+            ALTER DEFAULT PRIVILEGES FOR USER "read_only_role" IN SCHEMA public GRANT SELECT
+               ON TABLES TO "read_only_role";
+            ALTER DEFAULT PRIVILEGES FOR USER "read_only_role" IN SCHEMA public GRANT SELECT
+               ON SEQUENCES TO "read_only_role";
+            RESET ROLE;
+            """
+        ),
+        "revoke": Template(
+            """
+            -- Not supported
+            """
+        ),
     },
-    "admin": {
+    "app_user": {
+        "create": Template(
+            """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+            VALID UNTIL '{{expiration}}' IN ROLE "application_role" INHERIT;
+            ALTER ROLE "{{name}}" SET ROLE "application_role";
+          """
+        ),
+        "revoke": Template(
+            """REVOKE "application_role" FROM "{{name}}";
+            GRANT "{{name}}" TO application_role WITH ADMIN OPTION;
+            SET ROLE application_role;
+            REASSIGN OWNED BY "{{name}}" TO "application_role";
+            RESET ROLE;
+            DROP OWNED BY "{{name}}";
+            REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";
+            REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
+            REVOKE USAGE ON SCHEMA public FROM "{{name}}";
+            DROP USER "{{name}}";"""
+        ),
+    },
+    "read_only_user": {
+        "create": Template(
+            """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+            VALID UNTIL '{{expiration}}' IN ROLE "read_only_role" INHERIT;
+            ALTER ROLE "{{name}}" SET ROLE "read_only_role";
+          """
+        ),
+        "revoke": Template(
+            """REVOKE "read_only_role" FROM "{{name}}";
+            GRANT "{{name}}" TO read_only_role WITH ADMIN OPTION;
+            SET ROLE read_only_role;
+            REASSIGN OWNED BY "{{name}}" TO "read_only_role";
+            RESET ROLE;
+            DROP OWNED BY "{{name}}";
+            REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";
+            REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
+            REVOKE USAGE ON SCHEMA public FROM "{{name}}";
+            DROP USER "{{name}}";"""
+        ),
+    },
+    "admin": {  # Continue to use the legacy style creation for admin users
         "create": Template(
             """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
              VALID UNTIL '{{expiration}}' IN ROLE "rds_superuser"
@@ -45,7 +116,11 @@ postgres_role_statements = {
           DROP USER "{{name}}";"""
         ),
     },
-    "app": {
+    "approle": {  # Legacy endpoint
+        "create": Template("CREATE ROLE ${app_name};"),
+        "revoke": Template("DROP ROLE ${app_name};"),
+    },
+    "app": {  # Legacy endpoint
         "create": Template(
             """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
             VALID UNTIL '{{expiration}}' IN ROLE "${app_name}" INHERIT;
@@ -75,7 +150,7 @@ postgres_role_statements = {
           DROP USER "{{name}}";"""
         ),
     },
-    "readonly": {
+    "readonly": {  # Legacy endpoint
         "create": Template(
             """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
              VALID UNTIL '{{expiration}}';

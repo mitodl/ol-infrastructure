@@ -100,12 +100,12 @@ concourse_config_map = {
             "{{ end }}"
         ),
         database_user=(
-            '{{ with secret "postgres-concourse/creds/app" }}'
+            '{{ with secret "postgres-concourse/creds/app_user" }}'
             "{{ .Data.username }}"
             "{{ end }}"
         ),
         database_password=(  # noqa: S106
-            '{{ with secret "postgres-concourse/creds/app" }}'
+            '{{ with secret "postgres-concourse/creds/app_user" }}'
             "{{ .Data.password }}"
             "{{ end }}"
         ),
