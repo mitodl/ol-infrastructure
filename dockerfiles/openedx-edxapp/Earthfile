@@ -119,7 +119,6 @@ collected:
   ENV REVISION_CFG /openedx/config/revisions.yml
   ENV LMS_CFG /openedx/config/lms.env.yml
   ENV CMS_CFG /openedx/config/cms.env.yml
-  ENV DJANGO_SETTINGS_MODULE lms.envs.production
   ENV NO_PYTHON_UNINSTALL 1
   ENV NO_PREREQ_INSTALL 0
 
@@ -148,7 +147,6 @@ fetch-translations:
       atlas pull $OPENEDX_ATLAS_OPTIONS \
         translations/studio-frontend/src/i18n/messages:conf/plugins-locale/studio-frontend && \
       python manage.py cms compilejsi18n
-    ENV DJANGO_SETTINGS_MODULE lms.envs.production
   END
   SAVE ARTIFACT /openedx/edx-platform /edx-platform
 
@@ -159,17 +157,17 @@ build-static-assets-nonprod:
   RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/django-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/olxcleaner.git@2f0d6c7f126cbd69c9724b7b57a0b2565330a297#egg=olxcleaner"
-  IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
-    RUN pip install --no-warn-script-location --user --no-cache-dir "edx-proctoring-proctortrack==1.2.1"
-  END
-  ENV STATIC_ROOT_LMS="/openedx/staticfiles"
+  ENV STATIC_ROOT_LMS=/openedx/staticfiles/
   ENV NODE_ENV=prod
+  ENV DJANGO_SETTINGS_MODULE=lms.envs.mitol.assets
   ARG --required DEPLOYMENT_NAME
-  RUN npm run postinstall \
+  RUN mkdir -p $STATIC_ROOT_LMS && npm run postinstall \
     && npm run compile-sass -- --theme-dir /openedx/themes/ --theme $DEPLOYMENT_NAME \
-    && python manage.py lms collectstatic --noinput --settings=mitol.assets \
-    && python manage.py cms collectstatic --noinput --settings=mitol.assets \
+    && python manage.py lms collectstatic --noinput \
+    && python manage.py cms collectstatic --noinput \
     && npm run webpack 2> /dev/null \
+    && python manage.py lms collectstatic --noinput \
+    && python manage.py cms collectstatic --noinput \
     && rdfind -makesymlinks true -followsymlinks true /openedx/staticfiles/ \
     && mkdir -p /openedx/data/export_course_repos \
     && mkdir -p /openedx/data/var/log/edx \
@@ -184,17 +182,17 @@ build-static-assets-production:
   RUN pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/codejail.git@babbe784b48bb9888aa159d8b401cbe5e07f0af4#egg=codejail" \
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/django-wiki.git@0a1d555a1fa2834cc46367968aad907a5667317b#egg=django_wiki" \
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/olxcleaner.git@2f0d6c7f126cbd69c9724b7b57a0b2565330a297#egg=olxcleaner"
-  IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
-    RUN pip install --no-warn-script-location --user --no-cache-dir "edx-proctoring-proctortrack==1.2.1"
-  END
-  ENV STATIC_ROOT_LMS="/openedx/staticfiles"
+  ENV STATIC_ROOT_LMS=/openedx/staticfiles/
   ENV NODE_ENV=prod
+  ENV DJANGO_SETTINGS_MODULE=lms.envs.mitol.assets
   ARG --required DEPLOYMENT_NAME
-  RUN npm run postinstall \
+  RUN mkdir -p $STATIC_ROOT_LMS && npm run postinstall \
     && npm run compile-sass -- --theme-dir /openedx/themes/ --theme $DEPLOYMENT_NAME \
-    && python manage.py lms collectstatic --noinput --settings=mitol.assets \
-    && python manage.py cms collectstatic --noinput --settings=mitol.assets \
+    && python manage.py lms collectstatic --noinput \
+    && python manage.py cms collectstatic --noinput \
     && npm run webpack 2> /dev/null \
+    && python manage.py lms collectstatic --noinput \
+    && python manage.py cms collectstatic --noinput \
     && rdfind -makesymlinks true -followsymlinks true /openedx/staticfiles/ \
     && mkdir -p /openedx/data/export_course_repos \
     && mkdir -p /openedx/data/var/log/edx \
