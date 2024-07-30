@@ -563,6 +563,8 @@ edxapp_mysql_role_statements["edxapp"] = {
         "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp.* TO '{{name}}'@'%';"
     ),
     "revoke": Template("DROP USER '{{name}}';"),
+    "renew": [],
+    "rollback": [],
 }
 edxapp_mysql_role_statements["edxapp-csmh"] = {
     "create": Template(
@@ -572,6 +574,8 @@ edxapp_mysql_role_statements["edxapp-csmh"] = {
         "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh.* TO '{{name}}'@'%';"
     ),
     "revoke": Template("DROP USER '{{name}}';"),
+    "renew": [],
+    "rollback": [],
 }
 edxapp_mysql_role_statements["xqueue"] = {
     "create": Template(
@@ -581,6 +585,8 @@ edxapp_mysql_role_statements["xqueue"] = {
         "CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue.* TO '{{name}}'@'%';"
     ),
     "revoke": Template("DROP USER '{{name}}';"),
+    "renew": [],
+    "rollback": [],
 }
 edxapp_mysql_role_statements["notes"] = {
     "create": Template(
@@ -590,6 +596,8 @@ edxapp_mysql_role_statements["notes"] = {
         "CREATE TEMPORARY TABLES, LOCK TABLES ON edx_notes_api.* TO '{{name}}'@'%';"
     ),
     "revoke": Template("DROP USER '{{name}}';"),
+    "renew": [],
+    "rollback": [],
 }
 
 edxapp_db_vault_backend_config = OLVaultMysqlDatabaseConfig(

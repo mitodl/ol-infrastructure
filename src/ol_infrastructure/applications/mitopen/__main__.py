@@ -376,6 +376,8 @@ mitopen_role_statements["app"] = {
           REVOKE USAGE ON SCHEMA external FROM "{{name}}";
           DROP USER "{{name}}";"""
     ),
+    "renew": [],
+    "rollback": [],
 }
 mitopen_role_statements["reverse-etl"] = {
     "create": Template(
@@ -398,6 +400,8 @@ mitopen_role_statements["reverse-etl"] = {
           REVOKE USAGE ON SCHEMA external FROM "{{name}}";
           DROP USER "{{name}}";"""
     ),
+    "renew": [],
+    "rollback": [],
 }
 
 
