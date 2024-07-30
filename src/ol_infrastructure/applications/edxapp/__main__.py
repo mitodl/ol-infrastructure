@@ -996,7 +996,7 @@ studio_web_lb_target_group = lb.TargetGroup(
         healthy_threshold=3,
         timeout=10,
         interval=30,
-        path="/heartbeat",
+        path="/user_api/v1/account/login_session/",
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",
     ),
