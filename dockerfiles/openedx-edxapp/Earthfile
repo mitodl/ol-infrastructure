@@ -159,7 +159,6 @@ build-static-assets-nonprod:
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/olxcleaner.git@2f0d6c7f126cbd69c9724b7b57a0b2565330a297#egg=olxcleaner"
   ENV STATIC_ROOT_LMS=/openedx/staticfiles/
   ENV NODE_ENV=prod
-  ENV DJANGO_SETTINGS_MODULE=lms.envs.mitol.assets
   ARG --required DEPLOYMENT_NAME
   RUN mkdir -p $STATIC_ROOT_LMS && npm run postinstall \
     && npm run compile-sass -- --theme-dir /openedx/themes/ --theme $DEPLOYMENT_NAME \
@@ -184,7 +183,6 @@ build-static-assets-production:
     && pip install --no-warn-script-location --user --no-cache-dir -e "git+https://github.com/openedx/olxcleaner.git@2f0d6c7f126cbd69c9724b7b57a0b2565330a297#egg=olxcleaner"
   ENV STATIC_ROOT_LMS=/openedx/staticfiles/
   ENV NODE_ENV=prod
-  ENV DJANGO_SETTINGS_MODULE=lms.envs.mitol.assets
   ARG --required DEPLOYMENT_NAME
   RUN mkdir -p $STATIC_ROOT_LMS && npm run postinstall \
     && npm run compile-sass -- --theme-dir /openedx/themes/ --theme $DEPLOYMENT_NAME \
