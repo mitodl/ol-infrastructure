@@ -163,11 +163,11 @@ build-static-assets-nonprod:
   ARG --required DEPLOYMENT_NAME
   RUN mkdir -p $STATIC_ROOT_LMS && npm run postinstall \
     && npm run compile-sass -- --theme-dir /openedx/themes/ --theme $DEPLOYMENT_NAME \
-    && python manage.py lms collectstatic --noinput \
-    && python manage.py cms collectstatic --noinput \
+    && python manage.py lms collectstatic --noinput --settings=mitol.assets \
+    && python manage.py cms collectstatic --noinput --settings=mitol.assets \
     && npm run webpack 2> /dev/null \
-    && python manage.py lms collectstatic --noinput \
-    && python manage.py cms collectstatic --noinput \
+    && python manage.py lms collectstatic --noinput --settings=mitol.assets \
+    && python manage.py cms collectstatic --noinput --settings=mitol.assets \
     && rdfind -makesymlinks true -followsymlinks true /openedx/staticfiles/ \
     && mkdir -p /openedx/data/export_course_repos \
     && mkdir -p /openedx/data/var/log/edx \
@@ -188,11 +188,11 @@ build-static-assets-production:
   ARG --required DEPLOYMENT_NAME
   RUN mkdir -p $STATIC_ROOT_LMS && npm run postinstall \
     && npm run compile-sass -- --theme-dir /openedx/themes/ --theme $DEPLOYMENT_NAME \
-    && python manage.py lms collectstatic --noinput \
-    && python manage.py cms collectstatic --noinput \
+    && python manage.py lms collectstatic --noinput --settings=mitol.assets \
+    && python manage.py cms collectstatic --noinput --settings=mitol.assets \
     && npm run webpack 2> /dev/null \
-    && python manage.py lms collectstatic --noinput \
-    && python manage.py cms collectstatic --noinput \
+    && python manage.py lms collectstatic --noinput --settings=mitol.assets \
+    && python manage.py cms collectstatic --noinput --settings=mitol.assets \
     && rdfind -makesymlinks true -followsymlinks true /openedx/staticfiles/ \
     && mkdir -p /openedx/data/export_course_repos \
     && mkdir -p /openedx/data/var/log/edx \
