@@ -18,192 +18,222 @@ from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 postgres_role_statements = {
-    "bootstrap": {
-        "create": [
+    "admin": {
+        "create": [  # We use the prexisting rds_superuser role for admin users
             Template(
                 """
-            -- Create application role and assign privs
-            CREATE ROLE application_role;
-            GRANT CREATE ON SCHEMA public TO application_role WITH GRANT OPTION;
-            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "application_role"
-               WITH GRANT OPTION;
-            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "application_role"
-               WITH GRANT OPTION;
-            SET ROLE "application_role";
-            ALTER DEFAULT PRIVILEGES FOR ROLE "application_role" IN SCHEMA public
-                GRANT ALL PRIVILEGES ON TABLES TO "application_role" WITH GRANT OPTION;
-            ALTER DEFAULT PRIVILEGES FOR ROLE "application_role" IN SCHEMA public
-                GRANT ALL PRIVILEGES ON SEQUENCES TO "application_role" WITH GRANT OPTION;
-            RESET ROLE;
-            -- Create read-only role and assign privs
-            CREATE ROLE read_only_role;
-            GRANT SELECT ON ALL TABLES IN SCHEMA public TO "read_only_role";
-            GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO "read_only_role";
-            SET ROLE "read_only_role";
-            ALTER DEFAULT PRIVILEGES FOR USER "read_only_role" IN SCHEMA public GRANT SELECT
-               ON TABLES TO "read_only_role";
-            ALTER DEFAULT PRIVILEGES FOR USER "read_only_role" IN SCHEMA public GRANT SELECT
-               ON SEQUENCES TO "read_only_role";
-            RESET ROLE;
-            """
-            )
-        ],
-        "revoke": [
+                CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+                VALID UNTIL '{{expiration}}' IN ROLE "rds_superuser"
+                INHERIT CREATEROLE CREATEDB;
+                """
+            ),
             Template(
                 """
-            -- Not supported
-            """
-            )
-        ],
-        "renew": [],
-        "rollback": [],
-    },
-    "app_user": {
-        "create": [
+                GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{{name}}"
+                WITH GRANT OPTION;
+                """
+            ),
             Template(
-                """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
-            VALID UNTIL '{{expiration}}' IN ROLE "application_role" INHERIT;
-            ALTER ROLE "{{name}}" SET ROLE "application_role";
-          """
-            )
+                """
+                GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{{name}}"
+                WITH GRANT OPTION;
+                """
+            ),
         ],
         "revoke": [
+            # Remove the user from the pre-existing rds_superuser role
+            Template("""REVOKE "rds_superuser" FROM "{{name}}";"""),
+            # Ensure that the application role can do creations
             Template(
-                """REVOKE "application_role" FROM "{{name}}";
-            GRANT "{{name}}" TO application_role WITH ADMIN OPTION;
-            SET ROLE application_role;
-            REASSIGN OWNED BY "{{name}}" TO "application_role";
-            RESET ROLE;
-            DROP OWNED BY "{{name}}";
-            REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";
-            REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
-            REVOKE USAGE ON SCHEMA public FROM "{{name}}";
-            DROP USER "{{name}}";"""
-            )
+                """GRANT CREATE ON SCHEMA public TO ${app_name} WITH GRANT OPTION;"""
+            ),
+            # Put this user into the app role temporarily
+            Template("""GRANT "{{name}}" TO ${app_name} WITH ADMIN OPTION;"""),
+            # Change ownership to the app role for anything that might belong to this user
+            Template("""SET ROLE ${app_name};"""),
+            Template("""REASSIGN OWNED BY "{{name}}" TO "${app_name}";"""),
+            Template("""RESET ROLE;"""),
+            # Drop anything that remains owned by this user (hopefully nothing ...)
+            Template("""DROP OWNED BY "{{name}}";"""),
+            # Take any permissions assigned directly to this user away
+            Template(
+                """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";"""
+            ),
+            Template(
+                """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";"""
+            ),
+            Template("""REVOKE USAGE ON SCHEMA public FROM "{{name}}";"""),
+            # Finally, drop this user from the database
+            Template("""DROP USER "{{name}}";"""),
         ],
         "renew": [],
         "rollback": [],
     },
-    "read_only_user": {
+    "app": {
         "create": [
+            # Check if the role exists and create it if not
             Template(
-                """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
-            VALID UNTIL '{{expiration}}' IN ROLE "read_only_role" INHERIT;
-            ALTER ROLE "{{name}}" SET ROLE "read_only_role";
-          """
-            )
+                """
+                DO
+                $$do$$
+                BEGIN
+                   IF EXISTS (
+                      SELECT FROM pg_catalog.pg_roles
+                      WHERE  rolname = '{app_name}') THEN
+                   ELSE
+                      BEGIN   -- nested block
+                         CREATE ROLE {app_name};
+                      EXCEPTION
+                         WHEN duplicate_object THEN
+                            RAISE NOTICE 'Role "{app_name}" was just created by a concurrent transaction. Skipping.';
+                      END;
+                   END IF;
+                END
+                $$do$$;
+                """
+            ),
+            # Set/refresh the default privileges for the new role
+            Template(
+                """GRANT CREATE ON SCHEMA public TO ${app_name} WITH GRANT OPTION;"""
+            ),
+            Template("""
+                GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${app_name}"
+                WITH GRANT OPTION;
+                """),
+            Template(
+                """
+                GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "${app_name}"
+                WITH GRANT OPTION;
+                """
+            ),
+            Template("""SET ROLE "${app_name}";"""),
+            Template(
+                """
+                ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA public
+                GRANT ALL PRIVILEGES ON TABLES TO "${app_name}" WITH GRANT OPTION;
+                """
+            ),
+            Template(
+                """
+                ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA public
+                GRANT ALL PRIVILEGES ON SEQUENCES TO "${app_name}" WITH GRANT OPTION;
+                """
+            ),
+            Template("""RESET ROLE;"""),
+            # Create the user in ${app_name}
+            Template(
+                """
+                CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+                VALID UNTIL '{{expiration}}' IN ROLE "${app_name}" INHERIT;
+                """
+            ),
+            # Make sure things done by the new user belong to role and not the user
+            Template("""ALTER ROLE "{{name}}" SET ROLE "${app_name}";"""),
         ],
         "revoke": [
+            # Remove the user from the app role
+            Template("""REVOKE "${app_name}" FROM "{{name}}";"""),
+            # Put the user back into the app role but as an administrator
+            Template("""GRANT "{{name}}" TO ${app_name} WITH ADMIN OPTION;"""),
+            # Change ownership to the app role for anything that might belong to this user
+            Template("""SET ROLE ${app_name};"""),
+            Template("""REASSIGN OWNED BY "{{name}}" TO "${app_name}";"""),
+            Template("""RESET ROLE;"""),
+            # Drop anything that remains owned by this user (hopefully nothing ...)
+            Template("""DROP OWNED BY "{{name}}";"""),
+            # Take any permissions assigned directly to this user away
             Template(
-                """REVOKE "read_only_role" FROM "{{name}}";
-            GRANT "{{name}}" TO read_only_role WITH ADMIN OPTION;
-            SET ROLE read_only_role;
-            REASSIGN OWNED BY "{{name}}" TO "read_only_role";
-            RESET ROLE;
-            DROP OWNED BY "{{name}}";
-            REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";
-            REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
-            REVOKE USAGE ON SCHEMA public FROM "{{name}}";
-            DROP USER "{{name}}";"""
-            )
+                """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";"""
+            ),
+            Template(
+                """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";"""
+            ),
+            Template("""REVOKE USAGE ON SCHEMA public FROM "{{name}}";"""),
+            # Finally, drop this user from the database
+            Template("""DROP USER "{{name}}";"""),
         ],
         "renew": [],
         "rollback": [],
     },
-    "admin": {  # Continue to use the legacy style creation for admin users
+    "readonly": {
         "create": [
+            # Check if the role exists and create it if not
             Template(
-                """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
-             VALID UNTIL '{{expiration}}' IN ROLE "rds_superuser"
-             INHERIT CREATEROLE CREATEDB;
-          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{{name}}"
-             WITH GRANT OPTION;
-          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{{name}}"
-             WITH GRANT OPTION;"""
-            )
+                """
+                DO
+                $$do$$
+                BEGIN
+                   IF EXISTS (
+                      SELECT FROM pg_catalog.pg_roles
+                      WHERE  rolname = 'read_only_role') THEN
+                   ELSE
+                      BEGIN   -- nested block
+                         CREATE ROLE read_only_role;
+                      EXCEPTION
+                         WHEN duplicate_object THEN
+                            RAISE NOTICE 'Role "read_only_role" was just created by a concurrent transaction. Skipping.';
+                      END;
+                   END IF;
+                END
+                $$do$$;
+                """
+            ),
+            # Set/refresh the default privileges for the new role
+            Template(
+                """
+                GRANT SELECT ON ALL TABLES IN SCHEMA public TO "read_only_role";
+                """
+            ),
+            Template(
+                """
+                GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO "read_only_role";
+                """
+            ),
+            Template("""SET ROLE "read_only_role";"""),
+            Template(
+                """
+                ALTER DEFAULT PRIVILEGES FOR USER "read_only_role" IN SCHEMA public GRANT SELECT
+                ON TABLES TO "read_only_role";
+                """
+            ),
+            Template(
+                """
+                ALTER DEFAULT PRIVILEGES FOR USER "read_only_role" IN SCHEMA public GRANT SELECT
+                ON SEQUENCES TO "read_only_role";
+                """
+            ),
+            Template("""RESET ROLE;"""),
+            # Create the read-only user and put it into the read-only-role
+            Template(
+                """
+                CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+                VALID UNTIL '{{expiration}}' IN ROLE "read_only_role" INHERIT;
+                """
+            ),
+            # Make sure things done by the new user belong to role and not the user
+            Template("""ALTER ROLE "{{name}}" SET ROLE "read_only_role";"""),
         ],
         "revoke": [
+            # Remove the user from the app role
+            Template("""REVOKE "read_only_role" FROM "{{name}}";"""),
+            # Put the user back into the app role but as an administrator
+            Template("""GRANT "{{name}}" TO read_only_role WITH ADMIN OPTION;"""),
+            # Change ownership to the app role for anything that might belong to this user
+            Template("""SET ROLE read_only_role;"""),
+            Template("""REASSIGN OWNED BY "{{name}}" TO "read_only_role";"""),
+            Template("""RESET ROLE;"""),
+            # Drop anything that remains owned by this user (hopefully nothing ...)
+            Template("""DROP OWNED BY "{{name}}";"""),
+            # Take any permissions assigned directly to this user away
             Template(
-                """REVOKE "${app_name}" FROM "{{name}}";
-          GRANT CREATE ON SCHEMA public TO ${app_name} WITH GRANT OPTION;
-          GRANT "{{name}}" TO ${app_name} WITH ADMIN OPTION;
-          SET ROLE ${app_name};
-          REASSIGN OWNED BY "{{name}}" TO "${app_name}";
-          RESET ROLE;
-          DROP OWNED BY "{{name}}";
-          REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";
-          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
-          REVOKE USAGE ON SCHEMA public FROM "{{name}}";
-          DROP USER "{{name}}";"""
-            )
-        ],
-        "renew": [],
-        "rollback": [],
-    },
-    "approle": {  # Legacy endpoint
-        "create": [Template("CREATE ROLE ${app_name};")],
-        "revoke": [Template("DROP ROLE ${app_name};")],
-        "renew": [],
-        "rollback": [],
-    },
-    "app": {  # Legacy endpoint
-        "create": [
+                """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";"""
+            ),
             Template(
-                """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
-            VALID UNTIL '{{expiration}}' IN ROLE "${app_name}" INHERIT;
-          GRANT CREATE ON SCHEMA public TO ${app_name} WITH GRANT OPTION;
-          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${app_name}"
-             WITH GRANT OPTION;
-          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "${app_name}"
-             WITH GRANT OPTION;
-          SET ROLE "${app_name}";
-          ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA public
-            GRANT ALL PRIVILEGES ON TABLES TO "${app_name}" WITH GRANT OPTION;
-          ALTER DEFAULT PRIVILEGES FOR ROLE "${app_name}" IN SCHEMA public
-            GRANT ALL PRIVILEGES ON SEQUENCES TO "${app_name}" WITH GRANT OPTION;
-          RESET ROLE;
-          ALTER ROLE "{{name}}" SET ROLE "${app_name}";"""
-            )
-        ],
-        "revoke": [
-            Template(
-                """REVOKE "${app_name}" FROM "{{name}}";
-          GRANT "{{name}}" TO ${app_name} WITH ADMIN OPTION;
-          SET ROLE ${app_name};
-          REASSIGN OWNED BY "{{name}}" TO "${app_name}";
-          RESET ROLE;
-          DROP OWNED BY "{{name}}";
-          REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";
-          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
-          REVOKE USAGE ON SCHEMA public FROM "{{name}}";
-          DROP USER "{{name}}";"""
-            )
-        ],
-        "renew": [],
-        "rollback": [],
-    },
-    "readonly": {  # Legacy endpoint
-        "create": [
-            Template(
-                """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
-             VALID UNTIL '{{expiration}}';
-          GRANT SELECT ON ALL TABLES IN SCHEMA public TO "{{name}}";
-          GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO "{{name}}";
-          SET ROLE "{{name}}";
-          ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public GRANT SELECT
-             ON TABLES TO "{{name}}";
-          ALTER DEFAULT PRIVILEGES FOR USER "{{name}}" IN SCHEMA public GRANT SELECT
-             ON SEQUENCES TO "{{name}}";
-          RESET ROLE;"""
-            )
-        ],
-        "revoke": [
-            Template(
-                """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";
-          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
-          REVOKE USAGE ON SCHEMA public FROM "{{name}}";
-          DROP USER "{{name}}";"""
-            )
+                """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";"""
+            ),
+            Template("""REVOKE USAGE ON SCHEMA public FROM "{{name}}";"""),
+            # Finally, drop this user from the database
+            Template("""DROP USER "{{name}}";"""),
         ],
         "renew": [],
         "rollback": [],
@@ -213,27 +243,27 @@ postgres_role_statements = {
 mysql_role_statements = {
     "admin": {
         "create": [
+            Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
             Template(
-                "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-                "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, "
-                "ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, CREATE VIEW, "
-                "SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, EVENT, TRIGGER "
-                "ON `%`.* TO '{{name}}' WITH GRANT OPTION; "
-                "GRANT RELOAD, LOCK TABLES ON *.* to '{{name}}';"
-            )
+                """GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX,
+                ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, CREATE VIEW,
+                SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, EVENT, TRIGGER
+                ON `%`.* TO '{{name}}' WITH GRANT OPTION;"""
+            ),
+            Template("""GRANT RELOAD, LOCK TABLES ON *.* to '{{name}}';"""),
         ],
-        "revoke": [Template("DROP USER '{{name}}';")],
+        "revoke": [Template("""DROP USER '{{name}}';""")],
         "renew": [],
         "rollback": [],
     },
     "app": {
         "create": [
+            Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
             Template(
-                "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-                "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, "
-                "REFERENCES, CREATE TEMPORARY TABLES, LOCK TABLES "
-                "ON ${app_name}.* TO '{{name}}'@'%';"
-            )
+                """GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER,
+                REFERENCES, CREATE TEMPORARY TABLES, LOCK TABLES
+                ON ${app_name}.* TO '{{name}}'@'%';"""
+            ),
         ],
         "revoke": [Template("DROP USER '{{name}}';")],
         "renew": [],
@@ -242,9 +272,9 @@ mysql_role_statements = {
     "readonly": {
         "create": [
             Template(
-                "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-                "GRANT SELECT, SHOW VIEW ON `%`.* TO '{{name}}'@'%';"
-            )
+                """CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';
+                GRANT SELECT, SHOW VIEW ON `%`.* TO '{{name}}'@'%';"""
+            ),
         ],
         "revoke": [Template("DROP USER '{{name}}';")],
         "renew": [],

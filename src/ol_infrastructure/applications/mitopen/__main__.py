@@ -337,69 +337,243 @@ mitopen_db = OLAmazonDB(mitopen_db_config)
 mitopen_role_statements = postgres_role_statements.copy()
 mitopen_role_statements.pop("app")
 mitopen_role_statements["app"] = {
-    "create": Template(
-        """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
-            VALID UNTIL '{{expiration}}' IN ROLE "mitopen" INHERIT;
-          GRANT CREATE ON SCHEMA public TO mitopen WITH GRANT OPTION;
-          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "mitopen"
+    "create": [
+        # Check if the mitopen role exists and create it if not
+        Template(
+            """
+            DO
+            $$do$$
+            BEGIN
+               IF EXISTS (
+                  SELECT FROM pg_catalog.pg_roles
+                  WHERE  rolname = 'mitopen' THEN
+               ELSE
+                  BEGIN   -- nested block
+                     CREATE ROLE mitopen;
+                  EXCEPTION
+                     WHEN duplicate_object THEN
+                        RAISE NOTICE 'Role "mitopen" was just created by a concurrent transaction. Skipping.';
+                  END;
+               END IF;
+            END
+            $$do$$;
+            """
+        ),
+        # Create the external schema if it doesn't exist already
+        Template("""CREATE SCHEMA IF NOT EXISTS external;"""),
+        # Do grants on to the mitopen in both schemas
+        Template("""GRANT CREATE ON SCHEMA public TO mitopen WITH GRANT OPTION;"""),
+        Template(
+            """
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "mitopen"
             WITH GRANT OPTION;
-          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "mitopen"
+            """
+        ),
+        Template(
+            """
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "mitopen"
             WITH GRANT OPTION;
-          SET ROLE "mitopen";
-          ALTER DEFAULT PRIVILEGES FOR ROLE "mitopen" IN SCHEMA public
+            """
+        ),
+        Template("""GRANT CREATE ON SCHEMA external TO mitopen WITH GRANT OPTION;"""),
+        Template(
+            """
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA external TO "mitopen"
+            WITH GRANT OPTION;
+            """
+        ),
+        Template(
+            # Set/refresh default privileges in both schemas
+            """
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external TO "mitopen"
+            WITH GRANT OPTION;
+            """
+        ),
+        # Set/refresh default privileges in both schemas
+        Template("""SET ROLE "mitopen";"""),
+        Template("""
+            ALTER DEFAULT PRIVILEGES FOR ROLE "mitopen" IN SCHEMA public
             GRANT ALL PRIVILEGES ON TABLES TO "mitopen" WITH GRANT OPTION;
-
-          ALTER DEFAULT PRIVILEGES FOR ROLE "mitopen" IN SCHEMA public
+            """),
+        Template(
+            """
+            ALTER DEFAULT PRIVILEGES FOR ROLE "mitopen" IN SCHEMA public
             GRANT ALL PRIVILEGES ON SEQUENCES TO "mitopen" WITH GRANT OPTION;
-
-          CREATE SCHEMA IF NOT EXISTS external;
-
-          GRANT CREATE ON SCHEMA external TO "mitopen" WITH GRANT OPTION;
-          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA external TO "mitopen";
-          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external TO "mitopen"
-            WITH GRANT OPTION;
-          RESET ROLE;
-          ALTER ROLE "{{name}}" SET ROLE "mitopen";"""
-    ),
-    "revoke": Template(
-        """REVOKE "mitopen" FROM "{{name}}";
-          GRANT "{{name}}" TO mitopen WITH ADMIN OPTION;
-          SET ROLE mitopen;
-          REASSIGN OWNED BY "{{name}}" TO "mitopen";
-          RESET ROLE;
-          DROP OWNED BY "{{name}}";
-          REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";
-          REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA external FROM "{{name}}";
-          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";
-          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external FROM "{{name}}";
-          REVOKE USAGE ON SCHEMA public FROM "{{name}}";
-          REVOKE USAGE ON SCHEMA external FROM "{{name}}";
-          DROP USER "{{name}}";"""
-    ),
+            """
+        ),
+        Template("""
+            ALTER DEFAULT PRIVILEGES FOR ROLE "mitopen" IN SCHEMA external
+            GRANT ALL PRIVILEGES ON TABLES TO "mitopen" WITH GRANT OPTION;
+            """),
+        Template(
+            """
+            ALTER DEFAULT PRIVILEGES FOR ROLE "mitopen" IN SCHEMA external
+            GRANT ALL PRIVILEGES ON SEQUENCES TO "mitopen" WITH GRANT OPTION;
+            """
+        ),
+        Template("""RESET ROLE;"""),
+        # Actually create the user in the 'mitopen' role
+        Template(
+            """
+            CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+            VALID UNTIL '{{expiration}}' IN ROLE "mitopen" INHERIT;
+            """
+        ),
+        # Make sure things done by the new user belong to role and not the user
+        Template("""ALTER ROLE "{{name}}" SET ROLE "mitopen";"""),
+    ],
+    "revoke": [
+        # Remove the user from the mitopen role
+        Template("""REVOKE "mitopen" FROM "{{name}}";"""),
+        # Put the user back into the app role but as an administrator
+        Template("""GRANT "{{name}}" TO mitopen WITH ADMIN OPTION;"""),
+        # Change ownership to the app role for anything that might belong to this user
+        Template("""SET ROLE mitopen;"""),
+        Template("""REASSIGN OWNED BY "{{name}}" TO "mitopen";"""),
+        Template("""RESET ROLE;"""),
+        # Drop anything that remains owned by this user (hopefully nothing ...)
+        Template("""DROP OWNED BY "{{name}}";"""),
+        # Take any permissions assigned directly to this user away
+        Template(
+            """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";"""
+        ),
+        Template(
+            """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA external FROM "{{name}}";"""
+        ),
+        Template(
+            """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";"""
+        ),
+        Template(
+            """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external FROM "{{name}}";"""
+        ),
+        Template("""REVOKE USAGE ON SCHEMA public FROM "{{name}}";"""),
+        Template("""REVOKE USAGE ON SCHEMA external FROM "{{name}}";"""),
+        # Finally, drop this user from the database
+        Template("""DROP USER "{{name}}";"""),
+    ],
     "renew": [],
     "rollback": [],
 }
 mitopen_role_statements["reverse-etl"] = {
-    "create": Template(
-        """CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
-            VALID UNTIL '{{expiration}}';
-          GRANT CREATE ON SCHEMA external TO "{{name}}" WITH GRANT OPTION;
-          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA external TO "{{name}}";
-          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external TO "{{name}}"
+    "create": [
+        # Check if the reverse_etl role exists and create it if not
+        Template(
+            """
+            DO
+            $$do$$
+            BEGIN
+               IF EXISTS (
+                  SELECT FROM pg_catalog.pg_roles
+                  WHERE  rolname = 'reverse_etl' THEN
+               ELSE
+                  BEGIN   -- nested block
+                     CREATE ROLE reverse_etl;
+                  EXCEPTION
+                     WHEN duplicate_object THEN
+                        RAISE NOTICE 'Role "reverse_etl" was just created by a concurrent transaction. Skipping.';
+                  END;
+               END IF;
+            END
+            $$do$$;
+            """
+        ),
+        # Create the external schema if it doesn't exist already
+        Template("""CREATE SCHEMA IF NOT EXISTS external;"""),
+        # Do grants on to the reverse_etl in both schemas
+        Template("""GRANT CREATE ON SCHEMA public TO reverse_etl WITH GRANT OPTION;"""),
+        Template(
+            """
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "reverse_etl"
             WITH GRANT OPTION;
-        """
-    ),
-    "revoke": Template(
-        """GRANT "{{name}}" TO mitopen WITH ADMIN OPTION;
-          SET ROLE mitopen;
-          REASSIGN OWNED BY "{{name}}" TO "mitopen";
-          RESET ROLE;
-          DROP OWNED BY "{{name}}";
-          REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA external FROM "{{name}}";
-          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external FROM "{{name}}";
-          REVOKE USAGE ON SCHEMA external FROM "{{name}}";
-          DROP USER "{{name}}";"""
-    ),
+            """
+        ),
+        Template(
+            """
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "reverse_etl"
+            WITH GRANT OPTION;
+            """
+        ),
+        Template(
+            """GRANT CREATE ON SCHEMA external TO reverse_etl WITH GRANT OPTION;"""
+        ),
+        Template(
+            """
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA external TO "reverse_etl"
+            WITH GRANT OPTION;
+            """
+        ),
+        Template(
+            """
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external TO "reverse_etl"
+            WITH GRANT OPTION;
+            """
+        ),
+        # Set/refresh default privileges in both schemas
+        Template("""SET ROLE "reverse_etl";"""),
+        Template(
+            """
+            ALTER DEFAULT PRIVILEGES FOR ROLE "reverse_etl" IN SCHEMA public
+            GRANT ALL PRIVILEGES ON TABLES TO "reverse_etl" WITH GRANT OPTION;
+            """
+        ),
+        Template(
+            """
+            ALTER DEFAULT PRIVILEGES FOR ROLE "reverse_etl" IN SCHEMA public
+            GRANT ALL PRIVILEGES ON SEQUENCES TO "reverse_etl" WITH GRANT OPTION;
+            """
+        ),
+        Template(
+            """
+            ALTER DEFAULT PRIVILEGES FOR ROLE "reverse_etl" IN SCHEMA external
+            GRANT ALL PRIVILEGES ON TABLES TO "reverse_etl" WITH GRANT OPTION;
+            """
+        ),
+        Template(
+            """
+            ALTER DEFAULT PRIVILEGES FOR ROLE "reverse_etl" IN SCHEMA external
+            GRANT ALL PRIVILEGES ON SEQUENCES TO "reverse_etl" WITH GRANT OPTION;
+            """
+        ),
+        Template("""RESET ROLE;"""),
+        # Actually create the user in the 'reverse_etl' role
+        Template(
+            """
+            CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
+            VALID UNTIL '{{expiration}}' IN ROLE "reverse_etl" INHERIT;
+            """
+        ),
+        # Make sure things done by the new user belong to role and not the user
+        Template("""ALTER ROLE "{{name}}" SET ROLE "reverse_etl";"""),
+    ],
+    "revoke": [
+        # Remove the user from the reverse_etl role
+        Template("""REVOKE "reverse_etl" FROM "{{name}}";"""),
+        # Put the user back into the app role but as an administrator
+        Template("""GRANT "{{name}}" TO reverse_etl WITH ADMIN OPTION;"""),
+        # Change ownership to the app role for anything that might belong to this user
+        Template("""SET ROLE reverse_etl;"""),
+        Template("""REASSIGN OWNED BY "{{name}}" TO "reverse_etl";"""),
+        Template("""RESET ROLE;"""),
+        # Drop anything that remains owned by this user (hopefully nothing ...)
+        Template("""DROP OWNED BY "{{name}}";"""),
+        # Take any permissions assigned directly to this user away
+        Template(
+            """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";"""
+        ),
+        Template(
+            """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA external FROM "{{name}}";"""
+        ),
+        Template(
+            """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";"""
+        ),
+        Template(
+            """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external FROM "{{name}}";"""
+        ),
+        Template("""REVOKE USAGE ON SCHEMA public FROM "{{name}}";"""),
+        Template("""REVOKE USAGE ON SCHEMA external FROM "{{name}}";"""),
+        # Finally, drop this user from the database
+        Template("""DROP USER "{{name}}";"""),
+    ],
     "renew": [],
     "rollback": [],
 }

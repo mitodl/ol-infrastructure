@@ -9,6 +9,7 @@ This includes:
 """
 
 import json
+import textwrap
 from enum import Enum
 from string import Template
 from typing import Optional, Union
@@ -168,20 +169,32 @@ class OLVaultDatabaseBackend(ComponentResource):
                 backend=self.db_mount.path,
                 db_name=db_config.db_name,
                 creation_statements=[
-                    statement_template.substitute(app_name=db_config.db_name)
-                    for statement_template in role_defs["create"]
+                    textwrap.dedent(statement).strip()
+                    for statement in [
+                        statement_template.substitute(app_name=db_config.db_name)
+                        for statement_template in role_defs["create"]
+                    ]
                 ],
                 revocation_statements=[
-                    statement_template.substitute(app_name=db_config.db_name)
-                    for statement_template in role_defs["revoke"]
+                    textwrap.dedent(statement).strip()
+                    for statement in [
+                        statement_template.substitute(app_name=db_config.db_name)
+                        for statement_template in role_defs["revoke"]
+                    ]
                 ],
                 renew_statements=[
-                    statement_template.substitute(app_name=db_config.db_name)
-                    for statement_template in role_defs["renew"]
+                    textwrap.dedent(statement).strip()
+                    for statement in [
+                        statement_template.substitute(app_name=db_config.db_name)
+                        for statement_template in role_defs["renew"]
+                    ]
                 ],
                 rollback_statements=[
-                    statement_template.substitute(app_name=db_config.db_name)
-                    for statement_template in role_defs["rollback"]
+                    textwrap.dedent(statement).strip()
+                    for statement in [
+                        statement_template.substitute(app_name=db_config.db_name)
+                        for statement_template in role_defs["rollback"]
+                    ]
                 ],
                 max_ttl=db_config.max_ttl,
                 default_ttl=db_config.default_ttl,
