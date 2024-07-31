@@ -9,7 +9,6 @@ ENABLE_COMPREHENSIVE_THEMING = True
 COMPREHENSIVE_THEME_DIRS.append("/openedx/themes")
 
 STATIC_ROOT_BASE = "/openedx/staticfiles"
-STATIC_ROOT = STATIC_ROOT_BASE
 
 SECRET_KEY = "secret"  # pragma: allowlist secret
 XQUEUE_INTERFACE = {
