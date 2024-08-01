@@ -477,20 +477,6 @@ mitopen_role_statements["reverse-etl"] = {
         ),
         # Create the external schema if it doesn't exist already
         Template("""CREATE SCHEMA IF NOT EXISTS external;"""),
-        # Do grants on to the reverse_etl in both schemas
-        Template("""GRANT CREATE ON SCHEMA public TO reverse_etl WITH GRANT OPTION;"""),
-        Template(
-            """
-            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "reverse_etl"
-            WITH GRANT OPTION;
-            """
-        ),
-        Template(
-            """
-            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "reverse_etl"
-            WITH GRANT OPTION;
-            """
-        ),
         Template(
             """GRANT CREATE ON SCHEMA external TO reverse_etl WITH GRANT OPTION;"""
         ),
@@ -507,19 +493,6 @@ mitopen_role_statements["reverse-etl"] = {
             """
         ),
         # Set/refresh default privileges in both schemas
-        Template("""SET ROLE "reverse_etl";"""),
-        Template(
-            """
-            ALTER DEFAULT PRIVILEGES FOR ROLE "reverse_etl" IN SCHEMA public
-            GRANT ALL PRIVILEGES ON TABLES TO "reverse_etl" WITH GRANT OPTION;
-            """
-        ),
-        Template(
-            """
-            ALTER DEFAULT PRIVILEGES FOR ROLE "reverse_etl" IN SCHEMA public
-            GRANT ALL PRIVILEGES ON SEQUENCES TO "reverse_etl" WITH GRANT OPTION;
-            """
-        ),
         Template(
             """
             ALTER DEFAULT PRIVILEGES FOR ROLE "reverse_etl" IN SCHEMA external
@@ -554,18 +527,11 @@ mitopen_role_statements["reverse-etl"] = {
         Template("""RESET ROLE;"""),
         # Take any permissions assigned directly to this user away
         Template(
-            """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";"""
-        ),
-        Template(
             """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA external FROM "{{name}}";"""
-        ),
-        Template(
-            """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{name}}";"""
         ),
         Template(
             """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external FROM "{{name}}";"""
         ),
-        Template("""REVOKE USAGE ON SCHEMA public FROM "{{name}}";"""),
         Template("""REVOKE USAGE ON SCHEMA external FROM "{{name}}";"""),
         # Finally, drop this user from the database
         Template("""DROP USER "{{name}}";"""),
