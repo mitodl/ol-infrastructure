@@ -53,8 +53,6 @@ postgres_role_statements = {
             Template("""SET ROLE ${app_name};"""),
             Template("""REASSIGN OWNED BY "{{name}}" TO "${app_name}";"""),
             Template("""RESET ROLE;"""),
-            # Drop anything that remains owned by this user (hopefully nothing ...)
-            Template("""DROP OWNED BY "{{name}}";"""),
             # Take any permissions assigned directly to this user away
             Template(
                 """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";"""
@@ -139,8 +137,6 @@ postgres_role_statements = {
             Template("""SET ROLE ${app_name};"""),
             Template("""REASSIGN OWNED BY "{{name}}" TO "${app_name}";"""),
             Template("""RESET ROLE;"""),
-            # Drop anything that remains owned by this user (hopefully nothing ...)
-            Template("""DROP OWNED BY "{{name}}";"""),
             # Take any permissions assigned directly to this user away
             Template(
                 """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";"""
@@ -222,8 +218,6 @@ postgres_role_statements = {
             Template("""SET ROLE read_only_role;"""),
             Template("""REASSIGN OWNED BY "{{name}}" TO "read_only_role";"""),
             Template("""RESET ROLE;"""),
-            # Drop anything that remains owned by this user (hopefully nothing ...)
-            Template("""DROP OWNED BY "{{name}}";"""),
             # Take any permissions assigned directly to this user away
             Template(
                 """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{name}}";"""
