@@ -1,4 +1,4 @@
-path "postgres-concourse/creds/app_user" {
+path "postgres-concourse/creds/app" {
   capabilities = ["read"]
 }
 
