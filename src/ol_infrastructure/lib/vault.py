@@ -79,13 +79,13 @@ postgres_role_statements = {
                 BEGIN
                    IF EXISTS (
                       SELECT FROM pg_catalog.pg_roles
-                      WHERE  rolname = '{app_name}') THEN
+                      WHERE  rolname = '${app_name}') THEN
                    ELSE
                       BEGIN   -- nested block
-                         CREATE ROLE {app_name};
+                         CREATE ROLE ${app_name};
                       EXCEPTION
                          WHEN duplicate_object THEN
-                            RAISE NOTICE 'Role "{app_name}" was just created by a concurrent transaction. Skipping.';
+                            RAISE NOTICE 'Role "${app_name}" was just created by a concurrent transaction. Skipping.';
                       END;
                    END IF;
                 END
