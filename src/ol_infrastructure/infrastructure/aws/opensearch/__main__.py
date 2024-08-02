@@ -139,6 +139,9 @@ search_domain = aws.opensearch.Domain(
     "opensearch-v2-domain-cluster",
     domain_name=domain_name,
     engine_version=search_config.get("engine_version") or "Elasticsearch_7.10",
+    auto_tune_options=aws.opensearch.DomainAutoTuneOptionsArgs(
+        desired_state="ENABLED", use_off_peak_window=True
+    ),
     cluster_config=aws.opensearch.DomainClusterConfigArgs(
         zone_awareness_enabled=True,
         zone_awareness_config=aws.opensearch.DomainClusterConfigZoneAwarenessConfigArgs(
