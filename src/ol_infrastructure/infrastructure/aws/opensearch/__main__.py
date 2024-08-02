@@ -8,7 +8,7 @@ import pulumi_consul as consul
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
 
-from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
+from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, default_egress_args
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -139,6 +139,9 @@ search_domain = aws.opensearch.Domain(
     "opensearch-v2-domain-cluster",
     domain_name=domain_name,
     engine_version=search_config.get("engine_version") or "Elasticsearch_7.10",
+    auto_tune_options=aws.opensearch.DomainAutoTuneOptionsArgs(
+        desired_state="ENABLED", use_off_peak_window=True
+    ),
     cluster_config=aws.opensearch.DomainClusterConfigArgs(
         zone_awareness_enabled=True,
         zone_awareness_config=aws.opensearch.DomainClusterConfigZoneAwarenessConfigArgs(
@@ -149,7 +152,7 @@ search_domain = aws.opensearch.Domain(
     ),
     ebs_options=aws.opensearch.DomainEbsOptionsArgs(
         ebs_enabled=True,
-        volume_type="gp2",
+        volume_type=DiskTypes.ssd,
         volume_size=disk_size,
     ),
     tags=aws_config.merged_tags({"Name": f"{environment_name}-opensearch-cluster"}),
