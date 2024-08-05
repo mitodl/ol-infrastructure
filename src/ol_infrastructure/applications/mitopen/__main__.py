@@ -347,6 +347,7 @@ mitopen_role_statements["app"] = {
                IF EXISTS (
                   SELECT FROM pg_catalog.pg_roles
                   WHERE  rolname = 'mitopen' THEN
+                      RAISE NOTICE 'Role "mitopen" already exists. Skipping.';
                ELSE
                   BEGIN   -- nested block
                      CREATE ROLE mitopen;
@@ -463,6 +464,7 @@ mitopen_role_statements["reverse-etl"] = {
                IF EXISTS (
                   SELECT FROM pg_catalog.pg_roles
                   WHERE  rolname = 'reverse_etl' THEN
+                      RAISE NOTICE 'Role "reverse_etl" already exists. Skipping.';
                ELSE
                   BEGIN   -- nested block
                      CREATE ROLE reverse_etl;

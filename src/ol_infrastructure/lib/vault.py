@@ -43,12 +43,6 @@ postgres_role_statements = {
         "revoke": [
             # Remove the user from the pre-existing rds_superuser role
             Template("""REVOKE "rds_superuser" FROM "{{name}}";"""),
-            # Ensure that the application role can do creations
-            Template(
-                """GRANT CREATE ON SCHEMA public TO ${app_name} WITH GRANT OPTION;"""
-            ),
-            # Put this user into the app role temporarily
-            Template("""GRANT "{{name}}" TO ${app_name} WITH ADMIN OPTION;"""),
             # Change ownership to the app role for anything that might belong to this user
             Template("""SET ROLE ${app_name};"""),
             Template("""REASSIGN OWNED BY "{{name}}" TO "${app_name}";"""),
@@ -78,6 +72,7 @@ postgres_role_statements = {
                    IF EXISTS (
                       SELECT FROM pg_catalog.pg_roles
                       WHERE  rolname = '${app_name}') THEN
+                          RAISE NOTICE 'Role "${app_name}" already exists. Skipping.';
                    ELSE
                       BEGIN   -- nested block
                          CREATE ROLE ${app_name};
@@ -162,6 +157,7 @@ postgres_role_statements = {
                    IF EXISTS (
                       SELECT FROM pg_catalog.pg_roles
                       WHERE  rolname = 'read_only_role') THEN
+                          RAISE NOTICE 'Role "read_only_role" already exists. Skipping.';
                    ELSE
                       BEGIN   -- nested block
                          CREATE ROLE read_only_role;
