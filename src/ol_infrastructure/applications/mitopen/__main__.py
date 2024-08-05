@@ -849,7 +849,7 @@ gh_workflow_sentry_dsn_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_sentry_dsn_env_secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"SENTRY_DSN_{env_var_suffix}",
-    plaintext_value=mitopen_vault_secrets["sentry_dns"],
+    plaintext_value=mitopen_vault_secrets["sentry_dsn"],
     opts=ResourceOptions(provider=github_provider),
 )
 # not really secret, just easier this way
