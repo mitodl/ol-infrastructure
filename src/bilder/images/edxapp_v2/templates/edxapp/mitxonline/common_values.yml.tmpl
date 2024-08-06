@@ -1,7 +1,7 @@
 # -*- mode: yaml -*-
 {{ with secret "secret-mitxonline/mongodb-edxapp" }}
 mongodb_settings: &mongo_params
-  authSource: admin
+  authsource: admin
   host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
   port: 27017
   db: edxapp
