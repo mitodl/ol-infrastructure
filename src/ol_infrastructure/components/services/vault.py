@@ -9,6 +9,7 @@ This includes:
 """
 
 import json
+import textwrap
 from enum import Enum
 from string import Template
 from typing import Optional, Union
@@ -84,7 +85,7 @@ class OLVaultPostgresDatabaseConfig(OLVaultDatabaseConfig):
         "postgresql://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/{db_name}"
     )
     db_type: str = DBEngines.postgres.value
-    role_statements: dict[str, dict[str, Template]] = postgres_role_statements
+    role_statements: dict[str, dict[str, list[Template]]] = postgres_role_statements
 
 
 class OLVaultMysqlDatabaseConfig(OLVaultDatabaseConfig):
@@ -93,7 +94,7 @@ class OLVaultMysqlDatabaseConfig(OLVaultDatabaseConfig):
     db_port: int = DEFAULT_MYSQL_PORT
     db_connection: str = "{{{{username}}}}:{{{{password}}}}@tcp({db_host}:{db_port})/"
     db_type: str = DBEngines.mysql_rds.value
-    role_statements: dict[str, dict[str, Template]] = mysql_role_statements
+    role_statements: dict[str, dict[str, list[Template]]] = mysql_role_statements
 
 
 class OLVaultMongoDatabaseConfig(OLVaultDatabaseConfig):
@@ -104,7 +105,7 @@ class OLVaultMongoDatabaseConfig(OLVaultDatabaseConfig):
         "mongodb://{{{{username}}}}:{{{{password}}}}@{db_host}:{db_port}/admin"
     )
     db_type: str = DBEngines.mongodb.value
-    role_statements: dict[str, dict[str, Template]] = mongodb_role_statements
+    role_statements: dict[str, dict[str, list[Template]]] = mongodb_role_statements
 
 
 class OLVaultDatabaseBackend(ComponentResource):
@@ -168,10 +169,32 @@ class OLVaultDatabaseBackend(ComponentResource):
                 backend=self.db_mount.path,
                 db_name=db_config.db_name,
                 creation_statements=[
-                    role_defs["create"].substitute(app_name=db_config.db_name)
+                    textwrap.dedent(statement).strip()
+                    for statement in [
+                        statement_template.substitute(app_name=db_config.db_name)
+                        for statement_template in role_defs["create"]
+                    ]
                 ],
                 revocation_statements=[
-                    role_defs["revoke"].substitute(app_name=db_config.db_name)
+                    textwrap.dedent(statement).strip()
+                    for statement in [
+                        statement_template.substitute(app_name=db_config.db_name)
+                        for statement_template in role_defs["revoke"]
+                    ]
+                ],
+                renew_statements=[
+                    textwrap.dedent(statement).strip()
+                    for statement in [
+                        statement_template.substitute(app_name=db_config.db_name)
+                        for statement_template in role_defs["renew"]
+                    ]
+                ],
+                rollback_statements=[
+                    textwrap.dedent(statement).strip()
+                    for statement in [
+                        statement_template.substitute(app_name=db_config.db_name)
+                        for statement_template in role_defs["rollback"]
+                    ]
                 ],
                 max_ttl=db_config.max_ttl,
                 default_ttl=db_config.default_ttl,
