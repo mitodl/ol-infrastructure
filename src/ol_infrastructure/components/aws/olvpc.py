@@ -219,6 +219,15 @@ class OLVPC(ComponentResource):
             vpc_config.cidr_block.subnets(new_prefix=SUBNET_PREFIX_V4),
         )
 
+        # As a general rule, the smallest subnet we will allocate within one of
+        # of our VPCs will be a /24 (256 addresses).
+
+        # The initial, 'normal' subnets in each VPC, which are typically
+        # utilized by EC2 instances start at X.X.1.0/24 through
+        # X.X.N.O/24 where is N = number of subnets+1
+
+        # We need to know N for allocating the IPv6 subnet block
+        # and it is easy for these 'normal' networks.
         for index, zone, subnet_v4 in subnet_iterator:
             net_name = f"{vpc_config.vpc_name}-subnet-{index + 1}"
             subnet_resource_opts, imported_subnet_id = subnet_opts(
@@ -247,6 +256,16 @@ class OLVPC(ComponentResource):
                 opts=resource_options,
             )
             self.olvpc_subnets.append(ol_subnet)
+
+        # K8S subnets are generally going to be larger than the 'normal'
+        # subnets. Somewhere between /23 and /18. We are going to manually
+        # specify the ranges in configuration and we are also going to
+        # place them near the middle of the VPC's /16 block.
+
+        # Given that information, we do need to do some bitwise math to pick
+        # out the third octet of the K8S subnets in order to allocate
+        # the IPv6 address space since we don't have it handed to us by
+        # an iterator as above.
         self.k8s_service_subnet = None
         self.k8s_pod_subnet = None
         if vpc_config.k8s_service_subnet and vpc_config.k8s_pod_subnet:
