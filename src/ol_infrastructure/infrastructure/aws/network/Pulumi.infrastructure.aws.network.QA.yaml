@@ -5,8 +5,6 @@ config:
   apps_vpc:cidr_block: 10.12.0.0/16
   aws:region: us-east-1
   data_vpc:cidr_block: 10.2.0.0/16
-  k8s_vpc:cidr_block: 172.31.0.0/16
-  k8s_vpc:k8s_service_subnet: 172.31.48.0/20
   mitx_online_vpc:cidr_block: 10.21.0.0/16
   ocw_vpc:cidr_block: 10.99.0.0/16
   operations_vpc:cidr_block: 10.1.0.0/16
