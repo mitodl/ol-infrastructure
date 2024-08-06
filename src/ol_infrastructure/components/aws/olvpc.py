@@ -81,8 +81,8 @@ class OLVPCConfig(AWSBase):
             raise ValueError(msg)
         return network
 
-    # TODO @Ardiea: Add verification of the pod subnet and ensure
-    # that it doesn't overlap with service subnet
+    # TODO @Ardiea: Add verification of the pod subnet and ensure  # noqa: FIX002
+    # https://github.com/mitodl/ol-infrastructure/issues/2589
     @field_validator("k8s_service_subnet")
     @classmethod
     def k8s_service_subnet_is_subnet(
