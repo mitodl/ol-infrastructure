@@ -30,6 +30,10 @@ elif stack_info.env_prefix == "celery_monitoring":
     consul_stack = pulumi.StackReference(
         f"infrastructure.consul.operations.{stack_info.name}"
     )
+elif stack_info.env_prefix == "open_metadata":
+    consul_stack = pulumi.StackReference(
+        f"infrastructure.consul.data.{stack_info.name}"
+    )
 else:
     consul_stack = pulumi.StackReference(
         f"infrastructure.consul.{stack_info.env_prefix}.{stack_info.name}"
