@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-eks
+runtime: python
+description: Deploy and manage EKS clusters
+backend:
+  url: s3://mitol-pulumi-state/
