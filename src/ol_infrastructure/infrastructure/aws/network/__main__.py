@@ -51,11 +51,7 @@ def vpc_exports(vpc: OLVPC, peers: Optional[list[str]] = None) -> dict[str, Any]
         "route_table_id": vpc.route_table.id,
     }
     if vpc.k8s_service_subnet and vpc.k8s_pod_subnets:
-        return_value["k8s_service_subnet_cidr"] = vpc.k8s_service_subnet.cidr_block
-        return_value["k8s_service_subnet_id"] = vpc.k8s_service_subnet.id
-        return_value["k8s_service_subnet_zone"] = (
-            vpc.k8s_service_subnet.availability_zone
-        )
+        return_value["k8s_service_subnet_cidr"] = str(vpc.k8s_service_subnet)
         return_value["k8s_pod_subnet_cidrs"] = [
             k8s_pod_subnet.cidr_block for k8s_pod_subnet in vpc.k8s_pod_subnets
         ]
