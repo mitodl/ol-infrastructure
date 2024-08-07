@@ -16,17 +16,17 @@ config:
     INDEXING_API_USERNAME: "od_mm_rc_api"
     KEYCLOAK_BASE_URL: "https://sso-qa.ol.mit.edu"
     KEYCLOAK_REALM_NAME: "olapps"
-    MITOPEN_API_URL: "https://api.mitopen-rc.odl.mit.edu"
-    MITOPEN_APP_URL: "https://mitopen-rc.odl.mit.edu"
-    MITOPEN_BASE_URL: "https://mitopen-rc.odl.mit.edu"
-    MITOPEN_COOKIE_DOMAIN: "odl.mit.edu"
-    MITOPEN_COOKIE_NAME: "mitopen-rc"
-    MITOPEN_LOG_LEVEL: "INFO"
-    MITOPEN_NEW_USER_LOGIN_URL: "https://mitopen-rc.odl.mit.edu/onboarding"
-    MITOPEN_SUPPORT_EMAIL: "odl-mitopen-rc-support@mit.edu"
+    LEARN_API_URL: "https://api.learn-rc.odl.mit.edu"
+    LEARN_APP_URL: "https://learn-rc.odl.mit.edu"
+    LEARN_BASE_URL: "https://learn-rc.odl.mit.edu"
+    LEARN_COOKIE_DOMAIN: "odl.mit.edu"
+    LEARN_COOKIE_NAME: "learn-rc"
+    LEARN_LOG_LEVEL: "INFO"
+    LEARN_NEW_USER_LOGIN_URL: "https://learn-rc.odl.mit.edu/onboarding"
+    LEARN_SUPPORT_EMAIL: "odl-learn-rc-support@mit.edu"
     OCW_ITERATOR_CHUNK_SIZE: 300
     OIDC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
-    OPENSEARCH_INDEX: "mitopen-rc"
+    OPENSEARCH_INDEX: "learn-rc"
     OPENSEARCH_SHARD_COUNT: 2
     OPENSEARCH_URL: "https://search-opensearch-mitopen-qa-nvwau2pbr2nek5dgx2o5w3xju4.us-east-1.es.amazonaws.com"
     PGBOUNCER_DEFAULT_POOL_SIZE: 50
@@ -41,9 +41,11 @@ config:
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "live-qa.ocw.mit.edu"
-    - "mitopen-rc.odl.mit.edu"
-    session_cookie_domain: ".mitopen-rc.odl.mit.edu"
+    - "learn-rc.odl.mit.edu"
+    session_cookie_domain: ".learn-rc.odl.mit.edu"
     csrf_domains:
+    - "https://api.learn-rc.odl.mit.edu"
+    - "https://learn-rc.odl.mit.edu"
     - "https://api.mitopen-rc.odl.mit.edu"
     - "https://mitopen-rc.odl.mit.edu"
     cors_urls:
@@ -57,8 +59,8 @@ config:
   mitopen:db_instance_size: db.m7g.xlarge
   mitopen:db_password:
     secure: v1:Xk9oxNvxSQAJUAHE:8CdeLN2SlyhyU0iZpqEX5rnHSJ3PClleDJi2UpzoCsVZ4UjNkr7vCOAKY7CvCuB/7CBKJKM=
-  mitopen:api_domain: "api.mitopen-rc.odl.mit.edu"
-  mitopen:frontend_domain: "mitopen-rc.odl.mit.edu"
+  mitopen:api_domain: "api.learn-rc.odl.mit.edu"
+  mitopen:frontend_domain: "learn-rc.odl.mit.edu"
   mitopen:fastly_domain: "d.sni.global.fastly.net"
   mitopen:heroku_domain: "shaped-mullberry-fz35pvbrtc1qo8ahvcalp9ai.herokudns.com"
   vault:address: https://vault-qa.odl.mit.edu
