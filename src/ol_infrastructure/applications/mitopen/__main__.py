@@ -622,7 +622,7 @@ heroku_vars = {
     "OCW_CONTENT_BUCKET_NAME": "ocw-content-storage",
     "OCW_UPLOAD_IMAGE_ONLY": "True",
     "OCW_LIVE_BUCKET": "ocw-content-live-production",
-    "OLL_ALT_URL": "https://openlearninglibrary.mit.edu/courses/",
+    "OLL_ALT_URL": "https://openlearninglibrary.mit.edu/courses",
     "OLL_API_ACCESS_TOKEN_URL": "https://openlearninglibrary.mit.edu/oauth2/access_token/",
     "OLL_API_URL": "https://discovery.openlearninglibrary.mit.edu/api/v1/catalogs/1/courses/",
     "OLL_BASE_URL": "https://openlearninglibrary.mit.edu/course/",
