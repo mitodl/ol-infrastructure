@@ -9,51 +9,48 @@ config:
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "ocw.mit.edu"
-    - "learn.odl.mit.edu"
-    - "mitopen.odl.mit.edu"
+    - "mitopen.odl.mit.edu"  # legacy
     - "learn.mit.edu"
-    session_cookie_domain: ".learn.odl.mit.edu"
+    session_cookie_domain: ".learn.mit.edu"
     csrf_domains:
-    - "https://api.learn.odl.mit.edu"
-    - "https://api.mitopen.odl.mit.edu"
-    - "https://learn.odl.mit.edu"
+    - "https://api.learn.mit.edu"
+    - "https://api.mitopen.odl.mit.edu"  # legacy
     - "https://learn.mit.edu"
-    - "https://mitopen.odl.mit.edu"
+    - "https://mitopen.odl.mit.edu"  # legacy
     cors_urls:
     - "https://draft.ocw.mit.edu"
-    - "https://live-qa.ocw.mit.edu"
+    - "https://live-qa.ocw.mit.edu"  # Why?
     - "https://live.ocw.mit.edu"
-    - "https://learn.odl.mit.edu"
     - "https://learn.mit.edu"
-    - "https://mitopen.odl.mit.edu"
+    - "https://mitopen.odl.mit.edu"  # legacy
     - "https://ocw-preview.odl.mit.edu"
     - "https://ocw.mit.edu"
     - "https://www.ocw.mit.edu"
-    mailgun_sender_domain: "discussions-mail.odl.mit.edu"
+    mailgun_sender_domain: "discussions-mail.odl.mit.edu"  # Need to verify
     sso_url: "sso.ol.mit.edu"
   heroku_app:vars:
     CELERY_WORKER_MAX_MEMORY_PER_CHILD: 250000
     DEBUG: "false"
     EDX_LEARNING_COURSE_BUCKET_NAME: "edxorg-production-edxapp-courses"
     ENABLE_INFINITE_CORRIDOR: "true"
-    GA_G_TRACKING_ID: ""
-    GA_TRACKING_ID: ""
+    GA_G_TRACKING_ID: ""  # Missing?
+    GA_TRACKING_ID: ""  # Missing?
     INDEXING_API_USERNAME: "od_mm_prod_api"
     KEYCLOAK_BASE_URL: "https://sso.ol.mit.edu"
     KEYCLOAK_REALM_NAME: "olapps"
-    LEARN_API_URL: "https://api.learn.odl.mit.edu"
-    LEARN_APP_URL: "https://learn.odl.mit.edu"
-    LEARN_BASE_URL: "https://learn.odl.mit.edu"
-    LEARN_COOKIE_DOMAIN: "mit.edu"
-    LEARN_COOKIE_NAME: "learn"
-    LEARN_LOG_LEVEL: "INFO"
-    LEARN_NEW_USER_LOGIN_URL: "https://learn.odl.mit.edu/onboarding"
-    LEARN_SUPPORT_EMAIL: "learn-support@mit.edu"
+    MITOPEN_API_URL: "https://api.learn.mit.edu"
+    MITOPEN_APP_URL: "https://learn.mit.edu"
+    MITOPEN_BASE_URL: "https://learn.mit.edu"
+    MITOPEN_COOKIE_DOMAIN: "mit.edu"
+    MITOPEN_COOKIE_NAME: "learn"
+    MITOPEN_LOG_LEVEL: "INFO"
+    MITOPEN_NEW_USER_LOGIN_URL: "https://learn.mit.edu/onboarding"
+    MITOPEN_SUPPORT_EMAIL: "learn-support@mit.edu"  # Need to verify
     OCW_ITERATOR_CHUNK_SIZE: 300
     OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
-    OPENSEARCH_INDEX: "learn"
+    OPENSEARCH_INDEX: "mitopen"  # TBD if we change this. Impactful
     OPENSEARCH_SHARD_COUNT: 3
-    OPENSEARCH_URL: "https://search-opensearch-mitopen-productio-34bmfnsi2zdrngie5vdpe7keu4.us-east-1.es.amazonaws.com"
+    OPENSEARCH_URL: "https://search-opensearch-mitopen-productio-34bmfnsi2zdrngie5vdpe7keu4.us-east-1.es.amazonaws.com"  # TBD if we change this URL
     PGBOUNCER_DEFAULT_POOL_SIZE: 50
     PGBOUNER_MAX_CLIENT_CONN: 500
     PGBOUNER_MIN_POOL_SIZE: 20
@@ -66,8 +63,8 @@ config:
   mitopen:db_instance_size: db.m7g.2xlarge
   mitopen:db_password:
     secure: v1:siGmu4+ZCOqekx7l:4Pdgv4fKZIjWJPAcZDBdpvZ0mUW10SUcX/9ZatsnZbR/euYoklo8dTTFu4i/5kTnJHHYot1QK3xS+gk++lHZfneBoC9qBR+l2qzlvvNBoN8=
-  mitopen:api_domain: "api.learn.odl.mit.edu"
-  mitopen:frontend_domain: "learn.odl.mit.edu"
+  mitopen:api_domain: "api.learn.mit.edu"
+  mitopen:frontend_domain: "learn.mit.edu"
   mitopen:fastly_domain: "d.sni.global.fastly.net"
   mitopen:heroku_domain: "triangular-stingray-y0p9lbcns5zorm8392pou8sy.herokudns.com"
   vault:address: https://vault-production.odl.mit.edu

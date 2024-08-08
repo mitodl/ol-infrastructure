@@ -16,19 +16,19 @@ config:
     INDEXING_API_USERNAME: "od_mm_rc_api"
     KEYCLOAK_BASE_URL: "https://sso-qa.ol.mit.edu"
     KEYCLOAK_REALM_NAME: "olapps"
-    LEARN_API_URL: "https://api.learn-rc.odl.mit.edu"
-    LEARN_APP_URL: "https://learn-rc.odl.mit.edu"
-    LEARN_BASE_URL: "https://learn-rc.odl.mit.edu"
-    LEARN_COOKIE_DOMAIN: "odl.mit.edu"
-    LEARN_COOKIE_NAME: "learn-rc"
-    LEARN_LOG_LEVEL: "INFO"
-    LEARN_NEW_USER_LOGIN_URL: "https://learn-rc.odl.mit.edu/onboarding"
-    LEARN_SUPPORT_EMAIL: "odl-learn-rc-support@mit.edu"
+    MITOPEN_API_URL: "https://api.rc.learn.mit.edu"
+    MITOPEN_APP_URL: "https://rc.learn.mit.edu"
+    MITOPEN_BASE_URL: "https://rc.learn.mit.edu"
+    MITOPEN_COOKIE_DOMAIN: "learn.mit.edu"
+    MITOPEN_COOKIE_NAME: "learn-rc"
+    MITOPEN_LOG_LEVEL: "INFO"
+    MITOPEN_NEW_USER_LOGIN_URL: "https://rc.learn.mit.edu/onboarding"
+    MITOPEN_SUPPORT_EMAIL: "odl-learn-rc-support@mit.edu"   # Need to verify
     OCW_ITERATOR_CHUNK_SIZE: 300
     OIDC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
-    OPENSEARCH_INDEX: "learn-rc"
+    OPENSEARCH_INDEX: "mitopen-rc"  # TBD if we change this. Impactful
     OPENSEARCH_SHARD_COUNT: 2
-    OPENSEARCH_URL: "https://search-opensearch-mitopen-qa-nvwau2pbr2nek5dgx2o5w3xju4.us-east-1.es.amazonaws.com"
+    OPENSEARCH_URL: "https://search-opensearch-mitopen-qa-nvwau2pbr2nek5dgx2o5w3xju4.us-east-1.es.amazonaws.com"  # TBD if we change this URL
     PGBOUNCER_DEFAULT_POOL_SIZE: 50
     PGBOUNER_MAX_CLIENT_CONN: 500
     PGBOUNER_MIN_POOL_SIZE: 20
@@ -41,26 +41,26 @@ config:
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "live-qa.ocw.mit.edu"
-    - "learn-rc.odl.mit.edu"
-    session_cookie_domain: ".learn-rc.odl.mit.edu"
+    - "rc.learn.mit.edu"
+    session_cookie_domain: "rc.learn.mit.edu"
     csrf_domains:
-    - "https://api.learn-rc.odl.mit.edu"
-    - "https://learn-rc.odl.mit.edu"
-    - "https://api.mitopen-rc.odl.mit.edu"
-    - "https://mitopen-rc.odl.mit.edu"
+    - "https://api.rc.learn.mit.edu"
+    - "https://rc.learn.mit.edu"
+    - "https://api.mitopen-rc.odl.mit.edu"  # legacy
+    - "https://mitopen-rc.odl.mit.edu"  # leagcy
     cors_urls:
-    - "https://mitopen-rc.odl.mit.edu"
+    - "https://mitopen-rc.odl.mit.edu" # legacy
+    - "https://rc.learn.mit.edu"
     - "https://ocw-next.netlify.app"
-    - "https://ol-devops-ci.odl.mit.edu"
     - "https://draft-qa.ocw.mit.edu"
     - "https://live-qa.ocw.mit.edu"
-    mailgun_sender_domain: "discussions-mail.odl.mit.edu"
+    mailgun_sender_domain: "discussions-mail.odl.mit.edu"  # need to verify
     sso_url: "sso-qa.ol.mit.edu"
   mitopen:db_instance_size: db.m7g.xlarge
   mitopen:db_password:
     secure: v1:Xk9oxNvxSQAJUAHE:8CdeLN2SlyhyU0iZpqEX5rnHSJ3PClleDJi2UpzoCsVZ4UjNkr7vCOAKY7CvCuB/7CBKJKM=
-  mitopen:api_domain: "api.learn-rc.odl.mit.edu"
-  mitopen:frontend_domain: "learn-rc.odl.mit.edu"
+  mitopen:api_domain: "api.rc.learn.mit.edu"
+  mitopen:frontend_domain: "rc.learn.mit.edu"
   mitopen:fastly_domain: "d.sni.global.fastly.net"
   mitopen:heroku_domain: "shaped-mullberry-fz35pvbrtc1qo8ahvcalp9ai.herokudns.com"
   vault:address: https://vault-qa.odl.mit.edu
