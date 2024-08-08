@@ -18,7 +18,7 @@ from bridge.lib.magic_numbers import (
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
+from pulumi import Alias, Config, InvokeOptions, ResourceOptions, StackReference, export
 from pulumi.output import Output
 from pulumi_aws import ec2, iam, route53, s3
 
@@ -562,7 +562,9 @@ mitopen_fastly_service = fastly.ServiceVcl(
             request_max_bytes=ONE_MEGABYTE_BYTE,
         )
     ],
-    opts=fastly_provider,
+    opts=ResourceOptions.merge(
+        fastly_provider, ResourceOptions(aliases=[Alias(name="fastly-mitopen-qa")])
+    ),
 )
 
 five_minutes = 60 * 5
