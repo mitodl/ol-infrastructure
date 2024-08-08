@@ -26,7 +26,7 @@ config:
     - "https://ocw-preview.odl.mit.edu"
     - "https://ocw.mit.edu"
     - "https://www.ocw.mit.edu"
-    mailgun_sender_domain: "discussions-mail.odl.mit.edu"  # Need to verify
+    mailgun_sender_domain: "mail.learn.mit.edu"  # Need to verify
     sso_url: "sso.ol.mit.edu"
   heroku_app:vars:
     CELERY_WORKER_MAX_MEMORY_PER_CHILD: 250000
