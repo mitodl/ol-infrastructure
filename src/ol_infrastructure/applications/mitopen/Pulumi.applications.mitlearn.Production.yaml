@@ -9,8 +9,8 @@ config:
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "ocw.mit.edu"
-    - "mitopen.odl.mit.edu"  # legacy
-    - "learn.mit.edu"
+    - ".mitopen.odl.mit.edu"  # legacy
+    - ".learn.mit.edu"
     session_cookie_domain: ".learn.mit.edu"
     csrf_domains:
     - "https://api.learn.mit.edu"
