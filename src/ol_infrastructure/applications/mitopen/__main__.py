@@ -508,31 +508,36 @@ mitopen_fastly_service = fastly.ServiceVcl(
         fastly.ServiceVclSnippetArgs(
             name="Rewrite requests to root s3",
             content=textwrap.dedent(
-                r"""
+                rf"""
                 set req.http.orig-req-url = req.url;
                 declare local var.org_qs STRING;
                 set var.org_qs = req.url.qs;
                 unset req.http.Cookie;
 
+                # If the request is for the old DNS name, redirect
+                if (req.http.host == "{mitopen_config.require("legacy_frontend_domain")}") {{
+                  error 618 "redirect-host";
+                }}
+
                 # If the request does not end in a slash and does not contain a period, error to redirect
-                if (req.url.path !~ "\/$" && req.url.basename !~ "\." ) {
-                  error 618 "redirect";
-                }
+                if (req.url.path !~ "\/$" && req.url.basename !~ "\." ) {{
+                  error 618 "redirect-extension";
+                }}
 
                 # Return the ROOT index page if the request is for ANY directory
-                if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {
+                if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {{
                   set req.url = "/index.html";
-                }
+                }}
 
                 # If the request originally included a query string, put it back on
-                if (var.org_qs != "") {
+                if (var.org_qs != "") {{
                   set req.url = req.url + "?" + var.org_qs;
-                }
+                }}
 
                 # Don't keep pre-pending '/frontend' over and over
-                if (req.url !~ "^\/frontend") {
+                if (req.url !~ "^\/frontend") {{
                   set req.url = "/frontend" + req.url;
-                }
+                }}
                 """
             ),
             type="recv",
@@ -542,11 +547,25 @@ mitopen_fastly_service = fastly.ServiceVcl(
             content=textwrap.dedent(
                 r"""
                 # redirect to the same path + trailing slash + include any qs if present
-                if (obj.status == 618 && obj.response == "redirect") {
+                if (obj.status == 618 && obj.response == "redirect-extension") {
                   set obj.status = 302;
                   set obj.http.Location = req.url.path + "/" + if (req.url.qs, "?" + req.url.qs, "");
                   return (deliver);
                 }
+                """
+            ),
+            type="error",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            name="Redirect for to correct domain",
+            content=textwrap.dedent(
+                rf"""
+                # redirect to the correct host/domain
+                if (obj.status == 618 && obj.response == "redirect-host") {{
+                  set obj.status = 302;
+                  set obj.http.Location = "https://" + "{mitopen_config.require("frontend_domain")}" + req.url.path + "/" + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
+                  return (deliver);
+                }}
                 """
             ),
             type="error",
