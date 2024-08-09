@@ -60,8 +60,11 @@ config:
   mitopen:db_password:
     secure: v1:Xk9oxNvxSQAJUAHE:8CdeLN2SlyhyU0iZpqEX5rnHSJ3PClleDJi2UpzoCsVZ4UjNkr7vCOAKY7CvCuB/7CBKJKM=
   mitopen:api_domain: "api.rc.learn.mit.edu"
+  mitopen:legacy_api_domain: "api.mitopen-rc.mit.edu"
   mitopen:frontend_domain: "rc.learn.mit.edu"
+  mitopen:legacy_frontend_domain: "mitopen-rc.odl.mit.edu"
   mitopen:fastly_domain: "d.sni.global.fastly.net"
+  mitopen:fastly_anycast_ips: []
   mitopen:heroku_domain: "shaped-mullberry-fz35pvbrtc1qo8ahvcalp9ai.herokudns.com"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

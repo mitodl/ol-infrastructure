@@ -11,6 +11,7 @@ import pulumi_fastly as fastly
 import pulumi_github as github
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
+from bridge.lib.constants import FASTLY_A_TLS_1_3, FASTLY_CNAME_TLS_1_3
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
@@ -60,6 +61,7 @@ vector_log_proxy_stack = StackReference(
 monitoring_stack = StackReference("infrastructure.monitoring")
 dns_stack = StackReference("infrastructure.aws.dns")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
+learn_zone_id = dns_stack.require_output("learn")["id"]
 
 aws_config = AWSBase(
     tags={
@@ -477,9 +479,13 @@ mitopen_fastly_service = fastly.ServiceVcl(
     conditions=[],
     dictionaries=[],
     domains=[
+        # fastly.ServiceVclDomainArgs(
+        #    comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
+        #    name=mitopen_config.require("frontend_domain"),
+        # ),
         fastly.ServiceVclDomainArgs(
-            comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
-            name=mitopen_config.require("frontend_domain"),
+            comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application - Legacy",
+            name=mitopen_config.require("legacy_frontend_domain"),
         ),
     ],
     headers=[
@@ -571,15 +577,36 @@ five_minutes = 60 * 5
 route53.Record(
     "ol-mitopen-frontend-dns-record",
     name=mitopen_config.require("frontend_domain"),
-    type="CNAME",
+    allow_overwrite=True,
+    type="A",
     ttl=five_minutes,
-    records=[mitopen_config.require("fastly_domain")],
-    zone_id=mitodl_zone_id,
+    records=[str(addr) for addr in FASTLY_A_TLS_1_3],
+    zone_id=learn_zone_id,
     opts=ResourceOptions(delete_before_replace=True),
 )
 route53.Record(
+    "ol-mitopen-frontend-dns-record-legacy",
+    name=mitopen_config.require("legacy_frontend_domain"),
+    type="CNAME",
+    ttl=five_minutes,
+    records=[FASTLY_CNAME_TLS_1_3],
+    zone_id=mitodl_zone_id,
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+route53.Record(
     "ol-mitopen-api-dns-record",
     name=mitopen_config.require("api_domain"),
+    allow_overwrite=True,
+    type="CNAME",
+    ttl=five_minutes,
+    records=[mitopen_config.require("heroku_domain")],
+    zone_id=learn_zone_id,
+    opts=ResourceOptions(delete_before_replace=True),
+)
+route53.Record(
+    "ol-mitopen-api-dns-record-legacy",
+    name=mitopen_config.require("legacy_api_domain"),
     type="CNAME",
     ttl=five_minutes,
     records=[mitopen_config.require("heroku_domain")],
