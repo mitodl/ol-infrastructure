@@ -33,8 +33,8 @@ config:
   keycloak_realm:okta_single_sign_on_service_url: https://dev-66940844.okta.com/app/dev-66940844_collintestlogin_1/exk8gfblmeePE5uUQ5d7/sso/saml
   keycloak_realm:openid_clients:
   - client_info:
-      open: ["https://api.mitopen-rc.odl.mit.edu/*", "https://mitopen-rc.odl.mit.edu/*",
-        "https://api.rc.learn.mit.edu/*", "https://rc.learn.mit.edu/*"]
+      open: ["https://api.mitopen-rc.odl.mit.edu/*", "https://mitopen-rc.odl.mit.edu/*"]
+      mitlearn: ["https://api.rc.learn.mit.edu/*", "https://rc.learn.mit.edu/*"]
       open-discussions: ["https://discussions-rc.odl.mit.edu/*"]
     realm_name: olapps
   - client_info:
