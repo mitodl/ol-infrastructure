@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-mailgun-service
+runtime: python
+description: Manage configuration of mailgun domains
+backend:
+  url: s3://mitol-pulumi-state/
