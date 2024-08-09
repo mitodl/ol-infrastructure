@@ -65,6 +65,6 @@ config:
   mitopen:legacy_frontend_domain: "mitopen-rc.odl.mit.edu"
   mitopen:fastly_domain: "d.sni.global.fastly.net"
   mitopen:fastly_anycast_ips: []
-  mitopen:heroku_domain: "shaped-mullberry-fz35pvbrtc1qo8ahvcalp9ai.herokudns.com"
+  mitopen:heroku_domain: "shrouded-brook-krg88s8bvcdg6kgrdjrsrmbq.herokudns.com"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
