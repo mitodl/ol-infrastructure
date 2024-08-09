@@ -479,10 +479,10 @@ mitopen_fastly_service = fastly.ServiceVcl(
     conditions=[],
     dictionaries=[],
     domains=[
-        # fastly.ServiceVclDomainArgs(
-        #    comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
-        #    name=mitopen_config.require("frontend_domain"),
-        # ),
+        fastly.ServiceVclDomainArgs(
+            comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
+            name=mitopen_config.require("frontend_domain"),
+        ),
         fastly.ServiceVclDomainArgs(
             comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application - Legacy",
             name=mitopen_config.require("legacy_frontend_domain"),
