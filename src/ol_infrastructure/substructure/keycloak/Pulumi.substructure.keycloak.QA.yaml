@@ -21,8 +21,8 @@ config:
     secure: v1:TfpaJKet+1dR7zPW:uH/rZTfcHuW/+DmQNzeowgCQk8uw3Fi31ZN+UZkUBXnBYbUCZZGjYxYxMuSvuY4=
   keycloak_realm:mailgun_reply_to_address:
     secure: v1:uRDOLOjIW6qFgbcO:kyGfXZcMIUw0IQ36MEL0ujQoYDJdNCAaljl9j7uI1k5LCWVQm/cz5S7mOkz/+68=
-  keycloak_realm:mit-open-qa-scim-password:
-    secure: v1:pazNjt2BTYSGutic:YPKUHNDADTLHjqu9S20KrDM6T6d7Wc69243Sy8dGAsFAzvVbxYVJDzixtHRVuA==
+  keycloak_realm:mit-learn-qa-scim-password:
+    secure: v1:Bm9tUPq+YhRFUtiI:gWI6wZeDQvYO1P7JbizBqQtRgFfjXkZ5aSIGyFwncJGj9wBqUZek+jmLhkoFVg==
   keycloak_realm:mit_email_host:
     secure: v1:NJ2W839vX2H5EmR7:xZ1XFFS1Lj+zYG7REfJUUYmoBrItsSUCmtDoYCzhDa4=
   keycloak_realm:mit_email_password:
@@ -33,7 +33,8 @@ config:
   keycloak_realm:okta_single_sign_on_service_url: https://dev-66940844.okta.com/app/dev-66940844_collintestlogin_1/exk8gfblmeePE5uUQ5d7/sso/saml
   keycloak_realm:openid_clients:
   - client_info:
-      open: ["https://api.mitopen-rc.odl.mit.edu/*", "https://mitopen-rc.odl.mit.edu/*"]
+      open: ["https://api.mitopen-rc.odl.mit.edu/*", "https://mitopen-rc.odl.mit.edu/*",
+        "https://api.rc.learn.mit.edu/*", "https://rc.learn.mit.edu/*"]
       open-discussions: ["https://discussions-rc.odl.mit.edu/*"]
     realm_name: olapps
   - client_info:

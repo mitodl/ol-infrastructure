@@ -159,8 +159,8 @@ ol_apps_realm = keycloak.Realm(
     attributes={
         "business_unit": f"operations-{env_name}",
     },
-    display_name="MIT Open",
-    display_name_html="<b>MIT Open</b>",
+    display_name="MIT Learn",
+    display_name_html="<b>MIT Learn</b>",
     enabled=True,
     email_theme="ol",
     login_theme="ol",
@@ -210,7 +210,7 @@ ol_apps_realm = keycloak.Realm(
             username=mailgun_email_username,
         ),
         from_=mailgun_email_username,
-        from_display_name="MIT Open",
+        from_display_name="MIT Learn",
         host=mailgun_email_host,
         port="465",
         ssl=True,
@@ -941,26 +941,26 @@ if stack_info.env_suffix in ["ci", "qa"]:
     # OKTA-DEV [END] # noqa: ERA001
 
 if stack_info.env_suffix == "qa":
-    # SCIM for MIT-Open in RC.
+    # SCIM for MIT-Learn in RC.
     keycloak.CustomUserFederation(
-        "ol-mit-open-qa-scim",
+        "ol-mit-learn-qa-scim",
         config={
             "user-patchOp": "false",
             "fullSyncPeriod": "-1",
-            "auth-pass": keycloak_realm_config.get("mit-open-qa-scim-password"),
+            "auth-pass": keycloak_realm_config.get("mit-learn-qa-scim-password"),
             "auth-mode": "BEARER",
             "cachePolicy": "DEFAULT",
             "sync-import-action": "CREATE_LOCAL",
             "propagation-user": "true",
             "enabled": "true",
             "changedSyncPeriod": "-1",
-            "endpoint": "https://mitopen-rc.odl.mit.edu/scim/v2/",
+            "endpoint": "https://rc.learn.mit.edu/scim/v2/",
             "propagation-group": "true",
             "content-type": "application/scim+json",
             "group-patchOp": "false",
         },
         enabled=True,
-        name="MIT Open",
+        name="MIT Learn",
         provider_id="scim",
         realm_id=ol_apps_realm.id,
         opts=resource_options,
