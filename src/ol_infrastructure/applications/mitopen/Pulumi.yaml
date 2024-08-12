@@ -1,6 +1,6 @@
 ---
-name: ol-infrastructure-mitopen-application
+name: ol-infrastructure-mitlearn-application
 runtime: python
-description: Manage infrastructure required by the MIT Open application
+description: Manage infrastructure required by the MIT Learn application
 backend:
   url: s3://mitol-pulumi-state/

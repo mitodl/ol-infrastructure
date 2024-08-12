@@ -163,7 +163,7 @@ class OLMariaDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to MariaDB."""
 
     engine: str = "mariadb"
-    engine_major_version: str | int = "10.11"
+    engine_major_version: str | int = "11.4"
     port: PositiveInt = PositiveInt(3306)
     parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [  # noqa: RUF012
         {"name": "character_set_client", "value": "utf8mb4"},
