@@ -11,6 +11,7 @@ import pulumi_fastly as fastly
 import pulumi_github as github
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
+from bridge.lib.constants import FASTLY_A_TLS_1_3, FASTLY_CNAME_TLS_1_3
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
@@ -60,6 +61,7 @@ vector_log_proxy_stack = StackReference(
 monitoring_stack = StackReference("infrastructure.monitoring")
 dns_stack = StackReference("infrastructure.aws.dns")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
+learn_zone_id = dns_stack.require_output("learn")["id"]
 
 aws_config = AWSBase(
     tags={
@@ -481,6 +483,10 @@ mitopen_fastly_service = fastly.ServiceVcl(
             comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
             name=mitopen_config.require("frontend_domain"),
         ),
+        fastly.ServiceVclDomainArgs(
+            comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application - Legacy",
+            name=mitopen_config.require("legacy_frontend_domain"),
+        ),
     ],
     headers=[
         fastly.ServiceVclHeaderArgs(
@@ -502,31 +508,36 @@ mitopen_fastly_service = fastly.ServiceVcl(
         fastly.ServiceVclSnippetArgs(
             name="Rewrite requests to root s3",
             content=textwrap.dedent(
-                r"""
+                rf"""
                 set req.http.orig-req-url = req.url;
                 declare local var.org_qs STRING;
                 set var.org_qs = req.url.qs;
                 unset req.http.Cookie;
 
+                # If the request is for the old DNS name, redirect
+                if (req.http.host == "{mitopen_config.require("legacy_frontend_domain")}") {{
+                  error 618 "redirect-host";
+                }}
+
                 # If the request does not end in a slash and does not contain a period, error to redirect
-                if (req.url.path !~ "\/$" && req.url.basename !~ "\." ) {
-                  error 618 "redirect";
-                }
+                if (req.url.path !~ "\/$" && req.url.basename !~ "\." ) {{
+                  error 618 "redirect-extension";
+                }}
 
                 # Return the ROOT index page if the request is for ANY directory
-                if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {
+                if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {{
                   set req.url = "/index.html";
-                }
+                }}
 
                 # If the request originally included a query string, put it back on
-                if (var.org_qs != "") {
+                if (var.org_qs != "") {{
                   set req.url = req.url + "?" + var.org_qs;
-                }
+                }}
 
                 # Don't keep pre-pending '/frontend' over and over
-                if (req.url !~ "^\/frontend") {
+                if (req.url !~ "^\/frontend") {{
                   set req.url = "/frontend" + req.url;
-                }
+                }}
                 """
             ),
             type="recv",
@@ -536,11 +547,25 @@ mitopen_fastly_service = fastly.ServiceVcl(
             content=textwrap.dedent(
                 r"""
                 # redirect to the same path + trailing slash + include any qs if present
-                if (obj.status == 618 && obj.response == "redirect") {
+                if (obj.status == 618 && obj.response == "redirect-extension") {
                   set obj.status = 302;
                   set obj.http.Location = req.url.path + "/" + if (req.url.qs, "?" + req.url.qs, "");
                   return (deliver);
                 }
+                """
+            ),
+            type="error",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            name="Redirect for to correct domain",
+            content=textwrap.dedent(
+                rf"""
+                # redirect to the correct host/domain
+                if (obj.status == 618 && obj.response == "redirect-host") {{
+                  set obj.status = 302;
+                  set obj.http.Location = "https://" + "{mitopen_config.require("frontend_domain")}" + req.url.path + "/" + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
+                  return (deliver);
+                }}
                 """
             ),
             type="error",
@@ -571,15 +596,36 @@ five_minutes = 60 * 5
 route53.Record(
     "ol-mitopen-frontend-dns-record",
     name=mitopen_config.require("frontend_domain"),
-    type="CNAME",
+    allow_overwrite=True,
+    type="A",
     ttl=five_minutes,
-    records=[mitopen_config.require("fastly_domain")],
-    zone_id=mitodl_zone_id,
+    records=[str(addr) for addr in FASTLY_A_TLS_1_3],
+    zone_id=learn_zone_id,
     opts=ResourceOptions(delete_before_replace=True),
 )
 route53.Record(
+    "ol-mitopen-frontend-dns-record-legacy",
+    name=mitopen_config.require("legacy_frontend_domain"),
+    type="CNAME",
+    ttl=five_minutes,
+    records=[FASTLY_CNAME_TLS_1_3],
+    zone_id=mitodl_zone_id,
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+route53.Record(
     "ol-mitopen-api-dns-record",
     name=mitopen_config.require("api_domain"),
+    allow_overwrite=True,
+    type="CNAME",
+    ttl=five_minutes,
+    records=[mitopen_config.require("heroku_domain")],
+    zone_id=learn_zone_id,
+    opts=ResourceOptions(delete_before_replace=True),
+)
+route53.Record(
+    "ol-mitopen-api-dns-record-legacy",
+    name=mitopen_config.require("legacy_api_domain"),
     type="CNAME",
     ttl=five_minutes,
     records=[mitopen_config.require("heroku_domain")],
