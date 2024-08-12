@@ -114,21 +114,9 @@ postgres_role_statements = {
             ),
             Template("""RESET ROLE;"""),
         ],
-        "revoke": [
-            Template(
-                """ALTER DEFAULT PRIVILEGES REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM "${app_name}";"""
-            ),
-            Template(
-                """ALTER DEFAULT PRIVILEGES REVOKE ALL ON ALL TABLES IN SCHEMA public FROM "${app_name}";"""
-            ),
-            Template(
-                """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "${app_name}";"""
-            ),
-            Template(
-                """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "${app_name}";"""
-            ),
-            Template("""DROP ROLE "${app_name}";"""),
-        ],
+        # Don't provide a revoke statement so that Vault won't accidentally remove the
+        # role
+        "revoke": [],
         "renew": [],
         "rollback": [],
     },
