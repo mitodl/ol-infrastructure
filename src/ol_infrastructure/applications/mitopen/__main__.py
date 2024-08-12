@@ -519,6 +519,11 @@ mitopen_fastly_service = fastly.ServiceVcl(
                   error 618 "redirect-host";
                 }}
 
+                # If the request does not end in a slash and does not contain a period, error to redirect
+                if (req.url.path !~ "\/$" && req.url.basename !~ "\." ) {{
+                  error 618 "redirect-extension";
+                }}
+
                 # Return the ROOT index page if the request is for ANY directory
                 if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {{
                   set req.url = "/index.html";
@@ -538,13 +543,27 @@ mitopen_fastly_service = fastly.ServiceVcl(
             type="recv",
         ),
         fastly.ServiceVclSnippetArgs(
+            name="Redirect for directory",
+            content=textwrap.dedent(
+                r"""
+                # redirect to the same path + trailing slash + include any qs if present
+                if (obj.status == 618 && obj.response == "redirect-extension") {
+                  set obj.status = 302;
+                  set obj.http.Location = req.url.path + "/" + if (req.url.qs, "?" + req.url.qs, "");
+                  return (deliver);
+                }
+                """
+            ),
+            type="error",
+        ),
+        fastly.ServiceVclSnippetArgs(
             name="Redirect for to correct domain",
             content=textwrap.dedent(
                 rf"""
                 # redirect to the correct host/domain
                 if (obj.status == 618 && obj.response == "redirect-host") {{
                   set obj.status = 302;
-                  set obj.http.Location = "https://" + "{mitopen_config.require("frontend_domain")}" + req.url.path + "/" + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
+                  set obj.http.Location = "https://" + "{mitopen_config.require("frontend_domain")}" + req.url.path + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
                   return (deliver);
                 }}
                 """
