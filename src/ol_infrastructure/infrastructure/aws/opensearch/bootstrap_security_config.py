@@ -11,7 +11,8 @@ parser.add_argument("-s", "--stack", help="pulumi stack name", required=True)
 args = vars(parser.parse_args())
 
 env_prefix = args["stack"].split(".")[-2]
-env_suffix = args["stack"].split(".")[-1]
+env_suffix = args["stack"].split(".")[-1].lower()
+
 
 master_username = "opensearch"
 master_password = read_yaml_secrets(
