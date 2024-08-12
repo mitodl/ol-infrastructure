@@ -48,9 +48,9 @@ config:
     MITOPEN_SUPPORT_EMAIL: "learn-support@mit.edu"  # Need to verify
     OCW_ITERATOR_CHUNK_SIZE: 300
     OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
-    OPENSEARCH_INDEX: "mitopen"  # TBD if we change this. Impactful
+    OPENSEARCH_INDEX: "mitlearn"
     OPENSEARCH_SHARD_COUNT: 3
-    OPENSEARCH_URL: "https://search-opensearch-mitopen-productio-34bmfnsi2zdrngie5vdpe7keu4.us-east-1.es.amazonaws.com"  # TBD if we change this URL
+    OPENSEARCH_URL: "https://search-opensearch-mitlearn-producti-qjtnw2dcoampmbtscs3wdfci6y.us-east-1.es.amazonaws.com"
     PGBOUNCER_DEFAULT_POOL_SIZE: 50
     PGBOUNER_MAX_CLIENT_CONN: 500
     PGBOUNER_MIN_POOL_SIZE: 20
