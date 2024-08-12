@@ -61,7 +61,7 @@ postgres_role_statements = {
         "renew": [],
         "rollback": [],
     },
-    "app": {
+    "approle": {
         "create": [
             # Check if the role exists and create it if not
             Template(
@@ -113,6 +113,27 @@ postgres_role_statements = {
                 """
             ),
             Template("""RESET ROLE;"""),
+        ],
+        "revoke": [
+            Template(
+                """ALTER DEFAULT PRIVILEGES REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM "${app_name}";"""
+            ),
+            Template(
+                """ALTER DEFAULT PRIVILEGES REVOKE ALL ON ALL TABLES IN SCHEMA public FROM "${app_name}";"""
+            ),
+            Template(
+                """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "${app_name}";"""
+            ),
+            Template(
+                """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "${app_name}";"""
+            ),
+            Template("""DROP ROLE "${app_name}";"""),
+        ],
+        "renew": [],
+        "rollback": [],
+    },
+    "app": {
+        "create": [
             # Create the user in ${app_name}
             Template(
                 """
@@ -146,7 +167,7 @@ postgres_role_statements = {
         "renew": [],
         "rollback": [],
     },
-    "readonly": {
+    "readonly_role": {
         "create": [
             # Check if the role exists and create it if not
             Template(
@@ -195,6 +216,13 @@ postgres_role_statements = {
                 """
             ),
             Template("""RESET ROLE;"""),
+        ],
+        "revoke": [],
+        "renew": [],
+        "rollback": [],
+    },
+    "readonly": {
+        "create": [
             # Create the read-only user and put it into the read-only-role
             Template(
                 """

@@ -13,13 +13,13 @@ from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-setup_vault_provider(skip_child_token=True)
+stack_info = parse_stack()
+setup_vault_provider(stack_info, skip_child_token=True)
 setup_heroku_provider()
 
 mit_open_config = Config("mit_open")
 heroku_config = Config("heroku")
 heroku_app_config = Config("heroku_app")
-stack_info = parse_stack()
 aws_config = AWSBase(
     tags={
         "OU": "mit-open",
