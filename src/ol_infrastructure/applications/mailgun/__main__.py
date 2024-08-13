@@ -15,7 +15,7 @@ ol_mailgun_mitlearn_domain = mailgun.Domain(
     f"ol-mailgun-mitlearn-domain-{stack_info.env_suffix}",
     click_tracking=True,
     dkim_key_size=2048,
-    dkim_selector=mitlearn_config.require("dkim_public_key"),
+    dkim_selector="mx",
     force_dkim_authority=False,
     name=mitlearn_config.require("url"),
     open_tracking=True,
@@ -44,12 +44,19 @@ route53.Record(
 )
 
 # Mailgun MITLearn DKIM record
+# Mailgun resource currently (8/2024) does not support uploading a DKIM value
+# despite the UI providing that option. So we have to obtain the value set by Mailgun
+# and use it in the Route53 config
 route53.Record(
     "ol-mailgun-mitlearn-dkim-record",
     name=f"mx._domainkey.{mitlearn_config.require("url")}",
     type="TXT",
     ttl=thirty_minutes,
-    records=[f"v=DKIM1; k=rsa; p={mitlearn_config.require("dkim_public_key")}"],
+    records=[
+        ol_mailgun_mitlearn_domain.sending_records_sets[0].value.apply(
+            lambda value: f'{value[:254]}""{value[254:]}'
+        )
+    ],
     zone_id=mitlearn_zone_id,
     opts=ResourceOptions(delete_before_replace=True),
 )
@@ -60,7 +67,7 @@ route53.Record(
     name=mitlearn_config.require("url"),
     type="MX",
     ttl=thirty_minutes,
-    records=["mxa.mailgun.org", "mxb.mailgun.org"],
+    records=["10 mxa.mailgun.org", "10 mxb.mailgun.org"],
     zone_id=mitlearn_zone_id,
     opts=ResourceOptions(delete_before_replace=True),
 )
