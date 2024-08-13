@@ -64,8 +64,10 @@ config:
   mitopen:db_password:
     secure: v1:siGmu4+ZCOqekx7l:4Pdgv4fKZIjWJPAcZDBdpvZ0mUW10SUcX/9ZatsnZbR/euYoklo8dTTFu4i/5kTnJHHYot1QK3xS+gk++lHZfneBoC9qBR+l2qzlvvNBoN8=
   mitopen:api_domain: "api.learn.mit.edu"
+  mitopen:legacy_api_domain: "api.mitopen.odl.mit.edu"
   mitopen:frontend_domain: "learn.mit.edu"
+  mitopen:legacy_frontend_domain: "mitopen.odl.mit.edu"
   mitopen:fastly_domain: "d.sni.global.fastly.net"
-  mitopen:heroku_domain: "triangular-stingray-y0p9lbcns5zorm8392pou8sy.herokudns.com"
+  mitopen:heroku_domain: "computational-cherry-khbuwf9yvncf0kw3hbk5txff.herokudns.com"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
