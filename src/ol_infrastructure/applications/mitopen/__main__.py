@@ -714,7 +714,7 @@ heroku_interpolated_vars = {
     "CORS_ALLOWED_ORIGINS": cors_urls_json,
     "CSRF_TRUSTED_ORIGINS": json.dumps(csrf_origins_list),
     "KEYCLOAK_BASE_URL": f"https://{interpolation_vars['sso_url']}/",
-    "MAILGUN_FROM_EMAIL": f"MIT Open <no-reply@{interpolation_vars['mailgun_sender_domain']}",
+    "MAILGUN_FROM_EMAIL": f"MIT Learn <no-reply@{interpolation_vars['mailgun_sender_domain']}>",
     "MAILGUN_SENDER_DOMAIN": interpolation_vars["mailgun_sender_domain"],
     "MAILGUN_URL": f"https://api.mailgun.net/v3/{interpolation_vars['mailgun_sender_domain']}",
     "MITOPEN_CORS_ORIGIN_WHITELIST": cors_urls_json,
