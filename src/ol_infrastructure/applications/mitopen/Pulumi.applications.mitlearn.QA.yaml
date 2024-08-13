@@ -54,7 +54,7 @@ config:
     - "https://ocw-next.netlify.app"
     - "https://draft-qa.ocw.mit.edu"
     - "https://live-qa.ocw.mit.edu"
-    mailgun_sender_domain: "discussions-mail.odl.mit.edu"  # need to verify
+    mailgun_sender_domain: "mail-rc.learn.mit.edu"
     sso_url: "sso-qa.ol.mit.edu"
   mitopen:db_instance_size: db.m7g.xlarge
   mitopen:db_password:
