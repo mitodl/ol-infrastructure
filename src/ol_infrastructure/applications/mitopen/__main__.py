@@ -588,7 +588,10 @@ mitopen_fastly_service = fastly.ServiceVcl(
         )
     ],
     opts=ResourceOptions.merge(
-        fastly_provider, ResourceOptions(aliases=[Alias(name="fastly-mitopen-qa")])
+        fastly_provider,
+        ResourceOptions(
+            aliases=[Alias(name=f"fastly-mitopen-{stack_info.env_suffix}")]
+        ),
     ),
 )
 
