@@ -3,8 +3,6 @@ encryptionsalt: v1:1H9lnzZG79Q=:v1:/NIoxYp1G0jWpCYy:VmVozP1hULB00aVmsuavkdExnF4A
 config:
   mailgun:apiKey:
     secure: v1:fTYoaQ/6JGd1Tqv6:795fMzh+r4jM5ocXjBr89E7iJksrZ6jcgwLRE1zL32UdrDU0uCH2/6bzIeywwMB7n0dNAgcY21GeOhLsvvJbqIq2
-  mitlearn:dkim_public_key:
-    secure: v1:hpN1i2Sztyavb9E4:Ke7fBGWX0QjPzIEZNssYZVIpmFD3JPZGUh8sHq133W7qriOSra4To6i/7EobllKDuOCOolzHTWxZGUeHM7dmDoHT20D0ugTHMD+NmMKP9WDiD06v3yMRaFjxB9+TJLh4zEij5uyjqBqG0aoZn81T4o037VYf3273I/GbCn+enF7tPRWuv0wdCkqQgN1HYHCmb6ML9rzJQW2WHCU5Yv9PXyGl052fh8V+NDplnyYcW6mj6OkaOJEl0L/YM1GRC+uUbLcIEEioe/RplYJfyRml8NZ3D0ErlIVP6JxTBwJpEFb+eI005sd0TL+ZmLt9mYIeQqRC/81Ru71ZmHMokQlOn/TmmtBQ6ZX0qae3yHRtL5Q9lF4xu4wy0VeVbnkai2DV5agdTQcLGeD0gfpOlkNYuHa1x/uSpNaxDNKJc05g3T/0xnRmAh8ze0koEFaOd3fajWnlWFgpo/EIi1f+ihW6tBjg7bOX40PFAuLEnk+HuE4Slmvc7gh8zbbHl6lU4xHEsaoBqIcsM3kBFHBbDN1v1NlRYWZT3xqc
   mitlearn:smtp_noreply_password:
     secure: v1:S7hfaPBQJRmWU/xA:X/Nr8eBehG92yO10kw4qzgS7a8zbTpLUHH7sc0+OC6aoVU+SfI6dA3jP7RVlD4r9
   mitlearn:smtp_postmaster_password:
