@@ -651,17 +651,17 @@ heroku_vars = {
     "EDX_API_URL": "https://api.edx.org/catalog/v1/catalogs/10/courses",
     "MICROMASTERS_CATALOG_API_URL": "https://micromasters.mit.edu/api/v0/catalog/",
     "MICROMASTERS_CMS_API_URL": "https://micromasters.mit.edu/api/v0/wagtail/",
-    "MITOPEN_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
-    "MITOPEN_AXIOS_BASE_PATH": f"https://{mitopen_config.get('frontend_domain')}",
-    "MITOPEN_DB_CONN_MAX_AGE": 0,
-    "MITOPEN_DB_DISABLE_SSL": "True",
-    "MITOPEN_DEFAULT_SITE_KEY": "micromasters",
-    "MITOPEN_EMAIL_PORT": 587,
-    "MITOPEN_EMAIL_TLS": "True",
-    "MITOPEN_ENVIRONMENT": env_name,
-    "MITOPEN_FROM_EMAIL": "MITOpen <mitopen-support@mit.edu>",
-    "MITOPEN_FRONTPAGE_DIGEST_MAX_POSTS": 10,
-    "MITOPEN_USE_S3": "True",
+    "MITOL_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
+    "MITOL_AXIOS_BASE_PATH": f"https://{mitopen_config.get('frontend_domain')}",
+    "MITOL_DB_CONN_MAX_AGE": 0,
+    "MITOL_DB_DISABLE_SSL": "True",
+    "MITOL_DEFAULT_SITE_KEY": "micromasters",
+    "MITOL_EMAIL_PORT": 587,
+    "MITOL_EMAIL_TLS": "True",
+    "MITOL_ENVIRONMENT": env_name,
+    "MITOL_FROM_EMAIL": "MITOpen <mitopen-support@mit.edu>",
+    "MITOL_FRONTPAGE_DIGEST_MAX_POSTS": 10,
+    "MITOL_USE_S3": "True",
     "MITPE_BASE_URL": "https://professional.mit.edu/",
     "MITX_ONLINE_BASE_URL": "https://mitxonline.mit.edu/",
     "MITX_ONLINE_COURSES_API_URL": "https://mitxonline.mit.edu/api/v2/courses/",
@@ -720,7 +720,7 @@ heroku_interpolated_vars = {
     "MAILGUN_FROM_EMAIL": f"MIT Learn <no-reply@{interpolation_vars['mailgun_sender_domain']}>",
     "MAILGUN_SENDER_DOMAIN": interpolation_vars["mailgun_sender_domain"],
     "MAILGUN_URL": f"https://api.mailgun.net/v3/{interpolation_vars['mailgun_sender_domain']}",
-    "MITOPEN_CORS_ORIGIN_WHITELIST": cors_urls_json,
+    "MITOL_CORS_ORIGIN_WHITELIST": cors_urls_json,
     "OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
     "SESSION_COOKIE_DOMAIN": session_cookie_domain,
     "SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS": auth_allowed_redirect_hosts_json,
@@ -788,7 +788,7 @@ sensitive_heroku_vars = {
     "CKEDITOR_UPLOAD_URL": mitopen_vault_secrets["ckeditor"]["upload_url"],
     "EDX_API_CLIENT_ID": mitopen_vault_secrets["edx_api_client"]["id"],
     "EDX_API_CLIENT_SECRET": mitopen_vault_secrets["edx_api_client"]["secret"],
-    "MITOPEN_JWT_SECRET": mitopen_vault_secrets["jwt_secret"],
+    "MITOL_JWT_SECRET": mitopen_vault_secrets["jwt_secret"],
     "OLL_API_CLIENT_ID": mitopen_vault_secrets["open_learning_library_client"][
         "client_id"
     ],
@@ -823,13 +823,13 @@ sensitive_heroku_vars = {
     "MAILGUN_KEY": secret_global_mailgun_api_key.data.apply(
         lambda data: "{}".format(data["api_key"])
     ),
-    "MITOPEN_EMAIL_HOST": secret_operations_global_mit_smtp.data.apply(
+    "MITOL_EMAIL_HOST": secret_operations_global_mit_smtp.data.apply(
         lambda data: "{}".format(data["relay_host"])
     ),
-    "MITOPEN_EMAIL_PASSWORD": secret_operations_global_mit_smtp.data.apply(
+    "MITOL_EMAIL_PASSWORD": secret_operations_global_mit_smtp.data.apply(
         lambda data: "{}".format(data["relay_password"])
     ),
-    "MITOPEN_EMAIL_USER": secret_operations_global_mit_smtp.data.apply(
+    "MITOL_EMAIL_USER": secret_operations_global_mit_smtp.data.apply(
         lambda data: "{}".format(data["relay_username"])
     ),
     "OCW_NEXT_SEARCH_WEBHOOK_KEY": secret_operations_global_update_search_data_webhook_key.data.apply(
@@ -921,7 +921,7 @@ gh_workflow_posthog_project_api_key_env_secret = github.ActionsSecret(
 gh_workflow_environment_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_environment_env_secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
-    secret_name=f"MITOPEN_ENVIRONMENT_{env_var_suffix}",
+    secret_name=f"MITOL_ENVIRONMENT_{env_var_suffix}",
     plaintext_value=stack_info.env_suffix,
     opts=ResourceOptions(provider=github_provider),
 )

@@ -38,14 +38,15 @@ config:
     INDEXING_API_USERNAME: "od_mm_prod_api"
     KEYCLOAK_BASE_URL: "https://sso.ol.mit.edu"
     KEYCLOAK_REALM_NAME: "olapps"
-    MITOPEN_API_URL: "https://api.learn.mit.edu"
-    MITOPEN_APP_URL: "https://learn.mit.edu"
-    MITOPEN_BASE_URL: "https://learn.mit.edu"
-    MITOPEN_COOKIE_DOMAIN: "mit.edu"
-    MITOPEN_COOKIE_NAME: "learn"
-    MITOPEN_LOG_LEVEL: "INFO"
-    MITOPEN_NEW_USER_LOGIN_URL: "https://learn.mit.edu/onboarding"
-    MITOPEN_SUPPORT_EMAIL: "learn-support@mit.edu"  # Need to verify
+    MITOL_API_URL: "https://api.learn.mit.edu"
+    MITOL_APP_URL: "https://learn.mit.edu"
+    MITOL_APP_BASE_URL: "https://learn.mit.edu"
+    MITOL_BASE_URL: "https://learn.mit.edu"
+    MITOL_COOKIE_DOMAIN: "mit.edu"
+    MITOL_COOKIE_NAME: "learn"
+    MITOL_LOG_LEVEL: "INFO"
+    MITOL_NEW_USER_LOGIN_URL: "https://learn.mit.edu/onboarding"
+    MITOL_SUPPORT_EMAIL: "learn-support@mit.edu"  # Need to verify
     OCW_ITERATOR_CHUNK_SIZE: 300
     OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
     OPENSEARCH_INDEX: "mitlearn"
