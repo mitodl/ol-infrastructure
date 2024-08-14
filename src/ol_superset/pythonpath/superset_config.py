@@ -255,7 +255,7 @@ MAPBOX_API_KEY = os.environ.get("MAPBOX_API_KEY", "")
 
 # Adding http headers to allow iframe embedding
 ENABLE_CORS = True
-HTTP_HEADERS={"X-Frame-Options":"ALLOWALL"}
+HTTP_HEADERS = {"X-Frame-Options": "ALLOWALL"}
 
 
 class CeleryConfig:  # pylint: disable=too-few-public-methods
