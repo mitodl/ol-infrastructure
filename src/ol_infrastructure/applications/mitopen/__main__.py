@@ -601,7 +601,6 @@ mitopen_fastly_service = fastly.ServiceVcl(
             name="MITOpen Frontend",
             override_host=application_storage_bucket.bucket_domain_name,
             port=DEFAULT_HTTPS_PORT,
-            request_condition="frontend path",
             ssl_cert_hostname=application_storage_bucket.bucket_domain_name,
             ssl_sni_hostname=application_storage_bucket.bucket_domain_name,
             use_ssl=True,
