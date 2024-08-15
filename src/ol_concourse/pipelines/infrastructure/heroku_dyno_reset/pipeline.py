@@ -88,7 +88,7 @@ qa_dyno_map = {
             "extra_worker_performance=0:Performance-L",
             "extra_worker_2x=0:Standard-2X",
             "release=0:Standard-1X",
-            # "web=3:Standard-1X",
+            # "web=3:Standard-2X",
             "worker=1:Standard-2X",
         ],
     },
