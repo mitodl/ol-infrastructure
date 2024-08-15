@@ -221,9 +221,10 @@ def pypi(
 
 def schedule(
     name: Identifier,
-    interval: str,
+    interval: Optional[str] = None,
     start: Optional[str] = None,
     stop: Optional[str] = None,
+    days: Optional[list[str]] = None,
 ) -> Resource:
     return Resource(
         name=name,
@@ -233,6 +234,7 @@ def schedule(
             "interval": interval,
             "start": start,
             "stop": stop,
+            "days": days,
         },
     )
 
