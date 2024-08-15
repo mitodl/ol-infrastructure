@@ -348,7 +348,7 @@ mitopen_role_statements["app"] = {
             BEGIN
                IF EXISTS (
                   SELECT FROM pg_catalog.pg_roles
-                  WHERE  rolname = 'mitopen' THEN
+                  WHERE  rolname = 'mitopen') THEN
                       RAISE NOTICE 'Role "mitopen" already exists. Skipping.';
                ELSE
                   BEGIN   -- nested block
