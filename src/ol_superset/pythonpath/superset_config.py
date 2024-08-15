@@ -253,6 +253,10 @@ DATA_CACHE_CONFIG = {"CACHE_KEY_PREFIX": "superset_chart_cache", **cache_base}
 # Set this API key to enable Mapbox visualizations
 MAPBOX_API_KEY = os.environ.get("MAPBOX_API_KEY", "")
 
+# Adding http headers to allow iframe embedding
+ENABLE_CORS = True
+HTTP_HEADERS = {"X-Frame-Options": "ALLOWALL"}
+
 
 class CeleryConfig:  # pylint: disable=too-few-public-methods
     broker_url = "rediss://superset-redis.service.consul:6379/1"
