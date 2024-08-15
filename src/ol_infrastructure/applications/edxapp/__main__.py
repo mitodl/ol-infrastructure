@@ -1,3 +1,5 @@
+# ruff: noqa: E501
+
 """Provision and deploy the resources needed for an edxapp installation.
 
 - Create S3 buckets required by edxapp
@@ -417,7 +419,7 @@ edxapp_db_security_group = ec2.SecurityGroup(
                 data_vpc["security_groups"]["integrator"],
                 vault_stack.require_output("vault_server")["security_group"],
             ],
-            # TODO: Create Vault security group to act as source of allowed  # noqa: E501, FIX002, TD002, TD003
+            # TODO: Create Vault security group to act as source of allowed  # noqa: FIX002, TD002, TD003
             # traffic. (TMM 2021-05-04)
             cidr_blocks=[
                 edxapp_vpc["cidr"],
@@ -556,40 +558,66 @@ edxapp_db = OLAmazonDB(edxapp_db_config)
 edxapp_mysql_role_statements = mysql_role_statements.copy()
 edxapp_mysql_role_statements.pop("app")
 edxapp_mysql_role_statements["edxapp"] = {
-    "create": Template(
-        "CREATE DATABASE IF NOT EXISTS edxapp;"
-        "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
-        "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp.* TO '{{name}}'@'%';"
-    ),
-    "revoke": Template("DROP USER '{{name}}';"),
+    "create": [
+        Template("""CREATE DATABASE IF NOT EXISTS edxapp;"""),
+        Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
+        Template(
+            """
+            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES,
+            CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp.* TO '{{name}}'@'%';
+            """
+        ),
+    ],
+    "revoke": [Template("DROP USER '{{name}}';")],
+    "renew": [],
+    "rollback": [],
 }
 edxapp_mysql_role_statements["edxapp-csmh"] = {
-    "create": Template(
-        "CREATE DATABASE IF NOT EXISTS edxapp_csmh;"
-        "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
-        "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh.* TO '{{name}}'@'%';"
-    ),
-    "revoke": Template("DROP USER '{{name}}';"),
+    "create": [
+        Template("""CREATE DATABASE IF NOT EXISTS edxapp_csmh;"""),
+        Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
+        Template(
+            """
+            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES,
+            CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh.* TO '{{name}}'@'%';
+            """
+        ),
+    ],
+    "revoke": [Template("DROP USER '{{name}}';")],
+    "renew": [],
+    "rollback": [],
 }
 edxapp_mysql_role_statements["xqueue"] = {
-    "create": Template(
-        "CREATE DATABASE IF NOT EXISTS xqueue;"
-        "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
-        "CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue.* TO '{{name}}'@'%';"
-    ),
-    "revoke": Template("DROP USER '{{name}}';"),
+    "create": [
+        Template("""CREATE DATABASE IF NOT EXISTS xqueue;"""),
+        Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
+        Template(
+            """
+            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES,
+            CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue.* TO '{{name}}'@'%';
+            """
+        ),
+    ],
+    "revoke": [Template("DROP USER '{{name}}';")],
+    "renew": [],
+    "rollback": [],
 }
 edxapp_mysql_role_statements["notes"] = {
-    "create": Template(
-        "CREATE DATABASE IF NOT EXISTS edx_notes_api;"
-        "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
-        "CREATE TEMPORARY TABLES, LOCK TABLES ON edx_notes_api.* TO '{{name}}'@'%';"
-    ),
-    "revoke": Template("DROP USER '{{name}}';"),
+    "create": [
+        Template("""CREATE DATABASE IF NOT EXISTS edx_notes_api;"""),
+        Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
+        Template(
+            """
+            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES,
+            CREATE TEMPORARY TABLES, LOCK TABLES ON edx_notes_api.* TO '{{name}}'@'%';
+            """
+        ),
+    ],
+    "revoke": [
+        Template("DROP USER '{{name}}';"),
+    ],
+    "renew": [],
+    "rollback": [],
 }
 
 edxapp_db_vault_backend_config = OLVaultMysqlDatabaseConfig(
@@ -1578,7 +1606,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
                   set obj.status = 302;
                   set obj.http.Location = table.lookup(marketing_redirects, req.url.path) + if (req.url.qs, "?" req.url.qs, "");
                   return (deliver);
-                }"""  # noqa: E501
+                }"""
             ),
             name="Route Redirect Requests",
             type="error",
