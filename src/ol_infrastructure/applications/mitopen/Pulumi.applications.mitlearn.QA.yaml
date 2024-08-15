@@ -8,6 +8,7 @@ config:
     secure: v1:eSvnqne7KQRkHJlu:wTyl9W3aivfxlANqBML2wy4GEHe85VuKll60R5HmGUu1hJTcQBEfzK1cJOyvjlbLgBtXLw==
   heroku_app:vars:
     CELERY_WORKER_MAX_MEMORY_PER_CHILD: 125000
+    CSFRF_COOKIE_NAME: "learn-rc-csrftoken"
     DEBUG: "false"
     EDX_LEARNING_COURSE_BUCKET_NAME: "edxorg-qa-edxapp-courses"
     ENABLE_INFINITE_CORRIDOR: "true"
