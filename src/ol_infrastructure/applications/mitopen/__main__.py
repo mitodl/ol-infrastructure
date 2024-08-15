@@ -965,6 +965,13 @@ gh_workflow_environment_env_secret = github.ActionsSecret(
     plaintext_value=stack_info.env_suffix,
     opts=ResourceOptions(provider=github_provider),
 )
+gh_workflow_csrf_cookie_name_env_secret = github.ActionsSecret(
+    f"ol_mitopen_csrf_cookie_name-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"CSRF_COOKIE_NAME_{env_var_suffix}",
+    plaintext_value=heroku_vars["CSRF_COOKIE_NAME"],
+    opts=ResourceOptions(provider=github_provider),
+)
 
 
 export(
