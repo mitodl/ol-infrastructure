@@ -1,6 +1,5 @@
 ARG PYTHON_VERSION=3.8
-# FROM python:${PYTHON_VERSION}-slim-bookworm
-FROM python:3.12-slim-bookworm
+FROM python:${PYTHON_VERSION}-slim-bookworm
 SHELL ["/bin/bash", "-c"]
 
 ENV DEBIAN_FRONTEND=noninteractive
