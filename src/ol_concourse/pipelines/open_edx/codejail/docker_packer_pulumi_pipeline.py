@@ -82,6 +82,9 @@ def build_codejail_pipeline(
                     ),
                     "BUILD_ARG_OPENEDX_BRANCH": openedx_branch,
                     "BUILD_ARG_PYTHON_VERSION": openedx_release.python_version,
+                    "BUILD_ARG_OPENEDX_RELEASE": release_name
+                    if release_name != "master"
+                    else "",
                 },
                 build_args=[
                     "-t $(cat ./codejail-release/commit_sha)",
