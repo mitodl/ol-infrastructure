@@ -683,23 +683,27 @@ mitopen_fastly_service = fastly.ServiceVcl(
                   error 618 "redirect-extension";
                 }}
 
-                # Return the ROOT index page if the request is for ANY directory
-                if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {{
-                  set req.url = "/index.html";
-                }}
-
                 # If the request originally included a query string, put it back on
                 if (var.org_qs != "") {{
                   set req.url = req.url + "?" + var.org_qs;
                 }}
-
-                # Don't keep pre-pending '/frontend' over and over
-                if (req.url !~ "^\/frontend") {{
-                  set req.url = "/frontend" + req.url;
-                }}
                 """
             ),
             type="recv",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            name="Manage implicit redirects for backend requests",
+            content=textwrap.dedent(
+                r"""
+                # Don't keep pre-pending '/frontend' over and over
+                if (bereq.url !~ "^\/frontend") {
+                  set bereq.url = "/frontend" + bereq.url;
+                }
+                set bereq.url = regsub(bereq.url, "/$", "/index.html");
+                return (deliver);
+                """
+            ),
+            type="fetch",
         ),
         fastly.ServiceVclSnippetArgs(
             name="Redirect for directory",
