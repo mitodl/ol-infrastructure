@@ -41,7 +41,6 @@ config:
     POSTHOG_API_HOST: "https://app.posthog.com"
     POSTHOG_TIMEOUT_MS: 1000
     POSTHOG_PROJECT_ID: "63497"
-    MITOL_NOTIFICATION_EMAIL_BACKEND: "anymail.backends.mailgun.EmailBackend"
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "live-qa.ocw.mit.edu"
