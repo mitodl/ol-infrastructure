@@ -1,9 +1,8 @@
 import json
-import yaml
 
 import pulumi_aws
 import pulumi_eks as eks
-
+import yaml
 from bridge.lib.magic_numbers import IAM_ROLE_NAME_PREFIX_MAX_LENGTH
 from pulumi import Config, StackReference, export
 
@@ -114,16 +113,16 @@ cluster = eks.Cluster(
 eks.ManagedNodeGroup(
     f"{cluster_name}-managednodegroup-simple",
     cluster=cluster,
-    #cluster_name=cluster._name,
+    # cluster_name=cluster._name,
     capacity_type="ON_DEMAND",
     instance_types=["t3.medium"],
     node_group_name=f"{cluster_name}-managednodegroup-simple-testing",
-    #node_subnet_ids=pod_subnet_ids,
+    # node_subnet_ids=pod_subnet_ids,
     node_role_arn=node_role.arn,
 )
 
 # change this to a managed node group
-#eks.NodeGroupV2(
+# eks.NodeGroupV2(
 #    f"{cluster_name}-nodegroup-simple",
 #    cluster=cluster,
 #    instance_type="t3.medium",
@@ -132,6 +131,9 @@ eks.ManagedNodeGroup(
 #    max_size=2,
 #    node_subnet_ids=pod_subnet_ids,
 #    instance_profile=node_instance_profile,
-#)
+# )
 
-export("cluster_export", value={"kube_config": cluster.kubeconfig.apply(lambda cc: yaml.dump(cc))})
+export(
+    "cluster_export",
+    value={"kube_config": cluster.kubeconfig.apply(lambda cc: yaml.dump(cc))},
+)
