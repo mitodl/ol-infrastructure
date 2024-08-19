@@ -90,10 +90,10 @@ if "QA" in stack_info.name:
         ],
         bound_audiences=[f"{keycloak_config.get('client_id')}"],
         user_claim="sub",
-        oidc_scopes="openid email profile",
+        oidc_scopes=["openid email profile"],
         groups_claim="groups",
         bound_claims_type="string",
-        bound_claims='{"groups":["vault-admin"]}',
+        bound_claims={"groups": "vault-admin"},
         role_type="oidc",
     )
 
