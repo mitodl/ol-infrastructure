@@ -120,7 +120,7 @@ production_dyno_map = {
             "worker=1:Standard-2X",
         ],
     },
-    "xpro": {
+    "xpro-production": {
         "owner": "mitx-devops",
         "dyno_list": [
             "extra_worker=0:Standard-2x",
