@@ -35,13 +35,15 @@ config:
     PGBOUNCER_DEFAULT_POOL_SIZE: 50
     PGBOUNER_MAX_CLIENT_CONN: 500
     PGBOUNER_MIN_POOL_SIZE: 20
+    POSTHOG_API_HOST: "https://app.posthog.com"
+    POSTHOG_ENABLED: "true"
+    POSTHOG_PROJECT_ID: "63497"
+    POSTHOG_TIMEOUT_MS: 1000
     SESSION_COOKIE_NAME: "learn-rc-session"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT:
     TIKA_SERVER_ENDPOINT: "https://tika-qa.odl.mit.edu"
-    POSTHOG_ENABLED: "true"
-    POSTHOG_API_HOST: "https://app.posthog.com"
-    POSTHOG_TIMEOUT_MS: 1000
-    POSTHOG_PROJECT_ID: "63497"
+    UWSGI_WORKERS: 3
+    UWSGI_THREADS: 15
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "live-qa.ocw.mit.edu"
