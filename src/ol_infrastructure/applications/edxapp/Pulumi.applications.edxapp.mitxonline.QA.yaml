@@ -11,6 +11,7 @@ config:
   - ["content_tagging.disabled", "--create", "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone",
     "--staff", "--authenticated"]
+  - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone",
     "--staff"]
   - ["grades.bulk_management", "--create", "--superusers", "--everyone", "--staff",
