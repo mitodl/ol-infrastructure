@@ -394,20 +394,24 @@ mitopen_role_statements["app"] = {
         ),
         # Set/refresh default privileges in both schemas
         Template("""SET ROLE "mitopen";"""),
-        Template("""
+        Template(
+            """
             ALTER DEFAULT PRIVILEGES FOR ROLE "mitopen" IN SCHEMA public
             GRANT ALL PRIVILEGES ON TABLES TO "mitopen" WITH GRANT OPTION;
-            """),
+            """
+        ),
         Template(
             """
             ALTER DEFAULT PRIVILEGES FOR ROLE "mitopen" IN SCHEMA public
             GRANT ALL PRIVILEGES ON SEQUENCES TO "mitopen" WITH GRANT OPTION;
             """
         ),
-        Template("""
+        Template(
+            """
             ALTER DEFAULT PRIVILEGES FOR ROLE "mitopen" IN SCHEMA external
             GRANT ALL PRIVILEGES ON TABLES TO "mitopen" WITH GRANT OPTION;
-            """),
+            """
+        ),
         Template(
             """
             ALTER DEFAULT PRIVILEGES FOR ROLE "mitopen" IN SCHEMA external
@@ -843,6 +847,7 @@ heroku_vars = {
     "MITOL_FROM_EMAIL": "MITOpen <mitopen-support@mit.edu>",
     "MITOL_FRONTPAGE_DIGEST_MAX_POSTS": 10,
     "MITOL_USE_S3": "True",
+    "MITOL_NOTIFICATION_EMAIL_BACKEND": "anymail.backends.mailgun.EmailBackend",
     "MITPE_BASE_URL": "https://professional.mit.edu/",
     "MITX_ONLINE_BASE_URL": "https://mitxonline.mit.edu/",
     "MITX_ONLINE_COURSES_API_URL": "https://mitxonline.mit.edu/api/v2/courses/",
