@@ -2,15 +2,6 @@ import io
 import os
 from pathlib import Path
 
-from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, VAULT_HTTP_PORT
-from bridge.lib.versions import (
-    AIRBYTE_VERSION,
-    CONSUL_TEMPLATE_VERSION,
-    CONSUL_VERSION,
-    TRAEFIK_VERSION,
-    VAULT_VERSION,
-)
-from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files, server
 
@@ -58,6 +49,15 @@ from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import install_and_configure_vector
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
+from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, VAULT_HTTP_PORT
+from bridge.lib.versions import (
+    AIRBYTE_VERSION,
+    CONSUL_TEMPLATE_VERSION,
+    CONSUL_VERSION,
+    TRAEFIK_VERSION,
+    VAULT_VERSION,
+)
+from bridge.secrets.sops import set_env_secrets
 
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")

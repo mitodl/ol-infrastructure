@@ -9,6 +9,10 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
+from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_consul import Node, Service, ServiceCheckArgs
+
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_HTTP_PORT,
@@ -17,10 +21,6 @@ from bridge.lib.magic_numbers import (
     DEFAULT_REDIS_PORT,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam, route53
-from pulumi_consul import Node, Service, ServiceCheckArgs
-
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,

@@ -17,13 +17,13 @@ from typing import Any, Union
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
-from bridge.secrets.sops import read_yaml_secrets
 from pulumi import ResourceOptions, StackReference, export
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
+from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,

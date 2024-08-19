@@ -15,6 +15,10 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import yaml
+from pulumi import Config, Output, StackReference
+from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_consul import Node, Service, ServiceCheckArgs
+
 from bridge.lib.magic_numbers import (
     CONCOURSE_WORKER_HEALTHCHECK_PORT,
     DEFAULT_HTTPS_PORT,
@@ -22,10 +26,6 @@ from bridge.lib.magic_numbers import (
     MAXIMUM_PORT_NUMBER,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, StackReference
-from pulumi_aws import ec2, get_caller_identity, iam, route53
-from pulumi_consul import Node, Service, ServiceCheckArgs
-
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,

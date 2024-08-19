@@ -4,16 +4,6 @@ import os
 import tempfile
 from pathlib import Path
 
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import (
-    CONSUL_TEMPLATE_VERSION,
-    CONSUL_VERSION,
-    TUTOR_PERMISSIONS_VERSION,
-    VAULT_VERSION,
-)
-from bridge.secrets.sops import set_env_secrets
-from bridge.settings.openedx.accessors import fetch_application_version
-from bridge.settings.openedx.types import OpenEdxApplication
 from pyinfra import host
 from pyinfra.operations import apt, files, server
 
@@ -63,6 +53,16 @@ from bilder.lib.template_helpers import (
     CONSUL_TEMPLATE_DIRECTORY,
     place_consul_template_file,
 )
+from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import (
+    CONSUL_TEMPLATE_VERSION,
+    CONSUL_VERSION,
+    TUTOR_PERMISSIONS_VERSION,
+    VAULT_VERSION,
+)
+from bridge.secrets.sops import set_env_secrets
+from bridge.settings.openedx.accessors import fetch_application_version
+from bridge.settings.openedx.types import OpenEdxApplication
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),

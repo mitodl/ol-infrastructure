@@ -21,14 +21,6 @@ from typing import Any
 
 import pulumi_tls as tls
 import yaml
-from bridge.lib.magic_numbers import (
-    DEFAULT_RSA_KEY_SIZE,
-    FIVE_MINUTES,
-    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
-    VAULT_CLUSTER_PORT,
-    VAULT_HTTP_PORT,
-)
-from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, Output, StackReference, export
 from pulumi_aws import (
     acmpca,
@@ -39,6 +31,14 @@ from pulumi_aws import (
     s3,
 )
 
+from bridge.lib.magic_numbers import (
+    DEFAULT_RSA_KEY_SIZE,
+    FIVE_MINUTES,
+    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
+    VAULT_CLUSTER_PORT,
+    VAULT_HTTP_PORT,
+)
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,

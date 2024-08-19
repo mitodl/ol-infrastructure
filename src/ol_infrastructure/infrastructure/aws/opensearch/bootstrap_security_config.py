@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import requests
+
 from bridge.secrets.sops import read_yaml_secrets
 
 parser = argparse.ArgumentParser()

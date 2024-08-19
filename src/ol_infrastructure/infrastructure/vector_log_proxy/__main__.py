@@ -8,11 +8,11 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import yaml
-from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
-from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import acm, autoscaling, ec2, get_caller_identity, iam, lb, route53, s3
 
+from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,

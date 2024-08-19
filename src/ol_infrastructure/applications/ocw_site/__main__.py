@@ -4,6 +4,9 @@ from pathlib import Path
 
 import httpx
 import pulumi_fastly as fastly
+from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi_aws import iam, route53, s3
+
 from bridge.lib.constants import FASTLY_A_TLS_1_2, FASTLY_CNAME_TLS_1_3
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
@@ -14,9 +17,6 @@ from bridge.lib.magic_numbers import (
     SECONDS_IN_ONE_DAY,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import iam, route53, s3
-
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,

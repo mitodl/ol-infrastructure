@@ -4,15 +4,6 @@ import os
 from io import StringIO
 from pathlib import Path
 
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import (
-    APISIX_CLOUD_CLI_VERSION,
-    APISIX_VERSION,
-    CONSUL_VERSION,
-    TRAEFIK_VERSION,
-    VAULT_VERSION,
-)
-from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files, server
 
@@ -50,6 +41,15 @@ from bilder.components.vector.steps import (
 )
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.ami_helpers import build_tags_document
+from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import (
+    APISIX_CLOUD_CLI_VERSION,
+    APISIX_VERSION,
+    CONSUL_VERSION,
+    TRAEFIK_VERSION,
+    VAULT_VERSION,
+)
+from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),

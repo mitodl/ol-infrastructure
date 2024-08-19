@@ -2,7 +2,6 @@ import sys
 import textwrap
 
 from bridge.lib.versions import KEYCLOAK_VERSION
-
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain

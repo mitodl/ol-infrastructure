@@ -21,7 +21,6 @@ from enum import Enum, unique
 from typing import Optional
 
 import pulumi
-from bridge.lib.magic_numbers import DEFAULT_HTTP_PORT, DEFAULT_HTTPS_PORT
 from pulumi.resource import ResourceOptions
 from pulumi_aws.acm import get_certificate
 from pulumi_aws.ec2 import (
@@ -42,6 +41,7 @@ from pulumi_aws.lb import (
 from pulumi_aws.route53 import Record, RecordAliasArgs, get_zone
 from pydantic import ConfigDict, PositiveInt
 
+from bridge.lib.magic_numbers import DEFAULT_HTTP_PORT, DEFAULT_HTTPS_PORT
 from ol_infrastructure.components.aws.fargate_service import (
     DeploymentControllerTypes,
     LaunchTypes,

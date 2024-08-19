@@ -4,15 +4,15 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import yaml
-from bridge.lib.magic_numbers import (
-    AWS_RDS_DEFAULT_DATABASE_CAPACITY,
-    DEFAULT_POSTGRES_PORT,
-)
 from pulumi import Config, ResourceOptions, StackReference
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
+from bridge.lib.magic_numbers import (
+    AWS_RDS_DEFAULT_DATABASE_CAPACITY,
+    DEFAULT_POSTGRES_PORT,
+)
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,

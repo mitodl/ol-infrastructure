@@ -1,6 +1,7 @@
 import pytest
-from ol_infrastructure.lib.ol_types import AWSBase
 from pydantic import ValidationError
+
+from ol_infrastructure.lib.ol_types import AWSBase
 
 VALID_TAGS = {"OU": "operations", "Environment": "test"}
 

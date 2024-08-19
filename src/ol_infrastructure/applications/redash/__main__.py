@@ -22,12 +22,12 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
-from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, DEFAULT_POSTGRES_PORT
-from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, StackReference, export
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 
+from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, DEFAULT_POSTGRES_PORT
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,

@@ -7,15 +7,15 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
+from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi_aws import acm, ec2, get_caller_identity, iam, route53, ses
+
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
     FIVE_MINUTES,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import acm, ec2, get_caller_identity, iam, route53, ses
-
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,

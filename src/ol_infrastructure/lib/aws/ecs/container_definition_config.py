@@ -1,8 +1,8 @@
 from typing import Optional
 
-from bridge.lib.magic_numbers import DEFAULT_HTTP_PORT, HALF_GIGABYTE_MB
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt
 
+from bridge.lib.magic_numbers import DEFAULT_HTTP_PORT, HALF_GIGABYTE_MB
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 

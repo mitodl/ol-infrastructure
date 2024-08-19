@@ -2,10 +2,11 @@ import json
 from pathlib import Path
 
 import pulumi_vault as vault
+from pulumi import Config, ResourceOptions
+
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
-from pulumi import Config, ResourceOptions
 
 stack_info = parse_stack()
 global_vault_secrets = read_yaml_secrets(

@@ -1,12 +1,13 @@
 from pathlib import Path
 
+from pulumi import Config, ResourceOptions, StackReference
+from pulumi_aws import get_caller_identity
+from pulumi_vault import AuthBackend, AuthBackendTuneArgs, Policy, aws, github
+
 from bridge.lib.magic_numbers import ONE_MONTH_SECONDS
 from ol_infrastructure.lib.ol_types import AWSBase, Environment
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
-from pulumi import Config, ResourceOptions, StackReference
-from pulumi_aws import get_caller_identity
-from pulumi_vault import AuthBackend, AuthBackendTuneArgs, Policy, aws, github
 
 vault_config = Config("vault")
 stack_info = parse_stack()

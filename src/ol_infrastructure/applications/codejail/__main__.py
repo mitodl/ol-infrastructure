@@ -6,12 +6,12 @@ import textwrap
 from pathlib import Path
 
 import yaml
-from bridge.lib.magic_numbers import CODEJAIL_SERVICE_PORT
-from bridge.secrets import sops
-from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from pulumi import Config, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam
 
+from bridge.lib.magic_numbers import CODEJAIL_SERVICE_PORT
+from bridge.secrets import sops
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,

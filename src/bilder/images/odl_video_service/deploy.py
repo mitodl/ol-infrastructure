@@ -2,14 +2,6 @@ import io
 import os
 from pathlib import Path
 
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import (
-    CONSUL_TEMPLATE_VERSION,
-    CONSUL_VERSION,
-    OVS_VERSION,
-    VAULT_VERSION,
-)
-from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files, server
 
@@ -55,6 +47,14 @@ from bilder.lib.template_helpers import (
     CONSUL_TEMPLATE_DIRECTORY,
     place_consul_template_file,
 )
+from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import (
+    CONSUL_TEMPLATE_VERSION,
+    CONSUL_VERSION,
+    OVS_VERSION,
+    VAULT_VERSION,
+)
+from bridge.secrets.sops import set_env_secrets
 
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")

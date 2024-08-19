@@ -6,18 +6,6 @@ from pathlib import Path
 from typing import Union
 
 import yaml
-from bridge.lib.magic_numbers import (
-    CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
-    CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
-    VAULT_HTTP_PORT,
-)
-from bridge.lib.versions import (
-    CONCOURSE_VERSION,
-    CONSUL_VERSION,
-    TRAEFIK_VERSION,
-    VAULT_VERSION,
-)
-from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.api.util import get_template
 
@@ -76,6 +64,18 @@ from bilder.components.vector.steps import (
     install_and_configure_vector,
 )
 from bilder.facts.has_systemd import HasSystemd
+from bridge.lib.magic_numbers import (
+    CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT,
+    CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
+    VAULT_HTTP_PORT,
+)
+from bridge.lib.versions import (
+    CONCOURSE_VERSION,
+    CONSUL_VERSION,
+    TRAEFIK_VERSION,
+    VAULT_VERSION,
+)
+from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {
     "concourse": os.environ.get("CONCOURSE_VERSION", CONCOURSE_VERSION),

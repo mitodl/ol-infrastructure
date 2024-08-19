@@ -2,18 +2,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-from bridge.lib.magic_numbers import (
-    DEFAULT_HTTP_PORT,
-    DEFAULT_HTTPS_PORT,
-    VAULT_HTTP_PORT,
-)
-from bridge.lib.versions import (
-    CONSUL_TEMPLATE_VERSION,
-    CONSUL_VERSION,
-    REDASH_VERSION,
-    VAULT_VERSION,
-)
-from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files, server
 
@@ -55,6 +43,18 @@ from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import install_and_configure_vector
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
+from bridge.lib.magic_numbers import (
+    DEFAULT_HTTP_PORT,
+    DEFAULT_HTTPS_PORT,
+    VAULT_HTTP_PORT,
+)
+from bridge.lib.versions import (
+    CONSUL_TEMPLATE_VERSION,
+    CONSUL_VERSION,
+    REDASH_VERSION,
+    VAULT_VERSION,
+)
+from bridge.secrets.sops import set_env_secrets
 
 
 # TODO MD 20231013 Switch over to the shared lib functions that do this  # noqa: E501, FIX002, TD002, TD003, TD004

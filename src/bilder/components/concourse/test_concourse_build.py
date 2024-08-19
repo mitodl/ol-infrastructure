@@ -1,7 +1,7 @@
 import pytest
 
 
-@pytest.mark.concourse()
+@pytest.mark.concourse
 def test_concourse_installed(host):
     concourse_user = host.user("concourse")
     assert concourse_user.exists

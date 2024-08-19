@@ -5,6 +5,9 @@ from pathlib import Path
 
 import bcrypt
 import yaml
+from pulumi import Config, Output, StackReference, export
+from pulumi_aws import ec2, get_caller_identity, iam, route53
+
 from bridge.lib.magic_numbers import (
     CONSUL_DNS_PORT,
     CONSUL_HTTP_PORT,
@@ -14,9 +17,6 @@ from bridge.lib.magic_numbers import (
     FIVE_MINUTES,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam, route53
-
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,

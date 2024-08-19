@@ -17,11 +17,11 @@ import json
 import os
 from pathlib import Path
 
-from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
-from bridge.secrets.sops import read_json_secrets
 from pulumi import Config, Output, StackReference
 from pulumi_aws import acm, ecs, iam, lb, route53, secretsmanager
 
+from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
+from bridge.secrets.sops import read_json_secrets
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack

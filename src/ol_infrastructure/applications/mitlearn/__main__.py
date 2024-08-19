@@ -11,6 +11,10 @@ import pulumi_fastly as fastly
 import pulumi_github as github
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
+from pulumi import Alias, Config, InvokeOptions, ResourceOptions, StackReference, export
+from pulumi.output import Output
+from pulumi_aws import ec2, iam, route53, s3
+
 from bridge.lib.constants import FASTLY_A_TLS_1_3, FASTLY_CNAME_TLS_1_3
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
@@ -19,10 +23,6 @@ from bridge.lib.magic_numbers import (
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Alias, Config, InvokeOptions, ResourceOptions, StackReference, export
-from pulumi.output import Output
-from pulumi_aws import ec2, iam, route53, s3
-
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,

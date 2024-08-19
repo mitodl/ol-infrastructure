@@ -8,7 +8,6 @@ from bridge.settings.openedx.types import (
     OpenEdxApplication,
     OpenEdxSupportedRelease,
 )
-
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
