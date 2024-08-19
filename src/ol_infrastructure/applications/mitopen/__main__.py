@@ -670,8 +670,8 @@ mitopen_fastly_service = fastly.ServiceVcl(
                 r"""
                 if (req.method == "GET" && req.backend.is_origin) {
                   set bereq.url = "/frontend" + req.url;
-                  if (req.url.path ~ "/\z") {
-                    set req.url.path = req.url.path + "index.html";
+                  if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {
+                    set bereq.url = "/frontend/index.html";
                   }
                 }
                 """
@@ -679,7 +679,7 @@ mitopen_fastly_service = fastly.ServiceVcl(
             type="miss",
         ),
         fastly.ServiceVclSnippetArgs(
-            name="Rewrite requests to root s3",
+            name="handle domain redirect",
             content=textwrap.dedent(
                 rf"""
                 set req.http.orig-req-url = req.url;
