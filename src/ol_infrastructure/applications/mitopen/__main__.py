@@ -1116,7 +1116,7 @@ gh_workflow_csrf_cookie_name_env_secret = github.ActionsSecret(
 gh_workflow_appzi_url_env_secret = github.ActionsSecret(
     f"ol_mitopen_appzi_url-{stack_info.env_suffix}",
     repository=gh_repo.name,
-    secret_name=f"APPZI_URL{env_var_suffix}",
+    secret_name=f"APPZI_URL_{env_var_suffix}",
     plaintext_value=heroku_vars["APPZI_URL"],
     opts=ResourceOptions(provider=github_provider),
 )
