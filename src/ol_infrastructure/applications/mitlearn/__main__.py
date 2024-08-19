@@ -320,7 +320,7 @@ rds_defaults["instance_size"] = (
     mitopen_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
 mitopen_db_config = OLPostgresDBConfig(
-    instance_name=f"ol-mitopen-db-{stack_info.env_suffix}",
+    instance_name=f"ol-mitlearn-db-{stack_info.env_suffix}",
     password=rds_password,
     subnet_group_name=apps_vpc["rds_subnet"],
     security_groups=[mitopen_db_security_group],
@@ -334,7 +334,10 @@ mitopen_db_config.parameter_overrides.append(
     {"name": "password_encryption", "value": "md5"}
 )
 
-mitopen_db = OLAmazonDB(mitopen_db_config)
+mitopen_db = OLAmazonDB(
+    db_config=mitopen_db_config,
+    opts=ResourceOptions(aliases=[Alias(f"ol-mitopen-db-{stack_info.env_suffix}")]),
+)
 
 mitopen_role_statements = postgres_role_statements.copy()
 mitopen_role_statements.pop("app")
