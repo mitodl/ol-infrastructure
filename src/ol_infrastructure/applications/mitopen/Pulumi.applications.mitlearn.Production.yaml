@@ -29,6 +29,7 @@ config:
     mailgun_sender_domain: "mail.learn.mit.edu"  # Need to verify
     sso_url: "sso.ol.mit.edu"
   heroku_app:vars:
+    APPZI_URL: "https://w.appzi.io/w.js?token=Q2pSI"
     CELERY_WORKER_MAX_MEMORY_PER_CHILD: 250000
     CSRF_COOKIE_NAME: "learn-csrftoken"
     DEBUG: "false"

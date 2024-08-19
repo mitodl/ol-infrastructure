@@ -7,6 +7,7 @@ config:
   heroku:app_id:
     secure: v1:eSvnqne7KQRkHJlu:wTyl9W3aivfxlANqBML2wy4GEHe85VuKll60R5HmGUu1hJTcQBEfzK1cJOyvjlbLgBtXLw==
   heroku_app:vars:
+    APPZI_URL: ""
     CELERY_WORKER_MAX_MEMORY_PER_CHILD: 125000
     CSRF_COOKIE_NAME: "learn-rc-csrftoken"
     DEBUG: "false"
