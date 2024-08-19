@@ -239,6 +239,16 @@ services:
     - JAVA_OPTS=${JAVA_OPTS}
     - CONTAINER_ORCHESTRATOR_JAVA_OPTS=${CONTAINER_ORCHESTRATOR_JAVA_OPTS}
     - DD_TRACE_AGENT_PORT=${DD_TRACE_AGENT_PORT}
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.middlewares.dagster-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
+    - "traefik.http.routers.dagster.middlewares=dagster-auth"
+    - "traefik.http.routers.dagster.rule=((Host(`airbyte.service.consul`) || Host(`config-${AIRBYTE_HOSTNAME}`))\
+      \ && PathPrefix(`/api`))"
+    - "traefik.http.services.dagster.loadbalancer.server.port=8001"
+    - "traefik.http.routers.dagster.tls=true"
+    - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
+    - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
     ports:
     - "8001"
     configs:
@@ -267,21 +277,15 @@ services:
     labels:
     - "traefik.enable=true"
     - "traefik.http.middlewares.airbyte-api-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
-    - "traefik.http.middlewares.dagster-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
     - "traefik.http.routers.airbyte-api.middlewares=airbyte-api-auth"
     - "traefik.http.routers.airbyte-api.rule=((Host(`airbyte-api.service.consul`)\
       \ || Host(`api-${AIRBYTE_HOSTNAME}`)) && PathPrefix(`/v1`))"
     - "traefik.http.routers.airbyte-api.tls=true"
-    - "traefik.http.routers.dagster.middlewares=dagster-auth"
-    - "traefik.http.routers.dagster.rule=((Host(`airbyte.service.consul`) || Host(`config-${AIRBYTE_HOSTNAME}`))\
-      \ && PathPrefix(`/api/v1`))"
-    - "traefik.http.routers.dagster.tls=true"
     - "traefik.http.routers.public.middlewares=traefik-forward-auth"
     - "traefik.http.routers.public.rule=(Host(`${AIRBYTE_HOSTNAME}`) || Path(`/api/health`))"
     - "traefik.http.routers.public.service=public"
     - "traefik.http.routers.public.tls=true"
     - "traefik.http.services.airbyte-api.loadbalancer.server.port=8080"
-    - "traefik.http.services.dagster.loadbalancer.server.port=8080"
     - "traefik.http.services.public.loadbalancer.server.port=8080"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
