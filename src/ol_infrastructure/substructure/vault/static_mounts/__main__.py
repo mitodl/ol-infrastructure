@@ -1,7 +1,8 @@
 import pulumi_vault as vault
+from pulumi import ResourceOptions, export
+
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
-from pulumi import ResourceOptions, export
 
 setup_vault_provider()
 stack_info = parse_stack()

@@ -12,11 +12,11 @@ from pathlib import Path
 import pulumi_github as github
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
-from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
-from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
 from pulumi_aws import cloudwatch, ec2, iam, mediaconvert, s3, sns
 
+from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,

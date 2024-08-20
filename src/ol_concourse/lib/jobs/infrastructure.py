@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Optional
 
 from bridge.settings.github.team_members import DEVOPS_MIT
-
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (

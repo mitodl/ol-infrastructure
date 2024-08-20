@@ -6,10 +6,6 @@ from ipaddress import IPv4Address, IPv6Address
 from pathlib import Path
 from typing import Optional, Union
 
-from bridge.lib.magic_numbers import (
-    CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
-    DEFAULT_POSTGRES_PORT,
-)
 from pydantic import (
     Field,
     PositiveInt,
@@ -21,6 +17,10 @@ from pydantic import (
 from pydantic_settings import SettingsConfigDict
 
 from bilder.lib.model_helpers import OLBaseSettings
+from bridge.lib.magic_numbers import (
+    CONCOURSE_WEB_HOST_COMMUNICATION_PORT,
+    DEFAULT_POSTGRES_PORT,
+)
 
 CONCOURSE_ENCRYPTION_KEY_REQUIRED_LENGTH = 32
 

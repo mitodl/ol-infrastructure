@@ -10,11 +10,11 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import yaml
-from bridge.secrets.sops import read_yaml_secrets
-from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from pulumi import Config, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam
 
+from bridge.secrets.sops import read_yaml_secrets
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,

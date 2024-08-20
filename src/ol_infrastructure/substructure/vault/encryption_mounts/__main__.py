@@ -1,4 +1,5 @@
 import pulumi_vault as vault
+
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 

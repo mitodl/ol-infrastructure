@@ -1,6 +1,5 @@
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
-
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,

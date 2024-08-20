@@ -4,6 +4,8 @@ from collections import defaultdict
 from itertools import chain, product
 from typing import Optional
 
+from pydantic import BaseModel
+
 from bridge.settings.openedx.accessors import fetch_applications_by_type
 from bridge.settings.openedx.types import (
     EnvStage,
@@ -13,8 +15,6 @@ from bridge.settings.openedx.types import (
     OpenEdxSupportedRelease,
 )
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
-from pydantic import BaseModel
-
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,

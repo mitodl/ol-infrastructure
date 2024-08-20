@@ -13,8 +13,8 @@ from typing import Optional
 
 import pulumi
 import pulumi_vault
-from bridge.secrets.sops import read_yaml_secrets
 
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 postgres_role_statements = {

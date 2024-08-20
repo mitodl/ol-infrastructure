@@ -3,6 +3,7 @@ from typing import Union
 
 import pulumi
 import pulumi_fastly as fastly
+
 from bridge.secrets.sops import read_yaml_secrets
 
 # Documentation:

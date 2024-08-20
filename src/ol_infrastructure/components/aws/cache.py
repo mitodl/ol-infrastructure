@@ -9,7 +9,6 @@ import re
 from typing import Any, Optional, Union
 
 import pulumi
-from bridge.lib.magic_numbers import DEFAULT_MEMCACHED_PORT, DEFAULT_REDIS_PORT
 from pulumi_aws import elasticache
 from pydantic import (
     ConfigDict,
@@ -19,6 +18,7 @@ from pydantic import (
     field_validator,
 )
 
+from bridge.lib.magic_numbers import DEFAULT_MEMCACHED_PORT, DEFAULT_REDIS_PORT
 from ol_infrastructure.components.aws.cloudwatch import (
     OLCloudWatchAlarmSimpleElastiCache,
     OLCloudWatchAlarmSimpleElastiCacheConfig,

@@ -22,17 +22,6 @@ import pulumi_fastly as fastly
 import pulumi_mongodbatlas as atlas
 import pulumi_vault as vault
 import yaml
-from bridge.lib.magic_numbers import (
-    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
-    DEFAULT_HTTP_PORT,
-    DEFAULT_HTTPS_PORT,
-    DEFAULT_MYSQL_PORT,
-    DEFAULT_REDIS_PORT,
-    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
-    ONE_MEGABYTE_BYTE,
-)
-from bridge.secrets.sops import read_yaml_secrets
-from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import (
     acm,
@@ -48,6 +37,17 @@ from pulumi_aws import (
 )
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
+from bridge.lib.magic_numbers import (
+    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
+    DEFAULT_HTTP_PORT,
+    DEFAULT_HTTPS_PORT,
+    DEFAULT_MYSQL_PORT,
+    DEFAULT_REDIS_PORT,
+    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
+    ONE_MEGABYTE_BYTE,
+)
+from bridge.secrets.sops import read_yaml_secrets
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.services.vault import (

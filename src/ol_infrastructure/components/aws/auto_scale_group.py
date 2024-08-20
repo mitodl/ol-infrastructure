@@ -1,12 +1,6 @@
 from typing import Literal, Optional, Union
 
 import pulumi
-from bridge.lib.magic_numbers import (
-    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
-    AWS_TARGET_GROUP_NAME_MAX_LENGTH,
-    DEFAULT_HTTP_PORT,
-    DEFAULT_HTTPS_PORT,
-)
 from pulumi_aws.acm import get_certificate
 from pulumi_aws.autoscaling import (
     Group,
@@ -35,6 +29,12 @@ from pulumi_aws.lb import (
 )
 from pydantic import BaseModel, ConfigDict, NonNegativeInt, PositiveInt, field_validator
 
+from bridge.lib.magic_numbers import (
+    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
+    AWS_TARGET_GROUP_NAME_MAX_LENGTH,
+    DEFAULT_HTTP_PORT,
+    DEFAULT_HTTPS_PORT,
+)
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,

@@ -5,9 +5,9 @@ from pathlib import Path
 import pulumi
 import pulumi_aws as aws
 import pulumi_consul as consul
+
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from bridge.secrets.sops import read_yaml_secrets
-
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, default_egress_args
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
