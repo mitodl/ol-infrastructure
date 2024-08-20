@@ -70,7 +70,7 @@ operations_service_query = PreparedQuery(
 )
 
 nearest_service_query = PreparedQuery(
-    "neearest-service-query",
+    "nearest-service-query",
     name="nearest",
     service="${match(1)}",
     near="_agent",
