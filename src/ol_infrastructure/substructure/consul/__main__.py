@@ -1,4 +1,4 @@
-from pulumi import ResourceOptions, StackReference
+from pulumi import Alias, ResourceOptions, StackReference
 from pulumi_consul import (
     PreparedQuery,
     PreparedQueryFailoverArgs,
@@ -77,5 +77,7 @@ nearest_service_query = PreparedQuery(
     template=PreparedQueryTemplateArgs(
         regexp="^nearest-(.*?)$", type="name_prefix_match"
     ),
-    opts=consul_provider,
+    opts=consul_provider.merge(
+        ResourceOptions(aliases=[Alias("neearest-service-query")])
+    ),
 )
