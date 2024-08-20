@@ -866,6 +866,8 @@ heroku_vars = {
     "OPENSEARCH_DEFAULT_TIMEOUT": 30,
     "OPENSEARCH_INDEXING_CHUNK_SIZE": 75,
     "PROLEARN_CATALOG_API_URL": "https://prolearn.mit.edu/graphql",
+    "SEE_API_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/api/",
+    "SEE_API_ACCESS_TOKEN_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/oauth/token",
     "SECURE_CROSS_ORIGIN_OPENER_POLICY": "None",
     "SEE_BASE_URL": "https://executive.mit.edu/",
     "SOCIAL_AUTH_OL_OIDC_KEY": "ol-open-client",
@@ -986,6 +988,8 @@ sensitive_heroku_vars = {
     "YOUTUBE_DEVELOPER_KEY": mitopen_vault_secrets["youtube_developer_key"],
     "POSTHOG_PROJECT_API_KEY": mitopen_vault_secrets["posthog"]["project_api_key"],
     "POSTHOG_PERSONAL_API_KEY": mitopen_vault_secrets["posthog"]["personal_api_key"],
+    "SEE_API_CLIENT_ID": mitopen_vault_secrets["see_api_client"]["id"],
+    "SEE_API_CLIENT_SECRET": mitopen_vault_secrets["see_api_client"]["secret"],
     # Vars that require more
     "AWS_ACCESS_KEY_ID": auth_aws_mitx_creds_ol_mitopen_application.data.apply(
         lambda data: "{}".format(data["access_key"])
