@@ -12,6 +12,7 @@ app_list = [
     "xpro",
     "open",
     "mitopen",
+    "mitlearn",
     "celery_monitoring",
 ]
 
@@ -28,7 +29,7 @@ shared_pulumi_code_resource = git_repo(
 local_fragments: list[PipelineFragment] = []
 for app in app_list:
     stages = ["CI", "QA", "Production"]
-    if app in ["mitxonline", "mitopen"]:
+    if app in ["mitxonline", "mitopen", "mitlearn"]:
         stages = ["QA", "Production"]
     pulumi_fragment = pulumi_jobs_chain(
         pulumi_code=shared_pulumi_code_resource,
