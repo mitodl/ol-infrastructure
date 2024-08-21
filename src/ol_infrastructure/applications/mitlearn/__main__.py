@@ -19,7 +19,6 @@ from bridge.lib.constants import FASTLY_A_TLS_1_3, FASTLY_CNAME_TLS_1_3
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
-    FIVE_MINUTES,
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -74,6 +73,9 @@ app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
     stack_info.env_suffix
 ]
 
+#######################################################
+# begin legacy block - app bucket config
+#######################################################
 legacy_app_storage_bucket_name = f"ol-mitopen-app-storage-{app_env_suffix}"
 legacy_application_storage_bucket = s3.BucketV2(
     f"ol_mitopen_app_storage_bucket_{stack_info.env_suffix}",
@@ -127,21 +129,62 @@ s3.BucketPolicy(
         ]
     ),
 )
+#######################################################
+# end legacy block - app bucket config
+#######################################################
 
-legacy_course_data_bucket_name = f"ol-mitopen-course-data-{app_env_suffix}"
-legacy_course_data_bucket = s3.Bucket(
-    f"ol_mitopen_course_data_bucket_{stack_info.env_suffix}",
-    bucket=legacy_course_data_bucket_name,
-    versioning=s3.BucketVersioningArgs(enabled=True),
-    cors_rules=[
-        s3.BucketCorsRuleArgs(
-            allowed_methods=["GET"],
-            allowed_headers=["*"],
-            allowed_origins=["*"],
-            max_age_seconds=FIVE_MINUTES,
-        )
-    ],
+mitlearn_app_storage_bucket_name = f"ol-mitlearn-app-storage-{app_env_suffix}"
+mitlearn_application_storage_bucket = s3.BucketV2(
+    f"ol_mitlearn_app_storage_bucket_{stack_info.env_suffix}",
+    bucket=mitlearn_app_storage_bucket_name,
     tags=aws_config.tags,
+)
+
+s3.BucketVersioningV2(
+    "ol-mitlearn-bucket-versioning",
+    bucket=mitlearn_application_storage_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled"
+    ),
+)
+app_bucket_ownership_controls = s3.BucketOwnershipControls(
+    "ol-mitlearn-bucket-ownership-controls",
+    bucket=mitlearn_application_storage_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+app_bucket_public_access = s3.BucketPublicAccessBlock(
+    "ol-mitlearn-bucket-public-access",
+    bucket=mitlearn_application_storage_bucket.id,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+)
+
+s3.BucketPolicy(
+    "ol-mitlearn-bucket-policy",
+    bucket=mitlearn_application_storage_bucket.id,
+    policy=json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "PublicRead",
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": ["s3:GetObject"],
+                    "Resource": [f"arn:aws:s3:::{mitlearn_app_storage_bucket_name}/*"],
+                }
+            ],
+        }
+    ),
+    opts=ResourceOptions(
+        depends_on=[
+            app_bucket_public_access,
+            app_bucket_ownership_controls,
+        ]
+    ),
 )
 
 parliament_config = {
@@ -151,6 +194,9 @@ parliament_config = {
     "RESOURCE_EFFECTIVELY_STAR": {},
 }
 
+################################
+# Remove legacy bucket arns
+################################
 gh_workflow_s3_bucket_permissions = [
     {
         "Action": [
@@ -159,6 +205,7 @@ gh_workflow_s3_bucket_permissions = [
         "Effect": "Allow",
         "Resource": [
             f"arn:aws:s3:::{legacy_app_storage_bucket_name}",
+            f"arn:aws:s3:::{mitlearn_app_storage_bucket_name}",
         ],
     },
     {
@@ -171,6 +218,7 @@ gh_workflow_s3_bucket_permissions = [
         "Effect": "Allow",
         "Resource": [
             f"arn:aws:s3:::{legacy_app_storage_bucket_name}/frontend/*",
+            f"arn:aws:s3:::{mitlearn_app_storage_bucket_name}/frontend/*",
         ],
     },
 ]
@@ -207,8 +255,9 @@ gh_workflow_accesskey = iam.AccessKey(
     status="Active",
 )
 
-
-# TODO @Ardiea: 07312023 Requires review of bucket names
+################################
+# Remove legacy bucket arns
+################################
 application_s3_bucket_permissions = [
     {
         "Action": [
@@ -224,8 +273,8 @@ application_s3_bucket_permissions = [
             f"arn:aws:s3:::odl-discussions-{app_env_suffix}/*",
             f"arn:aws:s3:::{legacy_app_storage_bucket_name}",
             f"arn:aws:s3:::{legacy_app_storage_bucket_name}/*",
-            f"arn:aws:s3:::open-learning-course-data-{app_env_suffix}",
-            f"arn:aws:s3:::open-learning-course-data-{app_env_suffix}/*",
+            f"arn:aws:s3:::{mitlearn_app_storage_bucket_name}",
+            f"arn:aws:s3:::{mitlearn_app_storage_bucket_name}/*",
         ],
     },
     {
