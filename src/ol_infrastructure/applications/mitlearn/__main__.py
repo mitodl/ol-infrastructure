@@ -74,30 +74,30 @@ app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
     stack_info.env_suffix
 ]
 
-app_storage_bucket_name = f"ol-mitopen-app-storage-{app_env_suffix}"
-application_storage_bucket = s3.BucketV2(
+legacy_app_storage_bucket_name = f"ol-mitopen-app-storage-{app_env_suffix}"
+legacy_application_storage_bucket = s3.BucketV2(
     f"ol_mitopen_app_storage_bucket_{stack_info.env_suffix}",
-    bucket=app_storage_bucket_name,
+    bucket=legacy_app_storage_bucket_name,
     tags=aws_config.tags,
 )
 
 s3.BucketVersioningV2(
     "ol-mitopen-bucket-versioning",
-    bucket=application_storage_bucket.id,
+    bucket=legacy_application_storage_bucket.id,
     versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
         status="Enabled"
     ),
 )
-app_bucket_ownership_controls = s3.BucketOwnershipControls(
+legacy_app_bucket_ownership_controls = s3.BucketOwnershipControls(
     "ol-mitopen-bucket-ownership-controls",
-    bucket=application_storage_bucket.id,
+    bucket=legacy_application_storage_bucket.id,
     rule=s3.BucketOwnershipControlsRuleArgs(
         object_ownership="BucketOwnerPreferred",
     ),
 )
-app_bucket_public_access = s3.BucketPublicAccessBlock(
+legacy_app_bucket_public_access = s3.BucketPublicAccessBlock(
     "ol-mitopen-bucket-public-access",
-    bucket=application_storage_bucket.id,
+    bucket=legacy_application_storage_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
@@ -105,7 +105,7 @@ app_bucket_public_access = s3.BucketPublicAccessBlock(
 
 s3.BucketPolicy(
     "ol-mitopen-bucket-policy",
-    bucket=application_storage_bucket.id,
+    bucket=legacy_application_storage_bucket.id,
     policy=json.dumps(
         {
             "Version": "2012-10-17",
@@ -115,20 +115,23 @@ s3.BucketPolicy(
                     "Effect": "Allow",
                     "Principal": "*",
                     "Action": ["s3:GetObject"],
-                    "Resource": [f"arn:aws:s3:::{app_storage_bucket_name}/*"],
+                    "Resource": [f"arn:aws:s3:::{legacy_app_storage_bucket_name}/*"],
                 }
             ],
         }
     ),
     opts=ResourceOptions(
-        depends_on=[app_bucket_public_access, app_bucket_ownership_controls]
+        depends_on=[
+            legacy_app_bucket_public_access,
+            legacy_app_bucket_ownership_controls,
+        ]
     ),
 )
 
-course_data_bucket_name = f"ol-mitopen-course-data-{app_env_suffix}"
-course_data_bucket = s3.Bucket(
+legacy_course_data_bucket_name = f"ol-mitopen-course-data-{app_env_suffix}"
+legacy_course_data_bucket = s3.Bucket(
     f"ol_mitopen_course_data_bucket_{stack_info.env_suffix}",
-    bucket=course_data_bucket_name,
+    bucket=legacy_course_data_bucket_name,
     versioning=s3.BucketVersioningArgs(enabled=True),
     cors_rules=[
         s3.BucketCorsRuleArgs(
@@ -155,7 +158,7 @@ gh_workflow_s3_bucket_permissions = [
         ],
         "Effect": "Allow",
         "Resource": [
-            f"arn:aws:s3:::{app_storage_bucket_name}",
+            f"arn:aws:s3:::{legacy_app_storage_bucket_name}",
         ],
     },
     {
@@ -167,7 +170,7 @@ gh_workflow_s3_bucket_permissions = [
         ],
         "Effect": "Allow",
         "Resource": [
-            f"arn:aws:s3:::{app_storage_bucket_name}/frontend/*",
+            f"arn:aws:s3:::{legacy_app_storage_bucket_name}/frontend/*",
         ],
     },
 ]
@@ -219,8 +222,8 @@ application_s3_bucket_permissions = [
         "Resource": [
             f"arn:aws:s3:::odl-discussions-{app_env_suffix}",
             f"arn:aws:s3:::odl-discussions-{app_env_suffix}/*",
-            f"arn:aws:s3:::{app_storage_bucket_name}",
-            f"arn:aws:s3:::{app_storage_bucket_name}/*",
+            f"arn:aws:s3:::{legacy_app_storage_bucket_name}",
+            f"arn:aws:s3:::{legacy_app_storage_bucket_name}/*",
             f"arn:aws:s3:::open-learning-course-data-{app_env_suffix}",
             f"arn:aws:s3:::open-learning-course-data-{app_env_suffix}/*",
         ],
@@ -604,12 +607,12 @@ mitopen_fastly_service = fastly.ServiceVcl(
     comment="Managed by Pulumi",
     backends=[
         fastly.ServiceVclBackendArgs(
-            address=application_storage_bucket.bucket_domain_name,
+            address=legacy_application_storage_bucket.bucket_domain_name,
             name="MITOpen Frontend",
-            override_host=application_storage_bucket.bucket_domain_name,
+            override_host=legacy_application_storage_bucket.bucket_domain_name,
             port=DEFAULT_HTTPS_PORT,
-            ssl_cert_hostname=application_storage_bucket.bucket_domain_name,
-            ssl_sni_hostname=application_storage_bucket.bucket_domain_name,
+            ssl_cert_hostname=legacy_application_storage_bucket.bucket_domain_name,
+            ssl_sni_hostname=legacy_application_storage_bucket.bucket_domain_name,
             use_ssl=True,
         ),
         fastly.ServiceVclBackendArgs(
