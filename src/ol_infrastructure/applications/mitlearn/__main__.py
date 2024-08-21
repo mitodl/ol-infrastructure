@@ -847,6 +847,7 @@ heroku_vars = {
     "MITOL_USE_S3": "True",
     "MITOL_NOTIFICATION_EMAIL_BACKEND": "anymail.backends.mailgun.EmailBackend",
     "MITPE_BASE_URL": "https://professional.mit.edu/",
+    "MITPE_BASE_API_URL": "https://professional.mit.edu/",
     "MITX_ONLINE_BASE_URL": "https://mitxonline.mit.edu/",
     "MITX_ONLINE_COURSES_API_URL": "https://mitxonline.mit.edu/api/v2/courses/",
     "MITX_ONLINE_LEARNING_COURSE_BUCKET_NAME": "mitx-etl-mitxonline-production",
