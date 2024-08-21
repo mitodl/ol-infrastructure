@@ -40,6 +40,7 @@ class OpenEdxVars(BaseModel):
     accessibility_url: Optional[str] = None
     account_settings_url: Optional[str] = None
     contact_url: Optional[str] = None
+    certificate: Optional[str] = None
     deployment_name: OpenEdxDeploymentName
     display_feedback_widget: Optional[str] = None
     environment: str
@@ -82,6 +83,7 @@ def mfe_params(
         "CONTACT_URL": open_edx.contact_url,
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "DISPLAY_FEEDBACK_WIDGET": open_edx.display_feedback_widget,
+        "ENABLE_CERTIFICATE_PAGE":open_edx.certificate,
         "DISCUSSIONS_MFE_BASE_URL": f"https://{open_edx.lms_domain}/{discussion_mfe_path}",
         "FAVICON_URL": open_edx.favicon_url,
         "HONOR_CODE_URL": open_edx.honor_code_url,

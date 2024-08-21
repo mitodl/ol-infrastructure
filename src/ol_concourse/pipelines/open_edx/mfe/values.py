@@ -4,6 +4,7 @@ mitx = [
     OpenEdxVars(
         environment="mitx-ci",
         environment_stage="CI",
+        certificates="false",
         deployment_name="mitx",
         favicon_url="https://lms-ci.mitx.mit.edu/static/mitx/images/favicon.ico",
         lms_domain="lms-ci.mitx.mit.edu",
@@ -19,6 +20,7 @@ mitx = [
     OpenEdxVars(
         environment="mitx-qa",
         environment_stage="QA",
+        certificates="false",
         deployment_name="mitx",
         favicon_url="https://mitx-qa.mitx.mit.edu/static/mitx/images/favicon.ico",
         lms_domain="mitx-qa.mitx.mit.edu",
@@ -33,6 +35,7 @@ mitx = [
     OpenEdxVars(
         environment="mitx-production",
         environment_stage="Production",
+        certificates="false",
         deployment_name="mitx",
         favicon_url="https://lms.mitx.mit.edu/static/mitx/images/favicon.ico",
         lms_domain="lms.mitx.mit.edu",
