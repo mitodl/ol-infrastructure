@@ -53,7 +53,7 @@ class OLVPCConfig(AWSBase):
     vpc_name: str
     cidr_block: IPv4Network
     k8s_service_subnet: Optional[IPv4Network] = None
-    k8s_pod_subnet: Optional[IPv4Network] = None
+    k8s_pod_subnets: Optional[list[IPv4Network]] = None
     num_subnets: PositiveInt = MIN_SUBNETS
     enable_ipv6: bool = True
     default_public_ip: bool = True
@@ -81,8 +81,9 @@ class OLVPCConfig(AWSBase):
             raise ValueError(msg)
         return network
 
-    # TODO @Ardiea: Add verification of the pod subnet and ensure  # noqa: FIX002
+    # TODO @Ardiea: Add verification of the pod subnet and ensure # noqa: FIX002
     # https://github.com/mitodl/ol-infrastructure/issues/2589
+    # Needs comprehensive revisit
     @field_validator("k8s_service_subnet")
     @classmethod
     def k8s_service_subnet_is_subnet(
@@ -106,8 +107,8 @@ class OLVPCConfig(AWSBase):
         """
         network = info.data["cidr_block"]
         assert network is not None  # noqa: S101
-        if k8s_service_subnet is not None and not k8s_service_subnet.subnet_of(network):
-            msg = f"{k8s_service_subnet} is not a subnet of {network}"
+        if k8s_service_subnet is not None and k8s_service_subnet.subnet_of(network):
+            msg = f"{k8s_service_subnet} is a subnet of {network}"
             raise ValueError(msg)
         return k8s_service_subnet
 
@@ -267,53 +268,44 @@ class OLVPC(ComponentResource):
         # the IPv6 address space since we don't have it handed to us by
         # an iterator as above.
         self.k8s_service_subnet = None
-        self.k8s_pod_subnet = None
-        if vpc_config.k8s_service_subnet and vpc_config.k8s_pod_subnet:
-            service_subnet_third_octet = (
-                int(vpc_config.k8s_service_subnet.network_address) & 0xFF00
-            ) >> 8
-            self.k8s_service_subnet = ec2.Subnet(
-                f"{vpc_config.vpc_name}-k8s-service-subnet",
-                cidr_block=str(vpc_config.k8s_service_subnet),
-                ipv6_cidr_block=self.olvpc.ipv6_cidr_block.apply(
-                    partial(subnet_v6, service_subnet_third_octet)
-                ),
-                vpc_id=self.olvpc.id,
-                tags=vpc_config.merged_tags(
-                    {"Name": f"{vpc_config.vpc_name}-k8s-service-subnet"}
-                ),
-                assign_ipv6_address_on_creation=True,
-                opts=resource_options,
-            )
-            ec2.RouteTableAssociation(
-                f"{vpc_config.vpc_name}-k8s-service-subnet-route-table-association",
-                subnet_id=self.k8s_service_subnet.id,
-                route_table_id=self.route_table.id,
-                opts=resource_options,
+        self.k8s_pod_subnets = []
+        if vpc_config.k8s_service_subnet and vpc_config.k8s_pod_subnets:
+            self.k8s_service_subnet = vpc_config.k8s_service_subnet
+
+            k8s_subnet_iterator = zip(
+                vpc_config.k8s_pod_subnets,
+                cycle(zones),
             )
 
-            pod_subnet_third_octet = (
-                int(vpc_config.k8s_pod_subnet.network_address) & 0xFF00
-            ) >> 8
-            self.k8s_pod_subnet = ec2.Subnet(
-                f"{vpc_config.vpc_name}-k8s-pod-subnet",
-                cidr_block=str(vpc_config.k8s_pod_subnet),
-                ipv6_cidr_block=self.olvpc.ipv6_cidr_block.apply(
-                    partial(subnet_v6, pod_subnet_third_octet)
-                ),
-                vpc_id=self.olvpc.id,
-                tags=vpc_config.merged_tags(
-                    {"Name": f"{vpc_config.vpc_name}-k8s-pod-subnet"}
-                ),
-                assign_ipv6_address_on_creation=True,
-                opts=resource_options,
-            )
-            ec2.RouteTableAssociation(
-                f"{vpc_config.vpc_name}-k8s-pod-subnet-route-table-association",
-                subnet_id=self.k8s_pod_subnet.id,
-                route_table_id=self.route_table.id,
-                opts=resource_options,
-            )
+            for k8s_pod_subnet, zone in k8s_subnet_iterator:
+                pod_subnet_third_octet = (
+                    int(k8s_pod_subnet.network_address) & 0xFF00
+                ) >> 8
+                self.k8s_pod_subnets.append(
+                    ec2.Subnet(
+                        f"{vpc_config.vpc_name}-k8s-pod-{pod_subnet_third_octet}-subnet",
+                        cidr_block=str(k8s_pod_subnet),
+                        ipv6_cidr_block=self.olvpc.ipv6_cidr_block.apply(
+                            partial(subnet_v6, pod_subnet_third_octet)
+                        ),
+                        vpc_id=self.olvpc.id,
+                        availability_zone=zone,
+                        map_public_ip_on_launch=vpc_config.default_public_ip,
+                        assign_ipv6_address_on_creation=True,
+                        tags=vpc_config.merged_tags(
+                            {
+                                "Name": f"{vpc_config.vpc_name}-k8s-pod-{pod_subnet_third_octet}-subnet"  # noqa: E501
+                            }
+                        ),
+                        opts=resource_options,
+                    )
+                )
+                ec2.RouteTableAssociation(
+                    f"{vpc_config.vpc_name}-k8s-pod-{pod_subnet_third_octet}-subnet-rta",
+                    subnet_id=self.k8s_pod_subnets[-1].id,
+                    route_table_id=self.route_table.id,
+                    opts=resource_options,
+                )
 
         self.db_subnet_group = rds.SubnetGroup(
             f"{vpc_config.vpc_name}-db-subnet-group",
@@ -347,7 +339,7 @@ class OLVPC(ComponentResource):
             "rds_subnet_group": self.db_subnet_group,
         }
         if self.k8s_service_subnet:
-            outputs["k8s_service_subnet"] = self.k8s_service_subnet
+            outputs["k8s_service_subnet"] = str(self.k8s_service_subnet)
         self.register_outputs(outputs)
 
 
