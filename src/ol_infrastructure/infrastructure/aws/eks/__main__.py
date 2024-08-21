@@ -1,11 +1,13 @@
+# ruff: noqa: ERA001
+
 import json
 
 import pulumi_aws
 import pulumi_eks as eks
 import yaml
-from bridge.lib.magic_numbers import IAM_ROLE_NAME_PREFIX_MAX_LENGTH
 from pulumi import Config, StackReference, export
 
+from bridge.lib.magic_numbers import IAM_ROLE_NAME_PREFIX_MAX_LENGTH
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
