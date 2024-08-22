@@ -878,7 +878,7 @@ env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 # Values that are generally unchanging across environments
 heroku_vars = {
     "ALLOWED_HOSTS": '["*"]',
-    "AWS_STORAGE_BUCKET_NAME": f"ol-mitopen-app-storage-{env_name}",
+    "AWS_STORAGE_BUCKET_NAME": f"ol-mitlearn-app-storage-{env_name}",
     "CORS_ALLOWED_ORIGIN_REGEXES": "['^.+ocw-next.netlify.app$']",
     "CSAIL_BASE_URL": "https://cap.csail.mit.edu/",
     "CSRF_COOKIE_DOMAIN": f".{mitopen_config.get('frontend_domain')}",
