@@ -3,7 +3,6 @@ import textwrap
 from pathlib import Path
 
 from bridge.secrets.sops import read_yaml_secrets
-
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
