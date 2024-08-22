@@ -321,14 +321,11 @@ production_combined_fragment = PipelineFragment(
     jobs=production_jobs,
 )
 
-fully_combined_fragment = PipelineFragment(
-    resource_types=qa_combined_fragment.resource_types
-    + production_combined_fragment.resource_types,
-    resources=qa_combined_fragment.resources + production_combined_fragment.resources,
-    jobs=qa_combined_fragment.jobs + production_combined_fragment.jobs,
+fully_combined_fragment = PipelineFragment.combine_fragments(
+    qa_combined_fragment, production_combined_fragment
 )
 
-grafana_pipeline = Pipeline(
+heroku_dyno_pipeline = Pipeline(
     resource_types=fully_combined_fragment.resource_types,
     resources=fully_combined_fragment.resources,
     jobs=fully_combined_fragment.jobs,
@@ -339,8 +336,8 @@ if __name__ == "__main__":
     import sys
 
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(grafana_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(grafana_pipeline.model_dump_json(indent=2))
+        definition.write(heroku_dyno_pipeline.model_dump_json(indent=2))
+    sys.stdout.write(heroku_dyno_pipeline.model_dump_json(indent=2))
     print()  # noqa: T201
     print(  # noqa: T201
         "fly -t pr-inf sp -p misc-heroku-dyno-management -c definition.json"
