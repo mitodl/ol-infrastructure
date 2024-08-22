@@ -2,7 +2,7 @@ import sys
 import textwrap
 from collections import defaultdict
 from itertools import chain, product
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import BaseModel
 
@@ -69,7 +69,7 @@ class OpenEdxVars(BaseModel):
 
 def mfe_params(
     open_edx: OpenEdxVars, mfe: OpenEdxApplicationVersion
-) -> dict[str, Optional[str]]:
+) -> dict[str, Optional[Union[str,bool]]]:
     learning_mfe_path = OpenEdxMicroFrontend.learn.path
     discussion_mfe_path = OpenEdxMicroFrontend.discussion.path
     return {
