@@ -656,12 +656,12 @@ mitopen_fastly_service = fastly.ServiceVcl(
     comment="Managed by Pulumi",
     backends=[
         fastly.ServiceVclBackendArgs(
-            address=legacy_application_storage_bucket.bucket_domain_name,
+            address=mitlearn_application_storage_bucket.bucket_domain_name,
             name="MITOpen Frontend",
-            override_host=legacy_application_storage_bucket.bucket_domain_name,
+            override_host=mitlearn_application_storage_bucket.bucket_domain_name,
             port=DEFAULT_HTTPS_PORT,
-            ssl_cert_hostname=legacy_application_storage_bucket.bucket_domain_name,
-            ssl_sni_hostname=legacy_application_storage_bucket.bucket_domain_name,
+            ssl_cert_hostname=mitlearn_application_storage_bucket.bucket_domain_name,
+            ssl_sni_hostname=mitlearn_application_storage_bucket.bucket_domain_name,
             use_ssl=True,
         ),
         fastly.ServiceVclBackendArgs(
@@ -878,7 +878,7 @@ env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 # Values that are generally unchanging across environments
 heroku_vars = {
     "ALLOWED_HOSTS": '["*"]',
-    "AWS_STORAGE_BUCKET_NAME": f"ol-mitopen-app-storage-{env_name}",
+    "AWS_STORAGE_BUCKET_NAME": f"ol-mitlearn-app-storage-{env_name}",
     "CORS_ALLOWED_ORIGIN_REGEXES": "['^.+ocw-next.netlify.app$']",
     "CSAIL_BASE_URL": "https://cap.csail.mit.edu/",
     "CSRF_COOKIE_DOMAIN": f".{mitopen_config.get('frontend_domain')}",
