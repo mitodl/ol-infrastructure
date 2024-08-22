@@ -15,6 +15,12 @@ config:
   ocw_vpc:cidr_block: 172.21.0.0/16
   operations_vpc:cidr_block: 172.16.0.0/16
   operations_vpc:name: operations-ci
+  operations_vpc:k8s_pod_subnets:
+  - 172.16.128.0/21
+  - 172.16.136.0/21
+  - 172.16.144.0/21
+  - 172.16.152.0/21
+  operations_vpc:k8s_service_subnet: 10.110.24.0/23
   residential_staging_vpc:cidr_block: 172.22.0.0/16
   residential_vpc:cidr_block: 172.19.0.0/16
   xpro_vpc:cidr_block: 172.20.0.0/16

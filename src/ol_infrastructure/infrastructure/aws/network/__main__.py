@@ -107,6 +107,8 @@ operations_vpc_config = OLVPCConfig(
         "business_unit": "operations",
         "Name": f"Operations {stack_info.name}",
     },
+    k8s_pod_subnets=ops_config.require_object("k8s_pod_subnets") or None,
+    k8s_service_subnet=ops_config.require("k8s_service_subnet") or None,
 )
 operations_vpc = OLVPC(operations_vpc_config)
 
