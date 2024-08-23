@@ -1,0 +1,40 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQFVoeJh3NbKbr5xD+ynrch/AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMRmku2FlMJ1ec9gtXAgEQgDt6/1zxFvrdazB2Jhs5VNHGhyW9rvEn5qnXP57ZHjV8EkPOvp6nI9XM5CE19IXHC8Bmp7L6AD3AwwnSfA==
+config:
+  environment:business_unit: operations
+  environment:target_vpc: operations_vpc
+  eks:nodegroups:
+    worker-medium:
+      instance_types:
+      - "t3.medium"
+      labels:
+        ondemand: true
+        node_size: medium
+      disk_size_gb: 100
+      scaling:
+        desired: 2
+        min: 1
+        max: 2
+      version:
+      tags: {}
+      # Medium nodes are reserverd for operations services only
+      taints:
+        operations:
+          effect: NO_SCHEDULE
+          value: true
+      node_group_options: {}
+    worker-large:
+      instance_types:
+      - "t3.large"
+      labels:
+        ondemand: true
+        node_size: large
+      disk_size_gb: 100
+      scaling:
+        desired: 2
+        min: 1
+        max: 2
+      version:
+      tags: {}
+      taints: {}
