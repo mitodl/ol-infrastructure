@@ -2,7 +2,7 @@ import sys
 import textwrap
 from collections import defaultdict
 from itertools import chain, product
-from typing import Optional, Union
+from typing import Literal, Optional
 
 from pydantic import BaseModel
 
@@ -40,7 +40,7 @@ class OpenEdxVars(BaseModel):
     accessibility_url: Optional[str] = None
     account_settings_url: Optional[str] = None
     contact_url: Optional[str] = None
-    enable_certificate_page: Optional[bool] = None
+    enable_certificate_page: Optional[Literal["true","false"]] = None
     deployment_name: OpenEdxDeploymentName
     display_feedback_widget: Optional[str] = None
     environment: str
@@ -69,7 +69,7 @@ class OpenEdxVars(BaseModel):
 
 def mfe_params(
     open_edx: OpenEdxVars, mfe: OpenEdxApplicationVersion
-) -> dict[str, Optional[Union[str,bool]]]:
+) -> dict[str, Optional[str]]:
     learning_mfe_path = OpenEdxMicroFrontend.learn.path
     discussion_mfe_path = OpenEdxMicroFrontend.discussion.path
     return {
