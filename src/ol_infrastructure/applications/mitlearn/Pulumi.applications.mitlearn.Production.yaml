@@ -61,6 +61,7 @@ config:
     POSTHOG_ENABLED: "true"
     POSTHOG_PROJECT_ID: "63497"
     POSTHOG_TIMEOUT_MS: 1000
+    SEE_API_ENABLED: "false"
     SESSION_COOKIE_NAME: "learn-session"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
     TIKA_SERVER_ENDPOINT: "https://tika-production.odl.mit.edu"
