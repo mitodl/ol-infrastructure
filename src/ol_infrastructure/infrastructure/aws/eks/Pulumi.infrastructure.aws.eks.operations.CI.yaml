@@ -4,6 +4,10 @@ encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQFVoeJh3NbKbr5xD+
 config:
   environment:business_unit: operations
   environment:target_vpc: operations_vpc
+  eks:vault_secrets_operator: true
+  eks:namespaces:
+  - "application-namespace"
+  - "second-app-namespace"
   eks:nodegroups:
     worker-medium:
       instance_types:
@@ -38,3 +42,5 @@ config:
       version:
       tags: {}
       taints: {}
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

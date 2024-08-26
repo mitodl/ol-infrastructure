@@ -4,18 +4,22 @@ import json
 
 import pulumi_aws as aws
 import pulumi_eks as eks
-import yaml
-from pulumi import Config, StackReference, export
+import pulumi_kubernetes as kubernetes
+import pulumi_vault as vault
+from pulumi import Config, ResourceOptions, StackReference, export
 
 from bridge.lib.magic_numbers import IAM_ROLE_NAME_PREFIX_MAX_LENGTH
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.vault import setup_vault_provider
 
 eks_config = Config("eks")
 env_config = Config("environment")
+vault_config = Config("vault")
 
 stack_info = parse_stack()
+setup_vault_provider(stack_info)
 
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
@@ -26,6 +30,10 @@ target_vpc = network_stack.require_output(env_config.require("target_vpc"))
 pod_ip_blocks = target_vpc["k8s_pod_subnet_cidrs"]
 pod_subnet_ids = target_vpc["k8s_pod_subnet_ids"]
 service_ip_block = target_vpc["k8s_service_subnet_cidr"]
+
+cluster_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+
+ebs_csi_driver_role_name = f"{cluster_name}-eks-ebs-csi-role"
 
 # Commented out means we let the cluster manages it automatically
 default_addons = {
@@ -38,7 +46,6 @@ default_addons = {
     }
 }
 
-cluster_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
 aws_config = AWSBase(
     tags={
@@ -125,6 +132,11 @@ managed_policy_arns = [
     "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
     "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
     "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
+    # Ref: https://github.com/pulumi/pulumi-eks/issues/833#issuecomment-1591761276
+    # attach the built-in EBSCSIDriverPolicy directly to the nodes to simplify
+    # ensuring the driver has the IAM permissions it needs to work with
+    # EBS volumes + snapshots
+    "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy",
 ]
 for i, policy in enumerate(managed_policy_arns):
     aws.iam.RolePolicyAttachment(
@@ -160,7 +172,90 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
         taints=taint_list,
     )
 
-export(
-    "cluster_export",
-    value={"kube_config": cluster.kubeconfig.apply(lambda cc: yaml.dump(cc))},
+
+# Initalize the k8s pulumi provider and configure the central operations namespace
+k8s_provider = kubernetes.Provider(
+    "k8s-provider",
+    kubeconfig=cluster.kubeconfig,
+    opts=ResourceOptions(depends_on=[cluster]),
 )
+
+operations_namespace = kubernetes.core.v1.Namespace(
+    resource_name=f"{cluster_name}-operations-namespace",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="operations",
+        labels={
+            "pulumi_managed": "true",
+        },
+    ),
+    opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+)
+
+# Create any requested additional namespaces
+for namespace in eks_config.get_object("namespaces") or []:
+    resource_name = (f"{cluster_name}-{namespace}-namespace",)
+    kubernetes.core.v1.Namespace(
+        resource_name=f"{cluster_name}-{namespace}-namespace",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=namespace,
+            labels={
+                "pulumi_managed": "true",
+            },
+        ),
+        opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+    )
+
+# Configure vault auth backend and add the vault secrets operator if requested
+if eks_config.get_bool("vault_secrets_operator") or False:
+    vault_k8s_auth = vault.AuthBackend(
+        "vault-k8s-auth-backend",
+        type="kubernetes",
+        path=f"k8s-{cluster_name}",
+    )
+    vault_k8s_auth_backend_config = vault.kubernetes.AuthBackendConfig(
+        f"{cluster_name}-eks-vault-authentication-configuration-operations",
+        kubernetes_host=cluster.eks_cluster.endpoint,
+        backend=f"k8s-{cluster_name}",
+        disable_local_ca_jwt=True,
+        opts=ResourceOptions(parent=vault_k8s_auth),
+    )
+
+    vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
+        f"{cluster_name}-eks-vault-authentication-endpoint-operations",
+        role_name=f"{cluster_name}-operations",
+        backend=f"k8s-{cluster_name}",
+        bound_service_account_names=["*"],
+        bound_service_account_namespaces=["kube-system", "operations"],
+        opts=ResourceOptions(parent=vault_k8s_auth),
+    )
+
+    vault_secrets_operator = kubernetes.helm.v3.Release(
+        f"{cluster_name}-vault-secrets-operator-release",
+        kubernetes.helm.v3.ReleaseArgs(
+            name="vault-secrets-operator",
+            chart="vault-secrets-operator",
+            version="0.8.1",
+            namespace="operations",
+            repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+                repo="https://helm.releases.hashicorp.com",
+            ),
+            values={
+                "defaultVaultConnection": {
+                    "enabled": True,
+                    "address": vault_config.get("address"),
+                    "skipTLSVerify": False,
+                },
+                "defaultAuthMethod": {
+                    "enabled": True,
+                    "mount": f"k8s-{cluster_name}",
+                    "kubernetes": {
+                        "role": f"{cluster_name}-operations",
+                    },
+                    "allowed_namespaces": ["kube-system", "operations"],
+                },
+            },
+            skip_await=False,
+        ),
+        opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+    )
+    export("vault-secrets-operator-name", vault_secrets_operator.name)
