@@ -5,7 +5,10 @@ config:
   environment:business_unit: operations
   environment:target_vpc: operations_vpc
   eks:vault_secrets_operator: true
+  eks:ebs_csi_provisioner: true
+  eks:efs_csi_provisioner: true
   eks:namespaces:
+  - "omd"
   - "application-namespace"
   - "second-app-namespace"
   eks:nodegroups:

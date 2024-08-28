@@ -9,7 +9,12 @@ import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
 from bridge.lib.magic_numbers import IAM_ROLE_NAME_PREFIX_MAX_LENGTH
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
+from ol_infrastructure.lib.aws.iam_helper import (
+    IAM_POLICY_VERSION,
+    eks_ebs_oidc_trust_policy_template,
+    eks_efs_oidc_trust_policy_template,
+    lint_iam_policy,
+)
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -20,9 +25,12 @@ vault_config = Config("vault")
 
 stack_info = parse_stack()
 setup_vault_provider(stack_info)
+aws_account = aws.get_caller_identity()
 
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
+policy_stack = StackReference("infrastructure.aws.policies")
 
 business_unit = env_config.require("business_unit") or "operations"
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))
@@ -33,19 +41,13 @@ service_ip_block = target_vpc["k8s_service_subnet_cidr"]
 
 cluster_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
-ebs_csi_driver_role_name = f"{cluster_name}-eks-ebs-csi-role"
+kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 
-# Commented out means we let the cluster manages it automatically
 default_addons = {
     #    "aws-node" - daemonset
     #    "coredns" - deployment
     #    "kube-proxy" - daemonset
-    "aws-ebs-csi-driver": {
-        "addon_name": "aws-ebs-csi-driver",
-        "addon_version": "v1.33.0-eksbuild.1",
-    }
 }
-
 
 aws_config = AWSBase(
     tags={
@@ -54,6 +56,7 @@ aws_config = AWSBase(
         "Owner": "platform-engineering",
     },
 )
+AWS_REGION = aws_config.region
 
 default_assume_role_policy = {
     "Version": IAM_POLICY_VERSION,
@@ -109,16 +112,6 @@ cluster = eks.Cluster(
     ],
 )
 
-# Configure addons
-extra_addons = eks_config.get_object("extra_addons") or {}
-addons = default_addons | extra_addons
-for addon_key, addon_definition in addons.items():
-    eks.Addon(
-        f"{cluster_name}-eks-addon-{addon_key}",
-        cluster=cluster,
-        **addon_definition,
-    )
-
 
 # Configure node groups
 node_role = aws.iam.Role(
@@ -132,15 +125,21 @@ managed_policy_arns = [
     "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
     "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
     "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
-    # Ref: https://github.com/pulumi/pulumi-eks/issues/833#issuecomment-1591761276
-    # attach the built-in EBSCSIDriverPolicy directly to the nodes to simplify
-    # ensuring the driver has the IAM permissions it needs to work with
-    # EBS volumes + snapshots
-    "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy",
+    policy_stack.require_output("iam_policies")["describe_instances"],
 ]
+if eks_config.get_bool("ebs_csi_provisioner"):
+    managed_policy_arns.append(
+        "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+    )
+if eks_config.get_bool("efs_csi_provisioner"):
+    managed_policy_arns.append(
+        "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
+    )
 for i, policy in enumerate(managed_policy_arns):
     aws.iam.RolePolicyAttachment(
-        f"{cluster_name}-eks-node-role-policy-{i}", policy_arn=policy, role=node_role.id
+        f"{cluster_name}-eks-node-role-policy-attachment-{i}",
+        policy_arn=policy,
+        role=node_role.id,
     )
 node_instance_profile = aws.iam.InstanceProfile(
     f"{cluster_name}-eks-node-instanceProfile", role=node_role.name
@@ -159,6 +158,7 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
         f"{cluster_name}-eks-managednodegroup-{ng_name}",
         capacity_type="ON_DEMAND",
         cluster=cluster,
+        enable_imd_sv2=True,
         instance_types=ng_config["instance_types"],
         labels=ng_config["labels"] or {},
         node_group_name=f"{cluster_name}-managednodegroup-{ng_name}",
@@ -174,6 +174,9 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
 
 
 # Initalize the k8s pulumi provider and configure the central operations namespace
+k8s_global_labels = {
+    "pulumi_managed": "true",
+}
 k8s_provider = kubernetes.Provider(
     "k8s-provider",
     kubeconfig=cluster.kubeconfig,
@@ -184,9 +187,7 @@ operations_namespace = kubernetes.core.v1.Namespace(
     resource_name=f"{cluster_name}-operations-namespace",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="operations",
-        labels={
-            "pulumi_managed": "true",
-        },
+        labels=k8s_global_labels,
     ),
     opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
 )
@@ -198,11 +199,183 @@ for namespace in eks_config.get_object("namespaces") or []:
         resource_name=f"{cluster_name}-{namespace}-namespace",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=namespace,
-            labels={
-                "pulumi_managed": "true",
-            },
+            labels=k8s_global_labels,
         ),
         opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+    )
+
+# Configure CSI Drivers
+csi_driver_role_parliament_config = {
+    "UNKNOWN_FEDERATION_SOURCE": {"ignore_locations": [{"principal": "federated"}]},
+    "PERMISSIONS_MANAGEMENT_ACTIONS": {"ignore_locations": []},
+    "MALFORMED": {"ignore_lcoations": []},
+}
+
+# Setup EBS CSI provisioner
+# Ref: https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html
+if eks_config.get_bool("ebs_csi_provisioner"):
+    ebs_csi_driver_role = aws.iam.Role(
+        f"{cluster_name}-ebs-csi-driver-trust-role",
+        name=f"{cluster_name}-ebs-csi-driver-trust-role",
+        path=f"/ol-infrastructure/eks/{cluster_name}/",
+        assume_role_policy=cluster.eks_cluster.identities.apply(
+            lambda ids: lint_iam_policy(
+                eks_ebs_oidc_trust_policy_template(
+                    oidc_identifier=ids[0]["oidcs"][0]["issuer"],
+                    account_id=aws_account.account_id,
+                    k8s_service_account_identifier="system:serviceaccount:kube-system:ebs-csi-controller-sa",
+                ),
+                parliament_config=csi_driver_role_parliament_config,
+                stringify=True,
+            )
+        ),
+        description="Trust role for allowing the EBS CSI driver to provision storage "
+        "within the cluster.",
+        opts=ResourceOptions(parent=cluster),
+    )
+
+    ebs_csi_driver_kms_for_encryption_policy = aws.iam.Policy(
+        f"{cluster_name}-ebs-csi-driver-kms-for-encryption-policy",
+        name=f"{cluster_name}-ebs-csi-driver-kms-for-encryption-policy",
+        policy=kms_ebs.apply(
+            lambda kms_config: lint_iam_policy(
+                {
+                    "Version": IAM_POLICY_VERSION,
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "kms:CreateGrant",
+                                "kms:ListGrants",
+                                "kms:RevokeGrant",
+                            ],
+                            "Resource": [kms_config["arn"]],
+                            "Condition": {
+                                "Bool": {"kms:GrantIsForAWSResource": "true"}
+                            },
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "kms:Encrypt",
+                                "kms:Decrypt",
+                                "kms:ReEncrypt*",
+                                "kms:GenerateDataKey*",
+                                "kms:DescribeKey",
+                            ],
+                            "Resource": [kms_config["arn"]],
+                        },
+                    ],
+                },
+                parliament_config=csi_driver_role_parliament_config,
+                stringify=True,
+            )
+        ),
+    )
+    aws.iam.RolePolicyAttachment(
+        f"{cluster_name}-ebs-csi-driver-kms-policy-attachment",
+        policy_arn=ebs_csi_driver_kms_for_encryption_policy.arn,
+        role=ebs_csi_driver_role.id,
+    )
+    aws.iam.RolePolicyAttachment(
+        f"{cluster_name}-ebs-csi-driver-EBSCSIDriverPolicy-attachment",
+        policy_arn="arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy",
+        role=ebs_csi_driver_role.id,
+    )
+
+    # Default storageclass configured for nominal performance
+    kubernetes.storage.v1.StorageClass(
+        resource_name=f"{cluster_name}-ebs-gp3-storageclass",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="ebs-gp3-sc",
+            labels=k8s_global_labels,
+            annotations={"storageclass.kubernetes.io/is-default-class": "true"},
+        ),
+        provisioner="ebs.csi.aws.com",
+        volume_binding_mode="WaitForFirstConsumer",
+        # ref: https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/parameters.md
+        parameters={
+            "csi.storage.k8s.io/fstype": "xfs",
+            "type": "gp3",
+            "iopsPerGB": "50",
+            "throughput": "125",
+            "encrypted": "true",
+        },
+        opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+    )
+
+    default_addons["aws-ebs-csi-driver"] = {
+        "addon_name": "aws-ebs-csi-driver",
+        "addon_version": "v1.33.0-eksbuild.1",
+        "service_account_role_arn": ebs_csi_driver_role.arn,
+    }
+
+# Setup EFS CSI Provisioner
+if eks_config.get_bool("efs_csi_provisioner"):
+    efs_csi_driver_role = aws.iam.Role(
+        f"{cluster_name}-efs-csi-driver-trust-role",
+        name=f"{cluster_name}-efs-csi-driver-trust-role",
+        path=f"/ol-infrastructure/eks/{cluster_name}/",
+        assume_role_policy=cluster.eks_cluster.identities.apply(
+            lambda ids: lint_iam_policy(
+                eks_efs_oidc_trust_policy_template(
+                    oidc_identifier=ids[0]["oidcs"][0]["issuer"],
+                    account_id=aws_account.account_id,
+                    k8s_service_account_identifier="system:serviceaccount:kube-system:efs-csi-*",
+                ),
+                parliament_config=csi_driver_role_parliament_config,
+                stringify=True,
+            )
+        ),
+        description="Trust role for allowing the EFS CSI driver to provision storage "
+        "within the cluster.",
+        opts=ResourceOptions(parent=cluster),
+    )
+    aws.iam.RolePolicyAttachment(
+        f"{cluster_name}-efs-csi-driver-EFSCSIDriverPolicy-attachment",
+        policy_arn="arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy",
+        role=efs_csi_driver_role.id,
+    )
+
+    efs_filesystem = aws.efs.FileSystem(
+        f"{cluster_name}-eks-filesystem",
+        encrypted=True,
+        kms_key_id=kms_ebs["arn"],
+        tags=aws_config.tags,
+        throughput_mode="bursting",
+    )
+
+    kubernetes.storage.v1.StorageClass(
+        resource_name=f"{cluster_name}-efs-storageclass",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="efs-sc",
+            labels=k8s_global_labels,
+        ),
+        provisioner="efs.csi.aws.com",
+        volume_binding_mode="WaitForFirstConsumer",
+        # ref: https://github.com/kubernetes-sigs/aws-efs-csi-driver/blob/master/docs/README.md
+        parameters={
+            "provisioningMode": "efs-ap",
+            "fileSystemId": efs_filesystem.id,
+            "directoryPerms": "700",
+        },
+        opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+    )
+    default_addons["aws-efs-csi-driver"] = {
+        "addon_name": "aws-efs-csi-driver",
+        "addon_version": "v2.0.7-eksbuild.1",
+        "service_account_role_arn": efs_csi_driver_role.arn,
+    }
+
+# Configure addons
+# Commented out means we let the cluster manages it automatically
+extra_addons = eks_config.get_object("extra_addons") or {}
+addons = default_addons | extra_addons
+for addon_key, addon_definition in addons.items():
+    eks.Addon(
+        f"{cluster_name}-eks-addon-{addon_key}",
+        cluster=cluster,
+        **addon_definition,
     )
 
 # Configure vault auth backend and add the vault secrets operator if requested
@@ -256,6 +429,11 @@ if eks_config.get_bool("vault_secrets_operator") or False:
             },
             skip_await=False,
         ),
-        opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=operations_namespace,
+            delete_before_replace=True,
+        ),
     )
     export("vault-secrets-operator-name", vault_secrets_operator.name)
+    export("oidc_identifier", cluster.eks_cluster.identities)
