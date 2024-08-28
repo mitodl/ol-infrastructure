@@ -7,6 +7,25 @@ from parliament.finding import Finding
 
 IAM_POLICY_VERSION = "2012-10-17"
 
+ADMIN_USERNAMES = [
+    "cpatti",
+    "ferdial",
+    "ichuang",
+    "mas48",
+    "pdpinch",
+    "qhoque",
+    "shaidar",
+    "tmacey",
+]
+
+EKS_ADMIN_USERNAMES = [
+    "cpatti",
+    "mas48",
+    "qhoque",
+    "shaidar",
+    "tmacey",
+]
+
 
 def _is_parliament_finding_filtered(
     finding: Finding, parliament_config: dict[str, Any]
