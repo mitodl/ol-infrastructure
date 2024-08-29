@@ -1,5 +1,6 @@
 # ruff: noqa: ERA001
 
+import base64
 import json
 
 import pulumi_aws as aws
@@ -390,26 +391,33 @@ for addon_key, addon_definition in addons.items():
 
 # Configure vault-secrets-operator
 if eks_config.get_bool("vault_secrets_operator") or False:
-    # Setup vault auth endpoint for the cluster + backend role
+    # Setup vault auth endpoint for the cluster
+    vault_auth_endpoint_name = f"k8s-{stack_info.env_prefix}"
     vault_k8s_auth = vault.AuthBackend(
-        "vault-k8s-auth-backend",
+        f"{cluster_name}-eks-vault-k8s-auth-backend",
         type="kubernetes",
-        path=f"k8s-{stack_info.env_prefix}",
+        path=vault_auth_endpoint_name,
+        opts=ResourceOptions(delete_before_replace=True),
     )
     vault_k8s_auth_backend_config = vault.kubernetes.AuthBackendConfig(
         f"{cluster_name}-eks-vault-authentication-configuration-operations",
+        kubernetes_ca_cert=cluster.eks_cluster.certificate_authority.data.apply(
+            lambda b64_cert: "{}".format(base64.b64decode(b64_cert).decode("utf-8"))
+        ),
         kubernetes_host=cluster.eks_cluster.endpoint,
-        backend=f"k8s-{stack_info.env_prefix}",
+        backend=vault_auth_endpoint_name,
+        disable_iss_validation=True,
         disable_local_ca_jwt=True,
         opts=ResourceOptions(parent=vault_k8s_auth),
     )
-
+    # Setup a default auth backend role, not to be used by apps in the clsuter
     vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
         f"{cluster_name}-eks-vault-authentication-endpoint-operations",
         role_name="operations-default",
-        backend=f"k8s-{stack_info.env_prefix}",
+        backend=vault_auth_endpoint_name,
         bound_service_account_names=["*"],
-        bound_service_account_namespaces=["kube-system", "operations"],
+        bound_service_account_namespaces=["operations"],
+        token_policies=["vector-log-proxy"],
         opts=ResourceOptions(parent=vault_k8s_auth),
     )
 
@@ -419,14 +427,6 @@ if eks_config.get_bool("vault_secrets_operator") or False:
             "enabled": True,
             "address": vault_config.get("address"),
             "skipTLSVerify": False,
-        },
-        "defaultAuthMethod": {
-            "enabled": True,
-            "mount": f"k8s-{stack_info.env_prefix}",
-            "kubernetes": {
-                "role": "operations-default",
-            },
-            "allowed_namespaces": ["kube-system", "operations"],
         },
         "controller": {
             "extraLabels": k8s_global_labels,
@@ -464,6 +464,7 @@ if eks_config.get_bool("vault_secrets_operator") or False:
             delete_before_replace=True,
         ),
     )
+    export("vault-auth-endpoint", vault_auth_endpoint_name)
 
 export(
     "kube_config_data",
