@@ -12,12 +12,14 @@ config:
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone",
     "--staff", "--authenticated"]
   - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
-  - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--staff"]
+  - ["discussions.pages_and_resources_mfe", "--create", "--everyone"]
   - ["grades.bulk_management", "--create", "--superusers", "--everyone", "--staff",
     "--authenticated"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
   - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
   - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
+  - ["notifications.enable_notifications", "--create", "--everyone"]
+  - ["notifications.enable_email_notifications", "--create", "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone",
     "--staff", "--authenticated"]
   - ["seo.enable_anonymous_courseware_access", "--create", "--superusers", "--staff",
