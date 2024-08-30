@@ -139,7 +139,7 @@ def github_issues(  # noqa: PLR0913
         name=name,
         type="github-issues",
         icon="github",
-        check_every="1h",
+        check_every="15m",
         expose_build_created_by=True,
         source={k: v for k, v in issue_config.items() if v is not None},
     )
