@@ -1,7 +1,10 @@
-# ruff: noqa: ERA001
+# ruff: noqa: ERA001, TD003, FIX002
+
+# Misc Ref: https://docs.aws.amazon.com/eks/latest/userguide/associate-service-account-role.html
 
 import base64
 import json
+from pathlib import Path
 
 import pulumi_aws as aws
 import pulumi_eks as eks
@@ -13,9 +16,8 @@ from bridge.lib.magic_numbers import IAM_ROLE_NAME_PREFIX_MAX_LENGTH
 from ol_infrastructure.lib.aws.iam_helper import (
     EKS_ADMIN_USERNAMES,
     IAM_POLICY_VERSION,
-    eks_ebs_oidc_trust_policy_template,
-    eks_efs_oidc_trust_policy_template,
     lint_iam_policy,
+    oidc_trust_policy_template,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -231,17 +233,18 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         path=f"/ol-infrastructure/eks/{cluster_name}/",
         assume_role_policy=cluster.eks_cluster.identities.apply(
             lambda ids: lint_iam_policy(
-                eks_ebs_oidc_trust_policy_template(
+                oidc_trust_policy_template(
                     oidc_identifier=ids[0]["oidcs"][0]["issuer"],
                     account_id=aws_account.account_id,
                     k8s_service_account_identifier="system:serviceaccount:kube-system:ebs-csi-controller-sa",
+                    operator="StringEquals",
                 ),
                 parliament_config=csi_driver_role_parliament_config,
                 stringify=True,
             )
         ),
         description="Trust role for allowing the EBS CSI driver to provision storage "
-        "within the cluster.",
+        "from within the cluster.",
         opts=ResourceOptions(parent=cluster),
     )
 
@@ -330,17 +333,18 @@ if eks_config.get_bool("efs_csi_provisioner"):
         path=f"/ol-infrastructure/eks/{cluster_name}/",
         assume_role_policy=cluster.eks_cluster.identities.apply(
             lambda ids: lint_iam_policy(
-                eks_efs_oidc_trust_policy_template(
+                oidc_trust_policy_template(
                     oidc_identifier=ids[0]["oidcs"][0]["issuer"],
                     account_id=aws_account.account_id,
                     k8s_service_account_identifier="system:serviceaccount:kube-system:efs-csi-*",
+                    operator="StringLike",
                 ),
                 parliament_config=csi_driver_role_parliament_config,
                 stringify=True,
             )
         ),
         description="Trust role for allowing the EFS CSI driver to provision storage "
-        "within the cluster.",
+        "from within the cluster.",
         opts=ResourceOptions(parent=cluster),
     )
     aws.iam.RolePolicyAttachment(
@@ -465,6 +469,86 @@ if eks_config.get_bool("vault_secrets_operator") or False:
         ),
     )
     export("vault-auth-endpoint", vault_auth_endpoint_name)
+
+# Configure the load balancer controller if requested
+# Ref: https://docs.aws.amazon.com/eks/latest/userguide/lbc-helm.html
+# Ref: https://artifacthub.io/packages/helm/aws/aws-load-balancer-controller
+# Ref: https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.7/guide/ingress/annotations/
+# Ref: https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.7/guide/service/annotations/
+# Ref: https://aws.amazon.com/blogs/containers/exposing-kubernetes-applications-part-2-aws-load-balancer-controller/
+if eks_config.get_bool("lb_controller"):
+    # Use this as the name of the helm release + also the service account
+    lb_controller_name = "aws-load-balancer-controller"
+
+    aws_load_balancer_role_parliament_config = {
+        "UNKNOWN_FEDERATION_SOURCE": {"ignore_locations": [{"principal": "federated"}]},
+        "PERMISSIONS_MANAGEMENT_ACTIONS": {"ignore_locations": []},
+        "MALFORMED": {"ignore_lcoations": []},
+    }
+
+    aws_load_balancer_controller_role = aws.iam.Role(
+        f"{cluster_name}-aws-load-balancer-controller-trust-role",
+        name=f"{cluster_name}-aws-load-balancer-controller-trust-role",
+        path=f"/ol-infrastructure/eks/{cluster_name}/",
+        assume_role_policy=cluster.eks_cluster.identities.apply(
+            lambda ids: oidc_trust_policy_template(
+                oidc_identifier=ids[0]["oidcs"][0]["issuer"],
+                account_id=aws_account.account_id,
+                k8s_service_account_identifier=f"system:serviceaccount:operations:{lb_controller_name}",
+                operator="StringEquals",
+            ),
+        ),
+        description="Trust role for allowing the AWS Load Balancer Controler to "
+        "provision ELB resources from within the cluster.",
+        opts=ResourceOptions(parent=cluster),
+    )
+    # TODO @Ardiea: This should be sent through the linter but there are
+    # about 800 thing wrong with it
+    # TODO @Ardiea: This is the stock AWS policy for the LBC. It will allow this LBC
+    # instanance to work with basically any ELB resources which isn't good.
+    # We should parameterize the policy to reign it in a bit and standarize on a
+    # naming scheme for the resources it creats and manages.
+    with Path.open(
+        Path(__file__).parent.joinpath("files/aws_load_balancer_config_iam_policy.json")
+    ) as f:
+        aws_load_balancer_controller_policy_document = json.load(f)
+    aws_load_balancer_controller_policy = aws.iam.Policy(
+        f"{cluster_name}-aws-load-balancer-controller-policy",
+        name=f"{cluster_name}-aws-load-balancer-controller-policy",
+        policy=aws_load_balancer_controller_policy_document,
+    )
+    aws.iam.RolePolicyAttachment(
+        f"{cluster_name}-aws-load-balancer-controller-policy-attachment",
+        policy_arn=aws_load_balancer_controller_policy.arn,
+        role=aws_load_balancer_controller_role.id,
+    )
+
+    aws_load_balancer_controller_helm_release = kubernetes.helm.v3.Release(
+        f"{cluster_name}-aws-load-balancer-controller-release",
+        kubernetes.helm.v3.ReleaseArgs(
+            name=lb_controller_name,
+            chart="aws-load-balancer-controller",
+            version="1.8.2",
+            namespace="operations",
+            repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+                repo="https://aws.github.io/eks-charts",
+            ),
+            values={
+                "clusterName": cluster_name,
+                "serviceAccount": {
+                    "create": True,
+                    "name": lb_controller_name,
+                    "annotations": {
+                        "eks.amazonaws.com/role-arn": aws_load_balancer_controller_role.arn.apply(  # noqa: E501
+                            lambda arn: f"{arn}"
+                        ),
+                    },
+                },
+                "region": aws_config.region,
+                "vpcId": target_vpc["id"],
+            },
+        ),
+    )
 
 export(
     "kube_config_data",

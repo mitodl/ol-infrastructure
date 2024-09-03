@@ -7,6 +7,7 @@ config:
   eks:vault_secrets_operator: true
   eks:ebs_csi_provisioner: true
   eks:efs_csi_provisioner: true
+  eks:lb_controller: true
   eks:namespaces:
   - "omd"
   - "application-namespace"
