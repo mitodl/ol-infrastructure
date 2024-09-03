@@ -8,6 +8,7 @@ config:
   - ["content_tagging.disabled", "--create", "--everyone"]
   - ["blockstore.use_blockstore_app_api", "--create", "--superusers", "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
+  - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_advanced_settings_page", "--create", "--superusers",
     "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_export_page", "--create", "--superusers",
