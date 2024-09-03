@@ -2,7 +2,6 @@
 
 import json
 from enum import Enum
-from typing import Optional
 
 from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import acm, cloudfront, s3
@@ -39,9 +38,7 @@ class S3ServerlessSite(ComponentResource):
     """
 
     def __init__(
-        self,
-        site_config: S3ServerlessSiteConfig,
-        opts: Optional[ResourceOptions] = None,
+        self, site_config: S3ServerlessSiteConfig, opts: ResourceOptions | None
     ):
         """Create an S3 bucket, ACM certificate, and Cloudfront distribution for
             hosting a static site.
@@ -50,7 +47,7 @@ class S3ServerlessSite(ComponentResource):
         :type site_config: S3ServerlessSiteConfig
 
         :param opts: Pulumi resource options
-        :type opts: Optional[ResourceOptions]
+        :type opts: ResourceOptions
 
         :rtype: S3ServerlessSite
         """
@@ -60,7 +57,7 @@ class S3ServerlessSite(ComponentResource):
 
         resource_opts = ResourceOptions(parent=self).merge(opts)
 
-        self.site_bucket = s3.Bucket(
+        self.site_bucket = s3.BucketV2(
             f"{site_config.site_name}-bucket",
             bucket=site_config.bucket_name,
             acl="public-read",
@@ -79,9 +76,11 @@ class S3ServerlessSite(ComponentResource):
                 }
             ),
             tags=site_config.tags,
-            versioning={"enabled": True},
-            cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
-            website={"indexDocument": site_config.site_index},
+            # We need separate aws.s3.BucketVersioningV2 object instead.
+            # Same for Cors, website. -CAP
+            # versioning={"enabled": True},
+            # cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
+            # website={"indexDocument": site_config.site_index},
             opts=resource_opts,
         )
 
