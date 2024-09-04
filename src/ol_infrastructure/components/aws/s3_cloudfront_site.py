@@ -57,6 +57,19 @@ class S3ServerlessSite(ComponentResource):
 
         resource_opts = ResourceOptions(parent=self).merge(opts)
 
+        website_args = s3.BucketV2WebsiteArgs(
+            index_document=site_config.site_index,
+            error_document="error.html",
+        )
+
+        cors_args = s3.BucketV2CorsRuleArgs(
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=["*"],
+            max_age_seconds=3000,
+        )
+
+        versioning_args = s3.BucketV2VersioningArgs(enabled=True)
+
         self.site_bucket = s3.BucketV2(
             f"{site_config.site_name}-bucket",
             bucket=site_config.bucket_name,
@@ -76,11 +89,9 @@ class S3ServerlessSite(ComponentResource):
                 }
             ),
             tags=site_config.tags,
-            # We need separate aws.s3.BucketVersioningV2 object instead.
-            # Same for Cors, website. -CAP
-            # versioning={"enabled": True},
-            # cors_rules=[{"allowedMethods": ["GET", "HEAD"], "allowedOrigins": ["*"]}],
-            # website={"indexDocument": site_config.site_index},
+            versioning=versioning_args,
+            cors_rules=[cors_args],
+            website=[website_args],
             opts=resource_opts,
         )
 
