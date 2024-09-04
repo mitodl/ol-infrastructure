@@ -62,9 +62,19 @@ aws_config = AWSBase(
         "Owner": "platform-engineering",
     },
 )
-AWS_REGION = aws_config.region
 
 default_assume_role_policy = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {"Service": ["ec2.amazonaws.com", "eks.amazonaws.com"]},
+            "Action": "sts:AssumeRole",
+        }
+    ],
+}
+
+admin_assume_role_policy = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
         {
@@ -81,20 +91,44 @@ default_assume_role_policy = {
     ],
 }
 
-administrator_iam_role = aws.iam.Role(
+# create core IAM resources
+# IAM role that admins will assume when using kubectl
+administrator_role = aws.iam.Role(
     f"{cluster_name}-eks-admin-role",
-    assume_role_policy=json.dumps(default_assume_role_policy),
+    assume_role_policy=json.dumps(admin_assume_role_policy),
     name_prefix=f"{cluster_name}-eks-admin-role-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
     path=f"/ol-infrastructure/eks/{cluster_name}/",
     tags=aws_config.tags,
 )
 
+# Cluster role
+cluster_role = aws.iam.Role(
+    f"{cluster_name}-eks-cluster-role",
+    name_prefix=f"{cluster_name}-eks-cluster-role-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
+    assume_role_policy=json.dumps(default_assume_role_policy),
+    path=f"/ol-infrastructure/eks/{cluster_name}/",
+    tags=aws_config.tags,
+)
+cluster_policy_arns = [
+    "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
+    "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController",
+]
+for i, policy in enumerate(cluster_policy_arns):
+    aws.iam.RolePolicyAttachment(
+        f"{cluster_name}-eks-cluster-role-policy-attachment-{i}",
+        policy_arn=policy,
+        role=cluster_role.id,
+        opts=ResourceOptions(parent=cluster_role),
+    )
+
+# Actually provision the cluster
 cluster = eks.Cluster(
     f"{cluster_name}-eks-cluster",
     name=cluster_name,
+    service_role=cluster_role,
     access_entries={
         "admin": eks.AccessEntryArgs(
-            principal_arn=administrator_iam_role.arn,
+            principal_arn=administrator_role.arn,
             access_policies={
                 "admin": eks.AccessPolicyAssociationArgs(
                     access_scope=aws.eks.AccessPolicyAssociationAccessScopeArgs(
@@ -118,15 +152,28 @@ cluster = eks.Cluster(
     skip_default_node_group=True,
     node_associate_public_ip_address=False,
     subnet_ids=pod_subnet_ids,
+    use_default_vpc_cni=False,
+    # Ref: https://docs.aws.amazon.com/eks/latest/userguide/security-groups-pods-deployment.html
+    # Ref: https://docs.aws.amazon.com/eks/latest/userguide/sg-pods-example-deployment.html
+    vpc_cni_options=eks.cluster.VpcCniOptionsArgs(
+        enable_pod_eni=True,
+        disable_tcp_early_demux=True,
+        log_level="INFO",
+        warm_eni_target=2,
+        warm_ip_target=2,
+    ),
     enabled_cluster_log_types=[
         "api",
         "audit",
         "authenticator",
     ],
+    opts=ResourceOptions(
+        parent=cluster_role, depends_on=[cluster_role, administrator_role]
+    ),
 )
 
-
 # Configure node groups
+# Node role / instance profile role
 node_role = aws.iam.Role(
     f"{cluster_name}-eks-node-role",
     assume_role_policy=json.dumps(default_assume_role_policy),
@@ -134,29 +181,29 @@ node_role = aws.iam.Role(
     path=f"/ol-infrastructure/eks/{cluster_name}/",
     tags=aws_config.tags,
 )
-managed_policy_arns = [
+managed_node_policy_arns = [
     "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
     "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
     "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
     policy_stack.require_output("iam_policies")["describe_instances"],
 ]
 if eks_config.get_bool("ebs_csi_provisioner"):
-    managed_policy_arns.append(
+    managed_node_policy_arns.append(
         "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
     )
 if eks_config.get_bool("efs_csi_provisioner"):
-    managed_policy_arns.append(
+    managed_node_policy_arns.append(
         "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
     )
-for i, policy in enumerate(managed_policy_arns):
+for i, policy in enumerate(managed_node_policy_arns):
     aws.iam.RolePolicyAttachment(
         f"{cluster_name}-eks-node-role-policy-attachment-{i}",
         policy_arn=policy,
         role=node_role.id,
+        opts=ResourceOptions(parent=node_role),
     )
-node_instance_profile = aws.iam.InstanceProfile(
-    f"{cluster_name}-eks-node-instanceProfile", role=node_role.name
-)
+
+node_groups = []
 for ng_name, ng_config in eks_config.require_object("nodegroups").items():
     taint_list = []
     for taint_name, taint_config in ng_config["taints"].items():
@@ -167,22 +214,25 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
                 effect=taint_config["effect"],
             ),
         )
-    eks.ManagedNodeGroup(
-        f"{cluster_name}-eks-managednodegroup-{ng_name}",
-        capacity_type="ON_DEMAND",
-        cluster=cluster,
-        enable_imd_sv2=True,
-        instance_types=ng_config["instance_types"],
-        labels=ng_config["labels"] or {},
-        node_group_name=f"{cluster_name}-managednodegroup-{ng_name}",
-        node_role_arn=node_role.arn,
-        scaling_config=aws.eks.NodeGroupScalingConfigArgs(
-            desired_size=ng_config["scaling"]["desired"] or 2,
-            max_size=ng_config["scaling"]["max"] or 3,
-            min_size=ng_config["scaling"]["min"] or 1,
-        ),
-        tags=aws_config.merged_tags(ng_config["tags"] or {}),
-        taints=taint_list,
+    node_groups.append(
+        eks.ManagedNodeGroup(
+            f"{cluster_name}-eks-managednodegroup-{ng_name}",
+            capacity_type="ON_DEMAND",
+            cluster=cluster,
+            enable_imd_sv2=True,
+            instance_types=ng_config["instance_types"],
+            labels=ng_config["labels"] or {},
+            node_group_name=f"{cluster_name}-managednodegroup-{ng_name}",
+            node_role_arn=node_role.arn,
+            scaling_config=aws.eks.NodeGroupScalingConfigArgs(
+                desired_size=ng_config["scaling"]["desired"] or 2,
+                max_size=ng_config["scaling"]["max"] or 3,
+                min_size=ng_config["scaling"]["min"] or 1,
+            ),
+            tags=aws_config.merged_tags(ng_config["tags"] or {}),
+            taints=taint_list,
+            opts=ResourceOptions(parent=cluster, depends_on=cluster),
+        )
     )
 
 
@@ -193,7 +243,7 @@ k8s_global_labels = {
 k8s_provider = kubernetes.Provider(
     "k8s-provider",
     kubeconfig=cluster.kubeconfig,
-    opts=ResourceOptions(depends_on=[cluster]),
+    opts=ResourceOptions(parent=cluster, depends_on=[cluster, node_groups[0]]),
 )
 
 operations_namespace = kubernetes.core.v1.Namespace(
@@ -202,7 +252,9 @@ operations_namespace = kubernetes.core.v1.Namespace(
         name="operations",
         labels=k8s_global_labels,
     ),
-    opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+    opts=ResourceOptions(
+        provider=k8s_provider, parent=k8s_provider, depends_on=k8s_provider
+    ),
 )
 
 # Create any requested additional namespaces
@@ -214,7 +266,9 @@ for namespace in eks_config.get_object("namespaces") or []:
             name=namespace,
             labels=k8s_global_labels,
         ),
-        opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+        opts=ResourceOptions(
+            provider=k8s_provider, parent=k8s_provider, depends_on=k8s_provider
+        ),
     )
 
 # Configure CSI Drivers
@@ -245,7 +299,7 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         ),
         description="Trust role for allowing the EBS CSI driver to provision storage "
         "from within the cluster.",
-        opts=ResourceOptions(parent=cluster),
+        opts=ResourceOptions(parent=cluster, depends_on=cluster),
     )
 
     ebs_csi_driver_kms_for_encryption_policy = aws.iam.Policy(
@@ -285,16 +339,19 @@ if eks_config.get_bool("ebs_csi_provisioner"):
                 stringify=True,
             )
         ),
+        opts=ResourceOptions(parent=cluster, depends_on=cluster),
     )
     aws.iam.RolePolicyAttachment(
         f"{cluster_name}-ebs-csi-driver-kms-policy-attachment",
         policy_arn=ebs_csi_driver_kms_for_encryption_policy.arn,
         role=ebs_csi_driver_role.id,
+        opts=ResourceOptions(parent=ebs_csi_driver_role),
     )
     aws.iam.RolePolicyAttachment(
         f"{cluster_name}-ebs-csi-driver-EBSCSIDriverPolicy-attachment",
         policy_arn="arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy",
         role=ebs_csi_driver_role.id,
+        opts=ResourceOptions(parent=ebs_csi_driver_role),
     )
 
     # Default storageclass configured for nominal performance
@@ -315,7 +372,11 @@ if eks_config.get_bool("ebs_csi_provisioner"):
             "throughput": "125",
             "encrypted": "true",
         },
-        opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=k8s_provider,
+            depends_on=[k8s_provider, ebs_csi_driver_role],
+        ),
     )
 
     default_addons["aws-ebs-csi-driver"] = {
@@ -345,12 +406,13 @@ if eks_config.get_bool("efs_csi_provisioner"):
         ),
         description="Trust role for allowing the EFS CSI driver to provision storage "
         "from within the cluster.",
-        opts=ResourceOptions(parent=cluster),
+        opts=ResourceOptions(parent=cluster, depends_on=cluster),
     )
     aws.iam.RolePolicyAttachment(
         f"{cluster_name}-efs-csi-driver-EFSCSIDriverPolicy-attachment",
         policy_arn="arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy",
         role=efs_csi_driver_role.id,
+        opts=ResourceOptions(parent=efs_csi_driver_role),
     )
 
     efs_filesystem = aws.efs.FileSystem(
@@ -359,6 +421,7 @@ if eks_config.get_bool("efs_csi_provisioner"):
         kms_key_id=kms_ebs["arn"],
         tags=aws_config.tags,
         throughput_mode="bursting",
+        opts=ResourceOptions(parent=cluster, depends_on=cluster),
     )
 
     kubernetes.storage.v1.StorageClass(
@@ -375,7 +438,11 @@ if eks_config.get_bool("efs_csi_provisioner"):
             "fileSystemId": efs_filesystem.id,
             "directoryPerms": "700",
         },
-        opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=k8s_provider,
+            depends_on=[k8s_provider, efs_csi_driver_role],
+        ),
     )
     default_addons["aws-efs-csi-driver"] = {
         "addon_name": "aws-efs-csi-driver",
@@ -390,6 +457,11 @@ for addon_key, addon_definition in addons.items():
     eks.Addon(
         f"{cluster_name}-eks-addon-{addon_key}",
         cluster=cluster,
+        opts=ResourceOptions(
+            parent=cluster,
+            # Addons won't install properly if there are not nodes to schedule them on
+            depends_on=[cluster, node_groups[0]],
+        ),
         **addon_definition,
     )
 
@@ -401,7 +473,9 @@ if eks_config.get_bool("vault_secrets_operator") or False:
         f"{cluster_name}-eks-vault-k8s-auth-backend",
         type="kubernetes",
         path=vault_auth_endpoint_name,
-        opts=ResourceOptions(delete_before_replace=True),
+        opts=ResourceOptions(
+            parent=cluster, depends_on=cluster, delete_before_replace=True
+        ),
     )
     vault_k8s_auth_backend_config = vault.kubernetes.AuthBackendConfig(
         f"{cluster_name}-eks-vault-authentication-configuration-operations",
@@ -516,11 +590,13 @@ if eks_config.get_bool("lb_controller"):
         f"{cluster_name}-aws-load-balancer-controller-policy",
         name=f"{cluster_name}-aws-load-balancer-controller-policy",
         policy=aws_load_balancer_controller_policy_document,
+        opts=ResourceOptions(parent=aws_load_balancer_controller_role),
     )
     aws.iam.RolePolicyAttachment(
         f"{cluster_name}-aws-load-balancer-controller-policy-attachment",
         policy_arn=aws_load_balancer_controller_policy.arn,
         role=aws_load_balancer_controller_role.id,
+        opts=ResourceOptions(parent=aws_load_balancer_controller_role),
     )
 
     aws_load_balancer_controller_helm_release = kubernetes.helm.v3.Release(
@@ -548,12 +624,18 @@ if eks_config.get_bool("lb_controller"):
                 "vpcId": target_vpc["id"],
             },
         ),
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=operations_namespace,
+            delete_before_replace=True,
+            depends_on=aws_load_balancer_controller_role,
+        ),
     )
 
 export(
     "kube_config_data",
     {
-        "role_arn": administrator_iam_role.arn,
+        "role_arn": administrator_role.arn,
         "certificate-authority-data": cluster.eks_cluster.certificate_authority,
         "server": cluster.eks_cluster.endpoint,
     },
