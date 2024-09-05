@@ -33,6 +33,8 @@ services:
     volumes:
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     - /etc/aws/:/etc/aws/:ro
+    - /var/run/docker.sock:/var/run/docker.sock
+    - /tmp/io_manager_storage:/tmp/io_manager_storage
   traefik:
     image: traefik:latest
     container_name: traefik
