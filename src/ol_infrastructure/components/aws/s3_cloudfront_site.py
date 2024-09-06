@@ -89,9 +89,9 @@ class S3ServerlessSite(ComponentResource):
                 }
             ),
             tags=site_config.tags,
-            versioning=versioning_args,
+            versionings=[versioning_args],
             cors_rules=[cors_args],
-            website=[website_args],
+            websites=[website_args],
             opts=resource_opts,
         )
 
