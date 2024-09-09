@@ -317,13 +317,14 @@ rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["monitoring_profile_name"] = "disabled"
 
 dagster_db_config = OLPostgresDBConfig(
-    instance_name=f"ol-etl-db-{stack_info.env_suffix}",
-    password=get_config("dagster:db_password"),
-    subnet_group_name=data_vpc["rds_subnet"],
-    security_groups=[dagster_db_security_group],
-    engine_major_version="16",
-    tags=aws_config.tags,
     db_name="dagster",
+    engine_major_version="16",
+    instance_name=f"ol-etl-db-{stack_info.env_suffix}",
+    max_storage=1000,
+    password=get_config("dagster:db_password"),
+    security_groups=[dagster_db_security_group],
+    subnet_group_name=data_vpc["rds_subnet"],
+    tags=aws_config.tags,
     **rds_defaults,
 )
 dagster_db = OLAmazonDB(dagster_db_config)
