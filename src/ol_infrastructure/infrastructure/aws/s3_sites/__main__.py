@@ -37,7 +37,7 @@ if stack_info.env_suffix == "production":
     )
     export("xpro_certs_acm_cname", xpro_legacy_certs_site.site_tls.domain_name)
     # Static site for hosting legacy OCW
-    ocw_legacy_zone_id = dns_stack.get_output("ocw_legacy_zone_id")
+    ocw_zone_id = dns_stack.get_output("ocw")["id"]
     ocw_legacy_site_config = S3ServerlessSiteConfig(
         site_name="ocw-legacy",
         domains=["ocw-legacy.ocw.mit.edu"],
@@ -51,7 +51,7 @@ if stack_info.env_suffix == "production":
         type="CNAME",
         ttl=fifteen_minutes,
         records=[ocw_legacy_site.cloudfront_distribution.domain_name],
-        zone_id=ocw_legacy_zone_id,
+        zone_id=ocw_zone_id,
     )
     export("ocw_legacy_bucket", ocw_legacy_site.site_bucket.bucket)
     export("ocw_legacy_distribution_id", ocw_legacy_site.cloudfront_distribution.id)

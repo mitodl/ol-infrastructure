@@ -15,14 +15,6 @@ mitxpro_legacy_dns_zone = route53.Zone(
 )
 
 ocw_legacy_dns_name = "ocw-legacy.ocw.mit.edu"
-ocw_legacy_opts = zone_opts(ocw_legacy_dns_name)
-ocw_legacy_dns_zone = route53.Zone(
-    "ocw_legacy_subdomain",
-    name=ocw_legacy_dns_name,
-    comment="DNS Zone for legacy OCW resources",
-    tags=AWSBase(tags={"OU": "open-courseware", "Environment": "applications"}).tags,
-    opts=ocw_legacy_opts,
-)
 
 odl_dns_name = "odl.mit.edu"
 odl_opts = zone_opts(odl_dns_name)
@@ -123,7 +115,6 @@ podcast_dns_zone = route53.Zone(
 )
 
 export("mitxpro_legacy_zone_id", mitxpro_legacy_dns_zone.id)
-export("ocw_legacy_zone_id", ocw_legacy_dns_zone.id)
 export("odl_zone_id", odl_dns_zone.id)
 export("mitxonline", {"id": mitxonline_dns_zone.id, "domain": mitxonline_dns_zone.name})
 export("xpro", {"id": xpro_dns_zone.id, "domain": xpro_dns_zone.name})
