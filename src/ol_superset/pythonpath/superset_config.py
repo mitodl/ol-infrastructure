@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import urllib.request
+from ssl import CERT_OPTIONAL
 from typing import Optional
 
 from celery.schedules import crontab
@@ -296,7 +297,7 @@ RESULTS_BACKEND = RedisCache(
     password=REDIS_TOKEN,
     port=6379,
     ssl=True,
-    ssl_cert_reqs="none",
+    ssl_cert_reqs=CERT_OPTIONAL,
     username="default",
 )
 
