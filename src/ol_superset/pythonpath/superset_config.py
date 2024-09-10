@@ -261,9 +261,11 @@ HTTP_HEADERS = {"X-Frame-Options": "ALLOWALL"}
 
 
 class CeleryConfig:  # pylint: disable=too-few-public-methods
-    broker_url = "rediss://superset-redis.service.consul:6379/1"
+    broker_url = "rediss://superset-redis.service.consul:6379/1?ssl_cert_reqs=optional"
     imports = ("superset.sql_lab", "superset.tasks.scheduler")
-    result_backend = "rediss://superset-redis.service.consul:6379/2"
+    result_backend = (
+        "rediss://superset-redis.service.consul:6379/2?ssl_cert_reqs=optional"
+    )
     redis_username = "default"
     redis_password = REDIS_TOKEN
     worker_prefetch_multiplier = 1
