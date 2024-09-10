@@ -293,7 +293,7 @@ RESULTS_BACKEND = RedisCache(
     host="rediss://default@superset-redis.service.consul",
     port=6379,
     password=REDIS_TOKEN,
-    database=2,
+    db=2,
     key_prefix="superset_results",
 )
 
