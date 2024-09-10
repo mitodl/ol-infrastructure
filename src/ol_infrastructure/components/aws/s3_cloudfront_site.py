@@ -39,7 +39,7 @@ class S3ServerlessSite(ComponentResource):
     """
 
     def __init__(
-        self, site_config: S3ServerlessSiteConfig, opts: ResourceOptions | None
+        self, site_config: S3ServerlessSiteConfig, opts: ResourceOptions | None = None
     ):
         """Create an S3 bucket, ACM certificate, and Cloudfront distribution for
             hosting a static site.
@@ -64,6 +64,9 @@ class S3ServerlessSite(ComponentResource):
             f"{site_config.site_name}-bucket",
             bucket=site_config.bucket_name,
             tags=site_config.tags,
+            opts=generic_resource_opts.merge(
+                ResourceOptions(delete_before_replace=True)
+            ),
         )
 
         site_bucket_ownership_controls = s3.BucketOwnershipControls(
@@ -72,6 +75,7 @@ class S3ServerlessSite(ComponentResource):
             rule=s3.BucketOwnershipControlsRuleArgs(
                 object_ownership="BucketOwnerPreferred",
             ),
+            opts=generic_resource_opts,
         )
         site_bucket_public_access = s3.BucketPublicAccessBlock(
             f"{site_bucket_name}-public-access",
@@ -100,11 +104,13 @@ class S3ServerlessSite(ComponentResource):
                     ],
                 }
             ),
-            opts=ResourceOptions(
-                depends_on=[
-                    site_bucket_public_access,
-                    site_bucket_ownership_controls,
-                ]
+            opts=generic_resource_opts.merge(
+                ResourceOptions(
+                    depends_on=[
+                        site_bucket_public_access,
+                        site_bucket_ownership_controls,
+                    ]
+                )
             ),
         )
 
@@ -117,6 +123,7 @@ class S3ServerlessSite(ComponentResource):
             error_document=s3.BucketWebsiteConfigurationV2ErrorDocumentArgs(
                 key="error.html",
             ),
+            opts=generic_resource_opts,
         )
 
         _ = s3.BucketCorsConfigurationV2(
@@ -128,6 +135,7 @@ class S3ServerlessSite(ComponentResource):
                     allowed_origins=["*"],
                 )
             ],
+            opts=generic_resource_opts,
         )
         s3.BucketVersioningV2(
             f"{site_bucket_name}-versioning",
@@ -135,6 +143,7 @@ class S3ServerlessSite(ComponentResource):
             versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
                 status="Enabled"
             ),
+            opts=generic_resource_opts,
         )
 
         tls_config = ACMCertificateConfig(
@@ -147,6 +156,7 @@ class S3ServerlessSite(ComponentResource):
         self.site_tls = ACMCertificate(
             f"{site_config.site_name}-tls",
             cert_config=tls_config,
+            opts=generic_resource_opts,
         )
 
         s3_origin_id = f"{site_config.site_name}-s3-origin"

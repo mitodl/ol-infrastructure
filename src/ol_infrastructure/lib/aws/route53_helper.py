@@ -11,6 +11,15 @@ FIVE_MINUTES = 60 * 5
 route53_client = boto3.client("route53")
 
 
+def lookup_zone_id_from_domain(domain: str) -> str:
+    zone = route53_client.list_hosted_zones_by_name(
+        DNSName=".".join(domain.split(".")[-3:])
+    )["HostedZones"][0]
+    return zone["Id"].split("/")[
+        -1
+    ]  # 'Id' attribute is of the form /hostedzone/<ZONE_ID>
+
+
 def zone_opts(domain: str) -> pulumi.ResourceOptions:
     """Look up and conditionally import an existing hosted zone.
 

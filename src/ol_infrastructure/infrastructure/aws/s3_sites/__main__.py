@@ -22,7 +22,7 @@ if stack_info.env_suffix == "production":
         bucket_name="mitxpro-legacy-certificates",
         tags={"OU": "mitxpro", "Environment": "operations"},
     )
-    xpro_legacy_certs_site = S3ServerlessSite(xpro_legacy_certs_site_config, opts=None)
+    xpro_legacy_certs_site = S3ServerlessSite(xpro_legacy_certs_site_config)
     xpro_legacy_certs_domain = route53.Record(
         "xpro-legacy-certificates-domain",
         name=xpro_legacy_certs_site_config.domains[0],
@@ -41,10 +41,10 @@ if stack_info.env_suffix == "production":
     ocw_legacy_site_config = S3ServerlessSiteConfig(
         site_name="ocw-legacy",
         domains=["ocw-legacy.ocw.mit.edu"],
-        bucket_name="ocw-legacy",
+        bucket_name="ocw-legacy-site-content-archive",
         tags={"OU": "open-courseware", "Environment": "applications"},
     )
-    ocw_legacy_site = S3ServerlessSite(ocw_legacy_site_config, opts=None)
+    ocw_legacy_site = S3ServerlessSite(ocw_legacy_site_config)
     ocw_legacy_domain = route53.Record(
         "ocw-legacy-domain",
         name=ocw_legacy_site_config.domains[0],
