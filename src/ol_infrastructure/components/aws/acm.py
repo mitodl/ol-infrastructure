@@ -45,6 +45,9 @@ class ACMCertificate(ComponentResource):
             opts=cert_opts,
         )
 
+        self.arn = acm_cert.arn
+        self.domain_name = acm_cert.domain_name
+
         acm_cert_validation_records = acm_cert.domain_validation_options.apply(
             partial(
                 acm_certificate_validation_records,

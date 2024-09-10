@@ -4,8 +4,9 @@ import json
 from enum import Enum
 
 from pulumi import ComponentResource, ResourceOptions
-from pulumi_aws import acm, cloudfront, s3
+from pulumi_aws import cloudfront, s3
 
+from ol_infrastructure.components.aws.acm import ACMCertificate, ACMCertificateConfig
 from ol_infrastructure.lib.ol_types import AWSBase
 
 
@@ -56,7 +57,7 @@ class S3ServerlessSite(ComponentResource):
         )
 
         generic_resource_opts = ResourceOptions(parent=self).merge(opts)
-        site_bucket_name = (f"{site_config.site_name}-bucket",)
+        site_bucket_name = f"{site_config.site_name}-bucket"
         site_bucket_arn = f"arn:aws:s3:::{site_bucket_name}"
 
         self.site_bucket = s3.BucketV2(
@@ -136,15 +137,16 @@ class S3ServerlessSite(ComponentResource):
             ),
         )
 
-        self.site_tls = acm.Certificate(
-            f"{site_config.site_name}-tls",
-            domain_name=site_config.domains[0],
-            tags=site_config.merged_tags(
+        tls_config = ACMCertificateConfig(
+            certificate_domain=site_config.domains[0],
+            alternative_names=site_config.domains[1:],
+            certificate_tags=site_config.merged_tags(
                 {"Name": f"{site_config.site_name}-certificate"}
             ),
-            validation_method="DNS",
-            subject_alternative_names=site_config.domains[1:],
-            opts=generic_resource_opts,
+        )
+        self.site_tls = ACMCertificate(
+            f"{site_config.site_name}-tls",
+            cert_config=tls_config,
         )
 
         s3_origin_id = f"{site_config.site_name}-s3-origin"
