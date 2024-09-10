@@ -1,4 +1,4 @@
---pre apache-superset[cors,thumbnails,prophet,trino]>=4.0,<5
+apache-superset[cors,thumbnails,prophet,trino]>=4.0,<5
 authlib
 celery-redbeat
 duckdb
