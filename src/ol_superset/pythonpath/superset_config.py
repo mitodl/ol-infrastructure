@@ -7,6 +7,7 @@ from typing import Optional
 from celery.schedules import crontab
 from flask import g
 from flask_appbuilder.security.manager import AUTH_OAUTH
+from flask_caching.backends.rediscache import RedisCache
 from superset.security import SupersetSecurityManager
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
 from vault.aws_auth import get_vault_client
@@ -288,6 +289,13 @@ class CeleryConfig:  # pylint: disable=too-few-public-methods
 
 
 CELERY_CONFIG = CeleryConfig  # pylint: disable=invalid-name
+RESULTS_BACKEND = RedisCache(
+    host="rediss://default@superset-redis.service.consul",
+    port=6379,
+    password=REDIS_TOKEN,
+    database=2,
+    key_prefix="superset_results",
+)
 
 #########################
 # Notification Settings #
