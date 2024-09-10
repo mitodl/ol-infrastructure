@@ -290,11 +290,14 @@ class CeleryConfig:  # pylint: disable=too-few-public-methods
 
 CELERY_CONFIG = CeleryConfig  # pylint: disable=invalid-name
 RESULTS_BACKEND = RedisCache(
-    host="rediss://default@superset-redis.service.consul",
-    port=6379,
-    password=REDIS_TOKEN,
     db=2,
+    host="superset-redis.service.consul",
     key_prefix="superset_results",
+    password=REDIS_TOKEN,
+    port=6379,
+    ssl=True,
+    ssl_cert_reqs="none",
+    username="default",
 )
 
 #########################
