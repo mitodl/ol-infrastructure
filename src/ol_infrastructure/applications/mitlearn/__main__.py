@@ -884,6 +884,7 @@ heroku_vars = {
     "CSRF_COOKIE_DOMAIN": f".{mitopen_config.get('frontend_domain')}",
     "EDX_API_ACCESS_TOKEN_URL": "https://api.edx.org/oauth2/v1/access_token",
     "EDX_API_URL": "https://api.edx.org/catalog/v1/catalogs/10/courses",
+    "EDX_PROGRAMS_API_URL": "https://discovery.edx.org/api/v1/programs/",
     "MICROMASTERS_CATALOG_API_URL": "https://micromasters.mit.edu/api/v0/catalog/",
     "MICROMASTERS_CMS_API_URL": "https://micromasters.mit.edu/api/v0/wagtail/",
     "MITOL_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
