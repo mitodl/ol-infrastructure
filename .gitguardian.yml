@@ -2,6 +2,6 @@
 version: 2
 
 secret:
-ignored_matches:
-- name: "PostHog API Key (public)"
-  match: phc_XDgBzghi6cHYiBbiTsL91Fw03j073dXNSxtG7MWfeS0 #pragma: allowlist secret
+  ignored_matches:
+  - name: "PostHog API Key (public)"
+    match: phc_XDgBzghi6cHYiBbiTsL91Fw03j073dXNSxtG7MWfeS0 #pragma: allowlist secret
