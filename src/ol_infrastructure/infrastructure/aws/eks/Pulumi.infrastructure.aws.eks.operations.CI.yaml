@@ -8,43 +8,24 @@ config:
   eks:ebs_csi_provisioner: true
   eks:efs_csi_provisioner: true
   eks:lb_controller: true
+  eks:pod_security_groups: false
   eks:namespaces:
-  - "omd"
-  - "application-namespace"
-  - "second-app-namespace"
+  - "omd"  # Openmetadata testing
   eks:nodegroups:
-    worker-medium:
+    worker-xlarge:
       instance_types:
-      - "t3.medium"
+      - "c7a.xlarge"
       labels:
         ondemand: true
-        node_size: medium
-      disk_size_gb: 100
+        node_size: c7a.xlarge
+      disk_size_gb: 500
       scaling:
-        desired: 2
-        min: 1
-        max: 2
-      version:
-      tags: {}
-      # Medium nodes are reserverd for operations services only
-      taints:
-        operations:
-          effect: NO_SCHEDULE
-          value: true
-      node_group_options: {}
-    worker-large:
-      instance_types:
-      - "t3.large"
-      labels:
-        ondemand: true
-        node_size: large
-      disk_size_gb: 100
-      scaling:
-        desired: 2
-        min: 1
-        max: 2
+        desired: 3
+        min: 2
+        max: 4
       version:
       tags: {}
       taints: {}
+      node_group_options: {}
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

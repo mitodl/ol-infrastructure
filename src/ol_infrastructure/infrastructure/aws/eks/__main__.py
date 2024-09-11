@@ -12,7 +12,7 @@ import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
-from bridge.lib.magic_numbers import IAM_ROLE_NAME_PREFIX_MAX_LENGTH
+from bridge.lib.magic_numbers import DEFAULT_EFS_PORT, IAM_ROLE_NAME_PREFIX_MAX_LENGTH
 from ol_infrastructure.lib.aws.iam_helper import (
     EKS_ADMIN_USERNAMES,
     IAM_POLICY_VERSION,
@@ -48,11 +48,11 @@ cluster_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
 kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 
-# Commented out means we let the cluster manages it automatically
-default_addons = {
-    #    "aws-node" - daemonset
-    #    "coredns" - deployment
-    #    "kube-proxy" - daemonset
+VERSIONS = {
+    "AWS_LOAD_BALANCER_CONTROLLER": "1.8.2",
+    "EBS_CSI_DRIVER": "v1.33.0-eksbuild.1",
+    "EFS_CSI_DRIVER": "v2.0.7-eksbuild.1",
+    "VAULT_SECRETS_OPERATOR": "0.8.1",
 }
 
 aws_config = AWSBase(
@@ -113,9 +113,9 @@ cluster_policy_arns = [
     "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
     "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController",
 ]
-for i, policy in enumerate(cluster_policy_arns):
+for index, policy in enumerate(cluster_policy_arns):
     aws.iam.RolePolicyAttachment(
-        f"{cluster_name}-eks-cluster-role-policy-attachment-{i}",
+        f"{cluster_name}-eks-cluster-role-policy-attachment-{index}",
         policy_arn=policy,
         role=cluster_role.id,
         opts=ResourceOptions(parent=cluster_role),
@@ -156,11 +156,11 @@ cluster = eks.Cluster(
     # Ref: https://docs.aws.amazon.com/eks/latest/userguide/security-groups-pods-deployment.html
     # Ref: https://docs.aws.amazon.com/eks/latest/userguide/sg-pods-example-deployment.html
     vpc_cni_options=eks.cluster.VpcCniOptionsArgs(
-        enable_pod_eni=True,
-        disable_tcp_early_demux=True,
+        enable_pod_eni=eks_config.get_bool("pod_security_groups"),
+        disable_tcp_early_demux=eks_config.get_bool("pod_security_groups"),
         log_level="INFO",
-        warm_eni_target=2,
-        warm_ip_target=2,
+        #        warm_eni_target=2,
+        #        warm_ip_target=2,
     ),
     enabled_cluster_log_types=[
         "api",
@@ -206,7 +206,7 @@ for i, policy in enumerate(managed_node_policy_arns):
 node_groups = []
 for ng_name, ng_config in eks_config.require_object("nodegroups").items():
     taint_list = []
-    for taint_name, taint_config in ng_config["taints"].items():
+    for taint_name, taint_config in ng_config["taints"].items() or {}:
         taint_list.append(
             aws.eks.NodeGroupTaintArgs(
                 key=taint_name,
@@ -378,15 +378,22 @@ if eks_config.get_bool("ebs_csi_provisioner"):
             depends_on=[k8s_provider, ebs_csi_driver_role],
         ),
     )
-
-    default_addons["aws-ebs-csi-driver"] = {
-        "addon_name": "aws-ebs-csi-driver",
-        "addon_version": "v1.33.0-eksbuild.1",
-        "service_account_role_arn": ebs_csi_driver_role.arn,
-    }
+    aws_ebs_cni_driver_addon = eks.Addon(
+        f"{cluster_name}-eks-addon-ebs-cni-driver-addon",
+        cluster=cluster,
+        addon_name="aws-ebs-csi-driver",
+        addon_version=VERSIONS["EBS_CSI_DRIVER"],
+        service_account_role_arn=ebs_csi_driver_role.arn,
+        opts=ResourceOptions(
+            parent=cluster,
+            # Addons won't install properly if there are not nodes to schedule them on
+            depends_on=[cluster, node_groups[0]],
+        ),
+    )
 
 # Setup EFS CSI Provisioner
 # Ref: https://docs.aws.amazon.com/eks/latest/userguide/efs-csi.html
+# Ref: https://github.com/kubernetes-sigs/aws-efs-csi-driver/blob/master/docs/efs-create-filesystem.md
 if eks_config.get_bool("efs_csi_provisioner"):
     efs_csi_driver_role = aws.iam.Role(
         f"{cluster_name}-efs-csi-driver-trust-role",
@@ -424,6 +431,33 @@ if eks_config.get_bool("efs_csi_provisioner"):
         opts=ResourceOptions(parent=cluster, depends_on=cluster),
     )
 
+    efs_security_group = aws.ec2.SecurityGroup(
+        f"{cluster_name}-eks-efs-securitygroup",
+        description="Allows the EKS subnets to access EFS",
+        vpc_id=target_vpc["id"],
+        ingress=[
+            aws.ec2.SecurityGroupIngressArgs(
+                protocol="tcp",
+                from_port=DEFAULT_EFS_PORT,
+                to_port=DEFAULT_EFS_PORT,
+                cidr_blocks=target_vpc["k8s_pod_subnet_cidrs"],
+                description=f"Allow traffic from EKS nodes on port {DEFAULT_EFS_PORT}",
+            ),
+        ],
+    )
+
+    def create_mountpoints(pod_subnet_ids):
+        for index, subnet_id in enumerate(pod_subnet_ids):
+            aws.efs.MountTarget(
+                f"{cluster_name}-eks-mounttarget-{index}",
+                file_system_id=efs_filesystem.id,
+                subnet_id=subnet_id,
+                security_groups=[efs_security_group.id],
+                opts=ResourceOptions(parent=efs_filesystem),
+            )
+
+    pod_subnet_ids.apply(lambda pod_subnet_ids: create_mountpoints(pod_subnet_ids))
+
     kubernetes.storage.v1.StorageClass(
         resource_name=f"{cluster_name}-efs-storageclass",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -444,16 +478,22 @@ if eks_config.get_bool("efs_csi_provisioner"):
             depends_on=[k8s_provider, efs_csi_driver_role],
         ),
     )
-    default_addons["aws-efs-csi-driver"] = {
-        "addon_name": "aws-efs-csi-driver",
-        "addon_version": "v2.0.7-eksbuild.1",
-        "service_account_role_arn": efs_csi_driver_role.arn,
-    }
+    aws_efs_cni_driver_addon = eks.Addon(
+        f"{cluster_name}-eks-addon-efs-cni-driver-addon",
+        cluster=cluster,
+        addon_name="aws-efs-csi-driver",
+        addon_version=VERSIONS["EFS_CSI_DRIVER"],
+        service_account_role_arn=efs_csi_driver_role.arn,
+        opts=ResourceOptions(
+            parent=cluster,
+            # Addons won't install properly if there are not nodes to schedule them on
+            depends_on=[cluster, node_groups[0]],
+        ),
+    )
 
-# Configure and install addons
+# Configure and install any extra addons
 extra_addons = eks_config.get_object("extra_addons") or {}
-addons = default_addons | extra_addons
-for addon_key, addon_definition in addons.items():
+for addon_key, addon_definition in extra_addons.items():
     eks.Addon(
         f"{cluster_name}-eks-addon-{addon_key}",
         cluster=cluster,
@@ -495,6 +535,7 @@ if eks_config.get_bool("vault_secrets_operator") or False:
         backend=vault_auth_endpoint_name,
         bound_service_account_names=["*"],
         bound_service_account_namespaces=["operations"],
+        # TODO @Ardiea add a default token policy as part of this stack  # noqa: TD004
         token_policies=["vector-log-proxy"],
         opts=ResourceOptions(parent=vault_k8s_auth),
     )
@@ -507,6 +548,7 @@ if eks_config.get_bool("vault_secrets_operator") or False:
             "skipTLSVerify": False,
         },
         "controller": {
+            "replicas": 2,
             "extraLabels": k8s_global_labels,
             # Allow this to be scheduled on 'operations' tainted if they are present
             "tolerations": [
@@ -528,7 +570,7 @@ if eks_config.get_bool("vault_secrets_operator") or False:
         kubernetes.helm.v3.ReleaseArgs(
             name="vault-secrets-operator",
             chart="vault-secrets-operator",
-            version="0.8.1",
+            version=VERSIONS["VAULT_SECRETS_OPERATOR"],
             namespace="operations",
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://helm.releases.hashicorp.com",
@@ -539,6 +581,7 @@ if eks_config.get_bool("vault_secrets_operator") or False:
         opts=ResourceOptions(
             provider=k8s_provider,
             parent=operations_namespace,
+            depends_on=[cluster, node_groups[0]],
             delete_before_replace=True,
         ),
     )
@@ -604,12 +647,13 @@ if eks_config.get_bool("lb_controller"):
         kubernetes.helm.v3.ReleaseArgs(
             name=lb_controller_name,
             chart="aws-load-balancer-controller",
-            version="1.8.2",
+            version=VERSIONS["AWS_LOAD_BALANCER_CONTROLLER"],
             namespace="operations",
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://aws.github.io/eks-charts",
             ),
             values={
+                "replica_count": 2,
                 "clusterName": cluster_name,
                 "serviceAccount": {
                     "create": True,
@@ -620,6 +664,14 @@ if eks_config.get_bool("lb_controller"):
                         ),
                     },
                 },
+                "tolerations": [
+                    {
+                        "key": "operations",
+                        "operator": "Equal",
+                        "value": "true",
+                        "effect": "NoSchedule",
+                    },
+                ],
                 "region": aws_config.region,
                 "vpcId": target_vpc["id"],
             },
@@ -628,7 +680,7 @@ if eks_config.get_bool("lb_controller"):
             provider=k8s_provider,
             parent=operations_namespace,
             delete_before_replace=True,
-            depends_on=aws_load_balancer_controller_role,
+            depends_on=[cluster, node_groups[0], aws_load_balancer_controller_role],
         ),
     )
 
