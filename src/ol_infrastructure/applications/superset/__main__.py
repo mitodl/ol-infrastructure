@@ -710,7 +710,7 @@ superset_worker_lt_config = OLLaunchTemplateConfig(
 
 superset_worker_auto_scale_config = superset_config.get_object("worker_auto_scale") or {
     "desired": 1,
-    "Min": 1,
+    "min": 1,
     "max": 2,
 }
 superset_worker_asg_config = OLAutoScaleGroupConfig(
