@@ -53,8 +53,8 @@ services:
   superset-worker:
     image: *superset-image
     container_name: superset_worker
-    command: ["celery", "--app=superset.tasks.celery_app:app", "worker", "-O", "fair",
-      "-l", "INFO"]
+    command: ["celery", "--app=superset.tasks.celery_app:app", "worker", "--pool=prefork",
+      "-O", "fair", "-l", "INFO", "--task-events"]
     env_file: .env
     restart: unless-stopped
     volumes: *superset-volumes
