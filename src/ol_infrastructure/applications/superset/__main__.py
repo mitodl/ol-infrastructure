@@ -526,7 +526,7 @@ superset_web_tag_specs = [
 superset_web_lt_config = OLLaunchTemplateConfig(
     block_device_mappings=superset_web_block_device_mappings,
     image_id=superset_ami.id,
-    instance_type=superset_config.get("instance_type")
+    instance_type=superset_config.get("web_instance_type")
     or InstanceTypes.burstable_medium,
     instance_profile_arn=superset_profile.arn,
     security_groups=[
@@ -640,7 +640,7 @@ superset_worker_tag_specs = [
 superset_worker_lt_config = OLLaunchTemplateConfig(
     block_device_mappings=superset_worker_block_device_mappings,
     image_id=superset_ami.id,
-    instance_type=superset_config.get("instance_type")
+    instance_type=superset_config.get("worker_instance_type")
     or InstanceTypes.burstable_medium,
     instance_profile_arn=superset_profile.arn,
     security_groups=[
@@ -710,7 +710,7 @@ superset_worker_lt_config = OLLaunchTemplateConfig(
 
 superset_worker_auto_scale_config = superset_config.get_object("worker_auto_scale") or {
     "desired": 1,
-    "min": 1,
+    "Min": 1,
     "max": 2,
 }
 superset_worker_asg_config = OLAutoScaleGroupConfig(

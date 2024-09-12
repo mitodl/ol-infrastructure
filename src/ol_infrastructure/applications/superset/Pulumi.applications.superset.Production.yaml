@@ -6,6 +6,16 @@ config:
   superset:db_password:
     secure: v1:GzLRrnd2rtL916yo:uLuDiPJ840JJYqR1w0Ryi2T+FCChf2nsFZOYdiEMB6Ue11iwtgfLaGgeH4gwOs0SwilFIc4y9u0FzRs=
   superset:sender_email_address: ol-data@mit.edu
+  superset:web_instance_type: m7a.large
+  superset:worker_instance_type: m7a.large
+  superset:web_auto_scale:
+    desired: 2
+    min: 1
+    max: 5
+  superset:worker_auto_scale:
+    desired: 3
+    min: 1
+    max: 5
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   superset:domain: bi.ol.mit.edu
