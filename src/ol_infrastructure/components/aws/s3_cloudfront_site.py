@@ -118,7 +118,7 @@ class S3ServerlessSite(ComponentResource):
             f"{site_bucket_name}-website",
             bucket=self.site_bucket.id,
             index_document=s3.BucketWebsiteConfigurationV2IndexDocumentArgs(
-                suffix="index.html",
+                suffix=site_config.site_index,
             ),
             error_document=s3.BucketWebsiteConfigurationV2ErrorDocumentArgs(
                 key="error.html",
@@ -187,7 +187,7 @@ class S3ServerlessSite(ComponentResource):
                 "targetOriginId": s3_origin_id,
                 "viewerProtocolPolicy": "allow-all",
             },
-            default_root_object="index.html",
+            default_root_object=site_config.site_index,
             enabled=True,
             is_ipv6_enabled=True,
             origins=[

@@ -42,6 +42,7 @@ if stack_info.env_suffix == "production":
         site_name="ocw-legacy",
         domains=["ocw-legacy.ocw.mit.edu"],
         bucket_name="ocw-legacy-site-content-archive",
+        site_index="index.htm",
         tags={"OU": "open-courseware", "Environment": "applications"},
     )
     ocw_legacy_site = S3ServerlessSite(ocw_legacy_site_config)
