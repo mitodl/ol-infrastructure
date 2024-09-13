@@ -14,7 +14,7 @@ mitxpro_legacy_dns_zone = route53.Zone(
     opts=mitxpro_legacy_opts,
 )
 
-ocw_legacy_dns_name = "ocw-legacy.ocw.mit.edu"
+ocw_legacy_dns_name = "old.ocw.mit.edu"
 
 odl_dns_name = "odl.mit.edu"
 odl_opts = zone_opts(odl_dns_name)
