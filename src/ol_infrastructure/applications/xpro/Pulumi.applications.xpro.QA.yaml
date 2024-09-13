@@ -25,6 +25,7 @@ config:
     MITXPRO_LOG_LEVEL: "INFO"
     MITXPRO_SECURE_SSL_HOST: "rc.xpro.mit.edu"
     MITXPRO_USE_S3: "True"
+    MITXPRO_SUPPORT_EMAIL: "support@xpro-rc-mail.odl.mit.edu"
     OPENEDX_API_BASE_URL: "https://courses-rc.xpro.mit.edu"
     SENTRY_LOG_LEVEL: "ERROR"
     SHEETS_DEFERRAL_FIRST_ROW: 184
