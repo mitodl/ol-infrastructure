@@ -18,7 +18,7 @@ It is generally easiest to use the same file-local name for all three blocks and
 
 # `kube_config` Context Block
 ```
-- name: < file-local name you're fiving this context >
+- name: < file-local name you're giving this context >
   context:
     cluster: < file-local name you're going to give the cluster configuration >
     user: < file-local name you're going to give the username configuration >

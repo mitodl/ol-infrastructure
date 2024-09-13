@@ -1,12 +1,3 @@
-# Prereqs
-#
-# kubectl -n omd create secret generic mysql-secrets --from-literal=openmetadata-mysql-password=openmetadata_password
-# kubectl -n omd create secret generic airflow-secrets --from-literal=openmetadata-airflow-password=admin
-# kubectl -n omd create secret generic airflow-mysql-secrets --from-literal=airflow-mysql-password=airflow_pass
-#
-# helm repo add open-metadata https://helm.open-metadata.org/
-#
-# helm install openmetadata-dependencies open-metadata/openmetadata-dependencies -n omd -f omd_d_values.yaml
 ---
 opensearch:
   resources:
