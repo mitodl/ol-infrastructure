@@ -5,7 +5,10 @@ from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_aws import acm
 from pydantic import BaseModel, ConfigDict
 
-from ol_infrastructure.lib.aws.route53_helper import acm_certificate_validation_records
+from ol_infrastructure.lib.aws.route53_helper import (
+    acm_certificate_validation_records,
+    lookup_zone_id_from_domain,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
@@ -44,6 +47,13 @@ class ACMCertificate(ComponentResource):
             tags=cert_config.certificate_tags,
             opts=cert_opts,
         )
+
+        self.arn = acm_cert.arn
+        self.domain_name = acm_cert.domain_name
+
+        if not cert_config.certificate_zone_id:
+            zone_id = lookup_zone_id_from_domain(cert_config.certificate_domain)
+            cert_config.certificate_zone_id = zone_id
 
         acm_cert_validation_records = acm_cert.domain_validation_options.apply(
             partial(

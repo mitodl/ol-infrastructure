@@ -14,6 +14,7 @@ mitxpro_legacy_dns_zone = route53.Zone(
     opts=mitxpro_legacy_opts,
 )
 
+
 odl_dns_name = "odl.mit.edu"
 odl_opts = zone_opts(odl_dns_name)
 odl_dns_zone = route53.Zone(
