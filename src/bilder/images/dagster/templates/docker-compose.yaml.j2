@@ -13,6 +13,7 @@ services:
       - .env
     environment:
       - DAGSTER_CURRENT_IMAGE={{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+      - DAGSTER_SENSOR_GRPC_TIMEOUT_SECONDS=300
     volumes:
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     - /etc/aws/:/etc/aws/:ro
@@ -30,6 +31,7 @@ services:
       - .env
     environment:
       - DAGSTER_CURRENT_IMAGE={{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+      - DAGSTER_SENSOR_GRPC_TIMEOUT_SECONDS=300
     volumes:
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     - /etc/aws/:/etc/aws/:ro
