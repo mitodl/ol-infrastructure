@@ -75,7 +75,8 @@ class OLDBConfig(AWSBase):
     backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore  # noqa: PGH003
     db_name: Optional[str] = None  # The name of the database schema to create
     instance_size: str = DBInstanceTypes.general_purpose_large.value
-    max_storage: Optional[PositiveInt] = None  # Set to allow for storage autoscaling
+    # Set to allow for storage autoscaling. Default to 1 TB
+    max_storage: Optional[PositiveInt] = 1000
     multi_az: bool = True
     prevent_delete: bool = True
     public_access: bool = False
