@@ -50,9 +50,12 @@ JWT_AUTH:  # NEEDS ATTENTION
         SECRET_KEY: {{ .Data.django_secret_key }}
 RETIRED_USER_SALTS: {{ .Data.user_retirement_salts }}
 SENTRY_DSN: {{ .Data.sentry_dsn }}
+{{ end }}
+
+{{ with secret "secret-mitxonline/edx-xqueue" }}
 XQUEUE_INTERFACE:
     django_auth:
-        password: {{ .Data.xqueue_edxapp_password }}
+        password: {{ .Data.edxapp_password }}
         username: edxapp
     url: http://xqueue.service.consul:8040  # MODIFIED
 {{ end }}
