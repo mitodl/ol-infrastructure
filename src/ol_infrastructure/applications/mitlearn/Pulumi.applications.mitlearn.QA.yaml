@@ -57,13 +57,15 @@ config:
     - "https://api.rc.learn.mit.edu"
     - "https://rc.learn.mit.edu"
     - "https://api.mitopen-rc.odl.mit.edu"  # legacy
-    - "https://mitopen-rc.odl.mit.edu"  # leagcy
+    - "https://mitopen-rc.odl.mit.edu"  # legacy
+    - "https://next.rc.learn.mit.edu" # In use while the https://github.com/mitodl/mit-open/tree/nextjs branch is active TODO remove
     cors_urls:
     - "https://mitopen-rc.odl.mit.edu" # legacy
     - "https://rc.learn.mit.edu"
     - "https://ocw-next.netlify.app"
     - "https://draft-qa.ocw.mit.edu"
     - "https://live-qa.ocw.mit.edu"
+    - "https://next.rc.learn.mit.edu" # In use while the https://github.com/mitodl/mit-open/tree/nextjs branch is active TODO remove
     mailgun_sender_domain: "mail-rc.learn.mit.edu"
     sso_url: "sso-qa.ol.mit.edu"
   mitopen:db_instance_size: db.m7g.xlarge
