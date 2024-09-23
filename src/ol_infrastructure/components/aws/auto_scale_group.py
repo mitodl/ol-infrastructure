@@ -83,7 +83,6 @@ class OLTargetGroupConfig(AWSBase):
     health_check_protocol: str = "HTTPS"
     health_check_timeout: PositiveInt = PositiveInt(5)
     health_check_unhealthy_threshold: PositiveInt = PositiveInt(3)
-    max_instance_lifetime_seconds: Optional[PositiveInt] = 2592000  # 30 days
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("stickiness")
@@ -180,6 +179,7 @@ class OLAutoScaleGroupConfig(AWSBase):
     instance_refresh_min_healthy_percentage: NonNegativeInt = NonNegativeInt(50)
     instance_refresh_strategy: str = "Rolling"
     instance_refresh_triggers: list[str] = ["tag"]  # noqa: RUF012
+    max_instance_lifetime_seconds: Optional[NonNegativeInt] = 2592000  # 30 days
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("instance_refresh_strategy")
@@ -265,7 +265,6 @@ class OLAutoScaling(pulumi.ComponentResource):
                 protocol=tg_config.protocol,
                 health_check=target_group_healthcheck,
                 stickiness=target_group_stickiness,
-                max_instance_lifetime=tg_config.max_instance_lifetime_seconds,
                 opts=resource_options,
                 tags=tg_config.tags,
             )
@@ -443,6 +442,7 @@ class OLAutoScaling(pulumi.ComponentResource):
             ),
             max_size=asg_config.max_size,
             min_size=asg_config.min_size,
+            max_instance_lifetime=asg_config.max_instance_lifetime_seconds,
             tags=asg_tags,
             vpc_zone_identifiers=asg_config.vpc_zone_identifiers,
             opts=resource_options,
