@@ -83,7 +83,7 @@ class OLTargetGroupConfig(AWSBase):
     health_check_protocol: str = "HTTPS"
     health_check_timeout: PositiveInt = PositiveInt(5)
     health_check_unhealthy_threshold: PositiveInt = PositiveInt(3)
-    max_instance_lifetime: Optional[PositiveInt] = 2592000  # 30 days
+    max_instance_lifetime_seconds: Optional[PositiveInt] = 2592000  # 30 days
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("stickiness")
@@ -265,6 +265,7 @@ class OLAutoScaling(pulumi.ComponentResource):
                 protocol=tg_config.protocol,
                 health_check=target_group_healthcheck,
                 stickiness=target_group_stickiness,
+                max_instance_lifetime=tg_config.max_instance_lifetime_seconds,
                 opts=resource_options,
                 tags=tg_config.tags,
             )
