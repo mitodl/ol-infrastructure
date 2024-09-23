@@ -578,6 +578,7 @@ ol_web_asg_config = OLAutoScaleGroupConfig(
     desired_size=web_asg_config["desired"] or 1,
     min_size=web_asg_config["min"] or 1,
     max_size=web_asg_config["max"] or 5,
+    max_instance_lifetime_seconds=web_asg_config["max_instance_lifetime_seconds"],
     vpc_zone_identifiers=target_vpc["subnet_ids"],
     tags=aws_config.merged_tags({"Name": concourse_web_tag}),
 )
@@ -709,6 +710,7 @@ for worker_def in concourse_config.get_object("workers") or []:
         desired_size=web_asg_config["desired"] or 1,
         min_size=web_asg_config["min"] or 1,
         max_size=web_asg_config["max"] or 5,
+        max_instance_lifetime=web_asg_config.get("max_instance_lifetime_seconds"),
         vpc_zone_identifiers=target_vpc["subnet_ids"],
         tags=aws_config.merged_tags({"Name": concourse_web_tag}),
     )
@@ -720,6 +722,9 @@ for worker_def in concourse_config.get_object("workers") or []:
         desired_size=auto_scale_config["desired"] or 1,
         min_size=auto_scale_config["min"] or 1,
         max_size=auto_scale_config["max"] or 5,
+        max_instance_lifetime_seconds=auto_scale_config[
+            "max_instance_lifetime_seconds"
+        ],
         vpc_zone_identifiers=target_vpc["subnet_ids"],
         tags=aws_config.merged_tags(
             {"Name": worker_name_tag},
