@@ -192,7 +192,7 @@ class S3ServerlessSite(ComponentResource):
             is_ipv6_enabled=True,
             origins=[
                 {
-                    "domain_name": self.site_bucket.bucket_regional_domain_name,
+                    "domain_name": self.site_bucket.website_endpoint,
                     "originId": s3_origin_id,
                 }
             ],

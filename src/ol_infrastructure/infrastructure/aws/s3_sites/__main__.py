@@ -40,7 +40,7 @@ if stack_info.env_suffix == "production":
     ocw_zone_id = dns_stack.get_output("ocw")["id"]
     ocw_legacy_site_config = S3ServerlessSiteConfig(
         site_name="ocw-legacy",
-        domains=["ocw-legacy.ocw.mit.edu"],
+        domains=["old.ocw.mit.edu"],
         bucket_name="ocw-legacy-site-content-archive",
         site_index="index.htm",
         tags={"OU": "open-courseware", "Environment": "applications"},
