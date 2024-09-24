@@ -637,6 +637,8 @@ asg_config = OLAutoScaleGroupConfig(
     max_size=auto_scale_config["max"],
     vpc_zone_identifiers=target_vpc["subnet_ids"],
     tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
+    # Don't automatically cycle instances to avoid interrupting long-running syncs
+    max_instance_lifetime_seconds=None,
 )
 
 as_setup = OLAutoScaling(

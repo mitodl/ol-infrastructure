@@ -549,6 +549,9 @@ ol_vault_asg_config = OLAutoScaleGroupConfig(
     desired_size=cluster_count,
     min_size=cluster_count,
     max_size=cluster_count,
+    # Don't automatically cycle instances to avoid issues with cluster quorum falling
+    # out of sync.
+    max_instance_lifetime_seconds=None,
     vpc_zone_identifiers=target_vpc["subnet_ids"],
     instance_refresh_warmup=FIVE_MINUTES * 3,
     instance_refresh_min_healthy_percentage=90,
