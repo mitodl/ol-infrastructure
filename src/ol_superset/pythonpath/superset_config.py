@@ -141,6 +141,8 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
 
 
 CUSTOM_SECURITY_MANAGER = CustomSsoSecurityManager
+# Allow for managing users and roles via API
+FAB_ADD_SECURITY_API = True
 
 # ---------------------------------------------------
 # Feature flags
