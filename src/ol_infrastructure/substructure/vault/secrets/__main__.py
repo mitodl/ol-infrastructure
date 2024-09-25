@@ -18,6 +18,7 @@ grafana_vault_secrets = read_yaml_secrets(
 if Config("vault_server").get("env_namespace"):
     setup_vault_provider()
 keycloak_config = Config("keycloak")
+vault_config = Config("vault")
 
 # Create the secret mount used for storing global secrets
 global_vault_mount = vault.Mount(
@@ -87,14 +88,15 @@ if "QA" in stack_info.name:
         backend=vault_oidc_keycloak_auth.path,
         role_name="local-dev",
         token_policies=[
-            "local_developer_policy.name",
+            local_developer_policy.name,
         ],
         allowed_redirect_uris=[
-            f"{keycloak_config.get('url')}/realms/ol-platform-engineering"
+            f"{keycloak_config.get('url')}/realms/ol-platform-engineering",
+            f"{vault_config.get('address')}/ui/vault/auth/oidc/oidc/callback",
         ],
         bound_audiences=[f"{keycloak_config.get('client_id')}"],
         user_claim="sub",
-        oidc_scopes=["openid email profile"],
+        oidc_scopes=["email profile"],
         groups_claim="groups",
         bound_claims_type="string",
         bound_claims={"groups": "vault-admin"},
@@ -106,7 +108,7 @@ if "QA" in stack_info.name:
         "local-dev-group",
         name="external",
         type="external",
-        policies=["local_developer_policy.name"],
+        policies=[local_developer_policy.name],
         metadata={
             "responsibility": "1",
         },
