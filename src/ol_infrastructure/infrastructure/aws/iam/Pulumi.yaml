@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-aws-iam
+runtime: python
+description: Pulumi project for managing concrete IAM resources other projects.
+backend:
+  url: s3://mitol-pulumi-state/

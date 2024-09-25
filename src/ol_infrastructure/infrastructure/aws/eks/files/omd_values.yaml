@@ -1,0 +1,28 @@
+---
+openmetadata:
+  config:
+    openmetadata:
+      host: "0.0.0.0"
+#image:
+#  repository: openmetadata/server
+#  tag: 1.5.2
+service:
+  type: NodePort
+ingress:
+  enabled: true
+  className: "alb"
+  annotations:
+    alb.ingress.kubernetes.io/load-balancer-name: "operations-ci-ingress"
+    alb.ingress.kubernetes.io/target-type: "instance"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/ip-address-type: "ipv4"
+    alb.ingress.kubernetes.io/scheme: "internet-facing"
+    alb.ingress.kubernetes.io/group.name: "operations-ci"
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:610119931565:certificate/c8dc3b4d-f77b-46bb-9f4b-1b6b48a27540"
+    alb.ingress.kubernetes.io/backend-protocol: "HTTP"
+  hosts:
+  - host: "open-metadata-ci.odl.mit.edu"
+    paths:
+    - path: /
+      pathType: Prefix

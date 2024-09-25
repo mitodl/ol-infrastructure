@@ -294,7 +294,8 @@ class OLVPC(ComponentResource):
                         assign_ipv6_address_on_creation=True,
                         tags=vpc_config.merged_tags(
                             {
-                                "Name": f"{vpc_config.vpc_name}-k8s-pod-{pod_subnet_third_octet}-subnet"  # noqa: E501
+                                "Name": f"{vpc_config.vpc_name}-k8s-pod-{pod_subnet_third_octet}-subnet",  # noqa: E501
+                                "kubernetes.io/role/elb": "1",
                             }
                         ),
                         opts=resource_options,

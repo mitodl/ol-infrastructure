@@ -11,6 +11,7 @@ repos:
   - id: trailing-whitespace
   - id: end-of-file-fixer
   - id: check-yaml
+    exclude: src/ol_infrastructure/infrastructure/aws/eks/vso_testing.yaml
   - id: check-added-large-files
   - id: check-merge-conflict
   - id: check-toml

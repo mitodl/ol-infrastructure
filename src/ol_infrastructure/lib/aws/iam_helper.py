@@ -1,11 +1,30 @@
 import json
 import re
-from typing import Any, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 from parliament import analyze_policy_string
 from parliament.finding import Finding
 
 IAM_POLICY_VERSION = "2012-10-17"
+
+ADMIN_USERNAMES = [
+    "cpatti",
+    "ferdial",
+    "ichuang",
+    "mas48",
+    "pdpinch",
+    "qhoque",
+    "shaidar",
+    "tmacey",
+]
+
+EKS_ADMIN_USERNAMES = [
+    "cpatti",
+    "mas48",
+    "qhoque",
+    "shaidar",
+    "tmacey",
+]
 
 
 def _is_parliament_finding_filtered(
@@ -106,5 +125,50 @@ def route53_policy_template(zone_id: str) -> dict[str, Any]:
                 "Action": ["route53:ListHostedZonesByName", "route53:ListHostedZones"],
                 "Resource": "*",
             },
+        ],
+    }
+
+
+def oidc_trust_policy_template(
+    oidc_identifier: str,
+    account_id: str,
+    k8s_service_account_identifier: str,
+    operator: Literal["StringLike", "StringEquals"],
+) -> dict[str, Any]:
+    """Policy definition to allow EBS CSI driver installed into a EKS cluster
+    to provision EBS resources
+
+    :param oidc_identifier: The OIDC identifier from the cluster output prefixed
+     with 'https://'
+    :type oidc_identifier: str
+    :param account_id: The numerical account identifier
+    :type account_id: str
+    :param k8s_service_account_identifier: The service account identifier to apply
+     to the :sub condition.
+    :type k8s_service_account_identifier: str
+    :param operator: Which string operator to use inside the conditional expression.
+     vaild choices are "StringLike" and "StringEquals"
+    :type operator: str
+
+    :returns: A dictionary object representing a policy document to allow an EBS
+     CSI driver installed into an EKS cluster to provision storage.
+    """
+    stripped_oidc_identifier = oidc_identifier.replace("https://", "")
+    return {
+        "Version": IAM_POLICY_VERSION,
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {
+                    "Federated": f"arn:aws:iam::{account_id}:oidc-provider/{stripped_oidc_identifier}"  # noqa: E501
+                },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                    f"{operator}": {
+                        f"{stripped_oidc_identifier}:aud": "sts.amazonaws.com",
+                        f"{stripped_oidc_identifier}:sub": f"{k8s_service_account_identifier}",  # noqa: E501
+                    }
+                },
+            }
         ],
     }
