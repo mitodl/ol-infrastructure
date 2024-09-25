@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-open_metadata-application
+runtime: python
+description: MIT OL Open Metadata Service
+backend:
+  url: s3://mitol-pulumi-state/
