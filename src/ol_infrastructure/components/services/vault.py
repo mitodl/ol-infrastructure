@@ -235,7 +235,7 @@ class OLVaultAWSSecretsEngineConfig(BaseModel):
     vault_backend_path: str
     policy_documents: dict[str, str]
     credential_type: str = "iam_user"
-    iam_tags: list[str] = ["operations"]
+    iam_tags: list[str] = ["OU=operations"]
 
     @field_validator("vault_backend_path")
     @classmethod
