@@ -1,3 +1,10 @@
 ---
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQHNccb0Qf344tYSpNK++I71AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMqCuKG4WhkI4eNWUvAgEQgDtsdnkazeO8dfabHEekMYh4JgcxnwOf4B9F7zUoAkOMmqIQ8xQHmru06mRLnpK7v8QqW2zNACm6C2gUuA==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-data-ci.odl.mit.edu
+  open_metadata:db_password:
+    secure: v1:N26+x5PLL2Teu2wf:8NVzfMjmFDD+rOZOMmWaSpSP6zbFIg+DbuWsiFOan4UdUuhHOG4wZDsjCJLWFafRKCXlRJq/CvBI5zw=
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
