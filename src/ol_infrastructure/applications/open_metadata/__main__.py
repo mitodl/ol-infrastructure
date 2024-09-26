@@ -1,9 +1,8 @@
-import json
 from pathlib import Path
 
 import pulumi_vault as vault
 from pulumi import Config, StackReference
-from pulumi_aws import ec2, get_caller_identity, iam
+from pulumi_aws import ec2, get_caller_identity
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
@@ -15,7 +14,6 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -34,6 +32,7 @@ vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}
 consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 apps_vpc = network_stack.require_output("applications_vpc")
+k8s_pod_subnet_cidrs = network_stack.require_output("k8s_pod_subnet_cidrs")
 open_metadata_environment = f"operations-{stack_info.env_suffix}"
 aws_config = AWSBase(
     tags={"OU": "operations", "Environment": open_metadata_environment},
@@ -43,40 +42,6 @@ consul_provider = get_consul_provider(stack_info)
 consul_security_groups = consul_stack.require_output("security_groups")
 aws_account = get_caller_identity()
 
-open_metadata_role = iam.Role(
-    "open-metadata-poc-instance-role",
-    assume_role_policy=json.dumps(
-        {
-            "Version": "2012-10-17",
-            "Statement": {
-                "Effect": "Allow",
-                "Action": "sts:AssumeRole",
-                "Principal": {"Service": "ec2.amazonaws.com"},
-            },
-        }
-    ),
-    name=f"open-metadata-instance-role-{stack_info.env_suffix}",
-    path="/ol-infrastructure/open-metadata-role/",
-    tags=aws_config.tags,
-)
-
-open_metadata_server_security_group = ec2.SecurityGroup(
-    f"open-metadata-server-security-group-{stack_info.env_suffix}",
-    name=f"open-metadata-server-security-group-{stack_info.env_suffix}",
-    ingress=[
-        # ec2.SecurityGroupIngressArgs(
-        # ),
-        ec2.SecurityGroupIngressArgs(
-            protocol="tcp",
-            from_port=8011,
-            to_port=8011,
-            cidr_blocks=["0.0.0.0/0"],
-            description="Allow mike and matt to connect to http.",
-        ),
-    ],
-    egress=default_egress_args,
-    vpc_id=apps_vpc["id"],
-)
 
 open_metadata_database_security_group = ec2.SecurityGroup(
     f"open-metadata-database-security-group-{stack_info.env_suffix}",
@@ -85,7 +50,7 @@ open_metadata_database_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             security_groups=[
-                open_metadata_server_security_group.id,
+                # add k8s ingress?
                 consul_security_groups["consul_server"],
                 vault_stack.require_output("vault_server")["security_group"],
             ],
@@ -99,8 +64,8 @@ open_metadata_database_security_group = ec2.SecurityGroup(
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
-            cidr_blocks=["73.218.126.92/32", "98.110.175.231/32"],
-            description="Allow mike and matt to connect to postgres.",
+            cidr_blocks=k8s_pod_subnet_cidrs,
+            description="Allow k8s cluster to talk to DB",
         ),
     ],
     vpc_id=apps_vpc["id"],
