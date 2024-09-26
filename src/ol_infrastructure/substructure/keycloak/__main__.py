@@ -262,6 +262,120 @@ ol_apps_required_action_update_password = keycloak.RequiredAction(
     opts=resource_options,
 )
 
+ol_apps_user_profile = keycloak.RealmUserProfile(
+    "olapps-user-profile",
+    realm_id=ol_apps_realm.realm,
+    attributes=[
+        keycloak.RealmUserProfileAttributeArgs(
+            name="username",
+            displayName="${username}",
+            validators=[
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="length",
+                    config={"min": 3, "max": 255},
+                ),
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="username-prohibited-characters", config={}
+                ),
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="up-username-not-idn-homograph", config={}
+                ),
+            ],
+            permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                views=["admin", "user"], edits=["admin", "user"]
+            ),
+            multivalued=False,
+        ),
+        keycloak.RealmUserProfileAttributeArgs(
+            name="email",
+            displayName="${email}",
+            validators=[
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="email",
+                    config={},
+                ),
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="length",
+                    config={"max": 255},
+                ),
+            ],
+            required_for_roles=["user"],
+            permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                views=["admin", "user"], edits=["admin", "user"]
+            ),
+            multivalued=False,
+        ),
+        keycloak.RealmUserProfileAttributeArgs(
+            name="fullName",
+            displayName="${fullName}",
+            validators=[
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="length",
+                    config={"max": 512},
+                ),
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="person-name-prohibited-characters", config={}
+                ),
+            ],
+            required_for_roles=["user"],
+            permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                views=["admin", "user"], edits=["admin", "user"]
+            ),
+            multivalued=False,
+        ),
+        keycloak.RealmUserProfileAttributeArgs(
+            name="firstName",
+            displayName="${firstName}",
+            group="legal-address",
+            validators=[
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="length",
+                    config={"max": 255},
+                ),
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="person-name-prohibited-characters", config={}
+                ),
+            ],
+            required_for_roles=["user"],
+            permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                views=["admin", "user"], edits=["admin", "user"]
+            ),
+            multivalued=False,
+        ),
+        keycloak.RealmUserProfileAttributeArgs(
+            name="lastName",
+            displayName="${lastName}",
+            group="legal-address",
+            validators=[
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="length",
+                    config={"max": 255},
+                ),
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="person-name-prohibited-characters", config={}
+                ),
+            ],
+            required_for_roles=["user"],
+            permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                views=["admin", "user"], edits=["admin", "user"]
+            ),
+            multivalued=False,
+        ),
+    ],
+    groups=[
+        keycloak.RealmUserProfileGroupArgs(
+            name="user-metadata",
+            display_header="User metadata",
+            display_description="Attributes, which refer to user metadata",
+        ),
+        keycloak.RealmUserProfileGroupArgs(
+            name="legal-address",
+            display_header="Legal Address",
+            display_description="User's legal address",
+        ),
+    ],
+)
+
 """ # noqa: ERA001
 # This can be uncommented when a new release of the pulumi-keycloak
 # library is released that includes the below or similar PR
