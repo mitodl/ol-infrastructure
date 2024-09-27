@@ -13,8 +13,7 @@ config:
   eks:efs_csi_provisioner: true
   eks:gateway_release_channel: "experimental"
   eks:pod_security_groups: true
-  eks:namespaces:
-  - "omd"  # Openmetadata testing
+  eks:namespaces: []
   eks:nodegroups:
     worker-xlarge:
       instance_types:
