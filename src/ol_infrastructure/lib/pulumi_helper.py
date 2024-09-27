@@ -11,6 +11,7 @@ class StackInfo:
     namespace: str
     env_suffix: str
     env_prefix: str
+    full_name: str
 
 
 def parse_stack() -> StackInfo:
@@ -28,4 +29,5 @@ def parse_stack() -> StackInfo:
         namespace=namespace,
         env_suffix=stack_name.lower(),
         env_prefix=namespace.rsplit(".", 1)[-1],
+        full_name=stack,
     )

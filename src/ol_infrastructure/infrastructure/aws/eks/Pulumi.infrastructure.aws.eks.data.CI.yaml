@@ -4,3 +4,32 @@ encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQG7tVQ4cjSd4ZUD7S
 config:
   environment:business_unit: operations
   environment:target_vpc: data_vpc
+  eks:allowed_dns_zones:
+  - ".odl.mit.edu"
+  - "odl.mit.edu"
+  - ".ol.mit.edu"
+  - "ol.mit.edu"
+  eks:ebs_csi_provisioner: true
+  eks:efs_csi_provisioner: false
+  eks:gateway_release_channel: "experimental"
+  eks:pod_security_groups: false
+  eks:namespaces:
+  - "open-metadata"  # Openmetadata testing
+  eks:nodegroups:
+    worker-xlarge:
+      instance_types:
+      - "c7a.xlarge"
+      labels:
+        ondemand: true
+        node_size: c7a.xlarge
+      disk_size_gb: 500
+      scaling:
+        desired: 3
+        min: 2
+        max: 4
+      version:
+      tags: {}
+      taints: {}
+      node_group_options: {}
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

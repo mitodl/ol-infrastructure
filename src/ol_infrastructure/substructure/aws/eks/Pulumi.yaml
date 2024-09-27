@@ -1,0 +1,6 @@
+---
+name: ol-substructure-eks
+runtime: python
+description: Deploy resources that first require a running eks cluster
+backend:
+  url: s3://mitol-pulumi-state/

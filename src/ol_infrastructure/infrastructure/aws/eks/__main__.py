@@ -4,7 +4,6 @@
 
 import base64
 import json
-from pathlib import Path
 
 import pulumi_aws as aws
 import pulumi_eks as eks
@@ -56,7 +55,7 @@ kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 
 # Centralize version numbers
 VERSIONS = {
-    "CERT_MANAGER_CHART": "v1.15.3",
+    "CERT_MANAGER_CHART": "v1.16.0-beta.0",
     "EBS_CSI_DRIVER": "v1.33.0-eksbuild.1",
     "EFS_CSI_DRIVER": "v2.0.7-eksbuild.1",
     "GATEWAY_API": "v1.1.0",
@@ -195,14 +194,11 @@ cluster = eks.Cluster(
         parent=cluster_role, depends_on=[cluster_role, administrator_role]
     ),
 )
-export(
-    "kube_config_data",
-    {
-        "role_arn": administrator_role.arn,
-        "certificate-authority-data": cluster.eks_cluster.certificate_authority,
-        "server": cluster.eks_cluster.endpoint,
-    },
-)
+export("cluster_name", cluster_name)
+export("admin_role_arn", administrator_role.arn)
+export("cluster_ca", cluster.eks_cluster.certificate_authority)
+export("cluster_endpoint", cluster.eks_cluster.endpoint)
+export("kube_config", cluster.kubeconfig)
 
 ############################################################
 # Configure node groups
@@ -241,6 +237,7 @@ for i, policy in enumerate(managed_node_policy_arns):
         role=node_role.id,
         opts=ResourceOptions(parent=node_role),
     )
+export("node_role_arn", value=node_role.arn)
 
 # Loop through the node group definitions and add them to the cluster
 node_groups = []
@@ -279,6 +276,7 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
 # Initalize the k8s pulumi provider and configure the central operations namespace
 k8s_global_labels = {
     "pulumi_managed": "true",
+    "pulumi_stack": stack_info.full_name,
 }
 k8s_provider = kubernetes.Provider(
     "k8s-provider",
@@ -287,8 +285,8 @@ k8s_provider = kubernetes.Provider(
 )
 
 
-# Every cluster gets an 'operations' namespace and it acts as
-# a parent resource to many other resources below.
+# Every cluster gets an 'operations' namespace.
+# It acts as a parent resource to many other resources below.
 operations_namespace = kubernetes.core.v1.Namespace(
     resource_name=f"{cluster_name}-operations-namespace",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -301,7 +299,8 @@ operations_namespace = kubernetes.core.v1.Namespace(
 )
 
 # Create any requested namespaces defined for the cluster
-for namespace in eks_config.get_object("namespaces") or []:
+namespaces = eks_config.get_object("namespaces") or []
+for namespace in namespaces:
     resource_name = (f"{cluster_name}-{namespace}-namespace",)
     kubernetes.core.v1.Namespace(
         resource_name=f"{cluster_name}-{namespace}-namespace",
@@ -313,6 +312,7 @@ for namespace in eks_config.get_object("namespaces") or []:
             provider=k8s_provider, parent=k8s_provider, depends_on=k8s_provider
         ),
     )
+export("namespaces", [*namespaces, "operations"])
 
 ############################################################
 # Configure CSI Drivers
@@ -327,6 +327,7 @@ csi_driver_role_parliament_config = {
 # Setup EBS CSI provisioner
 ############################################################
 # Ref: https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html
+export("has_ebs_storage", eks_config.get_bool("ebs_csi_provisioner"))
 if eks_config.get_bool("ebs_csi_provisioner"):
     ebs_csi_driver_role = aws.iam.Role(
         f"{cluster_name}-ebs-csi-driver-trust-role",
@@ -444,6 +445,7 @@ if eks_config.get_bool("ebs_csi_provisioner"):
 ############################################################
 # Ref: https://docs.aws.amazon.com/eks/latest/userguide/efs-csi.html
 # Ref: https://github.com/kubernetes-sigs/aws-efs-csi-driver/blob/master/docs/efs-create-filesystem.md
+export("has_efs_storage", eks_config.get_bool("efs_csi_provisioner"))
 if eks_config.get_bool("efs_csi_provisioner"):
     efs_csi_driver_role = aws.iam.Role(
         f"{cluster_name}-efs-csi-driver-trust-role",
@@ -567,8 +569,7 @@ vault_k8s_auth_backend_config = vault.kubernetes.AuthBackendConfig(
     disable_local_ca_jwt=False,  # Important
     opts=ResourceOptions(parent=vault_k8s_auth),
 )
-export("vault-auth-endpoint", vault_auth_endpoint_name)
-
+export("vault_auth_endpoint", vault_auth_endpoint_name)
 
 # Install the vault-secrets-operator directly from the public chart
 vault_secrets_operator = kubernetes.helm.v3.Release(
@@ -607,175 +608,6 @@ vault_secrets_operator = kubernetes.helm.v3.Release(
     ),
 )
 
-#################################################################
-# Configure *.odl.mit.edu certificate into operations namespace
-#################################################################
-# Setup a default auth backend role, used to load the *.odl.mit.edu certificate
-# into the cluster. This shoudln't be used by applications. It is only for this
-# one thing.  This restriction is enforced by binding to the `operations`
-# namespace as well to a ServiceAccount within the operations namespace
-vault_traefik_policy_name = f"{stack_info.env_prefix}-eks-traefik"
-vault_traefik_service_account_name = "vault-traefik-auth"
-vault_traefik_policy = vault.Policy(
-    f"{cluster_name}-eks-vault-traefik-policy",
-    name=vault_traefik_policy_name,
-    policy=Path(__file__).parent.joinpath("traefik_vault_policy.hcl").read_text(),
-    opts=ResourceOptions(parent=vault_k8s_auth),
-)
-vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
-    f"{cluster_name}-eks-vault-authentication-endpoint-operations",
-    role_name="operations-default",
-    backend=vault_auth_endpoint_name,
-    bound_service_account_names=[vault_traefik_service_account_name],
-    bound_service_account_namespaces=["operations"],
-    token_policies=[vault_traefik_policy_name],
-    opts=ResourceOptions(parent=vault_k8s_auth),
-)
-# Create the service account that will make the request to vault
-vault_traefik_service_account = kubernetes.core.v1.ServiceAccount(
-    f"{cluster_name}-vault-traefik-service-account",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=vault_traefik_service_account_name,
-        labels=k8s_global_labels,
-        namespace="operations",
-    ),
-    automount_service_account_token=False,
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=vault_secrets_operator,
-        depends_on=[cluster, node_groups[0]],
-        delete_before_replace=True,
-    ),
-)
-
-# We need to give the ServiceAccount the 'system:auth-delegator' ClusterRole
-# which will allow vault to use the token that the request it makes to turn around
-# and validate the request from the cluster api endpoint.
-#
-# Every application that wishes to use the vault-secrets-operator
-# will need to implement this pattern because ServiceAccounts don't
-# come with long-lived tokens starting with k8s 1.21
-#
-# This operational overhead is annoying but it is the best / most secure option
-# for when working with a vault installation that resides outside of the cluster
-#
-# Ref: https://developer.hashicorp.com/vault/docs/auth/kubernetes#use-the-vault-client-s-jwt-as-the-reviewer-jwt
-# Ref: https://developer.hashicorp.com/vault/docs/auth/kubernetes#configuring-kubernetes
-vault_traefik_service_account_cluster_role_binding = (
-    kubernetes.rbac.v1.ClusterRoleBinding(
-        f"{cluster_name}-vault-traefik-service-account-cluster-role-binding",
-        args=kubernetes.rbac.v1.ClusterRoleBindingInitArgs(
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name=f"{vault_traefik_service_account_name}:cluster-auth",
-                labels=k8s_global_labels,
-                namespace="operations",
-            ),
-            role_ref=kubernetes.rbac.v1.RoleRefArgs(
-                api_group="rbac.authorization.k8s.io",
-                kind="ClusterRole",
-                name="system:auth-delegator",
-            ),
-            subjects=[
-                kubernetes.rbac.v1.SubjectArgs(
-                    kind="ServiceAccount",
-                    name=vault_traefik_service_account_name,
-                    namespace="operations",
-                ),
-            ],
-        ),
-        opts=ResourceOptions(
-            provider=k8s_provider,
-            parent=vault_secrets_operator,
-            depends_on=[cluster, node_groups[0], vault_traefik_service_account],
-            delete_before_replace=True,
-        ),
-    )
-)
-
-# Create a VaultAuth resource and a VaultStaticSecret resource
-# that will put 'secret-global/odl-wildcard'
-# into a k8s Secret in the operations namespace named: "odl-wildcard-cert"
-#
-# Every cluster gets this key-cert pair installed
-#
-# Gateways in other namespaces will need ReferenceGrants
-# added to the operations namespace in order to utilize it.
-#
-# Or they can setup their own VaultStaticSecret to import the
-# certificate into their own namespace.
-#
-# They will need to create VaultConnection and VaultAuth
-# resources as well
-traefik_vso_resources = kubernetes.yaml.v2.ConfigGroup(
-    f"{cluster_name}-traefik-vso-resources",
-    objs=[
-        {
-            "apiVersion": "secrets.hashicorp.com/v1beta1",
-            "kind": "VaultAuth",
-            "metadata": {
-                "name": "traefik-static-auth",
-                "namespace": "operations",
-                "labels": k8s_global_labels,
-            },
-            "spec": {
-                "method": "kubernetes",
-                "mount": vault_auth_endpoint_name,
-                # This was for us by the helm chart
-                "vaultConnectionRef": "default",
-                "kubernetes": {
-                    "role": vault_k8s_auth_backend_role.role_name,
-                    "serviceAccount": vault_traefik_service_account_name,
-                },
-            },
-        },
-        {
-            "apiVersion": "secrets.hashicorp.com/v1beta1",
-            "kind": "VaultStaticSecret",
-            "metadata": {
-                "name": "vault-kv-global-odl-wildcard",
-                "namespace": "operations",
-                "labels": k8s_global_labels,
-            },
-            "spec": {
-                "type": "kv-v2",
-                "mount": "secret-global",
-                "path": "odl-wildcard",
-                "destination": {
-                    "name": "odl-wildcard-cert",
-                    "create": True,
-                    "overwrite": True,
-                    "type": "kubernetes.io/tls",
-                    # Ref: https://developer.hashicorp.com/vault/docs/platform/k8s/vso/secret-transformation
-                    "transformation": {
-                        # Removes all the org fields from k8s secret
-                        "excludes": [
-                            ".*",
-                        ],
-                        # creates two new values in the k8s secret
-                        # tls.key and tls.crt populated with data from the vault data
-                        "templates": {
-                            "tls.key": {
-                                "text": '{{ get .Secrets "key_with_proper_newlines" }}',
-                            },
-                            "tls.crt": {
-                                "text": '{{ get .Secrets "cert_with_proper_newlines" }}',
-                            },
-                        },
-                    },
-                },
-                "refreshAfter": "1h",
-                # This directly references the object above
-                "vaultAuthRef": "traefik-static-auth",
-            },
-        },
-    ],
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=vault_secrets_operator,
-        depends_on=[cluster, node_groups[0], vault_traefik_service_account],
-        delete_before_replace=True,
-    ),
-)
 ############################################################
 # This entire block of commented out code relates to
 # security groups for pods and should be retained for the time being
@@ -1050,6 +882,7 @@ external_dns_policy_document = {
         },
     ],
 }
+export("allowed_dns_zones", eks_config.require_object("allowed_dns_zones"))
 
 external_dns_policy = aws.iam.Policy(
     f"{cluster_name}-external-dns-policy",
@@ -1115,7 +948,7 @@ external_dns_release = (
                     "--traefik-disable-legacy",
                 ],
                 # Limit the dns zones that exteranl dns knows about
-                "domainFilters": eks_config.get_object("external_dns_zones"),
+                "domainFilters": eks_config.require_object("allowed_dns_zones"),
             },
         ),
         opts=ResourceOptions(
@@ -1128,114 +961,124 @@ external_dns_release = (
 )
 
 ############################################################
-# This entire block of commented out code relates to
-# cert-manager installation and should be retained for the time being
+# Install and configure cert-manager
 ############################################################
-#    cert_manager_parliament_config = {
-#        "UNKNOWN_FEDERATION_SOURCE": {"ignore_locations": [{"principal": "federated"}]},
-#        "PERMISSIONS_MANAGEMENT_ACTIONS": {"ignore_locations": []},
-#        "MALFORMED": {"ignore_lcoations": []},
-#        "RESOURCE_STAR": {"ignore_lcoations": []},
-#    }
-#    cert_manager_role = aws.iam.Role(
-#        f"{cluster_name}-cert-manager-trust-role",
-#        name=f"{cluster_name}-cert-manager-trust-role",
-#        path=f"/ol-infrastructure/eks/{cluster_name}/",
-#        assume_role_policy=cluster.eks_cluster.identities.apply(
-#            lambda ids: lint_iam_policy(
-#                oidc_trust_policy_template(
-#                    oidc_identifier=ids[0]["oidcs"][0]["issuer"],
-#                    account_id=aws_account.account_id,
-#                    k8s_service_account_identifier="system:serviceaccount:operations:cert-manager",
-#                    operator="StringEquals",
-#                ),
-#                parliament_config=cert_manager_parliament_config,
-#                stringify=True,
-#            )
-#        ),
-#        description="Trust role for allowing cert-manager to modify route53 "
-#        "resources from within the cluster.",
-#        opts=ResourceOptions(parent=cluster, depends_on=cluster),
-#    )
-#
-#    cert_manager_policy_document = {
-#        "Version": IAM_POLICY_VERSION,
-#        "Statement": [
-#            {
-#                "Effect": "Allow",
-#                "Action": "route53:GetChange",
-#                "Resource": "arn:aws:route53:::change/*"
-#            },
-#            {
-#                "Effect": "Allow",
-#                "Action": [
-#                    "route53:ChangeResourceRecordSets",
-#                    "route53:ListResourceRecordSets"
-#                ],
-#                # TODO, interpolate with this explicit zones
-#                "Resource": "arn:aws:route53:::hostedzone/*"
-#            },
-#            {
-#                "Effect": "Allow",
-#                "Action": "route53:ListHostedZonesByName",
-#                "Resource": "*"
-#            }
-#        ]
-#    }
-#
-#    cert_manager_policy = aws.iam.Policy(
-#        f"{cluster_name}-cert-manager-policy",
-#        name=f"{cluster_name}-cert-manager-policy",
-#        path=f"/ol-infrastructure/eks/{cluster_name}/",
-#        policy=lint_iam_policy(
-#            cert_manager_policy_document,
-#            parliament_config=cert_manager_parliament_config,
-#            stringify=True,
-#        ),
-#        opts=ResourceOptions(parent=cluster, depends_on=cluster),
-#    )
-#    aws.iam.RolePolicyAttachment(
-#        f"{cluster_name}-cert-manager-attachment",
-#        policy_arn=cert_manager_policy.arn,
-#        role=cert_manager_role.id,
-#        opts=ResourceOptions(parent=cert_manager_role),
-#    )
-#
-#    # Ref: https://cert-manager.io/docs/installation/
-#    cert_manager_release = kubernetes.helm.v3.Release(
-#        f"{cluster_name}-cert-manager-helm-release",
-#        kubernetes.helm.v3.ReleaseArgs(
-#            name="cert-manager",
-#            chart="cert-manager",
-#            version=VERSIONS["CERT_MANAGER_CHART"],
-#            namespace="operations",
-#            repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-#                repo="https://charts.jetstack.io",
-#            ),
-#            cleanup_on_fail=True,
-#            skip_await=False,
-#            values={
-#                "crds": {
-#                    "enabled": True,
-#                },
-#                "replicaCount": 1,
-#                "enableCertificateOwnerRef": True,
-#                "prometheus": {
-#                    "enabled": False,
-#                },
-#                "serviceAccount": {
-#                    "create": "true",
-#                    "name": "cert-manager",
-#                }
-#            }
-#        ),
-#        opts=ResourceOptions(
-#            provider=k8s_provider,
-#            parent=operations_namespace,
-#            depends_on=[cluster, node_groups[0]],
-#            delete_before_replace=True,
-#        ),
-#    )
-############################################################
-# End cert-manager stuff
-############################################################
+cert_manager_parliament_config = {
+    "UNKNOWN_FEDERATION_SOURCE": {"ignore_locations": [{"principal": "federated"}]},
+    "PERMISSIONS_MANAGEMENT_ACTIONS": {"ignore_locations": []},
+    "MALFORMED": {"ignore_lcoations": []},
+    "RESOURCE_STAR": {"ignore_lcoations": []},
+}
+# Cert manager uses DNS txt records to confirm that we control the
+# domains that we are requesting certificates for.
+# Ref: https://cert-manager.io/docs/configuration/acme/dns01/route53/#set-up-an-iam-role
+cert_manager_role = aws.iam.Role(
+    f"{cluster_name}-cert-manager-trust-role",
+    name=f"{cluster_name}-cert-manager-trust-role",
+    path=f"/ol-infrastructure/eks/{cluster_name}/",
+    assume_role_policy=cluster.eks_cluster.identities.apply(
+        lambda ids: lint_iam_policy(
+            oidc_trust_policy_template(
+                oidc_identifier=ids[0]["oidcs"][0]["issuer"],
+                account_id=aws_account.account_id,
+                k8s_service_account_identifier="system:serviceaccount:operations:cert-manager",
+                operator="StringEquals",
+            ),
+            parliament_config=cert_manager_parliament_config,
+            stringify=True,
+        )
+    ),
+    description="Trust role for allowing cert-manager to modify route53 "
+    "resources from within the cluster.",
+    opts=ResourceOptions(parent=cluster, depends_on=cluster),
+)
+export("cert_manager_arn", cert_manager_role.arn)
+
+cert_manager_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "route53:GetChange",
+            "Resource": "arn:aws:route53:::change/*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "route53:ChangeResourceRecordSets",
+                "route53:ListResourceRecordSets",
+            ],
+            # TODO @Ardiea interpolate with explicit zone IDs
+            # More difficult than it sounds
+            "Resource": "arn:aws:route53:::hostedzone/*",
+        },
+        {"Effect": "Allow", "Action": "route53:ListHostedZonesByName", "Resource": "*"},
+    ],
+}
+
+cert_manager_policy = aws.iam.Policy(
+    f"{cluster_name}-cert-manager-policy",
+    name=f"{cluster_name}-cert-manager-policy",
+    path=f"/ol-infrastructure/eks/{cluster_name}/",
+    policy=lint_iam_policy(
+        cert_manager_policy_document,
+        parliament_config=cert_manager_parliament_config,
+        stringify=True,
+    ),
+    opts=ResourceOptions(parent=cluster, depends_on=cluster),
+)
+aws.iam.RolePolicyAttachment(
+    f"{cluster_name}-cert-manager-attachment",
+    policy_arn=cert_manager_policy.arn,
+    role=cert_manager_role.id,
+    opts=ResourceOptions(parent=cert_manager_role),
+)
+
+# Ref: https://cert-manager.io/docs/installation/
+cert_manager_release = kubernetes.helm.v3.Release(
+    f"{cluster_name}-cert-manager-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="cert-manager",
+        chart="cert-manager",
+        version=VERSIONS["CERT_MANAGER_CHART"],
+        namespace="operations",
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://charts.jetstack.io",
+        ),
+        cleanup_on_fail=True,
+        skip_await=False,
+        values={
+            "crds": {
+                "enabled": True,
+                "keep": True,
+            },
+            "global": {
+                "commonLabels": k8s_global_labels,
+            },
+            "replicaCount": 1,
+            "enableCertificateOwnerRef": True,
+            "prometheus": {
+                "enabled": False,
+            },
+            "config": {
+                "featureGates": {"ExperimentalGatewayAPISupport": True},
+            },
+            "serviceAccount": {
+                "create": True,
+                "name": "cert-manager",
+                "annotations": {
+                    # Allows cert-manager to make aws API calls to route53
+                    "eks.amazonaws.com/role-arn": cert_manager_role.arn.apply(
+                        lambda arn: f"{arn}"
+                    ),
+                },
+            },
+        },
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=operations_namespace,
+        depends_on=[cluster, node_groups[0]],
+        delete_before_replace=True,
+    ),
+)
