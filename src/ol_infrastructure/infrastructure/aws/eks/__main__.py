@@ -1061,7 +1061,9 @@ cert_manager_release = kubernetes.helm.v3.Release(
                 "enabled": False,
             },
             "config": {
-                "featureGates": {"ExperimentalGatewayAPISupport": True},
+                "apiVersion": "controller.config.cert-manager.io/v1alpha1",
+                "kind": "ControllerConfiguration",
+                "enableGatewayAPI": True,
             },
             "serviceAccount": {
                 "create": True,

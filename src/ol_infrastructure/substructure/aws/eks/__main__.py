@@ -245,12 +245,7 @@ cert_manager_clusterissuer_resources = kubernetes.yaml.v2.ConfigGroup(
                                 ),
                             },
                             "dns01": {
-                                "route53": {
-                                    "region": aws_config.region,
-                                    "role": cluster_stack.require_output(
-                                        "cert_manager_arn"
-                                    ),
-                                },
+                                "route53": {},
                             },
                         },
                     ],
@@ -280,12 +275,7 @@ cert_manager_clusterissuer_resources = kubernetes.yaml.v2.ConfigGroup(
                                 ),
                             },
                             "dns01": {
-                                "route53": {
-                                    "region": aws_config.region,
-                                    "role": cluster_stack.require_output(
-                                        "cert_manager_arn"
-                                    ),
-                                },
+                                "route53": {},
                             },
                         },
                     ],
