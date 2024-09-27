@@ -4,6 +4,7 @@ import pulumi_vault as vault
 from pulumi import Config, StackReference
 from pulumi_aws import ec2, get_caller_identity
 from pulumi_consul import Node, Service, ServiceCheckArgs
+from pulumi_kubernetes import Provider as kubernetes
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
@@ -30,7 +31,8 @@ network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
-mitodl_zone_id = dns_stack.require_output("odl_zone_id")
+cluster_stack = StackReference(f"infrastructure.k8s.cluster.{stack_info.name}")
+
 apps_vpc = network_stack.require_output("applications_vpc")
 k8s_pod_subnet_cidrs = network_stack.require_output("k8s_pod_subnet_cidrs")
 open_metadata_environment = f"operations-{stack_info.env_suffix}"
@@ -143,3 +145,13 @@ open_metadata_server_vault_policy = vault.Policy(
 )
 ## Begin block for migrating to pyinfra images
 consul_datacenter = consul_stack.require_output("datacenter")
+
+# Pulumi k8s omd help stuff. Still struggling with syntax.
+
+kubeconfig = cluster_stack.require_output("kube_config")
+_
+k8s_provider = kubernetes.Provider(
+    "k8s-provider",
+    kubeconfig=cluster.kubeconfig,
+    opts=ResourceOptions(parent=cluster, depends_on=[cluster, node_groups[0]]),
+)
