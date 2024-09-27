@@ -1,10 +1,10 @@
 from pathlib import Path
 
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, StackReference
 from pulumi_aws import ec2, get_caller_identity
 from pulumi_consul import Node, Service, ServiceCheckArgs
-from pulumi_kubernetes import Provider as kubernetes
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
@@ -31,10 +31,15 @@ network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
-cluster_stack = StackReference(f"infrastructure.k8s.cluster.{stack_info.name}")
+opensearch_stack = StackReference(
+    f"infrastructure.aws.opensearch.open_metadata.{stack_info.name}"
+)
+cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
 
+opensearch_cluster = opensearch_stack.require_output("cluster")
 apps_vpc = network_stack.require_output("applications_vpc")
-k8s_pod_subnet_cidrs = network_stack.require_output("k8s_pod_subnet_cidrs")
+data_vpc = network_stack.require_output("data_vpc")
+k8s_pod_subnet_cidrs = data_vpc["k8s_pod_subnet_cidrs"]
 open_metadata_environment = f"operations-{stack_info.env_suffix}"
 aws_config = AWSBase(
     tags={"OU": "operations", "Environment": open_metadata_environment},
@@ -149,9 +154,56 @@ consul_datacenter = consul_stack.require_output("datacenter")
 # Pulumi k8s omd help stuff. Still struggling with syntax.
 
 kubeconfig = cluster_stack.require_output("kube_config")
-_
+cluster_name = cluster_stack.require_output("cluster_name")
+VERSIONS = cluster_stack.require_output("versions")
+
 k8s_provider = kubernetes.Provider(
     "k8s-provider",
-    kubeconfig=cluster.kubeconfig,
-    opts=ResourceOptions(parent=cluster, depends_on=[cluster, node_groups[0]]),
+    kubeconfig=kubeconfig,
+)
+
+open_metadata_application = kubernetes.helm.v3.Release(
+    f"{cluster_name}-open-metadata-application-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="open-metadata-application",
+        chart="open-metadata-application",
+        version=VERSIONS["OPEN_METADATA"],
+        namespace="applications",
+        cleanup_on_fail=True,
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://helm.open-metadata.org",
+        ),
+        values={
+            "openmetadata": {
+                "config": {
+                    "elasticsearch": {
+                        # "auth": {
+                        # We don't export any of the auth stuff? WHY? -cap
+                        #     "username": "elastic",
+                        #     "password": {
+                        #         "secretRef": "elasticsearch-password",
+                        #         "secretKey": "password",
+                        #     },
+                        # },
+                        # Umm. Don't we need to specify the domain? -cap
+                        "host": opensearch_cluster["endpoint"],
+                        "port": opensearch_cluster["port"],
+                    },
+                    "database": {
+                        "host": open_metadata_db.db_instance.address,
+                        "port": open_metadata_db_config.port,
+                        "databaseName": open_metadata_db_config.db_name,
+                        "auth": {
+                            "username": open_metadata_db_config.username,
+                            "password": {
+                                "secretRef": open_metadata_db_config.password_secret_name,
+                                "secretKey": open_metadata_db_config.password_secret_key,
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        skip_await=False,
+    ),
 )
