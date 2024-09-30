@@ -124,14 +124,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         repository="keycloak-scim",
     )
 
-    # Repo: https://github.com/mitodl/keycloakify-starter
-    # Use: Keycloak Starter Theme
-    keycloakify_spi = github_release(
-        name=Identifier("keycloakify-spi"),
-        owner="mitodl",
-        repository="keycloakify-starter",
-    )
-
     #############################################
     image_build_context = Output(name=Identifier("image-build-context"))
 
@@ -145,7 +137,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
             GetStep(get=metrics_spi.name, trigger=True),
             GetStep(get=ol_spi.name, trigger=True),
             GetStep(get=scim_spi.name, trigger=True),
-            GetStep(get=keycloakify_spi.name, trigger=True),
             TaskStep(
                 task=Identifier("collect-artifacts-for-build-context"),
                 config=TaskConfig(
@@ -157,7 +148,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                         Input(name=metrics_spi.name),
                         Input(name=ol_spi.name),
                         Input(name=scim_spi.name),
-                        Input(name=keycloakify_spi.name),
                     ],
                     image_resource=AnonymousResource(
                         type=REGISTRY_IMAGE,
@@ -175,7 +165,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                         cp -r {metrics_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {ol_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {scim_spi.name}/* {image_build_context.name}/plugins/
-                        cp -r {keycloakify_spi.name}/* {image_build_context.name}/plugins/
                         """  # noqa: E501
                             ),
                         ],
@@ -216,7 +205,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
             metrics_spi,
             ol_spi,
             scim_spi,
-            keycloakify_spi,
         ],
         jobs=[docker_build_job],
     )
