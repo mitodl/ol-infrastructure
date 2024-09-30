@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, ResourceOptions, ResourceOpts, StackReference
 from pulumi_aws import ec2, get_caller_identity
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -196,7 +196,7 @@ vault_k8s_resources = OLVaultK8SResources(
     ),
 )
 
-db_creds_secret_name = "mysql-db-creds"
+db_creds_secret_name = "pgsql-db-creds"
 db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
     "open-metadata-dynamicsecret-db-creds",
     objs=[
@@ -244,6 +244,7 @@ db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
 
 # Install the openmetadata helm chart
 # TODO @Ardiea Add k8s global labels
+# https://github.com/mitodl/ol-infrastructure/issues/2680
 open_metadata_application = kubernetes.helm.v3.Release(
     f"{cluster_name}-open-metadata-application-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
