@@ -14,6 +14,7 @@ from enum import Enum
 from string import Template
 from typing import Optional, Union
 
+import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_aws.acmpca import Certificate, CertificateValidityArgs
 from pulumi_vault import Mount, aws, database, pkisecret
@@ -609,3 +610,105 @@ class OLVaultPKIIntermediateRole(ComponentResource):
         )
 
         self.register_outputs({})
+
+
+class OLVaultK8SResourcesConfig(BaseModel):
+    application_name: str
+    vault_address: str
+    vault_auth_endpoint: str
+    vault_auth_role_name: str
+    k8s_namespace: str
+    k8s_provider: kubernetes.Provider
+    k8s_global_labels: dict[str, str] = {}
+
+
+class OLVaultK8SResources(ComponentResource):
+    def __init__(
+        self,
+        resource_config: OLVaultK8SResourcesConfig,
+        opts: Optional[ResourceOptions] = None,
+    ):
+        super().__init__(
+            "ol:services:Vault:K8S:ResourcesConfig",
+            resource_config.application_name,
+            None,
+            opts,
+        )
+        resource_opts = ResourceOptions.merge(
+            ResourceOptions(parent=self, provider=resource_config.k8s_provider), opts
+        )
+
+        self.service_account_name = f"{resource_config.application_name}-vault"
+        self.connection_name = f"{resource_config.application_name}-vault-connection"
+        self.auth_name = f"{resource_config.application_name}-auth"
+
+        self.service_account = kubernetes.core.v1.ServiceAccount(
+            f"{resource_config.application_name}-vault-service-account",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=self.service_account_name,
+                namespace=resource_config.k8s_namespace,
+                labels=resource_config.k8s_global_labels,
+            ),
+            automount_service_account_token=False,
+            opts=resource_opts,
+        )
+
+        self.cluster_role_binding = kubernetes.rbac.v1.ClusterRoleBinding(
+            f"{resource_config.application_name}-vault-cluster-role-binding",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=f"{self.service_account_name}:cluster-auth",
+                namespace=resource_config.k8s_namespace,
+                labels=resource_config.k8s_global_labels,
+            ),
+            role_ref=kubernetes.rbac.v1.RoleRefArgs(
+                api_group="rbac.authorization.k8s.io",
+                kind="ClusterRole",
+                name="system:auth-delegator",
+            ),
+            subjects=[
+                kubernetes.rbac.v1.SubjectArgs(
+                    kind="ServiceAccount",
+                    name=self.service_account_name,
+                    namespace=resource_config.k8s_namespace,
+                ),
+            ],
+            opts=resource_opts,
+        )
+
+        self.vso_resources = kubernetes.yaml.v2.ConfigGroup(
+            f"{resource_config.application_name}-vso-resources",
+            objs=[
+                {
+                    "apiVersion": "secrets.hashicorp.com/v1beta1",
+                    "kind": "VaultConnection",
+                    "metadata": {
+                        "name": self.connection_name,
+                        "namespace": resource_config.k8s_namespace,
+                        "labels": resource_config.k8s_global_labels,
+                    },
+                    "spec": {
+                        "address": resource_config.vault_address,
+                        "skipTLSVerify": False,
+                    },
+                },
+                {
+                    "apiVersion": "secrets.hashicrop.com/v1beta1",
+                    "kind": "VaultAuth",
+                    "metadata": {
+                        "name": self.auth_name,
+                        "namespace": resource_config.k8s_namespace,
+                        "labels": resource_config.k8s_global_labels,
+                    },
+                    "spec": {
+                        "method": "kubernetes",
+                        "mount": resource_config.vault_auth_endpoint,
+                        "vaultConnectionRef": self.connection_name,
+                        "kubernetes": {
+                            "role": resource_config.vault_auth_role_name,
+                            "serviceAccount": self.service_account_name,
+                        },
+                    },
+                },
+            ],
+            opts=resource_opts,
+        )

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, StackReference, ResourceOptions
+from pulumi import Config, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -13,10 +13,12 @@ from bridge.lib.magic_numbers import (
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
+    OLVaultK8SResources,
+    OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.aws.eks_helper import check_cluster_namespace
+from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -166,9 +168,7 @@ VERSIONS = cluster_stack.require_output("versions")
 open_metadata_vault_policy = vault.Policy(
     "open-metadata-vault-policy",
     name="open-metadata",
-    policy=Path(__file__)
-    .parent.joinpath("open_metadata_policy.hcl")
-    .read_text(),
+    policy=Path(__file__).parent.joinpath("open_metadata_policy.hcl").read_text(),
 )
 open_metadata_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
     "open-metadata-vault-k8s-auth-backend-role",
@@ -179,7 +179,71 @@ open_metadata_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
     token_policies=[open_metadata_vault_policy.name],
 )
 
+# TODO @Ardiea Add k8s global labels
+vault_k8s_resources_config = OLVaultK8SResourcesConfig(
+    application_name="open-metadata",
+    vault_address=vault_config.require("address"),
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    vault_auth_role_name=open_metadata_vault_auth_backend_role.role_name,
+    k8s_namespace=open_metadata_namespace,
+    k8s_provider=k8s_provider,
+    k8s_global_labels={},
+)
+vault_k8s_resources = OLVaultK8SResources(
+    resource_config=vault_k8s_resources_config,
+    opts=ResourceOpts(
+        parent=k8s_provider, depends_on=[open_metadata_vault_auth_backend_role]
+    ),
+)
+
+db_creds_secret_name = "mysql-db-creds"
+db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
+    "open-metadata-dynamicsecret-db-creds",
+    objs=[
+        {
+            "apiVersion": "secrets.hashicorp.com/v1beta1",
+            "kind": "VaultDynamicSecret",
+            "metadata": {
+                "name": "openmetadata-db-credentials",
+                "namespace": open_metadata_namespace,
+            },
+            "spec": {
+                "mount": open_metadata_db_vault_backend_config.mount_point,
+                "path": "creds/app",
+                "destination": {
+                    "create": True,
+                    "overwrite": True,
+                    "name": db_creds_secret_name,
+                    "transformation": {
+                        "excludes": [".*"],
+                        "templates": {
+                            "DB_USER": {
+                                "text": '{{ get .Secrets ".username" }}',
+                            },
+                            "DB_PASSWORD": {
+                                "text": '{{ get .Secrets ".password" }}',
+                            },
+                        },
+                    },
+                },
+                "rolloutRestartTargets": [
+                    {
+                        "kind": "Deploymnet",
+                        # Name of the 'deployment' from the OMD helm chart
+                        "name": "openmetadata",
+                    },
+                ],
+                "vaultAuthRef": vault_k8s_resources.auth_name,
+            },
+        },
+    ],
+    opts=ResourceOpts(
+        provider=k8s_provider, parent=k8s_provider, depends_on=[vault_k8s_resources]
+    ),
+)
+
 # Install the openmetadata helm chart
+# TODO @Ardiea Add k8s global labels
 open_metadata_application = kubernetes.helm.v3.Release(
     f"{cluster_name}-open-metadata-application-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
@@ -211,14 +275,23 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "host": open_metadata_db.db_instance.address,
                         "port": open_metadata_db_config.port,
                         "databaseName": open_metadata_db_config.db_name,
+                        # Null out the auth elements in favor of our own
+                        # secret pulled in with envFrom below.
                         "auth": {
-                            "username": open_metadata_db_config.username,
+                            "username": "",
                             "password": {
-                                "secretRef": open_metadata_db_config.password_secret_name,
-                                "secretKey": open_metadata_db_config.password_secret_key,
+                                "secretRef": "",
+                                "secretKey": "",
                             },
                         },
                     },
+                    "envFrom": [
+                        {
+                            "secretRef": {
+                                "name": db_creds_secret_name,
+                            },
+                        },
+                    ],
                 },
             },
         },
@@ -227,5 +300,6 @@ open_metadata_application = kubernetes.helm.v3.Release(
     opts=ResourceOptions(
         provider=k8s_provider,
         parent=k8s_provider,
+        depends_on=[open_metadata_db, db_creds_dynamic_secret],
     ),
 )

@@ -1,7 +1,7 @@
 from pulumi import StackReference
 
 
-def check_cluster_namespaces(cluster_stack: StackReference, namespace: str):
+def check_cluster_namespace(cluster_stack: StackReference, namespace: str):
     """Verify that a namespace is available in an EKS cluster.
 
     :param cluster_stack: object representing the infrastructure.aws.eks
