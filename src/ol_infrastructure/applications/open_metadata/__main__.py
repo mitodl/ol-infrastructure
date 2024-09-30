@@ -79,7 +79,7 @@ open_metadata_database_security_group = ec2.SecurityGroup(
             to_port=DEFAULT_POSTGRES_PORT,
             description="Access to postgres from open metadata servers.",
         ),
-        # TODO: @Ardiea switch to use pod-security-groups once implemented
+        # TODO @Ardiea: switch to use pod-security-groups once implemented
         ec2.SecurityGroupIngressArgs(
             security_groups=[],
             protocol="tcp",
@@ -105,7 +105,7 @@ open_metadata_db_config = OLPostgresDBConfig(
     security_groups=[open_metadata_database_security_group],
     storage=open_metadata_config.get("db_capacity")
     or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
-    engine_major_version="15",
+    engine_major_version="16",
     tags=aws_config.tags,
     db_name="open_metadata",
     **defaults(stack_info)["rds"],
@@ -259,15 +259,6 @@ open_metadata_application = kubernetes.helm.v3.Release(
             "openmetadata": {
                 "config": {
                     "elasticsearch": {
-                        # "auth": {
-                        # We don't export any of the auth stuff? WHY? -cap
-                        #     "username": "elastic",
-                        #     "password": {
-                        #         "secretRef": "elasticsearch-password",
-                        #         "secretKey": "password",
-                        #     },
-                        # },
-                        # Umm. Don't we need to specify the domain? -cap
                         "host": opensearch_cluster["endpoint"],
                         "port": opensearch_cluster["port"],
                     },
