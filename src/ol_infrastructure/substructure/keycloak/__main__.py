@@ -941,21 +941,21 @@ if stack_info.env_suffix in ["ci", "qa"]:
     )
     # OKTA-DEV [END] # noqa: ERA001
 
-if stack_info.env_suffix == "qa":
-    # SCIM for MIT-Learn in RC.
+# SCIM for MIT-Learn
+if stack_info.env_suffix != "CI":
     keycloak.CustomUserFederation(
-        "ol-mit-learn-qa-scim",
+        "ol-mit-learn-scim",
         config={
             "user-patchOp": "false",
-            "fullSyncPeriod": "-1",
-            "auth-pass": keycloak_realm_config.get("mit-learn-qa-scim-password"),
+            "fullSyncPeriod": "86400",
+            "auth-pass": keycloak_realm_config.get("mit-learn-scim-password"),
             "auth-mode": "BEARER",
             "cachePolicy": "DEFAULT",
-            "sync-import-action": "CREATE_LOCAL",
+            "sync-import-action": "NOTHING",
             "propagation-user": "true",
             "enabled": "true",
-            "changedSyncPeriod": "-1",
-            "endpoint": "https://rc.learn.mit.edu/scim/v2/",
+            "changedSyncPeriod": "60",
+            "endpoint": keycloak_realm_config.get("mit-learn-scim-endpoint"),
             "propagation-group": "true",
             "content-type": "application/scim+json",
             "group-patchOp": "false",
