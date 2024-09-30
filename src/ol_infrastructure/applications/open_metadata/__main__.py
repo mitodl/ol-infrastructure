@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, StackReference
+from pulumi import Config, StackReference, ResourceOptions
 from pulumi_aws import ec2, get_caller_identity
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -16,6 +16,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
+from ol_infrastructure.lib.aws.eks_helper import check_cluster_namespace
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -44,11 +45,21 @@ open_metadata_environment = f"operations-{stack_info.env_suffix}"
 aws_config = AWSBase(
     tags={"OU": "operations", "Environment": open_metadata_environment},
 )
+
+vault_config = Config("vault")
+
 consul_provider = get_consul_provider(stack_info)
+setup_vault_provider(stack_info)
+k8s_provider = kubernetes.Provider(
+    "k8s-provider",
+    kubeconfig=cluster_stack.require_output("kube_config"),
+)
 
 consul_security_groups = consul_stack.require_output("security_groups")
 aws_account = get_caller_identity()
 
+open_metadata_namespace = "open-metadata"
+check_cluster_namespace(cluster_stack, open_metadata_namespace)
 
 open_metadata_database_security_group = ec2.SecurityGroup(
     f"open-metadata-database-security-group-{stack_info.env_suffix}",
@@ -66,6 +77,7 @@ open_metadata_database_security_group = ec2.SecurityGroup(
             to_port=DEFAULT_POSTGRES_PORT,
             description="Access to postgres from open metadata servers.",
         ),
+        # TODO: @Ardiea switch to use pod-security-groups once implemented
         ec2.SecurityGroupIngressArgs(
             security_groups=[],
             protocol="tcp",
@@ -140,35 +152,41 @@ open_metadata_db_consul_service = Service(
     opts=consul_provider,
 )
 
-# Create a vault policy to allow dagster to get to the secrets it needs
-open_metadata_server_vault_policy = vault.Policy(
-    "open-metadata-server-vault-policy",
-    name="open-metadata-server",
-    policy=Path(__file__)
-    .parent.joinpath("open_metadata_server_policy.hcl")
-    .read_text(),
-)
 ## Begin block for migrating to pyinfra images
 consul_datacenter = consul_stack.require_output("datacenter")
 
 # Pulumi k8s omd help stuff. Still struggling with syntax.
 
-kubeconfig = cluster_stack.require_output("kube_config")
 cluster_name = cluster_stack.require_output("cluster_name")
 VERSIONS = cluster_stack.require_output("versions")
 
-k8s_provider = kubernetes.Provider(
-    "k8s-provider",
-    kubeconfig=kubeconfig,
+
+# Create a vault policy and associate it with an auth backend role
+# on the vault k8s cluster auth endpoint
+open_metadata_vault_policy = vault.Policy(
+    "open-metadata-vault-policy",
+    name="open-metadata",
+    policy=Path(__file__)
+    .parent.joinpath("open_metadata_policy.hcl")
+    .read_text(),
+)
+open_metadata_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    "open-metadata-vault-k8s-auth-backend-role",
+    role_name="open-metadata",
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["*"],
+    bound_service_account_namespaces=[open_metadata_namespace],
+    token_policies=[open_metadata_vault_policy.name],
 )
 
+# Install the openmetadata helm chart
 open_metadata_application = kubernetes.helm.v3.Release(
     f"{cluster_name}-open-metadata-application-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
         name="open-metadata-application",
         chart="open-metadata-application",
         version=VERSIONS["OPEN_METADATA"],
-        namespace="applications",
+        namespace=open_metadata_namespace,
         cleanup_on_fail=True,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://helm.open-metadata.org",
@@ -205,5 +223,9 @@ open_metadata_application = kubernetes.helm.v3.Release(
             },
         },
         skip_await=False,
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=k8s_provider,
     ),
 )
