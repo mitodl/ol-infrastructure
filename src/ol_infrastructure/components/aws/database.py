@@ -352,7 +352,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 "period": 300,  # 5 minutes
                 "evaluation_periods": 6,  # 30 minutes
                 "metric_name": "CPUUtilization",
-                "threshold": 50,  # percent
+                "threshold": 90,  # percent
                 "unit": "Percent",
             },
             "FreeStorageSpace": {
@@ -374,7 +374,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 "period": 300,  # 5 minutes
                 "evaluation_periods": 6,  # 30 minutes
                 "metric_name": "WriteLatency",
-                "threshold": 0.050,  # 50 milliseconds
+                "threshold": 0.100,  # 100 milliseconds
             },
             "ReadLatency": {
                 "comparison_operator": "GreaterThanThreshold",
@@ -384,7 +384,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 "period": 300,  # 5 minutes
                 "evaluation_periods": 2,  # 10 minutes
                 "metric_name": "ReadLatency",
-                "threshold": 0.010,  # 10 milliseconds
+                "threshold": 0.020,  # 20 milliseconds
             },
         }
 
@@ -411,7 +411,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                     "period": 300,  # 5 minutes
                     "evaluation_periods": 2,  # 10 minutes
                     "metric_name": "DiskQueueDepth",
-                    "threshold": 1,  # requests
+                    "threshold": 10,  # requests
                 },
             },
         }
