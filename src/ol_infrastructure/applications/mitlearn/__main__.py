@@ -1080,7 +1080,7 @@ sensitive_heroku_vars = {
     "OCW_WEBHOOK_KEY": secret_operations_global_update_search_data_webhook_key.data.apply(
         lambda data: "{}".format(data["value"])
     ),
-    "SOCIAL_AUTH_OL_OIDC_SECRET": secret_operations_sso_open.data.apply(
+    "SOCIAL_AUTH_OL_OIDC_SECRET": secret_operations_sso_mitlearn.data.apply(
         lambda data: "{}".format(data["client_secret"])
     ),
     "TIKA_ACCESS_TOKEN": secret_operations_tika_access_token.data.apply(
