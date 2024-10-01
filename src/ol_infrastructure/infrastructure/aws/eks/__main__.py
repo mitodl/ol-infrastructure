@@ -1085,7 +1085,7 @@ cert_manager_release = kubernetes.helm.v3.Release(
         depends_on=[cluster, node_groups[0]],
         delete_before_replace=True,
     ),
-    )
+)
 
 export(
     "kube_config_data",
