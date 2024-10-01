@@ -333,7 +333,7 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
                     name="person-name-prohibited-characters", config={}
                 ),
             ],
-            required_for_roles=["user"],
+            required_for_roles=[],
             permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                 views=["admin", "user"], edits=["admin", "user"]
             ),
@@ -351,7 +351,7 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
                     name="person-name-prohibited-characters", config={}
                 ),
             ],
-            required_for_roles=["user"],
+            required_for_roles=[],
             permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                 views=["admin", "user"], edits=["admin", "user"]
             ),
