@@ -924,7 +924,7 @@ heroku_vars = {
     "SEE_API_ACCESS_TOKEN_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/oauth/token",
     "SECURE_CROSS_ORIGIN_OPENER_POLICY": "None",
     "SEE_BASE_URL": "https://executive.mit.edu/",
-    "SOCIAL_AUTH_OL_OIDC_KEY": "ol-open-client",
+    "SOCIAL_AUTH_OL_OIDC_KEY": "ol-mitlearn-client",
     "USE_X_FORWARDED_HOST": "True",
     "USE_X_FORWARDED_PORT": "True",
     "XPRO_CATALOG_API_URL": "https://xpro.mit.edu/api/programs/",
