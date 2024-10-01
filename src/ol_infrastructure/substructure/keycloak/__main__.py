@@ -268,7 +268,7 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
     attributes=[
         keycloak.RealmUserProfileAttributeArgs(
             name="username",
-            displayName="${username}",
+            display_name="${username}",
             validators=[
                 keycloak.RealmUserProfileAttributeValidatorArgs(
                     name="length",
@@ -288,7 +288,7 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
         ),
         keycloak.RealmUserProfileAttributeArgs(
             name="email",
-            displayName="${email}",
+            display_name="${email}",
             validators=[
                 keycloak.RealmUserProfileAttributeValidatorArgs(
                     name="email",
@@ -307,7 +307,7 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
         ),
         keycloak.RealmUserProfileAttributeArgs(
             name="fullName",
-            displayName="${fullName}",
+            display_name="${fullName}",
             validators=[
                 keycloak.RealmUserProfileAttributeValidatorArgs(
                     name="length",
@@ -325,7 +325,7 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
         ),
         keycloak.RealmUserProfileAttributeArgs(
             name="firstName",
-            displayName="${firstName}",
+            display_name="${firstName}",
             group="legal-address",
             validators=[
                 keycloak.RealmUserProfileAttributeValidatorArgs(
@@ -344,7 +344,7 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
         ),
         keycloak.RealmUserProfileAttributeArgs(
             name="lastName",
-            displayName="${lastName}",
+            display_name="${lastName}",
             group="legal-address",
             validators=[
                 keycloak.RealmUserProfileAttributeValidatorArgs(
