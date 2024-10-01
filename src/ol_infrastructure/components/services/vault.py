@@ -615,11 +615,12 @@ class OLVaultPKIIntermediateRole(ComponentResource):
 class OLVaultK8SResourcesConfig(BaseModel):
     application_name: str
     vault_address: str
-    vault_auth_endpoint: str
-    vault_auth_role_name: str
+    vault_auth_endpoint: Union[str, Output[str]]
+    vault_auth_role_name: Union[str, Output[str]]
     k8s_namespace: str
     k8s_provider: kubernetes.Provider
     k8s_global_labels: dict[str, str] = {}
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class OLVaultK8SResources(ComponentResource):
@@ -692,7 +693,7 @@ class OLVaultK8SResources(ComponentResource):
                     },
                 },
                 {
-                    "apiVersion": "secrets.hashicrop.com/v1beta1",
+                    "apiVersion": "secrets.hashicorp.com/v1beta1",
                     "kind": "VaultAuth",
                     "metadata": {
                         "name": self.auth_name,

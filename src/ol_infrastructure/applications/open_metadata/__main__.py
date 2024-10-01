@@ -1,14 +1,17 @@
 from pathlib import Path
+from functools import partial
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, ResourceOpts, StackReference
+from pulumi import Config, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
+from bridge.lib.versions import OPEN_METADATA_VERSION
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_POSTGRES_PORT,
+    DEFAULT_HTTPS_PORT,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -61,7 +64,7 @@ consul_security_groups = consul_stack.require_output("security_groups")
 aws_account = get_caller_identity()
 
 open_metadata_namespace = "open-metadata"
-check_cluster_namespace(cluster_stack, open_metadata_namespace)
+cluster_stack.require_output("namespaces").apply(lambda ns: check_cluster_namespace(open_metadata_namespace, ns))
 
 open_metadata_database_security_group = ec2.SecurityGroup(
     f"open-metadata-database-security-group-{stack_info.env_suffix}",
@@ -160,7 +163,6 @@ consul_datacenter = consul_stack.require_output("datacenter")
 # Pulumi k8s omd help stuff. Still struggling with syntax.
 
 cluster_name = cluster_stack.require_output("cluster_name")
-VERSIONS = cluster_stack.require_output("versions")
 
 
 # Create a vault policy and associate it with an auth backend role
@@ -183,15 +185,16 @@ open_metadata_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
 vault_k8s_resources_config = OLVaultK8SResourcesConfig(
     application_name="open-metadata",
     vault_address=vault_config.require("address"),
-    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
-    vault_auth_role_name=open_metadata_vault_auth_backend_role.role_name,
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint").apply(lambda vae: f"{vae}"),
+    #vault_auth_role_name=open_metadata_vault_auth_backend_role.role_name,
+    vault_auth_role_name="placeholder",
     k8s_namespace=open_metadata_namespace,
     k8s_provider=k8s_provider,
     k8s_global_labels={},
 )
 vault_k8s_resources = OLVaultK8SResources(
     resource_config=vault_k8s_resources_config,
-    opts=ResourceOpts(
+    opts=ResourceOptions(
         parent=k8s_provider, depends_on=[open_metadata_vault_auth_backend_role]
     ),
 )
@@ -228,7 +231,7 @@ db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
                 },
                 "rolloutRestartTargets": [
                     {
-                        "kind": "Deploymnet",
+                        "kind": "Deployment",
                         # Name of the 'deployment' from the OMD helm chart
                         "name": "openmetadata",
                     },
@@ -237,7 +240,7 @@ db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
             },
         },
     ],
-    opts=ResourceOpts(
+    opts=ResourceOptions(
         provider=k8s_provider, parent=k8s_provider, depends_on=[vault_k8s_resources]
     ),
 )
@@ -250,7 +253,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
     kubernetes.helm.v3.ReleaseArgs(
         name="open-metadata-application",
         chart="open-metadata-application",
-        version=VERSIONS["OPEN_METADATA"],
+        version=OPEN_METADATA_VERSION,
         namespace=open_metadata_namespace,
         cleanup_on_fail=True,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
@@ -261,7 +264,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
                 "config": {
                     "elasticsearch": {
                         "host": opensearch_cluster["endpoint"],
-                        "port": opensearch_cluster["port"],
+                        "port": DEFAULT_HTTPS_PORT,
                     },
                     "database": {
                         "host": open_metadata_db.db_instance.address,

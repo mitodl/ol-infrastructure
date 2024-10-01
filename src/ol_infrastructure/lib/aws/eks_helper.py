@@ -1,16 +1,13 @@
-from pulumi import StackReference
-
-
-def check_cluster_namespace(cluster_stack: StackReference, namespace: str):
+def check_cluster_namespace(namespace: str, namespaces: list[str]):
     """Verify that a namespace is available in an EKS cluster.
-
-    :param cluster_stack: object representing the infrastructure.aws.eks
-        stack that is being checked.
-    :type cluster_stakc: pulumi.StackReference
 
     :param namespace: The name of the namespace to verify.
     :type namespace: str
+
+    :param namespaces: list of namespaces available in the cluster
+    :type cluster_stakc: list[str]
+
     """
-    if namespace not in cluster_stack.require_output("namespaces"):
-        msg = f"Namespace: {namespace} is not present in the EKS cluster stack."
+    if namespace not in namespaces:
+        msg = f"namespace: {namespace} not in available namespaces: {namespaces}"
         raise ValueError(msg)
