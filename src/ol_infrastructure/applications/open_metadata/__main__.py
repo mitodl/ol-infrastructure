@@ -54,6 +54,10 @@ vault_config = Config("vault")
 
 consul_provider = get_consul_provider(stack_info)
 setup_vault_provider(stack_info)
+k8s_global_labels = {
+    "pulumi_managed": "true",
+    "pulumi_stack": stack_info.full_name,
+}
 k8s_provider = kubernetes.Provider(
     "k8s-provider",
     kubeconfig=cluster_stack.require_output("kube_config"),
@@ -186,14 +190,11 @@ open_metadata_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
 vault_k8s_resources_config = OLVaultK8SResourcesConfig(
     application_name="open-metadata",
     vault_address=vault_config.require("address"),
-    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint").apply(
-        lambda vae: f"{vae}"
-    ),
-    # vault_auth_role_name=open_metadata_vault_auth_backend_role.role_name,
-    vault_auth_role_name="placeholder",
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    vault_auth_role_name=open_metadata_vault_auth_backend_role.role_name,
     k8s_namespace=open_metadata_namespace,
     k8s_provider=k8s_provider,
-    k8s_global_labels={},
+    k8s_global_labels=k8s_global_labels
 )
 vault_k8s_resources = OLVaultK8SResources(
     resource_config=vault_k8s_resources_config,
@@ -212,6 +213,7 @@ db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
             "metadata": {
                 "name": "openmetadata-db-credentials",
                 "namespace": open_metadata_namespace,
+                "labels": k8s_global_labels,
             },
             "spec": {
                 "mount": open_metadata_db_vault_backend_config.mount_point,
@@ -252,10 +254,10 @@ db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
 # TODO @Ardiea Add k8s global labels
 # https://github.com/mitodl/ol-infrastructure/issues/2680
 open_metadata_application = kubernetes.helm.v3.Release(
-    f"{cluster_name}-open-metadata-application-helm-release",
+    f"open-metadata-{stack_info.name}-application-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
-        name="open-metadata-application",
-        chart="open-metadata-application",
+        name="open-metadata",
+        chart="openmetadata",
         version=OPEN_METADATA_VERSION,
         namespace=open_metadata_namespace,
         cleanup_on_fail=True,
@@ -263,6 +265,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
             repo="https://helm.open-metadata.org",
         ),
         values={
+            "commonLabels": k8s_global_labels,
             "openmetadata": {
                 "config": {
                     "elasticsearch": {
@@ -283,15 +286,15 @@ open_metadata_application = kubernetes.helm.v3.Release(
                             },
                         },
                     },
-                    "envFrom": [
-                        {
-                            "secretRef": {
-                                "name": db_creds_secret_name,
-                            },
-                        },
-                    ],
                 },
             },
+            "envFrom": [
+                {
+                    "secretRef": {
+                        "name": db_creds_secret_name,
+                    },
+                },
+            ],
         },
         skip_await=False,
     ),
