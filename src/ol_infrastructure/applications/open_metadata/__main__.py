@@ -194,7 +194,7 @@ vault_k8s_resources_config = OLVaultK8SResourcesConfig(
     vault_auth_role_name=open_metadata_vault_auth_backend_role.role_name,
     k8s_namespace=open_metadata_namespace,
     k8s_provider=k8s_provider,
-    k8s_global_labels=k8s_global_labels
+    k8s_global_labels=k8s_global_labels,
 )
 vault_k8s_resources = OLVaultK8SResources(
     resource_config=vault_k8s_resources_config,
