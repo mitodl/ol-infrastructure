@@ -1,5 +1,4 @@
 from pathlib import Path
-from functools import partial
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -7,12 +6,12 @@ from pulumi import Config, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
-from bridge.lib.versions import OPEN_METADATA_VERSION
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
-    DEFAULT_POSTGRES_PORT,
     DEFAULT_HTTPS_PORT,
+    DEFAULT_POSTGRES_PORT,
 )
+from bridge.lib.versions import OPEN_METADATA_VERSION
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -64,7 +63,9 @@ consul_security_groups = consul_stack.require_output("security_groups")
 aws_account = get_caller_identity()
 
 open_metadata_namespace = "open-metadata"
-cluster_stack.require_output("namespaces").apply(lambda ns: check_cluster_namespace(open_metadata_namespace, ns))
+cluster_stack.require_output("namespaces").apply(
+    lambda ns: check_cluster_namespace(open_metadata_namespace, ns)
+)
 
 open_metadata_database_security_group = ec2.SecurityGroup(
     f"open-metadata-database-security-group-{stack_info.env_suffix}",
@@ -185,8 +186,10 @@ open_metadata_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
 vault_k8s_resources_config = OLVaultK8SResourcesConfig(
     application_name="open-metadata",
     vault_address=vault_config.require("address"),
-    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint").apply(lambda vae: f"{vae}"),
-    #vault_auth_role_name=open_metadata_vault_auth_backend_role.role_name,
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint").apply(
+        lambda vae: f"{vae}"
+    ),
+    # vault_auth_role_name=open_metadata_vault_auth_backend_role.role_name,
     vault_auth_role_name="placeholder",
     k8s_namespace=open_metadata_namespace,
     k8s_provider=k8s_provider,
