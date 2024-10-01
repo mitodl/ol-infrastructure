@@ -268,11 +268,11 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
     attributes=[
         keycloak.RealmUserProfileAttributeArgs(
             name="username",
-            displayName="${username}",
+            display_name="${username}",
             validators=[
                 keycloak.RealmUserProfileAttributeValidatorArgs(
                     name="length",
-                    config={"min": 3, "max": 255},
+                    config={"min": "3", "max": "255"},
                 ),
                 keycloak.RealmUserProfileAttributeValidatorArgs(
                     name="username-prohibited-characters", config={}
@@ -284,11 +284,10 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
             permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                 views=["admin", "user"], edits=["admin", "user"]
             ),
-            multivalued=False,
         ),
         keycloak.RealmUserProfileAttributeArgs(
             name="email",
-            displayName="${email}",
+            display_name="${email}",
             validators=[
                 keycloak.RealmUserProfileAttributeValidatorArgs(
                     name="email",
@@ -296,22 +295,21 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
                 ),
                 keycloak.RealmUserProfileAttributeValidatorArgs(
                     name="length",
-                    config={"max": 255},
+                    config={"max": "255"},
                 ),
             ],
             required_for_roles=["user"],
             permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                 views=["admin", "user"], edits=["admin", "user"]
             ),
-            multivalued=False,
         ),
         keycloak.RealmUserProfileAttributeArgs(
             name="fullName",
-            displayName="${fullName}",
+            display_name="${fullName}",
             validators=[
                 keycloak.RealmUserProfileAttributeValidatorArgs(
                     name="length",
-                    config={"max": 512},
+                    config={"max": "512"},
                 ),
                 keycloak.RealmUserProfileAttributeValidatorArgs(
                     name="person-name-prohibited-characters", config={}
@@ -321,16 +319,15 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
             permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                 views=["admin", "user"], edits=["admin", "user"]
             ),
-            multivalued=False,
         ),
         keycloak.RealmUserProfileAttributeArgs(
             name="firstName",
-            displayName="${firstName}",
+            display_name="${firstName}",
             group="legal-address",
             validators=[
                 keycloak.RealmUserProfileAttributeValidatorArgs(
                     name="length",
-                    config={"max": 255},
+                    config={"max": "255"},
                 ),
                 keycloak.RealmUserProfileAttributeValidatorArgs(
                     name="person-name-prohibited-characters", config={}
@@ -340,16 +337,15 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
             permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                 views=["admin", "user"], edits=["admin", "user"]
             ),
-            multivalued=False,
         ),
         keycloak.RealmUserProfileAttributeArgs(
             name="lastName",
-            displayName="${lastName}",
+            display_name="${lastName}",
             group="legal-address",
             validators=[
                 keycloak.RealmUserProfileAttributeValidatorArgs(
                     name="length",
-                    config={"max": 255},
+                    config={"max": "255"},
                 ),
                 keycloak.RealmUserProfileAttributeValidatorArgs(
                     name="person-name-prohibited-characters", config={}
@@ -359,7 +355,6 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
             permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                 views=["admin", "user"], edits=["admin", "user"]
             ),
-            multivalued=False,
         ),
     ],
     groups=[
