@@ -1012,8 +1012,9 @@ secret_operations_global_update_search_data_webhook_key = (
         opts=InvokeOptions(parent=mitopen_vault_mount),
     )
 )
-secret_operations_sso_open = vault.generic.get_secret_output(
-    path="secret-operations/sso/open", opts=InvokeOptions(parent=mitopen_vault_mount)
+secret_operations_sso_learn = vault.generic.get_secret_output(
+    path="secret-operations/sso/mitlearn",
+    opts=InvokeOptions(parent=mitopen_vault_mount),
 )
 secret_operations_tika_access_token = vault.generic.get_secret_output(
     path="secret-operations/tika/access-token",
@@ -1080,7 +1081,7 @@ sensitive_heroku_vars = {
     "OCW_WEBHOOK_KEY": secret_operations_global_update_search_data_webhook_key.data.apply(
         lambda data: "{}".format(data["value"])
     ),
-    "SOCIAL_AUTH_OL_OIDC_SECRET": secret_operations_sso_open.data.apply(
+    "SOCIAL_AUTH_OL_OIDC_SECRET": secret_operations_sso_learn.data.apply(
         lambda data: "{}".format(data["client_secret"])
     ),
     "TIKA_ACCESS_TOKEN": secret_operations_tika_access_token.data.apply(
