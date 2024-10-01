@@ -4,13 +4,16 @@ encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQFVoeJh3NbKbr5xD+
 config:
   environment:business_unit: operations
   environment:target_vpc: operations_vpc
-  eks:vault_secrets_operator: true
+  eks:allowed_dns_zones:
+  - ".odl.mit.edu"
+  - "odl.mit.edu"
+  - ".ol.mit.edu"
+  - "ol.mit.edu"
   eks:ebs_csi_provisioner: true
   eks:efs_csi_provisioner: true
-  eks:lb_controller: true
-  eks:pod_security_groups: false
-  eks:namespaces:
-  - "omd"  # Openmetadata testing
+  eks:gateway_release_channel: "experimental"
+  eks:pod_security_groups: true
+  eks:namespaces: []
   eks:nodegroups:
     worker-xlarge:
       instance_types:
