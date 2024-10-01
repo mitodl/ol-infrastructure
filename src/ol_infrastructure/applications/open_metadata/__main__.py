@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, ResourceOpts, StackReference
+from pulumi import Config, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -191,7 +191,7 @@ vault_k8s_resources_config = OLVaultK8SResourcesConfig(
 )
 vault_k8s_resources = OLVaultK8SResources(
     resource_config=vault_k8s_resources_config,
-    opts=ResourceOpts(
+    opts=ResourceOptions(
         parent=k8s_provider, depends_on=[open_metadata_vault_auth_backend_role]
     ),
 )
@@ -237,7 +237,7 @@ db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
             },
         },
     ],
-    opts=ResourceOpts(
+    opts=ResourceOptions(
         provider=k8s_provider, parent=k8s_provider, depends_on=[vault_k8s_resources]
     ),
 )
