@@ -9,15 +9,15 @@ from pulumi_consul import Node, Service, ServiceCheckArgs
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_HTTPS_PORT,
-    DEFAULT_MYSQL_PORT,
+    DEFAULT_POSTGRES_PORT,
 )
 from bridge.lib.versions import OPEN_METADATA_VERSION
-from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
+from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
-    OLVaultMysqlDatabaseConfig,
+    OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import check_cluster_namespace
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
@@ -83,16 +83,16 @@ open_metadata_database_security_group = ec2.SecurityGroup(
                 vault_stack.require_output("vault_server")["security_group"],
             ],
             protocol="tcp",
-            from_port=DEFAULT_MYSQL_PORT,
-            to_port=DEFAULT_MYSQL_PORT,
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
             description="Access to postgres from open metadata servers.",
         ),
         # TODO @Ardiea: switch to use pod-security-groups once implemented
         ec2.SecurityGroupIngressArgs(
             security_groups=[],
             protocol="tcp",
-            from_port=DEFAULT_MYSQL_PORT,
-            to_port=DEFAULT_MYSQL_PORT,
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
             cidr_blocks=k8s_pod_subnet_cidrs,
             description="Allow k8s cluster to talk to DB",
         ),
@@ -106,7 +106,7 @@ rds_defaults["instance_size"] = (
     open_metadata_config.get("db_instance_size") or DBInstanceTypes.small.value
 )
 
-open_metadata_db_config = OLMariaDBConfig(
+open_metadata_db_config = OLPostgresDBConfig(
     instance_name=f"open-metadata-db-{stack_info.env_suffix}",
     password=open_metadata_config.get("db_password"),
     subnet_group_name=apps_vpc["rds_subnet"],
@@ -120,7 +120,7 @@ open_metadata_db_config = OLMariaDBConfig(
 )
 open_metadata_db = OLAmazonDB(open_metadata_db_config)
 
-open_metadata_db_vault_backend_config = OLVaultMysqlDatabaseConfig(
+open_metadata_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=open_metadata_db_config.db_name,
     mount_point=f"{open_metadata_db_config.engine}-open-metadata",
     db_admin_username=open_metadata_db_config.username,
