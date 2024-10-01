@@ -628,7 +628,8 @@ for openid_clients in keycloak_realm_config.get_object("openid_clients"):
     realm_name = openid_clients.get("realm_name")
     client_details = openid_clients.get("client_info")
     for client_name, client_detail in client_details.items():
-        url = client_detail[0]
+        urls = [url for url in client_detail if url.startswith("https")]
+
         openid_client = keycloak.openid.Client(
             f"{realm_name}-{client_name}-client",
             name=f"ol-{client_name}-client",
@@ -637,7 +638,7 @@ for openid_clients in keycloak_realm_config.get_object("openid_clients"):
             enabled=True,
             access_type="CONFIDENTIAL",
             standard_flow_enabled=True,
-            valid_redirect_uris=[f"{url}"],
+            valid_redirect_uris=urls,
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
         )
         vault.generic.Secret(
