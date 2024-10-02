@@ -331,7 +331,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     },
                     "authentication": {
                         "provider": "custom-oidc",
-                        "callbackUrl": f"http://localhost:8585/callback",
+                        "callbackUrl": "http://localhost:8585/callback",
                         # To be loaded from vault via env vars
                         # publicKeys
                         # authority
