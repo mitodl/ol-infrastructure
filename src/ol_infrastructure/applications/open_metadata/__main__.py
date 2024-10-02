@@ -321,3 +321,80 @@ open_metadata_application = kubernetes.helm.v3.Release(
         depends_on=[open_metadata_db, db_creds_dynamic_secret],
     ),
 )
+
+traefik_gateway = kubernetes.yaml.v2.ConfigGroup(
+    f"{cluster_name}-traefik-gateway",
+    objs=[
+        {
+            "apiVersion": "gateway.networking.k8s.io/v1",
+            "kind": "Gateway",
+            "metadata": {
+                "name": "openmetadata-gateway",
+                "namespace": open_metadata_namespace,
+                "annotations": {
+                    "cert-manager.io/cluster-issuer": "letsencrypt-production",
+                },
+            },
+            "spec": {
+                "gatewayClassName": "traefik",
+                "listeners": [
+                    {
+                        "name": "http",
+                        "protocol": "HTTP",
+                        "port": 8000,
+                    },
+                    {
+                        "name": "https",
+                        "hostname": "openmetadata-ci.ol.mit.edu",
+                        "protocol": "HTTPS",
+                        "port": 8443,
+                        "tls": {
+                            "mode": "Terminate",
+                            "certificateRefs": [
+                                {
+                                    "group": "core",
+                                    "kind": "Secret",
+                                    "name": "openmetadata-ci-tls",
+                                    "namespace": open_metadata_namespace,
+                                },
+                            ],
+                        },
+                    },
+                ],
+            },
+        },
+        {
+            "apiVersion": "gateway.networking.k8s.io/v1",
+            "kind": "HTTPRoute",
+            "metadata": {
+                "name": "openmetadata-httproute",
+                "namespace": open_metadata_namespace,
+            },
+            "spec": {
+                "parentRefs": [
+                    {
+                        "name": "openmetadata-gateway",
+                        "sectionName": "http",
+                        "kind": "Gateway",
+                        "group": "gateway.networking.k8s.io",
+                        "port": 8443,
+                    }
+                ],
+                "hostnames": ["openmetadata-ci.ol.mit.edu"],
+                "rules": [
+                    {
+                        "backendRefs": [
+                            {
+                                "name": "openmetadata",
+                                "namespace": open_metadata_namespace,
+                                "kind": "Service",
+                                "port": 8585,
+                            }
+                        ]
+                    },
+                ],
+            },
+        },
+    ],
+    opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+)
