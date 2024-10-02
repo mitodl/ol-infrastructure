@@ -31,7 +31,6 @@ config:
   keycloak_realm:openid_clients:
   - client_info:
       open-discusions: ["https://discussions-ci.odl.mit.edu/*"]
-      open-local: "*"
     realm_name: olapps
   - client_info:
       superset: ["https://bi-ci.ol.mit.edu/*", "superset_admin", "superset_alpha",
