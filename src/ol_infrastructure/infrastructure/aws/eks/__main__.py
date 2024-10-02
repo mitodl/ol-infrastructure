@@ -62,8 +62,6 @@ VERSIONS = {
     "EXTERNAL_DNS_CHART": "1.15.0",
     "TRAEFIK_CHART": "v31.0.0",
     "VAULT_SECRETS_OPERATOR_CHART": "0.8.1",
-    "VAULT_SECRETS_OPERATOR": "0.8.1",
-    "OPEN_METADATA": "1.5.5",
 }
 
 # A global toleration to allow operators to run on nodes tainted as

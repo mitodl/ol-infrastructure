@@ -226,10 +226,10 @@ db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
                         "excludes": [".*"],
                         "templates": {
                             "DB_USER": {
-                                "text": '{{ get .Secrets ".username" }}',
+                                "text": '{{ get .Secrets "username" }}',
                             },
-                            "DB_PASSWORD": {
-                                "text": '{{ get .Secrets ".password" }}',
+                            "DB_USER_PASSWORD": {
+                                "text": '{{ get .Secrets "password" }}',
                             },
                         },
                     },
@@ -268,6 +268,9 @@ open_metadata_application = kubernetes.helm.v3.Release(
             "commonLabels": k8s_global_labels,
             "openmetadata": {
                 "config": {
+                    "pipelineServiceClientConfig": {
+                        "enabled": False,
+                    },
                     "elasticsearch": {
                         "host": opensearch_cluster["endpoint"],
                         "port": DEFAULT_HTTPS_PORT,
@@ -276,6 +279,8 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "host": open_metadata_db.db_instance.address,
                         "port": open_metadata_db_config.port,
                         "databaseName": open_metadata_db_config.db_name,
+                        "driverClass": "org.postgresql.Driver",
+                        "dbScheme": "postgresql",
                         # Null out the auth elements in favor of our own
                         # secret pulled in with envFrom below.
                         "auth": {
