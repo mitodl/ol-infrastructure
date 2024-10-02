@@ -36,6 +36,14 @@ config:
       superset: ["https://bi-ci.ol.mit.edu/*", "superset_admin", "superset_alpha",
         "superset_gamma"]
     realm_name: ol-data-platform
+    service_accounts_enabled: true
+  - client_info:
+      open_metadata: ["https://open-metadata-ci.ol.mit.edu/*", "open_metadata_admin",
+        "open_metadata_user"]
+    realm_name: ol-data-platform
+    implicit_flow_enabled: true
+    standard_flow_enabled: false
+    service_accounts_enabled: true
   - client_info:
       leek: ["https://celery-monitoring-ci.odl.mit.edu/*"]
     realm_name: ol-platform-engineering
