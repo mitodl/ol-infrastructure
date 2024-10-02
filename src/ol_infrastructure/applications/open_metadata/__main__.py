@@ -26,7 +26,7 @@ from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import setup_vault_provider, postgres_role_statements
+from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
 setup_vault_provider()
 stack_info = parse_stack()
@@ -123,8 +123,12 @@ open_metadata_db = OLAmazonDB(open_metadata_db_config)
 
 # Ref: https://docs.open-metadata.org/latest/deployment/kubernetes/eks
 open_metadata_role_statements = postgres_role_statements.copy()
-open_metadata_role_statements["app"]["create"].append(Template('GRANT USAGE ON SCHEMA public TO "{{name}}";'))
-open_metadata_role_statements["app"]["create"].append(Template('GRANT CREATE ON EXTENSION pgcrypto TO "{{name}}";'))
+open_metadata_role_statements["app"]["create"].append(
+    Template('GRANT USAGE ON SCHEMA public TO "{{name}}";')
+)
+open_metadata_role_statements["app"]["create"].append(
+    Template('GRANT CREATE ON EXTENSION pgcrypto TO "{{name}}";')
+)
 
 open_metadata_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=open_metadata_db_config.db_name,
@@ -281,6 +285,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "elasticsearch": {
                         "host": opensearch_cluster["endpoint"],
                         "port": DEFAULT_HTTPS_PORT,
+                        "scheme": "https",
                     },
                     "database": {
                         "host": open_metadata_db.db_instance.address,
