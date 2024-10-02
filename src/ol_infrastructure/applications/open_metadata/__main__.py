@@ -176,10 +176,6 @@ open_metadata_db_consul_service = Service(
 ## Begin block for migrating to pyinfra images
 consul_datacenter = consul_stack.require_output("datacenter")
 
-# Pulumi k8s omd help stuff. Still struggling with syntax.
-
-cluster_name = cluster_stack.require_output("cluster_name")
-
 
 # Create a vault policy and associate it with an auth backend role
 # on the vault k8s cluster auth endpoint
@@ -323,7 +319,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
 )
 
 traefik_gateway = kubernetes.yaml.v2.ConfigGroup(
-    f"{cluster_name}-traefik-gateway",
+    f"{stack_info.name}-traefik-gateway",
     objs=[
         {
             "apiVersion": "gateway.networking.k8s.io/v1",
