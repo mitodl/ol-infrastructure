@@ -4,6 +4,7 @@ encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQHNccb0Qf344tYSpN
 config:
   aws:region: us-east-1
   consul:address: https://consul-data-ci.odl.mit.edu
+  open_metadata:domain: "open-metadata-ci.ol.mit.edu"
   open_metadata:db_password:
     secure: v1:N26+x5PLL2Teu2wf:8NVzfMjmFDD+rOZOMmWaSpSP6zbFIg+DbuWsiFOan4UdUuhHOG4wZDsjCJLWFafRKCXlRJq/CvBI5zw=
   vault:address: https://vault-ci.odl.mit.edu
