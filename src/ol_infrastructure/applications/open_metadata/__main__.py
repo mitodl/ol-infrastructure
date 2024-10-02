@@ -418,7 +418,7 @@ traefik_gateway = kubernetes.yaml.v2.ConfigGroup(
                                     "group": "",
                                     "kind": "Secret",
                                     "name": "openmetadata-ci-tls",
-                                    "namespace": open_metadata_namespace,
+                                    # "namespace": open_metadata_namespace,
                                 },
                             ],
                         },
