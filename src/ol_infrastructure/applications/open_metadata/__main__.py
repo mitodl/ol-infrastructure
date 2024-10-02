@@ -176,7 +176,6 @@ open_metadata_db_consul_service = Service(
 ## Begin block for migrating to pyinfra images
 consul_datacenter = consul_stack.require_output("datacenter")
 
-
 # Create a vault policy and associate it with an auth backend role
 # on the vault k8s cluster auth endpoint
 open_metadata_vault_policy = vault.Policy(
@@ -193,7 +192,6 @@ open_metadata_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
     token_policies=[open_metadata_vault_policy.name],
 )
 
-# TODO @Ardiea Add k8s global labels
 vault_k8s_resources_config = OLVaultK8SResourcesConfig(
     application_name="open-metadata",
     vault_address=vault_config.require("address"),
@@ -256,9 +254,55 @@ db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
         provider=k8s_provider, parent=k8s_provider, depends_on=[vault_k8s_resources]
     ),
 )
+oidc_config_secret_name = "oidc-config"
+oidc_static_secret = kubernetes.yaml.v2.ConfigGroup(
+    "open-metadata-staticsecret-oidc-config",
+    objs=[
+        {
+            "apiVersion": "secrets.hashicorp.com/v1beta1",
+            "kind": "VaultStaticSecret",
+            "metadata": {
+                "name": "openmetadata-oidc-config",
+                "namespace": open_metadata_namespace,
+                "labels": k8s_global_labels,
+            },
+            "spec": {
+                "type": "kv-v1",
+                "mount": "secret-operations",
+                "path": "sso/open_metadata",
+                "destination": {
+                    "name": oidc_config_secret_name,
+                    "create": True,
+                    "overwrite": True,
+                    "transformation": {
+                        "excludes": [".*"],
+                        "templates": {
+                            "AUTHENTICATION_PUBLIC_KEYS": {
+                                "text": '[http://openmetadata:8585/api/v1/system/config/jwks,{{ get .Secrets "url" }}/protocol/openid-connect/certs]',
+                            },
+                            "AUTHENTICATION_AUTHORITY": {
+                                "text": '{{ get .Secrets "url" }}',
+                            },
+                            "AUTHENTICATION_CLIENT_ID": {
+                                "text": '{{ get .Secrets "client_id" }}',
+                            },
+                            "OIDC_CLIENT_SECRET": {
+                                "text": '{{ get .Secrets "client_secret" }}',
+                            },
+                        },
+                    },
+                },
+                "refreshAfter": "1h",
+                "vaultAuthRef": vault_k8s_resources.auth_name,
+            },
+        },
+    ],
+    opts=ResourceOptions(
+        provider=k8s_provider, parent=k8s_provider, depends_on=[vault_k8s_resources]
+    ),
+)
 
 # Install the openmetadata helm chart
-# TODO @Ardiea Add k8s global labels
 # https://github.com/mitodl/ol-infrastructure/issues/2680
 open_metadata_application = kubernetes.helm.v3.Release(
     f"open-metadata-{stack_info.name}-application-helm-release",
@@ -275,6 +319,24 @@ open_metadata_application = kubernetes.helm.v3.Release(
             "commonLabels": k8s_global_labels,
             "openmetadata": {
                 "config": {
+                    # Ref: https://docs.open-metadata.org/latest/deployment/security/keycloak/kubernetes
+                    "authorizer": {
+                        "enabled": True,
+                        "className": "org.openmetadata.service.security.DefaultAuthorizer",
+                        "containerRequestFilter": "org.openmetadata.service.security.JwtFilter",
+                        "initialAdmins": [
+                            "admin-user",
+                        ],
+                        "principalDomain": "open-metadata.org",
+                    },
+                    "authentication": {
+                        "provider": "custom-oidc",
+                        "callbackUrl": "http://localhost:8585/callback",
+                        # To be loaded from vault via env vars
+                        # publicKeys
+                        # authority
+                        # clientId
+                    },
                     "pipelineServiceClientConfig": {
                         "enabled": False,
                     },
@@ -307,6 +369,11 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "name": db_creds_secret_name,
                     },
                 },
+                {
+                    "secretRef": {
+                        "name": oidc_config_secret_name,
+                    },
+                },
             ],
         },
         skip_await=False,
@@ -314,12 +381,12 @@ open_metadata_application = kubernetes.helm.v3.Release(
     opts=ResourceOptions(
         provider=k8s_provider,
         parent=k8s_provider,
-        depends_on=[open_metadata_db, db_creds_dynamic_secret],
+        depends_on=[open_metadata_db, db_creds_dynamic_secret, oidc_static_secret],
     ),
 )
 
 traefik_gateway = kubernetes.yaml.v2.ConfigGroup(
-    f"{stack_info.name}-traefik-gateway",
+    f"open-metadata-{stack_info.name}-traefik-gateway",
     objs=[
         {
             "apiVersion": "gateway.networking.k8s.io/v1",
@@ -341,17 +408,17 @@ traefik_gateway = kubernetes.yaml.v2.ConfigGroup(
                     },
                     {
                         "name": "https",
-                        "hostname": "openmetadata-ci.ol.mit.edu",
+                        "hostname": open_metadata_config.require("domain"),
                         "protocol": "HTTPS",
                         "port": 8443,
                         "tls": {
                             "mode": "Terminate",
                             "certificateRefs": [
                                 {
-                                    "group": "core",
+                                    "group": "",
                                     "kind": "Secret",
                                     "name": "openmetadata-ci-tls",
-                                    "namespace": open_metadata_namespace,
+                                    #"namespace": open_metadata_namespace,
                                 },
                             ],
                         },
@@ -363,7 +430,7 @@ traefik_gateway = kubernetes.yaml.v2.ConfigGroup(
             "apiVersion": "gateway.networking.k8s.io/v1",
             "kind": "HTTPRoute",
             "metadata": {
-                "name": "openmetadata-httproute",
+                "name": "openmetadata-http-route",
                 "namespace": open_metadata_namespace,
             },
             "spec": {
@@ -373,10 +440,42 @@ traefik_gateway = kubernetes.yaml.v2.ConfigGroup(
                         "sectionName": "http",
                         "kind": "Gateway",
                         "group": "gateway.networking.k8s.io",
+                        "port": 8000,
+                    }
+                ],
+                "hostnames": [open_metadata_config.require("domain")],
+                "rules": [
+                    {
+                        "filters": [
+                            {
+                                "type": "RequestRedirect",
+                                "requestRedirect": {
+                                    "scheme": "https",
+                                },
+                            },
+                        ],
+                    },
+                ],
+            },
+        },
+        {
+            "apiVersion": "gateway.networking.k8s.io/v1",
+            "kind": "HTTPRoute",
+            "metadata": {
+                "name": "openmetadata-https-route",
+                "namespace": open_metadata_namespace,
+            },
+            "spec": {
+                "parentRefs": [
+                    {
+                        "name": "openmetadata-gateway",
+                        "sectionName": "https",
+                        "kind": "Gateway",
+                        "group": "gateway.networking.k8s.io",
                         "port": 8443,
                     }
                 ],
-                "hostnames": ["openmetadata-ci.ol.mit.edu"],
+                "hostnames": [open_metadata_config.require("domain")],
                 "rules": [
                     {
                         "backendRefs": [
