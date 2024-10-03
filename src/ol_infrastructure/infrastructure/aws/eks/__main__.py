@@ -929,8 +929,8 @@ external_dns_release = (
                         ),
                     },
                 },
-                "logLevel": "debug",
-                "policy": "upsert-only",
+                "logLevel": "info",
+                "policy": "sync",
                 # Configure external-dns to only look at gateway resources
                 # disables support for monitoring services or legacy ingress resources
                 "sources": [

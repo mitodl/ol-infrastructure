@@ -88,7 +88,7 @@ open_metadata_database_security_group = ec2.SecurityGroup(
             to_port=DEFAULT_POSTGRES_PORT,
             description="Access to postgres from open metadata servers.",
         ),
-        # TODO @Ardiea: switch to use pod-security-groups once implemented
+        # TODO @Ardiea: switch to use pod-security-groups once implemented  # noqa: TD003, FIX002, E501
         ec2.SecurityGroupIngressArgs(
             security_groups=[],
             protocol="tcp",
@@ -137,6 +137,7 @@ open_metadata_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_admin_password=open_metadata_config.get("db_password"),
     db_host=open_metadata_db.db_instance.address,
     role_statements=open_metadata_role_statements,
+    opts=ResourceOptions(parent=open_metadata_db),
 )
 open_metadata_db_vault_backend = OLVaultDatabaseBackend(
     open_metadata_db_vault_backend_config
@@ -208,7 +209,7 @@ vault_k8s_resources = OLVaultK8SResources(
     ),
 )
 
-db_creds_secret_name = "pgsql-db-creds"
+db_creds_secret_name = "pgsql-db-creds"  # noqa: S105  # pragma: allowlist secret
 db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
     "open-metadata-dynamicsecret-db-creds",
     objs=[
@@ -254,7 +255,7 @@ db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
         provider=k8s_provider, parent=k8s_provider, depends_on=[vault_k8s_resources]
     ),
 )
-oidc_config_secret_name = "oidc-config"
+oidc_config_secret_name = "oidc-config"  # noqa: S105  # pragma: allowlist secret
 oidc_static_secret = kubernetes.yaml.v2.ConfigGroup(
     "open-metadata-staticsecret-oidc-config",
     objs=[
@@ -278,7 +279,7 @@ oidc_static_secret = kubernetes.yaml.v2.ConfigGroup(
                         "excludes": [".*"],
                         "templates": {
                             "AUTHENTICATION_PUBLIC_KEYS": {
-                                "text": '[http://openmetadata:8585/api/v1/system/config/jwks,{{ get .Secrets "url" }}/protocol/openid-connect/certs]',
+                                "text": '[http://openmetadata:8585/api/v1/system/config/jwks,{{ get .Secrets "url" }}/protocol/openid-connect/certs]',  # noqa: E501
                             },
                             "AUTHENTICATION_AUTHORITY": {
                                 "text": '{{ get .Secrets "url" }}',
@@ -322,8 +323,8 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     # Ref: https://docs.open-metadata.org/latest/deployment/security/keycloak/kubernetes
                     "authorizer": {
                         "enabled": True,
-                        "className": "org.openmetadata.service.security.DefaultAuthorizer",
-                        "containerRequestFilter": "org.openmetadata.service.security.JwtFilter",
+                        "className": "org.openmetadata.service.security.DefaultAuthorizer",  # noqa: E501
+                        "containerRequestFilter": "org.openmetadata.service.security.JwtFilter",  # noqa: E501
                         "initialAdmins": [
                             "admin-user",
                         ],
@@ -331,7 +332,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     },
                     "authentication": {
                         "provider": "custom-oidc",
-                        "callbackUrl": f"https://{open_metadata_config.require("domain")}/callback",
+                        "callbackUrl": f"https://{open_metadata_config.require('domain')}/callback",
                         # To be loaded from vault via env vars
                         # publicKeys
                         # authority
@@ -418,7 +419,7 @@ traefik_gateway = kubernetes.yaml.v2.ConfigGroup(
                                     "group": "",
                                     "kind": "Secret",
                                     "name": "openmetadata-ci-tls",
-                                    # "namespace": open_metadata_namespace,
+                                    "namespace": open_metadata_namespace,
                                 },
                             ],
                         },
