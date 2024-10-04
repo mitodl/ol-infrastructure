@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import yaml
-from pulumi import Config, Output, StackReference
+from pulumi import Config, Output, StackReference, export
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -615,6 +615,8 @@ for worker_def in concourse_config.get_object("workers") or []:
         path="/ol-applications/concourse/role/",
         tags=aws_config.tags,  # We will leave all the IAM resources with default tags.
     )
+
+    export(f"{worker_class_name}-instance-role-arn", concourse_worker_instance_role.arn)
 
     for iam_policy_name in worker_def["iam_policies"] or []:
         iam_policy_object = iam_policy_objects[iam_policy_name]
