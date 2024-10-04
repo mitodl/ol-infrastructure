@@ -123,11 +123,27 @@ open_metadata_db = OLAmazonDB(open_metadata_db_config)
 
 # Ref: https://docs.open-metadata.org/latest/deployment/kubernetes/eks
 open_metadata_role_statements = postgres_role_statements.copy()
-open_metadata_role_statements["app"]["create"].append(
-    Template('GRANT USAGE ON SCHEMA public TO "{{name}}";')
-)
-open_metadata_role_statements["app"]["create"].append(
-    Template('GRANT CREATE ON EXTENSION pgcrypto TO "{{name}}";')
+open_metadata_role_statements["approle"]["create"].append(
+    Template(
+        """
+        DO
+        $$do$$
+        BEGIN
+           IF EXISTS (
+              SELECT FROM pg_catalog.pg_extension
+              WHERE  extname = 'pgcrypto') THEN
+                  RAISE NOTICE 'Extension "pgcrypto" already exists. Skipping.';
+           ELSE
+              BEGIN   -- nested block
+                 CREATE EXTENSION pgcrypto;
+              EXCEPTION
+                 WHEN duplicate_object THEN
+                    RAISE NOTICE 'Extension "pgcrypto" was just created by a concurrent transaction. Skipping.';
+              END;
+           END IF;
+        END
+        $$do$$;"""  # noqa: E501
+    )
 )
 
 open_metadata_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
@@ -137,10 +153,10 @@ open_metadata_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_admin_password=open_metadata_config.get("db_password"),
     db_host=open_metadata_db.db_instance.address,
     role_statements=open_metadata_role_statements,
-    opts=ResourceOptions(parent=open_metadata_db),
 )
 open_metadata_db_vault_backend = OLVaultDatabaseBackend(
-    open_metadata_db_vault_backend_config
+    open_metadata_db_vault_backend_config,
+    opts=ResourceOptions(delete_before_replace=True, parent=open_metadata_db),
 )
 
 open_metadata_db_consul_node = Node(
@@ -205,7 +221,9 @@ vault_k8s_resources_config = OLVaultK8SResourcesConfig(
 vault_k8s_resources = OLVaultK8SResources(
     resource_config=vault_k8s_resources_config,
     opts=ResourceOptions(
-        parent=k8s_provider, depends_on=[open_metadata_vault_auth_backend_role]
+        parent=k8s_provider,
+        delete_before_replace=True,
+        depends_on=[open_metadata_vault_auth_backend_role],
     ),
 )
 
@@ -252,7 +270,9 @@ db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
         },
     ],
     opts=ResourceOptions(
-        provider=k8s_provider, parent=k8s_provider, depends_on=[vault_k8s_resources]
+        provider=k8s_provider,
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
     ),
 )
 oidc_config_secret_name = "oidc-config"  # noqa: S105  # pragma: allowlist secret
@@ -299,7 +319,9 @@ oidc_static_secret = kubernetes.yaml.v2.ConfigGroup(
         },
     ],
     opts=ResourceOptions(
-        provider=k8s_provider, parent=k8s_provider, depends_on=[vault_k8s_resources]
+        provider=k8s_provider,
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
     ),
 )
 
@@ -381,7 +403,8 @@ open_metadata_application = kubernetes.helm.v3.Release(
     ),
     opts=ResourceOptions(
         provider=k8s_provider,
-        parent=k8s_provider,
+        parent=vault_k8s_resources,
+        delete_before_replace=True,
         depends_on=[open_metadata_db, db_creds_dynamic_secret, oidc_static_secret],
     ),
 )
@@ -492,5 +515,9 @@ traefik_gateway = kubernetes.yaml.v2.ConfigGroup(
             },
         },
     ],
-    opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=open_metadata_application,
+        delete_before_replace=True,
+    ),
 )
