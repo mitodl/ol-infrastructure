@@ -929,8 +929,8 @@ external_dns_release = (
                         ),
                     },
                 },
-                "logLevel": "debug",
-                "policy": "upsert-only",
+                "logLevel": "info",
+                "policy": "sync",
                 # Configure external-dns to only look at gateway resources
                 # disables support for monitoring services or legacy ingress resources
                 "sources": [
@@ -1083,4 +1083,13 @@ cert_manager_release = kubernetes.helm.v3.Release(
         depends_on=[cluster, node_groups[0]],
         delete_before_replace=True,
     ),
+)
+
+export(
+    "kube_config_data",
+    {
+        "role_arn": administrator_role.arn,
+        "certificate-authority-data": cluster.eks_cluster.certificate_authority,
+        "server": cluster.eks_cluster.endpoint,
+    },
 )
