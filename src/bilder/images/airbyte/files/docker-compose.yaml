@@ -8,7 +8,7 @@ x-logging: &default-logging
   driver: json-file
 services:
   traefik:
-    image: traefik:v3.1
+    image: traefik:v3.2
     container_name: traefik
     command:
     - "--configFile=/etc/traefik/traefik.yaml"
