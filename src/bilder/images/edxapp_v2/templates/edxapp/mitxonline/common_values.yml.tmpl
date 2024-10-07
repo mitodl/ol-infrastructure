@@ -178,6 +178,17 @@ CACHES:  # MODIFIED
     staticfiles:
       <<: *redis_cache_config
       KEY_PREFIX: staticfiles
+CELERY_BEAT_SCHEDULE:
+    send-email-digest:
+      task: openedx.core.djangoapps.notifications.emails.tasks.send_digest_email_to_all_users
+      schedule:
+        minute: 0
+        hour: 0
+        day_of_week: "*"
+        day_of_month: "*"
+        month_of_year: "*"
+      args:
+        - "Daily"
 CELERYBEAT_SCHEDULER: redbeat.RedBeatScheduler  # MODIFIED
 CELERY_BROKER_HOSTNAME: edxapp-redis.service.consul:6379  # MODIFIED
 CELERY_BROKER_TRANSPORT: rediss  # MODIFIED - second "s" indicates "secure"
