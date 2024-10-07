@@ -12,11 +12,11 @@ import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
 from bridge.lib.magic_numbers import DEFAULT_EFS_PORT, IAM_ROLE_NAME_PREFIX_MAX_LENGTH
+from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.lib.aws.iam_helper import (
     EKS_ADMIN_USERNAMES,
     IAM_POLICY_VERSION,
     lint_iam_policy,
-    oidc_trust_policy_template,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -345,27 +345,22 @@ csi_driver_role_parliament_config = {
 # Ref: https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html
 export("has_ebs_storage", eks_config.get_bool("ebs_csi_provisioner"))
 if eks_config.get_bool("ebs_csi_provisioner"):
-    ebs_csi_driver_role = aws.iam.Role(
-        f"{cluster_name}-ebs-csi-driver-trust-role",
-        name=f"{cluster_name}-ebs-csi-driver-trust-role",
-        path=f"/ol-infrastructure/eks/{cluster_name}/",
-        assume_role_policy=cluster.eks_cluster.identities.apply(
-            lambda ids: lint_iam_policy(
-                oidc_trust_policy_template(
-                    oidc_identifier=ids[0]["oidcs"][0]["issuer"],
-                    account_id=aws_account.account_id,
-                    k8s_service_account_identifier="system:serviceaccount:kube-system:ebs-csi-controller-sa",
-                    operator="StringEquals",
-                ),
-                parliament_config=csi_driver_role_parliament_config,
-                stringify=True,
-            )
-        ),
-        description="Trust role for allowing the EBS CSI driver to provision storage "
+    ebs_csi_driver_role_config = OLEKSTrustRoleConfig(
+        account_id=aws_account.account_id,
+        cluster_name=cluster_name,
+        cluster_identities=cluster.eks_cluster.identities,
+        description="Trust role for allowing the ebs csi driver to provision storage "
         "from within the cluster.",
+        policy_operator="StringEquals",
+        role_name="ebs-csi-driver",
+        service_account_identifier="system:serviceaccounts:kube-system:ebs-csi-controller-sa",
+        tags=aws_config.tags,
+    )
+    ebs_csi_driver_role = OLEKSTrustRole(
+        f"{cluster_name}-ebs-csi-driver-trust-role",
+        role_config=ebs_csi_driver_role_config,
         opts=ResourceOptions(parent=cluster, depends_on=cluster),
     )
-
     ebs_csi_driver_kms_for_encryption_policy = aws.iam.Policy(
         f"{cluster_name}-ebs-csi-driver-kms-for-encryption-policy",
         name=f"{cluster_name}-ebs-csi-driver-kms-for-encryption-policy",
@@ -404,18 +399,18 @@ if eks_config.get_bool("ebs_csi_provisioner"):
                 stringify=True,
             )
         ),
-        opts=ResourceOptions(parent=cluster, depends_on=cluster),
+        opts=ResourceOptions(parent=ebs_csi_driver_role, depends_on=cluster),
     )
     aws.iam.RolePolicyAttachment(
         f"{cluster_name}-ebs-csi-driver-kms-policy-attachment",
         policy_arn=ebs_csi_driver_kms_for_encryption_policy.arn,
-        role=ebs_csi_driver_role.id,
+        role=ebs_csi_driver_role.role.id,
         opts=ResourceOptions(parent=ebs_csi_driver_role),
     )
     aws.iam.RolePolicyAttachment(
         f"{cluster_name}-ebs-csi-driver-EBSCSIDriverPolicy-attachment",
         policy_arn="arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy",
-        role=ebs_csi_driver_role.id,
+        role=ebs_csi_driver_role.role.id,
         opts=ResourceOptions(parent=ebs_csi_driver_role),
     )
 
@@ -448,7 +443,7 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         cluster=cluster,
         addon_name="aws-ebs-csi-driver",
         addon_version=VERSIONS["EBS_CSI_DRIVER"],
-        service_account_role_arn=ebs_csi_driver_role.arn,
+        service_account_role_arn=ebs_csi_driver_role.role.arn,
         opts=ResourceOptions(
             parent=cluster,
             # Addons won't install properly if there are not nodes to schedule them on
@@ -463,30 +458,26 @@ if eks_config.get_bool("ebs_csi_provisioner"):
 # Ref: https://github.com/kubernetes-sigs/aws-efs-csi-driver/blob/master/docs/efs-create-filesystem.md
 export("has_efs_storage", eks_config.get_bool("efs_csi_provisioner"))
 if eks_config.get_bool("efs_csi_provisioner"):
-    efs_csi_driver_role = aws.iam.Role(
-        f"{cluster_name}-efs-csi-driver-trust-role",
-        name=f"{cluster_name}-efs-csi-driver-trust-role",
-        path=f"/ol-infrastructure/eks/{cluster_name}/",
-        assume_role_policy=cluster.eks_cluster.identities.apply(
-            lambda ids: lint_iam_policy(
-                oidc_trust_policy_template(
-                    oidc_identifier=ids[0]["oidcs"][0]["issuer"],
-                    account_id=aws_account.account_id,
-                    k8s_service_account_identifier="system:serviceaccount:kube-system:efs-csi-*",
-                    operator="StringLike",
-                ),
-                parliament_config=csi_driver_role_parliament_config,
-                stringify=True,
-            )
-        ),
-        description="Trust role for allowing the EFS CSI driver to provision storage "
+    efs_csi_driver_role_config = OLEKSTrustRoleConfig(
+        account_id=aws_account.account_id,
+        cluster_name=cluster_name,
+        cluster_identities=cluster.eks_cluster.identities,
+        description="Trust role for allowing the efs csi driver to provision storage "
         "from within the cluster.",
+        policy_operator="StringLike",
+        role_name="efs-csi-driver",
+        service_account_identifier="system:serviceaccount:kube-system:efs-csi-*",
+        tags=aws_config.tags,
+    )
+    efs_csi_driver_role = OLEKSTrustRole(
+        f"{cluster_name}-efs-csi-driver-trust-role",
+        role_config=efs_csi_driver_role_config,
         opts=ResourceOptions(parent=cluster, depends_on=cluster),
     )
     aws.iam.RolePolicyAttachment(
         f"{cluster_name}-efs-csi-driver-EFSCSIDriverPolicy-attachment",
         policy_arn="arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy",
-        role=efs_csi_driver_role.id,
+        role=efs_csi_driver_role.role.id,
         opts=ResourceOptions(parent=efs_csi_driver_role),
     )
 
@@ -551,7 +542,7 @@ if eks_config.get_bool("efs_csi_provisioner"):
         cluster=cluster,
         addon_name="aws-efs-csi-driver",
         addon_version=VERSIONS["EFS_CSI_DRIVER"],
-        service_account_role_arn=efs_csi_driver_role.arn,
+        service_account_role_arn=efs_csi_driver_role.role.arn,
         opts=ResourceOptions(
             parent=cluster,
             # Addons won't install properly if there are not nodes to schedule them on
@@ -854,27 +845,22 @@ external_dns_parliament_config = {
     "MALFORMED": {"ignore_lcoations": []},
     "RESOURCE_STAR": {"ignore_lcoations": []},
 }
-external_dns_role = aws.iam.Role(
-    f"{cluster_name}-external-dns-trust-role",
-    name=f"{cluster_name}-external-dns-trust-role",
-    path=f"/ol-infrastructure/eks/{cluster_name}/",
-    assume_role_policy=cluster.eks_cluster.identities.apply(
-        lambda ids: lint_iam_policy(
-            oidc_trust_policy_template(
-                oidc_identifier=ids[0]["oidcs"][0]["issuer"],
-                account_id=aws_account.account_id,
-                k8s_service_account_identifier="system:serviceaccount:operations:external-dns",
-                operator="StringEquals",
-            ),
-            parliament_config=external_dns_parliament_config,
-            stringify=True,
-        )
-    ),
+external_dns_role_config = OLEKSTrustRoleConfig(
+    account_id=aws_account.account_id,
+    cluster_name=cluster_name,
+    cluster_identities=cluster.eks_cluster.identities,
     description="Trust role for allowing external-dns to modify route53 "
     "resources from within the cluster.",
+    policy_operator="StringEquals",
+    role_name="external-dns",
+    service_account_identifier="system:serviceaccount:operations:external-dns",
+    tags=aws_config.tags,
+)
+external_dns_role = OLEKSTrustRole(
+    f"{cluster_name}-external-dns-trust-role",
+    role_config=external_dns_role_config,
     opts=ResourceOptions(parent=cluster, depends_on=cluster),
 )
-
 external_dns_policy_document = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
@@ -909,12 +895,12 @@ external_dns_policy = aws.iam.Policy(
         parliament_config=external_dns_parliament_config,
         stringify=True,
     ),
-    opts=ResourceOptions(parent=cluster, depends_on=cluster),
+    opts=ResourceOptions(parent=external_dns_role, depends_on=cluster),
 )
 aws.iam.RolePolicyAttachment(
     f"{cluster_name}-external-dns-attachment",
     policy_arn=external_dns_policy.arn,
-    role=external_dns_role.id,
+    role=external_dns_role.role.id,
     opts=ResourceOptions(parent=external_dns_role),
 )
 external_dns_release = (
@@ -940,7 +926,7 @@ external_dns_release = (
                     "name": "external-dns",
                     "annotations": {
                         # Allows external-dns to make aws API calls to route53
-                        "eks.amazonaws.com/role-arn": external_dns_role.arn.apply(
+                        "eks.amazonaws.com/role-arn": external_dns_role.role.arn.apply(
                             lambda arn: f"{arn}"
                         ),
                     },
@@ -988,27 +974,23 @@ cert_manager_parliament_config = {
 # Cert manager uses DNS txt records to confirm that we control the
 # domains that we are requesting certificates for.
 # Ref: https://cert-manager.io/docs/configuration/acme/dns01/route53/#set-up-an-iam-role
-cert_manager_role = aws.iam.Role(
-    f"{cluster_name}-cert-manager-trust-role",
-    name=f"{cluster_name}-cert-manager-trust-role",
-    path=f"/ol-infrastructure/eks/{cluster_name}/",
-    assume_role_policy=cluster.eks_cluster.identities.apply(
-        lambda ids: lint_iam_policy(
-            oidc_trust_policy_template(
-                oidc_identifier=ids[0]["oidcs"][0]["issuer"],
-                account_id=aws_account.account_id,
-                k8s_service_account_identifier="system:serviceaccount:operations:cert-manager",
-                operator="StringEquals",
-            ),
-            parliament_config=cert_manager_parliament_config,
-            stringify=True,
-        )
-    ),
+cert_manager_role_config = OLEKSTrustRoleConfig(
+    account_id=aws_account.account_id,
+    cluster_name=cluster_name,
+    cluster_identities=cluster.eks_cluster.identities,
     description="Trust role for allowing cert-manager to modify route53 "
     "resources from within the cluster.",
+    policy_operator="StringEquals",
+    role_name="cert-manager",
+    service_account_identifier="system:serviceaccount:operations:cert-manager",
+    tags=aws_config.tags,
+)
+cert_manager_role = OLEKSTrustRole(
+    f"{cluster_name}-cert-manager-trust-role",
+    role_config=cert_manager_role_config,
     opts=ResourceOptions(parent=cluster, depends_on=cluster),
 )
-export("cert_manager_arn", cert_manager_role.arn)
+export("cert_manager_arn", cert_manager_role.role.arn)
 
 cert_manager_policy_document = {
     "Version": IAM_POLICY_VERSION,
@@ -1041,12 +1023,12 @@ cert_manager_policy = aws.iam.Policy(
         parliament_config=cert_manager_parliament_config,
         stringify=True,
     ),
-    opts=ResourceOptions(parent=cluster, depends_on=cluster),
+    opts=ResourceOptions(parent=cert_manager_role, depends_on=cluster),
 )
 aws.iam.RolePolicyAttachment(
     f"{cluster_name}-cert-manager-attachment",
     policy_arn=cert_manager_policy.arn,
-    role=cert_manager_role.id,
+    role=cert_manager_role.role.id,
     opts=ResourceOptions(parent=cert_manager_role),
 )
 
@@ -1086,7 +1068,7 @@ cert_manager_release = kubernetes.helm.v3.Release(
                 "name": "cert-manager",
                 "annotations": {
                     # Allows cert-manager to make aws API calls to route53
-                    "eks.amazonaws.com/role-arn": cert_manager_role.arn.apply(
+                    "eks.amazonaws.com/role-arn": cert_manager_role.role.arn.apply(
                         lambda arn: f"{arn}"
                     ),
                 },
