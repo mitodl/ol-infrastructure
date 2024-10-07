@@ -125,6 +125,7 @@ class OLCloudWatchAlarmSimpleElastiCacheConfig(OLCloudWatchAlarmSimpleConfig):
     cluster_id: Union[str, Output[str]]
     node_id: str
     namespace: str = "AWS/ElastiCache"
+    tags: dict[str, str] | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -163,6 +164,7 @@ class OLCloudWatchAlarmSimpleElastiCache(ComponentResource):
             namespace=alarm_config.namespace,
             period=alarm_config.period,
             statistic=alarm_config.statistic,
+            tags=alarm_config.tags,
             treat_missing_data=alarm_config.treat_missing_data_as,
             threshold=alarm_config.threshold,
             unit=alarm_config.unit,
@@ -175,6 +177,7 @@ class OLCloudWatchAlarmSimpleRDSConfig(OLCloudWatchAlarmSimpleConfig):
 
     database_identifier: str
     namespace: str = "AWS/RDS"
+    tags: dict[str, str] | None = None
 
 
 class OLCloudWatchAlarmSimpleRDS(ComponentResource):
@@ -211,6 +214,7 @@ class OLCloudWatchAlarmSimpleRDS(ComponentResource):
             namespace=alarm_config.namespace,
             period=alarm_config.period,
             statistic=alarm_config.statistic,
+            tags=alarm_config.tags,
             treat_missing_data=alarm_config.treat_missing_data_as,
             threshold=alarm_config.threshold,
             unit=alarm_config.unit,
