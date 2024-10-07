@@ -60,6 +60,7 @@ VERSIONS = {
     "EFS_CSI_DRIVER": "v2.0.7-eksbuild.1",
     "GATEWAY_API": "v1.1.0",
     "EXTERNAL_DNS_CHART": "1.15.0",
+    "KUBERNETES": "1.31",
     "TRAEFIK_CHART": "v31.0.0",
     "VAULT_SECRETS_OPERATOR_CHART": "0.8.1",
 }
@@ -142,14 +143,24 @@ for index, policy in enumerate(cluster_policy_arns):
         role=cluster_role.id,
         opts=ResourceOptions(parent=cluster_role),
     )
-
 ############################################################
 # Provision the cluster
 ############################################################
+
+# We are going to create a special aws provider to use for cluster and
+# any aws.* children it creates. This provider is going to masquerade
+# as a global, shared cluster creator role.
+# This keeps the cluster from being 'owned' by a specific person.
+cluster_creation_aws_provider = aws.Provider(
+    "cluster-creation-aws-provider",
+    assume_role=aws.ProviderAssumeRoleArgs(
+        role_arn=iam_stack.require_output("eks_cluster_creator_role_arn")
+    ),
+)
+# Actually make the cluster
 cluster = eks.Cluster(
     f"{cluster_name}-eks-cluster",
     name=cluster_name,
-    service_role=cluster_role,
     access_entries={
         "admin": eks.AccessEntryArgs(
             principal_arn=administrator_role.arn,
@@ -165,18 +176,25 @@ cluster = eks.Cluster(
         )
     },
     authentication_mode=eks.AuthenticationMode("API"),
-    endpoint_public_access=True,
-    endpoint_private_access=False,
     create_oidc_provider=True,
+    enabled_cluster_log_types=[
+        "api",
+        "audit",
+        "authenticator",
+    ],
+    endpoint_private_access=False,
+    endpoint_public_access=True,
     fargate=False,
     ip_family="ipv4",
     kubernetes_service_ip_address_range=service_ip_block,
-    tags=aws_config.tags,
-    vpc_id=target_vpc["id"],
-    skip_default_node_group=True,
     node_associate_public_ip_address=False,
+    provider_credential_opts=eks.KubeconfigOptionsArgs(role_arn=administrator_role.arn),
+    service_role=cluster_role,
+    skip_default_node_group=True,
     subnet_ids=pod_subnet_ids,
+    tags=aws_config.tags,
     use_default_vpc_cni=False,
+    version=VERSIONS["KUBERNETES"],
     # Ref: https://docs.aws.amazon.com/eks/latest/userguide/security-groups-pods-deployment.html
     # Ref: https://docs.aws.amazon.com/eks/latest/userguide/sg-pods-example-deployment.html
     vpc_cni_options=eks.cluster.VpcCniOptionsArgs(
@@ -185,13 +203,11 @@ cluster = eks.Cluster(
         disable_tcp_early_demux=eks_config.get_bool("pod_security_groups"),
         log_level="INFO",
     ),
-    enabled_cluster_log_types=[
-        "api",
-        "audit",
-        "authenticator",
-    ],
+    vpc_id=target_vpc["id"],
     opts=ResourceOptions(
-        parent=cluster_role, depends_on=[cluster_role, administrator_role]
+        provider=cluster_creation_aws_provider,
+        parent=cluster_role,
+        depends_on=[cluster_role, administrator_role],
     ),
 )
 export("cluster_name", cluster_name)
