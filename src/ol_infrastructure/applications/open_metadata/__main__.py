@@ -348,7 +348,11 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "className": "org.openmetadata.service.security.DefaultAuthorizer",  # noqa: E501
                         "containerRequestFilter": "org.openmetadata.service.security.JwtFilter",  # noqa: E501
                         "initialAdmins": [
-                            "admin-user",
+                            "tmacey",
+                            "mas48",
+                            "shaidar",
+                            "cpatti",
+                            "quazi",
                         ],
                         "principalDomain": "open-metadata.org",
                     },
