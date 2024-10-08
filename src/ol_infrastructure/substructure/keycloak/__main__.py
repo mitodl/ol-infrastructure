@@ -356,6 +356,14 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
                 views=["admin", "user"], edits=["admin", "user"]
             ),
         ),
+        keycloak.RealmUserProfileAttributeArgs(
+            name="emailOptIn",
+            display_name="${emailOptIn}",
+            required_for_roles=[],
+            permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                views=["admin", "user"], edits=["admin", "user"]
+            ),
+        ),
     ],
     groups=[
         keycloak.RealmUserProfileGroupArgs(
@@ -369,6 +377,27 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
             display_description="User's legal address",
         ),
     ],
+)
+
+ol_apps_profile_client_scope = keycloak.openid.ClientScope(
+    "profile", realm_id=ol_apps_realm.id
+)
+
+ol_apps_user_email_optin_attribute_mapper = keycloak.openid.UserAttributeProtocolMapper(
+    "email-optin-mapper",
+    realm_id=ol_apps_realm.id,
+    client_scope_id=ol_apps_profile_client_scope.id,
+    name="email-optin-mapper",
+    user_attribute="emailOptIn",
+    claim_name="email_optin",
+)
+ol_apps_user_fullname_attribute_mapper = keycloak.openid.UserAttributeProtocolMapper(
+    "fullname-mapper",
+    realm_id=ol_apps_realm.id,
+    client_scope_id=ol_apps_profile_client_scope.id,
+    name="fullname-mapper",
+    user_attribute="fullName",
+    claim_name="name",
 )
 
 """ # noqa: ERA001
