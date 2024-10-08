@@ -16,8 +16,11 @@ from bridge.lib.versions import OPEN_METADATA_VERSION
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
+    OLVaultK8SDynamicSecretConfig,
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import check_cluster_namespace
@@ -211,12 +214,11 @@ open_metadata_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
 
 vault_k8s_resources_config = OLVaultK8SResourcesConfig(
     application_name="open-metadata",
+    namespace=open_metadata_namespace,
+    labels=k8s_global_labels,
     vault_address=vault_config.require("address"),
     vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
     vault_auth_role_name=open_metadata_vault_auth_backend_role.role_name,
-    k8s_namespace=open_metadata_namespace,
-    k8s_provider=k8s_provider,
-    k8s_global_labels=k8s_global_labels,
 )
 vault_k8s_resources = OLVaultK8SResources(
     resource_config=vault_k8s_resources_config,
@@ -228,47 +230,25 @@ vault_k8s_resources = OLVaultK8SResources(
 )
 
 db_creds_secret_name = "pgsql-db-creds"  # noqa: S105  # pragma: allowlist secret
-db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
-    "open-metadata-dynamicsecret-db-creds",
-    objs=[
-        {
-            "apiVersion": "secrets.hashicorp.com/v1beta1",
-            "kind": "VaultDynamicSecret",
-            "metadata": {
-                "name": "openmetadata-db-credentials",
-                "namespace": open_metadata_namespace,
-                "labels": k8s_global_labels,
-            },
-            "spec": {
-                "mount": open_metadata_db_vault_backend_config.mount_point,
-                "path": "creds/app",
-                "destination": {
-                    "create": True,
-                    "overwrite": True,
-                    "name": db_creds_secret_name,
-                    "transformation": {
-                        "excludes": [".*"],
-                        "templates": {
-                            "DB_USER": {
-                                "text": '{{ get .Secrets "username" }}',
-                            },
-                            "DB_USER_PASSWORD": {
-                                "text": '{{ get .Secrets "password" }}',
-                            },
-                        },
-                    },
-                },
-                "rolloutRestartTargets": [
-                    {
-                        "kind": "Deployment",
-                        # Name of the 'deployment' from the OMD helm chart
-                        "name": "openmetadata",
-                    },
-                ],
-                "vaultAuthRef": vault_k8s_resources.auth_name,
-            },
-        },
-    ],
+db_creds_secret_config = OLVaultK8SDynamicSecretConfig(
+    name="openmetadata-db-creds",
+    namespace=open_metadata_namespace,
+    dest_secret_labels=k8s_global_labels,
+    dest_secret_name=db_creds_secret_name,
+    labels=k8s_global_labels,
+    mount=open_metadata_db_vault_backend_config.mount_point,
+    path="creds/app",
+    restart_target_kind="Deployment",
+    restart_target_name="openmetadata",
+    templates={
+        "DB_USER": '{{ get .Secrets "username" }}',
+        "DB_USER_PASSWORD": '{{ get .Secrets "password" }}',
+    },
+    vaultauth=vault_k8s_resources.auth_name,
+)
+db_creds_secret = OLVaultK8SSecret(
+    f"open-metadata-{stack_info.name}-db-creds-secret",
+    db_creds_secret_config,
     opts=ResourceOptions(
         provider=k8s_provider,
         delete_before_replace=True,
@@ -276,48 +256,28 @@ db_creds_dynamic_secret = kubernetes.yaml.v2.ConfigGroup(
     ),
 )
 oidc_config_secret_name = "oidc-config"  # noqa: S105  # pragma: allowlist secret
-oidc_static_secret = kubernetes.yaml.v2.ConfigGroup(
-    "open-metadata-staticsecret-oidc-config",
-    objs=[
-        {
-            "apiVersion": "secrets.hashicorp.com/v1beta1",
-            "kind": "VaultStaticSecret",
-            "metadata": {
-                "name": "openmetadata-oidc-config",
-                "namespace": open_metadata_namespace,
-                "labels": k8s_global_labels,
-            },
-            "spec": {
-                "type": "kv-v1",
-                "mount": "secret-operations",
-                "path": "sso/open_metadata",
-                "destination": {
-                    "name": oidc_config_secret_name,
-                    "create": True,
-                    "overwrite": True,
-                    "transformation": {
-                        "excludes": [".*"],
-                        "templates": {
-                            "AUTHENTICATION_PUBLIC_KEYS": {
-                                "text": '[http://openmetadata:8585/api/v1/system/config/jwks,{{ get .Secrets "url" }}/protocol/openid-connect/certs]',  # noqa: E501
-                            },
-                            "AUTHENTICATION_AUTHORITY": {
-                                "text": '{{ get .Secrets "url" }}',
-                            },
-                            "AUTHENTICATION_CLIENT_ID": {
-                                "text": '{{ get .Secrets "client_id" }}',
-                            },
-                            "OIDC_CLIENT_SECRET": {
-                                "text": '{{ get .Secrets "client_secret" }}',
-                            },
-                        },
-                    },
-                },
-                "refreshAfter": "1h",
-                "vaultAuthRef": vault_k8s_resources.auth_name,
-            },
-        },
-    ],
+oidc_config_secret_config = OLVaultK8SStaticSecretConfig(
+    name="openmetadata-oidc-config",
+    namespace=open_metadata_namespace,
+    dest_secret_labels=k8s_global_labels,
+    dest_secret_name=oidc_config_secret_name,
+    labels=k8s_global_labels,
+    mount="secret-operations",
+    mount_type="kv-v1",
+    path="sso/open_metadata",
+    restart_target_kind="Deployment",
+    restart_target_name="openmetadata",
+    templates={
+        "AUTHENTICATION_PUBLIC_KEYS": '[http://openmetadata:8585/api/v1/system/config/jwks,{{ get .Secrets "url" }}/protocol/openid-connect/certs]',  # noqa: E501
+        "AUTHENTICATION_AUTHORITY": '{{ get .Secrets "url" }}',
+        "AUTHENTICATION_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+        "OIDC_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+    },
+    vaultauth=vault_k8s_resources.auth_name,
+)
+oidc_config_secret = OLVaultK8SSecret(
+    f"open-metadata-{stack_info.name}-oidc-config-secret",
+    oidc_config_secret_config,
     opts=ResourceOptions(
         provider=k8s_provider,
         delete_before_replace=True,
@@ -348,7 +308,11 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "className": "org.openmetadata.service.security.DefaultAuthorizer",  # noqa: E501
                         "containerRequestFilter": "org.openmetadata.service.security.JwtFilter",  # noqa: E501
                         "initialAdmins": [
-                            "admin-user",
+                            "tmacey",
+                            "shaidar",
+                            "mas48",
+                            "cpatti",
+                            "qhoque",
                         ],
                         "principalDomain": "open-metadata.org",
                     },
@@ -405,7 +369,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
         provider=k8s_provider,
         parent=vault_k8s_resources,
         delete_before_replace=True,
-        depends_on=[open_metadata_db, db_creds_dynamic_secret, oidc_static_secret],
+        depends_on=[open_metadata_db, db_creds_secret, oidc_config_secret],
     ),
 )
 
