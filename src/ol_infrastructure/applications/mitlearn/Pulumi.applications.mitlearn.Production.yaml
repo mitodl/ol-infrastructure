@@ -79,5 +79,7 @@ config:
   mitlearn:legacy_frontend_domain: "mitopen.odl.mit.edu"
   mitlearn:fastly_domain: "d.sni.global.fastly.net"
   mitlearn:heroku_domain: "computational-cherry-khbuwf9yvncf0kw3hbk5txff.herokudns.com"
+  mitlearn:nextjs_heroku_domain: "next.learn.mit.edu"
+  mitlearn:nextjs_fastly_domain: "nextjs.learn.mit.edu"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
