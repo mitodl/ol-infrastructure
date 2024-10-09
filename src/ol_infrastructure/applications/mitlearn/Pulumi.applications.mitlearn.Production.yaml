@@ -70,14 +70,14 @@ config:
     TIKA_SERVER_ENDPOINT: "https://tika-production.odl.mit.edu"
     UWSGI_WORKERS: 3
     UWSGI_THREADS: 15
-  mitopen:db_instance_size: db.m7g.2xlarge
-  mitopen:db_password:
+  mitlearn:db_instance_size: db.m7g.2xlarge
+  mitlearn:db_password:
     secure: v1:siGmu4+ZCOqekx7l:4Pdgv4fKZIjWJPAcZDBdpvZ0mUW10SUcX/9ZatsnZbR/euYoklo8dTTFu4i/5kTnJHHYot1QK3xS+gk++lHZfneBoC9qBR+l2qzlvvNBoN8=
-  mitopen:api_domain: "api.learn.mit.edu"
-  mitopen:legacy_api_domain: "api.mitopen.odl.mit.edu"
-  mitopen:frontend_domain: "learn.mit.edu"
-  mitopen:legacy_frontend_domain: "mitopen.odl.mit.edu"
-  mitopen:fastly_domain: "d.sni.global.fastly.net"
-  mitopen:heroku_domain: "computational-cherry-khbuwf9yvncf0kw3hbk5txff.herokudns.com"
+  mitlearn:api_domain: "api.learn.mit.edu"
+  mitlearn:legacy_api_domain: "api.mitopen.odl.mit.edu"
+  mitlearn:frontend_domain: "learn.mit.edu"
+  mitlearn:legacy_frontend_domain: "mitopen.odl.mit.edu"
+  mitlearn:fastly_domain: "d.sni.global.fastly.net"
+  mitlearn:heroku_domain: "computational-cherry-khbuwf9yvncf0kw3hbk5txff.herokudns.com"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

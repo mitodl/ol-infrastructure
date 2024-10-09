@@ -47,7 +47,7 @@ github_provider = github.Provider(
     token=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["token"],
 )
 
-mitopen_config = Config("mitopen")
+mitlearn_config = Config("mitlearn")
 heroku_config = Config("heroku")
 heroku_app_config = Config("heroku_app")
 
@@ -61,9 +61,9 @@ monitoring_stack = StackReference("infrastructure.monitoring")
 dns_stack = StackReference("infrastructure.aws.dns")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 learn_zone_id = dns_stack.require_output("learn")["id"]
-learn_frotend_domain = mitopen_config.require("frontend_domain")
-legacy_learn_frontend_domain = mitopen_config.require("legacy_frontend_domain")
-nextjs_learn_domain = mitopen_config.require("nextjs_learn_domain")
+learn_frontend_domain = mitlearn_config.require("frontend_domain")
+legacy_learn_frontend_domain = mitlearn_config.require("legacy_frontend_domain")
+nextjs_heroku_domain = mitlearn_config.require("nextjs_heroku_domain")
 
 aws_config = AWSBase(
     tags={
@@ -369,10 +369,10 @@ mitopen_db_security_group = ec2.SecurityGroup(
     vpc_id=apps_vpc["id"],
 )
 
-rds_password = mitopen_config.require("db_password")
+rds_password = mitlearn_config.require("db_password")
 rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
-    mitopen_config.get("db_instance_size") or rds_defaults["instance_size"]
+    mitlearn_config.get("db_instance_size") or rds_defaults["instance_size"]
 )
 mitopen_db_config = OLPostgresDBConfig(
     instance_name=f"ol-mitlearn-db-{stack_info.env_suffix}",
@@ -701,11 +701,11 @@ mitopen_fastly_service = fastly.ServiceVcl(
     domains=[
         fastly.ServiceVclDomainArgs(
             comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
-            name=frontend_domain,
+            name=learn_frontend_domain,
         ),
         fastly.ServiceVclDomainArgs(
             comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application - Legacy",
-            name=legacy_frontend_domain,
+            name=legacy_learn_frontend_domain,
         ),
     ],
     headers=[
@@ -763,7 +763,7 @@ mitopen_fastly_service = fastly.ServiceVcl(
                 unset req.http.Cookie;
 
                 # If the request is for the old DNS name, redirect
-                if (req.http.host == "{mitopen_config.require("legacy_frontend_domain")}") {{
+                if (req.http.host == "{mitlearn_config.require("legacy_frontend_domain")}") {{
                   error 618 "redirect-host";
                 }}
                 """
@@ -778,7 +778,7 @@ mitopen_fastly_service = fastly.ServiceVcl(
                 # redirect to the correct host/domain
                 if (obj.status == 618 && obj.response == "redirect-host") {{
                   set obj.status = 302;
-                  set obj.http.Location = "https://" + "{mitopen_config.require("frontend_domain")}" + req.url.path + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
+                  set obj.http.Location = "https://" + "{mitlearn_config.require("frontend_domain")}" + req.url.path + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
                   return (deliver);
                 }}
                 """
@@ -838,29 +838,12 @@ learn_nextjs_fastly_service = fastly.ServiceVcl(
     comment="Managed by Pulumi",
     backends=[
         fastly.ServiceVclBackendArgs(
-            address=mitlearn_application_storage_bucket.bucket_domain_name,
-            name="MITOpen Frontend",
-            override_host=mitlearn_application_storage_bucket.bucket_domain_name,
+            address=nextjs_heroku_domain,
+            name="NextJS_Frontend",
+            override_host=nextjs_heroku_domain,
             port=DEFAULT_HTTPS_PORT,
-            ssl_cert_hostname=mitlearn_application_storage_bucket.bucket_domain_name,
-            ssl_sni_hostname=mitlearn_application_storage_bucket.bucket_domain_name,
-            use_ssl=True,
-        ),
-        fastly.ServiceVclBackendArgs(
-            address="service.prerender.io",
-            name="Prerender_Host",
-            between_bytes_timeout=10000,
-            connect_timeout=1000,
-            # dynamic=True,
-            first_byte_timeout=25000,
-            max_conn=200,
-            port=443,
-            request_condition="",
-            # Chicken-egg problem introduced here:
-            share_key=mitopen_vault_secrets["fastly"]["service_id"],
-            ssl_cert_hostname="service.prerender.io",
-            ssl_check_cert=True,
-            ssl_sni_hostname="service.prerender.io",
+            ssl_cert_hostname=nextjs_heroku_domain,
+            ssl_sni_hostname=nextjs_heroku_domain,
             use_ssl=True,
         ),
     ],
@@ -880,7 +863,7 @@ learn_nextjs_fastly_service = fastly.ServiceVcl(
     domains=[
         fastly.ServiceVclDomainArgs(
             comment=f"MIT Learn NextJS {stack_info.env_prefix} {stack_info.env_suffix} Application",
-            name=nextjs_frontend_domain,
+            name=mitlearn_config.require("nextjs_fastly_domain"),
         ),
     ],
     headers=[
@@ -920,7 +903,7 @@ learn_nextjs_fastly_service = fastly.ServiceVcl(
             content=textwrap.dedent(
                 r"""
                 if (req.method == "GET" && req.backend.is_origin && req.http.User-Agent ~ "(?i)prerender") {
-                  set req.backend = F_MITOpen_Frontend;
+                  set req.backend = F_NextJS_Frontend;
                   set bereq.url = "/frontend" + req.url;
                   if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {
                     set bereq.url = "/frontend/index.html";
@@ -938,7 +921,7 @@ learn_nextjs_fastly_service = fastly.ServiceVcl(
                 unset req.http.Cookie;
 
                 # If the request is for the old DNS name, redirect
-                if (req.http.host == "{mitopen_config.require("legacy_frontend_domain")}") {{
+                if (req.http.host == "{mitlearn_config.require("legacy_frontend_domain")}") {{
                   error 618 "redirect-host";
                 }}
                 """
@@ -953,35 +936,12 @@ learn_nextjs_fastly_service = fastly.ServiceVcl(
                 # redirect to the correct host/domain
                 if (obj.status == 618 && obj.response == "redirect-host") {{
                   set obj.status = 302;
-                  set obj.http.Location = "https://" + "{mitopen_config.require("frontend_domain")}" + req.url.path + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
+                  set obj.http.Location = "https://" + "{mitlearn_config.require("frontend_domain")}" + req.url.path + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
                   return (deliver);
                 }}
                 """
             ),
             type="error",
-        ),
-        fastly.ServiceVclSnippetArgs(
-            name="prerender_vcl_rcv",
-            content=textwrap.dedent(
-                rf"""
-                if(req.http.User-Agent ~ "(?i)prerender"){{
-                  return(pass);
-                }}
-                if( req.http.User-Agent ~ "(?i)yandex|baiduspider|facebookexternalhit|twitterbot|linkedinbot|embedly|showyoubot|outbrain|pinterestbot|slackbot|vkShare|W3C_Validator|whatsapp|ImgProxy| flipboard|tumblr|bitlybot|skype|nuzzel|discordbot|qwantify|pinterest|lighthouse|telegrambot" && req.url.ext !~ "(?i)js|css|xml|txt|less|png|jpg|jpeg|gif|pdf|doc|ico|rss|zip|mp3|rar|exe|wmv|doc|avi|ppt|mpg|mpeg|tif|wav|mov|psd|ai|xls|mp4|m4a|swf|dat|dmg|iso|flv|m4v|woff|ttf|svg|webmanifest" ) {{
-
-                  set req.backend = F_Prerender_Host;
-                  set req.http.user-agent = req.http.user-agent;
-                  set req.url = "/https://" req.http.host req.url;
-                  set req.http.x-prerender-token = "{mitopen_vault_secrets["prerender"]["token"]}";
-                  set req.http.int-type = "Fastly";
-                  return(pass);
-                }} else {{
-                  set req.backend = F_MITOpen_Frontend;
-                }}
-                """
-            ),
-            type="recv",
-            priority=20,
         ),
     ],
     logging_https=[
@@ -1009,8 +969,18 @@ learn_nextjs_fastly_service = fastly.ServiceVcl(
 )
 five_minutes = 60 * 5
 route53.Record(
+    "ol-mitopen-nextjs-fastly-dns-record",
+    name=mitlearn_config.require("nextjs_fastly_domain"),
+    allow_overwrite=True,
+    type="CNAME",
+    ttl=five_minutes,
+    records=[FASTLY_CNAME_TLS_1_3],
+    zone_id=learn_zone_id,
+    opts=ResourceOptions(delete_before_replace=True),
+)
+route53.Record(
     "ol-mitopen-frontend-dns-record",
-    name=mitopen_config.require("frontend_domain"),
+    name=mitlearn_config.require("frontend_domain"),
     allow_overwrite=True,
     type="A",
     ttl=five_minutes,
@@ -1020,7 +990,7 @@ route53.Record(
 )
 route53.Record(
     "ol-mitopen-frontend-dns-record-legacy",
-    name=mitopen_config.require("legacy_frontend_domain"),
+    name=mitlearn_config.require("legacy_frontend_domain"),
     type="CNAME",
     ttl=five_minutes,
     records=[FASTLY_CNAME_TLS_1_3],
@@ -1030,20 +1000,20 @@ route53.Record(
 
 route53.Record(
     "ol-mitopen-api-dns-record",
-    name=mitopen_config.require("api_domain"),
+    name=mitlearn_config.require("api_domain"),
     allow_overwrite=True,
     type="CNAME",
     ttl=five_minutes,
-    records=[mitopen_config.require("heroku_domain")],
+    records=[mitlearn_config.require("heroku_domain")],
     zone_id=learn_zone_id,
     opts=ResourceOptions(delete_before_replace=True),
 )
 route53.Record(
     "ol-mitopen-api-dns-record-legacy",
-    name=mitopen_config.require("legacy_api_domain"),
+    name=mitlearn_config.require("legacy_api_domain"),
     type="CNAME",
     ttl=five_minutes,
-    records=[mitopen_config.require("heroku_domain")],
+    records=[mitlearn_config.require("heroku_domain")],
     zone_id=mitodl_zone_id,
     opts=ResourceOptions(delete_before_replace=True),
 )
@@ -1058,14 +1028,14 @@ heroku_vars = {
     "AWS_STORAGE_BUCKET_NAME": f"ol-mitlearn-app-storage-{env_name}",
     "CORS_ALLOWED_ORIGIN_REGEXES": "['^.+ocw-next.netlify.app$']",
     "CSAIL_BASE_URL": "https://cap.csail.mit.edu/",
-    "CSRF_COOKIE_DOMAIN": f".{mitopen_config.get('frontend_domain')}",
+    "CSRF_COOKIE_DOMAIN": f".{mitlearn_config.get('frontend_domain')}",
     "EDX_API_ACCESS_TOKEN_URL": "https://api.edx.org/oauth2/v1/access_token",
     "EDX_API_URL": "https://api.edx.org/catalog/v1/catalogs/10/courses",
     "EDX_PROGRAMS_API_URL": "https://discovery.edx.org/api/v1/programs/",
     "MICROMASTERS_CATALOG_API_URL": "https://micromasters.mit.edu/api/v0/catalog/",
     "MICROMASTERS_CMS_API_URL": "https://micromasters.mit.edu/api/v0/wagtail/",
     "MITOL_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
-    "MITOL_AXIOS_BASE_PATH": f"https://{mitopen_config.get('frontend_domain')}",
+    "MITOL_AXIOS_BASE_PATH": f"https://{mitlearn_config.get('frontend_domain')}",
     "MITOL_DB_CONN_MAX_AGE": 0,
     "MITOL_DB_DISABLE_SSL": "True",
     "MITOL_DEFAULT_SITE_KEY": "micromasters",
