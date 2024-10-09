@@ -397,7 +397,7 @@ ol_apps_user_email_optin_attribute_mapper = keycloak.openid.UserAttributeProtoco
     client_scope_id=ol_apps_profile_client_scope.id,
     name="email-optin-mapper",
     user_attribute="emailOptIn",
-    claim_name="email_opt_in",
+    claim_name="email_optin",
     multivalued=True,
 )
 ol_apps_user_fullname_attribute_mapper = keycloak.openid.UserAttributeProtocolMapper(
@@ -406,7 +406,7 @@ ol_apps_user_fullname_attribute_mapper = keycloak.openid.UserAttributeProtocolMa
     client_scope_id=ol_apps_profile_client_scope.id,
     name="fullname-mapper",
     user_attribute="fullName",
-    claim_name="full_name",
+    claim_name="name",
 )
 
 """ # noqa: ERA001
