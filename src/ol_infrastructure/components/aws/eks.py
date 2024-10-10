@@ -101,7 +101,7 @@ class OLEKSGateway(pulumi.ComponentResource):
                     "parentRefs": [
                         {
                             "name": gateway_config.gateway_name,
-                            "section_name": "http",
+                            "sectionName": "http",
                             "kind": "Gateway",
                             "group": "gateway.networking.k8s.io",
                             "port": 8000,
@@ -161,7 +161,7 @@ class OLEKSGateway(pulumi.ComponentResource):
                     "parentRefs": [
                         {
                             "name": gateway_config.gateway_name,
-                            "section_name": route_config.name,
+                            "sectionName": route_config.name,
                             "kind": "Gateway",
                             "group": "gateway.networking.k8s.io",
                             "port": route_config.port,
