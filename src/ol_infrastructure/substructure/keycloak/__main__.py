@@ -361,11 +361,10 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
             display_name="${emailOptIn}",
             validators=[
                 keycloak.RealmUserProfileAttributeValidatorArgs(
-                    name="options",
-                    config={"options": ["global"]},
+                    name="integer-bool",
+                    config={"integer":{"min":0,"max":1}},
                 ),
             ],
-            multivalued=True,
             required_for_roles=[],
             permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                 views=["admin", "user"], edits=["admin", "user"]
@@ -398,7 +397,6 @@ ol_apps_user_email_optin_attribute_mapper = keycloak.openid.UserAttributeProtoco
     name="email-optin-mapper",
     user_attribute="emailOptIn",
     claim_name="email_optin",
-    multivalued=True,
 )
 ol_apps_user_fullname_attribute_mapper = keycloak.openid.UserAttributeProtocolMapper(
     "fullname-mapper",
