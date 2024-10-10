@@ -297,7 +297,9 @@ k8s_global_labels = {
 k8s_provider = kubernetes.Provider(
     "k8s-provider",
     kubeconfig=cluster.kubeconfig,
-    opts=ResourceOptions(parent=cluster, depends_on=[cluster, node_groups[0]]),
+    opts=ResourceOptions(
+        parent=cluster, depends_on=[cluster, node_groups[0], administrator_role]
+    ),
 )
 
 
@@ -1099,13 +1101,4 @@ cert_manager_release = kubernetes.helm.v3.Release(
         depends_on=[cluster, node_groups[0]],
         delete_before_replace=True,
     ),
-)
-
-export(
-    "kube_config_data",
-    {
-        "role_arn": administrator_role.arn,
-        "certificate-authority-data": cluster.eks_cluster.certificate_authority,
-        "server": cluster.eks_cluster.endpoint,
-    },
 )
