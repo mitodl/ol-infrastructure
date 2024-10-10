@@ -19,3 +19,11 @@ vault_sops_infrastructure_key = vault.transit.SecretBackendKey(
     type="aes256-gcm96",
     deletion_allowed=True,
 )
+
+vault_secrets_operator_key = vault.transit.SecretBackendKey(
+    "vault-secrets-operator-key",
+    name="vault-secrets-operator",
+    backend=vault_infrastructure_transit.path,
+    type="aes256-gcm96",
+    deletion_allowed=True,
+)
