@@ -362,7 +362,7 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
             validators=[
                 keycloak.RealmUserProfileAttributeValidatorArgs(
                     name="integer-bool",
-                    config={"integer":{"min":0,"max":1}},
+                    config={"integer": {"min": 0, "max": 1}},
                 ),
             ],
             required_for_roles=[],
@@ -370,7 +370,6 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
                 views=["admin", "user"], edits=["admin", "user"]
             ),
         ),
-
     ],
     groups=[
         keycloak.RealmUserProfileGroupArgs(
