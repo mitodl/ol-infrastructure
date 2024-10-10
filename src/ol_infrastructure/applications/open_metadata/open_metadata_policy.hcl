@@ -20,7 +20,7 @@ path "sys/leases/renew" {
     lease_id = ["postgres-open-metadata/creds/app/*"]
   }
 }
-path "sys/leases/renew" {
+path "sys/leases/revoke" {
   capabilities = ["update"]
   allowed_parameters = {
     lease_id = ["postgres-open-metadata/creds/app/*"]
