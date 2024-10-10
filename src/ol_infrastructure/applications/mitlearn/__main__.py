@@ -885,35 +885,6 @@ learn_nextjs_fastly_service = fastly.ServiceVcl(
     ],
     snippets=[
         fastly.ServiceVclSnippetArgs(
-            name="Rewrite requests to root s3 - miss",
-            content=textwrap.dedent(
-                r"""
-                if (req.method == "GET" && req.backend.is_origin) {
-                  set bereq.url = "/frontend" + req.url;
-                  if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {
-                    set bereq.url = "/frontend/index.html";
-                  }
-                }
-                """
-            ),
-            type="miss",
-        ),
-        fastly.ServiceVclSnippetArgs(
-            name="Rewrite requests to root s3 - bypass",
-            content=textwrap.dedent(
-                r"""
-                if (req.method == "GET" && req.backend.is_origin && req.http.User-Agent ~ "(?i)prerender") {
-                  set req.backend = F_NextJS_Frontend;
-                  set bereq.url = "/frontend" + req.url;
-                  if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {
-                    set bereq.url = "/frontend/index.html";
-                  }
-                }
-                """
-            ),
-            type="pass",
-        ),
-        fastly.ServiceVclSnippetArgs(
             name="handle domain redirect",
             content=textwrap.dedent(
                 rf"""
