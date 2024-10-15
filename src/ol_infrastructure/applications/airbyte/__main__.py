@@ -1,15 +1,13 @@
 """Create the resources needed to run a airbyte server.  # noqa: D200"""
 
-import base64
 import json
-import textwrap
 from pathlib import Path
 
 import pulumi_consul as consul
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-import yaml
 from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
+from pulumi_aws import ec2, get_caller_identity, iam, s3
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
@@ -18,21 +16,15 @@ from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from ol_infrastructure.components.aws.auto_scale_group import (
-    BlockDeviceMapping,
-    OLAutoScaleGroupConfig,
-    OLAutoScaling,
-    OLLaunchTemplateConfig,
-    OLLoadBalancerConfig,
-    OLTargetGroupConfig,
-    TagSpecification,
-)
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
+    OLVaultK8SDynamicSecretConfig,
+    OLVaultK8SResources,
+    OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
+from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -47,11 +39,14 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 stack_info = parse_stack()
 setup_vault_provider(stack_info)
 airbyte_config = Config("airbyte")
+vault_config = Config("vault")
+
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
 consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
 
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
@@ -59,6 +54,7 @@ env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
 target_vpc_name = airbyte_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
 target_vpc = network_stack.require_output(target_vpc_name)
+k8s_pod_subnet_cidrs = target_vpc["k8s_pod_subnet_cidrs"]
 
 consul_security_groups = consul_stack.require_output("security_groups")
 aws_config = AWSBase(
@@ -67,6 +63,17 @@ aws_config = AWSBase(
         "Environment": f"{env_name}",
     }
 )
+
+k8s_global_labels = {
+    "pulumi_managed": "true",
+    "pulumi_stack": stack_info.full_name,
+}
+k8s_provider = kubernetes.Provider(
+    "k8s-provider",
+    kubeconfig=cluster_stack.require_output("kube_config"),
+)
+airbyte_namespace = "airbyte"
+
 aws_account = get_caller_identity()
 vpc_id = target_vpc["id"]
 airbyte_server_ami = ec2.get_ami(
@@ -294,12 +301,6 @@ iam.RolePolicyAttachment(
     role=airbyte_server_instance_role.name,
 )
 
-airbyte_server_instance_profile = iam.InstanceProfile(
-    f"airbyte-server-instance-profile-{env_name}",
-    role=airbyte_server_instance_role.name,
-    path="/ol-infrastructure/airbyte-server/profile/",
-)
-
 airbyte_lakeformation_role = iam.Role(
     "airbyte-lakeformation-role",
     assume_role_policy=airbyte_server_instance_role.arn.apply(
@@ -333,18 +334,13 @@ airbyte_server_vault_policy = vault.Policy(
     name="airbyte-server",
     policy=Path(__file__).parent.joinpath("airbyte_server_policy.hcl").read_text(),
 )
-# Register Airbyte AMI for Vault AWS auth
-vault.aws.AuthBackendRole(
-    "airbyte-server-ami-ec2-vault-auth",
-    backend="aws",
-    auth_type="iam",
-    role="airbyte-server",
-    inferred_entity_type="ec2_instance",
-    inferred_aws_region=aws_config.region,
-    bound_iam_instance_profile_arns=[airbyte_server_instance_profile.arn],
-    bound_ami_ids=[airbyte_server_ami.id],
-    bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[vpc_id],
+
+airbyte_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    "airbyte-vault-k8s-auth-backend-role",
+    role_name="airbyte",
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["*"],
+    bound_service_account_namespaces=[airbyte_namespace],
     token_policies=[airbyte_server_vault_policy.name],
 )
 
@@ -415,6 +411,14 @@ airbyte_db_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
             description="Access to Postgres from Airbyte nodes.",
+        ),
+        ec2.SecurityGroupIngressArgs(
+            cidr_blocks=k8s_pod_subnet_cidrs,
+            description="Allow k8s cluster ipblocks to talk to DB",
+            from_port=DEFAULT_POSTGRES_PORT,
+            protocol="tcp",
+            security_groups=[],
+            to_port=DEFAULT_POSTGRES_PORT,
         ),
     ],
     tags=aws_config.tags,
@@ -530,157 +534,250 @@ consul.Keys(
     opts=consul_provider,
 )
 
-###################################
-#     Web Node EC2 Deployment     #
-###################################
-lb_config = OLLoadBalancerConfig(
-    subnets=target_vpc["subnet_ids"],
-    security_groups=[airbyte_server_security_group],
-    # Give extra time for discover_schema calls in connection setup
-    idle_timeout_seconds=60 * 5,
-    tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
-)
+airbyte_service_account_name = "airbyte-admin"
 
-tg_config = OLTargetGroupConfig(
-    vpc_id=vpc_id,
-    health_check_interval=60,
-    health_check_matcher="200-399",
-    health_check_path="/api/health",
-    health_check_unhealthy_threshold=6,  # give extra time for airbyte to start up
-    tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
+vault_k8s_resources_config = OLVaultK8SResourcesConfig(
+    application_name="airbyte",
+    namespace=airbyte_namespace,
+    labels=k8s_global_labels,
+    vault_address=vault_config.require("address"),
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    vault_auth_role_name=airbyte_vault_k8s_auth_backend_role.role_name,
 )
-
-consul_datacenter = consul_stack.require_output("datacenter")
-grafana_credentials = read_yaml_secrets(
-    Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
-)
-
-block_device_mappings = [BlockDeviceMapping(volume_size=500)]
-tag_specs = [
-    TagSpecification(
-        resource_type="instance",
-        tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
+vault_k8s_resources = OLVaultK8SResources(
+    resource_config=vault_k8s_resources_config,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=k8s_provider,
+        delete_before_replace=True,
+        depends_on=[airbyte_vault_k8s_auth_backend_role],
     ),
-    TagSpecification(
-        resource_type="volume",
-        tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
-    ),
+)
+
+db_creds_secret_name = "db-creds"  # noqa: S105  # pragma: allowlist secret
+db_creds_dynamic_secret_config = OLVaultK8SDynamicSecretConfig(
+    name="airbyte-db-creds",
+    dest_secret_labels=k8s_global_labels,
+    dest_secret_name=db_creds_secret_name,
+    exclude_raw=True,
+    labels=k8s_global_labels,
+    mount=airbyte_db_vault_backend_config.mount_point,
+    namespace=airbyte_namespace,
+    path="creds/app",
+    templates={
+        "DATABASE_USER": '{{ get .Secrets "username" }}',
+        "DATABASE_PASSWORD": '{{  get .Secrets "password" }}',
+        "DATABASE_URL": connection_string,
+    },
+    vaultauth=vault_k8s_resources.auth_name,
+)
+shared_extra_env_vars = [
+    {
+        "name": "DATABASE_USER",
+        "valueFrom": {
+            "secretKeyRef": {
+                "name": db_creds_secret_name,
+                "key": "DATABASE_USER",
+            },
+        },
+    },
+    {
+        "name": "DATABASE_PASSWORD",
+        "valueFrom": {
+            "secretKeyRef": {
+                "name": db_creds_secret_name,
+                "key": "DATABASE_PASSWORD",
+            },
+        },
+    },
+    {
+        "name": "DATABASE_URL",
+        "valueFrom": {
+            "secretKeyRef": {
+                "name": db_creds_secret_name,
+                "key": "DATABASE_URL",
+            },
+        },
+    },
 ]
 
-lt_config = OLLaunchTemplateConfig(
-    block_device_mappings=block_device_mappings,
-    image_id=airbyte_server_ami.id,
-    instance_type=airbyte_config.get("instance_type") or InstanceTypes.burstable_medium,
-    instance_profile_arn=airbyte_server_instance_profile.arn,
-    security_groups=[
-        airbyte_server_security_group,
-        consul_security_groups["consul_agent"],
-        target_vpc["security_groups"]["integrator"],
-    ],
-    tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
-    tag_specifications=tag_specs,
-    user_data=consul_datacenter.apply(
-        lambda consul_dc: base64.b64encode(
-            "#cloud-config\n{}".format(
-                yaml.dump(
-                    {
-                        "write_files": [
-                            {
-                                "path": "/etc/consul.d/02-autojoin.json",
-                                "content": json.dumps(
-                                    {
-                                        "retry_join": [
-                                            "provider=aws tag_key=consul_env "
-                                            f"tag_value={consul_dc}"
-                                        ],
-                                        "datacenter": consul_dc,
-                                    }
-                                ),
-                                "owner": "consul:consul",
-                            },
-                            {
-                                "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
-                            ENVIRONMENT={consul_dc}
-                            APPLICATION=air-byte
-                            SERVICE=data-platform
-                            VECTOR_CONFIG_DIR=/etc/vector/
-                            VECTOR_STRICT_ENV_VARS=false
-                            AWS_REGION={aws_config.region}
-                            GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
-                            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
-                            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            """
-                                ),
-                                "owner": "root:root",
-                            },
-                        ]
+airbyte_helm_release = kubernetes.helm.v3.Release(
+    "airbyte-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="airbyte",
+        chart="airbyte",
+        version="1.1.0",
+        namespace=airbyte_namespace,
+        cleanup_on_fail=True,
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://airbytehq.github.io/helm-charts",
+        ),
+        values={
+            "global": {
+                "serviceAccountName": airbyte_service_account_name,
+                "deploymentMode": "oss",
+                "edition": "community",
+            },
+            "database": {
+                "type": "external",
+            },
+            "storage": {
+                "s3": {
+                    "region": aws_config.region,
+                    "authenticationType": "instanceProfile",
+                },
+            },
+            "serviceAccount": {
+                "create": True,
+                "annotations": {},
+                "name": airbyte_service_account_name,
+            },
+            "webapp": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podAnnotations": {},
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
                     },
-                    sort_keys=True,
-                )
-            ).encode("utf8")
-        ).decode("utf8")
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+                "ingress": {
+                    "enabled": False,
+                },
+                "extraEnv": shared_extra_env_vars,
+            },
+            "pod-sweeper": {
+                "enabled": True,
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+            },
+            "server": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+                "extraEnv": shared_extra_env_vars,
+                "log": {
+                    "level": "INFO",
+                },
+            },
+            "worker": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+            },
+            "workload-launcher": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+            },
+            "metrics": {
+                "enabled": False,
+            },
+            "airbyte-bootloader": {
+                "enabled": True,
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+                "extraEnv": shared_extra_env_vars,
+            },
+            "temporal": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+                "extraEnv": shared_extra_env_vars,
+            },
+            "temporal-ui": {
+                "enabled": False,
+            },
+            "postgresql": {
+                "enabled": False,
+            },
+            "cron": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+                "extraEnv": shared_extra_env_vars,
+            },
+        },
+        skip_await=True,
     ),
-)
-
-auto_scale_config = airbyte_config.get_object("auto_scale") or {
-    "desired": 1,
-    "min": 1,
-    "max": 2,
-}
-asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"airbyte-server-{env_name}",
-    aws_config=aws_config,
-    desired_size=auto_scale_config["desired"],
-    min_size=auto_scale_config["min"],
-    max_size=auto_scale_config["max"],
-    vpc_zone_identifiers=target_vpc["subnet_ids"],
-    tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
-    # Don't automatically cycle instances to avoid interrupting long-running syncs
-    max_instance_lifetime_seconds=None,
-)
-
-as_setup = OLAutoScaling(
-    asg_config=asg_config,
-    lt_config=lt_config,
-    tg_config=tg_config,
-    lb_config=lb_config,
-)
-
-## Create Route53 DNS records for airbyte
-five_minutes = 60 * 5
-route53.Record(
-    "airbyte-server-dns-record",
-    name=airbyte_config.require("web_host_domain"),
-    type="CNAME",
-    ttl=five_minutes,
-    records=[as_setup.load_balancer.dns_name],
-    zone_id=mitodl_zone_id,
-)
-route53.Record(
-    "airbyte-api-server-dns-record",
-    name=f"api-{airbyte_config.require('web_host_domain')}",
-    type="CNAME",
-    ttl=five_minutes,
-    records=[as_setup.load_balancer.dns_name],
-    zone_id=mitodl_zone_id,
-)
-route53.Record(
-    "airbyte-config-api-dns-record",
-    name=f"config-{airbyte_config.require('web_host_domain')}",
-    type="CNAME",
-    ttl=five_minutes,
-    records=[as_setup.load_balancer.dns_name],
-    zone_id=mitodl_zone_id,
-)
-route53.Record(
-    "airbyte-auth-dns-record",
-    name=airbyte_config.require("auth_domain"),
-    type="CNAME",
-    ttl=five_minutes,
-    records=[as_setup.load_balancer.dns_name],
-    zone_id=mitodl_zone_id,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        depends_on=[airbyte_db_vault_backend, airbyte_db],
+    ),
 )
 
 export("lakeformation_role_arn", airbyte_lakeformation_role.arn)
