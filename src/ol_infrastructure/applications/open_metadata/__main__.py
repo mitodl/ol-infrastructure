@@ -14,6 +14,11 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.lib.versions import OPEN_METADATA_VERSION
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.eks import (
+    OLEKSGateway,
+    OLEKSGatewayConfig,
+    OLEKSGatewayRouteConfig,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
@@ -373,112 +378,33 @@ open_metadata_application = kubernetes.helm.v3.Release(
     ),
 )
 
-traefik_gateway = kubernetes.yaml.v2.ConfigGroup(
-    f"open-metadata-{stack_info.name}-traefik-gateway",
-    objs=[
-        {
-            "apiVersion": "gateway.networking.k8s.io/v1",
-            "kind": "Gateway",
-            "metadata": {
-                "name": "openmetadata-gateway",
-                "namespace": open_metadata_namespace,
-                "annotations": {
-                    "cert-manager.io/cluster-issuer": "letsencrypt-production",
-                },
-            },
-            "spec": {
-                "gatewayClassName": "traefik",
-                "listeners": [
-                    {
-                        "name": "http",
-                        "protocol": "HTTP",
-                        "port": 8000,
-                    },
-                    {
-                        "name": "https",
-                        "hostname": open_metadata_config.require("domain"),
-                        "protocol": "HTTPS",
-                        "port": 8443,
-                        "tls": {
-                            "mode": "Terminate",
-                            "certificateRefs": [
-                                {
-                                    "group": "",
-                                    "kind": "Secret",
-                                    "name": "openmetadata-ci-tls",
-                                    "namespace": open_metadata_namespace,
-                                },
-                            ],
-                        },
-                    },
-                ],
-            },
-        },
-        {
-            "apiVersion": "gateway.networking.k8s.io/v1",
-            "kind": "HTTPRoute",
-            "metadata": {
-                "name": "openmetadata-http-route",
-                "namespace": open_metadata_namespace,
-            },
-            "spec": {
-                "parentRefs": [
-                    {
-                        "name": "openmetadata-gateway",
-                        "sectionName": "http",
-                        "kind": "Gateway",
-                        "group": "gateway.networking.k8s.io",
-                        "port": 8000,
-                    }
-                ],
-                "hostnames": [open_metadata_config.require("domain")],
-                "rules": [
-                    {
-                        "filters": [
-                            {
-                                "type": "RequestRedirect",
-                                "requestRedirect": {
-                                    "scheme": "https",
-                                },
-                            },
-                        ],
-                    },
-                ],
-            },
-        },
-        {
-            "apiVersion": "gateway.networking.k8s.io/v1",
-            "kind": "HTTPRoute",
-            "metadata": {
-                "name": "openmetadata-https-route",
-                "namespace": open_metadata_namespace,
-            },
-            "spec": {
-                "parentRefs": [
-                    {
-                        "name": "openmetadata-gateway",
-                        "sectionName": "https",
-                        "kind": "Gateway",
-                        "group": "gateway.networking.k8s.io",
-                        "port": 8443,
-                    }
-                ],
-                "hostnames": [open_metadata_config.require("domain")],
-                "rules": [
-                    {
-                        "backendRefs": [
-                            {
-                                "name": "openmetadata",
-                                "namespace": open_metadata_namespace,
-                                "kind": "Service",
-                                "port": 8585,
-                            }
-                        ]
-                    },
-                ],
-            },
-        },
+
+gateway_config = OLEKSGatewayConfig(
+    cert_issuer="letsencrypt-production",
+    cert_issuer_class="cluster-issuer",
+    gateway_name="open-metadata",
+    hostnames=[open_metadata_config.require("domain")],
+    labels=k8s_global_labels,
+    namespace=open_metadata_namespace,
+    routes=[
+        OLEKSGatewayRouteConfig(
+            backend_service_name="openmetadata",  # sourced from the helm chart
+            backend_service_namespace=open_metadata_namespace,
+            backend_service_port=8585,  # sourced from the helm chart
+            certificate_secret_name="openmetadata-tls",  # cert-manager will create this  # noqa: S106, E501  # pragma: allowlist secret
+            certificate_secret_namespace=open_metadata_namespace,
+            hostname=open_metadata_config.require("domain"),
+            name="open-metadata-https",
+            port=8443,  # we should source this from somewhere instead of magic number
+            protocol="HTTPS",
+            tls_mode="Terminate",
+        ),
     ],
+)
+
+gateway = OLEKSGateway(
+    f"open-metadata-{stack_info.name}-gateway",
+    gateway_config=gateway_config,
     opts=ResourceOptions(
         provider=k8s_provider,
         parent=open_metadata_application,

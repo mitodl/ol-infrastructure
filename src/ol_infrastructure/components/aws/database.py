@@ -336,6 +336,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 alarm_config = OLCloudWatchAlarmSimpleRDSConfig(
                     database_identifier=db_config.instance_name,
                     name=f"{db_config.instance_name}-{alarm_name}-OLCloudWatchAlarmSimpleRDSConfig",
+                    tags=db_config.tags,
                     **alarm_args,
                 )
                 OLCloudWatchAlarmSimpleRDS(alarm_config=alarm_config)

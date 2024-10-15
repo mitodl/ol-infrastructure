@@ -1,6 +1,6 @@
 # Lifted from https://github.com/johnfmorton/docker-heroku-cli/blob/main/Dockerfile
 
-ARG TAG=16-alpine
+ARG TAG=20-alpine
 FROM node:$TAG
 
 WORKDIR /app

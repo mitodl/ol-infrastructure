@@ -220,6 +220,7 @@ class OLAmazonCache(pulumi.ComponentResource):
                     cluster_id=cache_config.cluster_name,
                     node_id=node_id_suffix,
                     name=f"{cache_config.cluster_name}{node_id_suffix}-{alarm_name}-OLCloudWatchAlarmSimpleElastiCacheConfig",
+                    tags=cache_config.tags,
                     **alarm_args,
                 )
                 OLCloudWatchAlarmSimpleElastiCache(alarm_config=alarm_config)
