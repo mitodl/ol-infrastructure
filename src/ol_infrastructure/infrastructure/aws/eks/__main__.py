@@ -4,6 +4,7 @@
 
 import base64
 import json
+from pathlib import Path
 
 import pulumi_aws as aws
 import pulumi_eks as eks
@@ -589,6 +590,31 @@ vault_k8s_auth_backend_config = vault.kubernetes.AuthBackendConfig(
 )
 export("vault_auth_endpoint", vault_auth_endpoint_name)
 
+# This role allows the vault secrets operator to use a transit mount for
+# maintaining a cache of open leases. Makes operator restarts less painful
+# on applications
+# Ref: https://developer.hashicorp.com/vault/tutorials/kubernetes/vault-secrets-operator#transit-encryption
+transit_policy_name = f"{stack_info.env_prefix}-eks-vso-transit"
+transit_policy = vault.Policy(
+    f"{cluster_name}-eks-vault-secrets-operator-transit-policy",
+    name=transit_policy_name,
+    policy=Path(__file__).parent.joinpath("vso_transit_policy.hcl").read_text(),
+    opts=ResourceOptions(parent=vault_k8s_auth),
+)
+transit_role_name = "vso-transit"
+vault_secrets_operator_service_account_name = (
+    "vault-secrets-operator-controller-manager"
+)
+vault_secret_operator_transit_role = vault.kubernetes.AuthBackendRole(
+    f"{cluster_name}-eks-vault-secrets-operator-transit-role",
+    role_name=transit_role_name,
+    backend=vault_auth_endpoint_name,
+    bound_service_account_names=[vault_secrets_operator_service_account_name],
+    bound_service_account_namespaces=["operations"],
+    token_policies=[transit_policy_name],
+    opts=ResourceOptions(parent=vault_k8s_auth),
+)
+
 # Install the vault-secrets-operator directly from the public chart
 vault_secrets_operator = kubernetes.helm.v3.Release(
     f"{cluster_name}-vault-secrets-operator-helm-release",
@@ -614,6 +640,22 @@ vault_secrets_operator = kubernetes.helm.v3.Release(
             "controller": {
                 "replicas": 1,
                 "tolerations": operations_tolerations,
+                "manager": {
+                    "clientCache": {
+                        "persistenceModel": "direct-encrypted",
+                        "storageEncryption": {
+                            "enabled": True,
+                            "mount": vault_auth_endpoint_name,
+                            "keyName": "vault-secrets-operator",
+                            "transitMount": "infrastructure",
+                            "kubernetes": {
+                                "role": transit_role_name,
+                                "serviceAccount": "vault-secrets-operator-controller-manager",
+                                "tokenAudiences": [],
+                            },
+                        },
+                    },
+                },
             },
         },
         skip_await=False,
@@ -621,7 +663,7 @@ vault_secrets_operator = kubernetes.helm.v3.Release(
     opts=ResourceOptions(
         provider=k8s_provider,
         parent=operations_namespace,
-        depends_on=[cluster, node_groups[0]],
+        depends_on=[cluster, node_groups[0], vault_secret_operator_transit_role],
         delete_before_replace=True,
     ),
 )
