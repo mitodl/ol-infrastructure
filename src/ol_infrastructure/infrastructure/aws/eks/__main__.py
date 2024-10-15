@@ -212,10 +212,15 @@ cluster = eks.Cluster(
     ),
 )
 export("cluster_name", cluster_name)
-export("admin_role_arn", administrator_role.arn)
-export("cluster_ca", cluster.eks_cluster.certificate_authority)
-export("cluster_endpoint", cluster.eks_cluster.endpoint)
 export("kube_config", cluster.kubeconfig)
+export(
+    "kube_config_data",
+    {
+        "role_arn": administrator_role.arn,
+        "certificate-authority-data": cluster.eks_cluster.certificate_authority,
+        "server": cluster.eks_cluster.endpoint,
+    },
+)
 
 ############################################################
 # Configure node groups
