@@ -39,6 +39,10 @@ from ol_infrastructure.lib.aws.iam_helper import (
     IAM_POLICY_VERSION,
     lint_iam_policy,
 )
+    OLVaultPostgresDatabaseConfig,
+)
+from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -603,6 +607,17 @@ vault_k8s_resources_config = OLVaultK8SResourcesConfig(
     vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
     vault_auth_role_name=airbyte_vault_k8s_auth_backend_role.role_name,
 )
+=======
+airbyte_service_account_name = "airbyte-admin"
+
+vault_k8s_resources_config = OLVaultK8SResourcesConfig(
+    application_name="airbyte",
+    namespace=airbyte_namespace,
+    labels=k8s_global_labels,
+    vault_address=vault_config.require("address"),
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    vault_auth_role_name=airbyte_vault_k8s_auth_backend_role.role_name,
+)
 vault_k8s_resources = OLVaultK8SResources(
     resource_config=vault_k8s_resources_config,
     opts=ResourceOptions(
@@ -1010,6 +1025,234 @@ forward_auth_service = kubernetes.core.v1.Service(
         parent=forward_auth_deployment,
         depends_on=[airbyte_helm_release, forward_auth_deployment],
         delete_before_replace=True,
+    ),
+=======
+    ),
+)
+
+db_creds_secret_name = "db-creds"  # noqa: S105  # pragma: allowlist secret
+db_creds_dynamic_secret_config = OLVaultK8SDynamicSecretConfig(
+    name="airbyte-db-creds",
+    dest_secret_labels=k8s_global_labels,
+    dest_secret_name=db_creds_secret_name,
+    exclude_raw=True,
+    labels=k8s_global_labels,
+    mount=airbyte_db_vault_backend_config.mount_point,
+    namespace=airbyte_namespace,
+    path="creds/app",
+    templates={
+        "DATABASE_USER": '{{ get .Secrets "username" }}',
+        "DATABASE_PASSWORD": '{{  get .Secrets "password" }}',
+        "DATABASE_URL": connection_string,
+    },
+    vaultauth=vault_k8s_resources.auth_name,
+)
+shared_extra_env_vars = [
+    {
+        "name": "DATABASE_USER",
+        "valueFrom": {
+            "secretKeyRef": {
+                "name": db_creds_secret_name,
+                "key": "DATABASE_USER",
+            },
+        },
+    },
+    {
+        "name": "DATABASE_PASSWORD",
+        "valueFrom": {
+            "secretKeyRef": {
+                "name": db_creds_secret_name,
+                "key": "DATABASE_PASSWORD",
+            },
+        },
+    },
+    {
+        "name": "DATABASE_URL",
+        "valueFrom": {
+            "secretKeyRef": {
+                "name": db_creds_secret_name,
+                "key": "DATABASE_URL",
+            },
+        },
+    },
+]
+
+airbyte_helm_release = kubernetes.helm.v3.Release(
+    "airbyte-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="airbyte",
+        chart="airbyte",
+        version="1.1.0",
+        namespace=airbyte_namespace,
+        cleanup_on_fail=True,
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://airbytehq.github.io/helm-charts",
+        ),
+        values={
+            "global": {
+                "serviceAccountName": airbyte_service_account_name,
+                "deploymentMode": "oss",
+                "edition": "community",
+            },
+            "database": {
+                "type": "external",
+            },
+            "storage": {
+                "s3": {
+                    "region": aws_config.region,
+                    "authenticationType": "instanceProfile",
+                },
+            },
+            "serviceAccount": {
+                "create": True,
+                "annotations": {},
+                "name": airbyte_service_account_name,
+            },
+            "webapp": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podAnnotations": {},
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+                "ingress": {
+                    "enabled": False,
+                },
+                "extraEnv": shared_extra_env_vars,
+            },
+            "pod-sweeper": {
+                "enabled": True,
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+            },
+            "server": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+                "extraEnv": shared_extra_env_vars,
+                "log": {
+                    "level": "INFO",
+                },
+            },
+            "worker": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+            },
+            "workload-launcher": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+            },
+            "metrics": {
+                "enabled": False,
+            },
+            "airbyte-bootloader": {
+                "enabled": True,
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+                "extraEnv": shared_extra_env_vars,
+            },
+            "temporal": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+                "extraEnv": shared_extra_env_vars,
+            },
+            "temporal-ui": {
+                "enabled": False,
+            },
+            "postgresql": {
+                "enabled": False,
+            },
+            "cron": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podLabels": k8s_global_labels,
+                "resources": {
+                    "limits": {
+                        "cpu": "1000m",
+                        "memory": "1Gi",
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "1Gi",
+                    },
+                },
+                "extraEnv": shared_extra_env_vars,
+            },
+        },
+        skip_await=True,
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        depends_on=[airbyte_db_vault_backend, airbyte_db],
     ),
 )
 
