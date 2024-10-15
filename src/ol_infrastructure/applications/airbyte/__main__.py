@@ -42,6 +42,8 @@ from ol_infrastructure.lib.aws.iam_helper import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
+)
+from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -607,7 +609,16 @@ vault_k8s_resources_config = OLVaultK8SResourcesConfig(
     vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
     vault_auth_role_name=airbyte_vault_k8s_auth_backend_role.role_name,
 )
-=======
+airbyte_service_account_name = "airbyte-admin"
+
+vault_k8s_resources_config = OLVaultK8SResourcesConfig(
+    application_name="airbyte",
+    namespace=airbyte_namespace,
+    labels=k8s_global_labels,
+    vault_address=vault_config.require("address"),
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    vault_auth_role_name=airbyte_vault_k8s_auth_backend_role.role_name,
+)
 airbyte_service_account_name = "airbyte-admin"
 
 vault_k8s_resources_config = OLVaultK8SResourcesConfig(
@@ -1026,9 +1037,8 @@ forward_auth_service = kubernetes.core.v1.Service(
         depends_on=[airbyte_helm_release, forward_auth_deployment],
         delete_before_replace=True,
     ),
-=======
-    ),
 )
+
 
 db_creds_secret_name = "db-creds"  # noqa: S105  # pragma: allowlist secret
 db_creds_dynamic_secret_config = OLVaultK8SDynamicSecretConfig(
