@@ -135,7 +135,10 @@ generate_clients_job = Job(
                 run=Command(
                     path="sh",
                     dir=unified_ecommerce_api_clients_repository.name,
-                    args=["-xc", _read_script("unified-ecommerce-api-clients-commit-changes.sh")],
+                    args=[
+                        "-xc",
+                        _read_script("unified-ecommerce-api-clients-commit-changes.sh"),
+                    ],
                 ),
             ),
         ),
@@ -168,7 +171,10 @@ publish_job = Job(
                 run=Command(
                     path="sh",
                     dir="unified-ecommerce-api-clients/src/typescript/unified-ecommerce-api-axios",
-                    args=["-xc", _read_script("unified-ecommerce-api-clients-publish-node.sh")],
+                    args=[
+                        "-xc",
+                        _read_script("unified-ecommerce-api-clients-publish-node.sh"),
+                    ],
                 ),
             ),
         ),
