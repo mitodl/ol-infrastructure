@@ -1,3 +1,3 @@
-path "secret-global/data/odl-wildcard" {
-  capabilities = ["read", "list"]
+path "secret-global/odl-wildcard" {
+  capabilities = ["read"]
 }
