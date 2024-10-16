@@ -228,7 +228,7 @@ cert_manager_clusterissuer_resources = kubernetes.yaml.v2.ConfigGroup(
                 "acme": {
                     "email": "odl-devops@mit.edu",
                     "server": "https://acme-staging-v02.api.letsencrypt.org/directory",
-                    "disableAccountKeyGeneration": True,
+                    "disableAccountKeyGeneration": False,
                     "privateKeySecretRef": {
                         "name": "letsencrypt-staging-private-key",
                     },
@@ -258,7 +258,7 @@ cert_manager_clusterissuer_resources = kubernetes.yaml.v2.ConfigGroup(
                 "acme": {
                     "email": "odl-devops@mit.edu",
                     "server": "https://acme-v02.api.letsencrypt.org/directory",
-                    "disableAccountKeyGeneration": True,
+                    "disableAccountKeyGeneration": False,
                     "privateKeySecretRef": {
                         "name": "letsencrypt-production-private-key",
                     },
