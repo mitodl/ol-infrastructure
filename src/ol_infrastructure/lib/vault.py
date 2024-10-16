@@ -61,7 +61,7 @@ postgres_role_statements = {
         "renew": [],
         "rollback": [],
     },
-    "approle": {
+    "app": {
         "create": [
             # Check if the role exists and create it if not
             Template(
@@ -113,15 +113,6 @@ postgres_role_statements = {
                 """
             ),
             Template("""RESET ROLE;"""),
-        ],
-        # Don't provide a revoke statement so that Vault won't accidentally remove the
-        # role
-        "revoke": [],
-        "renew": [],
-        "rollback": [],
-    },
-    "app": {
-        "create": [
             # Create the user in ${app_name}
             Template(
                 """
@@ -155,7 +146,7 @@ postgres_role_statements = {
         "renew": [],
         "rollback": [],
     },
-    "readonly_role": {
+    "readonly": {
         "create": [
             # Check if the role exists and create it if not
             Template(
@@ -204,13 +195,6 @@ postgres_role_statements = {
                 """
             ),
             Template("""RESET ROLE;"""),
-        ],
-        "revoke": [],
-        "renew": [],
-        "rollback": [],
-    },
-    "readonly": {
-        "create": [
             # Create the read-only user and put it into the read-only-role
             Template(
                 """
