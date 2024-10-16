@@ -1300,6 +1300,20 @@ gh_workflow_appzi_url_env_secret = github.ActionsSecret(
     plaintext_value=heroku_vars["APPZI_URL"],
     opts=ResourceOptions(provider=github_provider),
 )
+gh_workflow_sentry_traces_sample_rate = github.ActionsSecret(
+    f"ol_mitopen_sentry_traces_sample_rate-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"SENTRY_TRACES_SAMPLE_RATE_{env_var_suffix}",
+    plaintext_value=heroku_vars["SENTRY_TRACES_SAMPLE_RATE"],
+    opts=ResourceOptions(provider=github_provider),
+)
+gh_workflow_sentry_profiles_sample_rate = github.ActionsSecret(
+    f"ol_mitopen_sentry_profiles_sample_rate-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"SENTRY_PROFILES_SAMPLE_RATE_{env_var_suffix}",
+    plaintext_value=heroku_vars["SENTRY_PROFILES_SAMPLE_RATE"],
+    opts=ResourceOptions(provider=github_provider),
+)
 
 
 export(
