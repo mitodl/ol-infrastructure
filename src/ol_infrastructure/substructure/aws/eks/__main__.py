@@ -6,6 +6,10 @@ import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
+from ol_infrastructure.components.services.vault import (
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
+)
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -139,6 +143,9 @@ vault_traefik_service_account_cluster_role_binding = (
 star_odl_mit_edu_secret_name = (
     "odl-wildcard-cert"  # pragma: allowlist secret #  noqa: S105
 )
+# Continue to use the vault auth resource rather than one made by
+# OLVaulkK8SResources because this one hooks to a pre-defined
+# VaultConnection resource that comes with the helm release
 traefik_vso_resources = kubernetes.yaml.v2.ConfigGroup(
     f"{cluster_name}-traefik-vso-resources",
     objs=[
@@ -153,7 +160,7 @@ traefik_vso_resources = kubernetes.yaml.v2.ConfigGroup(
             "spec": {
                 "method": "kubernetes",
                 "mount": cluster_stack.require_output("vault_auth_endpoint"),
-                # This was for us by the helm chart
+                # This was made for us by the helm chart
                 "vaultConnectionRef": "default",
                 "kubernetes": {
                     "role": vault_k8s_auth_backend_role.role_name,
@@ -161,47 +168,35 @@ traefik_vso_resources = kubernetes.yaml.v2.ConfigGroup(
                 },
             },
         },
-        {
-            "apiVersion": "secrets.hashicorp.com/v1beta1",
-            "kind": "VaultStaticSecret",
-            "metadata": {
-                "name": "vault-kv-global-odl-wildcard",
-                "namespace": "operations",
-                "labels": k8s_global_labels,
-            },
-            "spec": {
-                "type": "kv-v2",
-                "mount": "secret-global",
-                "path": "odl-wildcard",
-                "destination": {
-                    "name": star_odl_mit_edu_secret_name,
-                    "create": True,
-                    "overwrite": True,
-                    "type": "kubernetes.io/tls",
-                    # Ref: https://developer.hashicorp.com/vault/docs/platform/k8s/vso/secret-transformation
-                    "transformation": {
-                        # Removes all the org fields from k8s secret
-                        "excludes": [
-                            ".*",
-                        ],
-                        # creates two new values in the k8s secret
-                        # tls.key and tls.crt populated with data from the vault data
-                        "templates": {
-                            "tls.key": {
-                                "text": '{{ get .Secrets "key_with_proper_newlines" }}',
-                            },
-                            "tls.crt": {
-                                "text": '{{ get .Secrets "cert_with_proper_newlines" }}',
-                            },
-                        },
-                    },
-                },
-                "refreshAfter": "1h",
-                # This directly references the object above
-                "vaultAuthRef": "traefik-static-auth",
-            },
-        },
     ],
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=vault_traefik_service_account,
+        delete_before_replace=True,
+    ),
+)
+
+star_odl_mit_edu_static_secret_config = OLVaultK8SStaticSecretConfig(
+    name="vault-kv-global-odl-wildcard",
+    namespace="operations",
+    labels=k8s_global_labels,
+    dest_secret_labels=k8s_global_labels,
+    dest_secret_name=star_odl_mit_edu_secret_name,
+    dest_secret_type="kubernetes.io/tls",  # noqa: S106  # pragma: allowlist secret
+    mount="secret-global",
+    mount_type="kv-v1",
+    path="odl-wildcard",
+    templates={
+        "tls.key": '{{ get .Secrets "key_with_proper_newlines" }}',
+        "tls.crt": '{{ get .Secrets "cert_with_proper_newlines" }}',
+    },
+    refresh_after="1h",
+    vaultauth="traefik-static-auth",
+)
+
+star_odl_mit_edu_static_secret = OLVaultK8SSecret(
+    f"{cluster_name}-star-odl-mit-edu-static-secret",
+    resource_config=star_odl_mit_edu_static_secret_config,
     opts=ResourceOptions(
         provider=k8s_provider,
         parent=vault_traefik_service_account,

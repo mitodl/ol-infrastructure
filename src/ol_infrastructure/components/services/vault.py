@@ -12,13 +12,13 @@ import json
 import textwrap
 from enum import Enum
 from string import Template
-from typing import Optional, Union
+from typing import Any, Literal, Optional, Union
 
 import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_aws.acmpca import Certificate, CertificateValidityArgs
 from pulumi_vault import Mount, aws, database, pkisecret
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from bridge.lib.magic_numbers import (
     DEFAULT_MONGODB_PORT,
@@ -612,18 +612,164 @@ class OLVaultPKIIntermediateRole(ComponentResource):
         self.register_outputs({})
 
 
+# TODO: @Ardiea expand to include support for transformationRefs  # noqa: FIX002, TD002
+# https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
+class OLVaultK8SSecretConfig(BaseModel):
+    annotations: Optional[dict[str, str]] = {}
+    dest_secret_annotations: Optional[dict[str, str]] = {}
+    dest_secret_create: bool = True
+    dest_secret_labels: Optional[dict[str, str]] = {}
+    dest_secret_name: str
+    dest_secret_overwrite: bool = True
+    # Ref: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
+    dest_secret_type: Literal[
+        "Opaque",
+        "kubernetes.io/tls",
+        "kubernetes.io/ssh-auth",
+        "kubernetes.io/basic-auth",
+    ] = "Opaque"
+    exclude_raw: Optional[bool] = True
+    excludes: Optional[list[str]] = [".*"]
+    includes: Optional[list[str]] = []
+    kind: str
+    labels: Optional[dict[str, str]] = {}
+    mount: str
+    mount_type: Optional[Literal["kv-v1", "kv-v2"]] = None
+    name: str
+    refresh_after: Optional[str] = None
+    # TODO: @Ardiea Add support for multiple restart targets  # noqa: FIX002 TD002 TD003
+    restart_target_kind: Optional[Literal["Deployment", "DaemonSet", "StatefulSet"]] = (
+        None
+    )
+    restart_target_name: Optional[str] = None
+    namespace: str
+    path: str
+    templates: Optional[dict[str, str]] = None
+    vaultauth: str
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @model_validator(mode="after")
+    def restart_target_is_set(self):
+        if not all((self.restart_target_kind, self.restart_target_name)) and any(
+            (self.restart_target_kind, self.restart_target_name)
+        ):
+            msg = "Both restart_target_kind and restart_target_name must be set."
+            raise ValueError(msg)
+        return self
+
+
+class OLVaultK8SStaticSecretConfig(OLVaultK8SSecretConfig):
+    kind: str = "VaultStaticSecret"
+    refresh_after: Optional[str] = "1h"
+    mount_type: Literal["kv-v1", "kv-v2"] = "kv-v2"
+
+    @field_validator("kind")
+    @classmethod
+    def is_valid_kind(cls, kind: str) -> str:
+        if kind != "VaultStaticSecret":
+            msg = "The only valid 'kind' for OLVaultK8SStaticSecret is 'VaultStaticSecret'"  # noqa: E501
+            raise ValueError(msg)
+        return kind
+
+
+class OLVaultK8SDynamicSecretConfig(OLVaultK8SSecretConfig):
+    kind: str = "VaultDynamicSecret"
+
+    @field_validator("kind")
+    @classmethod
+    def is_valid_kind(cls, kind: str) -> str:
+        if kind != "VaultDynamicSecret":
+            msg = "The only valid 'kind' for OLVaultK8SDynamicSecret is 'VaultDynamicSecret'"  # noqa: E501
+            raise ValueError(msg)
+        return kind
+
+
+class OLVaultK8SSecret(ComponentResource):
+    def __init__(
+        self,
+        name: str,
+        resource_config: OLVaultK8SSecretConfig,
+        opts: Optional[ResourceOptions] = None,
+    ):
+        super().__init__(
+            f"ol:services:Vault:K8S:{resource_config.kind}",
+            name,
+            None,
+            opts,
+        )
+
+        resource_opts = ResourceOptions.merge(ResourceOptions(parent=self), opts)
+
+        secret_def: dict[str, Any] = {
+            "apiVersion": "secrets.hashicorp.com/v1beta1",
+            "kind": resource_config.kind,
+            "metadata": {
+                "name": resource_config.name,
+                "namespace": resource_config.namespace,
+                "labels": resource_config.labels,
+                "annotations": resource_config.annotations,
+            },
+            "spec": {
+                "mount": resource_config.mount,
+                "path": resource_config.path,
+                "destination": {
+                    "name": resource_config.dest_secret_name,
+                    "type": resource_config.dest_secret_type,
+                    "overwrite": resource_config.dest_secret_overwrite,
+                    "create": resource_config.dest_secret_create,
+                    "labels": resource_config.dest_secret_labels,
+                    "annotations": resource_config.dest_secret_annotations,
+                },
+                "vaultAuthRef": resource_config.vaultauth,
+            },
+        }
+
+        if resource_config.restart_target_kind and resource_config.restart_target_name:
+            secret_def["spec"]["rolloutRestartTargets"] = [
+                {
+                    "name": resource_config.restart_target_name,
+                    "kind": resource_config.restart_target_kind,
+                },
+            ]
+
+        if resource_config.templates:
+            transformation_block: dict[str, Any] = {
+                "excludeRaw": resource_config.exclude_raw,
+                "excludes": resource_config.excludes,
+                "includes": resource_config.includes,
+                "templates": {},
+            }
+            for name, text in resource_config.templates.items():  # noqa: PLR1704
+                transformation_block["templates"][name] = {"text": str(text)}
+            secret_def["spec"]["destination"]["transformation"] = transformation_block
+
+        if resource_config.kind == "VaultStaticSecret":
+            secret_def["spec"]["type"] = str(resource_config.mount_type)
+            secret_def["spec"]["refreshAfter"] = resource_config.refresh_after
+
+        self.vault_secret_resource = kubernetes.yaml.v2.ConfigGroup(
+            f"OLVaultK8SSecret-{resource_config.namespace}-{resource_config.name}",
+            objs=[secret_def],
+            opts=resource_opts,
+        )
+
+
 class OLVaultK8SResourcesConfig(BaseModel):
+    annotations: dict[str, str] = {}
     application_name: str
+    labels: dict[str, str] = {}
+    namespace: str
     vault_address: str
     vault_auth_endpoint: Union[str, Output[str]]
     vault_auth_role_name: Union[str, Output[str]]
-    k8s_namespace: str
-    k8s_provider: kubernetes.Provider
-    k8s_global_labels: dict[str, str] = {}
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class OLVaultK8SResources(ComponentResource):
+    """Resource for encapsulating the components required to create a
+    vault-k8s integration
+    """
+
     def __init__(
         self,
         resource_config: OLVaultK8SResourcesConfig,
@@ -635,9 +781,7 @@ class OLVaultK8SResources(ComponentResource):
             None,
             opts,
         )
-        resource_opts = ResourceOptions.merge(
-            ResourceOptions(parent=self, provider=resource_config.k8s_provider), opts
-        )
+        resource_opts = ResourceOptions.merge(ResourceOptions(parent=self), opts)
 
         self.service_account_name = f"{resource_config.application_name}-vault"
         self.connection_name = f"{resource_config.application_name}-vault-connection"
@@ -647,8 +791,9 @@ class OLVaultK8SResources(ComponentResource):
             f"{resource_config.application_name}-vault-service-account",
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 name=self.service_account_name,
-                namespace=resource_config.k8s_namespace,
-                labels=resource_config.k8s_global_labels,
+                namespace=resource_config.namespace,
+                labels=resource_config.labels,
+                annotations=resource_config.annotations,
             ),
             automount_service_account_token=False,
             opts=resource_opts,
@@ -658,8 +803,9 @@ class OLVaultK8SResources(ComponentResource):
             f"{resource_config.application_name}-vault-cluster-role-binding",
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 name=f"{self.service_account_name}:cluster-auth",
-                namespace=resource_config.k8s_namespace,
-                labels=resource_config.k8s_global_labels,
+                namespace=resource_config.namespace,
+                labels=resource_config.labels,
+                annotations=resource_config.annotations,
             ),
             role_ref=kubernetes.rbac.v1.RoleRefArgs(
                 api_group="rbac.authorization.k8s.io",
@@ -670,7 +816,7 @@ class OLVaultK8SResources(ComponentResource):
                 kubernetes.rbac.v1.SubjectArgs(
                     kind="ServiceAccount",
                     name=self.service_account_name,
-                    namespace=resource_config.k8s_namespace,
+                    namespace=resource_config.namespace,
                 ),
             ],
             opts=resource_opts,
@@ -684,8 +830,9 @@ class OLVaultK8SResources(ComponentResource):
                     "kind": "VaultConnection",
                     "metadata": {
                         "name": self.connection_name,
-                        "namespace": resource_config.k8s_namespace,
-                        "labels": resource_config.k8s_global_labels,
+                        "namespace": resource_config.namespace,
+                        "labels": resource_config.labels,
+                        "annotations": resource_config.annotations,
                     },
                     "spec": {
                         "address": resource_config.vault_address,
@@ -697,8 +844,9 @@ class OLVaultK8SResources(ComponentResource):
                     "kind": "VaultAuth",
                     "metadata": {
                         "name": self.auth_name,
-                        "namespace": resource_config.k8s_namespace,
-                        "labels": resource_config.k8s_global_labels,
+                        "namespace": resource_config.namespace,
+                        "labels": resource_config.labels,
+                        "annotations": resource_config.annotations,
                     },
                     "spec": {
                         "method": "kubernetes",

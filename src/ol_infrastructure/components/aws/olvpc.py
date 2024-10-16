@@ -81,34 +81,26 @@ class OLVPCConfig(AWSBase):
             raise ValueError(msg)
         return network
 
-    # TODO @Ardiea: Add verification of the pod subnet and ensure # noqa: FIX002
-    # https://github.com/mitodl/ol-infrastructure/issues/2589
-    # Needs comprehensive revisit
     @field_validator("k8s_service_subnet")
     @classmethod
     def k8s_service_subnet_is_subnet(
         cls, k8s_service_subnet: Optional[IPv4Network], info: ValidationInfo
     ) -> Optional[IPv4Network]:
-        """Ensure that specified k8s subnet is actually a subnet of the cidr specified
+        """Ensure that specified k8s subnet is NOT a subnet of the cidr specified
             for the VPC.
-
         :param k8s_service_subnet: The K8S service subnet to be created in the VPC.
         :type k8s_service_subnet: IPv4Network
-
-        :param values: Dictonary containing the rest of the class values
-        :type values: Dict
-
-        :raises ValueError: Raise a ValueError if the specified subnet is not actually a
+        :param info: Dictonary containing the rest of the class values
+        :type info: Dict
+        :raises ValueError: Raise a ValueError if the specified subnet is a
             subnet of the VPC cidr
-
         :returns: The K8S service subnet
-
         :rtype: IPv4Network
         """
         network = info.data["cidr_block"]
         assert network is not None  # noqa: S101
         if k8s_service_subnet is not None and k8s_service_subnet.subnet_of(network):
-            msg = f"{k8s_service_subnet} is a subnet of {network}"
+            msg = f"{k8s_service_subnet} is a subnet of {network} and shouldn't be."
             raise ValueError(msg)
         return k8s_service_subnet
 
