@@ -792,7 +792,7 @@ mitopen_fastly_service = fastly.ServiceVcl(
                 if(req.http.User-Agent ~ "(?i)prerender"){{
                   return(pass);
                 }}
-                if( req.http.User-Agent ~ "(?i)yandex|baiduspider|facebookexternalhit|twitterbot|linkedinbot|embedly|showyoubot|outbrain|pinterestbot|slackbot|vkShare|W3C_Validator|whatsapp|ImgProxy| flipboard|tumblr|bitlybot|skype|nuzzel|discordbot|qwantify|pinterest|lighthouse|telegrambot" && req.url.ext !~ "(?i)js|css|xml|txt|less|png|jpg|jpeg|gif|pdf|doc|ico|rss|zip|mp3|rar|exe|wmv|doc|avi|ppt|mpg|mpeg|tif|wav|mov|psd|ai|xls|mp4|m4a|swf|dat|dmg|iso|flv|m4v|woff|ttf|svg|webmanifest" ) {{
+                if( req.http.User-Agent ~ "(?i)yandex|baiduspider|facebookexternalhit|twitterbot|linkedinbot|embedly|showyoubot|outbrain|pinterestbot|slackbot|vkShare|W3C_Validator|whatsapp|ImgProxy| flipboard|tumblr|bitlybot|skype|nuzzel|discordbot|qwantify|pinterest|telegrambot" && req.url.ext !~ "(?i)js|css|xml|txt|less|png|jpg|jpeg|gif|pdf|doc|ico|rss|zip|mp3|rar|exe|wmv|doc|avi|ppt|mpg|mpeg|tif|wav|mov|psd|ai|xls|mp4|m4a|swf|dat|dmg|iso|flv|m4v|woff|ttf|svg|webmanifest" ) {{
 
                   set req.backend = F_Prerender_Host;
                   set req.http.user-agent = req.http.user-agent;
