@@ -131,7 +131,7 @@ open_metadata_db = OLAmazonDB(open_metadata_db_config)
 
 # Ref: https://docs.open-metadata.org/latest/deployment/kubernetes/eks
 open_metadata_role_statements = postgres_role_statements.copy()
-open_metadata_role_statements["approle"]["create"].append(
+open_metadata_role_statements["app"]["create"].append(
     Template(
         """
         DO
@@ -319,7 +319,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
                             "cpatti",
                             "qhoque",
                         ],
-                        "principalDomain": "open-metadata.org",
+                        "principalDomain": "mit.edu",
                     },
                     "authentication": {
                         "provider": "custom-oidc",
