@@ -122,6 +122,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         name=Identifier("scim-spi"),
         owner="mitodl",
         repository="keycloak-scim",
+        tag_filter="alpha",
     )
 
     #############################################
