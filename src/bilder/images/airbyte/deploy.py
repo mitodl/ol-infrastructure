@@ -215,7 +215,7 @@ files.put(
 consul_configuration = {
     Path("00-default.json"): ConsulConfig(
         addresses=ConsulAddresses(dns="127.0.0.1", http="127.0.0.1"),
-        advertise_addr='{{ GetInterfaceIP "ens5" }}',
+        advertise_addr="{{ GetPrivateIP }}",
         services=[
             ConsulService(
                 name="airbyte",
