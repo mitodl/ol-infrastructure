@@ -22,10 +22,18 @@ path "secret-operations/sso/airbyte" {
   capabilities = ["read"]
 }
 
-path "sys/leases/renew" {
-  capabilities = ["update"]
-}
-
 path "auth/token/create" {
   capabilities = ["update"]
+}
+path "sys/leases/renew" {
+  capabilities = ["update"]
+  allowed_parameters = {
+    lease_id = ["postgres-airbyte/creds/app/*", "postgres-airbyte/creds/admin/*"]
+  }
+}
+path "sys/leases/revoke" {
+  capabilities = ["update"]
+  allowed_parameters = {
+    lease_id = ["postgres-airbyte/creds/app/*", "postgres-airbyte/creds/admin/*"]
+  }
 }
