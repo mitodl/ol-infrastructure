@@ -43,5 +43,12 @@ config:
   - client_info:
       superset: ["https://bi.ol.mit.edu/*", "superset_admin", "superset_alpha", "superset_gamma"]
     realm_name: ol-data-platform
+    service_accounts_enabled: true
+  - client_info:
+      open_metadata: ["https://data.ol.mit.edu/*", "open_metadata_admin", "open_metadata_user"]
+    realm_name: ol-data-platform
+    implicit_flow_enabled: true
+    standard_flow_enabled: false
+    service_accounts_enabled: true
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

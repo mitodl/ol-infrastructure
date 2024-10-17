@@ -1,0 +1,11 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgGgLlxFs9SwoghpBR3t3p07AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMGReTXAp/kkB0UA8rAgEQgDslmBosD/J26W0ENuL5kjHzAJaXnHK1q4d0tDnttLOLs2NX8hxa23lYz1V772ErT6vO0i0p0tH5Zgm2Ug==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-data-qa.odl.mit.edu
+  open_metadata:db_password:
+    secure: v1:ikO5h3b2i9oa0FSO:8ITKo2xQA8xIdJc93NjsrMZDwh5O3yuGsZ4bA1+uqKFDfX77eEYmaKxhgNmSw+fj/bSoSj1hbeYxGRg=
+  open_metadata:domain: "open-metadata-qa.ol.mit.edu"
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa
