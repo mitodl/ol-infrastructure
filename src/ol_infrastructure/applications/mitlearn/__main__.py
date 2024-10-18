@@ -1264,6 +1264,13 @@ gh_workflow_fastly_service_id_env_secret = github.ActionsSecret(
     plaintext_value=mitopen_fastly_service.id,
     opts=ResourceOptions(provider=github_provider),
 )
+gh_workflow_nextjs_fastly_service_id_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_nextjs_fastly_service_id_env_secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"FASTLY_SERVICE_ID_{env_var_suffix}_NEXTJS",  # pragma: allowlist secret
+    plaintext_value=learn_nextjs_fastly_service.id,
+    opts=ResourceOptions(provider=github_provider),
+)
 gh_workflow_sentry_dsn_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_sentry_dsn_env_secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
