@@ -1218,7 +1218,7 @@ mitopen_heroku_configassociation = heroku.app.ConfigAssociation(
 env_var_suffix = "RC" if stack_info.env_suffix == "qa" else "PROD"
 
 gh_repo = github.get_repository(
-    full_name="mitodl/mit-open", opts=InvokeOptions(provider=github_provider)
+    full_name="mitodl/mit-learn", opts=InvokeOptions(provider=github_provider)
 )
 gh_workflow_accesskey_id_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_accesskey_id_env_secret-{stack_info.env_suffix}",
