@@ -659,29 +659,12 @@ mitopen_fastly_service = fastly.ServiceVcl(
     comment="Managed by Pulumi",
     backends=[
         fastly.ServiceVclBackendArgs(
-            address=mitlearn_application_storage_bucket.bucket_domain_name,
-            name="MITOpen Frontend",
-            override_host=mitlearn_application_storage_bucket.bucket_domain_name,
+            address=nextjs_heroku_domain,
+            name="NextJS_Frontend",
+            override_host=nextjs_heroku_domain,
             port=DEFAULT_HTTPS_PORT,
-            ssl_cert_hostname=mitlearn_application_storage_bucket.bucket_domain_name,
-            ssl_sni_hostname=mitlearn_application_storage_bucket.bucket_domain_name,
-            use_ssl=True,
-        ),
-        fastly.ServiceVclBackendArgs(
-            address="service.prerender.io",
-            name="Prerender_Host",
-            between_bytes_timeout=10000,
-            connect_timeout=1000,
-            # dynamic=True,
-            first_byte_timeout=25000,
-            max_conn=200,
-            port=443,
-            request_condition="",
-            # Chicken-egg problem introduced here:
-            share_key=mitopen_vault_secrets["fastly"]["service_id"],
-            ssl_cert_hostname="service.prerender.io",
-            ssl_check_cert=True,
-            ssl_sni_hostname="service.prerender.io",
+            ssl_cert_hostname=nextjs_heroku_domain,
+            ssl_sni_hostname=nextjs_heroku_domain,
             use_ssl=True,
         ),
     ],
@@ -727,35 +710,6 @@ mitopen_fastly_service = fastly.ServiceVcl(
     ],
     snippets=[
         fastly.ServiceVclSnippetArgs(
-            name="Rewrite requests to root s3 - miss",
-            content=textwrap.dedent(
-                r"""
-                if (req.method == "GET" && req.backend.is_origin) {
-                  set bereq.url = "/frontend" + req.url;
-                  if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {
-                    set bereq.url = "/frontend/index.html";
-                  }
-                }
-                """
-            ),
-            type="miss",
-        ),
-        fastly.ServiceVclSnippetArgs(
-            name="Rewrite requests to root s3 - bypass",
-            content=textwrap.dedent(
-                r"""
-                if (req.method == "GET" && req.backend.is_origin && req.http.User-Agent ~ "(?i)prerender") {
-                  set req.backend = F_MITOpen_Frontend;
-                  set bereq.url = "/frontend" + req.url;
-                  if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {
-                    set bereq.url = "/frontend/index.html";
-                  }
-                }
-                """
-            ),
-            type="pass",
-        ),
-        fastly.ServiceVclSnippetArgs(
             name="handle domain redirect",
             content=textwrap.dedent(
                 rf"""
@@ -785,29 +739,6 @@ mitopen_fastly_service = fastly.ServiceVcl(
             ),
             type="error",
         ),
-        fastly.ServiceVclSnippetArgs(
-            name="prerender_vcl_rcv",
-            content=textwrap.dedent(
-                rf"""
-                if(req.http.User-Agent ~ "(?i)prerender"){{
-                  return(pass);
-                }}
-                if( req.http.User-Agent ~ "(?i)yandex|baiduspider|facebookexternalhit|twitterbot|linkedinbot|embedly|showyoubot|outbrain|pinterestbot|slackbot|vkShare|W3C_Validator|whatsapp|ImgProxy| flipboard|tumblr|bitlybot|skype|nuzzel|discordbot|qwantify|pinterest|telegrambot" && req.url.ext !~ "(?i)js|css|xml|txt|less|png|jpg|jpeg|gif|pdf|doc|ico|rss|zip|mp3|rar|exe|wmv|doc|avi|ppt|mpg|mpeg|tif|wav|mov|psd|ai|xls|mp4|m4a|swf|dat|dmg|iso|flv|m4v|woff|ttf|svg|webmanifest" ) {{
-
-                  set req.backend = F_Prerender_Host;
-                  set req.http.user-agent = req.http.user-agent;
-                  set req.url = "/https://" req.http.host req.url;
-                  set req.http.x-prerender-token = "{mitopen_vault_secrets["prerender"]["token"]}";
-                  set req.http.int-type = "Fastly";
-                  return(pass);
-                }} else {{
-                  set req.backend = F_MITOpen_Frontend;
-                }}
-                """
-            ),
-            type="recv",
-            priority=20,
-        ),
     ],
     logging_https=[
         fastly.ServiceVclLoggingHttpArgs(
@@ -832,123 +763,8 @@ mitopen_fastly_service = fastly.ServiceVcl(
         ),
     ),
 )
-learn_nextjs_fastly_service = fastly.ServiceVcl(
-    f"fastly-nextjs-{stack_info.env_prefix}-{stack_info.env_suffix}",
-    name=f"MIT Learn NextJS {stack_info.env_suffix}",
-    comment="Managed by Pulumi",
-    backends=[
-        fastly.ServiceVclBackendArgs(
-            address=nextjs_heroku_domain,
-            name="NextJS_Frontend",
-            override_host=nextjs_heroku_domain,
-            port=DEFAULT_HTTPS_PORT,
-            ssl_cert_hostname=nextjs_heroku_domain,
-            ssl_sni_hostname=nextjs_heroku_domain,
-            use_ssl=True,
-        ),
-    ],
-    gzips=[
-        fastly.ServiceVclGzipArgs(
-            name="enable-gzip-compression",
-            extensions=list(gzip_settings["extensions"]),
-            content_types=list(gzip_settings["content_types"]),
-        )
-    ],
-    product_enablement=fastly.ServiceVclProductEnablementArgs(
-        brotli_compression=True,
-    ),
-    cache_settings=[],
-    conditions=[],
-    dictionaries=[],
-    domains=[
-        fastly.ServiceVclDomainArgs(
-            comment=f"MIT Learn NextJS {stack_info.env_prefix} {stack_info.env_suffix} Application",
-            name=mitlearn_config.require("nextjs_fastly_domain"),
-        ),
-    ],
-    headers=[
-        fastly.ServiceVclHeaderArgs(
-            action="set",
-            destination="http.Strict-Transport-Security",
-            name="Generated by force TLS and enable HSTS",
-            source='"max-age=300"',
-            type="response",
-        ),
-    ],
-    request_settings=[
-        fastly.ServiceVclRequestSettingArgs(
-            force_ssl=True,
-            name="Generated by force TLS and enable HSTS, change hash keys for prerender.io",
-            hash_keys="req.url, req.http.host, req.http.User-Agent",
-            xff="",
-        ),
-    ],
-    snippets=[
-        fastly.ServiceVclSnippetArgs(
-            name="handle domain redirect",
-            content=textwrap.dedent(
-                rf"""
-                set req.http.orig-req-rl = req.url;
-                unset req.http.Cookie;
 
-                # If the request is for the old DNS name, redirect
-                if (req.http.host == "{mitlearn_config.require("legacy_frontend_domain")}") {{
-                  error 618 "redirect-host";
-                }}
-                """
-            ),
-            type="recv",
-            priority=10,
-        ),
-        fastly.ServiceVclSnippetArgs(
-            name="Redirect for to correct domain",
-            content=textwrap.dedent(
-                rf"""
-                # redirect to the correct host/domain
-                if (obj.status == 618 && obj.response == "redirect-host") {{
-                  set obj.status = 302;
-                  set obj.http.Location = "https://" + "{mitlearn_config.require("frontend_domain")}" + req.url.path + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
-                  return (deliver);
-                }}
-                """
-            ),
-            type="error",
-        ),
-    ],
-    logging_https=[
-        fastly.ServiceVclLoggingHttpArgs(
-            url=Output.all(fqdn=vector_log_proxy_fqdn).apply(
-                lambda fqdn: "https://{fqdn}".format(**fqdn)
-            ),
-            name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-https-logging-args",
-            content_type="application/json",
-            format=build_fastly_log_format_string(additional_static_fields={}),
-            format_version=2,
-            header_name="Authorization",
-            header_value=f"Basic {encoded_fastly_proxy_credentials}",
-            json_format="0",
-            method="POST",
-            request_max_bytes=ONE_MEGABYTE_BYTE,
-        )
-    ],
-    opts=ResourceOptions.merge(
-        fastly_provider,
-        ResourceOptions(
-            aliases=[Alias(name=f"fastly-mitopen-{stack_info.env_suffix}")]
-        ),
-    ),
-)
 five_minutes = 60 * 5
-route53.Record(
-    "ol-mitopen-nextjs-fastly-dns-record",
-    name=mitlearn_config.require("nextjs_fastly_domain"),
-    allow_overwrite=True,
-    type="CNAME",
-    ttl=five_minutes,
-    records=[FASTLY_CNAME_TLS_1_3],
-    zone_id=learn_zone_id,
-    opts=ResourceOptions(delete_before_replace=True),
-)
 route53.Record(
     "ol-mitopen-frontend-dns-record",
     name=mitlearn_config.require("frontend_domain"),
@@ -1225,14 +1041,14 @@ gh_workflow_accesskey_id_env_secret = github.ActionsSecret(
     repository=gh_repo.name,
     secret_name=f"AWS_ACCESS_KEY_ID_{env_var_suffix}",
     plaintext_value=gh_workflow_accesskey.id,
-    opts=ResourceOptions(provider=github_provider),
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_secretaccesskey_env_secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"AWS_SECRET_ACCESS_KEY_{env_var_suffix}",
     plaintext_value=gh_workflow_accesskey.secret,
-    opts=ResourceOptions(provider=github_provider),
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_embedlykey_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_embedlykey_env_secret-{stack_info.env_suffix}",
@@ -1241,42 +1057,28 @@ gh_workflow_embedlykey_env_secret = github.ActionsSecret(
     plaintext_value=secret_operations_global_embedly.data.apply(
         lambda data: "{}".format(data["key"])
     ),
-    opts=ResourceOptions(provider=github_provider),
-)
-gh_workflow_fastly_api_key_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_fastly_api_key_env_secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"FASTLY_API_KEY_{env_var_suffix}",  # pragma: allowlist secret
-    plaintext_value=mitopen_vault_secrets["fastly"]["api_key"],
-    opts=ResourceOptions(provider=github_provider),
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_nextjs_fastly_api_key_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_nextjs_fastly_api_key_env_secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"FASTLY_API_KEY_{env_var_suffix}_NEXTJS",  # pragma: allowlist secret
-    plaintext_value=mitopen_vault_secrets["fastly_nextjs"]["api_key"],
-    opts=ResourceOptions(provider=github_provider),
+    plaintext_value=mitopen_vault_secrets["fastly"]["api_key"],
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_fastly_service_id_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_fastly_service_id_env_secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
-    secret_name=f"FASTLY_SERVICE_ID_{env_var_suffix}",  # pragma: allowlist secret
-    plaintext_value=mitopen_fastly_service.id,
-    opts=ResourceOptions(provider=github_provider),
-)
-gh_workflow_nextjs_fastly_service_id_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_nextjs_fastly_service_id_env_secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
     secret_name=f"FASTLY_SERVICE_ID_{env_var_suffix}_NEXTJS",  # pragma: allowlist secret
-    plaintext_value=learn_nextjs_fastly_service.id,
-    opts=ResourceOptions(provider=github_provider),
+    plaintext_value=mitopen_fastly_service.id,
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_sentry_dsn_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_sentry_dsn_env_secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"SENTRY_DSN_{env_var_suffix}",
     plaintext_value=mitopen_vault_secrets["sentry_dsn"],
-    opts=ResourceOptions(provider=github_provider),
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 # not really secret, just easier this way
 gh_workflow_posthog_project_id_env_secret = github.ActionsSecret(
@@ -1284,49 +1086,49 @@ gh_workflow_posthog_project_id_env_secret = github.ActionsSecret(
     repository=gh_repo.name,
     secret_name=f"POSTHOG_PROJECT_ID_{env_var_suffix}",
     plaintext_value=heroku_vars["POSTHOG_PROJECT_ID"],
-    opts=ResourceOptions(provider=github_provider),
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_posthog_project_api_key_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_posthog_project_api_key-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"POSTHOG_PROJECT_API_KEY_{env_var_suffix}",
     plaintext_value=mitopen_vault_secrets["posthog"]["project_api_key"],
-    opts=ResourceOptions(provider=github_provider),
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_environment_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_environment_env_secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"MITOL_ENVIRONMENT_{env_var_suffix}",
     plaintext_value=stack_info.env_suffix,
-    opts=ResourceOptions(provider=github_provider),
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_csrf_cookie_name_env_secret = github.ActionsSecret(
     f"ol_mitopen_csrf_cookie_name-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"CSRF_COOKIE_NAME_{env_var_suffix}",
     plaintext_value=heroku_vars["CSRF_COOKIE_NAME"],
-    opts=ResourceOptions(provider=github_provider),
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_appzi_url_env_secret = github.ActionsSecret(
     f"ol_mitopen_appzi_url-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"APPZI_URL_{env_var_suffix}",
     plaintext_value=heroku_vars["APPZI_URL"],
-    opts=ResourceOptions(provider=github_provider),
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_sentry_traces_sample_rate = github.ActionsSecret(
     f"ol_mitopen_sentry_traces_sample_rate-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"SENTRY_TRACES_SAMPLE_RATE_{env_var_suffix}",
     plaintext_value=heroku_vars["SENTRY_TRACES_SAMPLE_RATE"],
-    opts=ResourceOptions(provider=github_provider),
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_sentry_profiles_sample_rate = github.ActionsSecret(
     f"ol_mitopen_sentry_profiles_sample_rate-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"SENTRY_PROFILES_SAMPLE_RATE_{env_var_suffix}",
     plaintext_value=heroku_vars["SENTRY_PROFILES_SAMPLE_RATE"],
-    opts=ResourceOptions(provider=github_provider),
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
 
