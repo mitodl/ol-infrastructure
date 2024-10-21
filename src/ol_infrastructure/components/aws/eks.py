@@ -39,14 +39,14 @@ class OLEKSGatewayRouteConfig(BaseModel):
 
 
 class OLEKSGatewayConfig(BaseModel):
-    annotations: dict[str, str] = {}
+    annotations: Optional[dict[str, str]]
     cert_issuer: Optional[str] = None
     cert_issuer_class: Literal["cluster-issuer", "issuer"] = "cluster-issuer"
     gateway_class_name: str = "traefik"
     gateway_name: str
     hostnames: Optional[list[str]] = []
     http_redirect: bool = True
-    labels: Optional[dict[str, str]] = {}
+    labels: Optional[dict[str, str]] = None
     namespace: str
     routes: list[OLEKSGatewayRouteConfig] = []
 
@@ -186,6 +186,8 @@ class OLEKSGateway(pulumi.ComponentResource):
             self.routes.append(route_resource)
 
         if gateway_config.cert_issuer:
+            if gateway_config.annotations is None:
+                gateway_config.annotations = {}
             gateway_config.annotations[
                 f"cert-manager.io/{gateway_config.cert_issuer_class}"
             ] = gateway_config.cert_issuer
@@ -210,7 +212,7 @@ class OLEKSGateway(pulumi.ComponentResource):
 
 class OLEKSTrustRoleConfig(AWSBase):
     account_id: Union[str, PositiveInt]
-    cluster_name: str
+    cluster_name: Union[str, pulumi.Output[str]]
     cluster_identities: pulumi.Output
     description: str
     policy_operator: Literal["StringEquals", "StringLike"]
