@@ -39,9 +39,9 @@ class OpenEdxMicroFrontend(str, Enum):
         "communications",
     )
     course_authoring = (
-        "course-authoring",
-        "https://github.com/openedx/frontend-app-course-authoring",
-        "course-authoring",
+        "authoring",
+        "https://github.com/openedx/frontend-app-authoring",
+        "authoring",
     )
     discussion = (
         "discussions",

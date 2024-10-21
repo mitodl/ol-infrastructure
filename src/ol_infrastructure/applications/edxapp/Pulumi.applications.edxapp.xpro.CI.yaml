@@ -38,7 +38,7 @@ config:
   edxapp:web_instance_type: m6a.large
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
-    course_authoring: course-authoring
+    authoring: authoring
     gradebook: gradebook
     learning: learn
     ora_grading: ora-grading
