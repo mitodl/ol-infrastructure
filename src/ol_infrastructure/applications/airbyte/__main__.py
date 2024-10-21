@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from string import Template
 
 import pulumi_consul as consul
 import pulumi_kubernetes as kubernetes
@@ -17,11 +18,16 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.eks import (
+    OLEKSTrustRole,
+    OLEKSTrustRoleConfig,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
+    OLVaultK8SSecret,
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
@@ -30,7 +36,7 @@ from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
 ##################################
 ##    Setup + Config Retrival   ##
@@ -454,12 +460,19 @@ db_address = airbyte_db.db_instance.address
 db_port = airbyte_db.db_instance.port
 db_name = airbyte_db.db_instance.db_name
 
+# Need special database credentialsA
+airbyte_role_statements = postgres_role_statements.copy()
+airbyte_role_statements["app"]["create"].append(
+    Template("ALTER ROLE ${app_name} WITH CREATEDB;")
+)
+
 airbyte_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=airbyte_db_config.db_name,
     mount_point=f"{airbyte_db_config.engine}-airbyte",
     db_admin_username=airbyte_db_config.username,
     db_admin_password=rds_password,
     db_host=airbyte_db.db_instance.address,
+    role_statements=airbyte_role_statements,
 )
 airbyte_db_vault_backend = OLVaultDatabaseBackend(airbyte_db_vault_backend_config)
 
@@ -536,6 +549,39 @@ consul.Keys(
 
 airbyte_service_account_name = "airbyte-admin"
 
+airbyte_trust_role_config = OLEKSTrustRoleConfig(
+    account_id=aws_account.account_id,
+    cluster_name=f"data-{stack_info.name}",
+    cluster_identities=cluster_stack.require_output("cluster_identities"),
+    description="Trust role for allowing the airbyte service account to "
+    "access the aws API",
+    policy_operator="StringEquals",
+    role_name="airbyte",
+    service_account_identifier=f"system:serviceaccounts:{airbyte_namespace}:{airbyte_service_account_name}",
+    tags=aws_config.tags,
+)
+
+airbyte_trust_role = OLEKSTrustRole(
+    f"{env_name}-ol-trust-role",
+    role_config=airbyte_trust_role_config,
+    opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+)
+iam.RolePolicyAttachment(
+    f"airbyte-service-account-data-lake-access-policy-{env_name}",
+    policy_arn=data_lake_policy.arn,
+    role=airbyte_trust_role.role.name,
+)
+iam.RolePolicyAttachment(
+    f"airbyte-service-account-s3-source-access-policy-{env_name}",
+    policy_arn=s3_source_policy.arn,
+    role=airbyte_trust_role.role.name,
+)
+iam.RolePolicyAttachment(
+    "airbyte-service-account-policy-attachement",
+    policy_arn=airbyte_app_policy.arn,
+    role=airbyte_trust_role.role.name,
+)
+
 vault_k8s_resources_config = OLVaultK8SResourcesConfig(
     application_name="airbyte",
     namespace=airbyte_namespace,
@@ -554,11 +600,11 @@ vault_k8s_resources = OLVaultK8SResources(
     ),
 )
 
-db_creds_secret_name = "db-creds"  # noqa: S105  # pragma: allowlist secret
-db_creds_dynamic_secret_config = OLVaultK8SDynamicSecretConfig(
-    name="airbyte-db-creds",
+app_db_creds_secret_name = "app-db-creds"  # noqa: S105  # pragma: allowlist secret
+app_db_creds_dynamic_secret_config = OLVaultK8SDynamicSecretConfig(
+    name="airbyte-app-db-creds",
     dest_secret_labels=k8s_global_labels,
-    dest_secret_name=db_creds_secret_name,
+    dest_secret_name=app_db_creds_secret_name,
     exclude_raw=True,
     labels=k8s_global_labels,
     mount=airbyte_db_vault_backend_config.mount_point,
@@ -567,39 +613,28 @@ db_creds_dynamic_secret_config = OLVaultK8SDynamicSecretConfig(
     templates={
         "DATABASE_USER": '{{ get .Secrets "username" }}',
         "DATABASE_PASSWORD": '{{  get .Secrets "password" }}',
-        "DATABASE_URL": connection_string,
     },
     vaultauth=vault_k8s_resources.auth_name,
 )
-shared_extra_env_vars = [
-    {
-        "name": "DATABASE_USER",
-        "valueFrom": {
-            "secretKeyRef": {
-                "name": db_creds_secret_name,
-                "key": "DATABASE_USER",
-            },
-        },
+app_db_creds_dynamic_secret = OLVaultK8SSecret(
+    "airbyte-app-db-creds-vaultdynamicsecret",
+    resource_config=app_db_creds_dynamic_secret_config,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=k8s_provider,
+    ),
+)
+
+default_resources_definition = {
+    "limits": {
+        "cpu": "1000m",
+        "memory": "1Gi",
     },
-    {
-        "name": "DATABASE_PASSWORD",
-        "valueFrom": {
-            "secretKeyRef": {
-                "name": db_creds_secret_name,
-                "key": "DATABASE_PASSWORD",
-            },
-        },
+    "requests": {
+        "cpu": "100m",
+        "memory": "1Gi",
     },
-    {
-        "name": "DATABASE_URL",
-        "valueFrom": {
-            "secretKeyRef": {
-                "name": db_creds_secret_name,
-                "key": "DATABASE_URL",
-            },
-        },
-    },
-]
+}
 
 airbyte_helm_release = kubernetes.helm.v3.Release(
     "airbyte-helm-release",
@@ -617,103 +652,72 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "serviceAccountName": airbyte_service_account_name,
                 "deploymentMode": "oss",
                 "edition": "community",
-            },
-            "database": {
-                "type": "external",
-            },
-            "storage": {
-                "s3": {
-                    "region": aws_config.region,
-                    "authenticationType": "instanceProfile",
+                "database": {
+                    "type": "external",
+                    "secretName": app_db_creds_secret_name,
+                    "userSecretKey": "DATABASE_USER",  # pragma: allowlist secret
+                    "passwordSecretKey": "DATABASE_PASSWORD",  # pragma: allowlist secret  # noqa: E501
+                    "host": db_address,
+                    "database": db_name,
+                    "port": DEFAULT_POSTGRES_PORT,
+                    "jdbcUrl": connection_string,
+                },
+                "storage": {
+                    "type": "s3",
+                    "bucket": {
+                        "log": airbyte_bucket_name,
+                        "state": airbyte_bucket_name,
+                        "workloadOutput": airbyte_bucket_name,
+                    },
+                    "s3": {
+                        "region": aws_config.region,
+                        "authenticationType": "instanceProfile",
+                    },
                 },
             },
             "serviceAccount": {
                 "create": True,
-                "annotations": {},
-                "name": airbyte_service_account_name,
+                "annotations": {
+                    "eks.amazonaws.com/role-arn": airbyte_trust_role.role.arn.apply(
+                        lambda arn: f"{arn}"
+                    ),
+                },
             },
             "webapp": {
                 "enabled": True,
                 "replicaCount": 1,
                 "podAnnotations": {},
                 "podLabels": k8s_global_labels,
-                "resources": {
-                    "limits": {
-                        "cpu": "1000m",
-                        "memory": "1Gi",
-                    },
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "1Gi",
-                    },
-                },
+                "resources": default_resources_definition,
                 "ingress": {
                     "enabled": False,
                 },
-                "extraEnv": shared_extra_env_vars,
             },
             "pod-sweeper": {
                 "enabled": True,
                 "podLabels": k8s_global_labels,
-                "resources": {
-                    "limits": {
-                        "cpu": "1000m",
-                        "memory": "1Gi",
-                    },
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "1Gi",
-                    },
-                },
+                "resources": default_resources_definition,
             },
             "server": {
                 "enabled": True,
                 "replicaCount": 1,
                 "podLabels": k8s_global_labels,
-                "resources": {
-                    "limits": {
-                        "cpu": "1000m",
-                        "memory": "1Gi",
-                    },
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "1Gi",
-                    },
-                },
-                "extraEnv": shared_extra_env_vars,
+                "resources": default_resources_definition,
                 "log": {
-                    "level": "INFO",
+                    "level": "DEBUG",
                 },
             },
             "worker": {
                 "enabled": True,
                 "replicaCount": 1,
                 "podLabels": k8s_global_labels,
-                "resources": {
-                    "limits": {
-                        "cpu": "1000m",
-                        "memory": "1Gi",
-                    },
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "1Gi",
-                    },
-                },
+                "resources": default_resources_definition,
             },
             "workload-launcher": {
                 "enabled": True,
                 "replicaCount": 1,
                 "podLabels": k8s_global_labels,
-                "resources": {
-                    "limits": {
-                        "cpu": "1000m",
-                        "memory": "1Gi",
-                    },
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "1Gi",
-                    },
-                },
+                "resources": default_resources_definition,
             },
             "metrics": {
                 "enabled": False,
@@ -721,33 +725,16 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             "airbyte-bootloader": {
                 "enabled": True,
                 "podLabels": k8s_global_labels,
-                "resources": {
-                    "limits": {
-                        "cpu": "1000m",
-                        "memory": "1Gi",
-                    },
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "1Gi",
-                    },
+                "resources": default_resources_definition,
+                "log": {
+                    "level": "DEBUG",
                 },
-                "extraEnv": shared_extra_env_vars,
             },
             "temporal": {
                 "enabled": True,
                 "replicaCount": 1,
                 "podLabels": k8s_global_labels,
-                "resources": {
-                    "limits": {
-                        "cpu": "1000m",
-                        "memory": "1Gi",
-                    },
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "1Gi",
-                    },
-                },
-                "extraEnv": shared_extra_env_vars,
+                "resources": default_resources_definition,
             },
             "temporal-ui": {
                 "enabled": False,
@@ -759,24 +746,48 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "enabled": True,
                 "replicaCount": 1,
                 "podLabels": k8s_global_labels,
-                "resources": {
-                    "limits": {
-                        "cpu": "1000m",
-                        "memory": "1Gi",
-                    },
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "1Gi",
-                    },
-                },
-                "extraEnv": shared_extra_env_vars,
+                "resources": default_resources_definition,
             },
         },
         skip_await=True,
     ),
     opts=ResourceOptions(
         provider=k8s_provider,
-        depends_on=[airbyte_db_vault_backend, airbyte_db],
+        parent=k8s_provider,
+        depends_on=[
+            app_db_creds_dynamic_secret,
+            airbyte_trust_role,
+            airbyte_db_vault_backend,
+            airbyte_db,
+        ],
+        delete_before_replace=True,
+    ),
+)
+
+# A filthy hack to override the development.yaml file that comes standard with
+# the installation of temporal.
+#
+# This WILL NOT take effect until temporal is restarted manually with something like:
+# `kubectl rollout restart deployment airbyte-temporal -n airbyte`
+override_dynamicconfig_data = (
+    Path(__file__).parent.joinpath("files/override-dynamicconfig.yaml").read_text()
+)
+
+override_dynamicconfig_configmap_patch = kubernetes.core.v1.ConfigMapPatch(
+    "airbyte-override-dynamicconfig-configmap-patch",
+    metadata=kubernetes.meta.v1.ObjectMetaPatchArgs(
+        name="airbyte-temporal-dynamicconfig",
+        namespace=airbyte_namespace,
+        annotations={
+            "pulumi.com/patchForce": "true",
+        },
+    ),
+    data={"development.yaml": override_dynamicconfig_data},
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=airbyte_helm_release,
+        depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
     ),
 )
 

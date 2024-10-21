@@ -64,7 +64,7 @@ class OLEKSGatewayConfig(BaseModel):
     gateway_class_name: str = "traefik"
     gateway_name: str
     http_redirect: bool = True
-    labels: Optional[dict[str, str]] = {}
+    labels: Optional[dict[str, str]] = None
     namespace: str
     listeners: list[OLEKSGatewayListenerConfig] = []
     routes: list[OLEKSGatewayRouteConfig] = []
@@ -297,7 +297,7 @@ class OLEKSGateway(pulumi.ComponentResource):
 
 class OLEKSTrustRoleConfig(AWSBase):
     account_id: Union[str, PositiveInt]
-    cluster_name: str
+    cluster_name: Union[str, pulumi.Output[str]]
     cluster_identities: pulumi.Output
     description: str
     policy_operator: Literal["StringEquals", "StringLike"]

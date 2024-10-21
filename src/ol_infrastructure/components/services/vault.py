@@ -615,10 +615,10 @@ class OLVaultPKIIntermediateRole(ComponentResource):
 # TODO: @Ardiea expand to include support for transformationRefs  # noqa: FIX002, TD002
 # https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
 class OLVaultK8SSecretConfig(BaseModel):
-    annotations: Optional[dict[str, str]] = {}
-    dest_secret_annotations: Optional[dict[str, str]] = {}
+    annotations: Optional[dict[str, str]] = None
+    dest_secret_annotations: Optional[dict[str, str]] = None
     dest_secret_create: bool = True
-    dest_secret_labels: Optional[dict[str, str]] = {}
+    dest_secret_labels: Optional[dict[str, str]] = None
     dest_secret_name: str
     dest_secret_overwrite: bool = True
     # Ref: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
@@ -632,7 +632,7 @@ class OLVaultK8SSecretConfig(BaseModel):
     excludes: Optional[list[str]] = [".*"]
     includes: Optional[list[str]] = []
     kind: str
-    labels: Optional[dict[str, str]] = {}
+    labels: Optional[dict[str, str]] = None
     mount: str
     mount_type: Optional[Literal["kv-v1", "kv-v2"]] = None
     name: str
@@ -644,7 +644,7 @@ class OLVaultK8SSecretConfig(BaseModel):
     restart_target_name: Optional[str] = None
     namespace: str
     path: str
-    templates: Optional[dict[str, str]] = None
+    templates: Optional[dict[str, Union[str, Output[str]]]] = None
     vaultauth: str
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -755,9 +755,9 @@ class OLVaultK8SSecret(ComponentResource):
 
 
 class OLVaultK8SResourcesConfig(BaseModel):
-    annotations: dict[str, str] = {}
+    annotations: Optional[dict[str, str]] = None
     application_name: str
-    labels: dict[str, str] = {}
+    labels: Optional[dict[str, str]] = None
     namespace: str
     vault_address: str
     vault_auth_endpoint: Union[str, Output[str]]
