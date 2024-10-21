@@ -41,6 +41,7 @@ class OLEKSGatewayRouteConfig(BaseModel):
 
 class OLEKSGatewayConfig(BaseModel):
     annotations: Optional[dict[str, str]] = None
+    annotations: Optional[dict[str, str]]
     cert_issuer: Optional[str] = None
     cert_issuer_class: Literal["cluster-issuer", "issuer"] = "cluster-issuer"
     gateway_class_name: str = "traefik"
