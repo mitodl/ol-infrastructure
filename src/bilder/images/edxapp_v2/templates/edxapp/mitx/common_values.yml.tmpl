@@ -182,7 +182,7 @@ CACHES:  # MODIFIED
       <<: *redis_cache_config
       KEY_PREFIX: staticfiles
 CANVAS_BASE_URL: {{ key "edxapp/canvas-url" }}
-CELERYBEAT_SCHEDULER: redbeat.RedBeatScheduler  # MODIFIED
+CELERY_BEAT_SCHEDULER: redbeat.RedBeatScheduler  # MODIFIED
 CELERY_BROKER_HOSTNAME: edxapp-redis.service.consul:6379  # MODIFIED
 CELERY_BROKER_TRANSPORT: rediss  # MODIFIED - second "s" indicates "secure"
 CELERY_BROKER_USER: default # MODIFIED
