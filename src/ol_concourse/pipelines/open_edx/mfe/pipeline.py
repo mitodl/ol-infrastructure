@@ -41,6 +41,7 @@ class OpenEdxVars(BaseModel):
     account_settings_url: Optional[str] = None
     contact_url: Optional[str] = None
     enable_certificate_page: Optional[Literal["true", "false"]] = None
+    enable_tagging_taxonomy_pages: Optional[Literal["true", "false"]] = "false"
     deployment_name: OpenEdxDeploymentName
     display_feedback_widget: Optional[str] = None
     environment: str
@@ -84,6 +85,7 @@ def mfe_params(
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "DISPLAY_FEEDBACK_WIDGET": open_edx.display_feedback_widget,
         "ENABLE_CERTIFICATE_PAGE": open_edx.enable_certificate_page,
+        "ENABLE_TAGGING_TAXONOMY_PAGES": open_edx.enable_tagging_taxonomy_pages,
         "DISCUSSIONS_MFE_BASE_URL": f"https://{open_edx.lms_domain}/{discussion_mfe_path}",
         "FAVICON_URL": open_edx.favicon_url,
         "HONOR_CODE_URL": open_edx.honor_code_url,
