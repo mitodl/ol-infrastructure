@@ -50,7 +50,7 @@ config:
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     communications: communications
-    course_authoring: course-authoring
+    authoring: authoring
     gradebook: gradebook
     learner_dashboard: dashboard
     learning: learn
