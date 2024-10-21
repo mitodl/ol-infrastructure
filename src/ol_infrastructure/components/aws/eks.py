@@ -57,6 +57,7 @@ class OLEKSGatewayListenerConfig(BaseModel):
 
 class OLEKSGatewayConfig(BaseModel):
     annotations: Optional[dict[str, str]] = None
+    annotations: Optional[dict[str, str]]
     cert_issuer: Optional[str] = None
     cert_issuer_class: Optional[Literal["cluster-issuer", "issuer", "external"]] = (
         "cluster-issuer"
