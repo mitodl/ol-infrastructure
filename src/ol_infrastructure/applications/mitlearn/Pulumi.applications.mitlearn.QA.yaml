@@ -58,16 +58,12 @@ config:
     - "https://rc.learn.mit.edu"
     - "https://api.mitopen-rc.odl.mit.edu"  # legacy
     - "https://mitopen-rc.odl.mit.edu"  # legacy
-    - "https://next.rc.learn.mit.edu"
-    - "https://nextjs-rc.learn.mit.edu"
     cors_urls:
     - "https://mitopen-rc.odl.mit.edu" # legacy
     - "https://rc.learn.mit.edu"
     - "https://ocw-next.netlify.app"
     - "https://draft-qa.ocw.mit.edu"
     - "https://live-qa.ocw.mit.edu"
-    - "https://next.rc.learn.mit.edu"
-    - "https://nextjs-rc.learn.mit.edu"
     mailgun_sender_domain: "mail-rc.learn.mit.edu"
     sso_url: "sso-qa.ol.mit.edu"
   mitlearn:db_instance_size: db.m7g.xlarge
@@ -78,7 +74,6 @@ config:
   mitlearn:frontend_domain: "rc.learn.mit.edu"
   mitlearn:legacy_frontend_domain: "mitopen-rc.odl.mit.edu"
   mitlearn:nextjs_heroku_domain: "next.rc.learn.mit.edu"
-  mitlearn:nextjs_fastly_domain: "nextjs-rc.learn.mit.edu"
   mitlearn:fastly_domain: "d.sni.global.fastly.net"
   mitlearn:fastly_anycast_ips: []
   mitlearn:heroku_domain: "shrouded-brook-krg88s8bvcdg6kgrdjrsrmbq.herokudns.com"
