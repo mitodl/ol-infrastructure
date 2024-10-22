@@ -1102,6 +1102,7 @@ cert_manager_release = kubernetes.helm.v3.Release(
             "global": {
                 "commonLabels": k8s_global_labels,
             },
+            "tolerations": operations_tolerations,
             "replicaCount": 1,
             "enableCertificateOwnerRef": True,
             "prometheus": {
@@ -1128,6 +1129,33 @@ cert_manager_release = kubernetes.helm.v3.Release(
         provider=k8s_provider,
         parent=operations_namespace,
         depends_on=[cluster, node_groups[0]],
+        delete_before_replace=True,
+    ),
+)
+
+############################################################
+# Install and configure metrics-server
+############################################################
+metrics_server_release = kubernetes.helm.v3.Release(
+    f"{cluster_name}-metrics-server-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="metrics-server",
+        chart="metrics-server",
+        namespace="kube-system",
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://kubernetes-sigs.github.io/metrics-server/",
+        ),
+        cleanup_on_fail=True,
+        skip_await=False,
+        values={
+            "commonLabels": k8s_global_labels,
+            "tolerations": operations_tolerations,
+        },
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=cluster,
+        depends_on=[node_groups[0]],
         delete_before_replace=True,
     ),
 )
