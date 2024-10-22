@@ -19,6 +19,9 @@ from bridge.lib.magic_numbers import (
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import (
+    OLEKSGateway,
+    OLEKSGatewayConfig,
+    OLEKSGatewayRouteConfig,
     OLEKSTrustRole,
     OLEKSTrustRoleConfig,
 )
@@ -28,10 +31,14 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import (
+    IAM_POLICY_VERSION,
+    lint_iam_policy,
+)
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -476,6 +483,9 @@ airbyte_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
 )
 airbyte_db_vault_backend = OLVaultDatabaseBackend(airbyte_db_vault_backend_config)
 
+##################################
+#     Consul Configs             #
+##################################
 airbyte_db_consul_node = Node(
     "airbyte-instance-db-node",
     name="airbyte-postgres-db",
@@ -547,6 +557,9 @@ consul.Keys(
     opts=consul_provider,
 )
 
+##################################
+#     General K8S + IAM Config   #
+##################################
 airbyte_service_account_name = "airbyte-admin"
 
 airbyte_trust_role_config = OLEKSTrustRoleConfig(
@@ -787,6 +800,215 @@ override_dynamicconfig_configmap_patch = kubernetes.core.v1.ConfigMapPatch(
         provider=k8s_provider,
         parent=airbyte_helm_release,
         depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
+)
+
+##################################
+#     Gateway + forward Auth     #
+##################################
+gateway_config = OLEKSGatewayConfig(
+    cert_issuer="letsencrypt-production",
+    cert_issuer_class="cluster-issuer",
+    gateway_name="airbyte",
+    hostnames=[airbyte_config.require("web_host_domain")],
+    namespace=airbyte_namespace,
+    routes=[
+        # Some of the info here is sourced from the helm chart
+        OLEKSGatewayRouteConfig(
+            backend_service_name="airbyte-airbyte-webapp-svc",
+            backend_service_namespace=airbyte_namespace,
+            backend_service_port=80,
+            certificate_secret_name="airbyte-webapp-tls",  # noqa: S106 # pragma: allowlist secret
+            certificate_secret_namespace=airbyte_namespace,
+            hostname=airbyte_config.require("web_host_domain"),
+            name="airbyte-https",
+            port=8443,
+            protocol="HTTPS",
+            tls_mode="Terminate",
+            additional_filters=[
+                {
+                    "type": "ExtensionRef",
+                    "extensionRef": {
+                        "group": "traefik.io",
+                        "kind": "Middleware",
+                        "name": "airbyte-forward-auth",
+                    },
+                },
+            ],
+        ),
+    ],
+)
+
+gateway = OLEKSGateway(
+    "airbyte-gateway",
+    gateway_config=gateway_config,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=airbyte_helm_release,
+        depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
+)
+
+airbyte_forward_auth_service_name = "airbyte-forward-auth"
+airbyte_forward_auth_deployment_name = "airbyte-forward-auth"
+oidc_config_secret_name = "oidc-config"  # noqa: S105  # pragma: allowlist secret
+
+forward_auth_middleware = kubernetes.apiextensions.CustomResource(
+    "airbyte-forward-auth-traefik-middleware",
+    api_version="traefik.io/v1alpha1",
+    kind="Middleware",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="airbyte-forward-auth",
+        namespace=airbyte_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        # a lot of guides and tutorials only use the service name,
+        # omitting the rest of the k8s domain. That works fine
+        # if you're doing *everything* in the default namespace.
+        # We are not, so we need to use the whole thing.
+        "forwardAuth": {
+            "address": f"http://{airbyte_forward_auth_service_name}.{airbyte_namespace}.svc.cluster.local:4181",
+            "authResponseHeaders": ["X-Forwarded-User"],
+        },
+    },
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=gateway,
+        depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
+)
+
+forward_auth_secret_config = OLVaultK8SStaticSecretConfig(
+    name="airbyte-forward-auth-oidc-config",
+    namespace=airbyte_namespace,
+    labels=k8s_global_labels,
+    dest_secret_name=oidc_config_secret_name,
+    dest_secret_labels=k8s_global_labels,
+    mount="secret-operations",
+    mount_type="kv-v1",
+    path="sso/airbyte",
+    restart_target_kind="Deployment",
+    restart_target_name=airbyte_forward_auth_deployment_name,
+    templates={
+        "PROVIDERS_OIDC_ISSUER_URL": '{{ get .Secrets "url" }}',
+        "PROVIDERS_OIDC_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+        "PROVIDERS_OIDC_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+        "SECRET": '{{ get .Secrets "secret" }}',
+    },
+    vaultauth=vault_k8s_resources.auth_name,
+)
+forward_auth_secret = OLVaultK8SSecret(
+    name="airbyte-forward-auth-oidc",
+    resource_config=forward_auth_secret_config,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=gateway,
+        depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
+)
+
+forward_auth_pod_labels = {
+    "app.kubernetes.io/instance": "airbyte",
+    "app.kubernetes.io/name": "forward-auth",
+}
+
+forward_auth_deployment = kubernetes.apps.v1.Deployment(
+    airbyte_forward_auth_deployment_name,
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=airbyte_forward_auth_deployment_name,
+        namespace=airbyte_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        replicas=1,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels=forward_auth_pod_labels,
+        ),
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels=forward_auth_pod_labels,
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                containers=[
+                    kubernetes.core.v1.ContainerArgs(
+                        image="thomseddon/traefik-forward-auth:2",
+                        name=airbyte_forward_auth_deployment_name,
+                        ports=[
+                            kubernetes.core.v1.ContainerPortArgs(
+                                container_port=4181,
+                            )
+                        ],
+                        env=[
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="DEFAULT_PROVIDER",
+                                value="oidc",
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="LOG_LEVEL",
+                                value=airbyte_config.get("forward_auth_log_level")
+                                or "info",
+                            ),
+                        ],
+                        env_from=[
+                            kubernetes.core.v1.EnvFromSourceArgs(
+                                secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+                                    name=oidc_config_secret_name,
+                                    optional=False,
+                                ),
+                            )
+                        ],
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            limits={
+                                "memory": "128Mi",
+                                "cpu": "100m",
+                            },
+                            requests={
+                                "memory": "128Mi",
+                                "cpu": "100m",
+                            },
+                        ),
+                    )
+                ],
+            ),
+        ),
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=gateway,
+        depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
+)
+
+forward_auth_service = kubernetes.core.v1.Service(
+    airbyte_forward_auth_service_name,
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=airbyte_forward_auth_service_name,
+        namespace=airbyte_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        internal_traffic_policy="Cluster",
+        selector=forward_auth_pod_labels,
+        type=kubernetes.core.v1.ServiceSpecType.CLUSTER_IP,
+        ports=[
+            kubernetes.core.v1.ServicePortArgs(
+                name="forward-auth",
+                port=4181,
+                protocol="TCP",
+                target_port=4181,
+            )
+        ],
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=forward_auth_deployment,
+        depends_on=[airbyte_helm_release, forward_auth_deployment],
         delete_before_replace=True,
     ),
 )
