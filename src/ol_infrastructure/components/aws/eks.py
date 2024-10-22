@@ -235,6 +235,32 @@ class OLEKSGateway(pulumi.ComponentResource):
                 ],
             }
 
+            https_route_spec = {
+                "parentRefs": [
+                    {
+                        "name": gateway_config.gateway_name,
+                        "sectionName": route_config.name,
+                        "kind": "Gateway",
+                        "group": "gateway.networking.k8s.io",
+                        "port": route_config.port,
+                    },
+                ],
+                "hostnames": gateway_config.hostnames,
+                "rules": [
+                    {
+                        "backendRefs": [
+                            {
+                                "name": route_config.backend_service_name,
+                                "namespace": route_config.backend_service_namespace,
+                                "kind": "Service",
+                                "port": route_config.backend_service_port,
+                            }
+                        ],
+                        "filters": route_config.additional_filters,
+                    }
+                ],
+            }
+
             route_resource = kubernetes.apiextensions.CustomResource(
                 f"{gateway_config.gateway_name}-{route_config.name}-httproute-resource",
                 api_version="gateway.networking.k8s.io/v1",
