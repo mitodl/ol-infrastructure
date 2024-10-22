@@ -1150,6 +1150,16 @@ metrics_server_release = kubernetes.helm.v3.Release(
         values={
             "commonLabels": k8s_global_labels,
             "tolerations": operations_tolerations,
+            "resources": {
+                "requests": {
+                    "memory": "50Mi",
+                    "cpu": "50m",
+                },
+                "limits": {
+                    "memory": "100Mi",
+                    "cpu": "100m",
+                },
+            },
         },
     ),
     opts=ResourceOptions(
