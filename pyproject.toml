@@ -40,7 +40,7 @@ bcrypt = "^4.0.0"
 pulumi-keycloak = "^5.1.0"
 pydantic-settings = "^2.0.1"
 pulumiverse-heroku = "^1.0.3"
-pulumi-eks = "^2.7.7"
+pulumi-eks = "^3.0.0"
 
 [tool.poetry.group.dev.dependencies]
 copier = "*"
