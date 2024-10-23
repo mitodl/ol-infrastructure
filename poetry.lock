@@ -1560,18 +1560,18 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-eks"
-version = "2.8.1"
+version = "3.0.0"
 description = "Pulumi Amazon Web Services (AWS) EKS Components."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pulumi_eks-2.8.1-py3-none-any.whl", hash = "sha256:b16ee7359e25b2e1f9beea12e08980c39141190ebe152ec15f2ba583ae97118a"},
-    {file = "pulumi_eks-2.8.1.tar.gz", hash = "sha256:f259f016938898a6dee50a57fcfcb0e14ef5d9e9c998e222b2a888d4a27cb25b"},
+    {file = "pulumi_eks-3.0.0-py3-none-any.whl", hash = "sha256:f62fb7a6b82f7d0e320d2fb8861fcd4da913069b12633ccb04bf4e80f5003301"},
+    {file = "pulumi_eks-3.0.0.tar.gz", hash = "sha256:2d456988801cbd16ba9116046a3d7ab4c7e83db71af40dfae135195cdc0aad4c"},
 ]
 
 [package.dependencies]
 parver = ">=0.2.1"
-pulumi = ">=3.0.0,<4.0.0"
+pulumi = ">=3.134.1,<4.0.0"
 pulumi-aws = ">=6.0.0,<7.0.0"
 pulumi-kubernetes = ">=4.0.0,<5.0.0"
 semver = ">=2.8.1"
@@ -2558,4 +2558,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "45c44aad1c39129e478016253b2c6ad85728070935cd55f36c0c52324416ff7b"
+content-hash = "377554b1281757d3e6c2fc02116334d952f2bc84b6ccab5a382a92af8fb47830"
