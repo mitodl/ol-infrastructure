@@ -181,15 +181,10 @@ CACHES:  # MODIFIED
 CELERYBEAT_SCHEDULE:
     send-email-digest:
       task: openedx.core.djangoapps.notifications.email.tasks.send_digest_email_to_all_users
-      schedule:
-        minute: 0
-        hour: 0
-        day_of_week: "*"
-        day_of_month: "*"
-        month_of_year: "*"
+      schedule: 86400 # 24 hours in seconds
       args:
         - "Daily"
-CELERY_BEAT_SCHEDULER: redbeat.RedBeatScheduler  # MODIFIED
+CELERYBEAT_SCHEDULER: redbeat.RedBeatScheduler  # MODIFIED
 CELERY_BROKER_HOSTNAME: edxapp-redis.service.consul:6379  # MODIFIED
 CELERY_BROKER_TRANSPORT: rediss  # MODIFIED - second "s" indicates "secure"
 CELERY_BROKER_USER: default # MODIFIED
