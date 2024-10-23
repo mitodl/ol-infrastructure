@@ -4,6 +4,7 @@
 
 import base64
 import json
+import os
 from pathlib import Path
 
 import pulumi_aws as aws
@@ -14,6 +15,7 @@ from pulumi import Config, ResourceOptions, StackReference, export
 
 from bridge.lib.magic_numbers import DEFAULT_EFS_PORT, IAM_ROLE_NAME_PREFIX_MAX_LENGTH
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
+from ol_infrastructure.lib.aws.eks_helper import eks_versions
 from ol_infrastructure.lib.aws.iam_helper import (
     EKS_ADMIN_USERNAMES,
     IAM_POLICY_VERSION,
@@ -56,14 +58,17 @@ kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 
 # Centralize version numbers
 VERSIONS = {
-    "CERT_MANAGER_CHART": "v1.16.0-beta.0",
-    "EBS_CSI_DRIVER": "v1.33.0-eksbuild.1",
-    "EFS_CSI_DRIVER": "v2.0.7-eksbuild.1",
-    "GATEWAY_API": "v1.1.0",
-    "EXTERNAL_DNS_CHART": "1.15.0",
-    "KUBERNETES": "1.31",
-    "TRAEFIK_CHART": "v31.0.0",
-    "VAULT_SECRETS_OPERATOR_CHART": "0.8.1",
+    "CERT_MANAGER_CHART": os.environ.get("CERT_MANAGER_CHART", "v1.16.0-beta.0"),
+    "EBS_CSI_DRIVER": os.environ.get("EBS_CSI_DRIVER", "v1.33.0-eksbuild.1"),
+    "EFS_CSI_DRIVER": os.environ.get("EFS_CSI_DRIVER", "v2.0.7-eksbuild.1"),
+    "GATEWAY_API": os.environ.get("GATEWAY_API", "v1.1.0"),
+    "EXTERNAL_DNS_CHART": os.environ.get("EXTERNAL_DNS_CHART", "1.15.0"),
+    "TRAEFIK_CHART": os.environ.get("TRAEFIK_CHART", "v31.0.0"),
+    "VAULT_SECRETS_OPERATOR_CHART": os.environ.get(
+        "VAULT_SECRETS_OPERATOR_CHART", "0.8.1"
+    ),
+    # K8S version is special, retrieve it from the AWS APIs
+    "KUBERNETES": os.environ.get("KUBERNETES", eks_versions()[0]),
 }
 
 # A global toleration to allow operators to run on nodes tainted as
