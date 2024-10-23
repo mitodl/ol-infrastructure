@@ -30,7 +30,7 @@ policy_folder = sorted(
 )
 for hcl_file in policy_folder:
     constituent_name = PurePath(hcl_file).stem
-    policy_file = open(hcl_file).read()  # noqa: PTH123, SIM115
+    policy_file = open(hcl_file).read()  # noqa: PTH123
     constituent_policy = Policy(constituent_name, policy=policy_file)
     constituent_approle = approle.AuthBackendRole(
         f"approle-{constituent_name}",
