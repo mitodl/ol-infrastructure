@@ -4,6 +4,7 @@
 
 import base64
 import json
+import os
 from pathlib import Path
 
 import pulumi_aws as aws
@@ -13,7 +14,17 @@ import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
 from bridge.lib.magic_numbers import DEFAULT_EFS_PORT, IAM_ROLE_NAME_PREFIX_MAX_LENGTH
+from bridge.lib.versions import (
+    CERT_MANAGER_CHART_VERSION,
+    EBS_CSI_DRIVER_VERSION,
+    EFS_CSI_DRIVER_VERSION,
+    EXTERNAL_DNS_CHART_VERSION,
+    GATEWAY_API_VERSION,
+    TRAEFIK_CHART_VERSION,
+    VAULT_SECRETS_OPERATOR_CHART_VERSION,
+)
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
+from ol_infrastructure.lib.aws.eks_helper import eks_versions
 from ol_infrastructure.lib.aws.iam_helper import (
     EKS_ADMIN_USERNAMES,
     IAM_POLICY_VERSION,
@@ -56,14 +67,21 @@ kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 
 # Centralize version numbers
 VERSIONS = {
-    "CERT_MANAGER_CHART": "v1.16.0-beta.0",
-    "EBS_CSI_DRIVER": "v1.33.0-eksbuild.1",
-    "EFS_CSI_DRIVER": "v2.0.7-eksbuild.1",
-    "GATEWAY_API": "v1.1.0",
-    "EXTERNAL_DNS_CHART": "1.15.0",
-    "KUBERNETES": "1.31",
-    "TRAEFIK_CHART": "v31.0.0",
-    "VAULT_SECRETS_OPERATOR_CHART": "0.8.1",
+    "CERT_MANAGER_CHART": os.environ.get(
+        "CERT_MANAGER_CHART", CERT_MANAGER_CHART_VERSION
+    ),
+    "EBS_CSI_DRIVER": os.environ.get("EBS_CSI_DRIVER", EBS_CSI_DRIVER_VERSION),
+    "EFS_CSI_DRIVER": os.environ.get("EFS_CSI_DRIVER", EFS_CSI_DRIVER_VERSION),
+    "GATEWAY_API": os.environ.get("GATEWAY_API", GATEWAY_API_VERSION),
+    "EXTERNAL_DNS_CHART": os.environ.get(
+        "EXTERNAL_DNS_CHART", EXTERNAL_DNS_CHART_VERSION
+    ),
+    "TRAEFIK_CHART": os.environ.get("TRAEFIK_CHART", TRAEFIK_CHART_VERSION),
+    "VAULT_SECRETS_OPERATOR_CHART": os.environ.get(
+        "VAULT_SECRETS_OPERATOR_CHART", VAULT_SECRETS_OPERATOR_CHART_VERSION
+    ),
+    # K8S version is special, retrieve it from the AWS APIs
+    "KUBERNETES": os.environ.get("KUBERNETES", eks_versions()[0]),
 }
 
 # A global toleration to allow operators to run on nodes tainted as
@@ -637,6 +655,16 @@ vault_secrets_operator = kubernetes.helm.v3.Release(
                 "replicas": 1,
                 "tolerations": operations_tolerations,
                 "manager": {
+                    "resources": {
+                        "requests": {
+                            "memory": "64Mi",
+                            "cpu": "10m",
+                        },
+                        "limits": {
+                            "memory": "128Mi",
+                            "cpu": "50m",
+                        },
+                    },
                     "clientCache": {
                         "persistenceModel": "direct-encrypted",
                         "storageEncryption": {
@@ -1000,6 +1028,16 @@ external_dns_release = (
                 ],
                 # Limit the dns zones that exteranl dns knows about
                 "domainFilters": eks_config.require_object("allowed_dns_zones"),
+                "resources": {
+                    "requests": {
+                        "memory": "64Mi",
+                        "cpu": "10m",
+                    },
+                    "limits": {
+                        "memory": "128Mi",
+                        "cpu": "50m",
+                    },
+                },
             },
         ),
         opts=ResourceOptions(
@@ -1081,6 +1119,17 @@ aws.iam.RolePolicyAttachment(
     opts=ResourceOptions(parent=cert_manager_role),
 )
 
+default_cert_manager_resources = {
+    "requests": {
+        "memory": "64Mi",
+        "cpu": "10m",
+    },
+    "limits": {
+        "memory": "128Mi",
+        "cpu": "50m",
+    },
+}
+
 # Ref: https://cert-manager.io/docs/installation/
 cert_manager_release = kubernetes.helm.v3.Release(
     f"{cluster_name}-cert-manager-helm-release",
@@ -1102,6 +1151,7 @@ cert_manager_release = kubernetes.helm.v3.Release(
             "global": {
                 "commonLabels": k8s_global_labels,
             },
+            "resources": default_cert_manager_resources,
             "tolerations": operations_tolerations,
             "replicaCount": 1,
             "enableCertificateOwnerRef": True,
@@ -1112,6 +1162,14 @@ cert_manager_release = kubernetes.helm.v3.Release(
                 "apiVersion": "controller.config.cert-manager.io/v1alpha1",
                 "kind": "ControllerConfiguration",
                 "enableGatewayAPI": True,
+            },
+            "webhook": {
+                "resources": default_cert_manager_resources,
+                "tolerations": operations_tolerations,
+            },
+            "cainjector": {
+                "resources": default_cert_manager_resources,
+                "tolerations": operations_tolerations,
             },
             "serviceAccount": {
                 "create": True,
@@ -1150,6 +1208,16 @@ metrics_server_release = kubernetes.helm.v3.Release(
         values={
             "commonLabels": k8s_global_labels,
             "tolerations": operations_tolerations,
+            "resources": {
+                "requests": {
+                    "memory": "50Mi",
+                    "cpu": "50m",
+                },
+                "limits": {
+                    "memory": "100Mi",
+                    "cpu": "100m",
+                },
+            },
         },
     ),
     opts=ResourceOptions(
