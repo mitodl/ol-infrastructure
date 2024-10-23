@@ -61,7 +61,7 @@ for hcl_file in policy_folder.iterdir():
         "software_engineer.hcl" in hcl_file.name
         and stack_info.env_suffix != "production"
     ):
-        software_engineer_policy_file = open(hcl_file).read()  # noqa: PTH123, SIM115
+        software_engineer_policy_file = open(hcl_file).read()  # noqa: PTH123
         software_engineer_policy = Policy(
             "github-auth-software-engineer", policy=software_engineer_policy_file
         )
@@ -72,7 +72,7 @@ for hcl_file in policy_folder.iterdir():
                 policies=[software_engineer_policy],
             )
     if "admin.hcl" in hcl_file.name:
-        devops_policy_file = open(hcl_file).read()  # noqa: PTH123, SIM115
+        devops_policy_file = open(hcl_file).read()  # noqa: PTH123
         devops_policy = Policy("github-auth-devops", policy=devops_policy_file)
         for team in ["vault-devops-access"]:
             vault_github_auth_team = github.Team(
