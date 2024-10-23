@@ -642,6 +642,16 @@ vault_secrets_operator = kubernetes.helm.v3.Release(
                 "replicas": 1,
                 "tolerations": operations_tolerations,
                 "manager": {
+                    "resources": {
+                        "requests": {
+                            "memory": "64Mi",
+                            "cpu": "10m",
+                        },
+                        "limits": {
+                            "memory": "128Mi",
+                            "cpu": "50m",
+                        },
+                    },
                     "clientCache": {
                         "persistenceModel": "direct-encrypted",
                         "storageEncryption": {
@@ -1005,6 +1015,16 @@ external_dns_release = (
                 ],
                 # Limit the dns zones that exteranl dns knows about
                 "domainFilters": eks_config.require_object("allowed_dns_zones"),
+                "resources": {
+                    "requests": {
+                        "memory": "64Mi",
+                        "cpu": "10m",
+                    },
+                    "limits": {
+                        "memory": "128Mi",
+                        "cpu": "50m",
+                    },
+                },
             },
         ),
         opts=ResourceOptions(
@@ -1086,6 +1106,19 @@ aws.iam.RolePolicyAttachment(
     opts=ResourceOptions(parent=cert_manager_role),
 )
 
+default_cert_manager_resources = (
+    {
+        "requests": {
+            "memory": "64Mi",
+            "cpu": "10m",
+        },
+        "limits": {
+            "memory": "128Mi",
+            "cpu": "50m",
+        },
+    },
+)
+
 # Ref: https://cert-manager.io/docs/installation/
 cert_manager_release = kubernetes.helm.v3.Release(
     f"{cluster_name}-cert-manager-helm-release",
@@ -1107,6 +1140,7 @@ cert_manager_release = kubernetes.helm.v3.Release(
             "global": {
                 "commonLabels": k8s_global_labels,
             },
+            "resources": default_cert_manager_resources,
             "tolerations": operations_tolerations,
             "replicaCount": 1,
             "enableCertificateOwnerRef": True,
@@ -1117,6 +1151,14 @@ cert_manager_release = kubernetes.helm.v3.Release(
                 "apiVersion": "controller.config.cert-manager.io/v1alpha1",
                 "kind": "ControllerConfiguration",
                 "enableGatewayAPI": True,
+            },
+            "webhook": {
+                "resources": default_cert_manager_resources,
+                "tolerations": operations_tolerations,
+            },
+            "cainjector": {
+                "resources": default_cert_manager_resources,
+                "tolerations": operations_tolerations,
             },
             "serviceAccount": {
                 "create": True,
