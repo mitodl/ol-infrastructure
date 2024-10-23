@@ -34,6 +34,7 @@ from ol_infrastructure.lib.aws.rds_helper import (
     DBInstanceTypes,
     db_engines,
     engine_major_version,
+    get_rds_instance,
     max_minor_version,
     parameter_group_family,
 )
@@ -213,22 +214,23 @@ class OLAmazonDB(pulumi.ComponentResource):
             parameter_group_family(db_config.engine, db_config.engine_version)
         )
         if db_config.read_replica:
-            current_db_state = rds.get_instance(
-                db_instance_identifier=db_config.instance_name
-            )
+            current_db_state = get_rds_instance(db_config.instance_name)
             replica_identifier = f"{db_config.instance_name}-replica"
-            current_replica_state = rds.get_instance(
-                db_instance_identifier=replica_identifier
-            )
-            if db_config.engine_version not in (
-                current_db_state.engine_version,
-                current_replica_state.engine_version,
-            ) and engine_major_version(
-                db_config.engine_version
-            ) == engine_major_version(current_db_state.engine_version):
+            current_replica_state = get_rds_instance(replica_identifier)
+            if (
+                current_db_state
+                and current_replica_state
+                and db_config.engine_version
+                not in (
+                    current_db_state["EngineVersion"],
+                    current_replica_state["EngineVersion"],
+                )
+                and engine_major_version(db_config.engine_version)
+                == engine_major_version(current_db_state["EngineVersion"])
+            ):
                 # Keep the primary engine version pinned while the replica is upgraded
                 # first.
-                primary_engine_version = current_db_state.engine_version
+                primary_engine_version = current_db_state["EngineVersion"]
                 primary_parameter_group_family = parameter_group_family(
                     db_config.engine, primary_engine_version
                 )
