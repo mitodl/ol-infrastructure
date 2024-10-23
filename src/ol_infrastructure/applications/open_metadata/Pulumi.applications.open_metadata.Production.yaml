@@ -4,7 +4,7 @@ encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygF8fmvvVe5DNkr9Hl
 config:
   aws:region: us-east-1
   consul:address: https://consul-data-production.odl.mit.edu
-  open_metadata:db_instance_size: db.m7g.2xlarge
+  open_metadata:db_instance_size: db.m7g.large
   open_metadata:db_password:
     secure: v1:VBuj1zz2MEIjzO11:fLVl43FJeZjj22hWk+XAslezaPQDliDPaEOtSbEaI5f8SoyPcBJB7dZcgIIXaWlEn/ucGE7zDSsxxQY=
   open_metadata:domain: "data.ol.mit.edu"
