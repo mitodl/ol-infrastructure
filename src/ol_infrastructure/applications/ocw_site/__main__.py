@@ -939,7 +939,7 @@ for purpose in ("draft", "live", "test"):
         f"ocw-{purpose}-{stack_info.env_suffix}",
         service_id=servicevcl_backend.id,
         dictionary_id=servicevcl_backend.dictionaries[0].dictionary_id,
-        items=json.load(open("redirect_dict.json")),  # noqa: PTH123, SIM115
+        items=json.load(open("redirect_dict.json")),  # noqa: PTH123
         manage_items=True,
         opts=ResourceOptions(protect=True).merge(fastly_provider),
     )
