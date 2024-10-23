@@ -154,6 +154,7 @@ lint.ignore = [
     "RET506",
     "RET507",
     "RET508",
+    "SIM115",
     "UP007"
 ]
 lint.typing-modules = ["colour.hints"]
