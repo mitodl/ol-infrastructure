@@ -316,7 +316,18 @@ concourse_worker_security_group = ec2.SecurityGroup(
     f"concourse-worker-security-group-{stack_info.env_suffix}",
     name=f"concourse-worker-operations-{stack_info.env_suffix}",
     description="Access control for Concourse worker servers",
-    ingress=[],
+    ingress=[
+        ec2.SecurityGroupIngressArgs(
+            self=True,
+            from_port=0,
+            to_port=MAXIMUM_PORT_NUMBER,
+            protocol="tcp",
+            description=(
+                "Allow Concourse workers to connect to all other concourse workers for"
+                " p2p streaming."
+            ),
+        )
+    ],
     egress=default_egress_args,
     vpc_id=ops_vpc_id,
 )
@@ -326,46 +337,30 @@ concourse_web_security_group = ec2.SecurityGroup(
     f"concourse-web-security-group-{stack_info.env_suffix}",
     name=f"concourse-web-operations-{stack_info.env_suffix}",
     description="Access control for Concourse web servers",
-    ingress=[],
+    ingress=[
+        ec2.SecurityGroupIngressArgs(
+            self=True,
+            security_groups=[concourse_worker_security_group.id],
+            from_port=0,
+            to_port=MAXIMUM_PORT_NUMBER,
+            protocol="tcp",
+            description="Allow Concourse workers to connect to Concourse web nodes",
+        )
+    ],
     egress=default_egress_args,
     vpc_id=ops_vpc_id,
 )
 
-# Link the two groups web    -> worker (all)
-#                     worker -> worker (all)
-#                     worker -> web    (all)
-#         not needed: web    -> web    (all)
-vpc.SecurityGroupIngressRule(
-    "concourse-worker-from-web-nodes",
+ec2.SecurityGroupRule(
+    "concourse-worker-access-from-concourse-web",
     security_group_id=concourse_worker_security_group.id,
-    referenced_security_group_id=concourse_web_security_group.id,
-    ip_protocol="tcp",
+    source_security_group_id=concourse_web_security_group.id,
+    protocol="tcp",
     from_port=0,
     to_port=MAXIMUM_PORT_NUMBER,
     description="Allow all traffic from Concourse web nodes to workers",
-    tags=aws_config.tags,
+    type="ingress",
 )
-vpc.SecurityGroupIngressRule(
-    "concourse-worker-from-concourse-worker",
-    security_group_id=concourse_worker_security_group.id,
-    referenced_security_group_id=concourse_worker_security_group.id,
-    ip_protocol="tcp",
-    from_port=0,
-    to_port=MAXIMUM_PORT_NUMBER,
-    description="Allow all traffic from concourse workers to all other workers.",
-    tags=aws_config.tags,
-)
-vpc.SecurityGroupIngressRule(
-    "concourse-web-from-concourse-worker",
-    security_group_id=concourse_web_security_group.id,
-    referenced_security_group_id=concourse_worker_security_group.id,
-    ip_protocol="tcp",
-    from_port=0,
-    to_port=MAXIMUM_PORT_NUMBER,
-    description="Allow all traffic from concourse workers to web nodes.",
-    tags=aws_config.tags,
-)
-
 
 # Create security group for Concourse Postgres database
 concourse_db_security_group = ec2.SecurityGroup(
