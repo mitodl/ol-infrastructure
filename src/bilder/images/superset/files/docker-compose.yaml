@@ -42,7 +42,7 @@ services:
   superset-init:
     image: *superset-image
     container_name: superset_init
-    command: ["superset", "db", "upgrade"]
+    command: ["sh", "-c", "superset db upgrade && superset fab import-roles -p /app/pythonpath/roles.json"]
     env_file: .env
     volumes: *superset-volumes
     healthcheck:
