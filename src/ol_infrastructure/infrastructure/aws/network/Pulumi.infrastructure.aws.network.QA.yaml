@@ -19,7 +19,7 @@ config:
   - 10.1.136.0/21
   - 10.1.144.0/21
   - 10.1.152.0/21
-  operations_vpc:k8s_service_subnet: 10.110.84.0/23
+  operations_vpc:k8s_service_subnet: 10.110.80.0/23
   operations_vpc:name: operations-qa
   residential_staging_vpc:cidr_block: 10.30.0.0/16
   residential_vpc:cidr_block: 10.5.0.0/16

@@ -1,6 +1,6 @@
 ---
-secretsprovider: awskms://alias/infrastructure-secrets-qa
-encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgFHpqW8dqPwpO+48iRjSPKlAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMT8+E8dJESaABQvpwAgEQgDuViDwWFIt7k1e04QwP3dBW2YCjvz7RUJdyesx59jYHfjXxmnDGziscc9wq1kN3UPp1+uaZf5qBfmA/oQ==
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygGvhXhSXiQ1XmPuxswm2OtcAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMTuh7nmhVuOpDSvyZAgEQgDuh3GDgOQHD2wbrhWUWE2wIUfXQxWNm83tq0ambQmpQqnAr9hajUcnokJAsLf0H8AKhFvUp8SAMbLaHtA==
 config:
   environment:business_unit: operations
   environment:target_vpc: data_vpc
@@ -31,5 +31,5 @@ config:
       tags: {}
       taints: {}
       node_group_options: {}
-  vault:address: https://vault-qa.odl.mit.edu
-  vault_server:env_namespace: operations.qa
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
