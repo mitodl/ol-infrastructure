@@ -94,7 +94,7 @@ ReleaseMap: dict[
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="course-authoring",
+                application="authoring",
                 application_type="MFE",
                 release="sumac",
                 branding_overrides=default_branding_overrides,
@@ -183,7 +183,7 @@ ReleaseMap: dict[
                 branding_overrides=default_branding_overrides,
             ),
             OpenEdxApplicationVersion(
-                application="course-authoring",
+                application="authoring",
                 application_type="MFE",
                 release="sumac",
                 branding_overrides=default_branding_overrides,
@@ -266,7 +266,7 @@ ReleaseMap: dict[
                 release="sumac",
             ),
             OpenEdxApplicationVersion(
-                application="course-authoring",
+                application="authoring",
                 application_type="MFE",
                 release="sumac",
                 branding_overrides=pinned_branding_overrides,
