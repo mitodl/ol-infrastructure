@@ -1,4 +1,4 @@
-from typing import ClassVar, Literal, Optional, Union
+from typing import Any, ClassVar, Literal, Optional, Union
 
 import pulumi
 import pulumi_aws as aws
@@ -21,6 +21,7 @@ class OLEKSGatewayRouteConfig(BaseModel):
     backend_service_port: Optional[int]
     certificate_secret_name: Optional[str]
     certificate_secret_namespace: Optional[str] = ""
+    additional_filters: Optional[list[dict[str, Any]]] = []
     hostname: str
     name: str
     port: int
@@ -39,14 +40,15 @@ class OLEKSGatewayRouteConfig(BaseModel):
 
 
 class OLEKSGatewayConfig(BaseModel):
-    annotations: dict[str, str] = {}
+    annotations: Optional[dict[str, str]] = None
+    annotations: Optional[dict[str, str]]
     cert_issuer: Optional[str] = None
     cert_issuer_class: Literal["cluster-issuer", "issuer"] = "cluster-issuer"
     gateway_class_name: str = "traefik"
     gateway_name: str
     hostnames: Optional[list[str]] = []
     http_redirect: bool = True
-    labels: Optional[dict[str, str]] = {}
+    labels: Optional[dict[str, str]] = None
     namespace: str
     routes: list[OLEKSGatewayRouteConfig] = []
 
@@ -147,6 +149,32 @@ class OLEKSGateway(pulumi.ComponentResource):
             }
             listeners.append(listener)
 
+            https_route_spec = {
+                "parentRefs": [
+                    {
+                        "name": gateway_config.gateway_name,
+                        "sectionName": route_config.name,
+                        "kind": "Gateway",
+                        "group": "gateway.networking.k8s.io",
+                        "port": route_config.port,
+                    },
+                ],
+                "hostnames": gateway_config.hostnames,
+                "rules": [
+                    {
+                        "backendRefs": [
+                            {
+                                "name": route_config.backend_service_name,
+                                "namespace": route_config.backend_service_namespace,
+                                "kind": "Service",
+                                "port": route_config.backend_service_port,
+                            }
+                        ],
+                        "filters": route_config.additional_filters,
+                    }
+                ],
+            }
+
             route_resource = kubernetes.apiextensions.CustomResource(
                 f"{gateway_config.gateway_name}-{route_config.name}-httproute-resource",
                 api_version="gateway.networking.k8s.io/v1",
@@ -157,35 +185,14 @@ class OLEKSGateway(pulumi.ComponentResource):
                     annotations=gateway_config.annotations,
                     namespace=gateway_config.namespace,
                 ),
-                spec={
-                    "parentRefs": [
-                        {
-                            "name": gateway_config.gateway_name,
-                            "sectionName": route_config.name,
-                            "kind": "Gateway",
-                            "group": "gateway.networking.k8s.io",
-                            "port": route_config.port,
-                        },
-                    ],
-                    "hostnames": gateway_config.hostnames,
-                    "rules": [
-                        {
-                            "backendRefs": [
-                                {
-                                    "name": route_config.backend_service_name,
-                                    "namespace": route_config.backend_service_namespace,
-                                    "kind": "Service",
-                                    "port": route_config.backend_service_port,
-                                }
-                            ],
-                        }
-                    ],
-                },
+                spec=https_route_spec,
                 opts=pulumi.ResourceOptions(parent=self).merge(opts),
             )
             self.routes.append(route_resource)
 
         if gateway_config.cert_issuer:
+            if gateway_config.annotations is None:
+                gateway_config.annotations = {}
             gateway_config.annotations[
                 f"cert-manager.io/{gateway_config.cert_issuer_class}"
             ] = gateway_config.cert_issuer
@@ -210,7 +217,7 @@ class OLEKSGateway(pulumi.ComponentResource):
 
 class OLEKSTrustRoleConfig(AWSBase):
     account_id: Union[str, PositiveInt]
-    cluster_name: str
+    cluster_name: Union[str, pulumi.Output[str]]
     cluster_identities: pulumi.Output
     description: str
     policy_operator: Literal["StringEquals", "StringLike"]
