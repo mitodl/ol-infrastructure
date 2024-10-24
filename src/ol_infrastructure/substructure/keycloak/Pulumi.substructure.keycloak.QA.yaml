@@ -21,9 +21,6 @@ config:
     secure: v1:TfpaJKet+1dR7zPW:uH/rZTfcHuW/+DmQNzeowgCQk8uw3Fi31ZN+UZkUBXnBYbUCZZGjYxYxMuSvuY4=
   keycloak_realm:mailgun_reply_to_address:
     secure: v1:uRDOLOjIW6qFgbcO:kyGfXZcMIUw0IQ36MEL0ujQoYDJdNCAaljl9j7uI1k5LCWVQm/cz5S7mOkz/+68=
-  keycloak_realm:mit-learn-scim-endpoint: https://api.rc.learn.mit.edu/scim/v2/
-  keycloak_realm:mit-learn-scim-password:
-    secure: v1:GzkoKrnvuhwYC9uT:IfBrZtoR/5YFZRe2OSixF9kyZqdsBWKppn4X3/V8icHPG1CFy06WM1DVCqqOow==
   keycloak_realm:mit_email_host:
     secure: v1:NJ2W839vX2H5EmR7:xZ1XFFS1Lj+zYG7REfJUUYmoBrItsSUCmtDoYCzhDa4=
   keycloak_realm:mit_email_password:
