@@ -116,15 +116,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         repository="ol-keycloak",
     )
 
-    # Repo: https://github.com/mitodl/keycloak-scim
-    # Use: SCIM client to use Starburst integration
-    scim_spi = github_release(
-        name=Identifier("scim-spi"),
-        owner="mitodl",
-        repository="keycloak-scim",
-        tag_filter="alpha",
-    )
-
     #############################################
     image_build_context = Output(name=Identifier("image-build-context"))
 
@@ -137,7 +128,29 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
             GetStep(get=keycloak_customization_repo.name, trigger=True),
             GetStep(get=metrics_spi.name, trigger=True),
             GetStep(get=ol_spi.name, trigger=True),
-            GetStep(get=scim_spi.name, trigger=True),
+            TaskStep(
+                task=Identifier("download-scim-client"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    image_resource=AnonymousResource(
+                        type="registry-image",
+                        source={
+                            "repository": "amazon/aws-cli",
+                            "tag": "latest",
+                        },
+                    ),
+                    inputs=[],
+                    outputs=[Output(name=Identifier("scim_client"))],
+                    run=Command(
+                        path="sh",
+                        args=[
+                            "-xc",
+                            """
+                            aws s3 cp s3://ol-eng-artifacts/keycloak/scim-client/scim_client_file.jar scim_client_file.jar""",  # noqa: E501
+                        ],
+                    ),
+                ),
+            ),
             TaskStep(
                 task=Identifier("collect-artifacts-for-build-context"),
                 config=TaskConfig(
@@ -148,7 +161,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                         Input(name=cas_protocol_spi.name),
                         Input(name=metrics_spi.name),
                         Input(name=ol_spi.name),
-                        Input(name=scim_spi.name),
                     ],
                     image_resource=AnonymousResource(
                         type=REGISTRY_IMAGE,
@@ -165,7 +177,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                         cp -r {cas_protocol_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {metrics_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {ol_spi.name}/* {image_build_context.name}/plugins/
-                        cp -r {scim_spi.name}/* {image_build_context.name}/plugins/
+                        cp -r scim_client/* {image_build_context.name}/plugins/
                         """  # noqa: E501
                             ),
                         ],
@@ -205,7 +217,6 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
             cas_protocol_spi,
             metrics_spi,
             ol_spi,
-            scim_spi,
         ],
         jobs=[docker_build_job],
     )
