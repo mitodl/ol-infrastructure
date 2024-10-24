@@ -236,7 +236,6 @@ heroku_vars = {
     "CYBERSOURCE_MERCHANT_ID": "mit_odl_xpro",
     "CYBERSOURCE_REFERENCE_PREFIX": f"xpro-{env_name}",
     "FEATURE_COUPON_SHEETS": "True",
-    "FEATURE_COUPON_SHEETS_TRACK_REQUESTER": "True",
     "FEATURE_COURSE_DROPDOWN": "True",
     "FEATURE_ENABLE_BLOG": "True",
     "FEATURE_ENABLE_ENTERPRISE": "True",
