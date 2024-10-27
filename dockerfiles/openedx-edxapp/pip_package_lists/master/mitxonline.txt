@@ -11,7 +11,7 @@ ol-openedx-course-structure-api
 ol-openedx-logging==0.2.0
 ol-openedx-sentry==0.2.1
 openedx-scorm-xblock
-pip==24.2
+pip==24.3
 social-auth-mitxpro==0.7.1
 uwsgi==2.0.28
 wheel==0.44.0
