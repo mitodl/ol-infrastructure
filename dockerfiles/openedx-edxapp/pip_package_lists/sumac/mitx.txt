@@ -12,7 +12,7 @@ ol-openedx-logging==0.2.0
 ol-openedx-rapid-response-reports==0.3.0
 ol-openedx-sentry==0.2.1
 openedx-scorm-xblock>=18.0.0,<18.1.0
-pip==24.3
+pip==24.3.1
 rapid-response-xblock==0.9.1
 uwsgi==2.0.28
 wheel==0.44.0
