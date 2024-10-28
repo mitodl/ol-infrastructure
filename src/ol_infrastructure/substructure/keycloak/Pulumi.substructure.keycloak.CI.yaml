@@ -45,6 +45,7 @@ config:
     standard_flow_enabled: false
     service_accounts_enabled: true
   - client_info:
+      airbyte: ["https://airbyte-ci.odl.mit.edu/*"]
       leek: ["https://celery-monitoring-ci.odl.mit.edu/*"]
     realm_name: ol-platform-engineering
   keycloak:url: https://sso-ci.ol.mit.edu
