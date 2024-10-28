@@ -707,7 +707,7 @@ for openid_clients in keycloak_realm_config.get_object("openid_clients"):
                     "role_list",
                     "roles",
                     "web-origins",
-                    *openid_clients.get("extra_default_scopes")
+                    *openid_clients.get("extra_default_scopes"),
                 ],
             )
 
