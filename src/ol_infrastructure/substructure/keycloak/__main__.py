@@ -380,7 +380,9 @@ ol_apps_user_profile = keycloak.RealmUserProfile(
 )
 
 ol_apps_profile_client_scope = keycloak.openid.ClientScope(
-    "profile", realm_id=ol_apps_realm.id
+    "ol-profile-client-scope",
+    name="ol-profile",
+    realm_id=ol_apps_realm.id,
 )
 
 ol_apps_user_email_optin_attribute_mapper = keycloak.openid.UserAttributeProtocolMapper(
@@ -693,6 +695,22 @@ for openid_clients in keycloak_realm_config.get_object("openid_clients"):
                 realm_id=realm_name,
                 opts=resource_options,
             )
+        if "extra_default_scopes" in openid_clients:
+            keycloak.openid.ClientDefaultScopes(
+                f"{realm_name}-{client_name}-default-scopes",
+                realm_id=realm_name,
+                client_id=openid_client.id,
+                default_scopes=[
+                    "acr",
+                    "email",
+                    "profile",
+                    "role_list",
+                    "roles",
+                    "web-origins",
+                    *openid_clients.get("extra_default_scopes"),
+                ],
+            )
+
 
 # OL - First login flow [START]
 # Does not require email verification or confirmation to connect with existing account.
