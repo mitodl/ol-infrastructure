@@ -57,7 +57,6 @@ class OLEKSGatewayListenerConfig(BaseModel):
 
 class OLEKSGatewayConfig(BaseModel):
     annotations: Optional[dict[str, str]] = None
-    annotations: Optional[dict[str, str]]
     cert_issuer: Optional[str] = None
     cert_issuer_class: Optional[Literal["cluster-issuer", "issuer", "external"]] = (
         "cluster-issuer"
@@ -136,6 +135,13 @@ class OLEKSGatewayConfig(BaseModel):
             raise ValueError(msg)
         return listeners
 
+<<<<<<< HEAD
+=======
+    # TODO @Ardiea: create validator that ensures  # noqa: TD003, FIX002
+    # each hostname supplied in routes
+    # exists in the gateway hostnames list
+
+>>>>>>> 7a7102f6 (refactored the gateway component resources to be a little bit moreflexible.)
 
 class OLEKSGateway(pulumi.ComponentResource):
     gateway: kubernetes.apiextensions.CustomResource = None
@@ -232,32 +238,6 @@ class OLEKSGateway(pulumi.ComponentResource):
                         ],
                         "filters": route_config.filters,
                         "matches": route_config.matches,
-                    }
-                ],
-            }
-
-            https_route_spec = {
-                "parentRefs": [
-                    {
-                        "name": gateway_config.gateway_name,
-                        "sectionName": route_config.name,
-                        "kind": "Gateway",
-                        "group": "gateway.networking.k8s.io",
-                        "port": route_config.port,
-                    },
-                ],
-                "hostnames": gateway_config.hostnames,
-                "rules": [
-                    {
-                        "backendRefs": [
-                            {
-                                "name": route_config.backend_service_name,
-                                "namespace": route_config.backend_service_namespace,
-                                "kind": "Service",
-                                "port": route_config.backend_service_port,
-                            }
-                        ],
-                        "filters": route_config.additional_filters,
                     }
                 ],
             }
