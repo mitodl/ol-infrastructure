@@ -26,6 +26,12 @@ class OLEKSGatewayRouteConfig(BaseModel):
     name: str
     port: int
 
+    @field_validator("hostnames")
+    @classmethod
+    def de_dupe_hostnames(cls, hostnames: list[str]) -> list[str]:
+        # Just to be safe
+        return list(set(hostnames))
+
 
 class OLEKSGatewayListenerConfig(BaseModel):
     name: str
@@ -39,10 +45,12 @@ class OLEKSGatewayListenerConfig(BaseModel):
     @model_validator(mode="after")
     def check_tls_config(self):
         if self.protocol == "HTTPS" and (
-            not self.certificate_secret_name or not self.tls_mode
+            not self.certificate_secret_name
+            or not self.tls_mode
+            or not self.certificate_secret_namespace
         ):
             msg = "If protocol is HTTPS then certificate_secret_name, "
-            "certificate_secret_namespace, and tls_mode must be set."
+            "certificate_secret_namespace, and tls_mode must be supplied."
             raise ValueError(msg)
         return self
 
@@ -50,15 +58,54 @@ class OLEKSGatewayListenerConfig(BaseModel):
 class OLEKSGatewayConfig(BaseModel):
     annotations: Optional[dict[str, str]] = None
     cert_issuer: Optional[str] = None
-    cert_issuer_class: Optional[Literal["cluster-issuer", "issuer"]] = "cluster-issuer"
+    cert_issuer_class: Optional[Literal["cluster-issuer", "issuer", "external"]] = (
+        "cluster-issuer"
+    )
     gateway_class_name: str = "traefik"
     gateway_name: str
-    hostnames: list[str]
     http_redirect: bool = True
     labels: Optional[dict[str, str]] = {}
     namespace: str
     listeners: list[OLEKSGatewayListenerConfig] = []
     routes: list[OLEKSGatewayRouteConfig] = []
+
+    @model_validator(mode="after")
+    def check_cert_issuer(self):
+        if self.cert_issuer_class == "external" and self.cert_issuer:
+            msg = "cert_issuer should be unspecified if cert_issuer_class is external"
+            raise ValueError(msg)
+        if (
+            self.cert_issuer_class in ["cluster-issuer", "issuer"]
+            and not self.cert_issuer
+        ):
+            msg = "cert_issuer must be set if using cert_issuer_class:"
+            " cluster-issuer or issuer"
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def check_listener_route_name(self):
+        listener_names = [listener_config.name for listener_config in self.listeners]
+        for route_config in self.routes:
+            if route_config.listener_name not in listener_names:
+                msg = f"listener_name : {route_config.listener_name}"
+                " in route : {route_config.name} is not defined"
+                raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def check_hostnames(self):
+        listener_hostnames = {
+            listener_config.hostname for listener_config in self.listeners
+        }  # a set comprehension!
+        route_hostnames = set()
+        for route_config in self.routes:
+            for hostname in route_config.hostnames:
+                route_hostnames.add(hostname)
+        if not listener_hostnames & route_hostnames:
+            msg = "The set of listener hostnames must match the set of route hostnames."
+            raise ValueError(msg)
+        return self
 
     @field_validator("gateway_class_name")
     @classmethod
@@ -88,10 +135,6 @@ class OLEKSGatewayConfig(BaseModel):
             raise ValueError(msg)
         return listeners
 
-    # TODO @Ardiea: create validator that ensures  # noqa: TD003, FIX002
-    # each hostname supplied in routes
-    # exists in the gateway hostnames list
-
 
 class OLEKSGateway(pulumi.ComponentResource):
     gateway: kubernetes.apiextensions.CustomResource = None
@@ -110,7 +153,10 @@ class OLEKSGateway(pulumi.ComponentResource):
             opts,
         )
 
-        if gateway_config.cert_issuer:
+        if gateway_config.cert_issuer and gateway_config.cert_issuer_class in [
+            "issuer",
+            "cluster-issuer",
+        ]:
             if gateway_config.annotations is None:
                 gateway_config.annotations = {}
             gateway_config.annotations[
