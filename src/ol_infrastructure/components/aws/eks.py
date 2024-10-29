@@ -1,4 +1,4 @@
-from typing import ClassVar, Literal, Optional, Union
+from typing import Any, ClassVar, Literal, Optional, Union
 
 import pulumi
 import pulumi_aws as aws
@@ -19,36 +19,93 @@ class OLEKSGatewayRouteConfig(BaseModel):
     backend_service_name: Optional[str]
     backend_service_namespace: Optional[str]
     backend_service_port: Optional[int]
-    certificate_secret_name: Optional[str]
-    certificate_secret_namespace: Optional[str] = ""
-    hostname: str
+    filters: Optional[list[dict[str, Any]]] = []
+    matches: Optional[list[dict[str, Any]]] = None
+    listener_name: str
+    hostnames: list[str]
     name: str
     port: int
-    protocol: str
+
+    @field_validator("hostnames")
+    @classmethod
+    def de_dupe_hostnames(cls, hostnames: list[str]) -> list[str]:
+        # Just to be safe
+        return list(set(hostnames))
+
+
+class OLEKSGatewayListenerConfig(BaseModel):
+    name: str
+    hostname: str
+    port: int
+    protocol: Literal["HTTPS", "HTTP"] = "HTTPS"
     tls_mode: Literal["Passthrough", "Terminate"] = "Terminate"
+    certificate_secret_name: Optional[str]
+    certificate_secret_namespace: Optional[str] = ""
 
     @model_validator(mode="after")
     def check_tls_config(self):
         if self.protocol == "HTTPS" and (
-            not self.certificate_secret_name or not self.tls_mode
+            not self.certificate_secret_name
+            or not self.tls_mode
+            or not self.certificate_secret_namespace
         ):
             msg = "If protocol is HTTPS then certificate_secret_name, "
-            "certificate_secret_namespace, and tls_mode must be set."
+            "certificate_secret_namespace, and tls_mode must be supplied."
             raise ValueError(msg)
         return self
 
 
 class OLEKSGatewayConfig(BaseModel):
-    annotations: dict[str, str] = {}
+    annotations: Optional[dict[str, str]] = None
     cert_issuer: Optional[str] = None
-    cert_issuer_class: Literal["cluster-issuer", "issuer"] = "cluster-issuer"
+    cert_issuer_class: Optional[Literal["cluster-issuer", "issuer", "external"]] = (
+        "cluster-issuer"
+    )
     gateway_class_name: str = "traefik"
     gateway_name: str
-    hostnames: Optional[list[str]] = []
     http_redirect: bool = True
     labels: Optional[dict[str, str]] = {}
     namespace: str
+    listeners: list[OLEKSGatewayListenerConfig] = []
     routes: list[OLEKSGatewayRouteConfig] = []
+
+    @model_validator(mode="after")
+    def check_cert_issuer(self):
+        if self.cert_issuer_class == "external" and self.cert_issuer:
+            msg = "cert_issuer should be unspecified if cert_issuer_class is external"
+            raise ValueError(msg)
+        if (
+            self.cert_issuer_class in ["cluster-issuer", "issuer"]
+            and not self.cert_issuer
+        ):
+            msg = "cert_issuer must be set if using cert_issuer_class:"
+            " cluster-issuer or issuer"
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def check_listener_route_name(self):
+        listener_names = [listener_config.name for listener_config in self.listeners]
+        for route_config in self.routes:
+            if route_config.listener_name not in listener_names:
+                msg = f"listener_name : {route_config.listener_name}"
+                " in route : {route_config.name} is not defined"
+                raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def check_hostnames(self):
+        listener_hostnames = {
+            listener_config.hostname for listener_config in self.listeners
+        }  # a set comprehension!
+        route_hostnames = set()
+        for route_config in self.routes:
+            for hostname in route_config.hostnames:
+                route_hostnames.add(hostname)
+        if not listener_hostnames & route_hostnames:
+            msg = "The set of listener hostnames must match the set of route hostnames."
+            raise ValueError(msg)
+        return self
 
     @field_validator("gateway_class_name")
     @classmethod
@@ -60,13 +117,23 @@ class OLEKSGatewayConfig(BaseModel):
 
     @field_validator("routes")
     @classmethod
-    def check_listeners(
+    def check_routes(
         cls, routes: list[OLEKSGatewayRouteConfig]
     ) -> list[OLEKSGatewayRouteConfig]:
         if not routes:
             msg = "At least one route must be supplied."
             raise ValueError(msg)
         return routes
+
+    @field_validator("listeners")
+    @classmethod
+    def check_listeners(
+        cls, listeners: list[OLEKSGatewayListenerConfig]
+    ) -> list[OLEKSGatewayListenerConfig]:
+        if not listeners:
+            msg = "At least one listener must be supplied."
+            raise ValueError(msg)
+        return listeners
 
 
 class OLEKSGateway(pulumi.ComponentResource):
@@ -86,7 +153,23 @@ class OLEKSGateway(pulumi.ComponentResource):
             opts,
         )
 
+        if gateway_config.cert_issuer and gateway_config.cert_issuer_class in [
+            "issuer",
+            "cluster-issuer",
+        ]:
+            if gateway_config.annotations is None:
+                gateway_config.annotations = {}
+            gateway_config.annotations[
+                f"cert-manager.io/{gateway_config.cert_issuer_class}"
+            ] = gateway_config.cert_issuer
+
+        # Create a generic HTTP route that always redirects to HTTPS
         if gateway_config.http_redirect:
+            hostname_set = set()
+            for route_config in gateway_config.routes:
+                for hostname in route_config.hostnames:
+                    hostname_set.add(hostname)
+
             kubernetes.apiextensions.CustomResource(
                 f"{gateway_config.gateway_name}-http-redirect-httproute-resource",
                 api_version="gateway.networking.k8s.io/v1",
@@ -107,7 +190,7 @@ class OLEKSGateway(pulumi.ComponentResource):
                             "port": 8000,
                         },
                     ],
-                    "hostnames": gateway_config.hostnames,
+                    "hostnames": sorted([*hostname_set]),  # sorted to avoid stack churn
                     "rules": [
                         {
                             "filters": [
@@ -124,28 +207,33 @@ class OLEKSGateway(pulumi.ComponentResource):
                 opts=pulumi.ResourceOptions(parent=self).merge(opts),
             )
 
-        listeners = []
         for route_config in gateway_config.routes:
-            if not route_config.certificate_secret_namespace:
-                route_config.certificate_secret_namespace = gateway_config.namespace
-            listener = {
-                "name": route_config.name,
-                "hostname": route_config.hostname,
-                "port": route_config.port,
-                "protocol": route_config.protocol,
-                "tls": {
-                    "mode": route_config.tls_mode,
-                    "certificateRefs": [
-                        {
-                            "group": "",
-                            "kind": "Secret",
-                            "name": route_config.certificate_secret_name,
-                            "namespace": route_config.certificate_secret_namespace,
-                        },
-                    ],
-                },
+            https_route_spec = {
+                "parentRefs": [
+                    {
+                        "name": gateway_config.gateway_name,
+                        "sectionName": route_config.listener_name,
+                        "kind": "Gateway",
+                        "group": "gateway.networking.k8s.io",
+                        "port": route_config.port,
+                    },
+                ],
+                "hostnames": route_config.hostnames,
+                "rules": [
+                    {
+                        "backendRefs": [
+                            {
+                                "name": route_config.backend_service_name,
+                                "namespace": route_config.backend_service_namespace,
+                                "kind": "Service",
+                                "port": route_config.backend_service_port,
+                            }
+                        ],
+                        "filters": route_config.filters,
+                        "matches": route_config.matches,
+                    }
+                ],
             }
-            listeners.append(listener)
 
             route_resource = kubernetes.apiextensions.CustomResource(
                 f"{gateway_config.gateway_name}-{route_config.name}-httproute-resource",
@@ -157,38 +245,37 @@ class OLEKSGateway(pulumi.ComponentResource):
                     annotations=gateway_config.annotations,
                     namespace=gateway_config.namespace,
                 ),
-                spec={
-                    "parentRefs": [
-                        {
-                            "name": gateway_config.gateway_name,
-                            "sectionName": route_config.name,
-                            "kind": "Gateway",
-                            "group": "gateway.networking.k8s.io",
-                            "port": route_config.port,
-                        },
-                    ],
-                    "hostnames": gateway_config.hostnames,
-                    "rules": [
-                        {
-                            "backendRefs": [
-                                {
-                                    "name": route_config.backend_service_name,
-                                    "namespace": route_config.backend_service_namespace,
-                                    "kind": "Service",
-                                    "port": route_config.backend_service_port,
-                                }
-                            ],
-                        }
-                    ],
-                },
+                spec=https_route_spec,
                 opts=pulumi.ResourceOptions(parent=self).merge(opts),
             )
             self.routes.append(route_resource)
 
-        if gateway_config.cert_issuer:
-            gateway_config.annotations[
-                f"cert-manager.io/{gateway_config.cert_issuer_class}"
-            ] = gateway_config.cert_issuer
+        listeners = []
+        for listener_config in gateway_config.listeners:
+            listener = {
+                "name": listener_config.name,
+                "allowedRoutes": {
+                    "namespaces": {
+                        "from": "Same",
+                    }
+                },
+                "hostname": listener_config.hostname,
+                "port": listener_config.port,
+                "protocol": listener_config.protocol,
+            }
+            if listener_config.protocol == "HTTPS":
+                listener["tls"] = {
+                    "mode": listener_config.tls_mode,
+                    "certificateRefs": [
+                        {
+                            "group": "",
+                            "kind": "Secret",
+                            "name": listener_config.certificate_secret_name,
+                            "namespace": listener_config.certificate_secret_namespace,
+                        },
+                    ],
+                }
+            listeners.append(listener)
 
         self.gateway = kubernetes.apiextensions.CustomResource(
             f"{gateway_config.gateway_name}-{gateway_config.gateway_class_name}-gateway-resource",
