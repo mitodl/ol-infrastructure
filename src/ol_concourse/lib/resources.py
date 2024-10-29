@@ -270,6 +270,24 @@ def slack_notification(name: Identifier, url: str) -> Resource:
     )
 
 
+def s3_object(
+    name: Identifier,
+    bucket: str,
+    object_path: str | None = None,
+    object_regex: str | None = None,
+):
+    return Resource(
+        name=name,
+        type="s3",
+        icon="bucket",
+        source={
+            "bucket": bucket,
+            "regexp": object_regex,
+            "versioned_file": object_path,
+        },
+    )
+
+
 # This resource type also supports s3, gcs and others. We can create those later.
 def git_semver(  # noqa: PLR0913
     name: str,
