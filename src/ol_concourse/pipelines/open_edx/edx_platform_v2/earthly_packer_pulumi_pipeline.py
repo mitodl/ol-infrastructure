@@ -19,6 +19,7 @@ from ol_concourse.lib.models.pipeline import (
     InParallelStep,
     Input,
     Job,
+    LoadVarStep,
     Output,
     Pipeline,
     Platform,
@@ -26,7 +27,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resources import git_repo, registry_image
+from ol_concourse.lib.resources import git_repo, github_release, registry_image
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 
@@ -86,6 +87,16 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                 GetStep(get=edx_platform_git_resource.name, trigger=True)
             )
 
+            node_version = edx_platform.release.node_version
+
+            nodejs_github_release = github_release(
+                name=Identifier(f"nodejs-{node_version}-released-version"),
+                owner="nodejs",
+                repository="node",
+                tag_filter=rf"^v({node_version}\.\d+\.\d+)",
+                order_by="version",
+            )
+
             # AMI code related resource setup
             edx_ami_code = git_repo(
                 name=Identifier(
@@ -142,7 +153,15 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                     InParallelStep(
                         in_parallel=theme_get_steps
                         + edx_platform_get_steps
-                        + [GetStep(get=earthly_git_resource.name, trigger=True)]
+                        + [
+                            GetStep(get=earthly_git_resource.name, trigger=True),
+                            GetStep(get=nodejs_github_release.name, trigger=False),
+                        ]
+                    ),
+                    LoadVarStep(
+                        load_var="node_version",
+                        reveal=True,
+                        file=f"{nodejs_github_release.name}/version",
                     ),
                     TaskStep(
                         task=Identifier("build"),
@@ -175,7 +194,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                                     EDX_PLATFORM_DIR="../../../{edx_platform_git_resource.name}"
                                     THEME_DIR="../../../{theme_git_resource.name}"
                                     PYTHON_VERSION="{edx_platform.runtime_version}"
-                                    NODE_VERSION="{'16.14.0' if release_name == 'quince' else '18.20.2'}"
+                                    NODE_VERSION="((.:node_version))"
                                     earthly +all --DEPLOYMENT_NAME="$DEPLOYMENT_NAME" --RELEASE_NAME="$RELEASE_NAME" --EDX_PLATFORM_DIR="$EDX_PLATFORM_DIR" --THEME_DIR="$THEME_DIR" --PYTHON_VERSION="$PYTHON_VERSION" --NODE_VERSION="$NODE_VERSION";
                                     DIGEST=$(docker inspect --format '{{{{.Id}}}}' mitodl/edxapp-$DEPLOYMENT_NAME-$RELEASE_NAME | cut -d ":" -f2);
                                     echo "Saving docker image to tar file in the artifacts directory";
@@ -235,6 +254,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                         edx_registry_image_resource,
                         edx_ami_code,
                         edx_pulumi_code,
+                        nodejs_github_release,
                         *theme_git_resources,
                         *edx_platform_git_resources,
                     ],
