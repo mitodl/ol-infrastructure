@@ -9,6 +9,7 @@ config:
     secure: v1:VWGgAaWUrrBoIqPG:nvVLDIwouJCl+5z/HcKI7S5xGZAseg4QdNbLeUSyVDcxAD7ECr9V/pA1u80dVpgxoVklw060SPJw3M+CeQn9dbIjXhkJx+6WxHROHw5Rjg0=
   airbyte:target_vpc: data_vpc
   airbyte:web_host_domain: airbyte-ci.odl.mit.edu
+  airbyte:api_host_domain: api-airbyte-ci.odl.mit.edu
   airbyte:forward_auth_log_level: info
   aws:region: us-east-1
   consul:address: https://consul-data-ci.odl.mit.edu

@@ -14,6 +14,7 @@ config:
     secure: v1:+8cXtPmd87pI6W34:JMqgjAAso2QgEcIeh2DtYiu52+Z+j4prhAMJRSBGYjFdG9N4QxyPr7zOO0aIh3iGC/9LDB5Q9qNXFIudw7JzaQ==
   airbyte:target_vpc: data_vpc
   airbyte:web_host_domain: airbyte-qa.odl.mit.edu
+  airbyte:api_host_domain: api-airbyte-qa.odl.mit.edu
   aws:region: us-east-1
   consul:address: https://consul-data-qa.odl.mit.edu
   vault:address: https://vault-qa.odl.mit.edu
