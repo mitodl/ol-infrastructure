@@ -383,7 +383,6 @@ gateway_config = OLEKSGatewayConfig(
     cert_issuer="letsencrypt-production",
     cert_issuer_class="cluster-issuer",
     gateway_name="open-metadata",
-    hostnames=[open_metadata_config.require("domain")],
     labels=k8s_global_labels,
     namespace=open_metadata_namespace,
     listeners=[
