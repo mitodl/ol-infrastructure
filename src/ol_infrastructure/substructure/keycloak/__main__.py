@@ -231,7 +231,7 @@ olapps_realm_events = keycloak.RealmEvents(
     events_expiration=SECONDS_IN_ONE_DAY,
     admin_events_enabled=True,
     admin_events_details_enabled=True,
-    events_listeners=["metrics-listener", "scim"],
+    events_listeners=["metrics-listener"],
     opts=resource_options,
 )
 
@@ -1100,28 +1100,3 @@ if stack_info.env_suffix in ["ci", "qa"]:
         ),
     )
     # OKTA-DEV [END] # noqa: ERA001
-
-# SCIM for MIT-Learn
-if stack_info.env_suffix != "CI":
-    keycloak.CustomUserFederation(
-        "ol-mit-learn-scim",
-        config={
-            "user-patchOp": "false",
-            "auth-pass": keycloak_realm_config.get("mit-learn-scim-password"),
-            "auth-mode": "BEARER",
-            "sync-import-action": "NOTHING",
-            "propagation-user": "true",
-            "endpoint": keycloak_realm_config.get("mit-learn-scim-endpoint"),
-            "propagation-group": "true",
-            "content-type": "application/scim+json",
-            "group-patchOp": "false",
-        },
-        cache_policy="DEFAULT",
-        changed_sync_period=60,
-        enabled=True,
-        full_sync_period=86400,
-        name="MIT Learn",
-        provider_id="scim",
-        realm_id=ol_apps_realm.id,
-        opts=resource_options,
-    )
