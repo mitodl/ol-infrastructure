@@ -17,6 +17,7 @@ from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBCo
 from ol_infrastructure.components.aws.eks import (
     OLEKSGateway,
     OLEKSGatewayConfig,
+    OLEKSGatewayListenerConfig,
     OLEKSGatewayRouteConfig,
 )
 from ol_infrastructure.components.services.vault import (
@@ -378,7 +379,6 @@ open_metadata_application = kubernetes.helm.v3.Release(
     ),
 )
 
-
 gateway_config = OLEKSGatewayConfig(
     cert_issuer="letsencrypt-production",
     cert_issuer_class="cluster-issuer",
@@ -386,18 +386,25 @@ gateway_config = OLEKSGatewayConfig(
     hostnames=[open_metadata_config.require("domain")],
     labels=k8s_global_labels,
     namespace=open_metadata_namespace,
+    listeners=[
+        OLEKSGatewayListenerConfig(
+            name="https",
+            hostname=open_metadata_config.require("domain"),
+            port=8443,
+            tls_mode="Terminate",
+            certificate_secret_name="openmetadata-tls",  # cert-manager will create this  # noqa: S106, E501  # pragma: allowlist secret
+            certificate_secret_namespace=open_metadata_namespace,
+        ),
+    ],
     routes=[
         OLEKSGatewayRouteConfig(
             backend_service_name="openmetadata",  # sourced from the helm chart
             backend_service_namespace=open_metadata_namespace,
             backend_service_port=8585,  # sourced from the helm chart
-            certificate_secret_name="openmetadata-tls",  # cert-manager will create this  # noqa: S106, E501  # pragma: allowlist secret
-            certificate_secret_namespace=open_metadata_namespace,
-            hostname=open_metadata_config.require("domain"),
+            hostnames=[open_metadata_config.require("domain")],
             name="open-metadata-https",
-            port=8443,  # we should source this from somewhere instead of magic number
-            protocol="HTTPS",
-            tls_mode="Terminate",
+            listener_name="https",
+            port=8443,
         ),
     ],
 )
