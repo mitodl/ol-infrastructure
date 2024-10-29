@@ -146,7 +146,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                         args=[
                             "-xc",
                             """
-                            aws s3 cp s3://ol-eng-artifacts/keycloak/scim-client/scim_client_file.jar scim_client_file.jar""",  # noqa: E501
+                            aws s3 cp s3://ol-eng-artifacts/keycloak/scim-client/scim-for-keycloak-kc-24-2.3.3-enterprise.jar scim-for-keycloak-kc-24-2.3.3-enterprise.jar """,  # noqa: E501
                         ],
                     ),
                 ),
