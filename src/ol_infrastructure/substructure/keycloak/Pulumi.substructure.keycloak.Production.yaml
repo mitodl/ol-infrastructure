@@ -32,6 +32,7 @@ config:
       open: ["https://api.mitopen.odl.mit.edu/*", "https://mitopen.odl.mit.edu/*"]
       open-discussions: ["https://open.mit.edu/*"]
     realm_name: olapps
+    extra_default_scopes: ["ol-profile"]
   - client_info:
       airbyte: ["https://airbyte.odl.mit.edu/*"]
       dagster: ["https://pipelines.odl.mit.edu/*"]
