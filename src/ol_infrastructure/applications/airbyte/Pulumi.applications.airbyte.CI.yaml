@@ -1,0 +1,17 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQFsFavVRgcZPhsYNw8nFJzrAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM1hSowbjLl3OTeQrEAgEQgDsaDAPMxwZdLb0KhXXTJ5FocsTmLWDifyfrHy3hngPZQFpKSf++NE8Iz7qKocZNhniD9j/fZ/GVTwdWtw==
+config:
+  airbyte:auth_domain: airbyte-ci-auth.odl.mit.edu
+  airbyte:business_unit: operations
+  airbyte:db_capacity: "334"
+  airbyte:rds_password:
+    secure: v1:VWGgAaWUrrBoIqPG:nvVLDIwouJCl+5z/HcKI7S5xGZAseg4QdNbLeUSyVDcxAD7ECr9V/pA1u80dVpgxoVklw060SPJw3M+CeQn9dbIjXhkJx+6WxHROHw5Rjg0=
+  airbyte:target_vpc: data_vpc
+  airbyte:web_host_domain: airbyte-ci.odl.mit.edu
+  airbyte:api_host_domain: api-airbyte-ci.odl.mit.edu
+  airbyte:forward_auth_log_level: info
+  aws:region: us-east-1
+  consul:address: https://consul-data-ci.odl.mit.edu
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

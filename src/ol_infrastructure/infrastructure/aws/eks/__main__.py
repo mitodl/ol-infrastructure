@@ -231,6 +231,8 @@ cluster = eks.Cluster(
 )
 export("cluster_name", cluster_name)
 export("kube_config", cluster.kubeconfig)
+export("cluster_identities", cluster.eks_cluster.identities)
+export("admin_role_arn", administrator_role.arn)
 export(
     "kube_config_data",
     {
@@ -336,7 +338,10 @@ operations_namespace = kubernetes.core.v1.Namespace(
         labels=k8s_global_labels,
     ),
     opts=ResourceOptions(
-        provider=k8s_provider, parent=k8s_provider, depends_on=k8s_provider
+        provider=k8s_provider,
+        parent=k8s_provider,
+        depends_on=k8s_provider,
+        protect=True,
     ),
 )
 
@@ -351,7 +356,10 @@ for namespace in namespaces:
             labels=k8s_global_labels,
         ),
         opts=ResourceOptions(
-            provider=k8s_provider, parent=k8s_provider, depends_on=k8s_provider
+            provider=k8s_provider,
+            parent=k8s_provider,
+            depends_on=k8s_provider,
+            protect=True,
         ),
     )
 export("namespaces", [*namespaces, "operations"])
@@ -531,7 +539,7 @@ if eks_config.get_bool("efs_csi_provisioner"):
         ],
     )
 
-    def create_mountpoints(pod_subnet_ids):
+    def __create_mountpoints(pod_subnet_ids):
         for index, subnet_id in enumerate(pod_subnet_ids):
             aws.efs.MountTarget(
                 f"{cluster_name}-eks-mounttarget-{index}",
@@ -541,7 +549,7 @@ if eks_config.get_bool("efs_csi_provisioner"):
                 opts=ResourceOptions(parent=efs_filesystem),
             )
 
-    pod_subnet_ids.apply(lambda pod_subnet_ids: create_mountpoints(pod_subnet_ids))
+    pod_subnet_ids.apply(lambda pod_subnet_ids: __create_mountpoints(pod_subnet_ids))
 
     kubernetes.storage.v1.StorageClass(
         resource_name=f"{cluster_name}-efs-storageclass",
