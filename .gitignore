@@ -14,3 +14,4 @@ venv/
 *.swp
 pyinfra-debug.log
 .vscode/
+.python-version
