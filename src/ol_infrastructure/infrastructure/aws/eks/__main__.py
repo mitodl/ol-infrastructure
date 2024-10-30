@@ -339,8 +339,6 @@ operations_namespace = kubernetes.core.v1.Namespace(
     ),
     opts=ResourceOptions(
         provider=k8s_provider,
-        parent=k8s_provider,
-        depends_on=k8s_provider,
         protect=True,
     ),
 )
@@ -357,8 +355,6 @@ for namespace in namespaces:
         ),
         opts=ResourceOptions(
             provider=k8s_provider,
-            parent=k8s_provider,
-            depends_on=k8s_provider,
             protect=True,
         ),
     )
@@ -468,8 +464,7 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         },
         opts=ResourceOptions(
             provider=k8s_provider,
-            parent=k8s_provider,
-            depends_on=[k8s_provider, ebs_csi_driver_role],
+            depends_on=[ebs_csi_driver_role],
         ),
     )
     aws_ebs_cni_driver_addon = eks.Addon(
@@ -567,8 +562,7 @@ if eks_config.get_bool("efs_csi_provisioner"):
         },
         opts=ResourceOptions(
             provider=k8s_provider,
-            parent=k8s_provider,
-            depends_on=[k8s_provider, efs_csi_driver_role],
+            depends_on=[efs_csi_driver_role],
         ),
     )
     aws_efs_cni_driver_addon = eks.Addon(
