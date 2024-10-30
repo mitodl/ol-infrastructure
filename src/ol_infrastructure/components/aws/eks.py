@@ -135,13 +135,6 @@ class OLEKSGatewayConfig(BaseModel):
             raise ValueError(msg)
         return listeners
 
-<<<<<<< HEAD
-=======
-    # TODO @Ardiea: create validator that ensures  # noqa: TD003, FIX002
-    # each hostname supplied in routes
-    # exists in the gateway hostnames list
-
->>>>>>> 7a7102f6 (refactored the gateway component resources to be a little bit moreflexible.)
 
 class OLEKSGateway(pulumi.ComponentResource):
     gateway: kubernetes.apiextensions.CustomResource = None
