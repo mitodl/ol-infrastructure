@@ -80,7 +80,6 @@ vault_traefik_service_account = kubernetes.core.v1.ServiceAccount(
     automount_service_account_token=False,
     opts=ResourceOptions(
         provider=k8s_provider,
-        parent=k8s_provider,
         delete_before_replace=True,
     ),
 )
@@ -280,7 +279,6 @@ cert_manager_clusterissuer_resources = kubernetes.yaml.v2.ConfigGroup(
     ],
     opts=ResourceOptions(
         provider=k8s_provider,
-        parent=k8s_provider,
         delete_before_replace=True,
     ),
 )

@@ -229,7 +229,6 @@ vault_k8s_resources_config = OLVaultK8SResourcesConfig(
 vault_k8s_resources = OLVaultK8SResources(
     resource_config=vault_k8s_resources_config,
     opts=ResourceOptions(
-        parent=k8s_provider,
         delete_before_replace=True,
         depends_on=[open_metadata_vault_auth_backend_role],
     ),
