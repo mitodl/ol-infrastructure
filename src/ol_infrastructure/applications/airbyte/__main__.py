@@ -584,7 +584,7 @@ airbyte_trust_role_config = OLEKSTrustRoleConfig(
 airbyte_trust_role = OLEKSTrustRole(
     f"{env_name}-ol-trust-role",
     role_config=airbyte_trust_role_config,
-    opts=ResourceOptions(provider=k8s_provider, parent=k8s_provider),
+    opts=ResourceOptions(provider=k8s_provider),
 )
 iam.RolePolicyAttachment(
     f"airbyte-service-account-data-lake-access-policy-{env_name}",
@@ -615,7 +615,6 @@ vault_k8s_resources = OLVaultK8SResources(
     resource_config=vault_k8s_resources_config,
     opts=ResourceOptions(
         provider=k8s_provider,
-        parent=k8s_provider,
         delete_before_replace=True,
         depends_on=[airbyte_vault_k8s_auth_backend_role],
     ),
@@ -642,7 +641,6 @@ app_db_creds_dynamic_secret = OLVaultK8SSecret(
     resource_config=app_db_creds_dynamic_secret_config,
     opts=ResourceOptions(
         provider=k8s_provider,
-        parent=k8s_provider,
     ),
 )
 
@@ -774,7 +772,6 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
     ),
     opts=ResourceOptions(
         provider=k8s_provider,
-        parent=k8s_provider,
         depends_on=[
             app_db_creds_dynamic_secret,
             airbyte_trust_role,
