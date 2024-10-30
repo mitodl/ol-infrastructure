@@ -2,7 +2,7 @@
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQG7tVQ4cjSd4ZUD7SwqIPuWAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbK4AIug73P0kVCSmAgEQgDtcf7tVi8RwSaTQ8SSy0Qob2DeSZdWru1j4Pjo4Bo88wQQLgZEWWRAPA9+6hc6IeT6agzB+rn0CeyvXhQ==
 config:
-  environment:business_unit: operations
+  environment:business_unit: data
   environment:target_vpc: data_vpc
   eks:allowed_dns_zones:
   - ".odl.mit.edu"

@@ -2,7 +2,7 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgFHpqW8dqPwpO+48iRjSPKlAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMT8+E8dJESaABQvpwAgEQgDuViDwWFIt7k1e04QwP3dBW2YCjvz7RUJdyesx59jYHfjXxmnDGziscc9wq1kN3UPp1+uaZf5qBfmA/oQ==
 config:
-  environment:business_unit: operations
+  environment:business_unit: data
   environment:target_vpc: data_vpc
   eks:allowed_dns_zones:
   - ".odl.mit.edu"
@@ -15,6 +15,7 @@ config:
   eks:pod_security_groups: false
   eks:namespaces:
   - "open-metadata"  # Openmetadata testing
+  - "airbyte"
   eks:nodegroups:
     worker-xlarge:
       instance_types:
