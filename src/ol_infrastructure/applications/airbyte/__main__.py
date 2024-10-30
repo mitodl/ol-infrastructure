@@ -1,6 +1,7 @@
 """Create the resources needed to run a airbyte server.  # noqa: D200"""
 
 import json
+import os
 from pathlib import Path
 from string import Template
 
@@ -16,6 +17,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
 )
+from bridge.lib.versions import AIRBYTE_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import (
@@ -102,6 +104,10 @@ airbyte_server_ami = ec2.get_ami(
 
 airbyte_server_tag = f"airbyte-server-{env_name}"
 consul_provider = get_consul_provider(stack_info)
+
+VERSIONS = {
+    "AIRBYTE_CHART": os.environ.get("AIRBYTE_CHART_VERSION", AIRBYTE_CHART_VERSION),
+}
 
 ###############################
 ##     General Resources     ##
@@ -656,7 +662,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
     kubernetes.helm.v3.ReleaseArgs(
         name="airbyte",
         chart="airbyte",
-        version="1.1.0",
+        version=VERSIONS["AIRBYTE_CHART"],
         namespace=airbyte_namespace,
         cleanup_on_fail=True,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
