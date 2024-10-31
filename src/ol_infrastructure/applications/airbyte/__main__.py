@@ -145,6 +145,7 @@ parliament_config = {
         "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
     },
     "UNKNOWN_ACTION": {"ignore_locations": []},
+    "RESOURCE_MISMATCH": {"ignore_locations": []},
 }
 
 airbyte_app_policy_document = {
@@ -163,6 +164,11 @@ airbyte_app_policy_document = {
             "Effect": "Allow",
             "Action": "s3:ListBucket",
             "Resource": f"arn:aws:s3:::{airbyte_bucket_name}",
+        },
+        {
+            "Effect": "Allow",
+            "Action": "secretsManager:*",
+            "Resource": ["arn:aws:secretsmanager:us-east-1::secret:airbyte_workspace*"],
         },
     ],
 }
@@ -691,6 +697,14 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     "s3": {
                         "region": aws_config.region,
                         "authenticationType": "instanceProfile",
+                    },
+                },
+                "secretsManager": {
+                    "type": "awsSecretManager",
+                    "awsSecretManager": {
+                        "region": "us-east-1",
+                        "authenticationType": "instanceProfile",
+                        "tags": [{"key": "OU", "value": "data"}],
                     },
                 },
             },
