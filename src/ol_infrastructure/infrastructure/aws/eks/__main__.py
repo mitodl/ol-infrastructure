@@ -53,6 +53,7 @@ kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+concourse_stack = StackReference("applications.concourse.Production")
 
 business_unit = env_config.require("business_unit") or "operations"
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))
@@ -114,22 +115,29 @@ default_assume_role_policy = {
     ],
 }
 
-admin_assume_role_policy = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": [
+admin_assume_role_policy_document = concourse_stack.require_output(
+    "infra-instance-role-arn"
+).apply(
+    lambda arn: json.dumps(
         {
-            "Effect": "Allow",
-            "Action": "sts:AssumeRole",
-            "Principal": {
-                "Service": "ec2.amazonaws.com",
-                "AWS": [
-                    f"arn:aws:iam::{aws_account.account_id}:user/{username}"
-                    for username in EKS_ADMIN_USERNAMES
-                ],
-            },
+            "Version": IAM_POLICY_VERSION,
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": "sts:AssumeRole",
+                    "Principal": {
+                        "Service": "ec2.amazonaws.com",
+                        "AWS": [
+                            f"arn:aws:iam::{aws_account.account_id}:user/{username}"
+                            for username in EKS_ADMIN_USERNAMES
+                        ]
+                        + [arn],
+                    },
+                }
+            ],
         }
-    ],
-}
+    )
+)
 
 ############################################################
 # create core IAM resources
@@ -137,7 +145,7 @@ admin_assume_role_policy = {
 # IAM role that admins will assume when using kubectl
 administrator_role = aws.iam.Role(
     f"{cluster_name}-eks-admin-role",
-    assume_role_policy=json.dumps(admin_assume_role_policy),
+    assume_role_policy=admin_assume_role_policy_document,
     name_prefix=f"{cluster_name}-eks-admin-role-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
     path=f"/ol-infrastructure/eks/{cluster_name}/",
     tags=aws_config.tags,
