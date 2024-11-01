@@ -391,7 +391,7 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         "from within the cluster.",
         policy_operator="StringEquals",
         role_name="ebs-csi-driver",
-        service_account_identifier="system:serviceaccounts:kube-system:ebs-csi-controller-sa",
+        service_account_identifier="system:serviceaccount:kube-system:ebs-csi-controller-sa",
         tags=aws_config.tags,
     )
     ebs_csi_driver_role = OLEKSTrustRole(
