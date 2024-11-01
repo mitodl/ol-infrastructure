@@ -1,12 +1,15 @@
 # ruff: noqa: E501
-
+import os
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
+from bridge.lib.versions import VANTAGE_K8S_AGENT_CHART_VERSION
 from ol_infrastructure.components.services.vault import (
+    OLVaultK8SResources,
+    OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
@@ -16,6 +19,12 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 
 env_config = Config("environment")
 vault_config = Config("vault")
+
+VERSIONS = {
+    "VANTAGE_K8S_AGENT_VERSION": os.environ.get(
+        "VANTAGE_K8S_AGENT_CHART_VERSION", VANTAGE_K8S_AGENT_CHART_VERSION
+    )
+}
 
 stack_info = parse_stack()
 
@@ -46,135 +55,40 @@ k8s_provider = kubernetes.Provider(
 ############################################################
 # Secondary resources for vault-secrets-operator
 ############################################################
-
-# install the *.odl.mit.edu certificate into the operations
-# namespace with a VaultStaticSecret
-
-# Setup a default auth backend role, used to load the *.odl.mit.edu certificate
-# into the cluster. This shoudln't be used by applications. It is only for this
-# one thing.  This restriction is enforced by binding to the `operations`
-# namespace as well to a ServiceAccount within the operations namespace
 vault_traefik_policy_name = f"{stack_info.env_prefix}-eks-traefik"
-vault_traefik_service_account_name = "vault-traefik-auth"
 vault_traefik_policy = vault.Policy(
     f"{cluster_name}-eks-vault-traefik-policy",
     name=vault_traefik_policy_name,
     policy=Path(__file__).parent.joinpath("traefik_vault_policy.hcl").read_text(),
 )
-vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
-    f"{cluster_name}-eks-vault-authentication-endpoint-operations",
-    role_name="operations-default",
+vault_traefik_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    f"{cluster_name}-traefik-gateway-vault-auth-backend-role",
+    role_name="traefik-gateway",
     backend=cluster_stack.require_output("vault_auth_endpoint"),
-    bound_service_account_names=[vault_traefik_service_account_name],
+    bound_service_account_names=["*"],
     bound_service_account_namespaces=["operations"],
     token_policies=[vault_traefik_policy_name],
 )
-# Create a k8s service account that will make the requests to vault
-vault_traefik_service_account = kubernetes.core.v1.ServiceAccount(
-    f"{cluster_name}-vault-traefik-service-account",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=vault_traefik_service_account_name,
-        labels=k8s_global_labels,
-        namespace="operations",
-    ),
-    automount_service_account_token=False,
+
+vault_traefik_k8s_resources_config = OLVaultK8SResourcesConfig(
+    application_name="traefik-gateway",
+    namespace="operations",
+    labels=k8s_global_labels,
+    vault_address=vault_config.require("address"),
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    vault_auth_role_name=vault_traefik_auth_backend_role.role_name,
+)
+
+vault_traefik_k8s_resources = OLVaultK8SResources(
+    resource_config=vault_traefik_k8s_resources_config,
     opts=ResourceOptions(
-        provider=k8s_provider,
         delete_before_replace=True,
+        depends_on=[vault_traefik_auth_backend_role],
     ),
 )
-
-# We need to give the ServiceAccount the 'system:auth-delegator' ClusterRole
-# which will allow vault to use the token that the request it makes to turn around
-# and validate the request from the cluster api endpoint.
-#
-# Every application that wishes to use the vault-secrets-operator
-# will need to implement this pattern because ServiceAccounts don't
-# come with long-lived tokens starting with k8s 1.21
-#
-# This operational overhead is annoying but it is the best / most secure option
-# for when working with a vault installation that resides outside of the cluster
-#
-# Ref: https://developer.hashicorp.com/vault/docs/auth/kubernetes#use-the-vault-client-s-jwt-as-the-reviewer-jwt
-# Ref: https://developer.hashicorp.com/vault/docs/auth/kubernetes#configuring-kubernetes
-vault_traefik_service_account_cluster_role_binding = (
-    kubernetes.rbac.v1.ClusterRoleBinding(
-        f"{cluster_name}-vault-traefik-service-account-cluster-role-binding",
-        args=kubernetes.rbac.v1.ClusterRoleBindingInitArgs(
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name=f"{vault_traefik_service_account_name}:cluster-auth",
-                labels=k8s_global_labels,
-                namespace="operations",
-            ),
-            role_ref=kubernetes.rbac.v1.RoleRefArgs(
-                api_group="rbac.authorization.k8s.io",
-                kind="ClusterRole",
-                name="system:auth-delegator",
-            ),
-            subjects=[
-                kubernetes.rbac.v1.SubjectArgs(
-                    kind="ServiceAccount",
-                    name=vault_traefik_service_account_name,
-                    namespace="operations",
-                ),
-            ],
-        ),
-        opts=ResourceOptions(
-            provider=k8s_provider,
-            parent=vault_traefik_service_account,
-            delete_before_replace=True,
-        ),
-    )
-)
-
-# Create a VaultAuth resource and a VaultStaticSecret resource
-# that will put 'secret-global/odl-wildcard'
-# into a k8s Secret in the operations namespace named: "odl-wildcard-cert"
-#
-# Gateways in other namespaces will need ReferenceGrants
-# added to the operations namespace in order to utilize it.
-#
-# Or they can setup their own VaultStaticSecret to import the
-# certificate into their own namespace.
-#
-# They will need to create VaultConnection and VaultAuth
-# resources as well
 star_odl_mit_edu_secret_name = (
     "odl-wildcard-cert"  # pragma: allowlist secret #  noqa: S105
 )
-# Continue to use the vault auth resource rather than one made by
-# OLVaulkK8SResources because this one hooks to a pre-defined
-# VaultConnection resource that comes with the helm release
-traefik_vso_resources = kubernetes.yaml.v2.ConfigGroup(
-    f"{cluster_name}-traefik-vso-resources",
-    objs=[
-        {
-            "apiVersion": "secrets.hashicorp.com/v1beta1",
-            "kind": "VaultAuth",
-            "metadata": {
-                "name": "traefik-static-auth",
-                "namespace": "operations",
-                "labels": k8s_global_labels,
-            },
-            "spec": {
-                "method": "kubernetes",
-                "mount": cluster_stack.require_output("vault_auth_endpoint"),
-                # This was made for us by the helm chart
-                "vaultConnectionRef": "default",
-                "kubernetes": {
-                    "role": vault_k8s_auth_backend_role.role_name,
-                    "serviceAccount": vault_traefik_service_account_name,
-                },
-            },
-        },
-    ],
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        parent=vault_traefik_service_account,
-        delete_before_replace=True,
-    ),
-)
-
 star_odl_mit_edu_static_secret_config = OLVaultK8SStaticSecretConfig(
     name="vault-kv-global-odl-wildcard",
     namespace="operations",
@@ -190,15 +104,13 @@ star_odl_mit_edu_static_secret_config = OLVaultK8SStaticSecretConfig(
         "tls.crt": '{{ get .Secrets "cert_with_proper_newlines" }}',
     },
     refresh_after="1h",
-    vaultauth="traefik-static-auth",
+    vaultauth=vault_traefik_k8s_resources.auth_name,
 )
-
 star_odl_mit_edu_static_secret = OLVaultK8SSecret(
     f"{cluster_name}-star-odl-mit-edu-static-secret",
     resource_config=star_odl_mit_edu_static_secret_config,
     opts=ResourceOptions(
         provider=k8s_provider,
-        parent=vault_traefik_service_account,
         delete_before_replace=True,
     ),
 )
@@ -282,3 +194,112 @@ cert_manager_clusterissuer_resources = kubernetes.yaml.v2.ConfigGroup(
         delete_before_replace=True,
     ),
 )
+
+
+############################################################
+# Install the vantage k8s agent
+############################################################
+# Requires EBS storage class and creates a statefulset
+if cluster_stack.require_output("has_ebs_storage"):
+    vault_vantage_policy_name = f"{stack_info.env_prefix}-eks-vantage"
+    vault_vantage_policy = vault.Policy(
+        f"{cluster_name}-eks-vault-vantage-policy",
+        name=vault_vantage_policy_name,
+        policy=Path(__file__).parent.joinpath("vantage_vault_policy.hcl").read_text(),
+    )
+    vault_vantage_auth_backend_role = vault.kubernetes.AuthBackendRole(
+        f"{cluster_name}-vantage-agent-vault-auth-backend-role",
+        role_name="vantage-agent",
+        backend=cluster_stack.require_output("vault_auth_endpoint"),
+        bound_service_account_names=["*"],
+        bound_service_account_namespaces=["operations"],
+        token_policies=[vault_vantage_policy_name],
+    )
+
+    vault_vantage_k8s_resources_config = OLVaultK8SResourcesConfig(
+        application_name="vantage-agent",
+        namespace="operations",
+        labels=k8s_global_labels,
+        vault_address=vault_config.require("address"),
+        vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+        vault_auth_role_name=vault_vantage_auth_backend_role.role_name,
+    )
+
+    vault_vantage_k8s_resources = OLVaultK8SResources(
+        resource_config=vault_vantage_k8s_resources_config,
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[vault_vantage_auth_backend_role],
+        ),
+    )
+    vantage_api_token_secret_name = "vantage-api-token"  # noqa: S105  # pragma: allowlist secret
+    vantage_api_token_secret_config = OLVaultK8SStaticSecretConfig(
+        name="vault-kv-global-vantage-api-token",
+        namespace="operations",
+        labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=vantage_api_token_secret_name,
+        mount="secret-global",
+        mount_type="kv-v2",
+        path="vantage",
+        templates={
+            "token": '{{ get .Secrets "token" }}',
+        },
+        refresh_after="1h",
+        vaultauth=vault_vantage_k8s_resources.auth_name,
+    )
+
+    vantage_api_token_secret = OLVaultK8SSecret(
+        f"{cluster_name}-vantage-api-token-static-secret",
+        resource_config=vantage_api_token_secret_config,
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            delete_before_replace=True,
+        ),
+    )
+
+    vantage_k8s_agent_release = kubernetes.helm.v3.Release(
+        f"{cluster_name}-vantage-k8s-agent-helm-release",
+        kubernetes.helm.v3.ReleaseArgs(
+            name="vantage-kubernetes-agent",
+            chart="vantage-kubernetes-agent",
+            version=VERSIONS["VANTAGE_K8S_AGENT_VERSION"],
+            namespace="operations",
+            cleanup_on_fail=True,
+            repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+                repo="https://vantage-sh.github.io/helm-charts",
+            ),
+            values={
+                "agent": {
+                    "secret": {
+                        "name": vantage_api_token_secret_name,
+                        "key": "token",
+                    },
+                    "clusterID": cluster_name,
+                    "disableKubeTLSverify": "true",
+                    "nodeAddressTypes": "InternalIP",
+                    "collectNamespaceLabels": "true",
+                },
+                "persist": {
+                    "storageClassName": cluster_stack.require_output(
+                        "ebs_storageclass"
+                    ),
+                },
+                "resources": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "100Mi",
+                    },
+                    "limits": {
+                        "cpu": "100m",
+                        "memory": "100Mi",
+                    },
+                },
+            },
+            skip_await=True,
+        ),
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[vantage_api_token_secret],
+        ),
+    )
