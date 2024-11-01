@@ -302,8 +302,33 @@ class OLEKSTrustRoleConfig(AWSBase):
     description: str
     policy_operator: Literal["StringEquals", "StringLike"]
     role_name: str
-    service_account_identifier: str
+    service_account_identifier: Optional[str] = None
+    service_account_name: Optional[str] = None
+    service_account_namespace: Optional[str] = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @model_validator(mode="after")
+    def check_service_account_args(self):
+        if self.service_account_identifier and (
+            self.service_account_name or self.service_account_namespace
+        ):
+            msg = "Only service_account_identifier OR (service_account_name "
+            "AND service_account_namespace) should be specified."
+            raise ValueError(msg)
+        if not self.service_account_identifier and (
+            not self.service_account_name or not self.service_account_namespace
+        ):
+            msg = "Both service_account_name and service_account_namespace "
+            "should be specified."
+            raise ValueError(msg)
+        if (
+            self.service_account_identifier
+            and not self.service_account_identifier.startswith("system:serviceaccount:")
+        ):
+            msg = "If specifying service_account_identifier "
+            "it should start with 'system:serviceaccount'"
+            raise ValueError(msg)
+        return self
 
 
 class OLEKSTrustRole(pulumi.ComponentResource):
@@ -326,6 +351,10 @@ class OLEKSTrustRole(pulumi.ComponentResource):
             opts,
         )
 
+        self.__service_account_identifier = (
+            role_config.service_account_identifier
+            or f"system.serviceaccount:{role_config.service_account_namespace}:{role_config.service_account_name}"  # noqa: E501
+        )
         self.role = aws.iam.Role(
             f"{role_config.cluster_name}-{role_config.role_name}-trust-role",
             name=f"{role_config.cluster_name}-{role_config.role_name}-trust-role",
@@ -334,7 +363,7 @@ class OLEKSTrustRole(pulumi.ComponentResource):
                 lambda ids: oidc_trust_policy_template(
                     oidc_identifier=ids[0]["oidcs"][0]["issuer"],
                     account_id=str(role_config.account_id),
-                    k8s_service_account_identifier=role_config.service_account_identifier,
+                    k8s_service_account_identifier=self.__service_account_identifier,
                     operator=role_config.policy_operator,
                 )
             ),
