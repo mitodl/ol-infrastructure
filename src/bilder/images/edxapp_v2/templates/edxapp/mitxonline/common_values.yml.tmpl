@@ -48,6 +48,8 @@ JWT_AUTH:  # NEEDS ATTENTION
       - ISSUER: https://{{ key "edxapp/lms-domain" }}/oauth2
         AUDIENCE: mitxonline
         SECRET_KEY: {{ .Data.django_secret_key }}
+OPENAI_SECRET_KEY: {{ .Data.openai_api_key }}
+OPENAI_API_KEY: {{ .Data.openai_api_key }}
 RETIRED_USER_SALTS: {{ .Data.user_retirement_salts }}
 SENTRY_DSN: {{ .Data.sentry_dsn }}
 {{ end }}
