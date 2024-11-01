@@ -1,3 +1,3 @@
-path "secret-global/odl-wildcard" {
+path "secret-global/data/odl-wildcard" {
   capabilities = ["read"]
 }

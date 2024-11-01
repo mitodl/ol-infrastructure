@@ -487,6 +487,7 @@ if eks_config.get_bool("ebs_csi_provisioner"):
             depends_on=[cluster, node_groups[0]],
         ),
     )
+    export("ebs_storageclass", "ebs-gp3-sc")
 
 ############################################################
 # Setup EFS CSI Provisioner
@@ -585,6 +586,7 @@ if eks_config.get_bool("efs_csi_provisioner"):
             depends_on=[cluster, node_groups[0]],
         ),
     )
+    export("efs_storageclass", "efs-sc")
 
 ############################################################
 # Configure vault-secrets-operator
