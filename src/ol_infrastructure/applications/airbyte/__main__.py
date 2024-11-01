@@ -146,6 +146,8 @@ parliament_config = {
     },
     "UNKNOWN_ACTION": {"ignore_locations": []},
     "RESOURCE_MISMATCH": {"ignore_locations": []},
+    "UNKNOWN_CONDITION_FOR_ACTION": {"ignore_locations": []},
+    "RESOURCE_STAR": {"ignore_locations": []},
 }
 
 airbyte_app_policy_document = {
@@ -167,8 +169,20 @@ airbyte_app_policy_document = {
         },
         {
             "Effect": "Allow",
-            "Action": "secretsManager:*",
-            "Resource": ["arn:aws:secretsmanager:us-east-1::secret:airbyte_workspace*"],
+            "Action": [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:CreateSecret",
+                "secretsmanager:ListSecrets",
+                "secretsmanager:DescribeSecret",
+                "secretsmanager:TagResource",
+                "secretsmanager:UpdateSecret",
+            ],
+            "Resource": ["*"],
+            "Condition": {
+                "ForAllValues:StringEquals": {
+                    "secretsmanager:ResourceTag/AirbyteManaged": "true"
+                }
+            },
         },
     ],
 }
@@ -583,7 +597,7 @@ airbyte_trust_role_config = OLEKSTrustRoleConfig(
     "access the aws API",
     policy_operator="StringEquals",
     role_name="airbyte",
-    service_account_identifier=f"system:serviceaccounts:{airbyte_namespace}:{airbyte_service_account_name}",
+    service_account_identifier=f"system:serviceaccount:{airbyte_namespace}:{airbyte_service_account_name}",
     tags=aws_config.tags,
 )
 
@@ -710,6 +724,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             },
             "serviceAccount": {
                 "create": True,
+                "name": airbyte_service_account_name,
                 "annotations": {
                     "eks.amazonaws.com/role-arn": airbyte_trust_role.role.arn.apply(
                         lambda arn: f"{arn}"
