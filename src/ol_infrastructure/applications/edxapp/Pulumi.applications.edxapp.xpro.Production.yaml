@@ -7,6 +7,7 @@ config:
   edxapp:waffle_flags:
   - ["completion.enable_completion_tracking", "--create", "--superusers", "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
+  - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
   - ["courseware.courseware_mfe", "--create", "--superusers", "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
