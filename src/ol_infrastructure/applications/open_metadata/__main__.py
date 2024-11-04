@@ -65,8 +65,8 @@ vault_config = Config("vault")
 consul_provider = get_consul_provider(stack_info)
 setup_vault_provider(stack_info)
 k8s_global_labels = {
-    "pulumi_managed": "true",
-    "pulumi_stack": stack_info.full_name,
+    "ol.mit.edu/stack": stack_info.full_name,
+    "ol.mit.edu/service": "open-metadata",
 }
 k8s_provider = kubernetes.Provider(
     "k8s-provider",

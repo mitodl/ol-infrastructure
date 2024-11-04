@@ -1010,6 +1010,7 @@ external_dns_release = (
                     "pullPolicy": "Always",
                 },
                 "commonLabels": k8s_global_labels,
+                "podLabels": k8s_global_labels,
                 "tolerations": operations_tolerations,
                 "serviceAccount": {
                     "create": True,
