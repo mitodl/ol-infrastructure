@@ -22,12 +22,12 @@ config:
       - "c7a.xlarge"
       labels:
         ondemand: true
-        node_size: c7a.xlarge
+        node_size: m7a.4xlarge
       disk_size_gb: 500
       scaling:
         desired: 3
         min: 2
-        max: 4
+        max: 5
       version:
       tags: {}
       taints: {}
