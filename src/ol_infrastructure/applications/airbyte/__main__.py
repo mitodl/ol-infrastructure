@@ -1019,6 +1019,34 @@ forward_auth_middleware = kubernetes.apiextensions.CustomResource(
         delete_before_replace=True,
     ),
 )
+
+airbyte_security_group_attachment = kubernetes.apiextensions.CustomResource(
+    "airbyte-data-integration-pod-security-group-attachment",
+    api_version="vpcresources.k8s.aws/v1beta1",
+    kind="SecurityGroupPolicy",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="airbyte-data-ingest-security-group",
+        namespace=airbyte_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        # a lot of guides and tutorials only use the service name,
+        # omitting the rest of the k8s domain. That works fine
+        # if you're doing *everything* in the default namespace.
+        # We are not, so we need to use the whole thing.
+        "podSelector": {
+            "matchLabels": {"airbyte": "job-pod"},
+        },
+        "securityGroups": {"groupIds": [target_vpc["security_groups"]["integrator"]]},
+    },
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=gateway,
+        depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
+)
+
 forward_auth_secret_config = OLVaultK8SStaticSecretConfig(
     name="airbyte-forward-auth-oidc-config",
     namespace=airbyte_namespace,
@@ -1053,7 +1081,6 @@ forward_auth_pod_labels = {
     "app.kubernetes.io/instance": "airbyte",
     "app.kubernetes.io/name": "forward-auth",
 }
-
 forward_auth_deployment = kubernetes.apps.v1.Deployment(
     airbyte_forward_auth_deployment_name,
     metadata=kubernetes.meta.v1.ObjectMetaArgs(

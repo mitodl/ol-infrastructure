@@ -19,7 +19,7 @@ config:
   eks:nodegroups:
     worker-xlarge:
       instance_types:
-      - "c7a.xlarge"
+      - "m7a.4xlarge"
       labels:
         ondemand: true
         node_size: m7a.4xlarge
