@@ -225,7 +225,7 @@ cluster = eks.Cluster(
     # Ref: https://docs.aws.amazon.com/eks/latest/userguide/security-groups-pods-deployment.html
     # Ref: https://docs.aws.amazon.com/eks/latest/userguide/sg-pods-example-deployment.html
     vpc_cni_options=eks.cluster.VpcCniOptionsArgs(
-        configurationValues={"POD_SECURITY_GROUP_ENFORCING_MODE": "standard"},
+        configuration_values={"env": {"POD_SECURITY_GROUP_ENFORCING_MODE": "standard"}},
         enable_pod_eni=eks_config.get_bool("pod_security_groups"),
         enable_prefix_delegation=eks_config.get_bool("pod_security_groups"),
         disable_tcp_early_demux=eks_config.get_bool("pod_security_groups"),

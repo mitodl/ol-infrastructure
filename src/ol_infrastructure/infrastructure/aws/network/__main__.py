@@ -21,6 +21,7 @@ from ol_infrastructure.components.aws.olvpc import (
     OLVPCConfig,
     OLVPCPeeringConnection,
 )
+from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
@@ -218,7 +219,7 @@ data_vpc_exports.update(
                 description="Security group used by the data integration engine",
                 vpc_id=data_vpc.olvpc.id,
                 ingress=[],
-                egress=[],
+                egress=default_egress_args,
                 tags=data_vpc_config.merged_tags(
                     {"Name": f"ol-data-{stack_info.env_suffix}-data-integrator"}
                 ),
