@@ -849,7 +849,7 @@ heroku_vars = {
     "OLL_API_URL": "https://discovery.openlearninglibrary.mit.edu/api/v1/catalogs/1/courses/",
     "OLL_BASE_URL": "https://openlearninglibrary.mit.edu/course/",
     "OLL_LEARNING_COURSE_BUCKET_NAME": "ol-data-lake-landing-zone-production",
-    "OLL_LEARNING_COURSE_BUCKET_PREFIX": "open-learning-library/courses/",
+    "OLL_LEARNING_COURSE_BUCKET_PREFIX": "open-learning-library/courses",
     "OPENSEARCH_DEFAULT_TIMEOUT": 30,
     "OPENSEARCH_INDEXING_CHUNK_SIZE": 75,
     "QDRANT_COLLECTION_NAME": f"mitlearn-{stack_info.env_suffix}",
