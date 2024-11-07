@@ -338,7 +338,9 @@ ovs_database_security_group = ec2.SecurityGroup(
                 vault_stack.require_output("vault_server")["security_group"],
                 data_vpc["security_groups"]["integrator"],
             ],
-            cidr_blocks=[target_vpc["cidr"]],
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
+                lambda pod_cidrs: [*pod_cidrs, target_vpc["cidr"]]
+            ),
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,

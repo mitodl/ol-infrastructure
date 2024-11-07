@@ -147,6 +147,7 @@ if data_vpc_access_config.get_bool("create_privatelink_to_datavpc"):
                 from_port=1024,
                 to_port=1026,
                 security_groups=[data_vpc["security_groups"]["integrator"]],
+                cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
             ),
         ],
         egress=[],
