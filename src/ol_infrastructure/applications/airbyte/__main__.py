@@ -716,7 +716,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "secretsManager": {
                     "type": "awsSecretManager",
                     "awsSecretManager": {
-                        "region": "us-east-1",
+                        "region": aws_config.region,
                         "authenticationType": "instanceProfile",
                         "tags": [{"key": "OU", "value": "data"}],
                     },

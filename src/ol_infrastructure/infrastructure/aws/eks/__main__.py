@@ -225,7 +225,12 @@ cluster = eks.Cluster(
     # Ref: https://docs.aws.amazon.com/eks/latest/userguide/security-groups-pods-deployment.html
     # Ref: https://docs.aws.amazon.com/eks/latest/userguide/sg-pods-example-deployment.html
     vpc_cni_options=eks.cluster.VpcCniOptionsArgs(
-        configuration_values={"env": {"POD_SECURITY_GROUP_ENFORCING_MODE": "standard"}},
+        configuration_values={
+            "env": {
+                "POD_SECURITY_GROUP_ENFORCING_MODE": "standard",
+                "AWS_VPC_K8S_CNI_EXTERNALSNAT": "true",
+            }
+        },
         enable_pod_eni=eks_config.get_bool("pod_security_groups"),
         enable_prefix_delegation=eks_config.get_bool("pod_security_groups"),
         disable_tcp_early_demux=eks_config.get_bool("pod_security_groups"),
@@ -308,6 +313,7 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
             capacity_type="ON_DEMAND",
             cluster=cluster,
             enable_imd_sv2=True,
+            # disk_size=ng_config["disk_size_gb"] or 100,
             instance_types=ng_config["instance_types"],
             labels=ng_config["labels"] or {},
             node_group_name=f"{cluster_name}-managednodegroup-{ng_name}",
