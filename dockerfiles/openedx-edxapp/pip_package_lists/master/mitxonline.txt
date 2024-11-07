@@ -19,3 +19,4 @@ wheel==0.44.0
 # Experimental Plugins for AI features
 ai-coach-xblock
 learning-assistant
+ai-aside
