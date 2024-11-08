@@ -666,8 +666,7 @@ app_db_creds_dynamic_secret = OLVaultK8SSecret(
 
 default_resources_definition = {
     "limits": {
-        "cpu": "1000m",
-        "memory": "1Gi",
+        "memory": "8Gi",
     },
     "requests": {
         "cpu": "100m",
