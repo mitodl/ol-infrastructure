@@ -1,5 +1,7 @@
 import json
 import secrets
+import urllib.request
+from functools import partial
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
@@ -15,6 +17,23 @@ env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 keycloak_config = Config("keycloak")
 keycloak_realm_config = Config("keycloak_realm")
 setup_vault_provider()
+
+
+def fetch_realm_public_key(keycloak_url: str, realm_id: str) -> str:
+    with urllib.request.urlopen(f"{keycloak_url}/realms/{realm_id}/") as response:  # noqa: S310
+        public_key_url_response = json.load(response)
+    public_key = public_key_url_response["public_key"]
+    if public_key:
+        pem_lines = [
+            "-----BEGIN PUBLIC KEY-----",
+            public_key,
+            "-----END PUBLIC KEY-----",
+        ]
+        cert_pem = "\n".join(pem_lines)
+    else:
+        cert_pem = "No public key found"
+    return cert_pem
+
 
 # Create a Keycloak provider cause we ran into an issue with pulumi reading
 # config from stack definition.
@@ -649,6 +668,11 @@ ol_data_oidc_attribute_importer_identity_provider_mapper = (
     ),
 )
 
+fetch_realm_public_key_partial = partial(
+    fetch_realm_public_key,
+    keycloak_url,
+)
+
 # Check if any Openid clients exist in config and create them
 for openid_clients in keycloak_realm_config.get_object("openid_clients"):
     realm_name = openid_clients.get("realm_name")
@@ -670,6 +694,7 @@ for openid_clients in keycloak_realm_config.get_object("openid_clients"):
             valid_redirect_uris=urls,
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
         )
+
         vault.generic.Secret(
             f"{realm_name}-{client_name}-vault-oidc-credentials",
             path=f"secret-operations/sso/{client_name}",
@@ -685,6 +710,9 @@ for openid_clients in keycloak_realm_config.get_object("openid_clients"):
                 secret=secrets.token_urlsafe(),
                 realm_id=openid_client.realm_id,
                 realm_name=realm_name,
+                realm_public_key=openid_client.realm_id.apply(
+                    lambda realm_id: fetch_realm_public_key_partial(realm_id)
+                ),
             ).apply(json.dumps),
         )
         for role in client_detail[1:]:
