@@ -3,7 +3,7 @@ from string import Template
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, Output, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -15,10 +15,12 @@ from bridge.lib.magic_numbers import (
 from bridge.lib.versions import OPEN_METADATA_VERSION
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import (
+    OLEKKSPodSecurityGroup,
     OLEKSGateway,
     OLEKSGatewayConfig,
     OLEKSGatewayListenerConfig,
     OLEKSGatewayRouteConfig,
+    OLEKSPodSecurityGroupConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -79,6 +81,32 @@ aws_account = get_caller_identity()
 open_metadata_namespace = "open-metadata"
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(open_metadata_namespace, ns)
+)
+
+#        "vault_iam_role": Output.all(
+#            mitopen_vault_iam_role.backend, mitopen_vault_iam_role.name
+#        ).apply(lambda role: f"{role[0]}/roles/{role[1]}"),
+
+open_metadata_database_pod_security_group_config = Output.all(
+    k8s_pod_subnet_cidrs
+).apply(
+    lambda cidrs: OLEKSPodSecurityGroupConfig(
+        k8s_labels=k8s_global_labels,
+        namespace=open_metadata_namespace,
+        cluster_cidrs=cidrs,
+        cluster_security_group_id=cluster_stack.require_output("cluster_sg_id"),
+        description="Allows open_metadata pods to connect to their RDS instance.",
+        cluster_vpc_id=data_vpc["id"],
+        label_selectors={
+            "app.kubernetes.io/name": "openmetadata",
+        },
+        ingress_rules=[],
+        egress_rules=[],
+    )
+)
+open_metadata_database_pod_security_group = OLEKKSPodSecurityGroup(
+    name="open-metadata-database-pod-security-group",
+    psg_config=open_metadata_database_pod_security_group_config,
 )
 
 open_metadata_database_security_group = ec2.SecurityGroup(

@@ -11,8 +11,144 @@ from pydantic import (
     model_validator,
 )
 
+from bridge.lib.magic_numbers import DEFAULT_DNS_PORT
 from ol_infrastructure.lib.aws.iam_helper import oidc_trust_policy_template
 from ol_infrastructure.lib.ol_types import AWSBase
+
+
+class OLEKSPodSecurityGroupConfig(BaseModel):
+    cluster_cidrs: Union[list[str], list[pulumi.Output[str]]]
+    cluster_security_group_id: Union[str, pulumi.Output[str]]
+    cluster_vpc_id: Union[str, pulumi.Output[str]]
+    description: str
+    egress_rules: list[aws.vpc.SecurityGroupEgressRuleArgs] = []
+    ingress_rules: list[aws.vpc.SecurityGroupIngressRuleArgs] = []
+    k8s_labels: Optional[dict[str, str]]
+    label_selectors: dict[str, str]
+    namespace: str
+    tags: Optional[dict[str, str]] = {}
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
+class OLEKKSPodSecurityGroup(pulumi.ComponentResource):
+    SecurityGroupPolicy: kubernetes.apiextensions.CustomResource = None
+
+    def __init__(
+        self,
+        name: str,
+        psg_config: OLEKSPodSecurityGroupConfig,
+        opts: Optional[pulumi.ResourceOptions] = None,
+    ):
+        super().__init__(
+            "ol:infrastructure:aws:eks:OLEKSPodSecurityGroup",
+            name,
+            None,
+            opts,
+        )
+
+        pod_security_group = aws.ec2.SecurityGroup(
+            f"ol-eks-pod-security-group-{name}",
+            name=name,
+            description=psg_config.description,
+            vpc_id=psg_config.cluster_vpc_id,
+            tags=psg_config.tags,
+        )
+        self.security_group_name = pod_security_group.name
+        self.security_group_id = pod_security_group.id
+
+        # Loop through the ingress + egress args to create the application rules
+        for ingress_rule_args in psg_config.ingress_rules:
+            aws.vpc.SecurityGroupIngressRule(
+                "name",
+                args=ingress_rule_args,
+                opts=pulumi.ResourceOptions(
+                    parent=self, depends_on=[pod_security_group]
+                ).merge(opts),
+            )
+        for egress_rule_args in psg_config.egress_rules:
+            aws.vpc.SecurityGroupEgressRule(
+                "name",
+                args=egress_rule_args,
+                opts=pulumi.ResourceOptions(
+                    parent=self, depends_on=[pod_security_group]
+                ).merge(opts),
+            )
+        pulumi.info(str(psg_config.cluster_cidrs))
+        # Create the rest of the rules needed by every pod-security-group
+        # In theory, these two overlap each other?
+        for i, cluster_cidr in psg_config.cluster_cidrs:
+            aws.vpc.SecurityGroupIngressRule(
+                f"psg-ingress-rule-pod-sg-from-cluster-cidrs-{name}-{i}",
+                ip_protocol="-1",  # allows all protocols + all ports
+                security_group_id=pod_security_group.id,
+                cidr_ipv4=cluster_cidr,
+                opts=pulumi.ResourceOptions(
+                    parent=self, depends_on=[pod_security_group]
+                ).merge(opts),
+            )
+        aws.vpc.SecurityGroupIngressRule(
+            f"psg-ingress-rule-pod-sg-from-cluster-sg-{name}",
+            ip_protocol="-1",  # allows all protocols + all ports
+            security_group_id=pod_security_group.id,
+            referenced_security_group_id=psg_config.cluster_security_group_id,
+            opts=pulumi.ResourceOptions(
+                parent=self, depends_on=[pod_security_group]
+            ).merge(opts),
+        )
+        # default ALLOW ALL egress rule that pulumi doesn't create for us
+        aws.vpc.SecurityGroupEgressRule(
+            f"psg-egress-rule-allow-all-{name}",
+            security_group_id=pod_security_group.id,
+            ip_protocol="-1",
+            cidr_ipv4="0.0.0.0/0",
+            opts=pulumi.ResourceOptions(
+                parent=self, depends_on=[pod_security_group]
+            ).merge(opts),
+        )
+        # From this group to the cluster-sg for DNS
+        aws.vpc.SecurityGroupEgressRule(
+            f"psg-egress-rule-pod-sg-to-cluster-dns-tcp-{name}",
+            security_group_id=pod_security_group.id,
+            referenced_security_group_id=psg_config.cluster_security_group_id,
+            ip_protocol="tcp",
+            from_port=DEFAULT_DNS_PORT,
+            to_port=DEFAULT_DNS_PORT,
+            opts=pulumi.ResourceOptions(
+                parent=self, depends_on=[pod_security_group]
+            ).merge(opts),
+        )
+        aws.vpc.SecurityGroupEgressRule(
+            f"psg-egress-rule-pod-sg-to-cluster-dns-udp-{name}",
+            security_group_id=pod_security_group.id,
+            referenced_security_group_id=psg_config.cluster_security_group_id,
+            ip_protocol="udp",
+            from_port=DEFAULT_DNS_PORT,
+            to_port=DEFAULT_DNS_PORT,
+            opts=pulumi.ResourceOptions(
+                parent=self, depends_on=[pod_security_group]
+            ).merge(opts),
+        )
+
+        kubernetes.apiextensions.CustomResource(
+            "airbyte-data-integration-psg-attachment",
+            api_version="vpcresources.k8s.aws/v1beta1",
+            kind="SecurityGroupPolicy",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name="airbyte-data-ingest-security-group",
+                namespace=psg_config.namespace,
+                labels=psg_config.k8s_labels,
+            ),
+            spec={
+                "podSelector": {
+                    "matchLabels": psg_config.label_selectors,
+                },
+                "securityGroups": {"groupIds": [pod_security_group.id]},
+            },
+            opts=pulumi.ResourceOptions(
+                parent=self, depends_on=[pod_security_group], delete_before_replace=True
+            ).merge(opts),
+        )
 
 
 class OLEKSGatewayRouteConfig(BaseModel):
