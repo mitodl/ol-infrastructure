@@ -285,6 +285,7 @@ ocw_studio_vault_backend_role = vault.aws.SecretBackendRole(
     name="ovs-server",
     backend="aws-mitx",
     credential_type="iam_user",
+    iam_tags={"OU": "operations", "vault_managed": "True"},
     policy_arns=[
         policy_stack.require_output("iam_policies")["describe_instances"],
         ovs_server_policy.arn,
