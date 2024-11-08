@@ -163,7 +163,6 @@ edxapp_zone_id = edxapp_zone["id"]
 kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 kms_s3_key = kms_stack.require_output("kms_s3_data_analytics_key")
 operations_vpc = network_stack.require_output("operations_vpc")
-data_vpc = network_stack.require_output("data_vpc")
 mongodb_cluster_uri = mongodb_atlas_stack.require_output("atlas_cluster")[
     "connection_strings"
 ][0]
@@ -421,9 +420,9 @@ edxapp_db_security_group = ec2.SecurityGroup(
             ],
             # TODO: Create Vault security group to act as source of allowed  # noqa: FIX002, TD002, TD003
             # traffic. (TMM 2021-05-04)
-            cidr_blocks=[
-                edxapp_vpc["cidr"],
-            ],
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
+                lambda pod_cidrs: [*pod_cidrs, edxapp_vpc["cidr"]]
+            ),
             protocol="tcp",
             from_port=DEFAULT_MYSQL_PORT,
             to_port=DEFAULT_MYSQL_PORT,

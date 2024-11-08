@@ -173,6 +173,7 @@ bootcamps_db_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
             security_groups=[data_vpc["security_groups"]["integrator"]],
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
         ),
     ],
     tags=aws_config.merged_tags(
