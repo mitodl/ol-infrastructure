@@ -14,4 +14,4 @@ openedx-scorm-xblock>=18.0.0,<18.1.0
 pip==24.3.1
 social-auth-mitxpro==0.7.1
 uwsgi==2.0.28
-wheel==0.44.0
+wheel==0.45.0
