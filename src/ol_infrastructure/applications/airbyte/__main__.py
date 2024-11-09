@@ -744,16 +744,20 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             },
             "server": {
                 "enabled": True,
-                "replicaCount": 1,
+                "replicaCount": 2,
                 "podLabels": k8s_global_labels,
                 "resources": default_resources_definition,
                 "log": {
                     "level": "DEBUG",
                 },
+                "extraEnv": [  # How long to attempt new source schema discovery
+                    {"name": "HTTP_IDLE_TIMEOUT", "value": "20m"},
+                    {"name": "READ_TIMEOUT", "value": "30m"},
+                ],
             },
             "worker": {
                 "enabled": True,
-                "replicaCount": 1,
+                "replicaCount": 2,
                 "podLabels": k8s_global_labels,
                 "resources": default_resources_definition,
             },
