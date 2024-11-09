@@ -2,7 +2,7 @@ celery-redbeat==2.2.0  # Support for using Redis as the lock for Celery schedule
 django-redis==5.4.0
 edx-git-auto-export==0.3
 edx-sysadmin==0.3.0
-edx-username-changer==0.3.1
+edx-username-changer==0.3.2
 git+https://github.com/ubc/ubcpi.git@1.0.0#egg=ubcpi-xblock
 openedx-companion-auth
 nodeenv>=1.7.0
