@@ -11,22 +11,29 @@
 import base64
 import json
 import textwrap
+import os
 from pathlib import Path
 from typing import Any, Union
 
 import pulumi_consul as consul
 import pulumi_vault as vault
+import pulumi_kubernetes as kubernetes
 import yaml
-from pulumi import ResourceOptions, StackReference, export
+from pulumi import Resource, ResourceOptions, StackReference, config, export
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
+from bridge.lib.versions import DAGSTER_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
+    OLVaultK8SDynamicSecretConfig,
+    OLVaultK8SResources,
+    OLVaultK8SResourcesConfig,
+    OLVaultK8SSecret,
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes
@@ -39,23 +46,16 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
 stack_info = parse_stack()
+
+# Infra Stacks
 dns_stack = StackReference("infrastructure.aws.dns")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
 consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")
-mitodl_zone_id = dns_stack.require_output("odl_zone_id")
-data_vpc = network_stack.require_output("data_vpc")
-operations_vpc = network_stack.require_output("operations_vpc")
-dagster_environment = f"data-{stack_info.env_suffix}"
-aws_config = AWSBase(
-    tags={"OU": "data", "Environment": dagster_environment},
-)
-consul_provider = get_consul_provider(stack_info)
+cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
 
-consul_security_groups = consul_stack.require_output("security_groups")
-aws_account = get_caller_identity()
-
+# Application Stacks
 mitxonline_stack = StackReference(f"applications.edxapp.mitxonline.{stack_info.name}")
 mitxonline_mongodb_stack = StackReference(
     f"infrastructure.mongodb_atlas.mitxonline.{stack_info.name}"
@@ -68,6 +68,36 @@ xpro_mongodb_stack = StackReference(
     f"infrastructure.mongodb_atlas.xpro.{stack_info.name}"
 )
 
+# Misc Configuration Items
+mitodl_zone_id = dns_stack.require_output("odl_zone_id")
+data_vpc = network_stack.require_output("data_vpc")
+operations_vpc = network_stack.require_output("operations_vpc")
+dagster_environment = f"data-{stack_info.env_suffix}"
+aws_config = AWSBase(
+    tags={"OU": "data", "Environment": dagster_environment},
+)
+consul_provider = get_consul_provider(stack_info)
+
+consul_security_groups = consul_stack.require_output("security_groups")
+aws_account = get_caller_identity()
+
+k8s_global_labels = {
+    "pulumi_managed": "true",
+    "pulumi_stack": stack_info.full_name,
+    "ol.mit.edu/pulumi-stack": stack_info.full_name,
+    "app.kubernetes.io/name": "dagster",
+}
+k8s_provider = kubernetes.Provider(
+    "k8s-provider",
+    kubeconfig=cluster_stack.require_output("kube_config")
+)
+dagster_namespace = "dagster"
+
+VERSIONS = {
+    "DAGSTER_CHART": os.environ.get("DAGSTER_CHART_VERSION", DAGSTER_CHART_VERSION),
+}
+
+# IAM and S3 Permission Documents
 dagster_bucket_name = f"dagster-{dagster_environment}"
 s3_tracking_logs_buckets = [
     f"{edxapp_deployment}-{stack_info.env_suffix}-edxapp-tracking"
@@ -313,6 +343,7 @@ dagster_db_security_group = ec2.SecurityGroup(
     vpc_id=data_vpc["id"],
 )
 
+# RDS Instance
 rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["monitoring_profile_name"] = "disabled"
 
@@ -370,6 +401,8 @@ dagster_db_consul_service = Service(
     opts=consul_provider,
 )
 
+
+
 # Get the AMI ID for the dagster/docker-compose image
 dagster_image = ec2.get_ami(
     filters=[
@@ -402,6 +435,120 @@ vault.aws.AuthBackendRole(
     bound_account_ids=[aws_account.account_id],
     bound_vpc_ids=[data_vpc["id"]],
     token_policies=[dagster_server_vault_policy.name],
+)
+
+dagster_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    "dagster-k8s-vault-auth",
+    role_name="dagster",
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["*"],
+    bound_service_account_namespaces=[dagster_namespace],
+    toke_policies=[dagster_server_vault_policy.name],
+)
+
+dagster_service_account_name = "dagster"
+# TODO create a trust role
+
+# A dynamic secret for database credentials
+vault_k8s_resources_config = OLVaultK8SResourcesConfig(
+    application_name="dagster",
+    namespace=dagster_namespace,
+    labels=k8s_global_labels,
+    vault_address=get_config("vault:address"),
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    vault_auth_role_name=dagster_vault_k8s_auth_backend_role.role_name,
+)
+vault_k8s_resources = OLVaultK8SResources(
+    resource_config=vault_k8s_resources_config,
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[dagster_vault_k8s_auth_backend_role],
+    ),
+)
+db_creds_secret_name = "pgsql-db-creds"
+db_creds_secret_config = OLVaultK8SDynamicSecretConfig(
+    name="dagster-db-creds",
+    namespace=dagster_namespace,
+    dest_secret_labels=k8s_global_labels,
+    dest_secret_name=db_creds_secret_name,
+    labels=k8s_global_labels,
+    mount=dagster_db_vault_backend_config.mount_point,
+    path="creds/app",
+    # TODO restart_target_kind
+    # TODO restart_target_name
+    templates={
+        "DAGSTER_PG_USERNAME": '{{ get .Secrets "username" }}', # DAGSTER_PG_USERNAME
+        # helm chart insists on this keyname
+        "posgresql-password": '{{ get .Secrets "password" }}', # DAGSTER_PG_PASSWORD
+    },
+    vaultauth=vault_k8s_resources.auth_name,
+)
+db_creds_secret = OLVaultK8SSecret(
+    f"dagster-{stack_info.name}-db-creds-secret",
+    db_creds_secret_config,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        delete_before_replace=True,
+        depends_on=[vault_k8s_resources, dagster_vault_k8s_auth_backend_role],
+    ),
+)
+
+# Put not-sensitive secrets into a configuration map
+dagster_env_vars_configmap_name = "env-vars"
+dagster_env_vars_configmap = kubernetes.core.v1.ConfigMap(
+    "dagster-non-sensitive-env-vars-configmap",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=dagster_env_vars_configmap_name,
+        namespace=dagster_namespace,
+        labels=k8s_global_labels,
+    ),
+    immutable=False,
+    data={
+        "AWS_CONFIG_FILE": "/etc/aws/config",
+        "DAGSTER_PG_HOST": dagster_db.db_instance.address,
+        "DAGSTER_PG_DB_NAME": dagster_db_config.db_name,
+        "DAGSTER_BUCKET_NAME": f"dagster-data-{stack_info.env_suffix}",
+        "DAGSTER_ENVIRONMENT": stack_info.env_suffix,
+        "DAGSTER_HOSTNAME": get_config("dagster:domain"),
+    },
+    opts=ResourceOptions(provider=k8s_provider)
+)
+
+dagster_release = kubernetes.helm.v3.Release(
+    f"dagster-{stack_info.name}-application-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="dagster",
+        chart="dagster",
+        version=DAGSTER_CHART_VERSION,
+        namespace=dagster_namespace,
+        cleanup_on_fail=True,
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://dagster-io.github.io/helm",
+        ),
+        values={
+            "global": {
+                "postgresqlSecretName": db_creds_secret_name,
+                "serviceAccountName": dagster_service_account_name,
+            },
+            "dagsterWebserver": {
+                "replicas": 1,  # TODO change to 2
+                "enableReadOnly": False,
+                "envConfigMaps": [
+                    dagster_env_vars_configmap_name,
+                ],
+                "envSecrets": [
+                    db_creds_secret_name,
+                ],
+            },
+
+        },
+        skip_await=True,
+    )
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        depends_on=[dagster_db, db_creds_secret],
+        delete_before_replace=True,
+    ),
 )
 
 # Create the consul keys required by various pipeline configurations
