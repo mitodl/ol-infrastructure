@@ -400,6 +400,7 @@ vault.aws.SecretBackendRole(
     name="airbyte-sources",
     backend="aws-mitx",
     credential_type="iam_user",
+    iam_tags={"OU": "operations", "vault_managed": "True"},
     policy_arns=[s3_source_policy.arn],
 )
 

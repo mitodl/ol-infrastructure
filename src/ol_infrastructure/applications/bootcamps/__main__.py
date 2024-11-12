@@ -152,6 +152,7 @@ bootcamps_vault_backend_role = vault.aws.SecretBackendRole(
     name="bootcamps-app",
     backend="aws-mitx",
     credential_type="iam_user",
+    iam_tags={"OU": "operations", "vault_managed": "True"},
     policy_arns=[bootcamps_iam_policy.arn],
 )
 

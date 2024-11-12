@@ -273,6 +273,7 @@ class OLVaultAWSSecretsEngine(ComponentResource):
                 role_name,
                 backend=self.aws_secrets_engine.name,
                 credential_type=engine_config.credential_type,
+                iam_tags=engine_config.iam_tags,
                 name=role_name,
                 policy_document=json.dumps(policy),
                 opts=resource_options,

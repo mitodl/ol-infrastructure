@@ -124,6 +124,7 @@ mitxonline_vault_backend_role = vault.aws.SecretBackendRole(
     name="mitxonline",
     backend="aws-mitx",
     credential_type="iam_user",
+    iam_tags={"OU": "operations", "vault_managed": "True"},
     policy_arns=[mitxonline_iam_policy.arn],
 )
 

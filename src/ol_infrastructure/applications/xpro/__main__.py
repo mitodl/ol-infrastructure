@@ -146,6 +146,7 @@ xpro_vault_backend_role = vault.aws.SecretBackendRole(
     name="xpro-app",
     backend="aws-mitx",
     credential_type="iam_user",
+    iam_tags={"OU": "operations", "vault_managed": "True"},
     policy_arns=[xpro_iam_policy.arn],
 )
 

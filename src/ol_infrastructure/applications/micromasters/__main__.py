@@ -108,6 +108,7 @@ micromasters_vault_backend_role = vault.aws.SecretBackendRole(
     name="micromasters",
     backend="aws-mitx",
     credential_type="iam_user",
+    iam_tags={"OU": "operations", "vault_managed": "True"},
     policy_arns=[micromasters_iam_policy.arn],
 )
 

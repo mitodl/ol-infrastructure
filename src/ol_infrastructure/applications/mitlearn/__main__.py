@@ -321,6 +321,7 @@ mitopen_vault_iam_role = vault.aws.SecretBackendRole(
     name="ol-mitopen-application",
     backend="aws-mitx",
     credential_type="iam_user",
+    iam_tags={"OU": "operations", "vault_managed": "True"},
     policy_arns=[mitopen_iam_policy.arn],
 )
 

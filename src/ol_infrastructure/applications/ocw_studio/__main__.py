@@ -243,6 +243,7 @@ ocw_studio_vault_backend_role = vault.aws.SecretBackendRole(
     name=f"ocw-studio-app-{stack_info.env_suffix}",
     backend="aws-mitx",
     credential_type="iam_user",
+    iam_tags={"OU": "operations", "vault_managed": "True"},
     policy_arns=[ocw_studio_iam_policy.arn],
 )
 
