@@ -8,6 +8,7 @@ from ol_concourse.lib.models.pipeline import (
     Identifier,
     Input,
     Job,
+    LoadVarStep,
     Output,
     Pipeline,
     Platform,
@@ -28,7 +29,7 @@ pipeline_code = git_repo(
 )
 
 
-def build_meta_job(release_name):
+def build_meta_job(release_name: str):
     if release_name == "meta":
         pipeline_definition_path = (
             "src/ol_concourse/pipelines/infrastructure/eks_cluster/meta.py"
@@ -44,6 +45,37 @@ def build_meta_job(release_name):
     return Job(
         name=Identifier(f"create-eks-cluster-{release_name}-pipeline"),
         plan=[
+            # TaskStep to generate list of pulumi eks_cluster projects
+            GetStep(get=pipeline_code.name, trigger=True),
+            TaskStep(
+                task=Identifier("generate-eks-cluster-list"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    image_resource=AnonymousResource(
+                        type="registry-image",
+                        source={
+                            "repository": "mitodl/ol-infrastructure",
+                            "tag": "latest",
+                        },
+                    ),
+                    inputs=[Input(name=Identifier(pipeline_code.name))],
+                    outputs=[Output(name=Identifier("eks-cluster-list"))],
+                    run=Command(
+                        path="sh",
+                        dir=pipeline_code.name,
+                        user="root",
+                        args=[
+                            "-c",
+                            f"ls ${pipeline_code.name}/src/ol_concourse/pipelines/infrastructure/eks_cluster",  # noqa: E501
+                        ],
+                    ),
+                ),
+            ),
+            LoadVarStep(
+                file="eks-cluster-list/eks-cluster-list.yml",
+                vars=Identifier("eks_cluster_projects"),
+            ),
+            # LoadVars to load the YAML/JSON into the meta_jobs variable.
             GetStep(get=pipeline_code.name, trigger=True),
             TaskStep(
                 task=Identifier(f"generate-{release_name}-pipeline-definition"),
