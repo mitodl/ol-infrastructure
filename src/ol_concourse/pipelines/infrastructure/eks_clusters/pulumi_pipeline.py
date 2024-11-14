@@ -15,10 +15,10 @@ pulumi_job_fragment = pulumi_job(
     eks_cluster_code,
     stack_name="infrastructure.aws.eks",
     project_name="ol-infrastructure-infrastructure-aws-eks",
-    project_source_path=PULUMI_CODE_PATH.joinpath("substructure/xpro_partner_dns/"),
+    project_source_path=PULUMI_CODE_PATH.joinpath("substructure/aws/eks/"),
 )
 
-xpro_partner_dns_pipeline = Pipeline(
+eks_cluster_update_pipeline = Pipeline(
     resource_types=pulumi_job_fragment.resource_types,
     resources=[eks_cluster_code, *pulumi_job_fragment.resources],
     jobs=pulumi_job_fragment.jobs,
@@ -28,13 +28,13 @@ if __name__ == "__main__":
     import sys
 
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(xpro_partner_dns_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(xpro_partner_dns_pipeline.model_dump_json(indent=2))
+        definition.write(eks_cluster_update_pipeline.model_dump_json(indent=2))
+    sys.stdout.write(eks_cluster_update_pipeline.model_dump_json(indent=2))
     sys.stdout.writelines(
         [
             "\n",
             (
-                "fly -t <target> set-pipeline -p pulumi-xpro-partner-dns -c"
+                "fly -t <target> set-pipeline -p pulumi-eks-cluster-update -c"
                 " definition.json"
             ),
         ]

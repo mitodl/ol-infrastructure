@@ -73,7 +73,7 @@ def build_meta_job(release_name: str):
             ),
             LoadVarStep(
                 file="eks-cluster-list/eks-cluster-list.yml",
-                vars=Identifier("eks_cluster_projects"),
+                load_var=Identifier("eks_cluster_projects"),
             ),
             # LoadVars to load the YAML/JSON into the meta_jobs variable.
             GetStep(get=pipeline_code.name, trigger=True),
