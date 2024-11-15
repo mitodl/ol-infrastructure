@@ -108,7 +108,7 @@ def build_forum_pipeline(
                             f"{forum_dockerfile_repo.name}/dockerfiles/openedx-forum"
                         ),
                         "BUILD_ARG_DOCKER_IMAGE_TAG": "3.3-slim-bullseye"
-                        if release_name in ["master", "redwood"]
+                        if release_name != "quince"
                         else "3.0-slim-bullseye",
                         "BUILD_ARG_GEMFILE_FILE": "Gemfile"
                         if release_name in ["master", "redwood"]
