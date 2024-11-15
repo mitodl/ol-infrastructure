@@ -82,6 +82,7 @@ vault_traefik_k8s_resources_config = OLVaultK8SResourcesConfig(
 vault_traefik_k8s_resources = OLVaultK8SResources(
     resource_config=vault_traefik_k8s_resources_config,
     opts=ResourceOptions(
+        provider=k8s_provider,
         delete_before_replace=True,
         depends_on=[vault_traefik_auth_backend_role],
     ),
@@ -228,6 +229,7 @@ if cluster_stack.require_output("has_ebs_storage"):
     vault_vantage_k8s_resources = OLVaultK8SResources(
         resource_config=vault_vantage_k8s_resources_config,
         opts=ResourceOptions(
+            provider=k8s_provider,
             delete_before_replace=True,
             depends_on=[vault_vantage_auth_backend_role],
         ),
