@@ -1,5 +1,6 @@
-from ol_concourse.lib.jobs.infrastructure import pulumi_job
-from ol_concourse.lib.models.pipeline import Identifier, Pipeline
+from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
+from ol_concourse.lib.models.fragment import PipelineFragment
+from ol_concourse.lib.models.pipeline import Identifier
 from ol_concourse.lib.resources import git_repo
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH
 
@@ -11,18 +12,22 @@ eks_cluster_code = git_repo(
     ],
 )
 
-pulumi_job_fragment = pulumi_job(
-    eks_cluster_code,
-    stack_name="infrastructure.aws.eks",
-    project_name="ol-infrastructure-infrastructure-aws-eks",
-    project_source_path=PULUMI_CODE_PATH.joinpath("substructure/aws/eks/"),
-)
+pipeline_fragments = []
 
-eks_cluster_update_pipeline = Pipeline(
-    resource_types=pulumi_job_fragment.resource_types,
-    resources=[eks_cluster_code, *pulumi_job_fragment.resources],
-    jobs=pulumi_job_fragment.jobs,
-)
+for cluster in ["data", "operations"]:
+    stages = ["CI", "QA", "Production"]
+    temp_chain = pulumi_jobs_chain(
+        eks_cluster_code,
+        project_name="ol-infrastructure-eks",
+        project_source_path=PULUMI_CODE_PATH.joinpath("infrastructure/aws/eks"),
+        stack_names=[f"infrastructure.aws.eks.{cluster}.{stage}" for stage in stages],
+    )
+    pipeline_fragments.append(temp_chain)
+
+eks_cluster_update_pipeline = PipelineFragment.combine_fragments(
+    *pipeline_fragments
+).to_pipeline()
+eks_cluster_update_pipeline.resources.append(eks_cluster_code)
 
 if __name__ == "__main__":
     import sys
