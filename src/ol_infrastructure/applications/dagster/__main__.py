@@ -10,16 +10,16 @@
 
 import base64
 import json
-import textwrap
 import os
+import textwrap
 from pathlib import Path
 from typing import Any, Union
 
 import pulumi_consul as consul
-import pulumi_vault as vault
 import pulumi_kubernetes as kubernetes
+import pulumi_vault as vault
 import yaml
-from pulumi import Resource, ResourceOptions, StackReference, config, export
+from pulumi import ResourceOptions, StackReference, export
 from pulumi.config import get_config
 from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
 from pulumi_consul import Node, Service, ServiceCheckArgs
@@ -88,13 +88,12 @@ k8s_global_labels = {
     "app.kubernetes.io/name": "dagster",
 }
 k8s_provider = kubernetes.Provider(
-    "k8s-provider",
-    kubeconfig=cluster_stack.require_output("kube_config")
+    "k8s-provider", kubeconfig=cluster_stack.require_output("kube_config")
 )
 dagster_namespace = "dagster"
 
 VERSIONS = {
-    "DAGSTER_CHART": os.environ.get("DAGSTER_CHART_VERSION", DAGSTER_CHART_VERSION),
+    "DAGSTER_CHART": os.environ.get("DAGSTER_CHART_VERSION", DAGSTER_CHART_VERSION)
 }
 
 # IAM and S3 Permission Documents
@@ -337,7 +336,15 @@ dagster_db_security_group = ec2.SecurityGroup(
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
-        )
+        ),
+        ec2.SecurityGroupIngressArgs(
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
+            security_groups=[],
+            description="Allow k8s cluster ipblocks to talk to DB",
+            protocol="tcp",
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+        ),
     ],
     tags=aws_config.tags,
     vpc_id=data_vpc["id"],
@@ -402,7 +409,6 @@ dagster_db_consul_service = Service(
 )
 
 
-
 # Get the AMI ID for the dagster/docker-compose image
 dagster_image = ec2.get_ami(
     filters=[
@@ -443,7 +449,7 @@ dagster_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
     backend=cluster_stack.require_output("vault_auth_endpoint"),
     bound_service_account_names=["*"],
     bound_service_account_namespaces=[dagster_namespace],
-    toke_policies=[dagster_server_vault_policy.name],
+    token_policies=[dagster_server_vault_policy.name],
 )
 
 dagster_service_account_name = "dagster"
@@ -477,9 +483,9 @@ db_creds_secret_config = OLVaultK8SDynamicSecretConfig(
     # TODO restart_target_kind
     # TODO restart_target_name
     templates={
-        "DAGSTER_PG_USERNAME": '{{ get .Secrets "username" }}', # DAGSTER_PG_USERNAME
+        "postgresql-username": '{{ get .Secrets "username" }}',  # DAGSTER_PG_USERNAME
         # helm chart insists on this keyname
-        "posgresql-password": '{{ get .Secrets "password" }}', # DAGSTER_PG_PASSWORD
+        "postgresql-password": '{{ get .Secrets "password" }}',  # DAGSTER_PG_PASSWORD
     },
     vaultauth=vault_k8s_resources.auth_name,
 )
@@ -511,7 +517,7 @@ dagster_env_vars_configmap = kubernetes.core.v1.ConfigMap(
         "DAGSTER_ENVIRONMENT": stack_info.env_suffix,
         "DAGSTER_HOSTNAME": get_config("dagster:domain"),
     },
-    opts=ResourceOptions(provider=k8s_provider)
+    opts=ResourceOptions(provider=k8s_provider),
 )
 
 dagster_release = kubernetes.helm.v3.Release(
@@ -519,10 +525,12 @@ dagster_release = kubernetes.helm.v3.Release(
     kubernetes.helm.v3.ReleaseArgs(
         name="dagster",
         chart="dagster",
-        version=DAGSTER_CHART_VERSION,
+        # version="0.0.1-dev",
+        version=VERSIONS["DAGSTER_CHART"],
         namespace=dagster_namespace,
         cleanup_on_fail=True,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            # repo="https://ardiea.github.io/dagster/",
             repo="https://dagster-io.github.io/helm",
         ),
         values={
@@ -530,20 +538,102 @@ dagster_release = kubernetes.helm.v3.Release(
                 "postgresqlSecretName": db_creds_secret_name,
                 "serviceAccountName": dagster_service_account_name,
             },
+            "generatePostgresqlPasswordSecret": False,
+            "serviceAccount": {
+                "create": True,
+                "name": dagster_service_account_name,
+            },
             "dagsterWebserver": {
-                "replicas": 1,  # TODO change to 2
+                "image": {
+                    "tag": "1.9.1",
+                },
+                "replicaCount": 1,  # TODO change to 2
+                "labels": k8s_global_labels,
                 "enableReadOnly": False,
                 "envConfigMaps": [
-                    dagster_env_vars_configmap_name,
+                    {"name": dagster_env_vars_configmap_name},
                 ],
                 "envSecrets": [
-                    db_creds_secret_name,
+                    {
+                        "name": db_creds_secret_name,
+                    },
+                ],
+                "resources": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "128Mi",
+                    },
+                    "limits": {
+                        "cpu": "100m",
+                        "memory": "128Mi",
+                    },
+                },
+            },
+            "ingress": {
+                "enabled": False,
+            },
+            # https://github.com/dagster-io/dagster/blob/master/helm/dagster/values.yaml#L196-L249
+            "computeLogManager": {
+                "type": "NoOpComputeLogManager",
+            },
+            "dagsterDaemon": {
+                "image": {
+                    "tag": "1.9.1",
+                },
+                "enabled": True,
+            },
+            "retention": {
+                "enabled": True,
+            },
+            "scheduler": {
+                "type": "DagsterDaemonScheduler",
+                "config": {
+                    "daemonScheduler": {
+                        "maxCatchupRuns": 5,
+                        "maxTickRetries": 0,
+                    },
+                },
+            },
+            "postgresql": {
+                "enabled": False,
+                "postgresqlHost": dagster_db.db_instance.address,
+                "postgresqlDatabase": "dagster",
+            },
+            "dagster-user-deployments": {
+                "enabled": True,
+                "enableSubchart": True,
+                "deployments": [
+                    {
+                        "name": "k8s-example-user-code-1",
+                        "image": {
+                            "repository": "docker.io/dagster/user-code-example",
+                            "tag": "latest",
+                            "pullPolicy": "Always",
+                        },
+                        "dagsterApiGrpcArgs": [
+                            "--python-file",
+                            "/eample_project/example_repo/repo.py",
+                        ],
+                        "port": 3030,
+                        "includeConfigInLaunchedRuns": {
+                            "enabled": True,
+                        },
+                        "envConfigMaps": [
+                            {"name": dagster_env_vars_configmap_name},
+                        ],
+                        "envSecrets": [
+                            {
+                                "name": db_creds_secret_name,
+                            },
+                        ],
+                        # "labels": k8s_global_labels,
+                        # "selectorLabels": k8s_global_labels,
+                    },
                 ],
             },
-
         },
         skip_await=True,
-    )
+    ),
     opts=ResourceOptions(
         provider=k8s_provider,
         depends_on=[dagster_db, db_creds_secret],
