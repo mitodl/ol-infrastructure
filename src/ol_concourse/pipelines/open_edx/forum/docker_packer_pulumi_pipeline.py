@@ -111,7 +111,7 @@ def build_forum_pipeline(
                         if release_name != "quince"
                         else "3.0-slim-bullseye",
                         "BUILD_ARG_GEMFILE_FILE": "Gemfile"
-                        if release_name in ["master", "redwood"]
+                        if release_name != "quince"
                         else "Gemfile3",
                         "BUILD_ARG_OPENEDX_COMMON_VERSION": branch,
                         "BUILD_ARG_OPENEDX_FORUM_REPOSITORY": origin,
