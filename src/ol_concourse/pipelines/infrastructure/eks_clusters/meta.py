@@ -60,6 +60,12 @@ def build_meta_job(release_name: str):
                     ),
                     inputs=[Input(name=Identifier(pipeline_code.name))],
                     outputs=[Output(name=Identifier("eks-cluster-list"))],
+                    # This actually needs to be a Python script (Run from Command)
+                    # which iterates through the stack list, ordering by prefix.
+                    # Generating a dict of lists where the key is the prefix and
+                    # the value is the list of stacks.
+                    # data: ['infrastructure.aws.eks.data.CI','infrastructure.aws.eks.data.QA']
+                    # Output is directory. Inside dir write JSON file.
                     run=Command(
                         path="sh",
                         dir=pipeline_code.name,
@@ -72,7 +78,7 @@ def build_meta_job(release_name: str):
                 ),
             ),
             LoadVarStep(
-                file="eks-cluster-list/eks-cluster-list.yml",
+                file="eks-cluster-list/eks-cluster-list.json",
                 load_var=Identifier("eks_cluster_projects"),
             ),
             # LoadVars to load the YAML/JSON into the meta_jobs variable.
