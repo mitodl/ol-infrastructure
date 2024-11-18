@@ -45,6 +45,7 @@ aws_config = AWSBase(
 k8s_global_labels = {
     "pulumi_managed": "true",
     "pulumi_stack": stack_info.full_name,
+    "ol.mit.edu/stack": stack_info.full_name,
 }
 
 setup_vault_provider(stack_info)
@@ -385,7 +386,8 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                     "__meta_kubernetes_pod_label_app_kubernetes_io_name",
                     "__meta_kubernetes_pod_label_app_kubernetes_io_instance",
                 ]
-                regex = ";*([^;]+);*"
+                replacement = "$1"
+                regex = ";*([^;]+).*"
                 action = "replace"
                 target_label = "service"
               }}
@@ -437,7 +439,8 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                     "__meta_kubernetes_pod_label_ol_mit_edu_stack",
                     "__meta_kubernetes_pod_label_pulumi_stack",
                 ]
-                regex = ";([^;]+);"
+                replacement = "$1"
+                regex = ";*([^;]+).*"
                 action = "replace"
                 target_label = "stack"
               }}
@@ -533,36 +536,36 @@ alloy_release = kubernetes.helm.v3.Release(
                         },
                     },
                 ],
-                "serviceAccount": {
-                    "create": True,
-                    "additionalLabels": k8s_global_labels,
-                },
-                "configReloader": {
-                    "enabled": True,
-                    "resources": {
-                        "requests": {
-                            "memory": "10Mi",
-                            "cpu": "1m",
-                        },
-                        "limits": {
-                            "memory": "10Mi",
-                            "cpu": "1m",
-                        },
+            },
+            "serviceAccount": {
+                "create": True,
+                "additionalLabels": k8s_global_labels,
+            },
+            "configReloader": {
+                "enabled": True,
+                "resources": {
+                    "requests": {
+                        "memory": "10Mi",
+                        "cpu": "1m",
+                    },
+                    "limits": {
+                        "memory": "10Mi",
+                        "cpu": "1m",
                     },
                 },
-                "controller": {
-                    "type": "daemonset",
-                    "podLabels": k8s_global_labels,
-                },
-                "service": {
-                    "enabled": True,
-                },
-                "serviceMonitor": {
-                    "enabled": False,
-                },
-                "ingress": {
-                    "enabled": False,
-                },
+            },
+            "controller": {
+                "type": "daemonset",
+                "podLabels": k8s_global_labels,
+            },
+            "service": {
+                "enabled": True,
+            },
+            "serviceMonitor": {
+                "enabled": False,
+            },
+            "ingress": {
+                "enabled": False,
             },
         },
     ),
