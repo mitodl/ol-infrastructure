@@ -21,8 +21,7 @@ config:
       instance_types:
       - "m7a.4xlarge"
       labels:
-        ondemand: true
-        node_size: m7a.4xlarge
+        ol.mit.edu/worker-class: "core"
       disk_size_gb: 500
       scaling:
         desired: 3
