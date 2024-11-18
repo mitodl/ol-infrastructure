@@ -14,7 +14,7 @@ class OpenLearningOpenEdxDeployment(Enum):
         deployment_name="mitx",
         env_release_map=[
             EnvRelease("CI", OpenEdxSupportedRelease["sumac"]),
-            EnvRelease("QA", OpenEdxSupportedRelease["sumac"]),
+            EnvRelease("QA", OpenEdxSupportedRelease["redwood"]),
             EnvRelease("Production", OpenEdxSupportedRelease["redwood"]),
         ],
     )
