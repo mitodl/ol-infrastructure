@@ -6,6 +6,8 @@ services:
     - start
     - --spi-sticky-session-encoder-infinispan-should-attach-route=false
     - --spi-login-provider=ol-freemarker
+    - --http-enabled=true
+    - --hostname=${KC_URL}
     env_file:
     - ./.env
     labels:
