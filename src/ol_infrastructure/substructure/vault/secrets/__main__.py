@@ -12,6 +12,9 @@ stack_info = parse_stack()
 global_vault_secrets = read_yaml_secrets(
     Path(f"vault/secrets.{stack_info.env_suffix}.yaml")
 )
+grafana_vault_secrets = read_yaml_secrets(
+    Path(f"alloy/grafana.{stack_info.env_suffix}.yaml")
+)
 if Config("vault_server").get("env_namespace"):
     setup_vault_provider()
 
@@ -32,3 +35,10 @@ for key, data in global_vault_secrets.items():
         mount=global_vault_mount,
         data_json=json.dumps(data),
     )
+
+vault.kv.SecretV2(
+    f"grafana-vault-secrets-{stack_info.env_suffix}",
+    name="grafana",
+    mount=global_vault_mount,
+    data_json=json.dumps(grafana_vault_secrets),
+)
