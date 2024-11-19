@@ -88,6 +88,7 @@ consul_templates: list[ConsulTemplateTemplate] = []
 # Configure and install traefik
 traefik_static_config = traefik_static.TraefikStaticConfig(
     log=traefik_static.Log(format="json"),
+    accessLog=traefik_static.AccessLog(format="json"),
     providers=traefik_static.Providers(docker=traefik_static.Docker()),
     certificates_resolvers={
         "letsencrypt_resolver": traefik_static.CertificatesResolvers(
