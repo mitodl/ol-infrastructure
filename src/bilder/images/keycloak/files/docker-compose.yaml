@@ -26,6 +26,8 @@ services:
     image: traefik:v3.2
     command:
     - "--configFile=/etc/traefik/traefik.yaml"
+    environment:
+    - AWS_REGION=us-east-1
     labels:
     - "traefik.http.middlewares.keycloak-ratelimit.ratelimit.average=10"
     ports:
