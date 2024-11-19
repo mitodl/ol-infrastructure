@@ -26,6 +26,7 @@ from bridge.lib.versions import (
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.lib.aws.eks_helper import (
     core_node_affinity,
+    coredns_configuration_values,
     eks_versions,
     operations_toleration,
 )
@@ -195,6 +196,12 @@ cluster = eks.Cluster(
             kubernetes_groups=["admin"],
         )
     },
+    coredns_addon_options=eks.cluster.CoreDnsAddonOptionsArgs(
+        enabled=True,
+        resolve_conflicts_on_create=eks.ResolveConflictsOnCreate("NONE"),
+        resolve_conflicts_on_update=eks.ResolveConflictsOnUpdate("OVERWRITE"),
+        configuration_values=coredns_configuration_values,
+    ),
     authentication_mode=eks.AuthenticationMode("API"),
     create_oidc_provider=True,
     enabled_cluster_log_types=[

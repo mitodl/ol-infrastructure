@@ -46,6 +46,74 @@ core_node_affinity = {
     },
 }
 
+# Ref: https://aws-quickstart.github.io/cdk-eks-blueprints/addons/coredns/
+# Ref: https://repost.aws/knowledge-center/eks-managed-add-on
+# aws eks describe-addon-configuration --addon-name coredns --addon-version v1.11.3-eksbuild.2 --query configurationSchema --output text | jq  # noqa: E501
+coredns_configuration_values = {
+    "resources": {
+        "requests": {
+            "memory": "100Mi",
+            "cpu": "100m",
+        },
+        "limits": {
+            "memory": "100Mi",
+            "cpu": "100m",
+        },
+    },
+    "replicaCount": 3,
+    "affinity": {
+        "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                    {
+                        "matchExpressions": [
+                            {
+                                "key": "kubernetes.io/os",
+                                "operator": "In",
+                                "values": ["linux"],
+                            },
+                            {
+                                "key": "kubernetes.io/arch",
+                                "operator": "In",
+                                "values": ["amd64", "arm64"],
+                            },
+                            {
+                                "key": "ol.mit.edu/worker-class",
+                                "operator": "In",
+                                "values": ["core"],
+                            },
+                        ]
+                    }
+                ],
+            }
+        },
+        "podAntiAffinity": {
+            "preferredDuringSchedulingIgnoredDuringExecution": [
+                {
+                    "podAffinityTerm": {
+                        "labelSelector": {
+                            "matchExpressions": [
+                                {
+                                    "key": "k8s-app",
+                                    "operator": "In",
+                                    "values": ["kube-dns"],
+                                }
+                            ]
+                        },
+                        "topologyKey": "kubernetes.io/hostname",
+                    },
+                    "weight": 100,
+                }
+            ]
+        },
+    },
+    "tolerations": [
+        {"key": "CriticalAddonsOnly", "operator": "Exists"},
+        {"key": "node-role.kubernetes.io/master", "operator": "NoSchedule"},
+        {"key": "operations", "operator": "Exists"},
+    ],
+}
+
 
 def check_cluster_namespace(namespace: str, namespaces: list[str]):
     """Verify that a namespace is available in an EKS cluster.
