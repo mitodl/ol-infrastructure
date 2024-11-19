@@ -135,6 +135,7 @@ def vault_policy_document(vault_key_arn) -> dict[str, Any]:
                     "iam:PutUserPolicy",
                     "iam:AddUserToGroup",
                     "iam:RemoveUserFromGroup",
+                    "iam:TagUser",
                 ],
                 "Resource": ["arn:*:iam::*:user/vault-*", "arn:*:iam::*:group/*"],
             },
