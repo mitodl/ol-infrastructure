@@ -403,7 +403,7 @@ ol_apps_profile_client_scope = keycloak.openid.ClientScope(
     name="ol-profile",
     realm_id=ol_apps_realm.id,
 )
-
+"""
 ol_apps_user_email_optin_attribute_mapper = keycloak.openid.UserAttributeProtocolMapper(
     "email-optin-mapper",
     realm_id=ol_apps_realm.id,
@@ -412,6 +412,7 @@ ol_apps_user_email_optin_attribute_mapper = keycloak.openid.UserAttributeProtoco
     user_attribute="emailOptIn",
     claim_name="email_optin",
 )
+"""
 ol_apps_user_fullname_attribute_mapper = keycloak.openid.UserAttributeProtocolMapper(
     "fullname-mapper",
     realm_id=ol_apps_realm.id,
