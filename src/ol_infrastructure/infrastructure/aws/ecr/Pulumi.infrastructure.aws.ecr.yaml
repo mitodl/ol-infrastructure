@@ -1,0 +1,7 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygEjuqTUOwi505tTDy5+CMtWAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMz8uR2rkD1u7n6+XjAgEQgDt0E1a33szo5p7XYuOcfKasJQeJlxzukmQNCO4o4nJDc92Y6KSafFGEP/9AnZI25aXpgVUMK1T80Vi1Fg==
+config:
+  ecr:dockerhub_username: mitxdevops
+  ecr:dockerhub_password:
+    secure: v1:3wPyB0muuXLoVNN4:kh9FXyQ8nv6oZ5K+ePcGOExOcGe98NyevUSfqO6ElPrtw42wv6ZWZAYyBXtbolGeKyAEpQ==
