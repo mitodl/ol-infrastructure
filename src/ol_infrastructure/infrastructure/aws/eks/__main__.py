@@ -24,7 +24,11 @@ from bridge.lib.versions import (
     VAULT_SECRETS_OPERATOR_CHART_VERSION,
 )
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
-from ol_infrastructure.lib.aws.eks_helper import eks_versions
+from ol_infrastructure.lib.aws.eks_helper import (
+    core_node_affinity,
+    eks_versions,
+    operations_toleration,
+)
 from ol_infrastructure.lib.aws.iam_helper import (
     EKS_ADMIN_USERNAMES,
     IAM_POLICY_VERSION,
@@ -84,17 +88,6 @@ VERSIONS = {
     # K8S version is special, retrieve it from the AWS APIs
     "KUBERNETES": os.environ.get("KUBERNETES", eks_versions()[0]),
 }
-
-# A global toleration to allow operators to run on nodes tainted as
-# 'operations' if there are any present in the cluster
-operations_tolerations = [
-    {
-        "key": "operations",
-        "operator": "Equal",
-        "value": "true",
-        "effect": "NoSchedule",
-    },
-]
 
 aws_config = AWSBase(
     tags={
@@ -471,6 +464,19 @@ if eks_config.get_bool("ebs_csi_provisioner"):
             "throughput": "125",
             "encrypted": "true",
         },
+        # Ref: https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/parameters.md#volume-availability-zone-and-topologies
+        allowed_topologies=[
+            kubernetes.core.v1.TopologySelectorTermArgs(
+                match_label_expressions=[
+                    kubernetes.core.v1.TopologySelectorLabelRequirementArgs(
+                        key="topology.kubernetes.io/zone",
+                        # Possible bug introduced here if the number of subnets
+                        # is greater than the number of availablity zones
+                        values=target_vpc["k8s_pod_subnet_zones"],
+                    )
+                ],
+            ),
+        ],
         opts=ResourceOptions(
             provider=k8s_provider,
             depends_on=[ebs_csi_driver_role],
@@ -666,7 +672,10 @@ vault_secrets_operator = kubernetes.helm.v3.Release(
             },
             "controller": {
                 "replicas": 1,
-                "tolerations": operations_tolerations,
+                # Allowed to run on nodes tainted 'operations'
+                "tolerations": operations_toleration,
+                # Required to be scheduled on core nodes
+                "affinity": core_node_affinity,
                 "manager": {
                     "resources": {
                         "requests": {
@@ -829,8 +838,11 @@ traefik_helm_release = kubernetes.helm.v3.Release(
                 "pullPolicy": "Always",
             },
             "commonLabels": k8s_global_labels,
-            "tolerations": operations_tolerations,
-            # Debug the traefik by turning off "DaemonSet"
+            # Allowed to run on nodes tainted 'operations'
+            "tolerations": operations_toleration,
+            # Affinity should not be set because this is run as a daemonset
+            "affinity": {},
+            # More easily debug traefik by turning off "DaemonSet"
             # and setting "replcias": 1
             "deployment": {
                 "kind": "DaemonSet",
@@ -1011,7 +1023,10 @@ external_dns_release = (
                 },
                 "commonLabels": k8s_global_labels,
                 "podLabels": k8s_global_labels,
-                "tolerations": operations_tolerations,
+                # Allowed to run on nodes tainted 'operations'
+                "tolerations": operations_toleration,
+                # Required to be scheduled on core nodes
+                "affinity": core_node_affinity,
                 "serviceAccount": {
                     "create": True,
                     "name": "external-dns",
@@ -1166,7 +1181,10 @@ cert_manager_release = kubernetes.helm.v3.Release(
                 "commonLabels": k8s_global_labels,
             },
             "resources": default_cert_manager_resources,
-            "tolerations": operations_tolerations,
+            # Allowed to run on nodes tainted 'operations'
+            "tolerations": operations_toleration,
+            # Required to be scheduled on core nodes
+            "affinity": core_node_affinity,
             "replicaCount": 1,
             "enableCertificateOwnerRef": True,
             "prometheus": {
@@ -1179,11 +1197,17 @@ cert_manager_release = kubernetes.helm.v3.Release(
             },
             "webhook": {
                 "resources": default_cert_manager_resources,
-                "tolerations": operations_tolerations,
+                # Allowed to run on nodes tainted 'operations'
+                "tolerations": operations_toleration,
+                # Required to be scheduled on core nodes
+                "affinity": core_node_affinity,
             },
             "cainjector": {
                 "resources": default_cert_manager_resources,
-                "tolerations": operations_tolerations,
+                # Allowed to run on nodes tainted 'operations'
+                "tolerations": operations_toleration,
+                # Required to be scheduled on core nodes
+                "affinity": core_node_affinity,
             },
             "serviceAccount": {
                 "create": True,
@@ -1221,7 +1245,10 @@ metrics_server_release = kubernetes.helm.v3.Release(
         skip_await=False,
         values={
             "commonLabels": k8s_global_labels,
-            "tolerations": operations_tolerations,
+            # Allowed to run on nodes tainted 'operations'
+            "tolerations": operations_toleration,
+            # Required to be scheduled on core nodes
+            "affinity": core_node_affinity,
             "resources": {
                 "requests": {
                     "memory": "50Mi",

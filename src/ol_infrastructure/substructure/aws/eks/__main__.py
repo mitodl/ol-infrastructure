@@ -14,6 +14,9 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
+from ol_infrastructure.lib.aws.eks_helper import (
+    operations_toleration,
+)
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -260,6 +263,7 @@ if cluster_stack.require_output("has_ebs_storage"):
         ),
     )
 
+    # Ref: https://github.com/vantage-sh/helm-charts/blob/main/charts/vantage-kubernetes-agent/values.yaml
     vantage_k8s_agent_release = kubernetes.helm.v3.Release(
         f"{cluster_name}-vantage-k8s-agent-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
@@ -287,6 +291,15 @@ if cluster_stack.require_output("has_ebs_storage"):
                         "ebs_storageclass"
                     ),
                 },
+                # Allowed to run on nodes tainted 'operations'
+                "tolerations": operations_toleration,
+                # ~Required to be scheduled on core nodes~
+                # Disabled due to K8S bug below
+                # It is special because it is a StatefulSet
+                # This isn't that important, we can let it run anywhere.
+                # https://github.com/kubernetes/kubernetes/issues/112609
+                #
+                # "affinity": core_node_affinity,  # noqa: ERA001
                 "resources": {
                     "requests": {
                         "cpu": "100m",
@@ -340,6 +353,7 @@ alloy_env_vars_static_secret = OLVaultK8SSecret(
     ),
 )
 
+# Ref: https://grafana.com/docs/alloy/latest/configure/
 alloy_configmap_name = "alloy-config"
 alloy_configmap = kubernetes.core.v1.ConfigMap(
     f"{cluster_name}-grafana-alloy-configmap",
@@ -507,6 +521,7 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
     ),
 )
 
+# Ref: https://github.com/grafana/alloy/blob/main/operations/helm/charts/alloy/values.yaml
 alloy_release = kubernetes.helm.v3.Release(
     f"{cluster_name}-grafana-alloy-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
@@ -557,6 +572,10 @@ alloy_release = kubernetes.helm.v3.Release(
             "controller": {
                 "type": "daemonset",
                 "podLabels": k8s_global_labels,
+                # Allowed to run on nodes tainted 'operations'
+                "tolerations": operations_toleration,
+                # Affinity should not be set because this is run as a daemonset
+                "affinity": {},
             },
             "service": {
                 "enabled": True,
@@ -576,3 +595,7 @@ alloy_release = kubernetes.helm.v3.Release(
         delete_before_replace=True,
     ),
 )
+
+############################################################
+# Install Karpenter to manage node groups automatically
+############################################################

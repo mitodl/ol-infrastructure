@@ -4,6 +4,48 @@ import boto3
 
 eks_client = boto3.client("eks")
 
+# A global toleration to allow operators to run on nodes that
+# are tainted 'operations' if there are any in the cluster
+#
+# Taints repel work, so no workload will be scheduled on a
+# node tainted as such UNLESS that workload has the
+# toleration below.
+operations_toleration = [
+    {
+        "key": "operations",
+        "operator": "Equal",
+        "value": "true",
+        "effect": "NoSchedule",
+    },
+]
+
+# A global node affinity to draw work towards nodes labeled
+# with ol.mit.edu/worker-class=core'
+#
+# Affinities attract work, so workloads configured with
+# this work MUST be scheduled on nodes that have this label.
+#
+# Other workloads may exist on these labeled nodes, as well.
+core_node_affinity = {
+    "nodeAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+            "labelSelector": [
+                {
+                    "matchExpressions": [
+                        {
+                            "key": "ol.mit.edu/worker-class",
+                            "operator": "In",
+                            "values": [
+                                "core",
+                            ],
+                        },
+                    ],
+                },
+            ]
+        },
+    },
+}
+
 
 def check_cluster_namespace(namespace: str, namespaces: list[str]):
     """Verify that a namespace is available in an EKS cluster.
