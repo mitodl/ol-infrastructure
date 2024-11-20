@@ -1,7 +1,7 @@
 ---
 services:
   keycloak:
-    image: mitodl/keycloak:${VERSION}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/keycloak:${VERSION}
     command:
     - start
     - --spi-sticky-session-encoder-infinispan-should-attach-route=false
@@ -23,7 +23,7 @@ services:
     volumes:
     - /etc/docker/compose/cache-ispn-jdbc-ping.xml:/opt/keycloak/conf/cache-ispn-jdbc-ping.xml:ro
   traefik:
-    image: traefik:v3.2
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/library/traefik:v3.2
     command:
     - "--configFile=/etc/traefik/traefik.yaml"
     environment:

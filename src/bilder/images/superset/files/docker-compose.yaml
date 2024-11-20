@@ -1,12 +1,12 @@
 ---
-x-superset-image: &superset-image mitodl/superset@${SUPERSET_IMAGE_SHA:-latest}
+x-superset-image: &superset-image 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/superset@${SUPERSET_IMAGE_SHA:-latest}
 x-superset-volumes: &superset-volumes
 - superset_home:/app/superset_home
 
 version: "3.8"
 services:
   traefik:
-    image: traefik:v3.2
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/librarytraefik:v3.2
     restart: unless-stopped
     command:
     - "--configFile=/etc/traefik/traefik.yaml"

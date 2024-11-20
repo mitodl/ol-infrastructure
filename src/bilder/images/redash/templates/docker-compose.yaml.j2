@@ -30,7 +30,7 @@
 version: "2.2"
 services:
   server:
-    image: mitodl/redash:{{ context.redash_version }}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/redash:{{ context.redash_version }}
     env_file:
     - ./.env
     restart: unless-stopped
@@ -42,7 +42,7 @@ services:
     environment:
       REDASH_WEB_WORKERS: {{ context.web_worker_count }}
   scheduler:
-    image: mitodl/redash:{{ context.redash_version }}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/redash:{{ context.redash_version }}
     env_file:
     - ./.env
     profiles:
@@ -50,7 +50,7 @@ services:
     restart: unless-stopped
     command: scheduler
   rq_worker:
-    image: mitodl/redash:{{ context.redash_version }}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/redash:{{ context.redash_version }}
     env_file:
     - ./.env
     profiles:
@@ -61,7 +61,7 @@ services:
       QUEUES: "periodic emails default"
       WORKERS_COUNT: {{ context.rq_worker_count }}
   scheduled_worker:
-    image: mitodl/redash:{{ context.redash_version }}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/redash:{{ context.redash_version }}
     env_file:
     - ./.env
     profiles:
@@ -72,7 +72,7 @@ services:
       QUEUES: "scheduled_queries,schemas"
       WORKERS_COUNT: {{ context.scheduled_worker_count }}
   adhoc_worker:
-    image: mitodl/redash:{{ context.redash_version }}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/redash:{{ context.redash_version }}
     env_file:
     - ./.env
     profiles:
@@ -83,7 +83,7 @@ services:
       QUEUES: "queries"
       WORKERS_COUNT: {{ context.adhoc_worker_count }}
   nginx:
-    image: pennlabs/shibboleth-sp-nginx:latest
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/pennlabs/shibboleth-sp-nginx:latest
     restart: unless-stopped
     depends_on:
     - server
