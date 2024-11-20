@@ -12,9 +12,6 @@ libjpeg-dev
 liblapack-dev
 libpng-dev
 libsqlite3-dev
-libxml2-dev
-libxmlsec1-dev
-libxmlsec1-openssl
 lynx
 ntp
 pkg-config
