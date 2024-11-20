@@ -2,7 +2,7 @@
 version: "3.7"
 services:
   traefik:
-    image: traefik:v3.2
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/library/traefik:v3.2
     container_name: traefik
     restart: unless-stopped
     command:
@@ -24,7 +24,7 @@ services:
     - "/etc/traefik/odl_wildcard.cert:/etc/traefik/star.odl.mit.edu.crt:ro"
     - "/etc/traefik/odl_wildcard.key:/etc/traefik/star.odl.mit.edu.key:ro"
   traefik-forward-auth:
-    image: thomseddon/traefik-forward-auth:2
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/thomseddon/traefik-forward-auth:2
     container_name: traefik-forward-auth
     restart: unless-stopped
     env_file:
@@ -35,7 +35,7 @@ services:
     - "traefik.http.middlewares.traefik-forward-auth.forwardauth.authResponseHeaders=X-Forwarded-User"
     - "traefik.http.services.traefik-forward-auth.loadbalancer.server.port=4181"
   app:
-    image: kodhive/leek
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/kodhive/leek
     labels:
     - "traefik.enable=true"
     - "traefik.http.routers.leek-web.tls=true"

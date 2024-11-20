@@ -3,7 +3,7 @@ version: "3.7"
 services:
   xqueue:
     container_name: xqueue
-    image: mitodl/xqueue:${OPENEDX_RELEASE}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/xqueue:${OPENEDX_RELEASE}
     environment:
     - XQUEUE_CFG=/etc/xqueue/xqueue.yaml
     ports:

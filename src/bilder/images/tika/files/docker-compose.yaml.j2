@@ -19,7 +19,7 @@ services:
   ## Apache Tika Server
   tika:
     # We can't use the antideluvian version we had as it's not docker compatible.
-    image: {{ context.DOCKER_REPO_NAME }}@{{ context.DOCKER_IMAGE_DIGEST }}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/{{ context.DOCKER_REPO_NAME }}@{{ context.DOCKER_IMAGE_DIGEST }}
     # Use custom script as entrypoint to go fetch models and setup recognisers
     restart: on-failure
     ports:
@@ -52,7 +52,7 @@ services:
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
   traefik:
-    image: traefik:v3.1
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/library/traefik:v3.1
     command:
     - "--configFile=/etc/traefik/traefik.yaml"
     env_file:
