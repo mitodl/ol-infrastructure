@@ -56,13 +56,17 @@ def _apt_install():
             "docker-ce-cli",
             "containerd.io",
             "docker-compose-plugin",
+            "amazon-ecr-credential-helper",
         ],
         update=add_apt_repo.changed,
     )
 
 
 @deploy("Deploy Docker")
-def deploy_docker(config: Optional[dict[str, Any]] = None):
+def deploy_docker(
+    daemon_config: Optional[dict[str, Any]] = None,
+    user_config: Optional[dict[str, Any]] = None,
+):
     if host.get_fact(DebPackages):
         _apt_install()
     else:
@@ -71,13 +75,23 @@ def deploy_docker(config: Optional[dict[str, Any]] = None):
             (msg),
         )
 
-    if config:
+    if daemon_config:
         with tempfile.NamedTemporaryFile("wt", delete=False) as daemon:
-            daemon.write(json.dumps(config, indent=4))
+            daemon.write(json.dumps(daemon_config, indent=4))
             files.put(
                 name="Upload the Docker daemon.json",
                 src=daemon.name,
                 dest="/etc/docker/daemon.json",
+            )
+
+    if user_config:
+        with tempfile.NamedTemporaryFile("wt", delete=False) as userconf:
+            userconf.write(json.dumps(user_config, indent=4))
+            files.put(
+                name="Upload the Docker user ~/.docker/config.json",
+                src=userconf.name,
+                dest="/root/.docker/config.json",
+                create_remote_dir=True,
             )
 
 
