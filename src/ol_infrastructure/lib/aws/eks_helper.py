@@ -13,8 +13,7 @@ eks_client = boto3.client("eks")
 operations_toleration = [
     {
         "key": "operations",
-        "operator": "Equal",
-        "value": "true",
+        "operator": "Exists",
         "effect": "NoSchedule",
     },
 ]
@@ -49,6 +48,7 @@ core_node_affinity = {
 # Ref: https://aws-quickstart.github.io/cdk-eks-blueprints/addons/coredns/
 # Ref: https://repost.aws/knowledge-center/eks-managed-add-on
 # aws eks describe-addon-configuration --addon-name coredns --addon-version v1.11.3-eksbuild.2 --query configurationSchema --output text | jq  # noqa: E501
+
 coredns_configuration_values = {
     "resources": {
         "requests": {
@@ -87,30 +87,15 @@ coredns_configuration_values = {
                 ],
             }
         },
-        "podAntiAffinity": {
-            "preferredDuringSchedulingIgnoredDuringExecution": [
-                {
-                    "podAffinityTerm": {
-                        "labelSelector": {
-                            "matchExpressions": [
-                                {
-                                    "key": "k8s-app",
-                                    "operator": "In",
-                                    "values": ["kube-dns"],
-                                }
-                            ]
-                        },
-                        "topologyKey": "kubernetes.io/hostname",
-                    },
-                    "weight": 100,
-                }
-            ]
-        },
     },
     "tolerations": [
-        {"key": "CriticalAddonsOnly", "operator": "Exists"},
-        {"key": "node-role.kubernetes.io/master", "operator": "NoSchedule"},
-        {"key": "operations", "operator": "Exists"},
+        {"key": "CriticalAddonsOnly", "operator": "Exists", "effect": "NoSchedule"},
+        {
+            "key": "node-role.kubernetes.io/master",
+            "operator": "Exists",
+            "effect": "NoSchedule",
+        },
+        {"key": "operations", "operator": "Exists", "effect": "NoSchedule"},
     ],
 }
 
