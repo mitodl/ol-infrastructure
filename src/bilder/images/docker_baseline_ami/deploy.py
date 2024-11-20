@@ -67,12 +67,14 @@ consul_template = ConsulTemplate(version=VERSIONS["consul_template"])
 hashicorp_products = [vault, consul, consul_template]
 install_hashicorp_products(hashicorp_products)
 
-docker_config = {
+daemon_config = {
     "log-driver": "json-file",
     "log-opts": {"max-size": "10m", "max-file": "3"},
 }
 
-deploy_docker(docker_config)
+user_config = {"credsStore": "ecr-login"}
+
+deploy_docker(daemon_config, user_config)
 
 if host.get_fact(HasSystemd):
     server.service(
