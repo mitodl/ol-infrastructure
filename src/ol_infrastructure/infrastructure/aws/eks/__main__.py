@@ -27,6 +27,7 @@ from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleC
 from ol_infrastructure.lib.aws.eks_helper import (
     core_node_affinity,
     coredns_configuration_values,
+    csi_driver_configuration_values,
     eks_versions,
     operations_toleration,
 )
@@ -492,6 +493,7 @@ if eks_config.get_bool("ebs_csi_provisioner"):
     aws_ebs_cni_driver_addon = eks.Addon(
         f"{cluster_name}-eks-addon-ebs-cni-driver-addon",
         cluster=cluster,
+        configuration_values=csi_driver_configuration_values,
         addon_name="aws-ebs-csi-driver",
         addon_version=VERSIONS["EBS_CSI_DRIVER"],
         service_account_role_arn=ebs_csi_driver_role.role.arn,
@@ -591,6 +593,7 @@ if eks_config.get_bool("efs_csi_provisioner"):
     aws_efs_cni_driver_addon = eks.Addon(
         f"{cluster_name}-eks-addon-efs-cni-driver-addon",
         cluster=cluster,
+        configuration_values=csi_driver_configuration_values,
         addon_name="aws-efs-csi-driver",
         addon_version=VERSIONS["EFS_CSI_DRIVER"],
         service_account_role_arn=efs_csi_driver_role.role.arn,

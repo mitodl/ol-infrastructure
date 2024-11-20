@@ -45,10 +45,23 @@ core_node_affinity = {
     },
 }
 
+# Only the EBS CSI driver supports affinities for the controller pod so
+# we use a node selector instead
+#
+# Ref: https://aws-quickstart.github.io/cdk-eks-blueprints/addons/coredns/
+# Ref: https://repost.aws/knowledge-center/eks-managed-add-on
+# Ref: aws eks describe-addon-configuration --addon-name aws-efs-csi-driver --addon-version v2.0.8-eksbuild.1 --query configurationSchema --output text | jq  # noqa: E501
+# Ref: aws eks describe-addon-configuration --addon-name aws-ebs-csi-driver --addon-version v1.36.0-eksbuild.1 --query configurationSchema --output text | jq  # noqa: E501
+csi_driver_configuration_values = {
+    "controller": {
+        "nodeSelector": {"ol.mit.edu/worker-class": "core"},
+        "tolerations": operations_toleration,
+    },
+}
+
 # Ref: https://aws-quickstart.github.io/cdk-eks-blueprints/addons/coredns/
 # Ref: https://repost.aws/knowledge-center/eks-managed-add-on
 # aws eks describe-addon-configuration --addon-name coredns --addon-version v1.11.3-eksbuild.2 --query configurationSchema --output text | jq  # noqa: E501
-
 coredns_configuration_values = {
     "resources": {
         "requests": {
@@ -95,7 +108,7 @@ coredns_configuration_values = {
             "operator": "Exists",
             "effect": "NoSchedule",
         },
-        {"key": "operations", "operator": "Exists", "effect": "NoSchedule"},
+        operations_toleration[0],
     ],
 }
 
