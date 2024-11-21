@@ -6,7 +6,7 @@ x-superset-volumes: &superset-volumes
 version: "3.8"
 services:
   traefik:
-    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/librarytraefik:v3.2
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/library/traefik:v3.2
     restart: unless-stopped
     command:
     - "--configFile=/etc/traefik/traefik.yaml"
