@@ -25,9 +25,9 @@ config:
         node_size: c7a.xlarge
       disk_size_gb: 500
       scaling:
-        desired: 3
+        desired: 4
         min: 2
-        max: 4
+        max: 5
       version:
       tags: {}
       taints: {}
