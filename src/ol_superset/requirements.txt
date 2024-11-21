@@ -6,5 +6,5 @@ flask-caching
 flask-oidc
 flask-openid
 hvac
-psycopg2
+psycopg2-binary
 redis
