@@ -48,10 +48,12 @@ install-deps:
   RUN cp /openedx/edx-platform/requirements/edx/base.txt /root/pip_package_lists/edx_base.txt
   RUN ls -l /root/pip_package_lists/
   RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_lists/edx_base.txt -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
-  RUN pip install --ignore-installed --no-warn-script-location --user --no-cache-dir -r /root/pip_package_overrides/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
   IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
     RUN pip uninstall --yes "edx-name-affirmation"
+    # This is a hack to address issues with lxml and xmlsec compatibilities with libxml2 (2024-11-21 TMM)
+    RUN pip uninstall --yes lxml
   END
+  RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_overrides/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
   WORKDIR /openedx/edx-platform
   ENV PATH /root/.local/bin:/openedx/nodeenv/bin:${PATH}
   ENV NPM_REGISTRY "https://registry.npmjs.org/"
