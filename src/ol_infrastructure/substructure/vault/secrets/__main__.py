@@ -70,6 +70,7 @@ if "QA" in stack_info.name:
         oidc_discovery_url=f"{keycloak_config.get("url")}/realms/ol-platform-engineering",
         oidc_client_id=keycloak_config.get("client_id"),
         oidc_client_secret=keycloak_config.get("client_secret"),
+        default_role="local-developer",
         opts=ResourceOptions(delete_before_replace=True),
     )
 
@@ -96,22 +97,7 @@ if "QA" in stack_info.name:
         ],
         bound_audiences=[f"{keycloak_config.get('client_id')}"],
         user_claim="sub",
-        oidc_scopes=["email profile"],
-        groups_claim="groups",
-        bound_claims_type="string",
-        bound_claims={"groups": "vault-admin"},
         role_type="oidc",
-    )
-
-    # Configure external group
-    local_dev_group = vault.identity.Group(
-        "local-dev-group",
-        name="external",
-        type="external",
-        policies=[local_developer_policy.name],
-        metadata={
-            "responsibility": "1",
-        },
     )
 
 vault.kv.SecretV2(
