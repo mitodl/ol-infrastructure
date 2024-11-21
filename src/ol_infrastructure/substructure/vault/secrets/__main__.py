@@ -92,7 +92,7 @@ if "QA" in stack_info.name:
             local_developer_policy.name,
         ],
         allowed_redirect_uris=[
-            f"{keycloak_config.get('url')}/realms/ol-platform-engineering",
+            "http://localhost:8250/oidc/callback",
             f"{vault_config.get('address')}/ui/vault/auth/oidc/oidc/callback",
         ],
         bound_audiences=[f"{keycloak_config.get('client_id')}"],
