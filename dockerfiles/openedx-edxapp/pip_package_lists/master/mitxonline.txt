@@ -20,6 +20,3 @@ wheel==0.45.0
 ai-coach-xblock
 learning-assistant
 ai-aside
-
-# Fix issues with lxml and xmlsec mismatches
-lxml==5.3.0 --force-reinstall --no-binary
