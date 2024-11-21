@@ -2,7 +2,6 @@
 x-superset-image: &superset-image 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/superset@${SUPERSET_IMAGE_SHA:-latest}
 x-superset-volumes: &superset-volumes
 - superset_home:/app/superset_home
-- vault:/var/vault
 
 version: "3.8"
 services:
@@ -81,4 +80,3 @@ services:
 volumes:
   superset_home:
     external: false
-  vault:
