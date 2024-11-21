@@ -1,6 +1,6 @@
 # ruff: noqa: E501
-import os
 import json
+import os
 import textwrap
 from pathlib import Path
 
@@ -13,6 +13,10 @@ from bridge.lib.versions import (
     GRAFANA_ALLOY_CHART_VERSION,
     KARPENTER_CHART_VERSION,
     VANTAGE_K8S_AGENT_CHART_VERSION,
+)
+from ol_infrastructure.components.aws.eks import (
+    OLEKSTrustRole,
+    OLEKSTrustRoleConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
@@ -614,210 +618,245 @@ alloy_release = kubernetes.helm.v3.Release(
 ############################################################
 # Install Karpenter to manage node groups automatically
 ############################################################
-aws_account_id = aws.get_caller_identity()
+aws_account = aws.get_caller_identity()
 karpenter_serviceaccount_name = "karpenter-admin"
 
-karpenter_policy_document = cluster_stack.require_output("node_role_arn").apply(lambda node_role_arn: json.dumps(
-    {
-        "Version": IAM_POLICY_VERSION,
-        "Statement": [
-            {
-                "Sid": "AllowScopedEC2InstanceAccessActions",
-                "Effect": "Allow",
-                "Action": [
-                    "ec2.RunInstances",
-                    "ec2:CreateFleet",
-                ],
-                "Resource": [
-                    f"arn:aws:ec2:{aws_config.region}::image/*",
-                    f"arn:aws:ec2:{aws_config.region}::snapshot/*",
-                    f"arn:aws:ec2:{aws_config.region}:*:security-group/*",
-                    f"arn:aws:ec2:{aws_config.region}:*:subnet/*",
-                ],
-            },
-            {
-                "Sid": "AllowScopedEC2LaunchTemplateAccessActions",
-                "Effect": "Allow",
-                "Action": ["ec2:RunInstances", "ec2:CreateFleet"],
-                "Resource": f"arn:aws:ec2:{aws_config.region}:*:launch-template/*",
-                "Condition": {
-                    "StringEquals": {
-                        f"aws:ResourceTag/kubernetes.io/cluster/{cluster_name}": "owned",
-                    },
-                    "StringLike": {"aws:ResourceTag/karpenter.sh/nodepool": "*"},
+karpenter_policy_document = cluster_stack.require_output("node_role_arn").apply(
+    lambda node_role_arn: json.dumps(
+        {
+            "Version": IAM_POLICY_VERSION,
+            "Statement": [
+                {
+                    "Sid": "AllowScopedEC2InstanceAccessActions",
+                    "Effect": "Allow",
+                    "Action": [
+                        "ec2:RunInstances",
+                        "ec2:CreateFleet",
+                    ],
+                    "Resource": [
+                        f"arn:aws:ec2:{aws_config.region}::image/*",
+                        f"arn:aws:ec2:{aws_config.region}::snapshot/*",
+                        f"arn:aws:ec2:{aws_config.region}:*:security-group/*",
+                        f"arn:aws:ec2:{aws_config.region}:*:subnet/*",
+                    ],
                 },
-            },
-            {
-                "Sid": "AllowScopedEC2InstanceActionsWithTags",
-                "Effect": "Allow",
-                "Resource": [
-                    f"arn:aws:ec2:{aws_config.region}:*:fleet/*",
-                    f"arn:aws:ec2:{aws_config.region}:*:instance/*",
-                    f"arn:aws:ec2:{aws_config.region}:*:volume/*",
-                    f"arn:aws:ec2:{aws_config.region}:*:network-interface/*",
-                    f"arn:aws:ec2:{aws_config.region}:*:launch-template/*",
-                    f"arn:aws:ec2:{aws_config.region}:*:spot-instances-request/*",
-                ],
-                "Action": [
-                    "ec2:RunInstances",
-                    "ec2:CreateFleet",
-                    "ec2:CreateLaunchTemplate",
-                ],
-                "Condition": {
-                    "StringEquals": {
-                        f"aws:RequestTag/kubernetes.io/cluster/{cluster_name}": "owned",
-                        "aws:RequestTag/eks:eks-cluster-name": cluster_name,
-                    },
-                    "StringLike": {"aws:RequestTag/karpenter.sh/nodepool": "*"},
-                },
-            },
-            {
-                "Sid": "AllowScopedResourceTagging",
-                "Effect": "Allow",
-                "Action": "ec2:CreateTags",
-                "Resource": f"arn:aws:ec2:{aws_config.region}:*:instance/*",
-                "Condition": {
-                    "StringEquals": {
-                        f"aws:ResourceTag/kubernetes.io/cluster/{cluster_name}": "owned"
-                    },
-                    "StringLike": {"aws:ResourceTag/karpenter.sh/nodepool": "*"},
-                    "StringEqualsIfExists": {
-                        "aws:RequestTag/eks:eks-cluster-name": cluster_name,
-                    },
-                    "ForAllValues:StringEquals": {
-                        "aws:TagKeys": [
-                            "eks:eks-cluster-name",
-                            "karpenter.sh/nodeclaim",
-                            "Name",
-                        ]
+                {
+                    "Sid": "AllowScopedEC2LaunchTemplateAccessActions",
+                    "Effect": "Allow",
+                    "Action": ["ec2:RunInstances", "ec2:CreateFleet"],
+                    "Resource": f"arn:aws:ec2:{aws_config.region}:*:launch-template/*",
+                    "Condition": {
+                        "StringEquals": {
+                            f"aws:ResourceTag/kubernetes.io/cluster/{cluster_name}": "owned",
+                        },
+                        "StringLike": {"aws:ResourceTag/karpenter.sh/nodepool": "*"},
                     },
                 },
-            },
-            {
-                "Sid": "AllowScopedDeletion",
-                "Effect": "Allow",
-                "Resource": [
-                    f"arn:aws:ec2:{aws_config.region}:*:instance/*",
-                    f"arn:aws:ec2:{aws_config.region}:*:launch-template/*",
-                ],
-                "Action": ["ec2:TerminateInstances", "ec2:DeleteLaunchTemplate"],
-                "Condition": {
-                    "StringEquals": {
-                        f"aws:ResourceTag/kubernetes.io/cluster/{cluster_name}": "owned"
-                    },
-                    "StringLike": {"aws:ResourceTag/karpenter.sh/nodepool": "*"},
-                },
-            },
-            {
-                "Sid": "AllowRegionalReadActions",
-                "Effect": "Allow",
-                "Resource": "*",
-                "Action": [
-                    "ec2:DescribeImages",
-                    "ec2:DescribeInstances",
-                    "ec2:DescribeInstanceTypeOfferings",
-                    "ec2:DescribeInstanceTypes",
-                    "ec2:DescribeLaunchTemplates",
-                    "ec2:DescribeSecurityGroups",
-                    "ec2:DescribeSpotPriceHistory",
-                    "ec2:DescribeSubnets",
-                ],
-                "Condition": {
-                    "StringEquals": {"aws:RequestedRegion": aws_config.region}
-                },
-            },
-            {
-                "Sid": "AllowSSMReadActions",
-                "Effect": "Allow",
-                "Resource": f"arn:aws:ssm:{aws_config.region}::parameter/aws/service/*",
-                "Action": "ssm:GetParameter",
-            },
-            {
-                "Sid": "AllowPricingReadActions",
-                "Effect": "Allow",
-                "Resource": "*",
-                "Action": "pricing:GetProducts",
-            },
-            {
-                "Sid": "AllowPassingInstanceRole",
-                "Effect": "Allow",
-                "Resource": node_role_arn,
-                "Action": "iam:PassRole",
-                "Condition": {
-                    "StringEquals": {
-                        "iam:PassedToService": ["ec2.amazonaws.com", "ec2.amazonaws.com.cn"]
-                    }
-                },
-            },
-            {
-                "Sid": "AllowScopedInstanceProfileCreationActions",
-                "Effect": "Allow",
-                "Resource": f"arn:aws:iam::{aws_account_id}:instance-profile/*",
-                "Action": ["iam:CreateInstanceProfile"],
-                "Condition": {
-                    "StringEquals": {
-                        f"aws:RequestTag/kubernetes.io/cluster/{cluster_name}": "owned",
-                        f"aws:RequestTag/eks:eks-cluster-name": cluster_name,
-                        f"aws:RequestTag/topology.kubernetes.io/region": aws_config.region,
-                    },
-                    "StringLike": {"aws:RequestTag/karpenter.k8s.aws/ec2nodeclass": "*"},
-                },
-            },
-            {
-                "Sid": "AllowScopedInstanceProfileTagActions",
-                "Effect": "Allow",
-                "Resource": f"arn:aws:iam::{aws_account_id}:instance-profile/*",
-                "Action": ["iam:TagInstanceProfile"],
-                "Condition": {
-                    "StringEquals": {
-                        f"aws:ResourceTag/kubernetes.io/cluster/{cluster_name}": "owned",
-                        "aws:ResourceTag/topology.kubernetes.io/region": aws_config.region,
-                        f"aws:RequestTag/kubernetes.io/cluster/{cluster_name}": "owned",
-                        "aws:RequestTag/eks:eks-cluster-name": cluster_name,
-                        "aws:RequestTag/topology.kubernetes.io/region": aws_config.region,
-                    },
-                    "StringLike": {
-                        "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass": "*",
-                        "aws:RequestTag/karpenter.k8s.aws/ec2nodeclass": "*",
+                {
+                    "Sid": "AllowScopedEC2InstanceActionsWithTags",
+                    "Effect": "Allow",
+                    "Resource": [
+                        f"arn:aws:ec2:{aws_config.region}:*:fleet/*",
+                        f"arn:aws:ec2:{aws_config.region}:*:instance/*",
+                        f"arn:aws:ec2:{aws_config.region}:*:volume/*",
+                        f"arn:aws:ec2:{aws_config.region}:*:network-interface/*",
+                        f"arn:aws:ec2:{aws_config.region}:*:launch-template/*",
+                        f"arn:aws:ec2:{aws_config.region}:*:spot-instances-request/*",
+                    ],
+                    "Action": [
+                        "ec2:RunInstances",
+                        "ec2:CreateFleet",
+                        "ec2:CreateLaunchTemplate",
+                    ],
+                    "Condition": {
+                        "StringEquals": {
+                            f"aws:RequestTag/kubernetes.io/cluster/{cluster_name}": "owned",
+                            "aws:RequestTag/eks:eks-cluster-name": cluster_name,
+                        },
+                        "StringLike": {"aws:RequestTag/karpenter.sh/nodepool": "*"},
                     },
                 },
-            },
-            {
-                "Sid": "AllowScopedInstanceProfileActions",
-                "Effect": "Allow",
-                "Resource": f"arn:aws:iam::{aws_account_id}:instance-profile/*",
-                "Action": [
-                    "iam:AddRoleToInstanceProfile",
-                    "iam:RemoveRoleFromInstanceProfile",
-                    "iam:DeleteInstanceProfile",
-                ],
-                "Condition": {
-                    "StringEquals": {
-                        f"aws:ResourceTag/kubernetes.io/cluster/f{cluster_name}": "owned",
-                        "aws:ResourceTag/topology.kubernetes.io/region": aws_config.region,
+                {
+                    "Sid": "AllowScopedResourceTagging",
+                    "Effect": "Allow",
+                    "Action": "ec2:CreateTags",
+                    "Resource": f"arn:aws:ec2:{aws_config.region}:*:instance/*",
+                    "Condition": {
+                        "StringEquals": {
+                            f"aws:ResourceTag/kubernetes.io/cluster/{cluster_name}": "owned"
+                        },
+                        "StringLike": {"aws:ResourceTag/karpenter.sh/nodepool": "*"},
+                        "StringEqualsIfExists": {
+                            "aws:RequestTag/eks:eks-cluster-name": cluster_name,
+                        },
+                        "ForAllValues:StringEquals": {
+                            "aws:TagKeys": [
+                                "eks:eks-cluster-name",
+                                "karpenter.sh/nodeclaim",
+                                "Name",
+                            ]
+                        },
                     },
-                    "StringLike": {"aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass": "*"},
                 },
-            },
-            {
-                "Sid": "AllowInstanceProfileReadActions",
-                "Effect": "Allow",
-                "Resource": f"arn:aws:iam::{aws_account_id}:instance-profile/*",
-                "Action": "iam:GetInstanceProfile",
-            },
-            {
-                "Sid": "AllowAPIServerEndpointDiscovery",
-                "Effect": "Allow",
-                "Resource": f"arn:aws:eks:{aws_config.region}:{aws_account_id}:cluster/{cluster_name}",
-                "Action": "eks:DescribeCluster",
-            },
-        ],
-    })
+                {
+                    "Sid": "AllowScopedDeletion",
+                    "Effect": "Allow",
+                    "Resource": [
+                        f"arn:aws:ec2:{aws_config.region}:*:instance/*",
+                        f"arn:aws:ec2:{aws_config.region}:*:launch-template/*",
+                    ],
+                    "Action": ["ec2:TerminateInstances", "ec2:DeleteLaunchTemplate"],
+                    "Condition": {
+                        "StringEquals": {
+                            f"aws:ResourceTag/kubernetes.io/cluster/{cluster_name}": "owned"
+                        },
+                        "StringLike": {"aws:ResourceTag/karpenter.sh/nodepool": "*"},
+                    },
+                },
+                {
+                    "Sid": "AllowRegionalReadActions",
+                    "Effect": "Allow",
+                    "Resource": "*",
+                    "Action": [
+                        "ec2:DescribeImages",
+                        "ec2:DescribeInstances",
+                        "ec2:DescribeInstanceTypeOfferings",
+                        "ec2:DescribeInstanceTypes",
+                        "ec2:DescribeLaunchTemplates",
+                        "ec2:DescribeSecurityGroups",
+                        "ec2:DescribeSpotPriceHistory",
+                        "ec2:DescribeSubnets",
+                    ],
+                    "Condition": {
+                        "StringEquals": {"aws:RequestedRegion": aws_config.region}
+                    },
+                },
+                {
+                    "Sid": "AllowSSMReadActions",
+                    "Effect": "Allow",
+                    "Resource": f"arn:aws:ssm:{aws_config.region}::parameter/aws/service/*",
+                    "Action": "ssm:GetParameter",
+                },
+                {
+                    "Sid": "AllowPricingReadActions",
+                    "Effect": "Allow",
+                    "Resource": "*",
+                    "Action": "pricing:GetProducts",
+                },
+                {
+                    "Sid": "AllowPassingInstanceRole",
+                    "Effect": "Allow",
+                    "Resource": node_role_arn,
+                    "Action": "iam:PassRole",
+                    "Condition": {
+                        "StringEquals": {
+                            "iam:PassedToService": [
+                                "ec2.amazonaws.com",
+                            ]
+                        }
+                    },
+                },
+                {
+                    "Sid": "AllowScopedInstanceProfileCreationActions",
+                    "Effect": "Allow",
+                    "Resource": f"arn:aws:iam::{aws_account.account_id}:instance-profile/*",
+                    "Action": ["iam:CreateInstanceProfile"],
+                    "Condition": {
+                        "StringEquals": {
+                            f"aws:RequestTag/kubernetes.io/cluster/{cluster_name}": "owned",
+                            "aws:RequestTag/eks:eks-cluster-name": cluster_name,
+                            "aws:RequestTag/topology.kubernetes.io/region": aws_config.region,
+                        },
+                        "StringLike": {
+                            "aws:RequestTag/karpenter.k8s.aws/ec2nodeclass": "*"
+                        },
+                    },
+                },
+                {
+                    "Sid": "AllowScopedInstanceProfileTagActions",
+                    "Effect": "Allow",
+                    "Resource": f"arn:aws:iam::{aws_account.account_id}:instance-profile/*",
+                    "Action": ["iam:TagInstanceProfile"],
+                    "Condition": {
+                        "StringEquals": {
+                            f"aws:ResourceTag/kubernetes.io/cluster/{cluster_name}": "owned",
+                            "aws:ResourceTag/topology.kubernetes.io/region": aws_config.region,
+                            f"aws:RequestTag/kubernetes.io/cluster/{cluster_name}": "owned",
+                            "aws:RequestTag/eks:eks-cluster-name": cluster_name,
+                            "aws:RequestTag/topology.kubernetes.io/region": aws_config.region,
+                        },
+                        "StringLike": {
+                            "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass": "*",
+                            "aws:RequestTag/karpenter.k8s.aws/ec2nodeclass": "*",
+                        },
+                    },
+                },
+                {
+                    "Sid": "AllowScopedInstanceProfileActions",
+                    "Effect": "Allow",
+                    "Resource": f"arn:aws:iam::{aws_account.account_id}:instance-profile/*",
+                    "Action": [
+                        "iam:AddRoleToInstanceProfile",
+                        "iam:RemoveRoleFromInstanceProfile",
+                        "iam:DeleteInstanceProfile",
+                    ],
+                    "Condition": {
+                        "StringEquals": {
+                            f"aws:ResourceTag/kubernetes.io/cluster/f{cluster_name}": "owned",
+                            "aws:ResourceTag/topology.kubernetes.io/region": aws_config.region,
+                        },
+                        "StringLike": {
+                            "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass": "*"
+                        },
+                    },
+                },
+                {
+                    "Sid": "AllowInstanceProfileReadActions",
+                    "Effect": "Allow",
+                    "Resource": f"arn:aws:iam::{aws_account.account_id}:instance-profile/*",
+                    "Action": "iam:GetInstanceProfile",
+                },
+                {
+                    "Sid": "AllowAPIServerEndpointDiscovery",
+                    "Effect": "Allow",
+                    "Resource": f"arn:aws:eks:{aws_config.region}:{aws_account.account_id}:cluster/{cluster_name}",
+                    "Action": "eks:DescribeCluster",
+                },
+            ],
+        }
+    )
+)
+
+karpenter_iam_policy = aws.iam.Policy(
+    "karpenter-iam-policy",
+    name_prefix=f"{cluster_name}-karpenter-policy-",
+    path=f"/ol-infrastructure/eks/{cluster_name}/",
+    policy=karpenter_policy_document,
 )
 
 karpenter_trust_role_config = OLEKSTrustRoleConfig(
+    account_id=aws_account.account_id,
+    cluster_name=cluster_name,
+    cluster_identities=cluster_stack.require_output("cluster_identities"),
+    description="Trust role for allowing the karpent service account to "
+    "access the aws API",
+    policy_operator="StringEquals",
+    role_name="karpenter",
+    service_account_identifier=f"system:serviceaccount:kube-system:{karpenter_serviceaccount_name}",
+    tags=aws_config.tags,
 )
 
+karpenter_trust_role = OLEKSTrustRole(
+    f"{cluster_name}-ol-karpenter-trust-role",
+    role_config=karpenter_trust_role_config,
+    opts=ResourceOptions(provider=k8s_provider),
+)
+
+aws.iam.RolePolicyAttachment(
+    f"{cluster_name}-karpenter-service-account-policy-attachment",
+    policy_arn=karpenter_iam_policy.arn,
+    role=karpenter_trust_role.role.id,
+)
 
 # Ref: https://karpenter.sh/docs/getting-started/getting-started-with-karpenter/
 # Ref: https://github.com/aws/karpenter-provider-aws/blob/main/charts/karpenter/values.yaml
@@ -825,13 +864,10 @@ karpenter_release = kubernetes.helm.v3.Release(
     f"{cluster_name}-karpenter-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
         name="karpenter",
-        chart="karpenter",
+        chart="oci://public.ecr.aws/karpenter/karpenter",
         version=VERSIONS["KARPENTER_VERSION"],
         # Ref: https://karpenter.sh/docs/getting-started/getting-started-with-karpenter/#preventing-apiserver-request-throttling
         namespace="kube-system",
-        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-            repo="oci://public.ecr.aws.karpenter/karpenter",
-        ),
         cleanup_on_fail=True,
         skip_await=True,
         values={
@@ -839,7 +875,6 @@ karpenter_release = kubernetes.helm.v3.Release(
             # Ref: https://github.com/aws/karpenter-provider-aws/blob/bbb499628ade784af2511d300c8ad3e15587fdca/charts/karpenter/values.yaml#L152
             "settings": {
                 "clusterName": cluster_name,
-                # "interruptionQueue": cluster_name,
                 "batchMaxDuration": "60s",
                 "batchIdleDuration": "10s",
                 "vmMemoryOverheadPercent": 0.075,
@@ -849,7 +884,11 @@ karpenter_release = kubernetes.helm.v3.Release(
             "serviceAccount": {
                 "create": True,
                 "name": karpenter_serviceaccount_name,
-                "annotations": {},
+                "annotations": {
+                    "eks.amazonaws.com/role-arn": karpenter_trust_role.role.arn.apply(
+                        lambda arn: f"{arn}"
+                    ),
+                },
             },
             "serviceMonitors": {
                 "enabled": False,
@@ -904,7 +943,8 @@ karpenter_release = kubernetes.helm.v3.Release(
                 },
                 "env": [
                     {
-                        "AWS_REGION": aws_config.region,
+                        "name": "AWS_REGION",
+                        "value": aws_config.region,
                     },
                 ],
             },
