@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 VAULT_URL = os.getenv("VAULT_ADDR", "https://127.0.0.1:8200")
 TOKEN_NONCE_PATH = os.getenv(
-    "VAULT_TOKEN_NONCE_PATH", "/etc/superset/.vault-token-meta-nonce"
+    "VAULT_TOKEN_NONCE_PATH", "/var/vault/.vault-token-meta-nonce"
 )
 EC2_METADATA_URL_BASE = "http://169.254.169.254"
 
