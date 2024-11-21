@@ -3,7 +3,6 @@ import sys
 from bridge.settings.openedx.accessors import filter_deployments_by_release
 from bridge.settings.openedx.types import DeploymentEnvRelease, OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
-
 from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
@@ -82,6 +81,9 @@ def build_codejail_pipeline(
                     ),
                     "BUILD_ARG_OPENEDX_BRANCH": openedx_branch,
                     "BUILD_ARG_PYTHON_VERSION": openedx_release.python_version,
+                    "BUILD_ARG_OPENEDX_RELEASE": release_name
+                    if release_name != "master"
+                    else "",
                 },
                 build_args=[
                     "-t $(cat ./codejail-release/commit_sha)",

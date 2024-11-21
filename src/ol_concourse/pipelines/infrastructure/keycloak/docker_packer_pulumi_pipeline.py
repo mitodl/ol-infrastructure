@@ -2,7 +2,6 @@ import sys
 import textwrap
 
 from bridge.lib.versions import KEYCLOAK_VERSION
-
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
@@ -21,7 +20,12 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resources import git_repo, github_release, registry_image
+from ol_concourse.lib.resources import (
+    git_repo,
+    github_release,
+    registry_image,
+    s3_object,
+)
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 
@@ -117,20 +121,10 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         repository="ol-keycloak",
     )
 
-    # Repo: https://github.com/mitodl/keycloak-scim
-    # Use: SCIM client to use Starburst integration
-    scim_spi = github_release(
-        name=Identifier("scim-spi"),
-        owner="mitodl",
-        repository="keycloak-scim",
-    )
-
-    # Repo: https://github.com/mitodl/keycloakify-starter
-    # Use: Keycloak Starter Theme
-    keycloakify_spi = github_release(
-        name=Identifier("keycloakify-spi"),
-        owner="mitodl",
-        repository="keycloakify-starter",
+    scim_plugin = s3_object(
+        name="scim_for_kecyloak",
+        bucket="ol-eng-artifacts",
+        object_regex=r"keycloak/scim-client/scim-for-keycloak-kc-(\d{2}-\d+\.\d+\.\d+)-enterprise.jar",
     )
 
     #############################################
@@ -145,8 +139,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
             GetStep(get=keycloak_customization_repo.name, trigger=True),
             GetStep(get=metrics_spi.name, trigger=True),
             GetStep(get=ol_spi.name, trigger=True),
-            GetStep(get=scim_spi.name, trigger=True),
-            GetStep(get=keycloakify_spi.name, trigger=True),
+            GetStep(get=scim_plugin.name, trigger=True),
             TaskStep(
                 task=Identifier("collect-artifacts-for-build-context"),
                 config=TaskConfig(
@@ -157,8 +150,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                         Input(name=cas_protocol_spi.name),
                         Input(name=metrics_spi.name),
                         Input(name=ol_spi.name),
-                        Input(name=scim_spi.name),
-                        Input(name=keycloakify_spi.name),
+                        Input(name=scim_plugin.name),
                     ],
                     image_resource=AnonymousResource(
                         type=REGISTRY_IMAGE,
@@ -175,8 +167,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                         cp -r {cas_protocol_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {metrics_spi.name}/* {image_build_context.name}/plugins/
                         cp -r {ol_spi.name}/* {image_build_context.name}/plugins/
-                        cp -r {scim_spi.name}/* {image_build_context.name}/plugins/
-                        cp -r {keycloakify_spi.name}/* {image_build_context.name}/plugins/
+                        cp -r {scim_plugin.name}/* {image_build_context.name}/plugins/
                         """  # noqa: E501
                             ),
                         ],
@@ -216,8 +207,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
             cas_protocol_spi,
             metrics_spi,
             ol_spi,
-            scim_spi,
-            keycloakify_spi,
+            scim_plugin,
         ],
         jobs=[docker_build_job],
     )

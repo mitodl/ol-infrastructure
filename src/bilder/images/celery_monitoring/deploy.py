@@ -3,14 +3,6 @@ import os
 from io import StringIO
 from pathlib import Path
 
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import (
-    CONSUL_TEMPLATE_VERSION,
-    CONSUL_VERSION,
-    TRAEFIK_VERSION,
-    VAULT_VERSION,
-)
-from bridge.secrets.sops import set_env_secrets
 from pyinfra.context import host
 from pyinfra.operations import files, server
 
@@ -63,6 +55,14 @@ from bilder.lib.template_helpers import (
     CONSUL_TEMPLATE_DIRECTORY,
     place_consul_template_file,
 )
+from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import (
+    CONSUL_TEMPLATE_VERSION,
+    CONSUL_VERSION,
+    TRAEFIK_VERSION,
+    VAULT_VERSION,
+)
+from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
@@ -86,7 +86,7 @@ set_env_secrets(Path("consul/consul.env"))
 consul_configuration = {
     Path("00-default.json"): ConsulConfig(
         addresses=ConsulAddresses(dns="127.0.0.1", http="127.0.0.1"),
-        advertise_addr='{{ GetInterfaceIP "ens5" }}',
+        advertise_addr="{{ GetPrivateIP }}",
     )
 }
 vector_config = VectorConfig(is_proxy=False)

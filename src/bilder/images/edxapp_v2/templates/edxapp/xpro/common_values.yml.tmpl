@@ -34,6 +34,7 @@ redis_cache_config: &redis_cache_config
     PASSWORD: {{ .Data.redis_auth_token }}
 SECRET_KEY: {{ .Data.django_secret_key }}
 JWT_AUTH:  # NEEDS ATTENTION
+    JWT_ALGORITHM: HS256
     JWT_AUDIENCE: xpro
     JWT_AUTH_COOKIE: {{ env "ENVIRONMENT"}}-edx-jwt-cookie
     JWT_AUTH_COOKIE_HEADER_PAYLOAD: {{ env "ENVIRONMENT" }}-edx-jwt-cookie-header-payload
@@ -342,7 +343,7 @@ FINANCIAL_REPORTS:
     BUCKET: null
     ROOT_PATH: sandbox
     STORAGE_TYPE: localfs
-FOOTER_ORGANIZATION_IMAGE: images/logo.png
+FOOTER_ORGANIZATION_IMAGE: /images/logo.png
 GITHUB_REPO_ROOT: /openedx/data
 GOOGLE_ANALYTICS_ACCOUNT: {{ key "edxapp/google-analytics-id" }}
 GRADES_DOWNLOAD:

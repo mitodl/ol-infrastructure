@@ -49,7 +49,7 @@ simple_services_combined_fragment = PipelineFragment(
 oneoff_resource_types = []
 oneoff_resources = []
 oneoff_jobs = []
-for service in ["dns", "policies"]:
+for service in ["dns", "policies", "iam"]:
     oneoff_pulumi_code = git_repo(
         name=Identifier(f"ol-infrastructure-pulumi-{service}"),
         uri="https://github.com/mitodl/ol-infrastructure",

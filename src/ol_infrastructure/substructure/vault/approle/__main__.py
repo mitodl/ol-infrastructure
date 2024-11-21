@@ -7,9 +7,10 @@ file names in the vault/policies folder.
 
 from pathlib import Path, PurePath
 
-from ol_infrastructure.lib.pulumi_helper import parse_stack
 from pulumi import Config, export
 from pulumi_vault import AuthBackend, Policy, approle
+
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 env_config = Config("environment")
 stack_info = parse_stack()
@@ -29,7 +30,7 @@ policy_folder = sorted(
 )
 for hcl_file in policy_folder:
     constituent_name = PurePath(hcl_file).stem
-    policy_file = open(hcl_file).read()  # noqa: PTH123, SIM115
+    policy_file = open(hcl_file).read()  # noqa: PTH123
     constituent_policy = Policy(constituent_name, policy=policy_file)
     constituent_approle = approle.AuthBackendRole(
         f"approle-{constituent_name}",

@@ -1,6 +1,12 @@
 import json
 
 import pulumi
+from pulumi_aws.ec2 import (
+    SecurityGroup,
+    SecurityGroupEgressArgs,
+    SecurityGroupIngressArgs,
+)
+
 from ol_infrastructure.components.aws.alb_fargate_service import (
     OLApplicationLoadBalancedFargateConfig,
     OLApplicationLoadBalancedFargateService,
@@ -12,11 +18,6 @@ from ol_infrastructure.lib.aws.ecs.task_definition_config import (
     OLFargateTaskDefinitionConfig,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
-from pulumi_aws.ec2 import (
-    SecurityGroup,
-    SecurityGroupEgressArgs,
-    SecurityGroupIngressArgs,
-)
 
 
 class PulumiMocks(pulumi.runtime.Mocks):

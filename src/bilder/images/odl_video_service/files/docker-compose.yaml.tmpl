@@ -2,7 +2,7 @@
 version: '2.1'
 services:
   nginx:
-    image: pennlabs/shibboleth-sp-nginx:latest
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/pennlabs/shibboleth-sp-nginx:latest
     volumes:
     - ${NGINX_CONFIG_FILE_PATH}:/etc/nginx/conf.d/odl-video.conf:ro
     - /etc/nginx/shib_fastcgi_params:/etc/nginx/shib_fastcgi_params:ro
@@ -24,7 +24,7 @@ services:
     links:
     - app
   init-app:
-    image: mitodl/ovs-app:${VERSION}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/ovs-app:${VERSION}
     env_file: .env
     command: >
       /bin/bash -c '
@@ -35,7 +35,7 @@ services:
     - /etc/docker/compose/staticfiles:/src/staticfiles:rw
     - /var/log:/var/log:rw
   app:
-    image: mitodl/ovs-app:${VERSION}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/ovs-app:${VERSION}
     env_file: .env
     ports:
     - "8087:8087"
@@ -51,7 +51,7 @@ services:
     - /etc/docker/compose/staticfiles:/src/staticfiles:rw
 
   celery:
-    image: mitodl/ovs-app:${VERSION}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/ovs-app:${VERSION}
     env_file: .env
     command: >
       /bin/bash -c '

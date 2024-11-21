@@ -4,6 +4,7 @@ from pathlib import Path
 import hvac
 import pulumi
 import pulumi_vault as vault
+
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import get_vault_provider

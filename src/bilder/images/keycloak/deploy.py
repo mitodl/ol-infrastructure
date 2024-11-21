@@ -2,17 +2,6 @@ import os
 from io import StringIO
 from pathlib import Path
 
-from bridge.lib.magic_numbers import (
-    KEYCLOAK_PROMETHEUS_METRICS_PORT,
-    VAULT_HTTP_PORT,
-)
-from bridge.lib.versions import (
-    CONSUL_TEMPLATE_VERSION,
-    CONSUL_VERSION,
-    KEYCLOAK_VERSION,
-    VAULT_VERSION,
-)
-from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files, server
 
@@ -60,6 +49,17 @@ from bilder.lib.template_helpers import (
     CONSUL_TEMPLATE_DIRECTORY,
     place_consul_template_file,
 )
+from bridge.lib.magic_numbers import (
+    KEYCLOAK_PROMETHEUS_METRICS_PORT,
+    VAULT_HTTP_PORT,
+)
+from bridge.lib.versions import (
+    CONSUL_TEMPLATE_VERSION,
+    CONSUL_VERSION,
+    KEYCLOAK_VERSION,
+    VAULT_VERSION,
+)
+from bridge.secrets.sops import set_env_secrets
 
 set_env_secrets(Path("consul/consul.env"))
 
@@ -88,6 +88,7 @@ consul_templates: list[ConsulTemplateTemplate] = []
 # Configure and install traefik
 traefik_static_config = traefik_static.TraefikStaticConfig(
     log=traefik_static.Log(format="json"),
+    accessLog=traefik_static.AccessLog(format="json"),
     providers=traefik_static.Providers(docker=traefik_static.Docker()),
     certificates_resolvers={
         "letsencrypt_resolver": traefik_static.CertificatesResolvers(
@@ -164,7 +165,7 @@ vault = Vault(
 consul_config = {
     Path("00-default.json"): ConsulConfig(
         addresses=ConsulAddresses(dns="127.0.0.1", http="127.0.0.1"),
-        advertise_addr='{{ GetInterfaceIP "ens5" }}',
+        advertise_addr="{{ GetPrivateIP }}",
         services=[],
     )
 }

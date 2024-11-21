@@ -3,9 +3,6 @@ import os
 from io import StringIO
 from pathlib import Path
 
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_VERSION, TRAEFIK_VERSION, VAULT_VERSION
-from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files, server
 
@@ -44,6 +41,9 @@ from bilder.components.vector.steps import (
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.ami_helpers import build_tags_document
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
+from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import CONSUL_VERSION, TRAEFIK_VERSION, VAULT_VERSION
+from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
@@ -52,6 +52,17 @@ VERSIONS = {
 }
 TEMPLATES_DIRECTORY = Path(__file__).parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).parent.joinpath("files")
+
+DOCKER_REPO_NAME = os.environ.get("DOCKER_REPO_NAME", "apache/tika")
+DOCKER_IMAGE_DIGEST = os.environ.get("DOCKER_IMAGE_DIGEST")
+
+# Preload the docker image
+server.shell(
+    name=f"Preload {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",
+    commands=[
+        f"/usr/bin/docker pull {DOCKER_REPO_NAME}@{DOCKER_IMAGE_DIGEST}",
+    ],
+)
 
 # Set up configuration objects
 set_env_secrets(Path("consul/consul.env"))
@@ -127,11 +138,15 @@ traefik_config = TraefikConfig(
 traefik_conf_directory = traefik_config.configuration_directory
 configure_traefik(traefik_config)
 
-files.put(
+files.template(
     name="Place the Tika docker-compose.yaml file",
-    src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml")),
+    src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml.j2")),
     dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
     mode="0664",
+    context={
+        "DOCKER_REPO_NAME": DOCKER_REPO_NAME,
+        "DOCKER_IMAGE_DIGEST": DOCKER_IMAGE_DIGEST,
+    },
 )
 
 vault_template_permissions(vault_config)

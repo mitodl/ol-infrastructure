@@ -10,11 +10,11 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
-from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
-from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
 from pulumi_aws import ec2, iam, s3
 
+from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -152,6 +152,7 @@ bootcamps_vault_backend_role = vault.aws.SecretBackendRole(
     name="bootcamps-app",
     backend="aws-mitx",
     credential_type="iam_user",
+    iam_tags={"OU": "operations", "vault_managed": "True"},
     policy_arns=[bootcamps_iam_policy.arn],
 )
 
@@ -173,6 +174,7 @@ bootcamps_db_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
             security_groups=[data_vpc["security_groups"]["integrator"]],
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
         ),
     ],
     tags=aws_config.merged_tags(

@@ -1,0 +1,12 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygF8fmvvVe5DNkr9Hl4T4PiAAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMfodeXfSUeEPLFSEjAgEQgDt5zX4veOhH9GAV44DHupAS/EzrD1q9rV7s8yk6n8sGXkr6d5MU5NvpKp+D3VcMPQs8s1Rxux9CiLKJhA==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-data-production.odl.mit.edu
+  open_metadata:db_instance_size: db.m7g.large
+  open_metadata:db_password:
+    secure: v1:VBuj1zz2MEIjzO11:fLVl43FJeZjj22hWk+XAslezaPQDliDPaEOtSbEaI5f8SoyPcBJB7dZcgIIXaWlEn/ucGE7zDSsxxQY=
+  open_metadata:domain: "data.ol.mit.edu"
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

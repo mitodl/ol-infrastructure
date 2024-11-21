@@ -9,17 +9,51 @@ from ol_infrastructure.lib.aws.iam_helper import (
 dns_stack = StackReference("infrastructure.aws.dns")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
-describe_instance_policy_document = {
+default_instance_policy_document = {
     "Version": "2012-10-17",
     "Statement": [
-        {"Effect": "Allow", "Action": "ec2:DescribeInstances", "Resource": "*"}
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:DescribeInstances",
+                "ecr:CreateRepository",
+                "ecr:BatchImportUpstreamImage",
+                "ecr:GetAuthorizationToken",
+            ],
+            "Resource": "*",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:GetRepositoryPolicy",
+                "ecr:DescribeRepositories",
+                "ecr:ListImages",
+                "ecr:DescribeImages",
+                "ecr:BatchGetImage",
+                "ecr:GetLifecyclePolicy",
+                "ecr:GetLifecyclePolicyPreview",
+                "ecr:ListTagsForResource",
+                "ecr:DescribeImageScanFindings",
+            ],
+            "Resource": ["arn:aws:ecr:*:*:repository/*"],
+        },
     ],
 }
-describe_instance_policy = iam.Policy(
+default_instance_policy = iam.Policy(
     "describe-ec2-instances-policy",
     name="describe-ec2-instances-policy",
     path="/ol-operations/describe-ec2-instances-policy/",
-    policy=lint_iam_policy(describe_instance_policy_document, stringify=True),
+    policy=lint_iam_policy(
+        default_instance_policy_document,
+        stringify=True,
+        parliament_config={
+            "CREDENTIALS_EXPOSURE": {
+                "ignore_locations": [{"actions": ["ecr:GetAuthorizationToken"]}]
+            },
+        },
+    ),
     description=(
         "Policy permitting EC2 describe instances capabilities for use with "
         "cloud auto-join systems."
@@ -82,7 +116,7 @@ create_cloudwatch_logs_policy = iam.Policy(
 
 
 export_dict = {
-    "describe_instances": describe_instance_policy.arn,
+    "describe_instances": default_instance_policy.arn,
     "cloudwatch_logging": create_cloudwatch_logs_policy.arn,
     "route53_odl_zone_records": odl_zone_route53_policy.arn,
 } | app_route53_policies

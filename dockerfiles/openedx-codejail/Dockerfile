@@ -1,6 +1,5 @@
-ARG PYTHON_VERSION=3.8
-# FROM python:${PYTHON_VERSION}-slim-bookworm
-FROM python:3.8-slim-bookworm
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim-bookworm
 SHELL ["/bin/bash", "-c"]
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -13,6 +12,8 @@ ENV CODEJAIL_SANDBOX_CALLER=debian
 ENV CODEJAIL_USER=sandbox
 ENV CODEJAIL_VENV=/sandbox/venv
 ARG OPENEDX_BRANCH=master
+ARG OPENEDX_RELEASE
+ENV OPEN_EDX_RELEASE=$OPENEDX_RELEASE
 ENV OPEN_EDX_BRANCH=$OPENEDX_BRANCH
 
 RUN virtualenv -p python${PYTHON_VERSION} --always-copy $CODEJAIL_VENV
@@ -36,7 +37,7 @@ RUN git clone https://github.com/eduNEXT/codejailservice/ --branch main --depth 
 RUN pip install --no-cache-dir -r requirements/base.txt  && \
     pip install --no-cache-dir gunicorn && \
     source $CODEJAIL_VENV/bin/activate && \
-    pip install --no-cache-dir -r https://raw.githubusercontent.com/openedx/edx-platform/master/requirements/edx-sandbox/py38.txt  && \
+    pip install --no-cache-dir -r https://raw.githubusercontent.com/openedx/edx-platform/master/requirements/edx-sandbox/releases/${OPEN_EDX_RELEASE:-../base}.txt  && \
     deactivate
 
 # Setup sudoers file

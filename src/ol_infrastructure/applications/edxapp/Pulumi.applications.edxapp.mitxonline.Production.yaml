@@ -11,12 +11,15 @@ config:
   - ["content_tagging.disabled", "--create", "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone",
     "--staff", "--authenticated"]
-  - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--staff"]
+  - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
+  - ["discussions.pages_and_resources_mfe", "--create", "--everyone"]
   - ["grades.bulk_management", "--create", "--superusers", "--everyone", "--staff",
     "--authenticated"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
   - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
   - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
+  - ["notifications.enable_notifications", "--create", "--everyone"]
+  - ["notifications.enable_email_notifications", "--create", "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone",
     "--staff", "--authenticated"]
   - ["seo.enable_anonymous_courseware_access", "--create", "--superusers", "--staff",
@@ -26,6 +29,7 @@ config:
   edxapp:business_unit: mitxonline
   edxapp:db_password:
     secure: v1:Za4LI6RKfAW7jLJh:hlthF86wmGH6VSiBHgehE8mY11hDfOUK/uYZADbodhCVuS8RSXoCoHtrRrBDNMXunQmHLABw4SM=
+  edxapp:db_version: 10.11
   edxapp:dns_zone: mitxonline
   edxapp:domains:
     lms: courses.mitxonline.mit.edu
@@ -37,7 +41,7 @@ config:
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     communications: communications
-    course_authoring: course-authoring
+    authoring: authoring
     discussions: discuss
     gradebook: gradebook
     learning: learn

@@ -1,7 +1,6 @@
 import sys
 
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
-
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,

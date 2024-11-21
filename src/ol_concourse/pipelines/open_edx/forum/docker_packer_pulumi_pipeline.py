@@ -6,7 +6,6 @@ from bridge.settings.openedx.accessors import (
     filter_deployments_by_release,
 )
 from bridge.settings.openedx.types import DeploymentEnvRelease
-
 from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
@@ -109,10 +108,10 @@ def build_forum_pipeline(
                             f"{forum_dockerfile_repo.name}/dockerfiles/openedx-forum"
                         ),
                         "BUILD_ARG_DOCKER_IMAGE_TAG": "3.3-slim-bullseye"
-                        if release_name in ["master", "redwood"]
+                        if release_name != "quince"
                         else "3.0-slim-bullseye",
                         "BUILD_ARG_GEMFILE_FILE": "Gemfile"
-                        if release_name in ["master", "redwood"]
+                        if release_name != "quince"
                         else "Gemfile3",
                         "BUILD_ARG_OPENEDX_COMMON_VERSION": branch,
                         "BUILD_ARG_OPENEDX_FORUM_REPOSITORY": origin,

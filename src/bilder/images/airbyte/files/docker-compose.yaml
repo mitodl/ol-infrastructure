@@ -8,7 +8,7 @@ x-logging: &default-logging
   driver: json-file
 services:
   traefik:
-    image: traefik:v3.1
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/library/traefik:v3.2
     container_name: traefik
     command:
     - "--configFile=/etc/traefik/traefik.yaml"
@@ -24,9 +24,8 @@ services:
     depends_on:
     - webapp
     - server
-    - airbyte-api-server
   traefik-forward-auth:
-    image: thomseddon/traefik-forward-auth:2
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/thomseddon/traefik-forward-auth:2
     container_name: traefik-forward-auth
     restart: unless-stopped
     env_file:
@@ -43,7 +42,7 @@ services:
     - server
     - traefik
   docker-proxy:
-    image: alpine/socat
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/alpine/socat
     command: -t 900 TCP-LISTEN:2375,fork,reuseaddr UNIX-CONNECT:/var/run/docker.sock
     ports:
     - "2375"
@@ -55,7 +54,7 @@ services:
   # hook in case we need to add init behavior
   # every root service (no depends_on) should depend on init
   init:
-    image: airbyte/init:${VERSION}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/airbyte/init:${VERSION}
     logging: *default-logging
     container_name: init
     command: /bin/sh -c "./scripts/create_mount_directories.sh /local_parent ${HACK_LOCAL_ROOT_PARENT}
@@ -68,7 +67,7 @@ services:
     volumes:
     - ${HACK_LOCAL_ROOT_PARENT}:/local_parent
   bootloader:
-    image: airbyte/bootloader:${VERSION}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/airbyte/bootloader:${VERSION}
     logging: *default-logging
     container_name: airbyte-bootloader
     environment:
@@ -94,7 +93,7 @@ services:
     env_file:
     - ./.env
   worker:
-    image: airbyte/worker:${VERSION}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/airbyte/worker:${VERSION}
     logging: *default-logging
     container_name: airbyte-worker
     restart: unless-stopped
@@ -107,9 +106,6 @@ services:
     - AIRBYTE_INSTALLATION_ID=${AIRBYTE_INSTALLATION_ID:-}
     - AIRBYTE_ROLE=${AIRBYTE_ROLE:-}
     - AIRBYTE_VERSION=${VERSION}
-    - APPLY_FIELD_SELECTION=${APPLY_FIELD_SELECTION}
-    - AUTO_DETECT_SCHEMA=${AUTO_DETECT_SCHEMA}
-    - AUTO_DISABLE_FAILING_CONNECTIONS=${AUTO_DISABLE_FAILING_CONNECTIONS}
     - CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION=${CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION:-}
     - CONFIG_DATABASE_PASSWORD=${CONFIG_DATABASE_PASSWORD:-}
     - CONFIG_DATABASE_URL=${CONFIG_DATABASE_URL:-}
@@ -124,7 +120,6 @@ services:
     - DD_DOGSTATSD_PORT=${DD_DOGSTATSD_PORT}
     - DOCKER_HOST=docker-proxy:2375
     - FEATURE_FLAG_CLIENT=${FEATURE_FLAG_CLIENT}
-    - FIELD_SELECTION_WORKSPACES=${FIELD_SELECTION_WORKSPACES}
     - INTERNAL_API_HOST=${INTERNAL_API_HOST}
     - JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION=${JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION:-}
     - JOB_ERROR_REPORTING_SENTRY_DSN=${JOB_ERROR_REPORTING_SENTRY_DSN}
@@ -138,20 +133,14 @@ services:
     - LOCAL_ROOT=${LOCAL_ROOT}
     - LOG_CONNECTOR_MESSAGES=${LOG_CONNECTOR_MESSAGES}
     - LOG_LEVEL=${LOG_LEVEL}
-    - MAX_CHECK_WORKERS=${MAX_CHECK_WORKERS}
-    - MAX_DISCOVER_WORKERS=${MAX_DISCOVER_WORKERS}
     - MAX_NOTIFY_WORKERS=${MAX_NOTIFY_WORKERS}
-    - MAX_SPEC_WORKERS=${MAX_SPEC_WORKERS}
+    - MAX_CHECK_WORKERS=${MAX_CHECK_WORKERS}
     - MAX_SYNC_WORKERS=${MAX_SYNC_WORKERS}
     - METRIC_CLIENT=${METRIC_CLIENT}
     - MICROMETER_METRICS_ENABLED=${MICROMETER_METRICS_ENABLED}
     - MICROMETER_METRICS_STATSD_FLAVOR=${MICROMETER_METRICS_STATSD_FLAVOR}
     - MICRONAUT_ENVIRONMENTS=${WORKERS_MICRONAUT_ENVIRONMENTS}
-    - MICRONAUT_SERVER_MAX_REQUEST_SIZE=15728640 # 15 Megabytes
-    - NORMALIZATION_JOB_MAIN_CONTAINER_CPU_LIMIT=${NORMALIZATION_JOB_MAIN_CONTAINER_CPU_LIMIT}
-    - NORMALIZATION_JOB_MAIN_CONTAINER_CPU_REQUEST=${NORMALIZATION_JOB_MAIN_CONTAINER_CPU_REQUEST}
-    - NORMALIZATION_JOB_MAIN_CONTAINER_MEMORY_LIMIT=${NORMALIZATION_JOB_MAIN_CONTAINER_MEMORY_LIMIT}
-    - NORMALIZATION_JOB_MAIN_CONTAINER_MEMORY_REQUEST=${NORMALIZATION_JOB_MAIN_CONTAINER_MEMORY_REQUEST}
+    - MICRONAUT_SERVER_MAX_REQUEST_SIZE=31457280 # 30 Megabytes
     - OTEL_COLLECTOR_ENDPOINT=${OTEL_COLLECTOR_ENDPOINT}
     - PUBLISH_METRICS=${PUBLISH_METRICS}
     - SECRET_PERSISTENCE=${SECRET_PERSISTENCE}
@@ -191,7 +180,7 @@ services:
       bootloader:
         condition: service_completed_successfully
   server:
-    image: airbyte/server:${VERSION}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/airbyte/server:${VERSION}
     logging: *default-logging
     container_name: airbyte-server
     restart: unless-stopped
@@ -200,7 +189,6 @@ services:
     - AIRBYTE_INSTALLATION_ID=${AIRBYTE_INSTALLATION_ID:-}
     - AIRBYTE_ROLE=${AIRBYTE_ROLE:-}
     - AIRBYTE_VERSION=${VERSION}
-    - AUTO_DETECT_SCHEMA=${AUTO_DETECT_SCHEMA}
     - CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION=${CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION:-}
     - CONFIG_DATABASE_PASSWORD=${CONFIG_DATABASE_PASSWORD:-}
     - CONFIG_DATABASE_URL=${CONFIG_DATABASE_URL:-}
@@ -227,8 +215,8 @@ services:
     - MAX_NOTIFY_WORKERS=5
     - MICROMETER_METRICS_ENABLED=${MICROMETER_METRICS_ENABLED}
     - MICROMETER_METRICS_STATSD_FLAVOR=${MICROMETER_METRICS_STATSD_FLAVOR}
-    - MICRONAUT_SERVER_MAX_REQUEST_SIZE=15728640 # 15 Megabytes
     - MICRONAUT_ENVIRONMENTS=${SERVER_MICRONAUT_ENVIRONMENTS}
+    - MICRONAUT_SERVER_MAX_REQUEST_SIZE=31457280 # 30 Megabytes
     - NEW_SCHEDULER=${NEW_SCHEDULER}
     - PUBLISH_METRICS=${PUBLISH_METRICS}
     - SECRET_PERSISTENCE=${SECRET_PERSISTENCE}
@@ -251,6 +239,16 @@ services:
     - JAVA_OPTS=${JAVA_OPTS}
     - CONTAINER_ORCHESTRATOR_JAVA_OPTS=${CONTAINER_ORCHESTRATOR_JAVA_OPTS}
     - DD_TRACE_AGENT_PORT=${DD_TRACE_AGENT_PORT}
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.middlewares.dagster-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
+    - "traefik.http.routers.dagster.middlewares=dagster-auth"
+    - "traefik.http.routers.dagster.rule=((Host(`airbyte.service.consul`) || Host(`config-${AIRBYTE_HOSTNAME}`))\
+      \ && PathPrefix(`/api`))"
+    - "traefik.http.services.dagster.loadbalancer.server.port=8001"
+    - "traefik.http.routers.dagster.tls=true"
+    - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
+    - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
     ports:
     - "8001"
     configs:
@@ -268,7 +266,7 @@ services:
     env_file:
     - ./.env
   webapp:
-    image: airbyte/webapp:${VERSION}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/airbyte/webapp:${VERSION}
     logging: *default-logging
     container_name: airbyte-webapp
     restart: unless-stopped
@@ -278,15 +276,16 @@ services:
     - KEYCLOAK_INTERNAL_HOST=localhost   # placeholder to ensure the webapp's nginx config is valid
     labels:
     - "traefik.enable=true"
-    - "traefik.http.middlewares.dagster-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
-    - "traefik.http.routers.dagster.middlewares=dagster-auth"
-    - "traefik.http.routers.dagster.rule=((Host(`airbyte.service.consul`) || Host(`config-${AIRBYTE_HOSTNAME}`))\
-      \ && PathPrefix(`/api/v1`))"
-    - "traefik.http.routers.dagster.tls=true"
+    - "traefik.http.middlewares.airbyte-api-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
+    - "traefik.http.routers.airbyte-api.middlewares=airbyte-api-auth"
+    - "traefik.http.routers.airbyte-api.rule=((Host(`airbyte-api.service.consul`)\
+      \ || Host(`api-${AIRBYTE_HOSTNAME}`)) && PathPrefix(`/v1`))"
+    - "traefik.http.routers.airbyte-api.tls=true"
     - "traefik.http.routers.public.middlewares=traefik-forward-auth"
     - "traefik.http.routers.public.rule=(Host(`${AIRBYTE_HOSTNAME}`) || Path(`/api/health`))"
     - "traefik.http.routers.public.service=public"
     - "traefik.http.routers.public.tls=true"
+    - "traefik.http.services.airbyte-api.loadbalancer.server.port=8080"
     - "traefik.http.services.public.loadbalancer.server.port=8080"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
     - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
@@ -298,7 +297,7 @@ services:
     env_file:
     - ./.env
   airbyte-temporal:
-    image: airbyte/temporal:${VERSION}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/airbyte/temporal:${VERSION}
     logging: *default-logging
     container_name: airbyte-temporal
     restart: unless-stopped
@@ -323,7 +322,7 @@ services:
     env_file:
     - ./.env
   airbyte-cron:
-    image: airbyte/cron:${VERSION}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/airbyte/cron:${VERSION}
     logging: *default-logging
     container_name: airbyte-cron
     restart: unless-stopped
@@ -344,7 +343,7 @@ services:
     - MICROMETER_METRICS_ENABLED=${MICROMETER_METRICS_ENABLED}
     - MICROMETER_METRICS_STATSD_FLAVOR=${MICROMETER_METRICS_STATSD_FLAVOR}
     - MICRONAUT_ENVIRONMENTS=${CRON_MICRONAUT_ENVIRONMENTS}
-    - MICRONAUT_SERVER_MAX_REQUEST_SIZE=15728640 # 15 Megabytes
+    - MICRONAUT_SERVER_MAX_REQUEST_SIZE=31457280 # 30 Megabytes
     - PUBLISH_METRICS=${PUBLISH_METRICS}
     - SEGMENT_WRITE_KEY=${SEGMENT_WRITE_KEY}
     - STATSD_HOST=${STATSD_HOST}
@@ -368,51 +367,8 @@ services:
         condition: service_completed_successfully
     env_file:
     - ./.env
-  airbyte-api-server:
-    image: airbyte/airbyte-api-server:${VERSION}
-    logging: *default-logging
-    container_name: airbyte-api-server
-    restart: unless-stopped
-    ports:
-    - "8006"
-    labels:
-    - "traefik.enable=true"
-    - "traefik.http.middlewares.airbyte-api-auth.basicauth.users=dagster:${DAGSTER_USER_PASS}"
-    - "traefik.http.middlewares.airbyte-api-prefix.stripprefix.prefixes=/api"
-    - "traefik.http.routers.airbyte-api.rule=((Host(`airbyte-api.service.consul`)\
-      \ || Host(`api-${AIRBYTE_HOSTNAME}`)) && PathPrefix(`/api/v1`))"
-    - "traefik.http.routers.airbyte-api.tls=true"
-    - "traefik.http.routers.airbyte-api.middlewares=airbyte-api-auth,airbyte-api-prefix"
-    - "traefik.http.services.airbyte-api.loadbalancer.server.port=8006"
-    - "traefik.tls.stores.OdlWildcard.defaultcertificate.certFile=/etc/traefik/star.odl.mit.edu.crt"
-    - "traefik.tls.stores.OdlWildcard.defaultcertificate.keyFile=/etc/traefik/star.odl.mit.edu.key"
-    environment:
-    - AIRBYTE_API_HOST=${AIRBYTE_API_HOST}
-    - AIRBYTE_VERSION=${VERSION}
-    - DEPLOYMENT_MODE=${DEPLOYMENT_MODE}
-    - INTERNAL_API_HOST=${INTERNAL_API_HOST}   # Non-ideal, but the existing URL can't have https:// added because it's used for nginx conf
-    - LOG_LEVEL=${LOG_LEVEL}
-    - MICROMETER_METRICS_ENABLED=${MICROMETER_METRICS_ENABLED}
-    - MICROMETER_METRICS_STATSD_FLAVOR=${MICROMETER_METRICS_STATSD_FLAVOR}
-    - SEGMENT_WRITE_KEY=${SEGMENT_WRITE_KEY}
-    - STATSD_HOST=${STATSD_HOST}
-    - STATSD_PORT=${STATSD_PORT}
-    - TRACKING_STRATEGY=${TRACKING_STRATEGY}
-    - DD_LOGS_INJECTION=${DD_LOGS_INJECTION}
-    - JAVA_OPTS=${JAVA_OPTS}
-    - CONTAINER_ORCHESTRATOR_JAVA_OPTS=${CONTAINER_ORCHESTRATOR_JAVA_OPTS}
-    - DD_DOGSTATSD_PORT=${DD_DOGSTATSD_PORT}
-    - DD_TRACE_AGENT_PORT=${DD_TRACE_AGENT_PORT}
-    - DD_AGENT_HOST=${DD_AGENT_HOST}
-    networks:
-    - airbyte_internal
-    depends_on:
-      bootloader:
-        condition: service_completed_successfully
-    env_file:
-    - ./.env
   airbyte-connector-builder-server:
-    image: airbyte/connector-builder-server:${VERSION}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/airbyte/connector-builder-server:${VERSION}
     logging: *default-logging
     container_name: airbyte-connector-builder-server
     restart: unless-stopped
@@ -446,7 +402,7 @@ services:
   # There is nothing listening at OTEL_COLLECTOR_ENDPOINT at the moment
   # but having the the reporter in place won't hurt anything.
   metrics-reporter:
-    image: airbyte/metrics-reporter:${VERSION}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/airbyte/metrics-reporter:${VERSION}
     container_name: metrics-reporter
     environment:
     - DATABASE_PASSWORD=${DATABASE_PASSWORD}

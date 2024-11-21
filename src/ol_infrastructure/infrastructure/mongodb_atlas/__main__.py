@@ -6,9 +6,9 @@ import pulumi
 import pulumi_aws as aws
 import pulumi_consul as consul
 import pulumi_mongodbatlas as atlas
+
 from bridge.lib.magic_numbers import DEFAULT_MONGODB_PORT
 from bridge.secrets.sops import read_yaml_secrets
-
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -147,6 +147,7 @@ if data_vpc_access_config.get_bool("create_privatelink_to_datavpc"):
                 from_port=1024,
                 to_port=1026,
                 security_groups=[data_vpc["security_groups"]["integrator"]],
+                cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
             ),
         ],
         egress=[],

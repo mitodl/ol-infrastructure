@@ -6,6 +6,7 @@ config:
   consul:address: https://consul-mitx-staging-qa.odl.mit.edu
   edxapp:waffle_flags:
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
+  - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_advanced_settings_page", "--create", "--superusers",
     "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_export_page", "--create", "--superusers",
@@ -48,7 +49,7 @@ config:
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     communications: communications
-    course_authoring: course-authoring
+    authoring: authoring
     gradebook: gradebook
     learner_dashboard: dashboard
     learning: learn

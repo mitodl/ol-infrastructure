@@ -14,6 +14,7 @@ mitxpro_legacy_dns_zone = route53.Zone(
     opts=mitxpro_legacy_opts,
 )
 
+
 odl_dns_name = "odl.mit.edu"
 odl_opts = zone_opts(odl_dns_name)
 odl_dns_zone = route53.Zone(
@@ -114,6 +115,7 @@ podcast_dns_zone = route53.Zone(
 
 export("mitxpro_legacy_zone_id", mitxpro_legacy_dns_zone.id)
 export("odl_zone_id", odl_dns_zone.id)
+export("odl", {"id": odl_dns_zone.id, "domain": odl_dns_zone.name})
 export("mitxonline", {"id": mitxonline_dns_zone.id, "domain": mitxonline_dns_zone.name})
 export("xpro", {"id": xpro_dns_zone.id, "domain": xpro_dns_zone.name})
 export("mitx", {"id": mitx_dns_zone.id, "domain": mitx_dns_zone.name})

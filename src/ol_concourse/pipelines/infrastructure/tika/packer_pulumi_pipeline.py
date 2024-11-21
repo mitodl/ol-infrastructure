@@ -39,6 +39,10 @@ tika_ami_fragment = packer_jobs(
     packer_template_path="src/bilder/images/tika/tika.pkr.hcl",
     node_types=["server"],
     extra_packer_params={"only": ["amazon-ebs.tika"]},
+    env_vars_from_files={
+        "DOCKER_REPO_NAME": f"{tika_docker_image.name}/repository",
+        "DOCKER_IMAGE_DIGEST": f"{tika_docker_image.name}/digest",
+    },
 )
 
 tika_pulumi_fragment = pulumi_jobs_chain(

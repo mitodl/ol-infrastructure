@@ -3,8 +3,8 @@ from typing import Union
 
 import pulumi
 import pulumi_consul as consul
-from bridge.secrets.sops import read_yaml_secrets
 
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 

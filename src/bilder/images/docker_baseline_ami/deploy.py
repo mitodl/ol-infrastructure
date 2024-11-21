@@ -1,9 +1,6 @@
 import os
 from pathlib import Path
 
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
-from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import apt, server
 
@@ -20,6 +17,9 @@ from bilder.components.hashicorp.vault.models import (
     VaultTCPListener,
 )
 from bilder.facts.has_systemd import HasSystemd
+from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import CONSUL_TEMPLATE_VERSION, CONSUL_VERSION, VAULT_VERSION
+from bridge.secrets.sops import set_env_secrets
 
 VERSIONS = {
     "consul": os.environ.get("CONSUL_VERSION", CONSUL_VERSION),
@@ -67,12 +67,14 @@ consul_template = ConsulTemplate(version=VERSIONS["consul_template"])
 hashicorp_products = [vault, consul, consul_template]
 install_hashicorp_products(hashicorp_products)
 
-docker_config = {
+daemon_config = {
     "log-driver": "json-file",
     "log-opts": {"max-size": "10m", "max-file": "3"},
 }
 
-deploy_docker(docker_config)
+user_config = {"credsStore": "ecr-login"}
+
+deploy_docker(daemon_config, user_config)
 
 if host.get_fact(HasSystemd):
     server.service(

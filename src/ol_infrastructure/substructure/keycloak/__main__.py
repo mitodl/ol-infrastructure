@@ -1,12 +1,15 @@
 import json
 import secrets
+import urllib.request
+from functools import partial
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
+from pulumi import Config, Output, ResourceOptions
+
 from bridge.lib.magic_numbers import SECONDS_IN_ONE_DAY
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
-from pulumi import Config, Output, ResourceOptions
 
 env_config = Config("environment")
 stack_info = parse_stack()
@@ -14,6 +17,23 @@ env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 keycloak_config = Config("keycloak")
 keycloak_realm_config = Config("keycloak_realm")
 setup_vault_provider()
+
+
+def fetch_realm_public_key(keycloak_url: str, realm_id: str) -> str:
+    with urllib.request.urlopen(f"{keycloak_url}/realms/{realm_id}/") as response:  # noqa: S310
+        public_key_url_response = json.load(response)
+    public_key = public_key_url_response["public_key"]
+    if public_key:
+        pem_lines = [
+            "-----BEGIN PUBLIC KEY-----",
+            public_key,
+            "-----END PUBLIC KEY-----",
+        ]
+        cert_pem = "\n".join(pem_lines)
+    else:
+        cert_pem = "No public key found"
+    return cert_pem
+
 
 # Create a Keycloak provider cause we ran into an issue with pulumi reading
 # config from stack definition.
@@ -159,8 +179,8 @@ ol_apps_realm = keycloak.Realm(
     attributes={
         "business_unit": f"operations-{env_name}",
     },
-    display_name="MIT Open",
-    display_name_html="<b>MIT Open</b>",
+    display_name="MIT Learn",
+    display_name_html="<b>MIT Learn</b>",
     enabled=True,
     email_theme="ol",
     login_theme="ol",
@@ -210,7 +230,7 @@ ol_apps_realm = keycloak.Realm(
             username=mailgun_email_username,
         ),
         from_=mailgun_email_username,
-        from_display_name="MIT Open",
+        from_display_name="MIT Learn",
         host=mailgun_email_host,
         port="465",
         ssl=True,
@@ -230,7 +250,7 @@ olapps_realm_events = keycloak.RealmEvents(
     events_expiration=SECONDS_IN_ONE_DAY,
     admin_events_enabled=True,
     admin_events_details_enabled=True,
-    events_listeners=["metrics-listener", "scim"],
+    events_listeners=["metrics-listener"],
     opts=resource_options,
 )
 
@@ -259,6 +279,147 @@ ol_apps_required_action_update_password = keycloak.RequiredAction(
     default_action=False,
     enabled=True,
     opts=resource_options,
+)
+
+ol_apps_user_profile = keycloak.RealmUserProfile(
+    "olapps-user-profile",
+    realm_id=ol_apps_realm.realm,
+    attributes=[
+        keycloak.RealmUserProfileAttributeArgs(
+            name="username",
+            display_name="${username}",
+            validators=[
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="length",
+                    config={"min": "3", "max": "255"},
+                ),
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="username-prohibited-characters", config={}
+                ),
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="up-username-not-idn-homograph", config={}
+                ),
+            ],
+            permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                views=["admin", "user"], edits=["admin", "user"]
+            ),
+        ),
+        keycloak.RealmUserProfileAttributeArgs(
+            name="email",
+            display_name="${email}",
+            validators=[
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="email",
+                    config={},
+                ),
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="length",
+                    config={"max": "255"},
+                ),
+            ],
+            required_for_roles=["user"],
+            permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                views=["admin", "user"], edits=["admin", "user"]
+            ),
+        ),
+        keycloak.RealmUserProfileAttributeArgs(
+            name="fullName",
+            display_name="${fullName}",
+            validators=[
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="length",
+                    config={"max": "512"},
+                ),
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="person-name-prohibited-characters", config={}
+                ),
+            ],
+            required_for_roles=["user"],
+            permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                views=["admin", "user"], edits=["admin", "user"]
+            ),
+        ),
+        keycloak.RealmUserProfileAttributeArgs(
+            name="firstName",
+            display_name="${firstName}",
+            group="legal-address",
+            validators=[
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="length",
+                    config={"max": "255"},
+                ),
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="person-name-prohibited-characters", config={}
+                ),
+            ],
+            required_for_roles=[],
+            permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                views=["admin", "user"], edits=["admin", "user"]
+            ),
+        ),
+        keycloak.RealmUserProfileAttributeArgs(
+            name="lastName",
+            display_name="${lastName}",
+            group="legal-address",
+            validators=[
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="length",
+                    config={"max": "255"},
+                ),
+                keycloak.RealmUserProfileAttributeValidatorArgs(
+                    name="person-name-prohibited-characters", config={}
+                ),
+            ],
+            required_for_roles=[],
+            permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                views=["admin", "user"], edits=["admin", "user"]
+            ),
+        ),
+        keycloak.RealmUserProfileAttributeArgs(
+            name="emailOptIn",
+            display_name="${emailOptIn}",
+            required_for_roles=[],
+            permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                views=["admin", "user"], edits=["admin", "user"]
+            ),
+        ),
+    ],
+    groups=[
+        keycloak.RealmUserProfileGroupArgs(
+            name="user-metadata",
+            display_header="User metadata",
+            display_description="Attributes, which refer to user metadata",
+        ),
+        keycloak.RealmUserProfileGroupArgs(
+            name="legal-address",
+            display_header="Legal Address",
+            display_description="User's legal address",
+        ),
+    ],
+)
+
+ol_apps_profile_client_scope = keycloak.openid.ClientScope(
+    "ol-profile-client-scope",
+    name="ol-profile",
+    realm_id=ol_apps_realm.id,
+)
+"""
+ol_apps_user_email_optin_attribute_mapper = keycloak.openid.UserAttributeProtocolMapper(
+    "email-optin-mapper",
+    realm_id=ol_apps_realm.id,
+    client_scope_id=ol_apps_profile_client_scope.id,
+    name="email-optin-mapper",
+    user_attribute="emailOptIn",
+    claim_name="email_optin",
+)
+"""
+ol_apps_user_fullname_attribute_mapper = keycloak.openid.UserAttributeProtocolMapper(
+    "fullname-mapper",
+    realm_id=ol_apps_realm.id,
+    client_scope_id=ol_apps_profile_client_scope.id,
+    name="fullname-mapper",
+    user_attribute="fullName",
+    claim_name="name",
 )
 
 """ # noqa: ERA001
@@ -508,12 +669,18 @@ ol_data_oidc_attribute_importer_identity_provider_mapper = (
     ),
 )
 
+fetch_realm_public_key_partial = partial(
+    fetch_realm_public_key,
+    keycloak_url,
+)
+
 # Check if any Openid clients exist in config and create them
 for openid_clients in keycloak_realm_config.get_object("openid_clients"):
     realm_name = openid_clients.get("realm_name")
     client_details = openid_clients.get("client_info")
     for client_name, client_detail in client_details.items():
-        url = client_detail[0]
+        urls = [url for url in client_detail if url.startswith("https")]
+
         openid_client = keycloak.openid.Client(
             f"{realm_name}-{client_name}-client",
             name=f"ol-{client_name}-client",
@@ -521,10 +688,14 @@ for openid_clients in keycloak_realm_config.get_object("openid_clients"):
             client_id=f"ol-{client_name}-client",
             enabled=True,
             access_type="CONFIDENTIAL",
-            standard_flow_enabled=True,
-            valid_redirect_uris=[f"{url}"],
+            standard_flow_enabled=openid_clients.get("standard_flow_enabled") or True,
+            implicit_flow_enabled=openid_clients.get("implicit_flow_enabled") or False,
+            service_accounts_enabled=openid_clients.get("service_accounts_enabled")
+            or False,
+            valid_redirect_uris=urls,
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
         )
+
         vault.generic.Secret(
             f"{realm_name}-{client_name}-vault-oidc-credentials",
             path=f"secret-operations/sso/{client_name}",
@@ -540,6 +711,9 @@ for openid_clients in keycloak_realm_config.get_object("openid_clients"):
                 secret=secrets.token_urlsafe(),
                 realm_id=openid_client.realm_id,
                 realm_name=realm_name,
+                realm_public_key=openid_client.realm_id.apply(
+                    lambda realm_id: fetch_realm_public_key_partial(realm_id)
+                ),
             ).apply(json.dumps),
         )
         for role in client_detail[1:]:
@@ -550,6 +724,22 @@ for openid_clients in keycloak_realm_config.get_object("openid_clients"):
                 realm_id=realm_name,
                 opts=resource_options,
             )
+        if "extra_default_scopes" in openid_clients:
+            keycloak.openid.ClientDefaultScopes(
+                f"{realm_name}-{client_name}-default-scopes",
+                realm_id=realm_name,
+                client_id=openid_client.id,
+                default_scopes=[
+                    "acr",
+                    "email",
+                    "profile",
+                    "role_list",
+                    "roles",
+                    "web-origins",
+                    *openid_clients.get("extra_default_scopes"),
+                ],
+            )
+
 
 # OL - First login flow [START]
 # Does not require email verification or confirmation to connect with existing account.
@@ -939,29 +1129,3 @@ if stack_info.env_suffix in ["ci", "qa"]:
         ),
     )
     # OKTA-DEV [END] # noqa: ERA001
-
-if stack_info.env_suffix == "qa":
-    # SCIM for MIT-Open in RC.
-    keycloak.CustomUserFederation(
-        "ol-mit-open-qa-scim",
-        config={
-            "user-patchOp": "false",
-            "fullSyncPeriod": "-1",
-            "auth-pass": keycloak_realm_config.get("mit-open-qa-scim-password"),
-            "auth-mode": "BEARER",
-            "cachePolicy": "DEFAULT",
-            "sync-import-action": "CREATE_LOCAL",
-            "propagation-user": "true",
-            "enabled": "true",
-            "changedSyncPeriod": "-1",
-            "endpoint": "https://mitopen-rc.odl.mit.edu/scim/v2/",
-            "propagation-group": "true",
-            "content-type": "application/scim+json",
-            "group-patchOp": "false",
-        },
-        enabled=True,
-        name="MIT Open",
-        provider_id="scim",
-        realm_id=ol_apps_realm.id,
-        opts=resource_options,
-    )

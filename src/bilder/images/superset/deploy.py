@@ -2,9 +2,6 @@ import io
 import os
 from pathlib import Path
 
-from bridge.lib.magic_numbers import VAULT_HTTP_PORT
-from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
-from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files, server
 
@@ -39,6 +36,9 @@ from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import install_and_configure_vector
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
+from bridge.lib.magic_numbers import VAULT_HTTP_PORT
+from bridge.lib.versions import CONSUL_VERSION, VAULT_VERSION
+from bridge.secrets.sops import set_env_secrets
 
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
@@ -87,7 +87,7 @@ watched_docker_compose_files.append(
 consul_configuration = {
     Path("00-default.json"): ConsulConfig(
         addresses=ConsulAddresses(dns="127.0.0.1", http="127.0.0.1"),
-        advertise_addr='{{ GetInterfaceIP "ens5" }}',
+        advertise_addr="{{ GetPrivateIP }}",
     )
 }
 consul = Consul(version=VERSIONS["consul"], configuration=consul_configuration)

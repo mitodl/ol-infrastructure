@@ -1,11 +1,12 @@
-from ol_infrastructure.lib.consul import get_consul_provider
-from ol_infrastructure.lib.pulumi_helper import parse_stack
-from pulumi import ResourceOptions, StackReference
+from pulumi import Alias, ResourceOptions, StackReference
 from pulumi_consul import (
     PreparedQuery,
     PreparedQueryFailoverArgs,
     PreparedQueryTemplateArgs,
 )
+
+from ol_infrastructure.lib.consul import get_consul_provider
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 stack_info = parse_stack()
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -69,12 +70,14 @@ operations_service_query = PreparedQuery(
 )
 
 nearest_service_query = PreparedQuery(
-    "neearest-service-query",
+    "nearest-service-query",
     name="nearest",
     service="${match(1)}",
     near="_agent",
     template=PreparedQueryTemplateArgs(
         regexp="^nearest-(.*?)$", type="name_prefix_match"
     ),
-    opts=consul_provider,
+    opts=consul_provider.merge(
+        ResourceOptions(aliases=[Alias("neearest-service-query")])
+    ),
 )

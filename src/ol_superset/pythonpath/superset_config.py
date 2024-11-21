@@ -2,11 +2,13 @@ import json
 import logging
 import os
 import urllib.request
+from ssl import CERT_OPTIONAL
 from typing import Optional
 
 from celery.schedules import crontab
 from flask import g
 from flask_appbuilder.security.manager import AUTH_OAUTH
+from flask_caching.backends.rediscache import RedisCache
 from superset.security import SupersetSecurityManager
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
 from vault.aws_auth import get_vault_client
@@ -139,6 +141,8 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
 
 
 CUSTOM_SECURITY_MANAGER = CustomSsoSecurityManager
+# Allow for managing users and roles via API
+FAB_ADD_SECURITY_API = True
 
 # ---------------------------------------------------
 # Feature flags
@@ -253,13 +257,15 @@ DATA_CACHE_CONFIG = {"CACHE_KEY_PREFIX": "superset_chart_cache", **cache_base}
 # Set this API key to enable Mapbox visualizations
 MAPBOX_API_KEY = os.environ.get("MAPBOX_API_KEY", "")
 
+# Adding http headers to allow iframe embedding
+ENABLE_CORS = True
+HTTP_HEADERS = {"X-Frame-Options": "ALLOWALL"}
+
 
 class CeleryConfig:  # pylint: disable=too-few-public-methods
-    broker_url = "rediss://superset-redis.service.consul:6379/1"
+    broker_url = f"rediss://default:{REDIS_TOKEN}@superset-redis.service.consul:6379/1?ssl_cert_reqs=optional"
     imports = ("superset.sql_lab", "superset.tasks.scheduler")
-    result_backend = "rediss://superset-redis.service.consul:6379/2"
-    redis_username = "default"
-    redis_password = REDIS_TOKEN
+    result_backend = f"rediss://default:{REDIS_TOKEN}@superset-redis.service.consul:6379/2?ssl_cert_reqs=optional"
     worker_prefetch_multiplier = 1
     task_acks_late = True
     task_track_started = True
@@ -284,6 +290,16 @@ class CeleryConfig:  # pylint: disable=too-few-public-methods
 
 
 CELERY_CONFIG = CeleryConfig  # pylint: disable=invalid-name
+RESULTS_BACKEND = RedisCache(
+    db=2,
+    host="superset-redis.service.consul",
+    key_prefix="superset_results",
+    password=REDIS_TOKEN,
+    port=6379,
+    ssl=True,
+    ssl_cert_reqs=CERT_OPTIONAL,
+    username="default",
+)
 
 #########################
 # Notification Settings #

@@ -6,7 +6,7 @@
 # This dockerfile is not expected to work locally. Only executes correctly within the context
 # of its concourse pipeline.
 
-FROM --platform=linux/amd64 python:3.8.12-buster as base
+FROM --platform=linux/amd64 python:3.11.4-buster as base
 
 ENV DEBIAN_FRONTEND=noninteractive
 COPY ./apt-pkg-list /root/
@@ -67,7 +67,7 @@ RUN useradd --home-dir /openedx --create-home --shell /bin/bash/ --uid ${APP_USE
 USER ${APP_USER_ID}
 
 # digest for docker.io/powerman/dockerize:0.19.0 --platform=linux/amd64
-COPY --from=docker.io/powerman/dockerize@sha256:97c00493b0d839c4ef5af33d0898e33a4cdc0c5f9148e43364e8c002ec396e54 /usr/local/bin/dockerize /usr/local/bin/dockerize
+COPY --from=docker.io/powerman/dockerize@sha256:2aac4d640107a17d659a2c69f5e410da599b5b4958fc42f739bc8aa732d27baf /usr/local/bin/dockerize /usr/local/bin/dockerize
 COPY --chown=app:app --from=locales /openedx/locale /openedx/locale
 COPY --chown=app:app --from=code /openedx/edx-platform /openedx/edx-platform
 COPY --chown=app:app --from=code /openedx/nodeenv /openedx/nodeenv

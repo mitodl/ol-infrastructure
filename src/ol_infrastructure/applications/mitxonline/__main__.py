@@ -10,10 +10,10 @@ import json
 
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
-from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from pulumi import Config, InvokeOptions, StackReference, export
 from pulumi_aws import ec2, iam, s3
 
+from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -124,6 +124,7 @@ mitxonline_vault_backend_role = vault.aws.SecretBackendRole(
     name="mitxonline",
     backend="aws-mitx",
     credential_type="iam_user",
+    iam_tags={"OU": "operations", "vault_managed": "True"},
     policy_arns=[mitxonline_iam_policy.arn],
 )
 

@@ -31,13 +31,21 @@ config:
   keycloak_realm:openid_clients:
   - client_info:
       open-discusions: ["https://discussions-ci.odl.mit.edu/*"]
-      open-local: "*"
     realm_name: olapps
   - client_info:
       superset: ["https://bi-ci.ol.mit.edu/*", "superset_admin", "superset_alpha",
         "superset_gamma"]
     realm_name: ol-data-platform
+    service_accounts_enabled: true
   - client_info:
+      open_metadata: ["https://open-metadata-ci.ol.mit.edu/*", "open_metadata_admin",
+        "open_metadata_user"]
+    realm_name: ol-data-platform
+    implicit_flow_enabled: true
+    standard_flow_enabled: false
+    service_accounts_enabled: true
+  - client_info:
+      airbyte: ["https://airbyte-ci.odl.mit.edu/*"]
       leek: ["https://celery-monitoring-ci.odl.mit.edu/*"]
     realm_name: ol-platform-engineering
   keycloak:url: https://sso-ci.ol.mit.edu

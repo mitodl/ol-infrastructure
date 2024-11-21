@@ -1,0 +1,82 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHg42pDDDGBhpaX14TdtzcK1hbiMYTHsYRH4k5GL5RFpIwEi8MniqKSK7PJ7AIbp17REAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbWm9PEFY6H+jKGYHAgEQgDtAZs04prjkVBGB8O8+C6kjqzMhazPYOAanmLoWdx4WArJXNKxZkv72c6my81/qnCg0xWYdmw6fJxV0dg==
+config:
+  consul:address: https://consul-apps-qa.odl.mit.edu
+  heroku:user: "odl-devops"
+  heroku:app_id:
+    secure: v1:eSvnqne7KQRkHJlu:wTyl9W3aivfxlANqBML2wy4GEHe85VuKll60R5HmGUu1hJTcQBEfzK1cJOyvjlbLgBtXLw==
+  heroku_app:vars:
+    APPZI_URL: ""
+    CELERY_WORKER_MAX_MEMORY_PER_CHILD: 125000
+    CSRF_COOKIE_NAME: "learn-rc-csrftoken"
+    DEBUG: "false"
+    EDX_LEARNING_COURSE_BUCKET_NAME: "edxorg-qa-edxapp-courses"
+    ENABLE_INFINITE_CORRIDOR: "true"
+    GA_G_TRACKING_ID: ""
+    GA_TRACKING_ID: ""
+    INDEXING_API_USERNAME: "od_mm_rc_api"
+    KEYCLOAK_BASE_URL: "https://sso-qa.ol.mit.edu"
+    KEYCLOAK_REALM_NAME: "olapps"
+    MITOL_API_URL: "https://api.rc.learn.mit.edu"
+    MITOL_APP_URL: "https://rc.learn.mit.edu"
+    MITOL_APP_BASE_URL: "https://rc.learn.mit.edu"
+    MITOL_BASE_URL: "https://rc.learn.mit.edu"
+    MITOL_COOKIE_DOMAIN: "learn.mit.edu"
+    MITOL_COOKIE_NAME: "learn-rc"
+    MITOL_LOG_LEVEL: "INFO"
+    MITOL_NEW_USER_LOGIN_URL: "https://rc.learn.mit.edu/onboarding"
+    MITOL_NOINDEX: "true"
+    MITOL_SUPPORT_EMAIL: "odl-learn-rc-support@mit.edu"   # Need to verify
+    MITPE_API_ENABLED: "true"
+    OCW_ITERATOR_CHUNK_SIZE: 300
+    OIDC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
+    OPENSEARCH_INDEX: "mitlearn-rc"
+    OPENSEARCH_SHARD_COUNT: 2
+    OPENSEARCH_URL: "https://search-opensearch-mitlearn-qa-254ozvoip3e2ywfx5lsch5w2uu.us-east-1.es.amazonaws.com"
+    PGBOUNCER_DEFAULT_POOL_SIZE: 50
+    PGBOUNER_MAX_CLIENT_CONN: 500
+    PGBOUNER_MIN_POOL_SIZE: 20
+    POSTHOG_API_HOST: "https://app.posthog.com"
+    POSTHOG_ENABLED: "true"
+    POSTHOG_PROJECT_ID: "86325"
+    POSTHOG_TIMEOUT_MS: 1000
+    SEE_API_ENABLED: "true"
+    SENTRY_PROFILES_SAMPLE_RATE: 1.0
+    SENTRY_TRACES_SAMPLE_RATE: 1.0
+    SESSION_COOKIE_NAME: "learn-rc-session"
+    SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT:
+    TIKA_SERVER_ENDPOINT: "https://tika-qa.odl.mit.edu"
+    UWSGI_WORKERS: 3
+    UWSGI_THREADS: 15
+  heroku_app:interpolation_vars:
+    auth_allowed_redirect_hosts:
+    - "live-qa.ocw.mit.edu"
+    - "rc.learn.mit.edu"
+    session_cookie_domain: ".rc.learn.mit.edu"
+    csrf_domains:
+    - "https://api.rc.learn.mit.edu"
+    - "https://rc.learn.mit.edu"
+    - "https://api.mitopen-rc.odl.mit.edu"  # legacy
+    - "https://mitopen-rc.odl.mit.edu"  # legacy
+    cors_urls:
+    - "https://mitopen-rc.odl.mit.edu" # legacy
+    - "https://rc.learn.mit.edu"
+    - "https://ocw-next.netlify.app"
+    - "https://draft-qa.ocw.mit.edu"
+    - "https://live-qa.ocw.mit.edu"
+    mailgun_sender_domain: "mail-rc.learn.mit.edu"
+    sso_url: "sso-qa.ol.mit.edu"
+  mitlearn:db_instance_size: db.m7g.xlarge
+  mitlearn:db_password:
+    secure: v1:Xk9oxNvxSQAJUAHE:8CdeLN2SlyhyU0iZpqEX5rnHSJ3PClleDJi2UpzoCsVZ4UjNkr7vCOAKY7CvCuB/7CBKJKM=
+  mitlearn:api_domain: "api.rc.learn.mit.edu"
+  mitlearn:legacy_api_domain: "api.mitopen-rc.mit.edu"
+  mitlearn:frontend_domain: "rc.learn.mit.edu"
+  mitlearn:legacy_frontend_domain: "mitopen-rc.odl.mit.edu"
+  mitlearn:nextjs_heroku_domain: "next.rc.learn.mit.edu"
+  mitlearn:fastly_domain: "d.sni.global.fastly.net"
+  mitlearn:fastly_anycast_ips: []
+  mitlearn:heroku_domain: "shrouded-brook-krg88s8bvcdg6kgrdjrsrmbq.herokudns.com"
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

@@ -2,14 +2,18 @@ import json
 from pathlib import Path
 
 import pulumi_vault as vault
+from pulumi import Config, ResourceOptions
+
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
-from pulumi import Config, ResourceOptions
 
 stack_info = parse_stack()
 global_vault_secrets = read_yaml_secrets(
     Path(f"vault/secrets.{stack_info.env_suffix}.yaml")
+)
+grafana_vault_secrets = read_yaml_secrets(
+    Path(f"alloy/grafana.{stack_info.env_suffix}.yaml")
 )
 if Config("vault_server").get("env_namespace"):
     setup_vault_provider()
@@ -107,3 +111,10 @@ if "QA" in stack_info.name:
             "responsibility": "1",
         },
     )
+
+vault.kv.SecretV2(
+    f"grafana-vault-secrets-{stack_info.env_suffix}",
+    name="grafana",
+    mount=global_vault_mount,
+    data_json=json.dumps(grafana_vault_secrets),
+)

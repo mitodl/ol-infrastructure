@@ -1,9 +1,9 @@
 from typing import Optional
 
-from bridge.lib.magic_numbers import HALF_GIGABYTE_MB, ONE_GIGAHERTZ
 from pulumi import Output
 from pydantic import BaseModel, ConfigDict, PositiveInt
 
+from bridge.lib.magic_numbers import HALF_GIGABYTE_MB, ONE_GIGAHERTZ
 from ol_infrastructure.lib.aws.ecs.container_definition_config import (
     OLFargateContainerDefinitionConfig,
 )

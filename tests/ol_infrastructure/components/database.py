@@ -1,6 +1,7 @@
 import pytest
-from ol_infrastructure.components.aws.database import OLDBConfig
 from pydantic import ValidationError
+
+from ol_infrastructure.components.aws.database import OLDBConfig
 
 VALID_CONFIG = {
     "db_name": "testdb",

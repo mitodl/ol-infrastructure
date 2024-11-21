@@ -29,23 +29,25 @@ pulumi = "^3.39.1"
 pulumi-aws = "^6.0.0"
 pulumi-fastly = "^8.0.0"
 pulumi-github = "^6.0.0"
+pulumi-mailgun = "^3.0.0"
 pulumi-tls = "^5.0.0"
-pulumi-vault = "^5.5.0, !=5.7.0"
+pulumi-vault = "^6.0.0"
 pulumi_consul = "^3.5.0"
 pydantic = "^2"
-pyinfra = "^2.3"
+pyinfra = "^3.0"
 pulumi-mongodbatlas = "^3.3.0"
 bcrypt = "^4.0.0"
 pulumi-keycloak = "^5.1.0"
 pydantic-settings = "^2.0.1"
 pulumiverse-heroku = "^1.0.3"
+pulumi-eks = "^3.0.0"
 
 [tool.poetry.group.dev.dependencies]
 copier = "*"
 datamodel-code-generator = "*"
 diagrams = "*"
 mypy = "*"
-pre-commit = "^3.0.0"
+pre-commit = "^4.0.0"
 pytest = "^8.0.0"
 pytest-testinfra = "^10.0.0"
 ruff = "^0"
@@ -152,6 +154,7 @@ lint.ignore = [
     "RET506",
     "RET507",
     "RET508",
+    "SIM115",
     "UP007"
 ]
 lint.typing-modules = ["colour.hints"]

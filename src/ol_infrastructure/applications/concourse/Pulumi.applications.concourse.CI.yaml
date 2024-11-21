@@ -13,6 +13,7 @@ config:
     desired: 1
     max: 3
     min: 1
+    max_instance_lifetime_seconds: 86400
   concourse:web_host_domain: cicd-ci.odl.mit.edu
   concourse:web_iam_policies:
   - base
@@ -23,6 +24,8 @@ config:
       desired: 1
       max: 10
       min: 1
+      max_instance_lifetime_seconds: 86400
+
     aws_tags:
       OU: open-courseware
     concourse_team: ocw
@@ -38,6 +41,7 @@ config:
       desired: 1
       max: 2
       min: 1
+      max_instance_lifetime_seconds: 86400
     aws_tags:
       OU: operations
     concourse_team: infrastructure
@@ -53,6 +57,7 @@ config:
       desired: 1
       max: 2
       min: 1
+      max_instance_lifetime_seconds: 86400
     aws_tags:
       OU: operations
     desired_capacity: 2

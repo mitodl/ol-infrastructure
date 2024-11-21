@@ -34,6 +34,7 @@ from ol_infrastructure.lib.aws.rds_helper import (
     DBInstanceTypes,
     db_engines,
     engine_major_version,
+    get_rds_instance,
     max_minor_version,
     parameter_group_family,
 )
@@ -75,7 +76,8 @@ class OLDBConfig(AWSBase):
     backup_days: conint(ge=0, le=MAX_BACKUP_DAYS, strict=True) = 30  # type: ignore  # noqa: PGH003
     db_name: Optional[str] = None  # The name of the database schema to create
     instance_size: str = DBInstanceTypes.general_purpose_large.value
-    max_storage: Optional[PositiveInt] = None  # Set to allow for storage autoscaling
+    # Set to allow for storage autoscaling. Default to 1 TB
+    max_storage: Optional[PositiveInt] = 1000
     multi_az: bool = True
     prevent_delete: bool = True
     public_access: bool = False
@@ -136,7 +138,7 @@ class OLDBConfig(AWSBase):
             raise ValueError(msg)
         return monitoring_profile_name
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def engine_version(self) -> str:
         return self.is_valid_version(
@@ -163,7 +165,7 @@ class OLMariaDBConfig(OLDBConfig):
     """Configuration container to specify settings specific to MariaDB."""
 
     engine: str = "mariadb"
-    engine_major_version: str | int = "10.11"
+    engine_major_version: str | int = "11.4"
     port: PositiveInt = PositiveInt(3306)
     parameter_overrides: list[dict[str, Union[str, bool, int, float]]] = [  # noqa: RUF012
         {"name": "character_set_client", "value": "utf8mb4"},
@@ -212,22 +214,23 @@ class OLAmazonDB(pulumi.ComponentResource):
             parameter_group_family(db_config.engine, db_config.engine_version)
         )
         if db_config.read_replica:
-            current_db_state = rds.get_instance(
-                db_instance_identifier=db_config.instance_name
-            )
+            current_db_state = get_rds_instance(db_config.instance_name)
             replica_identifier = f"{db_config.instance_name}-replica"
-            current_replica_state = rds.get_instance(
-                db_instance_identifier=replica_identifier
-            )
-            if db_config.engine_version not in (
-                current_db_state.engine_version,
-                current_replica_state.engine_version,
-            ) and engine_major_version(
-                db_config.engine_version
-            ) == engine_major_version(current_db_state.engine_version):
+            current_replica_state = get_rds_instance(replica_identifier)
+            if (
+                current_db_state
+                and current_replica_state
+                and db_config.engine_version
+                not in (
+                    current_db_state["EngineVersion"],
+                    current_replica_state["EngineVersion"],
+                )
+                and engine_major_version(db_config.engine_version)
+                == engine_major_version(current_db_state["EngineVersion"])
+            ):
                 # Keep the primary engine version pinned while the replica is upgraded
                 # first.
-                primary_engine_version = current_db_state.engine_version
+                primary_engine_version = current_db_state["EngineVersion"]
                 primary_parameter_group_family = parameter_group_family(
                     db_config.engine, primary_engine_version
                 )
@@ -335,6 +338,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 alarm_config = OLCloudWatchAlarmSimpleRDSConfig(
                     database_identifier=db_config.instance_name,
                     name=f"{db_config.instance_name}-{alarm_name}-OLCloudWatchAlarmSimpleRDSConfig",
+                    tags=db_config.tags,
                     **alarm_args,
                 )
                 OLCloudWatchAlarmSimpleRDS(alarm_config=alarm_config)
@@ -351,7 +355,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 "period": 300,  # 5 minutes
                 "evaluation_periods": 6,  # 30 minutes
                 "metric_name": "CPUUtilization",
-                "threshold": 50,  # percent
+                "threshold": 90,  # percent
                 "unit": "Percent",
             },
             "FreeStorageSpace": {
@@ -373,7 +377,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 "period": 300,  # 5 minutes
                 "evaluation_periods": 6,  # 30 minutes
                 "metric_name": "WriteLatency",
-                "threshold": 0.050,  # 50 milliseconds
+                "threshold": 0.100,  # 100 milliseconds
             },
             "ReadLatency": {
                 "comparison_operator": "GreaterThanThreshold",
@@ -383,7 +387,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 "period": 300,  # 5 minutes
                 "evaluation_periods": 2,  # 10 minutes
                 "metric_name": "ReadLatency",
-                "threshold": 0.010,  # 10 milliseconds
+                "threshold": 0.020,  # 20 milliseconds
             },
         }
 
@@ -410,7 +414,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                     "period": 300,  # 5 minutes
                     "evaluation_periods": 2,  # 10 minutes
                     "metric_name": "DiskQueueDepth",
-                    "threshold": 1,  # requests
+                    "threshold": 10,  # requests
                 },
             },
         }

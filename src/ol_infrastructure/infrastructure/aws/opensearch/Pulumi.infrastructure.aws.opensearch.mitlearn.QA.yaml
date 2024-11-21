@@ -1,0 +1,16 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgGNS4LmCY/O/KGF0UgE7vdaAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM26basxJszPTm1OYaAgEQgDvjkCNI29hM763b5+jrmjReM0p9cP/+1KSBpv9iBO8tutCDfDzqWA3CozA90sMeeEq11SKC4THOqTd7bg==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-apps-qa.odl.mit.edu
+  consul:scheme: https
+  environment:business_unit: 'mit-open'
+  environment:target_vpc: applications_vpc
+  opensearch:cluster_size: "3"
+  opensearch:disable_consul_components: true
+  opensearch:disk_size_gb: "60"
+  opensearch:engine_version: "OpenSearch_2.11"
+  opensearch:instance_type: t3.medium.search
+  opensearch:public_web: "true"
+  opensearch:secured_cluster: "true"

@@ -7,8 +7,10 @@ config:
   edxapp:waffle_flags:
   - ["completion.enable_completion_tracking", "--create", "--superusers", "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
+  - ["course_experience.relative_dates_disable_reset", "--create", "--everyone"]
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
+  - ["effort_estimation.disabled", "--create", "--superusers", "--everyone"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
   - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
   - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
@@ -37,13 +39,13 @@ config:
   edxapp:web_instance_type: m6a.large
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
-    course_authoring: course-authoring
+    authoring: authoring
     gradebook: gradebook
     learning: learn
     ora_grading: ora-grading
   edxapp:google_analytics_id: ""
   edxapp:mail_domain: edxapp-mail-ci.xpro.mit.edu
-  edxapp:min_web_nodes: "1"
+  edxapp:min_web_nodes: "2"
   edxapp:min_worker_nodes: "1"
   edxapp:sender_email_address: support@edxapp-mail-ci.xpro.mit.edu
   edxapp:web_node_capacity: "1"

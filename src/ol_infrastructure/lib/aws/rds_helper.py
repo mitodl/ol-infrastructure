@@ -81,3 +81,21 @@ def parameter_group_family(engine: str, engine_version: str) -> str:
         Engine=engine, EngineVersion=engine_version
     )
     return engine_details["DBEngineVersions"][0]["DBParameterGroupFamily"]
+
+
+def get_rds_instance(instance_name: str) -> dict[str, str]:
+    try:
+        db_instances = rds_client.describe_db_instances(
+            DBInstanceIdentifier=instance_name,
+        )
+        db_instances = db_instances.pop("DBInstances")
+        if len(db_instances) > 1:
+            msg = (
+                "More than one database instance was found. "
+                "Please provide a more specific instance name."
+            )
+            raise ValueError(msg)
+        db_instance = db_instances[0]
+    except rds_client.exceptions.DBInstanceNotFoundFault:
+        db_instance = {}
+    return db_instance

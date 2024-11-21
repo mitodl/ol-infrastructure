@@ -3,7 +3,7 @@ version: "3.7"
 
 services:
   dagster-webserver:
-    image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/{{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     container_name: dagster-webserver
     restart: unless-stopped
     entrypoint: ["poetry", "run", "dagster-webserver", "-w", "/opt/dagster/app/workspace.yaml", "-h", "0.0.0.0", "-p", "3000"]
@@ -13,6 +13,7 @@ services:
       - .env
     environment:
       - DAGSTER_CURRENT_IMAGE={{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+      - DAGSTER_SENSOR_GRPC_TIMEOUT_SECONDS=300
     volumes:
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     - /etc/aws/:/etc/aws/:ro
@@ -22,7 +23,7 @@ services:
       - "traefik.http.routers.dagit.middlewares=traefik-forward-auth"
       - "traefik.http.routers.dagit.tls=true"
   dagster-daemon:
-    image: {{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/{{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     container_name: dagster-daemon
     restart: unless-stopped
     entrypoint: ["poetry", "run", "dagster-daemon", "run", "-w", "/opt/dagster/app/workspace.yaml"]
@@ -30,11 +31,14 @@ services:
       - .env
     environment:
       - DAGSTER_CURRENT_IMAGE={{ context.docker_repo_name }}@{{ context.docker_image_digest }}
+      - DAGSTER_SENSOR_GRPC_TIMEOUT_SECONDS=300
     volumes:
     - "{{ context.edx_pipeline_definition_directory }}:/etc/dagster/:ro"
     - /etc/aws/:/etc/aws/:ro
+    - /var/run/docker.sock:/var/run/docker.sock
+    - /tmp/io_manager_storage:/tmp/io_manager_storage
   traefik:
-    image: traefik:latest
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/library/traefik:latest
     container_name: traefik
     restart: unless-stopped
     command:
@@ -58,7 +62,7 @@ services:
       - "{{ context.certificate_key_file }}:/etc/traefik/star.odl.mit.edu.key:ro"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
   traefik-forward-auth:
-    image: thomseddon/traefik-forward-auth:2
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/thomseddon/traefik-forward-auth:2
     container_name: traefik-forward-auth
     restart: unless-stopped
     env_file:

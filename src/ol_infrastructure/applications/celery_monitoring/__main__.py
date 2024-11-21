@@ -7,10 +7,10 @@ import pulumi_consul as consul
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
 import yaml
-from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, InvokeOptions, Output, ResourceOptions, StackReference
 from pulumi_aws import acm, ec2, get_caller_identity, iam, route53
 
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,

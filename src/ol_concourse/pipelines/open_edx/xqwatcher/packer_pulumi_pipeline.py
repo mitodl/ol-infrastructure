@@ -1,7 +1,6 @@
 import sys
 
 from bridge.settings.openedx.accessors import filter_deployments_by_application
-
 from ol_concourse.lib.jobs.infrastructure import packer_jobs, pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (

@@ -7,15 +7,15 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
+from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi_aws import acm, ec2, get_caller_identity, iam, route53, ses
+
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
     FIVE_MINUTES,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import acm, ec2, get_caller_identity, iam, route53, ses
-
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
@@ -526,7 +526,7 @@ superset_web_tag_specs = [
 superset_web_lt_config = OLLaunchTemplateConfig(
     block_device_mappings=superset_web_block_device_mappings,
     image_id=superset_ami.id,
-    instance_type=superset_config.get("instance_type")
+    instance_type=superset_config.get("web_instance_type")
     or InstanceTypes.burstable_medium,
     instance_profile_arn=superset_profile.arn,
     security_groups=[
@@ -640,7 +640,7 @@ superset_worker_tag_specs = [
 superset_worker_lt_config = OLLaunchTemplateConfig(
     block_device_mappings=superset_worker_block_device_mappings,
     image_id=superset_ami.id,
-    instance_type=superset_config.get("instance_type")
+    instance_type=superset_config.get("worker_instance_type")
     or InstanceTypes.burstable_medium,
     instance_profile_arn=superset_profile.arn,
     security_groups=[

@@ -21,14 +21,6 @@ from typing import Any
 
 import pulumi_tls as tls
 import yaml
-from bridge.lib.magic_numbers import (
-    DEFAULT_RSA_KEY_SIZE,
-    FIVE_MINUTES,
-    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
-    VAULT_CLUSTER_PORT,
-    VAULT_HTTP_PORT,
-)
-from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, Output, StackReference, export
 from pulumi_aws import (
     acmpca,
@@ -39,6 +31,14 @@ from pulumi_aws import (
     s3,
 )
 
+from bridge.lib.magic_numbers import (
+    DEFAULT_RSA_KEY_SIZE,
+    FIVE_MINUTES,
+    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
+    VAULT_CLUSTER_PORT,
+    VAULT_HTTP_PORT,
+)
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
@@ -135,6 +135,7 @@ def vault_policy_document(vault_key_arn) -> dict[str, Any]:
                     "iam:PutUserPolicy",
                     "iam:AddUserToGroup",
                     "iam:RemoveUserFromGroup",
+                    "iam:TagUser",
                 ],
                 "Resource": ["arn:*:iam::*:user/vault-*", "arn:*:iam::*:group/*"],
             },
@@ -549,6 +550,9 @@ ol_vault_asg_config = OLAutoScaleGroupConfig(
     desired_size=cluster_count,
     min_size=cluster_count,
     max_size=cluster_count,
+    # Don't automatically cycle instances to avoid issues with cluster quorum falling
+    # out of sync.
+    max_instance_lifetime_seconds=None,
     vpc_zone_identifiers=target_vpc["subnet_ids"],
     instance_refresh_warmup=FIVE_MINUTES * 3,
     instance_refresh_min_healthy_percentage=90,

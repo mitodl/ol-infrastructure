@@ -1,0 +1,36 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHjnbqe9AmEW1Js10nySybyuAG7Fb5E9EHUgkmqFDv7PxQG7tVQ4cjSd4ZUD7SwqIPuWAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbK4AIug73P0kVCSmAgEQgDtcf7tVi8RwSaTQ8SSy0Qob2DeSZdWru1j4Pjo4Bo88wQQLgZEWWRAPA9+6hc6IeT6agzB+rn0CeyvXhQ==
+config:
+  environment:business_unit: data
+  environment:target_vpc: data_vpc
+  eks:allowed_dns_zones:
+  - ".odl.mit.edu"
+  - "odl.mit.edu"
+  - ".ol.mit.edu"
+  - "ol.mit.edu"
+  eks:ebs_csi_provisioner: true
+  eks:efs_csi_provisioner: false
+  eks:gateway_release_channel: "experimental"
+  eks:pod_security_groups: true
+  eks:namespaces:
+  - "open-metadata"  # Openmetadata testing
+  - "airbyte"
+  eks:nodegroups:
+    worker-xlarge:
+      instance_types:
+      - "c7a.xlarge"
+      labels:
+        ondemand: true
+        node_size: c7a.xlarge
+      disk_size_gb: 500
+      scaling:
+        desired: 4
+        min: 2
+        max: 5
+      version:
+      tags: {}
+      taints: {}
+      node_group_options: {}
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

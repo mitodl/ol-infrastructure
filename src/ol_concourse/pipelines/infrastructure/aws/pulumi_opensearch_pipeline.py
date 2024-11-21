@@ -1,4 +1,4 @@
-from ol_concourse.lib.jobs.infrastructure import pulumi_job
+from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo
@@ -12,6 +12,7 @@ app_list = [
     "xpro",
     "open",
     "mitopen",
+    "mitlearn",
     "celery_monitoring",
 ]
 
@@ -27,20 +28,19 @@ shared_pulumi_code_resource = git_repo(
 
 local_fragments: list[PipelineFragment] = []
 for app in app_list:
-    for env in ["CI", "QA", "Production"]:
-        if app in ["mitxonline", "mitopen"] and env == "CI":
-            pass
-        else:
-            local_pulumi_fragment = pulumi_job(
-                pulumi_code=shared_pulumi_code_resource,
-                stack_name=f"infrastructure.aws.opensearch.{app}.{env}",
-                project_name="ol-infrastructure-opensearch",
-                dependencies=[],
-                project_source_path=PULUMI_CODE_PATH.joinpath(
-                    "infrastructure/aws/opensearch/"
-                ),
-            )
-            local_fragments.append(local_pulumi_fragment)
+    stages = ["CI", "QA", "Production"]
+    if app in ["mitxonline", "mitopen", "mitlearn"]:
+        stages = ["QA", "Production"]
+    pulumi_fragment = pulumi_jobs_chain(
+        pulumi_code=shared_pulumi_code_resource,
+        stack_names=[
+            f"infrastructure.aws.opensearch.{app}.{stage}" for stage in stages
+        ],
+        project_name="ol-infrastructure-opensearch",
+        dependencies=[],
+        project_source_path=PULUMI_CODE_PATH.joinpath("infrastructure/aws/opensearch/"),
+    )
+    local_fragments.append(pulumi_fragment)
 
 combined_fragments = PipelineFragment.combine_fragments(*local_fragments)
 aws_opensearch_pipeline = Pipeline(

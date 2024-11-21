@@ -22,12 +22,20 @@ consul_image_code = git_repo(
         *PACKER_WATCHED_PATHS,
     ],
 )
-consul_pulumi_code = git_repo(
+consul_pulumi_infrastructure_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
     uri="https://github.com/mitodl/ol-infrastructure",
     paths=[
         *PULUMI_WATCHED_PATHS,
         "src/ol_infrastructure/infrastructure/consul/",
+    ],
+)
+
+consul_pulumi_substructure_code = git_repo(
+    name=Identifier("ol-substructure-pulumi"),
+    uri="https://github.com/mitodl/ol-infrastructure",
+    paths=[
+        *PULUMI_WATCHED_PATHS,
         "src/ol_infrastructure/substructure/consul/",
     ],
 )
@@ -44,7 +52,8 @@ consul_ami_fragment = packer_jobs(
     extra_packer_params={"only": ["amazon-ebs.third-party"]},
 )
 
-consul_pulumi_fragments = []
+consul_pulumi_infrastructure_fragments = []
+consul_pulumi_substructure_fragments = []
 for network in [
     "mitx",
     "mitx-staging",
@@ -55,8 +64,8 @@ for network in [
     "xpro",
 ]:
     stages = ("CI", "QA", "Production")
-    consul_pulumi_fragment = pulumi_jobs_chain(
-        consul_pulumi_code,
+    consul_pulumi_infrastructure_fragment = pulumi_jobs_chain(
+        consul_pulumi_infrastructure_code,
         project_name="ol-infrastructure-consul-server",
         stack_names=[f"infrastructure.consul.{network}.{stage}" for stage in stages],
         project_source_path=PULUMI_CODE_PATH.joinpath("infrastructure/consul/"),
@@ -68,40 +77,64 @@ for network in [
             )
         ],
     )
-    consul_pulumi_fragments.append(consul_pulumi_fragment)
+    consul_pulumi_infrastructure_fragments.append(consul_pulumi_infrastructure_fragment)
+for network in [
+    "mitx",
+    "mitx-staging",
+    "mitxonline",
+    "applications",
+    "data",
+    "operations",
+    "xpro",
+]:
+    consul_pulumi_substructure_fragment = pulumi_jobs_chain(
+        consul_pulumi_substructure_code,
+        project_name="ol-infrastructure-substructure-consul",
+        stack_names=[f"substructure.consul.{network}.{stage}" for stage in stages],
+        project_source_path=PULUMI_CODE_PATH.joinpath("substructure/consul/"),
+    )
+    consul_pulumi_substructure_fragments.append(consul_pulumi_substructure_fragment)
 
 
 pulumi_resource_types = list(
     itertools.chain.from_iterable(
-        [pulumi_fragment.resource_types for pulumi_fragment in consul_pulumi_fragments]
+        [
+            pulumi_fragment.resource_types
+            for pulumi_fragment in consul_pulumi_infrastructure_fragments
+        ]
     )
 )
 pulumi_resources = list(
     itertools.chain.from_iterable(
-        [pulumi_fragment.resources for pulumi_fragment in consul_pulumi_fragments]
+        [
+            pulumi_fragment.resources
+            for pulumi_fragment in consul_pulumi_infrastructure_fragments
+        ]
     )
 )
 pulumi_jobs = list(
     itertools.chain.from_iterable(
-        [pulumi_fragment.jobs for pulumi_fragment in consul_pulumi_fragments]
+        [
+            pulumi_fragment.jobs
+            for pulumi_fragment in consul_pulumi_infrastructure_fragments
+        ]
     )
 )
 
-combined_fragment = PipelineFragment(
-    resource_types=consul_ami_fragment.resource_types
-    + pulumi_resource_types
-    + [hashicorp_resource()],
-    resources=consul_ami_fragment.resources + pulumi_resources,
-    jobs=consul_ami_fragment.jobs + pulumi_jobs,
+combined_fragment = PipelineFragment.combine_fragments(
+    *consul_pulumi_infrastructure_fragments,
+    *consul_pulumi_substructure_fragments,
+    consul_ami_fragment,
 )
 
 consul_pipeline = Pipeline(
-    resource_types=combined_fragment.resource_types,
+    resource_types=[*combined_fragment.resource_types, hashicorp_resource()],
     resources=[
         *combined_fragment.resources,
         consul_image_code,
         consul_release,
-        consul_pulumi_code,
+        consul_pulumi_infrastructure_code,
+        consul_pulumi_substructure_code,
     ],
     jobs=combined_fragment.jobs,
 )

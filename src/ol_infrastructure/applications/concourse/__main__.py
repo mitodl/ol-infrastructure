@@ -15,6 +15,10 @@ from pathlib import Path
 
 import pulumi_vault as vault
 import yaml
+from pulumi import Config, Output, StackReference, export
+from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_consul import Node, Service, ServiceCheckArgs
+
 from bridge.lib.magic_numbers import (
     CONCOURSE_WORKER_HEALTHCHECK_PORT,
     DEFAULT_HTTPS_PORT,
@@ -22,10 +26,6 @@ from bridge.lib.magic_numbers import (
     MAXIMUM_PORT_NUMBER,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, StackReference
-from pulumi_aws import ec2, get_caller_identity, iam, route53
-from pulumi_consul import Node, Service, ServiceCheckArgs
-
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
@@ -578,6 +578,7 @@ ol_web_asg_config = OLAutoScaleGroupConfig(
     desired_size=web_asg_config["desired"] or 1,
     min_size=web_asg_config["min"] or 1,
     max_size=web_asg_config["max"] or 5,
+    max_instance_lifetime_seconds=web_asg_config["max_instance_lifetime_seconds"],
     vpc_zone_identifiers=target_vpc["subnet_ids"],
     tags=aws_config.merged_tags({"Name": concourse_web_tag}),
 )
@@ -614,6 +615,8 @@ for worker_def in concourse_config.get_object("workers") or []:
         path="/ol-applications/concourse/role/",
         tags=aws_config.tags,  # We will leave all the IAM resources with default tags.
     )
+
+    export(f"{worker_class_name}-instance-role-arn", concourse_worker_instance_role.arn)
 
     for iam_policy_name in worker_def["iam_policies"] or []:
         iam_policy_object = iam_policy_objects[iam_policy_name]
@@ -709,6 +712,7 @@ for worker_def in concourse_config.get_object("workers") or []:
         desired_size=web_asg_config["desired"] or 1,
         min_size=web_asg_config["min"] or 1,
         max_size=web_asg_config["max"] or 5,
+        max_instance_lifetime=web_asg_config.get("max_instance_lifetime_seconds"),
         vpc_zone_identifiers=target_vpc["subnet_ids"],
         tags=aws_config.merged_tags({"Name": concourse_web_tag}),
     )
@@ -720,6 +724,9 @@ for worker_def in concourse_config.get_object("workers") or []:
         desired_size=auto_scale_config["desired"] or 1,
         min_size=auto_scale_config["min"] or 1,
         max_size=auto_scale_config["max"] or 5,
+        max_instance_lifetime_seconds=auto_scale_config[
+            "max_instance_lifetime_seconds"
+        ],
         vpc_zone_identifiers=target_vpc["subnet_ids"],
         tags=aws_config.merged_tags(
             {"Name": worker_name_tag},

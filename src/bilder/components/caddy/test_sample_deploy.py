@@ -1,7 +1,7 @@
 import pytest
 
 
-@pytest.mark.caddy()
+@pytest.mark.caddy
 def test_caddy_setup(host):
     caddy_user = host.user("caddy")
     assert caddy_user.exists

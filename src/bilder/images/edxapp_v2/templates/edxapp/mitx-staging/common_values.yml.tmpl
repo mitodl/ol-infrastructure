@@ -35,6 +35,7 @@ redis_cache_config: &redis_cache_config
     PASSWORD: {{ .Data.redis_auth_token }}
 SECRET_KEY: {{ .Data.django_secret_key }}
 JWT_AUTH:  # NEEDS ATTENTION
+    JWT_ALGORITHM: HS256
     JWT_AUDIENCE: mitx
     JWT_AUTH_COOKIE: {{ env "ENVIRONMENT"}}-edx-jwt-cookie
     JWT_AUTH_COOKIE_HEADER_PAYLOAD: {{ env "ENVIRONMENT" }}-edx-jwt-cookie-header-payload
@@ -315,6 +316,7 @@ FEATURES:
     ENABLE_MOBILE_REST_API: true
     ENABLE_NEW_BULK_EMAIL_EXPERIENCE: true  # ADDED KEY
     ENABLE_OAUTH2_PROVIDER: true
+    ENABLE_OTHER_COURSE_SETTINGS: true  # ADDED KEY
     ENABLE_PUBLISHER: false
     ENABLE_READING_FROM_MULTIPLE_HISTORY_TABLES: true
     ENABLE_SPECIAL_EXAMS: true # MODIFIED FOR PROCTORTRACK
@@ -367,7 +369,7 @@ FINANCIAL_REPORTS:
     BUCKET: null
     ROOT_PATH: sandbox
     STORAGE_TYPE: localfs
-FOOTER_ORGANIZATION_IMAGE: images/logo.png
+FOOTER_ORGANIZATION_IMAGE: /images/logo.png
 GITHUB_REPO_ROOT: /openedx/data
 GOOGLE_ANALYTICS_ACCOUNT: {{ key "edxapp/google-analytics-id" }}
 GRADES_DOWNLOAD:

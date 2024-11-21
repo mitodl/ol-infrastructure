@@ -2,15 +2,6 @@ import io
 import os
 from pathlib import Path
 
-from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, VAULT_HTTP_PORT
-from bridge.lib.versions import (
-    AIRBYTE_VERSION,
-    CONSUL_TEMPLATE_VERSION,
-    CONSUL_VERSION,
-    TRAEFIK_VERSION,
-    VAULT_VERSION,
-)
-from bridge.secrets.sops import set_env_secrets
 from pyinfra import host
 from pyinfra.operations import files, server
 
@@ -58,6 +49,15 @@ from bilder.components.vector.models import VectorConfig
 from bilder.components.vector.steps import install_and_configure_vector
 from bilder.facts.has_systemd import HasSystemd
 from bilder.lib.linux_helpers import DOCKER_COMPOSE_DIRECTORY
+from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, VAULT_HTTP_PORT
+from bridge.lib.versions import (
+    AIRBYTE_VERSION,
+    CONSUL_TEMPLATE_VERSION,
+    CONSUL_VERSION,
+    TRAEFIK_VERSION,
+    VAULT_VERSION,
+)
+from bridge.secrets.sops import set_env_secrets
 
 TEMPLATES_DIRECTORY = Path(__file__).resolve().parent.joinpath("templates")
 FILES_DIRECTORY = Path(__file__).resolve().parent.joinpath("files")
@@ -108,33 +108,39 @@ traefik_config = TraefikConfig(
 traefik_conf_directory = traefik_config.configuration_directory
 configure_traefik(traefik_config)
 
-
-# Preload some docker images. This will accelerate the first startup
-# but prolong the image build.
-docker_repo_names = [
-    "airbyte/airbyte-api-server",
-    "airbyte/bootloader",
-    "airbyte/connector-builder-server",
-    "airbyte/cron",
-    "airbyte/init",
-    "airbyte/metrics-reporter",
-    "airbyte/server",
-    "airbyte/temporal",
-    "airbyte/webapp",
-    "airbyte/worker",
-]
-for repo_name in docker_repo_names:
-    server.shell(
-        name=f"Preload {repo_name}:{VERSIONS['airbyte']}",
-        commands=[f"/usr/bin/docker pull {repo_name}:{VERSIONS['airbyte']}"],
-    )
-
-
 files.put(
     name="Place the airbyte docker-compose.yaml file",
     src=str(FILES_DIRECTORY.joinpath("docker-compose.yaml")),
     dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath("docker-compose.yaml")),
     mode="0664",
+)
+
+files.file(
+    name="Create dummy .env file for image pulling",
+    path=DOCKER_COMPOSE_DIRECTORY.joinpath(".env"),
+    touch=True,
+)
+
+files.file(
+    name="Create dummy .env_traefik_forward_auth file for image pulling",
+    path=DOCKER_COMPOSE_DIRECTORY.joinpath(".env_traefik_forward_auth"),
+    touch=True,
+)
+
+# Preload some docker images. This will accelerate the first startup
+# but prolong the image build.
+server.shell(
+    name=f"Preload Airbyte containers for version {VERSIONS['airbyte']}",
+    commands=["/usr/bin/docker compose pull"],
+    _chdir=DOCKER_COMPOSE_DIRECTORY,
+    _env={
+        "CONFIG_ROOT": "/data",
+        "HACK_LOCAL_ROOT_PARENT": "/tmp",  # noqa: S108
+        "LOCAL_ROOT": "/tmp/airbyte_local",  # noqa: S108
+        "VERSION": VERSIONS["airbyte"],
+        "WORKSPACE_DOCKER_MOUNT": "airbyte_workspace",
+        "WORKSPACE_ROOT": "/tmp/workspace",  # noqa: S108
+    },
 )
 
 files.put(
@@ -150,15 +156,15 @@ files.directory(
     present=True,
 )
 
-files.download(
-    name="Retrieve Temporal dynamicconfig file",
-    src="https://raw.githubusercontent.com/airbytehq/airbyte-platform/main/temporal/dynamicconfig/development.yaml",
+files.put(
+    name="Place our version of the Temporal dynamicconfig file",
+    src=str(FILES_DIRECTORY.joinpath("dynamic_config_development.yaml")),
     dest=str(
         DOCKER_COMPOSE_DIRECTORY.joinpath(
             "temporal", "dynamicconfig", "development.yaml"
         )
     ),
-    mode="0644",
+    mode="0664",
 )
 
 files.put(
@@ -209,7 +215,7 @@ files.put(
 consul_configuration = {
     Path("00-default.json"): ConsulConfig(
         addresses=ConsulAddresses(dns="127.0.0.1", http="127.0.0.1"),
-        advertise_addr='{{ GetInterfaceIP "ens5" }}',
+        advertise_addr="{{ GetPrivateIP }}",
         services=[
             ConsulService(
                 name="airbyte",

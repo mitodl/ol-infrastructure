@@ -1,3 +1,5 @@
+# ruff: noqa: E501
+
 """Provision and deploy the resources needed for an edxapp installation.
 
 - Create S3 buckets required by edxapp
@@ -20,17 +22,6 @@ import pulumi_fastly as fastly
 import pulumi_mongodbatlas as atlas
 import pulumi_vault as vault
 import yaml
-from bridge.lib.magic_numbers import (
-    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
-    DEFAULT_HTTP_PORT,
-    DEFAULT_HTTPS_PORT,
-    DEFAULT_MYSQL_PORT,
-    DEFAULT_REDIS_PORT,
-    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
-    ONE_MEGABYTE_BYTE,
-)
-from bridge.secrets.sops import read_yaml_secrets
-from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import (
     acm,
@@ -46,6 +37,17 @@ from pulumi_aws import (
 )
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
+from bridge.lib.magic_numbers import (
+    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
+    DEFAULT_HTTP_PORT,
+    DEFAULT_HTTPS_PORT,
+    DEFAULT_MYSQL_PORT,
+    DEFAULT_REDIS_PORT,
+    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
+    ONE_MEGABYTE_BYTE,
+)
+from bridge.secrets.sops import read_yaml_secrets
+from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -161,7 +163,6 @@ edxapp_zone_id = edxapp_zone["id"]
 kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 kms_s3_key = kms_stack.require_output("kms_s3_data_analytics_key")
 operations_vpc = network_stack.require_output("operations_vpc")
-data_vpc = network_stack.require_output("data_vpc")
 mongodb_cluster_uri = mongodb_atlas_stack.require_output("atlas_cluster")[
     "connection_strings"
 ][0]
@@ -417,11 +418,11 @@ edxapp_db_security_group = ec2.SecurityGroup(
                 data_vpc["security_groups"]["integrator"],
                 vault_stack.require_output("vault_server")["security_group"],
             ],
-            # TODO: Create Vault security group to act as source of allowed  # noqa: E501, FIX002, TD002, TD003
+            # TODO: Create Vault security group to act as source of allowed  # noqa: FIX002, TD002, TD003
             # traffic. (TMM 2021-05-04)
-            cidr_blocks=[
-                edxapp_vpc["cidr"],
-            ],
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
+                lambda pod_cidrs: [*pod_cidrs, edxapp_vpc["cidr"]]
+            ),
             protocol="tcp",
             from_port=DEFAULT_MYSQL_PORT,
             to_port=DEFAULT_MYSQL_PORT,
@@ -544,7 +545,7 @@ edxapp_db_config = OLMariaDBConfig(
     password=edxapp_config.require("db_password"),
     subnet_group_name=edxapp_vpc["rds_subnet"],
     security_groups=[edxapp_db_security_group],
-    engine_major_version="10.6",
+    engine_major_version=edxapp_config.get("db_version") or "10.11",
     tags=aws_config.tags,
     db_name="edxapp",
     storage=edxapp_config.get_int("db_storage_gb") or 50,
@@ -556,40 +557,66 @@ edxapp_db = OLAmazonDB(edxapp_db_config)
 edxapp_mysql_role_statements = mysql_role_statements.copy()
 edxapp_mysql_role_statements.pop("app")
 edxapp_mysql_role_statements["edxapp"] = {
-    "create": Template(
-        "CREATE DATABASE IF NOT EXISTS edxapp;"
-        "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
-        "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp.* TO '{{name}}'@'%';"
-    ),
-    "revoke": Template("DROP USER '{{name}}';"),
+    "create": [
+        Template("""CREATE DATABASE IF NOT EXISTS edxapp;"""),
+        Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
+        Template(
+            """
+            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES,
+            CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp.* TO '{{name}}'@'%';
+            """
+        ),
+    ],
+    "revoke": [Template("DROP USER '{{name}}';")],
+    "renew": [],
+    "rollback": [],
 }
 edxapp_mysql_role_statements["edxapp-csmh"] = {
-    "create": Template(
-        "CREATE DATABASE IF NOT EXISTS edxapp_csmh;"
-        "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
-        "CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh.* TO '{{name}}'@'%';"
-    ),
-    "revoke": Template("DROP USER '{{name}}';"),
+    "create": [
+        Template("""CREATE DATABASE IF NOT EXISTS edxapp_csmh;"""),
+        Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
+        Template(
+            """
+            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES,
+            CREATE TEMPORARY TABLES, LOCK TABLES ON edxapp_csmh.* TO '{{name}}'@'%';
+            """
+        ),
+    ],
+    "revoke": [Template("DROP USER '{{name}}';")],
+    "renew": [],
+    "rollback": [],
 }
 edxapp_mysql_role_statements["xqueue"] = {
-    "create": Template(
-        "CREATE DATABASE IF NOT EXISTS xqueue;"
-        "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
-        "CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue.* TO '{{name}}'@'%';"
-    ),
-    "revoke": Template("DROP USER '{{name}}';"),
+    "create": [
+        Template("""CREATE DATABASE IF NOT EXISTS xqueue;"""),
+        Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
+        Template(
+            """
+            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES,
+            CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue.* TO '{{name}}'@'%';
+            """
+        ),
+    ],
+    "revoke": [Template("DROP USER '{{name}}';")],
+    "renew": [],
+    "rollback": [],
 }
 edxapp_mysql_role_statements["notes"] = {
-    "create": Template(
-        "CREATE DATABASE IF NOT EXISTS edx_notes_api;"
-        "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES, "
-        "CREATE TEMPORARY TABLES, LOCK TABLES ON edx_notes_api.* TO '{{name}}'@'%';"
-    ),
-    "revoke": Template("DROP USER '{{name}}';"),
+    "create": [
+        Template("""CREATE DATABASE IF NOT EXISTS edx_notes_api;"""),
+        Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
+        Template(
+            """
+            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES,
+            CREATE TEMPORARY TABLES, LOCK TABLES ON edx_notes_api.* TO '{{name}}'@'%';
+            """
+        ),
+    ],
+    "revoke": [
+        Template("DROP USER '{{name}}';"),
+    ],
+    "renew": [],
+    "rollback": [],
 }
 
 edxapp_db_vault_backend_config = OLVaultMysqlDatabaseConfig(
@@ -972,7 +999,7 @@ lms_web_lb_target_group = lb.TargetGroup(
         healthy_threshold=3,
         timeout=10,
         interval=edxapp_config.get_int("elb_healthcheck_interval") or 30,
-        path="/user_api/v1/account/login_session/",
+        path="/heartbeat",
         port=str(DEFAULT_HTTPS_PORT),
         protocol="HTTPS",
     ),
@@ -1578,7 +1605,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
                   set obj.status = 302;
                   set obj.http.Location = table.lookup(marketing_redirects, req.url.path) + if (req.url.qs, "?" req.url.qs, "");
                   return (deliver);
-                }"""  # noqa: E501
+                }"""
             ),
             name="Route Redirect Requests",
             type="error",

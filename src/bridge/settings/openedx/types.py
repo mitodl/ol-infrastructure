@@ -39,9 +39,9 @@ class OpenEdxMicroFrontend(str, Enum):
         "communications",
     )
     course_authoring = (
-        "course-authoring",
-        "https://github.com/openedx/frontend-app-course-authoring",
-        "course-authoring",
+        "authoring",
+        "https://github.com/openedx/frontend-app-authoring",
+        "authoring",
     )
     discussion = (
         "discussions",
@@ -92,9 +92,10 @@ class OpenEdxSupportedRelease(str, Enum):
         enum_element.node_version = node_version
         return enum_element
 
-    master = ("master", "master", "3.11", "18")
+    master = ("master", "master", "3.11", "20")
     quince = ("quince", "open-release/quince.master", "3.8", "18")
     redwood = ("redwood", "open-release/redwood.master", "3.11", "18")
+    sumac = ("sumac", "open-release/sumac.master", "3.11", "20")
 
     def __str__(self):
         return self.value

@@ -1,0 +1,10 @@
+---
+encryptionsalt: v1:tpn96ot40Z4=:v1:Jwj0tmffGMlWJzIu:RJQDvm+3deBu6011y3tjtI+3wLlMiw==
+config:
+  mailgun:apiKey:
+    secure: v1:nWcIY984Q+9bMOWB:fuboWRtkQpIcC7y0ND4m3FOHCPLonHmkt0FMm2O1QqyW2D5tt5+WHqHZbJPTUbyfbG4NYtFqKU1VqoVm+ZyQTPux
+  mitlearn:smtp_noreply_password:
+    secure: v1:ulE82Q/Lb1kEfJbC:PURoZD0pOdAYOJSlPp2ZI9n5CYckG+s8jsoEa9R4n5qgMHI6SHyF5+VQf9PHpKay
+  mitlearn:smtp_postmaster_password:
+    secure: v1:ZR4lHftkNOhHXSyo:cmYnynFV9t5KGGwCK04G7mhBrqUti+ZQFvKPm4r+6BlRhYEKAiYcbP6fHsIQvJwL
+  mitlearn:url: mail-rc.learn.mit.edu

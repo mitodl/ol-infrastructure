@@ -139,7 +139,7 @@ def github_issues(  # noqa: PLR0913
         name=name,
         type="github-issues",
         icon="github",
-        check_every="1h",
+        check_every="15m",
         expose_build_created_by=True,
         source={k: v for k, v in issue_config.items() if v is not None},
     )
@@ -221,9 +221,10 @@ def pypi(
 
 def schedule(
     name: Identifier,
-    interval: str,
+    interval: Optional[str] = None,
     start: Optional[str] = None,
     stop: Optional[str] = None,
+    days: Optional[list[str]] = None,
 ) -> Resource:
     return Resource(
         name=name,
@@ -233,6 +234,7 @@ def schedule(
             "interval": interval,
             "start": start,
             "stop": stop,
+            "days": days,
         },
     )
 
@@ -265,6 +267,24 @@ def registry_image(  # noqa: PLR0913
 def slack_notification(name: Identifier, url: str) -> Resource:
     return Resource(
         name=name, type="slack-notification", source={"url": url, "disabled": False}
+    )
+
+
+def s3_object(
+    name: Identifier,
+    bucket: str,
+    object_path: str | None = None,
+    object_regex: str | None = None,
+):
+    return Resource(
+        name=name,
+        type="s3",
+        icon="bucket",
+        source={
+            "bucket": bucket,
+            "regexp": object_regex,
+            "versioned_file": object_path,
+        },
     )
 
 

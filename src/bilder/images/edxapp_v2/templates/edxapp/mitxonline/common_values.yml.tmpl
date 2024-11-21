@@ -32,6 +32,7 @@ redis_cache_config: &redis_cache_config
     PASSWORD: {{ .Data.redis_auth_token }}
 SECRET_KEY: {{ .Data.django_secret_key }}
 JWT_AUTH:  # NEEDS ATTENTION
+    JWT_ALGORITHM: HS256
     JWT_AUDIENCE: mitxonline
     JWT_AUTH_COOKIE: {{ env "ENVIRONMENT"}}-edx-jwt-cookie
     JWT_AUTH_COOKIE_HEADER_PAYLOAD: {{ env "ENVIRONMENT" }}-edx-jwt-cookie-header-payload
@@ -47,11 +48,16 @@ JWT_AUTH:  # NEEDS ATTENTION
       - ISSUER: https://{{ key "edxapp/lms-domain" }}/oauth2
         AUDIENCE: mitxonline
         SECRET_KEY: {{ .Data.django_secret_key }}
+OPENAI_SECRET_KEY: {{ .Data.openai_api_key }}
+OPENAI_API_KEY: {{ .Data.openai_api_key }}
 RETIRED_USER_SALTS: {{ .Data.user_retirement_salts }}
 SENTRY_DSN: {{ .Data.sentry_dsn }}
+{{ end }}
+
+{{ with secret "secret-mitxonline/edx-xqueue" }}
 XQUEUE_INTERFACE:
     django_auth:
-        password: {{ .Data.xqueue_edxapp_password }}
+        password: {{ .Data.edxapp_password }}
         username: edxapp
     url: http://xqueue.service.consul:8040  # MODIFIED
 {{ end }}
@@ -174,6 +180,12 @@ CACHES:  # MODIFIED
     staticfiles:
       <<: *redis_cache_config
       KEY_PREFIX: staticfiles
+CELERYBEAT_SCHEDULE:
+    send-email-digest:
+      task: openedx.core.djangoapps.notifications.email.tasks.send_digest_email_to_all_users
+      schedule: 86400 # 24 hours in seconds
+      args:
+        - "Daily"
 CELERYBEAT_SCHEDULER: redbeat.RedBeatScheduler  # MODIFIED
 CELERY_BROKER_HOSTNAME: edxapp-redis.service.consul:6379  # MODIFIED
 CELERY_BROKER_TRANSPORT: rediss  # MODIFIED - second "s" indicates "secure"
@@ -270,7 +282,7 @@ FEATURES:
     AUTH_USE_OPENID_PROVIDER: true
     AUTOMATIC_AUTH_FOR_TESTING: false
     CUSTOM_COURSES_EDX: false
-    CERTIFICATES_HTML_VIEW: true  # ADDED KEY
+    CERTIFICATES_HTML_VIEW: false  # ADDED KEY
     EMBARGO: true  # ADDED KEY
     ENABLE_BLAKE2B_HASHING: true
     ENABLE_BULK_ENROLLMENT_VIEW: false
@@ -317,7 +329,7 @@ FINANCIAL_REPORTS:
     BUCKET: null
     ROOT_PATH: sandbox
     STORAGE_TYPE: localfs
-FOOTER_ORGANIZATION_IMAGE: images/logo.png
+FOOTER_ORGANIZATION_IMAGE: /images/logo.png
 GITHUB_REPO_ROOT: /openedx/data
 GOOGLE_ANALYTICS_ACCOUNT: {{ key "edxapp/google-analytics-id" }}
 GRADES_DOWNLOAD:
@@ -342,6 +354,7 @@ JWT_EXPIRATION: 30
 LANGUAGE_CODE: en
 LANGUAGE_COOKIE: {{ env "ENVIRONMENT" }}-openedx-language-preference
 LEARNER_PORTAL_URL_ROOT: https://learner-portal-localhost:18000
+LEARNING_MICROFRONTEND_URL: https://{{ key "edxapp/lms-domain" }}/learn
 LMS_BASE: {{ key "edxapp/lms-domain" }}  # MODIFIED
 LMS_INTERNAL_ROOT_URL: https://{{ key "edxapp/lms-domain" }}  # MODIFIED
 LMS_ROOT_URL: https://{{ key "edxapp/lms-domain" }}  # MODIFIED
@@ -477,6 +490,7 @@ SESSION_COOKIE_DOMAIN: {{ key "edxapp/session-cookie-domain" }}  # MODIFIED
 SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
 SOCIAL_MEDIA_FOOTER_URLS: {}
+SOCIAL_MEDIA_FOOTER_ACE_URLS: {}
 SOCIAL_SHARING_SETTINGS:
     CERTIFICATE_FACEBOOK: false
     CERTIFICATE_TWITTER: false

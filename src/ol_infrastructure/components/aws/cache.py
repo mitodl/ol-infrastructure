@@ -9,7 +9,6 @@ import re
 from typing import Any, Optional, Union
 
 import pulumi
-from bridge.lib.magic_numbers import DEFAULT_MEMCACHED_PORT, DEFAULT_REDIS_PORT
 from pulumi_aws import elasticache
 from pydantic import (
     ConfigDict,
@@ -19,6 +18,7 @@ from pydantic import (
     field_validator,
 )
 
+from bridge.lib.magic_numbers import DEFAULT_MEMCACHED_PORT, DEFAULT_REDIS_PORT
 from ol_infrastructure.components.aws.cloudwatch import (
     OLCloudWatchAlarmSimpleElastiCache,
     OLCloudWatchAlarmSimpleElastiCacheConfig,
@@ -220,6 +220,7 @@ class OLAmazonCache(pulumi.ComponentResource):
                     cluster_id=cache_config.cluster_name,
                     node_id=node_id_suffix,
                     name=f"{cache_config.cluster_name}{node_id_suffix}-{alarm_name}-OLCloudWatchAlarmSimpleElastiCacheConfig",
+                    tags=cache_config.tags,
                     **alarm_args,
                 )
                 OLCloudWatchAlarmSimpleElastiCache(alarm_config=alarm_config)

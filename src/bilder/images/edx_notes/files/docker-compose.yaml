@@ -1,7 +1,7 @@
 ---
 services:
   notes_api:
-    image: mitodl/openedx-notes:${OPENEDX_RELEASE}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/openedx-notes:${OPENEDX_RELEASE}
     ports:
     - 8000
     env_file:
@@ -16,7 +16,7 @@ services:
     # https://github.com/openedx/edx-notes-api/blob/master/notesserver/settings/yaml_config.py
     - /etc/docker/compose/edx_notes_settings.yaml:/app/edx-notes-api/edx_notes_api.yml:ro
   traefik:
-    image: traefik:v3.1
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/library/traefik:v3.2
     command:
     - "--configFile=/etc/traefik/traefik.yaml"
     ports:

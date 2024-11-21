@@ -9,6 +9,10 @@ from pathlib import Path
 import pulumi_consul as consul
 import pulumi_vault as vault
 import yaml
+from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_consul import Node, Service, ServiceCheckArgs
+
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_HTTP_PORT,
@@ -17,10 +21,6 @@ from bridge.lib.magic_numbers import (
     DEFAULT_REDIS_PORT,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam, route53
-from pulumi_consul import Node, Service, ServiceCheckArgs
-
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
@@ -285,6 +285,7 @@ ocw_studio_vault_backend_role = vault.aws.SecretBackendRole(
     name="ovs-server",
     backend="aws-mitx",
     credential_type="iam_user",
+    iam_tags={"OU": "operations", "vault_managed": "True"},
     policy_arns=[
         policy_stack.require_output("iam_policies")["describe_instances"],
         ovs_server_policy.arn,
@@ -338,7 +339,9 @@ ovs_database_security_group = ec2.SecurityGroup(
                 vault_stack.require_output("vault_server")["security_group"],
                 data_vpc["security_groups"]["integrator"],
             ],
-            cidr_blocks=[target_vpc["cidr"]],
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
+                lambda pod_cidrs: [*pod_cidrs, target_vpc["cidr"]]
+            ),
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,

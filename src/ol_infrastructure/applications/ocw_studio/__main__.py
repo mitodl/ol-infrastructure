@@ -12,11 +12,11 @@ from pathlib import Path
 import pulumi_github as github
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
-from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
-from bridge.secrets.sops import read_yaml_secrets
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
 from pulumi_aws import cloudwatch, ec2, iam, mediaconvert, s3, sns
 
+from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -243,6 +243,7 @@ ocw_studio_vault_backend_role = vault.aws.SecretBackendRole(
     name=f"ocw-studio-app-{stack_info.env_suffix}",
     backend="aws-mitx",
     credential_type="iam_user",
+    iam_tags={"OU": "operations", "vault_managed": "True"},
     policy_arns=[ocw_studio_iam_policy.arn],
 )
 
@@ -264,6 +265,7 @@ ocw_studio_db_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
             security_groups=[data_vpc["security_groups"]["integrator"]],
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
         ),
     ],
     egress=[
@@ -426,6 +428,9 @@ heroku_vars = {
     "OCW_STUDIO_ENVIRONMENT": env_name,
     "OCW_STUDIO_USE_S3": "True",
     "OCW_WWW_TEST_SLUG": "ocw-ci-test-www",
+    "POSTHOG_API_HOST": "https://app.posthog.com",
+    "POSTHOG_ENABLED": "True",
+    "POSTHOG_PROJECT_API_KEY": "phc_XDgBzghi6cHYiBbiTsL91Fw03j073dXNSxtG7MWfeS0",  # pragma: allowlist secret
     "PREPUBLISH_ACTIONS": "videos.tasks.update_transcripts_for_website,videos.youtube.update_youtube_metadata,content_sync.tasks.update_website_in_root_website",
     "SOCIAL_AUTH_SAML_CONTACT_NAME": "Open Learning Support",
     "SOCIAL_AUTH_SAML_IDP_ATTRIBUTE_EMAIL": "urn:oid:0.9.2342.19200300.100.1.3",

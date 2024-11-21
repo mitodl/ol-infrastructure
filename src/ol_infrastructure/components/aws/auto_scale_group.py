@@ -1,12 +1,6 @@
 from typing import Literal, Optional, Union
 
 import pulumi
-from bridge.lib.magic_numbers import (
-    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
-    AWS_TARGET_GROUP_NAME_MAX_LENGTH,
-    DEFAULT_HTTP_PORT,
-    DEFAULT_HTTPS_PORT,
-)
 from pulumi_aws.acm import get_certificate
 from pulumi_aws.autoscaling import (
     Group,
@@ -35,6 +29,12 @@ from pulumi_aws.lb import (
 )
 from pydantic import BaseModel, ConfigDict, NonNegativeInt, PositiveInt, field_validator
 
+from bridge.lib.magic_numbers import (
+    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
+    AWS_TARGET_GROUP_NAME_MAX_LENGTH,
+    DEFAULT_HTTP_PORT,
+    DEFAULT_HTTPS_PORT,
+)
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
@@ -179,6 +179,7 @@ class OLAutoScaleGroupConfig(AWSBase):
     instance_refresh_min_healthy_percentage: NonNegativeInt = NonNegativeInt(50)
     instance_refresh_strategy: str = "Rolling"
     instance_refresh_triggers: list[str] = ["tag"]  # noqa: RUF012
+    max_instance_lifetime_seconds: Optional[NonNegativeInt] = 2592000  # 30 days
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("instance_refresh_strategy")
@@ -207,7 +208,7 @@ class OLAutoScaling(pulumi.ComponentResource):
     auto_scale_group: Group = None
     launch_template: LaunchTemplate = None
 
-    def __init__(  # noqa: C901, PLR0913, PLR0912
+    def __init__(  # noqa: C901, PLR0912
         self,
         asg_config: OLAutoScaleGroupConfig,
         lt_config: OLLaunchTemplateConfig,
@@ -441,6 +442,7 @@ class OLAutoScaling(pulumi.ComponentResource):
             ),
             max_size=asg_config.max_size,
             min_size=asg_config.min_size,
+            max_instance_lifetime=asg_config.max_instance_lifetime_seconds,
             tags=asg_tags,
             vpc_zone_identifiers=asg_config.vpc_zone_identifiers,
             opts=resource_options,

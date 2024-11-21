@@ -1,44 +1,52 @@
 """Create the resources needed to run a airbyte server.  # noqa: D200"""
 
-import base64
 import json
-import textwrap
+import os
 from pathlib import Path
+from string import Template
 
 import pulumi_consul as consul
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-import yaml
+from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi_aws import ec2, get_caller_identity, iam, s3
+from pulumi_consul import Node, Service, ServiceCheckArgs
+
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
 )
+from bridge.lib.versions import AIRBYTE_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
-from pulumi import Config, Output, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
-from pulumi_consul import Node, Service, ServiceCheckArgs
-
-from ol_infrastructure.components.aws.auto_scale_group import (
-    BlockDeviceMapping,
-    OLAutoScaleGroupConfig,
-    OLAutoScaling,
-    OLLaunchTemplateConfig,
-    OLLoadBalancerConfig,
-    OLTargetGroupConfig,
-    TagSpecification,
-)
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.eks import (
+    OLEKSGateway,
+    OLEKSGatewayConfig,
+    OLEKSGatewayListenerConfig,
+    OLEKSGatewayRouteConfig,
+    OLEKSTrustRole,
+    OLEKSTrustRoleConfig,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
+    OLVaultK8SDynamicSecretConfig,
+    OLVaultK8SResources,
+    OLVaultK8SResourcesConfig,
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
+from ol_infrastructure.lib.aws.iam_helper import (
+    IAM_POLICY_VERSION,
+    lint_iam_policy,
+)
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
-from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
 ##################################
 ##    Setup + Config Retrival   ##
@@ -47,11 +55,14 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 stack_info = parse_stack()
 setup_vault_provider(stack_info)
 airbyte_config = Config("airbyte")
+vault_config = Config("vault")
+
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
 consul_stack = StackReference(f"infrastructure.consul.data.{stack_info.name}")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+cluster_stack = StackReference(f"infrastructure.aws.eks.data.{stack_info.name}")
 
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
@@ -59,6 +70,7 @@ env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
 target_vpc_name = airbyte_config.get("target_vpc") or f"{stack_info.env_prefix}_vpc"
 target_vpc = network_stack.require_output(target_vpc_name)
+k8s_pod_subnet_cidrs = target_vpc["k8s_pod_subnet_cidrs"]
 
 consul_security_groups = consul_stack.require_output("security_groups")
 aws_config = AWSBase(
@@ -67,6 +79,17 @@ aws_config = AWSBase(
         "Environment": f"{env_name}",
     }
 )
+
+k8s_global_labels = {
+    "pulumi_managed": "true",
+    "pulumi_stack": stack_info.full_name,
+}
+k8s_provider = kubernetes.Provider(
+    "k8s-provider",
+    kubeconfig=cluster_stack.require_output("kube_config"),
+)
+airbyte_namespace = "airbyte"
+
 aws_account = get_caller_identity()
 vpc_id = target_vpc["id"]
 airbyte_server_ami = ec2.get_ami(
@@ -81,6 +104,10 @@ airbyte_server_ami = ec2.get_ami(
 
 airbyte_server_tag = f"airbyte-server-{env_name}"
 consul_provider = get_consul_provider(stack_info)
+
+VERSIONS = {
+    "AIRBYTE_CHART": os.environ.get("AIRBYTE_CHART_VERSION", AIRBYTE_CHART_VERSION),
+}
 
 ###############################
 ##     General Resources     ##
@@ -118,6 +145,9 @@ parliament_config = {
         "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
     },
     "UNKNOWN_ACTION": {"ignore_locations": []},
+    "RESOURCE_MISMATCH": {"ignore_locations": []},
+    "UNKNOWN_CONDITION_FOR_ACTION": {"ignore_locations": []},
+    "RESOURCE_STAR": {"ignore_locations": []},
 }
 
 airbyte_app_policy_document = {
@@ -136,6 +166,23 @@ airbyte_app_policy_document = {
             "Effect": "Allow",
             "Action": "s3:ListBucket",
             "Resource": f"arn:aws:s3:::{airbyte_bucket_name}",
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:CreateSecret",
+                "secretsmanager:ListSecrets",
+                "secretsmanager:DescribeSecret",
+                "secretsmanager:TagResource",
+                "secretsmanager:UpdateSecret",
+            ],
+            "Resource": ["*"],
+            "Condition": {
+                "ForAllValues:StringEquals": {
+                    "secretsmanager:ResourceTag/AirbyteManaged": "true"
+                }
+            },
         },
     ],
 }
@@ -294,12 +341,6 @@ iam.RolePolicyAttachment(
     role=airbyte_server_instance_role.name,
 )
 
-airbyte_server_instance_profile = iam.InstanceProfile(
-    f"airbyte-server-instance-profile-{env_name}",
-    role=airbyte_server_instance_role.name,
-    path="/ol-infrastructure/airbyte-server/profile/",
-)
-
 airbyte_lakeformation_role = iam.Role(
     "airbyte-lakeformation-role",
     assume_role_policy=airbyte_server_instance_role.arn.apply(
@@ -333,18 +374,13 @@ airbyte_server_vault_policy = vault.Policy(
     name="airbyte-server",
     policy=Path(__file__).parent.joinpath("airbyte_server_policy.hcl").read_text(),
 )
-# Register Airbyte AMI for Vault AWS auth
-vault.aws.AuthBackendRole(
-    "airbyte-server-ami-ec2-vault-auth",
-    backend="aws",
-    auth_type="iam",
-    role="airbyte-server",
-    inferred_entity_type="ec2_instance",
-    inferred_aws_region=aws_config.region,
-    bound_iam_instance_profile_arns=[airbyte_server_instance_profile.arn],
-    bound_ami_ids=[airbyte_server_ami.id],
-    bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[vpc_id],
+
+airbyte_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    "airbyte-vault-k8s-auth-backend-role",
+    role_name="airbyte",
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["*"],
+    bound_service_account_namespaces=[airbyte_namespace],
     token_policies=[airbyte_server_vault_policy.name],
 )
 
@@ -364,6 +400,7 @@ vault.aws.SecretBackendRole(
     name="airbyte-sources",
     backend="aws-mitx",
     credential_type="iam_user",
+    iam_tags={"OU": "operations", "vault_managed": "True"},
     policy_arns=[s3_source_policy.arn],
 )
 
@@ -416,6 +453,14 @@ airbyte_db_security_group = ec2.SecurityGroup(
             to_port=DEFAULT_POSTGRES_PORT,
             description="Access to Postgres from Airbyte nodes.",
         ),
+        ec2.SecurityGroupIngressArgs(
+            cidr_blocks=k8s_pod_subnet_cidrs,
+            description="Allow k8s cluster ipblocks to talk to DB",
+            from_port=DEFAULT_POSTGRES_PORT,
+            protocol="tcp",
+            security_groups=[],
+            to_port=DEFAULT_POSTGRES_PORT,
+        ),
     ],
     tags=aws_config.tags,
     vpc_id=vpc_id,
@@ -450,15 +495,25 @@ db_address = airbyte_db.db_instance.address
 db_port = airbyte_db.db_instance.port
 db_name = airbyte_db.db_instance.db_name
 
+# Need special database credentialsA
+airbyte_role_statements = postgres_role_statements.copy()
+airbyte_role_statements["app"]["create"].append(
+    Template("ALTER ROLE ${app_name} WITH CREATEDB;")
+)
+
 airbyte_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=airbyte_db_config.db_name,
     mount_point=f"{airbyte_db_config.engine}-airbyte",
     db_admin_username=airbyte_db_config.username,
     db_admin_password=rds_password,
     db_host=airbyte_db.db_instance.address,
+    role_statements=airbyte_role_statements,
 )
 airbyte_db_vault_backend = OLVaultDatabaseBackend(airbyte_db_vault_backend_config)
 
+##################################
+#     Consul Configs             #
+##################################
 airbyte_db_consul_node = Node(
     "airbyte-instance-db-node",
     name="airbyte-postgres-db",
@@ -530,155 +585,570 @@ consul.Keys(
     opts=consul_provider,
 )
 
-###################################
-#     Web Node EC2 Deployment     #
-###################################
-lb_config = OLLoadBalancerConfig(
-    subnets=target_vpc["subnet_ids"],
-    security_groups=[airbyte_server_security_group],
-    # Give extra time for discover_schema calls in connection setup
-    idle_timeout_seconds=60 * 5,
-    tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
+##################################
+#     General K8S + IAM Config   #
+##################################
+airbyte_service_account_name = "airbyte-admin"
+
+airbyte_trust_role_config = OLEKSTrustRoleConfig(
+    account_id=aws_account.account_id,
+    cluster_name=f"data-{stack_info.name}",
+    cluster_identities=cluster_stack.require_output("cluster_identities"),
+    description="Trust role for allowing the airbyte service account to "
+    "access the aws API",
+    policy_operator="StringEquals",
+    role_name="airbyte",
+    service_account_identifier=f"system:serviceaccount:{airbyte_namespace}:{airbyte_service_account_name}",
+    tags=aws_config.tags,
 )
 
-tg_config = OLTargetGroupConfig(
-    vpc_id=vpc_id,
-    health_check_interval=60,
-    health_check_matcher="200-399",
-    health_check_path="/api/health",
-    health_check_unhealthy_threshold=6,  # give extra time for airbyte to start up
-    tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
+airbyte_trust_role = OLEKSTrustRole(
+    f"{env_name}-ol-trust-role",
+    role_config=airbyte_trust_role_config,
+    opts=ResourceOptions(provider=k8s_provider),
+)
+iam.RolePolicyAttachment(
+    f"airbyte-service-account-data-lake-access-policy-{env_name}",
+    policy_arn=data_lake_policy.arn,
+    role=airbyte_trust_role.role.name,
+)
+iam.RolePolicyAttachment(
+    f"airbyte-service-account-s3-source-access-policy-{env_name}",
+    policy_arn=s3_source_policy.arn,
+    role=airbyte_trust_role.role.name,
+)
+iam.RolePolicyAttachment(
+    "airbyte-service-account-policy-attachement",
+    policy_arn=airbyte_app_policy.arn,
+    role=airbyte_trust_role.role.name,
 )
 
-consul_datacenter = consul_stack.require_output("datacenter")
-grafana_credentials = read_yaml_secrets(
-    Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
+airbyte_service_account_name = "airbyte-admin"
+vault_k8s_resources_config = OLVaultK8SResourcesConfig(
+    application_name="airbyte",
+    namespace=airbyte_namespace,
+    labels=k8s_global_labels,
+    vault_address=vault_config.require("address"),
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    vault_auth_role_name=airbyte_vault_k8s_auth_backend_role.role_name,
 )
-
-block_device_mappings = [BlockDeviceMapping(volume_size=500)]
-tag_specs = [
-    TagSpecification(
-        resource_type="instance",
-        tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
-    ),
-    TagSpecification(
-        resource_type="volume",
-        tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
-    ),
-]
-
-lt_config = OLLaunchTemplateConfig(
-    block_device_mappings=block_device_mappings,
-    image_id=airbyte_server_ami.id,
-    instance_type=airbyte_config.get("instance_type") or InstanceTypes.burstable_medium,
-    instance_profile_arn=airbyte_server_instance_profile.arn,
-    security_groups=[
-        airbyte_server_security_group,
-        consul_security_groups["consul_agent"],
-        target_vpc["security_groups"]["integrator"],
-    ],
-    tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
-    tag_specifications=tag_specs,
-    user_data=consul_datacenter.apply(
-        lambda consul_dc: base64.b64encode(
-            "#cloud-config\n{}".format(
-                yaml.dump(
-                    {
-                        "write_files": [
-                            {
-                                "path": "/etc/consul.d/02-autojoin.json",
-                                "content": json.dumps(
-                                    {
-                                        "retry_join": [
-                                            "provider=aws tag_key=consul_env "
-                                            f"tag_value={consul_dc}"
-                                        ],
-                                        "datacenter": consul_dc,
-                                    }
-                                ),
-                                "owner": "consul:consul",
-                            },
-                            {
-                                "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
-                            ENVIRONMENT={consul_dc}
-                            APPLICATION=air-byte
-                            SERVICE=data-platform
-                            VECTOR_CONFIG_DIR=/etc/vector/
-                            VECTOR_STRICT_ENV_VARS=false
-                            AWS_REGION={aws_config.region}
-                            GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
-                            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
-                            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-                            """
-                                ),
-                                "owner": "root:root",
-                            },
-                        ]
-                    },
-                    sort_keys=True,
-                )
-            ).encode("utf8")
-        ).decode("utf8")
+vault_k8s_resources = OLVaultK8SResources(
+    resource_config=vault_k8s_resources_config,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        delete_before_replace=True,
+        depends_on=[airbyte_vault_k8s_auth_backend_role],
     ),
 )
 
-auto_scale_config = airbyte_config.get_object("auto_scale") or {
-    "desired": 1,
-    "min": 1,
-    "max": 2,
+app_db_creds_secret_name = "app-db-creds"  # noqa: S105  # pragma: allowlist secret
+app_db_creds_dynamic_secret_config = OLVaultK8SDynamicSecretConfig(
+    name="airbyte-app-db-creds",
+    dest_secret_labels=k8s_global_labels,
+    dest_secret_name=app_db_creds_secret_name,
+    exclude_raw=True,
+    labels=k8s_global_labels,
+    mount=airbyte_db_vault_backend_config.mount_point,
+    namespace=airbyte_namespace,
+    path="creds/app",
+    templates={
+        "DATABASE_USER": '{{ get .Secrets "username" }}',
+        "DATABASE_PASSWORD": '{{  get .Secrets "password" }}',
+    },
+    vaultauth=vault_k8s_resources.auth_name,
+)
+app_db_creds_dynamic_secret = OLVaultK8SSecret(
+    "airbyte-app-db-creds-vaultdynamicsecret",
+    resource_config=app_db_creds_dynamic_secret_config,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+    ),
+)
+
+default_resources_definition = {
+    "requests": {
+        "cpu": "100m",
+        "memory": "1Gi",
+    },
 }
-asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"airbyte-server-{env_name}",
-    aws_config=aws_config,
-    desired_size=auto_scale_config["desired"],
-    min_size=auto_scale_config["min"],
-    max_size=auto_scale_config["max"],
-    vpc_zone_identifiers=target_vpc["subnet_ids"],
-    tags=aws_config.merged_tags({"Name": airbyte_server_tag}),
+
+airbyte_helm_release = kubernetes.helm.v3.Release(
+    "airbyte-helm-release",
+    kubernetes.helm.v3.ReleaseArgs(
+        name="airbyte",
+        chart="airbyte",
+        version=VERSIONS["AIRBYTE_CHART"],
+        namespace=airbyte_namespace,
+        cleanup_on_fail=True,
+        repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+            repo="https://airbytehq.github.io/helm-charts",
+        ),
+        values={
+            "global": {
+                "serviceAccountName": airbyte_service_account_name,
+                "deploymentMode": "oss",
+                "edition": "community",
+                "database": {
+                    "type": "external",
+                    "secretName": app_db_creds_secret_name,
+                    "userSecretKey": "DATABASE_USER",  # pragma: allowlist secret
+                    "passwordSecretKey": "DATABASE_PASSWORD",  # pragma: allowlist secret  # noqa: E501
+                    "host": db_address,
+                    "database": db_name,
+                    "port": DEFAULT_POSTGRES_PORT,
+                    "jdbcUrl": connection_string,
+                },
+                "storage": {
+                    "type": "s3",
+                    "bucket": {
+                        "log": airbyte_bucket_name,
+                        "state": airbyte_bucket_name,
+                        "workloadOutput": airbyte_bucket_name,
+                    },
+                    "s3": {
+                        "region": aws_config.region,
+                        "authenticationType": "instanceProfile",
+                    },
+                },
+                "secretsManager": {
+                    "type": "awsSecretManager",
+                    "awsSecretManager": {
+                        "region": "us-east-1",
+                        "authenticationType": "instanceProfile",
+                        "tags": [{"key": "OU", "value": "data"}],
+                    },
+                },
+            },
+            "serviceAccount": {
+                "create": True,
+                "name": airbyte_service_account_name,
+                "annotations": {
+                    "eks.amazonaws.com/role-arn": airbyte_trust_role.role.arn.apply(
+                        lambda arn: f"{arn}"
+                    ),
+                },
+            },
+            "webapp": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podAnnotations": {},
+                "podLabels": k8s_global_labels,
+                "resources": default_resources_definition,
+                "ingress": {
+                    "enabled": False,
+                },
+            },
+            "pod-sweeper": {
+                "enabled": True,
+                "podLabels": k8s_global_labels,
+                "resources": default_resources_definition,
+            },
+            "server": {
+                "enabled": True,
+                "replicaCount": 2,
+                "podLabels": k8s_global_labels,
+                "resources": default_resources_definition,
+                "log": {
+                    "level": "DEBUG",
+                },
+                "extraEnv": [  # How long to attempt new source schema discovery
+                    {"name": "HTTP_IDLE_TIMEOUT", "value": "20m"},
+                    {"name": "READ_TIMEOUT", "value": "30m"},
+                ],
+            },
+            "worker": {
+                "enabled": True,
+                "replicaCount": 2,
+                "podLabels": k8s_global_labels,
+                "resources": default_resources_definition,
+            },
+            "workload-launcher": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podLabels": k8s_global_labels,
+                "resources": default_resources_definition,
+            },
+            "metrics": {
+                "enabled": False,
+            },
+            "airbyte-bootloader": {
+                "enabled": True,
+                "podLabels": k8s_global_labels,
+                "resources": default_resources_definition,
+                "log": {
+                    "level": "DEBUG",
+                },
+            },
+            "temporal": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podLabels": k8s_global_labels,
+                "resources": default_resources_definition,
+            },
+            "temporal-ui": {
+                "enabled": False,
+            },
+            "postgresql": {
+                "enabled": False,
+            },
+            "cron": {
+                "enabled": True,
+                "replicaCount": 1,
+                "podLabels": k8s_global_labels,
+                "resources": default_resources_definition,
+            },
+        },
+        skip_await=True,
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        depends_on=[
+            app_db_creds_dynamic_secret,
+            airbyte_trust_role,
+            airbyte_db_vault_backend,
+            airbyte_db,
+        ],
+        delete_before_replace=True,
+    ),
 )
 
-as_setup = OLAutoScaling(
-    asg_config=asg_config,
-    lt_config=lt_config,
-    tg_config=tg_config,
-    lb_config=lb_config,
+# A filthy hack to override the development.yaml file that comes standard with
+# the installation of temporal.
+#
+# This WILL NOT take effect until temporal is restarted manually with something like:
+# `kubectl rollout restart deployment airbyte-temporal -n airbyte`
+override_dynamicconfig_data = (
+    Path(__file__).parent.joinpath("files/override-dynamicconfig.yaml").read_text()
 )
 
-## Create Route53 DNS records for airbyte
-five_minutes = 60 * 5
-route53.Record(
-    "airbyte-server-dns-record",
-    name=airbyte_config.require("web_host_domain"),
-    type="CNAME",
-    ttl=five_minutes,
-    records=[as_setup.load_balancer.dns_name],
-    zone_id=mitodl_zone_id,
+override_dynamicconfig_configmap_patch = kubernetes.core.v1.ConfigMapPatch(
+    "airbyte-override-dynamicconfig-configmap-patch",
+    metadata=kubernetes.meta.v1.ObjectMetaPatchArgs(
+        name="airbyte-temporal-dynamicconfig",
+        namespace=airbyte_namespace,
+        annotations={
+            "pulumi.com/patchForce": "true",
+        },
+    ),
+    data={"development.yaml": override_dynamicconfig_data},
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=airbyte_helm_release,
+        depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
 )
-route53.Record(
-    "airbyte-api-server-dns-record",
-    name=f"api-{airbyte_config.require('web_host_domain')}",
-    type="CNAME",
-    ttl=five_minutes,
-    records=[as_setup.load_balancer.dns_name],
-    zone_id=mitodl_zone_id,
+
+##################################
+#     Gateway + forward Auth     #
+##################################
+basic_auth_middleware_name = "airbyte-basic-auth"
+forward_auth_middleware_name = "airbyte-forward-auth"
+
+gateway_config = OLEKSGatewayConfig(
+    cert_issuer="letsencrypt-production",
+    cert_issuer_class="cluster-issuer",
+    gateway_name="airbyte",
+    hostnames=[
+        airbyte_config.require("web_host_domain"),
+        airbyte_config.require("api_host_domain"),
+    ],
+    namespace=airbyte_namespace,
+    listeners=[
+        OLEKSGatewayListenerConfig(
+            name="https-web",
+            hostname=airbyte_config.require("web_host_domain"),
+            port=8443,
+            tls_mode="Terminate",
+            certificate_secret_name="airbyte-webapp-tls",  # noqa: S106 # pragma: allowlist secret
+            certificate_secret_namespace=airbyte_namespace,
+        ),
+        OLEKSGatewayListenerConfig(
+            name="https-api",
+            hostname=airbyte_config.require("api_host_domain"),
+            port=8443,
+            tls_mode="Terminate",
+            certificate_secret_name="airbyte-api-tls",  # noqa: S106 # pragma: allowlist secret
+            certificate_secret_namespace=airbyte_namespace,
+        ),
+    ],
+    routes=[
+        # Some of the info here is sourced from the helm chart
+        # Calls to /v1/* get basic-auth in front of them
+        OLEKSGatewayRouteConfig(
+            backend_service_name="airbyte-airbyte-webapp-svc",
+            backend_service_namespace=airbyte_namespace,
+            backend_service_port=80,
+            name="airbyte-https-v1",
+            listener_name="https-api",
+            hostnames=[airbyte_config.require("api_host_domain")],
+            port=8443,
+            matches=[
+                {
+                    "path": {
+                        "type": "PathPrefix",
+                        "value": "/",
+                    },
+                },
+            ],
+            filters=[
+                {
+                    "type": "ExtensionRef",
+                    "extensionRef": {
+                        "group": "traefik.io",
+                        "kind": "Middleware",
+                        "name": basic_auth_middleware_name,
+                    },
+                },
+            ],
+        ),
+        # All other calls get forward-auth
+        OLEKSGatewayRouteConfig(
+            backend_service_name="airbyte-airbyte-webapp-svc",
+            backend_service_namespace=airbyte_namespace,
+            backend_service_port=80,
+            name="airbyte-https-root",
+            listener_name="https-web",
+            hostnames=[airbyte_config.require("web_host_domain")],
+            port=8443,
+            matches=[
+                {
+                    "path": {
+                        "type": "PathPrefix",
+                        "value": "/",
+                    },
+                },
+            ],
+            filters=[
+                {
+                    "type": "ExtensionRef",
+                    "extensionRef": {
+                        "group": "traefik.io",
+                        "kind": "Middleware",
+                        "name": forward_auth_middleware_name,
+                    },
+                },
+            ],
+        ),
+    ],
 )
-route53.Record(
-    "airbyte-config-api-dns-record",
-    name=f"config-{airbyte_config.require('web_host_domain')}",
-    type="CNAME",
-    ttl=five_minutes,
-    records=[as_setup.load_balancer.dns_name],
-    zone_id=mitodl_zone_id,
+
+gateway = OLEKSGateway(
+    "airbyte-gateway",
+    gateway_config=gateway_config,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=airbyte_helm_release,
+        depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
 )
-route53.Record(
-    "airbyte-auth-dns-record",
-    name=airbyte_config.require("auth_domain"),
-    type="CNAME",
-    ttl=five_minutes,
-    records=[as_setup.load_balancer.dns_name],
-    zone_id=mitodl_zone_id,
+# This basic auth is used by dagster to access the config api
+basic_auth_secret_name = "airbyte-basic-auth"  # noqa: S105  # pragma: allowlist secret
+
+basic_auth_middleware = kubernetes.apiextensions.CustomResource(
+    "airbyte-basic-auth-traefik-middleware",
+    api_version="traefik.io/v1alpha1",
+    kind="Middleware",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=basic_auth_middleware_name,
+        namespace=airbyte_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "basicAuth": {
+            "secret": basic_auth_secret_name,
+        },
+    },
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=gateway,
+        depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
+)
+basic_auth_secret_config = OLVaultK8SStaticSecretConfig(
+    name="airbyte-basic-auth-config",
+    namespace=airbyte_namespace,
+    labels=k8s_global_labels,
+    dest_secret_name=basic_auth_secret_name,
+    dest_secret_labels=k8s_global_labels,
+    mount="secret-airbyte",
+    mount_type="kv-v2",
+    path="dagster",
+    templates={"users": 'dagster:{{ get .Secrets "credentials" }}'},
+    vaultauth=vault_k8s_resources.auth_name,
+)
+basic_auth_secret = OLVaultK8SSecret(
+    name="airbyte-basic-auth",
+    resource_config=basic_auth_secret_config,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=gateway,
+        depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
+)
+
+airbyte_forward_auth_service_name = "airbyte-forward-auth"
+airbyte_forward_auth_deployment_name = "airbyte-forward-auth"
+oidc_config_secret_name = "oidc-config"  # noqa: S105  # pragma: allowlist secret
+
+forward_auth_middleware = kubernetes.apiextensions.CustomResource(
+    "airbyte-forward-auth-traefik-middleware",
+    api_version="traefik.io/v1alpha1",
+    kind="Middleware",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=forward_auth_middleware_name,
+        namespace=airbyte_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        # a lot of guides and tutorials only use the service name,
+        # omitting the rest of the k8s domain. That works fine
+        # if you're doing *everything* in the default namespace.
+        # We are not, so we need to use the whole thing.
+        "forwardAuth": {
+            "address": f"http://{airbyte_forward_auth_service_name}.{airbyte_namespace}.svc.cluster.local:4181",
+            "authResponseHeaders": ["X-Forwarded-User"],
+        },
+    },
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=gateway,
+        depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
+)
+
+forward_auth_secret_config = OLVaultK8SStaticSecretConfig(
+    name="airbyte-forward-auth-oidc-config",
+    namespace=airbyte_namespace,
+    labels=k8s_global_labels,
+    dest_secret_name=oidc_config_secret_name,
+    dest_secret_labels=k8s_global_labels,
+    mount="secret-operations",
+    mount_type="kv-v1",
+    path="sso/airbyte",
+    restart_target_kind="Deployment",
+    restart_target_name=airbyte_forward_auth_deployment_name,
+    templates={
+        "PROVIDERS_OIDC_ISSUER_URL": '{{ get .Secrets "url" }}',
+        "PROVIDERS_OIDC_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+        "PROVIDERS_OIDC_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+        "SECRET": '{{ get .Secrets "secret" }}',
+    },
+    vaultauth=vault_k8s_resources.auth_name,
+)
+forward_auth_secret = OLVaultK8SSecret(
+    name="airbyte-forward-auth-oidc",
+    resource_config=forward_auth_secret_config,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=gateway,
+        depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
+)
+
+forward_auth_pod_labels = {
+    "app.kubernetes.io/instance": "airbyte",
+    "app.kubernetes.io/name": "forward-auth",
+}
+forward_auth_deployment = kubernetes.apps.v1.Deployment(
+    airbyte_forward_auth_deployment_name,
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=airbyte_forward_auth_deployment_name,
+        namespace=airbyte_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        replicas=1,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels=forward_auth_pod_labels,
+        ),
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels=forward_auth_pod_labels,
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                containers=[
+                    kubernetes.core.v1.ContainerArgs(
+                        image="thomseddon/traefik-forward-auth:2",
+                        name=airbyte_forward_auth_deployment_name,
+                        ports=[
+                            kubernetes.core.v1.ContainerPortArgs(
+                                container_port=4181,
+                            )
+                        ],
+                        env=[
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="DEFAULT_PROVIDER",
+                                value="oidc",
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="LOG_LEVEL",
+                                value=airbyte_config.get("forward_auth_log_level")
+                                or "info",
+                            ),
+                        ],
+                        env_from=[
+                            kubernetes.core.v1.EnvFromSourceArgs(
+                                secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+                                    name=oidc_config_secret_name,
+                                    optional=False,
+                                ),
+                            )
+                        ],
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            limits={
+                                "memory": "128Mi",
+                                "cpu": "100m",
+                            },
+                            requests={
+                                "memory": "128Mi",
+                                "cpu": "100m",
+                            },
+                        ),
+                    )
+                ],
+            ),
+        ),
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=gateway,
+        depends_on=[airbyte_helm_release],
+        delete_before_replace=True,
+    ),
+)
+
+forward_auth_service = kubernetes.core.v1.Service(
+    airbyte_forward_auth_service_name,
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=airbyte_forward_auth_service_name,
+        namespace=airbyte_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        internal_traffic_policy="Cluster",
+        selector=forward_auth_pod_labels,
+        type=kubernetes.core.v1.ServiceSpecType.CLUSTER_IP,
+        ports=[
+            kubernetes.core.v1.ServicePortArgs(
+                name="forward-auth",
+                port=4181,
+                protocol="TCP",
+                target_port=4181,
+            )
+        ],
+    ),
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        parent=forward_auth_deployment,
+        depends_on=[airbyte_helm_release, forward_auth_deployment],
+        delete_before_replace=True,
+    ),
 )
 
 export("lakeformation_role_arn", airbyte_lakeformation_role.arn)

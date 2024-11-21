@@ -16,6 +16,7 @@ config:
   - ["contentstore.new_studio_mfe.use_new_updates_page", "--create", "--superusers",
     "--everyone"]
   - ["course_experience.relative_dates", "--create", "--superusers", "--everyone"]
+  - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
   - ["grades.bulk_management", "--create", "--superusers", "--everyone"]
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
@@ -47,7 +48,7 @@ config:
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     communications: communications
-    course_authoring: course-authoring
+    authoring: authoring
     gradebook: gradebook
     learner_dashboard: dashboard
     learning: learn
