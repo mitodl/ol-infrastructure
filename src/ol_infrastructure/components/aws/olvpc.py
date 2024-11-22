@@ -287,6 +287,9 @@ class OLVPC(ComponentResource):
                         tags=vpc_config.merged_tags(
                             {
                                 "Name": f"{vpc_config.vpc_name}-k8s-pod-{pod_subnet_third_octet}-subnet",  # noqa: E501
+                                "karpenter.sh/discovery": vpc_config.tags[
+                                    "Environment"
+                                ],
                                 "kubernetes.io/role/elb": "1",
                             }
                         ),
