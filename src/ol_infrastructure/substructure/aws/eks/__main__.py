@@ -56,6 +56,10 @@ cluster_stack = StackReference(
 )
 cluster_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
+kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
+network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+target_vpc = network_stack.require_output(env_config.require("target_vpc"))
+
 aws_config = AWSBase(
     tags={
         "OU": env_config.get("business_unit") or "operations",
@@ -866,6 +870,7 @@ karpenter_release = kubernetes.helm.v3.Release(
         name="karpenter",
         chart="oci://public.ecr.aws/karpenter/karpenter",
         version=VERSIONS["KARPENTER_VERSION"],
+        # Important that karpenter be deployed into `kube-system` and not `operations`
         # Ref: https://karpenter.sh/docs/getting-started/getting-started-with-karpenter/#preventing-apiserver-request-throttling
         namespace="kube-system",
         cleanup_on_fail=True,
@@ -895,6 +900,7 @@ karpenter_release = kubernetes.helm.v3.Release(
             },
             "affinity": {
                 "nodeAffinity": {
+                    # Keeps Karpenter off of nodes that Karpenter itself created
                     "requiredDuringSchedulingIgnoredDuringExecution": {
                         "nodeSelectorTerms": [
                             {
@@ -909,6 +915,7 @@ karpenter_release = kubernetes.helm.v3.Release(
                     },
                 },
                 "podAntiAffinity": {
+                    # Keeps both instances on different nodes
                     "requiredDuringSchedulingIgnoredDuringExecution": [
                         {
                             "topologyKey": "kubernetes.io/hostname",
@@ -916,6 +923,7 @@ karpenter_release = kubernetes.helm.v3.Release(
                     ],
                 },
             },
+            # Keeps both instances in different AZs
             "topologySpreadConstraints": [
                 {
                     "maxSkew": 1,
@@ -933,12 +941,12 @@ karpenter_release = kubernetes.helm.v3.Release(
             "controller": {
                 "resources": {
                     "requests": {
-                        "cpu": "1",
-                        "memory": "1Gi",
+                        "cpu": "100m",
+                        "memory": "512Mi",
                     },
                     "limits": {
-                        "cpu": "1",
-                        "memory": "1Gi",
+                        "cpu": "100m",
+                        "memory": "512Mi",
                     },
                 },
                 "env": [
@@ -954,5 +962,183 @@ karpenter_release = kubernetes.helm.v3.Release(
         provider=k8s_provider,
         parent=k8s_provider,
         delete_before_replace=True,
+    ),
+)
+
+# Ref: https://karpenter.sh/docs/concepts/nodeclasses/
+karpenter_node_class_spec = {
+    "amiSelectorTerms": [
+        {
+            # This is dangerous per the documentation
+            # Ref: https://karpenter.sh/docs/concepts/nodeclasses/#specamiselectorterms
+            "alias": "al2023@latest"
+        },
+    ],
+    "subnetSelectorTerms": [
+        {
+            "tags": {
+                "karpenter.sh/discovery": cluster_name,
+            },
+        },
+    ],
+    "securityGroupSelectorTerms": [
+        {"id": cluster_stack.require_output("cluster_security_group_id")},
+    ],
+    "role": cluster_stack.require_output("node_role_arn").apply(lambda arn: f"{arn}"),
+    "associatePublicIPAddress": True,
+    # We shouldn't consider the nodes that karpenter makes as 'pulumi managed'
+    "tags": aws_config.merged_tags({"pulumi_managed": "false"}),
+    "blockDeviceMappings": [
+        {
+            "deviceName": "/dev/xvda",
+            "ebs": {
+                "volumeSize": "100Gi",
+                "volumeType": "gp3",
+                "iops": 3000,
+                "encrypted": True,
+                "kmsKeyID": kms_stack.require_output("kms_ec2_ebs_key")["arn"],
+                "deleteOnTermination": True,
+                "throughput": 125,
+            },
+        },
+    ],
+    # "userData": "",
+    "kubelet": {
+        # Resources set aside for the operating system
+        "systemReserved": {
+            "cpu": "100m",
+            "memory": "100Mi",
+            "ephemeral-storage": "5Gi",
+        },
+        # Resources set aside for kubelet
+        "kubeReserved": {
+            "cpu": "100m",
+            "memory": "100Mi",
+            "ephemeral-storage": "5Gi",
+        },
+        # Resouce utilization threshold where pods are given a chance to leave nicely
+        "evictionSoft": {
+            "memory.available": "256Mi",
+            "nodefs.available": "21%",
+            "nodefs.inodesFree": "20%",
+            "imagefs.available": "10%",
+            "imagefs.inodesFree": "10%",
+            "pid.available": "10%",
+        },
+        "evictionSoftGracePeriod": {
+            "memory.available": "120s",
+            "nodefs.available": "120s",
+            "nodefs.inodesFree": "120s",
+            "imagefs.available": "120s",
+            "imagefs.inodesFree": "120s",
+            "pid.available": "120s",
+        },
+        "evictionMaxPodGracePeriod": 120,
+        # Resource utilization threshold where pods are forcefully evicited
+        "evictionHard": {
+            "memory.available": "128Mi",
+            "nodefs.available": "10%",
+            "nodefs.inodesFree": "10%",
+            "imagefs.available": "5%",
+            "imagefs.inodesFree": "5%",
+            "pid.available": "5%",
+        },
+    },
+}
+
+# Ref: https://karpenter.sh/docs/concepts/nodepools/
+karpenter_node_pool_spec = {
+    "template": {
+        "metadata": {
+            "labels": {
+                "pulumi_managed": "false",
+            },
+        },
+        "spec": {
+            "nodeClassRef": {
+                "group": "karpenter.k8s.aws",
+                "kind": "EC2NodeClass",
+                "name": "default",
+            },
+            "taints": [],
+            "startupTaints": [],
+            "expireAfter": "678h",
+            "terminationGracePeriod": "48h",
+            "requirements": [
+                {
+                    "key": "karpenter.k8s.aws/instance-category",
+                    "operator": "In",
+                    "values": ["c", "m", "r"],
+                },
+                {
+                    "key": "karpenter.k8s.aws/instance-hypervisor",
+                    "operator": "In",
+                    "values": ["nitro"],
+                },
+                {
+                    "key": "karpenter.sh/capacity-type",
+                    "operator": "In",
+                    "values": ["on-demand"],
+                },
+                {
+                    "key": "topology.kubernetes.io/zone",
+                    "operator": "In",
+                    "values": target_vpc["k8s_pod_subnet_zones"],
+                },
+                {
+                    "key": "kubernetes.io/arch",
+                    "operator": "In",
+                    "values": ["amd64"],
+                },
+            ],
+        },
+    },
+    # Restricts the total size of the pool
+    # TODO @Ardiea: Figure out a resonable value for this
+    "limits": {
+        "cpu": 1000,
+        "memory": "1000Gi",
+    },
+    "weight": 10,
+    "disruption": {
+        "consolidationPolicy": "WhenEmptyOrUnderutilized",
+        "consolidateAfter": "5m",
+        "budgets": [
+            {
+                "nodes": "10%",
+            },
+        ],
+    },
+}
+
+default_node_class_resource = kubernetes.apiextensions.CustomResource(
+    f"{cluster_name}-karpenter-default-NodeClass",
+    api_version="karpenter.k8s.aws/v1",
+    kind="EC2NodeClass",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="default",
+        namespace="kube-system",
+        labels=k8s_global_labels,
+    ),
+    spec=karpenter_node_class_spec,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        depends_on=[karpenter_release],
+    ),
+)
+
+default_node_pool_resource = kubernetes.apiextensions.CustomResource(
+    f"{cluster_name}-karpenter-default-NodeClass",
+    api_version="karpenter.sh/v1",
+    kind="NodePool",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="default",
+        namespace="kube-system",
+        labels=k8s_global_labels,
+    ),
+    spec=karpenter_node_pool_spec,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        depends_on=[karpenter_release],
     ),
 )

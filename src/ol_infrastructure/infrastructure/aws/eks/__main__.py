@@ -240,6 +240,10 @@ cluster = eks.Cluster(
     ),
 )
 export("cluster_name", cluster_name)
+export(
+    "cluster_security_group_id",
+    cluster.eks_cluster.vpc_config.cluster_security_group_id,
+)
 export("kube_config", cluster.kubeconfig)
 export("cluster_identities", cluster.eks_cluster.identities)
 export("admin_role_arn", administrator_role.arn)
