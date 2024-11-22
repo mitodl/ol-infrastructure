@@ -149,7 +149,7 @@ ReleaseMap: dict[
             OpenEdxApplicationVersion(
                 application="notes-api",
                 application_type="IDA",
-                release="sumac",
+                release="master",
             ),
             OpenEdxApplicationVersion(
                 application="ora-grading",
@@ -238,7 +238,7 @@ ReleaseMap: dict[
             OpenEdxApplicationVersion(
                 application="notes-api",
                 application_type="IDA",
-                release="sumac",
+                release="master",
             ),
             OpenEdxApplicationVersion(
                 application="ora-grading",
@@ -309,7 +309,7 @@ ReleaseMap: dict[
             OpenEdxApplicationVersion(
                 application="notes-api",
                 application_type="IDA",
-                release="sumac",
+                release="master",
             ),
             OpenEdxApplicationVersion(
                 application="ora-grading",
