@@ -22,7 +22,7 @@ eks_substructure_code = git_repo(
 
 pipeline_fragments = []
 
-for cluster in ["data", "operations"]:
+for cluster in ["data", "operations", "applications"]:
     stages = ["CI", "QA", "Production"]
 
     infra_chain = pulumi_jobs_chain(
