@@ -95,7 +95,7 @@ if "QA" in stack_info.name:
             "http://localhost:8250/oidc/callback",
             f"{vault_config.get('address')}/ui/vault/auth/oidc/oidc/callback",
         ],
-        bound_audiences=[f"{keycloak_config.get('client_id')}"],
+        bound_audiences=[keycloak_config.get('client_id')],
         user_claim="sub",
         role_type="oidc",
     )
