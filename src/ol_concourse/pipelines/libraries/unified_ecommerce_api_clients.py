@@ -73,7 +73,7 @@ unified_ecommerce_api_clients_repository = ssh_git_repo(
     name=Identifier("unified-ecommerce-api-clients"),
     uri="git@github.com:mitodl/open-api-clients.git",
     branch="main",
-    private_key="((unified_ecommerce_api_clients.odlbot_private_ssh_key))",
+    private_key="((npm_publish.odlbot_private_ssh_key))",
 )
 
 generate_clients_job = Job(
@@ -167,7 +167,7 @@ publish_job = Job(
             config=TaskConfig(
                 platform="linux",
                 inputs=[Input(name=unified_ecommerce_api_clients_repository.name)],
-                params={"NPM_TOKEN": "((unified_ecommerce_api_clients.npmjs_token))"},
+                params={"NPM_TOKEN": "((npm_publish.npmjs_token))"},
                 run=Command(
                     path="sh",
                     dir="unified-ecommerce-api-clients/src/typescript/unified-ecommerce-api-axios",
