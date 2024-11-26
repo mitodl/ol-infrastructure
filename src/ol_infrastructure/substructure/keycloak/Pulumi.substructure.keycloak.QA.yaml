@@ -40,6 +40,7 @@ config:
       airbyte: ["https://airbyte-qa.odl.mit.edu/*"]
       dagster: ["https://pipelines-qa.odl.mit.edu/*"]
       leek: ["https://celery-monitoring-qa.odl.mit.edu/*"]
+      vault: ["https://vault-qa.odl.mit.edu/ui/vault/auth/oidc/oidc/callback", "http://localhost:8250/oidc/callback"]
     realm_name: ol-platform-engineering
   - client_info:
       superset: ["https://bi-qa.ol.mit.edu/*", "superset_admin", "superset_alpha",
