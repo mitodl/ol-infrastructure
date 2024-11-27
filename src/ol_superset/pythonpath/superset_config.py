@@ -1,7 +1,5 @@
-import json
 import logging
 import os
-import urllib.request
 from ssl import CERT_OPTIONAL
 from typing import Optional
 
@@ -76,27 +74,7 @@ OAUTH_PROVIDERS = [
 # Required config to get Keycloak token for Superset API use
 # ----------------------------------------------------------
 JWT_ALGORITHM = "RS256"
-# URL to the public key endpoint
-public_key_url = f"{oidc_creds['url']}/"
-
-
-def fetch_keycloak_rs256_public_cert():
-    with urllib.request.urlopen(public_key_url) as response:  # noqa: S310
-        public_key_url_response = json.load(response)
-    public_key = public_key_url_response["public_key"]
-    if public_key:
-        pem_lines = [
-            "-----BEGIN PUBLIC KEY-----",
-            public_key,
-            "-----END PUBLIC KEY-----",
-        ]
-        cert_pem = "\n".join(pem_lines)
-    else:
-        cert_pem = "No cert found"
-    return cert_pem
-
-
-JWT_PUBLIC_KEY = fetch_keycloak_rs256_public_cert()
+JWT_PUBLIC_KEY = oidc_creds["realm_public_key"]
 
 # Testing out Keycloak role mapping to Superset
 # https://superset.apache.org/docs/installation/configuring-superset#mapping-ldap-or-oauth-groups-to-superset-roles
