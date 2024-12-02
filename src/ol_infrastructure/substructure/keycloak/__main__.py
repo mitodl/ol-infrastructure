@@ -679,7 +679,7 @@ for openid_clients in keycloak_realm_config.get_object("openid_clients"):
     realm_name = openid_clients.get("realm_name")
     client_details = openid_clients.get("client_info")
     for client_name, client_detail in client_details.items():
-        urls = [url for url in client_detail if url.startswith("http")]
+        urls = [url for url in client_detail if url.startswith("https")]
 
         openid_client = keycloak.openid.Client(
             f"{realm_name}-{client_name}-client",
