@@ -50,6 +50,16 @@ if "QA" in stack_info.name:
         opts=ResourceOptions(delete_before_replace=True),
     )
 
+    # Create the secret mount used for sharing secrets
+    dev_vault_mount = vault.Mount(
+        f"ol-dev-sharing-secrets-mount-{stack_info.env_suffix}",
+        path="secret-sandbox",
+        type="kv-v2",
+        options={"version": 2},
+        description="Securely share secrets",
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
     # Read MIT Open vault secrets
     mitopen_vault_secrets = read_yaml_secrets(
         Path(f"mitopen/secrets.{stack_info.env_suffix}.yaml"),
@@ -68,8 +78,8 @@ if "QA" in stack_info.name:
         type="oidc",
         description="OIDC auth Keycloak integration for use with dev vault client cli",
         oidc_discovery_url=f"{keycloak_config.get("url")}/realms/ol-platform-engineering",
-        oidc_client_id=keycloak_config.get("client_id"),
-        oidc_client_secret=keycloak_config.get("client_secret"),
+        oidc_client_id=f"{keycloak_config.get("client_id")}",
+        oidc_client_secret=f"{keycloak_config.get("client_secret")}",
         default_role="local-developer",
         opts=ResourceOptions(delete_before_replace=True),
     )
