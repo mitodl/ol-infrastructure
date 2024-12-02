@@ -51,7 +51,7 @@ if "QA" in stack_info.name:
     )
 
     # Create the secret mount used for sharing secrets
-    dev_vault_mount = vault.Mount(
+    dev_sandbox_vault_mount = vault.Mount(
         f"ol-dev-sharing-secrets-mount-{stack_info.env_suffix}",
         path="secret-sandbox",
         type="kv-v2",
