@@ -3,7 +3,7 @@ secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgHNo53bGgSBEnvNmModglvmAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMApkzxmwjrcsp+6wUAgEQgDtZaoHarOGlsVAbII/zlv2+IJRb3vk+B1fGRP87r4AmfvPdh44HPYeGH3D+xmNTClyRw+B0IzHy/3czAw==
 config:
   environment:business_unit: operations
-  environment:target_vpc: apps_vpc
+  environment:target_vpc: applications_vpc
   eks:allowed_dns_zones:
   - ".odl.mit.edu"
   - "odl.mit.edu"
@@ -14,7 +14,7 @@ config:
   eks:gateway_release_channel: "experimental"
   eks:pod_security_groups: true
   eks:namespaces:
-  - "ecommerce"  # Openmetadata testing
+  - "ecommerce"
   - "mitlearn"
   eks:nodegroups:
     worker-xlarge:

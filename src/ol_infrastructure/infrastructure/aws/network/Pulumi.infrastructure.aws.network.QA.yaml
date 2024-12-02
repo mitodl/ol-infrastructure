@@ -3,6 +3,12 @@ secretsprovider: awskms://alias/PulumiSecrets
 encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEGccCx6w+aU1z9VNPzXzwIAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkTCVUUXv23ZgiFtbAgEQgDusl6M2Rs0caUtV7jakSKAqsXTqm8f7M0UuEu0hjZ5KdbCp8HUDBShST/yKEpt0ExGXlODrlmL3gGN6fg==
 config:
   apps_vpc:cidr_block: 10.12.0.0/16
+  apps_vpc:k8s_pod_subnets:
+  - 10.12.128.0/21
+  - 10.12.136.0/21
+  - 10.12.144.0/21
+  - 10.12.152.0/21
+  apps_vpc:k8s_service_subnet: 10.110.84.0/23
   aws:region: us-east-1
   data_vpc:cidr_block: 10.2.0.0/16
   data_vpc:k8s_pod_subnets:
