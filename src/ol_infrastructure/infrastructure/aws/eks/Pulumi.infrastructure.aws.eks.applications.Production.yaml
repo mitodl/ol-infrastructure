@@ -1,0 +1,36 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygEdN0axOMy9AVpifVL7RUMrAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMKtlDiPRGq+lWNb+VAgEQgDtQ4gK42ds9xpBVRtOLvCzRZI75PdeovVSqjVZNL65Fz75d9fw80IJql9yNQTWodlaT+OLkyeJLh1EMcw==
+config:
+  environment:business_unit: operations
+  environment:target_vpc: apps_vpc
+  eks:allowed_dns_zones:
+  - ".odl.mit.edu"
+  - "odl.mit.edu"
+  - ".ol.mit.edu"
+  - "ol.mit.edu"
+  eks:ebs_csi_provisioner: true
+  eks:efs_csi_provisioner: false
+  eks:gateway_release_channel: "experimental"
+  eks:pod_security_groups: true
+  eks:namespaces:
+  - "ecommerce"  # Openmetadata testing
+  - "mitlearn"
+  eks:nodegroups:
+    worker-xlarge:
+      instance_types:
+      - "c7a.xlarge"
+      labels:
+        ondemand: true
+        node_size: c7a.xlarge
+      disk_size_gb: 500
+      scaling:
+        desired: 4
+        min: 2
+        max: 5
+      version:
+      tags: {}
+      taints: {}
+      node_group_options: {}
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
