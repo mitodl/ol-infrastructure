@@ -294,6 +294,7 @@ for i, policy in enumerate(managed_node_policy_arns):
         opts=ResourceOptions(parent=node_role),
     )
 export("node_role_arn", value=node_role.arn)
+export("node_role_name", value=node_role.name)
 
 # Loop through the node group definitions and add them to the cluster
 node_groups = []

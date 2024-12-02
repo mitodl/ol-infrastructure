@@ -625,6 +625,8 @@ alloy_release = kubernetes.helm.v3.Release(
 aws_account = aws.get_caller_identity()
 karpenter_serviceaccount_name = "karpenter-admin"
 
+
+# Trust Role for the karpenter pods / service account
 karpenter_policy_document = cluster_stack.require_output("node_role_arn").apply(
     lambda node_role_arn: json.dumps(
         {
@@ -647,18 +649,23 @@ karpenter_policy_document = cluster_stack.require_output("node_role_arn").apply(
                 {
                     "Sid": "AllowScopedEC2LaunchTemplateAccessActions",
                     "Effect": "Allow",
-                    "Action": ["ec2:RunInstances", "ec2:CreateFleet"],
+                    "Action": ["ec2:RunInstances", "ec2:CreateFleet", "ec2:CreateTags"],
                     "Resource": f"arn:aws:ec2:{aws_config.region}:*:launch-template/*",
-                    "Condition": {
-                        "StringEquals": {
-                            f"aws:ResourceTag/kubernetes.io/cluster/{cluster_name}": "owned",
-                        },
-                        "StringLike": {"aws:ResourceTag/karpenter.sh/nodepool": "*"},
-                    },
+#                    "Condition": {
+#                        "StringEquals": {
+#                            f"aws:ResourceTag/kubernetes.io/cluster/{cluster_name}": "owned",
+#                        },
+#                        "StringLike": {"aws:ResourceTag/karpenter.sh/nodepool": "*"},
+#                    },
                 },
                 {
                     "Sid": "AllowScopedEC2InstanceActionsWithTags",
                     "Effect": "Allow",
+                    "Action": [
+                        "ec2:RunInstances",
+                        "ec2:CreateFleet",
+                        "ec2:CreateLaunchTemplate",
+                    ],
                     "Resource": [
                         f"arn:aws:ec2:{aws_config.region}:*:fleet/*",
                         f"arn:aws:ec2:{aws_config.region}:*:instance/*",
@@ -666,11 +673,6 @@ karpenter_policy_document = cluster_stack.require_output("node_role_arn").apply(
                         f"arn:aws:ec2:{aws_config.region}:*:network-interface/*",
                         f"arn:aws:ec2:{aws_config.region}:*:launch-template/*",
                         f"arn:aws:ec2:{aws_config.region}:*:spot-instances-request/*",
-                    ],
-                    "Action": [
-                        "ec2:RunInstances",
-                        "ec2:CreateFleet",
-                        "ec2:CreateLaunchTemplate",
                     ],
                     "Condition": {
                         "StringEquals": {
@@ -705,11 +707,11 @@ karpenter_policy_document = cluster_stack.require_output("node_role_arn").apply(
                 {
                     "Sid": "AllowScopedDeletion",
                     "Effect": "Allow",
+                    "Action": ["ec2:TerminateInstances", "ec2:DeleteLaunchTemplate"],
                     "Resource": [
                         f"arn:aws:ec2:{aws_config.region}:*:instance/*",
                         f"arn:aws:ec2:{aws_config.region}:*:launch-template/*",
                     ],
-                    "Action": ["ec2:TerminateInstances", "ec2:DeleteLaunchTemplate"],
                     "Condition": {
                         "StringEquals": {
                             f"aws:ResourceTag/kubernetes.io/cluster/{cluster_name}": "owned"
@@ -830,7 +832,6 @@ karpenter_policy_document = cluster_stack.require_output("node_role_arn").apply(
         }
     )
 )
-
 karpenter_iam_policy = aws.iam.Policy(
     "karpenter-iam-policy",
     name_prefix=f"{cluster_name}-karpenter-policy-",
@@ -860,6 +861,12 @@ aws.iam.RolePolicyAttachment(
     f"{cluster_name}-karpenter-service-account-policy-attachment",
     policy_arn=karpenter_iam_policy.arn,
     role=karpenter_trust_role.role.id,
+)
+
+# Instance profile pinned to the same node-role that the core nodes use
+karpenter_instance_profile = aws.iam.InstanceProfile(
+    f"{cluster_name}-karpetner-instance-profile",
+    role=cluster_stack.require_output("node_role_name"),
 )
 
 # Ref: https://karpenter.sh/docs/getting-started/getting-started-with-karpenter/
@@ -984,7 +991,8 @@ karpenter_node_class_spec = {
     "securityGroupSelectorTerms": [
         {"id": cluster_stack.require_output("cluster_security_group_id")},
     ],
-    "role": cluster_stack.require_output("node_role_arn").apply(lambda arn: f"{arn}"),
+    #"role": cluster_stack.require_output("node_role_arn").apply(lambda arn: f"{arn}"),
+    "instanceProfile": karpenter_instance_profile.name,
     "associatePublicIPAddress": True,
     # We shouldn't consider the nodes that karpenter makes as 'pulumi managed'
     "tags": aws_config.merged_tags({"pulumi_managed": "false"}),
@@ -1124,6 +1132,7 @@ default_node_class_resource = kubernetes.apiextensions.CustomResource(
     opts=ResourceOptions(
         provider=k8s_provider,
         depends_on=[karpenter_release],
+        delete_before_replace=True,
     ),
 )
 
@@ -1140,5 +1149,6 @@ default_node_pool_resource = kubernetes.apiextensions.CustomResource(
     opts=ResourceOptions(
         provider=k8s_provider,
         depends_on=[karpenter_release],
+        delete_before_replace=True,
     ),
 )
