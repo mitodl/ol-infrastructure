@@ -2,6 +2,7 @@
 {{ with secret "secret-xpro/edxapp" }}
 SOCIAL_AUTH_OAUTH_SECRETS:
   mitxpro-oauth2: {{ .Data.xpro_oauth_secret }}
+  ol-oauth2: {{ .Data.xpro_oauth_secret }}
 {{ end }}
 
 ACCOUNT_MICROFRONTEND_URL: null
