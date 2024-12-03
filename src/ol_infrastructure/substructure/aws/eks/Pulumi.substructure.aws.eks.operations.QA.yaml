@@ -1,0 +1,5 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgHOIS1Uu6l9SnOTA2x8AjuPAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMJqLcjxQ3Qbj3AjmmAgEQgDuogblqlo7Me8sIEvvVqnTTHPL//yh78OPHMORDCTy+QAfIfAANnobldTPV4J0Vx6A6uKIjcEQX4PpcCg==
+config:
+  environment:business_unit: operations

@@ -32,5 +32,3 @@ config:
       tags: {}
       taints: {}
       node_group_options: {}
-  vault:address: https://vault-qa.odl.mit.edu
-  vault_server:env_namespace: operations.qa
