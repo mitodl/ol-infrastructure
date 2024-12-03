@@ -19,7 +19,6 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 env_config = Config("environment")
-vault_config = Config("vault")
 
 VERSIONS = {
     "VANTAGE_K8S_AGENT_VERSION": os.environ.get(
@@ -76,7 +75,7 @@ operations_vault_k8s_resources_config = OLVaultK8SResourcesConfig(
     application_name="operations",
     namespace="operations",
     labels=k8s_global_labels,
-    vault_address=vault_config.require("address"),
+    vault_address=f"https://vault-{stack_info.env_suffix}.odl.mit.edu",
     vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
     vault_auth_role_name=vault_traefik_auth_backend_role.role_name,
 )
@@ -221,7 +220,7 @@ if cluster_stack.require_output("has_ebs_storage"):
         application_name="vantage-agent",
         namespace="operations",
         labels=k8s_global_labels,
-        vault_address=vault_config.require("address"),
+        vault_address=f"https://vault-{stack_info.env_suffix}.odl.mit.edu",
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         vault_auth_role_name=vault_vantage_auth_backend_role.role_name,
     )

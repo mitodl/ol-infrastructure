@@ -41,7 +41,6 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 
 eks_config = Config("eks")
 env_config = Config("environment")
-vault_config = Config("vault")
 
 stack_info = parse_stack()
 setup_vault_provider(stack_info)
@@ -661,7 +660,7 @@ vault_secrets_operator = kubernetes.helm.v3.Release(
             "extraLabels": k8s_global_labels,
             "defaultVaultConnection": {
                 "enabled": True,
-                "address": vault_config.get("address"),
+                "address": f"https://vault-{stack_info.env_suffix}.odl.mit.edu",
                 "skipTLSVerify": False,
             },
             "controller": {
