@@ -65,7 +65,7 @@ node_image = Resource(
 unified_ecommerce_repository = git_repo(
     name=Identifier("unified-ecommerce"),
     uri=unified_ecommerce_repository_uri,
-    branch="release",
+    branch="main",
     paths=["openapi/specs/*.yaml"],
 )
 
@@ -200,5 +200,5 @@ if __name__ == "__main__":
         definition.write(build_pipeline.model_dump_json(indent=2))
     sys.stdout.write(build_pipeline.model_dump_json(indent=2))
     sys.stdout.write(
-        "fly -t <prod_target> set-pipeline -p open-api-clients -c definition.json"
+        "fly -t pr-main set-pipeline -p unified-ecommerce-api-client -c definition.json"
     )
