@@ -354,7 +354,7 @@ JWT_EXPIRATION: 30
 LANGUAGE_CODE: en
 LANGUAGE_COOKIE: {{ env "ENVIRONMENT" }}-openedx-language-preference
 LEARNER_PORTAL_URL_ROOT: https://learner-portal-localhost:18000
-LEARNER_HOME_MICROFRONTEND_URL: ''
+LEARNER_HOME_MICROFRONTEND_URL: '/dashboard/'
 LEARNING_MICROFRONTEND_URL: https://{{ key "edxapp/lms-domain" }}/learn
 LMS_BASE: {{ key "edxapp/lms-domain" }}  # MODIFIED
 LMS_INTERNAL_ROOT_URL: https://{{ key "edxapp/lms-domain" }}  # MODIFIED
