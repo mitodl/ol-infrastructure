@@ -52,7 +52,6 @@ class OLContainerLogConfig(BaseModel):
 # https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ContainerDefinition.html
 class OLFargateContainerDefinitionConfig(BaseModel):
     container_name: str = Field(
-        ...,
         description="Name of the container in the task config",
         parameter_name="name",  # type: ignore[call-arg]
     )
@@ -65,7 +64,6 @@ class OLFargateContainerDefinitionConfig(BaseModel):
         parameter_name="memory",  # type: ignore[call-arg]
     )
     image: str = Field(
-        ...,
         description=(
             "Fully qualified (registry/repository:tag) where ECS agent "
             "can retrieve image"
