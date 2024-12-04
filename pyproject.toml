@@ -22,7 +22,7 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.12"
 boto3 = "^1.24"
-httpx = "^0.27.0"
+httpx = "^0.28.0"
 hvac = {extras = ["parser"], version = "^2.0.0"}
 parliament = "^1.6.0"
 pulumi = "^3.39.1"
