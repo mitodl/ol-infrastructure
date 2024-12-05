@@ -1,7 +1,7 @@
 # -*- mode: yaml -*-
 {{ with secret "secret-mitxonline/edxapp" }}
 SOCIAL_AUTH_OAUTH_SECRETS:
-  mitxpro-oauth2: {{ .Data.mitxonline_oauth_secret }}
+  ol-oauth2: {{ .Data.mitxonline_oauth_secret }}
 {{ end }}
 
 ACCOUNT_MICROFRONTEND_URL: null
@@ -90,7 +90,7 @@ RECALCULATE_GRADES_ROUTING_KEY: edx.lms.core.default
 SITE_NAME: {{ key "edxapp/lms-domain" }}  # MODIFIED
 SESSION_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-lms-sessionid  # MODIFIED
 THIRD_PARTY_AUTH_BACKENDS:
-- social_auth_mitxpro.backends.MITxProOAuth2
+- ol_social_auth.backends.OLOAuth2
 - social_core.backends.google.GoogleOAuth2
 - social_core.backends.linkedin.LinkedinOAuth2
 - social_core.backends.facebook.FacebookOAuth2
