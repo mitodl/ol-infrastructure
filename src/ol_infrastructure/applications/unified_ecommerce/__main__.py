@@ -1,17 +1,30 @@
 # ruff: noqa: ERA001, C416
 
+import base64
 import json
+import mimetypes
+import textwrap
 from pathlib import Path
 
+import pulumi_fastly as fastly
+import pulumi_github as github
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions, StackReference
-from pulumi_aws import ec2, get_caller_identity
+from pulumi import (
+    Config,
+    InvokeOptions,
+    Output,
+    ResourceOptions,
+    StackReference,
+)
+from pulumi_aws import ec2, get_caller_identity, iam, s3
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
+    DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
+    ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
@@ -27,23 +40,38 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib.aws.cache_helper import CacheInstanceTypes
 from ol_infrastructure.lib.aws.eks_helper import check_cluster_namespace
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.consul import get_consul_provider
+from ol_infrastructure.lib.fastly import (
+    build_fastly_log_format_string,
+    get_fastly_provider,
+)
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 setup_vault_provider()
+fastly_provider = get_fastly_provider()
+github_provider = github.Provider(
+    "github_provider",
+    owner=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["owner"],
+    token=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["token"],
+)
 stack_info = parse_stack()
 
 ecommerce_config = Config("ecommerce")
+cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
+monitoring_stack = StackReference("infrastructure.monitoring")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
-cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+vector_log_proxy_stack = StackReference(
+    f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
+)
 
 apps_vpc = network_stack.require_output("applications_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
@@ -75,6 +103,282 @@ cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(ecommerce_namespace, ns)
 )
 
+# Frontend storage bucket
+unified_ecommerce_app_storage_bucket_name = (
+    f"ol-mit-unified-ecommerce-{stack_info.env_suffix}"
+)
+unified_ecommerce_app_storage_bucket = s3.BucketV2(
+    f"unified-ecommerce-app-storage-{stack_info.env_suffix}",
+    bucket=unified_ecommerce_app_storage_bucket_name,
+    tags=aws_config.tags,
+)
+
+s3.BucketVersioningV2(
+    f"unified-ecommerce-app-storage-versioning-{stack_info.env_suffix}",
+    bucket=unified_ecommerce_app_storage_bucket.id,
+    versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
+        status="Enabled",
+    ),
+)
+unified_ecommerce_app_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
+    f"unified-ecommerce-app-storage-ownership-controls-{stack_info.env_suffix}",
+    bucket=unified_ecommerce_app_storage_bucket.id,
+    rule=s3.BucketOwnershipControlsRuleArgs(
+        object_ownership="BucketOwnerPreferred",
+    ),
+)
+
+unified_ecommerce_app_storage_bucket_public_access = s3.BucketPublicAccessBlock(
+    f"unified-ecommerce-app-storage-public-access-{stack_info.env_suffix}",
+    bucket=unified_ecommerce_app_storage_bucket.id,
+    block_public_acls=False,
+    block_public_policy=False,
+    ignore_public_acls=False,
+)
+
+unified_ecommerce_app_storage_bucket_policy = s3.BucketPolicy(
+    f"unified-ecommerce-app-storage-policy-{stack_info.env_suffix}",
+    bucket=unified_ecommerce_app_storage_bucket.id,
+    policy=unified_ecommerce_app_storage_bucket.arn.apply(
+        lambda arn: json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Sid": "PublicRead",
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": "s3:GetObject",
+                        "Resource": f"{arn}/*",
+                    }
+                ],
+            }
+        )
+    ),
+    opts=ResourceOptions(
+        depends_on=[
+            unified_ecommerce_app_storage_bucket_public_access,
+            unified_ecommerce_app_storage_bucket_ownership_controls,
+        ],
+    ),
+)
+
+parliament_config = {
+    "PERMISSIONS_MANAGEMENT_ACTIONS": {
+        "ignore_locations": [{"actions": ["s3.putobjectacl"]}],
+    },
+    "RESOURCE_EFFECTIVLY_STAR": {},
+}
+
+gh_workflow_s3_bucket_permissions_doc = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Action": [
+                "s3:ListBucket*",
+            ],
+            "Effect": "Allow",
+            "Resource": [f"arn:aws:s3:::{unified_ecommerce_app_storage_bucket_name}"],
+        },
+        {
+            "Action": [
+                "s3:GetObject*",
+                "s3:PutObject",
+                "s3:PutObjectAcl",
+                "s3:DeleteObject",
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                f"arn:aws:s3:::{unified_ecommerce_app_storage_bucket_name}/frontend/*"
+            ],
+        },
+    ],
+}
+
+gh_workflow_iam_policy = iam.Policy(
+    f"unified-ecommerce-gh-workflow-iam-policy-{stack_info.env_suffix}",
+    name=f"unified-ecommerce-gh-workflow-iam-policy-{stack_info.env_suffix}",
+    policy=lint_iam_policy(
+        gh_workflow_s3_bucket_permissions_doc,
+        stringify=True,
+        parliament_config=parliament_config,
+    ),
+)
+
+# Just create a static user for now. Some day refactor to use
+# https://github.com/hashicorp/vault-action
+gh_workflow_user = iam.User(
+    f"unified-ecommerce-gh-workflow-user-{stack_info.env_suffix}",
+    name=f"ecommerce-gh-workflow-{stack_info.env_suffix}",
+    tags=aws_config.tags,
+)
+iam.PolicyAttachment(
+    f"unified-ecommerce-gh-workflow-iam-policy-attachment-{stack_info.env_suffix}",
+    policy_arn=gh_workflow_iam_policy.arn,
+    users=[gh_workflow_user.name],
+)
+gh_workflow_accesskey = iam.AccessKey(
+    f"unified-ecommerce-gh-workflow-access-key-{stack_info.env_suffix}",
+    user=gh_workflow_user.name,
+    status="Active",
+)
+
+# Finally, put the aws access key into the github actions configuration
+match stack_info.env_suffix:
+    case "production":
+        env_var_suffix = "PROD"
+    case "qa":
+        env_var_suffix = "RC"
+    case "ci":
+        env_var_suffix = "CI"
+    case _:
+        env_var_suffix = "INVALID"
+
+gh_repo = github.get_repository(
+    full_name="mitodl/unified-ecommerce",
+    opts=InvokeOptions(provider=github_provider),
+)
+
+gh_workflow_access_key_id_env_secret = github.ActionsSecret(
+    f"unified-ecommerce-gh-workflow-access-key-id-env-secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"AWS_ACCESS_KEY_ID_{env_var_suffix}",
+    plaintext_value=gh_workflow_accesskey.id,
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
+    f"unified-ecommerce-gh-workflow-secretaccesskey-env-secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"AWS_SECRET_ACCESS_KEY_{env_var_suffix}",
+    plaintext_value=gh_workflow_accesskey.secret,
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+
+# Fastly configuration
+vector_log_proxy_secrets = read_yaml_secrets(
+    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
+)
+fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
+encoded_fastly_proxy_credentials = base64.b64encode(
+    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
+).decode("utf8")
+vector_log_proxy_fqdn = vector_log_proxy_stack.require_output("vector_log_proxy")[
+    "fqdn"
+]
+
+fastly_access_logging_bucket = monitoring_stack.require_output(
+    "fastly_access_logging_bucket"
+)
+fastly_access_logging_iam_role = monitoring_stack.require_output(
+    "fastly_access_logging_iam_role"
+)
+gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
+for k, v in mimetypes.types_map.items():
+    if k in (
+        ".json",
+        ".pdf",
+        ".jpeg",
+        ".jpg",
+        ".html",
+        ".css",
+        ".js",
+        ".svg",
+        ".png",
+        ".gif",
+        ".xml",
+        ".vtt",
+        ".srt",
+    ):
+        gzip_settings["extensions"].add(k.strip("."))
+        gzip_settings["content_types"].add(v)
+unified_ecommerce_fastly_service = fastly.ServiceVcl(
+    f"unified-ecommerce-fastly-service-{stack_info.env_suffix}",
+    name=f"Unified Ecommerce {stack_info.env_suffix}",
+    comment="Managed by Pulumi",
+    backends=[
+        fastly.ServiceVclBackendArgs(
+            address=ecommerce_config.require("backend_domain"),
+            name="NextJS_Frontend",
+            override_host=ecommerce_config.require("backend_domain"),
+            port=DEFAULT_HTTPS_PORT,
+            ssl_cert_hostname=ecommerce_config.require("backend_domain"),
+            ssl_sni_hostname=ecommerce_config.require("backend_domain"),
+            use_ssl=True,
+        ),
+    ],
+    gzips=[
+        fastly.ServiceVclGzipArgs(
+            name="enable-gzip-compression",
+            extensions=list(gzip_settings["extensions"]),
+            content_types=list(gzip_settings["content_types"]),
+        )
+    ],
+    product_enablement=fastly.ServiceVclProductEnablementArgs(
+        brotli_compression=True,
+    ),
+    cache_settings=[],
+    conditions=[],
+    dictionaries=[],
+    domains=[
+        fastly.ServiceVclDomainArgs(
+            comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
+            name=ecommerce_config.require("frontend_domain"),
+        ),
+    ],
+    headers=[
+        fastly.ServiceVclHeaderArgs(
+            action="set",
+            destination="http.Strict-Transport-Security",
+            name="Generated by force TLS and enable HSTS",
+            source='"max-age=300"',
+            type="response",
+        ),
+    ],
+    request_settings=[
+        # TODO: Is this needed w/o pre-render in the mix?
+        fastly.ServiceVclRequestSettingArgs(
+            force_ssl=True,
+            name="Generated by force TLS and enable HSTS, change hash keys for prerender.io",
+            hash_keys="req.url, req.http.host, req.http.User-Agent",
+            xff="",
+        ),
+    ],
+    snippets=[
+        fastly.ServiceVclSnippetArgs(
+            name="Redirect for to correct domain",
+            content=textwrap.dedent(
+                rf"""
+                # redirect to the correct host/domain
+                if (obj.status == 618 && obj.response == "redirect-host") {{
+                  set obj.status = 302;
+                  set obj.http.Location = "https://" + "{ecommerce_config.require("frontend_domain")}" + req.url.path + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
+                  return (deliver);
+                }}
+                """
+            ),
+            type="error",
+        ),
+    ],
+    logging_https=[
+        fastly.ServiceVclLoggingHttpArgs(
+            url=Output.all(fqdn=vector_log_proxy_fqdn).apply(
+                lambda fqdn: "https://{fqdn}".format(**fqdn)
+            ),
+            name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-https-logging-args",
+            content_type="application/json",
+            format=build_fastly_log_format_string(additional_static_fields={}),
+            format_version=2,
+            header_name="Authorization",
+            header_value=f"Basic {encoded_fastly_proxy_credentials}",
+            json_format="0",
+            method="POST",
+            request_max_bytes=ONE_MEGABYTE_BYTE,
+        )
+    ],
+    opts=ResourceOptions.merge(fastly_provider, ResourceOptions()),
+)
+
+################################################
 # Put the application secrets into vault
 ecommerce_vault_secrets = read_yaml_secrets(
     Path(f"unified_ecommerce/secrets.{stack_info.env_suffix}.yaml"),
@@ -93,7 +397,7 @@ ecommerce_static_vault_secrets = vault.generic.Secret(
     data_json=json.dumps(ecommerce_vault_secrets),
 )
 
-# Security Group
+# RDS configuration and networking setup
 ecommerce_database_security_group = ec2.SecurityGroup(
     f"unified-ecommerce-db-security-group-{stack_info.env_suffix}",
     name=f"unified-ecommerce-db-security-group-{stack_info.env_suffix}",
@@ -186,7 +490,7 @@ ecommerce_db_consul_service = Service(
     opts=consul_provider,
 )
 
-# Redis
+# Redis configuration and networking setup
 redis_config = Config("redis")
 redis_instance_type = (
     redis_config.get("instance_type") or CacheInstanceTypes.micro.value
@@ -260,6 +564,7 @@ vault_k8s_resources = OLVaultK8SResources(
     ),
 )
 
+# Load the database creds into a k8s secret via VSO
 db_creds_secret_name = "pgsql-db-creds"  # noqa: S105  # pragma: allowlist secret
 db_creds_secret = Output.all(address=ecommerce_db.db_instance.address).apply(
     lambda db: OLVaultK8SSecret(
@@ -288,6 +593,27 @@ db_creds_secret = Output.all(address=ecommerce_db.db_instance.address).apply(
     )
 )
 
+# Load the redis creds into a normal k8s secret
+redis_creds_secret_name = "redis-creds"  # noqa: S105  # pragma: allowlist secret
+redis_creds = kubernetes.core.v1.Secret(
+    "unified-ecommerce-redis-creds",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=redis_creds_secret_name,
+        namespace=ecommerce_namespace,
+        labels=k8s_global_labels,
+    ),
+    string_data={
+        "CELERY_BROKER_URL": f'rediss://default:{redis_config.require("password")}@{redis_cache.address}:6379/0?ssl_cert_Reqs=required',
+        "CELERY_RESULT_BACKEND": f'rediss://default:{redis_config.require("password")}@{redis_cache.address}:6379/0?ssl_cert_Reqs=required',
+    },
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        depends_on=[redis_cache],
+        delete_before_replace=True,
+    ),
+)
+
+# Load the static secrets into a k8s secret via VSO
 static_secrets_name = "ecommerce-static-secrets"  # pragma: allowlist secret
 static_secrets = OLVaultK8SSecret(
     name="unified-ecommerce-static-secrets",
@@ -313,6 +639,7 @@ static_secrets = OLVaultK8SSecret(
     ),
 )
 
+# Put the not-secret configuration items into a configmap
 misc_config = kubernetes.core.v1.ConfigMap(
     "ecommerce-misc-config",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -328,25 +655,7 @@ misc_config = kubernetes.core.v1.ConfigMap(
     },
 )
 
-redis_creds_secret_name = "redis-creds"  # noqa: S105  # pragma: allowlist secret
-redis_creds = kubernetes.core.v1.Secret(
-    "unified-ecommerce-redis-creds",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=redis_creds_secret_name,
-        namespace=ecommerce_namespace,
-        labels=k8s_global_labels,
-    ),
-    string_data={
-        "CELERY_BROKER_URL": f'rediss://default:{redis_config.require("password")}@{redis_cache.address}:6379/0?ssl_cert_Reqs=required',
-        "CELERY_RESULT_BACKEND": f'rediss://default:{redis_config.require("password")}@{redis_cache.address}:6379/0?ssl_cert_Reqs=required',
-    },
-    opts=ResourceOptions(
-        provider=k8s_provider,
-        depends_on=[redis_cache],
-        delete_before_replace=True,
-    ),
-)
-
+# Create a deployment resource to manage the application pods
 deployment_labels = k8s_global_labels | {"ol.mit.edu/application": "unified-ecommerce"}
 ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
     f"unified-ecommerce-{stack_info.env_suffix}-deployment",
