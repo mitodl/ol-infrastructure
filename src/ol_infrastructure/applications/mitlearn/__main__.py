@@ -854,6 +854,7 @@ heroku_vars = {
     "OPENSEARCH_DEFAULT_TIMEOUT": 30,
     "OPENSEARCH_INDEXING_CHUNK_SIZE": 75,
     "QDRANT_COLLECTION_NAME": f"mitlearn-{stack_info.env_suffix}",
+    "QDRANT_ENCODER": "vector_search.encoders.litellm.LiteLLMEncoder",
     "PROLEARN_CATALOG_API_URL": "https://prolearn.mit.edu/graphql",
     "SEE_API_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/api/",
     "SEE_API_ACCESS_TOKEN_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/oauth/token",
@@ -971,6 +972,7 @@ sensitive_heroku_vars = {
     "OLL_API_CLIENT_SECRET": mitopen_vault_secrets["open_learning_library_client"][
         "client_secret"
     ],
+    "OPENAI_API_KEY": mitopen_vault_secrets["openai"]["api_key"],
     "OPENSEARCH_HTTP_AUTH": mitopen_vault_secrets["opensearch"]["http_auth"],
     "QDRANT_API_KEY": mitopen_vault_secrets["qdrant"]["api_key"],
     "QDRANT_HOST": mitopen_vault_secrets["qdrant"]["host_url"],
