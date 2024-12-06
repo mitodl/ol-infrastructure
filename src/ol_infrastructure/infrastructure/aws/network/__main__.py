@@ -78,8 +78,9 @@ applications_vpc_config = OLVPCConfig(
         "business_unit": "operations",
         "Name": f"OL Applications {stack_info.name}",
     },
-    k8s_pod_subnets=apps_config.require_object("k8s_pod_subnets") or None,
-    k8s_service_subnet=apps_config.require("k8s_service_subnet") or None,
+
+    k8s_pod_subnets=apps_config.get_object("k8s_pod_subnets") or None,
+    k8s_service_subnet=apps_config.get("k8s_service_subnet") or None,
 )
 applications_vpc = OLVPC(applications_vpc_config)
 
@@ -94,8 +95,8 @@ data_vpc_config = OLVPCConfig(
         "business_unit": "data",
         "Name": f"{stack_info.name} Data Services",
     },
-    k8s_pod_subnets=data_config.require_object("k8s_pod_subnets") or None,
-    k8s_service_subnet=data_config.require("k8s_service_subnet") or None,
+    k8s_pod_subnets=data_config.get_object("k8s_pod_subnets") or None,
+    k8s_service_subnet=data_config.get("k8s_service_subnet") or None,
 )
 data_vpc = OLVPC(data_vpc_config)
 
@@ -110,8 +111,8 @@ operations_vpc_config = OLVPCConfig(
         "business_unit": "operations",
         "Name": f"Operations {stack_info.name}",
     },
-    k8s_pod_subnets=ops_config.require_object("k8s_pod_subnets") or None,
-    k8s_service_subnet=ops_config.require("k8s_service_subnet") or None,
+    k8s_pod_subnets=ops_config.get_object("k8s_pod_subnets") or None,
+    k8s_service_subnet=ops_config.get("k8s_service_subnet") or None,
 )
 operations_vpc = OLVPC(operations_vpc_config)
 

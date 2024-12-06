@@ -112,6 +112,7 @@ CONTENTSTORE:
         auth_source: ''
         <<: *mongo_params
 
+ACCOUNT_MICROFRONTEND_URL: null
 ACTIVATION_EMAIL_SUPPORT_LINK: ''
 AFFILIATE_COOKIE_NAME: dev_affiliate_id
 # ANALYTICS_DASHBOARD_NAME: Your Platform Name Here Insights
@@ -207,6 +208,7 @@ CERTIFICATE_TEMPLATE_LANGUAGES:
     es: Español
 CERT_QUEUE: certificates
 CMS_BASE: {{ key "edxapp/studio-domain" }}  # MODIFIED
+CONTACT_MAILING_ADDRESS: SET-ME-PLEASE
 CONTACT_US_ENABLE: false
 ENABLE_CODEJAIL_REST_SERVICE: true
 CODE_JAIL_REST_SERVICE_HOST: http://codejail.service.consul:8000
@@ -354,6 +356,7 @@ JWT_EXPIRATION: 30
 LANGUAGE_CODE: en
 LANGUAGE_COOKIE: {{ env "ENVIRONMENT" }}-openedx-language-preference
 LEARNER_PORTAL_URL_ROOT: https://learner-portal-localhost:18000
+LEARNER_HOME_MICROFRONTEND_URL: '/dashboard/'
 LEARNING_MICROFRONTEND_URL: https://{{ key "edxapp/lms-domain" }}/learn
 LMS_BASE: {{ key "edxapp/lms-domain" }}  # MODIFIED
 LMS_INTERNAL_ROOT_URL: https://{{ key "edxapp/lms-domain" }}  # MODIFIED
@@ -491,6 +494,7 @@ SESSION_COOKIE_SECURE: true # MODIFIED
 SESSION_SAVE_EVERY_REQUEST: false
 SOCIAL_MEDIA_FOOTER_URLS: {}
 SOCIAL_MEDIA_FOOTER_ACE_URLS: {}
+SOCIAL_MEDIA_LOGO_URLS : {}
 SOCIAL_SHARING_SETTINGS:
     CERTIFICATE_FACEBOOK: false
     CERTIFICATE_TWITTER: false

@@ -65,6 +65,10 @@ plugin_dict = {
         "target_name": "openedx_companion_auth_package",
         "pypi_package_name": "openedx-companion-auth",
     },
+    "src/ol_social_auth": {
+        "target_name": "ol_social_auth_package",
+        "pypi_package_name": "ol-social-auth",
+    },
 }
 
 fragments = []

@@ -32,5 +32,3 @@ config:
       tags: {}
       taints: {}
       node_group_options: {}
-  vault:address: https://vault-production.odl.mit.edu
-  vault_server:env_namespace: operations.production

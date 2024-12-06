@@ -2,6 +2,10 @@ path "secret-dev/*" {
   capabilities = ["list", "read"]
 }
 
+path "secret-sandbox/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
 path "secret-operations/*" {
     capabilities = ["list"]
 }

@@ -23,6 +23,8 @@ config:
     MITXPRO_LOG_LEVEL: "INFO"
     MITXPRO_SECURE_SSL_HOST: "xpro-ci.odl.mit.edu"
     OPENEDX_API_BASE_URL: "https://courses-ci.xpro.mit.edu"
+    OPENEDX_OAUTH_PROVIDER: "ol-oauth2"
+    OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
     SENTRY_LOG_LEVEL: "ERROR"
     SHEETS_DEFERRAL_FIRST_ROW: 184
     SHEETS_MONITORING_FREQUENCY: 86400
