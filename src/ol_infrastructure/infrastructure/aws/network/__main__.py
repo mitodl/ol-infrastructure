@@ -78,7 +78,6 @@ applications_vpc_config = OLVPCConfig(
         "business_unit": "operations",
         "Name": f"OL Applications {stack_info.name}",
     },
-
     k8s_pod_subnets=apps_config.get_object("k8s_pod_subnets") or None,
     k8s_service_subnet=apps_config.get("k8s_service_subnet") or None,
 )
