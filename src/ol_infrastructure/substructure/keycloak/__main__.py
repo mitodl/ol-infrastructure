@@ -971,7 +971,7 @@ oidc_attribute_importer_identity_provider_mapper = (
     keycloak.AttributeImporterIdentityProviderMapper(
         "map-touchstone-saml-email-attribute",
         realm=ol_apps_realm.id,
-        attribute_name="mail",
+        attribute_name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
         identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
         user_attribute="email",
         extra_config={
@@ -982,7 +982,7 @@ oidc_attribute_importer_identity_provider_mapper = (
     keycloak.AttributeImporterIdentityProviderMapper(
         "map-touchstone-saml-last-name-attribute",
         realm=ol_apps_realm.id,
-        attribute_name="sn",
+        attribute_name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
         identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
         user_attribute="lastName",
         extra_config={
@@ -993,13 +993,35 @@ oidc_attribute_importer_identity_provider_mapper = (
     keycloak.AttributeImporterIdentityProviderMapper(
         "map-touchstone-saml-first-name-attribute",
         realm=ol_apps_realm.id,
-        attribute_name="givenName",
+        attribute_name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
         identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
         user_attribute="firstName",
         extra_config={
             "syncMode": "INHERIT",
         },
         opts=resource_options,
+    ),
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "map-touchstone-saml-full-name-attribute",
+        realm=ol_data_platform_realm.id,
+        attribute_name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        user_attribute="fullName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    ),
+    keycloak.HardcodedAttributeIdentityProviderMapper(
+        "map-touchstone-email-opt-in-attribute",
+        name="email-opt-in-default",
+        realm=ol_data_platform_realm.id,
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        attribute_name="emailOptIn",
+        attribute_value="true",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
     ),
 )
 # Touchstone SAML [END]
