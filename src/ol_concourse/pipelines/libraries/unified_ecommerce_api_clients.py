@@ -72,7 +72,7 @@ unified_ecommerce_repository = git_repo(
 unified_ecommerce_api_clients_repository = ssh_git_repo(
     name=Identifier("unified-ecommerce-api-clients"),
     uri="git@github.com:mitodl/unified-ecommerce-api-clients.git",
-    branch="main",
+    branch="release",
     private_key="((npm_publish.odlbot_private_ssh_key))",
 )
 
