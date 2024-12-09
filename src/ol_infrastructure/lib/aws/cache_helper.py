@@ -3,6 +3,7 @@ from enum import Enum, unique
 
 @unique
 class CacheInstanceTypes(str, Enum):
+    micro = "cache.t4g.micro"
     small = "cache.t4g.small"
     medium = "cache.t4g.medium"
     large = "cache.m7g.large"
