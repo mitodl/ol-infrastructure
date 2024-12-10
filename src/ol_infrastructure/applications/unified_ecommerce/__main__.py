@@ -244,23 +244,8 @@ match stack_info.env_suffix:
         env_var_suffix = "INVALID"
 
 gh_repo = github.get_repository(
-    full_name="mitodl/unified-ecommerce",
+    full_name="mitodl/unified-ecommerce-frontend",
     opts=InvokeOptions(provider=github_provider),
-)
-
-gh_workflow_access_key_id_env_secret = github.ActionsSecret(
-    f"unified-ecommerce-gh-workflow-access-key-id-env-secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"AWS_ACCESS_KEY_ID_{env_var_suffix}",
-    plaintext_value=gh_workflow_accesskey.id,
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
-    f"unified-ecommerce-gh-workflow-secretaccesskey-env-secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"AWS_SECRET_ACCESS_KEY_{env_var_suffix}",
-    plaintext_value=gh_workflow_accesskey.secret,
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
 # Fastly configuration
@@ -791,6 +776,37 @@ gateway = OLEKSGateway(
         depends_on=[ecommerce_service],
         delete_before_replace=True,
     ),
+)
+
+
+gh_workflow_access_key_id_env_secret = github.ActionsSecret(
+    f"unified-ecommerce-gh-workflow-access-key-id-env-secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"AWS_ACCESS_KEY_ID_{env_var_suffix}",  # pragma: allowlist secret
+    plaintext_value=gh_workflow_accesskey.id,
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
+    f"unified-ecommerce-gh-workflow-secretaccesskey-env-secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"AWS_SECRET_ACCESS_KEY_{env_var_suffix}",  # pragma: allowlist secret
+    plaintext_value=gh_workflow_accesskey.secret,
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+
+gh_workflow_fastly_api_key_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_nextjs_fastly_api_key_env_secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"FASTLY_API_KEY_{env_var_suffix}",  # pragma: allowlist secret
+    plaintext_value=ecommerce_config.require("fastly_api_key"),
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_fastly_service_id_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_fastly_service_id_env_secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"FASTLY_SERVICE_ID_{env_var_suffix}",  # pragma: allowlist secret
+    plaintext_value=unified_ecommerce_fastly_service.id,
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
 # No route53 config for ecommerce_config.require("backend_domain") because
