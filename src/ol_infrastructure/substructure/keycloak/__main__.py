@@ -1018,7 +1018,7 @@ oidc_attribute_importer_identity_provider_mapper = (
         realm=ol_data_platform_realm.id,
         identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
         attribute_name="emailOptIn",
-        attribute_value="true",
+        attribute_value="1",
         user_session=False,
         extra_config={
             "syncMode": "INHERIT",
