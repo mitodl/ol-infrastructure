@@ -1015,7 +1015,7 @@ oidc_attribute_importer_identity_provider_mapper = (
     keycloak.HardcodedAttributeIdentityProviderMapper(
         "map-touchstone-email-opt-in-attribute",
         name="email-opt-in-default",
-        realm=ol_data_platform_realm.id,
+        realm=ol_apps_realm.id,
         identity_provider_alias=ol_apps_touchstone_saml_identity_provider.alias,
         attribute_name="emailOptIn",
         attribute_value="1",
