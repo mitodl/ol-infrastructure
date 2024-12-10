@@ -690,7 +690,6 @@ for openid_clients in keycloak_realm_config.get_object("openid_clients"):
             access_type="CONFIDENTIAL",
             standard_flow_enabled=openid_clients.get("standard_flow_enabled") or True,
             implicit_flow_enabled=openid_clients.get("implicit_flow_enabled") or False,
-            pkce_code_challenge_method="S256",
             service_accounts_enabled=openid_clients.get("service_accounts_enabled")
             or False,
             valid_redirect_uris=urls,
