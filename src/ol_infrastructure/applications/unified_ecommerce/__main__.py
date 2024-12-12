@@ -3,6 +3,7 @@
 import base64
 import json
 import mimetypes
+import os
 import textwrap
 from pathlib import Path
 
@@ -99,6 +100,12 @@ k8s_provider = kubernetes.Provider(
     "k8s-provider",
     kubeconfig=cluster_stack.require_output("kube_config"),
 )
+
+# Fail hard if ECOMMERCE_DOCKER_TAG isn't set
+if "ECOMMERCE_DOCKER_TAG" not in os.environ:
+    msg = "ECOMMERCE_DOCKER_TAG must be set"
+    raise OSError(msg)
+ECOMMERCE_DOCKER_TAG = os.getenv("ECOMMERCE_DOCKER_TAG")
 
 consul_security_groups = consul_stack.require_output("security_groups")
 aws_account = get_caller_identity()
@@ -675,7 +682,7 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="ecommerce-app",
-                        image="mitodl/unified-ecommerce-app-main:latest",
+                        image=f"mitodl/unified-ecommerce-app-main:{ECOMMERCE_DOCKER_TAG}",
                         ports=[
                             kubernetes.core.v1.ContainerPortArgs(container_port=8071)
                         ],

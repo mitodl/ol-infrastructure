@@ -4,10 +4,9 @@ encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAFb8B9KFDK2X+gl09
 config:
   aws:region: us-east-1
   consul:address: https://consul-apps-ci.odl.mit.edu
+  ecommerce:backend_domain: "api.pay-ci.ol.mit.edu"
   ecommerce:db_password:
     secure: v1:rkeSh1S69nUNqVvu:cSeK5sUm8Q3RiFjCLwVcte3JGTR9cLSSiekj3YEcdcxYQWNih3h4YjuTAOgLed4C6wjBo5LL+aRUsUKR3mX96bOx3bTAgUxxIYhg/btcKMU=
-  ecommerce:frontend_domain: "pay-ci.ol.mit.edu"
-  ecommerce:backend_domain: "api.pay-ci.ol.mit.edu"
   ecommerce:env_vars:
     APISIX_PORT: "9080"
     CELERY_TASK_ALWAYS_EAGER: "False"
@@ -18,17 +17,20 @@ config:
     MITOL_UE_COOKIE_NAME: "mitolue"
     MITOL_UE_DB_DISABLE_SSL: "True"
     MITOL_UE_FEATURES_DEFAULT: "True"
-    MITOL_UE_FROM_EMAIL: "donotreply@ol.mit.edu"  ###FIX
+    MITOL_UE_FROM_EMAIL: "donotreply@ol.mit.edu" ###FIX
     MITOL_UE_HOSTNAME: "api.pay-ci.ol.mit.edu"
     MITOL_UE_PAYMENT_BASKET_CHOOSER: "http://learn.odl.local:8073/cart/" ###FIX
-    MITOL_UE_PAYMENT_BASKET_ROOT: "http://learn.odl.local:8073/cart/"  ###FIX
+    MITOL_UE_PAYMENT_BASKET_ROOT: "http://learn.odl.local:8073/cart/" ###FIX
     MITOL_UE_PAYMENT_INTERSTITIAL_DEBUG: "False"
     MITOL_UE_SECURE_SSL_REDIRECT: "False" ###FIX
-    MITOL_UE_USE_S3: "False"  ###FIX
+    MITOL_UE_USE_S3: "False" ###FIX
     NODE_ENV: "development"
     POSTHOG_API_HOST: "https://app.posthog.com"
     SITE_NAME: "MIT Open Learning Ecommerce"
     UWSGI_THREADS: "5"
+  ecommerce:fastly_api_key:
+    secure: v1:5UppWAatXu2kagvW:yZlbTDUCUP/cZ537sSYWrmlvc/2ppFwe0SZZQwZeQe/BadyIu8vWAHcoR7eh0N1K
+  ecommerce:frontend_domain: "pay-ci.ol.mit.edu"
   redis:password:
     secure: v1:gSGSH3Lc+dcCjMGC:DWAY3/dEqzdQvZYPpv8p17Nle6Ew/5M5+aImd1rxPJxy4Xkh2eKcJsmxo2kgRgrQBKyDibEBrvQev1w/HL+L64+4g3CM075KkbvIMqPoP/c=
   vault:address: https://vault-ci.odl.mit.edu
