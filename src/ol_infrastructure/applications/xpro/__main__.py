@@ -324,6 +324,7 @@ sensitive_heroku_vars = {
     "ENROLLMENT_CHANGE_SHEET_ID": xpro_vault_secrets["google-sheets"][
         "enroll_change_sheet_id"
     ],
+    "EXTERNAL_COURSE_SYNC_API_KEY": xpro_vault_secrets["emeritus"]["api_key"],
     "HIREFIRE_TOKEN": xpro_vault_secrets["hirefire"]["token"],
     "MITOL_DIGITAL_CREDENTIALS_HMAC_SECRET": xpro_vault_secrets["digital-credentials"][
         "hmac_secret"
