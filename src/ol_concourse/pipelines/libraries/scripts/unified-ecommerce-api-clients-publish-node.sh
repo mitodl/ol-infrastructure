@@ -1,7 +1,7 @@
 #!/bin/bash -x
 # publish the npm package to npmjs.org
 
-echo "//registry.npmjs.org/:_authToken=((unified_ecommerce_api_clients.npmjs_token))" > .npmrc
+echo "//registry.npmjs.org/:_authToken=((npm_publish.npmjs_token))" > .npmrc
 yarn install --immutable
 yarn build
 # OK so this is vaguely gross but it will do :)
