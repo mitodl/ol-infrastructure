@@ -3,6 +3,7 @@
 
 echo "//registry.npmjs.org/:_authToken=((npm_publish.npmjs_token))" > .npmrc
 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+export COREPACK_ENABLE_DOWNLOAD_PROMPT
 corepack enable
 yarn install --immutable
 yarn build
