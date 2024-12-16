@@ -1,55 +1,6 @@
-from typing import Optional
+from pydantic import Field
+from typing_extensions import Annotate
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt
-
-from bridge.lib.magic_numbers import DEFAULT_HTTP_PORT, HALF_GIGABYTE_MB
-from ol_infrastructure.lib.pulumi_helper import StackInfo
-
-
-def build_container_log_options(
-    service_name: str,
-    task_name: str,
-    stack_info: StackInfo,
-    container_name: Optional[str] = None,
-) -> dict[str, str]:
-    return {
-        "awslogs-group": f"ecs/{service_name}/{task_name}/{stack_info.env_suffix}/",
-        "awslogs-region": "us-east-1",
-        "awslogs-stream-prefix": f"{container_name}",
-        "awslogs-create-group": "true",
-    }
-
-
-class Secret(BaseModel):
-    name: str = Field(..., description="The name of the secret.")
-    value_from: str = Field(
-        ...,
-        alias="valueFrom",
-        description=(
-            "The secret to expose to the container. The supported values are either the"
-            " full ARN of the AWS Secrets Manager secret or the full ARN of the"
-            " parameter in the AWS Systems Manager Parameter Store.  If the AWS Systems"
-            " Manager Parameter Store parameter exists in the same Region as the task"
-            " you are launching, then you can use either the full ARN or name of the"
-            " parameter. If the parameter exists in a different Region, then the full"
-            " ARN must be specified. "
-        ),
-    )
-
-
-class OLContainerLogConfig(BaseModel):
-    # TODO: Put list of options in Enum object and set as type (TMM 2021-09-15)  # noqa: E501, FIX002, TD002, TD003
-    # Possible values are: "awslogs", "fluentd", "gelf", "json-file", "journald",
-    # "logentries", "splunk", "syslog", "awsfirelens"
-    log_driver: str
-    # Options to pass to log config
-    options: Optional[dict[str, str]] = None
-    secret_options: Optional[list[Secret]] = None
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-
-# Many more options available (in AWS) that are not defined in this configuration
-# https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ContainerDefinition.html
 class OLFargateContainerDefinitionConfig(BaseModel):
     container_name: str = Field(
         description="Name of the container in the task config",
@@ -126,11 +77,12 @@ class OLFargateContainerDefinitionConfig(BaseModel):
             "If set to True, container will be attached to target group and "
             "load balancer using the port_mappings name and container port"
         ),
+        parameter_name="attachToLoadBalancer",
     )
     volumes_from: Optional[list[dict[str, str]]] = Field(
         None,
         description=(
-            "Allow for mounting paths betwen containers. Useful for rendering "
+            "Allow for mounting paths between containers. Useful for rendering "
             "configuration templates via Vault agent or consul-template sidecars."
         ),
         parameter_name="volumesFrom",
