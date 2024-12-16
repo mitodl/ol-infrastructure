@@ -238,7 +238,7 @@ DEFAULT_FROM_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_MOBILE_AVAILABLE: false
 DEFAULT_SITE_THEME: xpro  # MODIFIED
 DEPRECATED_ADVANCED_COMPONENT_TYPES: []
-
+DISABLE_FORUM_V2: true
 EDXMKTG_USER_INFO_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-user-info
 {{ if keyOrDefault "edxapp/enable_notes" "false" | parseBool }}
 EDXNOTES_INTERNAL_API: https://{{ key "edx/notes-api-host" }}/api/v1
