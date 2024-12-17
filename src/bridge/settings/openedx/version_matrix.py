@@ -38,7 +38,7 @@ class OpenLearningOpenEdxDeployment(Enum):
         env_release_map=[
             EnvRelease("CI", OpenEdxSupportedRelease["sumac"]),
             EnvRelease("QA", OpenEdxSupportedRelease["sumac"]),
-            EnvRelease("Production", OpenEdxSupportedRelease["quince"]),
+            EnvRelease("Production", OpenEdxSupportedRelease["sumac"]),
         ],
     )
 
