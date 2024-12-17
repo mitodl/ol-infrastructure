@@ -3,7 +3,7 @@ django-redis==5.4.0
 edx-git-auto-export==0.3
 edx-sysadmin==0.3.0
 edx-username-changer==0.3.2
-openedx-companion-auth==1.0.0
+openedx-companion-auth==1.1.0
 nodeenv>=1.7.0
 ol-openedx-checkout-external
 ol-openedx-course-export==0.1.2
