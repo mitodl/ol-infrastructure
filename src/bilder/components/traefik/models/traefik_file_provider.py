@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional, Union
+from typing import Annotated, Any, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
@@ -981,14 +981,16 @@ class ForwardAuthMiddleware(BaseModel):
         None,
         description="The address option defines the authentication server address.",
     )
-    tls: Optional[Tls2] = Field(
-        None,
-        dependencies={"caOptional": ["ca"]},  # type: ignore[call-arg]
-        description=(
-            "The tls option is the TLS configuration from Traefik to the authentication"
-            " server."
+    tls: Annotated[
+        Optional[Tls2],
+        Field(
+            dependencies={"caOptional": ["ca"]},
+            description=(
+                "The tls option is the TLS configuration from Traefik to the "
+                "authentication server."
+            ),
         ),
-    )
+    ] = None
     trust_forward_header: Optional[bool] = Field(
         None,
         alias="trustForwardHeader",

@@ -65,7 +65,7 @@ repos:
     - --config-file=pyproject.toml
     - --warn-unused-configs
     additional_dependencies:
-    - pydantic>2
+    - pydantic>2.10
     - types-PyYAML
     - types-requests
 - repo: https://github.com/shellcheck-py/shellcheck-py

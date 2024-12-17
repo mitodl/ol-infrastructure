@@ -51,87 +51,119 @@ class OLContainerLogConfig(BaseModel):
 # Many more options available (in AWS) that are not defined in this configuration
 # https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ContainerDefinition.html
 class OLFargateContainerDefinitionConfig(BaseModel):
-    container_name: Annotated[str, Field(
-        description="Name of the container in the task config",
-        parameter_name="name",
-    )]
-    memory: Annotated[Optional[PositiveInt], Field(
-        description=(
-            "Memory reserved for this container. "
-            "If container exceeds this amount, it will be killed"
+    container_name: Annotated[
+        str,
+        Field(
+            description="Name of the container in the task config",
+            parameter_name="name",
         ),
-        parameter_name="memory",
-    )] = PositiveInt(HALF_GIGABYTE_MB)
-    image: Annotated[str, Field(
-        description=(
-            "Fully qualified (registry/repository:tag) where ECS agent "
-            "can retrieve image"
+    ]
+    memory: Annotated[
+        Optional[PositiveInt],
+        Field(
+            description=(
+                "Memory reserved for this container. "
+                "If container exceeds this amount, it will be killed"
+            ),
+            parameter_name="memory",
         ),
-        parameter_name="image",
-    )]
-    memory_reservation: Optional[PositiveInt] = Field(
-        None,
-        description="Soft limit of memory to reserve for the container",
-        parameter_name="memoryReservation",
-    )
-    container_port: PositiveInt = Field(
-        PositiveInt(DEFAULT_HTTP_PORT),
-        description="What port will be assigned to container.",
-        parameter_name="containerPort",
-    )
-    command: Optional[list[str]] = Field(
-        None,
-        description="The command that is passed to the container",
-        parameter_name="command",
-    )
-    cpu: Optional[PositiveInt] = Field(
-        None,
-        description="Number of cpu units reserved for container",
-        parameter_name="cpu",
-    )
-    is_essential: bool = Field(
-        False,  # noqa: FBT003
-        description=(
-            "Enabling this flag means if this container stops or fails, "
-            "all other containers that are part of the task are stopped"
+    ] = PositiveInt(HALF_GIGABYTE_MB)
+    image: Annotated[
+        str,
+        Field(
+            description=(
+                "Fully qualified (registry/repository:tag) where ECS agent "
+                "can retrieve image"
+            ),
+            parameter_name="image",
         ),
-        parameter_name="essential",
-    )
-    environment: Optional[dict[str, str]] = Field(
-        None,
-        description="Environment variables to pass to container",
-        parameter_name="environment",
-    )
-    secrets: Optional[list[Secret]] = Field(
-        None,
-        description="Secrets that will be exposed to your container",
-        parameter_name="secrets",
-    )
-    log_configuration: Optional[OLContainerLogConfig] = Field(
-        None,
-        description="Configuration for setting up log outputs for this container",
-        parameter_name="logConfiguration",
-    )
-    privileged: bool = Field(
-        False,  # noqa: FBT003
-        description=(
-            "If enabled, container is given elevated privileges, similar to 'root' user"
+    ]
+    memory_reservation: Annotated[
+        Optional[PositiveInt],
+        Field(
+            description="Soft limit of memory to reserve for the container",
+            parameter_name="memoryReservation",
         ),
-        parameter_name="privileged",
-    )
-    attach_to_load_balancer: bool = Field(
-        False,  # noqa: FBT003
-        description=(
-            "If set to True, container will be attached to target group and "
-            "load balancer using the port_mappings name and container port"
+    ] = None
+    container_port: Annotated[
+        PositiveInt,
+        Field(
+            description="What port will be assigned to container.",
+            parameter_name="containerPort",
         ),
-    )
-    volumes_from: Optional[list[dict[str, str]]] = Field(
-        None,
-        description=(
-            "Allow for mounting paths betwen containers. Useful for rendering "
-            "configuration templates via Vault agent or consul-template sidecars."
+    ] = PositiveInt(DEFAULT_HTTP_PORT)
+    command: Annotated[
+        Optional[list[str]],
+        Field(
+            description="The command that is passed to the container",
+            parameter_name="command",
         ),
-        parameter_name="volumesFrom",
-    )
+    ] = None
+    cpu: Annotated[
+        Optional[PositiveInt],
+        Field(
+            description="Number of cpu units reserved for container",
+            parameter_name="cpu",
+        ),
+    ] = None
+    is_essential: Annotated[
+        bool,
+        Field(
+            description=(
+                "Enabling this flag means if this container stops or fails, "
+                "all other containers that are part of the task are stopped"
+            ),
+            parameter_name="essential",
+        ),
+    ] = False
+    environment: Annotated[
+        Optional[dict[str, str]],
+        Field(
+            description="Environment variables to pass to container",
+            parameter_name="environment",
+        ),
+    ] = None
+    secrets: Annotated[
+        Optional[list[Secret]],
+        Field(
+            description="Secrets that will be exposed to your container",
+            parameter_name="secrets",
+        ),
+    ] = None
+    log_configuration: Annotated[
+        Optional[OLContainerLogConfig],
+        Field(
+            description="Configuration for setting up log outputs for this container",
+            parameter_name="logConfiguration",
+        ),
+    ] = None
+    privileged: Annotated[
+        bool,
+        Field(
+            description=(
+                "If enabled, container is given elevated privileges, similar to 'root'"
+                " user"
+            ),
+            parameter_name="privileged",
+        ),
+    ] = False
+    attach_to_load_balancer: Annotated[
+        bool,
+        Field(
+            description=(
+                "If set to True, container will be attached to target group and "
+                "load balancer using the port_mappings name and container port"
+            ),
+        ),
+    ] = False
+    volumes_from: Annotated[
+        Optional[list[dict[str, str]]],
+        Field(
+            description=(
+                "Allow for mounting paths betwen containers. Useful for rendering "
+                "configuration templates via Vault agent or consul-template sidecars."
+            ),
+            parameter_name="volumesFrom",
+        ),
+    ] = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
