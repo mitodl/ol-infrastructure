@@ -98,11 +98,14 @@ star_odl_mit_edu_static_secret_config = OLVaultK8SStaticSecretConfig(
     dest_secret_name=star_odl_mit_edu_secret_name,
     dest_secret_type="kubernetes.io/tls",  # noqa: S106  # pragma: allowlist secret
     mount="secret-global",
-    mount_type="kv-v1",
+    mount_type="kv-v2",
     path="odl-wildcard",
     templates={
         "tls.key": '{{ get .Secrets "key_with_proper_newlines" }}',
         "tls.crt": '{{ get .Secrets "cert_with_proper_newlines" }}',
+        # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
+        "key": '{{ get .Secrets "key_with_proper_newlines" }}',
+        "cert": '{{ get .Secrets "cert_with_proper_newlines" }}',
     },
     refresh_after="1h",
     vaultauth=operations_vault_k8s_resources.auth_name,
@@ -117,6 +120,40 @@ star_odl_mit_edu_static_secret = OLVaultK8SSecret(
 )
 export("star_odl_mit_edu_secret_name", star_odl_mit_edu_secret_name)
 export("star_odl_mit_edu_secret_namespace", "operations")
+
+star_ol_mit_edu_secret_name = (
+    "ol-wildcard-cert"  # pragma: allowlist secret #  noqa: S105
+)
+star_ol_mit_edu_static_secret_config = OLVaultK8SStaticSecretConfig(
+    name="vault-kv-global-ol-wildcard",
+    namespace="operations",
+    labels=k8s_global_labels,
+    dest_secret_labels=k8s_global_labels,
+    dest_secret_name=star_ol_mit_edu_secret_name,
+    dest_secret_type="kubernetes.io/tls",  # noqa: S106  # pragma: allowlist secret
+    mount="secret-global",
+    mount_type="kv-v2",
+    path="ol-wildcard",
+    templates={
+        "tls.key": '{{ get .Secrets "key_with_proper_newlines" }}',
+        "tls.crt": '{{ get .Secrets "cert_with_proper_newlines" }}',
+        # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
+        "key": '{{ get .Secrets "key_with_proper_newlines" }}',
+        "cert": '{{ get .Secrets "cert_with_proper_newlines" }}',
+    },
+    refresh_after="1h",
+    vaultauth=operations_vault_k8s_resources.auth_name,
+)
+star_ol_mit_edu_static_secret = OLVaultK8SSecret(
+    f"{cluster_name}-ol-mit-edu-wildcard-static-secret",
+    resource_config=star_ol_mit_edu_static_secret_config,
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        delete_before_replace=True,
+    ),
+)
+export("star_ol_mit_edu_secret_name", star_ol_mit_edu_secret_name)
+export("star_ol_mit_edu_secret_namespace", "operations")
 
 
 ############################################################
