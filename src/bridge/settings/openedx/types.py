@@ -93,7 +93,6 @@ class OpenEdxSupportedRelease(str, Enum):
         return enum_element
 
     master = ("master", "master", "3.11", "20")
-    quince = ("quince", "open-release/quince.master", "3.8", "18")
     redwood = ("redwood", "open-release/redwood.master", "3.11", "18")
     sumac = ("sumac", "open-release/sumac.master", "3.11", "20")
 

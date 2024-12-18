@@ -91,6 +91,7 @@ s3.BucketPolicy(
                     "Resource": [
                         f"arn:aws:s3:::{bootcamps_storage_bucket_name}/images/*",
                         f"arn:aws:s3:::{bootcamps_storage_bucket_name}/resumes/*",
+                        f"arn:aws:s3:::{bootcamps_storage_bucket_name}/documents/*",
                     ],
                 }
             ],

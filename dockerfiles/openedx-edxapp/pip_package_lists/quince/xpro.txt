@@ -10,7 +10,7 @@ ol-openedx-course-export==0.1.2
 ol-openedx-course-structure-api
 ol-openedx-logging==0.2.0
 ol-openedx-sentry==0.2.1
-openedx-scorm-xblock>=18.0.0,<18.1.0
+openedx-scorm-xblock>=19.0.1,<19.1.0
 pip==24.3.1
 social-auth-mitxpro==0.7.0
 uwsgi==2.0.28

@@ -38,7 +38,7 @@ class OpenLearningOpenEdxDeployment(Enum):
         env_release_map=[
             EnvRelease("CI", OpenEdxSupportedRelease["sumac"]),
             EnvRelease("QA", OpenEdxSupportedRelease["sumac"]),
-            EnvRelease("Production", OpenEdxSupportedRelease["quince"]),
+            EnvRelease("Production", OpenEdxSupportedRelease["sumac"]),
         ],
     )
 
@@ -56,15 +56,6 @@ class OpenLearningOpenEdxDeployment(Enum):
             deployment = deployment_name_map[key]
         return deployment.value
 
-
-pinned_branding_overrides = {
-    "@edx/frontend-component-footer@npm": (
-        "@mitodl/frontend-component-footer-mitol@quince"
-    ),
-    "@edx/frontend-component-header@npm": (
-        "@mitodl/frontend-component-header-mitol@quince"
-    ),
-}
 
 default_branding_overrides = {
     "@edx/frontend-component-footer@npm": (
@@ -496,69 +487,6 @@ ReleaseMap: dict[
                 branch_override="master",
                 origin_override="https://github.com/mitodl/xqueue-watcher",
                 release="redwood",
-            ),
-        ],
-    },
-    "quince": {
-        "xpro": [
-            OpenEdxApplicationVersion(
-                application="codejail",
-                application_type="IDA",
-                release="quince",
-            ),
-            OpenEdxApplicationVersion(
-                application="authoring",
-                application_type="MFE",
-                release="quince",
-                branding_overrides=pinned_branding_overrides,
-            ),
-            OpenEdxApplicationVersion(
-                application="discussions",
-                application_type="MFE",
-                release="quince",
-                branding_overrides=pinned_branding_overrides,
-            ),
-            OpenEdxApplicationVersion(
-                application="edx-platform",
-                application_type="IDA",
-                release="quince",
-                branch_override="xpro/quince",
-                origin_override="https://github.com/mitodl/edx-platform",
-            ),
-            OpenEdxApplicationVersion(
-                application="edxapp_theme",
-                application_type="IDA",
-                release="quince",
-                branch_override="quince",
-                origin_override="https://github.com/mitodl/mitxpro-theme",
-            ),
-            OpenEdxApplicationVersion(
-                application="forum",
-                application_type="IDA",
-                release="quince",
-            ),
-            OpenEdxApplicationVersion(
-                application="gradebook",
-                application_type="MFE",
-                release="quince",
-                branding_overrides=pinned_branding_overrides,
-            ),
-            OpenEdxApplicationVersion(
-                application="learning",
-                application_type="MFE",
-                release="quince",
-                branding_overrides=pinned_branding_overrides,
-            ),
-            OpenEdxApplicationVersion(
-                application="notes-api",
-                application_type="IDA",
-                release="quince",
-            ),
-            OpenEdxApplicationVersion(
-                application="ora-grading",
-                application_type="MFE",
-                release="quince",
-                branding_overrides=pinned_branding_overrides,
             ),
         ],
     },

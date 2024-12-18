@@ -92,17 +92,7 @@ airbyte_namespace = "airbyte"
 
 aws_account = get_caller_identity()
 vpc_id = target_vpc["id"]
-airbyte_server_ami = ec2.get_ami(
-    filters=[
-        ec2.GetAmiFilterArgs(name="name", values=["airbyte-server-*"]),
-        ec2.GetAmiFilterArgs(name="virtualization-type", values=["hvm"]),
-        ec2.GetAmiFilterArgs(name="root-device-type", values=["ebs"]),
-    ],
-    most_recent=True,
-    owners=[aws_account.account_id],
-)
 
-airbyte_server_tag = f"airbyte-server-{env_name}"
 consul_provider = get_consul_provider(stack_info)
 
 VERSIONS = {

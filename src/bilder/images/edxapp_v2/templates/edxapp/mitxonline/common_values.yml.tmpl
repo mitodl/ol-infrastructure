@@ -247,6 +247,7 @@ DEFAULT_FROM_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_MOBILE_AVAILABLE: false
 DEFAULT_SITE_THEME: mitxonline  # MODIFIED
 DEPRECATED_ADVANCED_COMPONENT_TYPES: []
+DISABLE_FORUM_V2: true
 DISCUSSIONS_MICROFRONTEND_URL: https://{{ key "edxapp/lms-domain" }}/discuss
 
 EDXMKTG_USER_INFO_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-user-info
@@ -426,6 +427,9 @@ MODULESTORE:
                 default_class: xmodule.hidden_block.HiddenBlock
                 fs_root: /openedx/data/var/edxapp/data
                 render_template: common.djangoapps.edxmako.shortcuts.render_to_string
+NOTIFICATIONS_DEFAULT_FROM_EMAIL: {{ key "edxapp/bulk-email-default-from-email" }} # ADDED
+NOTIFICATION_TYPE_ICONS: {} # ADDED
+DEFAULT_NOTIFICATION_ICON_URL: '' # ADDED
 ORA2_FILE_PREFIX: mitxonline/ora2  # MODIFIED
 PARTNER_SUPPORT_EMAIL: ''
 PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG:
