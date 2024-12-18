@@ -31,12 +31,6 @@ from bridge.lib.magic_numbers import (
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
-from ol_infrastructure.components.aws.eks import (
-    OLEKSGateway,
-    OLEKSGatewayConfig,
-    OLEKSGatewayListenerConfig,
-    OLEKSGatewayRouteConfig,
-)
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
@@ -110,7 +104,8 @@ ECOMMERCE_DOCKER_TAG = os.getenv("ECOMMERCE_DOCKER_TAG")
 consul_security_groups = consul_stack.require_output("security_groups")
 aws_account = get_caller_identity()
 
-UNIFIED_ECOMMERCE_LISTENER_PORT = 8073
+UWSGI_PORT = 8071
+NGINX_PORT = 8073
 
 ecommerce_namespace = "ecommerce"
 cluster_stack.require_output("namespaces").apply(
@@ -390,7 +385,7 @@ ecommerce_vault_secrets = read_yaml_secrets(
 )
 ecommerce_vault_mount = vault.Mount(
     f"unified-ecommerce-secrets-mount-{stack_info.env_suffix}",
-    path="secrets-ecommerce",
+    path="secret-ecommerce",
     type="kv-v2",
     options={"version": "2"},
     description="Secrets for the unified ecommerce application.",
@@ -607,10 +602,12 @@ redis_creds = kubernetes.core.v1.Secret(
         namespace=ecommerce_namespace,
         labels=k8s_global_labels,
     ),
-    string_data={
-        "CELERY_BROKER_URL": f'rediss://default:{redis_config.require("password")}@{redis_cache.address}:6379/0?ssl_cert_Reqs=required',
-        "CELERY_RESULT_BACKEND": f'rediss://default:{redis_config.require("password")}@{redis_cache.address}:6379/0?ssl_cert_Reqs=required',
-    },
+    string_data=redis_cache.address.apply(
+        lambda address: {
+            "CELERY_BROKER_URL": f'rediss://default:{redis_config.require("password")}@{address}:6379/0?ssl_cert_Reqs=required',
+            "CELERY_RESULT_BACKEND": f'rediss://default:{redis_config.require("password")}@{address}:6379/0?ssl_cert_Reqs=required',
+        }
+    ),
     opts=ResourceOptions(
         provider=k8s_provider,
         depends_on=[redis_cache],
@@ -644,21 +641,53 @@ static_secrets = OLVaultK8SSecret(
     ),
 )
 
-# Put the not-secret configuration items into a configmap
-misc_config = kubernetes.core.v1.ConfigMap(
-    f"unified-ecommerce-{stack_info.env_suffix}-misc-config",
+# Load the nginx configuration into a configmap
+ecommerce_nginx_configmap = kubernetes.core.v1.ConfigMap(
+    f"unified-ecommerce-{stack_info.env_suffix}-nginx-configmap",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="ecommerce-misc-config",
+        name="nginx-config",
         namespace=ecommerce_namespace,
         labels=k8s_global_labels,
     ),
     data={
-        k: v for (k, v) in (ecommerce_config.require_object("env_vars") or {}).items()
-    }
-    | {
-        "PORT": str(UNIFIED_ECOMMERCE_LISTENER_PORT),
+        "web.conf": Path(__file__).parent.joinpath("files/web.conf").read_text(),
     },
 )
+
+# Build a list of not-sensitive env vars for the deployment config
+ecommerce_deployment_env_vars = []
+for k, v in (ecommerce_config.require_object("env_vars") or {}).items():
+    ecommerce_deployment_env_vars.append(
+        kubernetes.core.v1.EnvVarArgs(
+            name=k,
+            value=v,
+        )
+    )
+ecommerce_deployment_env_vars.append(
+    kubernetes.core.v1.EnvVarArgs(name="PORT", value=str(UWSGI_PORT))
+)
+
+# Build a list of sensitive env vars for the deployment config via envFrom
+ecommerce_deployment_envfrom = [
+    # Database creds
+    kubernetes.core.v1.EnvFromSourceArgs(
+        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+            name=db_creds_secret_name,
+        ),
+    ),
+    # Redis Configuration
+    kubernetes.core.v1.EnvFromSourceArgs(
+        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+            name=redis_creds_secret_name,
+        ),
+    ),
+    # static secrets from secrets-ecommerce/secrets
+    kubernetes.core.v1.EnvFromSourceArgs(
+        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+            name=static_secrets_name,
+        ),
+    ),
+]
 
 # Create a deployment resource to manage the application pods
 application_labels = k8s_global_labels | {"ol.mit.edu/application": "unified-ecommerce"}
@@ -670,47 +699,135 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
         labels=application_labels,
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        # TODO @Ardiea: Add horizontial pod autoscaler  # noqa: TD003, FIX002
         replicas=1,
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels=application_labels,
+        ),
+        # Limits the chances of simulatious pod restarts -> db migrations (hopefully)
+        strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
+            type="RollingUpdate",
+            rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
+                max_surge=0,
+                max_unavailable=1,
+            ),
         ),
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 labels=application_labels,
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
+                volumes=[
+                    kubernetes.core.v1.VolumeArgs(
+                        name="staticfiles",
+                        empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+                    ),
+                    kubernetes.core.v1.VolumeArgs(
+                        name="static",
+                        empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+                    ),
+                    kubernetes.core.v1.VolumeArgs(
+                        name="nginx-config",
+                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                            name=ecommerce_nginx_configmap.metadata.name,
+                            items=[
+                                kubernetes.core.v1.KeyToPathArgs(
+                                    key="web.conf",
+                                    path="web.conf",
+                                ),
+                            ],
+                        ),
+                    ),
+                ],
+                init_containers=[
+                    # TODO: @Ardiea figure out to limit pod startup to one at a time  # noqa: TD002, TD003, FIX002, E501
+                    # Run database migrations at startup
+                    kubernetes.core.v1.ContainerArgs(
+                        name="migrate",
+                        image=f"mitodl/unified-ecommerce-app-main:{ECOMMERCE_DOCKER_TAG}",
+                        command=["python3", "manage.py", "migrate", "--noinput"],
+                        image_pull_policy="IfNotPresent",
+                        env=ecommerce_deployment_env_vars,
+                        env_from=ecommerce_deployment_envfrom,
+                    ),
+                    # Run collectstatic at startup
+                    # How expensive is this?
+                    # Should this actually be done at container build time?
+                    kubernetes.core.v1.ContainerArgs(
+                        name="collectstatic",
+                        image=f"mitodl/unified-ecommerce-app-main:{ECOMMERCE_DOCKER_TAG}",
+                        command=["python3", "manage.py", "collectstatic", "--noinput"],
+                        image_pull_policy="IfNotPresent",
+                        env=ecommerce_deployment_env_vars,
+                        env_from=ecommerce_deployment_envfrom,
+                        volume_mounts=[
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="staticfiles",
+                                mount_path="/src/staticfiles",
+                            ),
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="static",
+                                mount_path="/src/static",
+                            ),
+                        ],
+                    ),
+                ],
                 containers=[
+                    # nginx container infront of uwsgi
+                    kubernetes.core.v1.ContainerArgs(
+                        name="nginx",
+                        image="nginx:1.9.5",
+                        ports=[
+                            kubernetes.core.v1.ContainerPortArgs(
+                                container_port=NGINX_PORT
+                            )
+                        ],
+                        image_pull_policy="IfNotPresent",
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={"cpu": "50m", "memory": "64Mi"},
+                            limits={"cpu": "100m", "memory": "128Mi"},
+                        ),
+                        volume_mounts=[
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="staticfiles",
+                                mount_path="/src/staticfiles",
+                            ),
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="static",
+                                mount_path="/src/static",
+                            ),
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="nginx-config",
+                                mount_path="/etc/nginx/conf.d/web.conf",
+                                sub_path="web.conf",
+                                read_only=True,
+                            ),
+                        ],
+                    ),
+                    # Actual application run with uwsgi
                     kubernetes.core.v1.ContainerArgs(
                         name="ecommerce-app",
                         image=f"mitodl/unified-ecommerce-app-main:{ECOMMERCE_DOCKER_TAG}",
                         ports=[
-                            kubernetes.core.v1.ContainerPortArgs(container_port=8071)
+                            kubernetes.core.v1.ContainerPortArgs(
+                                container_port=UWSGI_PORT
+                            )
                         ],
-                        image_pull_policy="Always",
-                        env_from=[
-                            # Database creds
-                            kubernetes.core.v1.EnvFromSourceArgs(
-                                secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-                                    name=db_creds_secret_name,
-                                ),
+                        image_pull_policy="IfNotPresent",
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={"cpu": "250m", "memory": "300Mi"},
+                            limits={"cpu": "500m", "memory": "600Mi"},
+                        ),
+                        env=ecommerce_deployment_env_vars,
+                        env_from=ecommerce_deployment_envfrom,
+                        volume_mounts=[
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="staticfiles",
+                                mount_path="/src/staticfiles",
                             ),
-                            # Redis Configuration
-                            kubernetes.core.v1.EnvFromSourceArgs(
-                                secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-                                    name=redis_creds_secret_name,
-                                ),
-                            ),
-                            # static secrets from secrets-ecommerce/secrets
-                            kubernetes.core.v1.EnvFromSourceArgs(
-                                secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-                                    name=static_secrets_name,
-                                ),
-                            ),
-                            # vars specified in stack configs
-                            kubernetes.core.v1.EnvFromSourceArgs(
-                                config_map_ref=kubernetes.core.v1.ConfigMapEnvSourceArgs(
-                                    name="ecommerce-misc-config",
-                                ),
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="static",
+                                mount_path="/src/static",
                             ),
                         ],
                     ),
@@ -721,11 +838,13 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
     opts=ResourceOptions(
         provider=k8s_provider,
         delete_before_replace=True,
-        depends_on=[db_creds_secret, redis_creds, misc_config],
+        depends_on=[db_creds_secret, redis_creds],
     ),
 )
 
+# A kubernetes service resource to act as load balancer for the app instances
 ecommerce_service_name = "ecommerce-app"
+ecommerce_service_port_name = "http"
 ecommerce_service = kubernetes.core.v1.Service(
     f"unified-ecommerce-{stack_info.env_suffix}-service",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -737,8 +856,9 @@ ecommerce_service = kubernetes.core.v1.Service(
         selector=application_labels,
         ports=[
             kubernetes.core.v1.ServicePortArgs(
-                port=UNIFIED_ECOMMERCE_LISTENER_PORT,
-                target_port=UNIFIED_ECOMMERCE_LISTENER_PORT,
+                name=ecommerce_service_port_name,
+                port=NGINX_PORT,
+                target_port=NGINX_PORT,
                 protocol="TCP",
             ),
         ],
@@ -747,44 +867,222 @@ ecommerce_service = kubernetes.core.v1.Service(
     opts=ResourceOptions(provider=k8s_provider, delete_before_replace=True),
 )
 
-gateway_config = OLEKSGatewayConfig(
-    cert_issuer="letsencrypt-production",
-    cert_issuer_class="cluster-issuer",
-    gateway_name="unified-ecommerce",
-    labels=k8s_global_labels,
-    namespace=ecommerce_namespace,
-    listeners=[
-        OLEKSGatewayListenerConfig(
-            name="https",
-            hostname=ecommerce_config.require("backend_domain"),
-            port=8443,
-            tls_mode="Terminate",
-            certificate_secret_name="ecommerce-tls",  # cert-manager will create this  # noqa: E501 S106  # pragma: allowlist secret
-            certificate_secret_namespace=ecommerce_namespace,
-        ),
-    ],
-    routes=[
-        OLEKSGatewayRouteConfig(
-            backend_service_name=ecommerce_service_name,
-            backend_service_namespace=ecommerce_namespace,
-            backend_service_port=UNIFIED_ECOMMERCE_LISTENER_PORT,
-            hostnames=[ecommerce_config.require("backend_domain")],
-            name="ecommerce-https",
-            listener_name="https",
-            port=8443,
-        ),
-    ],
+
+# Create the apisix custom resources since it doesn't support gateway-api yet
+
+# Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_plugin_config/
+# Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_pluginconfig_v2/
+shared_plugin_config_name = "shared-plugin-config"
+ecommerce_https_apisix_pluginconfig = kubernetes.apiextensions.CustomResource(
+    f"unified-ecommerce-{stack_info.env_suffix}-https-apisix-pluginconfig",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixPluginConfig",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=shared_plugin_config_name,
+        namespace=ecommerce_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "plugins": [
+            {
+                "name": "cors",
+                "enable": True,
+                "config": {
+                    "allow_origins": "**",
+                    "allow_methods": "**",
+                    "allow_headers": "**",
+                    "allow_crednetial": True,
+                },
+            },
+            {
+                "name": "response-rewrite",
+                "enable": True,
+                "config": {
+                    "headers": {
+                        "set": {
+                            "Referrer-Policy": "origin",
+                        },
+                    },
+                },
+            },
+        ],
+    },
 )
-gateway = OLEKSGateway(
-    f"unified-ecommerce-{stack_info.env_suffix}-gateway",
-    gateway_config=gateway_config,
+
+# Load open-id-connect secrets into a k8s secret via VSO
+oidc_secret_name = "oidc-secrets"  # pragma: allowlist secret  # noqa: S105
+oidc_secret = OLVaultK8SSecret(
+    name=f"unified-ecommerce-{stack_info.env_suffix}-oidc-secrets",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="oidc-static-secrets",
+        namespace=ecommerce_namespace,
+        labels=k8s_global_labels,
+        dest_secret_name=oidc_secret_name,
+        dest_secret_labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/unified-ecommerce",
+        excludes=[".*"],
+        exclude_raw=True,
+        # TODO: @Ardiea figure out the rest of this  # noqa: TD002, TD003, FIX002
+        templates={
+            "client_id": '{{ get .Secrets "client_id" }}',
+            "client_secret": '{{ get .Secrets "client_secret" }}',
+            "discovery": "",  # What goes here?
+            "realm": '{{ get .Secrets "realm_name" }}',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
     opts=ResourceOptions(
         provider=k8s_provider,
-        depends_on=[ecommerce_service],
         delete_before_replace=True,
+        parent=vault_k8s_resources,
+        depends_on=[ecommerce_static_vault_secrets],
     ),
 )
 
+# ApisixUpstream resources don't seem to work but we don't really need them?
+# Ref: https://github.com/apache/apisix-ingress-controller/issues/1655
+# Ref: https://github.com/apache/apisix-ingress-controller/issues/1855
+
+# Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_route_v2/
+# Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/
+ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
+    f"unified-ecommerce-{stack_info.env_suffix}-https-apisix-route",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixRoute",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="ecommerce-https",
+        namespace=ecommerce_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "http": [
+            {
+                # unauthenticated routes, including assests and checkout callback API
+                "name": "ue-unauth",
+                "priority": 1,
+                "match": {
+                    "hosts": [
+                        ecommerce_config.require("backend_domain"),
+                    ],
+                    "paths": [
+                        "/api/*",
+                        "/_/*",
+                        "/logged_out/*" "/auth/*",
+                        "/static/*",
+                        "/favicon.ico",
+                        "/checkout/*",
+                    ],
+                },
+                "plugin_config_name": shared_plugin_config_name,
+                "backends": [
+                    {
+                        "serviceName": ecommerce_service_name,
+                        "servicePort": ecommerce_service_port_name,
+                    }
+                ],
+            },
+            {
+                # wildcard route for the rest of the system - auth required
+                "name": "ue-default",
+                "priority": 0,
+                "plugins": [
+                    # Ref: https://apisix.apache.org/docs/apisix/plugins/openid-connect/
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        # Get all the sensitive parts of this config from a secret
+                        "secretRef": oidc_secret_name,
+                        "config": {
+                            "scope": "openid profile ol-profile",
+                            "bearer_only": False,
+                            "introspection_endpoint_auth_method": "client_secret_post",
+                            "ssl_verify": False,
+                            "logout_path": "/logout",
+                            # Lets let the app handle this because we have an etcd
+                            # control-plane
+                            # "session": {
+                            #    "secret": "at_least_16_characters",  # pragma: allowlist secret  # noqa: E501
+                            # },
+                        },
+                    },
+                ],
+                "plugin_config_name": shared_plugin_config_name,
+                "match": {
+                    "hosts": [
+                        ecommerce_config.require("backend_domain"),
+                    ],
+                    "paths": [
+                        "/cart/*",
+                        "/admin/*",
+                        "/establish_session/*" "/logout",
+                    ],
+                },
+                "backends": [
+                    {
+                        "serviceName": ecommerce_service_name,
+                        "servicePort": ecommerce_service_port_name,
+                    }
+                ],
+            },
+            # Strip trailing slack from logout redirect
+            {
+                "name": "ue-logout-redirect",
+                "priority": 0,
+                "plugins": [
+                    {
+                        "name": "redirect",
+                        "enable": True,
+                        "config": {
+                            "uri": "/logout",
+                        },
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        ecommerce_config.require("backend_domain"),
+                    ],
+                    "paths": [
+                        "/logout/*",
+                    ],
+                },
+                "backends": [
+                    {
+                        "serviceName": ecommerce_service_name,
+                        "servicePort": ecommerce_service_port_name,
+                    }
+                ],
+            },
+        ]
+    },
+    opts=ResourceOptions(
+        provider=k8s_provider,
+        delete_before_replace=True,
+        depends_on=[ecommerce_service],
+    ),
+)
+
+# Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_tls_v2/
+# Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
+ecommerce_https_apisix_tls = kubernetes.apiextensions.CustomResource(
+    f"unified-ecommerce-{stack_info.env_suffix}-https-apisix-tls",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixTls",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="ecommerce-https",
+        namespace=ecommerce_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "hosts": [ecommerce_config.require("backend_domain")],
+        # Use the shared ol-wildcard cert loaded into every cluster
+        "secret": {
+            "name": "ol-wildcard-cert",
+            "namespace": "operations",
+        },
+    },
+)
 
 gh_workflow_access_key_id_env_secret = github.ActionsSecret(
     f"unified-ecommerce-gh-workflow-access-key-id-env-secret-{stack_info.env_suffix}",

@@ -4,21 +4,21 @@ encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAFb8B9KFDK2X+gl09
 config:
   aws:region: us-east-1
   consul:address: https://consul-apps-ci.odl.mit.edu
-  ecommerce:backend_domain: "api.pay-ci.ol.mit.edu"
+  ecommerce:backend_domain: "api-pay-ci.ol.mit.edu"
   ecommerce:db_password:
     secure: v1:rkeSh1S69nUNqVvu:cSeK5sUm8Q3RiFjCLwVcte3JGTR9cLSSiekj3YEcdcxYQWNih3h4YjuTAOgLed4C6wjBo5LL+aRUsUKR3mX96bOx3bTAgUxxIYhg/btcKMU=
   ecommerce:env_vars:
-    APISIX_PORT: "9080"
     CELERY_TASK_ALWAYS_EAGER: "False"
-    DEBUG: "True"
+    DEBUG: "true"
+    DEV_ENV: "true"
     ENVIRONMENT: "dev"
-    MITOL_UE_BASE_URL: "https://api.pay-ci.ol.mit.edu"
+    MITOL_UE_BASE_URL: "https://api-pay-ci.ol.mit.edu"
     MITOL_UE_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_UE_COOKIE_NAME: "mitolue"
     MITOL_UE_DB_DISABLE_SSL: "True"
     MITOL_UE_FEATURES_DEFAULT: "True"
     MITOL_UE_FROM_EMAIL: "donotreply@ol.mit.edu" ###FIX
-    MITOL_UE_HOSTNAME: "api.pay-ci.ol.mit.edu"
+    MITOL_UE_HOSTNAME: "api-pay-ci.ol.mit.edu"
     MITOL_UE_PAYMENT_BASKET_CHOOSER: "http://learn.odl.local:8073/cart/" ###FIX
     MITOL_UE_PAYMENT_BASKET_ROOT: "http://learn.odl.local:8073/cart/" ###FIX
     MITOL_UE_PAYMENT_INTERSTITIAL_DEBUG: "False"

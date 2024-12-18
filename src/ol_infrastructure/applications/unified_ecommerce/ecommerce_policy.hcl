@@ -4,10 +4,18 @@ path "postgres-ecommerce/creds/app/*" {
 path "postgres-ecommerce/creds/app" {
   capabilities = ["read"]
 }
-path "secrets-ecommerce/*" {
+
+path "secret-operations/sso/unified-ecommerce/*" {
   capabilities = ["read"]
 }
-path "secrets-ecommerce" {
+path "secret-operations/sso/unified-ecommerce" {
+  capabilities = ["read"]
+}
+
+path "secret-ecommerce/*" {
+  capabilities = ["read"]
+}
+path "secret-ecommerce" {
   capabilities = ["read"]
 }
 # vault-secrets-operator is a little more particular about
