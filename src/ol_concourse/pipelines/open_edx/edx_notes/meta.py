@@ -23,6 +23,7 @@ pipeline_code = git_repo(
     paths=[
         "src/ol_concourse/lib/",
         "src/ol_concourse/pipelines/open_edx/edx_notes/",
+        "src/bridge/settings/openedx/",
     ],
 )
 
