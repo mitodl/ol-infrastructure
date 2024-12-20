@@ -15,6 +15,7 @@ from pulumi import Config, ResourceOptions, StackReference, export
 
 from bridge.lib.magic_numbers import DEFAULT_EFS_PORT, IAM_ROLE_NAME_PREFIX_MAX_LENGTH
 from bridge.lib.versions import (
+    APISIX_CHART_VERSION,
     CERT_MANAGER_CHART_VERSION,
     EBS_CSI_DRIVER_VERSION,
     EFS_CSI_DRIVER_VERSION,
@@ -67,6 +68,7 @@ kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 
 # Centralize version numbers
 VERSIONS = {
+    "APISIX_CHART": os.environ.get("APISIX_CHART", APISIX_CHART_VERSION),
     "CERT_MANAGER_CHART": os.environ.get(
         "CERT_MANAGER_CHART", CERT_MANAGER_CHART_VERSION
     ),
@@ -347,7 +349,7 @@ operations_namespace = kubernetes.core.v1.Namespace(
     ),
     opts=ResourceOptions(
         provider=k8s_provider,
-        protect=True,
+        protect=False,
     ),
 )
 
@@ -363,7 +365,7 @@ for namespace in namespaces:
         ),
         opts=ResourceOptions(
             provider=k8s_provider,
-            protect=True,
+            protect=False,
         ),
     )
 export("namespaces", [*namespaces, "operations"])
@@ -922,6 +924,145 @@ traefik_helm_release = kubernetes.helm.v3.Release(
         depends_on=[cluster, node_groups[0], operations_namespace, gateway_api_crds],
     ),
 )
+
+# At this time 20241218, apisix does not provide first class support for the
+# kubernetes gateway api. So, we are going to use their custom resources and
+# not enable the experimental gateway-api features.
+#
+# We load apisix into the operations namespace for the cluster with a
+# feature flag but we will create the customresources in the application
+# namespaces that need them. See unified-ecommerce as an example.
+#
+# A consequence of this is that apisix will need its own NLB but if
+# we wanted to invest the time we could probably create OLGateway
+# resources that point traefik to the apisix. Seems like one more
+# layer of complexity that we probably don't need just to save a few
+# dollars.
+
+# Ref: https://apisix.apache.org/docs/ingress-controller/next/tutorials/configure-ingress-with-gateway-api/
+# Ref: https://apisix.apache.org/docs/ingress-controller/getting-started/
+# Ref: https://github.com/apache/apisix-helm-chart/blob/master/charts/apisix/values.yaml
+if eks_config.get_bool("apisix_ingress_enabled"):
+    apisix_domains = eks_config.require_object("apisix_domains")
+    apisix_helm_release = kubernetes.helm.v3.Release(
+        f"{cluster_name}-apisix-gateway-controller-helm-release",
+        kubernetes.helm.v3.ReleaseArgs(
+            name="apisix",
+            chart="apisix",
+            version=VERSIONS["APISIX_CHART"],
+            namespace="operations",
+            skip_crds=False,
+            cleanup_on_fail=True,
+            repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
+                repo="https://charts.apiseven.com",
+            ),
+            values={
+                "image": {
+                    "pullPolicy": "Always",
+                },
+                "service": {
+                    "type": "LoadBalancer",
+                    "annotations": {
+                        # Ref: https://github.com/kubernetes-sigs/external-dns/blob/master/docs/annotations/annotations.md#external-dnsalphakubernetesiohostname
+                        "external-dns.alpha.kubernetes.io/hostname": ",".join(
+                            apisix_domains
+                        ),
+                        "service.beta.kubernetes.io/aws-load-balancer-type": "nlb",
+                        "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "instance",
+                        "service.beta.kubernetes.io/aws-load-balancer-target-group-attributes": "preserve_client_ip.enabled=false",
+                        "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
+                            lambda tvpc: ",".join(tvpc["k8s_pod_subnet_ids"])
+                        ),
+                        "http": {
+                            "enabled": True,
+                        },
+                        "tls": {
+                            "enabled": True,
+                        },
+                    },
+                },
+                "useDaemonSet": True,
+                "commonLabels": k8s_global_labels,
+                "tolerations": operations_tolerations,
+                "resources": {
+                    "requests": {
+                        "cpu": "50m",
+                        "memory": "100Mi",
+                    },
+                    "limits": {
+                        "cpu": "100m",
+                        "memory": "150Mi",
+                    },
+                },
+                "apisix": {
+                    "ssl": {
+                        "enabled": True,
+                    },
+                    "admin": {
+                        "credentials": {
+                            "admin": eks_config.require("apisix_admin_key"),
+                            "viewer": eks_config.require("apisix_viewer_key"),
+                        },
+                    },
+                },
+                "etcd": {
+                    "enabled": True,
+                    "tolerations": operations_tolerations,
+                    "resources": {
+                        "requests": {
+                            "cpu": "50m",
+                            "memory": "100Mi",
+                        },
+                        "limits": {
+                            "cpu": "100m",
+                            "memory": "200Mi",
+                        },
+                    },
+                },
+                "ingress-controller": {
+                    "enabled": True,
+                    "gateway": {
+                        "type": "ClusterIP",
+                        "resources": {
+                            "requests": {
+                                "cpu": "50m",
+                                "memory": "50Mi",
+                            },
+                            "limits": {
+                                "cpu": "50m",
+                                "memory": "100Mi",
+                            },
+                        },
+                    },
+                    "config": {
+                        "apisix": {
+                            "serviceNamespace": "operations",
+                            "serviceName": "apisix-admin",
+                            "adminKey": eks_config.require("apisix_admin_key"),
+                            "adminAPIVersion": "v3",
+                        },
+                        "kubernetes": {
+                            # Requires using apisix CRs
+                            "enableGatewayAPI": False,  # Not first-class support
+                            "resyncInterval": "1m",
+                        },
+                    },
+                },
+            },
+        ),
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=operations_namespace,
+            delete_before_replace=True,
+            depends_on=[
+                cluster,
+                node_groups[0],
+                operations_namespace,
+                gateway_api_crds,
+            ],
+        ),
+    )
+
 ############################################################
 # Configure external-dns operator to setup domain names automatically
 ############################################################
@@ -1026,6 +1167,7 @@ external_dns_release = (
                 # Configure external-dns to only look at gateway resources
                 # disables support for monitoring services or legacy ingress resources
                 "sources": [
+                    "service",
                     "gateway-udproute",
                     "gateway-tcproute",
                     "gateway-grpcroute",
