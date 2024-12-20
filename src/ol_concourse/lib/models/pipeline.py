@@ -65,6 +65,7 @@ class Duration(RootModel[str]):
 class RegistryImage(BaseModel):
     repository: str
     tag: str = "latest"
+    tag_regex: Optional[str] = None
 
 
 class DisplayConfig(BaseModel):
