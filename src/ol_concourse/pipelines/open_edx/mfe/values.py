@@ -11,6 +11,10 @@ mitx = [
         logo_url="https://lms-ci.mitx.mit.edu/static/mitx/images/logo.svg",
         logo_trademark_url="https://lms-ci.mitx.mit.edu/static/mitx/images/mit-ol-logo.svg",
         marketing_site_domain="lms-ci.mitx.mit.edu",
+        plugin_slot_config_file_map={
+            "learning": "learning_header.env.jsx",
+            "simple": "simple_header.env.jsx",
+        },
         schedule_email_section="true",  # Because the communication MFE treats this boolean as string  # noqa: E501
         site_name="MITx Residential CI",
         studio_domain="studio-ci.mitx.mit.edu",
@@ -27,6 +31,10 @@ mitx = [
         logo_url="https://mitx-qa.mitx.mit.edu/static/mitx/images/logo.svg",
         logo_trademark_url="https://mitx-qa.mitx.mit.edu/static/mitx/images/mit-ol-logo.svg",
         marketing_site_domain="mitx-qa.mitx.mit.edu",
+        plugin_slot_config_file_map={
+            "learning": "learning_header.env.jsx",
+            "simple": "simple_header.env.jsx",
+        },
         site_name="MITx Residential QA",
         studio_domain="studio-mitx-qa.mitx.mit.edu",
         support_url="odl.zendesk.com/hc/en-us/requests/new",
@@ -59,6 +67,10 @@ mitx_staging = [
         logo_url="https://staging-ci.mitx.mit.edu/static/mitx-staging/images/logo.svg",
         logo_trademark_url="https://staging-ci.mitx.mit.edu/static/mitx-staging/images/mit-ol-logo.svg",
         marketing_site_domain="staging-ci.mitx.mit.edu",
+        plugin_slot_config_file_map={
+            "learning": "learning_header.env.jsx",
+            "simple": "simple_header.env.jsx",
+        },
         schedule_email_section="true",  # Because the communication MFE treats this boolean as string  # noqa: E501
         site_name="MITx Residential Staging CI",
         studio_domain="studio-staging-ci.mitx.mit.edu",
@@ -74,6 +86,10 @@ mitx_staging = [
         logo_url="https://mitx-qa-draft.mitx.mit.edu/static/mitx-staging/images/logo.svg",
         logo_trademark_url="https://mitx-qa-draft.mitx.mit.edu/static/mitx-staging/images/mit-ol-logo.svg",
         marketing_site_domain="mitx-qa-draft.mitx.mit.edu",
+        plugin_slot_config_file_map={
+            "learning": "learning_header.env.jsx",
+            "simple": "simple_header.env.jsx",
+        },
         site_name="MITx Residential Staging QA",
         studio_domain="studio-mitx-qa-draft.mitx.mit.edu",
         support_url="odl.zendesk.com/hc/en-us/requests/new",
