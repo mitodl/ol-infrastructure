@@ -93,7 +93,6 @@ class OpenEdxSupportedRelease(str, Enum):
         return enum_element
 
     master = ("master", "master", "3.11", "20")
-    redwood = ("redwood", "open-release/redwood.master", "3.11", "18")
     sumac = ("sumac", "open-release/sumac.master", "3.11", "20")
 
     def __str__(self):
