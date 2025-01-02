@@ -23,8 +23,8 @@ config:
     GA_G_TRACKING_ID: "G-5L2PYSTC4H"
     GA_TRACKING_ID: "UA-5145472-30"
     INDEXING_API_USERNAME: "od_mm_prod_api"
-    KEYCLOAK_BASE_URL: ""
-    KEYCLOAK_REALM_NAME: ""
+    KEYCLOAK_BASE_URL: "https://sso.ol.mit.edu"
+    KEYCLOAK_REALM_NAME: "olapps"
     MAILGUN_FROM_EMAIL: 'MIT Open <no-reply@mail.open.mit.edu'
     MICROMASTERS_CATALOG_API_URL: "https://micromasters.mit.edu/api/v0/catalog/"
     MICROMASTERS_COURSE_URL: "https://micromasters.mit.edu/api/v0/courseruns/"
