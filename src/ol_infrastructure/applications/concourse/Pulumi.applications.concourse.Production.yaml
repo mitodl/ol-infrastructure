@@ -36,7 +36,7 @@ config:
     iam_policies:
     - base
     - ocw
-    instance_type: general_purpose_xlarge
+    instance_type: c7a.2xlarge
     name: ocw
   - auto_scale:
       desired: 5
