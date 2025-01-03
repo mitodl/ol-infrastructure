@@ -241,6 +241,7 @@ data_lake_policy_document = {
             ],
             "Resource": [
                 "arn:aws:glue:*:*:catalog",
+                "arn:aws:glue:*:*:database/airbyte_test_namespace",
                 f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
                 f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
             ],
@@ -613,7 +614,6 @@ iam.RolePolicyAttachment(
     role=airbyte_trust_role.role.name,
 )
 
-airbyte_service_account_name = "airbyte-admin"
 vault_k8s_resources_config = OLVaultK8SResourcesConfig(
     application_name="airbyte",
     namespace=airbyte_namespace,
