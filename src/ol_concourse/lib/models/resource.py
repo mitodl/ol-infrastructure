@@ -10,4 +10,7 @@ class Git(BaseModel):
     paths: Optional[list[Path]] = None
     private_key: Optional[str] = None
     ignore_paths: Optional[list[Path]] = None
+    fetch_tags: bool = False
+    tag_regex: Optional[str] = None
+    depth: Optional[int] = None
     model_config = ConfigDict(extra="allow")

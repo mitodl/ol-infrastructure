@@ -11,6 +11,8 @@ def git_repo(  # noqa: PLR0913
     check_every: str = "60s",
     paths: Optional[list[str]] = None,
     depth: Optional[int] = None,
+    fetch_tags: bool = False,  # noqa: FBT001, FBT002
+    tag_regex: Optional[str] = None,
     **kwargs,
 ) -> Resource:
     return Resource(
@@ -18,9 +20,14 @@ def git_repo(  # noqa: PLR0913
         type="git",
         icon="git",
         check_every=check_every,
-        source=Git(uri=uri, branch=branch, paths=paths, depth=depth).model_dump(
-            exclude_none=True
-        ),
+        source=Git(
+            uri=uri,
+            branch=branch,
+            paths=paths,
+            depth=depth,
+            fetch_tags=fetch_tags,
+            tag_regex=tag_regex,
+        ).model_dump(exclude_none=True),
         **kwargs,
     )
 
@@ -244,6 +251,7 @@ def registry_image(  # noqa: PLR0913
     image_repository: str,
     image_tag: Optional[str] = None,
     variant: Optional[str] = None,
+    tag_regex: Optional[str] = None,
     username=None,
     password=None,
 ) -> Resource:
@@ -255,6 +263,8 @@ def registry_image(  # noqa: PLR0913
         image_source["password"] = password
     if variant:
         image_source["variant"] = variant
+    if tag_regex:
+        image_source["tag_regex"] = tag_regex
     return Resource(
         name=name,
         type="registry-image",
