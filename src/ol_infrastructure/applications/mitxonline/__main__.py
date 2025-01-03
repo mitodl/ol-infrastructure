@@ -197,9 +197,9 @@ heroku_vars = {
     "MITX_ONLINE_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
     "MITX_ONLINE_DB_CONN_MAX_AGE": "0",
     "MITX_ONLINE_DB_DISABLE_SSL": "True",  # pgbouncer buildpack uses stunnel to handle encryption"
-    "MITX_ONLINE_FROM_EMAIL": "MITx Online <support@mitxonline.mit.edu>",
+    "MITX_ONLINE_FROM_EMAIL": "MITx Online <mitxonline-support@mit.edu>",
     "MITX_ONLINE_OAUTH_PROVIDER": "mitxonline-oauth2",
-    "MITX_ONLINE_REPLY_TO_ADDRESS": "MITx Online <support@mitxonline.mit.edu>",
+    "MITX_ONLINE_REPLY_TO_ADDRESS": "MITx Online <mitxonline-support@mit.edu>",
     "MITX_ONLINE_SECURE_SSL_REDIRECT": "True",
     "MITX_ONLINE_USE_S3": "True",
     "NODE_MODULES_CACHE": "False",
