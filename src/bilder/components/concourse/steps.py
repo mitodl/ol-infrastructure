@@ -36,6 +36,9 @@ def install_concourse(concourse_config: ConcourseBaseConfig):
         concourse_archive = f"https://github.com/concourse/concourse/releases/download/v{concourse_config.version}/concourse-{concourse_config.version}-linux-amd64.tgz"
         concourse_archive_hash = f"{concourse_archive}.sha1"
         concourse_archive_path = f"/tmp/concourse-{concourse_config.version}.tgz"  # noqa: S108
+        logging.debug("concourse_archive: %s", concourse_archive)
+        logging.debug("concourse_archive_hash: %s", concourse_archive_hash)
+        logging.debug("concourse_archive_path: %s", concourse_archive_path)
         files.download(
             name="Download the Concourse release archive",
             src=str(concourse_archive),
@@ -55,14 +58,14 @@ def install_concourse(concourse_config: ConcourseBaseConfig):
         )
         # NOTE (cpatti) We need to remove this section when Concourse fixes https://github.com/concourse/concourse/issues/9027
         # Download 1.5.1 of CNI plugin to fix above issue.
-        cni_archive = (
-            "https://github.com/containernetworking/plugins/releases/download/v1.5.1/cni-plugins-linux-amd64-v1.5.1.tgz",
-        )
+        cni_archive_version = "v1.5.1"
+        cni_archive_platform = "linux-amd64"
+        cni_archive = f"https://github.com/containernetworking/plugins/releases/download/{cni_archive_version}/cni-plugins-{cni_archive_platform}-{cni_archive_version}.tgz"
         cni_archive_hash = f"{cni_archive}.sha256"
         cni_archive_path = "/tmp/cni-plugins-linux-amd64-v1.5.1.tgz"  # noqa: S108
-        logging.info("cni_archive: %s", cni_archive)
-        logging.info("cni_archive_hash: %s", cni_archive_hash)
-        logging.info("cni_archive_path: %s", cni_archive_path)
+        logging.debug("cni_archive: %s", cni_archive)
+        logging.debug("cni_archive_hash: %s", cni_archive_hash)
+        logging.debug("cni_archive_path: %s", cni_archive_path)
         files.download(
             name="Download the cni release archive",
             src=str(cni_archive),
