@@ -1,3 +1,4 @@
+import logging
 import tempfile
 from pathlib import Path
 from typing import Union
@@ -59,6 +60,9 @@ def install_concourse(concourse_config: ConcourseBaseConfig):
         )
         cni_archive_hash = f"{cni_archive}.sha256"
         cni_archive_path = "/tmp/cni-plugins-linux-amd64-v1.5.1.tgz"  # noqa: S108
+        logging.info("cni_archive: %s", cni_archive)
+        logging.info("cni_archive_hash: %s", cni_archive_hash)
+        logging.info("cni_archive_path: %s", cni_archive_path)
         files.download(
             name="Download the cni release archive",
             src=str(cni_archive),
