@@ -225,6 +225,7 @@ data_lake_policy_document = {
                 "glue:BatchDeletePartition",
                 "glue:BatchDeleteTable",
                 "glue:BatchGetPartition",
+                "glue:CreateDatabase",
                 "glue:CreateTable",
                 "glue:CreatePartition",
                 "glue:DeletePartition",
@@ -242,6 +243,7 @@ data_lake_policy_document = {
             "Resource": [
                 "arn:aws:glue:*:*:catalog",
                 "arn:aws:glue:*:*:database/airbyte_test_namespace",
+                "arn:aws:glue:*:*:table/airbyte_test_namespace/*",
                 f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
                 f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
             ],
