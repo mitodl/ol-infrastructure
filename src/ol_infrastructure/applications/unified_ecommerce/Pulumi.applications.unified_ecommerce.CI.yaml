@@ -29,7 +29,7 @@ config:
     SITE_NAME: "MIT Open Learning Ecommerce"
     UWSGI_THREADS: "5"
   ecommerce:fastly_api_key:
-    secure: v1:5UppWAatXu2kagvW:yZlbTDUCUP/cZ537sSYWrmlvc/2ppFwe0SZZQwZeQe/BadyIu8vWAHcoR7eh0N1K
+    secure: v1:uiS6uNFOM1mXgcx/:xlBwcsFtEYn8n4tUQxg66Nfy3zIq7gTX69t/n9lV+2le2S9dhzX6OEiIEIztpbHB
   ecommerce:frontend_domain: "pay-ci.ol.mit.edu"
   redis:password:
     secure: v1:gSGSH3Lc+dcCjMGC:DWAY3/dEqzdQvZYPpv8p17Nle6Ew/5M5+aImd1rxPJxy4Xkh2eKcJsmxo2kgRgrQBKyDibEBrvQev1w/HL+L64+4g3CM075KkbvIMqPoP/c=

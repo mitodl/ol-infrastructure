@@ -233,18 +233,6 @@ gh_workflow_accesskey = iam.AccessKey(
     user=gh_workflow_user.name,
     status="Active",
 )
-
-# Finally, put the aws access key into the github actions configuration
-match stack_info.env_suffix:
-    case "production":
-        env_var_suffix = "PROD"
-    case "qa":
-        env_var_suffix = "RC"
-    case "ci":
-        env_var_suffix = "CI"
-    case _:
-        env_var_suffix = "INVALID"
-
 gh_repo = github.get_repository(
     full_name="mitodl/unified-ecommerce-frontend",
     opts=InvokeOptions(provider=github_provider),
@@ -331,6 +319,35 @@ unified_ecommerce_fastly_service = fastly.ServiceVcl(
         ),
     ],
     snippets=[
+        fastly.ServiceVclSnippetArgs(
+            name="Rewrite requests to root s3 - miss",
+            content=textwrap.dedent(
+                r"""
+                if (req.method == "GET" && req.backend.is_origin) {
+                  set bereq.url = "/frontend" + req.url;
+                  if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {
+                    set bereq.url = "/frontend/index.html";
+                  }
+                }
+                """
+            ),
+            type="miss",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            name="Rewrite requests to root s3 - bypass",
+            content=textwrap.dedent(
+                r"""
+                if (req.method == "GET" && req.backend.is_origin && req.http.User-Agent ~ "(?i)prerender") {
+                  set req.backend = F_unified_ecommerce_frontend;
+                  set bereq.url = "/frontend" + req.url;
+                  if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {
+                    set bereq.url = "/frontend/index.html";
+                  }
+                }
+                """  # noqa: E501
+            ),
+            type="pass",
+        ),
         fastly.ServiceVclSnippetArgs(
             name="Redirect for to correct domain",
             content=textwrap.dedent(
@@ -625,7 +642,7 @@ static_secrets = OLVaultK8SSecret(
         labels=k8s_global_labels,
         dest_secret_name=static_secrets_name,
         dest_secret_labels=k8s_global_labels,
-        mount="secrets-ecommerce",
+        mount="secret-ecommerce",
         mount_type="kv-v2",
         path="secrets",
         includes=["*"],
@@ -1084,6 +1101,18 @@ ecommerce_https_apisix_tls = kubernetes.apiextensions.CustomResource(
     },
 )
 
+
+# Finally, put the aws access key into the github actions configuration
+match stack_info.env_suffix:
+    case "production":
+        env_var_suffix = "PROD"
+    case "qa":
+        env_var_suffix = "RC"
+    case "ci":
+        env_var_suffix = "CI"
+    case _:
+        env_var_suffix = "INVALID"
+
 gh_workflow_access_key_id_env_secret = github.ActionsSecret(
     f"unified-ecommerce-gh-workflow-access-key-id-env-secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
@@ -1100,17 +1129,33 @@ gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
 )
 
 gh_workflow_fastly_api_key_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_nextjs_fastly_api_key_env_secret-{stack_info.env_suffix}",
+    f"unified-ecommerce-gh-workflow-fastly-api-key-env-secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"FASTLY_API_KEY_{env_var_suffix}",  # pragma: allowlist secret
     plaintext_value=ecommerce_config.require("fastly_api_key"),
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_fastly_service_id_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_fastly_service_id_env_secret-{stack_info.env_suffix}",
+    f"unified-ecommerce-gh-workflow-fastly-service-id-env-secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"FASTLY_SERVICE_ID_{env_var_suffix}",  # pragma: allowlist secret
     plaintext_value=unified_ecommerce_fastly_service.id,
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+
+gh_workflow_s3_bucket_name_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_s3_bucket_name_env_secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"AWS_S3_BUCKET_NAME_{env_var_suffix}",  # pragma: allowlist secret
+    plaintext_value=unified_ecommerce_app_storage_bucket_name,
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+
+gh_workflow_api_base_env_var = github.ActionsVariable(
+    f"unified-ecommerce-gh-workflow-api-base-env-secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"API_BASE_{env_var_suffix}",  # pragma: allowlist secret
+    value=f"https://{ecommerce_config.require('backend_domain')}",
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
