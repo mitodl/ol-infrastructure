@@ -14,7 +14,7 @@ from bilder.components.concourse.steps import (
 from bilder.facts.has_systemd import HasSystemd
 
 concourse_config = ConcourseBaseConfig()
-web_config = ConcourseWebConfig()
+web_config = ConcourseWebConfig(admin_password="foobar", database_password="foobar")  # noqa: S106
 worker_config = ConcourseWorkerConfig()
 install_baseline_packages()
 install_changed = install_concourse(concourse_config)

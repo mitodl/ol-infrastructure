@@ -79,8 +79,7 @@ def install_concourse(concourse_config: ConcourseBaseConfig):
         server.shell(
             name="Extract the cni release archive.",
             commands=[
-                f"cd {installation_directory}/bin",
-                f"tar -xvzf {cni_archive_path}",
+                f"tar -xvzf {cni_archive_path} --directory {installation_directory}/bin/",  # noqa: E501
             ],
         )
         # Verify ownership of Concourse directory
@@ -129,13 +128,12 @@ def _manage_web_node_keys(
             src=host_key_file.name,
             state=state,
         )
-    elif not host.get_fact(File, concourse_config.tsa_host_key_path):
+    elif not host.get_fact(File, str(concourse_config.tsa_host_key_path)):
         server.shell(
             name="Generate a tsa host key",
             commands=[
                 f"{concourse_config.deploy_directory}/bin/concourse generate-key -t ssh -f {concourse_config.tsa_host_key_path}"  # noqa: E501
             ],
-            state=state,
         )
     if concourse_config.session_signing_key:
         session_signing_key_file = tempfile.NamedTemporaryFile(delete=False)
@@ -150,13 +148,12 @@ def _manage_web_node_keys(
             src=session_signing_key_file.name,
             state=state,
         )
-    elif not host.get_fact(File, concourse_config.session_signing_key_path):
+    elif not host.get_fact(File, str(concourse_config.session_signing_key_path)):
         server.shell(
             name="Generate a session signing key",
             commands=[
                 f"{concourse_config.deploy_directory}/bin/concourse generate-key -t rsa -f {concourse_config.session_signing_key_path}"  # noqa: E501
             ],
-            state=state,
         )
 
 
