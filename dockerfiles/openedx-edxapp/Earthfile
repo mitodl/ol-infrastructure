@@ -45,9 +45,9 @@ install-deps:
   ARG --required RELEASE_NAME
   ARG NODE_VERSION="20.18.0"
   COPY +get-code/edx-platform /openedx/edx-platform
-  RUN cp /openedx/edx-platform/requirements/edx/base.txt /root/pip_package_lists/edx_base.txt
+  RUN cp /openedx/edx-platform/requirements/edx/base.txt /root/pip_package_lists/edx_base.txt && cp /openedx/edx-platform/requirements/edx/assets.txt /root/pip_package_lists/edx_assets.txt
   RUN ls -l /root/pip_package_lists/
-  RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_lists/edx_base.txt -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
+  RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_lists/edx_base.txt -r /root/pip_package_lists/edx_assets.txt -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
   IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
     RUN pip uninstall --yes "edx-name-affirmation"
     # This is a hack to address issues with lxml and xmlsec compatibilities with libxml2 (2024-11-21 TMM)
