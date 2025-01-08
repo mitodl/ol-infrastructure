@@ -179,7 +179,7 @@ def _manage_worker_node_keys(concourse_config: ConcourseWorkerConfig):
             user=concourse_config.user,
             mode="600",
         )
-    elif not host.get_fact(File, concourse_config.worker_private_key_path):
+    elif not host.get_fact(File, str(concourse_config.worker_private_key_path)):
         server.shell(
             name="Generate a worker private key",
             commands=[
