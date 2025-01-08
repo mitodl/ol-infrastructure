@@ -62,7 +62,7 @@ build {
   }
   provisioner "shell-local" {
     environment_vars = ["NODE_TYPE=${var.node_type}"]
-    inline           = ["pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} --chdir ${path.root}/${var.app_name} deploy.py"]
+    inline           = ["pyinfra -y --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session-${build.ID}.pem ${build.Host} --chdir ${path.root}/${var.app_name} deploy.py"]
   }
 
   # TODO: move to vault pyinfra

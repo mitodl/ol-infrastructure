@@ -119,7 +119,7 @@ build {
       "EDX_INSTALLATION=${var.installation_target}",
     ]
     inline = [
-      "pyinfra --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"
+      "pyinfra -y --data ssh_strict_host_key_checking=off --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-${build.ID}.pem ${build.Host} --chdir ${path.root} deploy.py"
     ]
   }
 
