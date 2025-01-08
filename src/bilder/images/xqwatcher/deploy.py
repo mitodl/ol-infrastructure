@@ -162,7 +162,6 @@ files.directory(
     name="Remove the existing conf.d directory for xqwatcher configurations",
     path=str(XQWATCHER_CONF_DIR),
     force=True,
-    assume_present=True,
     present=False,
 )
 

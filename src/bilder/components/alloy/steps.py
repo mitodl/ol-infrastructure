@@ -42,7 +42,6 @@ def _install_from_package(alloy_config: AlloyConfig):
         files.directory(
             name="Remove example configurations",
             path=f"{alloy_config.configuration_directory}/config.alloy",
-            assume_present=True,
             present=False,
         )
 
