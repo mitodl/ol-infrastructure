@@ -38,6 +38,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
+from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.aws.iam_helper import (
     IAM_POLICY_VERSION,
     lint_iam_policy,
@@ -84,10 +85,7 @@ k8s_global_labels = {
     "pulumi_managed": "true",
     "pulumi_stack": stack_info.full_name,
 }
-k8s_provider = kubernetes.Provider(
-    "k8s-provider",
-    kubeconfig=cluster_stack.require_output("kube_config"),
-)
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 airbyte_namespace = "airbyte"
 
 aws_account = get_caller_identity()
@@ -596,7 +594,6 @@ airbyte_trust_role_config = OLEKSTrustRoleConfig(
 airbyte_trust_role = OLEKSTrustRole(
     f"{env_name}-ol-trust-role",
     role_config=airbyte_trust_role_config,
-    opts=ResourceOptions(provider=k8s_provider),
 )
 iam.RolePolicyAttachment(
     f"airbyte-service-account-data-lake-access-policy-{env_name}",
@@ -625,7 +622,6 @@ vault_k8s_resources_config = OLVaultK8SResourcesConfig(
 vault_k8s_resources = OLVaultK8SResources(
     resource_config=vault_k8s_resources_config,
     opts=ResourceOptions(
-        provider=k8s_provider,
         delete_before_replace=True,
         depends_on=[airbyte_vault_k8s_auth_backend_role],
     ),
@@ -650,9 +646,6 @@ app_db_creds_dynamic_secret_config = OLVaultK8SDynamicSecretConfig(
 app_db_creds_dynamic_secret = OLVaultK8SSecret(
     "airbyte-app-db-creds-vaultdynamicsecret",
     resource_config=app_db_creds_dynamic_secret_config,
-    opts=ResourceOptions(
-        provider=k8s_provider,
-    ),
 )
 
 default_resources_definition = {
@@ -791,7 +784,6 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
         skip_await=True,
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         depends_on=[
             app_db_creds_dynamic_secret,
             airbyte_trust_role,
@@ -822,7 +814,6 @@ override_dynamicconfig_configmap_patch = kubernetes.core.v1.ConfigMapPatch(
     ),
     data={"development.yaml": override_dynamicconfig_data},
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=airbyte_helm_release,
         depends_on=[airbyte_helm_release],
         delete_before_replace=True,
@@ -927,7 +918,6 @@ gateway = OLEKSGateway(
     "airbyte-gateway",
     gateway_config=gateway_config,
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=airbyte_helm_release,
         depends_on=[airbyte_helm_release],
         delete_before_replace=True,
@@ -951,7 +941,6 @@ basic_auth_middleware = kubernetes.apiextensions.CustomResource(
         },
     },
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=gateway,
         depends_on=[airbyte_helm_release],
         delete_before_replace=True,
@@ -973,7 +962,6 @@ basic_auth_secret = OLVaultK8SSecret(
     name="airbyte-basic-auth",
     resource_config=basic_auth_secret_config,
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=gateway,
         depends_on=[airbyte_helm_release],
         delete_before_replace=True,
@@ -1004,7 +992,6 @@ forward_auth_middleware = kubernetes.apiextensions.CustomResource(
         },
     },
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=gateway,
         depends_on=[airbyte_helm_release],
         delete_before_replace=True,
@@ -1034,7 +1021,6 @@ forward_auth_secret = OLVaultK8SSecret(
     name="airbyte-forward-auth-oidc",
     resource_config=forward_auth_secret_config,
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=gateway,
         depends_on=[airbyte_helm_release],
         delete_before_replace=True,
@@ -1106,7 +1092,6 @@ forward_auth_deployment = kubernetes.apps.v1.Deployment(
         ),
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=gateway,
         depends_on=[airbyte_helm_release],
         delete_before_replace=True,
@@ -1134,7 +1119,6 @@ forward_auth_service = kubernetes.core.v1.Service(
         ],
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=forward_auth_deployment,
         depends_on=[airbyte_helm_release, forward_auth_deployment],
         delete_before_replace=True,

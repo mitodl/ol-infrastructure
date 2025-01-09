@@ -29,7 +29,10 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.eks_helper import check_cluster_namespace
+from ol_infrastructure.lib.aws.eks_helper import (
+    check_cluster_namespace,
+    setup_k8s_provider,
+)
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -68,10 +71,8 @@ k8s_global_labels = {
     "ol.mit.edu/stack": stack_info.full_name,
     "ol.mit.edu/service": "open-metadata",
 }
-k8s_provider = kubernetes.Provider(
-    "k8s-provider",
-    kubeconfig=cluster_stack.require_output("kube_config"),
-)
+
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 consul_security_groups = consul_stack.require_output("security_groups")
 aws_account = get_caller_identity()
@@ -255,7 +256,6 @@ db_creds_secret = OLVaultK8SSecret(
     f"open-metadata-{stack_info.name}-db-creds-secret",
     db_creds_secret_config,
     opts=ResourceOptions(
-        provider=k8s_provider,
         delete_before_replace=True,
         parent=vault_k8s_resources,
     ),
@@ -284,7 +284,6 @@ oidc_config_secret = OLVaultK8SSecret(
     f"open-metadata-{stack_info.name}-oidc-config-secret",
     oidc_config_secret_config,
     opts=ResourceOptions(
-        provider=k8s_provider,
         delete_before_replace=True,
         parent=vault_k8s_resources,
     ),
@@ -371,7 +370,6 @@ open_metadata_application = kubernetes.helm.v3.Release(
         skip_await=False,
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=vault_k8s_resources,
         delete_before_replace=True,
         depends_on=[open_metadata_db, db_creds_secret, oidc_config_secret],
@@ -411,7 +409,6 @@ gateway = OLEKSGateway(
     f"open-metadata-{stack_info.name}-gateway",
     gateway_config=gateway_config,
     opts=ResourceOptions(
-        provider=k8s_provider,
         parent=open_metadata_application,
         delete_before_replace=True,
     ),

@@ -1,6 +1,9 @@
-from functools import lru_cache
+from functools import lru_cache, partial
+from typing import Optional
 
 import boto3
+import pulumi
+from pulumi_kubernetes import Provider
 
 eks_client = boto3.client("eks")
 
@@ -39,3 +42,43 @@ def eks_versions(reference_addon: str = "aws-ebs-csi-driver") -> list[str]:
         "compatibilities"
     ]
     return [compat_def["clusterVersion"] for compat_def in compatabilities_list]
+
+
+@lru_cache
+def get_k8s_provider(
+    kubeconfig: str,
+    provider_name: Optional[str],
+):
+    return Provider(
+        provider_name or "k8s-provider",
+        kubeconfig=kubeconfig,
+    )
+
+
+def set_k8s_provider(
+    kubeconfig: str,
+    provider_name: Optional[str],
+    resource_args: pulumi.ResourceTransformationArgs,
+) -> pulumi.ResourceTransformationResult:
+    if resource_args.type_.split(":")[0] == "kubernetes":
+        resource_args.opts.provider = get_k8s_provider(
+            kubeconfig,
+            provider_name,
+        )
+    return pulumi.ResourceTransformationResult(
+        props=resource_args.props,
+        opts=resource_args.opts,
+    )
+
+
+def setup_k8s_provider(
+    kubeconfig: str,
+    provider_name: Optional[str] = None,
+):
+    pulumi.runtime.register_stack_transformation(
+        partial(
+            set_k8s_provider,
+            kubeconfig,
+            provider_name,
+        )
+    )
