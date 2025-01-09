@@ -69,6 +69,10 @@ plugin_dict = {
         "target_name": "ol_social_auth_package",
         "pypi_package_name": "ol-social-auth",
     },
+    "src/edx_username_changer": {
+        "target_name": "edx_username_changer_package",
+        "pypi_package_name": "edx-username-changer",
+    },
 }
 
 fragments = []
