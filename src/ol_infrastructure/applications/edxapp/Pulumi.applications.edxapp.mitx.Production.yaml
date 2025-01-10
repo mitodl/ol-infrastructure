@@ -11,12 +11,16 @@ config:
   - ["course_home.course_home_mfe_progress_tab", "--create", "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_advanced_settings_page", "--create", "--superusers",
     "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_course_outline_page", "--deactivate"]
+  - ["contentstore.new_studio_mfe.use_new_course_team_page", "--deactivate"]
   - ["contentstore.new_studio_mfe.use_new_export_page", "--create", "--superusers",
     "--everyone"]
   - ["contentstore.new_studio_mfe.use_new_files_uploads_page", "--create", "--superusers",
     "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_grading_page", "--deactivate"]
   - ["contentstore.new_studio_mfe.use_new_import_page", "--create", "--superusers",
     "--everyone"]
+  - ["contentstore.new_studio_mfe.use_new_schedule_details_page", "--deactivate"]
   - ["contentstore.new_studio_mfe.use_new_updates_page", "--create", "--superusers",
     "--everyone"]
   - ["discussions.pages_and_resources_mfe", "--create", "--superusers", "--everyone"]
@@ -30,6 +34,7 @@ config:
   - ["new_core_editors.use_new_problem_editor", "--create", "--everyone"]
   - ["new_core_editors.use_new_text_editor", "--create", "--superusers", "--everyone"]
   - ["new_core_editors.use_new_video_editor", "--create", "--superusers", "--everyone"]
+  - ["new_studio_mfe.use_new_home_page", "--deactivate"]
   - ["new_studio_mfe.use_tagging_taxonomy_list_page", "--create", "--superusers",
     "--everyone"]
   - ["openresponseassessment.enhanced_staff_grader", "--create", "--superusers", "--everyone"]

@@ -8,6 +8,7 @@ services:
     - --spi-login-provider=ol-freemarker
     - --http-enabled=true
     - --hostname=${KC_URL}
+    - --proxy-headers=xforwarded
     env_file:
     - ./.env
     labels:

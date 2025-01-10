@@ -1,5 +1,5 @@
 VERSION 0.7
-ARG PYTHON_VERSION="3.8"
+ARG PYTHON_VERSION="3.11"
 FROM python:$PYTHON_VERSION"-bookworm"
 
 apt-base:
@@ -43,11 +43,11 @@ install-deps:
   FROM +apt-base
   ARG --required DEPLOYMENT_NAME
   ARG --required RELEASE_NAME
-  ARG NODE_VERSION="16.14.0"
+  ARG NODE_VERSION="20.18.0"
   COPY +get-code/edx-platform /openedx/edx-platform
-  RUN cp /openedx/edx-platform/requirements/edx/base.txt /root/pip_package_lists/edx_base.txt
+  RUN cp /openedx/edx-platform/requirements/edx/base.txt /root/pip_package_lists/edx_base.txt && cp /openedx/edx-platform/requirements/edx/assets.txt /root/pip_package_lists/edx_assets.txt
   RUN ls -l /root/pip_package_lists/
-  RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_lists/edx_base.txt -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
+  RUN pip install --no-warn-script-location --user --no-cache-dir -r /root/pip_package_lists/edx_base.txt -r /root/pip_package_lists/edx_assets.txt -r /root/pip_package_lists/$RELEASE_NAME/$DEPLOYMENT_NAME.txt
   IF [ "$DEPLOYMENT_NAME" = "mitxonline" ]
     RUN pip uninstall --yes "edx-name-affirmation"
     # This is a hack to address issues with lxml and xmlsec compatibilities with libxml2 (2024-11-21 TMM)
@@ -81,12 +81,12 @@ themes:
 tutor-utils:
   FROM +apt-base
   ARG TUTOR_REPO="https://github.com/overhangio/tutor.git"
-  ARG TUTOR_VERSION="v17.0.3"
+  ARG TUTOR_VERSION="v19.0.0"
   GIT CLONE --branch $TUTOR_VERSION $TUTOR_REPO /openedx/tutor
   SAVE ARTIFACT /openedx/tutor/tutor/templates/build/openedx/bin
 
 dockerize:
-  FROM docker.io/powerman/dockerize@sha256:dcad65f02c9915897ca63630c1a5e416ca28ad227f4b71736b706fed14a1779a
+  FROM docker.io/powerman/dockerize@sha256:f3ecfd5ac0f74eed3990782309ac6bf8b700f4eca0ea9e9ef507b11742c19cc6
   SAVE ARTIFACT /usr/local/bin/dockerize
 
 collected:

@@ -47,7 +47,7 @@ def install_hashicorp_products(hashicorp_products: list[HashicorpProduct]):
         }
         download_destination = f"/tmp/{product.name}.zip"  # noqa: S108
         target_directory = product.install_directory or "/usr/local/bin/"
-        download_binary = files.download(
+        files.download(
             name=f"Download {product.name} archive",
             src=f"https://releases.hashicorp.com/{product.name}/{product.version}/{file_download}",
             dest=download_destination,
@@ -60,7 +60,6 @@ def install_hashicorp_products(hashicorp_products: list[HashicorpProduct]):
         files.file(
             name=f"Ensure {product.name} binary is executable",
             path=str(Path(target_directory).joinpath(product.name)),
-            assume_present=download_binary.changed,
             user=product.name,
             group=product.name,
             mode="755",

@@ -1,4 +1,4 @@
-ARG DOCKER_IMAGE_TAG=3.0-slim-bullseye
+ARG DOCKER_IMAGE_TAG=3.4-slim-bullseye
 FROM docker.io/ruby:$DOCKER_IMAGE_TAG
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update && \

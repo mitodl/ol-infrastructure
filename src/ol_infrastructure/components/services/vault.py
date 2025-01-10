@@ -628,7 +628,7 @@ class OLVaultK8SSecretConfig(BaseModel):
         "kubernetes.io/tls",
         "kubernetes.io/ssh-auth",
         "kubernetes.io/basic-auth",
-    ] = "Opaque"
+    ] = "Opaque"  # noqa: S105
     exclude_raw: Optional[bool] = True
     excludes: Optional[list[str]] = [".*"]
     includes: Optional[list[str]] = []

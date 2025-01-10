@@ -39,10 +39,9 @@ def _install_from_package(alloy_config: AlloyConfig):
         update=True,
     )
     if alloy_config.clear_default_config:
-        files.directory(
+        files.file(
             name="Remove example configurations",
             path=f"{alloy_config.configuration_directory}/config.alloy",
-            assume_present=True,
             present=False,
         )
 

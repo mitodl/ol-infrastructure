@@ -47,7 +47,7 @@ def install_traefik_binary(traefik_config: TraefikConfig):
     }
     download_destination = "/tmp/traefik.tar.gz"  # noqa: S108
     target_directory = "/usr/local/bin/"
-    download_binary = files.download(
+    files.download(
         name="Download Traefik archive",
         src=f"https://github.com/traefik/traefik/releases/download/v{traefik_config.version}/{file_download}",
         dest=download_destination,
@@ -60,7 +60,6 @@ def install_traefik_binary(traefik_config: TraefikConfig):
     files.file(
         name="Ensure Traefik binary is executable",
         path=str(Path(target_directory).joinpath("traefik")),
-        assume_present=download_binary.changed,
         user=traefik_config.user,
         group=traefik_config.group,
         mode="755",

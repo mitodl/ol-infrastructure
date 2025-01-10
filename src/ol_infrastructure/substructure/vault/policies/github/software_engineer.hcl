@@ -37,7 +37,7 @@ path "secret-mitxonline/*" {
   capabilities = ["read", "list"]
 }
 
-path "secret-mitxpro/*" {
+path "secret-xpro/*" {
   capabilities = ["read", "list"]
 }
 

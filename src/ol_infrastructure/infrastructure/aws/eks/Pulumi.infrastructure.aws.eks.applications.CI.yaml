@@ -2,33 +2,40 @@
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAFI5IH8mbo9W80S6y2vnAxJAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMEbLde8oRQ90G1X9xAgEQgDsw9IWL3FWjQgU3qPyM6iaJktjuBAmQxd3/fb9uGJoBQIKMPval1Hs58h9R0/fVVRJuVXr+N5mAmCSSZQ==
 config:
-  environment:business_unit: operations
-  environment:target_vpc: applications_vpc
   eks:allowed_dns_zones:
   - ".odl.mit.edu"
   - "odl.mit.edu"
   - ".ol.mit.edu"
   - "ol.mit.edu"
-  eks:ebs_csi_provisioner: true
-  eks:efs_csi_provisioner: false
+  eks:apisix_admin_key:
+    secure: v1:sDse8RY8sLFEsPSE:8jqIrqb4BJHNipDXmbh4KXpVrAUUOmiLEV4aKjXqhIr2RvFqOks4pVz+km0wF1hh
+  eks:apisix_ingress_enabled: "true"
+  eks:apisix_viewer_key:
+    secure: v1:IuJlZQCcqboLDz6u:uileS7cOpmHmXYE0Xe+u7pSeJ0QlXNgxq04Zbc4toa010z8GVewuU0WWZsjxcHOI
+  eks:apisix_domains:
+  - "api-pay-ci.ol.mit.edu"
+  eks:ebs_csi_provisioner: "true"
+  eks:efs_csi_provisioner: "false"
   eks:gateway_release_channel: "experimental"
-  eks:pod_security_groups: true
   eks:namespaces:
   - "ecommerce"
   - "mitlearn"
   eks:nodegroups:
     worker-xlarge:
+      disk_size_gb: 500
       instance_types:
       - "c7a.xlarge"
       labels:
-        ondemand: true
         node_size: c7a.xlarge
-      disk_size_gb: 500
+        ondemand: true
+      node_group_options: {}
       scaling:
         desired: 4
-        min: 2
         max: 5
-      version:
+        min: 2
       tags: {}
       taints: {}
-      node_group_options: {}
+      version:
+  eks:pod_security_groups: "true"
+  environment:business_unit: operations
+  environment:target_vpc: applications_vpc

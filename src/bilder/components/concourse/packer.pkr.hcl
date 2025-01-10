@@ -82,7 +82,7 @@ build {
   }
   provisioner "shell-local" {
     except = ["docker.concourse"]
-    inline = ["pyinfra --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session.pem ${build.Host} ${path.root}/sample_deploy.py"]
+    inline = ["pyinfra -y --sudo --user ${build.User} --port ${build.Port} --key /tmp/packer-session.pem ${build.Host} ${path.root}/sample_deploy.py"]
   }
   provisioner "shell-local" {
     except = ["docker.concourse"]

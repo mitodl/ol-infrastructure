@@ -38,13 +38,11 @@ def _install_from_package():
     files.directory(
         name="Remove example configurations",
         path="/etc/vector/examples/",
-        assume_present=True,
         present=False,
     )
     files.file(
         name="Remove example vector.toml",
         path="/etc/vector/vector.toml",
-        assume_present=True,
         present=False,
     )
 
