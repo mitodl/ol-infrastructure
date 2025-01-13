@@ -259,6 +259,7 @@ heroku_vars = {
     "MITXPRO_USE_S3": "True",
     "NODE_MODULES_CACHE": "False",
     "OAUTH2_PROVIDER_ALLOWED_REDIRECT_URI_SCHEMES": "http,https,dccrequest",
+    "POSTHOG_API_HOST": "https://app.posthog.com",
     # This can be removed once PR#1314 is in production,
     "OPENEDX_OAUTH_APP_NAME": "edx-oauth-app",
     # This replaces OPENEDX_GRADES_API_TOKEN and is
@@ -352,6 +353,7 @@ sensitive_heroku_vars = {
     "OPENEDX_SERVICE_WORKER_API_TOKEN": xpro_vault_secrets["openedx"][
         "service_worker_api_token"
     ],
+    "POSTHOG_PROJECT_API_KEY": xpro_vault_secrets["posthog"]["project_api_key"],
     "RECAPTCHA_SECRET_KEY": xpro_vault_secrets["recaptcha"]["secret_key"],
     "RECAPTCHA_SITE_KEY": xpro_vault_secrets["recaptcha"]["site_key"],
     "REFUND_REQUEST_WORKSHEET_ID": xpro_vault_secrets["google-sheets"][
