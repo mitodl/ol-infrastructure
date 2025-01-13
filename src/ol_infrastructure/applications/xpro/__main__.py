@@ -353,7 +353,7 @@ sensitive_heroku_vars = {
     "OPENEDX_SERVICE_WORKER_API_TOKEN": xpro_vault_secrets["openedx"][
         "service_worker_api_token"
     ],
-    "POSTHOG_PROJECT_API_KEY": xpro_vault_secrets["posthog"]["project_api_key"],
+    "POSTHOG_PROJECT_API_KEY": xpro_vault_secrets["posthog"].get("project_api_key", ""),
     "RECAPTCHA_SECRET_KEY": xpro_vault_secrets["recaptcha"]["secret_key"],
     "RECAPTCHA_SITE_KEY": xpro_vault_secrets["recaptcha"]["site_key"],
     "REFUND_REQUEST_WORKSHEET_ID": xpro_vault_secrets["google-sheets"][
