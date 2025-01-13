@@ -801,8 +801,8 @@ ol_touchstone_user_creation_or_linking_subflow_automatically_set_existing_user_s
 # OL - First login flow [END]
 
 """
-# This can be uncommented once this issue is resolved - https://github.com/mrparkers/terraform-provider-keycloak/issues/896
-# noqa: ERA001
+# This can be uncommented once this issue is resolved - https://github.com/pulumi/pulumi-keycloak/issues/655
+# noqa: ERA001,E501
 # OL - Registration flow [START]
 ol_registration_flow = keycloak.authentication.Flow(
     "ol-registration-flow",
@@ -811,43 +811,25 @@ ol_registration_flow = keycloak.authentication.Flow(
     provider_id="basic-flow",
     opts=resource_options,
 )
-ol_registration_flow_page_form = keycloak.authentication.Execution(
-    "ol-registration-flow-page-form",
-    realm_id=ol_apps_realm.id,
-    parent_flow_alias=ol_registration_flow.alias,
-    authenticator="registration-page-form",
-    requirement="REQUIRED",
-    opts=resource_options,
-)
 ol_registration_form = keycloak.authentication.Subflow(
     "ol-registration-form",
     realm_id=ol_apps_realm.id,
-    #authenticator="registration-page-form",
+    authenticator="registration-page-form",
     alias="ol-registration-form",
     parent_flow_alias=ol_registration_flow.alias,
     provider_id="form-flow",
     requirement="REQUIRED",
     opts=resource_options,
 )
-ol_registration_flow_registration_user_creation_step = keycloak.authentication.Execution
-(
-    "ol-registration-flow-registration-user-creation-step",
-    realm_id=ol_apps_realm.id,
-    parent_flow_alias=ol_registration_form.alias,
-    authenticator="registration-user-creation",
-    requirement="REQUIRED",
-    opts=resource_options,
-)
-ol_registration_flow_profile_validation_step = keycloak.authentication.Execution(
-    "ol-registration-flow-profile-validation-step",
-    realm_id=ol_apps_realm.id,
-    parent_flow_alias=ol_registration_form.alias,
-    authenticator="registration-profile-action",
-    requirement="REQUIRED",
-    opts=ResourceOptions(
-        provider=keycloak_provider,
-        depends_on=ol_registration_flow_registration_user_creation_step
-    ),
+ol_registration_flow_registration_user_creation_step = (
+    keycloak.authentication.Execution(
+        "ol-registration-flow-registration-user-creation-step",
+        realm_id=ol_apps_realm.id,
+        parent_flow_alias=ol_registration_form.alias,
+        authenticator="registration-user-creation",
+        requirement="REQUIRED",
+        opts=resource_options,
+    )
 )
 ol_registration_flow_password_validation_step = keycloak.authentication.Execution(
     "ol-registration-flow-password-validation-step",
@@ -857,7 +839,7 @@ ol_registration_flow_password_validation_step = keycloak.authentication.Executio
     requirement="REQUIRED",
     opts=ResourceOptions(
         provider=keycloak_provider,
-        depends_on=ol_registration_flow_profile_validation_step
+        depends_on=ol_registration_flow_registration_user_creation_step
     ),
 )
 ol_registration_flow_recaptcha_step = keycloak.authentication.Execution(
@@ -890,6 +872,7 @@ ol_registration_flow_binding = keycloak.authentication.Bindings(
 )
 # OL - Registration flow [END]
 """
+
 # OL - browser flow [START]
 # username-form -> ol-auth-username-password-form
 ol_browser_flow = keycloak.authentication.Flow(
