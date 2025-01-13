@@ -41,7 +41,10 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.cache_helper import CacheInstanceTypes
-from ol_infrastructure.lib.aws.eks_helper import check_cluster_namespace
+from ol_infrastructure.lib.aws.eks_helper import (
+    check_cluster_namespace,
+    setup_k8s_provider,
+)
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.consul import get_consul_provider
@@ -90,10 +93,7 @@ k8s_global_labels = {
     "ol.mit.edu/stack": stack_info.full_name,
     "ol.mit.edu/service": "unified-ecommerce",
 }
-k8s_provider = kubernetes.Provider(
-    "k8s-provider",
-    kubeconfig=cluster_stack.require_output("kube_config"),
-)
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 # Fail hard if ECOMMERCE_DOCKER_TAG isn't set
 if "ECOMMERCE_DOCKER_TAG" not in os.environ:
@@ -602,7 +602,6 @@ db_creds_secret = Output.all(address=ecommerce_db.db_instance.address).apply(
             vaultauth=vault_k8s_resources.auth_name,
         ),
         opts=ResourceOptions(
-            provider=k8s_provider,
             delete_before_replace=True,
             parent=vault_k8s_resources,
             depends_on=[ecommerce_db_vault_backend],
@@ -626,7 +625,6 @@ redis_creds = kubernetes.core.v1.Secret(
         }
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         depends_on=[redis_cache],
         delete_before_replace=True,
     ),
@@ -651,7 +649,6 @@ static_secrets = OLVaultK8SSecret(
         vaultauth=vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         delete_before_replace=True,
         parent=vault_k8s_resources,
         depends_on=[ecommerce_static_vault_secrets],
@@ -669,6 +666,9 @@ ecommerce_nginx_configmap = kubernetes.core.v1.ConfigMap(
     data={
         "web.conf": Path(__file__).parent.joinpath("files/web.conf").read_text(),
     },
+    opts=ResourceOptions(
+        delete_before_replace=True,
+    ),
 )
 
 # Build a list of not-sensitive env vars for the deployment config
@@ -853,7 +853,6 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
         ),
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         delete_before_replace=True,
         depends_on=[db_creds_secret, redis_creds],
     ),
@@ -881,7 +880,7 @@ ecommerce_service = kubernetes.core.v1.Service(
         ],
         type="ClusterIP",
     ),
-    opts=ResourceOptions(provider=k8s_provider, delete_before_replace=True),
+    opts=ResourceOptions(delete_before_replace=True),
 )
 
 
@@ -945,13 +944,12 @@ oidc_secret = OLVaultK8SSecret(
         templates={
             "client_id": '{{ get .Secrets "client_id" }}',
             "client_secret": '{{ get .Secrets "client_secret" }}',
-            "discovery": "",  # What goes here?
+            # "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
             "realm": '{{ get .Secrets "realm_name" }}',
         },
         vaultauth=vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
-        provider=k8s_provider,
         delete_before_replace=True,
         parent=vault_k8s_resources,
         depends_on=[ecommerce_static_vault_secrets],
@@ -1017,6 +1015,7 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
                             "introspection_endpoint_auth_method": "client_secret_post",
                             "ssl_verify": False,
                             "logout_path": "/logout",
+                            "discovery": "https://sso-qa.ol.mit.edu/realms/olapps/.well-known/openid-configuration",
                             # Lets let the app handle this because we have an etcd
                             # control-plane
                             # "session": {
@@ -1033,7 +1032,8 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     "paths": [
                         "/cart/*",
                         "/admin/*",
-                        "/establish_session/*" "/logout",
+                        "/establish_session/*",
+                        "/logout",
                     ],
                 },
                 "backends": [
@@ -1074,7 +1074,6 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
         ]
     },
     opts=ResourceOptions(
-        provider=k8s_provider,
         delete_before_replace=True,
         depends_on=[ecommerce_service],
     ),

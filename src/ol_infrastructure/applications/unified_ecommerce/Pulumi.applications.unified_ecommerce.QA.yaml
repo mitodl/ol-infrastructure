@@ -9,18 +9,20 @@ config:
     secure: v1:OIaEfSH/Zi+Cx4xN:gxfyu42ieyWreccgmnbPDCBxnM5MAZbeDKJnIRlvp8Wvu87QhI+fFeEUtr+T3cPJVSvGiBipllOsETbkijSShL1TcTu+WDPmXtrRsSSBhWk=
   ecommerce:env_vars:
     CELERY_TASK_ALWAYS_EAGER: "False"
+    CSRF_ALLOWED_ORIGINS: '["https://pay-qa.ol.mit.edu", "https://api-pay-qa.ol.mit.edu"]'
+    CSRF_TRUSTED_ORIGINS: '["https://pay-qa.ol.mit.edu", "https://api-pay-qa.ol.mit.edu"]'
     DEBUG: "true"
     DEV_ENV: "true"
     ENVIRONMENT: "dev"
-    MITOL_UE_BASE_URL: "https://api-pay-ci.ol.mit.edu"
+    MITOL_UE_BASE_URL: "https://api-pay-qa.ol.mit.edu"
     MITOL_UE_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_UE_COOKIE_NAME: "mitolue"
     MITOL_UE_DB_DISABLE_SSL: "True"
     MITOL_UE_FEATURES_DEFAULT: "True"
     MITOL_UE_FROM_EMAIL: "donotreply@ol.mit.edu" ###FIX
     MITOL_UE_HOSTNAME: "api-pay-qa.ol.mit.edu"
-    MITOL_UE_PAYMENT_BASKET_CHOOSER: "http://learn.odl.local:8073/cart/" ###FIX
-    MITOL_UE_PAYMENT_BASKET_ROOT: "http://learn.odl.local:8073/cart/" ###FIX
+    MITOL_UE_PAYMENT_BASKET_CHOOSER: "https://pay-qa.ol.mit.edu/cart/" ###FIX
+    MITOL_UE_PAYMENT_BASKET_ROOT: "https://pau-qa.ol.mit.edu/cart/" ###FIX
     MITOL_UE_PAYMENT_INTERSTITIAL_DEBUG: "False"
     MITOL_UE_SECURE_SSL_REDIRECT: "False" ###FIX
     MITOL_UE_USE_S3: "False" ###FIX
@@ -29,7 +31,7 @@ config:
     SITE_NAME: "MIT Open Learning Ecommerce"
     UWSGI_THREADS: "5"
   ecommerce:fastly_api_key:
-    secure: v1:4+0m6FK/9EBsB6ZH:Qyrm9aQCo2urj0ZrjwzKihfdHjkjchfoJmOdprM80G2+ZlKmFNlPv2oEKa2y7pRh
+    secure: v1:x24k5WFqq8C5xUfX:JUeyiXS2GgliV8nekhiZ1ajMxMsvmX0WVohgI1x0L3YulW4tCC17uZrXAX7OVQZZ
   ecommerce:frontend_domain: "pay-qa.ol.mit.edu"
   redis:password:
     secure: v1:tdPY9uX/qaImM0Pa:qhMf9jxBqV7PDZ0xZhTw0zcfWfopOGTf8DOqsMv4SulC525W4/XYVd+Yj3uTOdcieG/k+DI3ACc=
