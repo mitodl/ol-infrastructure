@@ -77,9 +77,9 @@ if "QA" in stack_info.name:
         path="oidc",
         type="oidc",
         description="OIDC auth Keycloak integration for use with dev vault client cli",
-        oidc_discovery_url=f"{keycloak_config.get("url")}/realms/ol-platform-engineering",
-        oidc_client_id=f"{keycloak_config.get("client_id")}",
-        oidc_client_secret=f"{keycloak_config.get("client_secret")}",
+        oidc_discovery_url=f"{keycloak_config.get('url')}/realms/ol-platform-engineering",
+        oidc_client_id=f"{keycloak_config.get('client_id')}",
+        oidc_client_secret=f"{keycloak_config.get('client_secret')}",
         default_role="local-developer",
         opts=ResourceOptions(delete_before_replace=True),
     )

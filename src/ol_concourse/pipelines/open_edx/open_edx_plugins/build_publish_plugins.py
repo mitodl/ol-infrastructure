@@ -113,7 +113,7 @@ for path, config in plugin_dict.items():
                             "-exc",
                             f"""
                                 cd {plugin_git_repo.name};
-                                ./pants package {path}:{config['target_name']};
+                                ./pants package {path}:{config["target_name"]};
                             """,
                         ],
                     ),

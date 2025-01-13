@@ -32,7 +32,7 @@ def build_user_data(consul_dc, challenge_url, service_hash_bucket_fqdn):
                 "content": json.dumps(
                     {
                         "retry_join": [
-                            "provider=aws tag_key=consul_env " f"tag_value={consul_dc}"  # noqa: ISC001, RUF100
+                            f"provider=aws tag_key=consul_env tag_value={consul_dc}"  # noqa: ISC001, RUF100
                         ],
                         "datacenter": consul_dc,
                     }
@@ -43,7 +43,7 @@ def build_user_data(consul_dc, challenge_url, service_hash_bucket_fqdn):
                 "path": "/etc/default/traefik",
                 "content": textwrap.dedent(
                     f"""\
-            DOMAIN={vector_log_proxy_config.require('web_host_domain')}
+            DOMAIN={vector_log_proxy_config.require("web_host_domain")}
             FASTLY_SERVICE_HASH_BUCKET_FQDN={service_hash_bucket_fqdn}
             FASTLY_SERVICE_HASH_BUCKET_CHALLENGE_URL="{challenge_url}"
             """
@@ -60,13 +60,13 @@ def build_user_data(consul_dc, challenge_url, service_hash_bucket_fqdn):
             VECTOR_CONFIG_DIR=/etc/vector/
             VECTOR_STRICT_ENV_VARS=false
             AWS_REGION={aws_config.region}
-            GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
-            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
-            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
-            HEROKU_PROXY_PASSWORD={heroku_proxy_credentials['password']}
-            HEROKU_PROXY_USERNAME={heroku_proxy_credentials['username']}
-            FASTLY_PROXY_PASSWORD={fastly_proxy_credentials['password']}
-            FASTLY_PROXY_USERNAME={fastly_proxy_credentials['username']}
+            GRAFANA_CLOUD_API_KEY={grafana_credentials["api_key"]}
+            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
+            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
+            HEROKU_PROXY_PASSWORD={heroku_proxy_credentials["password"]}
+            HEROKU_PROXY_USERNAME={heroku_proxy_credentials["username"]}
+            FASTLY_PROXY_PASSWORD={fastly_proxy_credentials["password"]}
+            FASTLY_PROXY_USERNAME={fastly_proxy_credentials["username"]}
             FASTLY_CHALLENGE_REDIRECT_URL={challenge_url}
             """
                 ),
