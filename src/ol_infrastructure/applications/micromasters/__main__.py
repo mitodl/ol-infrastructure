@@ -169,6 +169,7 @@ micromasters_vault_backend = OLVaultDatabaseBackend(micromasters_vault_backend_c
 heroku_vars = {
     "BATCH_UPDATE_RATE_LIMIT": "2/m",
     "CLIENT_ELASTICSEARCH_URL": "/api/v0/search/",
+    "CRONTAB_DISCUSSIONS_SYNC": "0 9 * * *",
     "ENABLE_STUNNEL_AMAZON_RDS_FIX": "True",
     "FEATURE_ENABLE_PROGRAM_LETTER": "True",
     "FEATURE_FINAL_GRADE_ALGORITHM": "v1",
