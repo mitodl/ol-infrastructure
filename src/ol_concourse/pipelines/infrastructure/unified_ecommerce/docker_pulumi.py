@@ -26,7 +26,7 @@ from ol_concourse.lib.resources import git_repo, pulumi_provisioner, registry_im
 def build_ecommerce_pipeline() -> Pipeline:
     # Used for building a CI docker image and deploying to the CI environment
     ecommerce_backend_main_repo = git_repo(
-        Identifier("unified-ecommerce-backend-master"),
+        Identifier("unified-ecommerce-backend-main"),
         uri="https://github.com/mitodl/unified-ecommerce",
         branch="main",
     )
@@ -117,7 +117,7 @@ def build_ecommerce_pipeline() -> Pipeline:
                 put=ecommerce_registry_rc_backend_image.name,
                 params={
                     "image": "image/image.tar",
-                    "additional_tags": f"./{ecommerce_backend_main_repo.name}/.git/ref",  # Should contain a tag if doof is doing his job
+                    "additional_tags": f"./{ecommerce_backend_release_candidate_repo.name}/.git/ref",  # Should contain a tag if doof is doing his job
                 },
             ),
         ],
