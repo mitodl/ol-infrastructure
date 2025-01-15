@@ -30,9 +30,7 @@ config:
   keycloak_realm:okta_single_sign_on_service_url: https://dev-66940844.okta.com/app/dev-66940844_mitci_1/exkcshk0uw4gnJILX5d7/sso/saml
   keycloak_realm:openid_clients:
   - client_info:
-      unified-ecommerce: ["https://pay-ci.ol.mit.edu/*"]
-    realm_name: "olapps"
-  - client_info:
+      unified-ecommerce: ["https://pay-ci.ol.mit.edu/*", "https://api-pay-ci.ol.mit.edu/*"]
       open-discusions: ["https://discussions-ci.odl.mit.edu/*"]
     realm_name: olapps
   - client_info:
