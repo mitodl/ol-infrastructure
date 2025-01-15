@@ -194,7 +194,7 @@ tg_config = OLTargetGroupConfig(
     tags=aws_config.merged_tags({"Name": notes_server_tag}),
 )
 
-consul_datacenter = consul_stack.require_output("datacenter")
+
 block_device_mappings = [BlockDeviceMapping()]
 tag_specs = [
     TagSpecification(
