@@ -29,6 +29,7 @@ from bridge.lib.magic_numbers import (
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
+from bridge.settings.github.team_members import DEVOPS_MIT
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
@@ -706,6 +707,51 @@ ecommerce_deployment_envfrom = [
     ),
 ]
 
+init_containers = [
+    # Run database migrations at startup
+    kubernetes.core.v1.ContainerArgs(
+        name="migrate",
+        image=f"mitodl/unified-ecommerce-app-main:{ECOMMERCE_DOCKER_TAG}",
+        command=["python3", "manage.py", "migrate", "--noinput"],
+        image_pull_policy="IfNotPresent",
+        env=ecommerce_deployment_env_vars,
+        env_from=ecommerce_deployment_envfrom,
+    ),
+    kubernetes.core.v1.ContainerArgs(
+        name="collectstatic",
+        image=f"mitodl/unified-ecommerce-app-main:{ECOMMERCE_DOCKER_TAG}",
+        command=["python3", "manage.py", "collectstatic", "--noinput"],
+        image_pull_policy="IfNotPresent",
+        env=ecommerce_deployment_env_vars,
+        env_from=ecommerce_deployment_envfrom,
+        volume_mounts=[
+            kubernetes.core.v1.VolumeMountArgs(
+                name="staticfiles",
+                mount_path="/src/staticfiles",
+            ),
+            kubernetes.core.v1.VolumeMountArgs(
+                name="static",
+                mount_path="/src/static",
+            ),
+        ],
+    ),
+] + [
+    kubernetes.core.v1.ContainerArgs(
+        name=f"promote-{mit_username}-to-superuser",
+        image=f"mitodl/unified-ecommerce-app-main:{ECOMMERCE_DOCKER_TAG}",
+        # Jank that forces the promotion to always exit successfully
+        command=["/bin/bash"],
+        args=[
+            "-c",
+            f"./manage.py promote_user --promote --superuser '{mit_username}@mit.edu'; exit 0",  # noqa: E501
+        ],
+        image_pull_policy="IfNotPresent",
+        env=ecommerce_deployment_env_vars,
+        env_from=ecommerce_deployment_envfrom,
+    )
+    for mit_username in DEVOPS_MIT
+]
+
 # Create a deployment resource to manage the application pods
 application_labels = k8s_global_labels | {"ol.mit.edu/application": "unified-ecommerce"}
 ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
@@ -756,39 +802,7 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
                         ),
                     ),
                 ],
-                init_containers=[
-                    # TODO: @Ardiea figure out to limit pod startup to one at a time  # noqa: TD002, TD003, FIX002, E501
-                    # Run database migrations at startup
-                    kubernetes.core.v1.ContainerArgs(
-                        name="migrate",
-                        image=f"mitodl/unified-ecommerce-app-main:{ECOMMERCE_DOCKER_TAG}",
-                        command=["python3", "manage.py", "migrate", "--noinput"],
-                        image_pull_policy="IfNotPresent",
-                        env=ecommerce_deployment_env_vars,
-                        env_from=ecommerce_deployment_envfrom,
-                    ),
-                    # Run collectstatic at startup
-                    # How expensive is this?
-                    # Should this actually be done at container build time?
-                    kubernetes.core.v1.ContainerArgs(
-                        name="collectstatic",
-                        image=f"mitodl/unified-ecommerce-app-main:{ECOMMERCE_DOCKER_TAG}",
-                        command=["python3", "manage.py", "collectstatic", "--noinput"],
-                        image_pull_policy="IfNotPresent",
-                        env=ecommerce_deployment_env_vars,
-                        env_from=ecommerce_deployment_envfrom,
-                        volume_mounts=[
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="staticfiles",
-                                mount_path="/src/staticfiles",
-                            ),
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="static",
-                                mount_path="/src/static",
-                            ),
-                        ],
-                    ),
-                ],
+                init_containers=init_containers,
                 containers=[
                     # nginx container infront of uwsgi
                     kubernetes.core.v1.ContainerArgs(
