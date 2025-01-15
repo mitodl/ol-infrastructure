@@ -138,6 +138,7 @@ lint.select = [
     "YTT",  # flake8-2020
 ]
 lint.ignore = [
+    "A005",
     "B008",
     "B905",
     "D104",

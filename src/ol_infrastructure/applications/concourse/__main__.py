@@ -113,7 +113,7 @@ def build_worker_user_data(
                 "content": json.dumps(
                     {
                         "retry_join": [
-                            "provider=aws tag_key=consul_env " f"tag_value={consul_dc}"  # noqa: ISC001, RUF100
+                            f"provider=aws tag_key=consul_env tag_value={consul_dc}"  # noqa: ISC001, RUF100
                         ],
                         "datacenter": consul_dc,
                     }
@@ -130,9 +130,9 @@ def build_worker_user_data(
                     VECTOR_CONFIG_DIR=/etc/vector/
                     VECTOR_STRICT_ENV_VARS=false
                     AWS_REGION={aws_config.region}
-                    GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
-                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
-                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
+                    GRAFANA_CLOUD_API_KEY={grafana_credentials["api_key"]}
+                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
+                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
                     """
                 ),
                 "owner": "root:root",
@@ -534,9 +534,9 @@ ol_web_launch_config = OLLaunchTemplateConfig(
                                     VECTOR_CONFIG_DIR=/etc/vector/
                                     VECTOR_STRICT_ENV_VARS=false
                                     AWS_REGION={aws_config.region}
-                                    GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
-                                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
-                                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
+                                    GRAFANA_CLOUD_API_KEY={grafana_credentials["api_key"]}
+                                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
+                                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
                                     """
                                 ),
                                 "owner": "root:root",
@@ -548,15 +548,15 @@ ol_web_launch_config = OLLaunchTemplateConfig(
                                     CONFIG_FILE="/etc/alloy/config.alloy"
                                     CUSTOM_ARGS=""
                                     RESTART_ON_UPGRADE=true
-                                    GRAFANA_LOKI_ENDPOINT="{grafana_credentials['loki_endpoint']}"
-                                    GRAFANA_LOKI_PASSWORD="{grafana_credentials['loki_api_key']}"
-                                    GRAFANA_LOKI_USER="{grafana_credentials['loki_user_id']}"
-                                    GRAFANA_MIMIR_ENDPOINT="{grafana_credentials['prometheus_endpoint']}"
-                                    GRAFANA_MIMIR_PASSWORD="{grafana_credentials['prometheus_api_key']}"
-                                    GRAFANA_MIMIR_USERNAME="{grafana_credentials['prometheus_user_id']}"
-                                    GRAFANA_TEMPO_ENDPOINT="{grafana_credentials['tempo_endpoint']}"
-                                    GRAFANA_TEMPO_PASSWORD="{grafana_credentials['tempo_api_key']}"
-                                    GRAFANA_TEMPO_USERNAME="{grafana_credentials['tempo_user_id']}"
+                                    GRAFANA_LOKI_ENDPOINT="{grafana_credentials["loki_endpoint"]}"
+                                    GRAFANA_LOKI_PASSWORD="{grafana_credentials["loki_api_key"]}"
+                                    GRAFANA_LOKI_USER="{grafana_credentials["loki_user_id"]}"
+                                    GRAFANA_MIMIR_ENDPOINT="{grafana_credentials["prometheus_endpoint"]}"
+                                    GRAFANA_MIMIR_PASSWORD="{grafana_credentials["prometheus_api_key"]}"
+                                    GRAFANA_MIMIR_USERNAME="{grafana_credentials["prometheus_user_id"]}"
+                                    GRAFANA_TEMPO_ENDPOINT="{grafana_credentials["tempo_endpoint"]}"
+                                    GRAFANA_TEMPO_PASSWORD="{grafana_credentials["tempo_api_key"]}"
+                                    GRAFANA_TEMPO_USERNAME="{grafana_credentials["tempo_user_id"]}"
                                     """
                                 ),
                                 "owner": "root:root",

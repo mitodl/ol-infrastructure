@@ -239,11 +239,9 @@ heroku_vars = {
     "CYBERSOURCE_REFERENCE_PREFIX": f"xpro-{env_name}",
     "FEATURE_COUPON_SHEETS": "True",
     "FEATURE_COURSE_DROPDOWN": "True",
-    "FEATURE_ENABLE_BLOG": "True",
     "FEATURE_ENABLE_ENTERPRISE": "True",
     "FEATURE_ENABLE_EXTERNAL_COURSE_SYNC": "True",
     "FEATURE_ENROLLMENT_WELCOME_EMAIL": "True",
-    "FEATURE_WEBINARS": "True",
     "HUBSPOT_PIPELINE_ID": "75e28846-ad0d-4be2-a027-5e1da6590b98",
     "MITOL_DIGITAL_CREDENTIALS_AUTH_TYPE": "code",
     "MITOL_DIGITAL_CREDENTIALS_DEEP_LINK_URL": "dccrequest://request",
@@ -259,6 +257,7 @@ heroku_vars = {
     "MITXPRO_USE_S3": "True",
     "NODE_MODULES_CACHE": "False",
     "OAUTH2_PROVIDER_ALLOWED_REDIRECT_URI_SCHEMES": "http,https,dccrequest",
+    "POSTHOG_API_HOST": "https://app.posthog.com",
     # This can be removed once PR#1314 is in production,
     "OPENEDX_OAUTH_APP_NAME": "edx-oauth-app",
     # This replaces OPENEDX_GRADES_API_TOKEN and is
@@ -352,6 +351,9 @@ sensitive_heroku_vars = {
     "OPENEDX_SERVICE_WORKER_API_TOKEN": xpro_vault_secrets["openedx"][
         "service_worker_api_token"
     ],
+    "POSTHOG_PROJECT_API_KEY": xpro_vault_secrets.get("posthog", {}).get(
+        "project_api_key", ""
+    ),
     "RECAPTCHA_SECRET_KEY": xpro_vault_secrets["recaptcha"]["secret_key"],
     "RECAPTCHA_SITE_KEY": xpro_vault_secrets["recaptcha"]["site_key"],
     "REFUND_REQUEST_WORKSHEET_ID": xpro_vault_secrets["google-sheets"][

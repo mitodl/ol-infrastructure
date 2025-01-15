@@ -545,7 +545,7 @@ edxapp_db_config = OLMariaDBConfig(
     password=edxapp_config.require("db_password"),
     subnet_group_name=edxapp_vpc["rds_subnet"],
     security_groups=[edxapp_db_security_group],
-    engine_major_version=edxapp_config.get("db_version") or "10.11",
+    engine_major_version=edxapp_config.get("db_version") or "11.4",
     tags=aws_config.tags,
     db_name="edxapp",
     storage=edxapp_config.get_int("db_storage_gb") or 50,
@@ -1179,9 +1179,9 @@ def cloud_init_user_data_func(
                     SERVICE=openedx
                     VECTOR_CONFIG_DIR=/etc/vector/
                     VECTOR_STRICT_ENV_VARS=false
-                    GRAFANA_CLOUD_API_KEY={grafana_credentials['api_key']}
-                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials['prometheus_user_id']}
-                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials['loki_user_id']}
+                    GRAFANA_CLOUD_API_KEY={grafana_credentials["api_key"]}
+                    GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
+                    GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
                     """
                 ),
                 "owner": "root:root",

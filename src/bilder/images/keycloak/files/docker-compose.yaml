@@ -1,7 +1,7 @@
 ---
 services:
   keycloak:
-    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/keycloak:${VERSION}
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/keycloak@${VERSION}
     command:
     - start
     - --spi-sticky-session-encoder-infinispan-should-attach-route=false

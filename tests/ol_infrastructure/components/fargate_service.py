@@ -128,9 +128,9 @@ class TestClassBaseFargateArguments:
                 desired_count,
             ) = args
 
-            assert (
-                deployment_controller["type"] == "ECS"
-            ), "Deployment controller must be ECS"
+            assert deployment_controller["type"] == "ECS", (
+                "Deployment controller must be ECS"
+            )
             assert deployment_maximum_percent == 100  # noqa: PLR2004
             assert deployment_minimum_healthy_percent == 50  # noqa: PLR2004
             assert desired_count == 1
