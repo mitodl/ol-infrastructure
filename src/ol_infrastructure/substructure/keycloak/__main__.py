@@ -83,8 +83,7 @@ ol_platform_engineering_realm = keycloak.Realm(
     reset_password_allowed=True,
     verify_email=True,
     password_policy=(  # noqa: S106 # pragma: allowlist secret
-        "length(30) and forceExpiredPasswordChange(365)"
-        "  and notUsername and notEmail"
+        "length(30) and forceExpiredPasswordChange(365)  and notUsername and notEmail"
     ),
     security_defenses=keycloak.RealmSecurityDefensesArgs(
         brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(
@@ -455,8 +454,7 @@ ol_data_platform_realm = keycloak.Realm(
     verify_email=False,
     registration_allowed=False,
     password_policy=(  # noqa: S106 # pragma: allowlist secret
-        "length(16) and forceExpiredPasswordChange(365)"
-        "  and notUsername and notEmail"
+        "length(16) and forceExpiredPasswordChange(365)  and notUsername and notEmail"
     ),
     security_defenses=keycloak.RealmSecurityDefensesArgs(
         brute_force_detection=keycloak.RealmSecurityDefensesBruteForceDetectionArgs(

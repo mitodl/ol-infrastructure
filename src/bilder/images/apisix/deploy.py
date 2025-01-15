@@ -98,7 +98,7 @@ vault_config = VaultAgentConfig(
         # Puts the token needed for talking to api7 where the cloud-cli service expects it
         VaultTemplate(
             contents='{{ with secret "secret-operations/apisix" }}API7_ACCESS_TOKEN={{ .Data.api7_access_token }}{{ end }}\n'
-            f'APISIX_VERSION={VERSIONS["apisix"]}',
+            f"APISIX_VERSION={VERSIONS['apisix']}",
             destination=Path("/etc/default/cloud-cli"),
         )
     ],

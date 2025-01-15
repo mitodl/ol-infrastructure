@@ -49,7 +49,7 @@ route53.Record(
 # and use it in the Route53 config
 route53.Record(
     "ol-mailgun-mitlearn-dkim-record",
-    name=f"mx._domainkey.{mitlearn_config.require("url")}",
+    name=f"mx._domainkey.{mitlearn_config.require('url')}",
     type="TXT",
     ttl=thirty_minutes,
     records=[
@@ -75,7 +75,7 @@ route53.Record(
 # Mailgun MITLearn Tracking record
 route53.Record(
     "ol-mailgun-mitlearn-tracking-record",
-    name=f"email.{mitlearn_config.require("url")}",
+    name=f"email.{mitlearn_config.require('url')}",
     type="CNAME",
     ttl=thirty_minutes,
     records=["mailgun.org"],
