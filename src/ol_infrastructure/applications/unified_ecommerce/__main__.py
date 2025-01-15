@@ -620,8 +620,8 @@ redis_creds = kubernetes.core.v1.Secret(
     ),
     string_data=redis_cache.address.apply(
         lambda address: {
-            "CELERY_BROKER_URL": f'rediss://default:{redis_config.require("password")}@{address}:6379/0?ssl_cert_Reqs=required',
-            "CELERY_RESULT_BACKEND": f'rediss://default:{redis_config.require("password")}@{address}:6379/0?ssl_cert_Reqs=required',
+            "CELERY_BROKER_URL": f"rediss://default:{redis_config.require('password')}@{address}:6379/0?ssl_cert_Reqs=required",
+            "CELERY_RESULT_BACKEND": f"rediss://default:{redis_config.require('password')}@{address}:6379/0?ssl_cert_Reqs=required",
         }
     ),
     opts=ResourceOptions(
@@ -984,7 +984,7 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     "paths": [
                         "/api/*",
                         "/_/*",
-                        "/logged_out/*" "/auth/*",
+                        "/logged_out/*/auth/*",
                         "/static/*",
                         "/favicon.ico",
                         "/checkout/*",
