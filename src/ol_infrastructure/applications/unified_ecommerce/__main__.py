@@ -907,7 +907,7 @@ ecommerce_https_apisix_pluginconfig = kubernetes.apiextensions.CustomResource(
                     "allow_origins": "**",
                     "allow_methods": "**",
                     "allow_headers": "**",
-                    "allow_crednetial": True,
+                    "allow_credential": True,
                 },
             },
             {
