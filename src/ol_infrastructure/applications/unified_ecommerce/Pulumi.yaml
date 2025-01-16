@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-unified_ecommerce-application
+runtime: python
+description: MIT OL Unified Ecommerce
+backend:
+  url: s3://mitol-pulumi-state/
