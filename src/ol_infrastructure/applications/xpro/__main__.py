@@ -238,7 +238,6 @@ heroku_vars = {
     "CYBERSOURCE_MERCHANT_ID": "mit_odl_xpro",
     "CYBERSOURCE_REFERENCE_PREFIX": f"xpro-{env_name}",
     "FEATURE_COUPON_SHEETS": "True",
-    "FEATURE_COURSE_DROPDOWN": "True",
     "FEATURE_ENABLE_ENTERPRISE": "True",
     "FEATURE_ENROLLMENT_WELCOME_EMAIL": "True",
     "HUBSPOT_PIPELINE_ID": "75e28846-ad0d-4be2-a027-5e1da6590b98",
