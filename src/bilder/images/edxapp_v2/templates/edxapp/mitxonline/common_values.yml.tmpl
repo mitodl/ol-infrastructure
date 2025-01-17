@@ -248,7 +248,7 @@ DEFAULT_FROM_EMAIL: {{ key "edxapp/sender-email-address" }} # MODIFIED
 DEFAULT_MOBILE_AVAILABLE: false
 DEFAULT_SITE_THEME: mitxonline  # MODIFIED
 DEPRECATED_ADVANCED_COMPONENT_TYPES: []
-DISABLE_FORUM_V2: true
+DISCUSSIONS_ENABLE_FORUM_V2: true
 DISCUSSIONS_MICROFRONTEND_URL: https://{{ key "edxapp/lms-domain" }}/discuss
 
 EDXMKTG_USER_INFO_COOKIE_NAME: {{ env "ENVIRONMENT" }}-edx-user-info
@@ -335,6 +335,7 @@ FINANCIAL_REPORTS:
     ROOT_PATH: sandbox
     STORAGE_TYPE: localfs
 FOOTER_ORGANIZATION_IMAGE: /images/logo.png
+FORUM_V2_ENABLE_MYSQL_BACKEND: true
 GITHUB_REPO_ROOT: /openedx/data
 GOOGLE_ANALYTICS_ACCOUNT: {{ key "edxapp/google-analytics-id" }}
 GRADES_DOWNLOAD:
