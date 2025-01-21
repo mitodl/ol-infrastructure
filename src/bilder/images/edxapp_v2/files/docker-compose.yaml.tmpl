@@ -12,7 +12,7 @@ services:
     command: ["1000", "/openedx/data", "/openedx/media"]
     restart: on-failure
     volumes:
-    - /opt/data:/openedx/data
+    - /opt/data/lms:/openedx/data
     - /opt/data/media:/openedx/media
     - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
     - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
@@ -26,7 +26,7 @@ services:
     command: ["1000", "/openedx/data", "/openedx/media"]
     restart: on-failure
     volumes:
-    - /opt/data:/openedx/data
+    - /opt/data/cms:/openedx/data
     - /opt/data/media:/openedx/media
     - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
     - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
@@ -63,7 +63,7 @@ services:
     volumes:
     - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
     - ./settings/uwsgi.ini:/openedx/edx-platform/uwsgi.ini:ro
-    - /opt/data:/openedx/data
+    - /opt/data/lms:/openedx/data
     - /opt/data/media:/openedx/media
     - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
     - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
@@ -82,7 +82,7 @@ services:
     volumes:
     - ./settings/cms.env.yml:/openedx/config/cms.env.yml:ro
     - ./settings/uwsgi.ini:/openedx/edx-platform/uwsgi.ini:ro
-    - /opt/data:/openedx/data
+    - /opt/data/cms:/openedx/data
     - /opt/data/media:/openedx/media
     - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
     - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
@@ -112,7 +112,7 @@ services:
     restart: on-failure
     volumes:
     - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
-    - /opt/data:/openedx/data
+    - /opt/data/lms:/openedx/data
     - /opt/data/media:/openedx/media
     - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
     - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
@@ -153,7 +153,7 @@ services:
     volumes:
     - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
     - ./settings/waffle_flags.yaml:/openedx/config/waffle_flags.yaml:ro
-    - /opt/data:/openedx/data
+    - /opt/data/cms:/openedx/data
     - /opt/data/media:/openedx/media
     - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
     - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
@@ -175,7 +175,7 @@ services:
     restart: unless-stopped
     volumes:
     - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
-    - /opt/data:/openedx/data
+    - /opt/data/lms:/openedx/data
     - /opt/data/media:/openedx/media
     - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
     - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
@@ -197,7 +197,7 @@ services:
     restart: on-failure
     volumes:
     - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
-    - /opt/data:/openedx/data
+    - /opt/data/lms:/openedx/data
     - /opt/data/media:/openedx/media
     - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
     - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
@@ -216,7 +216,7 @@ services:
     restart: on-failure
     volumes:
     - ./settings/lms.env.yml:/openedx/config/lms.env.yml:ro
-    - /opt/data:/openedx/data
+    - /opt/data/lms:/openedx/data
     - /opt/data/media:/openedx/media
     - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
     - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
@@ -239,7 +239,7 @@ services:
     restart: unless-stopped
     volumes:
     - ./settings/cms.env.yml:/openedx/config/cms.env.yml:ro
-    - /opt/data:/openedx/data
+    - /opt/data/cms:/openedx/data
     - /opt/data/media:/openedx/media
     - ./ssh/id_rsa:/openedx/.ssh/id_rsa:ro
     - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
