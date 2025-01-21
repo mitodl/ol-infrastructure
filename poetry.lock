@@ -1597,18 +1597,18 @@ semver = ">=2.8.1"
 
 [[package]]
 name = "pulumi-keycloak"
-version = "5.4.0"
+version = "6.1.0"
 description = "A Pulumi package for creating and managing keycloak cloud resources."
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 files = [
-    {file = "pulumi_keycloak-5.4.0-py3-none-any.whl", hash = "sha256:27e0dcef6c609ec8cc3666c167da4e714b15db70cc681ce041a47b846829ec92"},
-    {file = "pulumi_keycloak-5.4.0.tar.gz", hash = "sha256:50c8b216e1d859943710adef9700ae8f977da1068c8fb0a3d2770ae914560aae"},
+    {file = "pulumi_keycloak-6.1.0-py3-none-any.whl", hash = "sha256:3ac88e212e1fc622f7a881b29989cad9ae67b5469f48e2f09e9a74bb17870087"},
+    {file = "pulumi_keycloak-6.1.0.tar.gz", hash = "sha256:cbc2d17c7c8a6367ed7b7e21c0c33493f1e758a5a56ce7e4a358155afd8aeb04"},
 ]
 
 [package.dependencies]
 parver = ">=0.2.1"
-pulumi = ">=3.136.0,<4.0.0"
+pulumi = ">=3.142.0,<4.0.0"
 semver = ">=2.8.1"
 
 [[package]]
@@ -2502,4 +2502,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "a8ebd2b25b46717e416e1c607e48e947abc40d18853309921c90d1d31deb0c8f"
+content-hash = "7836558cdbabb74c84a8b0cb874ed8b8038f2fa8e95392b0232b3cf747e395ba"
