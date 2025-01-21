@@ -175,9 +175,12 @@ server.shell(
 
 
 # Create skeleton directory structures for docker-compose
-data_directory = Path("/opt/data")
-media_directory = data_directory.joinpath("media")
-tracking_logs_directory = data_directory.joinpath("logs")
+shared_data_directory = Path("/opt/data")
+lms_data_directory = Path("/opt/data/lms")
+cms_data_directory = Path("/opt/data/cms")
+media_directory = shared_data_directory.joinpath("media")
+lms_tracking_logs_directory = lms_data_directory.joinpath("logs")
+cms_tracking_logs_directory = cms_data_directory.joinpath("logs")
 settings_directory = DOCKER_COMPOSE_DIRECTORY.joinpath("settings")
 tls_directory = DOCKER_COMPOSE_DIRECTORY.joinpath("tls")
 ssh_directory = DOCKER_COMPOSE_DIRECTORY.joinpath("ssh")
@@ -191,8 +194,15 @@ files.directory(
 )
 
 files.directory(
-    name="Create data directory",
-    path=data_directory,
+    name="Create LMS data directory",
+    path=lms_data_directory,
+    user="1000",
+    group="1000",
+    present=True,
+)
+files.directory(
+    name="Create CMS data directory",
+    path=cms_data_directory,
     user="1000",
     group="1000",
     present=True,
@@ -227,8 +237,15 @@ files.directory(
     present=True,
 )
 files.directory(
-    name="Create tracking logs directory",
-    path=tracking_logs_directory,
+    name="Create LMS tracking logs directory",
+    path=lms_tracking_logs_directory,
+    user="1000",
+    group="1000",
+    present=True,
+)
+files.directory(
+    name="Create CMS tracking logs directory",
+    path=cms_tracking_logs_directory,
     user="1000",
     group="1000",
     present=True,
