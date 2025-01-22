@@ -132,7 +132,7 @@ services:
     restart: on-failure
     volumes:
     - ./settings/cms.env.yml:/openedx/config/cms.env.yml:ro
-    - /opt/data:/openedx/data
+    - /opt/data/cms:/openedx/data
     - /opt/data/media:/openedx/media
     - /opt/staticfiles-${ENVIRONMENT_TIER}:/openedx/staticfiles:ro
     - /opt/staticfiles-${ENVIRONMENT_TIER}/bundles:/openedx/edx-platform/common/static/bundles:ro
