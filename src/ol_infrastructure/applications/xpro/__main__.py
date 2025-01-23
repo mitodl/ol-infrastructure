@@ -257,6 +257,7 @@ heroku_vars = {
     "MITXPRO_USE_S3": "True",
     "NODE_MODULES_CACHE": "False",
     "OAUTH2_PROVIDER_ALLOWED_REDIRECT_URI_SCHEMES": "http,https,dccrequest",
+    "POSTHOG_ENABLED": "True",
     "POSTHOG_API_HOST": "https://app.posthog.com",
     # This can be removed once PR#1314 is in production,
     "OPENEDX_OAUTH_APP_NAME": "edx-oauth-app",
