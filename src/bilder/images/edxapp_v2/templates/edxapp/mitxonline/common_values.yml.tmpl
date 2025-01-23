@@ -336,23 +336,21 @@ FINANCIAL_REPORTS:
     STORAGE_TYPE: localfs
 FOOTER_ORGANIZATION_IMAGE: /images/logo.png
 FORUM_V2_ENABLE_MYSQL_BACKEND: true
-FORUM_SEARCH_BACKEND = "forum.search.es.ElasticsearchBackend"
-FORUM_ELASTIC_SEARCH_CONFIG = [
-    {
-        "host": "{{ keyOrDefault "elasticsearch/host" "elasticsearch.service.consul" }}"
-        "port": "443",
-        "use_ssl": True,
-    }
-]
-FORUM_ELASTIC_SEARCH_CONFIG_ES7 = [
-    {
-        "host": "{{ keyOrDefault "elasticsearch/host" "elasticsearch.service.consul" }}",
-        "port": "443",
-        "use_ssl": True,
-    }
-]
-FORUM_MONGODB_CLIENT_PARAMETERS = mongo_params
-FORUM_MONGODB_DATABASE = "edxapp"
+FORUM_SEARCH_BACKEND: "forum.search.es.ElasticsearchBackend"
+
+FORUM_ELASTIC_SEARCH_CONFIG:
+  - host: "{{ keyOrDefault \"elasticsearch/host\" \"elasticsearch.service.consul\" }}"
+    port: "443"
+    use_ssl: true
+
+FORUM_ELASTIC_SEARCH_CONFIG_ES7:
+  - host: "{{ keyOrDefault \"elasticsearch/host\" \"elasticsearch.service.consul\" }}"
+    port: "443"
+    use_ssl: true
+
+FORUM_MONGODB_CLIENT_PARAMETERS: mongo_params
+
+FORUM_MONGODB_DATABASE: "edxapp"
 GITHUB_REPO_ROOT: /openedx/data
 GOOGLE_ANALYTICS_ACCOUNT: {{ key "edxapp/google-analytics-id" }}
 GRADES_DOWNLOAD:
