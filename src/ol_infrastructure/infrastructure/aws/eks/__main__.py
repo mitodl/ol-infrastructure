@@ -225,12 +225,17 @@ cluster = eks.Cluster(
     version=VERSIONS["KUBERNETES"],
     # Ref: https://docs.aws.amazon.com/eks/latest/userguide/security-groups-pods-deployment.html
     # Ref: https://docs.aws.amazon.com/eks/latest/userguide/sg-pods-example-deployment.html
+    # Ref: https://github.com/aws/amazon-vpc-cni-k8s/blob/master/README.md
     vpc_cni_options=eks.cluster.VpcCniOptionsArgs(
-        configuration_values={"env": {"POD_SECURITY_GROUP_ENFORCING_MODE": "standard"}},
-        enable_pod_eni=eks_config.get_bool("pod_security_groups"),
-        enable_prefix_delegation=eks_config.get_bool("pod_security_groups"),
-        disable_tcp_early_demux=eks_config.get_bool("pod_security_groups"),
-        log_level="INFO",
+        cni_external_snat=False,
+        configuration_values={"env": {"POD_SECURITY_GROUP_ENFORCING_MODE": "strict"}},
+        custom_network_config=False,
+        disable_tcp_early_demux=True,
+        enable_network_policy=False,
+        enable_pod_eni=True,
+        enable_prefix_delegation=True,
+        external_snat=False,
+        log_level="DEBUG",
     ),
     vpc_id=target_vpc["id"],
     opts=ResourceOptions(

@@ -36,6 +36,5 @@ config:
       tags: {}
       taints: {}
       version:
-  eks:pod_security_groups: "true"
   environment:business_unit: operations
   environment:target_vpc: applications_vpc

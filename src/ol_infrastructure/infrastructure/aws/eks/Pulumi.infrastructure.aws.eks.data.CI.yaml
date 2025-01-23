@@ -12,7 +12,6 @@ config:
   eks:ebs_csi_provisioner: true
   eks:efs_csi_provisioner: false
   eks:gateway_release_channel: "experimental"
-  eks:pod_security_groups: true
   eks:namespaces:
   - "open-metadata"  # Openmetadata testing
   - "airbyte"

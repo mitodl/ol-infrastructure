@@ -51,16 +51,17 @@ def vpc_exports(vpc: OLVPC, peers: Optional[list[str]] = None) -> dict[str, Any]
         "subnet_zones": [subnet.availability_zone for subnet in vpc.olvpc_subnets],
         "route_table_id": vpc.route_table.id,
     }
-    if vpc.k8s_service_subnet and vpc.k8s_pod_subnets:
+    if vpc.k8s_service_subnet and vpc.k8s_private_subnets:
         return_value["k8s_service_subnet_cidr"] = str(vpc.k8s_service_subnet)
         return_value["k8s_pod_subnet_cidrs"] = [
-            k8s_pod_subnet.cidr_block for k8s_pod_subnet in vpc.k8s_pod_subnets
+            k8s_pod_subnet.cidr_block for k8s_pod_subnet in vpc.k8s_private_subnets
         ]
         return_value["k8s_pod_subnet_ids"] = [
-            k8s_pod_subnet.id for k8s_pod_subnet in vpc.k8s_pod_subnets
+            k8s_pod_subnet.id for k8s_pod_subnet in vpc.k8s_private_subnets
         ]
         return_value["k8s_pod_subnet_zones"] = [
-            k8s_pod_subnet.availability_zone for k8s_pod_subnet in vpc.k8s_pod_subnets
+            k8s_pod_subnet.availability_zone
+            for k8s_pod_subnet in vpc.k8s_private_subnets
         ]
     return return_value
 
@@ -78,7 +79,7 @@ applications_vpc_config = OLVPCConfig(
         "business_unit": "operations",
         "Name": f"OL Applications {stack_info.name}",
     },
-    k8s_pod_subnets=apps_config.get_object("k8s_pod_subnets") or None,
+    k8s_subnet_pair_configs=apps_config.get_object("k8s_subnet_pair_configs") or None,
     k8s_service_subnet=apps_config.get("k8s_service_subnet") or None,
 )
 applications_vpc = OLVPC(applications_vpc_config)
@@ -94,7 +95,7 @@ data_vpc_config = OLVPCConfig(
         "business_unit": "data",
         "Name": f"{stack_info.name} Data Services",
     },
-    k8s_pod_subnets=data_config.get_object("k8s_pod_subnets") or None,
+    k8s_subnet_pair_configs=data_config.get_object("k8s_subnet_pair_configs") or None,
     k8s_service_subnet=data_config.get("k8s_service_subnet") or None,
 )
 data_vpc = OLVPC(data_vpc_config)
@@ -110,7 +111,7 @@ operations_vpc_config = OLVPCConfig(
         "business_unit": "operations",
         "Name": f"Operations {stack_info.name}",
     },
-    k8s_pod_subnets=ops_config.get_object("k8s_pod_subnets") or None,
+    k8s_subnet_pair_configs=ops_config.get_object("k8s_subnet_pair_configs") or None,
     k8s_service_subnet=ops_config.get("k8s_service_subnet") or None,
 )
 operations_vpc = OLVPC(operations_vpc_config)
