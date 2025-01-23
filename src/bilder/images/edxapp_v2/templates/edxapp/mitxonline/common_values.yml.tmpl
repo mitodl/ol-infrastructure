@@ -343,10 +343,6 @@ FORUM_ELASTIC_SEARCH_CONFIG:
     port: "443"
     use_ssl: true
 
-FORUM_ELASTIC_SEARCH_CONFIG_ES7:
-  - host: "{{ keyOrDefault \"elasticsearch/host\" \"elasticsearch.service.consul\" }}"
-    port: "443"
-    use_ssl: true
 
 FORUM_MONGODB_CLIENT_PARAMETERS: mongo_params
 
