@@ -342,7 +342,17 @@ FORUM_ELASTIC_SEARCH_CONFIG:
     use_ssl: true
 
 
-FORUM_MONGODB_CLIENT_PARAMETERS: mongo_params
+{{ with secret "secret-mitxonline/mongodb-forum" }}
+FORUM_MONGODB_CLIENT_PARAMETERS:
+  authSource: admin
+  host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
+  port: 27017
+  db: forum
+  replicaSet: {{ keyOrDefault "mongodb/replica-set" "rs0" }}
+  user: {{ .Data.username }}
+  password: {{ .Data.password }}
+  ssl: {{ keyOrDefault "mongodb/use-ssl" "false" }}
+{{ end }}
 
 FORUM_MONGODB_DATABASE: "forum"
 GITHUB_REPO_ROOT: /openedx/data
