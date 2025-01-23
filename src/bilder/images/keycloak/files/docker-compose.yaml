@@ -31,6 +31,8 @@ services:
     - AWS_REGION=us-east-1
     labels:
     - "traefik.http.middlewares.keycloak-ratelimit.ratelimit.average=10"
+    - "traefik.http.services.keycloak.loadbalancer.passHostHeader=true"
+    - "traefik.http.middlewares.forward-headers.headers.customRequestHeaders.X-Forwarded-For=X-Forwarded-For"
     ports:
     - "80:80"
     - "443:443"
