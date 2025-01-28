@@ -347,9 +347,8 @@ FORUM_MONGODB_CLIENT_PARAMETERS:
   authSource: admin
   host: {{ keyOrDefault "mongodb/host" "mongodb-master.service.consul" }}
   port: 27017
-  db: forum
   replicaSet: {{ keyOrDefault "mongodb/replica-set" "rs0" }}
-  user: {{ .Data.username }}
+  username: {{ .Data.username }}
   password: {{ .Data.password }}
   ssl: {{ keyOrDefault "mongodb/use-ssl" "false" }}
 {{ end }}
