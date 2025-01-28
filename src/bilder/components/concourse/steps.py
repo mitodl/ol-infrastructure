@@ -56,32 +56,6 @@ def install_concourse(concourse_config: ConcourseBaseConfig):
                 f"mv concourse {installation_directory}",
             ],
         )
-        # NOTE (cpatti) We need to remove this section when Concourse fixes https://github.com/concourse/concourse/issues/9027
-        # Download 1.5.1 of CNI plugin to fix above issue.
-        cni_archive_version = "v1.5.1"
-        cni_archive_platform = "linux-amd64"
-        cni_archive = f"https://github.com/containernetworking/plugins/releases/download/{cni_archive_version}/cni-plugins-{cni_archive_platform}-{cni_archive_version}.tgz"
-        cni_archive_hash = f"{cni_archive}.sha256"
-        cni_archive_path = "/tmp/cni-plugins-linux-amd64-v1.5.1.tgz"  # noqa: S108
-        logging.debug("cni_archive: %s", cni_archive)
-        logging.debug("cni_archive_hash: %s", cni_archive_hash)
-        logging.debug("cni_archive_path: %s", cni_archive_path)
-        files.download(
-            name="Download the cni release archive",
-            src=str(cni_archive),
-            dest=str(cni_archive_path),
-            sha256sum=httpx.get(cni_archive_hash, follow_redirects=True)
-            .read()
-            .decode("utf8")
-            .split()[0],
-        )
-        # Unpack cni to /opt/cni
-        server.shell(
-            name="Extract the cni release archive.",
-            commands=[
-                f"tar -xvzf {cni_archive_path} --directory {installation_directory}/bin/",  # noqa: E501
-            ],
-        )
         # Verify ownership of Concourse directory
         files.directory(
             name="Set ownership of Concourse directory",
