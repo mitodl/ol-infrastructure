@@ -3,9 +3,50 @@ from typing import Optional
 
 import boto3
 import pulumi
+from pulumi_aws import ec2
 from pulumi_kubernetes import Provider
 
 eks_client = boto3.client("eks")
+
+# Like our ec2 practices, allow pods to egress anywhere they want
+default_psg_egress_args = [
+    ec2.SecurityGroupEgressArgs(
+        protocol="-1",
+        from_port=0,
+        to_port=0,
+        cidr_blocks=["0.0.0.0/0"],
+        ipv6_cidr_blocks=["::/0"],
+    )
+]
+
+
+def get_default_psg_ingress_args(
+    k8s_pod_subnet_cidrs: list[str],
+    k8s_service_subnet_cidr: str,
+) -> list[ec2.SecurityGroupIngressArgs]:
+    return [
+        ec2.SecurityGroupIngressArgs(
+            protocol="-1",
+            from_port=0,
+            to_port=0,
+            cidr_blocks=["0.0.0.0/0"],
+            description="Allow ingress to the pod from anywhere in the k8s cluster.",
+        ),
+        ec2.SecurityGroupIngressArgs(
+            protocol="-1",
+            from_port=0,
+            to_port=0,
+            cidr_blocks=k8s_pod_subnet_cidrs,
+            description="Allow ingress to the pod from anywhere in the k8s cluster.",
+        ),
+        ec2.SecurityGroupIngressArgs(
+            protocol="-1",
+            from_port=0,
+            to_port=0,
+            cidr_blocks=[k8s_service_subnet_cidr],
+            description="Allow ingress to the pod from the service subnet.",
+        ),
+    ]
 
 
 def check_cluster_namespace(namespace: str, namespaces: list[str]):
