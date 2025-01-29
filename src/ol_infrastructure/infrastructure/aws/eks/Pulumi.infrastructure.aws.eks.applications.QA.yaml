@@ -23,8 +23,7 @@ config:
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 500
-      instance_types:
-      - "c7a.xlarge"
+      instance_type: "c7a.xlarge"
       labels:
         node_size: c7a.xlarge
         ondemand: true

@@ -17,8 +17,7 @@ config:
   - "airbyte"
   eks:nodegroups:
     worker-xlarge:
-      instance_types:
-      - "m7a.4xlarge"
+      instance_type: "m7a.4xlarge"
       labels:
         ondemand: true
         node_size: m7a.4xlarge
