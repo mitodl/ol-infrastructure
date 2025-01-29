@@ -16,6 +16,7 @@ config:
   apps_vpc:k8s_service_subnet: 10.110.84.0/23
   aws:region: us-east-1
   data_vpc:cidr_block: 10.2.0.0/16
+  data_vpc:k8s_nat_gateway_config: "single"
   data_vpc:k8s_pod_subnets:
   - private_cidr: 10.2.128.0/21
     public_cidr: 10.2.124.0/24
@@ -29,6 +30,7 @@ config:
   mitx_online_vpc:cidr_block: 10.21.0.0/16
   ocw_vpc:cidr_block: 10.99.0.0/16
   operations_vpc:cidr_block: 10.1.0.0/16
+  operations_vpc:k8s_nat_gateway_config: "single"
   operations_vpc:k8s_pod_subnets:
   - private_cidr: 10.1.128.0/21
     public_cidr: 10.1.124.0/24
