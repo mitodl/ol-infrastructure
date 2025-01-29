@@ -4,26 +4,38 @@ encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEiEmUCipB1ftXUOv
 config:
   apps_vpc:cidr_block: 10.13.0.0/16
   apps_vpc:k8s_pod_subnets:
-  - 10.13.128.0/21
-  - 10.13.136.0/21
-  - 10.13.144.0/21
-  - 10.13.152.0/21
+  - private_cidr: 10.13.128.0/21
+    public_cidr: 10.13.124.0/24
+  - private_cidr: 10.13.136.0/21
+    public_cidr: 10.13.125.0/24
+  - private_cidr: 10.13.144.0/21
+    public_cidr: 10.13.126.0/24
+  - private_cidr: 10.13.152.0/21
+    public_cidr: 10.13.127.0/24
   apps_vpc:k8s_service_subnet: 10.110.144.0/23
   aws:region: us-east-1
   data_vpc:cidr_block: 10.3.0.0/16
   data_vpc:k8s_pod_subnets:
-  - 10.3.128.0/21
-  - 10.3.136.0/21
-  - 10.3.144.0/21
-  - 10.3.152.0/21
+  - private_cidr: 10.3.128.0/21
+    public_cidr: 10.3.124.0/24
+  - private_cidr: 10.3.136.0/21
+    public_cidr: 10.3.125.0/24
+  - private_cidr: 10.3.144.0/21
+    public_cidr: 10.3.126.0/24
+  - private_cidr: 10.3.152.0/21
+    public_cidr: 10.3.127.0/24
   data_vpc:k8s_service_subnet: 10.110.142.0/23
   mitx_online_vpc:cidr_block: 10.22.0.0/16
   operations_vpc:cidr_block: 10.0.0.0/16
   operations_vpc:k8s_pod_subnets:
-  - 10.0.128.0/21
-  - 10.0.136.0/21
-  - 10.0.144.0/21
-  - 10.0.152.0/21
+  - private_cidr: 10.0.128.0/21
+    public_cidr: 10.0.124.0/24
+  - private_cidr: 10.0.136.0/21
+    public_cidr: 10.0.125.0/24
+  - private_cidr: 10.0.144.0/21
+    public_cidr: 10.0.126.0/24
+  - private_cidr: 10.0.152.0/21
+    public_cidr: 10.0.127.0/24
   operations_vpc:k8s_service_subnet: 10.110.140.0/23
   operations_vpc:name: operations
   residential_staging_vpc:cidr_block: 10.31.0.0/16
