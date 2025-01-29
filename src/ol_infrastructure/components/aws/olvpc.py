@@ -15,13 +15,19 @@ This includes:
 """
 
 from functools import partial
-from ipaddress import IPv4Network, IPv6Network
+from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network, ip_address
 from itertools import cycle
-from typing import Optional, Union
+from typing import Literal, Optional
 
 from pulumi import Alias, ComponentResource, ResourceOptions
 from pulumi_aws import ec2, elasticache, rds
-from pydantic import PositiveInt, ValidationInfo, field_validator
+from pydantic import (
+    BaseModel,
+    PositiveInt,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from ol_infrastructure.lib.aws.ec2_helper import (
     availability_zones,
@@ -47,10 +53,21 @@ def extract_third_octet(cidr_block: IPv4Network) -> int:
     return (int(cidr_block.network_address) & 0xFF00) >> 8
 
 
+# For simplicity, nat gateways (if they are created) are always at x.x.x.100 of the public subnet
+# Ref: https://docs.python.org/3/library/ipaddress.html#ipaddress.ip_address
+def get_nat_gateway_address(cidr_block: IPv4Network) -> IPv4Address | IPv6Address:
+    return (ip_address(int(cidr_block.network_address) & 0xFFFFFF00)) + 100
+
+
 def subnet_v6(subnet_number: int, cidr_block: IPv6Network) -> str:
     network = IPv6Network(cidr_block)
     subnets = network.subnets(new_prefix=SUBNET_PREFIX_V6)
     return str(list(subnets)[subnet_number])
+
+
+class OLVPCK8SSubnetPairConfig(BaseModel):
+    public_cidr: IPv4Network
+    private_cidr: IPv4Network
 
 
 class OLVPCConfig(AWSBase):
@@ -59,12 +76,21 @@ class OLVPCConfig(AWSBase):
     vpc_name: str
     cidr_block: IPv4Network
     k8s_service_subnet: Optional[IPv4Network] = None
-    k8s_subnet_pair_configs: Optional[
-        list[dict[str, Union[int, bool, IPv4Network]]]
-    ] = None
+    k8s_nat_gateway_config: Literal["single", "all"] = "single"
+    k8s_subnet_pair_configs: list[OLVPCK8SSubnetPairConfig] = []  # noqa: RUF012
     num_subnets: PositiveInt = MIN_SUBNETS
     enable_ipv6: bool = True
     default_public_ip: bool = True
+
+    @model_validator(mode="after")
+    def check_k8s_network_layout(self):
+        if self.k8s_service_subnet and not self.k8s_subnet_pair_configs:
+            msg = "A k8s_service_subnet was specified but no k8s_subnet_pair_configs were provided"
+            raise ValueError(msg)
+        if not self.k8s_service_subnet and self.k8s_subnet_pair_configs:
+            msg = "k8s_subnet_pair_configs were provided but no k8s_service_subnet was specified"
+            raise ValueError(msg)
+        return self
 
     @field_validator("cidr_block")
     @classmethod
@@ -263,36 +289,41 @@ class OLVPC(ComponentResource):
         # specify the ranges in configuration and we are also going to
         # place them near the middle of the VPC's /16 block.
 
-        # Given that information, we do need to do some bitwise math to pick
-        # out the third octet of the K8S subnets in order to allocate
-        # the IPv6 address space since we don't have it handed to us by
-        # an iterator as above.
-        self.k8s_service_subnet = None
-        self.k8s_private_subnets = []
-        self.k8s_private_route_tables = []
-        self.k8s_nat_gateways = []
-        self.k8s_public_subnets = []
+        self.k8s_service_subnet: Optional[ec2.Subnet] = None
+        self.k8s_private_subnets: list[ec2.Subnet] = []
+        self.k8s_private_route_tables: list[ec2.RouteTable] = []
+        self.k8s_nat_gateways: list[ec2.NatGateway] = []
+        self.k8s_public_subnets: list[ec2.Subnet] = []
 
         if vpc_config.k8s_service_subnet and vpc_config.k8s_subnet_pair_configs:
+            # The k8s service subnet is 'pretend'
             self.k8s_service_subnet = vpc_config.k8s_service_subnet
+
+            nat_gateway_index = -1
+            if vpc_config.k8s_nat_gateway_config == "single":
+                nat_gateway_index = sum(bytearray(vpc_config.vpc_name, "utf-8")) % len(
+                    vpc_config.k8s_subnet_pair_configs
+                )
 
             # First loop goes through the pairs and creates subnets, nat gateways, and route tables
             # for the private subnets
-            for k8s_subnet_pair_config, zone in zip(
-                vpc_config.k8s_subnet_pair_configs, cycle(zones)
+            for k8s_subnet_pair_config, zone, index in zip(
+                vpc_config.k8s_subnet_pair_configs,
+                cycle(zones),
+                range(len(vpc_config.k8s_subnet_pair_configs)),
             ):
                 public_subnet_third_octet = extract_third_octet(
-                    k8s_subnet_pair_config["public_cidr"]
+                    k8s_subnet_pair_config.public_cidr
                 )
                 private_subnet_third_octet = extract_third_octet(
-                    k8s_subnet_pair_config["private_cidr"]
+                    k8s_subnet_pair_config.private_cidr
                 )
 
                 # First create the public subnet from this pair and label it for use by ELB(s)
                 self.k8s_public_subnets.append(
                     ec2.Subnet(
                         f"{vpc_config.vpc_name}-k8s-public-{public_subnet_third_octet}-subnet",
-                        cidr_block=str(k8s_subnet_pair_config["public_cidr"]),
+                        cidr_block=str(k8s_subnet_pair_config.public_cidr),
                         ipv6_cidr_block=self.olvpc.ipv6_cidr_block.apply(
                             partial(subnet_v6, public_subnet_third_octet)
                         ),
@@ -317,11 +348,11 @@ class OLVPC(ComponentResource):
                     opts=resource_options,
                 )
 
-                # First create the public subnet from this pair
+                # Next create create the private subnet from this pair
                 self.k8s_private_subnets.append(
                     ec2.Subnet(
                         f"{vpc_config.vpc_name}-k8s-private-{private_subnet_third_octet}-subnet",
-                        cidr_block=str(k8s_subnet_pair_config["private_cidr"]),
+                        cidr_block=str(k8s_subnet_pair_config.private_cidr),
                         ipv6_cidr_block=self.olvpc.ipv6_cidr_block.apply(
                             partial(subnet_v6, private_subnet_third_octet)
                         ),
@@ -347,10 +378,12 @@ class OLVPC(ComponentResource):
                         ),
                     )
                 )
-                # We can't associate the private subnet with a route table yet because it needs a special one
 
                 # If we've said there will be a nat gateway in this pair's public subnet, create it
-                if "nat_gateway_address" in k8s_subnet_pair_config:
+                if (
+                    nat_gateway_index == index
+                    or vpc_config.k8s_nat_gateway_config == "all"
+                ):
                     elastic_ip_allocation = ec2.Eip(
                         f"{vpc_config.vpc_name}-k8s-subnets-{public_subnet_third_octet}-nat-gateway-eip",
                         domain="vpc",
@@ -363,22 +396,14 @@ class OLVPC(ComponentResource):
                             subnet_id=self.k8s_public_subnets[-1].id,
                             allocation_id=elastic_ip_allocation.id,
                             private_ip=str(
-                                k8s_subnet_pair_config[
-                                    "nat_gateway_address"
-                                ].network_address
+                                get_nat_gateway_address(
+                                    k8s_subnet_pair_config.public_cidr
+                                )
                             ),
                             tags=vpc_config.tags,
                             opts=resource_options,
                         )
                     )
-                # Otherwise we are going to reference a nat gateway in another pair's private subnet
-                elif "nat_gateway_index" in k8s_subnet_pair_config:
-                    self.k8s_nat_gateways.append(None)
-
-                # Or we have specified an invalid combination of settings in the pair definition
-                else:
-                    msg = f"Invalid NAT K8S Network layout for {vpc_config.vpc_name}"
-                    raise ValueError(msg)
 
                 # We will need a special route table just for the private network in this pair of subnets
                 k8s_subnet_private_route_table = ec2.RouteTable(
@@ -416,33 +441,21 @@ class OLVPC(ComponentResource):
             ) in zip(
                 vpc_config.k8s_subnet_pair_configs,
                 self.k8s_private_route_tables,
-                self.k8s_nat_gateways,
+                cycle(self.k8s_nat_gateways),
             ):
                 private_subnet_third_octet = extract_third_octet(
-                    k8s_subnet_pair_config["private_cidr"]
+                    k8s_subnet_pair_config.private_cidr
                 )
 
                 # Handle the case where this pair has a gateway in the public subnet
-                if nat_gateway:
-                    ec2.Route(
-                        f"{vpc_config.vpc_name}-k8s-private-{private_subnet_third_octet}-default-external-ipv4-network-route",
-                        route_table_id=private_route_table.id,
-                        destination_cidr_block="0.0.0.0/0",
-                        nat_gateway_id=nat_gateway.id,
-                        opts=resource_options,
-                    )
-                # Otherwise handle the case where the pair references another pairing
-                else:
-                    ec2.Route(
-                        f"{vpc_config.vpc_name}-k8s-private-{private_subnet_third_octet}-default-external-ipv4-network-route",
-                        route_table_id=private_route_table.id,
-                        destination_cidr_block="0.0.0.0/0",
-                        nat_gateway_id=self.k8s_nat_gateways[
-                            k8s_subnet_pair_config["nat_gateway_index"]
-                        ].id,
-                        opts=resource_options,
-                    )
-                # The default ipv6 route where we don't need NAT foolishness because 2^64 is a really big number
+                ec2.Route(
+                    f"{vpc_config.vpc_name}-k8s-private-{private_subnet_third_octet}-default-external-ipv4-network-route",
+                    route_table_id=private_route_table.id,
+                    destination_cidr_block="0.0.0.0/0",
+                    nat_gateway_id=nat_gateway.id,
+                    opts=resource_options,
+                )
+
                 ec2.Route(
                     f"{vpc_config.vpc_name}-k8s-subnets-{private_subnet_third_octet}-default-external-ipv6-network-route",
                     route_table_id=private_route_table.id,
@@ -536,6 +549,7 @@ class OLVPCPeeringConnection(ComponentResource):
             ),
             opts=resource_options.merge(vpc_peer_resource_opts),
         )
+        # Create the routes between the two VPCs for the default, not-k8s route tables
         self.source_to_dest_route = ec2.Route(
             f"{source_vpc.vpc_config.vpc_name}-to-{destination_vpc.vpc_config.vpc_name}-route",
             route_table_id=source_vpc.route_table.id,
@@ -550,4 +564,29 @@ class OLVPCPeeringConnection(ComponentResource):
             vpc_peering_connection_id=self.peering_connection.id,
             opts=resource_options,
         )
+
+        # Then loop through k8s route tables and create the routes for them
+        for source_route_table, index in zip(
+            source_vpc.k8s_private_route_tables,
+            range(len(source_vpc.k8s_private_route_tables)),
+        ):
+            ec2.Route(
+                f"{source_vpc.vpc_config.vpc_name}-{index}-to-{destination_vpc.vpc_config.vpc_name}-k8s-route",
+                route_table_id=source_route_table.id,
+                destination_cidr_block=destination_vpc.olvpc.cidr_block,
+                vpc_peering_connection_id=self.peering_connection.id,
+                opts=resource_options,
+            )
+        for destination_route_table, index in zip(
+            destination_vpc.k8s_private_route_tables,
+            range(len(destination_vpc.k8s_private_route_tables)),
+        ):
+            ec2.Route(
+                f"{destination_vpc.vpc_config.vpc_name}-{index}-to-{source_vpc.vpc_config.vpc_name}-k8s-route",
+                route_table_id=destination_route_table.id,
+                destination_cidr_block=source_vpc.olvpc.cidr_block,
+                vpc_peering_connection_id=self.peering_connection.id,
+                opts=resource_options,
+            )
+
         self.register_outputs({})
