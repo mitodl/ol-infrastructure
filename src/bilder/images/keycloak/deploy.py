@@ -112,12 +112,7 @@ traefik_static_config = traefik_static.TraefikStaticConfig(
                 )
             ),
         ),
-        "https": traefik_static.EntryPoints(
-            address=":443",
-            forwardedHeaders=traefik_static.ForwardedHeaders(
-                trusted_i_ps=["172.16.0.0/16", "10.0.0.0/8"]
-            ),
-        ),
+        "https": traefik_static.EntryPoints(address=":443"),
     },
 )
 traefik_config = TraefikConfig(static_configuration=traefik_static_config)
