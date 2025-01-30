@@ -3,28 +3,43 @@ secretsprovider: awskms://alias/PulumiSecrets
 encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEGccCx6w+aU1z9VNPzXzwIAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkTCVUUXv23ZgiFtbAgEQgDusl6M2Rs0caUtV7jakSKAqsXTqm8f7M0UuEu0hjZ5KdbCp8HUDBShST/yKEpt0ExGXlODrlmL3gGN6fg==
 config:
   apps_vpc:cidr_block: 10.12.0.0/16
-  apps_vpc:k8s_pod_subnets:
-  - 10.12.128.0/21
-  - 10.12.136.0/21
-  - 10.12.144.0/21
-  - 10.12.152.0/21
+  apps_vpc:k8s_nat_gateway_config: "single"
+  apps_vpc:k8s_subnet_pair_configs:
+  - private_cidr: 10.12.128.0/21
+    public_cidr: 10.12.124.0/24
+  - private_cidr: 10.12.136.0/21
+    public_cidr: 10.12.125.0/24
+  - private_cidr: 10.12.144.0/21
+    public_cidr: 10.12.126.0/24
+  - private_cidr: 10.12.152.0/21
+    public_cidr: 10.12.127.0/24
   apps_vpc:k8s_service_subnet: 10.110.84.0/23
   aws:region: us-east-1
   data_vpc:cidr_block: 10.2.0.0/16
+  data_vpc:k8s_nat_gateway_config: "single"
   data_vpc:k8s_pod_subnets:
-  - 10.2.128.0/21
-  - 10.2.136.0/21
-  - 10.2.144.0/21
-  - 10.2.152.0/21
+  - private_cidr: 10.2.128.0/21
+    public_cidr: 10.2.124.0/24
+  - private_cidr: 10.2.136.0/21
+    public_cidr: 10.2.125.0/24
+  - private_cidr: 10.2.144.0/21
+    public_cidr: 10.2.126.0/24
+  - private_cidr: 10.2.152.0/21
+    public_cidr: 10.2.127.0/24
   data_vpc:k8s_service_subnet: 10.110.82.0/23
   mitx_online_vpc:cidr_block: 10.21.0.0/16
   ocw_vpc:cidr_block: 10.99.0.0/16
   operations_vpc:cidr_block: 10.1.0.0/16
+  operations_vpc:k8s_nat_gateway_config: "single"
   operations_vpc:k8s_pod_subnets:
-  - 10.1.120.0/21
-  - 10.1.136.0/21
-  - 10.1.144.0/21
-  - 10.1.152.0/21
+  - private_cidr: 10.1.128.0/21
+    public_cidr: 10.1.124.0/24
+  - private_cidr: 10.1.136.0/21
+    public_cidr: 10.1.125.0/24
+  - private_cidr: 10.1.144.0/21
+    public_cidr: 10.1.126.0/24
+  - private_cidr: 10.1.152.0/21
+    public_cidr: 10.1.127.0/24
   operations_vpc:k8s_service_subnet: 10.110.80.0/23
   operations_vpc:name: operations-qa
   residential_staging_vpc:cidr_block: 10.30.0.0/16

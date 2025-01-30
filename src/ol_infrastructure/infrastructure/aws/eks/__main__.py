@@ -13,7 +13,10 @@ import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
 
-from bridge.lib.magic_numbers import DEFAULT_EFS_PORT, IAM_ROLE_NAME_PREFIX_MAX_LENGTH
+from bridge.lib.magic_numbers import (
+    DEFAULT_EFS_PORT,
+    IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
+)
 from bridge.lib.versions import (
     APISIX_CHART_VERSION,
     CERT_MANAGER_CHART_VERSION,
@@ -215,22 +218,29 @@ cluster = eks.Cluster(
     fargate=False,
     ip_family="ipv4",
     kubernetes_service_ip_address_range=service_ip_block,
-    node_associate_public_ip_address=False,
     provider_credential_opts=eks.KubeconfigOptionsArgs(role_arn=administrator_role.arn),
     service_role=cluster_role,
     skip_default_node_group=True,
-    subnet_ids=pod_subnet_ids,
+    # node_subnet_ids=target_vpc["k8s_pod_subnet_ids"],
+    private_subnet_ids=target_vpc["k8s_pod_subnet_ids"],
+    public_subnet_ids=target_vpc["k8s_public_subnet_ids"],
+    node_associate_public_ip_address=False,
     tags=aws_config.tags,
     use_default_vpc_cni=False,
     version=VERSIONS["KUBERNETES"],
     # Ref: https://docs.aws.amazon.com/eks/latest/userguide/security-groups-pods-deployment.html
     # Ref: https://docs.aws.amazon.com/eks/latest/userguide/sg-pods-example-deployment.html
+    # Ref: https://github.com/aws/amazon-vpc-cni-k8s/blob/master/README.md
     vpc_cni_options=eks.cluster.VpcCniOptionsArgs(
+        cni_external_snat=False,
         configuration_values={"env": {"POD_SECURITY_GROUP_ENFORCING_MODE": "standard"}},
-        enable_pod_eni=eks_config.get_bool("pod_security_groups"),
-        enable_prefix_delegation=eks_config.get_bool("pod_security_groups"),
-        disable_tcp_early_demux=eks_config.get_bool("pod_security_groups"),
-        log_level="INFO",
+        custom_network_config=False,
+        disable_tcp_early_demux=True,
+        enable_network_policy=False,
+        enable_pod_eni=True,
+        enable_prefix_delegation=True,
+        external_snat=False,
+        log_level="DEBUG",
     ),
     vpc_id=target_vpc["id"],
     opts=ResourceOptions(
@@ -239,10 +249,13 @@ cluster = eks.Cluster(
         depends_on=[cluster_role, administrator_role],
     ),
 )
+
 export("cluster_name", cluster_name)
 export("kube_config", cluster.kubeconfig)
 export("cluster_identities", cluster.eks_cluster.identities)
 export("admin_role_arn", administrator_role.arn)
+export("cluster_security_group_id", cluster.cluster_security_group_id)
+export("node_security_group_id", cluster.node_security_group_id)
 export(
     "kube_config_data",
     {
@@ -289,43 +302,14 @@ for i, policy in enumerate(managed_node_policy_arns):
         role=node_role.id,
         opts=ResourceOptions(parent=node_role),
     )
+node_instance_profile = aws.iam.InstanceProfile(
+    f"{cluster_name}-eks-node-instance-profile",
+    role=node_role.name,
+    path=f"/ol-infrastructure/eks/{cluster_name}/",
+)
 export("node_role_arn", value=node_role.arn)
 
-# Loop through the node group definitions and add them to the cluster
-node_groups = []
-for ng_name, ng_config in eks_config.require_object("nodegroups").items():
-    taint_list = []
-    for taint_name, taint_config in ng_config["taints"].items() or {}:
-        taint_list.append(
-            aws.eks.NodeGroupTaintArgs(
-                key=taint_name,
-                value=taint_config["value"] or None,
-                effect=taint_config["effect"],
-            ),
-        )
-    node_groups.append(
-        eks.ManagedNodeGroup(
-            f"{cluster_name}-eks-managednodegroup-{ng_name}",
-            capacity_type="ON_DEMAND",
-            cluster=cluster,
-            enable_imd_sv2=True,
-            instance_types=ng_config["instance_types"],
-            labels=ng_config["labels"] or {},
-            node_group_name=f"{cluster_name}-managednodegroup-{ng_name}",
-            node_role_arn=node_role.arn,
-            scaling_config=aws.eks.NodeGroupScalingConfigArgs(
-                desired_size=ng_config["scaling"]["desired"] or 2,
-                max_size=ng_config["scaling"]["max"] or 3,
-                min_size=ng_config["scaling"]["min"] or 1,
-            ),
-            tags=aws_config.merged_tags(ng_config["tags"] or {}),
-            taints=taint_list,
-            opts=ResourceOptions(parent=cluster, depends_on=cluster),
-        )
-    )
-
-
-# Initalize the k8s pulumi provider and configure the central operations namespace
+# Initalize the k8s pulumi provider
 k8s_global_labels = {
     "pulumi_managed": "true",
     "pulumi_stack": stack_info.full_name,
@@ -333,10 +317,72 @@ k8s_global_labels = {
 k8s_provider = kubernetes.Provider(
     "k8s-provider",
     kubeconfig=cluster.kubeconfig,
-    opts=ResourceOptions(
-        parent=cluster, depends_on=[cluster, node_groups[0], administrator_role]
-    ),
+    opts=ResourceOptions(parent=cluster, depends_on=[cluster, administrator_role]),
 )
+
+# Loop through the node group definitions and add them to the cluster
+node_groups = []
+for ng_name, ng_config in eks_config.require_object("nodegroups").items():
+    taint_list = {}
+    for taint_name, taint_config in ng_config["taints"].items() or {}:
+        taint_list[taint_name] = eks.TaintArgs(
+            value=taint_config["value"],
+            effect=taint_config["effect"],
+        )
+    node_groups.append(
+        eks.NodeGroupV2(
+            f"{cluster_name}-eks-nodegroup-{ng_name}",
+            cluster=eks.CoreDataArgs(
+                cluster=cluster.eks_cluster,
+                cluster_iam_role=cluster_role,
+                endpoint=cluster.eks_cluster.endpoint,
+                instance_roles=[node_role],
+                node_group_options=eks.ClusterNodeGroupOptionsArgs(
+                    node_associate_public_ip_address=False,
+                ),
+                provider=k8s_provider,
+                subnet_ids=target_vpc["k8s_pod_subnet_ids"],
+                vpc_id=target_vpc["id"],
+            ),
+            instance_type=ng_config["instance_type"],
+            instance_profile=node_instance_profile,
+            labels=ng_config["labels"] or {},
+            desired_capacity=ng_config["scaling"]["desired"] or 2,
+            max_size=ng_config["scaling"]["max"] or 3,
+            min_size=ng_config["scaling"]["min"] or 1,
+            taints=taint_list,
+            opts=ResourceOptions(parent=cluster, depends_on=cluster),
+        )
+    )
+    export("node_group_security_group_id", node_groups[0].node_security_group.id)
+
+    # There is a bug here when there is more than one node group defined.
+    # Don't have mental bandwidth to fix it right now.
+    # Ref: https://docs.astral.sh/ruff/rules/function-uses-loop-variable/
+    allow_tcp_dns_ingress = node_groups[-1].node_security_group.apply(
+        lambda ng: aws.ec2.SecurityGroupRule(
+            f"{cluster_name}-eks-nodegroup-{ng_name}-tcp-dns-ingress",  # noqa: B023
+            type="ingress",
+            description="Allow DNS traffic on TCP",
+            security_group_id=ng.id,
+            protocol=aws.ec2.ProtocolType.TCP,
+            from_port=53,
+            to_port=53,
+            cidr_blocks=pod_ip_blocks,
+        )
+    )
+    allow_udp_dns_ingress = node_groups[-1].node_security_group.apply(
+        lambda ng: aws.ec2.SecurityGroupRule(
+            f"{cluster_name}-eks-nodegroup-{ng_name}-udp-dns-ingress",  # noqa: B023
+            type="ingress",
+            description="Allow DNS traffic on UDP",
+            security_group_id=ng.id,
+            protocol=aws.ec2.ProtocolType.UDP,
+            from_port=53,
+            to_port=53,
+            cidr_blocks=pod_ip_blocks,
+        )
+    )
 
 
 # Every cluster gets an 'operations' namespace.
