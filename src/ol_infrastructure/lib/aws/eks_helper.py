@@ -22,29 +22,14 @@ default_psg_egress_args = [
 
 def get_default_psg_ingress_args(
     k8s_pod_subnet_cidrs: list[str],
-    k8s_service_subnet_cidr: str,
 ) -> list[ec2.SecurityGroupIngressArgs]:
     return [
         ec2.SecurityGroupIngressArgs(
             protocol="-1",
             from_port=0,
             to_port=0,
-            cidr_blocks=["0.0.0.0/0"],
-            description="Allow ingress to the pod from anywhere in the k8s cluster.",
-        ),
-        ec2.SecurityGroupIngressArgs(
-            protocol="-1",
-            from_port=0,
-            to_port=0,
             cidr_blocks=k8s_pod_subnet_cidrs,
             description="Allow ingress to the pod from anywhere in the k8s cluster.",
-        ),
-        ec2.SecurityGroupIngressArgs(
-            protocol="-1",
-            from_port=0,
-            to_port=0,
-            cidr_blocks=[k8s_service_subnet_cidr],
-            description="Allow ingress to the pod from the service subnet.",
         ),
     ]
 

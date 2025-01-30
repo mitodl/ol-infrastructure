@@ -426,7 +426,6 @@ ecommerce_application_security_group = ec2.SecurityGroup(
     egress=default_psg_egress_args,
     ingress=get_default_psg_ingress_args(
         k8s_pod_subnet_cidrs=k8s_pod_subnet_cidrs,
-        k8s_service_subnet_cidr=apps_vpc["k8s_service_subnet_cidr"],
     ),
     vpc_id=apps_vpc["id"],
     tags=aws_config.tags,
