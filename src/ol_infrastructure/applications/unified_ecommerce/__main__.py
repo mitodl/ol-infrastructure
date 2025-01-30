@@ -44,6 +44,8 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib.aws.cache_helper import CacheInstanceTypes
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
+    default_psg_egress_args,
+    get_default_psg_ingress_args,
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
@@ -415,6 +417,20 @@ ecommerce_static_vault_secrets = vault.generic.Secret(
     data_json=json.dumps(ecommerce_vault_secrets),
 )
 
+# Application security group
+ecommerce_application_security_group = ec2.SecurityGroup(
+    f"unified-ecommerce-application-security-group-{stack_info.env_suffix}",
+    name=f"unified-ecommerce-application-security-group-{stack_info.env_suffix}",
+    description="Access control for the unified ecommerce application pods.",
+    # allow all egress traffic
+    egress=default_psg_egress_args,
+    ingress=get_default_psg_ingress_args(
+        k8s_pod_subnet_cidrs=k8s_pod_subnet_cidrs,
+    ),
+    vpc_id=apps_vpc["id"],
+    tags=aws_config.tags,
+)
+
 # RDS configuration and networking setup
 ecommerce_database_security_group = ec2.SecurityGroup(
     f"unified-ecommerce-db-security-group-{stack_info.env_suffix}",
@@ -431,14 +447,12 @@ ecommerce_database_security_group = ec2.SecurityGroup(
             to_port=DEFAULT_POSTGRES_PORT,
             description="Access to postgres from consul and vault.",
         ),
-        # TODO @Ardiea: switch to use pod-security-groups once implemented  # noqa: TD003, FIX002, E501
         ec2.SecurityGroupIngressArgs(
-            security_groups=[],
+            security_groups=[ecommerce_application_security_group.id],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
-            cidr_blocks=k8s_pod_subnet_cidrs,
-            description="Allow k8s cluster to talk to DB",
+            description="Allow application pods to talk to DB",
         ),
     ],
     vpc_id=apps_vpc["id"],
@@ -753,7 +767,11 @@ init_containers = [
 ]
 
 # Create a deployment resource to manage the application pods
-application_labels = k8s_global_labels | {"ol.mit.edu/application": "unified-ecommerce"}
+application_labels = k8s_global_labels | {
+    "ol.mit.edu/application": "unified-ecommerce",
+    "ol.mit.edu/pod-security-group": "ecommerce-app",
+}
+
 ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
     f"unified-ecommerce-{stack_info.env_suffix}-deployment",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -803,6 +821,7 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
                     ),
                 ],
                 init_containers=init_containers,
+                dns_policy="ClusterFirst",
                 containers=[
                     # nginx container infront of uwsgi
                     kubernetes.core.v1.ContainerArgs(
@@ -897,6 +916,28 @@ ecommerce_service = kubernetes.core.v1.Service(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
+ecommerce_pod_security_group_policy = (
+    kubernetes.apiextensions.CustomResource(
+        f"unified-ecommerce-{stack_info.env_suffix}-application-pod-security-group-policy",
+        api_version="vpcresources.k8s.aws/v1beta1",
+        kind="SecurityGroupPolicy",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="ecommerce-app",
+            namespace=ecommerce_namespace,
+            labels=k8s_global_labels,
+        ),
+        spec={
+            "podSelector": {
+                "matchLabels": {"ol.mit.edu/pod-security-group": "ecommerce-app"},
+            },
+            "securityGroups": {
+                "groupIds": [
+                    ecommerce_application_security_group.id,
+                ],
+            },
+        },
+    ),
+)
 
 # Create the apisix custom resources since it doesn't support gateway-api yet
 

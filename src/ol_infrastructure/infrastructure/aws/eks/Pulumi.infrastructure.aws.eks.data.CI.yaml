@@ -12,14 +12,12 @@ config:
   eks:ebs_csi_provisioner: true
   eks:efs_csi_provisioner: false
   eks:gateway_release_channel: "experimental"
-  eks:pod_security_groups: true
   eks:namespaces:
   - "open-metadata"  # Openmetadata testing
   - "airbyte"
   eks:nodegroups:
     worker-xlarge:
-      instance_types:
-      - "c7a.xlarge"
+      instance_type: "c7a.xlarge"
       labels:
         ondemand: true
         node_size: c7a.xlarge
