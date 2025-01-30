@@ -15,8 +15,7 @@ from ol_concourse.lib.resources import git_repo
 concourse_github_issues_repository = git_repo(
     name=Identifier("ol-infra-health-checks-github"),
     uri="https://github.com/mitodl/ol-infra-health-checks",
-    branch="cpatti_add_initial_tests",
-    check_every="24h",
+    branch="main",
 )
 
 concourse_github_issues_image = Resource(

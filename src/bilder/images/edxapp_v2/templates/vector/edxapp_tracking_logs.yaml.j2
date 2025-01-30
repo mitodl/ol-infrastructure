@@ -4,7 +4,8 @@ sources:
     file_key: log_file
     type: file
     include:
-    - /opt/data/logs/tracking_logs.log
+    - /opt/data/cms/logs/tracking_logs.log*
+    - /opt/data/lms/logs/tracking_logs.log*
 
 transforms:
   # Maintaining a copy of the logs with nested objects for MIT IRx (TMM 2023-07-05)

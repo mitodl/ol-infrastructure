@@ -7,7 +7,7 @@ transforms:
     source: |
       .application = "edxapp"
       # Drop all logs pertaining to ELB healthchecks
-      abort_match_healthcheck, err = (match_any(.message, [r'GET /heartbeat']))
+      abort_match_healthcheck = (match_any!(.message, [r'GET /heartbeat']))
       if abort_match_healthcheck {
         abort
       }
