@@ -72,3 +72,16 @@ services:
       - "traefik.http.middlewares.traefik-forward-auth.forwardauth.address=http://traefik-forward-auth:4181"
       - "traefik.http.middlewares.traefik-forward-auth.forwardauth.authResponseHeaders=X-Forwarded-User"
       - "traefik.http.services.traefik-forward-auth.loadbalancer.server.port=4181"
+  # per node healthcheck container
+  health-check:
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/ol-infra-health-checks:latest
+    container_name: health-check
+    ports:
+    - "8097:8907"
+    labels:
+      # Explicitly tell Traefik to expose this container
+      - "traefik.enable=true"
+      # Use the path prefix routing for the healthcheck container
+      - "traefik.http.routers.healthcheck.rule=Host(`${DAGSTER_HOSTNAME}`) && PathPrefix(`/healthcheck`))"
+      # Enable TLS
+      - "traefik.http.routers.healthcheck.tls=true"
