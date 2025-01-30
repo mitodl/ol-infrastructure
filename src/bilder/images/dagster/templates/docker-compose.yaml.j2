@@ -20,7 +20,6 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.dagit.rule=Host(`${DAGSTER_HOSTNAME}`)"
-      - "traefik.http.routers.dagit.priority=1"
       - "traefik.http.routers.dagit.middlewares=traefik-forward-auth"
       - "traefik.http.routers.dagit.tls=true"
   dagster-daemon:
@@ -79,17 +78,10 @@ services:
     container_name: health-check
     ports:
     - "8097:8907"
-    # volumes:
-    # do I need this? Didn't need to specify when testing locally with ol-data-platform
-    - /var/run/docker.sock:/var/run/docker.sock
-    - /etc/docker/compose:/etc/docker/compose
     labels:
       # Explicitly tell Traefik to expose this container
       - "traefik.enable=true"
-      # Send all health_check host traffic to a router
-      - "traefik.http.routers.healthcheck.rule=Host(`0.0.0.0`)"
-      - "traefik.http.routers.healthcheck.priority=2"
-      # Specify the authentication middleware for the healthcheck router
-      - "traefik.http.routers.healthcheck.middlewares=traefik-forward-auth"
+      # Use the path prefix routing for the healthcheck container
+      - "traefik.http.routers.healthcheck.rule=Host(`${DAGSTER_HOSTNAME}`) && PathPrefix(`/healthcheck`))"
       # Enable TLS
       - "traefik.http.routers.healthcheck.tls=true"
