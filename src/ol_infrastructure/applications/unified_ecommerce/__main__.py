@@ -60,7 +60,6 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-setup_vault_provider()
 fastly_provider = get_fastly_provider()
 github_provider = github.Provider(
     "github_provider",
