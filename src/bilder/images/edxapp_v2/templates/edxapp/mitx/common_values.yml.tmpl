@@ -116,6 +116,10 @@ CONTENTSTORE:
 
 ACTIVATION_EMAIL_SUPPORT_LINK: ''
 AFFILIATE_COOKIE_NAME: dev_affiliate_id
+ALLOW_ORIGINS:
+- https://{{ key "edxapp/lms-domain" }}
+- https://{{ key "edxapp/studio-domain" }}
+- https://{{ key "edxapp/preview-domain" }}
 # ANALYTICS_DASHBOARD_NAME: Your Platform Name Here Insights
 # ANALYTICS_DASHBOARD_URL: http://localhost:18110/courses
 AUTH_PASSWORD_VALIDATORS:
