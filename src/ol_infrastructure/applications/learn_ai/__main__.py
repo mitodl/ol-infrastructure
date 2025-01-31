@@ -1,9 +1,14 @@
+# ruff: noqa: E501, ERA001
+import base64
 import json
+import mimetypes
 import os
+import textwrap
 from pathlib import Path
 
 import pulumi_fastly as fastly
 import pulumi_github as github
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
@@ -12,17 +17,33 @@ from bridge.lib.constants import FASTLY_A_TLS_1_3
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_HTTPS_PORT,
+    DEFAULT_NGINX_PORT,
     DEFAULT_POSTGRES_PORT,
+    DEFAULT_REDIS_PORT,
+    DEFAULT_UWSGI_PORT,
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
+from bridge.settings.github.team_members import DEVOPS_MIT
+from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
+from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.services.vault import (
+    OLVaultDatabaseBackend,
+    OLVaultK8SDynamicSecretConfig,
+    OLVaultK8SResources,
+    OLVaultK8SResourcesConfig,
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
+    OLVaultPostgresDatabaseConfig,
+)
+from ol_infrastructure.lib.aws.cache_helper import CacheInstanceTypes
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     default_psg_egress_args,
     get_default_psg_ingress_args,
     setup_k8s_provider,
 )
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
@@ -315,7 +336,7 @@ learn_ai_fastly_service = fastly.ServiceVcl(
                     set bereq.url = "/frontend/index.html";
                   }
                 }
-                """  # noqa: E501
+                """
             ),
             type="pass",
         ),
@@ -329,7 +350,7 @@ learn_ai_fastly_service = fastly.ServiceVcl(
                   set obj.http.Location = "https://" + "{learn_ai_config.require("frontend_domain")}" + req.url.path + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
                   return (deliver);
                 }}
-                """  # noqa: E501
+                """
             ),
             type="error",
         ),
@@ -369,18 +390,18 @@ route53.Record(
 ################################################
 # Put the application secrets into vault
 learn_ai_vault_secrets = read_yaml_secrets(
-    Path(f"unified_learn_ai/secrets.{stack_info.env_suffix}.yaml"),
+    Path(f"learn_ai/secrets.{stack_info.env_suffix}.yaml"),
 )
 learn_ai_vault_mount = vault.Mount(
-    f"unified-learn-ai-secrets-mount-{stack_info.env_suffix}",
+    f"learn-ai-secrets-mount-{stack_info.env_suffix}",
     path="secret-learn-ai",
     type="kv-v2",
     options={"version": "2"},
-    description="Secrets for the unified learn_ai application.",
+    description="Secrets for the learn ai application.",
     opts=ResourceOptions(delete_before_replace=True),
 )
 learn_ai_static_vault_secrets = vault.generic.Secret(
-    f"unified-learn-ai-secrets-{stack_info.env_suffix}",
+    f"learn-ai-secrets-{stack_info.env_suffix}",
     path=learn_ai_vault_mount.path.apply("{}/secrets".format),
     data_json=json.dumps(learn_ai_vault_secrets),
 )
@@ -389,9 +410,9 @@ learn_ai_static_vault_secrets = vault.generic.Secret(
 # Application security group
 # Needs to happen ebfore the database security group is created
 learn_ai_application_security_group = ec2.SecurityGroup(
-    f"unified-learn-ai-application-security-group-{stack_info.env_suffix}",
-    name=f"unified-learn-ai-application-security-group-{stack_info.env_suffix}",
-    description="Access control for the unified learn-ai application pods.",
+    f"learn-ai-application-security-group-{stack_info.env_suffix}",
+    name=f"learn-ai-application-security-group-{stack_info.env_suffix}",
+    description="Access control for the learn-ai application pods.",
     # allow all egress traffic
     egress=default_psg_egress_args,
     ingress=get_default_psg_ingress_args(
@@ -404,13 +425,12 @@ learn_ai_application_security_group = ec2.SecurityGroup(
 ################################################
 # RDS configuration and networking setup
 learn_ai_database_security_group = ec2.SecurityGroup(
-    f"unified-learn-ai-db-security-group-{stack_info.env_suffix}",
-    name=f"unified-learn-ai-db-security-group-{stack_info.env_suffix}",
-    description="Access control for the unified learn-ai database.",
+    f"learn-ai-db-security-group-{stack_info.env_suffix}",
+    name=f"learn-ai-db-security-group-{stack_info.env_suffix}",
+    description="Access control for the learn-ai database.",
     ingress=[
         ec2.SecurityGroupIngressArgs(
             security_groups=[
-                consul_security_groups["consul_server"],
                 vault_stack.require_output("vault_server")["security_group"],
             ],
             protocol="tcp",
@@ -436,7 +456,7 @@ rds_defaults["instance_size"] = (
 )
 
 learn_ai_db_config = OLPostgresDBConfig(
-    instance_name=f"unified-learn-ai-db-{stack_info.env_suffix}",
+    instance_name=f"learn-ai-db-{stack_info.env_suffix}",
     password=learn_ai_config.get("db_password"),
     subnet_group_name=apps_vpc["rds_subnet"],
     security_groups=[learn_ai_database_security_group],
@@ -459,4 +479,709 @@ learn_ai_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
 learn_ai_db_vault_backend = OLVaultDatabaseBackend(
     learn_ai_db_vault_backend_config,
     opts=ResourceOptions(delete_before_replace=True, parent=learn_ai_db),
+)
+
+# Redis Cluster configuration and networking setup
+redis_config = Config("redis")
+redis_instance_type = (
+    redis_config.get("instance_type") or CacheInstanceTypes.micro.value
+)
+
+redis_cluster_security_group = ec2.SecurityGroup(
+    f"learn-ai-redis-cluster-security-group-{stack_info.env_suffix}",
+    name_prefix=f"learn-ai-redis-security-group-{stack_info.env_suffix}",
+    description="Access control for the learn-ai redis cluster.",
+    ingress=[
+        ec2.SecurityGroupIngressArgs(
+            security_groups=[learn_ai_application_security_group.id],
+            protocol="tcp",
+            from_port=DEFAULT_REDIS_PORT,
+            to_port=DEFAULT_REDIS_PORT,
+            description="Allow application pods to talk to Redis",
+        ),
+    ],
+    vpc_id=apps_vpc["id"],
+    tags=aws_config.tags,
+)
+
+redis_cache_config = OLAmazonRedisConfig(
+    encrypt_transit=True,
+    auth_token=redis_config.require("password"),
+    cluster_mode_enabled=False,
+    encrypted=True,
+    engine_version="7.1",
+    instance_type=redis_instance_type,
+    num_instances=3,
+    shard_count=1,
+    auto_upgrade=True,
+    cluster_description="Redis cluster for learn UI tasks and caching.",
+    cluster_name=f"learn-ai-redis-{stack_info.env_suffix}",
+    subnet_group=apps_vpc["elasticache_subnet"],
+    security_groups=[redis_cluster_security_group.id],
+    tags=aws_config.tags,
+)
+redis_cache = OLAmazonCache(redis_cache_config)
+
+################################################
+# Create vault policy and associate it with an auth backend role
+# on the vault k8s cluster auth endpoint
+learn_ai_vault_policy = vault.Policy(
+    f"learn-ai-vault-policy-{stack_info.env_suffix}",
+    name="learn-ai",
+    policy=Path(__file__).parent.joinpath("learn_ai_policy.hcl").read_text(),
+)
+
+learn_ai_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    f"learn-ai-vault-auth-backend-role-{stack_info.env_suffix}",
+    role_name="learn-ai",
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["*"],
+    bound_service_account_namespaces=[learn_ai_namespace],
+    token_policies=[learn_ai_vault_policy.name],
+)
+
+vault_k8s_resources_config = OLVaultK8SResourcesConfig(
+    application_name="learn-ai",
+    namespace=learn_ai_namespace,
+    labels=k8s_global_labels,
+    vault_address=vault_config.require("address"),
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    vault_auth_role_name=learn_ai_vault_auth_backend_role.role_name,
+)
+
+vault_k8s_resources = OLVaultK8SResources(
+    resource_config=vault_k8s_resources_config,
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[learn_ai_vault_auth_backend_role],
+    ),
+)
+
+# Load the database creds into a k8s secret via VSO
+db_creds_secret_name = "pgsql-db-creds"  # noqa: S105  # pragma: allowlist secret
+db_creds_secret = Output.all(address=learn_ai_db.db_instance.address).apply(
+    lambda db: OLVaultK8SSecret(
+        f"learn-ai-{stack_info.env_suffix}-db-creds-secret",
+        OLVaultK8SDynamicSecretConfig(
+            name="learn-ai-db-creds",
+            namespace=learn_ai_namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=db_creds_secret_name,
+            labels=k8s_global_labels,
+            mount=learn_ai_db_vault_backend_config.mount_point,
+            path="creds/app",
+            restart_target_kind="Deployment",
+            restart_target_name="learn-ai-app",
+            templates={
+                "DATABASE_URL": f'postgres://{{{{ get .Secrets "username"}}}}:{{{{ get .Secrets "password" }}}}@{db["address"]}:{learn_ai_db_config.port}/{learn_ai_db_config.db_name}',
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            parent=vault_k8s_resources,
+            depends_on=[learn_ai_db_vault_backend],
+        ),
+    )
+)
+
+# Load the redis creds into a normal k8s secret
+redis_creds_secret_name = "redis-creds"  # noqa: S105  # pragma: allowlist secret
+redis_creds = kubernetes.core.v1.Secret(
+    f"learn-ai-{stack_info.env_suffix}-redis-creds",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=redis_creds_secret_name,
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+    ),
+    string_data=redis_cache.address.apply(
+        lambda address: {
+            "CELERY_BROKER_URL": f"rediss://default:{redis_config.require('password')}@{address}:6379/0?ssl_cert_Reqs=required",
+            "CELERY_RESULT_BACKEND": f"rediss://default:{redis_config.require('password')}@{address}:6379/0?ssl_cert_Reqs=required",
+        }
+    ),
+    opts=ResourceOptions(
+        depends_on=[redis_cache],
+        delete_before_replace=True,
+    ),
+)
+
+# Load the static secrets into a k8s secret via VSO
+static_secrets_name = "learn-ai-static-secrets"  # pragma: allowlist secret
+static_secrets = OLVaultK8SSecret(
+    name=f"learn-ai-{stack_info.env_suffix}-static-secrets",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="learn-ai-static-secrets",
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+        dest_secret_name=static_secrets_name,
+        dest_secret_labels=k8s_global_labels,
+        mount="secret-learn-ai",
+        mount_type="kv-v2",
+        path="secrets",
+        includes=["*"],
+        excludes=[],
+        exclude_raw=True,
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
+        depends_on=[learn_ai_static_vault_secrets],
+    ),
+)
+
+# Load the nginx configuration into a configmap
+learn_ai_nginx_configmap = kubernetes.core.v1.ConfigMap(
+    f"learn-ai-{stack_info.env_suffix}-nginx-configmap",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="nginx-config",
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+    ),
+    data={
+        "web.conf": Path(__file__).parent.joinpath("files/web.conf").read_text(),
+    },
+    opts=ResourceOptions(
+        delete_before_replace=True,
+    ),
+)
+
+# Build a list of not-sensitive env vars for the deployment config
+learn_ai_deployment_env_vars = []
+for k, v in (learn_ai_config.require_object("env_vars") or {}).items():
+    learn_ai_deployment_env_vars.append(
+        kubernetes.core.v1.EnvVarArgs(
+            name=k,
+            value=v,
+        )
+    )
+learn_ai_deployment_env_vars.append(
+    kubernetes.core.v1.EnvVarArgs(name="PORT", value=str(DEFAULT_UWSGI_PORT))
+)
+
+# Build a list of sensitive env vars for the deployment config via envFrom
+learn_ai_deployment_envfrom = [
+    # Database creds
+    kubernetes.core.v1.EnvFromSourceArgs(
+        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+            name=db_creds_secret_name,
+        ),
+    ),
+    # Redis Configuration
+    kubernetes.core.v1.EnvFromSourceArgs(
+        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+            name=redis_creds_secret_name,
+        ),
+    ),
+    # static secrets from secrets-learn-ai/secrets
+    kubernetes.core.v1.EnvFromSourceArgs(
+        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+            name=static_secrets_name,
+        ),
+    ),
+]
+
+init_containers = [
+    # Good Canidates for lib or component functions
+    # Run database migrations at startup
+    kubernetes.core.v1.ContainerArgs(
+        name="migrate",
+        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
+        command=["python3", "manage.py", "migrate", "--noinput"],
+        image_pull_policy="IfNotPresent",
+        env=learn_ai_deployment_env_vars,
+        env_from=learn_ai_deployment_envfrom,
+    ),
+    kubernetes.core.v1.ContainerArgs(
+        name="collectstatic",
+        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
+        command=["python3", "manage.py", "collectstatic", "--noinput"],
+        image_pull_policy="IfNotPresent",
+        env=learn_ai_deployment_env_vars,
+        env_from=learn_ai_deployment_envfrom,
+        volume_mounts=[
+            kubernetes.core.v1.VolumeMountArgs(
+                name="staticfiles",
+                mount_path="/src/staticfiles",
+            ),
+            kubernetes.core.v1.VolumeMountArgs(
+                name="static",
+                mount_path="/src/static",
+            ),
+        ],
+    ),
+] + [
+    # Good canidate for a lib or component function
+    kubernetes.core.v1.ContainerArgs(
+        name=f"promote-{mit_username}-to-superuser",
+        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
+        # Jank that forces the promotion to always exit successfully
+        command=["/bin/bash"],
+        args=[
+            "-c",
+            f"./manage.py promote_user --promote --superuser '{mit_username}@mit.edu'; exit 0",
+        ],
+        image_pull_policy="IfNotPresent",
+        env=learn_ai_deployment_env_vars,
+        env_from=learn_ai_deployment_envfrom,
+    )
+    for mit_username in DEVOPS_MIT
+]
+
+# Create a deployment resource to manage the application pods
+application_labels = k8s_global_labels | {
+    "ol.mit.edu/application": "learn-ai",
+    "ol.mit.edu/pod-security-group": "learn-ai-app",
+}
+
+learn_ai_deployment_resource = kubernetes.apps.v1.Deployment(
+    f"learn-ai-{stack_info.env_suffix}-deployment",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="learn-ai-app",
+        namespace=learn_ai_namespace,
+        labels=application_labels,
+    ),
+    spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        # TODO @Ardiea: Add horizontial pod autoscaler  # noqa: TD003, FIX002
+        replicas=1,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels=application_labels,
+        ),
+        # Limits the chances of simulatious pod restarts -> db migrations (hopefully)
+        strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
+            type="RollingUpdate",
+            rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
+                max_surge=0,
+                max_unavailable=1,
+            ),
+        ),
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels=application_labels,
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                volumes=[
+                    kubernetes.core.v1.VolumeArgs(
+                        name="staticfiles",
+                        empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+                    ),
+                    kubernetes.core.v1.VolumeArgs(
+                        name="static",
+                        empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+                    ),
+                    kubernetes.core.v1.VolumeArgs(
+                        name="nginx-config",
+                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                            name=learn_ai_nginx_configmap.metadata.name,
+                            items=[
+                                kubernetes.core.v1.KeyToPathArgs(
+                                    key="web.conf",
+                                    path="web.conf",
+                                ),
+                            ],
+                        ),
+                    ),
+                ],
+                init_containers=init_containers,
+                dns_policy="ClusterFirst",
+                containers=[
+                    # nginx container infront of uwsgi
+                    kubernetes.core.v1.ContainerArgs(
+                        name="nginx",
+                        image="nginx:1.9.5",
+                        ports=[
+                            kubernetes.core.v1.ContainerPortArgs(
+                                container_port=DEFAULT_NGINX_PORT,
+                            )
+                        ],
+                        image_pull_policy="IfNotPresent",
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={"cpu": "50m", "memory": "64Mi"},
+                            limits={"cpu": "100m", "memory": "128Mi"},
+                        ),
+                        volume_mounts=[
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="staticfiles",
+                                mount_path="/src/staticfiles",
+                            ),
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="static",
+                                mount_path="/src/static",
+                            ),
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="nginx-config",
+                                mount_path="/etc/nginx/conf.d/web.conf",
+                                sub_path="web.conf",
+                                read_only=True,
+                            ),
+                        ],
+                    ),
+                    # Actual application run with uwsgi
+                    kubernetes.core.v1.ContainerArgs(
+                        name="learn-ai-app",
+                        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
+                        ports=[
+                            kubernetes.core.v1.ContainerPortArgs(
+                                container_port=DEFAULT_UWSGI_PORT
+                            )
+                        ],
+                        image_pull_policy="IfNotPresent",
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={"cpu": "250m", "memory": "300Mi"},
+                            limits={"cpu": "500m", "memory": "600Mi"},
+                        ),
+                        env=learn_ai_deployment_env_vars,
+                        env_from=learn_ai_deployment_envfrom,
+                        volume_mounts=[
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="staticfiles",
+                                mount_path="/src/staticfiles",
+                            ),
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="static",
+                                mount_path="/src/static",
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        ),
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[db_creds_secret, redis_creds],
+    ),
+)
+
+# A kubernetes service resource to act as load balancer for the app instances
+learn_ai_service_name = "learn-ai-app"
+learn_ai_service_port_name = "http"
+learn_ai_service = kubernetes.core.v1.Service(
+    f"learn-ai-{stack_info.env_suffix}-service",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=learn_ai_service_name,
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        selector=application_labels,
+        ports=[
+            kubernetes.core.v1.ServicePortArgs(
+                name=learn_ai_service_port_name,
+                port=DEFAULT_NGINX_PORT,
+                target_port=DEFAULT_NGINX_PORT,
+                protocol="TCP",
+            ),
+        ],
+        type="ClusterIP",
+    ),
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+# Good canidate for a component resource
+learn_ai_pod_security_group_policy = (
+    kubernetes.apiextensions.CustomResource(
+        f"learn-ai-{stack_info.env_suffix}-application-pod-security-group-policy",
+        api_version="vpcresources.k8s.aws/v1beta1",
+        kind="SecurityGroupPolicy",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="learn-ai-app",
+            namespace=learn_ai_namespace,
+            labels=k8s_global_labels,
+        ),
+        spec={
+            "podSelector": {
+                "matchLabels": {"ol.mit.edu/pod-security-group": "learn-ai-app"},
+            },
+            "securityGroups": {
+                "groupIds": [
+                    learn_ai_application_security_group.id,
+                ],
+            },
+        },
+    ),
+)
+
+# Create the apisix custom resources since it doesn't support gateway-api yet
+
+# Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_plugin_config/
+# Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_pluginconfig_v2/
+
+# Load open-id-connect secrets into a k8s secret via VSO
+oidc_secret_name = "oidc-secrets"  # pragma: allowlist secret  # noqa: S105
+oidc_secret = OLVaultK8SSecret(
+    name=f"learn-ai-{stack_info.env_suffix}-oidc-secrets",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="oidc-static-secrets",
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+        dest_secret_name=oidc_secret_name,
+        dest_secret_labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/learn-ai",
+        excludes=[".*"],
+        exclude_raw=True,
+        templates={
+            "client_id": '{{ get .Secrets "client_id" }}',
+            "client_secret": '{{ get .Secrets "client_secret" }}',
+            "realm": '{{ get .Secrets "realm_name" }}',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
+        depends_on=[learn_ai_static_vault_secrets],
+    ),
+)
+
+# Good canidates for a component resource
+shared_plugin_config_name = "shared-plugin-config"
+learn_ai_https_apisix_pluginconfig = kubernetes.apiextensions.CustomResource(
+    f"learn_ai-{stack_info.env_suffix}-https-apisix-pluginconfig",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixPluginConfig",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=shared_plugin_config_name,
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "plugins": [
+            {
+                "name": "cors",
+                "enable": True,
+                "config": {
+                    "allow_origins": "**",
+                    "allow_methods": "**",
+                    "allow_headers": "**",
+                    "allow_credential": True,
+                },
+            },
+            {
+                "name": "response-rewrite",
+                "enable": True,
+                "config": {
+                    "headers": {
+                        "set": {
+                            "Referrer-Policy": "origin",
+                        },
+                    },
+                },
+            },
+        ],
+    },
+)
+# Ref: https://apisix.apache.org/docs/apisix/plugins/openid-connect/
+base_oidc_plugin_config = {
+    "name": "openid-connect",
+    "enable": True,
+    # Get all the sensitive parts of this config from a secret
+    "secretRef": oidc_secret_name,
+    "config": {
+        "scope": "openid profile ol-profile",
+        "bearer_only": False,
+        "introspection_endpoint_auth_method": "client_secret_post",
+        "ssl_verify": False,
+        "logout_path": "/logout",
+        "discovery": "https://sso-qa.ol.mit.edu/realms/olapps/.well-known/openid-configuration",
+        # Lets let the app handle this because we have an etcd
+        # control-plane
+        # "session": {
+        #    "secret": "at_least_16_characters",  # pragma: allowlist secret
+        # },
+    },
+}
+
+
+# ApisixUpstream resources don't seem to work but we don't really need them?
+# Ref: https://github.com/apache/apisix-ingress-controller/issues/1655
+# Ref: https://github.com/apache/apisix-ingress-controller/issues/1855
+
+# Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_route_v2/
+# Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/
+learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
+    f"learn-ai-{stack_info.env_suffix}-https-apisix-route",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixRoute",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="learn-ai-https",
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "http": [
+            {
+                # Sepcial handling for websocket URLS.
+                "name": "websocket",
+                "priority": 1,
+                "enable_websocket": True,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    base_oidc_plugin_config | {"unauth_action": "pass"},
+                ],
+                "match": {
+                    "hosts": [
+                        learn_ai_config.require("backend_domain"),
+                    ],
+                    "paths": [
+                        "/ws/*",
+                    ],
+                },
+                "backends": [
+                    {
+                        "serviceName": learn_ai_service_name,
+                        "servicePort": learn_ai_service_port_name,
+                    },
+                ],
+            },
+            {
+                # Wildcard route that can use auth but doesn't require it
+                "name": "passauth",
+                "priority": 2,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    base_oidc_plugin_config | {"unauth_action": "pass"},
+                ],
+                "match": {
+                    "hosts": [
+                        learn_ai_config.require("backend_domain"),
+                    ],
+                    "paths": [
+                        "*",
+                    ],
+                },
+                "backends": [
+                    {
+                        "serviceName": learn_ai_service_name,
+                        "servicePort": learn_ai_service_port_name,
+                    },
+                ],
+            },
+            {
+                # Strip trailing slash from logout redirect
+                "name": "logout-redirect",
+                "priority": 10,
+                "plugins": [
+                    {
+                        "name": "redirect",
+                        "enable": True,
+                        "config": {
+                            "uri": "/logout",
+                        },
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        learn_ai_config.require("backend_domain"),
+                    ],
+                    "paths": [
+                        "/logout/*",
+                    ],
+                },
+            },
+            {
+                # Routes that require authentication
+                "name": "reqauth",
+                "priority": 10,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    base_oidc_plugin_config | {"unauth_action": "auth"},  # Different
+                ],
+                "match": {
+                    "hosts": [
+                        learn_ai_config.require("backend_domain"),
+                    ],
+                    "paths": [
+                        "/admin/login/*",
+                        "/http/login/",
+                    ],
+                },
+            },
+        ],
+    },
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[learn_ai_service, oidc_secret],
+    ),
+)
+
+# Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_tls_v2/
+# Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
+learn_ai_https_apisix_tls = kubernetes.apiextensions.CustomResource(
+    f"learn-ai-{stack_info.env_suffix}-https-apisix-tls",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixTls",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="learn-ai-https",
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "hosts": [learn_ai_config.require("backend_domain")],
+        # Use the shared ol-wildcard cert loaded into every cluster
+        "secret": {
+            "name": "ol-wildcard-cert",
+            "namespace": "operations",
+        },
+    },
+)
+
+# Finally, put the aws access key into the github actions configuration
+match stack_info.env_suffix:
+    case "production":
+        env_var_suffix = "PROD"
+    case "qa":
+        env_var_suffix = "RC"
+    case "ci":
+        env_var_suffix = "CI"
+    case _:
+        env_var_suffix = "INVALID"
+
+gh_workflow_access_key_id_env_secret = github.ActionsSecret(
+    f"learn-ai-gh-workflow-access-key-id-env-secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"AWS_ACCESS_KEY_ID_{env_var_suffix}",  # pragma: allowlist secret
+    plaintext_value=gh_workflow_accesskey.id,
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
+    f"learn-ai-gh-workflow-secretaccesskey-env-secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"AWS_SECRET_ACCESS_KEY_{env_var_suffix}",  # pragma: allowlist secret
+    plaintext_value=gh_workflow_accesskey.secret,
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+
+gh_workflow_fastly_api_key_env_secret = github.ActionsSecret(
+    f"learn-ai-gh-workflow-fastly-api-key-env-secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"FASTLY_API_KEY_{env_var_suffix}",  # pragma: allowlist secret
+    plaintext_value=learn_ai_config.require("fastly_api_key"),
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_fastly_service_id_env_secret = github.ActionsSecret(
+    f"learn-ai-gh-workflow-fastly-service-id-env-secret-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"FASTLY_SERVICE_ID_{env_var_suffix}",  # pragma: allowlist secret
+    plaintext_value=learn_ai_fastly_service.id,
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+
+gh_workflow_s3_bucket_name_env_secret = github.ActionsVariable(
+    f"learn-ai-gh-workflow-s3-bucket-name-env-variable-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"AWS_S3_BUCKET_NAME_{env_var_suffix}",  # pragma: allowlist secret
+    value=learn_ai_app_storage_bucket_name,
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+
+gh_workflow_api_base_env_var = github.ActionsVariable(
+    f"learn-ai-gh-workflow-api-base-env-variablet-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"API_BASE_{env_var_suffix}",  # pragma: allowlist secret
+    value=f"https://{learn_ai_config.require('backend_domain')}",
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
