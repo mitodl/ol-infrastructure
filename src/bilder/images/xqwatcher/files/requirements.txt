@@ -13,5 +13,5 @@ PyYAML==6.0.2
 requests==2.32.3
 six==1.17.0
 smmap==5.0.2
-torch==2.5.1
+torch==2.6.0
 urllib3==1.26.20
