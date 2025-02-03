@@ -25,7 +25,10 @@ from bridge.lib.constants import FASTLY_A_TLS_1_3
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_HTTPS_PORT,
+    DEFAULT_NGINX_PORT,
     DEFAULT_POSTGRES_PORT,
+    DEFAULT_REDIS_PORT,
+    DEFAULT_UWSGI_PORT,
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -106,9 +109,6 @@ ECOMMERCE_DOCKER_TAG = os.getenv("ECOMMERCE_DOCKER_TAG")
 
 consul_security_groups = consul_stack.require_output("security_groups")
 aws_account = get_caller_identity()
-
-UWSGI_PORT = 8071
-NGINX_PORT = 8073
 
 ecommerce_namespace = "ecommerce"
 cluster_stack.require_output("namespaces").apply(
@@ -534,12 +534,11 @@ redis_cluster_security_group = ec2.SecurityGroup(
     description="Access control for the unified ecommerce redis cluster.",
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            security_groups=[],
+            security_groups=[ecommerce_application_security_group.id],
             protocol="tcp",
-            from_port=6379,
-            to_port=6379,
-            cidr_blocks=k8s_pod_subnet_cidrs,
-            description="Allow k8s cluster to talk to redis",
+            from_port=DEFAULT_REDIS_PORT,
+            to_port=DEFAULT_REDIS_PORT,
+            description="Allow application pods to talk to redis",
         ),
     ],
     vpc_id=apps_vpc["id"],
@@ -696,7 +695,7 @@ for k, v in (ecommerce_config.require_object("env_vars") or {}).items():
         )
     )
 ecommerce_deployment_env_vars.append(
-    kubernetes.core.v1.EnvVarArgs(name="PORT", value=str(UWSGI_PORT))
+    kubernetes.core.v1.EnvVarArgs(name="PORT", value=str(DEFAULT_UWSGI_PORT))
 )
 
 # Build a list of sensitive env vars for the deployment config via envFrom
@@ -829,7 +828,7 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
                         image="nginx:1.9.5",
                         ports=[
                             kubernetes.core.v1.ContainerPortArgs(
-                                container_port=NGINX_PORT
+                                container_port=DEFAULT_NGINX_PORT
                             )
                         ],
                         image_pull_policy="IfNotPresent",
@@ -860,7 +859,7 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
                         image=f"mitodl/unified-ecommerce-app-main:{ECOMMERCE_DOCKER_TAG}",
                         ports=[
                             kubernetes.core.v1.ContainerPortArgs(
-                                container_port=UWSGI_PORT
+                                container_port=DEFAULT_UWSGI_PORT
                             )
                         ],
                         image_pull_policy="IfNotPresent",
@@ -906,8 +905,8 @@ ecommerce_service = kubernetes.core.v1.Service(
         ports=[
             kubernetes.core.v1.ServicePortArgs(
                 name=ecommerce_service_port_name,
-                port=NGINX_PORT,
-                target_port=NGINX_PORT,
+                port=DEFAULT_NGINX_PORT,
+                target_port=DEFAULT_NGINX_PORT,
                 protocol="TCP",
             ),
         ],
@@ -995,11 +994,9 @@ oidc_secret = OLVaultK8SSecret(
         path="sso/unified-ecommerce",
         excludes=[".*"],
         exclude_raw=True,
-        # TODO: @Ardiea figure out the rest of this  # noqa: TD002, TD003, FIX002
         templates={
             "client_id": '{{ get .Secrets "client_id" }}',
             "client_secret": '{{ get .Secrets "client_secret" }}',
-            # "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
             "realm": '{{ get .Secrets "realm_name" }}',
         },
         vaultauth=vault_k8s_resources.auth_name,
@@ -1039,7 +1036,8 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     "paths": [
                         "/api/*",
                         "/_/*",
-                        "/logged_out/*/auth/*",
+                        "/logged_out/*",
+                        "/auth/*",
                         "/static/*",
                         "/favicon.ico",
                         "/checkout/*",
@@ -1197,16 +1195,16 @@ gh_workflow_fastly_service_id_env_secret = github.ActionsSecret(
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
-gh_workflow_s3_bucket_name_env_secret = github.ActionsSecret(
-    f"ol_mitopen_gh_workflow_s3_bucket_name_env_secret-{stack_info.env_suffix}",
+gh_workflow_s3_bucket_name_env_secret = github.ActionsVariable(
+    f"unified-ecommerce-gh-workflow-s3-bucket-name-env-variable-{stack_info.env_suffix}",
     repository=gh_repo.name,
-    secret_name=f"AWS_S3_BUCKET_NAME_{env_var_suffix}",  # pragma: allowlist secret
-    plaintext_value=unified_ecommerce_app_storage_bucket_name,
+    variable_name=f"AWS_S3_BUCKET_NAME_{env_var_suffix}",  # pragma: allowlist secret
+    value=unified_ecommerce_app_storage_bucket_name,
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
 gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"unified-ecommerce-gh-workflow-api-base-env-secret-{stack_info.env_suffix}",
+    f"unified-ecommerce-gh-workflow-api-base-env-variable-{stack_info.env_suffix}",
     repository=gh_repo.name,
     variable_name=f"API_BASE_{env_var_suffix}",  # pragma: allowlist secret
     value=f"https://{ecommerce_config.require('backend_domain')}",
