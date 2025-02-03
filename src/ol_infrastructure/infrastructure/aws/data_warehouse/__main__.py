@@ -196,6 +196,7 @@ query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
             "arn:aws:glue:*:*:database/information_schema",
             f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
             f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
+            f"arn:aws:glue:*:*:userDefinedFunction/*{stack_info.env_suffix}*/*",
         ],
     },
     {
