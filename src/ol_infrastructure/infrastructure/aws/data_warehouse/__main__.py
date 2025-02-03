@@ -222,7 +222,6 @@ query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
             for stage in data_stages
         ],
     },
-    {"Effect": "Allow", "Action": ["s3:ListAllMyBuckets"], "Resource": "*"},
 ]
 
 query_engine_iam_permissions = {

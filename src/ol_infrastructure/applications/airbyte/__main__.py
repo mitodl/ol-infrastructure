@@ -670,6 +670,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
         ),
         values={
             "global": {
+                "registry": "610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub",
                 "serviceAccountName": airbyte_service_account_name,
                 "deploymentMode": "oss",
                 "edition": "community",
