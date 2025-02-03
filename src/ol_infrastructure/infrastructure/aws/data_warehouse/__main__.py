@@ -157,6 +157,7 @@ query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
         "Action": [
             "glue:TagResource",
             "glue:UnTagResource",
+            "s3:ListAllMyBuckets",
         ],
         "Resource": ["*"],
     },
