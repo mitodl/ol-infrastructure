@@ -842,6 +842,7 @@ heroku_vars = {
     "NEW_RELIC_LOG": "stdout",
     "NODE_MODULES_CACHE": "False",
     "OCW_BASE_URL": "https://ocw.mit.edu/",
+    "LITELLM_TOKEN_ENCODING_NAME": "cl100k_base",
     "OCW_CONTENT_BUCKET_NAME": "ocw-content-storage",
     "OCW_UPLOAD_IMAGE_ONLY": "True",
     "OCW_LIVE_BUCKET": "ocw-content-live-production",
