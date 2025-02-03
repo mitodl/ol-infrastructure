@@ -172,7 +172,7 @@ query_engine_permissions: list[dict[str, Union[str, list[str]]]] = [
             "glue:CreateDatabase",
             "glue:CreatePartition",
             "glue:CreateTable",
-            "glue:DeleteColumnStatisticsForPartitionglue:BatchCreatePartition",
+            "glue:DeleteColumnStatisticsForPartition",
             "glue:DeleteColumnStatisticsForTable",
             "glue:DeleteDatabase",
             "glue:DeletePartition",
