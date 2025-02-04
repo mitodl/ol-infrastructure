@@ -4,7 +4,7 @@ encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQEiEmUCipB1ftXUOv
 config:
   apps_vpc:cidr_block: 10.13.0.0/16
   apps_vpc:k8s_nat_gateway_config: "all"
-  apps_vpc:k8s_pod_subnets:
+  apps_vpc:k8s_subnet_pair_configs:
   - private_cidr: 10.13.128.0/21
     public_cidr: 10.13.124.0/24
   - private_cidr: 10.13.136.0/21
@@ -17,7 +17,7 @@ config:
   aws:region: us-east-1
   data_vpc:cidr_block: 10.3.0.0/16
   data_vpc:k8s_nat_gateway_config: "all"
-  data_vpc:k8s_pod_subnets:
+  data_vpc:k8s_subnet_pair_configs:
   - private_cidr: 10.3.128.0/21
     public_cidr: 10.3.124.0/24
   - private_cidr: 10.3.136.0/21
@@ -30,7 +30,7 @@ config:
   mitx_online_vpc:cidr_block: 10.22.0.0/16
   operations_vpc:cidr_block: 10.0.0.0/16
   operations_vpc:k8s_nat_gateway_config: "all"
-  operations_vpc:k8s_pod_subnets:
+  operations_vpc:k8s_subnet_pair_configs:
   - private_cidr: 10.0.128.0/21
     public_cidr: 10.0.124.0/24
   - private_cidr: 10.0.136.0/21
