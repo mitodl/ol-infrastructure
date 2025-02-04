@@ -921,8 +921,12 @@ traefik_helm_release = kubernetes.helm.v3.Release(
                         "default": True,
                     },
                     "exposedPort": 80,
-                    "redirectTo": {
-                        "port": "websecure",
+                    "redirections": {
+                        "entryPoint": {
+                            "to": "websecure",
+                            "scheme": "https",
+                            "permanent": True,
+                        }
                     },
                 },
                 "websecure": {
