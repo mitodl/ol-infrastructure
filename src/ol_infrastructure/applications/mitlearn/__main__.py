@@ -857,6 +857,8 @@ heroku_vars = {
     "QDRANT_COLLECTION_NAME": f"mitlearn-{stack_info.env_suffix}",
     "QDRANT_DENSE_MODEL": "text-embedding-3-large",
     "QDRANT_ENCODER": "vector_search.encoders.litellm.LiteLLMEncoder",
+    "CONTENT_FILE_EMBEDDING_CHUNK_OVERLAP": 51,
+    "CONTENT_FILE_EMBEDDING_CHUNK_SIZE": 512,
     "PROLEARN_CATALOG_API_URL": "https://prolearn.mit.edu/graphql",
     "SEE_API_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/api/",
     "SEE_API_ACCESS_TOKEN_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/oauth/token",
