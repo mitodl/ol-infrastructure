@@ -62,6 +62,7 @@ business_unit = env_config.require("business_unit") or "operations"
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))
 
 pod_ip_blocks = target_vpc["k8s_pod_subnet_cidrs"]
+public_ip_blocks = target_vpc["k8s_public_subnet_cidrs"]
 pod_subnet_ids = target_vpc["k8s_pod_subnet_ids"]
 service_ip_block = target_vpc["k8s_service_subnet_cidr"]
 
@@ -961,7 +962,7 @@ traefik_helm_release = kubernetes.helm.v3.Release(
                     "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "instance",
                     "service.beta.kubernetes.io/aws-load-balancer-target-group-attributes": "preserve_client_ip.enabled=false",
                     "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
-                        lambda tvpc: ",".join(tvpc["k8s_pod_subnet_ids"])
+                        lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
                     ),
                 },
             },
@@ -1021,7 +1022,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                         "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "instance",
                         "service.beta.kubernetes.io/aws-load-balancer-target-group-attributes": "preserve_client_ip.enabled=false",
                         "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
-                            lambda tvpc: ",".join(tvpc["k8s_pod_subnet_ids"])
+                            lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
                         ),
                         "http": {
                             "enabled": True,
