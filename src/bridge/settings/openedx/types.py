@@ -154,8 +154,6 @@ class OpenEdxApplicationVersion(BaseModel):
     def release_branch(self) -> str:
         if self.branch_override:
             return self.branch_override
-        if self.application == "edx-platform" and self.release == "master":
-            return "2u/release"
         return self.release.branch
 
     @property
