@@ -55,6 +55,7 @@ config:
     OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
     OPENSEARCH_INDEX: "mitlearn"
     OPENSEARCH_SHARD_COUNT: 3
+    QDRANT_HOST: "https://4d41728c-25f0-4285-8858-664b5a03f93b.us-east-1-0.aws.cloud.qdrant.io"
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-producti-qjtnw2dcoampmbtscs3wdfci6y.us-east-1.es.amazonaws.com"
     AI_MIT_SYLLABUS_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
     PGBOUNCER_DEFAULT_POOL_SIZE: 50
