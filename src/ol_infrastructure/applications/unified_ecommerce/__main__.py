@@ -1004,6 +1004,7 @@ oidc_secret = OLVaultK8SSecret(
             "client_id": '{{ get .Secrets "client_id" }}',
             "client_secret": '{{ get .Secrets "client_secret" }}',
             "realm": '{{ get .Secrets "realm_name" }}',
+            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
         },
         vaultauth=vault_k8s_resources.auth_name,
     ),
