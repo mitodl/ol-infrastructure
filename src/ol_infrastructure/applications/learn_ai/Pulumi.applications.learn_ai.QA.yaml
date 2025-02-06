@@ -4,10 +4,12 @@ encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgF0G1SpXqAgEVHrcC
 config:
   aws:region: us-east-1
   learn_ai:backend_domain: "api-learn-ai-qa.ol.mit.edu"
+  learn_ai:db_password:
+    secure: v1:moKYAbHsHOnTUrEk:4OgRBNFXT0WKrz1KaKZDhQxT09dA36jN4+q/SO0IIAemTSiwGqrXbXn+r5dFlGrr24S+VGtiyNXSVKts+j/TgKS33FTo86OX2saBDrL4dFo=
   learn_ai:env_vars:
     CELERY_TASK_ALWAYS_EAGER: "false"
-    CSRF_ALLOWED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qq.ol.mit.edu"]'
-    CSRF_TRUSTED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qq.ol.mit.edu"]'
+    CSRF_ALLOWED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu"]'
+    CSRF_TRUSTED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu"]'
     DEBUG: "true"
     DEV_ENV: "true"
     ENVIRONMENT: "dev"
@@ -17,10 +19,10 @@ config:
     MITOL_FEATURES_DEFAULT: "true"
     NODE_ENV: "development"
     UWSGI_THREADS: "5"
-  learn_ai:fronend_domain": "learn-ai-qa.ol.mit.edu"
-  ol-infrastructure-learn_ai-application:ecommerce_db_password:
-    secure: v1:moKYAbHsHOnTUrEk:4OgRBNFXT0WKrz1KaKZDhQxT09dA36jN4+q/SO0IIAemTSiwGqrXbXn+r5dFlGrr24S+VGtiyNXSVKts+j/TgKS33FTo86OX2saBDrL4dFo=
+  learn_ai:fastly_api_key:
+    secure: v1:RUd9eazTNOjJbb09:orMjylm8XW+kEsh5NlKYvO+7Hj03rwbKXliH2zYU5FoOdyuBDdcc3BfDY9k6qwr6
+  learn_ai:frontend_domain: "learn-ai-qa.ol.mit.edu"
   redis:password:
     secure: v1:j1q4KgePVUsaaySb:EhUqxWBezBKe6Ck1o/gqlX68GBnrZZQdmUCscl5aPok1j6jJWKSRO89XfV+6dWJaCMhqHA==
-  vault:address: "https://vault-qa.ol.mit.edu"
+  vault:address: "https://vault-qa.odl.mit.edu"
   vault_server:env_namespace: "operations.qa"
