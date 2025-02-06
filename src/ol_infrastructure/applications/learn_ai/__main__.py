@@ -27,6 +27,7 @@ from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.github.team_members import DEVOPS_MIT
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
@@ -54,9 +55,9 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-aws_account = get_caller_identity
-
+aws_account = get_caller_identity()
 stack_info = parse_stack()
+env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
@@ -172,6 +173,113 @@ parliament_config = {
     },
     "RESOURCE_EFFECTIVLY_STAR": {},
 }
+
+##################################
+#     General K8S + IAM Config   #
+##################################
+learn_ai_service_account_name = "learn-ai-admin"
+
+learn_ai_app_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject*",
+                "s3:PutObject*",
+                "s3:DeleteObject",
+            ],
+            "Resource": [f"arn:aws:s3:::{learn_ai_app_storage_bucket_name}/*"],
+        },
+        {
+            "Effect": "Allow",
+            "Action": "s3:ListBucket",
+            "Resource": f"arn:aws:s3:::{learn_ai_app_storage_bucket_name}",
+        },
+    ],
+}
+learn_ai_app_policy = iam.Policy(
+    "learn-ai-app-instance-iam-policy",
+    path=f"/ol-applications/learn_ai/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    description=(
+        "Grant access to AWS resources for the operation of the learn_ai application."
+    ),
+    policy=lint_iam_policy(
+        learn_ai_app_policy_document,
+        stringify=True,
+        parliament_config=parliament_config,
+    ),
+    tags=aws_config.tags,
+)
+
+# Confidence in the correctness of this policy is VERY low. It currently spews errors.
+# I took the example from https://docs.aws.amazon.com/aws-managed-policy/latest/reference/AmazonDataZoneBedrockModelConsumptionPolicy.html
+
+learn_ai_bedrock_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Sid": "InvokeDomainInferenceProfiles",
+            "Effect": "Allow",
+            "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+            "Resource": "arn:aws:bedrock:*:*:application-inference-profile/*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:ResourceTag/AmazonDataZoneDomain": "${datazone:domainId}",
+                    "aws:ResourceAccount": "${aws:PrincipalAccount}",
+                },
+                "Null": {"aws:ResourceTag/AmazonDataZoneProject": "true"},
+            },
+        }
+    ],
+}
+
+learn_ai_bedrock_policy = iam.Policy(
+    "learn-ai-bedrock-iam-policy",
+    path=f"/ol-applications/learn_ai/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    description=(
+        "Grant access to AWS resources for the operation of the learn_ai application."
+    ),
+    policy=lint_iam_policy(
+        learn_ai_bedrock_policy_document,
+        stringify=True,
+        parliament_config=parliament_config,
+    ),
+    tags=aws_config.tags,
+)
+
+learn_ai_trust_role_config = OLEKSTrustRoleConfig(
+    account_id=aws_account.account_id,
+    cluster_name=f"data-{stack_info.name}",
+    cluster_identities=cluster_stack.require_output("cluster_identities"),
+    description="Trust role for allowing the learn_ai service account to "
+    "access the aws API",
+    policy_operator="StringEquals",
+    role_name="learn_ai",
+    service_account_identifier=f"system:serviceaccount:{learn_ai_namespace}:{learn_ai_service_account_name}",
+    tags=aws_config.tags,
+)
+
+learn_ai_trust_role = OLEKSTrustRole(
+    f"{env_name}-ol-trust-role",
+    role_config=learn_ai_trust_role_config,
+)
+iam.RolePolicyAttachment(
+    f"learn-ai-service-account-s3-source-access-policy-{env_name}",
+    policy_arn=learn_ai_app_storage_bucket_policy.policy.arn,
+    role=learn_ai_trust_role.role.name,
+)
+iam.RolePolicyAttachment(
+    "learn-ai-service-account-policy-attachement",
+    policy_arn=learn_ai_app_policy.arn,
+    role=learn_ai_trust_role.role.name,
+)
+iam.RolePolicyAttachment(
+    "learn-ai-bedrock-policy-attachement",
+    policy_arn=learn_ai_bedrock_policy.arn,
+    role=learn_ai_trust_role.role.name,
+)
+
 
 gh_workflow_s3_bucket_permissions_doc = {
     "Version": IAM_POLICY_VERSION,
@@ -966,7 +1074,7 @@ oidc_secret = OLVaultK8SSecret(
 # Good canidates for a component resource
 shared_plugin_config_name = "shared-plugin-config"
 learn_ai_https_apisix_pluginconfig = kubernetes.apiextensions.CustomResource(
-    f"learn_ai-{stack_info.env_suffix}-https-apisix-pluginconfig",
+    f"learn-ai-{stack_info.env_suffix}-https-apisix-pluginconfig",
     api_version="apisix.apache.org/v2",
     kind="ApisixPluginConfig",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
