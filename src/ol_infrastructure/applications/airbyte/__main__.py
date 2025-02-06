@@ -652,7 +652,7 @@ app_db_creds_dynamic_secret = OLVaultK8SSecret(
 
 default_resources_definition = {
     "requests": {
-        "cpu": "100m",
+        "cpu": "500m",
         "memory": "1Gi",
     },
 }
@@ -707,6 +707,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                         "tags": [{"key": "OU", "value": "data"}],
                     },
                 },
+                "jobs": {"resources": {"limits": {"memory": "10Gi", "cpu": "2000m"}}},
             },
             "serviceAccount": {
                 "create": True,
