@@ -14,6 +14,7 @@ config:
     secure: v1:IuJlZQCcqboLDz6u:uileS7cOpmHmXYE0Xe+u7pSeJ0QlXNgxq04Zbc4toa010z8GVewuU0WWZsjxcHOI
   eks:apisix_domains:
   - "api-pay-ci.ol.mit.edu"
+  - "api-learn-ai-ci.ol.mit.edu"
   eks:ebs_csi_provisioner: "true"
   eks:efs_csi_provisioner: "false"
   eks:gateway_release_channel: "experimental"
