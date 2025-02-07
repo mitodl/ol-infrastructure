@@ -179,39 +179,6 @@ parliament_config = {
 ##################################
 learn_ai_service_account_name = "learn-ai-admin"
 
-learn_ai_app_policy_document = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:GetObject*",
-                "s3:PutObject*",
-                "s3:DeleteObject",
-            ],
-            "Resource": [f"arn:aws:s3:::{learn_ai_app_storage_bucket_name}/*"],
-        },
-        {
-            "Effect": "Allow",
-            "Action": "s3:ListBucket",
-            "Resource": f"arn:aws:s3:::{learn_ai_app_storage_bucket_name}",
-        },
-    ],
-}
-learn_ai_app_policy = iam.Policy(
-    "learn-ai-app-instance-iam-policy",
-    path=f"/ol-applications/learn_ai/{stack_info.env_prefix}/{stack_info.env_suffix}/",
-    description=(
-        "Grant access to AWS resources for the operation of the learn_ai application."
-    ),
-    policy=lint_iam_policy(
-        learn_ai_app_policy_document,
-        stringify=True,
-        parliament_config=parliament_config,
-    ),
-    tags=aws_config.tags,
-)
-
 # Confidence in the correctness of this policy is VERY low. It currently spews errors.
 # I took the example from https://docs.aws.amazon.com/aws-managed-policy/latest/reference/AmazonDataZoneBedrockModelConsumptionPolicy.html
 
@@ -267,11 +234,6 @@ learn_ai_trust_role = OLEKSTrustRole(
 iam.RolePolicyAttachment(
     f"learn-ai-service-account-s3-source-access-policy-{env_name}",
     policy_arn=learn_ai_app_storage_bucket_policy.policy.arn,
-    role=learn_ai_trust_role.role.name,
-)
-iam.RolePolicyAttachment(
-    "learn-ai-service-account-policy-attachement",
-    policy_arn=learn_ai_app_policy.arn,
     role=learn_ai_trust_role.role.name,
 )
 iam.RolePolicyAttachment(
