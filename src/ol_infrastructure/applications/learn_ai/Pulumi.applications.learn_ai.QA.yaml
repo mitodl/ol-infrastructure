@@ -10,9 +10,9 @@ config:
     CELERY_TASK_ALWAYS_EAGER: "false"
     CSRF_ALLOWED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu"]'
     CSRF_TRUSTED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu"]'
-    DEBUG: "true"
-    DEV_ENV: "true"
-    ENVIRONMENT: "dev"
+    DEBUG: "false"
+    DEV_ENV: "false"
+    ENVIRONMENT: "production"
     MITOL_APP_BASE_URL: "https://learn-ai-qa.ol.mit.edu"
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_COOKIE_NAME: "mitol"

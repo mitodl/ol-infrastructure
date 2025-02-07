@@ -72,7 +72,7 @@ def build_ecommerce_pipeline() -> Pipeline:
     ol_infra_repo = git_repo(
         Identifier("ol-infra"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="md/unifed_ecomm",
+        branch="main",
         # Purposely not monitoring paths or using this as a trigger
     )
 
