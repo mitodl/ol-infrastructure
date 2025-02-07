@@ -183,7 +183,7 @@ learn_ai_service_account_name = "learn-ai-admin"
 # I took the example from https://docs.aws.amazon.com/aws-managed-policy/latest/reference/AmazonDataZoneBedrockModelConsumptionPolicy.html
 
 learn_ai_bedrock_policy_document = {
-    "Version": IAM_POLICY_VERSION,
+    "Version": "2012-10-17",
     "Statement": [
         {
             "Sid": "InvokeDomainInferenceProfiles",
@@ -201,18 +201,13 @@ learn_ai_bedrock_policy_document = {
     ],
 }
 
-learn_ai_bedrock_policy = iam.Policy(
-    "learn-ai-bedrock-iam-policy",
-    path=f"/ol-applications/learn_ai/{stack_info.env_prefix}/{stack_info.env_suffix}/",
-    description=(
-        "Grant access to AWS resources for the operation of the learn_ai application."
-    ),
-    policy=lint_iam_policy(
-        learn_ai_bedrock_policy_document,
-        stringify=True,
-        parliament_config=parliament_config,
-    ),
-    tags=aws_config.tags,
+learn_ai_bedrock_policy = iam.ManagedPolicy(
+    {
+        resource_name: "learn-ai-bedrock-iam-policy",
+        policy_document: learn_ai_bedrock_policy_document,
+        description: "Grant access to AWS Bedrock resources for the operation of the learn_ai application.",
+        path: f"/ol-applications/learn_ai/{stack_info.env_prefix}/{stack_info.env_suffix}/",
+    }
 )
 
 learn_ai_trust_role_config = OLEKSTrustRoleConfig(
