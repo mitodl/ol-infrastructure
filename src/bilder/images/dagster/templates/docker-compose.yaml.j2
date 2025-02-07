@@ -82,6 +82,6 @@ services:
       # Explicitly tell Traefik to expose this container
       - "traefik.enable=true"
       # Use the path prefix routing for the healthcheck container
-      - "traefik.http.routers.healthcheck.rule=Host(`${DAGSTER_HOSTNAME}`) && PathPrefix(`/healthcheck`))"
+      - "traefik.http.routers.healthcheck.rule=Host(`${DAGSTER_HOSTNAME}`) && PathPrefix(`/healthcheck`)"
       # Enable TLS
       - "traefik.http.routers.healthcheck.tls=true"
