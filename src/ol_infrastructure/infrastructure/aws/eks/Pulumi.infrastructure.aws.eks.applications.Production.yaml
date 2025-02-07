@@ -14,12 +14,14 @@ config:
     secure: v1:Iozn2qrhdgmfpCXw:1H82fWngqaTZzOrgGp+jykq0+p/YOKTs5KE7rIPxhGZ1PbjCQ8Clz9+JzXqLQfCu
   eks:apisix_domains:
   - "api-pay.ol.mit.edu"
+  - "api-learn-ai.ol.mit.edu"
   eks:ebs_csi_provisioner: "true"
   eks:efs_csi_provisioner: "false"
   eks:gateway_release_channel: "experimental"
   eks:namespaces:
   - "ecommerce"
   - "mitlearn"
+  - "learn-ai"
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 500
