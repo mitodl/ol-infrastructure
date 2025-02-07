@@ -867,6 +867,7 @@ learn_ai_deployment_resource = kubernetes.apps.v1.Deployment(
                         ),
                     ),
                 ],
+                service_account_name=learn_ai_service_account_name,
                 init_containers=init_containers,
                 dns_policy="ClusterFirst",
                 containers=[
