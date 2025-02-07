@@ -11,7 +11,8 @@ Example Stack Output:
         certificate-authority-data: {
             data: "Base64 Encoded CA for the cluster"
         }
-        role_arn                  : "arn:aws:iam::610119931565:role/ol-infrastructure/eks/<cluster_name>/<unique admin role identifier>"
+        admin_role_arn                  : "arn:aws:iam::610119931565:role/ol-infrastructure/eks/<cluster_name>/<unique admin role identifier>"
+        developer_role_arn                  : "arn:aws:iam::610119931565:role/ol-infrastructure/eks/<cluster_name>/<unique admin role identifier>"
         server                    : "https://<unique Kube-API endpoint for the cluster>.gr7.us-east-1.eks.amazonaws.com"
 ```
 It is generally easiest to use the same file-local name for all three blocks and to use the name of the cluster as that name. To use the `operations-ci` environment as an example: the `context`, `cluster`, and `user` would all named `operations-ci`
@@ -44,7 +45,7 @@ It is generally easiest to use the same file-local name for all three blocks and
       - --cluster-name
       - operations-ci
       - --role
-      - "< kube_config_data.role_arn >"
+      - "< kube_config_data.admin_role_arn or kube_config_data.developer_role_arn >"
       command: aws
       env:
       - name: "KUBERNETES_EXEC_INFO"

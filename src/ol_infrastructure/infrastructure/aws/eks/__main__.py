@@ -31,6 +31,7 @@ from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleC
 from ol_infrastructure.lib.aws.eks_helper import eks_versions
 from ol_infrastructure.lib.aws.iam_helper import (
     EKS_ADMIN_USERNAMES,
+    EKS_DEVELOPER_USERNAMES,
     IAM_POLICY_VERSION,
     lint_iam_policy,
 )
@@ -69,6 +70,8 @@ service_ip_block = target_vpc["k8s_service_subnet_cidr"]
 cluster_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
 kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
+
+namespaces = eks_config.get_object("namespaces") or []
 
 # Centralize version numbers
 VERSIONS = {
@@ -119,7 +122,14 @@ default_assume_role_policy = {
         }
     ],
 }
+############################################################
+# create core IAM resources
+############################################################
+# IAM role that admins will assume when using kubectl
 
+# This is what will let DevOps access the cluster with kubectl and the
+# script in this directory that builds a kube_config file
+# This also lets concourse be a cluster administrator
 admin_assume_role_policy_document = concourse_stack.require_output(
     "infra-instance-role-arn"
 ).apply(
@@ -143,11 +153,6 @@ admin_assume_role_policy_document = concourse_stack.require_output(
         }
     )
 )
-
-############################################################
-# create core IAM resources
-############################################################
-# IAM role that admins will assume when using kubectl
 administrator_role = aws.iam.Role(
     f"{cluster_name}-eks-admin-role",
     assume_role_policy=admin_assume_role_policy_document,
@@ -155,6 +160,87 @@ administrator_role = aws.iam.Role(
     path=f"/ol-infrastructure/eks/{cluster_name}/",
     tags=aws_config.tags,
 )
+
+# This is what will let developers access the cluster with kubectl and the
+# script in this directory that builds a kube_config file
+developer_assume_role_policy_document = {
+    "Version": IAM_POLICY_VERSION,
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "sts:AssumeRole",
+            "Principal": {
+                "Service": "ec2.amazonaws.com",
+                "AWS": [
+                    f"arn:aws:iam::{aws_account.account_id}:user/{username}"
+                    for username in EKS_DEVELOPER_USERNAMES
+                ],
+            },
+        }
+    ],
+}
+developer_role = aws.iam.Role(
+    f"{cluster_name}-eks-developer-role",
+    assume_role_policy=json.dumps(developer_assume_role_policy_document),
+    name_prefix=f"{cluster_name}-eks-developer-role-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
+    path=f"/ol-infrastructure/eks/{cluster_name}/",
+    tags=aws_config.tags,
+)
+
+
+# Depending on the environment, developers may have different access.
+developer_role_policy_name = (
+    eks_config.get("developer_role_policy_name") or "AmazonEKSViewPolicy"
+)
+developer_role_kubernetes_groups = eks_config.get_object(
+    "developer_role_kubernetes_groups"
+) or ["view"]
+
+access_entries = {
+    # This is the access entry for the assume role that devops uses with kubectl
+    # Devops is always a cluster administrator
+    "admin": eks.AccessEntryArgs(
+        principal_arn=administrator_role.arn,
+        access_policies={
+            "admin": eks.AccessPolicyAssociationArgs(
+                access_scope=aws.eks.AccessPolicyAssociationAccessScopeArgs(
+                    type="cluster",
+                ),
+                policy_arn="arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy",
+            ),
+        },
+        kubernetes_groups=["admin"],
+    ),
+    "developer": eks.AccessEntryArgs(
+        principal_arn=developer_role.arn,
+        access_policies={
+            "developer": eks.AccessPolicyAssociationArgs(
+                access_scope=aws.eks.AccessPolicyAssociationAccessScopeArgs(
+                    type="namespace",
+                    namespaces=[*namespaces, "operations", "kube-system"],
+                ),
+                policy_arn=f"arn:aws:eks::aws:cluster-access-policy/{developer_role_policy_name}",
+            ),
+        },
+        kubernetes_groups=developer_role_kubernetes_groups,
+    ),
+}
+
+# These are the access entries for devops users themselves, which allows the
+# EKS views in the aws console to work and be useful rather than just errors
+for username in EKS_ADMIN_USERNAMES:
+    access_entries[username] = eks.AccessEntryArgs(
+        principal_arn=f"arn:aws:iam::{aws_account.account_id}:user/{username}",
+        access_policies={
+            "admin": eks.AccessPolicyAssociationArgs(
+                access_scope=aws.eks.AccessPolicyAssociationAccessScopeArgs(
+                    type="cluster",
+                ),
+                policy_arn="arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy",
+            ),
+        },
+        kubernetes_groups=["admin"],
+    )
 
 # Cluster role
 cluster_role = aws.iam.Role(
@@ -193,20 +279,7 @@ cluster_creation_aws_provider = aws.Provider(
 cluster = eks.Cluster(
     f"{cluster_name}-eks-cluster",
     name=cluster_name,
-    access_entries={
-        "admin": eks.AccessEntryArgs(
-            principal_arn=administrator_role.arn,
-            access_policies={
-                "admin": eks.AccessPolicyAssociationArgs(
-                    access_scope=aws.eks.AccessPolicyAssociationAccessScopeArgs(
-                        type="cluster",
-                    ),
-                    policy_arn="arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy",
-                ),
-            },
-            kubernetes_groups=["admin"],
-        )
-    },
+    access_entries=access_entries,
     authentication_mode=eks.AuthenticationMode("API"),
     create_oidc_provider=True,
     enabled_cluster_log_types=[
@@ -255,12 +328,14 @@ export("cluster_name", cluster_name)
 export("kube_config", cluster.kubeconfig)
 export("cluster_identities", cluster.eks_cluster.identities)
 export("admin_role_arn", administrator_role.arn)
+export("developer_role_arn", developer_role.arn)
 export("cluster_security_group_id", cluster.cluster_security_group_id)
 export("node_security_group_id", cluster.node_security_group_id)
 export(
     "kube_config_data",
     {
-        "role_arn": administrator_role.arn,
+        "developer_role_arn": developer_role.arn,
+        "admin_role_arn": administrator_role.arn,
         "certificate-authority-data": cluster.eks_cluster.certificate_authority,
         "server": cluster.eks_cluster.endpoint,
     },
@@ -401,7 +476,6 @@ operations_namespace = kubernetes.core.v1.Namespace(
 )
 
 # Create any requested namespaces defined for the cluster
-namespaces = eks_config.get_object("namespaces") or []
 for namespace in namespaces:
     resource_name = (f"{cluster_name}-{namespace}-namespace",)
     kubernetes.core.v1.Namespace(
