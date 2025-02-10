@@ -41,6 +41,7 @@ pulumi-keycloak = "^6.0.0"
 pydantic-settings = "^2.0.1"
 pulumiverse-heroku = "^1.0.3"
 pulumi-eks = "^3.8.0"
+pulumi-aws-native = "^1.25.0"
 
 [tool.poetry.group.dev.dependencies]
 copier = "*"

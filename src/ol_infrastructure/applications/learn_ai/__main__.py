@@ -12,6 +12,7 @@ import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
+from pulumi_aws_native import iam as iam_native
 
 from bridge.lib.constants import FASTLY_A_TLS_1_3
 from bridge.lib.magic_numbers import (
@@ -179,9 +180,6 @@ parliament_config = {
 ##################################
 learn_ai_service_account_name = "learn-ai-admin"
 
-# Confidence in the correctness of this policy is VERY low. It currently spews errors.
-# I took the example from https://docs.aws.amazon.com/aws-managed-policy/latest/reference/AmazonDataZoneBedrockModelConsumptionPolicy.html
-
 learn_ai_bedrock_policy_document = {
     "Version": "2012-10-17",
     "Statement": [
@@ -201,13 +199,11 @@ learn_ai_bedrock_policy_document = {
     ],
 }
 
-learn_ai_bedrock_policy = iam.ManagedPolicy(
-    {
-        resource_name: "learn-ai-bedrock-iam-policy",
-        policy_document: learn_ai_bedrock_policy_document,
-        description: "Grant access to AWS Bedrock resources for the operation of the learn_ai application.",
-        path: f"/ol-applications/learn_ai/{stack_info.env_prefix}/{stack_info.env_suffix}/",
-    }
+learn_ai_bedrock_policy = iam_native.ManagedPolicy(
+    resource_name=f"learn-ai-bedrock-policy-{stack_info.env_suffix}",
+    description="Grant access to AWS Bedrock resources for the operation of the learn_ai application.",
+    policy_document=learn_ai_bedrock_policy_document,
+    # managed_policy_name = "AmazonDataZoneBedrockModelConsumptionPolicy",
 )
 
 learn_ai_trust_role_config = OLEKSTrustRoleConfig(
@@ -227,13 +223,8 @@ learn_ai_trust_role = OLEKSTrustRole(
     role_config=learn_ai_trust_role_config,
 )
 iam.RolePolicyAttachment(
-    f"learn-ai-service-account-s3-source-access-policy-{env_name}",
-    policy_arn=learn_ai_app_storage_bucket_policy.policy.arn,
-    role=learn_ai_trust_role.role.name,
-)
-iam.RolePolicyAttachment(
     "learn-ai-bedrock-policy-attachement",
-    policy_arn=learn_ai_bedrock_policy.arn,
+    policy_arn=learn_ai_bedrock_policy.policy_arn,
     role=learn_ai_trust_role.role.name,
 )
 
