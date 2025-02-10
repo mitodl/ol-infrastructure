@@ -10,19 +10,28 @@ import yaml
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "-c",
-    "--current-context",
+    "--set-current-context",
     help="sets a current context in the rendered kube_config file",
     required=False,
 )
+parser.add_argument(
+    "-t",
+    "--team",
+    help="sets the team to either 'devops' or 'developer'",
+    required=True,
+    default="developers",
+    choices=["devops", "developers"],
+)
 args = parser.parse_args()
-
 
 contexts = []
 clusters = []
 users = []
 
+role_arn_name = "admin_role_arn" if args.team == "devops" else "developer_role_arn"
 
-def extract_kube_config_params(admin_arn, cluster_ca, cluster_endpoint, cluster_name):
+
+def extract_kube_config_params(role_arn, cluster_ca, cluster_endpoint, cluster_name):
     clusters.append(
         {
             "name": cluster_name,
@@ -55,7 +64,7 @@ def extract_kube_config_params(admin_arn, cluster_ca, cluster_endpoint, cluster_
                         "--cluster-name",
                         cluster_name,
                         "--role",
-                        admin_arn,
+                        role_arn,
                     ],
                     "command": "aws",
                     "env": [
@@ -85,7 +94,7 @@ for stack in stack_defs:
     output_data = json.loads(command_output)
 
     extract_kube_config_params(
-        admin_arn=output_data["role_arn"],
+        role_arn=output_data[role_arn_name],
         cluster_ca=output_data["certificate-authority-data"]["data"],
         cluster_endpoint=output_data["server"],
         cluster_name=cluster_name,
@@ -99,7 +108,7 @@ kube_config = {
     "contexts": contexts,
     "users": users,
 }
-if args.current_context:
+if args.set_current_context:
     kube_config["current-context"] = args.current_context
 
 print(yaml.dump(kube_config))  # noqa: T201

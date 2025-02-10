@@ -26,6 +26,13 @@ EKS_ADMIN_USERNAMES = [
     "tmacey",
 ]
 
+EKS_DEVELOPER_USERNAMES = [
+    "ambady",
+    "abeglova",
+    "jkachel",
+    "rlougee",
+]
+
 
 def _is_parliament_finding_filtered(
     finding: Finding, parliament_config: dict[str, Any]

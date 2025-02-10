@@ -181,6 +181,8 @@ cms_data_directory = Path("/opt/data/cms")
 media_directory = shared_data_directory.joinpath("media")
 lms_tracking_logs_directory = lms_data_directory.joinpath("logs")
 cms_tracking_logs_directory = cms_data_directory.joinpath("logs")
+lms_git_directory = lms_data_directory.joinpath("export_course_repos")
+cms_git_directory = cms_data_directory.joinpath("export_course_repos")
 settings_directory = DOCKER_COMPOSE_DIRECTORY.joinpath("settings")
 tls_directory = DOCKER_COMPOSE_DIRECTORY.joinpath("tls")
 ssh_directory = DOCKER_COMPOSE_DIRECTORY.joinpath("ssh")
@@ -246,6 +248,20 @@ files.directory(
 files.directory(
     name="Create CMS tracking logs directory",
     path=cms_tracking_logs_directory,
+    user="1000",
+    group="1000",
+    present=True,
+)
+files.directory(
+    name="Create LMS git export directory",
+    path=lms_git_directory,
+    user="1000",
+    group="1000",
+    present=True,
+)
+files.directory(
+    name="Create CMS git export directory",
+    path=cms_git_directory,
     user="1000",
     group="1000",
     present=True,
