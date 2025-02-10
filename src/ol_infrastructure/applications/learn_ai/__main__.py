@@ -168,6 +168,18 @@ learn_ai_app_storage_bucket_policy = s3.BucketPolicy(
     ),
 )
 
+learn_ai_service_account_name = "learn-ai-admin"
+learn_ai_service_account = kubernetes.core.v1.ServiceAccount(
+    "learn-ai-service-account",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=learn_ai_service_account_name,
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+        annotations=None,
+    ),
+    automount_service_account_token=False,
+)
+
 parliament_config = {
     "PERMISSIONS_MANAGEMENT_ACTIONS": {
         "ignore_locations": [{"actions": ["s3.putobjectacl"]}],
@@ -178,7 +190,6 @@ parliament_config = {
 ##################################
 #     General K8S + IAM Config   #
 ##################################
-learn_ai_service_account_name = "learn-ai-admin"
 
 learn_ai_bedrock_policy_document = {
     "Version": "2012-10-17",
