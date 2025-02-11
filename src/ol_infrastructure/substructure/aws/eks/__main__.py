@@ -532,7 +532,7 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                 }}
               }}
             }}
-            """
+            """  # noqa: S608
         )
     },
     opts=ResourceOptions(
