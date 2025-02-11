@@ -1,5 +1,4 @@
-# ruff: noqa: ERA001, C416
-
+# ruff: noqa: E501, ERA001
 import base64
 import json
 import mimetypes
@@ -11,15 +10,9 @@ import pulumi_fastly as fastly
 import pulumi_github as github
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import (
-    Config,
-    InvokeOptions,
-    Output,
-    ResourceOptions,
-    StackReference,
-)
+from pulumi import Config, InvokeOptions, Output, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
-from pulumi_consul import Node, Service, ServiceCheckArgs
+from pulumi_aws_native import iam as iam_native
 
 from bridge.lib.constants import FASTLY_A_TLS_1_3
 from bridge.lib.magic_numbers import (
@@ -35,6 +28,7 @@ from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.github.team_members import DEVOPS_MIT
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
@@ -53,7 +47,6 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
-from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
@@ -63,17 +56,11 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-fastly_provider = get_fastly_provider()
-github_provider = github.Provider(
-    "github_provider",
-    owner=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["owner"],
-    token=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["token"],
-)
+aws_account = get_caller_identity()
 stack_info = parse_stack()
+env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
-ecommerce_config = Config("ecommerce")
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
-consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
 monitoring_stack = StackReference("infrastructure.monitoring")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -85,74 +72,79 @@ vector_log_proxy_stack = StackReference(
 
 apps_vpc = network_stack.require_output("applications_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
-ecommerce_environment = f"applications-{stack_info.env_suffix}"
+learn_ai_environment = f"applications-{stack_info.env_suffix}"
 
 aws_config = AWSBase(
-    tags={"OU": "operations", "Environment": ecommerce_environment},
+    tags={"OU": "operations", "Environment": learn_ai_environment},
 )
+learn_ai_config = Config("learn_ai")
 vault_config = Config("vault")
 
-consul_provider = get_consul_provider(stack_info)
 setup_vault_provider(stack_info)
+fastly_provider = get_fastly_provider()
+github_provider = github.Provider(
+    "github_provider",
+    owner=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["owner"],
+    token=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["token"],
+)
+
 k8s_global_labels = {
     "ol.mit.edu/stack": stack_info.full_name,
-    "ol.mit.edu/service": "unified-ecommerce",
+    "ol.mit.edu/service": "learn-ai",
 }
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
-# Fail hard if ECOMMERCE_DOCKER_TAG isn't set
-if "ECOMMERCE_DOCKER_TAG" not in os.environ:
-    msg = "ECOMMERCE_DOCKER_TAG must be set"
+# Fail hard if LEARN_AI_DOCKER_TAG is not set
+if "LEARN_AI_DOCKER_TAG" not in os.environ:
+    msg = "LEARN_AI_DOCKER_TAG must be set"
     raise OSError(msg)
-ECOMMERCE_DOCKER_TAG = os.getenv("ECOMMERCE_DOCKER_TAG")
+LEARN_AI_DOCKER_TAG = os.getenv("LEARN_AI_DOCKER_TAG")
 
-consul_security_groups = consul_stack.require_output("security_groups")
-aws_account = get_caller_identity()
-
-ecommerce_namespace = "ecommerce"
+learn_ai_namespace = "learn-ai"
 cluster_stack.require_output("namespaces").apply(
-    lambda ns: check_cluster_namespace(ecommerce_namespace, ns)
+    lambda ns: check_cluster_namespace(learn_ai_namespace, ns)
 )
 
 ol_zone_id = dns_stack.require_output("ol")["id"]
 
+################################################
 # Frontend storage bucket
-unified_ecommerce_app_storage_bucket_name = (
-    f"ol-mit-unified-ecommerce-{stack_info.env_suffix}"
-)
-unified_ecommerce_app_storage_bucket = s3.BucketV2(
-    f"unified-ecommerce-app-storage-{stack_info.env_suffix}",
-    bucket=unified_ecommerce_app_storage_bucket_name,
+learn_ai_app_storage_bucket_name = f"ol-mit-learn-ai-{stack_info.env_suffix}"
+
+learn_ai_app_storage_bucket = s3.BucketV2(
+    f"learn-ai-app-storage-bucket-{stack_info.env_suffix}",
+    bucket=learn_ai_app_storage_bucket_name,
     tags=aws_config.tags,
 )
 
 s3.BucketVersioningV2(
-    f"unified-ecommerce-app-storage-versioning-{stack_info.env_suffix}",
-    bucket=unified_ecommerce_app_storage_bucket.id,
+    f"learn-ai-app-storage-bucket-versioning-{stack_info.env_suffix}",
+    bucket=learn_ai_app_storage_bucket.id,
     versioning_configuration=s3.BucketVersioningV2VersioningConfigurationArgs(
         status="Enabled",
     ),
 )
-unified_ecommerce_app_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
-    f"unified-ecommerce-app-storage-ownership-controls-{stack_info.env_suffix}",
-    bucket=unified_ecommerce_app_storage_bucket.id,
+
+learn_ai_app_storage_bucket_ownership_controls = s3.BucketOwnershipControls(
+    f"learn-ai-app-storage-bucket-ownership-controls-{stack_info.env_suffix}",
+    bucket=learn_ai_app_storage_bucket.id,
     rule=s3.BucketOwnershipControlsRuleArgs(
         object_ownership="BucketOwnerPreferred",
     ),
 )
 
-unified_ecommerce_app_storage_bucket_public_access = s3.BucketPublicAccessBlock(
-    f"unified-ecommerce-app-storage-public-access-{stack_info.env_suffix}",
-    bucket=unified_ecommerce_app_storage_bucket.id,
+learn_ai_app_storage_bucket_public_access = s3.BucketPublicAccessBlock(
+    f"learn-ai-app-storage-bucket-public-access-{stack_info.env_suffix}",
+    bucket=learn_ai_app_storage_bucket.id,
     block_public_acls=False,
     block_public_policy=False,
     ignore_public_acls=False,
 )
 
-unified_ecommerce_app_storage_bucket_policy = s3.BucketPolicy(
-    f"unified-ecommerce-app-storage-policy-{stack_info.env_suffix}",
-    bucket=unified_ecommerce_app_storage_bucket.id,
-    policy=unified_ecommerce_app_storage_bucket.arn.apply(
+learn_ai_app_storage_bucket_policy = s3.BucketPolicy(
+    f"learn-ai-app-storage-bucket-policy-{stack_info.env_suffix}",
+    bucket=learn_ai_app_storage_bucket.id,
+    policy=learn_ai_app_storage_bucket.arn.apply(
         lambda arn: json.dumps(
             {
                 "Version": "2012-10-17",
@@ -170,10 +162,22 @@ unified_ecommerce_app_storage_bucket_policy = s3.BucketPolicy(
     ),
     opts=ResourceOptions(
         depends_on=[
-            unified_ecommerce_app_storage_bucket_public_access,
-            unified_ecommerce_app_storage_bucket_ownership_controls,
-        ],
+            learn_ai_app_storage_bucket_public_access,
+            learn_ai_app_storage_bucket_ownership_controls,
+        ]
     ),
+)
+
+learn_ai_service_account_name = "learn-ai-admin"
+learn_ai_service_account = kubernetes.core.v1.ServiceAccount(
+    "learn-ai-service-account",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=learn_ai_service_account_name,
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+        annotations=None,
+    ),
+    automount_service_account_token=False,
 )
 
 parliament_config = {
@@ -183,6 +187,59 @@ parliament_config = {
     "RESOURCE_EFFECTIVLY_STAR": {},
 }
 
+##################################
+#     General K8S + IAM Config   #
+##################################
+
+learn_ai_bedrock_policy_document = {
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "InvokeDomainInferenceProfiles",
+            "Effect": "Allow",
+            "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+            "Resource": "arn:aws:bedrock:*:*:application-inference-profile/*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:ResourceTag/AmazonDataZoneDomain": "${datazone:domainId}",
+                    "aws:ResourceAccount": "${aws:PrincipalAccount}",
+                },
+                "Null": {"aws:ResourceTag/AmazonDataZoneProject": "true"},
+            },
+        }
+    ],
+}
+
+learn_ai_bedrock_policy = iam_native.ManagedPolicy(
+    resource_name=f"learn-ai-bedrock-policy-{stack_info.env_suffix}",
+    description="Grant access to AWS Bedrock resources for the operation of the learn_ai application.",
+    policy_document=learn_ai_bedrock_policy_document,
+    # managed_policy_name = "AmazonDataZoneBedrockModelConsumptionPolicy",
+)
+
+learn_ai_trust_role_config = OLEKSTrustRoleConfig(
+    account_id=aws_account.account_id,
+    cluster_name=f"data-{stack_info.name}",
+    cluster_identities=cluster_stack.require_output("cluster_identities"),
+    description="Trust role for allowing the learn_ai service account to "
+    "access the aws API",
+    policy_operator="StringEquals",
+    role_name="learn_ai",
+    service_account_identifier=f"system:serviceaccount:{learn_ai_namespace}:{learn_ai_service_account_name}",
+    tags=aws_config.tags,
+)
+
+learn_ai_trust_role = OLEKSTrustRole(
+    f"{env_name}-ol-trust-role",
+    role_config=learn_ai_trust_role_config,
+)
+iam.RolePolicyAttachment(
+    "learn-ai-bedrock-policy-attachement",
+    policy_arn=learn_ai_bedrock_policy.policy_arn,
+    role=learn_ai_trust_role.role.name,
+)
+
+
 gh_workflow_s3_bucket_permissions_doc = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
@@ -191,7 +248,7 @@ gh_workflow_s3_bucket_permissions_doc = {
                 "s3:ListBucket*",
             ],
             "Effect": "Allow",
-            "Resource": [f"arn:aws:s3:::{unified_ecommerce_app_storage_bucket_name}"],
+            "Resource": [f"arn:aws:s3:::{learn_ai_app_storage_bucket_name}"],
         },
         {
             "Action": [
@@ -201,16 +258,14 @@ gh_workflow_s3_bucket_permissions_doc = {
                 "s3:DeleteObject",
             ],
             "Effect": "Allow",
-            "Resource": [
-                f"arn:aws:s3:::{unified_ecommerce_app_storage_bucket_name}/frontend/*"
-            ],
+            "Resource": [f"arn:aws:s3:::{learn_ai_app_storage_bucket_name}/frontend/*"],
         },
     ],
 }
 
 gh_workflow_iam_policy = iam.Policy(
-    f"unified-ecommerce-gh-workflow-iam-policy-{stack_info.env_suffix}",
-    name=f"unified-ecommerce-gh-workflow-iam-policy-{stack_info.env_suffix}",
+    f"learn-ai-gh-workflow-iam-policy-{stack_info.env_suffix}",
+    name=f"learn-ai-gh-workflow-iam-policy-{stack_info.env_suffix}",
     policy=lint_iam_policy(
         gh_workflow_s3_bucket_permissions_doc,
         stringify=True,
@@ -218,28 +273,31 @@ gh_workflow_iam_policy = iam.Policy(
     ),
 )
 
+################################################
+# Github frontend workflow IAM configuration
 # Just create a static user for now. Some day refactor to use
 # https://github.com/hashicorp/vault-action
 gh_workflow_user = iam.User(
-    f"unified-ecommerce-gh-workflow-user-{stack_info.env_suffix}",
-    name=f"ecommerce-gh-workflow-{stack_info.env_suffix}",
+    f"learn-ai-gh-workflow-user-{stack_info.env_suffix}",
+    name=f"learn-ai-gh-workflow-{stack_info.env_suffix}",
     tags=aws_config.tags,
 )
 iam.PolicyAttachment(
-    f"unified-ecommerce-gh-workflow-iam-policy-attachment-{stack_info.env_suffix}",
+    f"learn-ai-gh-workflow-iam-policy-attachment-{stack_info.env_suffix}",
     policy_arn=gh_workflow_iam_policy.arn,
     users=[gh_workflow_user.name],
 )
 gh_workflow_accesskey = iam.AccessKey(
-    f"unified-ecommerce-gh-workflow-access-key-{stack_info.env_suffix}",
+    f"learn-ai-gh-workflow-access-key-{stack_info.env_suffix}",
     user=gh_workflow_user.name,
     status="Active",
 )
 gh_repo = github.get_repository(
-    full_name="mitodl/unified-ecommerce-frontend",
+    full_name="mitodl/learn-ai",
     opts=InvokeOptions(provider=github_provider),
 )
 
+################################################
 # Fastly configuration
 vector_log_proxy_secrets = read_yaml_secrets(
     Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
@@ -265,8 +323,7 @@ for k, v in mimetypes.types_map.items():
         ".pdf",
         ".jpeg",
         ".jpg",
-        ".html",
-        ".css",
+        ".html.css",
         ".js",
         ".svg",
         ".png",
@@ -277,18 +334,18 @@ for k, v in mimetypes.types_map.items():
     ):
         gzip_settings["extensions"].add(k.strip("."))
         gzip_settings["content_types"].add(v)
-unified_ecommerce_fastly_service = fastly.ServiceVcl(
-    f"unified-ecommerce-fastly-service-{stack_info.env_suffix}",
-    name=f"Unified Ecommerce {stack_info.env_suffix}",
+learn_ai_fastly_service = fastly.ServiceVcl(
+    f"learn-ai-fastly-service-{stack_info.env_suffix}",
+    name=f"Learn AI {stack_info.env_suffix}",
     comment="Managed by Pulumi",
     backends=[
         fastly.ServiceVclBackendArgs(
-            address=unified_ecommerce_app_storage_bucket.bucket_domain_name,
-            name="unified-ecommerce frontend",
-            override_host=unified_ecommerce_app_storage_bucket.bucket_domain_name,
+            address=learn_ai_app_storage_bucket.bucket_domain_name,
+            name="learn-ai",
+            override_host=learn_ai_app_storage_bucket.bucket_domain_name,
             port=DEFAULT_HTTPS_PORT,
-            ssl_cert_hostname=unified_ecommerce_app_storage_bucket.bucket_domain_name,
-            ssl_sni_hostname=unified_ecommerce_app_storage_bucket.bucket_domain_name,
+            ssl_cert_hostname=learn_ai_app_storage_bucket.bucket_domain_name,
+            ssl_sni_hostname=learn_ai_app_storage_bucket.bucket_domain_name,
             use_ssl=True,
         ),
     ],
@@ -308,7 +365,7 @@ unified_ecommerce_fastly_service = fastly.ServiceVcl(
     domains=[
         fastly.ServiceVclDomainArgs(
             comment=f"{stack_info.env_prefix} {stack_info.env_suffix} Application",
-            name=ecommerce_config.require("frontend_domain"),
+            name=learn_ai_config.require("frontend_domain"),
         ),
     ],
     request_settings=[
@@ -347,13 +404,13 @@ unified_ecommerce_fastly_service = fastly.ServiceVcl(
             content=textwrap.dedent(
                 r"""
                 if (req.method == "GET" && req.backend.is_origin && req.http.User-Agent ~ "(?i)prerender") {
-                  set req.backend = F_unified_ecommerce_frontend;
+                  set req.backend = F_learn_ai;
                   set bereq.url = "/frontend" + req.url;
                   if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {
                     set bereq.url = "/frontend/index.html";
                   }
                 }
-                """  # noqa: E501
+                """
             ),
             type="pass",
         ),
@@ -364,10 +421,10 @@ unified_ecommerce_fastly_service = fastly.ServiceVcl(
                 # redirect to the correct host/domain
                 if (obj.status == 618 && obj.response == "redirect-host") {{
                   set obj.status = 302;
-                  set obj.http.Location = "https://" + "{ecommerce_config.require("frontend_domain")}" + req.url.path + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
+                  set obj.http.Location = "https://" + "{learn_ai_config.require("frontend_domain")}" + req.url.path + if (std.strlen(req.url.qs) > 0, "?" req.url.qs, "");
                   return (deliver);
                 }}
-                """  # noqa: E501
+                """
             ),
             type="error",
         ),
@@ -394,8 +451,8 @@ unified_ecommerce_fastly_service = fastly.ServiceVcl(
 # Point the frontend domain at fastly
 five_minutes = 60 * 5
 route53.Record(
-    f"unified-ecommerce-frontend-dns-{stack_info.env_suffix}",
-    name=ecommerce_config.require("frontend_domain"),
+    f"learn-ai-frontend-dns-{stack_info.env_suffix}",
+    name=learn_ai_config.require("frontend_domain"),
     allow_overwrite=True,
     type="A",
     ttl=five_minutes,
@@ -406,28 +463,30 @@ route53.Record(
 
 ################################################
 # Put the application secrets into vault
-ecommerce_vault_secrets = read_yaml_secrets(
-    Path(f"unified_ecommerce/secrets.{stack_info.env_suffix}.yaml"),
+learn_ai_vault_secrets = read_yaml_secrets(
+    Path(f"learn_ai/secrets.{stack_info.env_suffix}.yaml"),
 )
-ecommerce_vault_mount = vault.Mount(
-    f"unified-ecommerce-secrets-mount-{stack_info.env_suffix}",
-    path="secret-ecommerce",
+learn_ai_vault_mount = vault.Mount(
+    f"learn-ai-secrets-mount-{stack_info.env_suffix}",
+    path="secret-learn-ai",
     type="kv-v2",
     options={"version": "2"},
-    description="Secrets for the unified ecommerce application.",
+    description="Secrets for the learn ai application.",
     opts=ResourceOptions(delete_before_replace=True),
 )
-ecommerce_static_vault_secrets = vault.generic.Secret(
-    f"unified-ecommerce-secrets-{stack_info.env_suffix}",
-    path=ecommerce_vault_mount.path.apply("{}/secrets".format),
-    data_json=json.dumps(ecommerce_vault_secrets),
+learn_ai_static_vault_secrets = vault.generic.Secret(
+    f"learn-ai-secrets-{stack_info.env_suffix}",
+    path=learn_ai_vault_mount.path.apply("{}/secrets".format),
+    data_json=json.dumps(learn_ai_vault_secrets),
 )
 
+################################################
 # Application security group
-ecommerce_application_security_group = ec2.SecurityGroup(
-    f"unified-ecommerce-application-security-group-{stack_info.env_suffix}",
-    name=f"unified-ecommerce-application-security-group-{stack_info.env_suffix}",
-    description="Access control for the unified ecommerce application pods.",
+# Needs to happen ebfore the database security group is created
+learn_ai_application_security_group = ec2.SecurityGroup(
+    f"learn-ai-application-security-group-{stack_info.env_suffix}",
+    name=f"learn-ai-application-security-group-{stack_info.env_suffix}",
+    description="Access control for the learn-ai application pods.",
     # allow all egress traffic
     egress=default_psg_egress_args,
     ingress=get_default_psg_ingress_args(
@@ -437,15 +496,15 @@ ecommerce_application_security_group = ec2.SecurityGroup(
     tags=aws_config.tags,
 )
 
+################################################
 # RDS configuration and networking setup
-ecommerce_database_security_group = ec2.SecurityGroup(
-    f"unified-ecommerce-db-security-group-{stack_info.env_suffix}",
-    name=f"unified-ecommerce-db-security-group-{stack_info.env_suffix}",
-    description="Access control for the unified ecommerce database.",
+learn_ai_database_security_group = ec2.SecurityGroup(
+    f"learn-ai-db-security-group-{stack_info.env_suffix}",
+    name=f"learn-ai-db-security-group-{stack_info.env_suffix}",
+    description="Access control for the learn-ai database.",
     ingress=[
         ec2.SecurityGroupIngressArgs(
             security_groups=[
-                consul_security_groups["consul_server"],
                 vault_stack.require_output("vault_server")["security_group"],
             ],
             protocol="tcp",
@@ -454,7 +513,7 @@ ecommerce_database_security_group = ec2.SecurityGroup(
             description="Access to postgres from consul and vault.",
         ),
         ec2.SecurityGroupIngressArgs(
-            security_groups=[ecommerce_application_security_group.id],
+            security_groups=[learn_ai_application_security_group.id],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
@@ -467,84 +526,52 @@ ecommerce_database_security_group = ec2.SecurityGroup(
 
 rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["instance_size"] = (
-    ecommerce_config.get("db_instance_size") or DBInstanceTypes.small.value
+    learn_ai_config.get("db_instance_size") or DBInstanceTypes.small.value
 )
 
-ecommerce_db_config = OLPostgresDBConfig(
-    instance_name=f"unified-ecommerce-db-{stack_info.env_suffix}",
-    password=ecommerce_config.get("db_password"),
+learn_ai_db_config = OLPostgresDBConfig(
+    instance_name=f"learn-ai-db-{stack_info.env_suffix}",
+    password=learn_ai_config.get("db_password"),
     subnet_group_name=apps_vpc["rds_subnet"],
-    security_groups=[ecommerce_database_security_group],
-    storage=ecommerce_config.get("db_capacity")
+    security_groups=[learn_ai_database_security_group],
+    storage=learn_ai_config.get("db_capacity")
     or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
     engine_major_version="16",
     tags=aws_config.tags,
-    db_name="ecommerce",
+    db_name="learnai",
     **defaults(stack_info)["rds"],
 )
-ecommerce_db = OLAmazonDB(ecommerce_db_config)
+learn_ai_db = OLAmazonDB(learn_ai_db_config)
 
-ecommerce_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
-    db_name=ecommerce_db_config.db_name,
-    mount_point=f"{ecommerce_db_config.engine}-ecommerce",
-    db_admin_username=ecommerce_db_config.username,
-    db_admin_password=ecommerce_config.get("db_password"),
-    db_host=ecommerce_db.db_instance.address,
+learn_ai_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
+    db_name=learn_ai_db_config.db_name,
+    mount_point=f"{learn_ai_db_config.engine}-learn-ai",
+    db_admin_username=learn_ai_db_config.username,
+    db_admin_password=learn_ai_config.get("db_password"),
+    db_host=learn_ai_db.db_instance.address,
 )
-ecommerce_db_vault_backend = OLVaultDatabaseBackend(
-    ecommerce_db_vault_backend_config,
-    opts=ResourceOptions(delete_before_replace=True, parent=ecommerce_db),
-)
-
-# A bunch of RDS + Consul stuff of questionable utility
-ecommerce_db_consul_node = Node(
-    f"unified-ecommerce-{stack_info.env_suffix}-postgres-db",
-    name="ecommerce-postgres-db",
-    address=ecommerce_db.db_instance.address,
-    opts=consul_provider,
+learn_ai_db_vault_backend = OLVaultDatabaseBackend(
+    learn_ai_db_vault_backend_config,
+    opts=ResourceOptions(delete_before_replace=True, parent=learn_ai_db),
 )
 
-ecommerce_db_consul_service = Service(
-    "unified-ecommerce-{stack_info.env_suffix}-instance-db-consul-service",
-    node=ecommerce_db_consul_node.name,
-    name="ecommerce-db",
-    port=ecommerce_db_config.port,
-    meta={
-        "external-node": True,
-        "external-probe": True,
-    },
-    checks=[
-        ServiceCheckArgs(
-            check_id="ecommerce-instance-db",
-            interval="10s",
-            name="ecommerce-instance-id",
-            timeout="60s",
-            status="passing",
-            tcp=ecommerce_db.db_instance.address.apply(
-                lambda address: f"{address}:{ecommerce_db_config.port}"
-            ),
-        )
-    ],
-    opts=consul_provider,
-)
-
-# Redis configuration and networking setup
+# Redis Cluster configuration and networking setup
 redis_config = Config("redis")
 redis_instance_type = (
     redis_config.get("instance_type") or CacheInstanceTypes.micro.value
 )
 
 redis_cluster_security_group = ec2.SecurityGroup(
-    f"unified-ecommerce-redis-cluster-security-group-{stack_info.env_suffix}",
-    name_prefix=f"unified-ecommerce-{stack_info.env_suffix}-",
-    description="Access control for the unified ecommerce redis cluster.",
+    f"learn-ai-redis-cluster-security-group-{stack_info.env_suffix}",
+    name_prefix=f"learn-ai-redis-security-group-{stack_info.env_suffix}",
+    description="Access control for the learn-ai redis cluster.",
     ingress=[
         ec2.SecurityGroupIngressArgs(
-            security_groups=[ecommerce_application_security_group.id],
+            security_groups=[learn_ai_application_security_group.id],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
             to_port=DEFAULT_REDIS_PORT,
-            description="Allow application pods to talk to redis",
+            description="Allow application pods to talk to Redis",
         ),
     ],
     vpc_id=apps_vpc["id"],
@@ -556,75 +583,78 @@ redis_cache_config = OLAmazonRedisConfig(
     auth_token=redis_config.require("password"),
     cluster_mode_enabled=False,
     encrypted=True,
-    engine_version="6.2",
+    engine_version="7.1",
     instance_type=redis_instance_type,
     num_instances=3,
     shard_count=1,
     auto_upgrade=True,
-    cluster_description="Redis cluster for unified-ecommerce tasks and caching.",
-    cluster_name=f"unified-ecommerce-redis-{stack_info.env_suffix}",
+    cluster_description="Redis cluster for learn UI tasks and caching.",
+    cluster_name=f"learn-ai-redis-{stack_info.env_suffix}",
     subnet_group=apps_vpc["elasticache_subnet"],
     security_groups=[redis_cluster_security_group.id],
     tags=aws_config.tags,
 )
 redis_cache = OLAmazonCache(redis_cache_config)
 
-# Create a vault policy and associate it with an auth backend role
+################################################
+# Create vault policy and associate it with an auth backend role
 # on the vault k8s cluster auth endpoint
-ecommerce_vault_policy = vault.Policy(
-    f"unified-ecommerce-{stack_info.env_suffix}-vault-policy",
-    name="unified-ecommerce",
-    policy=Path(__file__).parent.joinpath("ecommerce_policy.hcl").read_text(),
+learn_ai_vault_policy = vault.Policy(
+    f"learn-ai-vault-policy-{stack_info.env_suffix}",
+    name="learn-ai",
+    policy=Path(__file__).parent.joinpath("learn_ai_policy.hcl").read_text(),
 )
-ecommerce_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
-    "ecommerce-vault-k8s-auth-backend-role",
-    role_name="unified-ecommerce",
+
+learn_ai_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    f"learn-ai-vault-auth-backend-role-{stack_info.env_suffix}",
+    role_name="learn-ai",
     backend=cluster_stack.require_output("vault_auth_endpoint"),
     bound_service_account_names=["*"],
-    bound_service_account_namespaces=[ecommerce_namespace],
-    token_policies=[ecommerce_vault_policy.name],
+    bound_service_account_namespaces=[learn_ai_namespace],
+    token_policies=[learn_ai_vault_policy.name],
 )
 
 vault_k8s_resources_config = OLVaultK8SResourcesConfig(
-    application_name="unified-ecommerce",
-    namespace=ecommerce_namespace,
+    application_name="learn-ai",
+    namespace=learn_ai_namespace,
     labels=k8s_global_labels,
     vault_address=vault_config.require("address"),
     vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
-    vault_auth_role_name=ecommerce_vault_auth_backend_role.role_name,
+    vault_auth_role_name=learn_ai_vault_auth_backend_role.role_name,
 )
+
 vault_k8s_resources = OLVaultK8SResources(
     resource_config=vault_k8s_resources_config,
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=[ecommerce_vault_auth_backend_role],
+        depends_on=[learn_ai_vault_auth_backend_role],
     ),
 )
 
 # Load the database creds into a k8s secret via VSO
 db_creds_secret_name = "pgsql-db-creds"  # noqa: S105  # pragma: allowlist secret
-db_creds_secret = Output.all(address=ecommerce_db.db_instance.address).apply(
+db_creds_secret = Output.all(address=learn_ai_db.db_instance.address).apply(
     lambda db: OLVaultK8SSecret(
-        f"unified-ecommerce-{stack_info.env_suffix}-db-creds-secret",
+        f"learn-ai-{stack_info.env_suffix}-db-creds-secret",
         OLVaultK8SDynamicSecretConfig(
-            name="ecommerce-db-creds",
-            namespace=ecommerce_namespace,
+            name="learn-ai-db-creds",
+            namespace=learn_ai_namespace,
             dest_secret_labels=k8s_global_labels,
             dest_secret_name=db_creds_secret_name,
             labels=k8s_global_labels,
-            mount=ecommerce_db_vault_backend_config.mount_point,
+            mount=learn_ai_db_vault_backend_config.mount_point,
             path="creds/app",
             restart_target_kind="Deployment",
-            restart_target_name="ecommerce-app",
+            restart_target_name="learn-ai-app",
             templates={
-                "DATABASE_URL": f'postgres://{{{{ get .Secrets "username"}}}}:{{{{ get .Secrets "password" }}}}@{db["address"]}:{ecommerce_db_config.port}/{ecommerce_db_config.db_name}',  # noqa: E501
+                "DATABASE_URL": f'postgres://{{{{ get .Secrets "username"}}}}:{{{{ get .Secrets "password" }}}}@{db["address"]}:{learn_ai_db_config.port}/{learn_ai_db_config.db_name}',
             },
             vaultauth=vault_k8s_resources.auth_name,
         ),
         opts=ResourceOptions(
             delete_before_replace=True,
             parent=vault_k8s_resources,
-            depends_on=[ecommerce_db_vault_backend],
+            depends_on=[learn_ai_db_vault_backend],
         ),
     )
 )
@@ -632,16 +662,18 @@ db_creds_secret = Output.all(address=ecommerce_db.db_instance.address).apply(
 # Load the redis creds into a normal k8s secret
 redis_creds_secret_name = "redis-creds"  # noqa: S105  # pragma: allowlist secret
 redis_creds = kubernetes.core.v1.Secret(
-    f"unified-ecommerce-{stack_info.env_suffix}-redis-creds",
+    f"learn-ai-{stack_info.env_suffix}-redis-creds",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=redis_creds_secret_name,
-        namespace=ecommerce_namespace,
+        namespace=learn_ai_namespace,
         labels=k8s_global_labels,
     ),
     string_data=redis_cache.address.apply(
         lambda address: {
-            "CELERY_BROKER_URL": f"rediss://default:{redis_config.require('password')}@{address}:6379/0?ssl_cert_Reqs=required",
-            "CELERY_RESULT_BACKEND": f"rediss://default:{redis_config.require('password')}@{address}:6379/0?ssl_cert_Reqs=required",
+            "REDIS_DOMAIN": f"rediss://default:{redis_config.require('password')}@{address}:{DEFAULT_REDIS_PORT}/0",
+            "REDIS_SSL_CERT_REQS": "required",
+            "CELERY_BROKER_URL": f"rediss://default:{redis_config.require('password')}@{address}:{DEFAULT_REDIS_PORT}/0?ssl_cert_Reqs=required",
+            "CELERY_RESULT_BACKEND": f"rediss://default:{redis_config.require('password')}@{address}:{DEFAULT_REDIS_PORT}/0?ssl_cert_Reqs=required",
         }
     ),
     opts=ResourceOptions(
@@ -651,16 +683,16 @@ redis_creds = kubernetes.core.v1.Secret(
 )
 
 # Load the static secrets into a k8s secret via VSO
-static_secrets_name = "ecommerce-static-secrets"  # pragma: allowlist secret
+static_secrets_name = "learn-ai-static-secrets"  # pragma: allowlist secret
 static_secrets = OLVaultK8SSecret(
-    name=f"unified-ecommerce-{stack_info.env_suffix}-static-secrets",
+    name=f"learn-ai-{stack_info.env_suffix}-static-secrets",
     resource_config=OLVaultK8SStaticSecretConfig(
-        name="unified-ecommerce-static-secrets",
-        namespace=ecommerce_namespace,
+        name="learn-ai-static-secrets",
+        namespace=learn_ai_namespace,
         labels=k8s_global_labels,
         dest_secret_name=static_secrets_name,
         dest_secret_labels=k8s_global_labels,
-        mount="secret-ecommerce",
+        mount="secret-learn-ai",
         mount_type="kv-v2",
         path="secrets",
         includes=["*"],
@@ -671,16 +703,16 @@ static_secrets = OLVaultK8SSecret(
     opts=ResourceOptions(
         delete_before_replace=True,
         parent=vault_k8s_resources,
-        depends_on=[ecommerce_static_vault_secrets],
+        depends_on=[learn_ai_static_vault_secrets],
     ),
 )
 
 # Load the nginx configuration into a configmap
-ecommerce_nginx_configmap = kubernetes.core.v1.ConfigMap(
-    f"unified-ecommerce-{stack_info.env_suffix}-nginx-configmap",
+learn_ai_nginx_configmap = kubernetes.core.v1.ConfigMap(
+    f"learn-ai-{stack_info.env_suffix}-nginx-configmap",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="nginx-config",
-        namespace=ecommerce_namespace,
+        namespace=learn_ai_namespace,
         labels=k8s_global_labels,
     ),
     data={
@@ -692,20 +724,17 @@ ecommerce_nginx_configmap = kubernetes.core.v1.ConfigMap(
 )
 
 # Build a list of not-sensitive env vars for the deployment config
-ecommerce_deployment_env_vars = []
-for k, v in (ecommerce_config.require_object("env_vars") or {}).items():
-    ecommerce_deployment_env_vars.append(
+learn_ai_deployment_env_vars = []
+for k, v in (learn_ai_config.require_object("env_vars") or {}).items():
+    learn_ai_deployment_env_vars.append(
         kubernetes.core.v1.EnvVarArgs(
             name=k,
             value=v,
         )
     )
-ecommerce_deployment_env_vars.append(
-    kubernetes.core.v1.EnvVarArgs(name="PORT", value=str(DEFAULT_UWSGI_PORT))
-)
 
 # Build a list of sensitive env vars for the deployment config via envFrom
-ecommerce_deployment_envfrom = [
+learn_ai_deployment_envfrom = [
     # Database creds
     kubernetes.core.v1.EnvFromSourceArgs(
         secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
@@ -718,7 +747,7 @@ ecommerce_deployment_envfrom = [
             name=redis_creds_secret_name,
         ),
     ),
-    # static secrets from secrets-ecommerce/secrets
+    # static secrets from secrets-learn-ai/secrets
     kubernetes.core.v1.EnvFromSourceArgs(
         secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
             name=static_secrets_name,
@@ -727,22 +756,31 @@ ecommerce_deployment_envfrom = [
 ]
 
 init_containers = [
+    # Good Canidates for lib or component functions
     # Run database migrations at startup
     kubernetes.core.v1.ContainerArgs(
         name="migrate",
-        image=f"mitodl/unified-ecommerce-app-main:{ECOMMERCE_DOCKER_TAG}",
+        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
         command=["python3", "manage.py", "migrate", "--noinput"],
         image_pull_policy="IfNotPresent",
-        env=ecommerce_deployment_env_vars,
-        env_from=ecommerce_deployment_envfrom,
+        env=learn_ai_deployment_env_vars,
+        env_from=learn_ai_deployment_envfrom,
+    ),
+    kubernetes.core.v1.ContainerArgs(
+        name="create-cachetable",
+        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
+        command=["python3", "manage.py", "createcachetable"],
+        image_pull_policy="IfNotPresent",
+        env=learn_ai_deployment_env_vars,
+        env_from=learn_ai_deployment_envfrom,
     ),
     kubernetes.core.v1.ContainerArgs(
         name="collectstatic",
-        image=f"mitodl/unified-ecommerce-app-main:{ECOMMERCE_DOCKER_TAG}",
+        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
         command=["python3", "manage.py", "collectstatic", "--noinput"],
         image_pull_policy="IfNotPresent",
-        env=ecommerce_deployment_env_vars,
-        env_from=ecommerce_deployment_envfrom,
+        env=learn_ai_deployment_env_vars,
+        env_from=learn_ai_deployment_envfrom,
         volume_mounts=[
             kubernetes.core.v1.VolumeMountArgs(
                 name="staticfiles",
@@ -755,33 +793,34 @@ init_containers = [
         ],
     ),
 ] + [
+    # Good canidate for a lib or component function
     kubernetes.core.v1.ContainerArgs(
         name=f"promote-{mit_username}-to-superuser",
-        image=f"mitodl/unified-ecommerce-app-main:{ECOMMERCE_DOCKER_TAG}",
+        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
         # Jank that forces the promotion to always exit successfully
         command=["/bin/bash"],
         args=[
             "-c",
-            f"./manage.py promote_user --promote --superuser '{mit_username}@mit.edu'; exit 0",  # noqa: E501
+            f"./manage.py promote_user --promote --superuser '{mit_username}@mit.edu'; exit 0",
         ],
         image_pull_policy="IfNotPresent",
-        env=ecommerce_deployment_env_vars,
-        env_from=ecommerce_deployment_envfrom,
+        env=learn_ai_deployment_env_vars,
+        env_from=learn_ai_deployment_envfrom,
     )
     for mit_username in DEVOPS_MIT
 ]
 
 # Create a deployment resource to manage the application pods
 application_labels = k8s_global_labels | {
-    "ol.mit.edu/application": "unified-ecommerce",
-    "ol.mit.edu/pod-security-group": "ecommerce-app",
+    "ol.mit.edu/application": "learn-ai",
+    "ol.mit.edu/pod-security-group": "learn-ai-app",
 }
 
-ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
-    f"unified-ecommerce-{stack_info.env_suffix}-deployment",
+learn_ai_deployment_resource = kubernetes.apps.v1.Deployment(
+    f"learn-ai-{stack_info.env_suffix}-deployment",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="ecommerce-app",
-        namespace=ecommerce_namespace,
+        name="learn-ai-app",
+        namespace=learn_ai_namespace,
         labels=application_labels,
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
@@ -815,7 +854,7 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
                     kubernetes.core.v1.VolumeArgs(
                         name="nginx-config",
                         config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                            name=ecommerce_nginx_configmap.metadata.name,
+                            name=learn_ai_nginx_configmap.metadata.name,
                             items=[
                                 kubernetes.core.v1.KeyToPathArgs(
                                     key="web.conf",
@@ -825,6 +864,7 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
                         ),
                     ),
                 ],
+                service_account_name=learn_ai_service_account_name,
                 init_containers=init_containers,
                 dns_policy="ClusterFirst",
                 containers=[
@@ -834,7 +874,7 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
                         image="nginx:1.9.5",
                         ports=[
                             kubernetes.core.v1.ContainerPortArgs(
-                                container_port=DEFAULT_NGINX_PORT
+                                container_port=DEFAULT_NGINX_PORT,
                             )
                         ],
                         image_pull_policy="IfNotPresent",
@@ -861,8 +901,17 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
                     ),
                     # Actual application run with uwsgi
                     kubernetes.core.v1.ContainerArgs(
-                        name="ecommerce-app",
-                        image=f"mitodl/unified-ecommerce-app-main:{ECOMMERCE_DOCKER_TAG}",
+                        name="learn-ai-app",
+                        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
+                        command=[
+                            "uvicorn",
+                            "main.asgi:application",
+                            "--reload",
+                            "--host",
+                            "0.0.0.0",  # noqa: S104
+                            "--port",
+                            f"{DEFAULT_UWSGI_PORT}",
+                        ],
                         ports=[
                             kubernetes.core.v1.ContainerPortArgs(
                                 container_port=DEFAULT_UWSGI_PORT
@@ -870,11 +919,11 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
                         ],
                         image_pull_policy="IfNotPresent",
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "250m", "memory": "300Mi"},
-                            limits={"cpu": "500m", "memory": "600Mi"},
+                            requests={"cpu": "250m", "memory": "1000Mi"},
+                            limits={"cpu": "500m", "memory": "1600Mi"},
                         ),
-                        env=ecommerce_deployment_env_vars,
-                        env_from=ecommerce_deployment_envfrom,
+                        env=learn_ai_deployment_env_vars,
+                        env_from=learn_ai_deployment_envfrom,
                         volume_mounts=[
                             kubernetes.core.v1.VolumeMountArgs(
                                 name="staticfiles",
@@ -897,20 +946,20 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
 )
 
 # A kubernetes service resource to act as load balancer for the app instances
-ecommerce_service_name = "ecommerce-app"
-ecommerce_service_port_name = "http"
-ecommerce_service = kubernetes.core.v1.Service(
-    f"unified-ecommerce-{stack_info.env_suffix}-service",
+learn_ai_service_name = "learn-ai-app"
+learn_ai_service_port_name = "http"
+learn_ai_service = kubernetes.core.v1.Service(
+    f"learn-ai-{stack_info.env_suffix}-service",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=ecommerce_service_name,
-        namespace=ecommerce_namespace,
+        name=learn_ai_service_name,
+        namespace=learn_ai_namespace,
         labels=k8s_global_labels,
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
         selector=application_labels,
         ports=[
             kubernetes.core.v1.ServicePortArgs(
-                name=ecommerce_service_port_name,
+                name=learn_ai_service_port_name,
                 port=DEFAULT_NGINX_PORT,
                 target_port=DEFAULT_NGINX_PORT,
                 protocol="TCP",
@@ -921,23 +970,24 @@ ecommerce_service = kubernetes.core.v1.Service(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-ecommerce_pod_security_group_policy = (
+# Good canidate for a component resource
+learn_ai_pod_security_group_policy = (
     kubernetes.apiextensions.CustomResource(
-        f"unified-ecommerce-{stack_info.env_suffix}-application-pod-security-group-policy",
+        f"learn-ai-{stack_info.env_suffix}-application-pod-security-group-policy",
         api_version="vpcresources.k8s.aws/v1beta1",
         kind="SecurityGroupPolicy",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="ecommerce-app",
-            namespace=ecommerce_namespace,
+            name="learn-ai-app",
+            namespace=learn_ai_namespace,
             labels=k8s_global_labels,
         ),
         spec={
             "podSelector": {
-                "matchLabels": {"ol.mit.edu/pod-security-group": "ecommerce-app"},
+                "matchLabels": {"ol.mit.edu/pod-security-group": "learn-ai-app"},
             },
             "securityGroups": {
                 "groupIds": [
-                    ecommerce_application_security_group.id,
+                    learn_ai_application_security_group.id,
                 ],
             },
         },
@@ -948,18 +998,59 @@ ecommerce_pod_security_group_policy = (
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_plugin_config/
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_pluginconfig_v2/
+
+# Load open-id-connect secrets into a k8s secret via VSO
+oidc_secret_name = "oidc-secrets"  # pragma: allowlist secret  # noqa: S105
+oidc_secret = OLVaultK8SSecret(
+    name=f"learn-ai-{stack_info.env_suffix}-oidc-secrets",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="oidc-static-secrets",
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+        dest_secret_name=oidc_secret_name,
+        dest_secret_labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/learn-ai",
+        excludes=[".*"],
+        exclude_raw=True,
+        # Refresh frequently because substructure keycloak stack could change some of these
+        refresh_after="1m",
+        templates={
+            "client_id": '{{ get .Secrets "client_id" }}',
+            "client_secret": '{{ get .Secrets "client_secret" }}',
+            "realm": '{{ get .Secrets "realm_name" }}',
+            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
+        depends_on=[learn_ai_static_vault_secrets],
+    ),
+)
+
+# Good canidates for a component resource
 shared_plugin_config_name = "shared-plugin-config"
-ecommerce_https_apisix_pluginconfig = kubernetes.apiextensions.CustomResource(
-    f"unified-ecommerce-{stack_info.env_suffix}-https-apisix-pluginconfig",
+learn_ai_https_apisix_pluginconfig = kubernetes.apiextensions.CustomResource(
+    f"learn-ai-{stack_info.env_suffix}-https-apisix-pluginconfig",
     api_version="apisix.apache.org/v2",
     kind="ApisixPluginConfig",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=shared_plugin_config_name,
-        namespace=ecommerce_namespace,
+        namespace=learn_ai_namespace,
         labels=k8s_global_labels,
     ),
     spec={
         "plugins": [
+            {
+                "name": "redirect",
+                "enable": True,
+                "config": {
+                    "http_to_https": True,
+                },
+            },
             {
                 "name": "cors",
                 "enable": True,
@@ -984,36 +1075,16 @@ ecommerce_https_apisix_pluginconfig = kubernetes.apiextensions.CustomResource(
         ],
     },
 )
+# Ref: https://apisix.apache.org/docs/apisix/plugins/openid-connect/
+base_oidc_plugin_config = {
+    "scope": "openid profile ol-profile",
+    "bearer_only": False,
+    "introspection_endpoint_auth_method": "client_secret_post",
+    "ssl_verify": False,
+    "logout_path": "/logout",
+    "post_logout_redirect_uri": "/",
+}
 
-# Load open-id-connect secrets into a k8s secret via VSO
-oidc_secret_name = "oidc-secrets"  # pragma: allowlist secret  # noqa: S105
-oidc_secret = OLVaultK8SSecret(
-    name=f"unified-ecommerce-{stack_info.env_suffix}-oidc-secrets",
-    resource_config=OLVaultK8SStaticSecretConfig(
-        name="oidc-static-secrets",
-        namespace=ecommerce_namespace,
-        labels=k8s_global_labels,
-        dest_secret_name=oidc_secret_name,
-        dest_secret_labels=k8s_global_labels,
-        mount="secret-operations",
-        mount_type="kv-v1",
-        path="sso/unified-ecommerce",
-        excludes=[".*"],
-        exclude_raw=True,
-        templates={
-            "client_id": '{{ get .Secrets "client_id" }}',
-            "client_secret": '{{ get .Secrets "client_secret" }}',
-            "realm": '{{ get .Secrets "realm_name" }}',
-            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
-        },
-        vaultauth=vault_k8s_resources.auth_name,
-    ),
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        parent=vault_k8s_resources,
-        depends_on=[ecommerce_static_vault_secrets],
-    ),
-)
 
 # ApisixUpstream resources don't seem to work but we don't really need them?
 # Ref: https://github.com/apache/apisix-ingress-controller/issues/1655
@@ -1021,92 +1092,78 @@ oidc_secret = OLVaultK8SSecret(
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_route_v2/
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/
-ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
-    f"unified-ecommerce-{stack_info.env_suffix}-https-apisix-route",
+learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
+    f"learn-ai-{stack_info.env_suffix}-https-apisix-route",
     api_version="apisix.apache.org/v2",
     kind="ApisixRoute",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="ecommerce-https",
-        namespace=ecommerce_namespace,
+        name="learn-ai-https",
+        namespace=learn_ai_namespace,
         labels=k8s_global_labels,
     ),
     spec={
         "http": [
             {
-                # unauthenticated routes, including assests and checkout callback API
-                "name": "ue-unauth",
+                # Sepcial handling for websocket URLS.
+                "name": "websocket",
                 "priority": 1,
-                "match": {
-                    "hosts": [
-                        ecommerce_config.require("backend_domain"),
-                    ],
-                    "paths": [
-                        "/api/*",
-                        "/_/*",
-                        "/logged_out/*",
-                        "/auth/*",
-                        "/static/*",
-                        "/favicon.ico",
-                        "/checkout/*",
-                    ],
-                },
+                "websocket": True,
                 "plugin_config_name": shared_plugin_config_name,
-                "backends": [
-                    {
-                        "serviceName": ecommerce_service_name,
-                        "servicePort": ecommerce_service_port_name,
-                    }
-                ],
-            },
-            {
-                # wildcard route for the rest of the system - auth required
-                "name": "ue-default",
-                "priority": 0,
                 "plugins": [
-                    # Ref: https://apisix.apache.org/docs/apisix/plugins/openid-connect/
                     {
                         "name": "openid-connect",
                         "enable": True,
-                        # Get all the sensitive parts of this config from a secret
                         "secretRef": oidc_secret_name,
-                        "config": {
-                            "scope": "openid profile ol-profile",
-                            "bearer_only": False,
-                            "introspection_endpoint_auth_method": "client_secret_post",
-                            "ssl_verify": False,
-                            "logout_path": "/logout",
-                            "discovery": "https://sso-qa.ol.mit.edu/realms/olapps/.well-known/openid-configuration",
-                            # Lets let the app handle this because we have an etcd
-                            # control-plane
-                            # "session": {
-                            #    "secret": "at_least_16_characters",  # pragma: allowlist secret  # noqa: E501
-                            # },
-                        },
-                    },
+                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
+                    }
                 ],
-                "plugin_config_name": shared_plugin_config_name,
                 "match": {
                     "hosts": [
-                        ecommerce_config.require("backend_domain"),
+                        learn_ai_config.require("backend_domain"),
                     ],
                     "paths": [
-                        "/cart/*",
-                        "/admin/*",
-                        "/establish_session/*",
-                        "/logout",
+                        "/ws/*",
                     ],
                 },
                 "backends": [
                     {
-                        "serviceName": ecommerce_service_name,
-                        "servicePort": ecommerce_service_port_name,
-                    }
+                        "serviceName": learn_ai_service_name,
+                        "servicePort": learn_ai_service_port_name,
+                    },
                 ],
             },
-            # Strip trailing slack from logout redirect
             {
-                "name": "ue-logout-redirect",
-                "priority": 0,
+                # Wildcard route that can use auth but doesn't require it
+                "name": "passauth",
+                "priority": 2,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
+                    }
+                ],
+                "match": {
+                    "hosts": [
+                        learn_ai_config.require("backend_domain"),
+                    ],
+                    "paths": [
+                        "/*",
+                    ],
+                },
+                "backends": [
+                    {
+                        "serviceName": learn_ai_service_name,
+                        "servicePort": learn_ai_service_port_name,
+                    },
+                ],
+            },
+            {
+                # Strip trailing slash from logout redirect
+                "name": "logout-redirect",
+                "priority": 10,
                 "plugins": [
                     {
                         "name": "redirect",
@@ -1118,7 +1175,7 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 ],
                 "match": {
                     "hosts": [
-                        ecommerce_config.require("backend_domain"),
+                        learn_ai_config.require("backend_domain"),
                     ],
                     "paths": [
                         "/logout/*",
@@ -1126,32 +1183,61 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 },
                 "backends": [
                     {
-                        "serviceName": ecommerce_service_name,
-                        "servicePort": ecommerce_service_port_name,
-                    }
+                        "serviceName": learn_ai_service_name,
+                        "servicePort": learn_ai_service_port_name,
+                    },
                 ],
             },
-        ]
+            {
+                # Routes that require authentication
+                "name": "reqauth",
+                "priority": 10,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "auth"},
+                    }
+                ],
+                "match": {
+                    "hosts": [
+                        learn_ai_config.require("backend_domain"),
+                    ],
+                    "paths": [
+                        "/admin/login/*",
+                        "/http/login/",
+                    ],
+                },
+                "backends": [
+                    {
+                        "serviceName": learn_ai_service_name,
+                        "servicePort": learn_ai_service_port_name,
+                    },
+                ],
+            },
+        ],
     },
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=[ecommerce_service],
+        depends_on=[learn_ai_service, oidc_secret],
     ),
 )
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_tls_v2/
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
-ecommerce_https_apisix_tls = kubernetes.apiextensions.CustomResource(
-    f"unified-ecommerce-{stack_info.env_suffix}-https-apisix-tls",
+learn_ai_https_apisix_tls = kubernetes.apiextensions.CustomResource(
+    f"learn-ai-{stack_info.env_suffix}-https-apisix-tls",
     api_version="apisix.apache.org/v2",
     kind="ApisixTls",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="ecommerce-https",
-        namespace=ecommerce_namespace,
+        name="learn-ai-https",
+        namespace=learn_ai_namespace,
         labels=k8s_global_labels,
     ),
     spec={
-        "hosts": [ecommerce_config.require("backend_domain")],
+        "hosts": [learn_ai_config.require("backend_domain")],
         # Use the shared ol-wildcard cert loaded into every cluster
         "secret": {
             "name": "ol-wildcard-cert",
@@ -1159,7 +1245,6 @@ ecommerce_https_apisix_tls = kubernetes.apiextensions.CustomResource(
         },
     },
 )
-
 
 # Finally, put the aws access key into the github actions configuration
 match stack_info.env_suffix:
@@ -1173,14 +1258,14 @@ match stack_info.env_suffix:
         env_var_suffix = "INVALID"
 
 gh_workflow_access_key_id_env_secret = github.ActionsSecret(
-    f"unified-ecommerce-gh-workflow-access-key-id-env-secret-{stack_info.env_suffix}",
+    f"learn-ai-gh-workflow-access-key-id-env-secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"AWS_ACCESS_KEY_ID_{env_var_suffix}",  # pragma: allowlist secret
     plaintext_value=gh_workflow_accesskey.id,
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
-    f"unified-ecommerce-gh-workflow-secretaccesskey-env-secret-{stack_info.env_suffix}",
+    f"learn-ai-gh-workflow-secretaccesskey-env-secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"AWS_SECRET_ACCESS_KEY_{env_var_suffix}",  # pragma: allowlist secret
     plaintext_value=gh_workflow_accesskey.secret,
@@ -1188,35 +1273,32 @@ gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
 )
 
 gh_workflow_fastly_api_key_env_secret = github.ActionsSecret(
-    f"unified-ecommerce-gh-workflow-fastly-api-key-env-secret-{stack_info.env_suffix}",
+    f"learn-ai-gh-workflow-fastly-api-key-env-secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"FASTLY_API_KEY_{env_var_suffix}",  # pragma: allowlist secret
-    plaintext_value=ecommerce_config.require("fastly_api_key"),
+    plaintext_value=read_yaml_secrets(Path("fastly.yaml"))["admin_api_key"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_fastly_service_id_env_secret = github.ActionsSecret(
-    f"unified-ecommerce-gh-workflow-fastly-service-id-env-secret-{stack_info.env_suffix}",
+    f"learn-ai-gh-workflow-fastly-service-id-env-secret-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"FASTLY_SERVICE_ID_{env_var_suffix}",  # pragma: allowlist secret
-    plaintext_value=unified_ecommerce_fastly_service.id,
+    plaintext_value=learn_ai_fastly_service.id,
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
 gh_workflow_s3_bucket_name_env_secret = github.ActionsVariable(
-    f"unified-ecommerce-gh-workflow-s3-bucket-name-env-variable-{stack_info.env_suffix}",
+    f"learn-ai-gh-workflow-s3-bucket-name-env-variable-{stack_info.env_suffix}",
     repository=gh_repo.name,
     variable_name=f"AWS_S3_BUCKET_NAME_{env_var_suffix}",  # pragma: allowlist secret
-    value=unified_ecommerce_app_storage_bucket_name,
+    value=learn_ai_app_storage_bucket_name,
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
 gh_workflow_api_base_env_var = github.ActionsVariable(
-    f"unified-ecommerce-gh-workflow-api-base-env-variable-{stack_info.env_suffix}",
+    f"learn-ai-gh-workflow-api-base-env-variablet-{stack_info.env_suffix}",
     repository=gh_repo.name,
     variable_name=f"API_BASE_{env_var_suffix}",  # pragma: allowlist secret
-    value=f"https://{ecommerce_config.require('backend_domain')}",
+    value=f"https://{learn_ai_config.require('backend_domain')}",
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
-
-# No route53 config for ecommerce_config.require("backend_domain") because
-# the external-dns service in the cluster will take care of it for us.

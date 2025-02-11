@@ -31,6 +31,7 @@ config:
   keycloak_realm:openid_clients:
   - client_info:
       unified-ecommerce: ["https://pay-ci.ol.mit.edu/*", "https://api-pay-ci.ol.mit.edu/*"]
+      learn-ai: ["https://learn-ai-ci.ol.mit.edu/*", "https://api-learn-ai-ci.ol.mit.edu/*"]
       open-discusions: ["https://discussions-ci.odl.mit.edu/*"]
     realm_name: olapps
   - client_info:

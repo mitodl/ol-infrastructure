@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-learn_ai-application
+runtime: python
+description: MIT OL Learn AI
+backend:
+  url: s3://mitol-pulumi-state/

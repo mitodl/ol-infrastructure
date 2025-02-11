@@ -1,0 +1,26 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygH4WWFJR+PlwkjoifCfDGjeAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMWSY1+A7LvTUEfLzRAgEQgDsF3zjFAnwsVgHgnZpDXnM5OXgjpHm0dUg8qXZRnNR/kcRMuI2HOuKaqbyVC+e6KlNlcSrONaiYE6Zyxw==
+config:
+  aws:region: us-east-1
+  learn_ai:backend_domain: "api-learn-ai.ol.mit.edu"
+  learn_ai:db_password:
+    secure: v1:DIaoiP0dVXpI2w72:zcSTWgD6DInTMOdD1oH1FTdlUJCney7MLeAfL5Q5hcL9lDfW7AjVGynLDeDtpL3DQIZvFBUvcbjIHVaBYQf8Ikf8tdjWamNBv+4Ymwe2
+  learn_ai:env_vars:
+    CELERY_TASK_ALWAYS_EAGER: "false"
+    CSRF_ALLOWED_ORIGINS: '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu"]'
+    CSRF_TRUSTED_ORIGINS: '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu"]'
+    DEBUG: "false"
+    DEV_ENV: "false"
+    ENVIRONMENT: "production"
+    MITOL_APP_BASE_URL: "https://learn-ai.ol.mit.edu"
+    MITOL_COOKIE_DOMAIN: "ol.mit.edu"
+    MITOL_COOKIE_NAME: "mitol"
+    MITOL_FEATURES_DEFAULT: "true"
+    NODE_ENV: "development"
+    UWSGI_THREADS: "5"
+  learn_ai:frontend_domain: "learn-ai.ol.mit.edu"
+  redis:password:
+    secure: v1:txrMWRvWLuyLZ9jG:RANFRu7iGA96qnc47SdQjrwTOS5Lz96n4Vdt6CK9vyb6FreKon4+qyLlk7P+dBS+T0lN7H6bvC1F38zIOA==
+  vault:address: "https://vault.odl.mit.edu"
+  vault_server:env_namespace: "operations.production"
