@@ -4,8 +4,8 @@ encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygH4WWFJR+Plwkjoif
 config:
   aws:region: us-east-1
   learn_ai:backend_domain: "api-learn-ai.ol.mit.edu"
-  # learn_ai:db_password:
-  #   secure: v1:moKYAbHsHOnTUrEk:4OgRBNFXT0WKrz1KaKZDhQxT09dA36jN4+q/SO0IIAemTSiwGqrXbXn+r5dFlGrr24S+VGtiyNXSVKts+j/TgKS33FTo86OX2saBDrL4dFo=
+  learn_ai:db_password:
+    secure: v1:DIaoiP0dVXpI2w72:zcSTWgD6DInTMOdD1oH1FTdlUJCney7MLeAfL5Q5hcL9lDfW7AjVGynLDeDtpL3DQIZvFBUvcbjIHVaBYQf8Ikf8tdjWamNBv+4Ymwe2
   learn_ai:env_vars:
     CELERY_TASK_ALWAYS_EAGER: "false"
     CSRF_ALLOWED_ORIGINS: '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu"]'
@@ -19,10 +19,8 @@ config:
     MITOL_FEATURES_DEFAULT: "true"
     NODE_ENV: "development"
     UWSGI_THREADS: "5"
-  # learn_ai:fastly_api_key:
-  #   secure: v1:RUd9eazTNOjJbb09:orMjylm8XW+kEsh5NlKYvO+7Hj03rwbKXliH2zYU5FoOdyuBDdcc3BfDY9k6qwr6
   learn_ai:frontend_domain: "learn-ai.ol.mit.edu"
-  # redis:password:
-  #   secure: v1:j1q4KgePVUsaaySb:EhUqxWBezBKe6Ck1o/gqlX68GBnrZZQdmUCscl5aPok1j6jJWKSRO89XfV+6dWJaCMhqHA==
+  redis:password:
+    secure: v1:txrMWRvWLuyLZ9jG:RANFRu7iGA96qnc47SdQjrwTOS5Lz96n4Vdt6CK9vyb6FreKon4+qyLlk7P+dBS+T0lN7H6bvC1F38zIOA==
   vault:address: "https://vault.odl.mit.edu"
   vault_server:env_namespace: "operations.production"

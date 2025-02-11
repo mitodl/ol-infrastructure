@@ -19,8 +19,6 @@ config:
     MITOL_FEATURES_DEFAULT: "true"
     NODE_ENV: "development"
     UWSGI_THREADS: "5"
-  learn_ai:fastly_api_key:
-    secure: v1:RUd9eazTNOjJbb09:orMjylm8XW+kEsh5NlKYvO+7Hj03rwbKXliH2zYU5FoOdyuBDdcc3BfDY9k6qwr6
   learn_ai:frontend_domain: "learn-ai-qa.ol.mit.edu"
   redis:password:
     secure: v1:j1q4KgePVUsaaySb:EhUqxWBezBKe6Ck1o/gqlX68GBnrZZQdmUCscl5aPok1j6jJWKSRO89XfV+6dWJaCMhqHA==
