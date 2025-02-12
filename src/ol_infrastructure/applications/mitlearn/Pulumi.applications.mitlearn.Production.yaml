@@ -85,3 +85,6 @@ config:
   mitlearn:nextjs_heroku_domain: "mitopen-production-nextjs-6b0d663f9110.herokuapp.com"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
+  mitlearn:learn_ai_recommendation_endpoint: "https://api-learn-ai.ol.mit.edu/http/recommendation_agent/"
+  mitlearn:learn_ai_syllabus_endpoint: "https://api-learn-ai.ol.mit.edu/http/syllabus_agent/"
+

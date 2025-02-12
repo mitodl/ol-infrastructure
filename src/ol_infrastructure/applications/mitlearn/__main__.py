@@ -1139,6 +1139,20 @@ gh_workflow_sentry_profiles_sample_rate = github.ActionsSecret(
     plaintext_value=heroku_vars["SENTRY_PROFILES_SAMPLE_RATE"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
+gh_workflow_learn_ai_recommendation_endpoint_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_learn_ai_recommendation_endpoint-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"LEARN_AI_RECOMMENDATION_ENDPOINT_{env_var_suffix}",
+    plaintext_value=f"{mitlearn_config.get('learn_ai_recommendation_endpoint')}",
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_learn_ai_syllabus_endpoint_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_learn_ai_syllabus_endpoint-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"LEARN_AI_SYLLABUS_ENDPOINT_{env_var_suffix}",
+    plaintext_value=f"{mitlearn_config.get('learn_ai_syllabus_endpoint')}",
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
 
 
 export(
