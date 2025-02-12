@@ -87,4 +87,3 @@ config:
   vault_server:env_namespace: operations.production
   mitlearn:learn_ai_recommendation_endpoint: "https://api-learn-ai.ol.mit.edu/http/recommendation_agent/"
   mitlearn:learn_ai_syllabus_endpoint: "https://api-learn-ai.ol.mit.edu/http/syllabus_agent/"
-
