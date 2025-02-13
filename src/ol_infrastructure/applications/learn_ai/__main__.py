@@ -12,7 +12,6 @@ import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions, StackReference
 from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
-from pulumi_aws_native import iam as iam_native
 
 from bridge.lib.constants import FASTLY_A_TLS_1_3
 from bridge.lib.magic_numbers import (
@@ -168,23 +167,12 @@ learn_ai_app_storage_bucket_policy = s3.BucketPolicy(
     ),
 )
 
-learn_ai_service_account_name = "learn-ai-admin"
-learn_ai_service_account = kubernetes.core.v1.ServiceAccount(
-    "learn-ai-service-account",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=learn_ai_service_account_name,
-        namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
-        annotations=None,
-    ),
-    automount_service_account_token=False,
-)
-
 parliament_config = {
     "PERMISSIONS_MANAGEMENT_ACTIONS": {
         "ignore_locations": [{"actions": ["s3.putobjectacl"]}],
     },
     "RESOURCE_EFFECTIVLY_STAR": {},
+    "RESOURCE_MISMATCH": {},
 }
 
 ##################################
@@ -198,25 +186,26 @@ learn_ai_bedrock_policy_document = {
             "Sid": "InvokeDomainInferenceProfiles",
             "Effect": "Allow",
             "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
-            "Resource": "arn:aws:bedrock:*:*:application-inference-profile/*",
-            "Condition": {
-                "StringEquals": {
-                    "aws:ResourceTag/AmazonDataZoneDomain": "${datazone:domainId}",
-                    "aws:ResourceAccount": "${aws:PrincipalAccount}",
-                },
-                "Null": {"aws:ResourceTag/AmazonDataZoneProject": "true"},
-            },
+            "Resource": [
+                "arn:aws:bedrock:*:*:inference-profile/*",
+                "arn:aws:bedrock:*:*:foundation-model/*",
+            ],
         }
     ],
 }
 
-learn_ai_bedrock_policy = iam_native.ManagedPolicy(
-    resource_name=f"learn-ai-bedrock-policy-{stack_info.env_suffix}",
-    description="Grant access to AWS Bedrock resources for the operation of the learn_ai application.",
-    policy_document=learn_ai_bedrock_policy_document,
-    # managed_policy_name = "AmazonDataZoneBedrockModelConsumptionPolicy",
+learn_ai_bedrock_policy = iam.Policy(
+    f"learn-ai-bedrock-policy-{stack_info.env_suffix}",
+    name=f"learn-ai-trustrole-bedrock-iam-policy-{stack_info.env_suffix}",
+    policy=lint_iam_policy(
+        learn_ai_bedrock_policy_document,
+        stringify=True,
+        parliament_config=parliament_config,
+    ),
 )
 
+
+learn_ai_service_account_name = "learn-ai-admin"
 learn_ai_trust_role_config = OLEKSTrustRoleConfig(
     account_id=aws_account.account_id,
     cluster_name=f"data-{stack_info.name}",
@@ -230,13 +219,26 @@ learn_ai_trust_role_config = OLEKSTrustRoleConfig(
 )
 
 learn_ai_trust_role = OLEKSTrustRole(
-    f"{env_name}-ol-trust-role",
+    f"learn-ai-ol-trust-role-{stack_info.env_suffix}",
     role_config=learn_ai_trust_role_config,
 )
 iam.RolePolicyAttachment(
-    "learn-ai-bedrock-policy-attachement",
-    policy_arn=learn_ai_bedrock_policy.policy_arn,
+    "learn-ai-bedrock-policy-attachement-{stack_info.env_suffix}",
+    policy_arn=learn_ai_bedrock_policy.arn,
     role=learn_ai_trust_role.role.name,
+)
+
+learn_ai_service_account = kubernetes.core.v1.ServiceAccount(
+    "learn-ai-service-account-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=learn_ai_service_account_name,
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+        annotations={
+            "eks.amazonaws.com/role-arn": learn_ai_trust_role.role.arn,
+        },
+    ),
+    automount_service_account_token=False,
 )
 
 
@@ -825,7 +827,7 @@ learn_ai_deployment_resource = kubernetes.apps.v1.Deployment(
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
         # TODO @Ardiea: Add horizontial pod autoscaler  # noqa: TD003, FIX002
-        replicas=1,
+        replicas=learn_ai_config.get_int("replica_count") or 2,
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels=application_labels,
         ),
