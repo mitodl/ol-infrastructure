@@ -21,7 +21,7 @@
         "^src/bridge/lib/versions.py$"
       ],
       "matchStrings": [
-          "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>.+?)(?: packageName=(?<packageName>.+?))(?: registryUrl=(?<registryUrl>.+?))(?: versioning=(?<versioning>[a-z-]+?))?\\s*.+\\s*=\\s*\"(?<currentValue>.+?)\""
+          "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>.+?)(?: packageName=(?<packageName>.+?))?(?: registryUrl=(?<registryUrl>.+?))?(?: versioning=(?<versioning>[a-z-]+?))?\\s*.+\\s*=\\s*\"(?<currentValue>.+?)\""
       ]
     }
   ]
