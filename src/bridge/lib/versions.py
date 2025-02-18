@@ -17,21 +17,21 @@ TUTOR_PERMISSIONS_VERSION = "15.3.4"
 VAULT_VERSION = "1.12.1"
 
 # EKS Specific Versions
-# renovate: datasource=helm depName=airbyte packageName=airbyte/airbyte
+# renovate: datasource=helm depName=airbyte registryUrl=https://artifacthub.io/packages/helm/airbyte/airbyte
 AIRBYTE_CHART_VERSION = "1.3.0"
-# renovate: datasource=helm depName=apisix packageName=apisix/apisix
+# renovate: datasource=helm depName=apisix registryUrl=https://artifacthub.io/packages/helm/apisix/apisix
 APISIX_CHART_VERSION = "2.10.0"
-# renovate: datasource=helm depName=cert-manager packageName=cert-manager/cert-manager
+# renovate: datasource=helm depName=cert-manager registryUrl=https://artifacthub.io/packages/helm/cert-manager/cert-manager
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
 EBS_CSI_DRIVER_VERSION = "v1.36.0-eksbuild.1"
 EFS_CSI_DRIVER_VERSION = "v2.0.8-eksbuild.1"
-# renovate: datasource=helm depName=external-dns packageName=external-dns/external-dns
+# renovate: datasource=helm depName=external-dns registryUrl=https://artifacthub.io/packages/helm/external-dns/external-dns
 EXTERNAL_DNS_CHART_VERSION = "1.15.0"
 # renovate: datasource=github-releases depName=gateway-api packageName=kubernetes-sigs/gateway-api
 GATEWAY_API_VERSION = "v1.2.1"
-# renovate: datasource=helm depName=traefik packageName=traefik/traefik
+# renovate: datasource=helm depName=traefik registryUrl=https://artifacthub.io/packages/helm/traefik/traefik
 TRAEFIK_CHART_VERSION = "v34.2.0"
-# renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent/vantage-kubernetes-agent
+# renovate: datasource=helm depName=vantage-kubernetes-agent registryUrl=https://artifacthub.io/packages/helm/vantage-kubernetes-agent/vantage-kubernetes-agent
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.0.36"
-# renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator/vault-secrets-operator
+# renovate: datasource=helm depName=vault-secrets-operator registryUrl=https://artifacthub.io/packages/helm/vault-secrets-operator/vault-secrets-operator
 VAULT_SECRETS_OPERATOR_CHART_VERSION = "0.9.0"
