@@ -33,5 +33,5 @@ GATEWAY_API_VERSION = "v1.2.1"
 TRAEFIK_CHART_VERSION = "v34.2.0"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.0.36"
-# renovate: datasource=github-releases depName=vault-secrets-operator packageName=hashicorp/vault-secrets-operator
+# renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
 VAULT_SECRETS_OPERATOR_CHART_VERSION = "0.9.0"
