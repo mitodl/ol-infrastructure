@@ -1,7 +1,7 @@
 # renovate: datasource=github-releases depName=concourse packageName=concourse/concourse
 CONCOURSE_VERSION = "7.8.3"
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
-CONSUL_TEMPLATE_VERSION = "0.29.5"
+CONSUL_TEMPLATE_VERSION = "0.40.0"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
 CONSUL_VERSION = "1.14.0"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
