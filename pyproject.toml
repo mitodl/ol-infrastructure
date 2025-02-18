@@ -172,3 +172,4 @@ inline-quotes = "double"
 "test_*.py" = ["S101"]
 "src/ol_infrastructure/substructure/vault/pki/__main__.py" = ["E501"]
 "src/ol_infrastructure/lib/fastly.py" = ["E501"]
+"src/bridge/lib/versions.py" = ["E501"]
