@@ -17,7 +17,7 @@ TUTOR_PERMISSIONS_VERSION = "15.3.4"
 VAULT_VERSION = "1.12.1"
 
 # EKS Specific Versions
-# renovate: datasource=helm depName=airbyte registryUrl=https://artifacthub.io/packages/helm/airbyte/airbyte
+# renovate: datasourceTemplate=helm depName=airbyte packageName=airbyte/airbyte registryUrl=https://airbytehq.github.io/helm-charts
 AIRBYTE_CHART_VERSION = "1.3.0"
 # renovate: datasource=helm depName=apisix registryUrl=https://artifacthub.io/packages/helm/apisix/apisix
 APISIX_CHART_VERSION = "2.10.0"
