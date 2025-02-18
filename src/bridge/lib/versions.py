@@ -6,7 +6,7 @@ CONSUL_TEMPLATE_VERSION = "0.29.5"
 CONSUL_VERSION = "1.14.0"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
 KEYCLOAK_VERSION = "26.1"
-# renovate: datasource=helm depName=open-metadata packageName=open-metadata/openmetadata registryUrl=https://helm.open-metadata.org
+# renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
 OPEN_METADATA_VERSION = "1.6.3"
 OVS_VERSION = "v0.65.1-3-g2630021"
 REDASH_VERSION = "9d273e4"
@@ -17,21 +17,21 @@ TUTOR_PERMISSIONS_VERSION = "15.3.4"
 VAULT_VERSION = "1.12.1"
 
 # EKS Specific Versions
-# renovate: datasource=helm depName=airbyte packageName=airbyte/airbyte registryUrl=https://airbytehq.github.io/helm-charts
+# renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/helm-charts
 AIRBYTE_CHART_VERSION = "1.3.0"
-# renovate: datasource=helm depName=apisix packageName=apisix/apisix registryUrl=https://charts.apiseven.com
+# renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://charts.apiseven.com
 APISIX_CHART_VERSION = "2.10.0"
-# renovate: datasource=helm depName=cert-manager packageName=cert-manager/cert-manager registryUrl=https://artifacthub.io/
+# renovate: datasource=helm depName=cert-manager packageName=cert-manager
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
 EBS_CSI_DRIVER_VERSION = "v1.36.0-eksbuild.1"
 EFS_CSI_DRIVER_VERSION = "v2.0.8-eksbuild.1"
-# renovate: datasource=helm depName=external-dns registryUrl=https://artifacthub.io/packages/helm/external-dns/external-dns
+# renovate: datasource=helm depName=external-dns packageName=external-dns
 EXTERNAL_DNS_CHART_VERSION = "1.15.0"
 # renovate: datasource=github-releases depName=gateway-api packageName=kubernetes-sigs/gateway-api
 GATEWAY_API_VERSION = "v1.2.1"
-# renovate: datasource=helm depName=traefik registryUrl=https://artifacthub.io/packages/helm/traefik/traefik
+# renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
 TRAEFIK_CHART_VERSION = "v34.2.0"
-# renovate: datasource=helm depName=vantage-kubernetes-agent registryUrl=https://artifacthub.io/packages/helm/vantage-kubernetes-agent/vantage-kubernetes-agent
+# renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.0.36"
-# renovate: datasource=helm depName=vault-secrets-operator registryUrl=https://artifacthub.io/packages/helm/vault-secrets-operator/vault-secrets-operator
+# renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://artifacthub.io/packages/helm/vault-secrets-operator/vault-secrets-operator
 VAULT_SECRETS_OPERATOR_CHART_VERSION = "0.9.0"
