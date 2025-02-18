@@ -21,7 +21,7 @@
         "src/bridge/lib/versions.py"
       ],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) packageName=(?<packageName>.*)\s+.*?\s*=\s*\"v?(?<currentVersion>.*?)\""
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) packageName=(?<packageName>.*)\s+.*?\s*=\s*\"v?(?<currentValue>.*?)\""
       ]
     }
   ]
