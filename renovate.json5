@@ -18,10 +18,10 @@
     {
       "customType": "regex",
       "fileMatch": [
-        "versions.py"
+        "^src/bridge/lib/versions.py$"
       ],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) packageName=(?<packageName>.*)\s+.*?\s*=\s*\"v?(?<currentValue>.*?)\""
+        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>.+?) packageName=(?<packageName>.+?)(?: versioning=(?<versioning>[a-z-]+?))?\\s*.+\\s*=\\s*\"(?<currentValue>.+?)\""
       ]
     }
   ]
