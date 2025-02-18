@@ -13,5 +13,16 @@
   ],
   "pip_requirements": {
     "fileMatch": "dockerfiles/openedx-edxapp/pip_package_lists/.*?/.*.txt"
-  }
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": [
+        "src/bridge/lib/versions.py"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) packageName=(?<packageName>.*)\s+.*?\s*=\s*\"v?(?<currentVersion>.*?)\""
+      ]
+    }
+  ]
 }
