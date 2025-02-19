@@ -85,7 +85,7 @@ for stack in stack_defs:
     output_data = json.loads(command_output)
 
     extract_kube_config_params(
-        admin_arn=output_data["role_arn"],
+        admin_arn=output_data["admin_role_arn"],
         cluster_ca=output_data["certificate-authority-data"]["data"],
         cluster_endpoint=output_data["server"],
         cluster_name=cluster_name,
