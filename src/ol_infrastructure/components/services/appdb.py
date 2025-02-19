@@ -26,16 +26,17 @@ aws_config = AWSBase(
     }
 )
 
+
 class OLDatabase(ComponentResource):
     def __init__(
-            self,
-            app_name: str,
-            app_db_name: str,
-            app_security_group,
-            app_db_security_group,
-            pulumi_app_config: Config,
-            app_db_config: OLPostgresDBConfig,
-            target_vpc_name: str,
+        self,
+        app_name: str,
+        app_db_name: str,
+        app_security_group,
+        app_db_security_group,
+        pulumi_app_config: Config,
+        app_db_config: OLPostgresDBConfig,
+        target_vpc_name: str,
     ):
         target_vpc = network_stack.require_output(target_vpc_name)
         self.app_db_security_group = ec2.SecurityGroup(
@@ -66,7 +67,8 @@ class OLDatabase(ComponentResource):
 
         rds_defaults = defaults(stack_info)["rds"]
         rds_defaults["instance_size"] = (
-            self.pulumi_app_config.get("db_instance_size") or DBInstanceTypes.small.value
+            self.pulumi_app_config.get("db_instance_size")
+            or DBInstanceTypes.small.value
         )
 
         self.app_db_config = OLPostgresDBConfig(
@@ -82,4 +84,3 @@ class OLDatabase(ComponentResource):
             **defaults(stack_info)["rds"],
         )
         self.app_db = OLAmazonDB(self.app_db_config)
-
