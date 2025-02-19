@@ -1106,35 +1106,6 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
     spec={
         "http": [
             {
-                # Sepcial handling for websocket URLS.
-                "name": "websocket",
-                "priority": 1,
-                "websocket": True,
-                "plugin_config_name": shared_plugin_config_name,
-                "plugins": [
-                    {
-                        "name": "openid-connect",
-                        "enable": True,
-                        "secretRef": oidc_secret_name,
-                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
-                    }
-                ],
-                "match": {
-                    "hosts": [
-                        learn_ai_config.require("backend_domain"),
-                    ],
-                    "paths": [
-                        "/ws/*",
-                    ],
-                },
-                "backends": [
-                    {
-                        "serviceName": learn_ai_service_name,
-                        "servicePort": learn_ai_service_port_name,
-                    },
-                ],
-            },
-            {
                 # Wildcard route that can use auth but doesn't require it
                 "name": "passauth",
                 "priority": 2,
@@ -1210,6 +1181,35 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     "paths": [
                         "/admin/login/*",
                         "/http/login/",
+                    ],
+                },
+                "backends": [
+                    {
+                        "serviceName": learn_ai_service_name,
+                        "servicePort": learn_ai_service_port_name,
+                    },
+                ],
+            },
+            {
+                # Sepcial handling for websocket URLS.
+                "name": "websocket",
+                "priority": 1,
+                "websocket": True,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
+                    }
+                ],
+                "match": {
+                    "hosts": [
+                        learn_ai_config.require("backend_domain"),
+                    ],
+                    "paths": [
+                        "/ws/*",
                     ],
                 },
                 "backends": [
