@@ -240,6 +240,9 @@ FEATURE_FLAGS: dict[str, bool] = {
 # every query ran, in both SQL Lab and charts/dashboards.
 QUERY_LOGGER = None
 
+# Maximum number of rows returned for any analytical database query
+SQL_MAX_ROW = 500000
+
 # Caching Settings
 cache_base = {
     "CACHE_TYPE": "RedisCache",
