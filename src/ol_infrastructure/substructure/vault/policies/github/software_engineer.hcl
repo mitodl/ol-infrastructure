@@ -88,3 +88,17 @@ path "aws-mitx/creds/read-write-delete-ol-bootcamps-app-*" {
 path "aws-mitx/creds/read-write-delete-xpro-app-*" {
   capabilities = ["read", "list"]
 }
+
+path "aws-mitx/creds/eks-cluster-shared-developer-role" {
+  capabilities = ["read", "list"]
+}
+
+path "secret-global" {
+  capabilities = ["list"]
+}
+path "secret-global/eks" {
+  capabilities = ["list"]
+}
+path "secret-global/eks/*" {
+  capabilities = ["read", "list"]
+}
