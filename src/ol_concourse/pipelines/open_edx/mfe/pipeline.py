@@ -135,7 +135,7 @@ def mfe_job(
         paths=[
             f"src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/"
         ],
-        branch="mfe_plugin_slots_config",
+        branch="main",
     )
 
     clone_mfe_repo = GetStep(
