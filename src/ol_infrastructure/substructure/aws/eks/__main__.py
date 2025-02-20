@@ -314,7 +314,7 @@ if cluster_stack.require_output("has_ebs_storage"):
                         "key": "token",
                     },
                     "clusterID": cluster_name,
-                    "disableKubeTLSverify": "true",
+                    "disableKubeTLSverify": True,
                     "nodeAddressTypes": "InternalIP",
                     "collectNamespaceLabels": "true",
                 },
