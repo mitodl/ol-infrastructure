@@ -46,11 +46,9 @@ class OLDatabaseConfig:
 class OLDatabase(ComponentResource):
     """MIT OL Database component"""
 
-    def __init__( # noqa: D107
-            self,
-            ol_db_config: OLDatabaseConfig
-        ):
-
+    def __init__(
+        self, ol_db_config: OLDatabaseConfig
+    ):
         self.ol_db_config = ol_db_config
         super().__init__(
             "ol:infrastructure:aws:OLDatabase", ol_db_config.app_name, None
@@ -93,7 +91,8 @@ class OLDatabase(ComponentResource):
             password=SecretStr(self.ol_db_config.app_db_password),
             subnet_group_name=target_vpc["rds_subnet"],
             security_groups=[self.app_db_security_group],
-            storage=self.ol_db_config.app_db_capacity or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
+            storage=self.ol_db_config.app_db_capacity
+            or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
             engine_major_version="16",
             tags=aws_config.tags,
             db_name=self.ol_db_config.app_db_name,
