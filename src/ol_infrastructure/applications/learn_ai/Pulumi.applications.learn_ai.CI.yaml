@@ -22,6 +22,6 @@ config:
   vault:address: "https://vault-ci.odl.mit.edu"
   vault_server:env_namespace: "operations.ci"
   learn_ai:db_password:
-    secure: v1:sJWxOOPa6ZYgXYve:0SKSo2KWIAAdiIYyxIN5VFAYtuNnG+R7cUNa7EoKRWNHDO/WA7GfRK7hVTSInyz8gYIMKzELY9yKfNYy
+    secure: v1:LPQWUf68siLqkk30:JHBZ8gREGp0fRcAWH4ER7ExID5d3LVbn8BoFZ8o7tOBj43Jf+Jqh2c9acA/im/p9+W4c15appQNpC1hMHo4+hrIks3UIhC8a8+SV6GzO908=
   redis:password:
     secure: v1:ObQfVCLRk72Bn9f3:7EKaqHGnHkYsurz0xWQcX9Cuhc4k0SSXcIIKSgYQnfFSu9uYHbUT0cpsic4M6SYG6ZuFxKXXeaZuLI2QC3s9Feo0oD+SEjetNxCZo0TPot8=
