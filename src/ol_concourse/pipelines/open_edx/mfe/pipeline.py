@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from bridge.settings.openedx.accessors import fetch_applications_by_type
 from bridge.settings.openedx.types import (
+    DeploymentEnvRelease,
     EnvStage,
     OpenEdxApplicationVersion,
     OpenEdxDeploymentName,
@@ -51,6 +52,7 @@ class OpenEdxVars(BaseModel):
     lms_domain: str
     logo_url: str
     marketing_site_domain: str
+    plugin_slot_config_file_map: Optional[dict[str, str]] = None
     privacy_policy_url: Optional[str] = None
     schedule_email_section: Optional[str] = None
     site_name: str
@@ -118,6 +120,7 @@ def mfe_params(
 def mfe_job(
     open_edx: OpenEdxVars,
     mfe: OpenEdxApplicationVersion,
+    open_edx_deployment: DeploymentEnvRelease,
     previous_job: Optional[Job] = None,
 ) -> PipelineFragment:
     mfe_name = mfe.application.value
@@ -126,51 +129,107 @@ def mfe_job(
         uri=mfe.git_origin,
         branch=mfe.release_branch,
     )
+    mfe_configs = git_repo(
+        name=Identifier("mfe-slots-config"),
+        uri="https://github.com/mitodl/ol-infrastructure",
+        paths=[
+            f"src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/"
+        ],
+        branch="mfe_plugin_slots_config",
+    )
 
-    clone_git_repo = GetStep(
+    clone_mfe_repo = GetStep(
         get=mfe_repo.name,
         trigger=previous_job is None and open_edx.environment_stage != "production",
     )
+    clone_mfe_configs = GetStep(
+        get=mfe_configs.name,
+        trigger=previous_job is None and open_edx.environment_stage != "production",
+    )
+
     branding_overrides = "\n".join(
         (
             f"npm install {component}:{override}"
             for component, override in (mfe.branding_overrides or {}).items()
         )
     )
+
     translation_overrides = "\n".join(cmd for cmd in mfe.translation_overrides or [])
     if previous_job and mfe_repo.name == previous_job.plan[0].get:
-        clone_git_repo.passed = [previous_job.name]
-    mfe_job_definition = Job(
-        name=Identifier(f"compile-and-deploy-mfe-{mfe_name}-to-{open_edx.environment}"),
-        plan=[
-            clone_git_repo,
-            TaskStep(
-                task=Identifier("compile-and-deploy-mfe"),
-                config=TaskConfig(
-                    platform=Platform.linux,
-                    image_resource=AnonymousResource(
-                        type="registry-image",
-                        source={
-                            "repository": "node",
-                            "tag": f"{mfe.runtime_version}-bookworm-slim",
-                        },
-                    ),
-                    inputs=[Input(name=mfe_repo.name)],
-                    outputs=[
-                        Output(
-                            name=Identifier("compiled-mfe"),
-                            path=f"{mfe_repo.name}/dist",
-                        )
-                    ],
-                    params=mfe_params(open_edx, mfe),
-                    run=Command(
-                        path="sh",
-                        dir=mfe_repo.name,
-                        args=[
-                            "-exc",
-                            # Ensure that webpack is installed (TMM 2023-06-27)
-                            textwrap.dedent(
-                                f"""\
+        clone_mfe_repo.passed = [previous_job.name]
+        clone_mfe_configs.passed = [previous_job.name]
+
+    mfe_build_dir = Output(name=Identifier("mfe-build"))
+    mfe_setup_plan = [clone_mfe_repo]
+
+    mfe_plugin_type_map = {
+        "learning": "learning",
+        "discussions": "learning",
+        "ora-grading": "learning",
+        "communications": "learning",
+        "gradebook": "simple",
+        "learner-dashboard": "simple",
+    }
+    if slot_config_file := mfe_plugin_type_map.get(
+        OpenEdxMicroFrontend[mfe_name].value
+    ):
+        mfe_setup_command = textwrap.dedent(
+            f"""\
+            cp -r {mfe_repo.name}/* {mfe_build_dir.name}
+            cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/{slot_config_file}.env.jsx {mfe_build_dir.name}/env.config.jsx
+            """  # noqa: E501
+        )
+    else:
+        mfe_setup_command = f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}"
+
+    mfe_setup_plan += [
+        clone_mfe_configs,
+        TaskStep(
+            task=Identifier("merge-mfe-and-configs"),
+            config=TaskConfig(
+                platform=Platform.linux,
+                image_resource=AnonymousResource(
+                    type="registry-image",
+                    source={"repository": "debian", "tag": "bookworm-slim"},
+                ),
+                inputs=[Input(name=mfe_repo.name), Input(name=mfe_configs.name)],
+                outputs=[mfe_build_dir],
+                run=Command(
+                    path="sh",
+                    args=["-exc", mfe_setup_command],
+                ),
+            ),
+        ),
+    ]
+
+    mfe_build_plan = [
+        TaskStep(
+            task=Identifier("compile-and-deploy-mfe"),
+            config=TaskConfig(
+                platform=Platform.linux,
+                image_resource=AnonymousResource(
+                    type="registry-image",
+                    source={
+                        "repository": "node",
+                        "tag": f"{mfe.runtime_version}-bookworm-slim",
+                    },
+                ),
+                inputs=[Input(name=mfe_build_dir.name)],
+                outputs=[
+                    Output(
+                        name=Identifier("compiled-mfe"),
+                        path=f"{mfe_build_dir.name}/dist",
+                    )
+                ],
+                params=mfe_params(open_edx, mfe),
+                run=Command(
+                    path="sh",
+                    dir=mfe_build_dir.name,
+                    args=[
+                        "-exc",
+                        # Ensure that webpack is installed (TMM 2023-06-27)
+                        textwrap.dedent(
+                            f"""\
                                 apt-get update
                                 apt-get install -q -y python3 python-is-python3 build-essential git
                                 npm install
@@ -180,26 +239,32 @@ def mfe_job(
                                 npm install webpack
                                 NODE_ENV=production npm run build
                                 """  # noqa: E501
-                            ),
-                        ],
-                    ),
+                        ),
+                    ],
                 ),
             ),
-            PutStep(
-                put="mfe-app-bucket",
-                params={
-                    "source": "compiled-mfe",
-                    "destination": [
-                        {
-                            "command": "sync",
-                            "dir": f"s3-remote:{open_edx.environment}-edxapp-mfe/{mfe.application.path}/",  # noqa: E501
-                        }
-                    ],
-                },
-            ),
-        ],
+        ),
+        PutStep(
+            put="mfe-app-bucket",
+            params={
+                "source": "compiled-mfe",
+                "destination": [
+                    {
+                        "command": "sync",
+                        "dir": f"s3-remote:{open_edx.environment}-edxapp-mfe/{mfe.application.path}/",  # noqa: E501
+                    }
+                ],
+            },
+        ),
+    ]
+
+    mfe_job_definition = Job(
+        name=Identifier(f"compile-and-deploy-mfe-{mfe_name}-to-{open_edx.environment}"),
+        plan=mfe_setup_plan + mfe_build_plan,
     )
-    return PipelineFragment(resources=[mfe_repo], jobs=[mfe_job_definition])
+    return PipelineFragment(
+        resources=[mfe_repo, mfe_configs], jobs=[mfe_job_definition]
+    )
 
 
 def mfe_pipeline(
@@ -219,7 +284,7 @@ def mfe_pipeline(
             prev_job = fragments.get(mfe.application, [])[-1].jobs[0]
         except IndexError:
             prev_job = None
-        mfe_fragment = mfe_job(edx_var, mfe, prev_job)
+        mfe_fragment = mfe_job(edx_var, mfe, deployment, prev_job)
         fragments[mfe.application].append(mfe_fragment)
     combined_fragments = PipelineFragment.combine_fragments(
         *chain.from_iterable(fragments.values()),

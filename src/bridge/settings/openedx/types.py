@@ -1,7 +1,16 @@
-from enum import Enum
+from enum import Enum, EnumMeta
 from typing import Literal, NamedTuple, Optional, Union
 
 from pydantic import BaseModel
+
+
+class EnumInvertedLookupMeta(EnumMeta):
+    def __getitem__(cls, item: str):
+        inverse_map = {v.value: v for k, v in cls._member_map_.items()}
+        try:
+            return cls._member_map_[item]
+        except KeyError:
+            return inverse_map[item]
 
 
 class OpenEdxApplication(str, Enum):
@@ -22,7 +31,7 @@ class OpenEdxApplication(str, Enum):
     xqwatcher = ("xqwatcher", "https://github.com/openedx/xqueue-watcher")
 
 
-class OpenEdxMicroFrontend(str, Enum):
+class OpenEdxMicroFrontend(str, Enum, metaclass=EnumInvertedLookupMeta):
     repository: str
     path: str
 
