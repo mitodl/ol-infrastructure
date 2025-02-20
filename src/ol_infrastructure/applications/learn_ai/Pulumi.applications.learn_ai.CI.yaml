@@ -24,4 +24,4 @@ config:
   learn_ai:db_password:
     secure: v1:sJWxOOPa6ZYgXYve:0SKSo2KWIAAdiIYyxIN5VFAYtuNnG+R7cUNa7EoKRWNHDO/WA7GfRK7hVTSInyz8gYIMKzELY9yKfNYy
   redis:password:
-    secure: v1:wHhsp+TA6zeSZzfr:oZGcoTBU8WM6Mptfb+bZi9PgAcaz1u/ZPdDye/7dg3c1dtq2Ef8PNXHoeySdRFaaF7nG/Vise/tdrfbZ
+    secure: v1:ObQfVCLRk72Bn9f3:7EKaqHGnHkYsurz0xWQcX9Cuhc4k0SSXcIIKSgYQnfFSu9uYHbUT0cpsic4M6SYG6ZuFxKXXeaZuLI2QC3s9Feo0oD+SEjetNxCZo0TPot8=
