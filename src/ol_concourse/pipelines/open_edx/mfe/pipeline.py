@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from bridge.settings.openedx.accessors import fetch_applications_by_type
 from bridge.settings.openedx.types import (
+    DeploymentEnvRelease,
     EnvStage,
     OpenEdxApplicationVersion,
     OpenEdxDeploymentName,
@@ -119,6 +120,7 @@ def mfe_params(
 def mfe_job(
     open_edx: OpenEdxVars,
     mfe: OpenEdxApplicationVersion,
+    open_edx_deployment: DeploymentEnvRelease,
     previous_job: Optional[Job] = None,
 ) -> PipelineFragment:
     mfe_name = mfe.application.value
@@ -130,7 +132,9 @@ def mfe_job(
     mfe_configs = git_repo(
         name=Identifier("mfe-slots-config"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        paths=["src/bridge/settings/openedx/mfe/"],
+        paths=[
+            f"src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/"
+        ],
         branch="mfe_plugin_slots_config",
     )
 
@@ -159,14 +163,14 @@ def mfe_job(
         "gradebook": "simple",
         "learner-dashboard": "simple",
     }
-    if slot_config_file := (open_edx.plugin_slot_config_file_map or {}).get(
-        mfe_plugin_type_map.get(OpenEdxMicroFrontend[mfe_name].value)  # type: ignore [arg-type]
+    if slot_config_file := mfe_plugin_type_map.get(
+        OpenEdxMicroFrontend[mfe_name].value
     ):
         mfe_setup_command = textwrap.dedent(
             f"""\
-                                cp -r {mfe_repo.name}/* {mfe_build_dir.name}
-                                cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/{slot_config_file} {mfe_build_dir.name}/env.config.jsx
-                                """  # noqa: E501
+            cp -r {mfe_repo.name}/* {mfe_build_dir.name}
+            cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/{slot_config_file}.env.jsx {mfe_build_dir.name}/env.config.jsx
+            """  # noqa: E501
         )
     else:
         mfe_setup_command = f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}"
@@ -272,7 +276,7 @@ def mfe_pipeline(
             prev_job = fragments.get(mfe.application, [])[-1].jobs[0]
         except IndexError:
             prev_job = None
-        mfe_fragment = mfe_job(edx_var, mfe, prev_job)
+        mfe_fragment = mfe_job(edx_var, mfe, deployment, prev_job)
         fragments[mfe.application].append(mfe_fragment)
     combined_fragments = PipelineFragment.combine_fragments(
         *chain.from_iterable(fragments.values()),
