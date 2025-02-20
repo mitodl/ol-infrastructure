@@ -11,6 +11,7 @@ from ol_concourse.lib.models.pipeline import (
     Identifier,
     Input,
     Job,
+    LoadVarStep,
     Output,
     Pipeline,
     Platform,
@@ -149,10 +150,15 @@ def build_ecommerce_pipeline() -> Pipeline:
                 get=ecommerce_registry_ci_backend_image.name,
                 trigger=True,
                 passed=[ecommerce_main_image_build_job.name],
+                params={"skip_download": True},
             ),
             GetStep(
                 get=ol_infra_repo.name,
                 trigger=False,
+            ),
+            LoadVarStep(
+                load_var="image_tag",
+                file=f"{ecommerce_registry_ci_backend_image.name}/tag",
             ),
             TaskStep(
                 task=Identifier("set-aws-creds"),
@@ -176,9 +182,10 @@ def build_ecommerce_pipeline() -> Pipeline:
                     "env_os": {
                         "AWS_DEFAULT_REGION": "us-east-1",
                         "PYTHONPATH": (
-                            f"/usr/lib/:/tmp/build/put/{ol_infra_repo.name}/src/",
+                            f"/usr/lib/:/tmp/build/put/{ol_infra_repo.name}/src/"
                         ),
                         "GITHUB_TOKEN": "((github.public_repo_access_token))",
+                        "ECOMMERCE_DOCKER_TAG": "((.:image_tag))",
                     },
                     "stack_name": "applications.unified_ecommerce.CI",
                 },
@@ -200,10 +207,15 @@ def build_ecommerce_pipeline() -> Pipeline:
                 get=ecommerce_registry_rc_backend_image.name,
                 trigger=True,
                 passed=[ecommerce_release_canidiate_image_build_job.name],
+                params={"skip_download": True},
             ),
             GetStep(
                 get=ol_infra_repo.name,
                 trigger=False,
+            ),
+            LoadVarStep(
+                load_var="image_tag",
+                file=f"{ecommerce_registry_rc_backend_image.name}/tag",
             ),
             TaskStep(
                 task=Identifier("set-aws-creds"),
@@ -227,9 +239,10 @@ def build_ecommerce_pipeline() -> Pipeline:
                     "env_os": {
                         "AWS_DEFAULT_REGION": "us-east-1",
                         "PYTHONPATH": (
-                            f"/usr/lib/:/tmp/build/put/{ol_infra_repo.name}/src/",
+                            f"/usr/lib/:/tmp/build/put/{ol_infra_repo.name}/src/"
                         ),
                         "GITHUB_TOKEN": "((github.public_repo_access_token))",
+                        "ECOMMERCE_DOCKER_TAG": "((.:image_tag))",
                     },
                     "stack_name": "applications.unified_ecommerce.QA",
                 },
@@ -251,10 +264,15 @@ def build_ecommerce_pipeline() -> Pipeline:
                 get=ecommerce_registry_rc_backend_image.name,
                 trigger=False,
                 passed=[ecommerce_backend_rc_deployment_job.name],
+                params={"skip_download": True},
             ),
             GetStep(
                 get=ol_infra_repo.name,
                 trigger=False,
+            ),
+            LoadVarStep(
+                load_var="image_tag",
+                file=f"{ecommerce_registry_rc_backend_image.name}/tag",
             ),
             TaskStep(
                 task=Identifier("set-aws-creds"),
@@ -278,9 +296,10 @@ def build_ecommerce_pipeline() -> Pipeline:
                     "env_os": {
                         "AWS_DEFAULT_REGION": "us-east-1",
                         "PYTHONPATH": (
-                            f"/usr/lib/:/tmp/build/put/{ol_infra_repo.name}/src/",
+                            f"/usr/lib/:/tmp/build/put/{ol_infra_repo.name}/src/"
                         ),
                         "GITHUB_TOKEN": "((github.public_repo_access_token))",
+                        "ECOMMERCE_DOCKER_TAG": "((.:image_tag))",
                     },
                     "stack_name": "applications.unified_ecommerce.Production",
                 },
