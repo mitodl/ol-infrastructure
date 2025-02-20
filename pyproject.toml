@@ -1,61 +1,79 @@
-[tool.poetry]
+[project]
 name = "ol-infrastructure"
 version = "0.1.0"
 description = "Infrastructure management, configuration management logic, and Packer templates for building and deploying images to run services in a production environment."
-authors = ["MIT Open Learning Engineering <oldevops@mit.edu>"]
-license = "BSD-3-Clause"
+authors = [{ name = "MIT Open Learning Engineering", email = "oldevops@mit.edu" }]
+requires-python = "~=3.12"
 readme = "README.md"
+license = "BSD-3-Clause"
 classifiers = [
-    'Operating System :: Linux',
-    'Programming Language :: Python',
-    'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.10',
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
 ]
-repository = "https://github.com/mitodl/ol-infrastructure"
-packages = [
-    {include = "ol_infrastructure", from = "src"},
-    {include = "bridge", from = "src"},
-    {include = "bilder", from = "src"},
-    {include = "ol_concourse", from = "src"},
+dependencies = [
+    "boto3~=1.24",
+    "httpx>=0.28.0,<0.29",
+    "hvac[parser]>=2.0.0,<3",
+    "parliament>=1.6.0,<2",
+    "pulumi>=3.39.1,<4",
+    "pulumi-aws>=6.0.0,<7",
+    "pulumi-fastly>=8.0.0,<9",
+    "pulumi-github>=6.0.0,<7",
+    "pulumi-mailgun>=3.0.0,<4",
+    "pulumi-tls>=5.0.0,<6",
+    "pulumi-vault>=6.0.0,<7",
+    "pulumi_consul>=3.5.0,<4",
+    "pydantic>=2,<3",
+    "pyinfra~=3.0",
+    "pulumi-mongodbatlas>=3.3.0,<4",
+    "bcrypt>=4.0.0,<5",
+    "pulumi-keycloak>=6.0.0,<7",
+    "pydantic-settings>=2.0.1,<3",
+    "pulumiverse-heroku>=1.0.3,<2",
+    "pulumi-eks>=3.8.0,<4",
+    "pulumi-aws-native>=1.25.0,<2",
 ]
 
-[tool.poetry.dependencies]
-python = "^3.12"
-boto3 = "^1.24"
-httpx = "^0.28.0"
-hvac = {extras = ["parser"], version = "^2.0.0"}
-parliament = "^1.6.0"
-pulumi = "^3.39.1"
-pulumi-aws = "^6.0.0"
-pulumi-fastly = "^8.0.0"
-pulumi-github = "^6.0.0"
-pulumi-mailgun = "^3.0.0"
-pulumi-tls = "^5.0.0"
-pulumi-vault = "^6.0.0"
-pulumi_consul = "^3.5.0"
-pydantic = "^2"
-pyinfra = "^3.0"
-pulumi-mongodbatlas = "^3.3.0"
-bcrypt = "^4.0.0"
-pulumi-keycloak = "^6.0.0"
-pydantic-settings = "^2.0.1"
-pulumiverse-heroku = "^1.0.3"
-pulumi-eks = "^3.8.0"
-pulumi-aws-native = "^1.25.0"
+[project.urls]
+Repository = "https://github.com/mitodl/ol-infrastructure"
 
-[tool.poetry.group.dev.dependencies]
-copier = "*"
-datamodel-code-generator = "*"
-diagrams = "*"
-mypy = "*"
-pre-commit = "^4.0.0"
-pytest = "^8.0.0"
-pytest-testinfra = "^10.0.0"
-ruff = "^0"
+[dependency-groups]
+dev = [
+    "copier",
+    "datamodel-code-generator",
+    "diagrams",
+    "mypy",
+    "pre-commit>=4.0.0,<5",
+    "pytest>=8.0.0,<9",
+    "pytest-testinfra>=10.0.0,<11",
+    "ruff>=0,<1",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/ol_infrastructure",
+    "src/bridge",
+    "src/bilder",
+    "src/ol_concourse",
+]
+
+[tool.hatch.build.targets.wheel]
+include = [
+    "src/ol_infrastructure",
+    "src/bridge",
+    "src/bilder",
+    "src/ol_concourse",
+]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/ol_infrastructure" = "ol_infrastructure"
+"src/bridge" = "bridge"
+"src/bilder" = "bilder"
+"src/ol_concourse" = "ol_concourse"
 
 [build-system]
-requires = ["poetry_core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.mypy]
 python_version = "3.12"
@@ -69,8 +87,6 @@ disallow_any_generics = true
 check_untyped_defs = true
 no_implicit_reexport = true
 ignore_missing_imports = true
-# for strict mypy: (this is the tricky one :-))
-# disallow_untyped_defs = true
 
 [tool.pydantic-mypy]
 init_forbid_extra = true
