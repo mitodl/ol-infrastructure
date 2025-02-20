@@ -139,7 +139,7 @@ def build_ecommerce_pipeline() -> Pipeline:
     pulumi_resource = pulumi_provisioner(
         name=Identifier("pulumi-ol-infrastructure-unified_ecommerce-application"),
         project_name="ol-infrastructure-unified_ecommerce-application",
-        project_path=f"{ol_infra_repo.name}/src/ol_infrastructure/unified_ecommerce",
+        project_path=f"{ol_infra_repo.name}/src/ol_infrastructure/applications/unified_ecommerce/",
     )
 
     ecommerce_backend_ci_deployment_job = Job(
