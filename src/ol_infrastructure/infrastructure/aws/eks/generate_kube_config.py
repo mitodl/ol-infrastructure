@@ -1,4 +1,7 @@
 # ruff:  noqa: E501
+
+# This script is only for devops to use. Requires access to the pulumi state files.
+
 import argparse
 import glob
 import json
@@ -14,21 +17,13 @@ parser.add_argument(
     help="sets a current context in the rendered kube_config file",
     required=False,
 )
-parser.add_argument(
-    "-t",
-    "--team",
-    help="sets the team to either 'devops' or 'developer'",
-    required=True,
-    default="developers",
-    choices=["devops", "developers"],
-)
 args = parser.parse_args()
 
 contexts = []
 clusters = []
 users = []
 
-role_arn_name = "admin_role_arn" if args.team == "devops" else "developer_role_arn"
+role_arn_name = "admin_role_arn"
 
 
 def extract_kube_config_params(role_arn, cluster_ca, cluster_endpoint, cluster_name):
@@ -109,6 +104,6 @@ kube_config = {
     "users": users,
 }
 if args.set_current_context:
-    kube_config["current-context"] = args.current_context
+    kube_config["current-context"] = args.set_current_context
 
 print(yaml.dump(kube_config))  # noqa: T201
