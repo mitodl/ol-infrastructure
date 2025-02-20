@@ -147,6 +147,13 @@ def mfe_job(
         trigger=previous_job is None and open_edx.environment_stage != "production",
     )
 
+    branding_overrides = "\n".join(
+        (
+            f"npm install {component}:{override}"
+            for component, override in (mfe.branding_overrides or {}).items()
+        )
+    )
+
     translation_overrides = "\n".join(cmd for cmd in mfe.translation_overrides or [])
     if previous_job and mfe_repo.name == previous_job.plan[0].get:
         clone_mfe_repo.passed = [previous_job.name]
@@ -227,6 +234,7 @@ def mfe_job(
                                 apt-get install -q -y python3 python-is-python3 build-essential git
                                 npm install
                                 npm install -g @edx/openedx-atlas
+                                {branding_overrides}
                                 {translation_overrides}
                                 npm install webpack
                                 NODE_ENV=production npm run build
