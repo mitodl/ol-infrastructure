@@ -1,11 +1,22 @@
 import { PLUGIN_OPERATIONS } from '@openedx/frontend-plugin-framework';
 import { getConfig } from '@edx/frontend-platform';
 
+import * as remoteAiChatDrawer from "./mitodl-smoot-design/dist/bundles/remoteAiChatDrawer.umd.js"
+
+
 const modifyUserMenu = (widget) => {
   widget.content.items = [
     {
       href: `${getConfig().LMS_BASE_URL}/dashboard`,
       message: 'Dashboard',
+    },
+    {
+      href: `${getConfig().MARKETING_SITE_BASE_URL}/profile/`,
+      message: 'Profile',
+    },
+    {
+      href: `${getConfig().MARKETING_SITE_BASE_URL}/account-settings/`,
+      message: 'Settings',
     },
     {
       href: `${getConfig().LMS_BASE_URL}/logout`,
@@ -14,6 +25,12 @@ const modifyUserMenu = (widget) => {
   ];
   return widget;
 };
+
+remoteAiChatDrawer.init({
+  messageOrigin: getConfig().LMS_BASE_URL,
+  transformBody: messages => ({ message: messages[messages.length - 1].content }),
+})
+
 
 const config = {
   pluginSlots: {
