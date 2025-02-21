@@ -154,6 +154,20 @@ def mfe_job(
         )
     )
 
+    if (
+        open_edx_deployment.deployment_name == "mitxonline"
+        and OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learn.value
+    ):
+        mfe_smoot_design_overrides = """
+        npm pack @mitodl/smoot-design@^3.4.0
+        tar -xvzf mitodl-smoot-design*.tgz
+        mv package mitodl-smoot-design
+        """
+        learning_mfe_slot_config_file = "learning-mfe-config"
+    else:
+        mfe_smoot_design_overrides = ""
+        learning_mfe_slot_config_file = "learning"
+
     translation_overrides = "\n".join(cmd for cmd in mfe.translation_overrides or [])
     if previous_job and mfe_repo.name == previous_job.plan[0].get:
         clone_mfe_repo.passed = [previous_job.name]
@@ -163,7 +177,7 @@ def mfe_job(
     mfe_setup_plan = [clone_mfe_repo]
 
     mfe_plugin_type_map = {
-        "learning": "learning",
+        "learning": learning_mfe_slot_config_file,
         "discussions": "learning",
         "ora-grading": "learning",
         "communications": "learning",
@@ -236,6 +250,7 @@ def mfe_job(
                                 npm install -g @edx/openedx-atlas
                                 {branding_overrides}
                                 {translation_overrides}
+                                {mfe_smoot_design_overrides}
                                 npm install webpack
                                 NODE_ENV=production npm run build
                                 """  # noqa: E501
