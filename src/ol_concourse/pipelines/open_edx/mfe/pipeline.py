@@ -154,11 +154,15 @@ def mfe_job(
         )
     )
 
-    mfe_smoot_design_overrides = """
+    mfe_smoot_design_overrides = (
+        """
     npm pack @mitodl/smoot-design
     tar -xvzf mitodl-smoot-design*.tgz
     mv package mitodl-smoot-design
-    """ if OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learn.value else ""
+    """
+        if OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learn.value
+        else ""
+    )
 
     translation_overrides = "\n".join(cmd for cmd in mfe.translation_overrides or [])
     if previous_job and mfe_repo.name == previous_job.plan[0].get:
