@@ -468,6 +468,13 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                 target_label = "container"
               }}
 
+                // Add a pod name label for easier searching / troubleshooting
+              rule {{
+                source_labels = ["__meta_kubernetes_pod_name"]
+                action = "replace"
+                target_label = "pod"
+              }}
+
                 // Select k8s label -> stack label
                 // From least desirable to most desireable
               rule {{
@@ -496,7 +503,7 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
               }}
 
               stage.label_keep {{
-                values = ["application", "cluster", "container", "environment", "namespace", "service", "stack"]
+                values = ["application", "cluster", "container", "environment", "namespace", "service", "stack", "pod"]
               }}
               forward_to = [loki.write.publish_to_grafana.receiver]
             }}
