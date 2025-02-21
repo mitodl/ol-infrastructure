@@ -499,6 +499,12 @@ ol_data_platform_realm = keycloak.Realm(
     sso_session_idle_timeout="2h",
     sso_session_max_lifespan="24h",
     opts=resource_options,
+    web_authn_passwordless_policy={
+        "relying_party_entity_name": "mit-ol-sso",
+        "relying_party_id": "mit.edu",
+        "require_resident_key": "Yes",
+        "user_verification_requirement": "required",
+    },
 )
 
 ol_data_required_action_configure_otp = keycloak.RequiredAction(
@@ -531,40 +537,6 @@ ol_data_passwordless_browser_flow_cookie = keycloak.authentication.Execution(
     "ol-data-passwordless-browser-flow-cookie",
     parent_flow_alias=ol_data_passwordless_browser_flow.alias,
     authenticator="auth-cookie",
-    realm_id=ol_data_platform_realm.realm,
-    requirement="ALTERNATIVE",
-    opts=resource_options,
-)
-ol_data_passwordless_browser_flow_alt_flow = keycloak.authentication.Subflow(
-    "ol-data-passwordless-browser-flow-alt-flow",
-    realm_id=ol_data_platform_realm.id,
-    alias="ol-data-passwordless-browser-flow-alt-flow",
-    parent_flow_alias=ol_data_passwordless_browser_flow.alias,
-    provider_id="basic-flow",
-    requirement="ALTERNATIVE",
-    opts=resource_options,
-)
-ol_data_passwordless_browser_flow_conditional_flow = keycloak.authentication.Subflow(
-    "ol-data-passwordless-browser-flow-conditional-flow",
-    realm_id=ol_data_platform_realm.id,
-    alias="ol-data-passwordless-browser-flow-conditional-flow",
-    parent_flow_alias=ol_data_passwordless_browser_flow_alt_flow.alias,
-    provider_id="basic-flow",
-    requirement="CONDITIONAL",
-    opts=resource_options,
-)
-ol_data_passwordless_browser_flow_user_configured = keycloak.authentication.Execution(
-    "ol-data-passwordless-browser-flow-user-configured",
-    parent_flow_alias=ol_data_passwordless_browser_flow_conditional_flow.alias,
-    authenticator="conditional-user-configured",
-    realm_id=ol_data_platform_realm.realm,
-    requirement="REQUIRED",
-    opts=resource_options,
-)
-ol_data_passwordless_browser_flow_org_identity = keycloak.authentication.Execution(
-    "ol-data-passwordless-browser-flow-org-identity",
-    parent_flow_alias=ol_data_passwordless_browser_flow_conditional_flow.alias,
-    authenticator="organization",
     realm_id=ol_data_platform_realm.realm,
     requirement="ALTERNATIVE",
     opts=resource_options,
@@ -603,40 +575,6 @@ ol_data_passwordless_browser_flow_binding = keycloak.authentication.Bindings(
     opts=resource_options,
 )
 # OL - Passwordless Browser login flow [END]
-
-# OL Data - Passwordless Registration flow with [START]
-ol_data_passwordless_registration_flow = keycloak.authentication.Flow(
-    "ol-data-passwordless-registration-flow",
-    realm_id=ol_data_platform_realm.id,
-    alias="ol-data-passwordless-registration-flow",
-    opts=resource_options,
-)
-ol_data_passwordless_registration_flow_registration_form = (
-    keycloak.authentication.Subflow(
-        "ol-data-passwordless-registration-flow-registration-form",
-        realm_id=ol_data_platform_realm.id,
-        alias="ol-data-passwordless-registration-flow-registration-form",
-        parent_flow_alias=ol_data_passwordless_registration_flow.alias,
-        provider_id="form-flow",
-        requirement="REQUIRED",
-        opts=resource_options,
-    )
-)
-ol_data_passwordless_registration_flow_user_profile_creation = keycloak.authentication.Execution(  # noqa: E501
-    "ol-data-passwordless-registration-flow-user-profile-creation",
-    parent_flow_alias=ol_data_passwordless_registration_flow_registration_form.alias,
-    authenticator="registration-user-creation",
-    realm_id=ol_data_platform_realm.realm,
-    requirement="REQUIRED",
-    opts=resource_options,
-)
-ol_data_passwordless_registration_flow_binding = keycloak.authentication.Bindings(
-    "ol-data-passwordless-registration-flow-binding",
-    registration_flow=ol_data_passwordless_registration_flow.alias,
-    realm_id=ol_data_platform_realm.realm,
-    opts=resource_options,
-)
-# OL - Passwordless Registration flow [END]
 
 # OL Data - First login flow [START]
 # Does not require email verification or confirmation to connect with existing account.
