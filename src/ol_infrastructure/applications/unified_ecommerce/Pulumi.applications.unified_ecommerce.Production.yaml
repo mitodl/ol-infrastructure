@@ -1,0 +1,39 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjmo6C0sCNz3fdkFlhbu0tdBZxnHmPYSnqtmocvGiuNygHC/PGOKljmuce0NQObwYDbAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMAVClXXcM3FVau7OjAgEQgDsmV5xll09OEHy5E5Cn4jL7eqzuWXjgEdfeMW3ZyNGzCDmc6B+1p78fJOjPwAJNmuYJHzmlnVjUqIwcIA==
+config:
+  aws:region: us-east-1
+  consul:address: https://consul-apps-production.odl.mit.edu
+  ecommerce:backend_domain: "api-pay.ol.mit.edu"
+  ecommerce:env_vars:
+    CELERY_TASK_ALWAYS_EAGER: "False"
+    CSRF_ALLOWED_ORIGINS: '["https://pay.ol.mit.edu", "https://api-pay.ol.mit.edu"]'
+    CSRF_TRUSTED_ORIGINS: '["https://pay.ol.mit.edu", "https://api-pay.ol.mit.edu"]'
+    DEBUG: "true"
+    DEV_ENV: "true"
+    ENVIRONMENT: "dev"
+    MITOL_UE_BASE_URL: "https://api-pay.ol.mit.edu"
+    MITOL_UE_COOKIE_DOMAIN: "ol.mit.edu"
+    MITOL_UE_COOKIE_NAME: "mitolue"
+    MITOL_UE_DB_DISABLE_SSL: "True"
+    MITOL_UE_FEATURES_DEFAULT: "True"
+    MITOL_UE_FROM_EMAIL: "donotreply@ol.mit.edu" ###FIX
+    MITOL_UE_HOSTNAME: "api-pay.ol.mit.edu"
+    MITOL_UE_PAYMENT_BASKET_CHOOSER: "https://pay.ol.mit.edu/cart/" ###FIX
+    MITOL_UE_PAYMENT_BASKET_ROOT: "https://pay.ol.mit.edu/cart/" ###FIX
+    MITOL_UE_PAYMENT_INTERSTITIAL_DEBUG: "False"
+    MITOL_UE_SECURE_SSL_REDIRECT: "False" ###FIX
+    MITOL_UE_USE_S3: "False" ###FIX
+    NODE_ENV: "production"
+    POSTHOG_API_HOST: "https://app.posthog.com"
+    SITE_NAME: "MIT Open Learning Ecommerce"
+    UWSGI_THREADS: "5"
+  ecommerce:frontend_domain: "pay.ol.mit.edu"
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
+  ecommerce:db_password:
+    secure: v1:63NKVpgDdLRi4b4f:kp7kQc7fjBHjriHWNLtzjUIW3Tfmliz9Zja2hCU93D+AHG4zbgWyQvjQUk3czESRSVkoj2M6FRpU0ZYWBHFFWOOgm4YLHplZ8s0dJ9HpwFI=
+  redis:password:
+    secure: v1:8+/FUUxNRfAeVzHK:dpMnerSfh08vrSVD2wbq9egdlosRhHYltAi1iF4yIbAJt+edorXaXLs01xem6nEJ96yrrRyq1dRO/Mbs+TqagAGPc6MliK2tar4juiVWQAM=
+  ecommerce:fastly_api_key:
+    secure: v1:a8Hnnt1YXN3HceF9:2nkpTCqQtTGIae4/LoCUq97SaHmu5w40V3oGd8LYx3x4nnUvGSxORyDzsBOeqxVZ
