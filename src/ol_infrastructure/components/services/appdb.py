@@ -1,9 +1,13 @@
 """
 This module collapses as much boilerplate as possible to facilitate the setup
+ptions
+
 of an application's database.
 """
 
-from pulumi import ComponentResource, StackReference
+from typing import Optional
+
+from pulumi import ComponentResource, ResourceOptions, StackReference
 from pulumi_aws import ec2
 
 from bridge.lib.magic_numbers import (
@@ -14,6 +18,10 @@ from ol_infrastructure.components.aws.database import (
     OLAmazonDB,
     OLPostgresDBConfig,
     SecretStr,
+)
+from ol_infrastructure.components.services.vault import (
+    OLVaultDatabaseBackend,
+    OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
@@ -32,13 +40,13 @@ aws_config = AWSBase(
 
 
 class OLDatabaseConfig:
-    """Confugration for the MIT OL Database component"""
+    """Configuration for the MIT OL Database component"""
 
     app_name: str
     app_db_name: str
     app_db_password: str
     app_db_instance_size: str | None
-    app_db_capacity: str | None
+    app_db_capacity: int | None
     target_vpc_name: str
     app_security_group: ec2.SecurityGroup
 
@@ -47,11 +55,13 @@ class OLDatabase(ComponentResource):
     """MIT OL Database component"""
 
     def __init__(
-        self, ol_db_config: OLDatabaseConfig
+        self,
+        ol_db_config: OLDatabaseConfig,
+        opts: Optional[ResourceOptions] = None,
     ):
         self.ol_db_config = ol_db_config
         super().__init__(
-            "ol:infrastructure:aws:OLDatabase", ol_db_config.app_name, None
+            "ol:infrastructure:aws:OLDatabase", ol_db_config.app_name, None, opts
         )
 
         target_vpc = network_stack.require_output(ol_db_config.target_vpc_name)
@@ -92,21 +102,22 @@ class OLDatabase(ComponentResource):
             subnet_group_name=target_vpc["rds_subnet"],
             security_groups=[self.app_db_security_group],
             storage=self.ol_db_config.app_db_capacity
-            or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
+            or AWS_RDS_DEFAULT_DATABASE_CAPACITY,
             engine_major_version="16",
             tags=aws_config.tags,
             db_name=self.ol_db_config.app_db_name,
             **defaults(stack_info)["rds"],
         )
+        self.app_db = OLAmazonDB(self.app_db_config)
+
         self.app_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
-            db_name=self.app_db_config.db_name,
+            db_name=self.ol_db_config.app_db_name,
             mount_point=f"{self.app_db_config.engine}-learn-ai",
             db_admin_username=self.app_db_config.username,
-            db_admin_password=self.app_db_config.db_password,
-            db_host=app_db.db_instance.address,
+            db_admin_password=self.ol_db_config.app_db_password,
+            db_host=self.app_db.db_instance.address,
         )
-        app_db_vault_backend = OLVaultDatabaseBackend(
+        OLVaultDatabaseBackend(
             self.app_db_vault_backend_config,
+            opts=ResourceOptions(delete_before_replace=True, parent=self.app_db),
         )
-
-        self.app_db = OLAmazonDB(app_db_config)
