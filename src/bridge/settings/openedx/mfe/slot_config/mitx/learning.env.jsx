@@ -1,6 +1,9 @@
 import { PLUGIN_OPERATIONS } from '@openedx/frontend-plugin-framework';
 import { getConfig } from '@edx/frontend-platform';
 
+import * as remoteAiChatDrawer from "./mitodl-smoot-design/dist/bundles/remoteAiChatDrawer.umd.js"
+
+
 const modifyUserMenu = (widget) => {
   widget.content.items = [
     {
@@ -14,6 +17,13 @@ const modifyUserMenu = (widget) => {
   ];
   return widget;
 };
+
+if (getConfig().APP_ID === 'learning') {
+  remoteAiChatDrawer.init({
+    messageOrigin: getConfig().LMS_BASE_URL,
+    transformBody: messages => ({ message: messages[messages.length - 1].content }),
+  })
+}
 
 const config = {
   pluginSlots: {
