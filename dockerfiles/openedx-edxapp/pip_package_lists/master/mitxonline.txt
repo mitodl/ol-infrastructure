@@ -16,6 +16,4 @@ uwsgi==2.0.28
 wheel==0.45.1
 
 # Experimental Plugins for AI features
-ai-coach-xblock
-learning-assistant
-ai-aside
+ol-openedx-chat

@@ -25,3 +25,8 @@ config:
     secure: v1:txrMWRvWLuyLZ9jG:RANFRu7iGA96qnc47SdQjrwTOS5Lz96n4Vdt6CK9vyb6FreKon4+qyLlk7P+dBS+T0lN7H6bvC1F38zIOA==
   vault:address: "https://vault-production.odl.mit.edu"
   vault_server:env_namespace: "operations.production"
+  # This is a hack. We need to write a Consul key for use by MITx Online and the apps
+  # and MITx Online VPCs aren't peered, so the Consul clusters aren't peered. We don't
+  # actually use Consul for anything else in this project so this is okay (so far) (TMM
+  # 2025-02-21)
+  consul:address: https://consul-mitxonline-production.odl.mit.edu
