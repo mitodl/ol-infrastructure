@@ -9,6 +9,7 @@ from string import Template
 
 import pulumi_fastly as fastly
 import pulumi_github as github
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
 from pulumi import Alias, Config, InvokeOptions, ResourceOptions, StackReference, export
@@ -26,6 +27,10 @@ from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBCo
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
+)
+from ol_infrastructure.lib.aws.eks_helper import (
+    check_cluster_namespace,
+    setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.fastly import (
@@ -52,7 +57,9 @@ heroku_config = Config("heroku")
 heroku_app_config = Config("heroku_app")
 
 stack_info = parse_stack()
+
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
 vector_log_proxy_stack = StackReference(
     f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
@@ -61,6 +68,7 @@ monitoring_stack = StackReference("infrastructure.monitoring")
 dns_stack = StackReference("infrastructure.aws.dns")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 learn_zone_id = dns_stack.require_output("learn")["id"]
+
 learn_frontend_domain = mitlearn_config.require("frontend_domain")
 legacy_learn_frontend_domain = mitlearn_config.require("legacy_frontend_domain")
 nextjs_heroku_domain = mitlearn_config.require("nextjs_heroku_domain")
@@ -75,6 +83,16 @@ aws_config = AWSBase(
 app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
     stack_info.env_suffix
 ]
+
+k8s_global_labels = {
+    "ol.mit.edu/stack": stack_info.full_name,
+    "ol.mit.edu/service": "mit-learn",  # What should this actually be?
+}
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
+learn_namespace = "mitlearn"
+cluster_stack.require_output("namespaces").apply(
+    lambda ns: check_cluster_namespace(learn_namespace, ns)
+)
 
 #######################################################
 # begin legacy block - app bucket config
@@ -765,6 +783,127 @@ mitopen_fastly_service = fastly.ServiceVcl(
     ),
 )
 
+application_labels = k8s_global_labels | {
+    "ol.mit.edu/application": "learn",
+    "ol.mit.edu/pod-security-group": "learn",
+}
+
+shared_plugin_config_name = "shared-plugin-config"
+learn_external_service_apisix_pluginconfig = kubernetes.apiextensions.CustomResource(
+    f"ol-mitlearn-external-service-apisix-pluginconfig-{stack_info.env_suffix}",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixPluginConfig",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=shared_plugin_config_name,
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec={
+        "plugins": [
+            {
+                "name": "proxy-rewrite",
+                "enable": True,
+                "config": {
+                    "host": mitlearn_config.require("heroku_domain"),
+                    "headers": {
+                        "set": {
+                            "Host": mitlearn_config.require("heroku_domain"),
+                        },
+                    },
+                },
+            },
+        ]
+    },
+)
+
+learn_external_service_name = "learn-at-heroku"
+learn_external_service_port_name = "https"
+
+learn_external_service = kubernetes.core.v1.Service(
+    f"ol-mitlearn-external-service-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=learn_external_service_name,
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        external_name=mitlearn_config.require("heroku_domain"),
+        ports=[
+            kubernetes.core.v1.ServicePortArgs(
+                name=learn_external_service_port_name,
+                port=DEFAULT_HTTPS_PORT,
+                target_port=DEFAULT_HTTPS_PORT,
+                protocol="TCP",
+            ),
+        ],
+        type="ExternalName",  # Special!
+    ),
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+learn_external_service_apisix_upstream = kubernetes.apiextensions.CustomResource(
+    f"ol-mitlearn-external-service-apisix-upstream-{stack_info.env_suffix}",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixUpstream",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=learn_external_service_name,
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec={
+        "externalNodes": [
+            {
+                "type": "Service",
+                "name": learn_external_service_name,
+            },
+        ],
+    },
+    opts=ResourceOptions(
+        delete_before_replace=True, depends_on=[learn_external_service]
+    ),
+)
+
+
+learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
+    f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixRoute",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=learn_external_service_name,
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec={
+        "http": [
+            {
+                "name": "learn-at-heroku-testing",
+                "plugin_config_name": shared_plugin_config_name,
+                "match": {
+                    "hosts": [
+                        mitlearn_config.require("api_domain"),
+                    ],
+                    "paths": [
+                        "/*",
+                    ],
+                },
+                "upstreams": [
+                    {
+                        "name": learn_external_service_name,
+                    },
+                ],
+            },
+        ],
+    },
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[
+            learn_external_service,
+            learn_external_service_apisix_upstream,
+            learn_external_service_apisix_pluginconfig,
+        ],
+    ),
+)
+
 five_minutes = 60 * 5
 route53.Record(
     "ol-mitopen-frontend-dns-record",
@@ -786,25 +925,27 @@ route53.Record(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-route53.Record(
-    "ol-mitopen-api-dns-record",
-    name=mitlearn_config.require("api_domain"),
-    allow_overwrite=True,
-    type="CNAME",
-    ttl=five_minutes,
-    records=[mitlearn_config.require("heroku_domain")],
-    zone_id=learn_zone_id,
-    opts=ResourceOptions(delete_before_replace=True),
-)
-route53.Record(
-    "ol-mitopen-api-dns-record-legacy",
-    name=mitlearn_config.require("legacy_api_domain"),
-    type="CNAME",
-    ttl=five_minutes,
-    records=[mitlearn_config.require("heroku_domain")],
-    zone_id=mitodl_zone_id,
-    opts=ResourceOptions(delete_before_replace=True),
-)
+# external-dns in the eks cluster is going to handle these now?
+
+# route53.Record(
+#    "ol-mitopen-api-dns-record",
+#    name=mitlearn_config.require("api_domain"),
+#    allow_overwrite=True,
+#    type="CNAME",
+#    ttl=five_minutes,
+#    records=[mitlearn_config.require("heroku_domain")],
+#    zone_id=learn_zone_id,
+#    opts=ResourceOptions(delete_before_replace=True),
+# )
+# route53.Record(
+#    "ol-mitopen-api-dns-record-legacy",
+#    name=mitlearn_config.require("legacy_api_domain"),
+#    type="CNAME",
+#    ttl=five_minutes,
+#    records=[mitlearn_config.require("heroku_domain")],
+#    zone_id=mitodl_zone_id,
+#    opts=ResourceOptions(delete_before_replace=True),
+# )
 
 
 # ci, rc, or production
