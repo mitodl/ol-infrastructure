@@ -823,6 +823,7 @@ heroku_vars = {
     "MICROMASTERS_CATALOG_API_URL": "https://micromasters.mit.edu/api/v0/catalog/",
     "MICROMASTERS_CMS_API_URL": "https://micromasters.mit.edu/api/v0/wagtail/",
     "MITOL_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
+    "MITOL_API_LOGOUT_SUFFIX": "logout/oidc",
     "MITOL_AXIOS_BASE_PATH": f"https://{mitlearn_config.get('frontend_domain')}",
     "MITOL_DB_CONN_MAX_AGE": 0,
     "MITOL_DB_DISABLE_SSL": "True",
