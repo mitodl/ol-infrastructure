@@ -584,6 +584,7 @@ export(
         "cluster_address": vault_public_dns.fqdn.apply("https://{}".format),
         "environment_namespace": f"{stack_info.env_prefix}.{stack_info.env_suffix}",
         "instance_profile_arn": vault_instance_profile.arn,
+        "instance_role_arn": vault_iam_role.arn,
         "public_dns": vault_public_dns.fqdn,
         "security_group": vault_security_group.id,
         "vpc_id": target_vpc["id"],
