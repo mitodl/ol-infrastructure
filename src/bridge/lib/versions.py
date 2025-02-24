@@ -26,7 +26,7 @@ CERT_MANAGER_CHART_VERSION = "v1.16.1"
 EBS_CSI_DRIVER_VERSION = "v1.36.0-eksbuild.1"
 EFS_CSI_DRIVER_VERSION = "v2.0.8-eksbuild.1"
 # renovate: datasource=helm depName=external-dns packageName=external-dns
-EXTERNAL_DNS_CHART_VERSION = "1.15.0"
+EXTERNAL_DNS_CHART_VERSION = "2.20.4"
 # renovate: datasource=github-releases depName=gateway-api packageName=kubernetes-sigs/gateway-api
 GATEWAY_API_VERSION = "v1.2.1"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
