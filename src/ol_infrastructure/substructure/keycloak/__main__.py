@@ -958,7 +958,7 @@ ol_data_platform_openmetadata_client = keycloak.openid.Client(
     enabled=True,
     access_type="CONFIDENTIAL",
     standard_flow_enabled=True,
-    implicit_flow_enabled=False,
+    implicit_flow_enabled=True,
     service_accounts_enabled=True,
     valid_redirect_uris=keycloak_realm_config.get_object(
         "ol-data-platform-openmetadata-redirect-uris"

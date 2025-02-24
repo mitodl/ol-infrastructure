@@ -26,29 +26,46 @@ config:
     secure: v1:iwlNVKpViup/xmjh:1nzhVf0/XBinQsI78YdpTcBZQiHgr9heAg+qv9T0rw==
   keycloak_realm:mit_email_username:
     secure: v1:ixrI5oZwMK2WCpQr:NaqM67NVCRDfOCsTlyrnN4tNmrPXcSOs
-  keycloak_realm:openid_clients:
-  - client_info:
-      unified-ecommerce: ["https://pay.ol.mit.edu/*", "https://api-pay.ol.mit.edu/*"]
-      learn-ai: ["https://learn-ai.ol.mit.edu/*", "https://api-learn-ai.ol.mit.edu/*"]
-      mitlearn: ["https://api.learn.mit.edu/*", "https://learn.mit.edu/*"]
-      open: ["https://api.mitopen.odl.mit.edu/*", "https://mitopen.odl.mit.edu/*"]
-      open-discussions: ["https://open.mit.edu/*"]
-    realm_name: olapps
-    extra_default_scopes: ["ol-profile"]
-  - client_info:
-      airbyte: ["https://airbyte.odl.mit.edu/*"]
-      dagster: ["https://pipelines.odl.mit.edu/*"]
-      leek: ["https://celery-monitoring.odl.mit.edu/*"]
-    realm_name: ol-platform-engineering
-  - client_info:
-      superset: ["https://bi.ol.mit.edu/*", "superset_admin", "superset_alpha", "superset_gamma"]
-    realm_name: ol-data-platform
-    service_accounts_enabled: true
-  - client_info:
-      open_metadata: ["https://data.ol.mit.edu/*", "open_metadata_admin", "open_metadata_user"]
-    realm_name: ol-data-platform
-    implicit_flow_enabled: true
-    standard_flow_enabled: false
-    service_accounts_enabled: true
+  keycloak_realm:olapps-unified-ecommerce-client-redirect-uris: ["https://pay.ol.mit.edu/*",
+    "https://api-pay.ol.mit.edu/*"]
+  keycloak_realm:olapps-unified-ecommerce-client-logout-uris: ["/establish_session*",
+    ".apisix/redirect/*"]
+  keycloak_realm:olapps-unified-ecommerce-client-roles: ["https://api-pay.ol.mit.edu/*"]
+  keycloak_realm:olapps-learn-ai-redirect-uris: ["https://learn-ai.ol.mit.edu/*",
+    "https://api-learn-ai.ol.mit.edu/*"]
+  keycloak_realm:olapps-learn-ai-client-roles: ["https://api-learn-ai.ol.mit.edu/*"]
+  keycloak_realm:olapps-mitlearn-client-redirect-uris: ["https://api.learn.mit.edu/*",
+    "https://learn.mit.edu/*"]
+  keycloak_realm:olapps-mitlearn-client-roles: ["https://learn.mit.edu/*"]
+  keycloak_realm:olapps-open-discussions-client-redirect-uris: ["https://open.mit.edu/*"]
+  keycloak_realm:ol-platform-engineering-airbyte-redirect-uris: ["https://airbyte.odl.mit.edu/*"]
+  keycloak_realm:ol-platform-engineering-dagster-redirect-uris: ["https://pipelines.odl.mit.edu/*"]
+  keycloak_realm:ol-platform-engineering-leek-redirect-uris: ["https://celery-monitoring.odl.mit.edu/*"]
+  keycloak_realm:ol-platform-engineering-vault-redirect-uris: ["https://vault.odl.mit.edu/ui/vault/auth/oidc/oidc/callback",
+    "http://localhost:8250/oidc/callback"]
+  keycloak_realm:ol-data-platform-superset-redirect-uris: ["https://bi.ol.mit.edu/*"]
+  keycloak_realm:ol-data-platform-superset-client-roles: ["superset_admin", "superset_alpha",
+    "superset_gamma"]
+  keycloak_realm:ol-data-platform-openmetadata-redirect-uris: ["https://data.ol.mit.edu/*"]
+  keycloak_realm:ol-data-platform-openmetadata-client-roles: ["open_metadata_admin",
+    "open_metadata_user"]
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
+  keycloak_realm:olapps-unified-ecommerce-client-secret:
+    secure: v1:M7V+wF8RPj2Wg8Ze:Tyg4FyTtImPBF/Oh1TQZ53feglE8Mzwm2WV+FBS4QZnIMZ/NOmWf28neMCu5I7wW
+  keycloak_realm:olapps-learn-ai-client-secret:
+    secure: v1:MvvmStk26rnq2N4+:+Y2bvHkdIfHaWwJ/X7qQuPgffR6MzJOUv6fqoxTszk135voTcnJb6Dhz8dWT6Yhs
+  keycloak_realm:olapps-mitlearn-client-secret:
+    secure: v1:0cKjKoixxCfy3QT0:SBVxJ4ol/twsQGjPmxrYnNkDy9aIUGEngln7RX7pFuL93O4bNgKg93BBCgp4wkAN
+  keycloak_realm:olapps-open-discussions-client-secret:
+    secure: v1:WZ6HmifHYsBzNV8i:8gOdt2Jc8kXSRF0qg5G+00wpqlTOi5RNsvazNOqVadx9YlVCU87JRikLue+GCWBm
+  keycloak_realm:ol-platform-engineering-airbyte-client-secret:
+    secure: v1:42oJ4V/C57IFfqlA:WxNL/KSF8dVjoSx+B755qRwquzsawxMYXfpbAI0gHf7k6GEHD701RocWeX6zdt+U
+  keycloak_realm:ol-platform-engineering-dagster-client-secret:
+    secure: v1:r4drRDC08ppZP7oF:LIYIGuIWCRKyCAG0mcaVU4Te1LpN/MtylDiO2FYfYR1Iq8OcahRcoT2hU5CzvO8Y
+  keycloak_realm:ol-platform-engineering-leek-client-secret:
+    secure: v1:q+CCXORqwpNWS3PZ:7JaJVv9GrEnLVR+dnRg1Y7RGJtVTKz1Q5zWNAZ5x44012mdmZm0C4Lr+P2a4mcxT
+  keycloak_realm:ol-data-platform-superset-client-secret:
+    secure: v1:LTpB1a4pNAAm04uf:1IqPnuHcO78FzzwhML/wLgP2IzoW2GEvmjipQtm5fXGW2qV9Snw9CUYP9qFGfdMZ
+  keycloak_realm:ol-data-platform-openmetadata-client-secret:
+    secure: v1:U19XJ1SgglbFMWWn:HXqzyUdQhqOPDWROVnnB21BkPoNO4ac+xkRhEVpD4zTqb8hzwYckjgH1UbXtAIww
