@@ -797,14 +797,15 @@ olapps_learn_ai_client_scope = keycloak.openid.ClientDefaultScopes(
 olapps_mitlearn_client_roles = keycloak_realm_config.get_object(
     "olapps-mitlearn-client-roles"
 )
-for role in olapps_mitlearn_client_roles:
-    keycloak.Role(
-        f"olapps-learn-ai-client-{role}",
-        name=role,
-        realm_id="olapps",
-        client_id=olapps_mitlearn_client.id,
-        opts=resource_options,
-    )
+if olapps_mitlearn_client_roles:
+    for role in olapps_mitlearn_client_roles:
+        keycloak.Role(
+            f"olapps-learn-ai-client-{role}",
+            name=role,
+            realm_id="olapps",
+            client_id=olapps_mitlearn_client.id,
+            opts=resource_options,
+        )
 # MIT LEARN [END]
 
 # OPEN DISCUSSIONS [START]
