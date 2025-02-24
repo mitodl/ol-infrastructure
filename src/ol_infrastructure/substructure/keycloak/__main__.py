@@ -1,22 +1,18 @@
 import json
-import secrets
 import urllib.request
 from functools import partial
 
 import pulumi_keycloak as keycloak
-import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions
+from pulumi import Config, ResourceOptions
 
 from bridge.lib.magic_numbers import SECONDS_IN_ONE_DAY
 from ol_infrastructure.lib.pulumi_helper import parse_stack
-from ol_infrastructure.lib.vault import setup_vault_provider
 
 env_config = Config("environment")
 stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 keycloak_config = Config("keycloak")
 keycloak_realm_config = Config("keycloak_realm")
-setup_vault_provider()
 
 
 def fetch_realm_public_key(keycloak_url: str, realm_id: str) -> str:
@@ -671,72 +667,319 @@ fetch_realm_public_key_partial = partial(
     keycloak_url,
 )
 
-# Check if any Openid clients exist in config and create them
-for openid_clients in keycloak_realm_config.get_object("openid_clients"):
-    realm_name = openid_clients.get("realm_name")
-    client_details = openid_clients.get("client_info")
-    for client_name, client_detail in client_details.items():
-        urls = [url for url in client_detail if url.startswith("http")]
+# OpenID Clients [START]
+# OLAPPS REALM - OpenID Clients [START]
 
-        openid_client = keycloak.openid.Client(
-            f"{realm_name}-{client_name}-client",
-            name=f"ol-{client_name}-client",
-            realm_id=realm_name,
-            client_id=f"ol-{client_name}-client",
-            enabled=True,
-            access_type="CONFIDENTIAL",
-            standard_flow_enabled=openid_clients.get("standard_flow_enabled") or True,
-            implicit_flow_enabled=openid_clients.get("implicit_flow_enabled") or False,
-            service_accounts_enabled=openid_clients.get("service_accounts_enabled")
-            or False,
-            valid_redirect_uris=urls,
-            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
-        )
+# Unified Ecommerce Client [START]
+olapps_unified_ecommerce_client = keycloak.openid.Client(
+    "olapps-unified-ecommerce-client",
+    name="ol-unified-ecommerce-client",
+    realm_id="olapps",
+    client_id="ol-unified-ecommerce-client",
+    client_secret=keycloak_realm_config.get("olapps-unified-ecommerce-client-secret"),
+    enabled=True,
+    access_type="CONFIDENTIAL",
+    standard_flow_enabled=True,
+    implicit_flow_enabled=False,
+    service_accounts_enabled=False,
+    valid_redirect_uris=keycloak_realm_config.get_object(
+        "olapps-unified-ecommerce-client-redirect-uris"
+    ),
+    valid_post_logout_redirect_uris=keycloak_realm_config.get_object(
+        "olapps-unified-ecommerce-client-logout-uris"
+    ),
+    opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+)
+olapps_unified_ecommerce_client_scope = keycloak.openid.ClientDefaultScopes(
+    "olapps-unified-ecommerce-client-default-scopes",
+    realm_id="olapps",
+    client_id=olapps_unified_ecommerce_client.id,
+    default_scopes=[
+        "acr",
+        "email",
+        "profile",
+        "role_list",
+        "roles",
+        "web-origins",
+        "ol-profile",
+    ],
+)
+olapps_unified_ecommerce_client_roles = keycloak_realm_config.get_object(
+    "olapps-unified-ecommerce-client-roles"
+)
+for role in olapps_unified_ecommerce_client_roles:
+    keycloak.Role(
+        f"olapps-unified-ecommerce-client-{role}",
+        name=role,
+        realm_id="olapps",
+        client_id=olapps_unified_ecommerce_client.id,
+        opts=resource_options,
+    )
+# Unified Ecommerce Client [END]
 
-        vault.generic.Secret(
-            f"{realm_name}-{client_name}-vault-oidc-credentials",
-            path=f"secret-operations/sso/{client_name}",
-            data_json=Output.all(
-                url=openid_client.realm_id.apply(
-                    lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
-                ),
-                client_id=openid_client.client_id,
-                client_secret=openid_client.client_secret,
-                # This is included for the case where we are using traefik-forward-auth.
-                # It requires a random secret value to be present which is independent
-                # of the OAuth credentials.
-                secret=secrets.token_urlsafe(),
-                realm_id=openid_client.realm_id,
-                realm_name=realm_name,
-                realm_public_key=openid_client.realm_id.apply(
-                    lambda realm_id: fetch_realm_public_key_partial(realm_id)
-                ),
-            ).apply(json.dumps),
-        )
-        for role in client_detail[1:]:
-            openid_client_role = keycloak.Role(
-                role,
+# Learn AI [START]
+olapps_learn_ai_client = keycloak.openid.Client(
+    "olapps-learn-ai-client",
+    name="ol-learn-ai-client",
+    realm_id="olapps",
+    client_id="ol-learn-ai-client",
+    client_secret=keycloak_realm_config.get("olapps-learn-ai-client-secret"),
+    enabled=True,
+    access_type="CONFIDENTIAL",
+    standard_flow_enabled=True,
+    implicit_flow_enabled=False,
+    service_accounts_enabled=False,
+    valid_redirect_uris=keycloak_realm_config.get_object(
+        "olapps-learn-ai-redirect-uris"
+    ),
+    opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+)
+olapps_learn_ai_client_scope = keycloak.openid.ClientDefaultScopes(
+    "olapps-learn-ai-client-default-scopes",
+    realm_id="olapps",
+    client_id=olapps_learn_ai_client.id,
+    default_scopes=[
+        "acr",
+        "email",
+        "profile",
+        "role_list",
+        "roles",
+        "web-origins",
+        "ol-profile",
+    ],
+)
+olapps_learn_ai_client_roles = keycloak_realm_config.get_object(
+    "olapps-learn-ai-client-roles"
+)
+for role in olapps_learn_ai_client_roles:
+    keycloak.Role(
+        f"olapps-learn-ai-client-{role}",
+        name=role,
+        realm_id="olapps",
+        client_id=olapps_learn_ai_client.id,
+        opts=resource_options,
+    )
+# Learn AI [END]
+
+# MIT LEARN [START]
+if keycloak_realm_config.get("olapps-mitlearn-client-secret"):
+    olapps_mitlearn_client = keycloak.openid.Client(
+        "olapps-mitlearn-client",
+        name="ol-mitlearn-client",
+        realm_id="olapps",
+        client_id="ol-mitlearn-client",
+        client_secret=keycloak_realm_config.get("olapps-mitlearn-client-secret"),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=False,
+        valid_redirect_uris=keycloak_realm_config.get_object(
+            "olapps-mitlearn-client-redirect-uris"
+        ),
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    olapps_mitlearn_client_scope = keycloak.openid.ClientDefaultScopes(
+        "olapps-mitlearn-client-default-scopes",
+        realm_id="olapps",
+        client_id=olapps_mitlearn_client.id,
+        default_scopes=[
+            "acr",
+            "email",
+            "profile",
+            "role_list",
+            "roles",
+            "web-origins",
+            "ol-profile",
+        ],
+    )
+    olapps_mitlearn_client_roles = keycloak_realm_config.get_object(
+        "olapps-mitlearn-client-roles"
+    )
+    if olapps_mitlearn_client_roles:
+        for role in olapps_mitlearn_client_roles:
+            keycloak.Role(
+                f"olapps-mitlearn-client-{role}",
                 name=role,
-                client_id=openid_client.id,
-                realm_id=realm_name,
+                realm_id="olapps",
+                client_id=olapps_mitlearn_client.id,
                 opts=resource_options,
             )
-        if "extra_default_scopes" in openid_clients:
-            keycloak.openid.ClientDefaultScopes(
-                f"{realm_name}-{client_name}-default-scopes",
-                realm_id=realm_name,
-                client_id=openid_client.id,
-                default_scopes=[
-                    "acr",
-                    "email",
-                    "profile",
-                    "role_list",
-                    "roles",
-                    "web-origins",
-                    *openid_clients.get("extra_default_scopes"),
-                ],
-            )
+# MIT LEARN [END]
 
+# OPEN DISCUSSIONS [START]
+olapps_open_discussions_client = keycloak.openid.Client(
+    "olapps-open-discussions-client",
+    name="ol-open-discussions-client",
+    realm_id="olapps",
+    client_id="ol-open-discussions-client",
+    client_secret=keycloak_realm_config.get("olapps-open-discussions-client-secret"),
+    enabled=True,
+    access_type="CONFIDENTIAL",
+    standard_flow_enabled=True,
+    implicit_flow_enabled=False,
+    service_accounts_enabled=False,
+    valid_redirect_uris=keycloak_realm_config.get_object(
+        "olapps-open-discussions-client-redirect-uris"
+    ),
+    opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+)
+# OPEN DISCUSSIONS [END]
+# OLAPPS REALM - OpenID Clients [START]
+
+# OL-PLATFORM-ENGINEERING REALM - OpenID Clients [START]
+
+# AIRBYTE [START] # noqa: ERA001
+ol_platform_engineering_airbyte_client = keycloak.openid.Client(
+    "ol-platform-engineering-airbyte-client",
+    name="ol-platform-engineering-airbyte-client",
+    realm_id="ol-platform-engineering",
+    client_id="ol-airbyte-client",
+    client_secret=keycloak_realm_config.get(
+        "ol-platform-engineering-airbyte-client-secret"
+    ),
+    enabled=True,
+    access_type="CONFIDENTIAL",
+    standard_flow_enabled=True,
+    implicit_flow_enabled=False,
+    service_accounts_enabled=False,
+    valid_redirect_uris=keycloak_realm_config.get_object(
+        "ol-platform-engineering-airbyte-redirect-uris"
+    ),
+    opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+)
+# AIRBYTE [END] # noqa: ERA001
+
+# DAGSTER [START] # noqa: ERA001
+ol_platform_engineering_dagster_client = keycloak.openid.Client(
+    "ol-platform-engineering-dagster-client",
+    name="ol-platform-engineering-dagster-client",
+    realm_id="ol-platform-engineering",
+    client_id="ol-dagster-client",
+    client_secret=keycloak_realm_config.get(
+        "ol-platform-engineering-dagster-client-secret"
+    ),
+    enabled=True,
+    access_type="CONFIDENTIAL",
+    standard_flow_enabled=True,
+    implicit_flow_enabled=False,
+    service_accounts_enabled=False,
+    valid_redirect_uris=keycloak_realm_config.get_object(
+        "ol-platform-engineering-dagster-redirect-uris"
+    ),
+    opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+)
+# DAGSTER [END] # noqa: ERA001
+
+# LEEK [START] # noqa: ERA001
+ol_platform_engineering_leek_client = keycloak.openid.Client(
+    "ol-platform-engineering-leek-client",
+    name="ol-platform-engineering-leek-client",
+    realm_id="ol-platform-engineering",
+    client_id="ol-leek-client",
+    client_secret=keycloak_realm_config.get(
+        "ol-platform-engineering-leek-client-secret"
+    ),
+    enabled=True,
+    access_type="CONFIDENTIAL",
+    standard_flow_enabled=True,
+    implicit_flow_enabled=False,
+    service_accounts_enabled=False,
+    valid_redirect_uris=keycloak_realm_config.get_object(
+        "ol-platform-engineering-leek-redirect-uris"
+    ),
+    opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+)
+# LEEK [END] # noqa: ERA001
+
+# VAULT [START] # noqa: ERA001
+if keycloak_realm_config.get("ol-platform-engineering-vault-client-secret"):
+    ol_platform_engineering_vault_client = keycloak.openid.Client(
+        "ol-platform-engineering-vault-client",
+        name="ol-platform-engineering-vault-client",
+        realm_id="ol-platform-engineering",
+        client_id="ol-vault-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-platform-engineering-vault-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=False,
+        valid_redirect_uris=keycloak_realm_config.get_object(
+            "ol-platform-engineering-vault-redirect-uris"
+        ),
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+# VAULT [END] # noqa: ERA001
+# OL-PLATFORM-ENGINEERING REALM - OpenID Clients [END]
+
+# OL-DATA-PLATFORM REALM - OpenID Clients [START]
+# SUPERSET [START] # noqa: ERA001
+ol_data_platform_superset_client = keycloak.openid.Client(
+    "ol-data-platform-superset-client",
+    name="ol-data-platform-superset-client",
+    realm_id="ol-data-platform",
+    client_id="ol-superset-client",
+    client_secret=keycloak_realm_config.get("ol-data-platform-superset-client-secret"),
+    enabled=True,
+    access_type="CONFIDENTIAL",
+    standard_flow_enabled=True,
+    implicit_flow_enabled=False,
+    service_accounts_enabled=True,
+    valid_redirect_uris=keycloak_realm_config.get_object(
+        "ol-data-platform-superset-redirect-uris"
+    ),
+    opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+)
+ol_data_platform_superset_client_roles = keycloak_realm_config.get_object(
+    "ol-data-platform-superset-client-roles"
+)
+for role in ol_data_platform_superset_client_roles:
+    keycloak.Role(
+        f"ol-data-platform-superset-client-{role}",
+        name=role,
+        realm_id="ol-data-platform",
+        client_id=ol_data_platform_superset_client.id,
+        opts=resource_options,
+    )
+# SUPERSET [END] # noqa: ERA001
+
+# OPENMETADATA [START] # noqa: ERA001
+ol_data_platform_openmetadata_client = keycloak.openid.Client(
+    "ol-data-platform-openmetadata-client",
+    name="ol-data-platform-openmetadata-client",
+    realm_id="ol-data-platform",
+    client_id="ol-open_metadata-client",
+    client_secret=keycloak_realm_config.get(
+        "ol-data-platform-openmetadata-client-secret"
+    ),
+    enabled=True,
+    access_type="CONFIDENTIAL",
+    standard_flow_enabled=True,
+    implicit_flow_enabled=True,
+    service_accounts_enabled=True,
+    valid_redirect_uris=keycloak_realm_config.get_object(
+        "ol-data-platform-openmetadata-redirect-uris"
+    ),
+    opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+)
+ol_data_platform_openmetadata_client_roles = keycloak_realm_config.get_object(
+    "ol-data-platform-openmetadata-client-roles"
+)
+for role in ol_data_platform_openmetadata_client_roles:
+    keycloak.Role(
+        f"ol-data-platform-openmetadata-client-{role}",
+        name=role,
+        realm_id="ol-data-platform",
+        client_id=ol_data_platform_openmetadata_client.id,
+        opts=resource_options,
+    )
+# OPENMETADATA [END] # noqa: ERA001
+
+# OL-DATA-PLATFORM REALM - OpenID Clients [END]
+# OpenID Clients [END]
 
 # OL - First login flow [START]
 # Does not require email verification or confirmation to connect with existing account.
