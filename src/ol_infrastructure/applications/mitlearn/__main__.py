@@ -26,6 +26,10 @@ from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
+    OLVaultK8SResources,
+    OLVaultK8SResourcesConfig,
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -55,6 +59,7 @@ github_provider = github.Provider(
 mitlearn_config = Config("mitlearn")
 heroku_config = Config("heroku")
 heroku_app_config = Config("heroku_app")
+vault_config = Config("vault")
 
 stack_info = parse_stack()
 
@@ -360,6 +365,38 @@ vault.generic.Secret(
     f"ol-mitopen-configuration-secrets-{stack_info.env_suffix}",
     path=mitopen_vault_mount.path.apply("{}/secrets".format),
     data_json=json.dumps(mitopen_vault_secrets),
+)
+
+mitlearn_vault_policy = vault.Policy(
+    f"ol-mitlearn-vault-policy-{stack_info.env_suffix}",
+    name="mitlearn",
+    policy=Path(__file__).parent.joinpath("vault_policies", "mitlearn.hcl").read_text(),
+)
+
+mitlearn_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    f"ol-mitlearn-vault-k8s-auth-backend-role-{stack_info.env_suffix}",
+    role_name="mitlearn",
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["*"],
+    bound_service_account_namespaces=[learn_namespace],
+    token_policies=[mitlearn_vault_policy.name],
+)
+
+vault_k8s_resources_config = OLVaultK8SResourcesConfig(
+    application_name="mitlearn",
+    namespace=learn_namespace,
+    labels=k8s_global_labels,
+    vault_address=vault_config.require("address"),
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    vault_auth_role_name=mitlearn_vault_k8s_auth_backend_role.role_name,
+)
+
+vault_k8s_resources = OLVaultK8SResources(
+    resource_config=vault_k8s_resources_config,
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[mitlearn_vault_k8s_auth_backend_role],
+    ),
 )
 
 mitopen_db_security_group = ec2.SecurityGroup(
@@ -788,6 +825,48 @@ application_labels = k8s_global_labels | {
     "ol.mit.edu/pod-security-group": "learn",
 }
 
+oidc_secret_name = "oidc-secrets"  # pragma: allowlist secret # noqa: S105
+oidc_secret = OLVaultK8SSecret(
+    f"ol-mitlearn-oidc-secrets-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="oidc-static-secrets",
+        namespace=learn_namespace,
+        labels=application_labels,
+        dest_secret_name=oidc_secret_name,
+        dest_secret_labels=application_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/mitlearn",
+        excludes=[".*"],
+        exclude_raw=True,
+        # Refresh frequently because substructure keycloak stack could change some of these
+        refresh_after="1m",
+        templates={
+            "client_id": '{{ get .Secrets "client_id" }}',
+            "client_secret": '{{ get .Secrets "client_secret" }}',
+            "realm": '{{ get .Secrets "realm_name" }}',
+            "discovery": '{{ get .Secrets "url" }}.well-known/openid-configuration',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
+        depends_on=[vault_k8s_resources],
+    ),
+)
+
+# We need to be able to change `unauth_action` depending on the route but otherwise
+# the settings for the oidc plugin will be unchanged
+base_oidc_plugin_config = {
+    "scope": "openid profile email",
+    "bearer_only": False,
+    "introspection_endpoint_auth_method": "client_secret_basic",
+    "ssl_verify": False,
+    "logout_path": "/logout/oidc",
+    "post_logout_redirect_uri": "/",
+}
+
 shared_plugin_config_name = "shared-plugin-config"
 learn_external_service_apisix_pluginconfig = kubernetes.apiextensions.CustomResource(
     f"ol-mitlearn-external-service-apisix-pluginconfig-{stack_info.env_suffix}",
@@ -800,6 +879,34 @@ learn_external_service_apisix_pluginconfig = kubernetes.apiextensions.CustomReso
     ),
     spec={
         "plugins": [
+            {
+                "name": "redirect",
+                "enable": True,
+                "config": {
+                    "http_to_https": True,
+                },
+            },
+            {
+                "name": "cors",
+                "enable": True,
+                "config": {
+                    "allow_origins": "**",
+                    "allow_methods": "**",
+                    "allow_headers": "**",
+                    "allow_credential": True,
+                },
+            },
+            {
+                "name": "response-rewrite",
+                "enable": True,
+                "config": {
+                    "headers": {
+                        "set": {
+                            "Referrer-Policy": "origin",
+                        },
+                    },
+                },
+            },
             {
                 "name": "proxy-rewrite",
                 "enable": True,
@@ -876,14 +983,79 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
     spec={
         "http": [
             {
-                "name": "learn-at-heroku-testing",
-                "plugin_config_name": shared_plugin_config_name,
+                # Wildcard route that can use auth but doesn't require it
+                "name": "passauth",
+                "priority": "0",
+                "plugin-config_name": shared_plugin_config_name,
+                "plugins": [
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
+                    },
+                ],
                 "match": {
                     "hosts": [
                         mitlearn_config.require("api_domain"),
                     ],
                     "paths": [
-                        "/*",
+                        "*",
+                    ],
+                },
+                "upstreams": [
+                    {
+                        "name": learn_external_service_name,
+                    },
+                ],
+            },
+            {
+                # Strip tailing slash from logout redirect
+                "name": "logout-redirect",
+                "priority": "10",
+                "plugins": [
+                    {
+                        "name": "redirect",
+                        "enable": True,
+                        "config": {
+                            "uri": "/logout/oidc",
+                        },
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        mitlearn_config.require("api_domain"),
+                    ],
+                    "paths": [
+                        "/logout/oidc/*",
+                    ],
+                },
+                "upstreams": [
+                    {
+                        "name": learn_external_service_name,
+                    },
+                ],
+            },
+            {
+                # Routes that require authentication
+                "name": "reqauth",
+                "priority": "10",
+                "plugin-config_name": shared_plugin_config_name,
+                "plugins": [
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "auth"},
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        mitlearn_config.require("api_domain"),
+                    ],
+                    "paths": [
+                        "/admin/login/*",
+                        "/login/*",
                     ],
                 },
                 "upstreams": [
