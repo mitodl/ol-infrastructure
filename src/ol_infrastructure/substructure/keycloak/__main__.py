@@ -701,7 +701,7 @@ olapps_unified_ecommerce_client_scope = keycloak.openid.ClientDefaultScopes(
         "role_list",
         "roles",
         "web-origins",
-        "olapps",
+        "ol-profile",
     ],
 )
 olapps_unified_ecommerce_client_roles = keycloak_realm_config.get_object(
@@ -745,7 +745,7 @@ olapps_learn_ai_client_scope = keycloak.openid.ClientDefaultScopes(
         "role_list",
         "roles",
         "web-origins",
-        "olapps",
+        "ol-profile",
     ],
 )
 olapps_learn_ai_client_roles = keycloak_realm_config.get_object(
@@ -790,7 +790,7 @@ if keycloak_realm_config.get("olapps-mitlearn-client-secret"):
             "role_list",
             "roles",
             "web-origins",
-            "olapps",
+            "ol-profile",
         ],
     )
     olapps_mitlearn_client_roles = keycloak_realm_config.get_object(
