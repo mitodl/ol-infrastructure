@@ -1104,6 +1104,13 @@ gh_workflow_posthog_project_api_key_env_secret = github.ActionsSecret(
     plaintext_value=mitopen_vault_secrets["posthog"]["project_api_key"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
+gh_workflow_posthog_enable_session_recording_env_secret = github.ActionsSecret(
+    f"ol_mitopen_gh_workflow_posthog_enable_session_recording-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"POSTHOG_ENABLE_SESSION_RECORDING_{env_var_suffix}",
+    plaintext_value=heroku_vars["POSTHOG_ENABLE_SESSION_RECORDING"],
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
 gh_workflow_environment_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_environment_env_secret-{stack_info.env_suffix}",
     repository=gh_repo.name,

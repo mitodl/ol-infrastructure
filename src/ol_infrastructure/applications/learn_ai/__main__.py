@@ -6,6 +6,7 @@ import os
 import textwrap
 from pathlib import Path
 
+import pulumi_consul as consul
 import pulumi_fastly as fastly
 import pulumi_github as github
 import pulumi_kubernetes as kubernetes
@@ -46,6 +47,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
+from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
@@ -1087,6 +1089,21 @@ base_oidc_plugin_config = {
     "post_logout_redirect_uri": "/",
 }
 
+learn_ai_api_domain = learn_ai_config.require("backend_domain")
+
+if stack_info.env_suffix != "ci":
+    consul_opts = get_consul_provider(stack_info)
+    consul.Keys(
+        "learn-ai-domain-consul-key-for-mitxonline-openedx",
+        keys=[
+            consul.KeysKeyArgs(
+                path="edxapp/learn-ai-api-domain",
+                delete=True,
+                value=learn_ai_api_domain,
+            )
+        ],
+        opts=consul_opts,
+    )
 
 # ApisixUpstream resources don't seem to work but we don't really need them?
 # Ref: https://github.com/apache/apisix-ingress-controller/issues/1655
@@ -1106,35 +1123,6 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
     spec={
         "http": [
             {
-                # Sepcial handling for websocket URLS.
-                "name": "websocket",
-                "priority": 1,
-                "websocket": True,
-                "plugin_config_name": shared_plugin_config_name,
-                "plugins": [
-                    {
-                        "name": "openid-connect",
-                        "enable": True,
-                        "secretRef": oidc_secret_name,
-                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
-                    }
-                ],
-                "match": {
-                    "hosts": [
-                        learn_ai_config.require("backend_domain"),
-                    ],
-                    "paths": [
-                        "/ws/*",
-                    ],
-                },
-                "backends": [
-                    {
-                        "serviceName": learn_ai_service_name,
-                        "servicePort": learn_ai_service_port_name,
-                    },
-                ],
-            },
-            {
                 # Wildcard route that can use auth but doesn't require it
                 "name": "passauth",
                 "priority": 2,
@@ -1148,9 +1136,7 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     }
                 ],
                 "match": {
-                    "hosts": [
-                        learn_ai_config.require("backend_domain"),
-                    ],
+                    "hosts": [learn_ai_api_domain],
                     "paths": [
                         "/*",
                     ],
@@ -1176,9 +1162,7 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     },
                 ],
                 "match": {
-                    "hosts": [
-                        learn_ai_config.require("backend_domain"),
-                    ],
+                    "hosts": [learn_ai_api_domain],
                     "paths": [
                         "/logout/*",
                     ],
@@ -1210,6 +1194,35 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     "paths": [
                         "/admin/login/*",
                         "/http/login/",
+                    ],
+                },
+                "backends": [
+                    {
+                        "serviceName": learn_ai_service_name,
+                        "servicePort": learn_ai_service_port_name,
+                    },
+                ],
+            },
+            {
+                # Sepcial handling for websocket URLS.
+                "name": "websocket",
+                "priority": 1,
+                "websocket": True,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
+                    }
+                ],
+                "match": {
+                    "hosts": [
+                        learn_ai_config.require("backend_domain"),
+                    ],
+                    "paths": [
+                        "/ws/*",
                     ],
                 },
                 "backends": [

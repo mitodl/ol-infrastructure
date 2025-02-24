@@ -1,11 +1,12 @@
 import json
 
-from pulumi import StackReference, export
+from pulumi import ResourceOptions, StackReference, export
 from pulumi_aws import get_caller_identity, iam
 
 from ol_infrastructure.lib.aws.iam_helper import (
     ADMIN_USERNAMES,
     EKS_ADMIN_USERNAMES,
+    EKS_DEVELOPER_USERNAMES,
     IAM_POLICY_VERSION,
 )
 
@@ -13,7 +14,6 @@ administrator_iam_group = iam.Group(
     "administrators-iam-group",
     name="Admins",
 )
-
 administrator_iam_group_membership = iam.GroupMembership(
     "administrators-iam-group-membership",
     group=administrator_iam_group.name,
@@ -23,26 +23,53 @@ administrator_export_dict = {
     "arn": administrator_iam_group.arn,
     "name": administrator_iam_group.name,
 }
-
 export("administrators", administrator_export_dict)
+
 
 eks_administrator_iam_group = iam.Group(
     "eks-administrators-iam-group",
     name="EKSAdmins",
 )
-
 eks_administrator_iam_group_membership = iam.GroupMembership(
-    "eks-amdministrators-iam-group-membership",
+    "eks-administrators-iam-group-membership",
     group=eks_administrator_iam_group.name,
     users=EKS_ADMIN_USERNAMES,
 )
-
 eks_administrator_export_dict = {
     "arn": eks_administrator_iam_group.arn,
     "name": eks_administrator_iam_group.name,
 }
-
 export("eks_administrators", eks_administrator_export_dict)
+
+# This developer group and these accounts don't actually serve a purpose
+# at this time but they might be useful some day
+eks_developers_iam_group = iam.Group(
+    "eks-developers-iam-group",
+    name="EKSDevelopers",
+)
+eks_developers_iam_group_membership = iam.GroupMembership(
+    "eks-developers-iam-group-membership",
+    group=eks_developers_iam_group.name,
+    users=EKS_DEVELOPER_USERNAMES,
+)
+eks_developers_export_dict = {
+    "arn": eks_developers_iam_group.arn,
+    "name": eks_developers_iam_group.name,
+}
+export("eks_developers", eks_developers_export_dict)
+
+# In the case of developers, we're actually going to create and manage them with pulumi
+# so we can ensure they have the tags they need for EKS access
+for developer in EKS_DEVELOPER_USERNAMES:
+    iam.User(
+        f"eks-developers-{developer}-iam-user",
+        name=developer,
+        opts=ResourceOptions(
+            import_=developer,  # Pull in any manually created users (Provided they have no tags yet)  # noqa: E501
+        ),
+        tags={"team": "eks-developers"},
+    )
+
 
 account_id = get_caller_identity().account_id
 concourse_production_stack = StackReference("applications.concourse.Production")

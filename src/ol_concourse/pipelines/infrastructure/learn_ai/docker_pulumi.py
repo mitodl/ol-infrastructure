@@ -11,6 +11,7 @@ from ol_concourse.lib.models.pipeline import (
     Identifier,
     Input,
     Job,
+    LoadVarStep,
     Output,
     Pipeline,
     Platform,
@@ -138,7 +139,7 @@ def build_learn_ai_pipeline() -> Pipeline:
     pulumi_resource = pulumi_provisioner(
         name=Identifier("pulumi-ol-infrastructure-learn-ai-application"),
         project_name="ol-infrastructure-learn-ai-application",
-        project_path=f"{ol_infra_repo.name}/src/ol_infrastructure/learn-ai",
+        project_path=f"{ol_infra_repo.name}/src/ol_infrastructure/applications/learn_ai",
     )
 
     learn_ai_ci_deployment_job = Job(
@@ -149,10 +150,15 @@ def build_learn_ai_pipeline() -> Pipeline:
                 get=learn_ai_registry_ci_image.name,
                 trigger=True,
                 passed=[learn_ai_main_image_build_job.name],
+                params={"skip_download": True},
             ),
             GetStep(
                 get=ol_infra_repo.name,
                 trigger=False,
+            ),
+            LoadVarStep(
+                load_var="image_tag",
+                file=f"{learn_ai_registry_ci_image.name}/tag",
             ),
             TaskStep(
                 task=Identifier("set-aws-creds"),
@@ -176,9 +182,10 @@ def build_learn_ai_pipeline() -> Pipeline:
                     "env_os": {
                         "AWS_DEFAULT_REGION": "us-east-1",
                         "PYTHONPATH": (
-                            f"/usr/lib/:/tmp/build/put/{ol_infra_repo.name}/src/",
+                            f"/usr/lib/:/tmp/build/put/{ol_infra_repo.name}/src/"
                         ),
                         "GITHUB_TOKEN": "((github.public_repo_access_token))",
+                        "LEARN_AI_DOCKER_TAG": "((.:image_tag))",
                     },
                     "stack_name": "applications.learn_ai.CI",
                 },
@@ -200,10 +207,15 @@ def build_learn_ai_pipeline() -> Pipeline:
                 get=learn_ai_registry_rc_image.name,
                 trigger=True,
                 passed=[learn_ai_release_canidiate_image_build_job.name],
+                params={"skip_download": True},
             ),
             GetStep(
                 get=ol_infra_repo.name,
                 trigger=False,
+            ),
+            LoadVarStep(
+                load_var="image_tag",
+                file=f"{learn_ai_registry_rc_image.name}/tag",
             ),
             TaskStep(
                 task=Identifier("set-aws-creds"),
@@ -227,9 +239,10 @@ def build_learn_ai_pipeline() -> Pipeline:
                     "env_os": {
                         "AWS_DEFAULT_REGION": "us-east-1",
                         "PYTHONPATH": (
-                            f"/usr/lib/:/tmp/build/put/{ol_infra_repo.name}/src/",
+                            f"/usr/lib/:/tmp/build/put/{ol_infra_repo.name}/src/"
                         ),
                         "GITHUB_TOKEN": "((github.public_repo_access_token))",
+                        "LEARN_AI_DOCKER_TAG": "((.:image_tag))",
                     },
                     "stack_name": "applications.learn_ai.QA",
                 },
@@ -251,10 +264,15 @@ def build_learn_ai_pipeline() -> Pipeline:
                 get=learn_ai_registry_rc_image.name,
                 trigger=False,
                 passed=[learn_ai_rc_deployment_job.name],
+                params={"skip_download": True},
             ),
             GetStep(
                 get=ol_infra_repo.name,
                 trigger=False,
+            ),
+            LoadVarStep(
+                load_var="image_tag",
+                file=f"{learn_ai_registry_rc_image.name}/tag",
             ),
             TaskStep(
                 task=Identifier("set-aws-creds"),
@@ -278,9 +296,10 @@ def build_learn_ai_pipeline() -> Pipeline:
                     "env_os": {
                         "AWS_DEFAULT_REGION": "us-east-1",
                         "PYTHONPATH": (
-                            f"/usr/lib/:/tmp/build/put/{ol_infra_repo.name}/src/",
+                            f"/usr/lib/:/tmp/build/put/{ol_infra_repo.name}/src/"
                         ),
                         "GITHUB_TOKEN": "((github.public_repo_access_token))",
+                        "LEARN_AI_DOCKER_TAG": "((.:image_tag))",
                     },
                     "stack_name": "applications.learn_ai.Production",
                 },

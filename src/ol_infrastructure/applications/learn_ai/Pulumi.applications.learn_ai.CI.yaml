@@ -1,0 +1,27 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAGzwYvKdv8btlpNoWfQrhopAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMA4aPdRQRnWQHfbAYAgEQgDvk5wiD1oK6gGUeZPT7mw/zGXqFmUNovUnubtRP/Vp/YcVaewPWpeOq6nFf8jBRI34GpG+6pc5PxmSARw==
+config:
+  aws:region: us-east-1
+  learn_ai:backend_domain: "api-learn-ai-ci.ol.mit.edu"
+  learn_ai:env_vars:
+    AI_DEFAULT_SYLLABUS_MODEL: "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+    CELERY_TASK_ALWAYS_EAGER: "false"
+    CSRF_ALLOWED_ORIGINS: '["https://learn-ai-ci.ol.mit.edu", "https://api-learn-ai-ci.ol.mit.edu"]'
+    CSRF_TRUSTED_ORIGINS: '["https://learn-ai-ci.ol.mit.edu", "https://api-learn-ai-ci.ol.mit.edu"]'
+    DEBUG: "false"
+    DEV_ENV: "false"
+    ENVIRONMENT: "production"
+    MITOL_APP_BASE_URL: "https://learn-ai-ci.ol.mit.edu"
+    MITOL_COOKIE_DOMAIN: "ol.mit.edu"
+    MITOL_COOKIE_NAME: "mitol"
+    MITOL_FEATURES_DEFAULT: "true"
+    NODE_ENV: "development"
+    UWSGI_THREADS: "5"
+  learn_ai:frontend_domain: "learn-ai-ci.ol.mit.edu"
+  vault:address: "https://vault-ci.odl.mit.edu"
+  vault_server:env_namespace: "operations.ci"
+  learn_ai:db_password:
+    secure: v1:LPQWUf68siLqkk30:JHBZ8gREGp0fRcAWH4ER7ExID5d3LVbn8BoFZ8o7tOBj43Jf+Jqh2c9acA/im/p9+W4c15appQNpC1hMHo4+hrIks3UIhC8a8+SV6GzO908=
+  redis:password:
+    secure: v1:ObQfVCLRk72Bn9f3:7EKaqHGnHkYsurz0xWQcX9Cuhc4k0SSXcIIKSgYQnfFSu9uYHbUT0cpsic4M6SYG6ZuFxKXXeaZuLI2QC3s9Feo0oD+SEjetNxCZo0TPot8=

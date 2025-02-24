@@ -11,7 +11,7 @@ import pulumi_aws as aws
 import pulumi_eks as eks
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, StackReference, export
 
 from bridge.lib.magic_numbers import (
     DEFAULT_EFS_PORT,
@@ -31,7 +31,6 @@ from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleC
 from ol_infrastructure.lib.aws.eks_helper import eks_versions
 from ol_infrastructure.lib.aws.iam_helper import (
     EKS_ADMIN_USERNAMES,
-    EKS_DEVELOPER_USERNAMES,
     IAM_POLICY_VERSION,
     lint_iam_policy,
 )
@@ -57,6 +56,7 @@ kms_stack = StackReference(f"infrastructure.aws.kms.{stack_info.name}")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
+vault_auth_stack = StackReference("substructure.vault.auth.operations.Production")
 concourse_stack = StackReference("applications.concourse.Production")
 
 business_unit = env_config.require("business_unit") or "operations"
@@ -130,6 +130,8 @@ default_assume_role_policy = {
 # This is what will let DevOps access the cluster with kubectl and the
 # script in this directory that builds a kube_config file
 # This also lets concourse be a cluster administrator
+#
+# We hook adminsitrators directly by username ARNs
 admin_assume_role_policy_document = concourse_stack.require_output(
     "infra-instance-role-arn"
 ).apply(
@@ -161,33 +163,6 @@ administrator_role = aws.iam.Role(
     tags=aws_config.tags,
 )
 
-# This is what will let developers access the cluster with kubectl and the
-# script in this directory that builds a kube_config file
-developer_assume_role_policy_document = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": "sts:AssumeRole",
-            "Principal": {
-                "Service": "ec2.amazonaws.com",
-                "AWS": [
-                    f"arn:aws:iam::{aws_account.account_id}:user/{username}"
-                    for username in EKS_DEVELOPER_USERNAMES
-                ],
-            },
-        }
-    ],
-}
-developer_role = aws.iam.Role(
-    f"{cluster_name}-eks-developer-role",
-    assume_role_policy=json.dumps(developer_assume_role_policy_document),
-    name_prefix=f"{cluster_name}-eks-developer-role-"[:IAM_ROLE_NAME_PREFIX_MAX_LENGTH],
-    path=f"/ol-infrastructure/eks/{cluster_name}/",
-    tags=aws_config.tags,
-)
-
-
 # Depending on the environment, developers may have different access.
 developer_role_policy_name = (
     eks_config.get("developer_role_policy_name") or "AmazonEKSViewPolicy"
@@ -212,12 +187,12 @@ access_entries = {
         kubernetes_groups=["admin"],
     ),
     "developer": eks.AccessEntryArgs(
-        principal_arn=developer_role.arn,
+        principal_arn=vault_auth_stack.require_output("eks_shared_developer_role_arn"),
         access_policies={
             "developer": eks.AccessPolicyAssociationArgs(
                 access_scope=aws.eks.AccessPolicyAssociationAccessScopeArgs(
                     type="namespace",
-                    namespaces=[*namespaces, "operations", "kube-system"],
+                    namespaces=[*namespaces, "default", "operations", "kube-system"],
                 ),
                 policy_arn=f"arn:aws:eks::aws:cluster-access-policy/{developer_role_policy_name}",
             ),
@@ -328,17 +303,32 @@ export("cluster_name", cluster_name)
 export("kube_config", cluster.kubeconfig)
 export("cluster_identities", cluster.eks_cluster.identities)
 export("admin_role_arn", administrator_role.arn)
-export("developer_role_arn", developer_role.arn)
 export("cluster_security_group_id", cluster.cluster_security_group_id)
 export("node_security_group_id", cluster.node_security_group_id)
 export(
     "kube_config_data",
     {
-        "developer_role_arn": developer_role.arn,
         "admin_role_arn": administrator_role.arn,
         "certificate-authority-data": cluster.eks_cluster.certificate_authority,
         "server": cluster.eks_cluster.endpoint,
     },
+)
+
+cluster_certificate_authority = cluster.eks_cluster.certificate_authority
+cluster_address = cluster.eks_cluster.endpoint
+
+Output.all(ca=cluster_certificate_authority, address=cluster_address).apply(
+    lambda cluster_atts: vault.generic.Secret(
+        f"{cluster_name}-eks-kubeconfig-vault-secret",
+        path=f"secret-global/eks/kubeconfigs/{cluster_name}",
+        data_json=json.dumps(
+            {
+                "ca": cluster_atts["ca"]["data"],
+                "server": cluster_atts["address"],
+            }
+        ),
+        opts=ResourceOptions(depends_on=[cluster]),
+    )
 )
 
 ############################################################
@@ -826,76 +816,6 @@ vault_secrets_operator = kubernetes.helm.v3.Release(
         delete_before_replace=True,
     ),
 )
-
-############################################################
-# This entire block of commented out code relates to
-# security groups for pods and should be retained for the time being
-############################################################
-#    traefik_pod_security_group = aws.ec2.SecurityGroup(
-#        f"{cluster_name}-eks-traefik-pod-securitygroup",
-#        description="Allows bi-directional trafic between the traefik gateway controller and pods",
-#        vpc_id=target_vpc["id"],
-#        egress=default_egress_args,
-#        ingress=[
-#            aws.ec2.SecurityGroupIngressArgs(
-#                protocol=-1,
-#                from_port=0,
-#                to_port=0,
-#                self=True,
-#                description=f"Allow traffic on all TCP ports from ourselves",
-#            ),
-#            aws.ec2.SecurityGroupIngressArgs(
-#                protocol="tcp",
-#                from_port=0,
-#                to_port=65535,
-#                self=True,
-#                description=f"Allow traffic on all TCP ports from ourselves",
-#            ),
-#            aws.ec2.SecurityGroupIngressArgs(
-#                protocol="udp",
-#                from_port=0,
-#                to_port=65535,
-#                self=True,
-#                description=f"Allow traffic on all UDP ports from ourselves",
-#            ),
-#        ],
-#        opts=ResourceOptions(parent=cluster),
-#    )
-#
-#    traefik_pod_security_group_policy = kubernetes.yaml.v2.ConfigGroup(
-#        f"{cluster_name}-eks-traefik-pod-security-group-policy",
-#        objs=[
-#            {
-#                "apiVersion": "vpcresources.k8s.aws/v1beta1",
-#                "kind": "SecurityGroupPolicy",
-#                "metadata": {
-#                    "name": "traefik-gateway-controller-sgp",
-#                    "namespace": "operations",
-#                },
-#                "spec": {
-#                    "podSelector": {
-#                        "matchLabels": {
-#                            "traffic-gateway-controller-security-group": "True",
-#                        },
-#                    },
-#                    "securityGroups": {
-#                        "groupIds": [
-#                            traefik_pod_security_group.id,
-#                        ],
-#                    },
-#                },
-#            },
-#        ],
-#        opts=ResourceOptions(
-#            provider=k8s_provider,
-#            parent=operations_namespace,
-#            delete_before_replace=True,
-#            depends_on=[cluster, node_groups[0], operations_namespace, traefik_pod_security_group],
-#        ),
-#    )
-############################################################
-# End security groups for pods stuff
-############################################################
 
 ############################################################
 # Install and configure the traefik gateway api controller

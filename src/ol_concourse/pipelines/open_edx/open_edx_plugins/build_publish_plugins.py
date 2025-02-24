@@ -25,9 +25,17 @@ plugin_dict = {
         "target_name": "edx_sysadmin_package",
         "pypi_package_name": "edx-sysadmin",
     },
+    "src/edx_username_changer": {
+        "target_name": "edx_username_changer_package",
+        "pypi_package_name": "edx-username-changer",
+    },
     "src/ol_openedx_canvas_integration": {
         "target_name": "canvas_integration_package",
         "pypi_package_name": "ol-openedx-canvas-integration",
+    },
+    "src/ol_openedx_chat": {
+        "target_name": "ol_openedx_chat_package",
+        "pypi_package_name": "ol-openedx-chat",
     },
     "src/ol_openedx_checkout_external": {
         "target_name": "checkout_external_package",
@@ -61,17 +69,13 @@ plugin_dict = {
         "target_name": "sentry_package",
         "pypi_package_name": "ol-openedx-sentry",
     },
-    "src/openedx_companion_auth": {
-        "target_name": "openedx_companion_auth_package",
-        "pypi_package_name": "openedx-companion-auth",
-    },
     "src/ol_social_auth": {
         "target_name": "ol_social_auth_package",
         "pypi_package_name": "ol-social-auth",
     },
-    "src/edx_username_changer": {
-        "target_name": "edx_username_changer_package",
-        "pypi_package_name": "edx-username-changer",
+    "src/openedx_companion_auth": {
+        "target_name": "openedx_companion_auth_package",
+        "pypi_package_name": "openedx-companion-auth",
     },
 }
 

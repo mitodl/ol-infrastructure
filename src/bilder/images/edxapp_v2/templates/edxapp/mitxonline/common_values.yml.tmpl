@@ -382,6 +382,7 @@ INTEGRATED_CHANNELS_API_CHUNK_TRANSMISSION_LIMIT:
 JWT_EXPIRATION: 30
 LANGUAGE_CODE: en
 LANGUAGE_COOKIE: {{ env "ENVIRONMENT" }}-openedx-language-preference
+LEARN_AI_API_URL: https://{{ key "edxapp/learn-ai-api-domain" }}/http/recommendation_agent/  # Added for ol_openedx_chat
 LEARNER_PORTAL_URL_ROOT: https://learner-portal-localhost:18000
 LEARNER_HOME_MICROFRONTEND_URL: '/dashboard/'
 LEARNING_MICROFRONTEND_URL: https://{{ key "edxapp/lms-domain" }}/learn
@@ -457,6 +458,7 @@ NOTIFICATIONS_DEFAULT_FROM_EMAIL: {{ key "edxapp/bulk-email-default-from-email" 
 NOTIFICATION_TYPE_ICONS: {} # ADDED
 DEFAULT_NOTIFICATION_ICON_URL: '' # ADDED
 ORA2_FILE_PREFIX: mitxonline/ora2  # MODIFIED
+OL_CHAT_SETTINGS: {}  # Added for ol_openedx_chat
 PARTNER_SUPPORT_EMAIL: ''
 PASSWORD_POLICY_COMPLIANCE_ROLLOUT_CONFIG:
     ENFORCE_COMPLIANCE_ON_LOGIN: false

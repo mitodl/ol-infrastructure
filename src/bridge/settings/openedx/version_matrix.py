@@ -61,9 +61,6 @@ default_branding_overrides = {
     "@edx/frontend-component-footer@npm": (
         "@mitodl/frontend-component-footer-mitol@latest"
     ),
-    "@edx/frontend-component-header@npm": (
-        "@mitodl/frontend-component-header-mitol@latest"
-    ),
 }
 
 

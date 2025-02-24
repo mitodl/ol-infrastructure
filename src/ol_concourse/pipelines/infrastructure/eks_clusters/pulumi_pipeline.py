@@ -2,13 +2,15 @@ from ol_concourse.lib.jobs.infrastructure import pulumi_jobs_chain
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import Identifier
 from ol_concourse.lib.resources import git_repo
-from ol_concourse.pipelines.constants import PULUMI_CODE_PATH
+from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 
 eks_infrastructure_code = git_repo(
     Identifier("ol-infrastructure"),
     uri="https://github.com/mitodl/ol-infrastructure",
     paths=[
         "src/ol_infrastructure/infrastructure/aws/eks",
+        *PULUMI_WATCHED_PATHS,
+        "src/bridge/lib/versions.py",
     ],
 )
 
@@ -17,6 +19,8 @@ eks_substructure_code = git_repo(
     uri="https://github.com/mitodl/ol-infrastructure",
     paths=[
         "src/ol_infrastructure/substructure/aws/eks",
+        *PULUMI_WATCHED_PATHS,
+        "src/bridge/lib/versions.py",
     ],
 )
 
