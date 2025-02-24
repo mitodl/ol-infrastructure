@@ -1,8 +1,10 @@
 """
 This module collapses as much boilerplate as possible to facilitate the setup
-ptions
-
 of an application's database.
+
+This is meant to be used as the standard, normal, run-of-the-mill database
+configuration for a typical application. Special snowflakes should continue
+to use the OLDatabase components available in `aws/database.py`.
 """
 
 from typing import Optional
@@ -39,7 +41,7 @@ aws_config = AWSBase(
 )
 
 
-class OLDatabaseConfig:
+class OLAppDatabaseConfig:
     """Configuration for the MIT OL Database component"""
 
     app_name: str
@@ -51,17 +53,17 @@ class OLDatabaseConfig:
     app_security_group: ec2.SecurityGroup
 
 
-class OLDatabase(ComponentResource):
+class OLAppDatabase(ComponentResource):
     """MIT OL Database component"""
 
     def __init__(
         self,
-        ol_db_config: OLDatabaseConfig,
+        ol_db_config: OLAppDatabaseConfig,
         opts: Optional[ResourceOptions] = None,
     ):
         self.ol_db_config = ol_db_config
         super().__init__(
-            "ol:infrastructure:aws:OLDatabase", ol_db_config.app_name, None, opts
+            "ol:infrastructure:aws:OLAppDatabase", ol_db_config.app_name, None, opts
         )
 
         target_vpc = network_stack.require_output(ol_db_config.target_vpc_name)
