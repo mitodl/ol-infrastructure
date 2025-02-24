@@ -78,6 +78,8 @@ services:
     container_name: health-check
     ports:
     - "8097:8907"
+    env_file:
+      - .env
     labels:
       # Explicitly tell Traefik to expose this container
       - "traefik.enable=true"
