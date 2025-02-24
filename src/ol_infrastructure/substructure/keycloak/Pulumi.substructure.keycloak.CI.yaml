@@ -40,8 +40,6 @@ config:
   keycloak_realm:ol-platform-engineering-airbyte-redirect-uris: ["https://airbyte-ci.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-dagster-redirect-uris: ["https://pipelines-ci.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-leek-redirect-uris: ["https://celery-monitoring-ci.odl.mit.edu/*"]
-  keycloak_realm:ol-platform-engineering-vault-redirect-uris: ["https://vault-ci.odl.mit.edu/ui/vault/auth/oidc/oidc/callback",
-    "http://localhost:8250/oidc/callback"]
   keycloak_realm:ol-data-platform-superset-redirect-uris: ["https://bi-ci.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-superset-client-roles: ["superset_admin", "superset_alpha",
     "superset_gamma"]
@@ -63,8 +61,6 @@ config:
     secure: v1:F4rjMcwJr2e+854p:8qPUK+Pi112EQrWoNsczQW99e5IHP7sxwtqZTIDnonrED8qTZiMofJGEHp1vliua
   keycloak_realm:ol-platform-engineering-leek-client-secret:
     secure: v1:xf9mFeIyIWLQbIYk:IY+XjdVmc6Va8WGTwrEN+t3jsyuJJ2b1fD83n2MiDSfUBNxeBoP1Xwd+KGskOLOX
-  keycloak_realm:ol-platform-engineering-vault-client-secret:
-    secure: v1:Rk81vW8zIAuqGjhz:3KYDFXhWCSrJRA4deeCeHfa5mFhgGBT/5iwtfv4eAw4ebojBruR5InN93YP5veE9
   keycloak_realm:ol-data-platform-superset-client-secret:
     secure: v1:Ow95HN9yKnXBg5jX:CUoA/qBSeUF2w0FNYlEnC5OyvP8sg7S3efyvrX8J10Q8T16oxlO3MF3ROByGk12G
   keycloak_realm:ol-data-platform-openmetadata-client-secret:
