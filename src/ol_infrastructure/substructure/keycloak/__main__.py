@@ -1,18 +1,22 @@
 import json
+import secrets
 import urllib.request
 from functools import partial
 
 import pulumi_keycloak as keycloak
-from pulumi import Config, ResourceOptions
+import pulumi_vault as vault
+from pulumi import Config, Output, ResourceOptions
 
 from bridge.lib.magic_numbers import SECONDS_IN_ONE_DAY
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.vault import setup_vault_provider
 
 env_config = Config("environment")
 stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 keycloak_config = Config("keycloak")
 keycloak_realm_config = Config("keycloak_realm")
+setup_vault_provider()
 
 
 def fetch_realm_public_key(keycloak_url: str, realm_id: str) -> str:
@@ -715,6 +719,26 @@ for role in olapps_unified_ecommerce_client_roles:
         client_id=olapps_unified_ecommerce_client.id,
         opts=resource_options,
     )
+olapps_unified_ecommerce_client_data = vault.generic.Secret(
+    "olapps-unified-ecommerce-client-vault-oidc-credentials",
+    path="secret-operations/sso/ol-unified-ecommerce-client",
+    data_json=Output.all(
+        url=olapps_unified_ecommerce_client.realm_id.apply(
+            lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+        ),
+        client_id=olapps_unified_ecommerce_client.client_id,
+        client_secret=olapps_unified_ecommerce_client.client_secret,
+        # This is included for the case where we are using traefik-forward-auth.
+        # It requires a random secret value to be present which is independent
+        # of the OAuth credentials.
+        secret=secrets.token_urlsafe(),
+        realm_id=olapps_unified_ecommerce_client.realm_id,
+        realm_name="olapps",
+        realm_public_key=olapps_unified_ecommerce_client.realm_id.apply(
+            lambda realm_id: fetch_realm_public_key_partial(realm_id)
+        ),
+    ).apply(json.dumps),
+)
 # Unified Ecommerce Client [END]
 
 # Learn AI [START]
@@ -759,6 +783,26 @@ for role in olapps_learn_ai_client_roles:
         client_id=olapps_learn_ai_client.id,
         opts=resource_options,
     )
+olapps_learn_ai_client_data = vault.generic.Secret(
+    "olapps-learn-ai-client-vault-oidc-credentials",
+    path="secret-operations/sso/ol-learn-ai-client",
+    data_json=Output.all(
+        url=olapps_learn_ai_client.realm_id.apply(
+            lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+        ),
+        client_id=olapps_learn_ai_client.client_id,
+        client_secret=olapps_learn_ai_client.client_secret,
+        # This is included for the case where we are using traefik-forward-auth.
+        # It requires a random secret value to be present which is independent
+        # of the OAuth credentials.
+        secret=secrets.token_urlsafe(),
+        realm_id=olapps_learn_ai_client.realm_id,
+        realm_name="olapps",
+        realm_public_key=olapps_learn_ai_client.realm_id.apply(
+            lambda realm_id: fetch_realm_public_key_partial(realm_id)
+        ),
+    ).apply(json.dumps),
+)
 # Learn AI [END]
 
 # MIT LEARN [START]
@@ -805,6 +849,26 @@ if keycloak_realm_config.get("olapps-mitlearn-client-secret"):
                 client_id=olapps_mitlearn_client.id,
                 opts=resource_options,
             )
+    olapps_mitlearn_client_data = vault.generic.Secret(
+        "olapps-mitlearn-client-vault-oidc-credentials",
+        path="secret-operations/sso/ol-mitlearn-client",
+        data_json=Output.all(
+            url=olapps_mitlearn_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=olapps_mitlearn_client.client_id,
+            client_secret=olapps_mitlearn_client.client_secret,
+            # This is included for the case where we are using traefik-forward-auth.
+            # It requires a random secret value to be present which is independent
+            # of the OAuth credentials.
+            secret=secrets.token_urlsafe(),
+            realm_id=olapps_mitlearn_client.realm_id,
+            realm_name="olapps",
+            realm_public_key=olapps_mitlearn_client.realm_id.apply(
+                lambda realm_id: fetch_realm_public_key_partial(realm_id)
+            ),
+        ).apply(json.dumps),
+    )
 # MIT LEARN [END]
 
 # OPEN DISCUSSIONS [START]
@@ -823,6 +887,26 @@ olapps_open_discussions_client = keycloak.openid.Client(
         "olapps-open-discussions-client-redirect-uris"
     ),
     opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+)
+olapps_open_discussions_client_data = vault.generic.Secret(
+    "olapps-open-discussions-client-vault-oidc-credentials",
+    path="secret-operations/sso/ol-open-discussions-client",
+    data_json=Output.all(
+        url=olapps_open_discussions_client.realm_id.apply(
+            lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+        ),
+        client_id=olapps_open_discussions_client.client_id,
+        client_secret=olapps_open_discussions_client.client_secret,
+        # This is included for the case where we are using traefik-forward-auth.
+        # It requires a random secret value to be present which is independent
+        # of the OAuth credentials.
+        secret=secrets.token_urlsafe(),
+        realm_id=olapps_open_discussions_client.realm_id,
+        realm_name="olapps",
+        realm_public_key=olapps_open_discussions_client.realm_id.apply(
+            lambda realm_id: fetch_realm_public_key_partial(realm_id)
+        ),
+    ).apply(json.dumps),
 )
 # OPEN DISCUSSIONS [END]
 # OLAPPS REALM - OpenID Clients [START]
@@ -848,6 +932,26 @@ ol_platform_engineering_airbyte_client = keycloak.openid.Client(
     ),
     opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
 )
+ol_platform_engineering_airbyte_client_data = vault.generic.Secret(
+    "ol-platform-engineering-airbyte-client-vault-oidc-credentials",
+    path="secret-operations/sso/ol-platform-engineering-airbyte-client",
+    data_json=Output.all(
+        url=ol_platform_engineering_airbyte_client.realm_id.apply(
+            lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+        ),
+        client_id=ol_platform_engineering_airbyte_client.client_id,
+        client_secret=ol_platform_engineering_airbyte_client.client_secret,
+        # This is included for the case where we are using traefik-forward-auth.
+        # It requires a random secret value to be present which is independent
+        # of the OAuth credentials.
+        secret=secrets.token_urlsafe(),
+        realm_id=ol_platform_engineering_airbyte_client.realm_id,
+        realm_name="ol-platform-engineering",
+        realm_public_key=ol_platform_engineering_airbyte_client.realm_id.apply(
+            lambda realm_id: fetch_realm_public_key_partial(realm_id)
+        ),
+    ).apply(json.dumps),
+)
 # AIRBYTE [END] # noqa: ERA001
 
 # DAGSTER [START] # noqa: ERA001
@@ -868,6 +972,26 @@ ol_platform_engineering_dagster_client = keycloak.openid.Client(
         "ol-platform-engineering-dagster-redirect-uris"
     ),
     opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+)
+ol_platform_engineering_dagster_client_data = vault.generic.Secret(
+    "ol-platform-engineering-dagster-client-vault-oidc-credentials",
+    path="secret-operations/sso/ol-platform-engineering-dagster-client",
+    data_json=Output.all(
+        url=ol_platform_engineering_dagster_client.realm_id.apply(
+            lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+        ),
+        client_id=ol_platform_engineering_dagster_client.client_id,
+        client_secret=ol_platform_engineering_dagster_client.client_secret,
+        # This is included for the case where we are using traefik-forward-auth.
+        # It requires a random secret value to be present which is independent
+        # of the OAuth credentials.
+        secret=secrets.token_urlsafe(),
+        realm_id=ol_platform_engineering_dagster_client.realm_id,
+        realm_name="ol-platform-engineering",
+        realm_public_key=ol_platform_engineering_dagster_client.realm_id.apply(
+            lambda realm_id: fetch_realm_public_key_partial(realm_id)
+        ),
+    ).apply(json.dumps),
 )
 # DAGSTER [END] # noqa: ERA001
 
@@ -890,6 +1014,26 @@ ol_platform_engineering_leek_client = keycloak.openid.Client(
     ),
     opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
 )
+ol_platform_engineering_leek_client_data = vault.generic.Secret(
+    "ol-platform-engineering-leek-client-vault-oidc-credentials",
+    path="secret-operations/sso/ol-platform-engineering-leek-client",
+    data_json=Output.all(
+        url=ol_platform_engineering_leek_client.realm_id.apply(
+            lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+        ),
+        client_id=ol_platform_engineering_leek_client.client_id,
+        client_secret=ol_platform_engineering_leek_client.client_secret,
+        # This is included for the case where we are using traefik-forward-auth.
+        # It requires a random secret value to be present which is independent
+        # of the OAuth credentials.
+        secret=secrets.token_urlsafe(),
+        realm_id=ol_platform_engineering_leek_client.realm_id,
+        realm_name="ol-platform-engineering",
+        realm_public_key=ol_platform_engineering_leek_client.realm_id.apply(
+            lambda realm_id: fetch_realm_public_key_partial(realm_id)
+        ),
+    ).apply(json.dumps),
+)
 # LEEK [END] # noqa: ERA001
 
 # VAULT [START] # noqa: ERA001
@@ -911,6 +1055,26 @@ if keycloak_realm_config.get("ol-platform-engineering-vault-client-secret"):
             "ol-platform-engineering-vault-redirect-uris"
         ),
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    ol_platform_engineering_vault_client_data = vault.generic.Secret(
+        "ol-platform-engineering-vault-client-vault-oidc-credentials",
+        path="secret-operations/sso/ol-platform-engineering-vault-client",
+        data_json=Output.all(
+            url=ol_platform_engineering_vault_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=ol_platform_engineering_vault_client.client_id,
+            client_secret=ol_platform_engineering_vault_client.client_secret,
+            # This is included for the case where we are using traefik-forward-auth.
+            # It requires a random secret value to be present which is independent
+            # of the OAuth credentials.
+            secret=secrets.token_urlsafe(),
+            realm_id=ol_platform_engineering_vault_client.realm_id,
+            realm_name="ol-platform-engineering",
+            realm_public_key=ol_platform_engineering_vault_client.realm_id.apply(
+                lambda realm_id: fetch_realm_public_key_partial(realm_id)
+            ),
+        ).apply(json.dumps),
     )
 # VAULT [END] # noqa: ERA001
 # OL-PLATFORM-ENGINEERING REALM - OpenID Clients [END]
@@ -944,6 +1108,26 @@ for role in ol_data_platform_superset_client_roles:
         client_id=ol_data_platform_superset_client.id,
         opts=resource_options,
     )
+ol_data_platform_superset_client_data = vault.generic.Secret(
+    "ol-data-platform-superset-client-vault-oidc-credentials",
+    path="secret-operations/sso/ol-data-platform-superset-client",
+    data_json=Output.all(
+        url=ol_data_platform_superset_client.realm_id.apply(
+            lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+        ),
+        client_id=ol_data_platform_superset_client.client_id,
+        client_secret=ol_data_platform_superset_client.client_secret,
+        # This is included for the case where we are using traefik-forward-auth.
+        # It requires a random secret value to be present which is independent
+        # of the OAuth credentials.
+        secret=secrets.token_urlsafe(),
+        realm_id=ol_data_platform_superset_client.realm_id,
+        realm_name="ol-data-platform",
+        realm_public_key=ol_data_platform_superset_client.realm_id.apply(
+            lambda realm_id: fetch_realm_public_key_partial(realm_id)
+        ),
+    ).apply(json.dumps),
+)
 # SUPERSET [END] # noqa: ERA001
 
 # OPENMETADATA [START] # noqa: ERA001
@@ -976,6 +1160,26 @@ for role in ol_data_platform_openmetadata_client_roles:
         client_id=ol_data_platform_openmetadata_client.id,
         opts=resource_options,
     )
+ol_data_platform_openmetadata_client_data = vault.generic.Secret(
+    "ol-data-platform-openmetadata-client-vault-oidc-credentials",
+    path="secret-operations/sso/ol-data-platform-openmetadata-client",
+    data_json=Output.all(
+        url=ol_data_platform_openmetadata_client.realm_id.apply(
+            lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+        ),
+        client_id=ol_data_platform_openmetadata_client.client_id,
+        client_secret=ol_data_platform_openmetadata_client.client_secret,
+        # This is included for the case where we are using traefik-forward-auth.
+        # It requires a random secret value to be present which is independent
+        # of the OAuth credentials.
+        secret=secrets.token_urlsafe(),
+        realm_id=ol_data_platform_openmetadata_client.realm_id,
+        realm_name="ol-data-platform",
+        realm_public_key=ol_data_platform_openmetadata_client.realm_id.apply(
+            lambda realm_id: fetch_realm_public_key_partial(realm_id)
+        ),
+    ).apply(json.dumps),
+)
 # OPENMETADATA [END] # noqa: ERA001
 
 # OL-DATA-PLATFORM REALM - OpenID Clients [END]
