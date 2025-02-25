@@ -370,7 +370,7 @@ vault.generic.Secret(
 mitlearn_vault_policy = vault.Policy(
     f"ol-mitlearn-vault-policy-{stack_info.env_suffix}",
     name="mitlearn",
-    policy=Path(__file__).parent.joinpath("vault_policies", "mitlearn.hcl").read_text(),
+    policy=Path(__file__).parent.joinpath("mitlearn_policy.hcl").read_text(),
 )
 
 mitlearn_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
@@ -854,6 +854,57 @@ oidc_secret = OLVaultK8SSecret(
         parent=vault_k8s_resources,
         depends_on=[vault_k8s_resources],
     ),
+)
+
+# This will (eventually) create a secret in the mitlearn namespace
+# containing two keys `tls.key` and `tls.crt`
+# According to the apisix code this should work fine, despite the
+# documentation saying only they keys `cert` and `key` are supported.
+#
+# Hopefully this is true because there is no way to control what the key
+# names in the secret are via this `Certificate` resource and there is
+# no way to controll what keys APISIX is looking up.
+# Ref: https://github.com/apache/apisix-ingress-controller/blob/adc70f3de2e745a29306fc155721a639a6367b6d/pkg/providers/translation/util.go#L35
+api_tls_secret_name = "api-mitlearn-tls"  # pragma: allowlist secret # noqa: S105
+cert_manager_certificate = kubernetes.apiextensions.CustomResource(
+    f"ol-mitlearn-cert-manager-certificate-{stack_info.env_suffix}",
+    api_version="cert-manager.io/v1",
+    kind="Certificate",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=mitlearn_config.require("api_domain"),
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec={
+        "issuerRef": {
+            "group": "cert-manager.io",
+            "name": "letsencrypt-production",
+            "kind": "ClusterIssuer",
+        },
+        "secretName": api_tls_secret_name,
+        "dnsNames": [
+            mitlearn_config.require("api_domain"),
+        ],
+        "usages": ["digital signature", "key encipherment", "server auth"],
+    },
+)
+
+mitlearn_https_apisix_tls = kubernetes.apiextensions.CustomResource(
+    f"ol-mitlearn-https-apisix-tls-{stack_info.env_suffix}",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixTls",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=api_tls_secret_name,
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec={
+        "hosts": [mitlearn_config.require("api_domain")],
+        "secret": {
+            "name": api_tls_secret_name,
+            "namespace": learn_namespace,
+        },
+    },
 )
 
 # We need to be able to change `unauth_action` depending on the route but otherwise
