@@ -890,7 +890,7 @@ olapps_open_discussions_client = keycloak.openid.Client(
 )
 olapps_open_discussions_client_data = vault.generic.Secret(
     "olapps-open-discussions-client-vault-oidc-credentials",
-    path="secret-operations/sso/ol-open-disuccions-client",
+    path="secret-operations/sso/ol-open-discussions-client",
     data_json=Output.all(
         url=olapps_open_discussions_client.realm_id.apply(
             lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
