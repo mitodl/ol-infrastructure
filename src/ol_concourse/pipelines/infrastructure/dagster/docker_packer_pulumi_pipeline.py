@@ -68,6 +68,8 @@ def build_dagster_docker_pipeline() -> Pipeline:
                 build_parameters={
                     "CONTEXT": data_platform_repo.name,
                     "DOCKERFILE": f"{data_platform_repo.name}/dockerfiles/orchestrate/Dockerfile.global",  # noqa: E501
+                    "BUILDKIT_SECRETTEXT_dbt_trino_username": "((dbt.trino_username))",
+                    "BUILDKIT_SECRETTEXT_dbt_trino_password": "((dbt.trino_password))",
                 },
                 build_args=[],
             ),

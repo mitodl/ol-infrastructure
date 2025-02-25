@@ -6,7 +6,7 @@ services:
     image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/{{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     container_name: dagster-webserver
     restart: unless-stopped
-    entrypoint: ["uv", "run", "dagster-webserver", "-w", "/opt/dagster/app/workspace.yaml", "-h", "0.0.0.0", "-p", "3000"]
+    entrypoint: ["uv", "run", "--no-dev", "dagster-webserver", "-w", "/opt/dagster/app/workspace.yaml", "-h", "0.0.0.0", "-p", "3000"]
     ports:
     - ":3000"
     env_file:
@@ -26,7 +26,7 @@ services:
     image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/{{ context.docker_repo_name }}@{{ context.docker_image_digest }}
     container_name: dagster-daemon
     restart: unless-stopped
-    entrypoint: ["uv", "run", "dagster-daemon", "run", "-w", "/opt/dagster/app/workspace.yaml"]
+    entrypoint: ["uv", "run", "--no-dev", "dagster-daemon", "run", "-w", "/opt/dagster/app/workspace.yaml"]
     env_file:
       - .env
     environment:
