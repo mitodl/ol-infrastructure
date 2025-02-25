@@ -721,7 +721,7 @@ for role in olapps_unified_ecommerce_client_roles:
     )
 olapps_unified_ecommerce_client_data = vault.generic.Secret(
     "olapps-unified-ecommerce-client-vault-oidc-credentials",
-    path="secret-operations/sso/ol-unified-ecommerce-client",
+    path="secret-operations/sso/unified-ecommerce",
     data_json=Output.all(
         url=olapps_unified_ecommerce_client.realm_id.apply(
             lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
@@ -785,7 +785,7 @@ for role in olapps_learn_ai_client_roles:
     )
 olapps_learn_ai_client_data = vault.generic.Secret(
     "olapps-learn-ai-client-vault-oidc-credentials",
-    path="secret-operations/sso/ol-learn-ai-client",
+    path="secret-operations/sso/learn-ai",
     data_json=Output.all(
         url=olapps_learn_ai_client.realm_id.apply(
             lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
@@ -851,7 +851,7 @@ if keycloak_realm_config.get("olapps-mitlearn-client-secret"):
             )
     olapps_mitlearn_client_data = vault.generic.Secret(
         "olapps-mitlearn-client-vault-oidc-credentials",
-        path="secret-operations/sso/ol-mitlearn-client",
+        path="secret-operations/sso/mitlearn",
         data_json=Output.all(
             url=olapps_mitlearn_client.realm_id.apply(
                 lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
@@ -890,7 +890,7 @@ olapps_open_discussions_client = keycloak.openid.Client(
 )
 olapps_open_discussions_client_data = vault.generic.Secret(
     "olapps-open-discussions-client-vault-oidc-credentials",
-    path="secret-operations/sso/ol-open-discussions-client",
+    path="secret-operations/sso/open-discussions",
     data_json=Output.all(
         url=olapps_open_discussions_client.realm_id.apply(
             lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
@@ -934,7 +934,7 @@ ol_platform_engineering_airbyte_client = keycloak.openid.Client(
 )
 ol_platform_engineering_airbyte_client_data = vault.generic.Secret(
     "ol-platform-engineering-airbyte-client-vault-oidc-credentials",
-    path="secret-operations/sso/ol-platform-engineering-airbyte-client",
+    path="secret-operations/sso/airbyte",
     data_json=Output.all(
         url=ol_platform_engineering_airbyte_client.realm_id.apply(
             lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
@@ -975,7 +975,7 @@ ol_platform_engineering_dagster_client = keycloak.openid.Client(
 )
 ol_platform_engineering_dagster_client_data = vault.generic.Secret(
     "ol-platform-engineering-dagster-client-vault-oidc-credentials",
-    path="secret-operations/sso/ol-platform-engineering-dagster-client",
+    path="secret-operations/sso/dagster",
     data_json=Output.all(
         url=ol_platform_engineering_dagster_client.realm_id.apply(
             lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
@@ -1016,7 +1016,7 @@ ol_platform_engineering_leek_client = keycloak.openid.Client(
 )
 ol_platform_engineering_leek_client_data = vault.generic.Secret(
     "ol-platform-engineering-leek-client-vault-oidc-credentials",
-    path="secret-operations/sso/ol-platform-engineering-leek-client",
+    path="secret-operations/sso/leek",
     data_json=Output.all(
         url=ol_platform_engineering_leek_client.realm_id.apply(
             lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
@@ -1058,7 +1058,7 @@ if keycloak_realm_config.get("ol-platform-engineering-vault-client-secret"):
     )
     ol_platform_engineering_vault_client_data = vault.generic.Secret(
         "ol-platform-engineering-vault-client-vault-oidc-credentials",
-        path="secret-operations/sso/ol-platform-engineering-vault-client",
+        path="secret-operations/sso/vault",
         data_json=Output.all(
             url=ol_platform_engineering_vault_client.realm_id.apply(
                 lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
@@ -1110,7 +1110,7 @@ for role in ol_data_platform_superset_client_roles:
     )
 ol_data_platform_superset_client_data = vault.generic.Secret(
     "ol-data-platform-superset-client-vault-oidc-credentials",
-    path="secret-operations/sso/ol-data-platform-superset-client",
+    path="secret-operations/sso/superset",
     data_json=Output.all(
         url=ol_data_platform_superset_client.realm_id.apply(
             lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
@@ -1162,7 +1162,7 @@ for role in ol_data_platform_openmetadata_client_roles:
     )
 ol_data_platform_openmetadata_client_data = vault.generic.Secret(
     "ol-data-platform-openmetadata-client-vault-oidc-credentials",
-    path="secret-operations/sso/ol-data-platform-openmetadata-client",
+    path="secret-operations/sso/open_metadata",
     data_json=Output.all(
         url=ol_data_platform_openmetadata_client.realm_id.apply(
             lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
