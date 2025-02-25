@@ -452,7 +452,6 @@ ol_data_platform_realm = keycloak.Realm(
     login_theme="keycloak.v2",
     email_theme="keycloak",
     registration_email_as_username=True,
-    browser_flow="",
     login_with_email_allowed=True,
     duplicate_emails_allowed=False,
     realm="ol-data-platform",
