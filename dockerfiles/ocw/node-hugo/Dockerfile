@@ -1,7 +1,7 @@
 FROM node:22-bookworm-slim
 LABEL maintainer="MIT Open Learning (odl-devops@mit.edu)"
 LABEL description="Node and Hugo, used for building OCW website"
-LABEL version="0.7"
+LABEL version="0.8"
 WORKDIR /tmp
 ENV HUGO_VERSION="0.142.0"
 ENV HUGO_NAME="hugo_extended_${HUGO_VERSION}_linux-amd64"
