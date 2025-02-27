@@ -12,7 +12,7 @@ resources:
   check_every: 1h
   source:
     repository: node
-    tag: 14-buster-slim
+    tag: 22-bookworm-slim
 - name: ocw-course-publisher-image
   type: docker-image
   source:
