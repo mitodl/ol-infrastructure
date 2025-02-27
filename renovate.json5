@@ -18,7 +18,8 @@
     {
       "customType": "regex",
       "fileMatch": [
-        "^src/bridge/lib/versions.py$"
+        "^src/bridge/lib/versions.py$",
+        "^dockerfiles/ocw/node-hugo/Dockerfile$"
       ],
       "matchStrings": [
           "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>.+?)(?: packageName=(?<packageName>.+?))?(?: registryUrl=(?<registryUrl>.+?))?(?: versioning=(?<versioning>[a-z-]+?))?\\s*.+\\s*=\\s*\"(?<currentValue>.+?)\""
