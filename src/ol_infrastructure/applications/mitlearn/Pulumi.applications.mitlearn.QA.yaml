@@ -18,6 +18,7 @@ config:
     INDEXING_API_USERNAME: "od_mm_rc_api"
     KEYCLOAK_BASE_URL: "https://sso-qa.ol.mit.edu"
     KEYCLOAK_REALM_NAME: "olapps"
+    MITOL_API_LOGOUT_SUFFIX: "logout"
     MITOL_API_URL: "https://api.rc.learn.mit.edu"
     MITOL_APP_URL: "https://rc.learn.mit.edu"
     MITOL_APP_BASE_URL: "https://rc.learn.mit.edu"
