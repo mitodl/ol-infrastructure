@@ -4,7 +4,7 @@ resources:
   type: git
   source:
     uri: https://github.com/mitodl/ol-infrastructure.git
-    branch: ((ol-infrastructure-git-ref))
+    branch: main
     paths:
     - dockerfiles/ocw/node-hugo/Dockerfile
 - name: node-image
@@ -35,3 +35,47 @@ jobs:
     params:
       build: ol-infrastructure/dockerfiles/ocw/node-hugo
       additional_tags: ol-infrastructure/dockerfiles/ocw/node-hugo/tag
+  - task: tar-resource-files
+    config:
+      image_resource:
+        name: ""
+        source:
+          repository: node
+          tag: 22-bookworm-slim
+        type: docker-image
+      inputs:
+      - name: ocw-course-publisher-image
+      - name: ol-infrastructure
+      outputs:
+      - name: ocw-course-publisher-image
+      platform: linux
+      run:
+        args:
+        - -exc
+        - 'echo "Packaging ocw-course-publisher"; cd ocw-course-publisher-image; tar
+          czf rootfs.tgz --directory=rootfs .; rm -rf ./rootfs/; version=$(cat ../ol-infrastructure/dockerfiles/ocw/node-hugo/tag);
+          echo { >> resource_metadata.json; echo \ \ \"type\": \"ocw-course-publisher\",
+          >> resource_metadata.json; echo \ \ \"version\": \"${version}\", >> resource_metadata.json;
+          echo \ \ \"privileged\": false, >> resource_metadata.json; echo \ \ \"version_history\":
+          false >> resource_metadata.json; echo } >> resource_metadata.json; echo
+          "resource_metadata.json contents:" cat resource_metadata.json; tar czf ./ocw-course-publisher.tgz
+          rootfs.tgz resource_metadata.json;'
+        path: sh
+  - task: packaged-resource-upload-
+    config:
+      image_resource:
+        name: ""
+        source:
+          repository: amazon/aws-cli
+          tag: latest
+        type: docker-image
+      inputs:
+      - name: ocw-course-publisher-image
+      platform: linux
+      run:
+        args:
+        - -exc
+        - |
+          ls -lthraR
+          aws s3 cp ./ocw-course-publisher-image/ocw-course-publisher.tgz s3://ol-eng-artifacts/bundled-concourse-resources/
+        path: sh
