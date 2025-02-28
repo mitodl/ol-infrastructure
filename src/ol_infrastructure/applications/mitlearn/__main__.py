@@ -954,28 +954,6 @@ learn_external_service_apisix_pluginconfig = kubernetes.apiextensions.CustomReso
 learn_external_service_name = "learn-at-heroku"
 learn_external_service_port_name = "https"
 
-learn_external_service = kubernetes.core.v1.Service(
-    f"ol-mitlearn-external-service-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=learn_external_service_name,
-        namespace=learn_namespace,
-        labels=application_labels,
-    ),
-    spec=kubernetes.core.v1.ServiceSpecArgs(
-        external_name=mitlearn_config.require("heroku_domain"),
-        ports=[
-            kubernetes.core.v1.ServicePortArgs(
-                name=learn_external_service_port_name,
-                port=DEFAULT_HTTPS_PORT,
-                target_port=DEFAULT_HTTPS_PORT,
-                protocol="TCP",
-            ),
-        ],
-        type="ExternalName",  # Special!
-    ),
-    opts=ResourceOptions(delete_before_replace=True),
-)
-
 learn_external_service_apisix_upstream = kubernetes.apiextensions.CustomResource(
     f"ol-mitlearn-external-service-apisix-upstream-{stack_info.env_suffix}",
     api_version="apisix.apache.org/v2",
@@ -994,9 +972,7 @@ learn_external_service_apisix_upstream = kubernetes.apiextensions.CustomResource
             },
         ],
     },
-    opts=ResourceOptions(
-        delete_before_replace=True, depends_on=[learn_external_service]
-    ),
+    opts=ResourceOptions(delete_before_replace=True),
 )
 
 
@@ -1098,7 +1074,6 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
     opts=ResourceOptions(
         delete_before_replace=True,
         depends_on=[
-            learn_external_service,
             learn_external_service_apisix_upstream,
             learn_external_service_apisix_pluginconfig,
         ],
