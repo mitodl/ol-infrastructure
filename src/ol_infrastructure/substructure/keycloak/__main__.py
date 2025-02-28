@@ -1217,14 +1217,17 @@ ol_data_platform_superset_client = keycloak.openid.Client(
 ol_data_platform_superset_client_roles = keycloak_realm_config.get_object(
     "ol-data-platform-superset-client-roles"
 )
+ol_data_platform_superset_client_role_refs = {}
 for role in ol_data_platform_superset_client_roles:
-    keycloak.Role(
+    role_ref = keycloak.Role(
         f"ol-data-platform-superset-client-{role}",
         name=role,
         realm_id="ol-data-platform",
         client_id=ol_data_platform_superset_client.id,
         opts=resource_options,
     )
+    ol_data_platform_superset_client_role_refs[role] = role_ref
+
 ol_data_platform_superset_client_data = vault.generic.Secret(
     "ol-data-platform-superset-client-vault-oidc-credentials",
     path="secret-operations/sso/superset",
@@ -1252,11 +1255,7 @@ ol_data_platform_eng_data_role = keycloak.Role(
     realm_id=ol_data_platform_realm.id,
     name="ol-eng-data",
     description="OL Engineering Data role - maps to superset_admin",
-    composite_roles=[
-        ol_data_platform_superset_client.id.apply(
-            lambda client_id: f"{client_id}.superset_admin"
-        )
-    ],
+    composite_roles=[ol_data_platform_superset_client_role_refs["superset_admin"].id],
     opts=resource_options,
 )
 
@@ -1265,11 +1264,7 @@ ol_data_platform_eng_developer_role = keycloak.Role(
     realm_id=ol_data_platform_realm.id,
     name="ol-eng-developer",
     description="OL Engineering Developer role - maps to superset_alpha",
-    composite_roles=[
-        ol_data_platform_superset_client.id.apply(
-            lambda client_id: f"{client_id}.superset_alpha"
-        )
-    ],
+    composite_roles=[ol_data_platform_superset_client_role_refs["superset_alpha"].id],
     opts=resource_options,
 )
 
@@ -1278,11 +1273,7 @@ ol_data_platform_eng_reporter_role = keycloak.Role(
     realm_id=ol_data_platform_realm.id,
     name="ol-eng-reporter",
     description="OL Engineering Reporter role - maps to superset_gamma",
-    composite_roles=[
-        ol_data_platform_superset_client.id.apply(
-            lambda client_id: f"{client_id}.superset_gamma"
-        )
-    ],
+    composite_roles=[ol_data_platform_superset_client_role_refs["superset_gamma"].id],
     opts=resource_options,
 )
 
@@ -1294,6 +1285,36 @@ ol_data_platform_role_keys_openid_client_scope = keycloak.openid.ClientScope(
     include_in_token_scope=True,
     opts=resource_options,
 )
+
+ol_data_platform_role_keys_openid_client_scope_mapper = (
+    keycloak.openid.UserClientRoleProtocolMapper(
+        "ol-data-platform-role-keys-openid-client-scope-mapper",
+        claim_name="role_keys",
+        realm_id=ol_data_platform_realm.id,
+        add_to_access_token=True,
+        add_to_id_token=True,
+        add_to_userinfo=True,
+        claim_value_type="STRING",
+        client_id=ol_data_platform_superset_client.id,
+        client_id_for_role_mappings=ol_data_platform_role_keys_openid_client_scope.id,
+        multivalued=True,
+        name="role_keys",
+    )
+)
+
+ol_data_platform_superset_client_scope = keycloak.openid.ClientDefaultScopes(
+    "ol-data-platform-superset-client-default-scopes",
+    realm_id="ol-data-platform",
+    client_id=ol_data_platform_superset_client.id,
+    default_scopes=[
+        "acr",
+        "email",
+        "profile",
+        "roles",
+        "web-origins",
+    ],
+)
+
 # SUPERSET [END] # noqa: ERA001
 
 # OPENMETADATA [START] # noqa: ERA001
