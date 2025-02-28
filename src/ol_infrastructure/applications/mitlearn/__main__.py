@@ -9,6 +9,7 @@ from string import Template
 
 import pulumi_fastly as fastly
 import pulumi_github as github
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
 from pulumi import Alias, Config, InvokeOptions, ResourceOptions, StackReference, export
@@ -25,7 +26,15 @@ from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
+    OLVaultK8SResources,
+    OLVaultK8SResourcesConfig,
+    OLVaultK8SSecret,
+    OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
+)
+from ol_infrastructure.lib.aws.eks_helper import (
+    check_cluster_namespace,
+    setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.fastly import (
@@ -50,9 +59,12 @@ github_provider = github.Provider(
 mitlearn_config = Config("mitlearn")
 heroku_config = Config("heroku")
 heroku_app_config = Config("heroku_app")
+vault_config = Config("vault")
 
 stack_info = parse_stack()
+
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
+cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
 vector_log_proxy_stack = StackReference(
     f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
@@ -61,6 +73,7 @@ monitoring_stack = StackReference("infrastructure.monitoring")
 dns_stack = StackReference("infrastructure.aws.dns")
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 learn_zone_id = dns_stack.require_output("learn")["id"]
+
 learn_frontend_domain = mitlearn_config.require("frontend_domain")
 legacy_learn_frontend_domain = mitlearn_config.require("legacy_frontend_domain")
 nextjs_heroku_domain = mitlearn_config.require("nextjs_heroku_domain")
@@ -75,6 +88,16 @@ aws_config = AWSBase(
 app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
     stack_info.env_suffix
 ]
+
+k8s_global_labels = {
+    "ol.mit.edu/stack": stack_info.full_name,
+    "ol.mit.edu/service": "mit-learn",  # What should this actually be?
+}
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
+learn_namespace = "mitlearn"
+cluster_stack.require_output("namespaces").apply(
+    lambda ns: check_cluster_namespace(learn_namespace, ns)
+)
 
 #######################################################
 # begin legacy block - app bucket config
@@ -338,10 +361,42 @@ mitopen_vault_secrets = read_yaml_secrets(
     Path(f"mitopen/secrets.{stack_info.env_suffix}.yaml"),
 )
 
-vault.generic.Secret(
+mitlearn_vault_static_secrets = vault.generic.Secret(
     f"ol-mitopen-configuration-secrets-{stack_info.env_suffix}",
     path=mitopen_vault_mount.path.apply("{}/secrets".format),
     data_json=json.dumps(mitopen_vault_secrets),
+)
+
+mitlearn_vault_policy = vault.Policy(
+    f"ol-mitlearn-vault-policy-{stack_info.env_suffix}",
+    name="mitlearn",
+    policy=Path(__file__).parent.joinpath("mitlearn_policy.hcl").read_text(),
+)
+
+mitlearn_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    f"ol-mitlearn-vault-k8s-auth-backend-role-{stack_info.env_suffix}",
+    role_name="mitlearn",
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["*"],
+    bound_service_account_namespaces=[learn_namespace],
+    token_policies=[mitlearn_vault_policy.name],
+)
+
+vault_k8s_resources_config = OLVaultK8SResourcesConfig(
+    application_name="mitlearn",
+    namespace=learn_namespace,
+    labels=k8s_global_labels,
+    vault_address=vault_config.require("address"),
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    vault_auth_role_name=mitlearn_vault_k8s_auth_backend_role.role_name,
+)
+
+vault_k8s_resources = OLVaultK8SResources(
+    resource_config=vault_k8s_resources_config,
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[mitlearn_vault_k8s_auth_backend_role],
+    ),
 )
 
 mitopen_db_security_group = ec2.SecurityGroup(
@@ -765,6 +820,266 @@ mitopen_fastly_service = fastly.ServiceVcl(
     ),
 )
 
+application_labels = k8s_global_labels | {
+    "ol.mit.edu/application": "learn",
+    "ol.mit.edu/pod-security-group": "learn",
+}
+
+oidc_secret_name = "oidc-secrets"  # pragma: allowlist secret # noqa: S105
+oidc_secret = OLVaultK8SSecret(
+    f"ol-mitlearn-oidc-secrets-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="oidc-static-secrets",
+        namespace=learn_namespace,
+        labels=application_labels,
+        dest_secret_name=oidc_secret_name,
+        dest_secret_labels=application_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/mitlearn",
+        excludes=[".*"],
+        exclude_raw=True,
+        # Refresh frequently because substructure keycloak stack could change some of these
+        refresh_after="1m",
+        templates={
+            "client_id": '{{ get .Secrets "client_id" }}',
+            "client_secret": '{{ get .Secrets "client_secret" }}',
+            "realm": '{{ get .Secrets "realm_name" }}',
+            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
+        depends_on=[mitlearn_vault_static_secrets],
+    ),
+)
+
+# This will (eventually) create a secret in the mitlearn namespace
+# containing two keys `tls.key` and `tls.crt`
+# According to the apisix code this should work fine, despite the
+# documentation saying only they keys `cert` and `key` are supported.
+#
+# Hopefully this is true because there is no way to control what the key
+# names in the secret are via this `Certificate` resource and there is
+# no way to controll what keys APISIX is looking up.
+# Ref: https://github.com/apache/apisix-ingress-controller/blob/adc70f3de2e745a29306fc155721a639a6367b6d/pkg/providers/translation/util.go#L35
+api_tls_secret_name = "api-mitlearn-tls"  # pragma: allowlist secret # noqa: S105
+cert_manager_certificate = kubernetes.apiextensions.CustomResource(
+    f"ol-mitlearn-cert-manager-certificate-{stack_info.env_suffix}",
+    api_version="cert-manager.io/v1",
+    kind="Certificate",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=mitlearn_config.require("api_domain"),
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec={
+        "issuerRef": {
+            "group": "cert-manager.io",
+            "name": "letsencrypt-production",
+            "kind": "ClusterIssuer",
+        },
+        "secretName": api_tls_secret_name,
+        "dnsNames": [
+            mitlearn_config.require("api_domain"),
+        ],
+        "usages": ["digital signature", "key encipherment", "server auth"],
+    },
+)
+
+mitlearn_https_apisix_tls = kubernetes.apiextensions.CustomResource(
+    f"ol-mitlearn-https-apisix-tls-{stack_info.env_suffix}",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixTls",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=api_tls_secret_name,
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec={
+        "hosts": [mitlearn_config.require("api_domain")],
+        "secret": {
+            "name": api_tls_secret_name,
+            "namespace": learn_namespace,
+        },
+    },
+)
+
+# We need to be able to change `unauth_action` depending on the route but otherwise
+# the settings for the oidc plugin will be unchanged
+base_oidc_plugin_config = {
+    "scope": "openid profile email",
+    "bearer_only": False,
+    "introspection_endpoint_auth_method": "client_secret_basic",
+    "ssl_verify": False,
+    "logout_path": "/logout/oidc",
+    "post_logout_redirect_uri": "/",
+}
+
+shared_plugin_config_name = "shared-plugin-config"
+learn_external_service_apisix_pluginconfig = kubernetes.apiextensions.CustomResource(
+    f"ol-mitlearn-external-service-apisix-pluginconfig-{stack_info.env_suffix}",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixPluginConfig",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=shared_plugin_config_name,
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec={
+        "plugins": [
+            {
+                "name": "redirect",
+                "enable": True,
+                "config": {
+                    "http_to_https": True,
+                },
+            },
+            {
+                "name": "cors",
+                "enable": True,
+                "config": {
+                    "allow_origins": "**",
+                    "allow_methods": "**",
+                    "allow_headers": "**",
+                    "allow_credential": True,
+                },
+            },
+        ]
+    },
+)
+
+learn_external_service_name = "learn-at-heroku"
+learn_external_service_port_name = "https"
+
+learn_external_service_apisix_upstream = kubernetes.apiextensions.CustomResource(
+    f"ol-mitlearn-external-service-apisix-upstream-{stack_info.env_suffix}",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixUpstream",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=learn_external_service_name,
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec={
+        "scheme": "https",
+        "externalNodes": [
+            {
+                "type": "Domain",
+                "name": mitlearn_config.require("heroku_domain"),
+            },
+        ],
+    },
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+
+learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
+    f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixRoute",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=learn_external_service_name,
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec={
+        "http": [
+            {
+                # Wildcard route that can use auth but doesn't require it
+                "name": "passauth",
+                "priority": 0,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        mitlearn_config.require("api_domain"),
+                    ],
+                    "paths": [
+                        "/*",
+                    ],
+                },
+                "upstreams": [
+                    {
+                        "name": learn_external_service_name,
+                    },
+                ],
+            },
+            {
+                # Strip tailing slash from logout redirect
+                "name": "logout-redirect",
+                "priority": 10,
+                "plugins": [
+                    {
+                        "name": "redirect",
+                        "enable": True,
+                        "config": {
+                            "uri": "/logout/oidc",
+                        },
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        mitlearn_config.require("api_domain"),
+                    ],
+                    "paths": [
+                        "/logout/oidc/*",
+                    ],
+                },
+                "upstreams": [
+                    {
+                        "name": learn_external_service_name,
+                    },
+                ],
+            },
+            {
+                # Routes that require authentication
+                "name": "reqauth",
+                "priority": 10,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "auth"},
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        mitlearn_config.require("api_domain"),
+                    ],
+                    "paths": [
+                        "/admin/login/*",
+                        "/login/*",
+                    ],
+                },
+                "upstreams": [
+                    {
+                        "name": learn_external_service_name,
+                    },
+                ],
+            },
+        ],
+    },
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[
+            learn_external_service_apisix_upstream,
+            learn_external_service_apisix_pluginconfig,
+        ],
+    ),
+)
+
 five_minutes = 60 * 5
 route53.Record(
     "ol-mitopen-frontend-dns-record",
@@ -786,25 +1101,27 @@ route53.Record(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-route53.Record(
-    "ol-mitopen-api-dns-record",
-    name=mitlearn_config.require("api_domain"),
-    allow_overwrite=True,
-    type="CNAME",
-    ttl=five_minutes,
-    records=[mitlearn_config.require("heroku_domain")],
-    zone_id=learn_zone_id,
-    opts=ResourceOptions(delete_before_replace=True),
-)
-route53.Record(
-    "ol-mitopen-api-dns-record-legacy",
-    name=mitlearn_config.require("legacy_api_domain"),
-    type="CNAME",
-    ttl=five_minutes,
-    records=[mitlearn_config.require("heroku_domain")],
-    zone_id=mitodl_zone_id,
-    opts=ResourceOptions(delete_before_replace=True),
-)
+# external-dns in the eks cluster is going to handle these now?
+
+# route53.Record(
+#    "ol-mitopen-api-dns-record",
+#    name=mitlearn_config.require("api_domain"),
+#    allow_overwrite=True,
+#    type="CNAME",
+#    ttl=five_minutes,
+#    records=[mitlearn_config.require("heroku_domain")],
+#    zone_id=learn_zone_id,
+#    opts=ResourceOptions(delete_before_replace=True),
+# )
+# route53.Record(
+#    "ol-mitopen-api-dns-record-legacy",
+#    name=mitlearn_config.require("legacy_api_domain"),
+#    type="CNAME",
+#    ttl=five_minutes,
+#    records=[mitlearn_config.require("heroku_domain")],
+#    zone_id=mitodl_zone_id,
+#    opts=ResourceOptions(delete_before_replace=True),
+# )
 
 
 # ci, rc, or production
