@@ -1294,9 +1294,9 @@ ol_data_platform_role_keys_openid_client_scope_mapper = (
         add_to_access_token=True,
         add_to_id_token=True,
         add_to_userinfo=True,
-        claim_value_type="STRING",
-        client_id=ol_data_platform_superset_client.id,
-        client_id_for_role_mappings=ol_data_platform_role_keys_openid_client_scope.id,
+        claim_value_type="String",
+        client_id_for_role_mappings="ol-superset-client",
+        client_scope_id=ol_data_platform_role_keys_openid_client_scope.id,
         multivalued=True,
         name="role_keys",
     )
