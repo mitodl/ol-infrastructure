@@ -1317,3 +1317,18 @@ gh_workflow_api_base_env_var = github.ActionsVariable(
     value=f"https://{learn_ai_config.require('backend_domain')}",
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
+
+gh_workflow_posthog_project_api_key_env_secret = github.ActionsSecret(
+    f"learn-ai-gh-workflow-posthog-project-api_key-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"POSTHOG_PROJECT_API_KEY_{env_var_suffix}",
+    plaintext_value=read_yaml_secrets(Path("posthog.yaml"))["project_api_key"],
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_posthog_personal_api_key_env_secret = github.ActionsSecret(
+    f"learn-ai-gh-workflow-posthog-personal-api-key-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    secret_name=f"POSTHOG_PERSONAL_API_KEY_{env_var_suffix}",
+    plaintext_value=read_yaml_secrets(Path("posthog.yaml"))["personal_api_key"],
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)

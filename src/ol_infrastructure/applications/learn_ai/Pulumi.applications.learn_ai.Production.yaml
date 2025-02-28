@@ -19,6 +19,11 @@ config:
     MITOL_COOKIE_NAME: "mitol"
     MITOL_FEATURES_DEFAULT: "true"
     NODE_ENV: "development"
+    POSTHOG_API_HOST: "https://app.posthog.com"
+    POSTHOG_ENABLED: "true"
+    POSTHOG_PROJECT_ID: "63497"
+    POSTHOG_TIMEOUT_MS: 1000
+    POSTHOG_ENABLE_SESSION_RECORDING: "false"
     UWSGI_THREADS: "5"
   learn_ai:frontend_domain: "learn-ai.ol.mit.edu"
   redis:password:
