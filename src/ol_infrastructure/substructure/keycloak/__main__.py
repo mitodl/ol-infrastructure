@@ -1245,6 +1245,55 @@ ol_data_platform_superset_client_data = vault.generic.Secret(
         ),
     ).apply(json.dumps),
 )
+
+# Create realm roles for ol-data-platform
+ol_data_platform_eng_data_role = keycloak.Role(
+    "ol-data-platform-eng-data-role",
+    realm_id=ol_data_platform_realm.id,
+    name="ol-eng-data",
+    description="OL Engineering Data role - maps to superset_admin",
+    composite_roles=[
+        ol_data_platform_superset_client.id.apply(
+            lambda client_id: f"{client_id}.superset_admin"
+        )
+    ],
+    opts=resource_options,
+)
+
+ol_data_platform_eng_developer_role = keycloak.Role(
+    "ol-data-platform-eng-developer-role",
+    realm_id=ol_data_platform_realm.id,
+    name="ol-eng-developer",
+    description="OL Engineering Developer role - maps to superset_alpha",
+    composite_roles=[
+        ol_data_platform_superset_client.id.apply(
+            lambda client_id: f"{client_id}.superset_alpha"
+        )
+    ],
+    opts=resource_options,
+)
+
+ol_data_platform_eng_reporter_role = keycloak.Role(
+    "ol-data-platform-eng-reporter-role",
+    realm_id=ol_data_platform_realm.id,
+    name="ol-eng-reporter",
+    description="OL Engineering Reporter role - maps to superset_gamma",
+    composite_roles=[
+        ol_data_platform_superset_client.id.apply(
+            lambda client_id: f"{client_id}.superset_gamma"
+        )
+    ],
+    opts=resource_options,
+)
+
+ol_data_platform_role_keys_openid_client_scope = keycloak.openid.ClientScope(
+    "ol-data-platform-role-keys-openid-client-scope",
+    realm_id=ol_data_platform_realm.id,
+    name="roles",
+    description="Scope will map a user's group memberships to a claim",
+    include_in_token_scope=True,
+    opts=resource_options,
+)
 # SUPERSET [END] # noqa: ERA001
 
 # OPENMETADATA [START] # noqa: ERA001
