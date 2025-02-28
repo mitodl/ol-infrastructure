@@ -361,7 +361,7 @@ mitopen_vault_secrets = read_yaml_secrets(
     Path(f"mitopen/secrets.{stack_info.env_suffix}.yaml"),
 )
 
-vault.generic.Secret(
+mitlearn_vault_static_secrets = vault.generic.Secret(
     f"ol-mitopen-configuration-secrets-{stack_info.env_suffix}",
     path=mitopen_vault_mount.path.apply("{}/secrets".format),
     data_json=json.dumps(mitopen_vault_secrets),
@@ -845,14 +845,14 @@ oidc_secret = OLVaultK8SSecret(
             "client_id": '{{ get .Secrets "client_id" }}',
             "client_secret": '{{ get .Secrets "client_secret" }}',
             "realm": '{{ get .Secrets "realm_name" }}',
-            "discovery": '{{ get .Secrets "url" }}.well-known/openid-configuration',
+            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
         },
         vaultauth=vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
         parent=vault_k8s_resources,
-        depends_on=[vault_k8s_resources],
+        depends_on=[mitlearn_vault_static_secrets],
     ),
 )
 
@@ -947,29 +947,6 @@ learn_external_service_apisix_pluginconfig = kubernetes.apiextensions.CustomReso
                     "allow_credential": True,
                 },
             },
-            {
-                "name": "response-rewrite",
-                "enable": True,
-                "config": {
-                    "headers": {
-                        "set": {
-                            "Referrer-Policy": "origin",
-                        },
-                    },
-                },
-            },
-            {
-                "name": "proxy-rewrite",
-                "enable": True,
-                "config": {
-                    "host": mitlearn_config.require("heroku_domain"),
-                    "headers": {
-                        "set": {
-                            "Host": mitlearn_config.require("heroku_domain"),
-                        },
-                    },
-                },
-            },
         ]
     },
 )
@@ -1009,10 +986,11 @@ learn_external_service_apisix_upstream = kubernetes.apiextensions.CustomResource
         labels=application_labels,
     ),
     spec={
+        "scheme": "https",
         "externalNodes": [
             {
-                "type": "Service",
-                "name": learn_external_service_name,
+                "type": "Domain",
+                "name": mitlearn_config.require("heroku_domain"),
             },
         ],
     },
@@ -1036,8 +1014,8 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
             {
                 # Wildcard route that can use auth but doesn't require it
                 "name": "passauth",
-                "priority": "0",
-                "plugin-config_name": shared_plugin_config_name,
+                "priority": 0,
+                "plugin_config_name": shared_plugin_config_name,
                 "plugins": [
                     {
                         "name": "openid-connect",
@@ -1051,7 +1029,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                         mitlearn_config.require("api_domain"),
                     ],
                     "paths": [
-                        "*",
+                        "/*",
                     ],
                 },
                 "upstreams": [
@@ -1063,7 +1041,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
             {
                 # Strip tailing slash from logout redirect
                 "name": "logout-redirect",
-                "priority": "10",
+                "priority": 10,
                 "plugins": [
                     {
                         "name": "redirect",
@@ -1090,8 +1068,8 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
             {
                 # Routes that require authentication
                 "name": "reqauth",
-                "priority": "10",
-                "plugin-config_name": shared_plugin_config_name,
+                "priority": 10,
+                "plugin_config_name": shared_plugin_config_name,
                 "plugins": [
                     {
                         "name": "openid-connect",
