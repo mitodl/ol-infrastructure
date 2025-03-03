@@ -7,6 +7,8 @@ config:
   - "odl.mit.edu"
   - ".ol.mit.edu"
   - "ol.mit.edu"
+  - "learn.mit.edu"
+  - ".learn.mit.edu"
   eks:apisix_admin_key:
     secure: v1:PafPE9cAPNoOSOrU:8V16zZH9OGc1jgfZffXRDLvb6ROksZLULaYJvdjHgPCG/zmB/8nA8EMZb8X2/O74
   eks:apisix_ingress_enabled: "true"
@@ -15,6 +17,7 @@ config:
   eks:apisix_domains:
   - "api-pay.ol.mit.edu"
   - "api-learn-ai.ol.mit.edu"
+  - "api.learn.mit.edu"
   eks:ebs_csi_provisioner: "true"
   eks:efs_csi_provisioner: "false"
   eks:gateway_release_channel: "experimental"
