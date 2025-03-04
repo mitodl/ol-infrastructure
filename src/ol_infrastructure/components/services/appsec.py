@@ -19,4 +19,3 @@ application_security_group = ec2.SecurityGroup(
     vpc_id=apps_vpc["id"],
     tags=aws_config.tags,
 )
-
