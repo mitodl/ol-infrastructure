@@ -114,7 +114,7 @@ class OLAppDatabase(ComponentResource):
 
         self.app_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
             db_name=self.ol_db_config.app_db_name,
-            mount_point=f"{self.app_db_config.engine}-learn-ai",
+            mount_point=f"{self.app_db_config.engine}-{ol_db_config.app_name}",
             db_admin_username=self.app_db_config.username,
             db_admin_password=self.ol_db_config.app_db_password,
             db_host=self.app_db.db_instance.address,
