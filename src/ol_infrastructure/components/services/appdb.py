@@ -70,7 +70,7 @@ class OLAppDatabase(ComponentResource):
         self.app_db_security_group = ec2.SecurityGroup(
             f"{ol_db_config.app_name}-db-security-group-{stack_info.env_suffix}",
             name=f"{ol_db_config.app_name}-db-security-group-{stack_info.env_suffix}",
-            description="Access control for the learn-ai database.",
+            description="Access control for application databases.",
             ingress=[
                 ec2.SecurityGroupIngressArgs(
                     security_groups=[
