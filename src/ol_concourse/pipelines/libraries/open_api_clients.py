@@ -49,7 +49,7 @@ python_image = Resource(
     icon="docker",
     source={
         "repository": "python",
-        "tag": "3.11-slim",
+        "tag": "3.12-slim",
     },
 )
 node_image = Resource(
@@ -58,7 +58,7 @@ node_image = Resource(
     icon="docker",
     source={
         "repository": "node",
-        "tag": "18-slim",
+        "tag": "22-slim",
     },
 )
 
