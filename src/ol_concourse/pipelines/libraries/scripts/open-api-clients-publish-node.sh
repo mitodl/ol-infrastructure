@@ -11,4 +11,4 @@ yarn build
 # OK so this is vaguely gross but it will do :)
 new_version=$(cat ../../../VERSION)
 echo "Publishing version $new_version"
-npm publish --dry-run --access public
+npm publish --access public
