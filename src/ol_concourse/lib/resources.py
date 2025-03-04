@@ -1,6 +1,6 @@
-from typing import Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
-from ol_concourse.lib.models.pipeline import Identifier, RegistryImage, Resource
+from ol_concourse.lib.models.pipeline import Identifier, Resource
 from ol_concourse.lib.models.resource import Git
 
 
@@ -249,22 +249,26 @@ def schedule(
 def registry_image(  # noqa: PLR0913
     name: Identifier,
     image_repository: str,
-    image_tag: Optional[str] = None,
+    image_tag: Optional[str] = "latest",
     variant: Optional[str] = None,
     tag_regex: Optional[str] = None,
+    sort_by_creation: bool | None = None,
     username=None,
     password=None,
+    check_every: str | None = None,
 ) -> Resource:
-    image_source = RegistryImage(
-        repository=image_repository, tag=image_tag or "latest"
-    ).model_dump()
+    image_source: dict[str, Any] = {"repository": image_repository, "tag": image_tag}
     if username and password:
         image_source["username"] = username
         image_source["password"] = password
     if variant:
         image_source["variant"] = variant
-    if tag_regex:
+    if tag_regex is not None:
         image_source["tag_regex"] = tag_regex
+    if sort_by_creation is not None:
+        image_source["created_at_sort"] = sort_by_creation
+    if check_every:
+        image_source["check_every"] = check_every
     return Resource(
         name=name,
         type="registry-image",

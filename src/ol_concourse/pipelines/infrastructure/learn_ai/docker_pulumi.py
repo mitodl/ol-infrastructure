@@ -39,7 +39,6 @@ def build_learn_ai_pipeline() -> Pipeline:
         uri="http://github.com/mitodl/learn-ai",
         branch="release-candidate",
         fetch_tags=True,
-        tag_regex=r"v[0-9]\.[0-9]*\.[0-9]",  # examples v0.24.0, v0.26.3
     )
 
     # Used for trigging the production deployment
@@ -58,15 +57,19 @@ def build_learn_ai_pipeline() -> Pipeline:
         username="((dockerhub.username))",
         password="((dockerhub.password))",  # noqa: S106
         tag_regex="[0-9A-Fa-f]+",  # Should only capture the CI images
+        check_every="24h",
     )
 
     # Used for publishing the RC / production containers to dockerhub
     learn_ai_registry_rc_image = registry_image(
         name=Identifier("learn-ai-rc-image"),
         image_repository="mitodl/learn-ai-app-main",
+        image_tag=None,  # Only filter on tagged images
         username="((dockerhub.username))",
         password="((dockerhub.password))",  # noqa: S106
-        tag_regex=r"v[0-9]\.[0-9]*\.[0-9]",  # examples v0.24.0, v0.26.3
+        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
+        sort_by_creation=True,
+        check_every="24h",
     )
 
     # Fetches the pulumi code
@@ -107,6 +110,30 @@ def build_learn_ai_pipeline() -> Pipeline:
         build_log_retention={"builds": 10},
         plan=[
             GetStep(get=learn_ai_release_candidate_repo.name, trigger=True),
+            TaskStep(
+                task=Identifier("fetch-rc-version"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    image_resource=AnonymousResource(
+                        type=REGISTRY_IMAGE,
+                        source=RegistryImage(repository="alpine"),
+                    ),
+                    inputs=[Input(name=learn_ai_release_candidate_repo.name)],
+                    outputs=[Output(name=Identifier("rc_version"))],
+                    run=Command(
+                        path="sh",
+                        args=[
+                            "-c",
+                            f"grep 'VERSION = ' {learn_ai_release_candidate_repo.name}/main/settings.py | cut -d'\"' -f2 > rc_version/version",
+                        ],
+                    ),
+                ),
+            ),
+            LoadVarStep(
+                load_var="rc_version",
+                file="rc_version/version",
+                reveal=True,
+            ),
             container_build_task(
                 inputs=[Input(name=learn_ai_release_candidate_repo.name)],
                 build_parameters={
@@ -118,6 +145,8 @@ def build_learn_ai_pipeline() -> Pipeline:
                 put=learn_ai_registry_rc_image.name,
                 params={
                     "image": "image/image.tar",
+                    "version": "((.:rc_version))",
+                    "bump_aliases": True,
                     "additional_tags": f"./{learn_ai_release_candidate_repo.name}/.git/ref",  # Should contain a tag if doof is doing his job
                 },
             ),
