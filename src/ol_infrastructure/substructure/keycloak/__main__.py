@@ -499,8 +499,8 @@ ol_data_platform_realm = keycloak.Realm(
     sso_session_max_lifespan="24h",
     opts=resource_options,
     web_authn_passwordless_policy={
-        "relying_party_entity_name": "mit-ol-sso",
-        "relying_party_id": "mit.edu",
+        "relying_party_entity_name": f"mit-ol-sso-{stack_info.env_suffix}",
+        "relying_party_id": f"sso-{stack_info.env_suffix}.ol.mit.edu",
         "require_resident_key": "Yes",
         "user_verification_requirement": "required",
     },
