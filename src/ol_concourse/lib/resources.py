@@ -267,11 +267,10 @@ def registry_image(  # noqa: PLR0913
         image_source["tag_regex"] = tag_regex
     if sort_by_creation is not None:
         image_source["created_at_sort"] = sort_by_creation
-    if check_every:
-        image_source["check_every"] = check_every
     return Resource(
         name=name,
         type="registry-image",
+        check_every=check_every,
         source=image_source,
     )
 
