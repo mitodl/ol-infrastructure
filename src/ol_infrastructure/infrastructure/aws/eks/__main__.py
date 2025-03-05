@@ -1040,13 +1040,23 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                     },
                 },
                 "apisix": {
+                    "deployment": {
+                        "mode": "traditional",
+                        "role": "traditional",
+                    },
                     "ssl": {
                         "enabled": True,
                     },
                     "admin": {
+                        "enabled": True,
                         "credentials": {
                             "admin": eks_config.require("apisix_admin_key"),
                             "viewer": eks_config.require("apisix_viewer_key"),
+                        },
+                        "allow": {
+                            "ipList": Output.all(pods=pod_ip_blocks).apply(
+                                lambda args: [*args["pods"]]
+                            )
                         },
                     },
                 },
@@ -1066,6 +1076,8 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                 },
                 "ingress-controller": {
                     "enabled": True,
+                    "replicaCount": 2,
+                    "tolerations": operations_tolerations,
                     "gateway": {
                         "type": "ClusterIP",
                         "resources": {
@@ -1088,7 +1100,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                         },
                         "kubernetes": {
                             # Requires using apisix CRs
-                            "enableGatewayAPI": False,  # Not first-class support
+                            "enableGatewayAPI": False,  # Not first-class support 20250304
                             "resyncInterval": "1m",
                         },
                     },
