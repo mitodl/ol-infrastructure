@@ -6,7 +6,7 @@
   "packageRules": [
     {
       "matchManagers": ["regex"],
-      "matchPaths": ["dockerfiles/ocw/node-hugo/Dockerfile"],
+      "matchFileNames": ["dockerfiles/ocw/node-hugo/Dockerfile"],
       "automerge": false
     },
     {
