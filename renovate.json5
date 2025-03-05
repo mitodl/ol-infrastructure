@@ -5,6 +5,11 @@
   ],
   "packageRules": [
     {
+      "matchManagers": ["regex"],
+      "matchFileNames": ["dockerfiles/ocw/node-hugo/Dockerfile"],
+      "automerge": false
+    },
+    {
       "groupName": "pulumi-plugins",
       "matchPackageNames": [
         "pulumi{/,}**"
