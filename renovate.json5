@@ -1,34 +1,38 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "local>mitodl/.github:renovate-config"
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'local>mitodl/.github:renovate-config',
   ],
-  "packageRules": [
+  packageRules: [
     {
-      "matchManagers": ["regex"],
-      "matchFileNames": ["dockerfiles/ocw/node-hugo/Dockerfile"],
-      "automerge": false
+      matchManagers: [
+        'custom.regex',
+      ],
+      matchFileNames: [
+        'dockerfiles/ocw/node-hugo/Dockerfile',
+      ],
+      automerge: false,
     },
     {
-      "groupName": "pulumi-plugins",
-      "matchPackageNames": [
-        "pulumi{/,}**"
-      ]
-    }
-  ],
-  "pip_requirements": {
-    "fileMatch": "dockerfiles/openedx-edxapp/pip_package_lists/.*?/.*.txt"
-  },
-  "customManagers": [
-    {
-      "customType": "regex",
-      "fileMatch": [
-        "^src/bridge/lib/versions.py$",
-        "^dockerfiles/ocw/node-hugo/Dockerfile$"
+      groupName: 'pulumi-plugins',
+      matchPackageNames: [
+        'pulumi{/,}**',
       ],
-      "matchStrings": [
-          "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>.+?)(?: packageName=(?<packageName>.+?))?(?: registryUrl=(?<registryUrl>.+?))?(?: versioning=(?<versioning>[a-z-]+?))?\\s*.+\\s*=\\s*\"(?<currentValue>.+?)\""
-      ]
-    }
-  ]
+    },
+  ],
+  pip_requirements: {
+    fileMatch: 'dockerfiles/openedx-edxapp/pip_package_lists/.*?/.*.txt',
+  },
+  customManagers: [
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^src/bridge/lib/versions.py$',
+        '^dockerfiles/ocw/node-hugo/Dockerfile$',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>.+?)(?: packageName=(?<packageName>.+?))?(?: registryUrl=(?<registryUrl>.+?))?(?: versioning=(?<versioning>[a-z-]+?))?\\s*.+\\s*=\\s*"(?<currentValue>.+?)"',
+      ],
+    },
+  ],
 }
