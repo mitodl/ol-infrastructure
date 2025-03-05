@@ -394,9 +394,10 @@ learn_ai_fastly_service = fastly.ServiceVcl(
             content=textwrap.dedent(
                 r"""
                 if (req.method == "GET" && req.backend.is_origin) {
-                  set bereq.url = "/frontend" + req.url;
-                  if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {
+                  if (req.url == "/") {
                     set bereq.url = "/frontend/index.html";
+                  } else {
+                    set bereq.url = "/frontend" + req.url;
                   }
                 }
                 """
@@ -404,19 +405,43 @@ learn_ai_fastly_service = fastly.ServiceVcl(
             type="miss",
         ),
         fastly.ServiceVclSnippetArgs(
+            name="Handle 404s",
+            content=textwrap.dedent(
+                r"""
+                if (beresp.status == 403 && req.method == "GET" && req.backend.is_origin) {
+                  set beresp.status = 604;
+                }
+                """
+            ),
+            type="fetch",
+        ),
+        fastly.ServiceVclSnippetArgs(
             name="Rewrite requests to root s3 - bypass",
             content=textwrap.dedent(
                 r"""
                 if (req.method == "GET" && req.backend.is_origin && req.http.User-Agent ~ "(?i)prerender") {
                   set req.backend = F_learn_ai;
-                  set bereq.url = "/frontend" + req.url;
-                  if (req.url.path ~ "\/$" || req.url.basename !~ "\." ) {
-                    set bereq.url = "/frontend/index.html";
+                  if (req.url !~ "\.html$") {
+                    set bereq.url = "/frontend" + req.url + ".html";
+                  } else {
+                    set bereq.url = "/frontend" + req.url;
                   }
                 }
                 """
             ),
             type="pass",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            name="Deliver Custom 404",
+            content=textwrap.dedent(
+                r"""
+                if (obj.status == 604) {
+                  set req.url = "/frontend/404.html";
+                  restart;
+                }
+                """
+            ),
+            type="error",
         ),
         fastly.ServiceVclSnippetArgs(
             name="Redirect for to correct domain",
