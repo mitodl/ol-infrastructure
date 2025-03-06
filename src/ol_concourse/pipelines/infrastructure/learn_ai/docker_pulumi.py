@@ -22,6 +22,7 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resource_types import pulumi_provisioner_resource
 from ol_concourse.lib.resources import git_repo, pulumi_provisioner, registry_image
+from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS
 
 
 def build_learn_ai_pipeline() -> Pipeline:
@@ -77,7 +78,7 @@ def build_learn_ai_pipeline() -> Pipeline:
         Identifier("ol-infra"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
-        # Purposely not monitoring paths or using this as a trigger
+        paths=["src/ol_infrastructure/applications/learn_ai", *PULUMI_WATCHED_PATHS],
     )
 
     # This image is only used for the CI environment
@@ -193,7 +194,7 @@ def build_learn_ai_pipeline() -> Pipeline:
             ),
             GetStep(
                 get=ol_infra_repo.name,
-                trigger=False,
+                trigger=True,
             ),
             LoadVarStep(
                 load_var="image_tag",
@@ -250,7 +251,7 @@ def build_learn_ai_pipeline() -> Pipeline:
             ),
             GetStep(
                 get=ol_infra_repo.name,
-                trigger=False,
+                trigger=True,
             ),
             LoadVarStep(
                 load_var="image_tag",
@@ -308,6 +309,7 @@ def build_learn_ai_pipeline() -> Pipeline:
             GetStep(
                 get=ol_infra_repo.name,
                 trigger=False,
+                passed=[learn_ai_rc_deployment_job.name],
             ),
             LoadVarStep(
                 load_var="image_tag",
