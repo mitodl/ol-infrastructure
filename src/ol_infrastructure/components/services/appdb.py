@@ -11,6 +11,7 @@ from typing import Optional
 
 from pulumi import ComponentResource, ResourceOptions, StackReference
 from pulumi_aws import ec2
+from pydantic import BaseModel
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
@@ -41,7 +42,7 @@ aws_config = AWSBase(
 )
 
 
-class OLAppDatabaseConfig:
+class OLAppDatabaseConfig(BaseModel):
     """Configuration for the MIT OL Database component"""
 
     app_name: str
@@ -54,13 +55,25 @@ class OLAppDatabaseConfig:
 
 
 class OLAppDatabase(ComponentResource):
-    """MIT OL Database component"""
+    """
+    MIT OL Database component
+    """
 
     def __init__(
         self,
         ol_db_config: OLAppDatabaseConfig,
         opts: Optional[ResourceOptions] = None,
     ):
+        """
+        Create all the resources necessary for an MIT OL Postgres Database.
+        :param ol_db_config: Configuration object for database class.
+        :type OLAppDatabase
+
+        :param opts: Pulumi resource options
+        :type opts: ResourceOptions
+
+        :rtype: OLAppDatabase
+        """
         self.ol_db_config = ol_db_config
         super().__init__(
             "ol:infrastructure:aws:OLAppDatabase", ol_db_config.app_name, None, opts
@@ -119,7 +132,7 @@ class OLAppDatabase(ComponentResource):
             db_admin_password=self.ol_db_config.app_db_password,
             db_host=self.app_db.db_instance.address,
         )
-        OLVaultDatabaseBackend(
+        self.app_db_vault_backend = OLVaultDatabaseBackend(
             self.app_db_vault_backend_config,
             opts=ResourceOptions(delete_before_replace=True, parent=self.app_db),
         )
