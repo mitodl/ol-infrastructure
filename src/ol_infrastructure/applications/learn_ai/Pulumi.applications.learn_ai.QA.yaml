@@ -27,8 +27,8 @@ config:
     POSTHOG_PROJECT_ID: "86325"
     POSTHOG_TIMEOUT_MS: "1000"
     SENTRY_LOG_LEVEL: "ERROR"
-    SENTRY_PROFILES_SAMPLE_RATE: 0
-    SENTRY_TRACES_SAMPLE_RATE: 0
+    SENTRY_PROFILES_SAMPLE_RATE: "0.1"
+    SENTRY_TRACES_SAMPLE_RATE: "0.1"
     UWSGI_THREADS: "5"
   learn_ai:frontend_domain: "learn-ai-qa.ol.mit.edu"
   redis:password:
