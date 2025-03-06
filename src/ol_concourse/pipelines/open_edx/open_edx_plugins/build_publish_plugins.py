@@ -85,7 +85,7 @@ for path, config in plugin_dict.items():
         Identifier(f"{config['target_name']}-repo"),
         uri="https://github.com/mitodl/open-edx-plugins",
         paths=[path],
-        check_every="24h",
+        check_every="1h",
     )
 
     plugin_pypi = pypi(
