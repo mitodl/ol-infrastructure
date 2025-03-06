@@ -8,8 +8,8 @@ config:
     secure: v1:moKYAbHsHOnTUrEk:4OgRBNFXT0WKrz1KaKZDhQxT09dA36jN4+q/SO0IIAemTSiwGqrXbXn+r5dFlGrr24S+VGtiyNXSVKts+j/TgKS33FTo86OX2saBDrL4dFo=
   learn_ai:env_vars:
     AI_DEFAULT_SYLLABUS_MODEL: "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
-    AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_SEARCH_URL: "https://api.rc.learn.mit.edu/api/v1/learning_resources_search/"
+    AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     CELERY_TASK_ALWAYS_EAGER: "false"
     CSRF_ALLOWED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu"]'
     CSRF_TRUSTED_ORIGINS: '["https://learn-ai-qa.ol.mit.edu", "https://api-learn-ai-qa.ol.mit.edu"]'
@@ -23,9 +23,12 @@ config:
     NODE_ENV: "development"
     POSTHOG_API_HOST: "https://app.posthog.com"
     POSTHOG_ENABLED: "true"
+    POSTHOG_ENABLE_SESSION_RECORDING: "true"
     POSTHOG_PROJECT_ID: "86325"
     POSTHOG_TIMEOUT_MS: "1000"
-    POSTHOG_ENABLE_SESSION_RECORDING: "true"
+    SENTRY_LOG_LEVEL: "ERROR"
+    SENTRY_PROFILES_SAMPLE_RATE: "0.1"
+    SENTRY_TRACES_SAMPLE_RATE: "0.1"
     UWSGI_THREADS: "5"
   learn_ai:frontend_domain: "learn-ai-qa.ol.mit.edu"
   redis:password:
