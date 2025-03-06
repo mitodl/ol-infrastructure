@@ -86,12 +86,18 @@ def build_learn_ai_pipeline() -> Pipeline:
         build_log_retention={"builds": 10},
         plan=[
             GetStep(get=learn_ai_main_repo.name, trigger=True),
+            LoadVarStep(
+                load_var="git_ref",
+                file=f"{learn_ai_main_repo.name}/.git/ref",
+            ),
             container_build_task(
                 inputs=[Input(name=learn_ai_main_repo.name)],
                 build_parameters={
                     "CONTEXT": learn_ai_main_repo.name,
                 },
-                build_args=[],
+                build_args=[
+                    "--build-arg GIT_REF=((.:git_ref))",
+                ],
             ),
             PutStep(
                 put=learn_ai_registry_ci_image.name,
@@ -134,12 +140,18 @@ def build_learn_ai_pipeline() -> Pipeline:
                 file="rc_version/version",
                 reveal=True,
             ),
+            LoadVarStep(
+                load_var="git_ref",
+                file=f"{learn_ai_release_candidate_repo.name}/.git/ref",
+            ),
             container_build_task(
                 inputs=[Input(name=learn_ai_release_candidate_repo.name)],
                 build_parameters={
                     "CONTEXT": learn_ai_release_candidate_repo.name,
                 },
-                build_args=[],
+                build_args=[
+                    "--build-arg GIT_REF=((.:git_ref))",
+                ],
             ),
             PutStep(
                 put=learn_ai_registry_rc_image.name,
