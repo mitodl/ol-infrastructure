@@ -63,7 +63,7 @@ def build_learn_ai_pipeline() -> Pipeline:
     # Used for publishing the RC / production containers to dockerhub
     learn_ai_registry_rc_image = registry_image(
         name=Identifier("learn-ai-rc-image"),
-        image_repository="mitodl/learn-ai-app-main",
+        image_repository="mitodl/learn-ai-app-rc",
         image_tag=None,  # Only filter on tagged images
         username="((dockerhub.username))",
         password="((dockerhub.password))",  # noqa: S106
