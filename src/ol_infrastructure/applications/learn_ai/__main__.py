@@ -759,12 +759,14 @@ learn_ai_deployment_envfrom = [
     ),
 ]
 
+image_repository_suffix = "-main" if stack_info.env_suffix == "ci" else "-rc"
+
 init_containers = [
     # Good Canidates for lib or component functions
     # Run database migrations at startup
     kubernetes.core.v1.ContainerArgs(
         name="migrate",
-        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
+        image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
         command=["python3", "manage.py", "migrate", "--noinput"],
         image_pull_policy="IfNotPresent",
         env=learn_ai_deployment_env_vars,
@@ -772,7 +774,7 @@ init_containers = [
     ),
     kubernetes.core.v1.ContainerArgs(
         name="create-cachetable",
-        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
+        image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
         command=["python3", "manage.py", "createcachetable"],
         image_pull_policy="IfNotPresent",
         env=learn_ai_deployment_env_vars,
@@ -780,7 +782,7 @@ init_containers = [
     ),
     kubernetes.core.v1.ContainerArgs(
         name="collectstatic",
-        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
+        image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
         command=["python3", "manage.py", "collectstatic", "--noinput"],
         image_pull_policy="IfNotPresent",
         env=learn_ai_deployment_env_vars,
@@ -800,7 +802,7 @@ init_containers = [
     # Good canidate for a lib or component function
     kubernetes.core.v1.ContainerArgs(
         name=f"promote-{mit_username}-to-superuser",
-        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
+        image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
         # Jank that forces the promotion to always exit successfully
         command=["/bin/bash"],
         args=[
@@ -906,7 +908,7 @@ learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
                     # Actual application run with uwsgi
                     kubernetes.core.v1.ContainerArgs(
                         name="learn-ai-app",
-                        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
+                        image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
                         command=[
                             "uvicorn",
                             "main.asgi:application",
@@ -971,7 +973,7 @@ learn_ai_celery_deployment_resource = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="celery-worker",
-                        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
+                        image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
                         command=[
                             "celery",
                             "-A",
@@ -982,7 +984,7 @@ learn_ai_celery_deployment_resource = kubernetes.apps.v1.Deployment(
                             "default,edx_content",
                             "-B",
                             "-l",
-                            "$(MITOL_LOG_LEVEL:-INFO)",
+                            "INFO",
                         ],
                         env=learn_ai_deployment_env_vars,
                         env_from=learn_ai_deployment_envfrom,
