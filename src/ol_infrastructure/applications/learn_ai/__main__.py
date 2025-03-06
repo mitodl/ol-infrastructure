@@ -820,16 +820,16 @@ application_labels = k8s_global_labels | {
     "ol.mit.edu/pod-security-group": "learn-ai-app",
 }
 
-learn_ai_deployment_resource = kubernetes.apps.v1.Deployment(
-    f"learn-ai-{stack_info.env_suffix}-deployment",
+learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
+    f"learn-ai-{stack_info.env_suffix}-webapp-deployment",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="learn-ai-app",
+        name="learn-ai-webapp",
         namespace=learn_ai_namespace,
         labels=application_labels,
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
-        # TODO @Ardiea: Add horizontial pod autoscaler  # noqa: TD003, FIX002
-        replicas=learn_ai_config.get_int("replica_count") or 2,
+        # TODO @Ardiea: Add horizontal pod autoscaler  # noqa: TD003, FIX002
+        replicas=learn_ai_config.get_int("webapp_replica_count") or 2,
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels=application_labels,
         ),
@@ -949,8 +949,60 @@ learn_ai_deployment_resource = kubernetes.apps.v1.Deployment(
     ),
 )
 
+learn_ai_celery_deployment_resource = kubernetes.apps.v1.Deployment(
+    f"learn-ai-{stack_info.env_suffix}-celery-deployment",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="learn-ai-celery",
+        namespace=learn_ai_namespace,
+        labels=application_labels,
+    ),
+    spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        replicas=learn_ai_config.get_int("celery_replica_count") or 2,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels=application_labels,
+        ),
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels=application_labels,
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                service_account_name=learn_ai_service_account_name,
+                dns_policy="ClusterFirst",
+                containers=[
+                    kubernetes.core.v1.ContainerArgs(
+                        name="celery-worker",
+                        image=f"mitodl/learn-ai-app-main:{LEARN_AI_DOCKER_TAG}",
+                        command=[
+                            "celery",
+                            "-A",
+                            "main.celery:app",
+                            "worker",
+                            "-E",
+                            "-Q",
+                            "default,edx_content",
+                            "-B",
+                            "-l",
+                            "$(MITOL_LOG_LEVEL:-INFO)",
+                        ],
+                        env=learn_ai_deployment_env_vars,
+                        env_from=learn_ai_deployment_envfrom,
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={"cpu": "250m", "memory": "1000Mi"},
+                            limits={"cpu": "500m", "memory": "1600Mi"},
+                        ),
+                    )
+                ],
+            ),
+        ),
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[db_creds_secret, redis_creds],
+    ),
+)
+
 # A kubernetes service resource to act as load balancer for the app instances
-learn_ai_service_name = "learn-ai-app"
+learn_ai_service_name = "learn-ai-webapp"
 learn_ai_service_port_name = "http"
 learn_ai_service = kubernetes.core.v1.Service(
     f"learn-ai-{stack_info.env_suffix}-service",
