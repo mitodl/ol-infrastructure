@@ -828,7 +828,7 @@ learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
         labels=application_labels,
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
-        # TODO @Ardiea: Add horizontial pod autoscaler  # noqa: TD003, FIX002
+        # TODO @Ardiea: Add horizontal pod autoscaler  # noqa: TD003, FIX002
         replicas=learn_ai_config.get_int("webapp_replica_count") or 2,
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels=application_labels,
@@ -1002,7 +1002,7 @@ learn_ai_celery_deployment_resource = kubernetes.apps.v1.Deployment(
 )
 
 # A kubernetes service resource to act as load balancer for the app instances
-learn_ai_service_name = "learn-ai-app"
+learn_ai_service_name = "learn-ai-webapp"
 learn_ai_service_port_name = "http"
 learn_ai_service = kubernetes.core.v1.Service(
     f"learn-ai-{stack_info.env_suffix}-service",
