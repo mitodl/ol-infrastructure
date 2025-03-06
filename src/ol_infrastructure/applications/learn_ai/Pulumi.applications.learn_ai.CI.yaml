@@ -6,8 +6,8 @@ config:
   learn_ai:backend_domain: "api-learn-ai-ci.ol.mit.edu"
   learn_ai:env_vars:
     AI_DEFAULT_SYLLABUS_MODEL: "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
-    AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_SEARCH_URL: "https://api.rc.learn.mit.edu/api/v1/learning_resources_search/"
+    AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     CELERY_TASK_ALWAYS_EAGER: "false"
     CSRF_ALLOWED_ORIGINS: '["https://learn-ai-ci.ol.mit.edu", "https://api-learn-ai-ci.ol.mit.edu"]'
     CSRF_TRUSTED_ORIGINS: '["https://learn-ai-ci.ol.mit.edu", "https://api-learn-ai-ci.ol.mit.edu"]'
@@ -19,6 +19,9 @@ config:
     MITOL_COOKIE_NAME: "mitol"
     MITOL_FEATURES_DEFAULT: "true"
     NODE_ENV: "development"
+    SENTRY_LOG_LEVEL: "ERROR"
+    SENTRY_PROFILES_SAMPLE_RATE: "0"
+    SENTRY_TRACES_SAMPLE_RATE: "0"
     UWSGI_THREADS: "5"
   learn_ai:frontend_domain: "learn-ai-ci.ol.mit.edu"
   vault:address: "https://vault-ci.odl.mit.edu"
