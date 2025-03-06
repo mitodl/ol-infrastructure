@@ -506,6 +506,17 @@ ol_data_platform_realm = keycloak.Realm(
     },
 )
 
+ol_data_platforme_realm_events = keycloak.RealmEvents(
+    "ol-data-platforme-realm-events",
+    realm_id=ol_data_platform_realm.realm,
+    events_enabled=True,
+    events_expiration=604800,
+    admin_events_enabled=True,
+    admin_events_details_enabled=True,
+    enabled_event_types=[],
+    events_listeners=["jboss-logging"],
+)
+
 ol_data_required_action_configure_otp = keycloak.RequiredAction(
     "webauthn-register-passwordless",
     realm_id=ol_data_platform_realm.realm,
