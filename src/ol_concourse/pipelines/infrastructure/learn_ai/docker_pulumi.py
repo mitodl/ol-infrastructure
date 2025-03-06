@@ -94,10 +94,9 @@ def build_learn_ai_pipeline() -> Pipeline:
                 inputs=[Input(name=learn_ai_main_repo.name)],
                 build_parameters={
                     "CONTEXT": learn_ai_main_repo.name,
+                    "BUILD_ARG_GIT_REF": "((.:git_ref))",
                 },
-                build_args=[
-                    "--build-arg GIT_REF=((.:git_ref))",
-                ],
+                build_args=[],
             ),
             PutStep(
                 put=learn_ai_registry_ci_image.name,
@@ -148,10 +147,9 @@ def build_learn_ai_pipeline() -> Pipeline:
                 inputs=[Input(name=learn_ai_release_candidate_repo.name)],
                 build_parameters={
                     "CONTEXT": learn_ai_release_candidate_repo.name,
+                    "BUILD_ARG_GIT_REF": "((.:git_ref))",
                 },
-                build_args=[
-                    "--build-arg GIT_REF=((.:git_ref))",
-                ],
+                build_args=[],
             ),
             PutStep(
                 put=learn_ai_registry_rc_image.name,
