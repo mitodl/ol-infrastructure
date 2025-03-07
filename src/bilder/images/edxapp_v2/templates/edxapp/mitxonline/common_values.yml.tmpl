@@ -52,6 +52,7 @@ OPENAI_SECRET_KEY: {{ .Data.openai_api_key }}
 OPENAI_API_KEY: {{ .Data.openai_api_key }}
 RETIRED_USER_SALTS: {{ .Data.user_retirement_salts }}
 SENTRY_DSN: {{ .Data.sentry_dsn }}
+SYSADMIN_GITHUB_WEBHOOK_KEY: {{ .Data.sysadmin_git_webhook_secret }}
 {{ end }}
 
 {{ with secret "secret-mitxonline/edx-xqueue" }}
@@ -538,6 +539,7 @@ STATIC_ROOT_BASE: /openedx/staticfiles/
 STUDIO_NAME: Studio
 STUDIO_SHORT_NAME: Studio
 SUPPORT_SITE_LINK: https://mitxonline.zendesk.com/hc/
+SYSADMIN_DEFAULT_BRANCH: live
 SYSTEM_WIDE_ROLE_CLASSES: []
 TECH_SUPPORT_EMAIL: odl-devops@mit.edu  # MODIFIED
 TIME_ZONE: America/New_York
@@ -574,64 +576,9 @@ ZENDESK_OAUTH_ACCESS_TOKEN: ''
 ZENDESK_URL: ''
 ZENDESK_USER: ''
 
-############################################################
-# Used for integrating with OpenStack Swift Object Storage #
-# Commenting out/removing because we don't use it          #
-############################################################
-# SWIFT_AUTH_URL: null
-# SWIFT_AUTH_VERSION: null
-# SWIFT_KEY: null
-# SWIFT_REGION_NAME: null
-# SWIFT_TEMP_URL_DURATION: 1800
-# SWIFT_TEMP_URL_KEY: null
-# SWIFT_TENANT_ID: null
-# SWIFT_TENANT_NAME: null
-# SWIFT_USERNAME: null
-# SWIFT_USE_TEMP_URLS: false
-#######################################
-# Doesn't Appear To Get Used Anywhere #
-#######################################
-# SYSLOG_SERVER: ''
-
-#######################################
-# Not Using SAML For This Environment #
-#######################################
-# SOCIAL_AUTH_SAML_SP_PRIVATE_KEY: ''
-# SOCIAL_AUTH_SAML_SP_PRIVATE_KEY_DICT: {}
-# SOCIAL_AUTH_SAML_SP_PUBLIC_CERT: ''
-# SOCIAL_AUTH_SAML_SP_PUBLIC_CERT_DICT: {}
-
-##############################
-# CAS Is No Longer Supported #
-##############################
-# CAS_ATTRIBUTE_CALLBACK: ''
-# CAS_EXTRA_LOGIN_PARAMS: ''
-# CAS_SERVER_URL: ''
-
-###########################################
-# We will not be using the enterprise app #
-###########################################
-# ENTERPRISE_API_URL: https://localhost:18000/enterprise/api/v1
-# ENTERPRISE_MARKETING_FOOTER_QUERY_PARAMS: {}
-# ENTERPRISE_SERVICE_WORKER_USERNAME: enterprise_worker
-
 ##############################################
 # We will not be using the edX Ecommerce app #
 ##############################################
 # ECOMMERCE_API_SIGNING_KEY: SET-ME-PLEASE
 # ECOMMERCE_API_URL: http://localhost:8002/api/v2
 ECOMMERCE_PUBLIC_URL_ROOT: {{ key "edxapp/lms-domain" }}  # MODIFIED
-
-#############################################
-# Deprecated settings that are no longer used #
-#############################################
-# JWT_ISSUER: http://127.0.0.1:8000/oauth2
-# JWT_PRIVATE_SIGNING_KEY: null
-
-####################################################
-# This settings is deprecated and no longer in use #
-####################################################
-# DEFAULT_JWT_ISSUER:
-#     AUDIENCE: SET-ME-PLEASE
-#     ISSUER: http://127.0.0.1:8000/oauth2
-#     SECRET_KEY: SET-ME-PLEASE
