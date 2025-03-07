@@ -62,14 +62,14 @@ if (
 
 current_clusters = {
     "applications-ci": ci_vault_client,
-    "applications-production": ci_vault_client,
-    "applications-qa": ci_vault_client,
+    "applications-production": production_vault_client,
+    "applications-qa": qa_vault_client,
     "data-ci": ci_vault_client,
-    "data-production": ci_vault_client,
-    "data-qa": ci_vault_client,
+    "data-production": production_vault_client,
+    "data-qa": qa_vault_client,
     "operations-ci": ci_vault_client,
-    "operations-production": ci_vault_client,
-    "operations-qa": ci_vault_client,
+    "operations-production": production_vault_client,
+    "operations-qa": qa_vault_client,
 }
 
 if production_vault_client.is_authenticated():
