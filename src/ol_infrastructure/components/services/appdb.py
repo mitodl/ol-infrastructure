@@ -10,12 +10,10 @@ to use the OLDatabase components available in `aws/database.py`.
 from typing import Optional
 
 from pulumi import ComponentResource, ResourceOptions, StackReference
-from pulumi_aws import ec2
 from pydantic import BaseModel
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
-    DEFAULT_POSTGRES_PORT,
 )
 from ol_infrastructure.components.aws.database import (
     OLAmazonDB,
@@ -32,26 +30,19 @@ from ol_infrastructure.lib.stack_defaults import defaults
 
 stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
-vault_stack = StackReference(f"infrastructure.vault.operations.{stack_info.name}")
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
-aws_config = AWSBase(
-    tags={
-        "OU": "applications",
-        "Environment": f"{env_name}",
-    }
-)
+# Network and vault stack references are defined in-situ for uniqueness.
 
 
 class OLAppDatabaseConfig(BaseModel):
     """Configuration for the MIT OL Database component"""
 
     app_name: str
+    app_ou: str
     app_db_name: str
     app_db_password: str
     app_db_instance_size: str | None
     app_db_capacity: int | None
     target_vpc_name: str
-    app_security_group: ec2.SecurityGroup
 
 
 class OLAppDatabase(ComponentResource):
@@ -75,36 +66,32 @@ class OLAppDatabase(ComponentResource):
         :rtype: OLAppDatabase
         """
         self.ol_db_config = ol_db_config
+        self.aws_config: AWSBase = AWSBase(
+            tags={
+                "OU": self.ol_db_config.app_ou,
+                "Environment": f"{env_name}",
+            },
+        )
         super().__init__(
-            "ol:infrastructure:aws:OLAppDatabase", ol_db_config.app_name, None, opts
+            "ol:infrastructure:aws:OLAppDatabase",
+            self.ol_db_config.app_name,
+            None,
+            opts,
         )
 
-        target_vpc = network_stack.require_output(ol_db_config.target_vpc_name)
-        self.app_db_security_group = ec2.SecurityGroup(
-            f"{ol_db_config.app_name}-db-security-group-{stack_info.env_suffix}",
-            name=f"{ol_db_config.app_name}-db-security-group-{stack_info.env_suffix}",
-            description="Access control for application databases.",
-            ingress=[
-                ec2.SecurityGroupIngressArgs(
-                    security_groups=[
-                        vault_stack.require_output("vault_server")["security_group"],
-                    ],
-                    protocol="tcp",
-                    from_port=DEFAULT_POSTGRES_PORT,
-                    to_port=DEFAULT_POSTGRES_PORT,
-                    description="Access to postgres from consul and vault.",
-                ),
-                ec2.SecurityGroupIngressArgs(
-                    security_groups=[self.ol_db_config.app_security_group.id],
-                    protocol="tcp",
-                    from_port=DEFAULT_POSTGRES_PORT,
-                    to_port=DEFAULT_POSTGRES_PORT,
-                    description="Allow application pods to talk to DB",
-                ),
-            ],
-            vpc_id=target_vpc["id"],
-            tags=aws_config.tags,
+        # We do this here rather than at the top because we need a unique
+        # identifier for the name.
+        db_network_stack = StackReference(
+            name=f"db_network_stack_reference_{self.ol_db_config.app_db_name}",
+            stack_name=f"infrastructure.aws.network.{stack_info.name}",
         )
+
+        StackReference(
+            name=f"db_vault_stack_reference_{self.ol_db_config.app_db_name}",
+            stack_name=f"infrastructure.vault.operations.{stack_info.name}",
+        )
+
+        target_vpc = db_network_stack.require_output(ol_db_config.target_vpc_name)
 
         rds_defaults = defaults(stack_info)["rds"]
         rds_defaults["instance_size"] = (
@@ -115,11 +102,10 @@ class OLAppDatabase(ComponentResource):
             instance_name=f"{ol_db_config.app_name}-db-{stack_info.env_suffix}",
             password=SecretStr(self.ol_db_config.app_db_password),
             subnet_group_name=target_vpc["rds_subnet"],
-            security_groups=[self.app_db_security_group],
             storage=self.ol_db_config.app_db_capacity
             or AWS_RDS_DEFAULT_DATABASE_CAPACITY,
             engine_major_version="16",
-            tags=aws_config.tags,
+            tags=self.aws_config.tags,
             db_name=self.ol_db_config.app_db_name,
             **defaults(stack_info)["rds"],
         )
