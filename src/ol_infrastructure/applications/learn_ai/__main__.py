@@ -496,12 +496,18 @@ learn_ai_static_vault_secrets = vault.generic.Secret(
     data_json=json.dumps(learn_ai_vault_secrets),
 )
 
-learn_ai_application_security_config = appsec.OLAppSecurityGroup(
-    app_name=learn_ai_namespace, target_vpc_name="applications_vpc"
+learn_ai_application_security_group_config = appsec.OLAppSecurityGroupConfig(
+    app_name=learn_ai_namespace, target_vpc_name="applications", app_ou="operations"
 )
+learn_ai_application_security_group_service = appsec.OLAppSecurityGroup(
+    app_security_group_config=learn_ai_application_security_group_config
+)
+# learn_ai_application_security_config = appsec.OLAppSecurityGroup(
+#     app_name=learn_ai_namespace, target_vpc_name="applications_vpc"
+# )
 
 learn_ai_application_security_group = (
-    learn_ai_application_security_config.application_security_group
+    learn_ai_application_security_group_service.application_security_group
 )
 
 ol_app_db_config = appdb.OLAppDatabaseConfig(
@@ -512,6 +518,7 @@ ol_app_db_config = appdb.OLAppDatabaseConfig(
     or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
     app_security_group=learn_ai_application_security_group,
     target_vpc_name=apps_vpc,
+    app_ou="operations",
 )
 
 ol_app_db_service = appdb.OLAppDatabase(ol_db_config=ol_app_db_config)
