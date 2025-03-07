@@ -792,10 +792,6 @@ init_containers = [
                 name="staticfiles",
                 mount_path="/src/staticfiles",
             ),
-            kubernetes.core.v1.VolumeMountArgs(
-                name="static",
-                mount_path="/src/static",
-            ),
         ],
     ),
 ] + [
@@ -854,10 +850,6 @@ learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
                         empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
                     ),
                     kubernetes.core.v1.VolumeArgs(
-                        name="static",
-                        empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-                    ),
-                    kubernetes.core.v1.VolumeArgs(
                         name="nginx-config",
                         config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
                             name=learn_ai_nginx_configmap.metadata.name,
@@ -892,10 +884,6 @@ learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
                             kubernetes.core.v1.VolumeMountArgs(
                                 name="staticfiles",
                                 mount_path="/src/staticfiles",
-                            ),
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="static",
-                                mount_path="/src/static",
                             ),
                             kubernetes.core.v1.VolumeMountArgs(
                                 name="nginx-config",
@@ -934,10 +922,6 @@ learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
                             kubernetes.core.v1.VolumeMountArgs(
                                 name="staticfiles",
                                 mount_path="/src/staticfiles",
-                            ),
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="static",
-                                mount_path="/src/static",
                             ),
                         ],
                     ),

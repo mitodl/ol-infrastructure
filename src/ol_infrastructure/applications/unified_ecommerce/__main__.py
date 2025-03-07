@@ -748,10 +748,6 @@ init_containers = [
                 name="staticfiles",
                 mount_path="/src/staticfiles",
             ),
-            kubernetes.core.v1.VolumeMountArgs(
-                name="static",
-                mount_path="/src/static",
-            ),
         ],
     ),
 ] + [
@@ -809,10 +805,6 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
                         empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
                     ),
                     kubernetes.core.v1.VolumeArgs(
-                        name="static",
-                        empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-                    ),
-                    kubernetes.core.v1.VolumeArgs(
                         name="nginx-config",
                         config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
                             name=ecommerce_nginx_configmap.metadata.name,
@@ -848,10 +840,6 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
                                 mount_path="/src/staticfiles",
                             ),
                             kubernetes.core.v1.VolumeMountArgs(
-                                name="static",
-                                mount_path="/src/static",
-                            ),
-                            kubernetes.core.v1.VolumeMountArgs(
                                 name="nginx-config",
                                 mount_path="/etc/nginx/conf.d/web.conf",
                                 sub_path="web.conf",
@@ -879,10 +867,6 @@ ecommerce_deployment_resource = kubernetes.apps.v1.Deployment(
                             kubernetes.core.v1.VolumeMountArgs(
                                 name="staticfiles",
                                 mount_path="/src/staticfiles",
-                            ),
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="static",
-                                mount_path="/src/static",
                             ),
                         ],
                     ),
