@@ -19,6 +19,7 @@ from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_HTTPS_PORT,
     DEFAULT_NGINX_PORT,
+    DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
     DEFAULT_UWSGI_PORT,
     ONE_MEGABYTE_BYTE,
@@ -502,12 +503,38 @@ learn_ai_application_security_group_config = appsec.OLAppSecurityGroupConfig(
 learn_ai_application_security_group_service = appsec.OLAppSecurityGroup(
     app_security_group_config=learn_ai_application_security_group_config
 )
-# learn_ai_application_security_config = appsec.OLAppSecurityGroup(
-#     app_name=learn_ai_namespace, target_vpc_name="applications_vpc"
-# )
 
 learn_ai_application_security_group = (
     learn_ai_application_security_group_service.application_security_group
+)
+
+
+################################################
+# RDS configuration and networking setup
+learn_ai_database_security_group = ec2.SecurityGroup(
+    f"learn-ai-db-security-group-{stack_info.env_suffix}",
+    name=f"learn-ai-db-security-group-{stack_info.env_suffix}",
+    description="Access control for the learn-ai database.",
+    ingress=[
+        ec2.SecurityGroupIngressArgs(
+            security_groups=[
+                vault_stack.require_output("vault_server")["security_group"],
+            ],
+            protocol="tcp",
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+            description="Access to postgres from consul and vault.",
+        ),
+        ec2.SecurityGroupIngressArgs(
+            security_groups=[learn_ai_application_security_group.id],
+            protocol="tcp",
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+            description="Allow application pods to talk to DB",
+        ),
+    ],
+    vpc_id=apps_vpc["id"],
+    tags=aws_config.tags,
 )
 
 ol_app_db_config = appdb.OLAppDatabaseConfig(
@@ -516,7 +543,6 @@ ol_app_db_config = appdb.OLAppDatabaseConfig(
     app_db_password=learn_ai_config.get("db_password"),
     app_db_capacity=learn_ai_config.get("db_capacity")
     or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
-    app_security_group=learn_ai_application_security_group,
     target_vpc_name=apps_vpc,
     app_ou="operations",
 )
