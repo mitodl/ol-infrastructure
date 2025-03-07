@@ -1,5 +1,13 @@
 # Github MITODL org developer permissions on QA environment
 
+path "sys/internal/ui/resultant-acl" {
+    capabilities = ["read"]
+}
+
+path "auth/token/lookup-self" {
+    capabilities = ["read"]
+}
+
 path "sys/capabilities-self" {
   capabilities = ["read", "update"]
 }
@@ -96,9 +104,9 @@ path "aws-mitx/creds/eks-cluster-shared-developer-role" {
 path "secret-global" {
   capabilities = ["list"]
 }
-path "secret-global/eks" {
+path "secret-global/*" {
   capabilities = ["list"]
 }
-path "secret-global/eks/*" {
+path "secret-global/data/eks/*" {
   capabilities = ["read", "list"]
 }

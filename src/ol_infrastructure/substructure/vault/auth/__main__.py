@@ -58,10 +58,7 @@ vault_github_auth = github.AuthBackend(
 
 policy_folder = (Path(__file__).resolve()).parent.parent.joinpath("policies/github/")
 for hcl_file in policy_folder.iterdir():
-    if (
-        "software_engineer.hcl" in hcl_file.name
-        and stack_info.env_suffix != "production"
-    ):
+    if "software_engineer.hcl" in hcl_file.name:
         software_engineer_policy_file = open(hcl_file).read()  # noqa: PTH123
         software_engineer_policy = Policy(
             "github-auth-software-engineer", policy=software_engineer_policy_file
