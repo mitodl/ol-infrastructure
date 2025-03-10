@@ -110,6 +110,7 @@ def packer_jobs(  # noqa: PLR0913
             InParallelStep(
                 in_parallel=[
                     PutStep(
+                        attempts=3,
                         put=packer_build_resource.name,
                         params={
                             "template": f"{image_code.name}/{packer_template_path}",
