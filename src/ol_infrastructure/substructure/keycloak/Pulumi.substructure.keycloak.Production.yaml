@@ -34,9 +34,17 @@ config:
   keycloak_realm:olapps-learn-ai-redirect-uris: ["https://learn-ai.ol.mit.edu/*",
     "https://api-learn-ai.ol.mit.edu/*"]
   keycloak_realm:olapps-learn-ai-client-roles: ["https://api-learn-ai.ol.mit.edu/*"]
-  keycloak_realm:olapps-mitlearn-client-redirect-uris: ["https://api.learn.mit.edu/*",
-    "https://learn.mit.edu/*"]
-  keycloak_realm:olapps-mitlearn-client-roles: ["https://learn.mit.edu/*"]
+  keycloak_realm:olapps-mitlearn-client-redirect-uris:
+  - "https://api.learn.mit.edu/*"
+  - "https://learn.mit.edu/*"
+  - "https://api-learn-ai.ol.mit.edu/*"
+  - "https://learn-ai.ol.mit.edu/*"
+  - "https://api-pay.ol.mit.edu/*"
+  - "https://pay.ol.mit.edu/*"
+  keycloak_realm:olapps-mitlearn-client-roles:
+  - "https://learn.mit.edu/*"
+  - "https://learn-ai.ol.mit.edu/*"
+  - "https://pay.ol.mit.edu/*"
   keycloak_realm:olapps-open-discussions-client-redirect-uris: ["https://open.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-airbyte-redirect-uris: ["https://airbyte.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-dagster-redirect-uris: ["https://pipelines.odl.mit.edu/*"]
