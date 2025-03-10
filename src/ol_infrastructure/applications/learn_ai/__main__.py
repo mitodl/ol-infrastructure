@@ -470,6 +470,16 @@ route53.Record(
 learn_ai_vault_secrets = read_yaml_secrets(
     Path(f"learn_ai/secrets.{stack_info.env_suffix}.yaml"),
 )
+if stack_info.env_suffix != "ci":
+    mitlearn_posthog_secrets = read_yaml_secrets(
+        Path(f"mitopen/secrets.{stack_info.env_suffix}.yaml")
+    )["posthog"]
+    learn_ai_vault_secrets.update(
+        {
+            "POSTHOG_PROJECT_API_KEY": mitlearn_posthog_secrets["project_api_key"],
+            "POSTHOG_PERSONAL_API_KEY": mitlearn_posthog_secrets["personal_api_key"],
+        }
+    )
 learn_ai_vault_mount = vault.Mount(
     f"learn-ai-secrets-mount-{stack_info.env_suffix}",
     path="secret-learn-ai",
@@ -1364,17 +1374,13 @@ if stack_info.env_suffix != "ci":
         f"learn-ai-gh-workflow-posthog-project-api_key-{stack_info.env_suffix}",
         repository=gh_repo.name,
         secret_name=f"POSTHOG_PROJECT_API_KEY_{env_var_suffix}",
-        plaintext_value=read_yaml_secrets(
-            Path(f"mitopen/secrets.{stack_info.env_suffix}.yaml")
-        )["posthog"]["project_api_key"],
+        plaintext_value=mitlearn_posthog_secrets["project_api_key"],
         opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
     )
     gh_workflow_posthog_personal_api_key_env_secret = github.ActionsSecret(
         f"learn-ai-gh-workflow-posthog-personal-api-key-{stack_info.env_suffix}",
         repository=gh_repo.name,
         secret_name=f"POSTHOG_PERSONAL_API_KEY_{env_var_suffix}",
-        plaintext_value=read_yaml_secrets(
-            Path(f"mitopen/secrets.{stack_info.env_suffix}.yaml")
-        )["posthog"]["personal_api_key"],
+        plaintext_value=mitlearn_posthog_secrets["personal_api_key"],
         opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
     )
