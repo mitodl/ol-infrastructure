@@ -760,7 +760,9 @@ learn_ai_deployment_envfrom = [
 ]
 
 image_repository_suffix = "-main" if stack_info.env_suffix == "ci" else "-rc"
-
+image_pull_policy = (
+    "Always" if stack_info.env_suffix in ("ci", "qa") else "IfNotPresent"
+)
 init_containers = [
     # Good Canidates for lib or component functions
     # Run database migrations at startup
@@ -768,7 +770,7 @@ init_containers = [
         name="migrate",
         image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
         command=["python3", "manage.py", "migrate", "--noinput"],
-        image_pull_policy="IfNotPresent",
+        image_pull_policy=image_pull_policy,
         env=learn_ai_deployment_env_vars,
         env_from=learn_ai_deployment_envfrom,
     ),
@@ -776,7 +778,7 @@ init_containers = [
         name="create-cachetable",
         image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
         command=["python3", "manage.py", "createcachetable"],
-        image_pull_policy="IfNotPresent",
+        image_pull_policy=image_pull_policy,
         env=learn_ai_deployment_env_vars,
         env_from=learn_ai_deployment_envfrom,
     ),
@@ -784,7 +786,7 @@ init_containers = [
         name="collectstatic",
         image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
         command=["python3", "manage.py", "collectstatic", "--noinput"],
-        image_pull_policy="IfNotPresent",
+        image_pull_policy=image_pull_policy,
         env=learn_ai_deployment_env_vars,
         env_from=learn_ai_deployment_envfrom,
         volume_mounts=[
@@ -805,7 +807,7 @@ init_containers = [
             "-c",
             f"./manage.py promote_user --promote --superuser '{mit_username}@mit.edu'; exit 0",
         ],
-        image_pull_policy="IfNotPresent",
+        image_pull_policy=image_pull_policy,
         env=learn_ai_deployment_env_vars,
         env_from=learn_ai_deployment_envfrom,
     )
@@ -875,7 +877,7 @@ learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
                                 container_port=DEFAULT_NGINX_PORT,
                             )
                         ],
-                        image_pull_policy="IfNotPresent",
+                        image_pull_policy=image_pull_policy,
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
                             requests={"cpu": "50m", "memory": "64Mi"},
                             limits={"cpu": "100m", "memory": "128Mi"},
@@ -911,7 +913,7 @@ learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
                                 container_port=DEFAULT_UWSGI_PORT
                             )
                         ],
-                        image_pull_policy="IfNotPresent",
+                        image_pull_policy=image_pull_policy,
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
                             requests={"cpu": "250m", "memory": "1000Mi"},
                             limits={"cpu": "500m", "memory": "1600Mi"},
