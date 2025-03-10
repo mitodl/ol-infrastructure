@@ -25,7 +25,7 @@ APISIX_CHART_VERSION = "2.10.0"
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
 # renovate: datasource=github-releases depName=aws-ebs-csi-driver packageName=kubernetes-sigs/aws-ebs-csi-driver
 EBS_CSI_DRIVER_VERSION = "v1.36.0-eksbuild.1"
-# renovate: datasource=github-releases depName=aws-ebs-csi-driver packageName=kubernetes-sigs/aws-efs-csi-driver
+# renovate: datasource=github-releases depName=aws-efs-csi-driver packageName=kubernetes-sigs/aws-efs-csi-driver
 EFS_CSI_DRIVER_VERSION = "v2.0.8-eksbuild.1"
 # renovate: datasource=helm depName=external-dns packageName=external-dns
 EXTERNAL_DNS_CHART_VERSION = "1.15.0"
