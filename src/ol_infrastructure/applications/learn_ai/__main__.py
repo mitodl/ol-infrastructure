@@ -394,8 +394,11 @@ learn_ai_fastly_service = fastly.ServiceVcl(
             content=textwrap.dedent(
                 r"""
                 if (req.method == "GET" && req.backend.is_origin) {
+                  set req.backend = F_learn_ai;
                   if (req.url == "/") {
                     set bereq.url = "/frontend/index.html";
+                  } else if (req.url ~ "^/[^.]*$") {
+                    set bereq.url = "/frontend" + req.url + ".html";
                   } else {
                     set bereq.url = "/frontend" + req.url;
                   }
@@ -409,7 +412,7 @@ learn_ai_fastly_service = fastly.ServiceVcl(
             content=textwrap.dedent(
                 r"""
                 if (beresp.status == 403 && req.method == "GET" && req.backend.is_origin) {
-                  set beresp.status = 604;
+                  error 604 "### Custom Response";
                 }
                 """
             ),
@@ -419,9 +422,11 @@ learn_ai_fastly_service = fastly.ServiceVcl(
             name="Rewrite requests to root s3 - bypass",
             content=textwrap.dedent(
                 r"""
-                if (req.method == "GET" && req.backend.is_origin && req.http.User-Agent ~ "(?i)prerender") {
+                if (req.method == "GET" && req.backend.is_origin) {
                   set req.backend = F_learn_ai;
-                  if (req.url !~ "\.html$") {
+                  if (req.url == "/") {
+                    set bereq.url = "/frontend/index.html";
+                  } else if (req.url ~ "^/[^.]*$") {
                     set bereq.url = "/frontend" + req.url + ".html";
                   } else {
                     set bereq.url = "/frontend" + req.url;
@@ -437,10 +442,12 @@ learn_ai_fastly_service = fastly.ServiceVcl(
                 r"""
                 if (obj.status == 604) {
                   set req.url = "/frontend/404.html";
-                  restart;
+                  set obj.status = 404;
+                  set obj.http.Location = obj.response;
                 }
                 """
             ),
+            priority=120,
             type="error",
         ),
         fastly.ServiceVclSnippetArgs(
