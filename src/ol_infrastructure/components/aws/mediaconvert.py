@@ -13,7 +13,7 @@ class MediaConvertConfig(BaseModel):
 
     service_name: str = Field(
         ...,
-        description="Name of the service using MediaConvert (e.g., 'ovs', 'ocw-studio')",
+        description="Name of the service using MediaConvert (e.g., 'ocw-studio')",
     )
     stack_info: dict = Field(
         ..., description="Stack information including environment details"
@@ -49,6 +49,8 @@ class OLMediaConvert(ComponentResource):
         config: MediaConvertConfig,
         opts: Optional[ResourceOptions] = None,
     ):
+        """Create an instance of the OLMediaConvert component resource"""
+
         super().__init__(
             "ol:infrastructure:aws:MediaConvert",
             f"{config.service_name}-{config.stack_info.env_suffix}-mediaconvert",
@@ -201,6 +203,7 @@ class OLMediaConvert(ComponentResource):
             {
                 "Effect": "Allow",
                 "Action": "iam:PassRole",
-                "Resource": f"arn:aws:iam::{account_id}:role/{resource_prefix}-mediaconvert-service-role",
+                "Resource": (f"arn:aws:iam::{account_id}:role/"
+                f"{resource_prefix}-mediaconvert-service-role"),
             },
         ]
