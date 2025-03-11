@@ -977,6 +977,8 @@ learn_external_service_apisix_upstream = kubernetes.apiextensions.CustomResource
 )
 
 
+# LEGACY RETIREMENT : goes away
+mit_learn_api_domain = mitlearn_config.require("api_domain")
 learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
     f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
     api_version="apisix.apache.org/v2",
@@ -1003,7 +1005,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 ],
                 "match": {
                     "hosts": [
-                        mitlearn_config.require("api_domain"),
+                        mit_learn_api_domain,
                     ],
                     "paths": [
                         "/*",
@@ -1030,7 +1032,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 ],
                 "match": {
                     "hosts": [
-                        mitlearn_config.require("api_domain"),
+                        mit_learn_api_domain,
                     ],
                     "paths": [
                         "/logout/oidc/*",
@@ -1057,7 +1059,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 ],
                 "match": {
                     "hosts": [
-                        mitlearn_config.require("api_domain"),
+                        mit_learn_api_domain,
                     ],
                     "paths": [
                         "/admin/login/*",
@@ -1082,6 +1084,112 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
     ),
 )
 
+# New ApisixRoute object
+# All paths prefixed with /learn
+mit_learn_api_domain = mitlearn_config.require("api_domain")
+learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
+    f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixRoute",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=learn_external_service_name,
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec={
+        "http": [
+            {
+                # Wildcard route that can use auth but doesn't require it
+                "name": "passauth",
+                "priority": 0,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        mit_learn_api_domain,
+                    ],
+                    "paths": [
+                        "/learn/*",
+                    ],
+                },
+                "upstreams": [
+                    {
+                        "name": learn_external_service_name,
+                    },
+                ],
+            },
+            {
+                # Strip tailing slash from logout redirect
+                "name": "logout-redirect",
+                "priority": 10,
+                "plugins": [
+                    {
+                        "name": "redirect",
+                        "enable": True,
+                        "config": {
+                            "uri": "/logout/oidc",
+                        },
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        mit_learn_api_domain,
+                    ],
+                    "paths": [
+                        "/learn/logout/oidc/*",
+                    ],
+                },
+                "upstreams": [
+                    {
+                        "name": learn_external_service_name,
+                    },
+                ],
+            },
+            {
+                # Routes that require authentication
+                "name": "reqauth",
+                "priority": 10,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "auth"},
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        mit_learn_api_domain,
+                    ],
+                    "paths": [
+                        "/learn/admin/login/*",
+                        "/learn/login/*",
+                    ],
+                },
+                "upstreams": [
+                    {
+                        "name": learn_external_service_name,
+                    },
+                ],
+            },
+        ],
+    },
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[
+            learn_external_service_apisix_upstream,
+            learn_external_service_apisix_pluginconfig,
+        ],
+    ),
+)
 five_minutes = 60 * 5
 route53.Record(
     "ol-mitopen-frontend-dns-record",
