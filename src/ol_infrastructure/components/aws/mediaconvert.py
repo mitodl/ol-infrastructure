@@ -7,6 +7,8 @@ from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import cloudwatch, iam, mediaconvert, sns
 from pydantic import BaseModel, Field
 
+from ol_infrastructure.lib.pulumi_helper import StackInfo
+
 
 class MediaConvertConfig(BaseModel):
     """Configuration for AWS MediaConvert resources"""
@@ -15,10 +17,10 @@ class MediaConvertConfig(BaseModel):
         ...,
         description="Name of the service using MediaConvert (e.g., 'ocw-studio')",
     )
-    stack_info: dict = Field(
+    stack_info: StackInfo = Field(
         ..., description="Stack information including environment details"
     )
-    aws_config: dict = Field(..., description="AWS configuration object")
+    aws_config: dict[str, Any] = Field(..., description="AWS configuration object")
     policy_arn: str = Field(
         ..., description="ARN of the IAM policy to attach to the MediaConvert role"
     )
@@ -80,7 +82,7 @@ class OLMediaConvert(ComponentResource):
             f"{resource_prefix}-mediaconvert-queue",
             description=f"{resource_prefix} MediaConvert Queue",
             name=queue_name,
-            tags=aws_config.tags,
+            tags=aws_config["tags"],
             opts=ResourceOptions(parent=self),
         )
 
@@ -98,7 +100,7 @@ class OLMediaConvert(ComponentResource):
                 }
             ),
             name=role_name,
-            tags=aws_config.tags,
+            tags=aws_config["tags"],
             opts=ResourceOptions(parent=self),
         )
 
@@ -114,7 +116,7 @@ class OLMediaConvert(ComponentResource):
         self.sns_topic = sns.Topic(
             f"{resource_prefix}-mediaconvert-topic",
             name=topic_name,
-            tags=aws_config.tags,
+            tags=aws_config["tags"],
             opts=ResourceOptions(parent=self),
         )
 
@@ -163,7 +165,7 @@ class OLMediaConvert(ComponentResource):
 
     @staticmethod
     def get_standard_policy_statements(
-        stack_info: dict, account_id: str, service_name: str
+        stack_info: StackInfo, account_id: str, service_name: str
     ) -> list[dict[str, Any]]:
         """Return a standardized set of IAM policy statements for MediaConvert access.
 
