@@ -4,6 +4,7 @@ encryptedkey: AQICAHgQW+3bag/cl2fPG3dPdqAPbfcsZuwI7rETXZsx85HRpgF0G1SpXqAgEVHrcC
 config:
   aws:region: us-east-1
   learn_ai:backend_domain: "api-learn-ai-qa.ol.mit.edu"
+  learn_ai:learn_backend_domain: "api.rc.learn.mit.edu"
   learn_ai:db_password:
     secure: v1:moKYAbHsHOnTUrEk:4OgRBNFXT0WKrz1KaKZDhQxT09dA36jN4+q/SO0IIAemTSiwGqrXbXn+r5dFlGrr24S+VGtiyNXSVKts+j/TgKS33FTo86OX2saBDrL4dFo=
   learn_ai:env_vars:
