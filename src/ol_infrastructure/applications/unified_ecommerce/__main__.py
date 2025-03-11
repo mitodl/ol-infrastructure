@@ -1154,6 +1154,17 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
     ),
 )
 
+proxy_rewrite_plugin_config = {
+    "name": "proxy-rewrite",
+    "enable": True,
+    "config": {
+        "regex_uri": [
+            "/commerce/(.*)",
+            "/$1",
+        ],
+    },
+}
+
 # New ApisixRoute object for the learn.mit.edu address
 # All paths prefixed with /commerce
 # Host match is only the mit-learn domain
@@ -1171,7 +1182,8 @@ mit_learn_ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource
             {
                 # unauthenticated routes, including assests and checkout callback API
                 "name": "ue-unauth",
-                "priority": 1,
+                "priority": 100,
+                "plugins": [proxy_rewrite_plugin_config],
                 "match": {
                     "hosts": [
                         learn_api_domain,
@@ -1199,6 +1211,7 @@ mit_learn_ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource
                 "name": "ue-default",
                 "priority": 0,
                 "plugins": [
+                    proxy_rewrite_plugin_config,
                     # Ref: https://apisix.apache.org/docs/apisix/plugins/openid-connect/
                     {
                         "name": "openid-connect",
@@ -1239,11 +1252,12 @@ mit_learn_ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource
                 "name": "ue-logout-redirect",
                 "priority": 0,
                 "plugins": [
+                    proxy_rewrite_plugin_config,
                     {
                         "name": "redirect",
                         "enable": True,
                         "config": {
-                            "uri": "/logout",
+                            "uri": "/commerce/logout",
                         },
                     },
                 ],
