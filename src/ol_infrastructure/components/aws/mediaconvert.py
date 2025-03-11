@@ -1,24 +1,39 @@
 """Resource Component for AWS MediaConvert"""
 
 import json
-from typing import Dict, List, Optional, Any
+from typing import Any, Optional
 
-from pydantic import BaseModel, Field
 from pulumi import ComponentResource, ResourceOptions
-from pulumi_aws import cloudwatch, mediaconvert, iam, sns
+from pulumi_aws import cloudwatch, iam, mediaconvert, sns
+from pydantic import BaseModel, Field
 
 
 class MediaConvertConfig(BaseModel):
     """Configuration for AWS MediaConvert resources"""
 
-    service_name: str = Field(..., description="Name of the service using MediaConvert (e.g., 'ovs', 'ocw-studio')")
-    stack_info: dict = Field(..., description="Stack information including environment details")
+    service_name: str = Field(
+        ...,
+        description="Name of the service using MediaConvert (e.g., 'ovs', 'ocw-studio')",
+    )
+    stack_info: dict = Field(
+        ..., description="Stack information including environment details"
+    )
     aws_config: dict = Field(..., description="AWS configuration object")
-    policy_arn: str = Field(..., description="ARN of the IAM policy to attach to the MediaConvert role")
-    host: Optional[str] = Field(None, description="Host for SNS notification subscriptions")
-    custom_queue_name: Optional[str] = Field(None, description="Optional custom name for the MediaConvert queue")
-    custom_role_name: Optional[str] = Field(None, description="Optional custom name for the MediaConvert role")
-    custom_topic_name: Optional[str] = Field(None, description="Optional custom name for the SNS topic")
+    policy_arn: str = Field(
+        ..., description="ARN of the IAM policy to attach to the MediaConvert role"
+    )
+    host: Optional[str] = Field(
+        None, description="Host for SNS notification subscriptions"
+    )
+    custom_queue_name: Optional[str] = Field(
+        None, description="Optional custom name for the MediaConvert queue"
+    )
+    custom_role_name: Optional[str] = Field(
+        None, description="Optional custom name for the MediaConvert role"
+    )
+    custom_topic_name: Optional[str] = Field(
+        None, description="Optional custom name for the SNS topic"
+    )
 
 
 class OLMediaConvert(ComponentResource):
@@ -53,7 +68,9 @@ class OLMediaConvert(ComponentResource):
 
         # Create resource names
         queue_name = config.custom_queue_name or f"{resource_prefix}-mediaconvert-queue"
-        role_name = config.custom_role_name or f"{resource_prefix}-mediaconvert-service-role"
+        role_name = (
+            config.custom_role_name or f"{resource_prefix}-mediaconvert-service-role"
+        )
         topic_name = config.custom_topic_name or f"{resource_prefix}-mediaconvert"
 
         # Create MediaConvert Queue
@@ -109,7 +126,6 @@ class OLMediaConvert(ComponentResource):
             opts=ResourceOptions(parent=self),
         )
 
-
         # Configure Cloudwatch EventRule and EventTarget
         self.mediaconvert_cloudwatch_rule = cloudwatch.EventRule(
             f"{resource_prefix}-mediaconvert-cloudwatch-eventrule",
@@ -119,9 +135,7 @@ class OLMediaConvert(ComponentResource):
                     "source": ["aws.mediaconvert"],
                     "detail-type": ["MediaConvert Job State Change"],
                     "detail": {
-                        "userMetadata": {
-                            "filter": [queue_name]
-                        },
+                        "userMetadata": {"filter": [queue_name]},
                         "status": ["COMPLETE", "ERROR"],
                     },
                 }
@@ -133,7 +147,6 @@ class OLMediaConvert(ComponentResource):
             rule=self.mediaconvert_cloudwatch_rule.name,
             arn=self.sns_topic.arn,
         )
-
 
         # Register outputs
         outputs = {
@@ -148,9 +161,7 @@ class OLMediaConvert(ComponentResource):
 
     @staticmethod
     def get_standard_policy_statements(
-        stack_info: dict,
-        account_id: str,
-        service_name: str
+        stack_info: dict, account_id: str, service_name: str
     ) -> list[dict[str, Any]]:
         """Return a standardized set of IAM policy statements for MediaConvert access.
 

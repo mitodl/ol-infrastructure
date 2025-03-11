@@ -32,6 +32,10 @@ from ol_infrastructure.components.aws.auto_scale_group import (
 )
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.mediaconvert import (
+    MediaConvertConfig,
+    OLMediaConvert,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
@@ -43,7 +47,6 @@ from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
-from ol_infrastructure.components.aws.mediaconvert import OLMediaConvert, MediaConvertConfig
 
 # Configuration items and initialziations
 if Config("vault_server").get("env_namespace"):
@@ -92,7 +95,9 @@ parliament_config = {
 }
 
 # Get the standard MediaConvert policy statements
-mediaconvert_policy_statements = OLMediaConvert.get_standard_policy_statements(stack_info)
+mediaconvert_policy_statements = OLMediaConvert.get_standard_policy_statements(
+    stack_info
+)
 
 ovs_server_policy_document = {
     "Version": IAM_POLICY_VERSION,
@@ -658,7 +663,7 @@ ovs_mediaconvert_config = MediaConvertConfig(
     stack_info=stack_info,
     aws_config=aws_config,
     policy_arn=ovs_server_policy.arn,
-    host=ovs_config.get("default_domain")
+    host=ovs_config.get("default_domain"),
 )
 
 ovs_mediaconvert = OLMediaConvert(ovs_mediaconvert_config)

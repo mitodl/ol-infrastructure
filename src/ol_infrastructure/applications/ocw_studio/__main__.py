@@ -18,6 +18,10 @@ from pulumi_aws import ec2, iam, s3
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.mediaconvert import (
+    MediaConvertConfig,
+    OLMediaConvert,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
@@ -28,7 +32,6 @@ from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
-from ol_infrastructure.components.aws.mediaconvert import OLMediaConvert, MediaConvertConfig
 
 setup_vault_provider(skip_child_token=True)
 setup_heroku_provider()
@@ -315,7 +318,7 @@ ocw_studio_mediaconvert_config = MediaConvertConfig(
     stack_info=stack_info,
     aws_config=aws_config,
     policy_arn=ocw_studio_iam_policy.arn,
-    host=ocw_studio_config.require("app_domain")
+    host=ocw_studio_config.require("app_domain"),
 )
 
 ocw_studio_mediaconvert = OLMediaConvert(ocw_studio_mediaconvert_config)
