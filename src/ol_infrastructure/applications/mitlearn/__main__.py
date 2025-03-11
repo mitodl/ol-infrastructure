@@ -915,8 +915,8 @@ base_oidc_plugin_config = {
     "bearer_only": False,
     "introspection_endpoint_auth_method": "client_secret_basic",
     "ssl_verify": False,
-    "logout_path": "/logout/oidc",
-    "post_logout_redirect_uri": "/",
+    "logout_path": "/logout/",
+    "post_logout_redirect_uri": "/django_logout/",
 }
 
 shared_plugin_config_name = "shared-plugin-config"
