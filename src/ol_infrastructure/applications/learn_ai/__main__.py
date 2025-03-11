@@ -390,65 +390,42 @@ learn_ai_fastly_service = fastly.ServiceVcl(
     ],
     snippets=[
         fastly.ServiceVclSnippetArgs(
-            name="Rewrite requests to root s3 - miss",
+            name="Add frontend to path",
             content=textwrap.dedent(
                 r"""
-                if (req.method == "GET" && req.backend.is_origin) {
-                  set req.backend = F_learn_ai;
-                  if (req.url == "/") {
-                    set bereq.url = "/frontend/index.html";
-                  } else if (req.url ~ "^/[^.]*$") {
-                    set bereq.url = "/frontend" + req.url + ".html";
-                  } else {
-                    set bereq.url = "/frontend" + req.url;
-                  }
+                {
+                # If the request is for the root ("/"), rewrite it to "/frontend/index.html"
+                if (req.url == "/" || req.url == "") {
+                    set req.url = "/frontend/index.html";
                 }
+
+                # If the request does NOT have an extension and is NOT a directory, append ".html"
+                if (req.url !~ "\.[a-zA-Z0-9]+$" && req.url !~ "/$") {
+                    set req.url = req.url + ".html";
+                }
+
+                # Prepend "/frontend" unless it's already prefixed
+                if (req.method == "GET" && req.url !~ "^/frontend/") {
+                    set req.url = "/frontend" + req.url;
+                }
+            }
                 """
             ),
-            type="miss",
+            type="recv",
         ),
         fastly.ServiceVclSnippetArgs(
-            name="Handle 404s",
+            name="Return custom 404 page",
             content=textwrap.dedent(
                 r"""
-                if (beresp.status == 403 && req.method == "GET" && req.backend.is_origin) {
-                  error 604 "### Custom Response";
+                {
+                if ((resp.status == 404 || resp.status == 403) && req.url !~ "^/frontend/404\.html$") {
+                    set req.url = "/frontend/404.html";
+                    restart;
                 }
+            }
                 """
             ),
-            type="fetch",
-        ),
-        fastly.ServiceVclSnippetArgs(
-            name="Rewrite requests to root s3 - bypass",
-            content=textwrap.dedent(
-                r"""
-                if (req.method == "GET" && req.backend.is_origin) {
-                  set req.backend = F_learn_ai;
-                  if (req.url == "/") {
-                    set bereq.url = "/frontend/index.html";
-                  } else if (req.url ~ "^/[^.]*$") {
-                    set bereq.url = "/frontend" + req.url + ".html";
-                  } else {
-                    set bereq.url = "/frontend" + req.url;
-                  }
-                }
-                """
-            ),
-            type="pass",
-        ),
-        fastly.ServiceVclSnippetArgs(
-            name="Deliver Custom 404",
-            content=textwrap.dedent(
-                r"""
-                if (obj.status == 604) {
-                  set req.url = "/frontend/404.html";
-                  set obj.status = 404;
-                  set obj.http.Location = obj.response;
-                }
-                """
-            ),
-            priority=120,
-            type="error",
+            type="deliver",
         ),
         fastly.ServiceVclSnippetArgs(
             name="Redirect for to correct domain",
