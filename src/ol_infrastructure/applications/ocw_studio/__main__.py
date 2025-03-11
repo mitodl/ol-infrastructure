@@ -339,7 +339,7 @@ heroku_vars = {
     "AWS_PREVIEW_BUCKET_NAME": f"ocw-content-draft-{stack_info.env_suffix}",
     "AWS_PUBLISH_BUCKET_NAME": f"ocw-content-live-{stack_info.env_suffix}",
     "AWS_REGION": "us-east-1",
-    "AWS_ROLE_NAME": ocw_studio_mediaconvert.role,
+    "AWS_ROLE_NAME": ocw_studio_mediaconvert.role.name,
     "AWS_STORAGE_BUCKET_NAME": f"ol-ocw-studio-app-{stack_info.env_suffix}",
     "AWS_TEST_BUCKET_NAME": f"ocw-content-test-{stack_info.env_suffix}",
     "CONCOURSE_USERNAME": "oldevops",
