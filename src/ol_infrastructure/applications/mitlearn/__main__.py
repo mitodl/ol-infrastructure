@@ -1088,11 +1088,11 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
 # All paths prefixed with /learn
 mit_learn_api_domain = mitlearn_config.require("api_domain")
 learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
-    f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
+    f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}-new",
     api_version="apisix.apache.org/v2",
     kind="ApisixRoute",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=learn_external_service_name,
+        name=f"{learn_external_service_name}-new",
         namespace=learn_namespace,
         labels=application_labels,
     ),
