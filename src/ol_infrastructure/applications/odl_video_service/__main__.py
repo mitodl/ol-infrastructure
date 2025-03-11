@@ -96,7 +96,7 @@ parliament_config = {
 
 # Get the standard MediaConvert policy statements
 mediaconvert_policy_statements = OLMediaConvert.get_standard_policy_statements(
-    stack_info
+    stack_info, aws_account.id, "ovs"
 )
 
 ovs_server_policy_document = {
