@@ -96,7 +96,7 @@ parliament_config = {
 
 # Get the standard MediaConvert policy statements
 mediaconvert_policy_statements = OLMediaConvert.get_standard_policy_statements(
-    stack_info, aws_account.id, "ovs"
+    stack_info.env_suffix, aws_account.id, "ovs"
 )
 
 ovs_server_policy_document = {
@@ -659,7 +659,6 @@ for domain in ovs_config.get_object("route53_managed_domains"):
     )
 
 ovs_mediaconvert_config = MediaConvertConfig(
-    service_name="ovs",
     stack_info=stack_info,
     aws_config=aws_config,
     policy_arn=ovs_server_policy.arn,

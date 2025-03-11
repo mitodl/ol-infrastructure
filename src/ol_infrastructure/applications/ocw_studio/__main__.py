@@ -120,7 +120,8 @@ s3.BucketPolicy(
 
 # Get the standard MediaConvert policy statements
 mediaconvert_policy_statements = OLMediaConvert.get_standard_policy_statements(
-    stack_info, "610119931565", "ocw-studio"
+    stack_info.env_suffix,
+    "610119931565",
 )
 
 ocw_studio_iam_policy = iam.Policy(
@@ -314,7 +315,6 @@ ocw_starter_webhook = github.RepositoryWebhook(
 
 # Setup AWS MediaConvert Queue
 ocw_studio_mediaconvert_config = MediaConvertConfig(
-    service_name="ocw-studio",
     stack_info=stack_info,
     aws_config=aws_config,
     policy_arn=ocw_studio_iam_policy.arn,
@@ -322,9 +322,6 @@ ocw_studio_mediaconvert_config = MediaConvertConfig(
 )
 
 ocw_studio_mediaconvert = OLMediaConvert(ocw_studio_mediaconvert_config)
-
-# Use the resources
-ocw_studio_mediaconvert_queue = ocw_studio_mediaconvert.queue
 
 env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 
@@ -463,6 +460,6 @@ export(
     "ocw_studio_app",
     {
         "rds_host": ocw_studio_db.db_instance.address,
-        "mediaconvert_queue": ocw_studio_mediaconvert_queue.id,
+        "mediaconvert_queue": ocw_studio_mediaconvert.queue.id,
     },
 )

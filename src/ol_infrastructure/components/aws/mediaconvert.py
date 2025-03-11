@@ -13,8 +13,8 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 class MediaConvertConfig(BaseModel):
     """Configuration for AWS MediaConvert resources"""
 
-    service_name: str = Field(
-        ...,
+    service_name: Optional[str] = Field(
+        None,
         description="Name of the service using MediaConvert (e.g., 'ocw-studio')",
     )
     stack_info: StackInfo = Field(
@@ -24,18 +24,7 @@ class MediaConvertConfig(BaseModel):
     policy_arn: str = Field(
         ..., description="ARN of the IAM policy to attach to the MediaConvert role"
     )
-    host: Optional[str] = Field(
-        None, description="Host for SNS notification subscriptions"
-    )
-    custom_queue_name: Optional[str] = Field(
-        None, description="Optional custom name for the MediaConvert queue"
-    )
-    custom_role_name: Optional[str] = Field(
-        None, description="Optional custom name for the MediaConvert role"
-    )
-    custom_topic_name: Optional[str] = Field(
-        None, description="Optional custom name for the SNS topic"
-    )
+    host: str = Field(..., description="Host for SNS notification subscriptions")
 
 
 class OLMediaConvert(ComponentResource):
@@ -53,13 +42,6 @@ class OLMediaConvert(ComponentResource):
     ):
         """Create an instance of the OLMediaConvert component resource"""
 
-        super().__init__(
-            "ol:infrastructure:aws:MediaConvert",
-            f"{config.service_name}-{config.stack_info.env_suffix}-mediaconvert",
-            None,
-            opts,
-        )
-
         # Extract values from config
         stack_info = config.stack_info
         aws_config = config.aws_config
@@ -68,14 +50,23 @@ class OLMediaConvert(ComponentResource):
         host = config.host
 
         # Create resource prefix
-        resource_prefix = f"{service_name}-{stack_info.env_suffix}"
+        resource_prefix = (
+            f"{service_name}-{stack_info.env_suffix}"
+            if service_name
+            else stack_info.env_suffix
+        )
+
+        super().__init__(
+            "ol:infrastructure:aws:MediaConvert",
+            f"{resource_prefix}-mediaconvert",
+            None,
+            opts,
+        )
 
         # Create resource names
-        queue_name = config.custom_queue_name or f"{resource_prefix}-mediaconvert-queue"
-        role_name = (
-            config.custom_role_name or f"{resource_prefix}-mediaconvert-service-role"
-        )
-        topic_name = config.custom_topic_name or f"{resource_prefix}-mediaconvert"
+        queue_name = f"{resource_prefix}-mediaconvert-queue"
+        role_name = f"{resource_prefix}-mediaconvert-service-role"
+        topic_name = f"{resource_prefix}-mediaconvert"
 
         # Create MediaConvert Queue
         self.queue = mediaconvert.Queue(
@@ -122,7 +113,7 @@ class OLMediaConvert(ComponentResource):
 
         # Configure SNS Topic Subscription with provided host
         self.sns_topic_subscription = sns.TopicSubscription(
-            f"{resource_prefix}-sns-topic-subscription",
+            f"{resource_prefix}-mediaconvert-topic-subscription",
             endpoint=f"https://{host}/api/transcode-jobs/",
             protocol="https",
             raw_message_delivery=True,
@@ -165,7 +156,7 @@ class OLMediaConvert(ComponentResource):
 
     @staticmethod
     def get_standard_policy_statements(
-        stack_info: StackInfo, account_id: str, service_name: str
+        env_suffix: str, account_id: str, service_name: str = ""
     ) -> list[dict[str, Any]]:
         """Return a standardized set of IAM policy statements for MediaConvert access.
 
@@ -179,7 +170,7 @@ class OLMediaConvert(ComponentResource):
             List of IAM policy statements for MediaConvert access
         """
 
-        resource_prefix = f"{service_name}-{stack_info.env_suffix}"
+        resource_prefix = f"{service_name}-{env_suffix}" if service_name else env_suffix
 
         return [
             {
