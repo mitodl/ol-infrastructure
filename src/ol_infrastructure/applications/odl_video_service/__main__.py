@@ -43,6 +43,7 @@ from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.components.aws.mediaconvert import OLMediaConvert, MediaConvertConfig
 
 # Configuration items and initialziations
 if Config("vault_server").get("env_namespace"):
@@ -90,6 +91,9 @@ parliament_config = {
     "UNKNOWN_ACTION": {"ignore_locations": []},
 }
 
+# Get the standard MediaConvert policy statements
+mediaconvert_policy_statements = OLMediaConvert.get_standard_policy_statements(stack_info)
+
 ovs_server_policy_document = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
@@ -103,52 +107,6 @@ ovs_server_policy_document = {
                 "arn:aws:s3:::ttv_static/*",
             ],
         },
-        {
-            "Action": [
-                "elastictranscoder:CancelJob",
-                "elastictranscoder:ReadJob",
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:job/*"
-            ],
-        },
-        {
-            "Action": [
-                "elastictranscoder:ListJobsByPipeline",
-                "elastictranscoder:ReadPipeline",
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:pipeline/{secrets['misc']['et_pipeline_id']}"
-            ],
-        },
-        {
-            "Action": [
-                "elastictranscoder:CreateJob",
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:preset/*",
-                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:pipeline/{secrets['misc']['et_pipeline_id']}",
-            ],
-        },
-        {
-            "Action": [
-                "elastictranscoder:ReadPreset",
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:preset/*",
-            ],
-        },
-        # This block against odl-video-service* buckets is REQUIRED
-        # App does not work without it?????
-        # TODO MAD 20221115 Why is it required?  # noqa: FIX002, TD002, TD003, TD004
-        # The S3 permissions block following this SHOULD cover what this provides
-        # but the app must be making some kind of call to bucket that isn't qualified
-        # by the environment (CI,RC,Production)
-        # There are 21 odl-video-service* buckets at the moment.
         {
             "Action": [
                 "s3:HeadObject",
@@ -169,7 +127,6 @@ ovs_server_policy_document = {
             "Action": ["sns:ListSubscriptionsByTopic", "sns:Publish"],
             "Effect": "Allow",
             "Resource": [
-                # This sns topic isn't managed by pulumi - MAD 20221115
                 f"arn:aws:sns:{aws_config.region}:{aws_account.id}:odl-video-service"
             ],
         },
@@ -225,6 +182,8 @@ ovs_server_policy_document = {
                 f"arn:aws:s3:::{ovs_config.get('s3_watch_bucket_name')}/*",
             ],
         },
+        # Include standard MediaConvert policy statements
+        *mediaconvert_policy_statements,
     ],
 }
 ovs_server_policy = iam.Policy(
@@ -694,11 +653,33 @@ for domain in ovs_config.get_object("route53_managed_domains"):
         zone_id=mitodl_zone_id,
     )
 
-# TODO MD 20221011 revisit this, probably need to export more things  # noqa: E501, FIX002, TD002, TD003, TD004
+ovs_mediaconvert_config = MediaConvertConfig(
+    service_name="ovs",
+    stack_info=stack_info,
+    aws_config=aws_config,
+    policy_arn=ovs_server_policy.arn,
+    host=ovs_config.get("default_domain")
+)
+
+ovs_mediaconvert = OLMediaConvert(ovs_mediaconvert_config)
+
+# Add the SNS Topic ARN to consul keys
+consul_keys = {
+    "ovs/mediaconvert_sns_topic_arn": ovs_mediaconvert.sns_topic.arn,
+}
+
+consul.Keys(
+    "ovs-server-configuration-data",
+    keys=consul_key_helper(consul_keys),
+    opts=consul_provider,
+)
+
+# Add the resources to the export
 export(
     "odl_video_service",
     {
         "rds_host": db_address,
         "redis_cluster": ovs_server_redis_cluster.address,
+        "mediaconvert_queue": ovs_mediaconvert.queue.id,
     },
 )
