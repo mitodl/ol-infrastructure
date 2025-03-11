@@ -5,6 +5,7 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-apps-production.odl.mit.edu
   ecommerce:backend_domain: "api-pay.ol.mit.edu"
+  ecommerce:learn_backend_domain: "api.learn.mit.edu"
   ecommerce:env_vars:
     CELERY_TASK_ALWAYS_EAGER: "False"
     CSRF_ALLOWED_ORIGINS: '["https://pay.ol.mit.edu", "https://api-pay.ol.mit.edu"]'
