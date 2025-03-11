@@ -203,7 +203,9 @@ class OLMediaConvert(ComponentResource):
             {
                 "Effect": "Allow",
                 "Action": "iam:PassRole",
-                "Resource": (f"arn:aws:iam::{account_id}:role/"
-                f"{resource_prefix}-mediaconvert-service-role"),
+                "Resource": (
+                    f"arn:aws:iam::{account_id}:role/"
+                    f"{resource_prefix}-mediaconvert-service-role"
+                ),
             },
         ]
