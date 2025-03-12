@@ -72,79 +72,112 @@ class OLMediaConvert(ComponentResource):
         event_rule_name = f"{resource_prefix}-mediaconvert-cloudwatch-eventrule"
         event_target_name = f"{resource_prefix}-mediaconvert-cloudwatch-eventtarget"
 
-        # Create MediaConvert Queue
-        self.queue = mediaconvert.Queue(
-            queue_name,
-            description=f"{resource_prefix} MediaConvert Queue",
-            name=queue_name,
-            tags=aws_config["tags"],
-            opts=ResourceOptions(parent=self),
-        )
+        # Check if queue exists
+        try:
+            existing_queue = mediaconvert.get_queue(id=queue_name)
+            self.queue = mediaconvert.Queue.get(
+                queue_name, existing_queue.id, opts=ResourceOptions(parent=self)
+            )
+        except Exception:  # noqa: BLE001
+            # Create MediaConvert Queue if it doesn't exist
+            self.queue = mediaconvert.Queue(
+                queue_name,
+                description=f"{resource_prefix} MediaConvert Queue",
+                name=queue_name,
+                tags=aws_config["tags"],
+                opts=ResourceOptions(parent=self, protect=False),
+            )
 
-        # Create MediaConvert Role
-        self.role = iam.Role(
-            role_name,
-            assume_role_policy=json.dumps(
-                {
-                    "Version": "2012-10-17",
-                    "Statement": {
-                        "Effect": "Allow",
-                        "Action": "sts:AssumeRole",
-                        "Principal": {"Service": "mediaconvert.amazonaws.com"},
-                    },
-                }
-            ),
-            name=role_name,
-            tags=aws_config["tags"],
-            opts=ResourceOptions(parent=self),
-        )
+        # Check if role exists
+        try:
+            existing_role = iam.get_role(name=role_name)
+            self.role = iam.Role.get(
+                role_name, existing_role.id, opts=ResourceOptions(parent=self)
+            )
+        except Exception:  # noqa: BLE001
+            # Create MediaConvert Role if it doesn't exist
+            self.role = iam.Role(
+                role_name,
+                assume_role_policy=json.dumps(
+                    {
+                        "Version": "2012-10-17",
+                        "Statement": {
+                            "Effect": "Allow",
+                            "Action": "sts:AssumeRole",
+                            "Principal": {"Service": "mediaconvert.amazonaws.com"},
+                        },
+                    }
+                ),
+                name=role_name,
+                tags=aws_config["tags"],
+                opts=ResourceOptions(parent=self, protect=False),
+            )
 
-        # Attach policy to the role
-        self.role_policy_attachment = iam.RolePolicyAttachment(
-            policy_name,
-            policy_arn=policy_arn,
-            role=self.role.name,
-            opts=ResourceOptions(parent=self),
-        )
+            # Attach policy to the role
+            self.role_policy_attachment = iam.RolePolicyAttachment(
+                policy_name,
+                policy_arn=policy_arn,
+                role=self.role.name,
+                opts=ResourceOptions(parent=self, protect=False),
+            )
 
-        # Create SNS Topic for MediaConvert notifications
-        self.sns_topic = sns.Topic(
-            f"{resource_prefix}-mediaconvert-topic",
-            name=topic_name,
-            tags=aws_config["tags"],
-            opts=ResourceOptions(parent=self),
-        )
+        # Check if SNS topic exists
+        try:
+            existing_topic = sns.get_topic(name=topic_name)
+            self.sns_topic = sns.Topic.get(
+                topic_name, existing_topic.id, opts=ResourceOptions(parent=self)
+            )
+        except Exception:  # noqa: BLE001
+            # Create SNS Topic for MediaConvert notifications if it doesn't exist
+            self.sns_topic = sns.Topic(
+                topic_name,
+                name=topic_name,
+                tags=aws_config["tags"],
+                opts=ResourceOptions(parent=self, protect=False),
+            )
 
-        # Configure SNS Topic Subscription with provided host
-        self.sns_topic_subscription = sns.TopicSubscription(
-            subscription_name,
-            endpoint=f"https://{host}/api/transcode-jobs/",
-            protocol="https",
-            raw_message_delivery=True,
-            topic=self.sns_topic.arn,
-            opts=ResourceOptions(parent=self),
-        )
+            # Configure SNS Topic Subscription with provided host
+            # (Subscription is idempotent so no need to check existence)
+            self.sns_topic_subscription = sns.TopicSubscription(
+                subscription_name,
+                endpoint=f"https://{host}/api/transcode-jobs/",
+                protocol="https",
+                raw_message_delivery=True,
+                topic=self.sns_topic.arn,
+                opts=ResourceOptions(parent=self, protect=False),
+            )
 
-        # Configure Cloudwatch EventRule and EventTarget
-        self.mediaconvert_cloudwatch_rule = cloudwatch.EventRule(
-            event_rule_name,
-            description="Capture MediaConvert Events for use with SNS",
-            event_pattern=json.dumps(
-                {
-                    "source": ["aws.mediaconvert"],
-                    "detail-type": ["MediaConvert Job State Change"],
-                    "detail": {
-                        "userMetadata": {"filter": [queue_name]},
-                        "status": ["COMPLETE", "ERROR"],
-                    },
-                }
-            ),
-        )
+        # Check if CloudWatch EventRule exists
+        try:
+            existing_rule = cloudwatch.get_event_rule(name=event_rule_name)
+            self.mediaconvert_cloudwatch_rule = cloudwatch.EventRule.get(
+                event_rule_name, existing_rule.id
+            )
+        except Exception:  # noqa: BLE001
+            # Configure Cloudwatch EventRule if it doesn't exist
+            self.mediaconvert_cloudwatch_rule = cloudwatch.EventRule(
+                event_rule_name,
+                description="Capture MediaConvert Events for use with SNS",
+                name=event_rule_name,
+                event_pattern=json.dumps(
+                    {
+                        "source": ["aws.mediaconvert"],
+                        "detail-type": ["MediaConvert Job State Change"],
+                        "detail": {
+                            "userMetadata": {"filter": [queue_name]},
+                            "status": ["COMPLETE", "ERROR"],
+                        },
+                    }
+                ),
+                opts=ResourceOptions(protect=False),
+            )
 
+        # EventTarget is idempotent - it will update if exists or create if not
         self.mediaconvert_cloudwatch_target = cloudwatch.EventTarget(
             event_target_name,
             rule=self.mediaconvert_cloudwatch_rule.name,
             arn=self.sns_topic.arn,
+            opts=ResourceOptions(protect=False),
         )
 
         # Register outputs
