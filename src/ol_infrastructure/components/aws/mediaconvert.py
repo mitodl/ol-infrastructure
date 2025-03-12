@@ -65,12 +65,16 @@ class OLMediaConvert(ComponentResource):
 
         # Create resource names
         queue_name = f"{resource_prefix}-mediaconvert-queue"
-        role_name = f"{resource_prefix}-mediaconvert-service-role"
-        topic_name = f"{resource_prefix}-mediaconvert"
+        role_name = f"{resource_prefix}-mediaconvert-role"
+        topic_name = f"{resource_prefix}-mediaconvert-topic"
+        policy_name = f"{resource_prefix}-mediaconvert-role-policy"
+        subscription_name = f"{resource_prefix}-mediaconvert-topic-subscription"
+        event_rule_name = f"{resource_prefix}-mediaconvert-cloudwatch-eventrule"
+        event_target_name = f"{resource_prefix}-mediaconvert-cloudwatch-eventtarget"
 
         # Create MediaConvert Queue
         self.queue = mediaconvert.Queue(
-            f"{resource_prefix}-mediaconvert-queue",
+            queue_name,
             description=f"{resource_prefix} MediaConvert Queue",
             name=queue_name,
             tags=aws_config["tags"],
@@ -79,7 +83,7 @@ class OLMediaConvert(ComponentResource):
 
         # Create MediaConvert Role
         self.role = iam.Role(
-            f"{resource_prefix}-mediaconvert-role",
+            role_name,
             assume_role_policy=json.dumps(
                 {
                     "Version": "2012-10-17",
@@ -97,7 +101,7 @@ class OLMediaConvert(ComponentResource):
 
         # Attach policy to the role
         self.role_policy_attachment = iam.RolePolicyAttachment(
-            f"{resource_prefix}-mediaconvert-role-policy",
+            policy_name,
             policy_arn=policy_arn,
             role=self.role.name,
             opts=ResourceOptions(parent=self),
@@ -113,7 +117,7 @@ class OLMediaConvert(ComponentResource):
 
         # Configure SNS Topic Subscription with provided host
         self.sns_topic_subscription = sns.TopicSubscription(
-            f"{resource_prefix}-mediaconvert-topic-subscription",
+            subscription_name,
             endpoint=f"https://{host}/api/transcode-jobs/",
             protocol="https",
             raw_message_delivery=True,
@@ -123,7 +127,7 @@ class OLMediaConvert(ComponentResource):
 
         # Configure Cloudwatch EventRule and EventTarget
         self.mediaconvert_cloudwatch_rule = cloudwatch.EventRule(
-            f"{resource_prefix}-mediaconvert-cloudwatch-eventrule",
+            event_rule_name,
             description="Capture MediaConvert Events for use with SNS",
             event_pattern=json.dumps(
                 {
@@ -138,7 +142,7 @@ class OLMediaConvert(ComponentResource):
         )
 
         self.mediaconvert_cloudwatch_target = cloudwatch.EventTarget(
-            f"{resource_prefix}-mediaconvert-cloudwatch-eventtarget",
+            event_target_name,
             rule=self.mediaconvert_cloudwatch_rule.name,
             arn=self.sns_topic.arn,
         )
