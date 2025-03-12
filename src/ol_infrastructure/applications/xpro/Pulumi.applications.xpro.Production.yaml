@@ -34,7 +34,7 @@ config:
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
     POSTHOG_ENABLED: "True"
     SENTRY_LOG_LEVEL: "WARN"
-    SESSION_COOKIE_NAME: f"session_xpro"        
+    SESSION_COOKIE_NAME: f"session_xpro"
     SHEETS_DEFERRAL_FIRST_ROW: 234
     SHEETS_MONITORING_FREQUENCY: 3600
     SHEETS_REFUND_COMPLETED_DATE_COL: 13
