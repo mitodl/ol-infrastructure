@@ -981,7 +981,7 @@ mit_learn_ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource
             {
                 # wildcard route for the rest of the system - auth required
                 "name": "ue-default",
-                "priority": 0,
+                "priority": 100,
                 "plugins": [
                     proxy_rewrite_plugin_config,
                     # Ref: https://apisix.apache.org/docs/apisix/plugins/openid-connect/
@@ -1022,7 +1022,7 @@ mit_learn_ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource
             # Strip trailing slack from logout redirect
             {
                 "name": "ue-logout-redirect",
-                "priority": 0,
+                "priority": 100,
                 "plugins": [
                     proxy_rewrite_plugin_config,
                     {
