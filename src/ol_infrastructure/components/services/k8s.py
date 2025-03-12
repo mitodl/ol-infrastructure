@@ -59,7 +59,7 @@ class OLApplicationK8s(ComponentResource):
         resource_options = ResourceOptions(parent=self).merge(opts)
         self.ol_app_k8s_config: OLApplicationK8sConfiguration = ol_app_k8s_config
 
-        if ol_app_k8s_config.import_nging_config:
+        if ol_app_k8s_config.import_nginx_config:
             application_nginx_configmap = kubernetes.core.v1.ConfigMap(
                 f"unified-application-{stack_info.env_suffix}-nginx-configmap",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(

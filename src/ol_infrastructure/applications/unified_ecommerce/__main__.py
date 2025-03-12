@@ -692,7 +692,7 @@ ecommerce_k8s_config: OLApplicationK8sConfiguration = OLApplicationK8sConfigurat
     application_security_group_id=str(ecommerce_application_security_group.id),
     application_docker_tag=ECOMMERCE_DOCKER_TAG,
     vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
-    import_nging_config=True,
+    import_nginx_config=True,
 )
 
 ol_k8s_application = OLApplicationK8s(
