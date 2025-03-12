@@ -30,8 +30,7 @@ class OLApplicationK8sConfiguration(BaseModel):
     application_security_group_id: str
     application_docker_tag: str | None
     vault_k8s_resource_auth_name: str
-    import_nging_config: bool
-
+    import_nginx_config: bool
 
 stack_info = parse_stack()
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
