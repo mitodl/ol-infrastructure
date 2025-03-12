@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 import pulumi_kubernetes as kubernetes
-from pulumi import ComponentResource, Config, ResourceOptions
+from pulumi import ComponentResource, ResourceOptions
 from pydantic import BaseModel
 
 from bridge.lib.magic_numbers import DEFAULT_NGINX_PORT, DEFAULT_UWSGI_PORT
@@ -17,7 +17,8 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
 class OLApplicationK8sConfiguration(BaseModel):
-    application_config: Config
+    project_root: Path
+    application_config: dict[str, str]
     application_name: str
     application_namespace: str
     application_lb_service_name: str
@@ -29,6 +30,7 @@ class OLApplicationK8sConfiguration(BaseModel):
     application_security_group_id: str
     application_docker_tag: str | None
     vault_k8s_resource_auth_name: str
+    import_nging_config: bool
 
 
 stack_info = parse_stack()
@@ -48,35 +50,34 @@ class OLApplicationK8s(ComponentResource):
         """
         It's .. the constructor. Shaddap Ruff :)
         """
+        super().__init__(
+            "ol:infrastructure:components:services:OLApplicationK8s",
+            ol_app_k8s_config.application_namespace,
+            None,
+            opts=opts,
+        )
         resource_options = ResourceOptions(parent=self).merge(opts)
         self.ol_app_k8s_config: OLApplicationK8sConfiguration = ol_app_k8s_config
-        super().__init__(
-            "ol:infrastructure:aws:OLApplicationK8s",
-            self.ol_app_k8s_config.application_namespace,
-            None,
-            opts=resource_options,
-        )
 
-        application_nginx_configmap = kubernetes.core.v1.ConfigMap(
-            f"unified-application-{stack_info.env_suffix}-nginx-configmap",
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name="nginx-config",
-                namespace=ol_app_k8s_config.application_namespace,
-                labels=ol_app_k8s_config.k8s_global_labels,
-            ),
-            data={
-                "web.conf": Path(__file__)
-                .parent.joinpath("files/web.conf")
-                .read_text(),
-            },
-            opts=resource_options,
-        )
+        if ol_app_k8s_config.import_nging_config:
+            application_nginx_configmap = kubernetes.core.v1.ConfigMap(
+                f"unified-application-{stack_info.env_suffix}-nginx-configmap",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name="nginx-config",
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=ol_app_k8s_config.k8s_global_labels,
+                ),
+                data={
+                    "web.conf": ol_app_k8s_config.project_root.joinpath(
+                        "files/web.conf"
+                    ).read_text(),
+                },
+                opts=resource_options,
+            )
 
         # Build a list of not-sensitive env vars for the deployment config
         application_deployment_env_vars = []
-        for k, v in (
-            self.ol_app_k8s_config.application_config.require_object("env_vars") or {}
-        ).items():
+        for k, v in (self.ol_app_k8s_config.application_config).items():
             application_deployment_env_vars.append(
                 kubernetes.core.v1.EnvVarArgs(
                     name=k,

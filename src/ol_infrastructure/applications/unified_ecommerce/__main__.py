@@ -679,7 +679,8 @@ static_secrets = OLVaultK8SSecret(
 # k8s Component Resource
 
 ecommerce_k8s_config: OLApplicationK8sConfiguration = OLApplicationK8sConfiguration(
-    application_config=ecommerce_config,
+    project_root=Path(__file__).parent,
+    application_config=ecommerce_config.require_object("env_vars"),
     application_name="ecommerce",
     application_namespace=ecommerce_namespace,
     application_lb_service_name="ecommerce",
@@ -688,9 +689,10 @@ ecommerce_k8s_config: OLApplicationK8sConfiguration = OLApplicationK8sConfigurat
     db_creds_secret_name=db_creds_secret_name,
     redis_creds_secret_name=redis_creds_secret_name,
     static_secrets_name=static_secrets_name,
-    application_security_group_id=ecommerce_application_security_group.id,
+    application_security_group_id=str(ecommerce_application_security_group.id),
     application_docker_tag=ECOMMERCE_DOCKER_TAG,
     vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
+    import_nging_config=True,
 )
 
 ol_k8s_application = OLApplicationK8s(
