@@ -31,6 +31,7 @@ config:
     SENTRY_LOG_LEVEL: "ERROR"
     SENTRY_PROFILES_SAMPLE_RATE: "0.1"
     SENTRY_TRACES_SAMPLE_RATE: "0.1"
+    SESSION_COOKIE_NAME: "session_learn_ai_rc"
     UWSGI_THREADS: "5"
   learn_ai:frontend_domain: "learn-ai-qa.ol.mit.edu"
   redis:password:

@@ -23,6 +23,7 @@ config:
     SENTRY_LOG_LEVEL: "ERROR"
     SENTRY_PROFILES_SAMPLE_RATE: "0.1"
     SENTRY_TRACES_SAMPLE_RATE: "0.1"
+    SESSION_COOKIE_NAME: "session_learn_ai_ci"
     UWSGI_THREADS: "5"
   learn_ai:frontend_domain: "learn-ai-ci.ol.mit.edu"
   vault:address: "https://vault-ci.odl.mit.edu"
