@@ -1084,6 +1084,17 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
     ),
 )
 
+
+proxy_rewrite_plugin_config = {
+    "name": "proxy-rewrite",
+    "enable": True,
+    "config": {
+        "regex_uri": [
+            "/learn/(.*)",
+            "/$1",
+        ],
+    },
+}
 # New ApisixRoute object
 # All paths prefixed with /learn
 mit_learn_api_domain = mitlearn_config.require("api_domain")
@@ -1104,6 +1115,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 "priority": 0,
                 "plugin_config_name": shared_plugin_config_name,
                 "plugins": [
+                    proxy_rewrite_plugin_config,
                     {
                         "name": "openid-connect",
                         "enable": True,
@@ -1158,6 +1170,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 "priority": 10,
                 "plugin_config_name": shared_plugin_config_name,
                 "plugins": [
+                    proxy_rewrite_plugin_config,
                     {
                         "name": "openid-connect",
                         "enable": True,
