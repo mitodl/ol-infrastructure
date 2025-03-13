@@ -5,12 +5,15 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-apps-qa.odl.mit.edu
   ecommerce:backend_domain: "api-pay-qa.ol.mit.edu"
+  ecommerce:learn_backend_domain: "api.rc.learn.mit.edu"
   ecommerce:db_password:
     secure: v1:OIaEfSH/Zi+Cx4xN:gxfyu42ieyWreccgmnbPDCBxnM5MAZbeDKJnIRlvp8Wvu87QhI+fFeEUtr+T3cPJVSvGiBipllOsETbkijSShL1TcTu+WDPmXtrRsSSBhWk=
   ecommerce:env_vars:
     CELERY_TASK_ALWAYS_EAGER: "False"
-    CSRF_ALLOWED_ORIGINS: '["https://pay-qa.ol.mit.edu", "https://api-pay-qa.ol.mit.edu"]'
-    CSRF_TRUSTED_ORIGINS: '["https://pay-qa.ol.mit.edu", "https://api-pay-qa.ol.mit.edu"]'
+    CSRF_ALLOWED_ORIGINS: '["https://pay-qa.ol.mit.edu", "https://api-pay-qa.ol.mit.edu",
+      "https://api.rc.learn.mit.edu", "https://rc.learn.mit.edu"]'
+    CSRF_TRUSTED_ORIGINS: '["https://pay-qa.ol.mit.edu", "https://api-pay-qa.ol.mit.edu",
+      "https://api.rc.learn.mit.edu", "https://rc.learn.mit.edu"]'
     DEBUG: "true"
     DEV_ENV: "true"
     ENVIRONMENT: "dev"
