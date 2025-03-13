@@ -149,11 +149,6 @@ class OLMediaConvert(ComponentResource):
 
         # Check if CloudWatch EventRule exists
         try:
-            existing_rule = cloudwatch.get_event_rule(name=event_rule_name)
-            self.mediaconvert_cloudwatch_rule = cloudwatch.EventRule.get(
-                event_rule_name, existing_rule.id
-            )
-        except Exception:  # noqa: BLE001
             # Configure Cloudwatch EventRule if it doesn't exist
             self.mediaconvert_cloudwatch_rule = cloudwatch.EventRule(
                 event_rule_name,
@@ -172,13 +167,16 @@ class OLMediaConvert(ComponentResource):
                 opts=ResourceOptions(protect=False),
             )
 
-        # EventTarget is idempotent - it will update if exists or create if not
-        self.mediaconvert_cloudwatch_target = cloudwatch.EventTarget(
-            event_target_name,
-            rule=self.mediaconvert_cloudwatch_rule.name,
-            arn=self.sns_topic.arn,
-            opts=ResourceOptions(protect=False),
-        )
+            # EventTarget is idempotent - it will update if exists or create if not
+            self.mediaconvert_cloudwatch_target = cloudwatch.EventTarget(
+                event_target_name,
+                rule=self.mediaconvert_cloudwatch_rule.name,
+                arn=self.sns_topic.arn,
+                opts=ResourceOptions(protect=False),
+            )
+
+        except Exception:  # noqa: BLE001, S110
+            pass
 
         # Register outputs
         outputs = {
