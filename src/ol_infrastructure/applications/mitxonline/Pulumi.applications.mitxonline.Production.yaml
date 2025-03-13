@@ -31,6 +31,7 @@ config:
     OPENEDX_OAUTH_PROVIDER: "ol-oauth2"
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
     SENTRY_LOG_LEVEL: "ERROR"
+    SESSION_COOKIE_NAME: "session_mitxonline"
   mitxonline:db_password:
     secure: v1:1SGxkH66kKNXMVc0:P9FztYdyzfxIrapGHU3pD5gz9ZkW6Of/zTqhaZf4O+L+Y8yAbcissYxogKfyDMxSJYSSUxI12K0=
   vault:address: https://vault-production.odl.mit.edu

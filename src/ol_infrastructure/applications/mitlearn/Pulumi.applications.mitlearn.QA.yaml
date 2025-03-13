@@ -47,7 +47,7 @@ config:
     SEE_API_ENABLED: "true"
     SENTRY_PROFILES_SAMPLE_RATE: 1.0
     SENTRY_TRACES_SAMPLE_RATE: 1.0
-    SESSION_COOKIE_NAME: "learn-rc-session"
+    SESSION_COOKIE_NAME": "session_mitlearn_rc"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT:
     TIKA_SERVER_ENDPOINT: "https://tika-qa.odl.mit.edu"
     UWSGI_WORKERS: 3
