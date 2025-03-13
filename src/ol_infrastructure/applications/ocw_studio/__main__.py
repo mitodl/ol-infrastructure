@@ -13,7 +13,7 @@ import pulumi_github as github
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
-from pulumi_aws import ec2, iam, s3
+from pulumi_aws import ec2, get_caller_identity, iam, s3
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.secrets.sops import read_yaml_secrets
@@ -56,6 +56,9 @@ aws_config = AWSBase(
 )
 heroku_config = Config("heroku")
 heroku_app_config = Config("heroku_app")
+
+# AWS Account Information
+aws_account = get_caller_identity()
 
 # Create S3 buckets
 
@@ -121,7 +124,7 @@ s3.BucketPolicy(
 # Get the standard MediaConvert policy statements
 mediaconvert_policy_statements = OLMediaConvert.get_standard_policy_statements(
     stack_info.env_suffix,
-    "610119931565",
+    aws_account.id,
 )
 
 ocw_studio_iam_policy = iam.Policy(
@@ -327,7 +330,7 @@ env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 
 heroku_vars = {
     "ALLOWED_HOSTS": '["*"]',
-    "AWS_ACCOUNT_ID": "610119931565",
+    "AWS_ACCOUNT_ID": aws_account.id,
     "AWS_ARTIFACTS_BUCKET_NAME": "ol-eng-artifacts",
     "AWS_MAX_CONCURRENT_CONNECTIONS": 100,
     "AWS_OFFLINE_PREVIEW_BUCKET_NAME": f"ocw-content-offline-draft-{stack_info.env_suffix}",
