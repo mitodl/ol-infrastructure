@@ -690,6 +690,7 @@ ecommerce_k8s_config: OLApplicationK8sConfiguration = OLApplicationK8sConfigurat
     redis_creds_secret_name=redis_creds_secret_name,
     static_secrets_name=static_secrets_name,
     application_security_group_id=str(ecommerce_application_security_group.id),
+    application_security_group_name=str(ecommerce_application_security_group.name),
     application_docker_tag=ECOMMERCE_DOCKER_TAG,
     vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
     import_nginx_config=True,
