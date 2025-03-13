@@ -1314,6 +1314,17 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
         depends_on=[learn_ai_service, oidc_secret],
     ),
 )
+
+proxy_rewrite_plugin_config = {
+    "name": "proxy-rewrite",
+    "enable": True,
+    "config": {
+        "regex_uri": [
+            "/ai/(.*)",
+            "/$1",
+        ],
+    },
+}
 # New ApisixRoute object for the learn.mit.edu address
 # All paths prefixed with /ai
 # Host match is only the mit-learn domain
@@ -1334,12 +1345,13 @@ mit_learn_learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 "priority": 2,
                 "plugin_config_name": shared_plugin_config_name,
                 "plugins": [
+                    proxy_rewrite_plugin_config,
                     {
                         "name": "openid-connect",
                         "enable": True,
                         "secretRef": mit_learn_oidc_secret_name,
                         "config": base_oidc_plugin_config | {"unauth_action": "pass"},
-                    }
+                    },
                 ],
                 "match": {
                     "hosts": [learn_ai_api_domain],
@@ -1359,6 +1371,7 @@ mit_learn_learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 "name": "logout-redirect",
                 "priority": 10,
                 "plugins": [
+                    proxy_rewrite_plugin_config,
                     {
                         "name": "redirect",
                         "enable": True,
@@ -1388,12 +1401,13 @@ mit_learn_learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 "priority": 10,
                 "plugin_config_name": shared_plugin_config_name,
                 "plugins": [
+                    proxy_rewrite_plugin_config,
                     {
                         "name": "openid-connect",
                         "enable": True,
                         "secretRef": mit_learn_oidc_secret_name,
                         "config": base_oidc_plugin_config | {"unauth_action": "auth"},
-                    }
+                    },
                 ],
                 "match": {
                     "hosts": [
@@ -1418,12 +1432,13 @@ mit_learn_learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 "websocket": True,
                 "plugin_config_name": shared_plugin_config_name,
                 "plugins": [
+                    proxy_rewrite_plugin_config,
                     {
                         "name": "openid-connect",
                         "enable": True,
                         "secretRef": mit_learn_oidc_secret_name,
                         "config": base_oidc_plugin_config | {"unauth_action": "pass"},
-                    }
+                    },
                 ],
                 "match": {
                     "hosts": [
