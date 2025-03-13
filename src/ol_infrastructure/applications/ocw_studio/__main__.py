@@ -318,8 +318,8 @@ ocw_starter_webhook = github.RepositoryWebhook(
 
 # Setup AWS MediaConvert Queue
 ocw_studio_mediaconvert_config = MediaConvertConfig(
-    stack_info=stack_info,
-    aws_config=aws_config,
+    env_suffix=stack_info.env_suffix,
+    tags=aws_config.tags,
     policy_arn=ocw_studio_iam_policy.arn,
     host=ocw_studio_config.require("app_domain"),
 )

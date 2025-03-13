@@ -7,8 +7,6 @@ from pulumi import ComponentResource, ResourceOptions
 from pulumi_aws import cloudwatch, iam, mediaconvert, sns
 from pydantic import BaseModel, Field
 
-from ol_infrastructure.lib.pulumi_helper import StackInfo
-
 ROLE_NAME = "{resource_prefix}-role"
 
 
@@ -19,10 +17,10 @@ class MediaConvertConfig(BaseModel):
         None,
         description="Name of the service using MediaConvert (e.g., 'ocw-studio')",
     )
-    stack_info: StackInfo = Field(
-        ..., description="Stack information including environment details"
+    env_suffix: str = Field(
+        ..., description="Environment suffix for the MediaConvert resources"
     )
-    aws_config: dict[str, Any] = Field(..., description="AWS configuration object")
+    tags: dict[str, str] = Field(..., description="Tags for the AWS resources")
     policy_arn: str = Field(
         ..., description="ARN of the IAM policy to attach to the MediaConvert role"
     )
@@ -45,17 +43,17 @@ class OLMediaConvert(ComponentResource):
         """Create an instance of the OLMediaConvert component resource"""
 
         # Extract values from config
-        stack_info = config.stack_info
-        aws_config = config.aws_config
+        env_suffix = config.env_suffix
+        tags = config.tags
         policy_arn = config.policy_arn
         service_name = config.service_name
         host = config.host
 
         # Create resource prefix
         resource_prefix = (
-            f"{service_name}-{stack_info.env_suffix}-mediaconvert"
+            f"{service_name}-{env_suffix}-mediaconvert"
             if service_name
-            else f"{stack_info.env_suffix}-mediaconvert"
+            else f"{env_suffix}-mediaconvert"
         )
 
         super().__init__(
@@ -86,7 +84,7 @@ class OLMediaConvert(ComponentResource):
                 queue_name,
                 description=f"{resource_prefix} MediaConvert Queue",
                 name=queue_name,
-                tags=aws_config["tags"],
+                tags=tags,
                 opts=ResourceOptions(parent=self, protect=False),
             )
 
@@ -111,7 +109,7 @@ class OLMediaConvert(ComponentResource):
                     }
                 ),
                 name=role_name,
-                tags=aws_config["tags"],
+                tags=tags,
                 opts=ResourceOptions(parent=self, protect=False),
             )
 
@@ -134,7 +132,7 @@ class OLMediaConvert(ComponentResource):
             self.sns_topic = sns.Topic(
                 topic_name,
                 name=topic_name,
-                tags=aws_config["tags"],
+                tags=tags,
                 opts=ResourceOptions(parent=self, protect=False),
             )
 

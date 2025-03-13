@@ -666,8 +666,8 @@ for domain in ovs_config.get_object("route53_managed_domains"):
     )
 
 ovs_mediaconvert_config = MediaConvertConfig(
-    stack_info=stack_info,
-    aws_config=aws_config,
+    env_suffix=stack_info.env_suffix,
+    tags=aws_config.tags,
     policy_arn=ovs_server_policy.arn,
     host=ovs_config.get("default_domain"),
 )
