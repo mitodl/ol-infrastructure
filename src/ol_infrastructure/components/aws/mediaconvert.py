@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
+ROLE_NAME = "{resource_prefix}-role"
+
 
 class MediaConvertConfig(BaseModel):
     """Configuration for AWS MediaConvert resources"""
@@ -51,26 +53,26 @@ class OLMediaConvert(ComponentResource):
 
         # Create resource prefix
         resource_prefix = (
-            f"{service_name}-{stack_info.env_suffix}"
+            f"{service_name}-{stack_info.env_suffix}-mediaconvert"
             if service_name
-            else stack_info.env_suffix
+            else f"{stack_info.env_suffix}-mediaconvert"
         )
 
         super().__init__(
             "ol:infrastructure:aws:MediaConvert",
-            f"{resource_prefix}-mediaconvert",
+            resource_prefix,
             None,
             opts,
         )
 
         # Create resource names
-        queue_name = f"{resource_prefix}-mediaconvert-queue"
-        role_name = f"{resource_prefix}-mediaconvert-role"
-        topic_name = f"{resource_prefix}-mediaconvert-topic"
-        policy_name = f"{resource_prefix}-mediaconvert-role-policy"
-        subscription_name = f"{resource_prefix}-mediaconvert-topic-subscription"
-        event_rule_name = f"{resource_prefix}-mediaconvert-cloudwatch-eventrule"
-        event_target_name = f"{resource_prefix}-mediaconvert-cloudwatch-eventtarget"
+        queue_name = f"{resource_prefix}-queue"
+        role_name = ROLE_NAME.format(resource_prefix=resource_prefix)
+        topic_name = f"{resource_prefix}-topic"
+        policy_name = f"{resource_prefix}-role-policy"
+        subscription_name = f"{resource_prefix}-topic-subscription"
+        event_rule_name = f"{resource_prefix}-cloudwatch-eventrule"
+        event_target_name = f"{resource_prefix}-cloudwatch-eventtarget"
 
         # Check if queue exists
         try:
@@ -235,7 +237,7 @@ class OLMediaConvert(ComponentResource):
                 "Action": "iam:PassRole",
                 "Resource": (
                     f"arn:aws:iam::{account_id}:role/"
-                    f"{resource_prefix}-mediaconvert-service-role"
+                    f"{ROLE_NAME.format(resource_prefix=resource_prefix)}"
                 ),
             },
         ]
