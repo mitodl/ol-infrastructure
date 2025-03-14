@@ -92,11 +92,12 @@ parliament_config = {
         "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
     },
     "UNKNOWN_ACTION": {"ignore_locations": []},
+    "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []},
 }
 
 # Get the standard MediaConvert policy statements
 mediaconvert_policy_statements = OLMediaConvert.get_standard_policy_statements(
-    stack_info.env_suffix, aws_account.id
+    stack_info.env_suffix, service_name="odl-video"
 )
 
 ovs_server_policy_document = {
@@ -666,32 +667,6 @@ else:
 
 domains_string = ",".join(ovs_config.get_object("domains"))
 
-consul_keys = {
-    "ovs/database_endpoint": db_address,
-    "ovs/default_domain": ovs_config.get("default_domain"),
-    "ovs/domains": domains_string,
-    "ovs/edx_base_url": ovs_config.get("edx_base_url"),
-    "ovs/environment": stack_info.env_suffix,
-    "ovs/log_level": ovs_config.get("log_level"),
-    "ovs/nginx_config_file_path": nginx_config_file_path,
-    "ovs/redis_cluster_address": ovs_server_redis_cluster.address,
-    "ovs/redis_max_connections": redis_config.get("max_connections") or 65000,
-    "ovs/s3_bucket_name": ovs_config.get("s3_bucket_name"),
-    "ovs/s3_subtitle_bucket_name": ovs_config.get("s3_subtitle_bucket_name"),
-    "ovs/s3_thumbnail_bucket_name": ovs_config.get("s3_thumbnail_bucket_name"),
-    "ovs/s3_transcode_bucket_name": ovs_config.get("s3_transcode_bucket_name"),
-    "ovs/s3_watch_bucket_name": ovs_config.get("s3_watch_bucket_name"),
-    "ovs/use_shibboleth": "True" if use_shibboleth else "False",  # Yes, quoted booleans
-    "ovs/feature_annotations": (
-        "True" if enabled_annotations else "False"
-    ),  # Yes, quoted booleans
-}
-consul.Keys(
-    "ovs-server-configuration-data",
-    keys=consul_key_helper(consul_keys),
-    opts=consul_provider,
-)
-
 # Create Route53 DNS records
 five_minutes = 60 * 5
 for domain in ovs_config.get_object("route53_managed_domains"):
@@ -705,6 +680,7 @@ for domain in ovs_config.get_object("route53_managed_domains"):
     )
 
 ovs_mediaconvert_config = MediaConvertConfig(
+    service_name="odl-video",
     env_suffix=stack_info.env_suffix,
     tags=aws_config.tags,
     policy_arn=ovs_server_policy.arn,
@@ -713,11 +689,25 @@ ovs_mediaconvert_config = MediaConvertConfig(
 
 ovs_mediaconvert = OLMediaConvert(ovs_mediaconvert_config)
 
-# Add the SNS Topic ARN to consul keys
 consul_keys = {
+    "ovs/database_endpoint": db_address,
+    "ovs/default_domain": ovs_config.get("default_domain"),
+    "ovs/domains": domains_string,
+    "ovs/edx_base_url": ovs_config.get("edx_base_url"),
+    "ovs/environment": stack_info.env_suffix,
+    "ovs/feature_annotations": ("True" if enabled_annotations else "False"),
+    "ovs/log_level": ovs_config.get("log_level"),
     "ovs/mediaconvert_sns_topic_arn": ovs_mediaconvert.sns_topic.arn,
+    "ovs/nginx_config_file_path": nginx_config_file_path,
+    "ovs/redis_cluster_address": ovs_server_redis_cluster.address,
+    "ovs/redis_max_connections": redis_config.get("max_connections") or 65000,
+    "ovs/s3_bucket_name": ovs_config.get("s3_bucket_name"),
+    "ovs/s3_subtitle_bucket_name": ovs_config.get("s3_subtitle_bucket_name"),
+    "ovs/s3_thumbnail_bucket_name": ovs_config.get("s3_thumbnail_bucket_name"),
+    "ovs/s3_transcode_bucket_name": ovs_config.get("s3_transcode_bucket_name"),
+    "ovs/s3_watch_bucket_name": ovs_config.get("s3_watch_bucket_name"),
+    "ovs/use_shibboleth": "True" if use_shibboleth else "False",
 }
-
 consul.Keys(
     "ovs-server-configuration-data",
     keys=consul_key_helper(consul_keys),
