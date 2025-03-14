@@ -112,6 +112,45 @@ ovs_server_policy_document = {
                 "arn:aws:s3:::ttv_static/*",
             ],
         },
+        {
+            "Action": [
+                "elastictranscoder:CancelJob",
+                "elastictranscoder:ReadJob",
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:job/*"
+            ],
+        },
+        {
+            "Action": [
+                "elastictranscoder:ListJobsByPipeline",
+                "elastictranscoder:ReadPipeline",
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:pipeline/{secrets['misc']['et_pipeline_id']}"
+            ],
+        },
+        {
+            "Action": [
+                "elastictranscoder:CreateJob",
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:preset/*",
+                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:pipeline/{secrets['misc']['et_pipeline_id']}",
+            ],
+        },
+        {
+            "Action": [
+                "elastictranscoder:ReadPreset",
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                f"arn:aws:elastictranscoder:{aws_config.region}:{aws_account.id}:preset/*",
+            ],
+        },
         # This block against odl-video-service* buckets is REQUIRED
         # App does not work without it?????
         # TODO MAD 20221115 Why is it required?  # noqa: FIX002, TD002, TD003, TD004
