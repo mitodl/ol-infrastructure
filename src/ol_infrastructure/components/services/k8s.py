@@ -56,11 +56,11 @@ class OLApplicationK8sConfiguration(BaseModel):
     init_collectstatic: bool = Field(default=True)
 
     @field_validator("application_security_group_id")
-    def validate_sec_group_id(self, application_security_group_id: Output[str]):
+    def validate_sec_group_id(application_security_group_id: Output[str]):  # noqa: N805
         return Output.from_input(application_security_group_id)
 
     @field_validator("application_security_group_name")
-    def validate_sec_group_name(self, application_security_group_name: Output[str]):
+    def validate_sec_group_name(application_security_group_name: Output[str]):  # noqa: N805
         return Output.from_input(application_security_group_name)
 
 
