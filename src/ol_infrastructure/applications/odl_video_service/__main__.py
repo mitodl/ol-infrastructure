@@ -32,6 +32,10 @@ from ol_infrastructure.components.aws.auto_scale_group import (
 )
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.mediaconvert import (
+    MediaConvertConfig,
+    OLMediaConvert,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
@@ -89,6 +93,11 @@ parliament_config = {
     },
     "UNKNOWN_ACTION": {"ignore_locations": []},
 }
+
+# Get the standard MediaConvert policy statements
+mediaconvert_policy_statements = OLMediaConvert.get_standard_policy_statements(
+    stack_info.env_suffix, aws_account.id
+)
 
 ovs_server_policy_document = {
     "Version": IAM_POLICY_VERSION,
@@ -169,7 +178,6 @@ ovs_server_policy_document = {
             "Action": ["sns:ListSubscriptionsByTopic", "sns:Publish"],
             "Effect": "Allow",
             "Resource": [
-                # This sns topic isn't managed by pulumi - MAD 20221115
                 f"arn:aws:sns:{aws_config.region}:{aws_account.id}:odl-video-service"
             ],
         },
@@ -225,6 +233,8 @@ ovs_server_policy_document = {
                 f"arn:aws:s3:::{ovs_config.get('s3_watch_bucket_name')}/*",
             ],
         },
+        # Include standard MediaConvert policy statements
+        *mediaconvert_policy_statements,
     ],
 }
 ovs_server_policy = iam.Policy(
@@ -694,11 +704,32 @@ for domain in ovs_config.get_object("route53_managed_domains"):
         zone_id=mitodl_zone_id,
     )
 
-# TODO MD 20221011 revisit this, probably need to export more things  # noqa: E501, FIX002, TD002, TD003, TD004
+ovs_mediaconvert_config = MediaConvertConfig(
+    env_suffix=stack_info.env_suffix,
+    tags=aws_config.tags,
+    policy_arn=ovs_server_policy.arn,
+    host=ovs_config.get("default_domain"),
+)
+
+ovs_mediaconvert = OLMediaConvert(ovs_mediaconvert_config)
+
+# Add the SNS Topic ARN to consul keys
+consul_keys = {
+    "ovs/mediaconvert_sns_topic_arn": ovs_mediaconvert.sns_topic.arn,
+}
+
+consul.Keys(
+    "ovs-server-configuration-data",
+    keys=consul_key_helper(consul_keys),
+    opts=consul_provider,
+)
+
+# Add the resources to the export
 export(
     "odl_video_service",
     {
         "rds_host": db_address,
         "redis_cluster": ovs_server_redis_cluster.address,
+        "mediaconvert_queue": ovs_mediaconvert.queue.id,
     },
 )

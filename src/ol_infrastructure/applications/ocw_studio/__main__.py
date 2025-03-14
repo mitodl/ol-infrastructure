@@ -13,11 +13,15 @@ import pulumi_github as github
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
 from pulumi import Config, InvokeOptions, ResourceOptions, StackReference, export
-from pulumi_aws import cloudwatch, ec2, iam, mediaconvert, s3, sns
+from pulumi_aws import ec2, get_caller_identity, iam, s3
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.mediaconvert import (
+    MediaConvertConfig,
+    OLMediaConvert,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultPostgresDatabaseConfig,
@@ -52,6 +56,9 @@ aws_config = AWSBase(
 )
 heroku_config = Config("heroku")
 heroku_app_config = Config("heroku_app")
+
+# AWS Account Information
+aws_account = get_caller_identity()
 
 # Create S3 buckets
 
@@ -114,6 +121,11 @@ s3.BucketPolicy(
     ),
 )
 
+# Get the standard MediaConvert policy statements
+mediaconvert_policy_statements = OLMediaConvert.get_standard_policy_statements(
+    stack_info.env_suffix,
+    aws_account.id,
+)
 
 ocw_studio_iam_policy = iam.Policy(
     f"ocw-studio-{stack_info.env_suffix}-policy",
@@ -162,31 +174,6 @@ ocw_studio_iam_policy = iam.Policy(
                     "Action": ["execute-api:Invoke", "execute-api:ManageConnections"],
                     "Resource": "arn:aws:execute-api:*:*:*",
                 },
-                {
-                    "Effect": "Allow",
-                    "Action": [
-                        "mediaconvert:ListQueues",
-                        "mediaconvert:DescribeEndpoints",
-                        "mediaconvert:ListPresets",
-                        "mediaconvert:CreatePreset",
-                        "mediaconvert:DisassociateCertificate",
-                        "mediaconvert:CreateQueue",
-                        "mediaconvert:AssociateCertificate",
-                        "mediaconvert:CreateJob",
-                        "mediaconvert:ListJobTemplates",
-                    ],
-                    "Resource": "*",
-                },
-                {
-                    "Effect": "Allow",
-                    "Action": "mediaconvert:GetJob",
-                    "Resource": "arn:*:mediaconvert:*:*:jobs/*",
-                },
-                {
-                    "Effect": "Allow",
-                    "Action": "iam:PassRole",
-                    "Resource": f"arn:aws:iam::610119931565:role/service-role-mediaconvert-ocw-studio-{stack_info.env_suffix}",
-                },
                 # Temporary permissions until video archives are synced via management
                 # command. TMM 2023-04-19
                 {
@@ -204,6 +191,8 @@ ocw_studio_iam_policy = iam.Policy(
                         f"arn:aws:s3:::ocw-content*{stack_info.env_suffix}/*",
                     ],
                 },
+                # Include standard MediaConvert policy statements
+                *mediaconvert_policy_statements,
             ],
         },
         stringify=True,
@@ -216,27 +205,6 @@ ocw_studio_iam_policy = iam.Policy(
     ),
 )
 
-ocw_studio_mediaconvert_role = iam.Role(
-    "ocw-studio-mediaconvert-role",
-    assume_role_policy=json.dumps(
-        {
-            "Version": "2012-10-17",
-            "Statement": {
-                "Effect": "Allow",
-                "Action": "sts:AssumeRole",
-                "Principal": {"Service": "mediaconvert.amazonaws.com"},
-            },
-        }
-    ),
-    name=f"service-role-mediaconvert-ocw-studio-{stack_info.env_suffix}",
-    tags=aws_config.tags,
-)
-
-iam.RolePolicyAttachment(
-    f"ocw-studio-{stack_info.env_suffix}-mediaconvert-role-policy",
-    policy_arn=ocw_studio_iam_policy.arn,
-    role=ocw_studio_mediaconvert_role.name,
-)
 
 ocw_studio_vault_backend_role = vault.aws.SecretBackendRole(
     f"ocw-studio-app-{stack_info.env_suffix}",
@@ -349,57 +317,20 @@ ocw_starter_webhook = github.RepositoryWebhook(
 )
 
 # Setup AWS MediaConvert Queue
-ocw_studio_mediaconvert_queue = mediaconvert.Queue(
-    "ocw-studio-mediaconvert-queue",
-    description="OCW Studio Queue",
-    name=f"ocw-studio-mediaconvert-queue-{stack_info.env_suffix}",
+ocw_studio_mediaconvert_config = MediaConvertConfig(
+    env_suffix=stack_info.env_suffix,
     tags=aws_config.tags,
+    policy_arn=ocw_studio_iam_policy.arn,
+    host=ocw_studio_config.require("app_domain"),
 )
 
-# Configure SNS Topic and Subscription
-ocw_studio_sns_topic = sns.Topic(
-    f"ocw-studio-{stack_info.env_suffix}-sns-topic", tags=aws_config.tags
-)
-
-ocw_studio_sns_topic_subscription = sns.TopicSubscription(
-    "ocw-studio-sns-topic-subscription",
-    endpoint="https://{}/api/transcode-jobs/".format(
-        ocw_studio_config.require("app_domain")
-    ),
-    protocol="https",
-    raw_message_delivery=True,
-    topic=ocw_studio_sns_topic.arn,
-)
-
-# Configure Cloudwatch EventRule and EventTarget
-ocw_studio_mediaconvert_cloudwatch_rule = cloudwatch.EventRule(
-    "ocw-studio-mediaconvert-cloudwatch-eventrule",
-    description="Capture MediaConvert Events for use with OCW Studio",
-    event_pattern=json.dumps(
-        {
-            "source": ["aws.mediaconvert"],
-            "detail-type": ["MediaConvert Job State Change"],
-            "detail": {
-                "userMetadata": {
-                    "filter": [f"ocw-studio-mediaconvert-queue-{stack_info.env_suffix}"]
-                },
-                "status": ["COMPLETE", "ERROR"],
-            },
-        }
-    ),
-)
-
-ocw_studio_mediaconvert_cloudwatch_target = cloudwatch.EventTarget(
-    "ocw-studio-mediaconvert-cloudwatch-eventtarget",
-    rule=ocw_studio_mediaconvert_cloudwatch_rule.name,
-    arn=ocw_studio_sns_topic.arn,
-)
+ocw_studio_mediaconvert = OLMediaConvert(ocw_studio_mediaconvert_config)
 
 env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 
 heroku_vars = {
     "ALLOWED_HOSTS": '["*"]',
-    "AWS_ACCOUNT_ID": "610119931565",
+    "AWS_ACCOUNT_ID": aws_account.id,
     "AWS_ARTIFACTS_BUCKET_NAME": "ol-eng-artifacts",
     "AWS_MAX_CONCURRENT_CONNECTIONS": 100,
     "AWS_OFFLINE_PREVIEW_BUCKET_NAME": f"ocw-content-offline-draft-{stack_info.env_suffix}",
@@ -408,7 +339,7 @@ heroku_vars = {
     "AWS_PREVIEW_BUCKET_NAME": f"ocw-content-draft-{stack_info.env_suffix}",
     "AWS_PUBLISH_BUCKET_NAME": f"ocw-content-live-{stack_info.env_suffix}",
     "AWS_REGION": "us-east-1",
-    "AWS_ROLE_NAME": f"service-role-mediaconvert-ocw-studio-{stack_info.env_suffix}",
+    "AWS_ROLE_NAME": ocw_studio_mediaconvert.role.name,
     "AWS_STORAGE_BUCKET_NAME": f"ol-ocw-studio-app-{stack_info.env_suffix}",
     "AWS_TEST_BUCKET_NAME": f"ocw-content-test-{stack_info.env_suffix}",
     "CONCOURSE_USERNAME": "oldevops",
@@ -532,6 +463,6 @@ export(
     "ocw_studio_app",
     {
         "rds_host": ocw_studio_db.db_instance.address,
-        "mediaconvert_queue": ocw_studio_mediaconvert_queue.id,
+        "mediaconvert_queue": ocw_studio_mediaconvert.queue.id,
     },
 )
