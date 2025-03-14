@@ -8,14 +8,29 @@ from pathlib import Path
 from typing import Optional
 
 import pulumi_kubernetes as kubernetes
-from pulumi import ComponentResource, ResourceOptions
-from pydantic import BaseModel, Field
+from pulumi import ComponentResource, Output, ResourceOptions, debug
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from bridge.lib.magic_numbers import DEFAULT_NGINX_PORT, DEFAULT_UWSGI_PORT
+from bridge.lib.magic_numbers import (
+    DEFAULT_NGINX_PORT,
+    DEFAULT_UWSGI_PORT,
+    MAXIMUM_K8S_NAME_LENGTH,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
+def truncate_k8s_metanames(name: str) -> str:
+    """
+    Sanitize the names we use for k8s objects
+    """
+    truncated_name = name[:MAXIMUM_K8S_NAME_LENGTH].rstrip("-_.")
+    debug(f"moof: {truncated_name=}")
+    return truncated_name
+
+
 class OLApplicationK8sConfiguration(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     project_root: Path
     application_config: dict[str, str]
     application_name: str
@@ -26,17 +41,27 @@ class OLApplicationK8sConfiguration(BaseModel):
     db_creds_secret_name: str
     redis_creds_secret_name: str
     static_secrets_name: str
-    application_security_group_id: str
-    application_security_group_name: str
+    application_security_group_id: Output[str]
+    application_security_group_name: Output[str]
     application_docker_tag: str | None
     vault_k8s_resource_auth_name: str
     import_nginx_config: bool
-    resource_limits: dict[str, str] = Field(default={"cpu": "250m", "memory": "300Mi"})
     resource_requests: dict[str, str] = Field(
+        default={"cpu": "250m", "memory": "300Mi"}
+    )
+    resource_limits: dict[str, str] = Field(
         default={"cpu": "500m", "memory": "600Mi"},
     )
     init_migrations: bool = Field(default=True)
     init_collectstatic: bool = Field(default=True)
+
+    @field_validator("application_security_group_id")
+    def validate_sec_group_id(self, application_security_group_id: Output[str]):
+        return Output.from_input(application_security_group_id)
+
+    @field_validator("application_security_group_name")
+    def validate_sec_group_name(self, application_security_group_name: Output[str]):
+        return Output.from_input(application_security_group_name)
 
 
 stack_info = parse_stack()
@@ -64,6 +89,12 @@ class OLApplicationK8s(ComponentResource):
         )
         resource_options = ResourceOptions(parent=self).merge(opts)
         self.ol_app_k8s_config: OLApplicationK8sConfiguration = ol_app_k8s_config
+        self.application_lb_service_name: str = (
+            self.ol_app_k8s_config.application_lb_service_name
+        )
+        self.application_lb_service_port_name: str = (
+            self.ol_app_k8s_config.application_lb_service_port_name
+        )
 
         if ol_app_k8s_config.import_nginx_config:
             application_nginx_configmap = kubernetes.core.v1.ConfigMap(
@@ -150,14 +181,18 @@ class OLApplicationK8s(ComponentResource):
 
         # Create a deployment resource to manage the application pods
         application_labels = self.ol_app_k8s_config.k8s_global_labels | {
-            "ol.mit.edu/application": f"{self.ol_app_k8s_config.application_name}-application",
-            "ol.mit.edu/pod-security-group": self.ol_app_k8s_config.application_security_group_name,
+            "ol.mit.edu/application": f"{self.ol_app_k8s_config.application_name}-application",  # noqa: E501
+            "ol.mit.edu/pod-security-group": self.ol_app_k8s_config.application_security_group_name.apply(  # noqa: E501
+                truncate_k8s_metanames
+            ),
         }
 
         _application_deployment = kubernetes.apps.v1.Deployment(
             f"{self.ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-deployment",
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name=f"{self.ol_app_k8s_config.application_name}-app",
+                name=truncate_k8s_metanames(
+                    f"{self.ol_app_k8s_config.application_name}-app"
+                ),
                 namespace=self.ol_app_k8s_config.application_namespace,
                 labels=application_labels,
             ),
@@ -263,7 +298,9 @@ class OLApplicationK8s(ComponentResource):
         _application_service = kubernetes.core.v1.Service(
             f"{self.ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-service",
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name=self.ol_app_k8s_config.application_lb_service_name,
+                name=truncate_k8s_metanames(
+                    self.ol_app_k8s_config.application_lb_service_name
+                ),
                 namespace=self.ol_app_k8s_config.application_namespace,
                 labels=self.ol_app_k8s_config.k8s_global_labels,
             ),
@@ -288,14 +325,18 @@ class OLApplicationK8s(ComponentResource):
                 api_version="vpcresources.k8s.aws/v1beta1",
                 kind="SecurityGroupPolicy",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    name=self.ol_app_k8s_config.application_security_group_name,
+                    name=self.ol_app_k8s_config.application_security_group_name.apply(
+                        truncate_k8s_metanames
+                    ),
                     namespace=self.ol_app_k8s_config.application_namespace,
                     labels=self.ol_app_k8s_config.k8s_global_labels,
                 ),
                 spec={
                     "podSelector": {
                         "matchLabels": {
-                            "ol.mit.edu/pod-security-group": self.ol_app_k8s_config.application_security_group_name
+                            "ol.mit.edu/pod-security-group": self.ol_app_k8s_config.application_security_group_name.apply(  # noqa: E501
+                                truncate_k8s_metanames
+                            ),
                         },
                     },
                     "securityGroups": {

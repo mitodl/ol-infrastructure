@@ -689,8 +689,8 @@ ecommerce_k8s_config: OLApplicationK8sConfiguration = OLApplicationK8sConfigurat
     db_creds_secret_name=db_creds_secret_name,
     redis_creds_secret_name=redis_creds_secret_name,
     static_secrets_name=static_secrets_name,
-    application_security_group_id=str(ecommerce_application_security_group.id),
-    application_security_group_name=str(ecommerce_application_security_group.name),
+    application_security_group_id=ecommerce_application_security_group.id,
+    application_security_group_name=ecommerce_application_security_group.name,
     application_docker_tag=ECOMMERCE_DOCKER_TAG,
     vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
     import_nginx_config=True,
@@ -810,8 +810,8 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 "plugin_config_name": shared_plugin_config_name,
                 "backends": [
                     {
-                        "serviceName": ol_k8s_application.ol_app_k8s_config.application_lb_service_name,  # noqa: E501
-                        "servicePort": ol_k8s_application.ol_app_k8s_config.application_lb_service_port_name,  # noqa: E501
+                        "serviceName": ol_k8s_application.application_lb_service_name,
+                        "servicePort": ol_k8s_application.application_lb_service_port_name,  # noqa: E501
                     }
                 ],
             },
@@ -855,8 +855,8 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 },
                 "backends": [
                     {
-                        "serviceName": ol_k8s_application.ol_app_k8s_config.application_lb_service_name,  # noqa: E501
-                        "servicePort": ol_k8s_application.ol_app_k8s_config.application_lb_service_port_name,  # noqa: E501
+                        "serviceName": ol_k8s_application.application_lb_service_name,
+                        "servicePort": ol_k8s_application.application_lb_service_port_name,  # noqa: E501
                     }
                 ],
             },
@@ -883,8 +883,8 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 },
                 "backends": [
                     {
-                        "serviceName": ol_k8s_application.ol_app_k8s_config.application_lb_service_name,  # noqa: E501
-                        "servicePort": ol_k8s_application.ol_app_k8s_config.application_lb_service_port_name,  # noqa: E501
+                        "serviceName": ol_k8s_application.application_lb_service_name,
+                        "servicePort": ol_k8s_application.application_lb_service_port_name,  # noqa: E501
                     }
                 ],
             },
