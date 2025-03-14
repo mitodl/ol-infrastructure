@@ -916,7 +916,7 @@ base_oidc_plugin_config = {
     "introspection_endpoint_auth_method": "client_secret_basic",
     "ssl_verify": False,
     "logout_path": "/logout/oidc",
-    "post_logout_redirect_uri": f"{mitlearn_config.require('api_domain')}/logout/",
+    "post_logout_redirect_uri": f"https://{mitlearn_config.require('api_domain')}/logout/",
 }
 
 shared_plugin_config_name = "shared-plugin-config"
