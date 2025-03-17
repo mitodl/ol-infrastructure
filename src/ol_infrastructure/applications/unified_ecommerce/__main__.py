@@ -59,7 +59,7 @@ from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -97,15 +97,13 @@ consul_provider = get_consul_provider(stack_info)
 setup_vault_provider(stack_info)
 k8s_global_labels = {
     "ol.mit.edu/stack": stack_info.full_name,
-    "ol.mit.edu/service": "unified-ecommerce",
+    "ol.mit.edu/service": Apps.ecommerce,
 }
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
-# Fail hard if ECOMMERCE_DOCKER_TAG isn't set
-if "ECOMMERCE_DOCKER_TAG" not in os.environ:
+if not (ECOMMERCE_DOCKER_TAG := os.getenv("ECOMMERCE_DOCKER_TAG")):
     msg = "ECOMMERCE_DOCKER_TAG must be set"
     raise OSError(msg)
-ECOMMERCE_DOCKER_TAG = os.getenv("ECOMMERCE_DOCKER_TAG")
 
 consul_security_groups = consul_stack.require_output("security_groups")
 aws_account = get_caller_identity()
@@ -681,7 +679,7 @@ static_secrets = OLVaultK8SSecret(
 ecommerce_k8s_config: OLApplicationK8sConfiguration = OLApplicationK8sConfiguration(
     project_root=Path(__file__).parent,
     application_config=ecommerce_config.require_object("env_vars"),
-    application_name="ecommerce",
+    application_name=Apps.ecommerce,
     application_namespace=ecommerce_namespace,
     application_lb_service_name="ecommerce",
     application_lb_service_port_name="http",
@@ -691,6 +689,7 @@ ecommerce_k8s_config: OLApplicationK8sConfiguration = OLApplicationK8sConfigurat
     static_secrets_name=static_secrets_name,
     application_security_group_id=ecommerce_application_security_group.id,
     application_security_group_name=ecommerce_application_security_group.name,
+    application_image_repository="mitodl/unified-ecommerce-app-main",
     application_docker_tag=ECOMMERCE_DOCKER_TAG,
     vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
     import_nginx_config=True,

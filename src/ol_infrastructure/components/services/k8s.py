@@ -41,7 +41,8 @@ class OLApplicationK8sConfiguration(BaseModel):
     static_secrets_name: str
     application_security_group_id: Output[str]
     application_security_group_name: Output[str]
-    application_docker_tag: str | None
+    application_image_repository: str
+    application_docker_tag: str
     vault_k8s_resource_auth_name: str
     import_nginx_config: bool
     resource_requests: dict[str, str] = Field(
@@ -144,13 +145,14 @@ class OLApplicationK8s(ComponentResource):
             ),
         ]
 
+        app_image = f"{ol_app_k8s_config.application_image_repository}:{ol_app_k8s_config.application_docker_tag}"  # noqa: E501
         init_containers = []
         if ol_app_k8s_config.init_collectstatic:
             init_containers.append(
                 # Run database migrations at startup
                 kubernetes.core.v1.ContainerArgs(
                     name="migrate",
-                    image=f"mitodl/{ol_app_k8s_config.application_name}-application-app-main:{ol_app_k8s_config.application_docker_tag}",
+                    image=app_image,
                     command=["python3", "manage.py", "migrate", "--noinput"],
                     image_pull_policy="IfNotPresent",
                     env=application_deployment_env_vars,
@@ -162,7 +164,7 @@ class OLApplicationK8s(ComponentResource):
             init_containers.append(
                 kubernetes.core.v1.ContainerArgs(
                     name="collectstatic",
-                    image=f"mitodl/{ol_app_k8s_config.application_name}-application-app-main:{ol_app_k8s_config.application_docker_tag}",
+                    image=app_image,
                     command=["python3", "manage.py", "collectstatic", "--noinput"],
                     image_pull_policy="IfNotPresent",
                     env=application_deployment_env_vars,
@@ -264,7 +266,7 @@ class OLApplicationK8s(ComponentResource):
                             # Actual application run with uwsgi
                             kubernetes.core.v1.ContainerArgs(
                                 name=f"{ol_app_k8s_config.application_name}-app",
-                                image=f"mitodl/{ol_app_k8s_config.application_name}-application-app-main:{ol_app_k8s_config.application_docker_tag}",
+                                image=app_image,
                                 ports=[
                                     kubernetes.core.v1.ContainerPortArgs(
                                         container_port=DEFAULT_UWSGI_PORT
@@ -305,7 +307,7 @@ class OLApplicationK8s(ComponentResource):
                 selector=application_labels,
                 ports=[
                     kubernetes.core.v1.ServicePortArgs(
-                        name=ol_app_k8s_config.application_lb_service_name,
+                        name=ol_app_k8s_config.application_lb_service_port_name,
                         port=DEFAULT_NGINX_PORT,
                         target_port=DEFAULT_NGINX_PORT,
                         protocol="TCP",
