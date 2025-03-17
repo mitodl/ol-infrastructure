@@ -194,7 +194,6 @@ class OLMediaConvert(ComponentResource):
 
         Args:
             stack_info: Stack information including environment details
-            account_id: AWS account ID where the role exists
             service_name: Name of the service using MediaConvert
                 (e.g., 'ovs', 'ocw-studio')
 
