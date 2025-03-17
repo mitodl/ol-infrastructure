@@ -361,6 +361,9 @@ alloy_env_vars_static_secret_config = OLVaultK8SStaticSecretConfig(
         "GRAFANA_CLOUD_LOKI_URL": '{{ get .Secrets "loki_endpoint" }}',
         "GRAFANA_CLOUD_LOKI_PASSWORD": '{{ get .Secrets "loki_api_key" }}',
         "GRAFANA_CLOUD_LOKI_USERNAME": '{{ get .Secrets "loki_user_id" }}',
+        "GRAFANA_CLOUD_TEMPO_URL": '{{ get .Secrets "tempo_endpoint" }}',
+        "GRAFANA_CLOUD_TEMPO_PASSWORD": '{{ get .Secrets "tempo_api_key" }}',
+        "GRAFANA_CLOUD_TEMPO_USERNAME": '{{ get .Secrets "tempo_user_id" }}',
     },
     refresh_after="1m",
     vaultauth=operations_vault_k8s_resources.auth_name,
@@ -538,6 +541,39 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
                   password = env("GRAFANA_CLOUD_LOKI_PASSWORD")
                 }}
               }}
+            }}
+
+            // OpenTelemetry trace collection
+            otelcol.receiver.otlp "kubernetes_traces" {{
+              grpc {{
+                endpoint = "0.0.0.0:4317"
+              }}
+
+              http {{
+                endpoint = "0.0.0.0:4318"
+              }}
+
+              output {{
+                traces = [otelcol.processor.batch.kubernetes_traces.input]
+              }}
+            }}
+
+            otelcol.processor.batch "kubernetes_traces" {{
+              output {{
+                traces = [otelcol.exporter.otlp.grafana_cloud_traces.input]
+              }}
+            }}
+
+            otelcol.exporter.otlp "grafana_cloud_traces" {{
+              client {{
+                endpoint = env("GRAFANA_CLOUD_TEMPO_URL")
+                auth = otelcol.auth.basic.grafana_cloud_traces.handler
+              }}
+            }}
+
+            otelcol.auth.basic "grafana_cloud_traces" {{
+              username = env("GRAFANA_CLOUD_TEMPO_USERNAME")
+              password = env("GRAFANA_CLOUD_TEMPO_PASSWORD")
             }}
             """  # noqa: S608
         )
