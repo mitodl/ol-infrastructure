@@ -1348,7 +1348,7 @@ proxy_rewrite_plugin_config = {
 # All paths prefixed with /ai
 # Host match is only the mit-learn domain
 mit_learn_learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
-    f"learn-ai-{stack_info.env_suffix}-https-apisix-route",
+    f"mit-learn-learn-ai-{stack_info.env_suffix}-https-apisix-route",
     api_version="apisix.apache.org/v2",
     kind="ApisixRoute",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -1373,7 +1373,7 @@ mit_learn_learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     },
                 ],
                 "match": {
-                    "hosts": [learn_ai_api_domain],
+                    "hosts": [learn_api_domain],
                     "paths": [
                         "/ai/*",
                     ],

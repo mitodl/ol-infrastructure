@@ -779,9 +779,9 @@ mit_learn_oidc_secret = OLVaultK8SSecret(
     resource_config=OLVaultK8SStaticSecretConfig(
         name="mit-learn-oidc-static-secrets",
         namespace=ecommerce_namespace,
-        labels=application_labels,
+        labels=k8s_global_labels,
         dest_secret_name=mit_learn_oidc_secret_name,
-        dest_secret_labels=application_labels,
+        dest_secret_labels=k8s_global_labels,
         mount="secret-operations",
         mount_type="kv-v1",
         path="sso/mitlearn",
@@ -973,8 +973,8 @@ mit_learn_ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource
                 "plugin_config_name": shared_plugin_config_name,
                 "backends": [
                     {
-                        "serviceName": ecommerce_service_name,
-                        "servicePort": ecommerce_service_port_name,
+                        "serviceName": ol_k8s_application.application_lb_service_name,
+                        "servicePort": ol_k8s_application.application_lb_service_port_name,  # noqa: E501
                     }
                 ],
             },
@@ -1014,8 +1014,8 @@ mit_learn_ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource
                 },
                 "backends": [
                     {
-                        "serviceName": ecommerce_service_name,
-                        "servicePort": ecommerce_service_port_name,
+                        "serviceName": ol_k8s_application.application_lb_service_name,
+                        "servicePort": ol_k8s_application.application_lb_service_port_name,  # noqa: E501
                     }
                 ],
             },
@@ -1043,8 +1043,8 @@ mit_learn_ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource
                 },
                 "backends": [
                     {
-                        "serviceName": ecommerce_service_name,
-                        "servicePort": ecommerce_service_port_name,
+                        "serviceName": ol_k8s_application.application_lb_service_name,
+                        "servicePort": ol_k8s_application.application_lb_service_port_name,  # noqa: E501
                     }
                 ],
             },
@@ -1052,7 +1052,7 @@ mit_learn_ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource
     },
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=[ecommerce_service],
+        depends_on=[ol_k8s_application],
     ),
 )
 
