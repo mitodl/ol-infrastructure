@@ -910,7 +910,7 @@ mitlearn_https_apisix_tls = kubernetes.apiextensions.CustomResource(
 
 # We need to be able to change `unauth_action` depending on the route but otherwise
 # the settings for the oidc plugin will be unchanged
-base_oidc_plugin_config = {
+legacy_base_oidc_plugin_config = {
     "scope": "openid profile email",
     "bearer_only": False,
     "introspection_endpoint_auth_method": "client_secret_basic",
@@ -1000,7 +1000,8 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                         "name": "openid-connect",
                         "enable": True,
                         "secretRef": oidc_secret_name,
-                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
+                        "config": legacy_base_oidc_plugin_config
+                        | {"unauth_action": "pass"},
                     },
                 ],
                 "match": {
@@ -1054,7 +1055,8 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                         "name": "openid-connect",
                         "enable": True,
                         "secretRef": oidc_secret_name,
-                        "config": base_oidc_plugin_config | {"unauth_action": "auth"},
+                        "config": legacy_base_oidc_plugin_config
+                        | {"unauth_action": "auth"},
                     },
                 ],
                 "match": {
@@ -1094,6 +1096,15 @@ proxy_rewrite_plugin_config = {
             "/$1",
         ],
     },
+}
+
+base_oidc_plugin_config = {
+    "scope": "openid profile email",
+    "bearer_only": False,
+    "introspection_endpoint_auth_method": "client_secret_basic",
+    "ssl_verify": False,
+    "logout_path": "/learn/logout/",
+    "post_logout_redirect_uri": "/learn/django_logout/",
 }
 # New ApisixRoute object
 # All paths prefixed with /learn
