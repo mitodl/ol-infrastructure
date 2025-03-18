@@ -46,7 +46,7 @@ dev = [
     "pre-commit>=4.0.0,<5",
     "pytest>=8.0.0,<9",
     "pytest-testinfra>=10.0.0,<11",
-    "ruff>=0,<1",
+    "ruff>=0.11,<1",
 ]
 
 [tool.hatch.build.targets.sdist]
@@ -110,6 +110,7 @@ lint.select = [
     "CPY",  # flake8-copyright
     "D",  # pydocstyle
     # "DJ",  # flake8-django
+    "DOC",  # pydoclint
     "DTZ",  # flake8-datetimez
     "E",  # Pycodestyle Error
     "EM",  # flake8-errmsg
