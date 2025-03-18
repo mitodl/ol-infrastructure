@@ -83,5 +83,5 @@ config:
   mitlearn:heroku_domain: "shrouded-brook-krg88s8bvcdg6kgrdjrsrmbq.herokudns.com"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
-  mitlearn:learn_ai_recommendation_endpoint: "https://api-learn-ai-qa.ol.mit.edu/http/recommendation_agent/"
-  mitlearn:learn_ai_syllabus_endpoint: "https://api-learn-ai-qa.ol.mit.edu/http/syllabus_agent/"
+  mitlearn:learn_ai_recommendation_endpoint: "https://api.rc.learn.mit.edu/ai/http/recommendation_agent/"
+  mitlearn:learn_ai_syllabus_endpoint: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
