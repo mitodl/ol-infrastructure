@@ -1108,7 +1108,6 @@ base_oidc_plugin_config = {
 }
 # New ApisixRoute object
 # All paths prefixed with /learn
-mit_learn_api_domain = mitlearn_config.require("api_domain")
 learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
     f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}-new",
     api_version="apisix.apache.org/v2",
@@ -1495,6 +1494,13 @@ env_var_suffix = "RC" if stack_info.env_suffix == "qa" else "PROD"
 
 gh_repo = github.get_repository(
     full_name="mitodl/mit-learn", opts=InvokeOptions(provider=github_provider)
+)
+gh_workflow_api_base_env_var = github.ActionsVariable(
+    f"ol_mitopen_gh_workflow_api_base_env_var-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"API_BASE_{env_var_suffix}",
+    value=f"https://{mit_learn_api_domain}/learn",
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_accesskey_id_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_accesskey_id_env_secret-{stack_info.env_suffix}",

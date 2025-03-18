@@ -1133,8 +1133,7 @@ gh_workflow_api_base_env_var = github.ActionsVariable(
     f"unified-ecommerce-gh-workflow-api-base-env-variable-{stack_info.env_suffix}",
     repository=gh_repo.name,
     variable_name=f"API_BASE_{env_var_suffix}",  # pragma: allowlist secret
-    # SWITCHOVER : Update to learn_api_domain
-    value=f"https://{ecommerce_api_domain}",
+    value=f"https://{learn_api_domain}/commerce",
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
