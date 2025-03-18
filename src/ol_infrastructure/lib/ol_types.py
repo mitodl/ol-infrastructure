@@ -61,6 +61,8 @@ class Apps(str, Enum):
     odl_video_service = "ovs"
     redash = "redash"
     xpro = "xpro"
+    ecommerce = "unified-ecommerce"
+    mit_learn = "mit-learn"
 
 
 class AWSBase(BaseModel):
