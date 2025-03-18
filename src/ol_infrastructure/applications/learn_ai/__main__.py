@@ -1062,6 +1062,7 @@ learn_ai_pod_security_group_policy = (
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_plugin_config/
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_pluginconfig_v2/
 
+# LEGACY RETIREMENT : goes away
 # Load open-id-connect secrets into a k8s secret via VSO
 oidc_secret_name = "oidc-secrets"  # pragma: allowlist secret  # noqa: S105
 oidc_secret = OLVaultK8SSecret(
@@ -1090,8 +1091,38 @@ oidc_secret = OLVaultK8SSecret(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
-        parent=vault_k8s_resources,
-        depends_on=[learn_ai_static_vault_secrets],
+    ),
+)
+
+mit_learn_oidc_secret_name = (
+    "mit-learn-oidc-secrets"  # pragma: allowlist secret # noqa: S105
+)
+mit_learn_oidc_secret = OLVaultK8SSecret(
+    f"ol-mitlearn-oidc-secrets-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="mit-learn-oidc-static-secrets",
+        namespace=learn_ai_namespace,
+        labels=application_labels,
+        dest_secret_name=mit_learn_oidc_secret_name,
+        dest_secret_labels=application_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/mitlearn",
+        excludes=[".*"],
+        exclude_raw=True,
+        # Refresh frequently because substructure keycloak stack could change some of these
+        refresh_after="1m",
+        templates={
+            "client_id": '{{ get .Secrets "client_id" }}',
+            "client_secret": '{{ get .Secrets "client_secret" }}',
+            "realm": '{{ get .Secrets "realm_name" }}',
+            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
+            "session.secret": '{{ get .Secrets "secret" }}',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
     ),
 )
 
@@ -1150,6 +1181,7 @@ base_oidc_plugin_config = {
 }
 
 learn_ai_api_domain = learn_ai_config.require("backend_domain")
+learn_api_domain = learn_ai_config.require("learn_backend_domain")
 
 if stack_info.env_suffix != "ci":
     consul_opts = get_consul_provider(stack_info)
@@ -1159,6 +1191,7 @@ if stack_info.env_suffix != "ci":
             consul.KeysKeyArgs(
                 path="edxapp/learn-ai-api-domain",
                 delete=True,
+                # SWITCHOVER : Update to learn_api_domain
                 value=learn_ai_api_domain,
             )
         ],
@@ -1171,6 +1204,7 @@ if stack_info.env_suffix != "ci":
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_route_v2/
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/
+# LEGACY RETIREMENT : goes away
 learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
     f"learn-ai-{stack_info.env_suffix}-https-apisix-route",
     api_version="apisix.apache.org/v2",
@@ -1249,7 +1283,7 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 ],
                 "match": {
                     "hosts": [
-                        learn_ai_config.require("backend_domain"),
+                        learn_ai_api_domain,
                     ],
                     "paths": [
                         "/admin/login/*",
@@ -1279,7 +1313,7 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 ],
                 "match": {
                     "hosts": [
-                        learn_ai_config.require("backend_domain"),
+                        learn_ai_api_domain,
                     ],
                     "paths": [
                         "/ws/*",
@@ -1300,8 +1334,158 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
     ),
 )
 
+proxy_rewrite_plugin_config = {
+    "name": "proxy-rewrite",
+    "enable": True,
+    "config": {
+        "regex_uri": [
+            "/ai/(.*)",
+            "/$1",
+        ],
+    },
+}
+# New ApisixRoute object for the learn.mit.edu address
+# All paths prefixed with /ai
+# Host match is only the mit-learn domain
+mit_learn_learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
+    f"mit-learn-learn-ai-{stack_info.env_suffix}-https-apisix-route",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixRoute",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="mit-learn-learn-ai-https",
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "http": [
+            {
+                # Wildcard route that can use auth but doesn't require it
+                "name": "passauth",
+                "priority": 2,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    proxy_rewrite_plugin_config,
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": mit_learn_oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
+                    },
+                ],
+                "match": {
+                    "hosts": [learn_api_domain],
+                    "paths": [
+                        "/ai/*",
+                    ],
+                },
+                "backends": [
+                    {
+                        "serviceName": learn_ai_service_name,
+                        "servicePort": learn_ai_service_port_name,
+                    },
+                ],
+            },
+            {
+                # Strip trailing slash from logout redirect
+                "name": "logout-redirect",
+                "priority": 10,
+                "plugins": [
+                    proxy_rewrite_plugin_config,
+                    {
+                        "name": "redirect",
+                        "enable": True,
+                        "config": {
+                            "uri": "/logout",
+                        },
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        learn_api_domain,
+                    ],
+                    "paths": [
+                        "/ai/logout/*",
+                    ],
+                },
+                "backends": [
+                    {
+                        "serviceName": learn_ai_service_name,
+                        "servicePort": learn_ai_service_port_name,
+                    },
+                ],
+            },
+            {
+                # Routes that require authentication
+                "name": "reqauth",
+                "priority": 10,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    proxy_rewrite_plugin_config,
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": mit_learn_oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "auth"},
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        learn_api_domain,
+                    ],
+                    "paths": [
+                        "/ai/admin/login/*",
+                        "/ai/http/login/",
+                    ],
+                },
+                "backends": [
+                    {
+                        "serviceName": learn_ai_service_name,
+                        "servicePort": learn_ai_service_port_name,
+                    },
+                ],
+            },
+            {
+                # Sepcial handling for websocket URLS.
+                "name": "websocket",
+                "priority": 1,
+                "websocket": True,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    proxy_rewrite_plugin_config,
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": mit_learn_oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        learn_api_domain,
+                    ],
+                    "paths": [
+                        "/ai/ws/*",
+                    ],
+                },
+                "backends": [
+                    {
+                        "serviceName": learn_ai_service_name,
+                        "servicePort": learn_ai_service_port_name,
+                    },
+                ],
+            },
+        ],
+    },
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[learn_ai_service, mit_learn_oidc_secret],
+    ),
+)
+
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_tls_v2/
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
+# LEGACY RETIREMENT : goes away
+# Won't need this because it will exist from the mit-learn namespace
 learn_ai_https_apisix_tls = kubernetes.apiextensions.CustomResource(
     f"learn-ai-{stack_info.env_suffix}-https-apisix-tls",
     api_version="apisix.apache.org/v2",
@@ -1312,7 +1496,7 @@ learn_ai_https_apisix_tls = kubernetes.apiextensions.CustomResource(
         labels=k8s_global_labels,
     ),
     spec={
-        "hosts": [learn_ai_config.require("backend_domain")],
+        "hosts": [learn_ai_api_domain],
         # Use the shared ol-wildcard cert loaded into every cluster
         "secret": {
             "name": "ol-wildcard-cert",
@@ -1374,7 +1558,7 @@ gh_workflow_api_base_env_var = github.ActionsVariable(
     f"learn-ai-gh-workflow-api-base-env-variablet-{stack_info.env_suffix}",
     repository=gh_repo.name,
     variable_name=f"API_BASE_{env_var_suffix}",  # pragma: allowlist secret
-    value=f"https://{learn_ai_config.require('backend_domain')}",
+    value=f"https://{learn_api_domain}/ai",
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 

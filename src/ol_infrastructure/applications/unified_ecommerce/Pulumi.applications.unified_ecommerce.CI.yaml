@@ -5,6 +5,7 @@ config:
   aws:region: us-east-1
   consul:address: https://consul-apps-ci.odl.mit.edu
   ecommerce:backend_domain: "api-pay-ci.ol.mit.edu"
+  ecommerce:learn_backend_domain: "api.ci.learn.mit.edu"
   ecommerce:db_password:
     secure: v1:rkeSh1S69nUNqVvu:cSeK5sUm8Q3RiFjCLwVcte3JGTR9cLSSiekj3YEcdcxYQWNih3h4YjuTAOgLed4C6wjBo5LL+aRUsUKR3mX96bOx3bTAgUxxIYhg/btcKMU=
   ecommerce:env_vars:

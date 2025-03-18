@@ -910,7 +910,7 @@ mitlearn_https_apisix_tls = kubernetes.apiextensions.CustomResource(
 
 # We need to be able to change `unauth_action` depending on the route but otherwise
 # the settings for the oidc plugin will be unchanged
-base_oidc_plugin_config = {
+legacy_base_oidc_plugin_config = {
     "scope": "openid profile email",
     "bearer_only": False,
     "introspection_endpoint_auth_method": "client_secret_basic",
@@ -977,6 +977,8 @@ learn_external_service_apisix_upstream = kubernetes.apiextensions.CustomResource
 )
 
 
+# LEGACY RETIREMENT : goes away
+mit_learn_api_domain = mitlearn_config.require("api_domain")
 learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
     f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
     api_version="apisix.apache.org/v2",
@@ -998,12 +1000,13 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                         "name": "openid-connect",
                         "enable": True,
                         "secretRef": oidc_secret_name,
-                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
+                        "config": legacy_base_oidc_plugin_config
+                        | {"unauth_action": "pass"},
                     },
                 ],
                 "match": {
                     "hosts": [
-                        mitlearn_config.require("api_domain"),
+                        mit_learn_api_domain,
                     ],
                     "paths": [
                         "/*",
@@ -1030,7 +1033,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 ],
                 "match": {
                     "hosts": [
-                        mitlearn_config.require("api_domain"),
+                        mit_learn_api_domain,
                     ],
                     "paths": [
                         "/logout/oidc/*",
@@ -1052,12 +1055,13 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                         "name": "openid-connect",
                         "enable": True,
                         "secretRef": oidc_secret_name,
-                        "config": base_oidc_plugin_config | {"unauth_action": "auth"},
+                        "config": legacy_base_oidc_plugin_config
+                        | {"unauth_action": "auth"},
                     },
                 ],
                 "match": {
                     "hosts": [
-                        mitlearn_config.require("api_domain"),
+                        mit_learn_api_domain,
                     ],
                     "paths": [
                         "/admin/login/*",
@@ -1082,6 +1086,133 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
     ),
 )
 
+
+proxy_rewrite_plugin_config = {
+    "name": "proxy-rewrite",
+    "enable": True,
+    "config": {
+        "regex_uri": [
+            "/learn/(.*)",
+            "/$1",
+        ],
+    },
+}
+
+base_oidc_plugin_config = {
+    "scope": "openid profile email",
+    "bearer_only": False,
+    "introspection_endpoint_auth_method": "client_secret_basic",
+    "ssl_verify": False,
+    "logout_path": "/learn/logout/oidc",
+    "post_logout_redirect_uri": f"https://{mitlearn_config.require('api_domain')}/learn/logout/",
+}
+# New ApisixRoute object
+# All paths prefixed with /learn
+learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
+    f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}-new",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixRoute",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=f"{learn_external_service_name}-new",
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec={
+        "http": [
+            {
+                # Wildcard route that can use auth but doesn't require it
+                "name": "passauth",
+                "priority": 0,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    proxy_rewrite_plugin_config,
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        mit_learn_api_domain,
+                    ],
+                    "paths": [
+                        "/learn/*",
+                    ],
+                },
+                "upstreams": [
+                    {
+                        "name": learn_external_service_name,
+                    },
+                ],
+            },
+            {
+                # Strip tailing slash from logout redirect
+                "name": "logout-redirect",
+                "priority": 10,
+                "plugins": [
+                    {
+                        "name": "redirect",
+                        "enable": True,
+                        "config": {
+                            "uri": "/logout/oidc",
+                        },
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        mit_learn_api_domain,
+                    ],
+                    "paths": [
+                        "/learn/logout/oidc/*",
+                    ],
+                },
+                "upstreams": [
+                    {
+                        "name": learn_external_service_name,
+                    },
+                ],
+            },
+            {
+                # Routes that require authentication
+                "name": "reqauth",
+                "priority": 10,
+                "plugin_config_name": shared_plugin_config_name,
+                "plugins": [
+                    proxy_rewrite_plugin_config,
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        "secretRef": oidc_secret_name,
+                        "config": base_oidc_plugin_config | {"unauth_action": "auth"},
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        mit_learn_api_domain,
+                    ],
+                    "paths": [
+                        "/learn/admin/login/*",
+                        "/learn/login/*",
+                    ],
+                },
+                "upstreams": [
+                    {
+                        "name": learn_external_service_name,
+                    },
+                ],
+            },
+        ],
+    },
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[
+            learn_external_service_apisix_upstream,
+            learn_external_service_apisix_pluginconfig,
+        ],
+    ),
+)
 five_minutes = 60 * 5
 route53.Record(
     "ol-mitopen-frontend-dns-record",
@@ -1363,6 +1494,13 @@ env_var_suffix = "RC" if stack_info.env_suffix == "qa" else "PROD"
 
 gh_repo = github.get_repository(
     full_name="mitodl/mit-learn", opts=InvokeOptions(provider=github_provider)
+)
+gh_workflow_api_base_env_var = github.ActionsVariable(
+    f"ol_mitopen_gh_workflow_api_base_env_var-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"API_BASE_{env_var_suffix}",
+    value=f"https://{mit_learn_api_domain}/learn",
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_accesskey_id_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_accesskey_id_env_secret-{stack_info.env_suffix}",

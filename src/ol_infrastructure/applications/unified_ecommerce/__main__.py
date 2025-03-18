@@ -771,12 +771,48 @@ oidc_secret = OLVaultK8SSecret(
     ),
 )
 
+mit_learn_oidc_secret_name = (
+    "mit-learn-oidc-secrets"  # pragma: allowlist secret # noqa: S105
+)
+mit_learn_oidc_secret = OLVaultK8SSecret(
+    f"ol-mitlearn-oidc-secrets-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="mit-learn-oidc-static-secrets",
+        namespace=ecommerce_namespace,
+        labels=k8s_global_labels,
+        dest_secret_name=mit_learn_oidc_secret_name,
+        dest_secret_labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/mitlearn",
+        excludes=[".*"],
+        exclude_raw=True,
+        # Refresh frequently because substructure keycloak stack could change these
+        refresh_after="1m",
+        templates={
+            "client_id": '{{ get .Secrets "client_id" }}',
+            "client_secret": '{{ get .Secrets "client_secret" }}',
+            "realm": '{{ get .Secrets "realm_name" }}',
+            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
+            "session.secret": '{{ get .Secrets "secret" }}',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+    ),
+)
+
+ecommerce_api_domain = ecommerce_config.require("backend_domain")
+learn_api_domain = ecommerce_config.require("learn_backend_domain")
+
 # ApisixUpstream resources don't seem to work but we don't really need them?
 # Ref: https://github.com/apache/apisix-ingress-controller/issues/1655
 # Ref: https://github.com/apache/apisix-ingress-controller/issues/1855
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_route_v2/
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/
+# LEGACY RETIREMENT: goes away
 ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
     f"unified-ecommerce-{stack_info.env_suffix}-https-apisix-route",
     api_version="apisix.apache.org/v2",
@@ -794,7 +830,7 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 "priority": 1,
                 "match": {
                     "hosts": [
-                        ecommerce_config.require("backend_domain"),
+                        ecommerce_api_domain,
                     ],
                     "paths": [
                         "/api/*",
@@ -832,18 +868,13 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
                             "ssl_verify": False,
                             "logout_path": "/logout",
                             "discovery": "https://sso-qa.ol.mit.edu/realms/olapps/.well-known/openid-configuration",
-                            # Lets let the app handle this because we have an etcd
-                            # control-plane
-                            # "session": {
-                            #    "secret": "at_least_16_characters",  # pragma: allowlist secret  # noqa: E501
-                            # },
                         },
                     },
                 ],
                 "plugin_config_name": shared_plugin_config_name,
                 "match": {
                     "hosts": [
-                        ecommerce_config.require("backend_domain"),
+                        ecommerce_api_domain,
                     ],
                     "paths": [
                         "/cart/*",
@@ -874,7 +905,7 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 ],
                 "match": {
                     "hosts": [
-                        ecommerce_config.require("backend_domain"),
+                        ecommerce_api_domain,
                     ],
                     "paths": [
                         "/logout/*",
@@ -895,8 +926,140 @@ ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
     ),
 )
 
+proxy_rewrite_plugin_config = {
+    "name": "proxy-rewrite",
+    "enable": True,
+    "config": {
+        "regex_uri": [
+            "/commerce/(.*)",
+            "/$1",
+        ],
+    },
+}
+
+# New ApisixRoute object for the learn.mit.edu address
+# All paths prefixed with /commerce
+# Host match is only the mit-learn domain
+mit_learn_ecommerce_https_apisix_route = kubernetes.apiextensions.CustomResource(
+    f"mit-learn-unified-ecommerce-{stack_info.env_suffix}-https-apisix-route",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixRoute",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="mit-learn-ecommerce-https",
+        namespace=ecommerce_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "http": [
+            {
+                # unauthenticated routes, including assests and checkout callback API
+                "name": "ue-unauth",
+                "priority": 100,
+                "plugins": [proxy_rewrite_plugin_config],
+                "match": {
+                    "hosts": [
+                        learn_api_domain,
+                    ],
+                    "paths": [
+                        "/commerce/api/*",
+                        "/commerce/_/*",
+                        "/commerce/logged_out/*",
+                        "/commerce/auth/*",
+                        "/commerce/static/*",
+                        "/commerce/favicon.ico",
+                        "/commerce/checkout/*",
+                    ],
+                },
+                "plugin_config_name": shared_plugin_config_name,
+                "backends": [
+                    {
+                        "serviceName": ol_k8s_application.application_lb_service_name,
+                        "servicePort": ol_k8s_application.application_lb_service_port_name,  # noqa: E501
+                    }
+                ],
+            },
+            {
+                # wildcard route for the rest of the system - auth required
+                "name": "ue-default",
+                "priority": 100,
+                "plugins": [
+                    proxy_rewrite_plugin_config,
+                    # Ref: https://apisix.apache.org/docs/apisix/plugins/openid-connect/
+                    {
+                        "name": "openid-connect",
+                        "enable": True,
+                        # Get all the sensitive parts of this config from a secret
+                        "secretRef": mit_learn_oidc_secret_name,
+                        "config": {
+                            "scope": "openid profile ol-profile",
+                            "bearer_only": False,
+                            "introspection_endpoint_auth_method": "client_secret_post",
+                            "ssl_verify": False,
+                            "logout_path": "/logout",
+                            "discovery": "https://sso-qa.ol.mit.edu/realms/olapps/.well-known/openid-configuration",
+                        },
+                    },
+                ],
+                "plugin_config_name": shared_plugin_config_name,
+                "match": {
+                    "hosts": [
+                        learn_api_domain,
+                    ],
+                    "paths": [
+                        "/commerce/cart/*",
+                        "/commerce/admin/*",
+                        "/commerce/establish_session/*",
+                        "/commerce/logout",
+                    ],
+                },
+                "backends": [
+                    {
+                        "serviceName": ol_k8s_application.application_lb_service_name,
+                        "servicePort": ol_k8s_application.application_lb_service_port_name,  # noqa: E501
+                    }
+                ],
+            },
+            # Strip trailing slack from logout redirect
+            {
+                "name": "ue-logout-redirect",
+                "priority": 100,
+                "plugins": [
+                    proxy_rewrite_plugin_config,
+                    {
+                        "name": "redirect",
+                        "enable": True,
+                        "config": {
+                            "uri": "/commerce/logout",
+                        },
+                    },
+                ],
+                "match": {
+                    "hosts": [
+                        learn_api_domain,
+                    ],
+                    "paths": [
+                        "/commerce/logout/*",
+                    ],
+                },
+                "backends": [
+                    {
+                        "serviceName": ol_k8s_application.application_lb_service_name,
+                        "servicePort": ol_k8s_application.application_lb_service_port_name,  # noqa: E501
+                    }
+                ],
+            },
+        ]
+    },
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[ol_k8s_application],
+    ),
+)
+
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_tls_v2/
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
+# LEGACY RETIREMENT : goes away
+# Won't need this because it will exist from the mit-learn namespace
 ecommerce_https_apisix_tls = kubernetes.apiextensions.CustomResource(
     f"unified-ecommerce-{stack_info.env_suffix}-https-apisix-tls",
     api_version="apisix.apache.org/v2",
@@ -970,7 +1133,7 @@ gh_workflow_api_base_env_var = github.ActionsVariable(
     f"unified-ecommerce-gh-workflow-api-base-env-variable-{stack_info.env_suffix}",
     repository=gh_repo.name,
     variable_name=f"API_BASE_{env_var_suffix}",  # pragma: allowlist secret
-    value=f"https://{ecommerce_config.require('backend_domain')}",
+    value=f"https://{learn_api_domain}/commerce",
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
