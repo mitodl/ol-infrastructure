@@ -1558,8 +1558,7 @@ gh_workflow_api_base_env_var = github.ActionsVariable(
     f"learn-ai-gh-workflow-api-base-env-variablet-{stack_info.env_suffix}",
     repository=gh_repo.name,
     variable_name=f"API_BASE_{env_var_suffix}",  # pragma: allowlist secret
-    # SWITCHOVER : Update to learn_api_domain
-    value=f"https://{learn_ai_api_domain}",
+    value=f"https://{learn_api_domain}/ai",
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
