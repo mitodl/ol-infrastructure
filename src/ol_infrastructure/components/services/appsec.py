@@ -28,7 +28,6 @@ class OLAppSecurityGroupConfig(BaseModel):
         return target_vpc_name
 
 
-
 class OLAppSecurityGroup(ComponentResource):
     """MIT OL security group component"""
 
