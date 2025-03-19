@@ -1103,6 +1103,7 @@ base_oidc_plugin_config = {
     "bearer_only": False,
     "introspection_endpoint_auth_method": "client_secret_basic",
     "ssl_verify": False,
+    "renew_access_token_on_expiry": True,
     "logout_path": "/learn/logout/oidc",
     "post_logout_redirect_uri": f"https://{mitlearn_config.require('api_domain')}/learn/logout/",
 }
