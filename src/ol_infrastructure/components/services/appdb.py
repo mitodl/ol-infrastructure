@@ -9,7 +9,7 @@ to use the OLDatabase components available in `aws/database.py`.
 
 from typing import Optional
 
-from pulumi import ComponentResource, ResourceOptions, StackReference
+from pulumi import ComponentResource, Output, ResourceOptions, StackReference
 from pulumi_aws import ec2
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -46,7 +46,7 @@ class OLAppDatabaseConfig(BaseModel):
     app_db_password: str
     app_db_instance_size: str | None = None
     app_db_capacity: int | None = None
-    app_vpc_id: str
+    app_vpc_id: Output[str]
     target_vpc_name: str
 
     @field_validator("target_vpc_name")
