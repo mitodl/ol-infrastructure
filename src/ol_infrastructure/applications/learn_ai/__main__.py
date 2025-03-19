@@ -28,7 +28,7 @@ from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.github.team_members import DEVOPS_MIT
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
-from ol_infrastructure.components.services import appdb, appsec
+from ol_infrastructure.components.services import appdb
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SDynamicSecretConfig,
     OLVaultK8SResources,
@@ -39,6 +39,8 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib.aws.cache_helper import CacheInstanceTypes
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
+    default_psg_egress_args,
+    get_default_psg_ingress_args,
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
@@ -497,17 +499,33 @@ learn_ai_static_vault_secrets = vault.generic.Secret(
     data_json=json.dumps(learn_ai_vault_secrets),
 )
 
-learn_ai_application_security_group_config = appsec.OLAppSecurityGroupConfig(
-    app_name=learn_ai_namespace, target_vpc_name="applications", app_ou="operations"
-)
-learn_ai_application_security_group_service = appsec.OLAppSecurityGroup(
-    app_security_group_config=learn_ai_application_security_group_config
-)
+# learn_ai_application_security_group_config = appsec.OLAppSecurityGroupConfig(
+#     app_name=learn_ai_namespace, target_vpc_name="applications", app_ou="operations"
+# )
+# learn_ai_application_security_group_service = appsec.OLAppSecurityGroup(
+#     app_security_group_config=learn_ai_application_security_group_config
+# )
+#
+# learn_ai_application_security_group = (
+#     learn_ai_application_security_group_service.application_security_group
+# )
+#
 
-learn_ai_application_security_group = (
-    learn_ai_application_security_group_service.application_security_group
+################################################
+# Application security group
+# Needs to happen ebfore the database security group is created
+learn_ai_application_security_group = ec2.SecurityGroup(
+    f"learn-ai-application-security-group-{stack_info.env_suffix}",
+    name=f"learn-ai-application-security-group-{stack_info.env_suffix}",
+    description="Access control for the learn-ai application pods.",
+    # allow all egress traffic
+    egress=default_psg_egress_args,
+    ingress=get_default_psg_ingress_args(
+        k8s_pod_subnet_cidrs=k8s_pod_subnet_cidrs,
+    ),
+    vpc_id=apps_vpc["id"],
+    tags=aws_config.tags,
 )
-
 
 ################################################
 # RDS configuration and networking setup
@@ -539,11 +557,12 @@ learn_ai_database_security_group = ec2.SecurityGroup(
 
 ol_app_db_config = appdb.OLAppDatabaseConfig(
     app_name=learn_ai_namespace,
+    app_security_group=learn_ai_application_security_group,
     app_db_name="learnai",
     app_db_password=learn_ai_config.get("db_password"),
     app_db_capacity=learn_ai_config.get("db_capacity")
     or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
-    target_vpc_name=apps_vpc,
+    target_vpc_name="applications_vpc",
     app_ou="operations",
 )
 

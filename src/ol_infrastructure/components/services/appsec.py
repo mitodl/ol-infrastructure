@@ -2,7 +2,7 @@ from typing import Optional
 
 from pulumi import ComponentResource, ResourceOptions, StackReference
 from pulumi_aws import ec2
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from ol_infrastructure.lib.aws.eks_helper import (
     default_psg_egress_args,
@@ -19,6 +19,14 @@ class OLAppSecurityGroupConfig(BaseModel):
     app_name: str
     target_vpc_name: str
     app_ou: str
+
+    @field_validator("target_vpc_name")
+    @classmethod
+    def validate_target_vpc_name(cls, target_vpc_name: str) -> str:
+        if not target_vpc_name.endswith("_vpc"):
+            target_vpc_name += "_vpc"
+        return target_vpc_name
+
 
 
 class OLAppSecurityGroup(ComponentResource):

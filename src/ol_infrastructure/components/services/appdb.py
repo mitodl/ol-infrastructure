@@ -10,7 +10,8 @@ to use the OLDatabase components available in `aws/database.py`.
 from typing import Optional
 
 from pulumi import ComponentResource, ResourceOptions, StackReference
-from pydantic import BaseModel
+from pulumi_aws import ec2
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
@@ -36,13 +37,23 @@ env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 class OLAppDatabaseConfig(BaseModel):
     """Configuration for the MIT OL Database component"""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     app_name: str
+    app_security_group: ec2.SecurityGroup
     app_ou: str
     app_db_name: str
     app_db_password: str
-    app_db_instance_size: str | None
-    app_db_capacity: int | None
+    app_db_instance_size: str | None = None
+    app_db_capacity: int | None = None
     target_vpc_name: str
+
+    @field_validator("target_vpc_name")
+    @classmethod
+    def validate_target_vpc_name(cls, target_vpc_name: str) -> str:
+        if not target_vpc_name.endswith("_vpc"):
+            target_vpc_name += "_vpc"
+        return target_vpc_name
+
 
 
 class OLAppDatabase(ComponentResource):
@@ -94,14 +105,44 @@ class OLAppDatabase(ComponentResource):
         target_vpc = db_network_stack.require_output(ol_db_config.target_vpc_name)
 
         rds_defaults = defaults(stack_info)["rds"]
-        rds_defaults["instance_size"] = (
-            self.ol_db_config.app_db_instance_size or rds_defaults["instance_size"]
-        )
+
+################################################
+# RDS configuration and networking setup
+# NEEDS FIX -CAP
+learn_ai_database_security_group = ec2.SecurityGroup(
+    f"learn-ai-db-security-group-{stack_info.env_suffix}",
+    name=f"learn-ai-db-security-group-{stack_info.env_suffix}",
+    description="Access control for the learn-ai database.",
+    ingress=[
+        ec2.SecurityGroupIngressArgs(
+            security_groups=[
+                vault_stack.require_output("vault_server")["security_group"],
+            ],
+            protocol="tcp",
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+            description="Access to postgres from consul and vault.",
+        ),
+        ec2.SecurityGroupIngressArgs(
+            security_groups=[learn_ai_application_security_group.id],
+            protocol="tcp",
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+            description="Allow application pods to talk to DB",
+        ),
+    ],
+    vpc_id=apps_vpc["id"],
+    tags=aws_config.tags,
+)
+
+        self.db_security_group: ec2.SecurityGroup=\
+            ec2.SecurityGroup("app-db-security-group",opts=opts)
 
         self.app_db_config = OLPostgresDBConfig(
             instance_name=f"{ol_db_config.app_name}-db-{stack_info.env_suffix}",
             password=SecretStr(self.ol_db_config.app_db_password),
             subnet_group_name=target_vpc["rds_subnet"],
+            security_groups=[self.db_security_group],
             storage=self.ol_db_config.app_db_capacity
             or AWS_RDS_DEFAULT_DATABASE_CAPACITY,
             engine_major_version="16",
