@@ -1194,6 +1194,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                     ],
                     "paths": [
                         "/learn/admin/login/*",
+                        "/learn/login",
                         "/learn/login/*",
                     ],
                 },
