@@ -5,10 +5,10 @@ path "postgres-ecommerce/creds/app" {
   capabilities = ["read"]
 }
 
-path "secret-operations/sso/unified-ecommerce/*" {
+path "secret-operations/sso/unified-ecommerce" {
   capabilities = ["read"]
 }
-path "secret-operations/sso/unified-ecommerce" {
+path "secret-operations/sso/mitlearn" {
   capabilities = ["read"]
 }
 
