@@ -12,6 +12,7 @@ import pulumi_github as github
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import (
+    Alias,
     Config,
     InvokeOptions,
     Output,
@@ -432,17 +433,25 @@ ecommerce_application_security_group = ec2.SecurityGroup(
 
 
 ecommerce_db_config: appdb.OLAppDatabaseConfig = appdb.OLAppDatabaseConfig(
-    app_name=ecommerce_namespace,
+    app_name="unified-ecommerce",
     app_security_group=ecommerce_application_security_group,
-    app_db_name="ecommerce",
+    app_db_name="unified-ecommerce",
     app_ou=aws_config.tags["OU"],
     app_vpc_id=apps_vpc["id"],
     target_vpc_name="applications",
     app_db_password=ecommerce_config.get("db_password"),
+    alias_map={
+        appdb.AliasKeys.secgroup: f"unified-ecommerce-application-security-group-{stack_info.env_suffix}",  # noqa: E501
+    },
 )
 
 ecommerce_db = appdb.OLAppDatabase(
     ol_db_config=ecommerce_db_config,
+    opts=ResourceOptions(
+        aliases=[
+            Alias(f"unified-ecommerce-db-{stack_info.env_suffix}-postgres-instance")
+        ]
+    ),
 )
 
 ecommerce_db_consul_node = Node(
@@ -468,7 +477,7 @@ ecommerce_db_consul_service = Service(
             name="ecommerce-instance-id",
             timeout="60s",
             status="passing",
-            tcp=ecommerce_db.db_instance.address.apply(
+            tcp=ecommerce_db.app_db.db_instance.address.apply(
                 lambda address: f"{address}:{ecommerce_db.app_db.db_instance.port}"
             ),
         )
@@ -551,7 +560,7 @@ vault_k8s_resources = OLVaultK8SResources(
 
 # Load the database creds into a k8s secret via VSO
 db_creds_secret_name = "pgsql-db-creds"  # noqa: S105  # pragma: allowlist secret
-db_creds_secret = Output.all(address=ecommerce_db.db_instance.address).apply(
+db_creds_secret = Output.all(address=ecommerce_db.app_db.db_instance.address).apply(
     lambda db: OLVaultK8SSecret(
         f"unified-ecommerce-{stack_info.env_suffix}-db-creds-secret",
         OLVaultK8SDynamicSecretConfig(
