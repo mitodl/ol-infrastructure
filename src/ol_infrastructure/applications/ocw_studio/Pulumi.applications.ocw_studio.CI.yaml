@@ -29,7 +29,6 @@ config:
     SENTRY_LOG_LEVEL: 'WARN'
     SOCIAL_AUTH_SAML_SP_ENTITY_ID: 'https://ocw-studio-ci.odl.mit.edu/saml/metadata'
     STATIC_API_BASE_URL_TEST: 'https://test-qa.ocw.mit.edu/'
-    VIDEO_TRANSCODE_QUEUE: 'aws_mediaconvert_transcodes'
     YT_PROJECT_ID: 'ovs-youtube-qa'
   ocw_studio:app_domain: ocw-studio-ci.odl.mit.edu
   ocw_studio:db_password:

@@ -375,6 +375,7 @@ heroku_vars = {
     "SOCIAL_AUTH_SAML_SECURITY_ENCRYPTED": "True",
     "USE_X_FORWARDED_PORT": "True",
     "VIDEO_S3_TRANSCODE_PREFIX": "aws_mediaconvert_transcodes",
+    "VIDEO_TRANSCODE_QUEUE": ocw_studio_mediaconvert.queue.name,
 }
 
 heroku_vars.update(**heroku_app_config.get_object("vars"))

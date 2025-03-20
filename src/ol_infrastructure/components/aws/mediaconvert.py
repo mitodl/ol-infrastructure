@@ -71,44 +71,30 @@ class OLMediaConvert(ComponentResource):
         event_rule_name = f"{resource_prefix}-cloudwatch-eventrule"
         event_target_name = f"{resource_prefix}-cloudwatch-eventtarget"
 
-        # Check if queue exists
-        try:
-            existing_queue = mediaconvert.get_queue(id=queue_name)
-            self.queue = mediaconvert.Queue.get(
-                queue_name, existing_queue.id, opts=ResourceOptions(parent=self)
-            )
-        except Exception:  # noqa: BLE001
-            # Create MediaConvert Queue if it doesn't exist
-            self.queue = mediaconvert.Queue(
-                queue_name,
-                description=f"{resource_prefix} MediaConvert Queue",
-                name=queue_name,
-                tags=tags,
-                opts=component_ops,
-            )
+        self.queue = mediaconvert.Queue(
+            queue_name,
+            description=f"{resource_prefix} MediaConvert Queue",
+            name=queue_name,
+            tags=tags,
+            opts=component_ops,
+        )
 
-        # Check if role exists
-        try:
-            existing_role = iam.get_role(name=role_name)
-            self.role = iam.Role.get(role_name, existing_role.id)
-        except Exception:  # noqa: BLE001
-            # Create MediaConvert Role if it doesn't exist
-            self.role = iam.Role(
-                role_name,
-                assume_role_policy=json.dumps(
-                    {
-                        "Version": "2012-10-17",
-                        "Statement": {
-                            "Effect": "Allow",
-                            "Action": "sts:AssumeRole",
-                            "Principal": {"Service": "mediaconvert.amazonaws.com"},
-                        },
-                    }
-                ),
-                name=role_name,
-                tags=tags,
-                opts=component_ops,
-            )
+        self.role = iam.Role(
+            role_name,
+            assume_role_policy=json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": {
+                        "Effect": "Allow",
+                        "Action": "sts:AssumeRole",
+                        "Principal": {"Service": "mediaconvert.amazonaws.com"},
+                    },
+                }
+            ),
+            name=role_name,
+            tags=tags,
+            opts=component_ops,
+        )
 
         # Attach policy to the role
         self.role_policy_attachment = iam.RolePolicyAttachment(

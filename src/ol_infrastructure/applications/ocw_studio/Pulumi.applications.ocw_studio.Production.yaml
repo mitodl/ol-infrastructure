@@ -41,7 +41,6 @@ config:
     SITEMAP_DOMAIN: 'ocw.mit.edu'
     SOCIAL_AUTH_SAML_SP_ENTITY_ID: 'https://ocw-studio.odl.mit.edu/saml/metadata'
     STATIC_API_BASE_URL_TEST: 'https://test.ocw.mit.edu/'
-    VIDEO_TRANSCODE_QUEUE: 'ocw-studio-mediaconvert-queue-production'
     YT_PROJECT_ID: 'ocw-studio-qa'
   ocw_studio:app_domain: ocw-studio.odl.mit.edu
   ocw_studio:db_password:
