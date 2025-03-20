@@ -1105,6 +1105,7 @@ base_oidc_plugin_config = {
     "ssl_verify": False,
     "renew_access_token_on_expiry": True,
     "refresh_session_interval": 1800,
+    "session.cookie.lifetime": 60 * 20160,
     "logout_path": "/learn/logout/oidc",
     "post_logout_redirect_uri": f"https://{mitlearn_config.require('api_domain')}/learn/logout/",
 }
