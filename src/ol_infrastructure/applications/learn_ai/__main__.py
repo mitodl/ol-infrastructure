@@ -1290,7 +1290,7 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     ],
                     "paths": [
                         "/admin/login/*",
-                        "/http/login/",
+                        "/http/login/*",
                     ],
                 },
                 "backends": [
@@ -1437,7 +1437,7 @@ mit_learn_learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     ],
                     "paths": [
                         "/ai/admin/login/*",
-                        "/ai/http/login/",
+                        "/ai/http/login/*",
                     ],
                 },
                 "backends": [

@@ -5,10 +5,10 @@ path "postgres-learn-ai/creds/app" {
   capabilities = ["read"]
 }
 
-path "secret-operations/sso/learn-ai/*" {
+path "secret-operations/sso/learn-ai" {
   capabilities = ["read"]
 }
-path "secret-operations/sso/learn-ai" {
+path "secret-operations/sso/mitlearn" {
   capabilities = ["read"]
 }
 
