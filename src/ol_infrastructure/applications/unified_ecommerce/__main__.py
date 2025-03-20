@@ -23,27 +23,23 @@ from pulumi_consul import Node, Service, ServiceCheckArgs
 
 from bridge.lib.constants import FASTLY_A_TLS_1_3
 from bridge.lib.magic_numbers import (
-    AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_HTTPS_PORT,
-    DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
-from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.services import appdb
 from ol_infrastructure.components.services.k8s import (
     OLApplicationK8s,
     OLApplicationK8sConfiguration,
 )
 from ol_infrastructure.components.services.vault import (
-    OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
-    OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.cache_helper import CacheInstanceTypes
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -53,7 +49,6 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
@@ -61,7 +56,6 @@ from ol_infrastructure.lib.fastly import (
 )
 from ol_infrastructure.lib.ol_types import Apps, AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
-from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 fastly_provider = get_fastly_provider()
@@ -436,70 +430,25 @@ ecommerce_application_security_group = ec2.SecurityGroup(
     tags=aws_config.tags,
 )
 
-# RDS configuration and networking setup
-ecommerce_database_security_group = ec2.SecurityGroup(
-    f"unified-ecommerce-db-security-group-{stack_info.env_suffix}",
-    name=f"unified-ecommerce-db-security-group-{stack_info.env_suffix}",
-    description="Access control for the unified ecommerce database.",
-    ingress=[
-        ec2.SecurityGroupIngressArgs(
-            security_groups=[
-                consul_security_groups["consul_server"],
-                vault_stack.require_output("vault_server")["security_group"],
-            ],
-            protocol="tcp",
-            from_port=DEFAULT_POSTGRES_PORT,
-            to_port=DEFAULT_POSTGRES_PORT,
-            description="Access to postgres from consul and vault.",
-        ),
-        ec2.SecurityGroupIngressArgs(
-            security_groups=[ecommerce_application_security_group.id],
-            protocol="tcp",
-            from_port=DEFAULT_POSTGRES_PORT,
-            to_port=DEFAULT_POSTGRES_PORT,
-            description="Allow application pods to talk to DB",
-        ),
-    ],
-    vpc_id=apps_vpc["id"],
-    tags=aws_config.tags,
+
+ecommerce_db_config: appdb.OLAppDatabaseConfig = appdb.OLAppDatabaseConfig(
+    app_name=ecommerce_namespace,
+    app_security_group=ecommerce_application_security_group,
+    app_db_name="ecommerce",
+    app_ou=aws_config.tags["OU"],
+    app_vpc_id=apps_vpc["id"],
+    target_vpc_name="applications",
+    app_db_password=ecommerce_config.get("db_password"),
 )
 
-rds_defaults = defaults(stack_info)["rds"]
-rds_defaults["instance_size"] = (
-    ecommerce_config.get("db_instance_size") or DBInstanceTypes.small.value
+ecommerce_db = appdb.OLAppDatabase(
+    ol_db_config=ecommerce_db_config,
 )
 
-ecommerce_db_config = OLPostgresDBConfig(
-    instance_name=f"unified-ecommerce-db-{stack_info.env_suffix}",
-    password=ecommerce_config.get("db_password"),
-    subnet_group_name=apps_vpc["rds_subnet"],
-    security_groups=[ecommerce_database_security_group],
-    storage=ecommerce_config.get("db_capacity")
-    or str(AWS_RDS_DEFAULT_DATABASE_CAPACITY),
-    engine_major_version="16",
-    tags=aws_config.tags,
-    db_name="ecommerce",
-    **defaults(stack_info)["rds"],
-)
-ecommerce_db = OLAmazonDB(ecommerce_db_config)
-
-ecommerce_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
-    db_name=ecommerce_db_config.db_name,
-    mount_point=f"{ecommerce_db_config.engine}-ecommerce",
-    db_admin_username=ecommerce_db_config.username,
-    db_admin_password=ecommerce_config.get("db_password"),
-    db_host=ecommerce_db.db_instance.address,
-)
-ecommerce_db_vault_backend = OLVaultDatabaseBackend(
-    ecommerce_db_vault_backend_config,
-    opts=ResourceOptions(delete_before_replace=True, parent=ecommerce_db),
-)
-
-# A bunch of RDS + Consul stuff of questionable utility
 ecommerce_db_consul_node = Node(
     f"unified-ecommerce-{stack_info.env_suffix}-postgres-db",
     name="ecommerce-postgres-db",
-    address=ecommerce_db.db_instance.address,
+    address=ecommerce_db.app_db.db_instance.address,
     opts=consul_provider,
 )
 
@@ -507,7 +456,7 @@ ecommerce_db_consul_service = Service(
     "unified-ecommerce-{stack_info.env_suffix}-instance-db-consul-service",
     node=ecommerce_db_consul_node.name,
     name="ecommerce-db",
-    port=ecommerce_db_config.port,
+    port=ecommerce_db.app_db.db_instance.port,
     meta={
         "external-node": True,
         "external-probe": True,
@@ -520,7 +469,7 @@ ecommerce_db_consul_service = Service(
             timeout="60s",
             status="passing",
             tcp=ecommerce_db.db_instance.address.apply(
-                lambda address: f"{address}:{ecommerce_db_config.port}"
+                lambda address: f"{address}:{ecommerce_db.app_db.db_instance.port}"
             ),
         )
     ],
@@ -611,7 +560,7 @@ db_creds_secret = Output.all(address=ecommerce_db.db_instance.address).apply(
             dest_secret_labels=k8s_global_labels,
             dest_secret_name=db_creds_secret_name,
             labels=k8s_global_labels,
-            mount=ecommerce_db_vault_backend_config.mount_point,
+            mount=ecommerce_db.app_db_vault_backend_config.mount_point,
             path="creds/app",
             restart_target_kind="Deployment",
             restart_target_name="ecommerce-app",
@@ -623,7 +572,7 @@ db_creds_secret = Output.all(address=ecommerce_db.db_instance.address).apply(
         opts=ResourceOptions(
             delete_before_replace=True,
             parent=vault_k8s_resources,
-            depends_on=[ecommerce_db_vault_backend],
+            depends_on=[ecommerce_db.app_db_vault_backend],
         ),
     )
 )
