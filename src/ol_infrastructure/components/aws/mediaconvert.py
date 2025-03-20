@@ -201,7 +201,7 @@ class OLMediaConvert(ComponentResource):
             List of IAM policy statements for MediaConvert access
         """
 
-        resource_prefix = f"{service_name}-{env_suffix}"
+        resource_prefix = f"{service_name}-{env_suffix}-mediaconvert"
 
         return [
             {
