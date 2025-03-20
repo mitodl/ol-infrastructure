@@ -9,7 +9,7 @@ config:
   heroku_app:vars:
     APPZI_URL: ""
     CELERY_WORKER_MAX_MEMORY_PER_CHILD: 125000
-    CSRF_COOKIE_NAME: "learn-rc-csrftoken"
+    CSRF_COOKIE_NAME: "learn_rc_csrftoken"
     DEBUG: "false"
     EDX_LEARNING_COURSE_BUCKET_NAME: "edxorg-qa-edxapp-courses"
     ENABLE_INFINITE_CORRIDOR: "true"
