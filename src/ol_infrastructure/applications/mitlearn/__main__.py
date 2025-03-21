@@ -837,7 +837,7 @@ application_labels = k8s_global_labels | {
     "ol.mit.edu/pod-security-group": "learn",
 }
 
-# MD : 2025-03-21 Leaving this out of OLApisix* refactoring for the legacy configs
+# TODO (mmd, YYYY-MM-DD): Leaving this out of OLApisix* refactoring for the legacy configs
 oidc_secret_name = "oidc-secrets"  # pragma: allowlist secret # noqa: S105
 oidc_secret = OLVaultK8SSecret(
     f"ol-mitlearn-oidc-secrets-{stack_info.env_suffix}",
