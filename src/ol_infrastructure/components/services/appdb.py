@@ -8,11 +8,11 @@ to use the OLDatabase components available in `aws/database.py`.
 """
 
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pulumi import Alias, ComponentResource, Output, ResourceOptions, StackReference
 from pulumi_aws import ec2
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
@@ -47,22 +47,13 @@ class OLAppDatabaseConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     app_name: str
     app_security_group: ec2.SecurityGroup
-    app_ou: str
     app_db_name: str
     app_db_password: str
     app_db_instance_size: str | None = None
     app_db_capacity: int | None = None
-    app_vpc_id: Output[str]
-    target_vpc_name: str
+    app_vpc: Output[dict[str, Any]]
     aws_config: AWSBase
     alias_map: dict[AliasKey, list[Alias]] | None = None
-
-    @field_validator("target_vpc_name")
-    @classmethod
-    def validate_target_vpc_name(cls, target_vpc_name: str) -> str:
-        if not target_vpc_name.endswith("_vpc"):
-            target_vpc_name += "_vpc"
-        return target_vpc_name
 
 
 class OLAppDatabase(ComponentResource):
@@ -92,13 +83,6 @@ class OLAppDatabase(ComponentResource):
             opts=opts,
         )
 
-        # We do this here rather than at the top because we need a unique
-        # identifier for the name.
-        db_network_stack = StackReference(
-            name=f"db_network_stack_reference_{ol_db_config.app_db_name}",
-            stack_name=f"infrastructure.aws.network.{stack_info.name}",
-        )
-
         vault_stack = StackReference(
             name=f"db_vault_stack_reference_{ol_db_config.app_db_name}",
             stack_name=f"infrastructure.vault.operations.{stack_info.name}",
@@ -108,8 +92,6 @@ class OLAppDatabase(ComponentResource):
             name=f"db_consul_stack_reference_{ol_db_config.app_db_name}",
             stack_name=f"infrastructure.consul.apps.{stack_info.name}",
         )
-
-        target_vpc = db_network_stack.require_output(ol_db_config.target_vpc_name)
 
         ################################################
         # RDS configuration and networking setup
@@ -136,7 +118,7 @@ class OLAppDatabase(ComponentResource):
                     description="Allow application pods to talk to DB",
                 ),
             ],
-            vpc_id=ol_db_config.app_vpc_id,
+            vpc_id=ol_db_config.app_vpc["id"],
             tags=ol_db_config.aws_config.tags,
             opts=ResourceOptions(
                 ignore_changes=["description"],
@@ -148,7 +130,7 @@ class OLAppDatabase(ComponentResource):
         self.app_db_config = OLPostgresDBConfig(
             instance_name=f"{ol_db_config.app_name}-db-{stack_info.env_suffix}",
             password=SecretStr(ol_db_config.app_db_password),
-            subnet_group_name=target_vpc["rds_subnet"],
+            subnet_group_name=ol_db_config.app_vpc["rds_subnet"],
             security_groups=[self.db_security_group],
             storage=ol_db_config.app_db_capacity or AWS_RDS_DEFAULT_DATABASE_CAPACITY,
             engine_major_version="16",
@@ -175,8 +157,7 @@ class OLAppDatabase(ComponentResource):
             app_db_vault_backend_config,
             opts=ResourceOptions(
                 delete_before_replace=True,
-                parent=self,
-                depends_on=[self.app_db],
+                parent=self.app_db,
                 aliases=(ol_db_config.alias_map or {}).get(AliasKey.vault, []),
             ),
         )

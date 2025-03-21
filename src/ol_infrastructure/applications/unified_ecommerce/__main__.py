@@ -435,15 +435,12 @@ ecommerce_db_config: appdb.OLAppDatabaseConfig = appdb.OLAppDatabaseConfig(
     app_name="unified-ecommerce",
     app_security_group=ecommerce_application_security_group,
     app_db_name="ecommerce",
-    app_ou=aws_config.tags["OU"],
-    app_vpc_id=apps_vpc["id"],
-    target_vpc_name="applications",
+    app_vpc=apps_vpc,
     aws_config=aws_config,
     app_db_password=ecommerce_config.get("db_password"),
     alias_map={
         appdb.AliasKey.secgroup: [Alias(parent=ROOT_STACK_RESOURCE)],
         appdb.AliasKey.db: [Alias(parent=ROOT_STACK_RESOURCE)],
-        # appdb.AliasKey.vault: [Alias(parent=ROOT_STACK_RESOURCE)],
     },
 )
 
@@ -582,7 +579,7 @@ db_creds_secret = Output.all(
         opts=ResourceOptions(
             delete_before_replace=True,
             parent=vault_k8s_resources,
-            depends_on=[ecommerce_db.app_db_vault_backend],
+            depends_on=[ecommerce_db],
         ),
     )
 )
