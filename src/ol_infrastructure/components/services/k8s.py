@@ -385,10 +385,10 @@ class OLApisixRouteConfig(BaseModel):
     upstream: Optional[str] = None
 
     @model_validator(mode="after")
-    def check_backend_or_upstream(self):
-        upstream = self.upstream
-        backend_service_name = self.backend_service_name
-        backend_service_port = self.backend_service_port
+    def check_backend_or_upstream(self) -> "OLApisixRouteConfig":
+        upstream: Optional[str] = self.upstream
+        backend_service_name: Optional[str] = self.backend_service_name
+        backend_service_port: Optional[str] = self.backend_service_port
 
         if upstream is not None:
             if backend_service_name is not None or backend_service_port is not None:
