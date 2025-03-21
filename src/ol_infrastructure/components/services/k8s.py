@@ -570,8 +570,6 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
 
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_pluginconfig_v2/
-
-
 class OLApisixSharedPluginsConfig(BaseModel):
     application_name: str
     resource_suffix: str = "shared-plugins"
