@@ -1357,7 +1357,7 @@ heroku_interpolated_vars = {
     "MITOL_CORS_ORIGIN_WHITELIST": cors_urls_json,
     "OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
     "SESSION_COOKIE_DOMAIN": session_cookie_domain,
-    "SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS": auth_allowed_redirect_hosts_json,
+    "ALLOWED_REDIRECT_HOSTS": auth_allowed_redirect_hosts_json,
     "SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
     "USERINFO_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/userinfo",
 }
