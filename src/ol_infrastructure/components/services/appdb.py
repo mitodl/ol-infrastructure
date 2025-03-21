@@ -7,9 +7,10 @@ configuration for a typical application. Special snowflakes should continue
 to use the OLDatabase components available in `aws/database.py`.
 """
 
+from enum import Enum
 from typing import Optional
 
-from pulumi import ComponentResource, Output, ResourceOptions, StackReference
+from pulumi import Alias, ComponentResource, Output, ResourceOptions, StackReference
 from pulumi_aws import ec2
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -31,8 +32,13 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 
 stack_info = parse_stack()
-env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 # Network and vault stack references are defined in-situ for uniqueness.
+
+
+class AliasKey(str, Enum):
+    secgroup = "secgroup"
+    db = "database"
+    vault = "vault"
 
 
 class OLAppDatabaseConfig(BaseModel):
@@ -48,6 +54,8 @@ class OLAppDatabaseConfig(BaseModel):
     app_db_capacity: int | None = None
     app_vpc_id: Output[str]
     target_vpc_name: str
+    aws_config: AWSBase
+    alias_map: dict[AliasKey, list[Alias]] | None = None
 
     @field_validator("target_vpc_name")
     @classmethod
@@ -77,16 +85,9 @@ class OLAppDatabase(ComponentResource):
 
         :rtype: OLAppDatabase
         """
-        self.ol_db_config = ol_db_config
-        self.aws_config: AWSBase = AWSBase(
-            tags={
-                "OU": self.ol_db_config.app_ou,
-                "Environment": f"{env_name}",
-            },
-        )
         super().__init__(
             "ol:infrastructure:components:services:OLAppDatabase",
-            self.ol_db_config.app_name,
+            ol_db_config.app_name,
             None,
             opts=opts,
         )
@@ -94,27 +95,32 @@ class OLAppDatabase(ComponentResource):
         # We do this here rather than at the top because we need a unique
         # identifier for the name.
         db_network_stack = StackReference(
-            name=f"db_network_stack_reference_{self.ol_db_config.app_db_name}",
+            name=f"db_network_stack_reference_{ol_db_config.app_db_name}",
             stack_name=f"infrastructure.aws.network.{stack_info.name}",
         )
 
         vault_stack = StackReference(
-            name=f"db_vault_stack_reference_{self.ol_db_config.app_db_name}",
+            name=f"db_vault_stack_reference_{ol_db_config.app_db_name}",
             stack_name=f"infrastructure.vault.operations.{stack_info.name}",
+        )
+
+        consul_stack = StackReference(
+            name=f"db_consul_stack_reference_{ol_db_config.app_db_name}",
+            stack_name=f"infrastructure.consul.apps.{stack_info.name}",
         )
 
         target_vpc = db_network_stack.require_output(ol_db_config.target_vpc_name)
 
         ################################################
         # RDS configuration and networking setup
-        # NEEDS FIX -CAP
         self.db_security_group: ec2.SecurityGroup = ec2.SecurityGroup(
-            f"learn-ai-db-security-group-{stack_info.env_suffix}",
-            name=f"learn-ai-db-security-group-{stack_info.env_suffix}",
-            description="Access control for the learn-ai database.",
+            f"{ol_db_config.app_name}-db-security-group-{stack_info.env_suffix}",
+            name=f"{ol_db_config.app_name}-db-security-group-{stack_info.env_suffix}",
+            description=f"Access control for the {ol_db_config.app_name} database.",
             ingress=[
                 ec2.SecurityGroupIngressArgs(
                     security_groups=[
+                        consul_stack.require_output("security_groups")["consul_server"],
                         vault_stack.require_output("vault_server")["security_group"],
                     ],
                     protocol="tcp",
@@ -123,46 +129,54 @@ class OLAppDatabase(ComponentResource):
                     description="Access to postgres from consul and vault.",
                 ),
                 ec2.SecurityGroupIngressArgs(
-                    security_groups=[self.ol_db_config.app_security_group],
+                    security_groups=[ol_db_config.app_security_group],
                     protocol="tcp",
                     from_port=DEFAULT_POSTGRES_PORT,
                     to_port=DEFAULT_POSTGRES_PORT,
                     description="Allow application pods to talk to DB",
                 ),
             ],
-            vpc_id=self.ol_db_config.app_vpc_id,
-            tags=self.aws_config.tags,
-            opts=ResourceOptions(parent=self),
+            vpc_id=ol_db_config.app_vpc_id,
+            tags=ol_db_config.aws_config.tags,
+            opts=ResourceOptions(
+                ignore_changes=["description"],
+                parent=self,
+                aliases=(ol_db_config.alias_map or {}).get(AliasKey.secgroup, []),
+            ),
         )
 
         self.app_db_config = OLPostgresDBConfig(
             instance_name=f"{ol_db_config.app_name}-db-{stack_info.env_suffix}",
-            password=SecretStr(self.ol_db_config.app_db_password),
+            password=SecretStr(ol_db_config.app_db_password),
             subnet_group_name=target_vpc["rds_subnet"],
             security_groups=[self.db_security_group],
-            storage=self.ol_db_config.app_db_capacity
-            or AWS_RDS_DEFAULT_DATABASE_CAPACITY,
+            storage=ol_db_config.app_db_capacity or AWS_RDS_DEFAULT_DATABASE_CAPACITY,
             engine_major_version="16",
-            tags=self.aws_config.tags,
-            db_name=self.ol_db_config.app_db_name,
+            tags=ol_db_config.aws_config.tags,
+            db_name=ol_db_config.app_db_name,
             **defaults(stack_info)["rds"],
         )
         self.app_db = OLAmazonDB(
             self.app_db_config,
-            opts=ResourceOptions(parent=self),
+            opts=ResourceOptions(
+                parent=self,
+                aliases=(ol_db_config.alias_map or {}).get(AliasKey.db, []),
+            ),
         )
 
         app_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
-            db_name=self.ol_db_config.app_db_name,
+            db_name=ol_db_config.app_db_name,
             mount_point=f"{self.app_db_config.engine}-{ol_db_config.app_name}",
             db_admin_username=self.app_db_config.username,
-            db_admin_password=self.ol_db_config.app_db_password,
+            db_admin_password=ol_db_config.app_db_password,
             db_host=self.app_db.db_instance.address,
         )
         self.app_db_vault_backend = OLVaultDatabaseBackend(
             app_db_vault_backend_config,
             opts=ResourceOptions(
                 delete_before_replace=True,
-                parent=self.app_db,
+                parent=self,
+                depends_on=[self.app_db],
+                aliases=(ol_db_config.alias_map or {}).get(AliasKey.vault, []),
             ),
         )

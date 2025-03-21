@@ -12,6 +12,8 @@ import pulumi_github as github
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import (
+    ROOT_STACK_RESOURCE,
+    Alias,
     Config,
     InvokeOptions,
     Output,
@@ -68,7 +70,6 @@ stack_info = parse_stack()
 
 ecommerce_config = Config("ecommerce")
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
-consul_stack = StackReference(f"infrastructure.consul.operations.{stack_info.name}")
 dns_stack = StackReference("infrastructure.aws.dns")
 monitoring_stack = StackReference("infrastructure.monitoring")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
@@ -99,7 +100,6 @@ if not (ECOMMERCE_DOCKER_TAG := os.getenv("ECOMMERCE_DOCKER_TAG")):
     msg = "ECOMMERCE_DOCKER_TAG must be set"
     raise OSError(msg)
 
-consul_security_groups = consul_stack.require_output("security_groups")
 aws_account = get_caller_identity()
 
 ecommerce_namespace = "ecommerce"
@@ -434,11 +434,17 @@ ecommerce_application_security_group = ec2.SecurityGroup(
 ecommerce_db_config: appdb.OLAppDatabaseConfig = appdb.OLAppDatabaseConfig(
     app_name="unified-ecommerce",
     app_security_group=ecommerce_application_security_group,
-    app_db_name="unified-ecommerce",
+    app_db_name="ecommerce",
     app_ou=aws_config.tags["OU"],
     app_vpc_id=apps_vpc["id"],
     target_vpc_name="applications",
+    aws_config=aws_config,
     app_db_password=ecommerce_config.get("db_password"),
+    alias_map={
+        appdb.AliasKey.secgroup: [Alias(parent=ROOT_STACK_RESOURCE)],
+        appdb.AliasKey.db: [Alias(parent=ROOT_STACK_RESOURCE)],
+        # appdb.AliasKey.vault: [Alias(parent=ROOT_STACK_RESOURCE)],
+    },
 )
 
 ecommerce_db = appdb.OLAppDatabase(
@@ -551,7 +557,11 @@ vault_k8s_resources = OLVaultK8SResources(
 
 # Load the database creds into a k8s secret via VSO
 db_creds_secret_name = "pgsql-db-creds"  # noqa: S105  # pragma: allowlist secret
-db_creds_secret = Output.all(address=ecommerce_db.app_db.db_instance.address).apply(
+db_creds_secret = Output.all(
+    address=ecommerce_db.app_db.db_instance.address,
+    port=ecommerce_db.app_db.db_instance.port,
+    db_name=ecommerce_db.app_db.db_instance.db_name,
+).apply(
     lambda db: OLVaultK8SSecret(
         f"unified-ecommerce-{stack_info.env_suffix}-db-creds-secret",
         OLVaultK8SDynamicSecretConfig(
@@ -560,12 +570,12 @@ db_creds_secret = Output.all(address=ecommerce_db.app_db.db_instance.address).ap
             dest_secret_labels=k8s_global_labels,
             dest_secret_name=db_creds_secret_name,
             labels=k8s_global_labels,
-            mount=ecommerce_db.app_db_vault_backend_config.mount_point,
+            mount=ecommerce_db.app_db_vault_backend.db_mount.path,
             path="creds/app",
             restart_target_kind="Deployment",
             restart_target_name="ecommerce-app",
             templates={
-                "DATABASE_URL": f'postgres://{{{{ get .Secrets "username"}}}}:{{{{ get .Secrets "password" }}}}@{db["address"]}:{ecommerce_db_config.port}/{ecommerce_db_config.db_name}',  # noqa: E501
+                "DATABASE_URL": f'postgres://{{{{ get .Secrets "username"}}}}:{{{{ get .Secrets "password" }}}}@{db["address"]}:{db["port"]}/{db["db_name"]}',  # noqa: E501
             },
             vaultauth=vault_k8s_resources.auth_name,
         ),
