@@ -363,31 +363,49 @@ class OLApplicationK8s(ComponentResource):
         )
 
 
+class OLApisixPluginConfig(BaseModel):
+    name: str
+    enable: bool = True
+    secret_ref: Optional[str] = Field(
+        None,
+        alias="secretRef",
+    )
+    config: dict[str, Any] = {}
+
+
 class OLApisixRouteConfig(BaseModel):
     route_name: str
     priority: int = 0
     shared_plugin_config_name: Optional[str] = None
-    plugins: list[dict[str, Any]] = []
+    plugins: list[OLApisixPluginConfig] = []
     hosts: list[str] = []
     paths: list[str] = []
-    backend_service_name: Optional[str]
-    backend_service_port: Optional[str]
-    upstream: Optional[str]
+    backend_service_name: Optional[str] = None
+    backend_service_port: Optional[str] = None
+    upstream: Optional[str] = None
 
     @model_validator(mode="after")
-    def check_upstream_backend(self):
-        if self.upstream and (self.backend_service_name or self.backend_service_port):
-            msg = "Upstream and backend_service_name/backend_service_port are mutually exclusive"
-            raise ValueError(msg)
-        if not self.upstream and not (
-            self.backend_service_name and self.backend_service_port
-        ):
-            msg = "Either upstream or backend_service_name/backend_service_port must be set"
+    def check_backend_or_upstream(self):
+        upstream = self.upstream
+        backend_service_name = self.backend_service_name
+        backend_service_port = self.backend_service_port
+
+        if upstream is not None:
+            if backend_service_name is not None or backend_service_port is not None:
+                msg = "If 'upstream' is provided, 'backend_service_name' and 'backend_service_port' must not be provided."
+                raise ValueError(msg)
+        elif backend_service_name is None or backend_service_port is None:
+            msg = "If 'upstream' is not provided, both 'backend_service_name' and 'backend_service_port' must be provided."
             raise ValueError(msg)
         return self
 
 
 class OLApisixRoute(pulumi.ComponentResource):
+    """
+    Route configuration for apisix
+    Defines and creates an "ApisixRoute" resource in the k8s cluster
+    """
+
     def __init__(
         self,
         name: str,
@@ -429,7 +447,7 @@ class OLApisixRoute(pulumi.ComponentResource):
                 "name": route_config.route_name,
                 "priority": route_config.priority,
                 "plugin_config_name": route_config.shared_plugin_config_name,
-                "plugins": route_config.plugins,
+                "plugins": [p.model_dump(by_alias=True) for p in route_config.plugins],
                 "match": {
                     "hosts": route_config.hosts,
                     "paths": route_config.paths,
@@ -473,6 +491,12 @@ class OLApisixOIDCConfig(BaseModel):
 
 
 class OLApisixOIDCResources(pulumi.ComponentResource):
+    """
+    OIDC configuration for apisix
+    Defines and creates an "OLVaultK8SSecret" resource in the k8s cluster
+    Also provides helper functions for creating config blocks for the oidc plugin
+    """
+
     def __init__(
         self,
         name: str,
@@ -485,7 +509,7 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
 
         resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
 
-        self.secret_name = f"{oidc_config.application_name}-oidc-secrets"
+        self.secret_name = f"ol-apisix-{oidc_config.application_name}-oidc-secrets"
 
         __templates = {
             "client_id": '{{ get .Secrets "client_id" }}',
@@ -507,7 +531,7 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
                 labels=oidc_config.k8s_labels,
                 mount=oidc_config.vault_mount,
                 mount_type=oidc_config.vault_mount_type,
-                name="oidc-static-secrets",
+                name=self.secret_name,
                 namespace=oidc_config.k8s_namespace,
                 path=oidc_config.vault_path,
                 refresh_after="1m",
@@ -546,7 +570,9 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
 
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_pluginconfig_v2/
-class OLApisixSharedPluginConfig(BaseModel):
+
+
+class OLApisixSharedPluginsConfig(BaseModel):
     application_name: str
     resource_suffix: str = "shared-plugins"
     enable_defaults: bool = True
@@ -555,11 +581,16 @@ class OLApisixSharedPluginConfig(BaseModel):
     plugins: list[dict[str, Any]] = []
 
 
-class OLApisixSharedPlugin(pulumi.ComponentResource):
+class OLApisixSharedPlugins(pulumi.ComponentResource):
+    """
+    Shared plugin configuration for apisix
+    Defines and creates an "ApisixPluginConfig" resource in the k8s cluster
+    """
+
     def __init__(
         self,
         name: str,
-        plugin_config: OLApisixSharedPluginConfig,
+        plugin_config: OLApisixSharedPluginsConfig,
         opts: Optional[pulumi.ResourceOptions] = None,
     ):
         super().__init__(
@@ -606,10 +637,63 @@ class OLApisixSharedPlugin(pulumi.ComponentResource):
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     name=self.resource_name,
                     labels=plugin_config.k8s_labels,
-                    namespace=plugin_config.application_name,
+                    namespace=plugin_config.k8s_namespace,
                 ),
                 spec={
                     "plugins": plugin_config.plugins,
+                },
+                opts=resource_options,
+            )
+        )
+
+
+class OLApisixExternalUpstreamConfig(BaseModel):
+    application_name: str
+    resource_suffix: str = "external-upstream"
+    k8s_labels: dict[str, str] = {}
+    k8s_namespace: str
+    external_hostname: str
+    scheme: str = "https"
+
+
+class OLApisixExternalUpstream(pulumi.ComponentResource):
+    """
+    External upstream configuration for apisix
+    Defines and creates an "ApisixUpstream" resource in the k8s cluster
+    This is for a service that is hosted outside of kubernetes but we want
+    to have APISIX in front of it anyways.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        external_upstream_config: OLApisixExternalUpstreamConfig,
+        opts: Optional[pulumi.ResourceOptions] = None,
+    ):
+        super().__init__(
+            "ol:infrastructure:services:k8s:OLApisixExternalUpstream", name, None, opts
+        )
+        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
+
+        self.resource_name = f"{external_upstream_config.application_name}-{external_upstream_config.resource_suffix}"
+        self.shared_plugin_apisix_pluginconfig_resource = (
+            kubernetes.apiextensions.CustomResource(
+                f"OLApisixExternalService-{self.resource_name}",
+                api_version="apisix.apache.org/v2",
+                kind="ApisixUpstream",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=self.resource_name,
+                    labels=external_upstream_config.k8s_labels,
+                    namespace=external_upstream_config.k8s_namespace,
+                ),
+                spec={
+                    "scheme": external_upstream_config.scheme,
+                    "externalNodes": [
+                        {
+                            "type": "Domain",
+                            "name": external_upstream_config.external_hostname,
+                        },
+                    ],
                 },
                 opts=resource_options,
             )
