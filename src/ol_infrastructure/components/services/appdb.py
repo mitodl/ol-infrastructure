@@ -152,7 +152,7 @@ class OLAppDatabase(ComponentResource):
             opts=ResourceOptions(parent=self),
         )
 
-        self.app_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
+        app_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
             db_name=self.ol_db_config.app_db_name,
             mount_point=f"{self.app_db_config.engine}-{ol_db_config.app_name}",
             db_admin_username=self.app_db_config.username,
@@ -160,7 +160,7 @@ class OLAppDatabase(ComponentResource):
             db_host=self.app_db.db_instance.address,
         )
         self.app_db_vault_backend = OLVaultDatabaseBackend(
-            self.app_db_vault_backend_config,
+            app_db_vault_backend_config,
             opts=ResourceOptions(
                 delete_before_replace=True,
                 parent=self.app_db,
