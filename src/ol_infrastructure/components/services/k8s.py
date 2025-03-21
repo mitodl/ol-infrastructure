@@ -54,12 +54,16 @@ class OLApplicationK8sConfiguration(BaseModel):
     init_migrations: bool = Field(default=True)
     init_collectstatic: bool = Field(default=True)
 
+    # See https://www.pulumi.com/docs/reference/pkg/python/pulumi/#pulumi.Output.from_input
+    # for docs. This unwraps the value so Pydantic can store it in the config class.
     @field_validator("application_security_group_id")
-    def validate_sec_group_id(application_security_group_id: Output[str]):  # noqa: N805
+    @classmethod
+    def validate_sec_group_id(cls, application_security_group_id: Output[str]):
         return Output.from_input(application_security_group_id)
 
     @field_validator("application_security_group_name")
-    def validate_sec_group_name(application_security_group_name: Output[str]):  # noqa: N805
+    @classmethod
+    def validate_sec_group_name(cls, application_security_group_name: Output[str]):
         return Output.from_input(application_security_group_name)
 
 

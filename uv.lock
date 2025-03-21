@@ -850,7 +850,7 @@ dev = [
     { name = "pre-commit", specifier = ">=4.0.0,<5" },
     { name = "pytest", specifier = ">=8.0.0,<9" },
     { name = "pytest-testinfra", specifier = ">=10.0.0,<11" },
-    { name = "ruff", specifier = ">=0,<1" },
+    { name = "ruff", specifier = ">=0.11,<1" },
 ]
 
 [[package]]
