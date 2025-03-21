@@ -90,7 +90,7 @@ class OLApplicationK8s(ComponentResource):
             None,
             opts=opts,
         )
-        resource_options = ResourceOptions(parent=self).merge(opts)
+        resource_options = ResourceOptions(parent=self)
         self.application_lb_service_name: str = (
             ol_app_k8s_config.application_lb_service_name
         )

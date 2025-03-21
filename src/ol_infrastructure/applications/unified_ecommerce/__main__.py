@@ -653,6 +653,7 @@ ecommerce_k8s_config: OLApplicationK8sConfiguration = OLApplicationK8sConfigurat
 
 ol_k8s_application = OLApplicationK8s(
     ol_app_k8s_config=ecommerce_k8s_config,
+    opts=ResourceOptions(depends_on=ecommerce_db),
 )
 
 

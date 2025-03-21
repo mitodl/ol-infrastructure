@@ -916,7 +916,7 @@ learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=[db_creds_secret, redis_creds],
+        depends_on=[learn_ai_db, db_creds_secret, redis_creds],
     ),
 )
 
@@ -968,7 +968,7 @@ learn_ai_celery_deployment_resource = kubernetes.apps.v1.Deployment(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=[db_creds_secret, redis_creds],
+        depends_on=[learn_ai_db, db_creds_secret, redis_creds],
     ),
 )
 
