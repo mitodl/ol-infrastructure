@@ -615,6 +615,18 @@ alloy_release = kubernetes.helm.v3.Release(
                         },
                     },
                 ],
+                "extraPorts": [
+                    {
+                        "name": "otlp",
+                        "port": 4317,
+                        "targetPort": 4317,
+                    },
+                    {
+                        "name": "otlp-http",
+                        "port": 4317,
+                        "targetPort": 4318,
+                    },
+                ],
             },
             "serviceAccount": {
                 "create": True,
