@@ -1179,6 +1179,12 @@ base_oidc_plugin_config = {
     "renew_access_token_on_expiry": True,
     "refresh_session_interval": 1800,
     "session": {"cookie": {"lifetime": 60 * 20160}},
+    "session_contents": {
+        "access_token": True,
+        "enc_id_token": True,
+        "id_token": True,
+        "user": True,
+    },
     "logout_path": "/logout",
     "post_logout_redirect_uri": "/",
 }
