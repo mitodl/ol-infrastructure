@@ -923,7 +923,7 @@ mitlearn_https_apisix_tls = kubernetes.apiextensions.CustomResource(
 
 # We need to be able to change `unauth_action` depending on the route but otherwise
 # the settings for the oidc plugin will be unchanged
-# MD : 2025-03-21 Leaving this out of OLApisix* refactoring
+# TODO (mmd, YYYY-MM-DD): Leaving this out of OLApisix* refactoring
 legacy_base_oidc_plugin_config = {
     "scope": "openid profile email",
     "bearer_only": False,
