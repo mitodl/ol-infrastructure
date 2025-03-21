@@ -603,7 +603,7 @@ class OLApisixSharedPlugins(pulumi.ComponentResource):
                     "allow_origins": "**",
                     "allow_methods": "**",
                     "allow_headers": "**",
-                    "allow_crednetials": True,
+                    "allow_credentials": True,
                 },
             },
             {
