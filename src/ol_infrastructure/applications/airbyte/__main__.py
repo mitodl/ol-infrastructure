@@ -708,7 +708,12 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                         "tags": [{"key": "OU", "value": "data"}],
                     },
                 },
-                "jobs": {"resources": {"limits": {"memory": "20Gi", "cpu": "4000m"}}},
+                "jobs": {
+                    "resources": {
+                        "limits": {"memory": "20Gi", "cpu": "2000m"},
+                        "requests": {"memory": "5Gi", "cpu": "500m"},
+                    }
+                },
             },
             "serviceAccount": {
                 "create": True,
