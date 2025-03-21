@@ -38,7 +38,6 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.cache_helper import CacheInstanceTypes
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     default_psg_egress_args,
@@ -580,10 +579,6 @@ learn_ai_db_vault_backend = OLVaultDatabaseBackend(
 
 # Redis Cluster configuration and networking setup
 redis_config = Config("redis")
-redis_instance_type = (
-    redis_config.get("instance_type") or CacheInstanceTypes.micro.value
-)
-
 redis_cluster_security_group = ec2.SecurityGroup(
     f"learn-ai-redis-cluster-security-group-{stack_info.env_suffix}",
     name_prefix=f"learn-ai-redis-security-group-{stack_info.env_suffix}",
@@ -607,7 +602,6 @@ redis_cache_config = OLAmazonRedisConfig(
     cluster_mode_enabled=False,
     encrypted=True,
     engine_version="7.1",
-    instance_type=redis_instance_type,
     num_instances=3,
     shard_count=1,
     auto_upgrade=True,
@@ -616,6 +610,7 @@ redis_cache_config = OLAmazonRedisConfig(
     subnet_group=apps_vpc["elasticache_subnet"],
     security_groups=[redis_cluster_security_group.id],
     tags=aws_config.tags,
+    **defaults(stack_info)["redis"],
 )
 redis_cache = OLAmazonCache(redis_cache_config)
 
