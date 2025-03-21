@@ -620,10 +620,11 @@ alloy_release = kubernetes.helm.v3.Release(
                         "name": "otlp",
                         "port": 4317,
                         "targetPort": 4317,
+                        "appProtocol": "grpc",
                     },
                     {
                         "name": "otlp-http",
-                        "port": 4317,
+                        "port": 4318,
                         "targetPort": 4318,
                     },
                 ],
