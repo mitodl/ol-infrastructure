@@ -12,7 +12,6 @@ import pulumi_github as github
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import (
-    Alias,
     Config,
     InvokeOptions,
     Output,
@@ -440,18 +439,10 @@ ecommerce_db_config: appdb.OLAppDatabaseConfig = appdb.OLAppDatabaseConfig(
     app_vpc_id=apps_vpc["id"],
     target_vpc_name="applications",
     app_db_password=ecommerce_config.get("db_password"),
-    alias_map={
-        appdb.AliasKeys.secgroup: f"unified-ecommerce-application-security-group-{stack_info.env_suffix}",  # noqa: E501
-    },
 )
 
 ecommerce_db = appdb.OLAppDatabase(
     ol_db_config=ecommerce_db_config,
-    opts=ResourceOptions(
-        aliases=[
-            Alias(f"unified-ecommerce-db-{stack_info.env_suffix}-postgres-instance")
-        ]
-    ),
 )
 
 ecommerce_db_consul_node = Node(

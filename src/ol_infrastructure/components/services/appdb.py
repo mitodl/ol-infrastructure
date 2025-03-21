@@ -7,10 +7,9 @@ configuration for a typical application. Special snowflakes should continue
 to use the OLDatabase components available in `aws/database.py`.
 """
 
-from enum import Enum
 from typing import Optional
 
-from pulumi import Alias, ComponentResource, Output, ResourceOptions, StackReference
+from pulumi import ComponentResource, Output, ResourceOptions, StackReference
 from pulumi_aws import ec2
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -36,12 +35,6 @@ env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 # Network and vault stack references are defined in-situ for uniqueness.
 
 
-class AliasKeys(str, Enum):
-    secgroup = "olsecgroup"
-    amazondb = "olamazondb"
-    vault = "olvaultbackend"
-
-
 class OLAppDatabaseConfig(BaseModel):
     """Configuration for the MIT OL Database component"""
 
@@ -55,7 +48,6 @@ class OLAppDatabaseConfig(BaseModel):
     app_db_capacity: int | None = None
     app_vpc_id: Output[str]
     target_vpc_name: str
-    alias_map: dict[AliasKeys, str] | None = None
 
     @field_validator("target_vpc_name")
     @classmethod
@@ -113,18 +105,6 @@ class OLAppDatabase(ComponentResource):
 
         target_vpc = db_network_stack.require_output(ol_db_config.target_vpc_name)
 
-        db_aliases = []
-        secgroup_aliases = []
-        vault_aliases = []
-
-        if db_alias := (ol_db_config.alias_map or {}).get(AliasKeys.amazondb):
-            db_aliases.append(Alias(name=db_alias))
-
-        if secgroup_alias := (ol_db_config.alias_map or {}).get(AliasKeys.secgroup):
-            secgroup_aliases.append(Alias(name=secgroup_alias))
-
-        if vault_alias := (ol_db_config.alias_map or {}).get(AliasKeys.vault):
-            vault_aliases.append(Alias(name=vault_alias))
         ################################################
         # RDS configuration and networking setup
         # NEEDS FIX -CAP
@@ -152,7 +132,7 @@ class OLAppDatabase(ComponentResource):
             ],
             vpc_id=self.ol_db_config.app_vpc_id,
             tags=self.aws_config.tags,
-            opts=ResourceOptions(parent=self, aliases=secgroup_aliases),
+            opts=ResourceOptions(parent=self),
         )
 
         self.app_db_config = OLPostgresDBConfig(
@@ -169,7 +149,7 @@ class OLAppDatabase(ComponentResource):
         )
         self.app_db = OLAmazonDB(
             self.app_db_config,
-            opts=ResourceOptions(parent=self, aliases=db_aliases),
+            opts=ResourceOptions(parent=self),
         )
 
         self.app_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
@@ -184,6 +164,5 @@ class OLAppDatabase(ComponentResource):
             opts=ResourceOptions(
                 delete_before_replace=True,
                 parent=self.app_db,
-                aliases=vault_aliases,
             ),
         )
