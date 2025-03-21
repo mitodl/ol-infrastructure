@@ -452,12 +452,6 @@ class OLApisixRoute(pulumi.ComponentResource):
                     "hosts": route_config.hosts,
                     "paths": route_config.paths,
                 },
-                "upstreams": [
-                    {
-                        "type": "roundrobin",
-                        "nodes": route_config.upstream,
-                    }
-                ],
             }
             if route_config.upstream:
                 route["upstreams"] = [{"name": route_config.upstream}]
