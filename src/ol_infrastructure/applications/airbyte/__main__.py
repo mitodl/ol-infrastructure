@@ -158,10 +158,11 @@ airbyte_app_policy_document = {
         {
             "Effect": "Allow",
             "Action": [
-                "secretsmanager:GetSecretValue",
                 "secretsmanager:CreateSecret",
-                "secretsmanager:ListSecrets",
+                "secretsmanager:DeleteSecret",
                 "secretsmanager:DescribeSecret",
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:ListSecrets",
                 "secretsmanager:TagResource",
                 "secretsmanager:UpdateSecret",
             ],
