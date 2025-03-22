@@ -29,7 +29,7 @@ qa_defaults = {
 
 ci_defaults = {
     "rds": {
-        "instance_size": DBInstanceTypes.medium.value,
+        "instance_size": DBInstanceTypes.small.value,
         "multi_az": False,
         "prevent_delete": False,
         "take_final_snapshot": False,

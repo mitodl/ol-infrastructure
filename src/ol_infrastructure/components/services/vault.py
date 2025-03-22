@@ -124,7 +124,7 @@ class OLVaultDatabaseBackend(ComponentResource):
             opts,
         )
 
-        resource_opts = ResourceOptions.merge(ResourceOptions(parent=self), opts)
+        resource_opts = ResourceOptions(parent=self)
 
         self.db_mount = Mount(
             f"{db_config.db_name}-mount-point",
@@ -638,7 +638,7 @@ class OLVaultK8SSecretConfig(BaseModel):
     includes: Optional[list[str]] = []
     kind: str
     labels: Optional[dict[str, str]] = None
-    mount: str
+    mount: str | Output[str]
     mount_type: Optional[Literal["kv-v1", "kv-v2"]] = None
     name: str
     refresh_after: Optional[str] = None

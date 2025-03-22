@@ -202,7 +202,7 @@ class OLAmazonDB(pulumi.ComponentResource):
             opts,
         )
 
-        resource_options = pulumi.ResourceOptions(parent=self).merge(opts)
+        resource_options = pulumi.ResourceOptions(parent=self)
 
         # In order to update the minor versions of an RDS instance with a read replica,
         # the replica has to be upgraded prior to the primary. This block of logic
