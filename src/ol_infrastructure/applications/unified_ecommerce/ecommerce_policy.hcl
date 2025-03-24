@@ -1,7 +1,7 @@
-path "postgres-ecommerce/creds/app/*" {
+path "postgres-unified-ecommerce/creds/app/*" {
   capabilities = ["read"]
 }
-path "postgres-ecommerce/creds/app" {
+path "postgres-unified-ecommerce/creds/app" {
   capabilities = ["read"]
 }
 
