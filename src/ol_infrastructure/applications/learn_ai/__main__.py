@@ -56,6 +56,7 @@ from ol_infrastructure.lib.fastly import (
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 aws_account = get_caller_identity()
