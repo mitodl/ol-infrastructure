@@ -104,23 +104,14 @@ class OLMediaConvert(ComponentResource):
             opts=component_ops,
         )
 
-        # Check if SNS topic exists
-        try:
-            existing_topic = sns.get_topic(name=topic_name)
-            self.sns_topic = sns.Topic.get(
-                topic_name, existing_topic.id, opts=component_ops
-            )
-        except Exception:  # noqa: BLE001
-            # Create SNS Topic for MediaConvert notifications if it doesn't exist
-            self.sns_topic = sns.Topic(
-                topic_name,
-                name=topic_name,
-                tags=tags,
-                opts=component_ops,
-            )
+        self.sns_topic = sns.Topic(
+            topic_name,
+            name=topic_name,
+            tags=tags,
+            opts=component_ops,
+        )
 
         # Configure SNS Topic Subscription with provided host
-        # (Subscription is idempotent so no need to check existence)
         self.sns_topic_subscription = sns.TopicSubscription(
             subscription_name,
             endpoint=f"https://{host}/api/transcode-jobs/",
@@ -130,36 +121,29 @@ class OLMediaConvert(ComponentResource):
             opts=component_ops,
         )
 
-        # Check if CloudWatch EventRule exists
-        try:
-            # Configure Cloudwatch EventRule if it doesn't exist
-            self.mediaconvert_cloudwatch_rule = cloudwatch.EventRule(
-                event_rule_name,
-                description="Capture MediaConvert Events for use with SNS",
-                name=event_rule_name,
-                event_pattern=json.dumps(
-                    {
-                        "source": ["aws.mediaconvert"],
-                        "detail-type": ["MediaConvert Job State Change"],
-                        "detail": {
-                            "userMetadata": {"filter": [queue_name]},
-                            "status": ["COMPLETE", "ERROR"],
-                        },
-                    }
-                ),
-                opts=component_ops,
-            )
+        self.mediaconvert_cloudwatch_rule = cloudwatch.EventRule(
+            event_rule_name,
+            description="Capture MediaConvert Events for use with SNS",
+            name=event_rule_name,
+            event_pattern=json.dumps(
+                {
+                    "source": ["aws.mediaconvert"],
+                    "detail-type": ["MediaConvert Job State Change"],
+                    "detail": {
+                        "userMetadata": {"filter": [queue_name]},
+                        "status": ["COMPLETE", "ERROR"],
+                    },
+                }
+            ),
+            opts=component_ops,
+        )
 
-            # EventTarget is idempotent - it will update if exists or create if not
-            self.mediaconvert_cloudwatch_target = cloudwatch.EventTarget(
-                event_target_name,
-                rule=self.mediaconvert_cloudwatch_rule.name,
-                arn=self.sns_topic.arn,
-                opts=component_ops,
-            )
-
-        except Exception:  # noqa: BLE001, S110
-            pass
+        self.mediaconvert_cloudwatch_target = cloudwatch.EventTarget(
+            event_target_name,
+            rule=self.mediaconvert_cloudwatch_rule.name,
+            arn=self.sns_topic.arn,
+            opts=component_ops,
+        )
 
         # Register outputs
         outputs = {
