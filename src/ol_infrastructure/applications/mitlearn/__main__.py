@@ -1126,7 +1126,12 @@ learn_external_service_apisix_route = OLApisixRoute(
             route_name="passauth",
             priority=0,
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[proxy_rewrite_plugin_config],
+            plugins=[
+                proxy_rewrite_plugin_config,
+                learn_external_service_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
             hosts=[mit_learn_api_domain],
             paths=["/learn/*"],
             upstream=learn_external_service_apisix_upstream.resource_name,
