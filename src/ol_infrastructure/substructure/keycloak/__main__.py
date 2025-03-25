@@ -237,8 +237,8 @@ ol_apps_realm = keycloak.Realm(
     ),
     ssl_required="external",
     offline_session_idle_timeout="168h",
-    sso_session_idle_timeout="2h",
-    sso_session_max_lifespan="24h",
+    sso_session_idle_timeout="336h",
+    sso_session_max_lifespan="336h",
     opts=resource_options,
 )
 
