@@ -1212,6 +1212,7 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     {
                         "serviceName": learn_ai_service_name,
                         "servicePort": learn_ai_service_port_name,
+                        "resolveGranularity": "service",
                     },
                 ],
             },
@@ -1238,6 +1239,7 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     {
                         "serviceName": learn_ai_service_name,
                         "servicePort": learn_ai_service_port_name,
+                        "resolveGranularity": "service",
                     },
                 ],
             },
@@ -1267,6 +1269,7 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     {
                         "serviceName": learn_ai_service_name,
                         "servicePort": learn_ai_service_port_name,
+                        "resolveGranularity": "service",
                     },
                 ],
             },
@@ -1296,6 +1299,7 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     {
                         "serviceName": learn_ai_service_name,
                         "servicePort": learn_ai_service_port_name,
+                        "resolveGranularity": "service",
                     },
                 ],
             },
@@ -1355,6 +1359,7 @@ mit_learn_learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     {
                         "serviceName": learn_ai_service_name,
                         "servicePort": learn_ai_service_port_name,
+                        "resolveGranularity": "service",
                     },
                 ],
             },
@@ -1384,6 +1389,7 @@ mit_learn_learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     {
                         "serviceName": learn_ai_service_name,
                         "servicePort": learn_ai_service_port_name,
+                        "resolveGranularity": "service",
                     },
                 ],
             },
@@ -1414,6 +1420,7 @@ mit_learn_learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     {
                         "serviceName": learn_ai_service_name,
                         "servicePort": learn_ai_service_port_name,
+                        "resolveGranularity": "service",
                     },
                 ],
             },
@@ -1444,6 +1451,7 @@ mit_learn_learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                     {
                         "serviceName": learn_ai_service_name,
                         "servicePort": learn_ai_service_port_name,
+                        "resolveGranularity": "service",
                     },
                 ],
             },
