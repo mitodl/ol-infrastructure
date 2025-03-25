@@ -93,7 +93,7 @@ github_provider = github.Provider(
 
 k8s_global_labels = {
     "ol.mit.edu/stack": stack_info.full_name,
-    "ol.mit.edu/service": "learn-ai",
+    "ol.mit.edu/application": "learn-ai",
 }
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
@@ -794,8 +794,8 @@ init_containers = [
 ]
 
 # Create a deployment resource to manage the application pods
-application_labels = k8s_global_labels | {
-    "ol.mit.edu/application": "learn-ai",
+webapp_labels = k8s_global_labels | {
+    "ol.mit.edu/service": "webapp",
     "ol.mit.edu/pod-security-group": "learn-ai-app",
 }
 
@@ -804,13 +804,13 @@ learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="learn-ai-webapp",
         namespace=learn_ai_namespace,
-        labels=application_labels,
+        labels=webapp_labels,
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
         # TODO @Ardiea: Add horizontal pod autoscaler  # noqa: TD003, FIX002
         replicas=learn_ai_config.get_int("webapp_replica_count") or 2,
         selector=kubernetes.meta.v1.LabelSelectorArgs(
-            match_labels=application_labels,
+            match_labels=webapp_labels,
         ),
         # Limits the chances of simulatious pod restarts -> db migrations (hopefully)
         strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
@@ -822,7 +822,7 @@ learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
         ),
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                labels=application_labels,
+                labels=webapp_labels,
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
                 volumes=[
@@ -916,21 +916,25 @@ learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
     ),
 )
 
+celery_labels = k8s_global_labels | {
+    "ol.mit.edu/service": "webapp",
+    "ol.mit.edu/pod-security-group": "learn-ai-app",
+}
 learn_ai_celery_deployment_resource = kubernetes.apps.v1.Deployment(
     f"learn-ai-{stack_info.env_suffix}-celery-deployment",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="learn-ai-celery",
         namespace=learn_ai_namespace,
-        labels=application_labels,
+        labels=celery_labels,
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
         replicas=learn_ai_config.get_int("celery_replica_count") or 2,
         selector=kubernetes.meta.v1.LabelSelectorArgs(
-            match_labels=application_labels,
+            match_labels=celery_labels,
         ),
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                labels=application_labels,
+                labels=celery_labels,
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
                 service_account_name=learn_ai_service_account_name,
@@ -979,7 +983,7 @@ learn_ai_service = kubernetes.core.v1.Service(
         labels=k8s_global_labels,
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
-        selector=application_labels,
+        selector=webapp_labels,
         ports=[
             kubernetes.core.v1.ServicePortArgs(
                 name=learn_ai_service_port_name,
@@ -1062,9 +1066,9 @@ mit_learn_oidc_secret = OLVaultK8SSecret(
     resource_config=OLVaultK8SStaticSecretConfig(
         name="mit-learn-oidc-static-secrets",
         namespace=learn_ai_namespace,
-        labels=application_labels,
+        labels=k8s_global_labels,
         dest_secret_name=mit_learn_oidc_secret_name,
-        dest_secret_labels=application_labels,
+        dest_secret_labels=k8s_global_labels,
         mount="secret-operations",
         mount_type="kv-v1",
         path="sso/mitlearn",
