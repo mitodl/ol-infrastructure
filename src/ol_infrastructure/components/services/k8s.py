@@ -558,7 +558,7 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
             "introspection_endpoint_auth_method": oidc_config.oidc_introspection_endpoint_auth_method,
             "ssl_verify": oidc_config.oidc_ssl_verify,
             "renew_access_token_on_expiry": oidc_config.oidc_renew_access_token_on_expiry,
-            "refresH_session_interval": oidc_config.oidc_refresh_session_interval,
+            "refresh_session_interval": oidc_config.oidc_refresh_session_interval,
             "logout_path": oidc_config.oidc_logout_path,
             "post_logout_redirect_uri": oidc_config.oidc_post_logout_redirect_uri,
         }
