@@ -5,7 +5,7 @@ calls we currently make into one convenient callable package.
 """
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 import pulumi
 import pulumi_kubernetes as kubernetes
@@ -14,6 +14,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    NonNegativeInt,
     field_validator,
     model_validator,
 )
@@ -382,7 +383,10 @@ class OLApisixRouteConfig(BaseModel):
     paths: list[str] = []
     backend_service_name: Optional[str] = None
     backend_service_port: Optional[str] = None
+    # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/#service-resolution-granularity
+    backend_resolve_granularity: Literal["endpoint", "service"] = "service"
     upstream: Optional[str] = None
+    websocket: bool = False
 
     @model_validator(mode="after")
     def check_backend_or_upstream(self) -> "OLApisixRouteConfig":
@@ -452,6 +456,7 @@ class OLApisixRoute(pulumi.ComponentResource):
                     "hosts": route_config.hosts,
                     "paths": route_config.paths,
                 },
+                "websocket": route_config.websocket,
             }
             if route_config.upstream:
                 route["upstreams"] = [{"name": route_config.upstream}]
@@ -460,6 +465,7 @@ class OLApisixRoute(pulumi.ComponentResource):
                     {
                         "serviceName": route_config.backend_service_name,
                         "servicePort": route_config.backend_service_port,
+                        "resolveGranularity": route_config.backend_resolve_granularity,
                     }
                 ]
             routes.append(route)
@@ -468,19 +474,28 @@ class OLApisixRoute(pulumi.ComponentResource):
 
 class OLApisixOIDCConfig(BaseModel):
     application_name: str
-    k8s_namespace: str
     k8s_labels: dict[str, str] = {}
+    k8s_namespace: str
     vault_mount: str = "secret-operations"
-    vault_path: str
     vault_mount_type: str = "kv-v1"
+    vault_path: str
     vaultauth: str
 
-    oidc_scope: str = "openid profile email"
     oidc_bearer_only: bool = False
     oidc_introspection_endpoint_auth_method: str = "client_secret_basic"
-    oidc_ssl_verify: bool = False
     oidc_logout_path: str = "/logout/oidc"
     oidc_post_logout_redirect_uri: str = "/"
+    oidc_refresh_session_interval: NonNegativeInt = 1800
+    oidc_renew_access_token_on_expiry: bool = True
+    oidc_scope: str = "openid profile email"
+    oidc_session_contents: dict[str, bool] = {
+        "access_token": True,
+        "enc_id_token": True,
+        "id_token": True,
+        "user": True,
+    }
+    oidc_session_cookie_lifetime: NonNegativeInt = 0
+    oidc_ssl_verify: bool = False
     oidc_use_session_secret: bool = False
 
 
@@ -542,9 +557,23 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
             "bearer_only": oidc_config.oidc_bearer_only,
             "introspection_endpoint_auth_method": oidc_config.oidc_introspection_endpoint_auth_method,
             "ssl_verify": oidc_config.oidc_ssl_verify,
+            "renew_access_token_on_expiry": oidc_config.oidc_renew_access_token_on_expiry,
+            "refresH_session_interval": oidc_config.oidc_refresh_session_interval,
             "logout_path": oidc_config.oidc_logout_path,
             "post_logout_redirect_uri": oidc_config.oidc_post_logout_redirect_uri,
         }
+
+        if oidc_config.oidc_session_cookie_lifetime:
+            self.base_oidc_config["session_cookie_lifetime"] = {
+                "cookie": {
+                    "lifetime": 60 * oidc_config.oidc_session_cookie_lifetime,
+                },
+            }
+
+        if oidc_config.oidc_session_contents:
+            self.base_oidc_config["session_contents"] = (
+                oidc_config.oidc_session_contents
+            )
 
     def get_base_oidc_config(self, unauth_action: str) -> dict[str, Any]:
         return {
@@ -590,6 +619,13 @@ class OLApisixSharedPlugins(pulumi.ComponentResource):
         )
 
         __default_plugins: list[dict[str, Any]] = [
+            {
+                "name": "redirect",
+                "enable": True,
+                "config": {
+                    "http_to_https": True,
+                },
+            },
             {
                 "name": "cors",
                 "enable": True,
