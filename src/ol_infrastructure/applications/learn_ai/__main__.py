@@ -917,7 +917,7 @@ learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
 )
 
 celery_labels = k8s_global_labels | {
-    "ol.mit.edu/service": "webapp",
+    "ol.mit.edu/service": "celery",
     "ol.mit.edu/pod-security-group": "learn-ai-app",
 }
 learn_ai_celery_deployment_resource = kubernetes.apps.v1.Deployment(
