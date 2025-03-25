@@ -218,6 +218,7 @@ def mfe_job(
 
     mfe_build_plan = [
         TaskStep(
+            attempts=3,
             task=Identifier("compile-and-deploy-mfe"),
             config=TaskConfig(
                 platform=Platform.linux,
