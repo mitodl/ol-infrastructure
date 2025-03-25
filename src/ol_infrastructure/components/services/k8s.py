@@ -44,6 +44,7 @@ class OLApplicationK8sConfiguration(BaseModel):
     application_image_repository: str
     application_docker_tag: str
     vault_k8s_resource_auth_name: str
+    target_cpu_utilization_percentage: int = 50
     import_nginx_config: bool
     resource_requests: dict[str, str] = Field(
         default={"cpu": "250m", "memory": "300Mi"}
@@ -297,6 +298,29 @@ class OLApplicationK8s(ComponentResource):
             opts=resource_options,
         )
 
+        _application_hpa = kubernetes.autoscaling.v1.HorizontalPodAutoscaler(
+            f"{ol_app_k8s_config.application_name}-hpa",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=truncate_k8s_metanames(
+                    f"{ol_app_k8s_config.application_name}-app"
+                ),
+                namespace=ol_app_k8s_config.application_namespace,
+                labels=application_labels,
+            ),
+            spec=kubernetes.autoscaling.v1.HorizontalPodAutoscalerSpecArgs(
+                max_replicas=5,
+                min_replicas=1,
+                target_cpu_utilization_percentage=ol_app_k8s_config.target_cpu_utilization_percentage,
+                scale_target_ref=kubernetes.autoscaling.v1.CrossVersionObjectReferenceArgs(
+                    api_version="apps/v1",
+                    kind="Deployment",
+                    name=truncate_k8s_metanames(
+                        f"{ol_app_k8s_config.application_name}-app"
+                    ),
+                ),
+            ),
+            opts=resource_options,
+        )
         # A kubernetes service resource to act as load balancer for the app instances
         _application_service = kubernetes.core.v1.Service(
             f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-service",
