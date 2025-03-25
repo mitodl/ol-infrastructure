@@ -321,6 +321,9 @@ sensitive_heroku_vars = {
     "EXTERNAL_COURSE_SYNC_API_KEY": xpro_vault_secrets["external-course-sync"][
         "api_key"
     ],
+    "EXTERNAL_COURSE_SYNC_EMAIL_RECIPIENTS": xpro_vault_secrets[
+        "external-course-sync"
+    ]["email-recipients"],
     "HIREFIRE_TOKEN": xpro_vault_secrets["hirefire"]["token"],
     "MITOL_DIGITAL_CREDENTIALS_HMAC_SECRET": xpro_vault_secrets["digital-credentials"][
         "hmac_secret"
