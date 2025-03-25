@@ -1082,6 +1082,7 @@ learn_external_service_oidc_resources = OLApisixOIDCResources(
         k8s_namespace=learn_namespace,
         oidc_logout_path="/learn/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{mitlearn_config.require('api_domain')}/learn/logout/",
+        oidc_session_cookie_lifetime=60 * 20160,
         oidc_use_session_secret=True,
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",
@@ -1100,23 +1101,6 @@ proxy_rewrite_plugin_config = OLApisixPluginConfig(
     },
 )
 
-base_oidc_plugin_config = {
-    "scope": "openid profile email",
-    "bearer_only": False,
-    "introspection_endpoint_auth_method": "client_secret_basic",
-    "ssl_verify": False,
-    "renew_access_token_on_expiry": True,
-    "refresh_session_interval": 1800,
-    "session": {"cookie": {"lifetime": 60 * 20160}},
-    "session_contents": {
-        "access_token": True,
-        "enc_id_token": True,
-        "id_token": True,
-        "user": True,
-    },
-    "logout_path": "/learn/logout/oidc",
-    "post_logout_redirect_uri": f"https://{mitlearn_config.require('api_domain')}/learn/logout/",
-}
 learn_external_service_apisix_route = OLApisixRoute(
     name=f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
     k8s_namespace=learn_namespace,
