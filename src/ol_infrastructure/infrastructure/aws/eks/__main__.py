@@ -1031,12 +1031,12 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                 "tolerations": operations_tolerations,
                 "resources": {
                     "requests": {
-                        "cpu": "50m",
-                        "memory": "100Mi",
+                        "cpu": "100m",
+                        "memory": "200Mi",
                     },
                     "limits": {
-                        "cpu": "100m",
-                        "memory": "150Mi",
+                        "cpu": "200m",
+                        "memory": "400Mi",
                     },
                 },
                 "apisix": {
