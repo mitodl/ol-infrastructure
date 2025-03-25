@@ -8,24 +8,25 @@ config:
   heroku:user: "odl-devops"
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
+    - "draft.ocw.mit.edu"
     - "ocw.mit.edu"
     - ".mitopen.odl.mit.edu"  # legacy
     - ".learn.mit.edu"
     session_cookie_domain: ".learn.mit.edu"
     csrf_domains:
     - "https://api.learn.mit.edu"
+    - "https://learn.mit.edu"
     - "https://api.mitopen.odl.mit.edu"  # legacy
-    - "https://learn.mit.edu"
     - "https://mitopen.odl.mit.edu"  # legacy
-    cors_urls:
     - "https://draft.ocw.mit.edu"
-    - "https://live-qa.ocw.mit.edu"  # Why?
-    - "https://live.ocw.mit.edu"
-    - "https://learn.mit.edu"
-    - "https://mitopen.odl.mit.edu"  # legacy
-    - "https://ocw-preview.odl.mit.edu"
     - "https://ocw.mit.edu"
-    - "https://www.ocw.mit.edu"
+    cors_urls:
+    - "https://api.learn.mit.edu"
+    - "https://learn.mit.edu"
+    - "https://api.mitopen.odl.mit.edu"  # legacy
+    - "https://mitopen.odl.mit.edu"  # legacy
+    - "https://draft.ocw.mit.edu"
+    - "https://ocw.mit.edu"
     mailgun_sender_domain: "mail.learn.mit.edu"  # Need to verify
     sso_url: "sso.ol.mit.edu"
   heroku_app:vars:

@@ -54,6 +54,7 @@ config:
     UWSGI_THREADS: 15
   heroku_app:interpolation_vars:
     auth_allowed_redirect_hosts:
+    - "draft-qa.ocw.mit.edu"
     - "live-qa.ocw.mit.edu"
     - "rc.learn.mit.edu"
     session_cookie_domain: ".rc.learn.mit.edu"
@@ -62,6 +63,8 @@ config:
     - "https://rc.learn.mit.edu"
     - "https://api.mitopen-rc.odl.mit.edu"  # legacy
     - "https://mitopen-rc.odl.mit.edu"  # legacy
+    - "https://draft-qa.ocw.mit.edu"
+    - "https://live-qa.ocw.mit.edu"
     cors_urls:
     - "https://mitopen-rc.odl.mit.edu" # legacy
     - "https://rc.learn.mit.edu"
