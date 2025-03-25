@@ -21,8 +21,8 @@ config:
     MITOL_UE_FEATURES_DEFAULT: "True"
     MITOL_UE_FROM_EMAIL: "donotreply@ol.mit.edu" ###FIX
     MITOL_UE_HOSTNAME: "api-pay-qa.ol.mit.edu"
-    MITOL_UE_PAYMENT_BASKET_CHOOSER: "https://pay-qa.ol.mit.edu/cart/" ###FIX
-    MITOL_UE_PAYMENT_BASKET_ROOT: "https://pau-qa.ol.mit.edu/cart/" ###FIX
+    MITOL_UE_PAYMENT_BASKET_CHOOSER: "https://pay-qa.ol.mit.edu/"
+    MITOL_UE_PAYMENT_BASKET_ROOT: "https://pay-qa.ol.mit.edu/"
     MITOL_UE_PAYMENT_INTERSTITIAL_DEBUG: "False"
     MITOL_UE_SECURE_SSL_REDIRECT: "False" ###FIX
     MITOL_UE_USE_S3: "False" ###FIX
