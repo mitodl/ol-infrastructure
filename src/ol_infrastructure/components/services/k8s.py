@@ -485,7 +485,6 @@ class OLApisixOIDCConfig(BaseModel):
     oidc_introspection_endpoint_auth_method: str = "client_secret_basic"
     oidc_logout_path: str = "/logout/oidc"
     oidc_post_logout_redirect_uri: str = "/"
-    oidc_refresh_session_interval: NonNegativeInt = 1800
     oidc_renew_access_token_on_expiry: bool = True
     oidc_scope: str = "openid profile email"
     oidc_session_contents: dict[str, bool] = {
@@ -558,7 +557,6 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
             "introspection_endpoint_auth_method": oidc_config.oidc_introspection_endpoint_auth_method,
             "ssl_verify": oidc_config.oidc_ssl_verify,
             "renew_access_token_on_expiry": oidc_config.oidc_renew_access_token_on_expiry,
-            "refresh_session_interval": oidc_config.oidc_refresh_session_interval,
             "logout_path": oidc_config.oidc_logout_path,
             "post_logout_redirect_uri": oidc_config.oidc_post_logout_redirect_uri,
         }
