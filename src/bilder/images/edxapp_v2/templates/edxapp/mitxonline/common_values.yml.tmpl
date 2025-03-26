@@ -385,7 +385,8 @@ JWT_EXPIRATION: 30
 LANGUAGE_CODE: en
 LANGUAGE_COOKIE: {{ env "ENVIRONMENT" }}-openedx-language-preference
 MIT_LEARN_AI_API_URL: https://{{ key "edxapp/learn-ai-api-domain" }}  # Added for ol_openedx_chat
-MIT_LEARN_API_URL: https://{{ key "edxapp/mit-learn-api-domain" }}  # Added for ol_openedx_chat
+MIT_LEARN_API_BASE_URL: https://{{ key "edxapp/mit-learn-api-domain" }}  # Added for ol_openedx_chat
+MIT_LEARN_SUMMARY_FLASHCARD_URL: https://{{ key "edxapp/mit-learn-api-domain" }}/api/v1/contentfiles/  # Added for ol_openedx_chat
 LEARNER_PORTAL_URL_ROOT: https://learner-portal-localhost:18000
 LEARNER_HOME_MICROFRONTEND_URL: '/dashboard/'
 LEARNING_MICROFRONTEND_URL: https://{{ key "edxapp/lms-domain" }}/learn
