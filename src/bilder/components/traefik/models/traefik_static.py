@@ -36,7 +36,9 @@ class AccessLog(FieldModel):
     file_path: Optional[str] = Field(None, alias="filePath")
     format: Optional[str] = None
     filters: Optional[Filters] = None
-    fields: Optional[Fields] = None
+    fields: Optional[Fields] = Fields(
+        default_mode="keep", headers=Headers(default_mode="keep")
+    )
     buffering_size: Optional[int] = Field(None, alias="bufferingSize")
 
 
@@ -708,7 +710,7 @@ class Tracing(FieldModel):
 
 
 class TraefikStaticConfig(FieldModel):
-    access_log: Optional[AccessLog] = Field(None, alias="accessLog")
+    access_log: Optional[AccessLog] = Field(AccessLog(), alias="accessLog")
     api: Optional[Api] = None
     certificates_resolvers: Optional[dict[str, CertificatesResolvers]] = Field(
         None, alias="certificatesResolvers"
