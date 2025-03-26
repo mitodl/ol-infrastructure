@@ -44,7 +44,7 @@ class OLApplicationK8sConfiguration(BaseModel):
     application_image_repository: str
     application_docker_tag: str
     vault_k8s_resource_auth_name: str
-    target_cpu_utilization_percentage: int = 50
+    target_cpu_utilization_percentage: int = 70
     import_nginx_config: bool
     resource_requests: dict[str, str] = Field(
         default={"cpu": "250m", "memory": "300Mi"}
