@@ -5,12 +5,10 @@ calls we currently make into one convenient callable package.
 """
 
 from pathlib import Path
-
 from typing import Any, Literal, Optional
 
 import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
-
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -359,6 +357,7 @@ class OLApplicationK8s(ComponentResource):
                 },
             ),
         )
+
 
 class OLApisixPluginConfig(BaseModel):
     name: str
