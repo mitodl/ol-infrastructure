@@ -1,10 +1,7 @@
 from django.core import management
-import lms.startup
 
 import yaml
 import sys
-
-lms.startup.run()
 
 with open(sys.argv[1]) as yamlfile:
     config = yaml.safe_load(yamlfile)
