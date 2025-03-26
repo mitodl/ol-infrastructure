@@ -528,7 +528,7 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
         }
 
         if oidc_config.oidc_use_session_secret:
-            __templates["session_secret"] = '{{ get .Secrets "secret" }}'  # noqa: S105
+            __templates["session.secret"] = '{{ get .Secrets "secret" }}'
 
         self.oidc_secrets = OLVaultK8SSecret(
             f"{oidc_config.application_name}-oidc-secrets",
