@@ -1104,7 +1104,6 @@ base_oidc_plugin_config = {
     "introspection_endpoint_auth_method": "client_secret_basic",
     "ssl_verify": False,
     "renew_access_token_on_expiry": True,
-    "refresh_session_interval": 1800,
     "session": {"cookie": {"lifetime": 60 * 20160}},
     "session_contents": {
         "access_token": True,
