@@ -595,8 +595,8 @@ redis_creds = kubernetes.core.v1.Secret(
     ),
     string_data=redis_cache.address.apply(
         lambda address: {
-            "CELERY_BROKER_URL": f"rediss://default:{redis_config.require('password')}@{address}:6379/0?ssl_cert_Reqs=required",
-            "CELERY_RESULT_BACKEND": f"rediss://default:{redis_config.require('password')}@{address}:6379/0?ssl_cert_Reqs=required",
+            "CELERY_BROKER_URL": f"rediss://default:{redis_config.require('password')}@{address}:6379/0?ssl_cert_reqs=required",
+            "CELERY_RESULT_BACKEND": f"rediss://default:{redis_config.require('password')}@{address}:6379/0?ssl_cert_reqs=required",
         }
     ),
     opts=ResourceOptions(

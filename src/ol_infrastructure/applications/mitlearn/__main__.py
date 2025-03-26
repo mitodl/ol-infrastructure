@@ -1,6 +1,5 @@
 # ruff: noqa: TD003, ERA001, FIX002, E501
 
-
 import base64
 import json
 import mimetypes
@@ -25,17 +24,6 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
-from ol_infrastructure.components.services.k8s import (
-    OLApisixExternalUpstream,
-    OLApisixExternalUpstreamConfig,
-    OLApisixOIDCConfig,
-    OLApisixOIDCResources,
-    OLApisixPluginConfig,
-    OLApisixRoute,
-    OLApisixRouteConfig,
-    OLApisixSharedPlugins,
-    OLApisixSharedPluginsConfig,
-)
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SResources,
@@ -837,7 +825,6 @@ application_labels = k8s_global_labels | {
     "ol.mit.edu/pod-security-group": "learn",
 }
 
-# TODO (mmd, YYYY-MM-DD): Leaving this out of OLApisix* refactoring for the legacy configs
 oidc_secret_name = "oidc-secrets"  # pragma: allowlist secret # noqa: S105
 oidc_secret = OLVaultK8SSecret(
     f"ol-mitlearn-oidc-secrets-{stack_info.env_suffix}",
@@ -923,7 +910,6 @@ mitlearn_https_apisix_tls = kubernetes.apiextensions.CustomResource(
 
 # We need to be able to change `unauth_action` depending on the route but otherwise
 # the settings for the oidc plugin will be unchanged
-# TODO (mmd, YYYY-MM-DD): Leaving this out of OLApisix* refactoring
 legacy_base_oidc_plugin_config = {
     "scope": "openid profile email",
     "bearer_only": False,
@@ -933,39 +919,65 @@ legacy_base_oidc_plugin_config = {
     "post_logout_redirect_uri": f"https://{mitlearn_config.require('api_domain')}/logout/",
 }
 
-learn_external_service_name = "learn-at-heroku"
-learn_external_service_scheme = "https"
-
-learn_external_service_shared_plugins = OLApisixSharedPlugins(
-    name="ol-mitlearn-external-service-apisix-plugins",
-    plugin_config=OLApisixSharedPluginsConfig(
-        application_name="mitlearn",
-        resource_suffix="ol-shared-plugins",
-        k8s_namespace=learn_namespace,
-        k8s_labels=application_labels,
-        enable_defaults=True,
+shared_plugin_config_name = "shared-plugin-config"
+learn_external_service_apisix_pluginconfig = kubernetes.apiextensions.CustomResource(
+    f"ol-mitlearn-external-service-apisix-pluginconfig-{stack_info.env_suffix}",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixPluginConfig",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=shared_plugin_config_name,
+        namespace=learn_namespace,
+        labels=application_labels,
     ),
-)
-
-learn_external_service_apisix_upstream = OLApisixExternalUpstream(
-    name=learn_external_service_name,
-    external_upstream_config=OLApisixExternalUpstreamConfig(
-        application_name=learn_external_service_name,
-        k8s_labels=application_labels,
-        k8s_namespace=learn_namespace,
-        external_hostname=mitlearn_config.require("heroku_domain"),
-    ),
-    opts=ResourceOptions(
-        aliases=[
-            Alias(
-                f"ol-mitlearn-external-service-apisix-upstream-{stack_info.env_suffix}",
-            )
+    spec={
+        "plugins": [
+            {
+                "name": "redirect",
+                "enable": True,
+                "config": {
+                    "http_to_https": True,
+                },
+            },
+            {
+                "name": "cors",
+                "enable": True,
+                "config": {
+                    "allow_origins": "**",
+                    "allow_methods": "**",
+                    "allow_headers": "**",
+                    "allow_credential": True,
+                },
+            },
         ]
-    ),
+    },
 )
+
+learn_external_service_name = "learn-at-heroku"
+learn_external_service_port_name = "https"
+
+learn_external_service_apisix_upstream = kubernetes.apiextensions.CustomResource(
+    f"ol-mitlearn-external-service-apisix-upstream-{stack_info.env_suffix}",
+    api_version="apisix.apache.org/v2",
+    kind="ApisixUpstream",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=learn_external_service_name,
+        namespace=learn_namespace,
+        labels=application_labels,
+    ),
+    spec={
+        "scheme": "https",
+        "externalNodes": [
+            {
+                "type": "Domain",
+                "name": mitlearn_config.require("heroku_domain"),
+            },
+        ],
+    },
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
 
 # LEGACY RETIREMENT : goes away
-# MD : 2025-03-21 Leaving this out of OLApisix* refactoring
 mit_learn_api_domain = mitlearn_config.require("api_domain")
 learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
     f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
@@ -982,7 +994,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 # Wildcard route that can use auth but doesn't require it
                 "name": "passauth",
                 "priority": 0,
-                "plugin_config_name": learn_external_service_shared_plugins.resource_name,
+                "plugin_config_name": shared_plugin_config_name,
                 "plugins": [
                     {
                         "name": "openid-connect",
@@ -1002,7 +1014,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 },
                 "upstreams": [
                     {
-                        "name": learn_external_service_apisix_upstream.resource_name,
+                        "name": learn_external_service_name,
                     },
                 ],
             },
@@ -1029,7 +1041,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 },
                 "upstreams": [
                     {
-                        "name": learn_external_service_apisix_upstream.resource_name,
+                        "name": learn_external_service_name,
                     },
                 ],
             },
@@ -1037,7 +1049,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 # Routes that require authentication
                 "name": "reqauth",
                 "priority": 10,
-                "plugin_config_name": learn_external_service_shared_plugins.resource_name,
+                "plugin_config_name": shared_plugin_config_name,
                 "plugins": [
                     {
                         "name": "openid-connect",
@@ -1059,7 +1071,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 },
                 "upstreams": [
                     {
-                        "name": learn_external_service_apisix_upstream.resource_name,
+                        "name": learn_external_service_name,
                     },
                 ],
             },
@@ -1069,7 +1081,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
         delete_before_replace=True,
         depends_on=[
             learn_external_service_apisix_upstream,
-            learn_external_service_shared_plugins,
+            learn_external_service_apisix_pluginconfig,
         ],
     ),
 )
@@ -1091,15 +1103,16 @@ learn_external_service_oidc_resources = OLApisixOIDCResources(
     ),
 )
 
-proxy_rewrite_plugin_config = OLApisixPluginConfig(
-    name="proxy-rewrite",
-    config={
+proxy_rewrite_plugin_config = {
+    "name": "proxy-rewrite",
+    "enable": True,
+    "config": {
         "regex_uri": [
             "/learn/(.*)",
             "/$1",
         ],
     },
-)
+}
 
 learn_external_service_apisix_route = OLApisixRoute(
     name=f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
@@ -1154,12 +1167,10 @@ learn_external_service_apisix_route = OLApisixRoute(
         delete_before_replace=True,
         depends_on=[
             learn_external_service_apisix_upstream,
-            learn_external_service_shared_plugins,
+            learn_external_service_apisix_pluginconfig,
         ],
     ),
 )
-
-
 five_minutes = 60 * 5
 route53.Record(
     "ol-mitopen-frontend-dns-record",

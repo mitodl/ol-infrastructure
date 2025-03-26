@@ -111,8 +111,24 @@ traefik_static_config = traefik_static.TraefikStaticConfig(
                     )
                 )
             ),
+            forwarded_headers=traefik_static.ForwardedHeaders(
+                trusted_ips=[
+                    "10.0.0.0/8",
+                    "172.16.0.0/12",
+                    "192.168.0.0/16",
+                ]
+            ),
         ),
-        "https": traefik_static.EntryPoints(address=":443"),
+        "https": traefik_static.EntryPoints(
+            address=":443",
+            forwarded_headers=traefik_static.ForwardedHeaders(
+                trusted_ips=[
+                    "10.0.0.0/8",
+                    "172.16.0.0/12",
+                    "192.168.0.0/16",
+                ]
+            ),
+        ),
     },
 )
 traefik_config = TraefikConfig(static_configuration=traefik_static_config)

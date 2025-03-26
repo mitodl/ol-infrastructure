@@ -108,7 +108,7 @@ class ProxyProtocol(FieldModel):
 
 class ForwardedHeaders(FieldModel):
     insecure: Optional[bool] = None
-    trusted_i_ps: Optional[list[str]] = Field(None, alias="trustedIPs")
+    trusted_ips: Optional[list[str]] = Field(None, alias="trustedIPs")
 
 
 class EntryPoint(FieldModel):
@@ -156,7 +156,14 @@ class EntryPoints(FieldModel):
     transport: Optional[Transport] = None
     proxy_protocol: Optional[ProxyProtocol] = Field(None, alias="proxyProtocol")
     forwarded_headers: Optional[ForwardedHeaders] = Field(
-        None, alias="forwardedHeaders"
+        ForwardedHeaders(
+            trusted_ips=[
+                "10.0.0.0/8",
+                "172.16.0.0/12",
+                "192.168.0.0/16",
+            ]
+        ),
+        alias="forwardedHeaders",
     )
     http: Optional[Http] = None
     http2: Optional[Http2] = None

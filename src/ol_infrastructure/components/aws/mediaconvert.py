@@ -143,7 +143,6 @@ class OLMediaConvert(ComponentResource):
             event_target_name,
             rule=self.mediaconvert_cloudwatch_rule.name,
             arn=self.sns_topic.arn,
-            tags=tags,
             opts=component_ops,
         )
 

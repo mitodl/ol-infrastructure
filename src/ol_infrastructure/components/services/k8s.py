@@ -1,15 +1,16 @@
-# ruff: noqa: ERA001, C416, E501
+# ruff: noqa: ERA001, C416
 """
 This is a service components that replaces a number of "boilerplate" kubernetes
 calls we currently make into one convenient callable package.
 """
 
 from pathlib import Path
+
 from typing import Any, Literal, Optional
 
-import pulumi
 import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -23,10 +24,6 @@ from bridge.lib.magic_numbers import (
     DEFAULT_NGINX_PORT,
     DEFAULT_UWSGI_PORT,
     MAXIMUM_K8S_NAME_LENGTH,
-)
-from ol_infrastructure.components.services.vault import (
-    OLVaultK8SSecret,
-    OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
@@ -161,7 +158,7 @@ class OLApplicationK8s(ComponentResource):
             ),
         ]
 
-        app_image = f"{ol_app_k8s_config.application_image_repository}:{ol_app_k8s_config.application_docker_tag}"
+        app_image = f"{ol_app_k8s_config.application_image_repository}:{ol_app_k8s_config.application_docker_tag}"  # noqa: E501
         init_containers = []
         if ol_app_k8s_config.init_collectstatic:
             init_containers.append(
@@ -196,8 +193,8 @@ class OLApplicationK8s(ComponentResource):
 
         # Create a deployment resource to manage the application pods
         application_labels = ol_app_k8s_config.k8s_global_labels | {
-            "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}-application",
-            "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
+            "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}-application",  # noqa: E501
+            "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(  # noqa: E501
                 truncate_k8s_metanames
             ),
         }
@@ -349,7 +346,7 @@ class OLApplicationK8s(ComponentResource):
                 spec={
                     "podSelector": {
                         "matchLabels": {
-                            "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
+                            "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(  # noqa: E501
                                 truncate_k8s_metanames
                             ),
                         },
@@ -362,7 +359,6 @@ class OLApplicationK8s(ComponentResource):
                 },
             ),
         )
-
 
 class OLApisixPluginConfig(BaseModel):
     name: str
