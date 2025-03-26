@@ -821,6 +821,7 @@ if keycloak_realm_config.get("olapps-mitlearn-client-secret"):
         valid_redirect_uris=keycloak_realm_config.get_object(
             "olapps-mitlearn-client-redirect-uris"
         ),
+        web_origins="+",
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
     olapps_mitlearn_client_scope = keycloak.openid.ClientDefaultScopes(
