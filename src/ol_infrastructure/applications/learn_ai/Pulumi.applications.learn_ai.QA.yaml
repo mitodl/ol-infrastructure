@@ -26,6 +26,8 @@ config:
     MITOL_COOKIE_NAME: "mitol"
     MITOL_FEATURES_DEFAULT: "true"
     NODE_ENV: "development"
+    OPENTELEMETRY_ENABLED: "true"
+    OPENTELEMETRY_ENDPOINT: "grafana-alloy.operations.svc.cluster.local:4317"
     POSTHOG_API_HOST: "https://app.posthog.com"
     POSTHOG_ENABLED: "true"
     POSTHOG_ENABLE_SESSION_RECORDING: "true"
