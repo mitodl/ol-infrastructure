@@ -162,7 +162,7 @@ forum_server_security_group = ec2.SecurityGroup(
 lt_config = OLLaunchTemplateConfig(
     block_device_mappings=block_device_mappings,
     image_id=forum_server_ami.id,
-    instance_type=forum_config.get("instance_type") or InstanceTypes.burstable_micro,
+    instance_type=forum_config.get("instance_type") or InstanceTypes.burstable_medium,
     instance_profile_arn=forum_server_instance_profile.arn,
     security_groups=[
         forum_server_security_group,

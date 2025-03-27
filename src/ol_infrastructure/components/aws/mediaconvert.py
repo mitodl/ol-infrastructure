@@ -4,7 +4,7 @@ import json
 from typing import Any, Optional
 
 from pulumi import ComponentResource, Output, ResourceOptions
-from pulumi_aws import cloudwatch, iam, mediaconvert, sns
+from pulumi_aws import cloudwatch, get_caller_identity, iam, mediaconvert, sns
 from pydantic import BaseModel, ConfigDict, Field
 
 ROLE_NAME = "{resource_prefix}-role"
@@ -109,6 +109,52 @@ class OLMediaConvert(ComponentResource):
             name=topic_name,
             tags=tags,
             opts=component_ops,
+        )
+
+        aws_account = get_caller_identity()
+
+        policy_document = self.sns_topic.arn.apply(
+            lambda arn: iam.get_policy_document_output(
+                statements=[
+                    {
+                        "Sid": "__default_statement_ID",
+                        "Effect": "Allow",
+                        "principals": [{"type": "AWS", "identifiers": ["*"]}],
+                        "actions": [
+                            "SNS:GetTopicAttributes",
+                            "SNS:SetTopicAttributes",
+                            "SNS:AddPermission",
+                            "SNS:RemovePermission",
+                            "SNS:DeleteTopic",
+                            "SNS:Subscribe",
+                            "SNS:ListSubscriptionsByTopic",
+                            "SNS:Publish",
+                        ],
+                        "resources": [arn],
+                        "conditions": [
+                            iam.GetPolicyDocumentStatementConditionArgs(
+                                test="StringEquals",
+                                variable="AWS:SourceOwner",
+                                values=[aws_account.account_id],
+                            )
+                        ],
+                    },
+                    {
+                        "Sid": "AllowEventsServiceToPublish",
+                        "Effect": "Allow",
+                        "principals": [
+                            {"type": "Service", "identifiers": ["events.amazonaws.com"]}
+                        ],
+                        "actions": ["SNS:Publish"],
+                        "resources": [arn],
+                    },
+                ]
+            )
+        )
+        self.sns_topic_policy = sns.TopicPolicy(
+            f"{topic_name}-policy",
+            arn=self.sns_topic.arn,
+            policy=policy_document.json,
         )
 
         # Configure SNS Topic Subscription with provided host

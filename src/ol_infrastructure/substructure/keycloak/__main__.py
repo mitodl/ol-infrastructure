@@ -237,8 +237,8 @@ ol_apps_realm = keycloak.Realm(
     ),
     ssl_required="external",
     offline_session_idle_timeout="168h",
-    sso_session_idle_timeout="2h",
-    sso_session_max_lifespan="24h",
+    sso_session_idle_timeout="336h",
+    sso_session_max_lifespan="336h",
     opts=resource_options,
 )
 
@@ -821,7 +821,7 @@ if keycloak_realm_config.get("olapps-mitlearn-client-secret"):
         valid_redirect_uris=keycloak_realm_config.get_object(
             "olapps-mitlearn-client-redirect-uris"
         ),
-        web_origins="+",
+        web_origins=["+"],
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
     olapps_mitlearn_client_scope = keycloak.openid.ClientDefaultScopes(
