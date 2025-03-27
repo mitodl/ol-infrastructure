@@ -22,6 +22,7 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resource_types import pulumi_provisioner_resource
 from ol_concourse.lib.resources import git_repo, pulumi_provisioner, registry_image
+from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS
 
 
 def build_ecommerce_pipeline() -> Pipeline:
@@ -39,10 +40,10 @@ def build_ecommerce_pipeline() -> Pipeline:
         uri="http://github.com/mitodl/unified-ecommerce",
         branch="release-candidate",
         fetch_tags=True,
-        tag_regex=r"v[0-9]\.[0-9]*\.[0-9]",  # examples v0.24.0, v0.26.3
     )
 
-    # Used for trigging the production deployment
+    # Used for building a release docker image and
+    # trigging the production deployment
     ecommerce_backend_release_repo = git_repo(
         Identifier("unified-ecommerce-backend-release"),
         uri="http://github.com/mitodl/unified-ecommerce",
@@ -60,10 +61,19 @@ def build_ecommerce_pipeline() -> Pipeline:
         tag_regex="[0-9A-Fa-f]+",  # Should only capture the CI images
     )
 
-    # Used for publishing the RC / production containers to dockerhub
+    # Used for publishing the RC containers to dockerhub
     ecommerce_registry_rc_backend_image = registry_image(
         name=Identifier("unified-ecommerce-rc-image"),
-        image_repository="mitodl/unified-ecommerce-app-main",
+        image_repository="mitodl/unified-ecommerce-app-rc",
+        username="((dockerhub.username))",
+        password="((dockerhub.password))",  # noqa: S106
+        tag_regex=r"v[0-9]\.[0-9]*\.[0-9]",  # examples v0.24.0, v0.26.3
+    )
+
+    # Used for publishing the production containers to dockerhub
+    ecommerce_registry_release_backend_image = registry_image(
+        name=Identifier("unified-ecommerce-rc-image"),
+        image_repository="mitodl/unified-ecommerce-app-release",
         username="((dockerhub.username))",
         password="((dockerhub.password))",  # noqa: S106
         tag_regex=r"v[0-9]\.[0-9]*\.[0-9]",  # examples v0.24.0, v0.26.3
@@ -74,7 +84,7 @@ def build_ecommerce_pipeline() -> Pipeline:
         Identifier("ol-infra"),
         uri="https://github.com/mitodl/ol-infrastructure",
         branch="main",
-        # Purposely not monitoring paths or using this as a trigger
+        paths=["src/ol_infrastructure/applications/learn_ai", *PULUMI_WATCHED_PATHS],
     )
 
     # This image is only used for the CI environment
@@ -100,8 +110,7 @@ def build_ecommerce_pipeline() -> Pipeline:
         ],
     )
 
-    # This image will be used for both the QA and production deployments
-    # hopefully it gets a meaningful tag
+    # This image is only used for the QA environment
     ecommerce_release_canidiate_image_build_job = Job(
         name="build-ecommerce-image-from-release-candidate",
         build_log_retention={"builds": 10},
@@ -123,6 +132,30 @@ def build_ecommerce_pipeline() -> Pipeline:
             ),
         ],
     )
+
+    # This image is only used for the Production environment
+    # (I hate this)
+    ecommerce_release_image_build_job = Job(
+        name="build-ecommerce-image-from-release",
+        build_log_retention={"builds": 10},
+        plan=[
+            GetStep(get=ecommerce_backend_release_repo.name, trigger=True),
+            container_build_task(
+                inputs=[Input(name=ecommerce_backend_release_repo.name)],
+                build_parameters={
+                    "CONTEXT": ecommerce_backend_release_repo.name,
+                },
+                build_args=[],
+            ),
+            PutStep(
+                put=ecommerce_registry_release_backend_image.name,
+                params={
+                    "image": "image/image.tar",
+                    "additional_tags": f"./{ecommerce_backend_release_repo.name}/.git/ref",  # Should contain a tag if doof is doing his job
+                },
+            ),
+        ],
+    )
     ecommerce_backend_main_branch_container_fragement = PipelineFragment(
         resources=[ecommerce_backend_main_repo, ecommerce_registry_ci_backend_image],
         jobs=[ecommerce_main_image_build_job],
@@ -133,6 +166,13 @@ def build_ecommerce_pipeline() -> Pipeline:
             ecommerce_registry_ci_backend_image,
         ],
         jobs=[ecommerce_release_canidiate_image_build_job],
+    )
+    ecommerce_backend_release_container_fragment = PipelineFragment(
+        resources=[
+            ecommerce_backend_release_repo,
+            ecommerce_registry_release_backend_image,
+        ],
+        jobs=[ecommerce_release_image_build_job],
     )
 
     pulumi_resource_type = pulumi_provisioner_resource()
@@ -154,7 +194,7 @@ def build_ecommerce_pipeline() -> Pipeline:
             ),
             GetStep(
                 get=ol_infra_repo.name,
-                trigger=False,
+                trigger=True,
             ),
             LoadVarStep(
                 load_var="image_tag",
@@ -211,7 +251,7 @@ def build_ecommerce_pipeline() -> Pipeline:
             ),
             GetStep(
                 get=ol_infra_repo.name,
-                trigger=False,
+                trigger=True,
             ),
             LoadVarStep(
                 load_var="image_tag",
@@ -259,20 +299,19 @@ def build_ecommerce_pipeline() -> Pipeline:
         name=Identifier("unified-ecommerce-production-backend-deployment"),
         max_in_flight=1,
         plan=[
-            GetStep(get=ecommerce_backend_release_repo.name, trigger=True),
             GetStep(
-                get=ecommerce_registry_rc_backend_image.name,
-                trigger=False,
-                passed=[ecommerce_backend_rc_deployment_job.name],
+                get=ecommerce_registry_release_backend_image.name,
+                trigger=True,
+                passed=[ecommerce_release_image_build_job.name],
                 params={"skip_download": True},
             ),
             GetStep(
                 get=ol_infra_repo.name,
-                trigger=False,
+                trigger=False,  # Intentionally false
             ),
             LoadVarStep(
                 load_var="image_tag",
-                file=f"{ecommerce_registry_rc_backend_image.name}/tag",
+                file=f"{ecommerce_registry_release_backend_image.name}/tag",
             ),
             TaskStep(
                 task=Identifier("set-aws-creds"),
@@ -323,6 +362,7 @@ def build_ecommerce_pipeline() -> Pipeline:
         production_deployment_fragment,
         ecommerce_backend_main_branch_container_fragement,
         ecommerce_backend_release_candidate_container_fragment,
+        ecommerce_backend_release_container_fragment,
     )
     return combined_fragment.to_pipeline()
 

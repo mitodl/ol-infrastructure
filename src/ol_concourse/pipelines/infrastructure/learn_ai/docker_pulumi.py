@@ -42,13 +42,13 @@ def build_learn_ai_pipeline() -> Pipeline:
         fetch_tags=True,
     )
 
-    # Used for trigging the production deployment
+    # Used for building a releasae docker image and
+    # triggering the production deployment
     learn_ai_release_repo = git_repo(
         Identifier("learn-ai-release"),
         uri="http://github.com/mitodl/learn-ai",
         branch="release",
         fetch_tags=True,
-        tag_regex=r"v[0-9]\.[0-9]*\.[0-9]",  # examples v0.24.0, v0.26.3
     )
 
     # Used for publishing the CI containers to dockerhub
@@ -61,10 +61,22 @@ def build_learn_ai_pipeline() -> Pipeline:
         check_every="24h",
     )
 
-    # Used for publishing the RC / production containers to dockerhub
+    # Used for publishing the RC containers to dockerhub
     learn_ai_registry_rc_image = registry_image(
         name=Identifier("learn-ai-rc-image"),
         image_repository="mitodl/learn-ai-app-rc",
+        image_tag=None,  # Only filter on tagged images
+        username="((dockerhub.username))",
+        password="((dockerhub.password))",  # noqa: S106
+        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
+        sort_by_creation=True,
+        check_every="24h",
+    )
+
+    # Used for publishing the production containers to dockerhub
+    learn_ai_registry_release_image = registry_image(
+        name=Identifier("learn-ai-rc-image"),
+        image_repository="mitodl/learn-ai-app-release",
         image_tag=None,  # Only filter on tagged images
         username="((dockerhub.username))",
         password="((dockerhub.password))",  # noqa: S106
@@ -109,8 +121,7 @@ def build_learn_ai_pipeline() -> Pipeline:
         ],
     )
 
-    # This image will be used for both the QA and production deployments
-    # hopefully it gets a meaningful tag
+    # This image is only used for the QA environment
     learn_ai_release_canidiate_image_build_job = Job(
         name="build-learn-ai-image-from-release-candidate",
         build_log_retention={"builds": 10},
@@ -163,6 +174,60 @@ def build_learn_ai_pipeline() -> Pipeline:
             ),
         ],
     )
+
+    # This image is only used for the Production environment
+    learn_ai_release_image_build_job = Job(
+        name="build-learn-ai-image-from-release",
+        build_log_retention={"builds": 10},
+        plan=[
+            GetStep(get=learn_ai_release_repo.name, trigger=True),
+            TaskStep(
+                task=Identifier("fetch-release-version"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    image_resource=AnonymousResource(
+                        type=REGISTRY_IMAGE,
+                        source=RegistryImage(repository="alpine"),
+                    ),
+                    inputs=[Input(name=learn_ai_release_repo.name)],
+                    outputs=[Output(name=Identifier("release_version"))],
+                    run=Command(
+                        path="sh",
+                        args=[
+                            "-c",
+                            f"grep 'VERSION = ' {learn_ai_release_repo.name}/main/settings.py | cut -d'\"' -f2 > release_version/version",
+                        ],
+                    ),
+                ),
+            ),
+            LoadVarStep(
+                load_var="release_version",
+                file="release_version/version",
+                reveal=True,
+            ),
+            LoadVarStep(
+                load_var="git_ref",
+                file=f"{learn_ai_release_repo.name}/.git/ref",
+            ),
+            container_build_task(
+                inputs=[Input(name=learn_ai_release_repo.name)],
+                build_parameters={
+                    "CONTEXT": learn_ai_release_repo.name,
+                    "BUILD_ARG_GIT_REF": "((.:git_ref))",
+                },
+                build_args=[],
+            ),
+            PutStep(
+                put=learn_ai_registry_release_image.name,
+                params={
+                    "image": "image/image.tar",
+                    "version": "((.:release_version))",
+                    "bump_aliases": True,
+                    "additional_tags": f"./{learn_ai_release_candidate_repo.name}/.git/ref",  # Should contain a tag if doof is doing his job
+                },
+            ),
+        ],
+    )
     learn_ai_main_branch_container_fragement = PipelineFragment(
         resources=[learn_ai_main_repo, learn_ai_registry_ci_image],
         jobs=[learn_ai_main_image_build_job],
@@ -173,6 +238,10 @@ def build_learn_ai_pipeline() -> Pipeline:
             learn_ai_registry_ci_image,
         ],
         jobs=[learn_ai_release_canidiate_image_build_job],
+    )
+    learn_ai_release_container_fragment = PipelineFragment(
+        resources=[learn_ai_release_repo, learn_ai_registry_release_image],
+        jobs=[learn_ai_release_image_build_job],
     )
 
     pulumi_resource_type = pulumi_provisioner_resource()
@@ -299,21 +368,19 @@ def build_learn_ai_pipeline() -> Pipeline:
         name=Identifier("learn-ai-production-deployment"),
         max_in_flight=1,
         plan=[
-            GetStep(get=learn_ai_release_repo.name, trigger=True),
             GetStep(
-                get=learn_ai_registry_rc_image.name,
-                trigger=False,
-                passed=[learn_ai_rc_deployment_job.name],
+                get=learn_ai_registry_release_image.name,
+                trigger=True,
+                passed=[learn_ai_release_image_build_job.name],
                 params={"skip_download": True},
             ),
             GetStep(
                 get=ol_infra_repo.name,
-                trigger=False,
-                passed=[learn_ai_rc_deployment_job.name],
+                trigger=False,  # Intentionally false
             ),
             LoadVarStep(
                 load_var="image_tag",
-                file=f"{learn_ai_registry_rc_image.name}/tag",
+                file=f"{learn_ai_registry_release_image.name}/tag",
             ),
             TaskStep(
                 task=Identifier("set-aws-creds"),
@@ -364,6 +431,7 @@ def build_learn_ai_pipeline() -> Pipeline:
         production_deployment_fragment,
         learn_ai_main_branch_container_fragement,
         learn_ai_release_candidate_container_fragment,
+        learn_ai_release_container_fragment,
     )
     return combined_fragment.to_pipeline()
 
