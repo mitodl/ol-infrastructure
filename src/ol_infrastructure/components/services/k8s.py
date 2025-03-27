@@ -491,7 +491,7 @@ class OLApisixOIDCConfig(BaseModel):
         "access_token": True,
         "enc_id_token": True,
         "id_token": True,
-        "user": False,
+        "user": True,
     }
     oidc_session_cookie_lifetime: NonNegativeInt = 0
     oidc_ssl_verify: bool = False
