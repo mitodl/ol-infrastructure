@@ -2,7 +2,6 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHg42pDDDGBhpaX14TdtzcK1hbiMYTHsYRH4k5GL5RFpIwEi8MniqKSK7PJ7AIbp17REAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbWm9PEFY6H+jKGYHAgEQgDtAZs04prjkVBGB8O8+C6kjqzMhazPYOAanmLoWdx4WArJXNKxZkv72c6my81/qnCg0xWYdmw6fJxV0dg==
 config:
-  consul:address: https://consul-apps-qa.odl.mit.edu
   heroku:user: "odl-devops"
   heroku:app_id:
     secure: v1:eSvnqne7KQRkHJlu:wTyl9W3aivfxlANqBML2wy4GEHe85VuKll60R5HmGUu1hJTcQBEfzK1cJOyvjlbLgBtXLw==
@@ -88,3 +87,8 @@ config:
   vault_server:env_namespace: operations.qa
   mitlearn:learn_ai_recommendation_endpoint: "https://api.rc.learn.mit.edu/ai/http/recommendation_agent/"
   mitlearn:learn_ai_syllabus_endpoint: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
+  # This is a hack. We need to write a Consul key for use by MITx Online and the apps
+  # and MITx Online VPCs aren't peered, so the Consul clusters aren't peered. We don't
+  # actually use Consul for anything else in this project so this is okay (so far) (TMM
+  # 2025-02-21)
+  consul:address: https://consul-mitxonline-qa.odl.mit.edu

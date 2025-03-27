@@ -7,6 +7,7 @@ import textwrap
 from pathlib import Path
 from string import Template
 
+import pulumi_consul as consul
 import pulumi_fastly as fastly
 import pulumi_github as github
 import pulumi_kubernetes as kubernetes
@@ -48,6 +49,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
@@ -836,6 +838,7 @@ application_labels = k8s_global_labels | {
     "ol.mit.edu/pod-security-group": "learn",
 }
 
+# TODO (mmd, YYYY-MM-DD): Leaving this out of OLApisix* refactoring for the legacy configs
 oidc_secret_name = "oidc-secrets"  # pragma: allowlist secret # noqa: S105
 oidc_secret = OLVaultK8SSecret(
     f"ol-mitlearn-oidc-secrets-{stack_info.env_suffix}",
@@ -919,18 +922,22 @@ mitlearn_https_apisix_tls = kubernetes.apiextensions.CustomResource(
     },
 )
 
+mit_learn_api_domain = mitlearn_config.require("api_domain")
 # We need to be able to change `unauth_action` depending on the route but otherwise
 # the settings for the oidc plugin will be unchanged
+# TODO (mmd, YYYY-MM-DD): Leaving this out of OLApisix* refactoring
 legacy_base_oidc_plugin_config = {
     "scope": "openid profile email",
     "bearer_only": False,
     "introspection_endpoint_auth_method": "client_secret_basic",
     "ssl_verify": False,
     "logout_path": "/logout/oidc",
-    "post_logout_redirect_uri": f"https://{mitlearn_config.require('api_domain')}/logout/",
+    "post_logout_redirect_uri": f"https://{mit_learn_api_domain}/logout/",
 }
 
-shared_plugin_config_name = "shared-plugin-config"
+learn_external_service_name = "learn-at-heroku"
+learn_external_service_scheme = "https"
+
 learn_external_service_shared_plugins = OLApisixSharedPlugins(
     name="ol-mitlearn-external-service-apisix-plugins",
     plugin_config=OLApisixSharedPluginsConfig(
@@ -941,8 +948,6 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
         enable_defaults=True,
     ),
 )
-
-learn_external_service_name = "learn-at-heroku"
 
 learn_external_service_apisix_upstream = OLApisixExternalUpstream(
     name=learn_external_service_name,
@@ -962,9 +967,22 @@ learn_external_service_apisix_upstream = OLApisixExternalUpstream(
     ),
 )
 
-
 # LEGACY RETIREMENT : goes away
-mit_learn_api_domain = mitlearn_config.require("api_domain")
+# MD : 2025-03-21 Leaving this out of OLApisix* refactoring
+if stack_info.env_suffix != "ci":
+    consul_opts = get_consul_provider(stack_info)
+    consul.Keys(
+        "learn-api-domain-consul-key-for-mitxonline-openedx",
+        keys=[
+            consul.KeysKeyArgs(
+                path="edxapp/learn-api-domain",
+                delete=True,
+                # SWITCHOVER : Update to learn_api_domain
+                value=mit_learn_api_domain,
+            )
+        ],
+        opts=consul_opts,
+    )
 learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
     f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
     api_version="apisix.apache.org/v2",
@@ -1089,16 +1107,15 @@ learn_external_service_oidc_resources = OLApisixOIDCResources(
     ),
 )
 
-proxy_rewrite_plugin_config = {
-    "name": "proxy-rewrite",
-    "enable": True,
-    "config": {
+proxy_rewrite_plugin_config = OLApisixPluginConfig(
+    name="proxy-rewrite",
+    config={
         "regex_uri": [
             "/learn/(.*)",
             "/$1",
         ],
     },
-}
+)
 
 learn_external_service_apisix_route = OLApisixRoute(
     name=f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",

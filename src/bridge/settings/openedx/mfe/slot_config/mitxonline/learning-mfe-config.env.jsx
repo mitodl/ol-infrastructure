@@ -1,7 +1,7 @@
 import { PLUGIN_OPERATIONS } from '@openedx/frontend-plugin-framework';
 import { getConfig } from '@edx/frontend-platform';
 
-import * as remoteAiChatDrawer from "./mitodl-smoot-design/dist/bundles/remoteAiChatDrawer.umd.js"
+import * as remoteTutorDrawer from "./mitodl-smoot-design/dist/bundles/remoteTutorDrawer.umd.js"
 
 
 const modifyUserMenu = (widget) => {
@@ -26,7 +26,7 @@ const modifyUserMenu = (widget) => {
   return widget;
 };
 
-remoteAiChatDrawer.init({
+remoteTutorDrawer.init({
   messageOrigin: getConfig().LMS_BASE_URL,
   transformBody: messages => ({ message: messages[messages.length - 1].content }),
 })
