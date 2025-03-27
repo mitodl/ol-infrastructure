@@ -223,7 +223,7 @@ def build_learn_ai_pipeline() -> Pipeline:
                     "image": "image/image.tar",
                     "version": "((.:release_version))",
                     "bump_aliases": True,
-                    "additional_tags": f"./{learn_ai_release_candidate_repo.name}/.git/ref",  # Should contain a tag if doof is doing his job
+                    "additional_tags": f"./{learn_ai_release_repo.name}/.git/ref",  # Should contain a tag if doof is doing his job
                 },
             ),
         ],
