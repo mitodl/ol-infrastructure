@@ -24,6 +24,17 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.services.k8s import (
+    OLApisixExternalUpstream,
+    OLApisixExternalUpstreamConfig,
+    OLApisixOIDCConfig,
+    OLApisixOIDCResources,
+    OLApisixPluginConfig,
+    OLApisixRoute,
+    OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SResources,
@@ -920,60 +931,35 @@ legacy_base_oidc_plugin_config = {
 }
 
 shared_plugin_config_name = "shared-plugin-config"
-learn_external_service_apisix_pluginconfig = kubernetes.apiextensions.CustomResource(
-    f"ol-mitlearn-external-service-apisix-pluginconfig-{stack_info.env_suffix}",
-    api_version="apisix.apache.org/v2",
-    kind="ApisixPluginConfig",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=shared_plugin_config_name,
-        namespace=learn_namespace,
-        labels=application_labels,
+learn_external_service_shared_plugins = OLApisixSharedPlugins(
+    name="ol-mitlearn-external-service-apisix-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="mitlearn",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=learn_namespace,
+        k8s_labels=application_labels,
+        enable_defaults=True,
     ),
-    spec={
-        "plugins": [
-            {
-                "name": "redirect",
-                "enable": True,
-                "config": {
-                    "http_to_https": True,
-                },
-            },
-            {
-                "name": "cors",
-                "enable": True,
-                "config": {
-                    "allow_origins": "**",
-                    "allow_methods": "**",
-                    "allow_headers": "**",
-                    "allow_credential": True,
-                },
-            },
-        ]
-    },
 )
 
 learn_external_service_name = "learn-at-heroku"
-learn_external_service_port_name = "https"
 
-learn_external_service_apisix_upstream = kubernetes.apiextensions.CustomResource(
-    f"ol-mitlearn-external-service-apisix-upstream-{stack_info.env_suffix}",
-    api_version="apisix.apache.org/v2",
-    kind="ApisixUpstream",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=learn_external_service_name,
-        namespace=learn_namespace,
-        labels=application_labels,
+learn_external_service_apisix_upstream = OLApisixExternalUpstream(
+    name=learn_external_service_name,
+    external_upstream_config=OLApisixExternalUpstreamConfig(
+        application_name=learn_external_service_name,
+        k8s_labels=application_labels,
+        k8s_namespace=learn_namespace,
+        external_hostname=mitlearn_config.require("heroku_domain"),
     ),
-    spec={
-        "scheme": "https",
-        "externalNodes": [
-            {
-                "type": "Domain",
-                "name": mitlearn_config.require("heroku_domain"),
-            },
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                f"ol-mitlearn-external-service-apisix-upstream-{stack_info.env_suffix}",
+            )
         ],
-    },
-    opts=ResourceOptions(delete_before_replace=True),
+        delete_before_replace=True,
+    ),
 )
 
 
@@ -994,7 +980,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 # Wildcard route that can use auth but doesn't require it
                 "name": "passauth",
                 "priority": 0,
-                "plugin_config_name": shared_plugin_config_name,
+                "plugin_config_name": learn_external_service_shared_plugins.resource_name,
                 "plugins": [
                     {
                         "name": "openid-connect",
@@ -1014,7 +1000,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 },
                 "upstreams": [
                     {
-                        "name": learn_external_service_name,
+                        "name": learn_external_service_apisix_upstream.resource_name,
                     },
                 ],
             },
@@ -1041,7 +1027,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 },
                 "upstreams": [
                     {
-                        "name": learn_external_service_name,
+                        "name": learn_external_service_apisix_upstream.resource_name,
                     },
                 ],
             },
@@ -1049,7 +1035,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 # Routes that require authentication
                 "name": "reqauth",
                 "priority": 10,
-                "plugin_config_name": shared_plugin_config_name,
+                "plugin_config_name": learn_external_service_shared_plugins.resource_name,
                 "plugins": [
                     {
                         "name": "openid-connect",
@@ -1071,7 +1057,7 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
                 },
                 "upstreams": [
                     {
-                        "name": learn_external_service_name,
+                        "name": learn_external_service_apisix_upstream.resource_name,
                     },
                 ],
             },
@@ -1081,11 +1067,27 @@ learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
         delete_before_replace=True,
         depends_on=[
             learn_external_service_apisix_upstream,
-            learn_external_service_apisix_pluginconfig,
+            learn_external_service_shared_plugins,
         ],
     ),
 )
 
+learn_external_service_oidc_resources = OLApisixOIDCResources(
+    f"ol-mitlearn-external-service-olapisixoidcresources-{stack_info.env_suffix}",
+    oidc_config=OLApisixOIDCConfig(
+        application_name="mitlearn",
+        k8s_labels=application_labels,
+        k8s_namespace=learn_namespace,
+        oidc_logout_path="/learn/logout/oidc",
+        oidc_post_logout_redirect_uri=f"https://{mitlearn_config.require('api_domain')}/learn/logout/",
+        oidc_session_cookie_lifetime=60 * 20160,
+        oidc_use_session_secret=True,
+        vault_mount="secret-operations",
+        vault_mount_type="kv-v1",
+        vault_path="sso/mitlearn",
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+)
 
 proxy_rewrite_plugin_config = {
     "name": "proxy-rewrite",
@@ -1098,127 +1100,60 @@ proxy_rewrite_plugin_config = {
     },
 }
 
-base_oidc_plugin_config = {
-    "scope": "openid profile email",
-    "bearer_only": False,
-    "introspection_endpoint_auth_method": "client_secret_basic",
-    "ssl_verify": False,
-    "renew_access_token_on_expiry": True,
-    "session": {"cookie": {"lifetime": 60 * 20160}},
-    "session_contents": {
-        "access_token": True,
-        "enc_id_token": True,
-        "id_token": True,
-        "user": True,
-    },
-    "logout_path": "/learn/logout/oidc",
-    "post_logout_redirect_uri": f"https://{mitlearn_config.require('api_domain')}/learn/logout/",
-}
-# New ApisixRoute object
-# All paths prefixed with /learn
-learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
-    f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}-new",
-    api_version="apisix.apache.org/v2",
-    kind="ApisixRoute",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=f"{learn_external_service_name}-new",
-        namespace=learn_namespace,
-        labels=application_labels,
-    ),
-    spec={
-        "http": [
-            {
-                # Wildcard route that can use auth but doesn't require it
-                "name": "passauth",
-                "priority": 0,
-                "plugin_config_name": shared_plugin_config_name,
-                "plugins": [
-                    proxy_rewrite_plugin_config,
-                    {
-                        "name": "openid-connect",
-                        "enable": True,
-                        "secretRef": oidc_secret_name,
-                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
-                    },
-                ],
-                "match": {
-                    "hosts": [
-                        mit_learn_api_domain,
-                    ],
-                    "paths": [
-                        "/learn/*",
-                    ],
-                },
-                "upstreams": [
-                    {
-                        "name": learn_external_service_name,
-                    },
-                ],
-            },
-            {
-                # Strip tailing slash from logout redirect
-                "name": "logout-redirect",
-                "priority": 10,
-                "plugins": [
-                    {
-                        "name": "redirect",
-                        "enable": True,
-                        "config": {
-                            "uri": "/logout/oidc",
-                        },
-                    },
-                ],
-                "match": {
-                    "hosts": [
-                        mit_learn_api_domain,
-                    ],
-                    "paths": [
-                        "/learn/logout/oidc/*",
-                    ],
-                },
-                "upstreams": [
-                    {
-                        "name": learn_external_service_name,
-                    },
-                ],
-            },
-            {
-                # Routes that require authentication
-                "name": "reqauth",
-                "priority": 10,
-                "plugin_config_name": shared_plugin_config_name,
-                "plugins": [
-                    proxy_rewrite_plugin_config,
-                    {
-                        "name": "openid-connect",
-                        "enable": True,
-                        "secretRef": oidc_secret_name,
-                        "config": base_oidc_plugin_config | {"unauth_action": "auth"},
-                    },
-                ],
-                "match": {
-                    "hosts": [
-                        mit_learn_api_domain,
-                    ],
-                    "paths": [
-                        "/learn/admin/login/*",
-                        "/learn/login",
-                        "/learn/login/*",
-                    ],
-                },
-                "upstreams": [
-                    {
-                        "name": learn_external_service_name,
-                    },
-                ],
-            },
-        ],
-    },
+learn_external_service_apisix_route = OLApisixRoute(
+    name=f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
+    k8s_namespace=learn_namespace,
+    k8s_labels=application_labels,
+    route_configs=[
+        OLApisixRouteConfig(
+            route_name="passauth",
+            priority=0,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                learn_external_service_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mit_learn_api_domain],
+            paths=["/learn/*"],
+            upstream=learn_external_service_apisix_upstream.resource_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="logout-redirect",
+            priority=10,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
+            ],
+            hosts=[mit_learn_api_domain],
+            paths=["/learn/logout/oidc/*"],
+            upstream=learn_external_service_apisix_upstream.resource_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="reqauth",
+            priority=10,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                learn_external_service_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="auth"
+                ),
+            ],
+            hosts=[mit_learn_api_domain],
+            paths=[
+                "/learn/admin/login/*",
+                "/learn/login",
+                "/learn/login/*",
+            ],
+            upstream=learn_external_service_apisix_upstream.resource_name,
+        ),
+    ],
     opts=ResourceOptions(
         delete_before_replace=True,
         depends_on=[
             learn_external_service_apisix_upstream,
-            learn_external_service_apisix_pluginconfig,
+            learn_external_service_shared_plugins,
         ],
     ),
 )

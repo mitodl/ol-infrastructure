@@ -35,6 +35,14 @@ from bridge.settings.github.team_members import DEVOPS_MIT
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.services import appdb
+from ol_infrastructure.components.services.k8s import (
+    OLApisixOIDCConfig,
+    OLApisixOIDCResources,
+    OLApisixRoute,
+    OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SDynamicSecretConfig,
     OLVaultK8SResources,
@@ -1091,49 +1099,17 @@ mit_learn_oidc_secret = OLVaultK8SSecret(
 )
 
 # Good canidates for a component resource
-shared_plugin_config_name = "shared-plugin-config"
-learn_ai_https_apisix_pluginconfig = kubernetes.apiextensions.CustomResource(
-    f"learn-ai-{stack_info.env_suffix}-https-apisix-pluginconfig",
-    api_version="apisix.apache.org/v2",
-    kind="ApisixPluginConfig",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=shared_plugin_config_name,
-        namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
+learn_ai_shared_plugins = OLApisixSharedPlugins(
+    f"learn-ai-{stack_info.env_suffix}-shared-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="learn-ai",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=learn_ai_namespace,
+        k8s_labels=k8s_global_labels,
+        enable_defaults=True,
     ),
-    spec={
-        "plugins": [
-            {
-                "name": "redirect",
-                "enable": True,
-                "config": {
-                    "http_to_https": True,
-                },
-            },
-            {
-                "name": "cors",
-                "enable": True,
-                "config": {
-                    "allow_origins": "**",
-                    "allow_methods": "**",
-                    "allow_headers": "**",
-                    "allow_credential": True,
-                },
-            },
-            {
-                "name": "response-rewrite",
-                "enable": True,
-                "config": {
-                    "headers": {
-                        "set": {
-                            "Referrer-Policy": "origin",
-                        },
-                    },
-                },
-            },
-        ],
-    },
 )
+
 # Ref: https://apisix.apache.org/docs/apisix/plugins/openid-connect/
 base_oidc_plugin_config = {
     "scope": "openid profile ol-profile",
@@ -1192,7 +1168,7 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 # Wildcard route that can use auth but doesn't require it
                 "name": "passauth",
                 "priority": 2,
-                "plugin_config_name": shared_plugin_config_name,
+                "plugin_config_name": learn_ai_shared_plugins.resource_name,
                 "plugins": [
                     {
                         "name": "openid-connect",
@@ -1246,7 +1222,7 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 # Routes that require authentication
                 "name": "reqauth",
                 "priority": 10,
-                "plugin_config_name": shared_plugin_config_name,
+                "plugin_config_name": learn_ai_shared_plugins.resource_name,
                 "plugins": [
                     {
                         "name": "openid-connect",
@@ -1277,7 +1253,7 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
                 "name": "websocket",
                 "priority": 1,
                 "websocket": True,
-                "plugin_config_name": shared_plugin_config_name,
+                "plugin_config_name": learn_ai_shared_plugins.resource_name,
                 "plugins": [
                     {
                         "name": "openid-connect",
@@ -1310,6 +1286,22 @@ learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
     ),
 )
 
+learn_ai_oidc_resources = OLApisixOIDCResources(
+    f"learn-ai-{stack_info.env_suffix}-oidc-resources",
+    oidc_config=OLApisixOIDCConfig(
+        application_name="learn-ai",
+        k8s_labels=k8s_global_labels,
+        k8s_namespace=learn_ai_namespace,
+        oidc_logout_path="/logout",  # maybe `/ai/logout` ????
+        oidc_post_logout_redirect_uri="/",
+        oidc_use_session_secret=True,
+        vault_mount="secret-operations",
+        vault_mount_type="kv-v1",
+        vault_path="sso/mitlearn",
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+)
+
 proxy_rewrite_plugin_config = {
     "name": "proxy-rewrite",
     "enable": True,
@@ -1320,142 +1312,84 @@ proxy_rewrite_plugin_config = {
         ],
     },
 }
+
 # New ApisixRoute object for the learn.mit.edu address
 # All paths prefixed with /ai
 # Host match is only the mit-learn domain
-mit_learn_learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
-    f"mit-learn-learn-ai-{stack_info.env_suffix}-https-apisix-route",
-    api_version="apisix.apache.org/v2",
-    kind="ApisixRoute",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="mit-learn-learn-ai-https",
-        namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
-    ),
-    spec={
-        "http": [
-            {
-                # Wildcard route that can use auth but doesn't require it
-                "name": "passauth",
-                "priority": 2,
-                "plugin_config_name": shared_plugin_config_name,
-                "plugins": [
-                    proxy_rewrite_plugin_config,
-                    {
-                        "name": "openid-connect",
-                        "enable": True,
-                        "secretRef": mit_learn_oidc_secret_name,
-                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
+mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
+    name=f"mit-learn-learn-ai-{stack_info.env_suffix}-https-olapisixroute",
+    k8s_namespace=learn_ai_namespace,
+    k8s_labels=k8s_global_labels,
+    route_configs=[
+        OLApisixRouteConfig(
+            route_name="passauth",
+            priority=2,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                learn_ai_oidc_resources.get_full_oidc_plugin_config("pass"),
+            ],
+            hosts=[learn_api_domain],
+            paths=["/ai/*"],
+            backend_service_name=learn_ai_service_name,
+            backend_service_port=learn_ai_service_port_name,
+            backend_resolve_granularity="service",
+        ),
+        OLApisixRouteConfig(
+            route_name="logout-redirect",
+            priority=10,
+            # shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                {
+                    "name": "redirect",
+                    "enable": True,
+                    "config": {
+                        "uri": "/logout",
                     },
-                ],
-                "match": {
-                    "hosts": [learn_api_domain],
-                    "paths": [
-                        "/ai/*",
-                    ],
                 },
-                "backends": [
-                    {
-                        "serviceName": learn_ai_service_name,
-                        "servicePort": learn_ai_service_port_name,
-                        "resolveGranularity": "service",
-                    },
-                ],
-            },
-            {
-                # Strip trailing slash from logout redirect
-                "name": "logout-redirect",
-                "priority": 10,
-                "plugins": [
-                    proxy_rewrite_plugin_config,
-                    {
-                        "name": "redirect",
-                        "enable": True,
-                        "config": {
-                            "uri": "/logout",
-                        },
-                    },
-                ],
-                "match": {
-                    "hosts": [
-                        learn_api_domain,
-                    ],
-                    "paths": [
-                        "/ai/logout/*",
-                    ],
-                },
-                "backends": [
-                    {
-                        "serviceName": learn_ai_service_name,
-                        "servicePort": learn_ai_service_port_name,
-                        "resolveGranularity": "service",
-                    },
-                ],
-            },
-            {
-                # Routes that require authentication
-                "name": "reqauth",
-                "priority": 10,
-                "plugin_config_name": shared_plugin_config_name,
-                "plugins": [
-                    proxy_rewrite_plugin_config,
-                    {
-                        "name": "openid-connect",
-                        "enable": True,
-                        "secretRef": mit_learn_oidc_secret_name,
-                        "config": base_oidc_plugin_config | {"unauth_action": "auth"},
-                    },
-                ],
-                "match": {
-                    "hosts": [
-                        learn_api_domain,
-                    ],
-                    "paths": [
-                        "/ai/admin/login/*",
-                        "/ai/http/login/*",
-                    ],
-                },
-                "backends": [
-                    {
-                        "serviceName": learn_ai_service_name,
-                        "servicePort": learn_ai_service_port_name,
-                        "resolveGranularity": "service",
-                    },
-                ],
-            },
-            {
-                # Sepcial handling for websocket URLS.
-                "name": "websocket",
-                "priority": 1,
-                "websocket": True,
-                "plugin_config_name": shared_plugin_config_name,
-                "plugins": [
-                    proxy_rewrite_plugin_config,
-                    {
-                        "name": "openid-connect",
-                        "enable": True,
-                        "secretRef": mit_learn_oidc_secret_name,
-                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
-                    },
-                ],
-                "match": {
-                    "hosts": [
-                        learn_api_domain,
-                    ],
-                    "paths": [
-                        "/ai/ws/*",
-                    ],
-                },
-                "backends": [
-                    {
-                        "serviceName": learn_ai_service_name,
-                        "servicePort": learn_ai_service_port_name,
-                        "resolveGranularity": "service",
-                    },
-                ],
-            },
-        ],
-    },
+            ],
+            hosts=[learn_api_domain],
+            paths=["/ai/logout/*"],
+            backend_service_name=learn_ai_service_name,
+            backend_service_port=learn_ai_service_port_name,
+            backend_resolve_granularity="service",
+        ),
+        OLApisixRouteConfig(
+            route_name="reqauth",
+            priority=10,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                learn_ai_oidc_resources.get_full_oidc_plugin_config("auth"),
+            ],
+            hosts=[learn_api_domain],
+            paths=[
+                "/ai/admin/login/*",
+                "/ai/http/login/*",
+            ],
+            backend_service_name=learn_ai_service_name,
+            backend_service_port=learn_ai_service_port_name,
+            backend_resolve_granularity="service",
+        ),
+        OLApisixRouteConfig(
+            route_name="websocket",
+            priority=1,
+            websocket=True,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                learn_ai_oidc_resources.get_full_oidc_plugin_config("pass"),
+            ],
+            hosts=[learn_api_domain],
+            paths=[
+                "/ai/ws/*",
+            ],
+            backend_service_name=learn_ai_service_name,
+            backend_service_port=learn_ai_service_port_name,
+            backend_resolve_granularity="service",
+        ),
+    ],
     opts=ResourceOptions(
         delete_before_replace=True,
         depends_on=[learn_ai_service, mit_learn_oidc_secret],
