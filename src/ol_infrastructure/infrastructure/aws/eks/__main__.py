@@ -1066,7 +1066,20 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                                 """
                                 large_client_header_buffers 4 32k;
                                 """
-                            )
+                            ),
+                            "accessLogFormat": '"$time_local" client=$remote_addr '
+                            'method=$request_method request="$request" '
+                            "request_length=$request_length "
+                            "status=$status bytes_sent=$bytes_sent "
+                            "body_bytes_sent=$body_bytes_sent "
+                            "referer=$http_referer "
+                            'user_agent="$http_user_agent" '
+                            "upstream_addr=$upstream_addr "
+                            "upstream_status=$upstream_status "
+                            "request_time=$request_time "
+                            "upstream_response_time=$upstream_response_time "
+                            "upstream_connect_time=$upstream_connect_time "
+                            "upstream_header_time=$upstream_header_time",
                         },
                     },
                 },
