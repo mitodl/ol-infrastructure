@@ -5,6 +5,7 @@
 import base64
 import json
 import os
+import textwrap
 from pathlib import Path
 
 import pulumi_aws as aws
@@ -1056,6 +1057,15 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                         "allow": {
                             "ipList": Output.all(pods=pod_ip_blocks).apply(
                                 lambda args: [*args["pods"]]
+                            )
+                        },
+                    },
+                    "nginx": {
+                        "configurationSnippet": {
+                            "httpSrv": textwrap.dedent(
+                                """
+                                large_client_header_buffers 4 32k;
+                                """
                             )
                         },
                     },
