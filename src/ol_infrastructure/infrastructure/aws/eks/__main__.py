@@ -1061,12 +1061,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                         },
                     },
                     "nginx": {
-                        "configurationSnippet": {
-                            "httpSrv": textwrap.dedent(
-                                """
-                                large_client_header_buffers 4 32k;
-                                """
-                            ),
+                        "logs": {
                             "accessLogFormat": '"$time_local" client=$remote_addr '
                             'method=$request_method request="$request" '
                             "request_length=$request_length "
@@ -1080,6 +1075,13 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             "upstream_response_time=$upstream_response_time "
                             "upstream_connect_time=$upstream_connect_time "
                             "upstream_header_time=$upstream_header_time",
+                        },
+                        "configurationSnippet": {
+                            "httpSrv": textwrap.dedent(
+                                """
+                                large_client_header_buffers 4 32k;
+                                """
+                            ),
                         },
                     },
                 },
