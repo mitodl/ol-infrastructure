@@ -1075,6 +1075,16 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             "upstream_response_time=$upstream_response_time "
                             "upstream_connect_time=$upstream_connect_time "
                             "upstream_header_time=$upstream_header_time",
+                            "errorLog": "/dev/stdout",
+                            "errorLogLevel": "info",
+                        },
+                        "configurationSnippet": {
+                            "main": textwrap.dedent(
+                                """
+                                client_header_buffer_size 32k;
+                                large_client_header_buffers 4 32k;
+                                """
+                            ),
                         },
                         "configurationSnippet": {
                             "httpSrv": textwrap.dedent(
