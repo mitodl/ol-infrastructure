@@ -4,6 +4,7 @@
 ci:
   skip:
   - packer_fmt
+  - hadolint-docker
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v5.0.0
@@ -86,3 +87,4 @@ repos:
   rev: v2.12.0
   hooks:
   - id: hadolint-docker
+  - id: hadolint
