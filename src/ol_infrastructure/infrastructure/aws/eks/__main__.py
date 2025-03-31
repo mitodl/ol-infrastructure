@@ -1071,7 +1071,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             "status=$status bytes_sent=$bytes_sent "
                             "upstream_addr=$upstream_addr "
                             "upstream_connect_time=$upstream_connect_time "
-                            "upstream_header_time=$upstream_header_time"
+                            "upstream_header_time=$upstream_header_time "
                             "upstream_response_time=$upstream_response_time "
                             "upstream_status=$upstream_status "
                             'method=$request_method request="$request"',
