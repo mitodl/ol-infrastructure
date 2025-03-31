@@ -1086,13 +1086,6 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                                 """
                             ),
                         },
-                        "configurationSnippet": {
-                            "httpSrv": textwrap.dedent(
-                                """
-                                large_client_header_buffers 4 32k;
-                                """
-                            ),
-                        },
                     },
                 },
                 "etcd": {
