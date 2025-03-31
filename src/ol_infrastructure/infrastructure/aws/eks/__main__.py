@@ -1079,7 +1079,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             "errorLogLevel": "info",
                         },
                         "configurationSnippet": {
-                            "main": textwrap.dedent(
+                            "httpStart": textwrap.dedent(
                                 """
                                 client_header_buffer_size 32k;
                                 large_client_header_buffers 4 32k;
