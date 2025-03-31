@@ -1080,9 +1080,14 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                         },
                         "configurationSnippet": {
                             "httpStart": textwrap.dedent(
-                                """
-                                client_header_buffer_size 32k;
+                                """\
+                                client_header_buffer_size 8k;
                                 large_client_header_buffers 4 32k;
+                                """
+                            ),
+                            "httpSrv": textwrap.dedent(
+                                """\
+                                set $session_compressor zlib;
                                 """
                             ),
                         },
