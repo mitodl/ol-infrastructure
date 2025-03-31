@@ -1063,18 +1063,18 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                     "nginx": {
                         "logs": {
                             "accessLogFormat": '"$time_local" client=$remote_addr '
-                            'method=$request_method request="$request" '
-                            "request_length=$request_length "
-                            "status=$status bytes_sent=$bytes_sent "
                             "body_bytes_sent=$body_bytes_sent "
                             "referer=$http_referer "
-                            'user_agent="$http_user_agent" '
-                            "upstream_addr=$upstream_addr "
-                            "upstream_status=$upstream_status "
+                            "request_length=$request_length "
+                            "request_id=$request_id "
                             "request_time=$request_time "
-                            "upstream_response_time=$upstream_response_time "
+                            "status=$status bytes_sent=$bytes_sent "
+                            "upstream_addr=$upstream_addr "
                             "upstream_connect_time=$upstream_connect_time "
-                            "upstream_header_time=$upstream_header_time",
+                            "upstream_header_time=$upstream_header_time"
+                            "upstream_response_time=$upstream_response_time "
+                            "upstream_status=$upstream_status "
+                            'method=$request_method request="$request"',
                             "errorLog": "/dev/stdout",
                             "errorLogLevel": "info",
                         },
