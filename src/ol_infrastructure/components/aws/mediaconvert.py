@@ -186,8 +186,8 @@ class OLMediaConvert(ComponentResource):
         )
 
         self.mediaconvert_cloudwatch_target = cloudwatch.EventTarget(
-            event_target_name,
-            name=event_target_name[:63],
+            event_target_name[:63],
+            target_id=event_target_name[:63],
             rule=self.mediaconvert_cloudwatch_rule.name,
             arn=self.sns_topic.arn,
             opts=component_ops,
