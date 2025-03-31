@@ -1075,7 +1075,7 @@ if eks_config.get_bool("apisix_ingress_enabled"):
                             "upstream_response_time=$upstream_response_time "
                             "upstream_status=$upstream_status "
                             'method=$request_method request="$request"',
-                            "errorLog": "/dev/stdout",
+                            "errorLog": "/dev/stderr",
                             "errorLogLevel": "info",
                         },
                         "configurationSnippet": {
