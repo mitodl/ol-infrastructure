@@ -388,6 +388,22 @@ class OLApisixRouteConfig(BaseModel):
     upstream: Optional[str] = None
     websocket: bool = False
 
+    @field_validator("plugins")
+    @classmethod
+    def ensure_request_id_plugin(
+        cls, v: list[OLApisixPluginConfig]
+    ) -> list[OLApisixPluginConfig]:
+        """
+        Ensure that the request-id plugin is always added to the plugins list
+        """
+        if not any(plugin.name == "request-id" for plugin in v):
+            v.append(
+                OLApisixPluginConfig(
+                    name="request-id", config={"include_in_response": True}
+                )
+            )
+        return v
+
     @model_validator(mode="after")
     def check_backend_or_upstream(self) -> "OLApisixRouteConfig":
         upstream: Optional[str] = self.upstream
