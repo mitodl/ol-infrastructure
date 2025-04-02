@@ -5,7 +5,7 @@ config:
   heroku:app_id:
     secure: v1:mdVwWs7IkyH7o5j7:49eMfOoVshilsOCouixsxdQSGehSeqRHF3DhPWp2UIiE1clEoyoKqOodkpBQ27rik/MIDg==
   heroku:user: "odl-devops"
-  heroku_app:interpolation_vars:
+  mitlearn:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "draft.ocw.mit.edu"
     - "ocw.mit.edu"
@@ -28,7 +28,7 @@ config:
     - "https://ocw.mit.edu"
     mailgun_sender_domain: "mail.learn.mit.edu"  # Need to verify
     sso_url: "sso.ol.mit.edu"
-  heroku_app:vars:
+  mitlearn:vars:
     APPZI_URL: "https://w.appzi.io/w.js?token=Q2pSI"
     CELERY_WORKER_MAX_MEMORY_PER_CHILD: 250000
     CSRF_COOKIE_NAME: "learn_csrftoken"
