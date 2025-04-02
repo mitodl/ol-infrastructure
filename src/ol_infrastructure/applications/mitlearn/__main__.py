@@ -75,7 +75,6 @@ github_provider = github.Provider(
 
 mitlearn_config = Config("mitlearn")
 heroku_config = Config("heroku")
-heroku_app_config = Config("heroku_app")
 vault_config = Config("vault")
 
 stack_info = parse_stack()
@@ -1257,7 +1256,7 @@ heroku_vars = {
 }
 
 # Values that require interpolation or other special considerations
-interpolation_vars = heroku_app_config.get_object("interpolation_vars")
+interpolation_vars = mitlearn_config.get_object("interpolation_vars")
 
 csrf_origins_list = interpolation_vars["csrf_domains"] or []
 session_cookie_domain = interpolation_vars["session_cookie_domain"] or ""
@@ -1287,7 +1286,7 @@ heroku_interpolated_vars = {
 
 # Combine two var sources above with values explictly defined in pulumi configuration
 heroku_vars.update(**heroku_interpolated_vars)
-heroku_vars.update(**heroku_app_config.get_object("vars"))
+heroku_vars.update(**mitlearn_config.get_object("vars"))
 
 # Making these `get_secret_*()` calls children of the seemigly un-related vault mount `secret-mitopen/` tricks
 # them into inheriting the correct vault provider rather than attempting to create their own (which won't work and / or
