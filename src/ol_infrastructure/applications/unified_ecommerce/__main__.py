@@ -100,6 +100,21 @@ if not (ECOMMERCE_DOCKER_TAG := os.getenv("ECOMMERCE_DOCKER_TAG")):
     msg = "ECOMMERCE_DOCKER_TAG must be set"
     raise OSError(msg)
 
+match stack_info.env_suffix:
+    case "production":
+        image_repository_suffix = "-release"
+        env_var_suffix = "PROD"
+    case "qa":
+        image_repository_suffix = "-rc"
+        env_var_suffix = "RC"
+    case "ci":
+        image_repository_suffix = "-main"
+        env_var_suffix = "CI"
+    case _:
+        image_repository_suffix = "-invalid"
+        env_var_suffix = "INVALID"
+
+
 aws_account = get_caller_identity()
 
 ecommerce_namespace = "ecommerce"
@@ -645,7 +660,8 @@ ecommerce_k8s_config: OLApplicationK8sConfiguration = OLApplicationK8sConfigurat
     static_secrets_name=static_secrets_name,
     application_security_group_id=ecommerce_application_security_group.id,
     application_security_group_name=ecommerce_application_security_group.name,
-    application_image_repository="mitodl/unified-ecommerce-app-main",
+    application_image_repository="mitodl/unified-ecommerce-app",
+    application_image_repository_suffix=image_repository_suffix,
     application_docker_tag=ECOMMERCE_DOCKER_TAG,
     vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
     import_nginx_config=True,
@@ -1038,16 +1054,6 @@ ecommerce_https_apisix_tls = kubernetes.apiextensions.CustomResource(
 
 
 # Finally, put the aws access key into the github actions configuration
-match stack_info.env_suffix:
-    case "production":
-        env_var_suffix = "PROD"
-    case "qa":
-        env_var_suffix = "RC"
-    case "ci":
-        env_var_suffix = "CI"
-    case _:
-        env_var_suffix = "INVALID"
-
 gh_workflow_access_key_id_env_secret = github.ActionsSecret(
     f"unified-ecommerce-gh-workflow-access-key-id-env-secret-{stack_info.env_suffix}",
     repository=gh_repo.name,

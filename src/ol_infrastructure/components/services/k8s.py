@@ -54,6 +54,7 @@ class OLApplicationK8sConfiguration(BaseModel):
     application_security_group_id: Output[str]
     application_security_group_name: Output[str]
     application_image_repository: str
+    application_image_repository_suffix: Optional[str] = None
     application_docker_tag: str
     vault_k8s_resource_auth_name: str
     import_nginx_config: bool
@@ -160,8 +161,11 @@ class OLApplicationK8s(ComponentResource):
                 ),
             ),
         ]
+        if ol_app_k8s_config.application_image_repository_suffix:
+            app_image = f"{ol_app_k8s_config.application_image_repository}{ol_app_k8s_config.application_image_repository_suffix}:{ol_app_k8s_config.application_docker_tag}"
+        else:
+            app_image = f"{ol_app_k8s_config.application_image_repository}:{ol_app_k8s_config.application_docker_tag}"
 
-        app_image = f"{ol_app_k8s_config.application_image_repository}:{ol_app_k8s_config.application_docker_tag}"
         init_containers = []
         if ol_app_k8s_config.init_collectstatic:
             init_containers.append(

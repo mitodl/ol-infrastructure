@@ -30,7 +30,6 @@ from bridge.lib.magic_numbers import (
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from bridge.settings.github.team_members import DEVOPS_MIT
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.services import appdb
@@ -108,6 +107,20 @@ if "LEARN_AI_DOCKER_TAG" not in os.environ:
     msg = "LEARN_AI_DOCKER_TAG must be set"
     raise OSError(msg)
 LEARN_AI_DOCKER_TAG = os.getenv("LEARN_AI_DOCKER_TAG")
+
+match stack_info.env_suffix:
+    case "production":
+        image_repository_suffix = "-release"
+        env_var_suffix = "PROD"
+    case "qa":
+        image_repository_suffix = "-rc"
+        env_var_suffix = "RC"
+    case "ci":
+        image_repository_suffix = "-main"
+        env_var_suffix = "CI"
+    case _:
+        image_repository_suffix = "-invalid"
+        env_var_suffix = "INVALID"
 
 learn_ai_namespace = "learn-ai"
 cluster_stack.require_output("namespaces").apply(
@@ -744,7 +757,10 @@ learn_ai_deployment_envfrom = [
     ),
 ]
 
-image_repository_suffix = "-main" if stack_info.env_suffix == "ci" else "-rc"
+
+application_image_repository_and_tag = (
+    f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}"
+)
 image_pull_policy = (
     "Always" if stack_info.env_suffix in ("ci", "qa") else "IfNotPresent"
 )
@@ -753,7 +769,7 @@ init_containers = [
     # Run database migrations at startup
     kubernetes.core.v1.ContainerArgs(
         name="migrate",
-        image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
+        image=application_image_repository_and_tag,
         command=["python3", "manage.py", "migrate", "--noinput"],
         image_pull_policy=image_pull_policy,
         env=learn_ai_deployment_env_vars,
@@ -761,7 +777,7 @@ init_containers = [
     ),
     kubernetes.core.v1.ContainerArgs(
         name="create-cachetable",
-        image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
+        image=application_image_repository_and_tag,
         command=["python3", "manage.py", "createcachetable"],
         image_pull_policy=image_pull_policy,
         env=learn_ai_deployment_env_vars,
@@ -769,7 +785,7 @@ init_containers = [
     ),
     kubernetes.core.v1.ContainerArgs(
         name="collectstatic",
-        image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
+        image=application_image_repository_and_tag,
         command=["python3", "manage.py", "collectstatic", "--noinput"],
         image_pull_policy=image_pull_policy,
         env=learn_ai_deployment_env_vars,
@@ -781,22 +797,6 @@ init_containers = [
             ),
         ],
     ),
-] + [
-    # Good canidate for a lib or component function
-    kubernetes.core.v1.ContainerArgs(
-        name=f"promote-{mit_username}-to-superuser",
-        image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
-        # Jank that forces the promotion to always exit successfully
-        command=["/bin/bash"],
-        args=[
-            "-c",
-            f"./manage.py promote_user --promote --superuser '{mit_username}@mit.edu'; exit 0",
-        ],
-        image_pull_policy=image_pull_policy,
-        env=learn_ai_deployment_env_vars,
-        env_from=learn_ai_deployment_envfrom,
-    )
-    for mit_username in DEVOPS_MIT
 ]
 
 # Create a deployment resource to manage the application pods
@@ -883,7 +883,7 @@ learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
                     # Actual application run with uwsgi
                     kubernetes.core.v1.ContainerArgs(
                         name="learn-ai-app",
-                        image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
+                        image=application_image_repository_and_tag,
                         command=[
                             "uvicorn",
                             "main.asgi:application",
@@ -948,7 +948,7 @@ learn_ai_celery_deployment_resource = kubernetes.apps.v1.Deployment(
                 containers=[
                     kubernetes.core.v1.ContainerArgs(
                         name="celery-worker",
-                        image=f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}",
+                        image=application_image_repository_and_tag,
                         command=[
                             "celery",
                             "-A",
@@ -1403,15 +1403,6 @@ learn_ai_https_apisix_tls = kubernetes.apiextensions.CustomResource(
 )
 
 # Finally, put the aws access key into the github actions configuration
-match stack_info.env_suffix:
-    case "production":
-        env_var_suffix = "PROD"
-    case "qa":
-        env_var_suffix = "RC"
-    case "ci":
-        env_var_suffix = "CI"
-    case _:
-        env_var_suffix = "INVALID"
 
 gh_workflow_access_key_id_env_secret = github.ActionsSecret(
     f"learn-ai-gh-workflow-access-key-id-env-secret-{stack_info.env_suffix}",
