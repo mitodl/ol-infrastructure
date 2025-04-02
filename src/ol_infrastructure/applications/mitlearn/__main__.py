@@ -1227,7 +1227,7 @@ route53.Record(
 env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 
 # Values that are generally unchanging across environments
-heroku_vars = {
+env_vars = {
     "ALLOWED_HOSTS": '["*"]',
     "AWS_STORAGE_BUCKET_NAME": f"ol-mitlearn-app-storage-{env_name}",
     "CORS_ALLOWED_ORIGIN_REGEXES": "['^.+ocw-next.netlify.app$']",
@@ -1306,7 +1306,7 @@ auth_allowed_redirect_hosts_list = (
 )
 auth_allowed_redirect_hosts_json = json.dumps(auth_allowed_redirect_hosts_list)
 
-heroku_interpolated_vars = {
+interpolated_vars = {
     "ACCESS_TOKEN_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/token",
     "AUTHORIZATION_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/auth",
     "CORS_ALLOWED_ORIGINS": cors_urls_json,
@@ -1324,8 +1324,8 @@ heroku_interpolated_vars = {
 }
 
 # Combine two var sources above with values explictly defined in pulumi configuration
-heroku_vars.update(**heroku_interpolated_vars)
-heroku_vars.update(**mitlearn_config.get_object("vars"))
+env_vars.update(**interpolated_vars)
+env_vars.update(**mitlearn_config.get_object("vars"))
 
 # Making these `get_secret_*()` calls children of the seemigly un-related vault mount `secret-mitopen/` tricks
 # them into inheriting the correct vault provider rather than attempting to create their own (which won't work and / or
@@ -1377,7 +1377,7 @@ secret_operations_tika_access_token = vault.generic.get_secret_output(
 )
 
 # Gets masked in any console outputs
-sensitive_heroku_vars = {
+sensitive_env_vars = {
     # Vars available locally from SOPS
     "CKEDITOR_ENVIRONMENT_ID": mitopen_vault_secrets["ckeditor"]["environment_id"],
     "CKEDITOR_SECRET_KEY": mitopen_vault_secrets["ckeditor"]["secret_key"],
@@ -1451,8 +1451,8 @@ heroku_app_id = heroku_config.require("app_id")
 mitopen_heroku_configassociation = heroku.app.ConfigAssociation(
     f"ol-mitopen-heroku-configassociation-{stack_info.env_suffix}",
     app_id=heroku_app_id,
-    sensitive_vars=sensitive_heroku_vars,
-    vars=heroku_vars,
+    sensitive_vars=sensitive_env_vars,
+    vars=env_vars,
 )
 
 env_var_suffix = "RC" if stack_info.env_suffix == "qa" else "PROD"
@@ -1516,7 +1516,7 @@ gh_workflow_posthog_project_id_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_posthog_project_id-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"POSTHOG_PROJECT_ID_{env_var_suffix}",
-    plaintext_value=heroku_vars["POSTHOG_PROJECT_ID"],
+    plaintext_value=env_vars["POSTHOG_PROJECT_ID"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_posthog_project_api_key_env_secret = github.ActionsSecret(
@@ -1537,28 +1537,28 @@ gh_workflow_csrf_cookie_name_env_secret = github.ActionsSecret(
     f"ol_mitopen_csrf_cookie_name-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"CSRF_COOKIE_NAME_{env_var_suffix}",
-    plaintext_value=heroku_vars["CSRF_COOKIE_NAME"],
+    plaintext_value=env_vars["CSRF_COOKIE_NAME"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_appzi_url_env_secret = github.ActionsSecret(
     f"ol_mitopen_appzi_url-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"APPZI_URL_{env_var_suffix}",
-    plaintext_value=heroku_vars["APPZI_URL"],
+    plaintext_value=env_vars["APPZI_URL"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_sentry_traces_sample_rate = github.ActionsSecret(
     f"ol_mitopen_sentry_traces_sample_rate-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"SENTRY_TRACES_SAMPLE_RATE_{env_var_suffix}",
-    plaintext_value=heroku_vars["SENTRY_TRACES_SAMPLE_RATE"],
+    plaintext_value=env_vars["SENTRY_TRACES_SAMPLE_RATE"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_sentry_profiles_sample_rate = github.ActionsSecret(
     f"ol_mitopen_sentry_profiles_sample_rate-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"SENTRY_PROFILES_SAMPLE_RATE_{env_var_suffix}",
-    plaintext_value=heroku_vars["SENTRY_PROFILES_SAMPLE_RATE"],
+    plaintext_value=env_vars["SENTRY_PROFILES_SAMPLE_RATE"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_learn_ai_recommendation_endpoint_env_secret = github.ActionsSecret(
@@ -1579,9 +1579,13 @@ gh_workflow_learn_api_logout_env_secret = github.ActionsSecret(
     f"ol_mitopen_gh_workflow_mitol_api_logout_suffix-{stack_info.env_suffix}",
     repository=gh_repo.name,
     secret_name=f"MITOL_API_LOGOUT_SUFFIX_{env_var_suffix}",
-    plaintext_value=heroku_vars["MITOL_API_LOGOUT_SUFFIX"],
+    plaintext_value=env_vars["MITOL_API_LOGOUT_SUFFIX"],
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
+
+if mitlearn_config.get_bool("k8s_deploy"):
+    # Things you do when k8s deployment is enabled
+    pass
 
 export(
     "mitopen",
