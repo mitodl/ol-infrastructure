@@ -373,6 +373,8 @@ mitopen_vault_mount = vault.Mount(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
+# There is a reason, I think, why these are still at `bridge/secrets/mitopen`
+# and not `bridge/secrets/mitlearn` -- Open Discussions
 mitopen_vault_secrets = read_yaml_secrets(
     Path(f"mitopen/secrets.{stack_info.env_suffix}.yaml"),
 )
