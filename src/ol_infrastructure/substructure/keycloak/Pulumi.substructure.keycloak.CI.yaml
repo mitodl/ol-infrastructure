@@ -2,14 +2,15 @@
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHi+npazf3LfzV9oCtcYyCMYLOzaQhbo9xt6lJVVpz9tkQHpMQwRqf/EDyjHtgc9PpBrAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMp4sFsrI21U3yju5pAgEQgDv+w0KTW6e8fKqtizilkgPASV4sfeJ3/8qATl1EUUwhKU5jZM5jYS7LIbi027t5MFpWM8UxULdB09/vhQ==
 config:
-  keycloak_realm:captcha_secret_key:
-    secure: v1:S79qKq0yt6l+G950:rCDu52HiOU8wzfIEDjZSYT1s21IFMRnBdiVNqjg3ireUcjBlafXXEmrNbBIrK9HmGm7YlwexNIg=
-  keycloak_realm:captcha_site_key:
-    secure: v1:w1SgsUDrVFmdddf0:JSqvVFAP7QjU/n9QcaLGqAwaL25i7C/0Yn0zDO5p6k8YsMtwG/pI/dHI374WeVIcNNrmPI1SDZA=
   keycloak:client_id:
     secure: v1:yUi9Gz4PwFc9yy9R:s3/3nHcEW2wIxOaq9LUFKT0omyctCw==
   keycloak:client_secret:
     secure: v1:P5o6ZpkbE58s9kqg:3oS/Yeorg1vpIZpYY1lV5BB74lSeWYG/xq48RQEfwEkXzL4dtuvvngurcikRH3mn
+  keycloak:url: https://sso-ci.ol.mit.edu
+  keycloak_realm:captcha_secret_key:
+    secure: v1:S79qKq0yt6l+G950:rCDu52HiOU8wzfIEDjZSYT1s21IFMRnBdiVNqjg3ireUcjBlafXXEmrNbBIrK9HmGm7YlwexNIg=
+  keycloak_realm:captcha_site_key:
+    secure: v1:w1SgsUDrVFmdddf0:JSqvVFAP7QjU/n9QcaLGqAwaL25i7C/0Yn0zDO5p6k8YsMtwG/pI/dHI374WeVIcNNrmPI1SDZA=
   keycloak_realm:fake_touchstone_sig_cert: MIIDqDCCApCgAwIBAgIGAYtCTcf2MA0GCSqGSIb3DQEBCwUAMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTAeFw0yMzEwMTgxMDIwMTVaFw0zMzEwMTgxMDIxMTVaMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMhXOW/OMdHhUh0qgf/oJObcwNqUHzp6yO5JHDhPWPfg+TGxAL7capF8Jeni/Mgi2mOOiXOrg0h7dp4xbzPiv1eDS6aJld9diWpsZs42YRgiLrcBUq0Zsnw2qgQmCs4ZCpu6q3TTj2uKGZscmq8aiA31mdObCFzy+vlZbkZNymSCQpnJAjsmXfIbO3aLzxvGqdvtdW7+rFDGR3Ct2a3i+j+03AfCrvCNGn0lGMItgLSmhdyq6yzlVNAA6ptFOy+GcgfjbNNzwsXtCxb1xwN3egl5C6ywFoTV/MIZTo598pHZw/DHaWOKHCKan09teXAb7MNJaudcN7StyiSbYOZVf7sCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAcRnWon72th5mIFxWP3pKde4tnsHgxbm4kyw+6koWRtuK6IntyHjLukK4Wszf0PKofVltSEjez1JL42EZ+vmAh9S5edmFSTDcQjZut0/ciTzD6rKmBoYxZ2vWaxrkLkCz1x15QetdAw/BXTwOQKI1nkly8VqPhX8FevdA2WNPfd3dmOD06mpFlCyU16u/U+C1XLZOe/WCI7XuuEgLo+PYRRbJeEA38Ftmcy0lbEOpeiL74NXGTr4ebOxAY5ylDmYcUpuqO8UjmZvKTnEz8gsc+V2XqONvB0pX7rcrTYDJ4BFhJGJFG9vf8AwPv6SXAVbHZT/Bm3cqgAaPYfFwEIafZg== # pragma: allowlist secret # noqa: E501
   keycloak_realm:fake_touchstone_single_sign_on_service_url: https://dev-66940844.okta.com/app/dev-66940844_oldevfaketouchstoneci_1/exkctrcovnN73u6Kv5d7/sso/saml
   keycloak_realm:mailgun_email_host:
@@ -28,40 +29,52 @@ config:
     secure: v1:X2HfdQQMsRI6PoD+:iPxRyDo6z29kibOayiOEss3pavHKQ6hI
   keycloak_realm:okta_sig_cert: MIIDqDCCApCgAwIBAgIGAYs5vaEcMA0GCSqGSIb3DQEBCwUAMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTAeFw0yMzEwMTYxODI1NTBaFw0zMzEwMTYxODI2NTBaMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAPValYv+hMAZ0W607sZuWb69rSXDQvQ/p75sYKA4vax3uAIZT159SsYe0hBg734yIC6nGW+4gqc0mENSi16Q68AM80AyJczTduD52wBmZARxWgewahtlFStqRTh1Dh2n7P72qyeEkYhprDEk/MNnamR6Kxu2QfalYxD0EGJgCv1wXMziq3zNSqQ8nN27iAzgw8xWnNlZvVuTGWzUzvMrWoLV6uTBbK+eU827I2dcE4KiT5MVAVVmfsFwhBAtVO5TcahwbwWg0I9rQAVcSTIojnuDBlYvhh7llRFVetN6Y8JFeIZQsAHEGt2tiV/+us7jvAsaH+ostKCebA3YrnU412kCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAWId9RqHguZDWsNW5zeylefXwjDfiQeTWZfio6yIuGSNHUseFnatlMBgROOCrYGuitINCE5actyiZkrLQ0bQvj6ZWvqIISryhhtPD247MJ6sFNlBcSNpGLE+trPEp+QQ5bfxdvg6znsVb/fbYoiXs1lBTSHwnHF8tN1IY5ZUhZzFH6WOKCOeCFCJfprqTeI7SrPq59ABWCTv50is3TmKK7Q7WjAZmbmEHQmdSdy5ctvqsmlwapUzJoWsJ4u8tJZzgU2kCof2lyhaYa7yGWHFajRY6/FBslYfA5j/h1h2PZ7n5sGqghVRn94ZMNU4DbL14gkxT0nPExr0H3nLEvVwANg== # pragma: allowlist secret # noqa: E501
   keycloak_realm:okta_single_sign_on_service_url: https://dev-66940844.okta.com/app/dev-66940844_mitci_1/exkcshk0uw4gnJILX5d7/sso/saml
-  keycloak_realm:olapps-unified-ecommerce-client-redirect-uris: ["https://pay-ci.ol.mit.edu/*",
-    "https://api-pay-ci.ol.mit.edu/*"]
-  keycloak_realm:olapps-unified-ecommerce-client-logout-uris: ["/establish_session*",
-    ".apisix/redirect/*"]
-  keycloak_realm:olapps-unified-ecommerce-client-roles: ["https://api-pay-ci.ol.mit.edu/*"]
-  keycloak_realm:olapps-learn-ai-redirect-uris: ["https://learn-ai-ci.ol.mit.edu/*",
-    "https://api-learn-ai-ci.ol.mit.edu/*"]
-  keycloak_realm:olapps-learn-ai-client-roles: ["https://api-learn-ai-ci.ol.mit.edu/*"]
-  keycloak_realm:olapps-open-discussions-client-redirect-uris: ["https://discussions-ci.odl.mit.edu/*"]
-  keycloak_realm:ol-platform-engineering-airbyte-redirect-uris: ["https://airbyte-ci.odl.mit.edu/*"]
-  keycloak_realm:ol-platform-engineering-dagster-redirect-uris: ["https://pipelines-ci.odl.mit.edu/*"]
-  keycloak_realm:ol-platform-engineering-leek-redirect-uris: ["https://celery-monitoring-ci.odl.mit.edu/*"]
-  keycloak_realm:ol-data-platform-superset-redirect-uris: ["https://bi-ci.ol.mit.edu/*"]
-  keycloak_realm:ol-data-platform-superset-client-roles: ["superset_admin", "superset_alpha",
-    "superset_gamma"]
-  keycloak_realm:ol-data-platform-openmetadata-redirect-uris: ["https://open-metadata-ci.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-openmetadata-client-roles: ["open_metadata_admin",
     "open_metadata_user"]
-  keycloak:url: https://sso-ci.ol.mit.edu
-  vault:address: https://vault-ci.odl.mit.edu
-  vault_server:env_namespace: operations.ci
-  keycloak_realm:olapps-unified-ecommerce-client-secret:
-    secure: v1:56Sc/lnkJ3zwDj62:YmgdAN9f8QQK1L5hIygF3I31St5PS8IjlwRyFkP/i2hxNxoNzKsbJQCIskQ58bte
-  keycloak_realm:olapps-learn-ai-client-secret:
-    secure: v1:hJQd4Gnpww6vFMI8:ScX791cNeXk1iWO0j/4uXMzfFivtTkhFWPCXkhJIbwIC/Jb5zaiFO591c25Ri64+
-  keycloak_realm:olapps-open-discussions-client-secret:
-    secure: v1:uAB+cVrN2bsEepg6:HZazIFvhKkr4xVJ3QN9nU02QG5p6T54aZTkCtqzlS1Y15ceGGU7cK/tmJiIq7YTj
-  keycloak_realm:ol-platform-engineering-airbyte-client-secret:
-    secure: v1:RN2SKGo+MKCkI9OY:tP05EhbUMuyqGY4OmVsNIGefmYeqoHVX85z6ZyEhmzs9Jcp7fVaslk/R6FSbNd2Z
-  keycloak_realm:ol-platform-engineering-dagster-client-secret:
-    secure: v1:F4rjMcwJr2e+854p:8qPUK+Pi112EQrWoNsczQW99e5IHP7sxwtqZTIDnonrED8qTZiMofJGEHp1vliua
-  keycloak_realm:ol-platform-engineering-leek-client-secret:
-    secure: v1:xf9mFeIyIWLQbIYk:IY+XjdVmc6Va8WGTwrEN+t3jsyuJJ2b1fD83n2MiDSfUBNxeBoP1Xwd+KGskOLOX
-  keycloak_realm:ol-data-platform-superset-client-secret:
-    secure: v1:Ow95HN9yKnXBg5jX:CUoA/qBSeUF2w0FNYlEnC5OyvP8sg7S3efyvrX8J10Q8T16oxlO3MF3ROByGk12G
   keycloak_realm:ol-data-platform-openmetadata-client-secret:
     secure: v1:xDcFOGyX+zMEcLPi:bsgsId1OSzW4kJR8cdTMsltFM6WlrhwyJk8fwavo1rWpiS/yU8S4Z6A7Z5b+uj7I
+  keycloak_realm:ol-data-platform-openmetadata-redirect-uris: ["https://open-metadata-ci.ol.mit.edu/*"]
+  keycloak_realm:ol-data-platform-superset-client-roles: ["superset_admin", "superset_alpha",
+    "superset_gamma"]
+  keycloak_realm:ol-data-platform-superset-client-secret:
+    secure: v1:Ow95HN9yKnXBg5jX:CUoA/qBSeUF2w0FNYlEnC5OyvP8sg7S3efyvrX8J10Q8T16oxlO3MF3ROByGk12G
+  keycloak_realm:ol-data-platform-superset-redirect-uris: ["https://bi-ci.ol.mit.edu/*"]
+  keycloak_realm:ol-platform-engineering-airbyte-client-secret:
+    secure: v1:RN2SKGo+MKCkI9OY:tP05EhbUMuyqGY4OmVsNIGefmYeqoHVX85z6ZyEhmzs9Jcp7fVaslk/R6FSbNd2Z
+  keycloak_realm:ol-platform-engineering-airbyte-redirect-uris: ["https://airbyte-ci.odl.mit.edu/*"]
+  keycloak_realm:ol-platform-engineering-dagster-client-secret:
+    secure: v1:F4rjMcwJr2e+854p:8qPUK+Pi112EQrWoNsczQW99e5IHP7sxwtqZTIDnonrED8qTZiMofJGEHp1vliua
+  keycloak_realm:ol-platform-engineering-dagster-redirect-uris: ["https://pipelines-ci.odl.mit.edu/*"]
+  keycloak_realm:ol-platform-engineering-leek-client-secret:
+    secure: v1:xf9mFeIyIWLQbIYk:IY+XjdVmc6Va8WGTwrEN+t3jsyuJJ2b1fD83n2MiDSfUBNxeBoP1Xwd+KGskOLOX
+  keycloak_realm:ol-platform-engineering-leek-redirect-uris: ["https://celery-monitoring-ci.odl.mit.edu/*"]
+  keycloak_realm:olapps-learn-ai-client-roles: ["https://api-learn-ai-ci.ol.mit.edu/*"]
+  keycloak_realm:olapps-learn-ai-client-secret:
+    secure: v1:hJQd4Gnpww6vFMI8:ScX791cNeXk1iWO0j/4uXMzfFivtTkhFWPCXkhJIbwIC/Jb5zaiFO591c25Ri64+
+  keycloak_realm:olapps-learn-ai-redirect-uris: ["https://learn-ai-ci.ol.mit.edu/*",
+    "https://api-learn-ai-ci.ol.mit.edu/*"]
+  keycloak_realm:olapps-mitlearn-client-roles:
+  - "https://ci.learn.mit.edu/*"
+  - "https://learn-ai-ci.ol.mit.edu/*"
+  - "https://pay-ci.ol.mit.edu/*"
+  keycloak_realm:olapps-mitlearn-client-redirect-uris:
+  - "https://api.ci.learn.mit.edu/*"
+  - "https://ci.learn.mit.edu/*"
+  - "https://api-learn-ai-ci.ol.mit.edu/*"
+  - "https://learn-ai-ci.ol.mit.edu/*"
+  - "https://api-pay-ci.ol.mit.edu/*"
+  - "https://pay-ci.ol.mit.edu/*"
+  keycloak_realm:olapps-mitlearn-client-secret:
+    secure: v1:sJuWLKHeep4Qz9cr:YbZNIQoy3Bn1nbpKsCUPNUeEtZJgd+tA5LAU8pDfSKWr2fzvjfMy0XcmO4CR7a3q
+  keycloak_realm:olapps-open-discussions-client-redirect-uris: ["https://discussions-ci.odl.mit.edu/*"]
+  keycloak_realm:olapps-open-discussions-client-secret:
+    secure: v1:uAB+cVrN2bsEepg6:HZazIFvhKkr4xVJ3QN9nU02QG5p6T54aZTkCtqzlS1Y15ceGGU7cK/tmJiIq7YTj
+  keycloak_realm:olapps-unified-ecommerce-client-logout-uris: ["/establish_session*",
+    ".apisix/redirect/*"]
+  keycloak_realm:olapps-unified-ecommerce-client-redirect-uris: ["https://pay-ci.ol.mit.edu/*",
+    "https://api-pay-ci.ol.mit.edu/*"]
+  keycloak_realm:olapps-unified-ecommerce-client-roles: ["https://api-pay-ci.ol.mit.edu/*"]
+  keycloak_realm:olapps-unified-ecommerce-client-secret:
+    secure: v1:56Sc/lnkJ3zwDj62:YmgdAN9f8QQK1L5hIygF3I31St5PS8IjlwRyFkP/i2hxNxoNzKsbJQCIskQ58bte
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
