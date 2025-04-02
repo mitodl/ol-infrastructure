@@ -370,7 +370,9 @@ mitopen_vault_mount = vault.Mount(
     type="kv-v2",
     options={"version": 2},
     description="Storage of configuration secrets used by MIT-Open",
-    opts=ResourceOptions(delete_before_replace=True),
+    opts=ResourceOptions(
+        delete_before_replace=True, depends_on=[mitopen_vault_iam_role]
+    ),
 )
 
 # There is a reason, I think, why these are still at `bridge/secrets/mitopen`
@@ -1333,47 +1335,36 @@ env_vars.update(**mitlearn_config.get_object("vars"))
 
 # TODO @Ardiea: 01112024 We should be able to use vault.aws.get_access_credentials_output()
 # for this but it doesn't seem to work
-# auth_aws_mitx_creds_ol_mitopen_application = vault.aws.get_access_credentials_output(backend=mitopen_vault_iam_role.backend, role=mitopen_vault_iam_role.name, opts=InvokeOptions(parent=mitopen_vault_mount))  # . TD003
-auth_aws_mitx_creds_ol_mitopen_application = vault.generic.get_secret_output(
-    path="aws-mitx/creds/ol-mitopen-application",
-    with_lease_start_time=False,
-    opts=InvokeOptions(parent=mitopen_vault_mount),
-)
-auth_postgres_mitopen_creds_app = vault.generic.get_secret_output(
-    path="postgres-mitopen/creds/app",
-    with_lease_start_time=False,
-    opts=InvokeOptions(parent=mitopen_vault_mount),
-)
-
+# auth_aws_mitx_creds_ol_mitopen_application = vault.aws.get_access_credentials_output(backend=mitopen_vault_iam_role.backend, role=mitopen_vault_iam_role.name, opts=InvokeOptions(parent=mitopen_vault_iam_role))  # . TD003
 secret_operations_global_embedly = vault.generic.get_secret_output(
     path="secret-operations/global/embedly",
-    opts=InvokeOptions(parent=mitopen_vault_mount),
+    opts=InvokeOptions(parent=mitopen_vault_iam_role),
 )
 secret_operations_global_odlbot_github_access_token = vault.generic.get_secret_output(
     path="secret-operations/global/odlbot-github-access-token",
-    opts=InvokeOptions(parent=mitopen_vault_mount),
+    opts=InvokeOptions(parent=mitopen_vault_iam_role),
 )
 secret_global_mailgun_api_key = vault.generic.get_secret_output(
     path="secret-global/mailgun",
-    opts=InvokeOptions(parent=mitopen_vault_mount),
+    opts=InvokeOptions(parent=mitopen_vault_iam_role),
 )
 secret_operations_global_mit_smtp = vault.generic.get_secret_output(
     path="secret-operations/global/mit-smtp",
-    opts=InvokeOptions(parent=mitopen_vault_mount),
+    opts=InvokeOptions(parent=mitopen_vault_iam_role),
 )
 secret_operations_global_update_search_data_webhook_key = (
     vault.generic.get_secret_output(
         path="secret-operations/global/update-search-data-webhook-key",
-        opts=InvokeOptions(parent=mitopen_vault_mount),
+        opts=InvokeOptions(parent=mitopen_vault_iam_role),
     )
 )
 secret_operations_sso_learn = vault.generic.get_secret_output(
     path="secret-operations/sso/mitlearn",
-    opts=InvokeOptions(parent=mitopen_vault_mount),
+    opts=InvokeOptions(parent=mitopen_vault_iam_role),
 )
 secret_operations_tika_access_token = vault.generic.get_secret_output(
     path="secret-operations/tika/access-token",
-    opts=InvokeOptions(parent=mitopen_vault_mount),
+    opts=InvokeOptions(parent=mitopen_vault_iam_role),
 )
 
 # Gets masked in any console outputs
@@ -1403,18 +1394,6 @@ sensitive_env_vars = {
     "POSTHOG_PERSONAL_API_KEY": mitopen_vault_secrets["posthog"]["personal_api_key"],
     "SEE_API_CLIENT_ID": mitopen_vault_secrets["see_api_client"]["id"],
     "SEE_API_CLIENT_SECRET": mitopen_vault_secrets["see_api_client"]["secret"],
-    # Vars that require more
-    "AWS_ACCESS_KEY_ID": auth_aws_mitx_creds_ol_mitopen_application.data.apply(
-        lambda data: "{}".format(data["access_key"])
-    ),  # TODO @Ardiea: This changes every run / preview and creates a mess in IAM.
-    "AWS_SECRET_ACCESS_KEY": auth_aws_mitx_creds_ol_mitopen_application.data.apply(
-        lambda data: "{}".format(data["secret_key"])
-    ),
-    "DATABASE_URL": auth_postgres_mitopen_creds_app.data.apply(
-        lambda data: "postgres://{}:{}@ol-mitlearn-db-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/mitopen".format(
-            data["username"], data["password"], stack_info.name.lower()
-        )
-    ),  # TODO @Ardiea: This changes every run / preview and creates a mess in the DB.
     "EMBEDLY_KEY": secret_operations_global_embedly.data.apply(
         lambda data: "{}".format(data["key"])
     ),
@@ -1447,15 +1426,56 @@ sensitive_env_vars = {
     ),
 }
 
-heroku_app_id = heroku_config.require("app_id")
-mitopen_heroku_configassociation = heroku.app.ConfigAssociation(
-    f"ol-mitopen-heroku-configassociation-{stack_info.env_suffix}",
-    app_id=heroku_app_id,
-    sensitive_vars=sensitive_env_vars,
-    vars=env_vars,
-)
+# There were a few ndiscovered circular dependencies here that wasn't revealed until attempting
+# to build the CI environment. Since we won't even need this in K8S we will just let it be
+# for now behind this conditional
+if stack_info.env_suffix != "ci":
+    auth_aws_mitx_creds_ol_mitopen_application = vault.generic.get_secret_output(
+        path="aws-mitx/creds/ol-mitopen-application",
+        with_lease_start_time=False,
+        opts=InvokeOptions(
+            parent=mitopen_vault_iam_role,
+        ),
+    )
+    sensitive_env_vars["AWS_ACCESS_KEY_ID"] = (
+        auth_aws_mitx_creds_ol_mitopen_application.data.apply(
+            lambda data: "{}".format(data["access_key"])
+        )
+    )
+    sensitive_env_vars["AWS_SECRET_ACCESS_KEY"] = (
+        auth_aws_mitx_creds_ol_mitopen_application.data.apply(
+            lambda data: "{}".format(data["secret_key"])
+        )
+    )
 
-env_var_suffix = "RC" if stack_info.env_suffix == "qa" else "PROD"
+    auth_postgres_mitopen_creds_app = vault.generic.get_secret_output(
+        path="postgres-mitopen/creds/app",
+        with_lease_start_time=False,
+        opts=InvokeOptions(parent=mitopen_vault_iam_role),
+    )
+    sensitive_env_vars["DATABASE_URL"] = auth_postgres_mitopen_creds_app.data.apply(
+        lambda data: "postgres://{}:{}@ol-mitlearn-db-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/mitopen".format(
+            data["username"], data["password"], stack_info.name.lower()
+        )
+    )
+
+    heroku_app_id = heroku_config.require("app_id")
+    mitopen_heroku_configassociation = heroku.app.ConfigAssociation(
+        f"ol-mitopen-heroku-configassociation-{stack_info.env_suffix}",
+        app_id=heroku_app_id,
+        sensitive_vars=sensitive_env_vars,
+        vars=env_vars,
+    )
+
+match stack_info.env_suffix:
+    case "production":
+        env_var_suffix = "PROD"
+    case "qa":
+        env_var_suffix = "RC"
+    case "ci":
+        env_var_suffix = "CI"
+    case _:
+        env_var_suffix = "INVALID"
 
 gh_repo = github.get_repository(
     full_name="mitodl/mit-learn", opts=InvokeOptions(provider=github_provider)
