@@ -3,6 +3,8 @@ secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAFI5IH8mbo9W80S6y2vnAxJAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMEbLde8oRQ90G1X9xAgEQgDsw9IWL3FWjQgU3qPyM6iaJktjuBAmQxd3/fb9uGJoBQIKMPval1Hs58h9R0/fVVRJuVXr+N5mAmCSSZQ==
 config:
   eks:allowed_dns_zones:
+  - ".learn.mit.edu"
+  - "learn.mit.edu"
   - ".odl.mit.edu"
   - "odl.mit.edu"
   - ".ol.mit.edu"
@@ -15,6 +17,7 @@ config:
   eks:apisix_domains:
   - "api-pay-ci.ol.mit.edu"
   - "api-learn-ai-ci.ol.mit.edu"
+  - "api.ci.learn.mit.edu"
   eks:developer_role_policy_name: "AmazonEKSAdminPolicy"
   eks:developer_role_kubernetes_groups: ["admin"]
   eks:ebs_csi_provisioner: "true"
