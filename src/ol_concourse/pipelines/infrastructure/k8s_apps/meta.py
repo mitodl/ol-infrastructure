@@ -61,7 +61,7 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
     pipeline_definitions = git_repo(
         name=Identifier("k8s-app-pipeline-definitions"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="k8s_app_pipeline_refactor",
+        branch="main",
         paths=[
             "src/ol_concourse/pipelines/infrastructure/k8s_apps/",
             "src/ol_concourse/lib/",

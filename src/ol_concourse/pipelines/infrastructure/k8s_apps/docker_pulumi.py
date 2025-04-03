@@ -228,7 +228,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
             ),
         ],
         additional_env_vars={
-            f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:ci_git_ref))",
+            f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:image_tag))",
         },
     )
 
@@ -305,7 +305,10 @@ def build_app_pipeline(app_name: str) -> Pipeline:
 if __name__ == "__main__":
     import sys
 
-    app_name = sys.argv[1] if len(sys.argv) > 1 else "learn-ai"
+    app_name = sys.argv[1] if len(sys.argv) > 1 else None
+    if not app_name:
+        msg = "Please provide an app name as a command line argument."
+        raise ValueError(msg)
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(
             build_app_pipeline(app_name=app_name).model_dump_json(indent=2)
