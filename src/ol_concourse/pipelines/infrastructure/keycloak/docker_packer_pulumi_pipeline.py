@@ -33,7 +33,7 @@ def build_keycloak_substructure_pipeline() -> PipelineFragment:
     keycloak_pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi-substructure"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="main",
+        branch="sar/phasetwo_keycloak",
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath("substructure/keycloak/")),
@@ -54,13 +54,13 @@ def build_keycloak_substructure_pipeline() -> PipelineFragment:
 def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
     keycloak_upstream_registry_image = registry_image(
         name=Identifier("keycloak-upstream-image"),
-        image_repository="quay.io/keycloak/keycloak",
-        image_tag=KEYCLOAK_VERSION,
+        image_repository="quay.io/phasetwo/phasetwo-keycloak",
+        image_tag="26.1.2",
     )
     keycloak_customization_repo = git_repo(
         Identifier("ol-keycloak-customization"),
         uri="https://github.com/mitodl/ol-keycloak",
-        branch="main",
+        branch="sar/phasetwo_keycloak",
     )
 
     keycloak_registry_image = registry_image(
@@ -84,7 +84,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
     keycloak_pulumi_code = git_repo(
         name=Identifier("ol-infrastructure-pulumi-build"),
         uri="https://github.com/mitodl/ol-infrastructure",
-        branch="main",
+        branch="sar/phasetwo_keycloak",
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath("applications/keycloak/")),

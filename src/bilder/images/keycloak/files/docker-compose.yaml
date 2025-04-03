@@ -6,6 +6,9 @@ services:
     - start
     - --spi-sticky-session-encoder-infinispan-should-attach-route=false
     - --spi-login-provider=ol-freemarker
+    - --spi-email-template-provider=freemarker-plus-mustache
+    - --spi-email-template-freemarker-plus-mustache-enabled=true
+    - --spi-theme-cache-themes=false
     - --http-enabled=true
     - --hostname=${KC_URL}
     - --proxy-headers=xforwarded
