@@ -48,7 +48,7 @@ def _define_git_resources(
 
     release_repo = git_repo(
         name=Identifier(f"{app_name}-release"),
-        uri="http://github.com/mitodl/learn-ai",
+        uri=f"http://github.com/mitodl/{app_name}",
         branch="release",
         fetch_tags=True,
         tag_regex=r"v[0-9]\.[0-9]*\.[0-9]",  # examples v0.24.0, v0.26.3
@@ -349,11 +349,14 @@ def build_app_pipeline(app_name: str) -> Pipeline:
 
 
 if __name__ == "__main__":
+    import sys
+
+    app_name = sys.argv[1] if len(sys.argv) > 1 else "learn-ai"
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(
-            build_app_pipeline(app_name="learn-ai").model_dump_json(indent=2)
+            build_app_pipeline(app_name=app_name).model_dump_json(indent=2)
         )
-    sys.stdout.write(build_app_pipeline(app_name="learn-ai").model_dump_json(indent=2))
+    sys.stdout.write(build_app_pipeline(app_name=app_name).model_dump_json(indent=2))
     sys.stdout.writelines(
         (
             "\n",
