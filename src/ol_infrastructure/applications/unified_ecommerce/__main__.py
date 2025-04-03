@@ -631,7 +631,7 @@ static_secrets = OLVaultK8SSecret(
 )
 
 # k8s Component Resource
-
+secret_names = [db_creds_secret_name, redis_creds_secret_name, static_secrets_name]
 ecommerce_k8s_config: OLApplicationK8sConfiguration = OLApplicationK8sConfiguration(
     project_root=Path(__file__).parent,
     application_config=ecommerce_config.require_object("env_vars"),
@@ -640,9 +640,7 @@ ecommerce_k8s_config: OLApplicationK8sConfiguration = OLApplicationK8sConfigurat
     application_lb_service_name="ecommerce",
     application_lb_service_port_name="http",
     k8s_global_labels=k8s_global_labels,
-    db_creds_secret_name=db_creds_secret_name,
-    redis_creds_secret_name=redis_creds_secret_name,
-    static_secrets_name=static_secrets_name,
+    env_from_secret_names=secret_names,
     application_security_group_id=ecommerce_application_security_group.id,
     application_security_group_name=ecommerce_application_security_group.name,
     application_image_repository="mitodl/unified-ecommerce-app-main",
