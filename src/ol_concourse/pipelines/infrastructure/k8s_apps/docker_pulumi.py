@@ -20,7 +20,6 @@ from ol_concourse.lib.models.pipeline import (
     RegistryImage,
     Resource,
     ResourceType,
-    Step,
     TaskConfig,
     TaskStep,
 )
@@ -153,6 +152,7 @@ def _build_image_job(
             LoadVarStep(
                 load_var="git_ref",
                 file=f"{git_repo_resource.name}/.git/ref",
+                reveal=True,
             ),
             container_build_task(
                 inputs=[Input(name=git_repo_resource.name)],
@@ -176,51 +176,6 @@ def _build_image_job(
     plan.append(PutStep(put=registry_image_resource.name, params=put_params))
 
     return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
-
-
-def _common_deployment_steps(
-    app_name: str,
-    stack_env: str,
-    registry_image_resource: Resource,
-    pulumi_resource: Resource,
-    ol_infra_repo: Resource,
-) -> list[Step]:
-    """Generate the common task and put steps for a deployment job."""
-    pulumi_stack_name = f"applications.{app_name.replace('-', '_')}.{stack_env}"
-    return [
-        LoadVarStep(
-            load_var="image_tag",
-            file=f"{registry_image_resource.name}/tag",
-        ),
-        TaskStep(
-            task=Identifier("set-aws-creds"),
-            config=TaskConfig(
-                platform=Platform.linux,
-                image_resource=AnonymousResource(
-                    type=REGISTRY_IMAGE,
-                    source=RegistryImage(repository="amazon/aws-cli"),
-                ),
-                inputs=[Input(name=ol_infra_repo)],
-                outputs=[Output(name=Identifier("aws_creds"))],
-                run=Command(
-                    path=f"{ol_infra_repo.name}/pipelines/infrastructure/scripts/generate_aws_config_from_instance_profile.sh",
-                ),
-            ),
-        ),
-        PutStep(
-            put=pulumi_resource,
-            get_params={"skip_implicit_get": True},
-            params={
-                "env_os": {
-                    "AWS_DEFAULT_REGION": "us-east-1",
-                    "PYTHONPATH": f"/usr/lib/:/tmp/build/put/{ol_infra_repo}/src/",
-                    "GITHUB_TOKEN": "((github.public_repo_access_token))",
-                    f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:image_tag))",  # noqa: E501
-                },
-                "stack_name": pulumi_stack_name,
-            },
-        ),
-    ]
 
 
 def build_app_pipeline(app_name: str) -> Pipeline:
@@ -268,7 +223,13 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                 passed=[main_image_build_job.name],
                 params={"skip_download": True},
             ),
+            LoadVarStep(
+                load_var="image_tag", file=f"{app_image.name}/tag", reveal=True
+            ),
         ],
+        additional_env_vars={
+            f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:ci_git_ref))",
+        },
     )
 
     # QA and Production Deployments
@@ -289,7 +250,13 @@ def build_app_pipeline(app_name: str) -> Pipeline:
                 passed=[rc_image_build_job.name],
                 params={"skip_download": True},
             ),
+            LoadVarStep(
+                load_var="image_tag", file=f"{app_image.name}/tag", reveal=True
+            ),
         ],
+        additional_env_vars={
+            f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:image_tag))",
+        },
     )
 
     # Group into Fragments
