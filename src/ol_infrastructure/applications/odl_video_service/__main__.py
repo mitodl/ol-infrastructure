@@ -514,7 +514,7 @@ block_device_mappings = [BlockDeviceMapping()]
 
 ovs_lb_config = OLLoadBalancerConfig(
     enable_insecure_http=True,
-    listener_cert_domain="video.odl.mit.edu",
+    listener_cert_domain="*.odl.mit.edu",
     listener_use_acm=True,
     security_groups=[ovs_server_security_group],
     subnets=subnets,
