@@ -151,6 +151,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901
     github_issue_assignees: Optional[list[str]] = None,
     github_issue_labels: Optional[list[str]] = None,
     github_issue_repository: Optional[str] = None,
+    additional_env_vars: Optional[dict[str, str]] = None,
 ) -> PipelineFragment:
     """Create a chained sequence of jobs for running Pulumi tasks.
 
@@ -243,6 +244,7 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901
             project_source_path,
             local_dependencies,
             previous_job,
+            additional_env_vars=additional_env_vars,
         )
         default_github_issue_labels = [
             "product:infrastructure",
@@ -286,6 +288,7 @@ def pulumi_job(  # noqa: PLR0913
     project_source_path: Path,
     dependencies: Optional[list[GetStep]] = None,
     previous_job: Optional[Job] = None,
+    additional_env_vars: Optional[dict[str, str]] = None,
 ) -> PipelineFragment:
     """Create a job definition for running a Pulumi task.
 
@@ -347,6 +350,7 @@ def pulumi_job(  # noqa: PLR0913
                             f"/usr/lib/:/tmp/build/put/{pulumi_code.name}/src/"
                         ),
                         "GITHUB_TOKEN": "((github.public_repo_access_token))",
+                        **(additional_env_vars or {}),
                     },
                     "stack_name": stack_name,
                 },
