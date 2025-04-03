@@ -96,22 +96,18 @@ k8s_global_labels = {
 }
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
-if not (ECOMMERCE_DOCKER_TAG := os.getenv("ECOMMERCE_DOCKER_TAG")):
-    msg = "ECOMMERCE_DOCKER_TAG must be set"
+if not (UNIFIED_ECOMMERCE_DOCKER_TAG := os.getenv("UNIFIED_ECOMMERCE_DOCKER_TAG")):
+    msg = "UNIFIED_ECOMMERCE_DOCKER_TAG must be set"
     raise OSError(msg)
 
 match stack_info.env_suffix:
     case "production":
-        image_repository_suffix = "-release"
         env_var_suffix = "PROD"
     case "qa":
-        image_repository_suffix = "-rc"
         env_var_suffix = "RC"
     case "ci":
-        image_repository_suffix = "-main"
         env_var_suffix = "CI"
     case _:
-        image_repository_suffix = "-invalid"
         env_var_suffix = "INVALID"
 
 
@@ -661,8 +657,7 @@ ecommerce_k8s_config: OLApplicationK8sConfiguration = OLApplicationK8sConfigurat
     application_security_group_id=ecommerce_application_security_group.id,
     application_security_group_name=ecommerce_application_security_group.name,
     application_image_repository="mitodl/unified-ecommerce-app",
-    application_image_repository_suffix=image_repository_suffix,
-    application_docker_tag=ECOMMERCE_DOCKER_TAG,
+    application_docker_tag=UNIFIED_ECOMMERCE_DOCKER_TAG,
     vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
     import_nginx_config=True,
 )

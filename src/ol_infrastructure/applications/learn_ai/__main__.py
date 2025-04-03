@@ -110,16 +110,12 @@ LEARN_AI_DOCKER_TAG = os.getenv("LEARN_AI_DOCKER_TAG")
 
 match stack_info.env_suffix:
     case "production":
-        image_repository_suffix = "-release"
         env_var_suffix = "PROD"
     case "qa":
-        image_repository_suffix = "-rc"
         env_var_suffix = "RC"
     case "ci":
-        image_repository_suffix = "-main"
         env_var_suffix = "CI"
     case _:
-        image_repository_suffix = "-invalid"
         env_var_suffix = "INVALID"
 
 learn_ai_namespace = "learn-ai"
@@ -758,9 +754,7 @@ learn_ai_deployment_envfrom = [
 ]
 
 
-application_image_repository_and_tag = (
-    f"mitodl/learn-ai-app{image_repository_suffix}:{LEARN_AI_DOCKER_TAG}"
-)
+application_image_repository_and_tag = f"mitodl/learn-ai-app:{LEARN_AI_DOCKER_TAG}"
 image_pull_policy = (
     "Always" if stack_info.env_suffix in ("ci", "qa") else "IfNotPresent"
 )
