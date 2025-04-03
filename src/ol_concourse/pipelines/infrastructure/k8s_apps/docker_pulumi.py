@@ -71,33 +71,17 @@ def _define_git_resources(
     )
 
 
-def _define_registry_image_resources(app_name: str) -> tuple[Resource, Resource]:
-    """Define the registry image resources needed for the pipeline."""
-    # Used for publishing the CI containers to dockerhub
-    registry_ci_image = registry_image(
-        name=Identifier(f"{app_name}-ci-image"),
-        image_repository=f"mitodl/{app_name}-app-main",
+def _define_registry_image_resource(app_name: str) -> Resource:
+    """Define the registry image resource needed for the pipeline."""
+    # Unified image repository for CI, RC, and Production images
+    return registry_image(
+        name=Identifier(f"{app_name}-app-image"),
+        image_repository=f"mitodl/{app_name}-app",
         username="((dockerhub.username))",
-        password="((dockerhub.password))",  # noqa: S106
-        tag_regex="[0-9A-Fa-f]+",  # Should only capture the CI images
-        check_every="24h",
-    )
-
-    # Used for publishing the RC / production containers to dockerhub
-    registry_rc_image = registry_image(
-        name=Identifier(f"{app_name}-rc-image"),
-        image_repository=f"mitodl/{app_name}-app-rc",
-        image_tag=None,  # Only filter on tagged images
-        username="((dockerhub.username))",
-        password="((dockerhub.password))",  # noqa: S106
-        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
-        sort_by_creation=True,
-        check_every="24h",
-    )
-
-    return (
-        registry_ci_image,
-        registry_rc_image,
+        password="((dockerhub.password))",  # noqa: S106 No tag_regex here; tags are
+        # managed explicitly in put steps check_every="never" might be suitable if only
+        # put triggers are desired
+        check_every="24h",  # Or keep checking if needed for manual triggers
     )
 
 
@@ -247,10 +231,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         release_repo,
         ol_infra_repo,
     ) = _define_git_resources(app_name)
-    (
-        registry_ci_image,
-        registry_rc_image,
-    ) = _define_registry_image_resources(app_name)
+    app_image = _define_registry_image_resource(app_name)
     pulumi_resource_type, pulumi_resource = _define_pulumi_resources(
         app_name, ol_infra_repo.name
     )
@@ -261,13 +242,13 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         app_name=app_name,
         branch_type="main",
         git_repo_resource=main_repo,
-        registry_image_resource=registry_ci_image,
+        registry_image_resource=app_image,
     )
     rc_image_build_job = _build_image_job(
         app_name=app_name,
         branch_type="release_candidate",
         git_repo_resource=release_candidate_repo,
-        registry_image_resource=registry_rc_image,
+        registry_image_resource=app_image,
     )
 
     # Define Deployment Jobs
@@ -282,7 +263,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         ),
         dependencies=[
             GetStep(
-                get=registry_ci_image.name,
+                get=app_image.name,
                 trigger=True,
                 passed=[main_image_build_job.name],
                 params={"skip_download": True},
@@ -303,7 +284,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         ),
         dependencies=[
             GetStep(
-                get=registry_rc_image.name,
+                get=app_image.name,
                 trigger=True,
                 passed=[rc_image_build_job.name],
                 params={"skip_download": True},
@@ -314,28 +295,34 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     # Group into Fragments
 
     main_branch_container_fragement = PipelineFragment(
-        resources=[main_repo, registry_ci_image],
-        jobs=[main_image_build_job],
+        resources=[main_repo, app_image], jobs=[main_image_build_job]
     )
 
     release_candidate_container_fragment = PipelineFragment(
         resources=[
             release_candidate_repo,
-            registry_rc_image,
+            # app_image is already included in main_branch_container_fragement
         ],
         jobs=[rc_image_build_job],
     )
 
+    # Consolidate resources for deployment fragments
+    deployment_resources = [
+        ol_infra_repo,
+        pulumi_resource,
+        app_image,
+    ]
+
     ci_deployment_fragment = PipelineFragment(
         resource_types=[pulumi_resource_type, *ci_fragment.resource_types],
-        resources=[
-            ol_infra_repo,
-            pulumi_resource,
-            registry_ci_image,
-            *ci_fragment.resources,
-        ],
+        resources=[*deployment_resources, *ci_fragment.resources],
         jobs=ci_fragment.jobs,
     )
+
+    # Update qa_and_production_fragment resources similarly if needed,
+    # though pulumi_jobs_chain handles its own resource management internally.
+    # Ensure app_image is available to qa_and_production_fragment jobs.
+    # The dependency GetStep already references app_image.name.
 
     # Combine all fragments
 
@@ -357,9 +344,12 @@ if __name__ == "__main__":
             build_app_pipeline(app_name=app_name).model_dump_json(indent=2)
         )
     sys.stdout.write(build_app_pipeline(app_name=app_name).model_dump_json(indent=2))
+    # Note: The pipeline name generated below might need adjustment
+    # if the app_name changes the resulting pipeline identifier.
+    pipeline_name = f"docker-pulumi-{app_name}"
     sys.stdout.writelines(
         (
             "\n",
-            "fly -t pr-inf sp -p docker-pulumi-learn-ai -c definition.json",
+            f"fly -t pr-inf sp -p {pipeline_name} -c definition.json",
         )
     )
