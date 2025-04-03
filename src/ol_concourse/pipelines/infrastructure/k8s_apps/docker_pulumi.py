@@ -40,7 +40,7 @@ def _define_git_resources(
 
     release_candidate_repo = git_repo(
         name=Identifier(f"{app_name}-release-candidate"),
-        uri=f"http://github.com/mitodl/{app_name}",
+        uri=f"https://github.com/mitodl/{app_name}",
         branch="release-candidate",
         fetch_tags=True,
     )
