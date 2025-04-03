@@ -48,9 +48,7 @@ class OLApplicationK8sConfiguration(BaseModel):
     application_lb_service_name: str
     application_lb_service_port_name: str
     k8s_global_labels: dict[str, str]
-    db_creds_secret_name: str
-    redis_creds_secret_name: str
-    static_secrets_name: str
+    env_from_secret_names: list[str]
     application_security_group_id: Output[str]
     application_security_group_name: Output[str]
     application_image_repository: str
@@ -142,30 +140,15 @@ class OLApplicationK8s(ComponentResource):
         )
 
         # Build a list of sensitive env vars for the deployment config via envFrom
-        application_deployment_envfrom = [
-            # Database creds
-            kubernetes.core.v1.EnvFromSourceArgs(
-                secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-                    name=ol_app_k8s_config.db_creds_secret_name,
-                ),
-            ),
-            # Redis Configuration
-            kubernetes.core.v1.EnvFromSourceArgs(
-                secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-                    name=ol_app_k8s_config.redis_creds_secret_name,
-                ),
-            ),
-            # static secrets from secrets-application/secrets
-            kubernetes.core.v1.EnvFromSourceArgs(
-                secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-                    name=ol_app_k8s_config.static_secrets_name,
-                ),
-            ),
-        ]
-        if ol_app_k8s_config.application_image_repository_suffix:
-            app_image = f"{ol_app_k8s_config.application_image_repository}{ol_app_k8s_config.application_image_repository_suffix}:{ol_app_k8s_config.application_docker_tag}"
-        else:
-            app_image = f"{ol_app_k8s_config.application_image_repository}:{ol_app_k8s_config.application_docker_tag}"
+        application_deployment_envfrom = []
+        for secret_name in ol_app_k8s_config.env_from_secret_names:
+            application_deployment_envfrom.append(  # noqa: PERF401
+                kubernetes.core.v1.EnvFromSourceArgs(
+                    secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+                        name=secret_name,
+                    ),
+                )
+            )
 
         init_containers = []
         if ol_app_k8s_config.init_collectstatic:
