@@ -140,7 +140,7 @@ def packer_jobs(  # noqa: PLR0913
     )
 
 
-def pulumi_jobs_chain(  # noqa: PLR0913, C901
+def pulumi_jobs_chain(  # noqa: PLR0913, C901, PLR0912
     pulumi_code: Resource,
     stack_names: list[str],
     project_name: str,
@@ -211,8 +211,9 @@ def pulumi_jobs_chain(  # noqa: PLR0913, C901
 
         for dependency in dependencies or []:
             # These mutations apply globally if the dependencies aren't copied below
-            dependency.trigger = not bool(previous_job or production_stack)
-            dependency.passed = passed_param or dependency.passed
+            if hasattr(dependency, "trigger"):
+                dependency.trigger = not bool(previous_job or production_stack)
+                dependency.passed = passed_param or dependency.passed
 
         # Need to copy the dependencies because otherwise they are globally mutated
         local_dependencies = [
