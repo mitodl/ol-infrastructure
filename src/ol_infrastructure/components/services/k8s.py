@@ -56,6 +56,7 @@ class OLApplicationK8sConfiguration(BaseModel):
     application_image_repository: str
     application_image_repository_suffix: Optional[str] = None
     application_docker_tag: str
+    application_cmd_array: Optional[list[str]] = None
     vault_k8s_resource_auth_name: str
     import_nginx_config: bool
     resource_requests: dict[str, str] = Field(
@@ -294,9 +295,10 @@ class OLApplicationK8s(ComponentResource):
                                 ],
                                 image_pull_policy="IfNotPresent",
                                 resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                    requests={"cpu": "250m", "memory": "300Mi"},
-                                    limits={"cpu": "500m", "memory": "600Mi"},
+                                    requests=ol_app_k8s_config.resource_requests,
+                                    limits=ol_app_k8s_config.resource_limits,
                                 ),
+                                command=ol_app_k8s_config.application_cmd_array,
                                 env=application_deployment_env_vars,
                                 env_from=application_deployment_envfrom,
                                 volume_mounts=[
