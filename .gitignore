@@ -15,3 +15,4 @@ venv/
 pyinfra-debug.log
 .vscode/
 .python-version
+.aider*
