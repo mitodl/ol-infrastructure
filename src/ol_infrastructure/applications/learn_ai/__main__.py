@@ -1015,6 +1015,90 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
 # LEGACY RETIREMENT : goes away
 # Won't need this because it will exist from the mit-learn namespace
+learn_ai_https_apisix_route = OLApisixRoute(
+    f"learn-ai-{stack_info.env_suffix}-https-olapisixroute",
+    k8s_namespace=learn_ai_namespace,
+    k8s_labels=k8s_global_labels,
+    route_configs=[
+        # Wildcard route that can use auth but doesn't require it
+        OLApisixRouteConfig(
+            route_name="passauth",
+            priority=2,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                # Use helper from OIDC component instance
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
+                ),
+            ],
+            hosts=[learn_api_domain],
+            paths=["/*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+            backend_resolve_granularity="service",
+        ),
+        # Strip trailing slash from logout redirect
+        OLApisixRouteConfig(
+            route_name="logout-redirect",
+            priority=10,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="redirect",
+                    config={
+                        "uri": "/logout",  # Redirect within the rewritten path
+                    },
+                ),
+            ],
+            hosts=[learn_ai_api_domain],
+            paths=["/logout/*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+            backend_resolve_granularity="service",
+        ),
+        # Routes that require authentication
+        OLApisixRouteConfig(
+            route_name="reqauth",
+            priority=10,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("auth")
+                ),
+            ],
+            hosts=[learn_ai_api_domain],
+            paths=[
+                "/admin/login/*",
+                "/http/login/*",
+            ],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+            backend_resolve_granularity="service",
+        ),
+        # Special handling for websocket URLs.
+        OLApisixRouteConfig(
+            route_name="websocket",
+            priority=1,
+            websocket=True,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
+                ),
+            ],
+            hosts=[learn_ai_api_domain],
+            paths=[
+                "/ws/*",
+            ],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+            backend_resolve_granularity="service",
+        ),
+    ],
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[learn_ai_app_k8s, learn_ai_oidc_resources],
+    ),
+)
 learn_ai_https_apisix_tls = kubernetes.apiextensions.CustomResource(
     f"learn-ai-{stack_info.env_suffix}-https-apisix-tls",
     api_version="apisix.apache.org/v2",
