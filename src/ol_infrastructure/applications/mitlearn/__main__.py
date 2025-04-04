@@ -933,8 +933,7 @@ learn_external_service_apisix_upstream = OLApisixExternalUpstream(
     ),
 )
 
-# LEGACY RETIREMENT : goes away
-# MD : 2025-03-21 Leaving this out of OLApisix* refactoring
+# MITx Online doesn't have a CI environment. Remove this once that ceases to be true.
 if stack_info.env_suffix != "ci":
     mitxonline_consul_opts = get_consul_provider(
         stack_info,
@@ -950,7 +949,6 @@ if stack_info.env_suffix != "ci":
             consul.KeysKeyArgs(
                 path="edxapp/learn-api-domain",
                 delete=True,
-                # SWITCHOVER : Update to learn_api_domain
                 value=mit_learn_api_domain,
             )
         ],
@@ -962,12 +960,30 @@ if stack_info.env_suffix != "ci":
             consul.KeysKeyArgs(
                 path="edxapp/learn-api-domain",
                 delete=True,
-                # SWITCHOVER : Update to learn_api_domain
                 value=mit_learn_api_domain,
             )
         ],
         opts=xpro_consul_opts,
     )
+# TODO(TMM 2025-04-04): Remove this hack once there is a CI deployment of Learn
+if stack_info.env_suffix == "qa":
+    xpro_consul_opts = get_consul_provider(
+        stack_info,
+        consul_address="https://consul-xpro-ci.odl.mit.edu",
+    )
+    consul.Keys(
+        "learn-api-domain-consul-key-for-xpro-openedx",
+        keys=[
+            consul.KeysKeyArgs(
+                path="edxapp/learn-api-domain",
+                delete=True,
+                value=mit_learn_api_domain,
+            )
+        ],
+        opts=xpro_consul_opts,
+    )
+# LEGACY RETIREMENT : goes away
+# MD : 2025-03-21 Leaving this out of OLApisix* refactoring
 learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
     f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
     api_version="apisix.apache.org/v2",
