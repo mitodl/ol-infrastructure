@@ -378,12 +378,6 @@ heroku_vars = {
     "VIDEO_TRANSCODE_QUEUE": ocw_studio_mediaconvert.queue.name,
 }
 
-if stack_info.env_suffix.lower() != "production":
-    heroku_vars["PUBLISH_POSTHOG_ENABLED"] = "True"
-    heroku_vars["PUBLISH_POSTHOG_API_HOST"] = "https://ph.rc.learn.mit.edu"
-    heroku_vars["PUBLISH_POSTHOG_PROJECT_API_KEY"] = (
-        "phc_Ci6X3XFSc1mj8chO0BO0qfSnJ5cJEVUGT0cyQ5CIE6x"  # pragma: allowlist secret
-    )
 
 heroku_vars.update(**heroku_app_config.get_object("vars"))
 
