@@ -1031,7 +1031,7 @@ learn_ai_https_apisix_route = OLApisixRoute(
                     **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
                 ),
             ],
-            hosts=[learn_api_domain],
+            hosts=[learn_ai_api_domain],
             paths=["/*"],
             backend_service_name=learn_ai_app_k8s.application_lb_service_name,
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
