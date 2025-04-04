@@ -82,7 +82,7 @@ def _define_registry_image_resources(app_name: str) -> tuple[Resource, Resource]
     )
     # RC/Production image resource - tagged with version, pushed by RC build
     rc_image = registry_image(
-        name=Identifier(f"{app_name}-app-rc-image"),
+        name=Identifier(f"{app_name}-app-release-image"),
         image_repository=f"mitodl/{app_name}-app",
         username="((dockerhub.username))",
         password="((dockerhub.password))",  # noqa: S106
@@ -90,6 +90,7 @@ def _define_registry_image_resources(app_name: str) -> tuple[Resource, Resource]
         # While check_every=never, defining tag_regex helps Concourse UI understand
         # resource versions
         tag_regex=r"([0-9]+)\.([0-9]+)\.([0-9]+)",
+        sort_by_creation=True,
     )
     return ci_image, rc_image
 
