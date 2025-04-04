@@ -178,7 +178,7 @@ def _build_image_job(
 
     put_params: dict[str, Any] = {
         "image": "image/image.tar",
-        "additional_tags_file": f"./{git_repo_resource.name}/.git/short_ref",
+        "additional_tags": f"./{git_repo_resource.name}/.git/short_ref",
     }
     if branch_type == "main":
         # Tag with 'latest' and the git short ref
