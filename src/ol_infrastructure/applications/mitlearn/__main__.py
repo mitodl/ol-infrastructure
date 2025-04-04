@@ -60,7 +60,7 @@ from ol_infrastructure.lib.fastly import (
 )
 from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import StackInfo, parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
@@ -970,7 +970,13 @@ if stack_info.env_suffix != "ci":
 # TODO(TMM 2025-04-04): Remove this hack once there is a CI deployment of Learn
 if stack_info.env_suffix == "qa":
     xpro_consul_opts = get_consul_provider(
-        stack_info,
+        StackInfo(
+            name="CI",
+            namespace=stack_info.namespace,
+            env_suffix="ci",
+            env_prefix=stack_info.env_prefix,
+            full_name=stack_info.full_name,
+        ),
         consul_address="https://consul-xpro-ci.odl.mit.edu",
         provider_name="consul-provider-xpro-ci",
     )
