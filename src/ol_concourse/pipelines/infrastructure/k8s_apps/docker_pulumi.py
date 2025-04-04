@@ -89,7 +89,7 @@ def _define_registry_image_resources(app_name: str) -> tuple[Resource, Resource]
         check_every="never",  # Only updated via put step from rc build job
         # While check_every=never, defining tag_regex helps Concourse UI understand
         # resource versions
-        tag_regex=r"([0-9]+)\.([0-9]+)\.([0-9]+)",
+        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
         sort_by_creation=True,
     )
     return ci_image, rc_image
