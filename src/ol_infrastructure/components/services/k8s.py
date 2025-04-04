@@ -53,6 +53,7 @@ class OLApplicationK8sConfiguration(BaseModel):
     static_secrets_name: str
     application_security_group_id: Output[str]
     application_security_group_name: Output[str]
+    application_service_account_name: str | Output[str] | None = None
     application_image_repository: str
     application_image_repository_suffix: Optional[str] = None
     application_docker_tag: str
@@ -256,6 +257,7 @@ class OLApplicationK8s(ComponentResource):
                         ],
                         init_containers=init_containers,
                         dns_policy="ClusterFirst",
+                        service_account_name=ol_app_k8s_config.application_service_account_name,
                         containers=[
                             # nginx container infront of uwsgi
                             kubernetes.core.v1.ContainerArgs(

@@ -736,6 +736,7 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_security_group_id=learn_ai_application_security_group.id,
         # Use the fixed name used in the SecurityGroupPolicy spec
         application_security_group_name=Output.from_input("learn-ai-app"),
+        application_service_account_name=learn_ai_service_account.metadata.name,
         application_image_repository="mitodl/learn-ai-app",
         application_docker_tag=LEARN_AI_DOCKER_TAG,
         application_cmd_array=[
