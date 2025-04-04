@@ -1287,7 +1287,6 @@ heroku_vars = {
     "YOUTUBE_CONFIG_URL": "https://raw.githubusercontent.com/mitodl/open-video-data/mitopen/youtube/channels.yaml",
     "POSTHOG_ENABLED": "True",
     "POSTHOG_TIMEOUT_MS": 1000,
-    "POSTHOG_API_HOST": "https://app.posthog.com",
     "POSTHOG_PROJECT_ID": 63497,
 }
 
