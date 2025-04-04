@@ -957,7 +957,7 @@ if stack_info.env_suffix != "ci":
         opts=mitxonline_consul_opts,
     )
     consul.Keys(
-        "learn-api-domain-consul-key-for-xpro-openedx",
+        f"learn-api-domain-consul-key-for-xpro-openedx-{stack_info.env_suffix}",
         keys=[
             consul.KeysKeyArgs(
                 path="edxapp/learn-api-domain",
@@ -975,7 +975,7 @@ if stack_info.env_suffix == "qa":
         provider_name="consul-provider-xpro-ci",
     )
     consul.Keys(
-        "learn-api-domain-consul-key-for-xpro-openedx",
+        "learn-api-domain-consul-key-for-xpro-openedx-ci",
         keys=[
             consul.KeysKeyArgs(
                 path="edxapp/learn-api-domain",
