@@ -24,6 +24,9 @@ from bridge.lib.magic_numbers import (
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.applications.mitlearn.k8s_secrets import (
+    create_mitlearn_k8s_secrets,
+)
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -50,6 +53,8 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
+    default_psg_egress_args,
+    get_default_psg_ingress_args,
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
@@ -79,9 +84,12 @@ vault_config = Config("vault")
 
 stack_info = parse_stack()
 
-network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
+
+network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 apps_vpc = network_stack.require_output("applications_vpc")
+k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
+
 vector_log_proxy_stack = StackReference(
     f"infrastructure.vector_log_proxy.operations.{stack_info.name}"
 )
@@ -1604,8 +1612,61 @@ gh_workflow_learn_api_logout_env_secret = github.ActionsSecret(
 )
 
 if mitlearn_config.get_bool("k8s_deploy"):
-    # Things you do when k8s deployment is enabled
-    pass
+    # Create a security group for the application pods
+    mitlearn_app_security_group = ec2.SecurityGroup(
+        f"mitlearn-app-sg-{stack_info.env_suffix}",
+        name=f"mitlearn-app-sg-{stack_info.env_suffix}",
+        description="Security group for mitlearn application pods",
+        egress=default_psg_egress_args,
+        ingress=get_default_psg_ingress_args(k8s_pod_subnet_cidrs=k8s_pod_subnet_cidrs),
+        tags=aws_config.tags,
+        vpc_id=apps_vpc["id"],
+    )
+
+    # Create all Kubernetes secrets needed by the application
+    secret_names = create_mitlearn_k8s_secrets(
+        stack_info=stack_info,
+        learn_namespace=learn_namespace,
+        k8s_global_labels=k8s_global_labels,
+        vault_k8s_resources=vault_k8s_resources,
+        mitopen_vault_mount=mitopen_vault_mount,
+        db_config=mitopen_vault_backend_config,
+    )
+
+#    # Configure and deploy the mitlearn application using OLApplicationK8s
+#    mitlearn_k8s_app_config = OLApplicationK8sConfiguration(
+#        project_root=Path(__file__).parent,
+#        application_config=env_vars,
+#        application_name="mitlearn",
+#        application_namespace=learn_namespace,
+#        application_lb_service_name=f"mitlearn-lb-service-{stack_info.env_suffix}",
+#        application_lb_service_port_name="http",
+#        k8s_global_labels=k8s_global_labels,
+#        # Reference all Kubernetes secrets containing environment variables
+#        env_from_secret_names=secret_names,
+#        application_security_group_id=mitlearn_app_security_group.id,
+#        application_security_group_name=mitlearn_app_security_group.name,
+#        application_image_repository="ardiea/mitlearn",  # As requested
+#        application_docker_tag="testing",  # As requested
+#        vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
+#        import_nginx_config=True,  # Assuming Django app needs nginx
+#        init_migrations=True,  # Assuming Django app needs migrations
+#        init_collectstatic=True,  # Assuming Django app needs collectstatic
+#        # Using default resource requests/limits for now
+#    )
+#
+#    mitlearn_k8s_app = OLApplicationK8s(
+#        ol_app_k8s_config=mitlearn_k8s_app_config,
+#        opts=ResourceOptions(
+#            depends_on=[
+#                mitlearn_app_security_group,
+#                # Ensure all Vault secret resources are created before the app
+#                # Dependencies are implicitly handled by Pulumi based on the
+#                # resources created within create_mitlearn_k8s_secrets
+#            ]
+#        ),
+#    )
+
 
 export(
     "mitopen",
