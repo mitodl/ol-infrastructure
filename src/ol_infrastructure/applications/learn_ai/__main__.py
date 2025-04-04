@@ -24,7 +24,6 @@ from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
 from bridge.lib.constants import FASTLY_A_TLS_1_3
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
-    DEFAULT_NGINX_PORT,
     DEFAULT_REDIS_PORT,
     DEFAULT_UWSGI_PORT,
     ONE_MEGABYTE_BYTE,
@@ -36,10 +35,13 @@ from ol_infrastructure.components.services import appdb
 from ol_infrastructure.components.services.k8s import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    OLApplicationK8s,
+    OLApplicationK8sConfiguration,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SDynamicSecretConfig,
@@ -716,12 +718,60 @@ learn_ai_nginx_configmap = kubernetes.core.v1.ConfigMap(
     data={
         "web.conf": Path(__file__).parent.joinpath("files/web.conf").read_text(),
     },
+)
+
+# Instantiate the OLApplicationK8s component
+learn_ai_app_k8s = OLApplicationK8s(
+    ol_app_k8s_config=OLApplicationK8sConfiguration(
+        project_root=Path(__file__).parent,
+        application_config=learn_ai_config.require_object("env_vars") or {},
+        application_name="learn-ai",
+        application_namespace=learn_ai_namespace,
+        application_lb_service_name="learn-ai-webapp",
+        application_lb_service_port_name="http",
+        k8s_global_labels=k8s_global_labels,
+        db_creds_secret_name=db_creds_secret_name,
+        redis_creds_secret_name=redis_creds_secret_name,
+        static_secrets_name=static_secrets_name,
+        application_security_group_id=learn_ai_application_security_group.id,
+        # Use the fixed name used in the SecurityGroupPolicy spec
+        application_security_group_name=Output.from_input("learn-ai-app"),
+        application_image_repository="mitodl/learn-ai-app",
+        application_docker_tag=LEARN_AI_DOCKER_TAG,
+        application_cmd_array=[
+            "uvicorn",
+            "main.asgi:application",
+            "--reload",
+            "--host",
+            "0.0.0.0",  # noqa: S104
+            "--port",
+            f"{DEFAULT_UWSGI_PORT}",
+        ],
+        vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
+        import_nginx_config=True,
+        # Nginx resources (defaults from component are fine)
+        # App container resources
+        resource_requests={"cpu": "250m", "memory": "1000Mi"},
+        resource_limits={"cpu": "500m", "memory": "1600Mi"},
+        init_migrations=True,
+        init_collectstatic=True,  # Assuming createcachetable is not needed or handled elsewhere
+    ),
     opts=ResourceOptions(
         delete_before_replace=True,
+        depends_on=[
+            learn_ai_db,
+            db_creds_secret,
+            redis_creds,
+            static_secrets,
+            vault_k8s_resources,
+            learn_ai_application_security_group,
+        ],
     ),
 )
 
-# Build a list of not-sensitive env vars for the deployment config
+# Reconstruct variables needed for Celery deployment
+application_image_repository_and_tag = f"mitodl/learn-ai-app:{LEARN_AI_DOCKER_TAG}"
+
 learn_ai_deployment_env_vars = []
 for k, v in (learn_ai_config.require_object("env_vars") or {}).items():
     learn_ai_deployment_env_vars.append(
@@ -753,168 +803,6 @@ learn_ai_deployment_envfrom = [
     ),
 ]
 
-
-application_image_repository_and_tag = f"mitodl/learn-ai-app:{LEARN_AI_DOCKER_TAG}"
-image_pull_policy = (
-    "Always" if stack_info.env_suffix in ("ci", "qa") else "IfNotPresent"
-)
-init_containers = [
-    # Good Canidates for lib or component functions
-    # Run database migrations at startup
-    kubernetes.core.v1.ContainerArgs(
-        name="migrate",
-        image=application_image_repository_and_tag,
-        command=["python3", "manage.py", "migrate", "--noinput"],
-        image_pull_policy=image_pull_policy,
-        env=learn_ai_deployment_env_vars,
-        env_from=learn_ai_deployment_envfrom,
-    ),
-    kubernetes.core.v1.ContainerArgs(
-        name="create-cachetable",
-        image=application_image_repository_and_tag,
-        command=["python3", "manage.py", "createcachetable"],
-        image_pull_policy=image_pull_policy,
-        env=learn_ai_deployment_env_vars,
-        env_from=learn_ai_deployment_envfrom,
-    ),
-    kubernetes.core.v1.ContainerArgs(
-        name="collectstatic",
-        image=application_image_repository_and_tag,
-        command=["python3", "manage.py", "collectstatic", "--noinput"],
-        image_pull_policy=image_pull_policy,
-        env=learn_ai_deployment_env_vars,
-        env_from=learn_ai_deployment_envfrom,
-        volume_mounts=[
-            kubernetes.core.v1.VolumeMountArgs(
-                name="staticfiles",
-                mount_path="/src/staticfiles",
-            ),
-        ],
-    ),
-]
-
-# Create a deployment resource to manage the application pods
-webapp_labels = k8s_global_labels | {
-    "ol.mit.edu/service": "webapp",
-    "ol.mit.edu/pod-security-group": "learn-ai-app",
-}
-
-learn_ai_webapp_deployment_resource = kubernetes.apps.v1.Deployment(
-    f"learn-ai-{stack_info.env_suffix}-webapp-deployment",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="learn-ai-webapp",
-        namespace=learn_ai_namespace,
-        labels=webapp_labels,
-    ),
-    spec=kubernetes.apps.v1.DeploymentSpecArgs(
-        # TODO @Ardiea: Add horizontal pod autoscaler  # noqa: TD003, FIX002
-        replicas=learn_ai_config.get_int("webapp_replica_count") or 2,
-        selector=kubernetes.meta.v1.LabelSelectorArgs(
-            match_labels=webapp_labels,
-        ),
-        # Limits the chances of simulatious pod restarts -> db migrations (hopefully)
-        strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
-            type="RollingUpdate",
-            rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
-                max_surge=0,
-                max_unavailable=1,
-            ),
-        ),
-        template=kubernetes.core.v1.PodTemplateSpecArgs(
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                labels=webapp_labels,
-            ),
-            spec=kubernetes.core.v1.PodSpecArgs(
-                volumes=[
-                    kubernetes.core.v1.VolumeArgs(
-                        name="staticfiles",
-                        empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-                    ),
-                    kubernetes.core.v1.VolumeArgs(
-                        name="nginx-config",
-                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                            name=learn_ai_nginx_configmap.metadata.name,
-                            items=[
-                                kubernetes.core.v1.KeyToPathArgs(
-                                    key="web.conf",
-                                    path="web.conf",
-                                ),
-                            ],
-                        ),
-                    ),
-                ],
-                service_account_name=learn_ai_service_account_name,
-                init_containers=init_containers,
-                dns_policy="ClusterFirst",
-                containers=[
-                    # nginx container infront of uwsgi
-                    kubernetes.core.v1.ContainerArgs(
-                        name="nginx",
-                        image="nginx:1.9.5",
-                        ports=[
-                            kubernetes.core.v1.ContainerPortArgs(
-                                container_port=DEFAULT_NGINX_PORT,
-                            )
-                        ],
-                        image_pull_policy=image_pull_policy,
-                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "50m", "memory": "64Mi"},
-                            limits={"cpu": "100m", "memory": "128Mi"},
-                        ),
-                        volume_mounts=[
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="staticfiles",
-                                mount_path="/src/staticfiles",
-                            ),
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="nginx-config",
-                                mount_path="/etc/nginx/conf.d/web.conf",
-                                sub_path="web.conf",
-                                read_only=True,
-                            ),
-                        ],
-                    ),
-                    # Actual application run with uwsgi
-                    kubernetes.core.v1.ContainerArgs(
-                        name="learn-ai-app",
-                        image=application_image_repository_and_tag,
-                        command=[
-                            "uvicorn",
-                            "main.asgi:application",
-                            "--reload",
-                            "--host",
-                            "0.0.0.0",  # noqa: S104
-                            "--port",
-                            f"{DEFAULT_UWSGI_PORT}",
-                        ],
-                        ports=[
-                            kubernetes.core.v1.ContainerPortArgs(
-                                container_port=DEFAULT_UWSGI_PORT
-                            )
-                        ],
-                        image_pull_policy=image_pull_policy,
-                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "250m", "memory": "1000Mi"},
-                            limits={"cpu": "500m", "memory": "1600Mi"},
-                        ),
-                        env=learn_ai_deployment_env_vars,
-                        env_from=learn_ai_deployment_envfrom,
-                        volume_mounts=[
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="staticfiles",
-                                mount_path="/src/staticfiles",
-                            ),
-                        ],
-                    ),
-                ],
-            ),
-        ),
-    ),
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        depends_on=[learn_ai_db, db_creds_secret, redis_creds],
-    ),
-)
 
 celery_labels = k8s_global_labels | {
     "ol.mit.edu/service": "celery",
@@ -972,127 +860,14 @@ learn_ai_celery_deployment_resource = kubernetes.apps.v1.Deployment(
     ),
 )
 
-# A kubernetes service resource to act as load balancer for the app instances
-learn_ai_service_name = "learn-ai-webapp"
-learn_ai_service_port_name = "http"
-learn_ai_service = kubernetes.core.v1.Service(
-    f"learn-ai-{stack_info.env_suffix}-service",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=learn_ai_service_name,
-        namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
-    ),
-    spec=kubernetes.core.v1.ServiceSpecArgs(
-        selector=webapp_labels,
-        ports=[
-            kubernetes.core.v1.ServicePortArgs(
-                name=learn_ai_service_port_name,
-                port=DEFAULT_NGINX_PORT,
-                target_port=DEFAULT_NGINX_PORT,
-                protocol="TCP",
-            ),
-        ],
-        type="ClusterIP",
-    ),
-    opts=ResourceOptions(delete_before_replace=True),
-)
-
-# Good canidate for a component resource
-learn_ai_pod_security_group_policy = (
-    kubernetes.apiextensions.CustomResource(
-        f"learn-ai-{stack_info.env_suffix}-application-pod-security-group-policy",
-        api_version="vpcresources.k8s.aws/v1beta1",
-        kind="SecurityGroupPolicy",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="learn-ai-app",
-            namespace=learn_ai_namespace,
-            labels=k8s_global_labels,
-        ),
-        spec={
-            "podSelector": {
-                "matchLabels": {"ol.mit.edu/pod-security-group": "learn-ai-app"},
-            },
-            "securityGroups": {
-                "groupIds": [
-                    learn_ai_application_security_group.id,
-                ],
-            },
-        },
-    ),
-)
-
 # Create the apisix custom resources since it doesn't support gateway-api yet
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_plugin_config/
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_pluginconfig_v2/
 
-# LEGACY RETIREMENT : goes away
-# Load open-id-connect secrets into a k8s secret via VSO
-oidc_secret_name = "oidc-secrets"  # pragma: allowlist secret  # noqa: S105
-oidc_secret = OLVaultK8SSecret(
-    name=f"learn-ai-{stack_info.env_suffix}-oidc-secrets",
-    resource_config=OLVaultK8SStaticSecretConfig(
-        name="oidc-static-secrets",
-        namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
-        dest_secret_name=oidc_secret_name,
-        dest_secret_labels=k8s_global_labels,
-        mount="secret-operations",
-        mount_type="kv-v1",
-        path="sso/learn-ai",
-        excludes=[".*"],
-        exclude_raw=True,
-        # Refresh frequently because substructure keycloak stack could change some of these
-        refresh_after="1m",
-        templates={
-            "client_id": '{{ get .Secrets "client_id" }}',
-            "client_secret": '{{ get .Secrets "client_secret" }}',
-            "realm": '{{ get .Secrets "realm_name" }}',
-            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
-            "session.secret": '{{ get .Secrets "secret" }}',
-        },
-        vaultauth=vault_k8s_resources.auth_name,
-    ),
-    opts=ResourceOptions(
-        delete_before_replace=True,
-    ),
-)
-
-mit_learn_oidc_secret_name = (
-    "mit-learn-oidc-secrets"  # pragma: allowlist secret # noqa: S105
-)
-mit_learn_oidc_secret = OLVaultK8SSecret(
-    f"ol-mitlearn-oidc-secrets-{stack_info.env_suffix}",
-    resource_config=OLVaultK8SStaticSecretConfig(
-        name="mit-learn-oidc-static-secrets",
-        namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
-        dest_secret_name=mit_learn_oidc_secret_name,
-        dest_secret_labels=k8s_global_labels,
-        mount="secret-operations",
-        mount_type="kv-v1",
-        path="sso/mitlearn",
-        excludes=[".*"],
-        exclude_raw=True,
-        # Refresh frequently because substructure keycloak stack could change some of these
-        refresh_after="1m",
-        templates={
-            "client_id": '{{ get .Secrets "client_id" }}',
-            "client_secret": '{{ get .Secrets "client_secret" }}',
-            "realm": '{{ get .Secrets "realm_name" }}',
-            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
-            "session.secret": '{{ get .Secrets "secret" }}',
-        },
-        vaultauth=vault_k8s_resources.auth_name,
-    ),
-    opts=ResourceOptions(
-        delete_before_replace=True,
-    ),
-)
-
-# Good canidates for a component resource
+# Instantiate shared plugins component
 learn_ai_shared_plugins = OLApisixSharedPlugins(
-    f"learn-ai-{stack_info.env_suffix}-shared-plugins",
+    f"learn-ai-{stack_info.env_suffix}-ol-shared-plugins",
     plugin_config=OLApisixSharedPluginsConfig(
         application_name="learn-ai",
         resource_suffix="ol-shared-plugins",
@@ -1100,28 +875,31 @@ learn_ai_shared_plugins = OLApisixSharedPlugins(
         k8s_labels=k8s_global_labels,
         enable_defaults=True,
     ),
+    opts=ResourceOptions(delete_before_replace=True),
 )
 
-# Ref: https://apisix.apache.org/docs/apisix/plugins/openid-connect/
-base_oidc_plugin_config = {
-    "scope": "openid profile ol-profile",
-    "bearer_only": False,
-    "introspection_endpoint_auth_method": "client_secret_post",
-    "ssl_verify": False,
-    "renew_access_token_on_expiry": True,
-    "session": {"cookie": {"lifetime": 60 * 20160}},
-    "session_contents": {
-        "access_token": True,
-        "enc_id_token": True,
-        "id_token": True,
-        "user": True,
-    },
-    "logout_path": "/logout",
-    "post_logout_redirect_uri": "/",
-}
+# Instantiate OIDC resources component for mit-learn domain
+learn_ai_oidc_resources = OLApisixOIDCResources(
+    f"learn-ai-{stack_info.env_suffix}-oidc-resources",
+    oidc_config=OLApisixOIDCConfig(
+        application_name="learn-ai",
+        k8s_labels=k8s_global_labels,
+        k8s_namespace=learn_ai_namespace,
+        oidc_scope="openid profile email",  # Default scope from component
+        oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
+        oidc_logout_path="/logout",
+        oidc_post_logout_redirect_uri="/",
+        oidc_use_session_secret=True,
+        vault_mount="secret-operations",
+        vault_mount_type="kv-v1",
+        vault_path="sso/mitlearn",  # Use mitlearn SSO config
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(delete_before_replace=True, parent=vault_k8s_resources),
+)
 
-learn_ai_api_domain = learn_ai_config.require("backend_domain")
-learn_api_domain = learn_ai_config.require("learn_backend_domain")
+learn_ai_api_domain = learn_ai_config.require("backend_domain")  # Legacy domain
+learn_api_domain = learn_ai_config.require("learn_backend_domain")  # New domain
 
 # ApisixUpstream resources don't seem to work but we don't really need them?
 # Ref: https://github.com/apache/apisix-ingress-controller/issues/1655
@@ -1129,254 +907,198 @@ learn_api_domain = learn_ai_config.require("learn_backend_domain")
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_route_v2/
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/
-# LEGACY RETIREMENT : goes away
-learn_ai_https_apisix_route = kubernetes.apiextensions.CustomResource(
-    f"learn-ai-{stack_info.env_suffix}-https-apisix-route",
-    api_version="apisix.apache.org/v2",
-    kind="ApisixRoute",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="learn-ai-https",
-        namespace=learn_ai_namespace,
-        labels=k8s_global_labels,
-    ),
-    spec={
-        "http": [
-            {
-                # Wildcard route that can use auth but doesn't require it
-                "name": "passauth",
-                "priority": 2,
-                "plugin_config_name": learn_ai_shared_plugins.resource_name,
-                "plugins": [
-                    {
-                        "name": "openid-connect",
-                        "enable": True,
-                        "secretRef": oidc_secret_name,
-                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
-                    }
-                ],
-                "match": {
-                    "hosts": [learn_ai_api_domain],
-                    "paths": [
-                        "/*",
-                    ],
-                },
-                "backends": [
-                    {
-                        "serviceName": learn_ai_service_name,
-                        "servicePort": learn_ai_service_port_name,
-                        "resolveGranularity": "service",
-                    },
-                ],
-            },
-            {
-                # Strip trailing slash from logout redirect
-                "name": "logout-redirect",
-                "priority": 10,
-                "plugins": [
-                    {
-                        "name": "redirect",
-                        "enable": True,
-                        "config": {
-                            "uri": "/logout",
-                        },
-                    },
-                ],
-                "match": {
-                    "hosts": [learn_ai_api_domain],
-                    "paths": [
-                        "/logout/*",
-                    ],
-                },
-                "backends": [
-                    {
-                        "serviceName": learn_ai_service_name,
-                        "servicePort": learn_ai_service_port_name,
-                        "resolveGranularity": "service",
-                    },
-                ],
-            },
-            {
-                # Routes that require authentication
-                "name": "reqauth",
-                "priority": 10,
-                "plugin_config_name": learn_ai_shared_plugins.resource_name,
-                "plugins": [
-                    {
-                        "name": "openid-connect",
-                        "enable": True,
-                        "secretRef": oidc_secret_name,
-                        "config": base_oidc_plugin_config | {"unauth_action": "auth"},
-                    }
-                ],
-                "match": {
-                    "hosts": [
-                        learn_ai_api_domain,
-                    ],
-                    "paths": [
-                        "/admin/login/*",
-                        "/http/login/*",
-                    ],
-                },
-                "backends": [
-                    {
-                        "serviceName": learn_ai_service_name,
-                        "servicePort": learn_ai_service_port_name,
-                        "resolveGranularity": "service",
-                    },
-                ],
-            },
-            {
-                # Sepcial handling for websocket URLS.
-                "name": "websocket",
-                "priority": 1,
-                "websocket": True,
-                "plugin_config_name": learn_ai_shared_plugins.resource_name,
-                "plugins": [
-                    {
-                        "name": "openid-connect",
-                        "enable": True,
-                        "secretRef": oidc_secret_name,
-                        "config": base_oidc_plugin_config | {"unauth_action": "pass"},
-                    }
-                ],
-                "match": {
-                    "hosts": [
-                        learn_ai_api_domain,
-                    ],
-                    "paths": [
-                        "/ws/*",
-                    ],
-                },
-                "backends": [
-                    {
-                        "serviceName": learn_ai_service_name,
-                        "servicePort": learn_ai_service_port_name,
-                        "resolveGranularity": "service",
-                    },
-                ],
-            },
-        ],
-    },
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        depends_on=[learn_ai_service, oidc_secret],
-    ),
-)
 
-learn_ai_oidc_resources = OLApisixOIDCResources(
-    f"learn-ai-{stack_info.env_suffix}-oidc-resources",
-    oidc_config=OLApisixOIDCConfig(
-        application_name="learn-ai",
-        k8s_labels=k8s_global_labels,
-        k8s_namespace=learn_ai_namespace,
-        oidc_logout_path="/logout",  # maybe `/ai/logout` ????
-        oidc_post_logout_redirect_uri="/",
-        oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",
-        vaultauth=vault_k8s_resources.auth_name,
-    ),
-)
-
-proxy_rewrite_plugin_config = {
-    "name": "proxy-rewrite",
-    "enable": True,
-    "config": {
+# Define proxy-rewrite plugin once
+proxy_rewrite_plugin = OLApisixPluginConfig(
+    name="proxy-rewrite",
+    enable=True,
+    config={
         "regex_uri": [
             "/ai/(.*)",
             "/$1",
         ],
     },
-}
+)
 
-# New ApisixRoute object for the learn.mit.edu address
-# All paths prefixed with /ai
-# Host match is only the mit-learn domain
+# Instantiate ApisixRoute component for the learn.mit.edu address
 mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
-    name=f"mit-learn-learn-ai-{stack_info.env_suffix}-https-olapisixroute",
+    f"mit-learn-learn-ai-{stack_info.env_suffix}-https-olapisixroute",
     k8s_namespace=learn_ai_namespace,
     k8s_labels=k8s_global_labels,
     route_configs=[
+        # Wildcard route that can use auth but doesn't require it
         OLApisixRouteConfig(
             route_name="passauth",
             priority=2,
             shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
-                proxy_rewrite_plugin_config,
-                learn_ai_oidc_resources.get_full_oidc_plugin_config("pass"),
+                proxy_rewrite_plugin,
+                # Use helper from OIDC component instance
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
+                ),
             ],
             hosts=[learn_api_domain],
             paths=["/ai/*"],
-            backend_service_name=learn_ai_service_name,
-            backend_service_port=learn_ai_service_port_name,
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
         ),
+        # Strip trailing slash from logout redirect
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
-            # shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
-                proxy_rewrite_plugin_config,
-                {
-                    "name": "redirect",
-                    "enable": True,
-                    "config": {
-                        "uri": "/logout",
+                proxy_rewrite_plugin,
+                OLApisixPluginConfig(
+                    name="redirect",
+                    config={
+                        "uri": "/logout",  # Redirect within the rewritten path
                     },
-                },
+                ),
             ],
             hosts=[learn_api_domain],
             paths=["/ai/logout/*"],
-            backend_service_name=learn_ai_service_name,
-            backend_service_port=learn_ai_service_port_name,
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
         ),
+        # Routes that require authentication
         OLApisixRouteConfig(
             route_name="reqauth",
             priority=10,
             shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
-                proxy_rewrite_plugin_config,
-                learn_ai_oidc_resources.get_full_oidc_plugin_config("auth"),
+                proxy_rewrite_plugin,
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("auth")
+                ),
             ],
             hosts=[learn_api_domain],
             paths=[
                 "/ai/admin/login/*",
                 "/ai/http/login/*",
             ],
-            backend_service_name=learn_ai_service_name,
-            backend_service_port=learn_ai_service_port_name,
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
         ),
+        # Special handling for websocket URLs.
         OLApisixRouteConfig(
             route_name="websocket",
             priority=1,
             websocket=True,
             shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
-                proxy_rewrite_plugin_config,
-                learn_ai_oidc_resources.get_full_oidc_plugin_config("pass"),
+                proxy_rewrite_plugin,
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
+                ),
             ],
             hosts=[learn_api_domain],
             paths=[
                 "/ai/ws/*",
             ],
-            backend_service_name=learn_ai_service_name,
-            backend_service_port=learn_ai_service_port_name,
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
         ),
     ],
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=[learn_ai_service, mit_learn_oidc_secret],
+        depends_on=[learn_ai_app_k8s, learn_ai_oidc_resources],
     ),
 )
+
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_tls_v2/
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_tls/
 # LEGACY RETIREMENT : goes away
 # Won't need this because it will exist from the mit-learn namespace
+learn_ai_https_apisix_route = OLApisixRoute(
+    f"learn-ai-{stack_info.env_suffix}-https-olapisixroute",
+    k8s_namespace=learn_ai_namespace,
+    k8s_labels=k8s_global_labels,
+    route_configs=[
+        # Wildcard route that can use auth but doesn't require it
+        OLApisixRouteConfig(
+            route_name="passauth",
+            priority=2,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                # Use helper from OIDC component instance
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
+                ),
+            ],
+            hosts=[learn_api_domain],
+            paths=["/*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+            backend_resolve_granularity="service",
+        ),
+        # Strip trailing slash from logout redirect
+        OLApisixRouteConfig(
+            route_name="logout-redirect",
+            priority=10,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="redirect",
+                    config={
+                        "uri": "/logout",  # Redirect within the rewritten path
+                    },
+                ),
+            ],
+            hosts=[learn_ai_api_domain],
+            paths=["/logout/*"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+            backend_resolve_granularity="service",
+        ),
+        # Routes that require authentication
+        OLApisixRouteConfig(
+            route_name="reqauth",
+            priority=10,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("auth")
+                ),
+            ],
+            hosts=[learn_ai_api_domain],
+            paths=[
+                "/admin/login/*",
+                "/http/login/*",
+            ],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+            backend_resolve_granularity="service",
+        ),
+        # Special handling for websocket URLs.
+        OLApisixRouteConfig(
+            route_name="websocket",
+            priority=1,
+            websocket=True,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
+                ),
+            ],
+            hosts=[learn_ai_api_domain],
+            paths=[
+                "/ws/*",
+            ],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+            backend_resolve_granularity="service",
+        ),
+    ],
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[learn_ai_app_k8s, learn_ai_oidc_resources],
+    ),
+)
 learn_ai_https_apisix_tls = kubernetes.apiextensions.CustomResource(
     f"learn-ai-{stack_info.env_suffix}-https-apisix-tls",
     api_version="apisix.apache.org/v2",
