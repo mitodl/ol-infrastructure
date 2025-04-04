@@ -186,7 +186,7 @@ def _build_image_job(
     }
     if branch_type == "main":
         # Tag with 'latest' and the git short ref
-        put_params["tag"] = "latest"
+        put_params["image_tag"] = "latest"
     else:  # release_candidate
         put_params["version"] = f"((.:{version_var}))"
         put_params["bump_aliases"] = True
