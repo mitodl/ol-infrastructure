@@ -70,18 +70,28 @@ def _define_git_resources(
     )
 
 
-def _define_registry_image_resource(app_name: str) -> Resource:
-    """Define the registry image resource needed for the pipeline."""
-    # Unified image repository for CI, RC, and Production images
-    return registry_image(
-        name=Identifier(f"{app_name}-app-image"),
+def _define_registry_image_resources(app_name: str) -> tuple[Resource, Resource]:
+    """Define the registry image resources needed for the pipeline."""
+    # CI image resource - tagged 'latest' and git short ref, pushed by main build
+    ci_image = registry_image(
+        name=Identifier(f"{app_name}-app-ci-image"),
         image_repository=f"mitodl/{app_name}-app",
         username="((dockerhub.username))",
-        password="((dockerhub.password))",  # noqa: S106 No tag_regex here; tags are
-        # managed explicitly in put steps check_every="never" might be suitable if only
-        # put triggers are desired
-        check_every="24h",  # Or keep checking if needed for manual triggers
+        password="((dockerhub.password))",  # noqa: S106
+        check_every="never",  # Only updated via put step from main build job
     )
+    # RC/Production image resource - tagged with version, pushed by RC build
+    rc_image = registry_image(
+        name=Identifier(f"{app_name}-app-rc-image"),
+        image_repository=f"mitodl/{app_name}-app",
+        username="((dockerhub.username))",
+        password="((dockerhub.password))",  # noqa: S106
+        check_every="never",  # Only updated via put step from rc build job
+        # While check_every=never, defining tag_regex helps Concourse UI understand
+        # resource versions
+        tag_regex=r"([0-9]+)\.([0-9]+)\.([0-9]+)",
+    )
+    return ci_image, rc_image
 
 
 def _define_pulumi_resources(
@@ -101,8 +111,8 @@ def _define_pulumi_resources(
 
 
 def _build_image_job(
-    app_name: Resource,
-    branch_type: Resource,
+    app_name: str,
+    branch_type: str,
     git_repo_resource: Resource,
     registry_image_resource: Resource,
 ) -> Job:
@@ -165,13 +175,16 @@ def _build_image_job(
         ]
     )
 
-    put_params: dict[str, Any] = {"image": "image/image.tar"}
+    put_params: dict[str, Any] = {
+        "image": "image/image.tar",
+        "additional_tags_file": f"./{git_repo_resource.name}/.git/short_ref",
+    }
     if branch_type == "main":
-        put_params["additional_tags"] = f"./{git_repo_resource.name}/.git/short_ref"
+        # Tag with 'latest' and the git short ref
+        put_params["tag"] = "latest"
     else:  # release_candidate
         put_params["version"] = f"((.:{version_var}))"
         put_params["bump_aliases"] = True
-        put_params["additional_tags"] = f"./{git_repo_resource.name}/.git/ref"
 
     plan.append(PutStep(put=registry_image_resource.name, params=put_params))
 
@@ -183,10 +196,10 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     (
         main_repo,
         release_candidate_repo,
-        release_repo,
+        release_repo,  # Currently unused, but defined
         ol_infra_repo,
     ) = _define_git_resources(app_name)
-    app_image = _define_registry_image_resource(app_name)
+    app_ci_image, app_rc_image = _define_registry_image_resources(app_name)
     pulumi_resource_type, pulumi_resource = _define_pulumi_resources(
         app_name, ol_infra_repo.name
     )
@@ -197,13 +210,13 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         app_name=app_name,
         branch_type="main",
         git_repo_resource=main_repo,
-        registry_image_resource=app_image,
+        registry_image_resource=app_ci_image,
     )
     rc_image_build_job = _build_image_job(
         app_name=app_name,
         branch_type="release_candidate",
         git_repo_resource=release_candidate_repo,
-        registry_image_resource=app_image,
+        registry_image_resource=app_rc_image,
     )
 
     # Define Deployment Jobs
@@ -218,13 +231,13 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         ),
         dependencies=[
             GetStep(
-                get=app_image.name,
+                get=app_ci_image.name,
                 trigger=True,
                 passed=[main_image_build_job.name],
                 params={"skip_download": True},
             ),
             LoadVarStep(
-                load_var="image_tag", file=f"{app_image.name}/tag", reveal=True
+                load_var="image_tag", file=f"{app_ci_image.name}/tag", reveal=True
             ),
         ],
         additional_env_vars={
@@ -245,13 +258,13 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         ),
         dependencies=[
             GetStep(
-                get=app_image.name,
+                get=app_rc_image.name,
                 trigger=True,
                 passed=[rc_image_build_job.name],
                 params={"skip_download": True},
             ),
             LoadVarStep(
-                load_var="image_tag", file=f"{app_image.name}/tag", reveal=True
+                load_var="image_tag", file=f"{app_rc_image.name}/tag", reveal=True
             ),
         ],
         additional_env_vars={
@@ -262,14 +275,11 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     # Group into Fragments
 
     main_branch_container_fragement = PipelineFragment(
-        resources=[main_repo, app_image], jobs=[main_image_build_job]
+        resources=[main_repo, app_ci_image], jobs=[main_image_build_job]
     )
 
     release_candidate_container_fragment = PipelineFragment(
-        resources=[
-            release_candidate_repo,
-            # app_image is already included in main_branch_container_fragement
-        ],
+        resources=[release_candidate_repo, app_rc_image],
         jobs=[rc_image_build_job],
     )
 
@@ -277,7 +287,8 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     deployment_resources = [
         ol_infra_repo,
         pulumi_resource,
-        app_image,
+        app_ci_image,  # Needed for CI deployment trigger
+        app_rc_image,  # Needed for QA/Prod deployment trigger
     ]
 
     ci_deployment_fragment = PipelineFragment(
