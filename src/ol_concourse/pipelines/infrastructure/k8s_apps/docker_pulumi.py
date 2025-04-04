@@ -129,6 +129,7 @@ def _build_image_job(
     ]
 
     # Add version extraction steps only for release_candidate
+    version_args = {}
     if branch_type == "release_candidate":
         plan.extend(
             [
@@ -158,6 +159,7 @@ def _build_image_job(
                 ),
             ]
         )
+        version_args = {"BUILD_ARG_RELEASE_VERSION": f"((.:{version_var}))"}
 
     plan.extend(
         [
@@ -171,7 +173,7 @@ def _build_image_job(
                 build_parameters={
                     "CONTEXT": git_repo_resource.name,
                     "BUILD_ARG_GIT_REF": "((.:git_ref))",
-                    "BUILD_ARG_RELEASE_VERSION": f"((.:{version_var}))",
+                    **version_args,
                 },
                 build_args=[],
             ),
