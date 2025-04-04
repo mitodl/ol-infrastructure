@@ -87,8 +87,3 @@ config:
   vault_server:env_namespace: operations.qa
   mitlearn:learn_ai_recommendation_endpoint: "https://api.rc.learn.mit.edu/ai/http/recommendation_agent/"
   mitlearn:learn_ai_syllabus_endpoint: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
-  # This is a hack. We need to write a Consul key for use by MITx Online and the apps
-  # and MITx Online VPCs aren't peered, so the Consul clusters aren't peered. We don't
-  # actually use Consul for anything else in this project so this is okay (so far) (TMM
-  # 2025-02-21)
-  consul:address: https://consul-mitxonline-qa.odl.mit.edu

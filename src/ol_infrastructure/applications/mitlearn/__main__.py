@@ -936,7 +936,14 @@ learn_external_service_apisix_upstream = OLApisixExternalUpstream(
 # LEGACY RETIREMENT : goes away
 # MD : 2025-03-21 Leaving this out of OLApisix* refactoring
 if stack_info.env_suffix != "ci":
-    consul_opts = get_consul_provider(stack_info)
+    mitxonline_consul_opts = get_consul_provider(
+        stack_info,
+        consul_address=f"https://consul-mitxonline-{stack_info.env_suffix}.odl.mit.edu",
+    )
+    xpro_consul_opts = get_consul_provider(
+        stack_info,
+        consul_address=f"https://consul-xpro-{stack_info.env_suffix}.odl.mit.edu",
+    )
     consul.Keys(
         "learn-api-domain-consul-key-for-mitxonline-openedx",
         keys=[
@@ -947,7 +954,19 @@ if stack_info.env_suffix != "ci":
                 value=mit_learn_api_domain,
             )
         ],
-        opts=consul_opts,
+        opts=mitxonline_consul_opts,
+    )
+    consul.Keys(
+        "learn-api-domain-consul-key-for-xpro-openedx",
+        keys=[
+            consul.KeysKeyArgs(
+                path="edxapp/learn-api-domain",
+                delete=True,
+                # SWITCHOVER : Update to learn_api_domain
+                value=mit_learn_api_domain,
+            )
+        ],
+        opts=xpro_consul_opts,
     )
 learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
     f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",

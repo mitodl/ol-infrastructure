@@ -11,11 +11,12 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 def get_consul_provider(
     stack_info: StackInfo,
     wrap_in_pulumi_options: bool = True,  # noqa: FBT001, FBT002
+    consul_address: str | None = None,
 ) -> Union[consul.Provider, pulumi.ResourceOptions]:
     consul_config = pulumi.Config("consul")
     consul_provider = consul.Provider(
         "consul-provider",
-        address=consul_config.require("address"),
+        address=consul_address or consul_config.get("address"),
         scheme="https",
         http_auth="pulumi:{}".format(
             read_yaml_secrets(Path(f"pulumi/consul.{stack_info.env_suffix}.yaml"))[
