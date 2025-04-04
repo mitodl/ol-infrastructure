@@ -378,7 +378,6 @@ heroku_vars = {
     "VIDEO_TRANSCODE_QUEUE": ocw_studio_mediaconvert.queue.name,
 }
 
-
 heroku_vars.update(**heroku_app_config.get_object("vars"))
 
 auth_aws_mitx_creds_ocw_studio_app_env = vault.generic.get_secret_output(
