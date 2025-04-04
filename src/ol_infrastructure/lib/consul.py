@@ -12,10 +12,11 @@ def get_consul_provider(
     stack_info: StackInfo,
     wrap_in_pulumi_options: bool = True,  # noqa: FBT001, FBT002
     consul_address: str | None = None,
+    provider_name: str = "consul-provider",
 ) -> Union[consul.Provider, pulumi.ResourceOptions]:
     consul_config = pulumi.Config("consul")
     consul_provider = consul.Provider(
-        "consul-provider",
+        provider_name,
         address=consul_address or consul_config.get("address"),
         scheme="https",
         http_auth="pulumi:{}".format(

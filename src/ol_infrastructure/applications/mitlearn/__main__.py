@@ -938,10 +938,12 @@ if stack_info.env_suffix != "ci":
     mitxonline_consul_opts = get_consul_provider(
         stack_info,
         consul_address=f"https://consul-mitxonline-{stack_info.env_suffix}.odl.mit.edu",
+        provider_name=f"consul-provider-mitxonline-{stack_info.env_suffix}",
     )
     xpro_consul_opts = get_consul_provider(
         stack_info,
         consul_address=f"https://consul-xpro-{stack_info.env_suffix}.odl.mit.edu",
+        provider_name=f"consul-provider-xpro-{stack_info.env_suffix}",
     )
     consul.Keys(
         "learn-api-domain-consul-key-for-mitxonline-openedx",
@@ -970,6 +972,7 @@ if stack_info.env_suffix == "qa":
     xpro_consul_opts = get_consul_provider(
         stack_info,
         consul_address="https://consul-xpro-ci.odl.mit.edu",
+        provider_name="consul-provider-xpro-ci",
     )
     consul.Keys(
         "learn-api-domain-consul-key-for-xpro-openedx",
