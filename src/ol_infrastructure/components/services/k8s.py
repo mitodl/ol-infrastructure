@@ -42,6 +42,7 @@ class OLApplicationK8sConfiguration(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     project_root: Path
+    application_replicas: int = 1
     application_config: dict[str, str]
     application_name: str
     application_namespace: str
@@ -219,7 +220,7 @@ class OLApplicationK8s(ComponentResource):
             ),
             spec=kubernetes.apps.v1.DeploymentSpecArgs(
                 # TODO @Ardiea: Add horizontial pod autoscaler  # noqa: TD003, FIX002
-                replicas=1,
+                replicas=ol_app_k8s_config.application_replicas,
                 selector=kubernetes.meta.v1.LabelSelectorArgs(
                     match_labels=application_labels,
                 ),

@@ -726,6 +726,7 @@ learn_ai_app_k8s = OLApplicationK8s(
         project_root=Path(__file__).parent,
         application_config=learn_ai_config.require_object("env_vars") or {},
         application_name="learn-ai",
+        application_replicas=3 if stack_info.env_suffix == "production" else 1,
         application_namespace=learn_ai_namespace,
         application_lb_service_name="learn-ai-webapp",
         application_lb_service_port_name="http",
