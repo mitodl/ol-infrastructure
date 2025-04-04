@@ -155,7 +155,7 @@ def mfe_job(
     )
 
     if (
-        open_edx_deployment.deployment_name == "mitxonline"
+        open_edx_deployment.deployment_name in ["mitxonline", "xpro"]
         and OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learn.value
     ):
         mfe_smoot_design_overrides = """
