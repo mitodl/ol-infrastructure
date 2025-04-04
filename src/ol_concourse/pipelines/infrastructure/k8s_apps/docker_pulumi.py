@@ -272,7 +272,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         additional_env_vars={
             f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:image_tag))",
         },
-        enable_github_issues_resource=False,
+        enable_github_issue_resource=False,
     )
 
     # Group into Fragments
