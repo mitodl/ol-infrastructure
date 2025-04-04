@@ -171,6 +171,7 @@ def _build_image_job(
                 build_parameters={
                     "CONTEXT": git_repo_resource.name,
                     "BUILD_ARG_GIT_REF": "((.:git_ref))",
+                    "BUILD_ARG_RELEASE_VERSION": f"((.:{version_var}))",
                 },
                 build_args=[],
             ),
