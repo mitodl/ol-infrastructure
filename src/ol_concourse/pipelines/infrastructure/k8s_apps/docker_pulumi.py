@@ -263,6 +263,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
             GetStep(
                 get=app_rc_image.name,
                 trigger=True,
+                passed=[rc_image_build_job.name],
                 params={"skip_download": True},
             ),
             LoadVarStep(
