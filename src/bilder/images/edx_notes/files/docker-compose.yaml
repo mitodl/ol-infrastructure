@@ -15,6 +15,17 @@ services:
     # Ref: CONFIG_ROOT
     # https://github.com/openedx/edx-notes-api/blob/master/notesserver/settings/yaml_config.py
     - /etc/docker/compose/edx_notes_settings.yaml:/app/edx-notes-api/edx_notes_api.yml:ro
+  notes_es_create_index:
+    image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/openedx-notes:${OPENEDX_RELEASE}
+    env_file:
+    - ./.env
+    depends_on:
+    - notes_api
+    command: ["python", "manage.py", "search_index", "--rebuild", "-f"]
+    volumes:
+    # Ref: CONFIG_ROOT
+    # https://github.com/openedx/edx-notes-api/blob/master/notesserver/settings/yaml_config.py
+    - /etc/docker/compose/edx_notes_settings.yaml:/app/edx-notes-api/edx_notes_api.yml:ro
   traefik:
     image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/library/traefik:v3.2
     command:
