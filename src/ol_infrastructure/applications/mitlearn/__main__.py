@@ -26,6 +26,7 @@ from bridge.lib.magic_numbers import (
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.mitlearn.k8s_secrets import (
     create_mitlearn_k8s_secrets,
+    create_oidc_k8s_secret,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.cert_manager import (
@@ -49,8 +50,6 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
-    OLVaultK8SSecret,
-    OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -1290,32 +1289,12 @@ learn_external_service_apisix_upstream = OLApisixExternalUpstream(
 
 # Actions specific to non-Kubernetes (Heroku) deployments
 if not mitlearn_config.get_bool("k8s_deploy"):
-    # TODO (mmd, YYYY-MM-DD): Leaving this out of OLApisix* refactoring for the legacy configs
-    oidc_secret_name = "oidc-secrets"  # pragma: allowlist secret # noqa: S105
-    oidc_secret = OLVaultK8SSecret(
-        f"ol-mitlearn-oidc-secrets-{stack_info.env_suffix}",
-        resource_config=OLVaultK8SStaticSecretConfig(
-            name="oidc-static-secrets",
-            namespace=learn_namespace,
-            labels=application_labels,
-            dest_secret_name=oidc_secret_name,
-            dest_secret_labels=application_labels,
-            mount="secret-operations",
-            mount_type="kv-v1",
-            path="sso/mitlearn",
-            excludes=[".*"],
-            exclude_raw=True,
-            # Refresh frequently because substructure keycloak stack could change some of these
-            refresh_after="1m",
-            templates={
-                "client_id": '{{ get .Secrets "client_id" }}',
-                "client_secret": '{{ get .Secrets "client_secret" }}',
-                "realm": '{{ get .Secrets "realm_name" }}',
-                "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
-                "session.secret": '{{ get .Secrets "secret" }}',
-            },
-            vaultauth=vault_k8s_resources.auth_name,
-        ),
+    # Create the OIDC secret needed for APISIX when deployed outside K8s
+    oidc_secret_name, oidc_secret = create_oidc_k8s_secret(
+        stack_info=stack_info,
+        namespace=learn_namespace,
+        labels=application_labels,
+        vault_k8s_resources=vault_k8s_resources,
         opts=ResourceOptions(
             delete_before_replace=True,
             parent=vault_k8s_resources,

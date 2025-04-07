@@ -303,3 +303,57 @@ def create_mitlearn_k8s_secrets(
     # The resources themselves are implicitly tracked by Pulumi.
 
     return secret_names
+
+
+# OIDC secret is a little different so we do that one with its own function.
+def create_oidc_k8s_secret(
+    stack_info: StackInfo,
+    namespace: str,
+    labels: dict[str, str],
+    vault_k8s_resources: OLVaultK8SResources,
+    opts: ResourceOptions | None = None,
+) -> tuple[str, OLVaultK8SSecret]:
+    """
+    Create the Kubernetes secret containing OIDC configuration from Vault.
+
+    This secret is specifically for the APISIX openid-connect plugin when
+    mitlearn is deployed outside of Kubernetes (e.g., Heroku).
+
+    Args:
+        stack_info: Information about the current Pulumi stack.
+        namespace: Kubernetes namespace where the secret will be created.
+        labels: Labels to apply to the Kubernetes secret.
+        vault_k8s_resources: Vault Kubernetes auth backend resources.
+        opts: Optional Pulumi resource options.
+
+    Returns:
+        A tuple containing the generated Kubernetes secret name and the resource object.
+    """
+    secret_name = "oidc-secrets"  # pragma: allowlist secret # noqa: S105
+    resource = OLVaultK8SSecret(
+        f"ol-mitlearn-{stack_info.env_suffix}-oidc-secrets",  # Pulumi resource name
+        resource_config=OLVaultK8SStaticSecretConfig(
+            name="oidc-static-secrets",  # Name of the VaultK8SSecret CRD
+            namespace=namespace,
+            labels=labels,
+            dest_secret_name=secret_name,  # Name of the resulting K8s Secret object
+            dest_secret_labels=labels,
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",
+            excludes=[".*"],
+            exclude_raw=True,
+            # Refresh frequently because substructure keycloak stack could change some of these
+            refresh_after="1m",
+            templates={
+                "client_id": '{{ get .Secrets "client_id" }}',
+                "client_secret": '{{ get .Secrets "client_secret" }}',
+                "realm": '{{ get .Secrets "realm_name" }}',
+                "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
+                "session.secret": '{{ get .Secrets "secret" }}',
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=opts,
+    )
+    return secret_name, resource
