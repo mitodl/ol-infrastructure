@@ -520,6 +520,7 @@ mitopen_role_statements["app"] = {
         Template(
             """GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA external TO "mitopen";"""
         ),
+        Template("""GRANT CREATE ON DATABASE \"mitopen\" TO mitopen;"""),
         Template(
             """
             GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "mitopen"
