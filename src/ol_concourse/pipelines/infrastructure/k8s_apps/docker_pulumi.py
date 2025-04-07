@@ -275,6 +275,11 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         enable_github_issue_resource=False,
     )
 
+    # Trigger a production deploy when the release branch is updated
+    qa_and_production_fragment.jobs[-1].plan.insert(
+        0, GetStep(get=release_repo.name, trigger=True)
+    )
+
     # Group into Fragments
 
     main_branch_container_fragement = PipelineFragment(
