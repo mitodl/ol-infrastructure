@@ -117,7 +117,7 @@ class OLApplicationK8s(ComponentResource):
             ol_app_k8s_config.application_lb_service_port_name
         )
 
-        # Determin the full name of the container image
+        # Determine the full name of the container image
         if ol_app_k8s_config.application_image_repository_suffix:
             app_image = f"{ol_app_k8s_config.application_image_repository}{ol_app_k8s_config.application_image_repository_suffix}:{ol_app_k8s_config.application_docker_tag}"
         else:
