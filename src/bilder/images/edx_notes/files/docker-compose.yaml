@@ -2,8 +2,6 @@
 services:
   notes_api:
     image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/openedx-notes:${OPENEDX_RELEASE}
-    depends_on:
-    - notes_django_migrate
     volumes:
       # Ref: CONFIG_ROOT
       # https://github.com/openedx/edx-notes-api/blob/master/notesserver/settings/yaml_config.py
@@ -20,7 +18,7 @@ services:
   notes_django_migrate:
     image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/openedx-notes:${OPENEDX_RELEASE}
     depends_on:
-    - notes_es_crate_index
+    - notes_api
     volumes:
     - /etc/docker/compose/edx_notes_settings.yaml:/app/edx-notes-api/edx_notes_api.yml:ro
     env_file:
@@ -29,7 +27,7 @@ services:
   notes_es_create_index:
     image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mitodl/openedx-notes:${OPENEDX_RELEASE}
     depends_on:
-    - notes_api
+    - notes_django_migrate
     volumes:
     - /etc/docker/compose/edx_notes_settings.yaml:/app/edx-notes-api/edx_notes_api.yml:ro
     env_file:
