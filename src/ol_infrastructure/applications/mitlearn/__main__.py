@@ -1270,6 +1270,19 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
     ),
 )
 
+api_tls_secret_name = "api-mitlearn-tls-pair"  # pragma: allowlist secret # noqa: S105
+cert_manager_certificate = OLCertManagerCert(
+    f"ol-mitlearn-cert-manager-certificate-{stack_info.env_suffix}",
+    cert_config=OLCertManagerCertConfig(
+        application_name="mitlearn",
+        k8s_namespace=learn_namespace,
+        k8s_labels=application_labels,
+        create_apisixtls_resource=True,
+        dest_secret_name=api_tls_secret_name,
+        dns_names=[mitlearn_config.require("api_domain")],
+    ),
+)
+
 learn_external_service_apisix_upstream = OLApisixExternalUpstream(
     name=learn_external_service_name,
     external_upstream_config=OLApisixExternalUpstreamConfig(
