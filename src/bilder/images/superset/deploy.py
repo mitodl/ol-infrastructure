@@ -1,6 +1,8 @@
 import io
+import json
 import os
 from pathlib import Path
+from typing import Literal, cast
 
 from pyinfra import host
 from pyinfra.operations import files, server
@@ -54,6 +56,29 @@ SUPERSET_IMAGE_SHA = os.environ.get("SUPERSET_IMAGE_SHA")
 
 set_env_secrets(Path("consul/consul.env"))
 
+
+class InvalidEnvironmentError(ValueError):
+    """Exception raised when an invalid environment type is provided."""
+
+    def __init__(self, env: str) -> None:
+        super().__init__(f"Invalid environment type: {env}")
+
+
+def get_environment_type() -> Literal["ci", "qa", "prod"]:
+    """Determine environment type from instance tags.
+
+    Returns:
+        Literal["ci", "qa", "prod"]: The environment type
+
+    Raises:
+        InvalidEnvironmentError: If environment type is not ci, qa, or prod
+    """
+    env = os.environ.get("ENVIRONMENT_TYPE", "prod")
+    if env not in ("ci", "qa", "prod"):
+        raise InvalidEnvironmentError(env)
+    return cast(Literal["ci", "qa", "prod"], env)
+
+
 # Preload the superset docker image to accelerate startup
 server.shell(
     name=f"Preload mitodl/superset@{SUPERSET_IMAGE_SHA}",
@@ -64,14 +89,31 @@ server.shell(
 
 # There is only one key needed in the .env. Everything else will come at runtime
 # via the helper entrypoint built into the custom superset image.
+environment_type = get_environment_type()
+image_name = "mitodl/superset-ci" if environment_type == "ci" else "mitodl/superset"
+
 files.put(
     name="Setup .env file for docker compose.",
     src=io.StringIO(
-        f"SUPERSET_IMAGE_SHA={SUPERSET_IMAGE_SHA}\nSUPERSET_HOME=/app/superset_home\n"
+        f"SUPERSET_IMAGE={image_name}\n"
+        f"SUPERSET_IMAGE_SHA={SUPERSET_IMAGE_SHA}\n"
+        f"SUPERSET_HOME=/app/superset_home\n"
     ),
     dest=str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env")),
 )
 watched_docker_compose_files.append(str(DOCKER_COMPOSE_DIRECTORY.joinpath(".env")))
+
+if environment_type == "ci":
+    files.put(
+        name="Add CI configuration overrides",
+        src=io.StringIO(
+            json.dumps(
+                {"FEATURE_FLAGS": {"ENABLE_TEMPLATE_PROCESSING": True, "CI_MODE": True}}
+            )
+        ),
+        dest="/app/superset_config_ci.py",
+        mode="0644",
+    )
 
 files.put(
     name="Place docker-compose.yaml.",
