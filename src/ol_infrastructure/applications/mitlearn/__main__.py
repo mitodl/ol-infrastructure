@@ -42,6 +42,8 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    OLApplicationK8s,
+    OLApplicationK8sConfiguration,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -101,6 +103,7 @@ learn_zone_id = dns_stack.require_output("learn")["id"]
 learn_frontend_domain = mitlearn_config.require("frontend_domain")
 legacy_learn_frontend_domain = mitlearn_config.require("legacy_frontend_domain")
 nextjs_heroku_domain = mitlearn_config.require("nextjs_heroku_domain")
+mit_learn_api_domain = mitlearn_config.require("api_domain")
 
 aws_config = AWSBase(
     tags={
@@ -514,6 +517,10 @@ mitopen_role_statements["app"] = {
             WITH GRANT OPTION;
             """
         ),
+        Template("""GRANT USAGE ON SCHEMA external TO mitopen WITH GRANT OPTION;"""),
+        Template(
+            """GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA external TO "mitopen";"""
+        ),
         Template(
             """
             GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "mitopen"
@@ -690,7 +697,6 @@ mitopen_role_statements["reverse-etl"] = {
     "rollback": [],
 }
 
-
 mitopen_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=mitopen_db_config.db_name,
     mount_point=f"{mitopen_db_config.engine}-mitopen",
@@ -700,6 +706,7 @@ mitopen_vault_backend_config = OLVaultPostgresDatabaseConfig(
     role_statements=mitopen_role_statements,
 )
 mitopen_vault_backend = OLVaultDatabaseBackend(mitopen_vault_backend_config)
+
 
 vector_log_proxy_secrets = read_yaml_secrets(
     Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
@@ -848,347 +855,17 @@ mitopen_fastly_service = fastly.ServiceVcl(
     ),
 )
 
-application_labels = k8s_global_labels | {
-    "ol.mit.edu/application": "learn",
-    "ol.mit.edu/pod-security-group": "learn",
-}
-
-# TODO (mmd, YYYY-MM-DD): Leaving this out of OLApisix* refactoring for the legacy configs
-oidc_secret_name = "oidc-secrets"  # pragma: allowlist secret # noqa: S105
-oidc_secret = OLVaultK8SSecret(
-    f"ol-mitlearn-oidc-secrets-{stack_info.env_suffix}",
-    resource_config=OLVaultK8SStaticSecretConfig(
-        name="oidc-static-secrets",
-        namespace=learn_namespace,
-        labels=application_labels,
-        dest_secret_name=oidc_secret_name,
-        dest_secret_labels=application_labels,
-        mount="secret-operations",
-        mount_type="kv-v1",
-        path="sso/mitlearn",
-        excludes=[".*"],
-        exclude_raw=True,
-        # Refresh frequently because substructure keycloak stack could change some of these
-        refresh_after="1m",
-        templates={
-            "client_id": '{{ get .Secrets "client_id" }}',
-            "client_secret": '{{ get .Secrets "client_secret" }}',
-            "realm": '{{ get .Secrets "realm_name" }}',
-            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
-            "session.secret": '{{ get .Secrets "secret" }}',
-        },
-        vaultauth=vault_k8s_resources.auth_name,
-    ),
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        parent=vault_k8s_resources,
-        depends_on=[mitlearn_vault_static_secrets],
-    ),
-)
-
-api_tls_secret_name = "api-mitlearn-tls-pair"  # pragma: allowlist secret # noqa: S105
-cert_manager_certificate = OLCertManagerCert(
-    f"ol-mitlearn-cert-manager-certificate-{stack_info.env_suffix}",
-    cert_config=OLCertManagerCertConfig(
-        application_name="mitlearn",
-        k8s_namespace=learn_namespace,
-        k8s_labels=application_labels,
-        create_apisixtls_resource=True,
-        dest_secret_name=api_tls_secret_name,
-        dns_names=[mitlearn_config.require("api_domain")],
-    ),
-)
-
-mit_learn_api_domain = mitlearn_config.require("api_domain")
-# We need to be able to change `unauth_action` depending on the route but otherwise
-# the settings for the oidc plugin will be unchanged
-# TODO (mmd, YYYY-MM-DD): Leaving this out of OLApisix* refactoring
-legacy_base_oidc_plugin_config = {
-    "scope": "openid profile email",
-    "bearer_only": False,
-    "introspection_endpoint_auth_method": "client_secret_basic",
-    "ssl_verify": False,
-    "logout_path": "/logout/oidc",
-    "post_logout_redirect_uri": f"https://{mit_learn_api_domain}/logout/",
-}
-
-learn_external_service_name = "learn-at-heroku"
-learn_external_service_scheme = "https"
-
-learn_external_service_shared_plugins = OLApisixSharedPlugins(
-    name="ol-mitlearn-external-service-apisix-plugins",
-    plugin_config=OLApisixSharedPluginsConfig(
-        application_name="mitlearn",
-        resource_suffix="ol-shared-plugins",
-        k8s_namespace=learn_namespace,
-        k8s_labels=application_labels,
-        enable_defaults=True,
-    ),
-)
-
-learn_external_service_apisix_upstream = OLApisixExternalUpstream(
-    name=learn_external_service_name,
-    external_upstream_config=OLApisixExternalUpstreamConfig(
-        application_name=learn_external_service_name,
-        k8s_labels=application_labels,
-        k8s_namespace=learn_namespace,
-        external_hostname=mitlearn_config.require("heroku_domain"),
-    ),
-    opts=ResourceOptions(
-        aliases=[
-            Alias(
-                f"ol-mitlearn-external-service-apisix-upstream-{stack_info.env_suffix}",
-            )
-        ],
-        delete_before_replace=True,
-    ),
-)
-
-# MITx Online doesn't have a CI environment. Remove this once that ceases to be true.
-if stack_info.env_suffix != "ci":
-    mitxonline_consul_opts = get_consul_provider(
-        stack_info,
-        consul_address=f"https://consul-mitxonline-{stack_info.env_suffix}.odl.mit.edu",
-        provider_name=f"consul-provider-mitxonline-{stack_info.env_suffix}",
-    )
-    xpro_consul_opts = get_consul_provider(
-        stack_info,
-        consul_address=f"https://consul-xpro-{stack_info.env_suffix}.odl.mit.edu",
-        provider_name=f"consul-provider-xpro-{stack_info.env_suffix}",
-    )
-    consul.Keys(
-        "learn-api-domain-consul-key-for-mitxonline-openedx",
-        keys=[
-            consul.KeysKeyArgs(
-                path="edxapp/learn-api-domain",
-                delete=True,
-                value=mit_learn_api_domain,
-            )
-        ],
-        opts=mitxonline_consul_opts,
-    )
-    consul.Keys(
-        f"learn-api-domain-consul-key-for-xpro-openedx-{stack_info.env_suffix}",
-        keys=[
-            consul.KeysKeyArgs(
-                path="edxapp/learn-api-domain",
-                delete=True,
-                value=mit_learn_api_domain,
-            )
-        ],
-        opts=xpro_consul_opts,
-    )
-# TODO(TMM 2025-04-04): Remove this hack once there is a CI deployment of Learn
-if stack_info.env_suffix == "qa":
-    xpro_consul_opts = get_consul_provider(
-        stack_info,
-        consul_address="https://consul-xpro-ci.odl.mit.edu",
-        provider_name="consul-provider-xpro-ci",
-    )
-    consul.Keys(
-        "learn-api-domain-consul-key-for-xpro-openedx-ci",
-        keys=[
-            consul.KeysKeyArgs(
-                path="edxapp/learn-api-domain",
-                delete=True,
-                value=mit_learn_api_domain,
-            )
-        ],
-        opts=xpro_consul_opts,
-    )
+# Conditional block moved below
 # LEGACY RETIREMENT : goes away
 # MD : 2025-03-21 Leaving this out of OLApisix* refactoring
-learn_external_service_apisix_route = kubernetes.apiextensions.CustomResource(
-    f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
-    api_version="apisix.apache.org/v2",
-    kind="ApisixRoute",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=learn_external_service_name,
-        namespace=learn_namespace,
-        labels=application_labels,
-    ),
-    spec={
-        "http": [
-            {
-                # Wildcard route that can use auth but doesn't require it
-                "name": "passauth",
-                "priority": 0,
-                "plugin_config_name": learn_external_service_shared_plugins.resource_name,
-                "plugins": [
-                    {
-                        "name": "openid-connect",
-                        "enable": True,
-                        "secretRef": oidc_secret_name,
-                        "config": legacy_base_oidc_plugin_config
-                        | {"unauth_action": "pass"},
-                    },
-                ],
-                "match": {
-                    "hosts": [
-                        mit_learn_api_domain,
-                    ],
-                    "paths": [
-                        "/*",
-                    ],
-                },
-                "upstreams": [
-                    {
-                        "name": learn_external_service_apisix_upstream.resource_name,
-                    },
-                ],
-            },
-            {
-                # Strip tailing slash from logout redirect
-                "name": "logout-redirect",
-                "priority": 10,
-                "plugins": [
-                    {
-                        "name": "redirect",
-                        "enable": True,
-                        "config": {
-                            "uri": "/logout/oidc",
-                        },
-                    },
-                ],
-                "match": {
-                    "hosts": [
-                        mit_learn_api_domain,
-                    ],
-                    "paths": [
-                        "/logout/oidc/*",
-                    ],
-                },
-                "upstreams": [
-                    {
-                        "name": learn_external_service_apisix_upstream.resource_name,
-                    },
-                ],
-            },
-            {
-                # Routes that require authentication
-                "name": "reqauth",
-                "priority": 10,
-                "plugin_config_name": learn_external_service_shared_plugins.resource_name,
-                "plugins": [
-                    {
-                        "name": "openid-connect",
-                        "enable": True,
-                        "secretRef": oidc_secret_name,
-                        "config": legacy_base_oidc_plugin_config
-                        | {"unauth_action": "auth"},
-                    },
-                ],
-                "match": {
-                    "hosts": [
-                        mit_learn_api_domain,
-                    ],
-                    "paths": [
-                        "/admin/login/*",
-                        "/login",
-                        "/login/*",
-                    ],
-                },
-                "upstreams": [
-                    {
-                        "name": learn_external_service_apisix_upstream.resource_name,
-                    },
-                ],
-            },
-        ],
-    },
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        depends_on=[
-            learn_external_service_apisix_upstream,
-            learn_external_service_shared_plugins,
-        ],
-    ),
-)
+# Resource moved below into conditional block
 
-learn_external_service_oidc_resources = OLApisixOIDCResources(
-    f"ol-mitlearn-external-service-olapisixoidcresources-{stack_info.env_suffix}",
-    oidc_config=OLApisixOIDCConfig(
-        application_name="mitlearn",
-        k8s_labels=application_labels,
-        k8s_namespace=learn_namespace,
-        oidc_logout_path="/learn/logout/oidc",
-        oidc_post_logout_redirect_uri=f"https://{mitlearn_config.require('api_domain')}/learn/logout/",
-        oidc_session_cookie_lifetime=60 * 20160,
-        oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",
-        vaultauth=vault_k8s_resources.auth_name,
-    ),
-)
+# Resource moved below into conditional block
+# learn_external_service_oidc_resources = OLApisixOIDCResources(...)
+# Resource moved below into conditional block
 
-proxy_rewrite_plugin_config = OLApisixPluginConfig(
-    name="proxy-rewrite",
-    config={
-        "regex_uri": [
-            "/learn/(.*)",
-            "/$1",
-        ],
-    },
-)
+# Resource moved below into conditional block
 
-learn_external_service_apisix_route = OLApisixRoute(
-    name=f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
-    k8s_namespace=learn_namespace,
-    k8s_labels=application_labels,
-    route_configs=[
-        OLApisixRouteConfig(
-            route_name="passauth",
-            priority=0,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                learn_external_service_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mit_learn_api_domain],
-            paths=["/learn/*"],
-            upstream=learn_external_service_apisix_upstream.resource_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="logout-redirect",
-            priority=10,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
-            ],
-            hosts=[mit_learn_api_domain],
-            paths=["/learn/logout/oidc/*"],
-            upstream=learn_external_service_apisix_upstream.resource_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="reqauth",
-            priority=10,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                learn_external_service_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
-            ],
-            hosts=[mit_learn_api_domain],
-            paths=[
-                "/learn/admin/login/*",
-                "/learn/login",
-                "/learn/login/*",
-            ],
-            upstream=learn_external_service_apisix_upstream.resource_name,
-        ),
-    ],
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        depends_on=[
-            learn_external_service_apisix_upstream,
-            learn_external_service_shared_plugins,
-        ],
-    ),
-)
 five_minutes = 60 * 5
 route53.Record(
     "ol-mitopen-frontend-dns-record",
@@ -1434,46 +1111,9 @@ sensitive_env_vars = {
     ),
 }
 
-# There were a few ndiscovered circular dependencies here that wasn't revealed until attempting
+# There were a few undiscovered circular dependencies here that wasn't revealed until attempting
 # to build the CI environment. Since we won't even need this in K8S we will just let it be
 # for now behind this conditional
-if stack_info.env_suffix != "ci":
-    auth_aws_mitx_creds_ol_mitopen_application = vault.generic.get_secret_output(
-        path="aws-mitx/creds/ol-mitopen-application",
-        with_lease_start_time=False,
-        opts=InvokeOptions(
-            parent=mitopen_vault_iam_role,
-        ),
-    )
-    sensitive_env_vars["AWS_ACCESS_KEY_ID"] = (
-        auth_aws_mitx_creds_ol_mitopen_application.data.apply(
-            lambda data: "{}".format(data["access_key"])
-        )
-    )
-    sensitive_env_vars["AWS_SECRET_ACCESS_KEY"] = (
-        auth_aws_mitx_creds_ol_mitopen_application.data.apply(
-            lambda data: "{}".format(data["secret_key"])
-        )
-    )
-
-    auth_postgres_mitopen_creds_app = vault.generic.get_secret_output(
-        path="postgres-mitopen/creds/app",
-        with_lease_start_time=False,
-        opts=InvokeOptions(parent=mitopen_vault_iam_role),
-    )
-    sensitive_env_vars["DATABASE_URL"] = auth_postgres_mitopen_creds_app.data.apply(
-        lambda data: "postgres://{}:{}@ol-mitlearn-db-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/mitopen".format(
-            data["username"], data["password"], stack_info.name.lower()
-        )
-    )
-
-    heroku_app_id = heroku_config.require("app_id")
-    mitopen_heroku_configassociation = heroku.app.ConfigAssociation(
-        f"ol-mitopen-heroku-configassociation-{stack_info.env_suffix}",
-        app_id=heroku_app_id,
-        sensitive_vars=sensitive_env_vars,
-        vars=env_vars,
-    )
 
 match stack_info.env_suffix:
     case "production":
@@ -1611,6 +1251,398 @@ gh_workflow_learn_api_logout_env_secret = github.ActionsSecret(
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
+application_labels = k8s_global_labels | {
+    "ol.mit.edu/application": "learn",
+    "ol.mit.edu/pod-security-group": "learn",
+}
+
+learn_external_service_name = "learn-at-heroku"
+learn_external_service_scheme = "https"
+
+learn_external_service_shared_plugins = OLApisixSharedPlugins(
+    name="ol-mitlearn-external-service-apisix-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="mitlearn",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=learn_namespace,
+        k8s_labels=application_labels,
+        enable_defaults=True,
+    ),
+)
+
+learn_external_service_apisix_upstream = OLApisixExternalUpstream(
+    name=learn_external_service_name,
+    external_upstream_config=OLApisixExternalUpstreamConfig(
+        application_name=learn_external_service_name,
+        k8s_labels=application_labels,
+        k8s_namespace=learn_namespace,
+        external_hostname=mitlearn_config.require("heroku_domain"),
+    ),
+    opts=ResourceOptions(
+        aliases=[
+            Alias(
+                f"ol-mitlearn-external-service-apisix-upstream-{stack_info.env_suffix}",
+            )
+        ],
+        delete_before_replace=True,
+    ),
+)
+
+# Actions specific to non-Kubernetes (Heroku) deployments
+if not mitlearn_config.get_bool("k8s_deploy"):
+    # TODO (mmd, YYYY-MM-DD): Leaving this out of OLApisix* refactoring for the legacy configs
+    oidc_secret_name = "oidc-secrets"  # pragma: allowlist secret # noqa: S105
+    oidc_secret = OLVaultK8SSecret(
+        f"ol-mitlearn-oidc-secrets-{stack_info.env_suffix}",
+        resource_config=OLVaultK8SStaticSecretConfig(
+            name="oidc-static-secrets",
+            namespace=learn_namespace,
+            labels=application_labels,
+            dest_secret_name=oidc_secret_name,
+            dest_secret_labels=application_labels,
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",
+            excludes=[".*"],
+            exclude_raw=True,
+            # Refresh frequently because substructure keycloak stack could change some of these
+            refresh_after="1m",
+            templates={
+                "client_id": '{{ get .Secrets "client_id" }}',
+                "client_secret": '{{ get .Secrets "client_secret" }}',
+                "realm": '{{ get .Secrets "realm_name" }}',
+                "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
+                "session.secret": '{{ get .Secrets "secret" }}',
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            parent=vault_k8s_resources,
+            depends_on=[mitlearn_vault_static_secrets],
+        ),
+    )
+
+    api_tls_secret_name = (
+        "api-mitlearn-tls-pair"  # pragma: allowlist secret # noqa: S105
+    )
+    cert_manager_certificate = OLCertManagerCert(
+        f"ol-mitlearn-cert-manager-certificate-{stack_info.env_suffix}",
+        cert_config=OLCertManagerCertConfig(
+            application_name="mitlearn",
+            k8s_namespace=learn_namespace,
+            k8s_labels=application_labels,
+            create_apisixtls_resource=True,
+            dest_secret_name=api_tls_secret_name,
+            dns_names=[mitlearn_config.require("api_domain")],
+        ),
+    )
+
+    # We need to be able to change `unauth_action` depending on the route but otherwise
+    # the settings for the oidc plugin will be unchanged
+    # TODO (mmd, YYYY-MM-DD): Leaving this out of OLApisix* refactoring
+    legacy_base_oidc_plugin_config = {
+        "scope": "openid profile email",
+        "bearer_only": False,
+        "introspection_endpoint_auth_method": "client_secret_basic",
+        "ssl_verify": False,
+        "logout_path": "/logout/oidc",
+        "post_logout_redirect_uri": f"https://{mit_learn_api_domain}/logout/",
+    }
+
+    # MITx Online doesn't have a CI environment. Remove this once that ceases to be true.
+    # TODO(TMM 2025-04-04): Remove this hack once there is a CI deployment of Learn
+    mitxonline_consul_opts = get_consul_provider(
+        stack_info,
+        consul_address=f"https://consul-mitxonline-{stack_info.env_suffix}.odl.mit.edu",
+        provider_name=f"consul-provider-mitxonline-{stack_info.env_suffix}",
+    )
+    xpro_consul_opts = get_consul_provider(
+        stack_info,
+        consul_address=f"https://consul-xpro-{stack_info.env_suffix}.odl.mit.edu",
+        provider_name=f"consul-provider-xpro-{stack_info.env_suffix}",
+    )
+    consul.Keys(
+        "learn-api-domain-consul-key-for-mitxonline-openedx",
+        keys=[
+            consul.KeysKeyArgs(
+                path="edxapp/learn-api-domain",
+                delete=True,
+                value=mit_learn_api_domain,
+            )
+        ],
+        opts=mitxonline_consul_opts,
+    )
+    consul.Keys(
+        f"learn-api-domain-consul-key-for-xpro-openedx-{stack_info.env_suffix}",
+        keys=[
+            consul.KeysKeyArgs(
+                path="edxapp/learn-api-domain",
+                delete=True,
+                value=mit_learn_api_domain,
+            )
+        ],
+        opts=xpro_consul_opts,
+    )
+
+    # TODO(TMM 2025-04-04): Remove this hack once there is a CI deployment of Learn
+    # This condition was originally `if stack_info.env_suffix == "qa":`
+    # It's included here because QA is currently a non-k8s deployment.
+    if stack_info.env_suffix == "qa":
+        xpro_ci_consul_opts = get_consul_provider(
+            stack_info,
+            consul_address="https://consul-xpro-ci.odl.mit.edu",
+            provider_name="consul-provider-xpro-ci",
+        )
+        consul.Keys(
+            "learn-api-domain-consul-key-for-xpro-openedx-ci",
+            keys=[
+                consul.KeysKeyArgs(
+                    path="edxapp/learn-api-domain",
+                    delete=True,
+                    value=mit_learn_api_domain,
+                )
+            ],
+            opts=xpro_ci_consul_opts,
+        )
+
+    # LEGACY RETIREMENT : goes away
+    # MD : 2025-03-21 Leaving this out of OLApisix* refactoring
+    learn_external_service_apisix_route_legacy = kubernetes.apiextensions.CustomResource(
+        f"ol-mitlearn-external-service-apisix-route-legacy-{stack_info.env_suffix}",  # Renamed to avoid conflict
+        api_version="apisix.apache.org/v2",
+        kind="ApisixRoute",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{learn_external_service_name}-legacy",  # Renamed to avoid conflict
+            namespace=learn_namespace,
+            labels=application_labels,
+        ),
+        spec={
+            "http": [
+                {
+                    # Wildcard route that can use auth but doesn't require it
+                    "name": "passauth",
+                    "priority": 0,
+                    "plugin_config_name": learn_external_service_shared_plugins.resource_name,
+                    "plugins": [
+                        {
+                            "name": "openid-connect",
+                            "enable": True,
+                            "secretRef": oidc_secret_name,
+                            "config": legacy_base_oidc_plugin_config
+                            | {"unauth_action": "pass"},
+                        },
+                    ],
+                    "match": {
+                        "hosts": [
+                            mit_learn_api_domain,
+                        ],
+                        "paths": [
+                            "/*",
+                        ],
+                    },
+                    "upstreams": [
+                        {
+                            "name": learn_external_service_apisix_upstream.resource_name,
+                        },
+                    ],
+                },
+                {
+                    # Strip tailing slash from logout redirect
+                    "name": "logout-redirect",
+                    "priority": 10,
+                    "plugins": [
+                        {
+                            "name": "redirect",
+                            "enable": True,
+                            "config": {
+                                "uri": "/logout/oidc",
+                            },
+                        },
+                    ],
+                    "match": {
+                        "hosts": [
+                            mit_learn_api_domain,
+                        ],
+                        "paths": [
+                            "/logout/oidc/*",
+                        ],
+                    },
+                    "upstreams": [
+                        {
+                            "name": learn_external_service_apisix_upstream.resource_name,
+                        },
+                    ],
+                },
+                {
+                    # Routes that require authentication
+                    "name": "reqauth",
+                    "priority": 10,
+                    "plugin_config_name": learn_external_service_shared_plugins.resource_name,
+                    "plugins": [
+                        {
+                            "name": "openid-connect",
+                            "enable": True,
+                            "secretRef": oidc_secret_name,
+                            "config": legacy_base_oidc_plugin_config
+                            | {"unauth_action": "auth"},
+                        },
+                    ],
+                    "match": {
+                        "hosts": [
+                            mit_learn_api_domain,
+                        ],
+                        "paths": [
+                            "/admin/login/*",
+                            "/login",
+                            "/login/*",
+                        ],
+                    },
+                    "upstreams": [
+                        {
+                            "name": learn_external_service_apisix_upstream.resource_name,
+                        },
+                    ],
+                },
+            ],
+        },
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[
+                learn_external_service_apisix_upstream,
+                learn_external_service_shared_plugins,
+            ],
+        ),
+    )
+
+    learn_external_service_oidc_resources = OLApisixOIDCResources(
+        f"ol-mitlearn-external-service-olapisixoidcresources-{stack_info.env_suffix}",
+        oidc_config=OLApisixOIDCConfig(
+            application_name="mitlearn",
+            k8s_labels=application_labels,
+            k8s_namespace=learn_namespace,
+            oidc_logout_path="/learn/logout/oidc",
+            oidc_post_logout_redirect_uri=f"https://{mitlearn_config.require('api_domain')}/learn/logout/",
+            oidc_session_cookie_lifetime=60 * 20160,
+            oidc_use_session_secret=True,
+            vault_mount="secret-operations",
+            vault_mount_type="kv-v1",
+            vault_path="sso/mitlearn",
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+    )
+
+    # Define proxy rewrite config needed for the route below
+    proxy_rewrite_plugin_config = OLApisixPluginConfig(
+        name="proxy-rewrite",
+        config={
+            "regex_uri": [
+                "/learn/(.*)",
+                "/$1",
+            ],
+        },
+    )
+
+    learn_external_service_apisix_route = OLApisixRoute(
+        name=f"ol-mitlearn-external-service-apisix-route-{stack_info.env_suffix}",
+        k8s_namespace=learn_namespace,
+        k8s_labels=application_labels,
+        route_configs=[
+            OLApisixRouteConfig(
+                route_name="passauth",
+                priority=0,
+                shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+                plugins=[
+                    proxy_rewrite_plugin_config,
+                    learn_external_service_oidc_resources.get_full_oidc_plugin_config(
+                        unauth_action="pass"
+                    ),
+                ],
+                hosts=[mit_learn_api_domain],
+                paths=["/learn/*"],
+                upstream=learn_external_service_apisix_upstream.resource_name,
+            ),
+            OLApisixRouteConfig(
+                route_name="logout-redirect",
+                priority=10,
+                shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+                plugins=[
+                    OLApisixPluginConfig(
+                        name="redirect", config={"uri": "/logout/oidc"}
+                    ),
+                ],
+                hosts=[mit_learn_api_domain],
+                paths=["/learn/logout/oidc/*"],
+                upstream=learn_external_service_apisix_upstream.resource_name,
+            ),
+            OLApisixRouteConfig(
+                route_name="reqauth",
+                priority=10,
+                shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+                plugins=[
+                    proxy_rewrite_plugin_config,
+                    learn_external_service_oidc_resources.get_full_oidc_plugin_config(
+                        unauth_action="auth"
+                    ),
+                ],
+                hosts=[mit_learn_api_domain],
+                paths=[
+                    "/learn/admin/login/*",
+                    "/learn/login",
+                    "/learn/login/*",
+                ],
+                upstream=learn_external_service_apisix_upstream.resource_name,
+            ),
+        ],
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[
+                learn_external_service_apisix_upstream,
+                learn_external_service_shared_plugins,
+            ],
+        ),
+    )
+
+    # Vault secret lookups and Heroku config association
+    auth_aws_mitx_creds_ol_mitopen_application = vault.generic.get_secret_output(
+        path="aws-mitx/creds/ol-mitopen-application",
+        with_lease_start_time=False,
+        opts=InvokeOptions(
+            parent=mitopen_vault_iam_role,
+        ),
+    )
+    sensitive_env_vars["AWS_ACCESS_KEY_ID"] = (
+        auth_aws_mitx_creds_ol_mitopen_application.data.apply(
+            lambda data: "{}".format(data["access_key"])
+        )
+    )
+    sensitive_env_vars["AWS_SECRET_ACCESS_KEY"] = (
+        auth_aws_mitx_creds_ol_mitopen_application.data.apply(
+            lambda data: "{}".format(data["secret_key"])
+        )
+    )
+
+    auth_postgres_mitopen_creds_app = vault.generic.get_secret_output(
+        path="postgres-mitopen/creds/app",
+        with_lease_start_time=False,
+        opts=InvokeOptions(parent=mitopen_vault_iam_role),
+    )
+    sensitive_env_vars["DATABASE_URL"] = auth_postgres_mitopen_creds_app.data.apply(
+        lambda data: "postgres://{}:{}@ol-mitlearn-db-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/mitopen".format(
+            data["username"], data["password"], stack_info.name.lower()
+        )
+    )
+
+    heroku_app_id = heroku_config.require("app_id")
+    mitopen_heroku_configassociation = heroku.app.ConfigAssociation(
+        f"ol-mitopen-heroku-configassociation-{stack_info.env_suffix}",
+        app_id=heroku_app_id,
+        sensitive_vars=sensitive_env_vars,
+        vars=env_vars,
+    )
+
+
+# Actions specific to Kubernetes deployments
 if mitlearn_config.get_bool("k8s_deploy"):
     # Create a security group for the application pods
     mitlearn_app_security_group = ec2.SecurityGroup(
@@ -1630,42 +1662,210 @@ if mitlearn_config.get_bool("k8s_deploy"):
         k8s_global_labels=k8s_global_labels,
         vault_k8s_resources=vault_k8s_resources,
         mitopen_vault_mount=mitopen_vault_mount,
-        db_config=mitopen_vault_backend_config,
+        db_config=mitopen_vault_backend,  # Use the original DB config object
     )
 
-#    # Configure and deploy the mitlearn application using OLApplicationK8s
-#    mitlearn_k8s_app_config = OLApplicationK8sConfiguration(
-#        project_root=Path(__file__).parent,
-#        application_config=env_vars,
-#        application_name="mitlearn",
-#        application_namespace=learn_namespace,
-#        application_lb_service_name=f"mitlearn-lb-service-{stack_info.env_suffix}",
-#        application_lb_service_port_name="http",
-#        k8s_global_labels=k8s_global_labels,
-#        # Reference all Kubernetes secrets containing environment variables
-#        env_from_secret_names=secret_names,
-#        application_security_group_id=mitlearn_app_security_group.id,
-#        application_security_group_name=mitlearn_app_security_group.name,
-#        application_image_repository="ardiea/mitlearn",  # As requested
-#        application_docker_tag="testing",  # As requested
-#        vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
-#        import_nginx_config=True,  # Assuming Django app needs nginx
-#        init_migrations=True,  # Assuming Django app needs migrations
-#        init_collectstatic=True,  # Assuming Django app needs collectstatic
-#        # Using default resource requests/limits for now
-#    )
-#
-#    mitlearn_k8s_app = OLApplicationK8s(
-#        ol_app_k8s_config=mitlearn_k8s_app_config,
-#        opts=ResourceOptions(
-#            depends_on=[
-#                mitlearn_app_security_group,
-#                # Ensure all Vault secret resources are created before the app
-#                # Dependencies are implicitly handled by Pulumi based on the
-#                # resources created within create_mitlearn_k8s_secrets
-#            ]
-#        ),
-#    )
+    # Configure and deploy the mitlearn application using OLApplicationK8s
+    mitlearn_k8s_app_config = OLApplicationK8sConfiguration(
+        project_root=Path(__file__).parent,
+        application_config=env_vars,
+        application_name="mitlearn",
+        application_namespace=learn_namespace,
+        application_lb_service_name="mitlearn-webapp",
+        application_lb_service_port_name="http",
+        k8s_global_labels=k8s_global_labels,
+        # Reference all Kubernetes secrets containing environment variables
+        env_from_secret_names=secret_names,
+        application_security_group_id=mitlearn_app_security_group.id,
+        application_security_group_name=mitlearn_app_security_group.name,
+        application_image_repository="ardiea/mitlearn",  # As requested
+        application_docker_tag="testing",  # As requested
+        application_cmd_array=[
+            "uwsgi",
+            "/tmp/uwsgi.ini",  # noqa: S108
+        ],
+        vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
+        import_nginx_config=True,  # Assuming Django app needs nginx
+        import_uwsgi_config=True,  # Assuming Django app needs uwsgi
+        resource_requests={"cpu": "500m", "memory": "1600Mi"},
+        resource_limits={"cpu": "1000m", "memory": "1600Mi"},
+        init_migrations=True,  # Assuming Django app needs migrations
+        init_collectstatic=True,  # Assuming Django app needs collectstatic
+        # Using default resource requests/limits for now
+    )
+
+    mitlearn_k8s_app = OLApplicationK8s(
+        ol_app_k8s_config=mitlearn_k8s_app_config,
+        opts=ResourceOptions(
+            depends_on=[
+                mitlearn_app_security_group,
+                # Ensure all Vault secret resources are created before the app
+                # Dependencies are implicitly handled by Pulumi based on the
+                # resources created within create_mitlearn_k8s_secrets
+            ]
+        ),
+    )
+
+    mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
+        f"ol-mitlearn-k8s-olapisixoidcresources-no-prefix-{stack_info.env_suffix}",
+        oidc_config=OLApisixOIDCConfig(
+            application_name="mitlearn-k8s-no-prefix",
+            k8s_labels=application_labels,
+            k8s_namespace=learn_namespace,
+            oidc_logout_path="/logout/oidc",
+            oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/logout/",
+            oidc_session_cookie_lifetime=60 * 20160,
+            oidc_use_session_secret=True,
+            vault_mount="secret-operations",
+            vault_mount_type="kv-v1",
+            vault_path="sso/mitlearn",
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+    )
+    mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
+        f"ol-mitlearn-k8s-olapisixoidcresources-{stack_info.env_suffix}",
+        oidc_config=OLApisixOIDCConfig(
+            application_name="mitlearn-k8s",
+            k8s_labels=application_labels,
+            k8s_namespace=learn_namespace,
+            oidc_logout_path="/learn/logout/oidc",
+            oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/learn/logout/",
+            oidc_session_cookie_lifetime=60 * 20160,
+            oidc_use_session_secret=True,
+            vault_mount="secret-operations",
+            vault_mount_type="kv-v1",
+            vault_path="sso/mitlearn",
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+    )
+
+    proxy_rewrite_plugin_config = OLApisixPluginConfig(
+        name="proxy-rewrite",
+        config={
+            "regex_uri": [
+                "/learn/(.*)",
+                "/$1",
+            ],
+        },
+    )
+
+    learn_external_service_apisix_route_no_prefix = OLApisixRoute(
+        name=f"ol-mitlearn-k8s-apisix-route-no-prefix-{stack_info.env_suffix}",
+        k8s_namespace=learn_namespace,
+        k8s_labels=application_labels,
+        route_configs=[
+            OLApisixRouteConfig(
+                route_name="passauth",
+                priority=0,
+                shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+                plugins=[
+                    proxy_rewrite_plugin_config,
+                    mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
+                        unauth_action="pass"
+                    ),
+                ],
+                hosts=[mit_learn_api_domain],
+                paths=["/*"],
+                backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+                backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            ),
+            OLApisixRouteConfig(
+                route_name="logout-redirect",
+                priority=10,
+                shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+                plugins=[
+                    OLApisixPluginConfig(
+                        name="redirect", config={"uri": "/logout/oidc"}
+                    ),
+                ],
+                hosts=[mit_learn_api_domain],
+                paths=["/logout/oidc/*"],
+                backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+                backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            ),
+            OLApisixRouteConfig(
+                route_name="reqauth",
+                priority=10,
+                shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+                plugins=[
+                    proxy_rewrite_plugin_config,
+                    mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
+                        unauth_action="auth"
+                    ),
+                ],
+                hosts=[mit_learn_api_domain],
+                paths=[
+                    "/admin/login/*",
+                    "/login",
+                    "/login/*",
+                ],
+                backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+                backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            ),
+        ],
+        opts=ResourceOptions(
+            delete_before_replace=True,
+        ),
+    )
+
+    learn_external_service_apisix_route = OLApisixRoute(
+        name=f"ol-mitlearn-k8s-apisix-route-{stack_info.env_suffix}",
+        k8s_namespace=learn_namespace,
+        k8s_labels=application_labels,
+        route_configs=[
+            OLApisixRouteConfig(
+                route_name="passauth",
+                priority=0,
+                shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+                plugins=[
+                    proxy_rewrite_plugin_config,
+                    mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                        unauth_action="pass"
+                    ),
+                ],
+                hosts=[mit_learn_api_domain],
+                paths=["/learn/*"],
+                backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+                backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            ),
+            OLApisixRouteConfig(
+                route_name="logout-redirect",
+                priority=10,
+                shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+                plugins=[
+                    OLApisixPluginConfig(
+                        name="redirect", config={"uri": "/logout/oidc"}
+                    ),
+                ],
+                hosts=[mit_learn_api_domain],
+                paths=["/learn/logout/oidc/*"],
+                backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+                backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            ),
+            OLApisixRouteConfig(
+                route_name="reqauth",
+                priority=10,
+                shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+                plugins=[
+                    proxy_rewrite_plugin_config,
+                    mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                        unauth_action="auth"
+                    ),
+                ],
+                hosts=[mit_learn_api_domain],
+                paths=[
+                    "/learn/admin/login/*",
+                    "/learn/login",
+                    "/learn/login/*",
+                ],
+                backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+                backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            ),
+        ],
+        opts=ResourceOptions(
+            delete_before_replace=True,
+        ),
+    )
 
 
 export(

@@ -37,7 +37,7 @@ path "secret-operations/global/update-search-data-webhook-key" {
 path "secret-operations/tika/access-token" {
   capabilities = ["read"]
 }
-path "secret-global/mailgun" {
+path "secret-global/data/mailgun" {
   capabilities = ["read"]
 }
 

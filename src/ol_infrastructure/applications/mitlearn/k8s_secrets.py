@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ERA001
+# ruff: noqa: E501, ERA001, PLR0913
 """
 Manage Kubernetes secrets for the mitlearn application using Vault.
 
@@ -12,11 +12,11 @@ from pulumi import ResourceOptions
 from pulumi_vault import Mount
 
 from ol_infrastructure.components.services.vault import (
+    OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
     OLVaultK8SResources,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
-    OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -128,7 +128,7 @@ def create_mitlearn_k8s_secrets(
     k8s_global_labels: dict[str, str],
     vault_k8s_resources: OLVaultK8SResources,
     mitopen_vault_mount: Mount,
-    db_config: OLVaultPostgresDatabaseConfig,
+    db_config: OLVaultDatabaseBackend,
 ) -> list[str]:
     """
     Create all Kubernetes secrets required by the mitlearn application.
@@ -157,7 +157,7 @@ def create_mitlearn_k8s_secrets(
     # Static secrets derived from mitopen/secrets.*.yaml, fetched via Vault agent
     mitopen_static_secret_name, mitopen_static_secret = _create_static_secret(
         stack_info=stack_info,
-        secret_base_name="mitopen",  # Base name for the K8s secret resource
+        secret_base_name="mitopen",  # Base name for the K8s secret resource  # pragma: allowlist secret  # noqa: S106
         namespace=learn_namespace,
         labels=k8s_global_labels,
         mount=mitopen_vault_mount.path,
@@ -252,10 +252,11 @@ def create_mitlearn_k8s_secrets(
     # Mailgun API key
     secret_global_mailgun_name, secret_global_mailgun = _create_static_secret(
         stack_info=stack_info,
-        secret_base_name="secret-global-mailgun",  # Mailgun API key
+        secret_base_name="secret-global-mailgun",  # Mailgun API key # pragma: allowlist secret  # noqa: S106
         namespace=learn_namespace,
         labels=k8s_global_labels,
         mount="secret-global",
+        mount_type="kv-v2",
         path="mailgun",
         templates={"MAILGUN_KEY": '{{ get .Secrets "api_key" }}'},
         vaultauth=vault_k8s_resources.auth_name,
@@ -267,7 +268,7 @@ def create_mitlearn_k8s_secrets(
     # Provides temporary AWS access keys for the application role.
     aws_access_key_secret_name, aws_access_key_secret = _create_dynamic_secret(
         stack_info=stack_info,
-        secret_base_name="aws-secrets",  # AWS credentials
+        secret_base_name="aws-secrets",  # AWS credentials  # pragma: allowlist secret  # noqa: S106
         namespace=learn_namespace,
         labels=k8s_global_labels,
         mount="aws-mitx",
@@ -285,10 +286,10 @@ def create_mitlearn_k8s_secrets(
     # Provides temporary database credentials for the application role.
     database_url_secret_name, database_url_secret = _create_dynamic_secret(
         stack_info=stack_info,
-        secret_base_name="psql-secrets",  # PostgreSQL credentials
+        secret_base_name="psql-secrets",  # PostgreSQL credentials  # pragma: allowlist secret  # noqa: S106
         namespace=learn_namespace,
         labels=k8s_global_labels,
-        mount=db_config.mount_point,
+        mount=db_config.db_mount.path,
         path="creds/app",
         templates={
             "DATABASE_URL": f'postgres://{{{{ get .Secrets "username" }}}}:{{{{ get .Secrets "password" }}}}@ol-mitlearn-db-{stack_info.name.lower()}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/mitopen'
@@ -298,7 +299,6 @@ def create_mitlearn_k8s_secrets(
     secret_names.append(database_url_secret_name)
     secret_resources.append(database_url_secret)
 
-    # TODO: Add dependency tracking if needed, e.g., for OLApplicationK8s
     # For now, just returning the names as the original code did.
     # The resources themselves are implicitly tracked by Pulumi.
 
