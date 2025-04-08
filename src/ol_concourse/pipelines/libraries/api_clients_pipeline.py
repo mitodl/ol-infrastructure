@@ -1,5 +1,5 @@
 # src/ol_concourse/pipelines/libraries/api_clients_pipeline.py
-# --- START NEW CONTENT ---
+import argparse
 import sys
 from pathlib import Path
 
@@ -20,6 +20,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, ssh_git_repo
+from ol_concourse.pipelines.libraries.configuration import PIPELINE_CONFIGS
 
 
 def _read_script(script_name: str) -> str:
@@ -35,18 +36,34 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     client_repo_uri: str,
     client_repo_branch: str,
     client_repo_subpath: str,
-    vault_ssh_secret_path: str,
-    vault_npm_secret_path: str,
-    python_image_tag: str = "3.12-slim",
-    node_image_tag: str = "22-slim",
-    openapi_generator_tag: str = "v7.2.0",
-    generate_script: str = "api-clients-generate-inner.sh",
-    bump_script: str = "api-clients-bumpver.sh",
-    commit_script: str = "api-clients-commit-changes.sh",
-    publish_script: str = "api-clients-publish-node.sh",
 ) -> Pipeline:
-    """Generate a pipeline for building and publishing API clients."""
-    # Define common resources with parameterized image tags
+    """
+    Generate a pipeline definition for building and publishing API clients.
+
+    :param source_repo_name: The identifier for the source code repository resource.
+    :param source_repo_uri: The URI of the source code repository (e.g., GitHub URL).
+    :param source_repo_branch: The branch of the source code repository to track.
+    :param client_repo_name: The identifier for the generated client code repository
+        resource.
+    :param client_repo_uri: The URI of the client code repository (e.g., GitHub SSH
+        URL).
+    :param client_repo_branch: The branch of the client code repository to push to.
+    :param client_repo_subpath: The subpath within the client repo where the generated
+        code resides (relative to src/typescript/).
+
+    :return: A Pipeline object representing the Concourse pipeline definition.
+    """
+    # Define parameterized image tags
+    python_image_tag = "3.12-slim"
+    node_image_tag = "22-slim"
+    openapi_generator_tag = "v7.2.0"
+
+    # Define script names
+    generate_script: str = "api-clients-generate-inner.sh"
+    bump_script: str = "api-clients-bumpver.sh"
+    commit_script: str = "api-clients-commit-changes.sh"
+    publish_script: str = "api-clients-publish-node.sh"
+
     openapi_generator_image = Resource(
         name=Identifier("openapi-generator-image"),
         type="registry-image",
@@ -87,7 +104,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         name=Identifier(client_repo_name),
         uri=client_repo_uri,
         branch=client_repo_branch,
-        private_key=f"(({vault_ssh_secret_path}))",
+        private_key="((npm_publish.odlbot_private_ssh_key))",
     )
 
     # Define the 'generate-clients' job
@@ -123,7 +140,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
             ),
             TaskStep(
                 task="bump-version",
-                image=python_image.name,
+                image=python_image,
                 config=TaskConfig(
                     platform="linux",
                     inputs=[Input(name=api_clients_repository.name)],
@@ -183,11 +200,11 @@ def generate_api_client_pipeline(  # noqa: PLR0913
             ),
             TaskStep(
                 task="publish-node",
-                image=node_image.name,
+                image=node_image,
                 config=TaskConfig(
                     platform="linux",
                     inputs=[Input(name=api_clients_repository.name)],
-                    params={"NPM_TOKEN": f"(({vault_npm_secret_path}))"},
+                    params={"NPM_TOKEN": "((npm_publish.npmjs_token))"},
                     run=Command(
                         path="sh",
                         # Adjust dir based on which publish script is used
@@ -216,73 +233,16 @@ def generate_api_client_pipeline(  # noqa: PLR0913
 
 
 if __name__ == "__main__":
-    # Configuration for each pipeline variant
-    configs = {
-        "mit_open": {
-            "pipeline_name": "open-api-clients",
-            "source_repo_name": "mit-open",
-            "source_repo_uri": "https://github.com/mitodl/mit-open",
-            "source_repo_branch": "release",
-            "client_repo_name": "mit-open-api-clients",
-            "client_repo_uri": "git@github.com:mitodl/open-api-clients.git",
-            "client_repo_branch": "main",
-            "client_repo_subpath": "mit-open-api-axios",
-            "vault_ssh_secret_path": "open_api_clients.odlbot_private_ssh_key",  # pragma: allowlist secret  # noqa: E501
-            "vault_npm_secret_path": "open_api_clients.npmjs_token",  # pragma: allowlist secret  # noqa: E501
-            "python_image_tag": "3.12-slim",
-            "node_image_tag": "22-slim",
-            # Use the original npm publish script for mit-open
-            "publish_script": "open-api-clients-publish-node.sh",
-        },
-        "mitxonline": {
-            "pipeline_name": "mitxonline-api-client",
-            "source_repo_name": "mitxonline",
-            "source_repo_uri": "https://github.com/mitodl/mitxonline",
-            "source_repo_branch": "main",
-            "client_repo_name": "mitxonline-api-clients",
-            "client_repo_uri": "git@github.com:mitodl/mitxonline-api-clients.git",
-            "client_repo_branch": "release",
-            "client_repo_subpath": "mitxonline-api-axios",
-            "vault_ssh_secret_path": "npm_publish.odlbot_private_ssh_key",  # pragma: allowlist secret  # noqa: E501
-            "vault_npm_secret_path": "npm_publish.npmjs_token",  # pragma: allowlist secret  # noqa: E501
-            "python_image_tag": "3.11-slim",  # Keep original tags
-            "node_image_tag": "18-slim",  # Keep original tags
-            "publish_script": "api-clients-publish-node.sh",  # Use generic yarn script
-        },
-        "unified_ecommerce": {
-            "pipeline_name": "unified-ecommerce-api-client",
-            "source_repo_name": "unified-ecommerce",
-            "source_repo_uri": "https://github.com/mitodl/unified-ecommerce",
-            "source_repo_branch": "main",
-            "client_repo_name": "unified-ecommerce-api-clients",
-            "client_repo_uri": "git@github.com:mitodl/unified-ecommerce-api-clients.git",  # noqa: E501
-            "client_repo_branch": "release",
-            "client_repo_subpath": "unified-ecommerce-api-axios",
-            "vault_ssh_secret_path": "npm_publish.odlbot_private_ssh_key",  # pragma: allowlist secret  # noqa: E501
-            "vault_npm_secret_path": "npm_publish.npmjs_token",  # pragma: allowlist secret  # noqa: E501
-            "python_image_tag": "3.11-slim",  # Keep original tags
-            "node_image_tag": "18-slim",  # Keep original tags
-            "publish_script": "api-clients-publish-node.sh",  # Use generic yarn script
-        },
-    }
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--variant",
+        required=True,
+        choices=PIPELINE_CONFIGS.keys(),
+        help="The pipeline variant configuration to generate.",
+    )
+    args = parser.parse_args()
 
-    # Generate and print/save pipeline definitions
-    for variant, config in configs.items():
-        pipeline = generate_api_client_pipeline(**config)
-        pipeline_json = pipeline.model_dump_json(indent=2)
-        definition_filename = f"{config['pipeline_name']}-definition.json"
-        with open(definition_filename, "w") as definition_file:  # noqa: PTH123
-            definition_file.write(pipeline_json)
-        print(f"Generated {definition_filename}")  # noqa: T201
-        # Print command for the first pipeline only for brevity
-        if variant == "mit_open":
-            sys.stdout.write(pipeline_json)
-            sys.stdout.write(
-                f"\nfly -t <target> set-pipeline -p {config['pipeline_name']} -c {definition_filename}\n"  # noqa: E501
-            )
-        else:
-            sys.stdout.write(
-                f"\nfly -t <target> set-pipeline -p {config['pipeline_name']} -c {definition_filename}\n"  # noqa: E501
-            )
-
-# --- END NEW CONTENT ---
+    variant_config = PIPELINE_CONFIGS[args.variant]
+    pipeline = generate_api_client_pipeline(**variant_config)
+    # Print the generated pipeline definition JSON to stdout
+    sys.stdout.write(pipeline.model_dump_json(indent=2))
