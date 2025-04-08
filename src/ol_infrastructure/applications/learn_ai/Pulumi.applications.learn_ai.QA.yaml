@@ -11,6 +11,7 @@ config:
     AI_DEBUG: "true"
     AI_DEFAULT_SYLLABUS_MODEL: "bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
     AI_MIT_SEARCH_URL: "https://api.rc.learn.mit.edu/api/v1/learning_resources_search/"
+    AI_MIT_SEARCH_DETAIL_URL: "https://rc.learn.mit.edu/?resource="
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     CELERY_TASK_ALWAYS_EAGER: "false"

@@ -38,11 +38,29 @@ def truncate_k8s_metanames(name: str) -> str:
     return name[:MAXIMUM_K8S_NAME_LENGTH].rstrip("-_.")
 
 
+class OLApplicationK8sCeleryWorkerConfig(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    worker_name: str
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"] = (
+        "INFO"
+    )
+    queues: list[str] = ["default"]
+    resource_requests: dict[str, str] = Field(
+        default={"cpu": "250m", "memory": "300Mi"}
+    )
+    resource_limits: dict[str, str] = Field(
+        default={"cpu": "500m", "memory": "600Mi"},
+    )
+    replicas: int = 1  # In lieu of a proper autoscaler 20250407
+
+
+# Refactor this to just be 'Config' rather than 'Configuration' - but not today
 class OLApplicationK8sConfiguration(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     project_root: Path
-    application_config: dict[str, Any]
+    application_replicas: int = 1
+    application_config: dict[str, str]
     application_name: str
     application_namespace: str
     application_lb_service_name: str
@@ -51,6 +69,7 @@ class OLApplicationK8sConfiguration(BaseModel):
     env_from_secret_names: list[str]
     application_security_group_id: Output[str]
     application_security_group_name: Output[str]
+    application_service_account_name: str | Output[str] | None = None
     application_image_repository: str
     application_image_repository_suffix: Optional[str] = None
     application_docker_tag: str
@@ -66,6 +85,7 @@ class OLApplicationK8sConfiguration(BaseModel):
     )
     init_migrations: bool = Field(default=True)
     init_collectstatic: bool = Field(default=True)
+    celery_worker_configs: list[OLApplicationK8sCeleryWorkerConfig] = []
 
     # See https://www.pulumi.com/docs/reference/pkg/python/pulumi/#pulumi.Output.from_input
     # for docs. This unwraps the value so Pydantic can store it in the config class.
@@ -272,7 +292,8 @@ class OLApplicationK8s(ComponentResource):
 
         # Create a deployment resource to manage the application pods
         application_labels = ol_app_k8s_config.k8s_global_labels | {
-            "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}-application",
+            "ol.mit.edu/service": "webapp",
+            "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
             "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
                 truncate_k8s_metanames
             ),
@@ -289,7 +310,7 @@ class OLApplicationK8s(ComponentResource):
             ),
             spec=kubernetes.apps.v1.DeploymentSpecArgs(
                 # TODO @Ardiea: Add horizontial pod autoscaler  # noqa: TD003, FIX002
-                replicas=1,
+                replicas=ol_app_k8s_config.application_replicas,
                 selector=kubernetes.meta.v1.LabelSelectorArgs(
                     match_labels=application_labels,
                 ),
@@ -312,6 +333,7 @@ class OLApplicationK8s(ComponentResource):
                             *init_containers,  # Add existing init containers after the new one
                         ],
                         dns_policy="ClusterFirst",
+                        service_account_name=ol_app_k8s_config.application_service_account_name,
                         containers=[
                             # nginx container infront of uwsgi
                             kubernetes.core.v1.ContainerArgs(
@@ -379,6 +401,67 @@ class OLApplicationK8s(ComponentResource):
             ),
             opts=resource_options,
         )
+
+        for celery_worker_config in ol_app_k8s_config.celery_worker_configs:
+            celery_labels = ol_app_k8s_config.k8s_global_labels | {
+                "ol.mit.edu/service": "celery",
+                "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
+                "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
+                    truncate_k8s_metanames
+                ),
+                # This is important!
+                # Every type of worker needs a unique set of labels or the pod selectors will break.
+                "ol.mit.edu/worker-name": celery_worker_config.worker_name,
+            }
+            kubernetes.apps.v1.Deployment(
+                f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.worker_name}-{stack_info.env_suffix}",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=truncate_k8s_metanames(
+                        f"{ol_app_k8s_config.application_name}-celery-worker"
+                    ),
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=celery_labels,
+                ),
+                spec=kubernetes.apps.v1.DeploymentSpecArgs(
+                    replicas=celery_worker_config.replicas,  # In lieu of a proper autoscaler 20250407
+                    selector=kubernetes.meta.v1.LabelSelectorArgs(
+                        match_labels=celery_labels,
+                    ),
+                    template=kubernetes.core.v1.PodTemplateSpecArgs(
+                        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                            labels=celery_labels,
+                        ),
+                        spec=kubernetes.core.v1.PodSpecArgs(
+                            service_account_name=ol_app_k8s_config.application_service_account_name,
+                            dns_policy="ClusterFirst",
+                            containers=[
+                                kubernetes.core.v1.ContainerArgs(
+                                    name="celery-worker",
+                                    image=app_image,
+                                    command=[
+                                        "celery",
+                                        "-A",
+                                        "main.celery:app",
+                                        "worker",
+                                        "-E",
+                                        "-Q",
+                                        ",".join(celery_worker_config.queues),
+                                        "-B",
+                                        "-l",
+                                        celery_worker_config.log_level,
+                                    ],
+                                    env=application_deployment_env_vars,
+                                    env_from=application_deployment_envfrom,
+                                    resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                        requests=celery_worker_config.resource_requests,
+                                        limits=celery_worker_config.resource_limits,
+                                    ),
+                                ),
+                            ],
+                        ),
+                    ),
+                ),
+            )
 
         _application_pod_security_group_policy = (
             kubernetes.apiextensions.CustomResource(

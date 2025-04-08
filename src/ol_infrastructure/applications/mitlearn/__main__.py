@@ -855,7 +855,6 @@ mitopen_fastly_service = fastly.ServiceVcl(
     ),
 )
 
-# Conditional block moved below
 # LEGACY RETIREMENT : goes away
 # MD : 2025-03-21 Leaving this out of OLApisix* refactoring
 # Resource moved below into conditional block

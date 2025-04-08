@@ -198,7 +198,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     (
         main_repo,
         release_candidate_repo,
-        release_repo,  # Currently unused, but defined
+        release_repo,
         ol_infra_repo,
     ) = _define_git_resources(app_name)
     app_ci_image, app_rc_image = _define_registry_image_resources(app_name)
@@ -275,6 +275,11 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         enable_github_issue_resource=False,
     )
 
+    # Trigger a production deploy when the release branch is updated
+    qa_and_production_fragment.jobs[-1].plan.insert(
+        0, GetStep(get=release_repo.name, trigger=True)
+    )
+
     # Group into Fragments
 
     main_branch_container_fragement = PipelineFragment(
@@ -290,6 +295,7 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     deployment_resources = [
         ol_infra_repo,
         pulumi_resource,
+        release_repo,
         app_ci_image,  # Needed for CI deployment trigger
         app_rc_image,  # Needed for QA/Prod deployment trigger
     ]
