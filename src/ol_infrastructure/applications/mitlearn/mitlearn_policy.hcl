@@ -44,6 +44,9 @@ path "secret-global/data/mailgun" {
 path "secret-mitopen/*" {
   capabilities = ["read"]
 }
+path "secret-mitlearn/*" {
+  capabilities = ["read"]
+}
 # vault-secrets-operator is a little more particular about
 # managing its own leases, give it the permissions it needs
 # for dynamic secret renwals / revocation without giving
