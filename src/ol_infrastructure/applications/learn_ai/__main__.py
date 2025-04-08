@@ -41,6 +41,7 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
     OLApplicationK8s,
+    OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfiguration,
 )
 from ol_infrastructure.components.services.vault import (
@@ -757,6 +758,13 @@ learn_ai_app_k8s = OLApplicationK8s(
         resource_limits={"cpu": "500m", "memory": "1600Mi"},
         init_migrations=True,
         init_collectstatic=True,  # Assuming createcachetable is not needed or handled elsewhere
+        celery_worker_configs=[
+            OLApplicationK8sCeleryWorkerConfig(
+                worker_name="default",
+                queues=["default", "edx_content"],
+                replicas=2,
+            )
+        ],
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
@@ -805,62 +813,6 @@ learn_ai_deployment_envfrom = [
     ),
 ]
 
-
-celery_labels = k8s_global_labels | {
-    "ol.mit.edu/service": "celery",
-    "ol.mit.edu/pod-security-group": "learn-ai-app",
-}
-learn_ai_celery_deployment_resource = kubernetes.apps.v1.Deployment(
-    f"learn-ai-{stack_info.env_suffix}-celery-deployment",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="learn-ai-celery",
-        namespace=learn_ai_namespace,
-        labels=celery_labels,
-    ),
-    spec=kubernetes.apps.v1.DeploymentSpecArgs(
-        replicas=learn_ai_config.get_int("celery_replica_count") or 2,
-        selector=kubernetes.meta.v1.LabelSelectorArgs(
-            match_labels=celery_labels,
-        ),
-        template=kubernetes.core.v1.PodTemplateSpecArgs(
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                labels=celery_labels,
-            ),
-            spec=kubernetes.core.v1.PodSpecArgs(
-                service_account_name=learn_ai_service_account_name,
-                dns_policy="ClusterFirst",
-                containers=[
-                    kubernetes.core.v1.ContainerArgs(
-                        name="celery-worker",
-                        image=application_image_repository_and_tag,
-                        command=[
-                            "celery",
-                            "-A",
-                            "main.celery:app",
-                            "worker",
-                            "-E",
-                            "-Q",
-                            "default,edx_content",
-                            "-B",
-                            "-l",
-                            "INFO",
-                        ],
-                        env=learn_ai_deployment_env_vars,
-                        env_from=learn_ai_deployment_envfrom,
-                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "250m", "memory": "1000Mi"},
-                            limits={"cpu": "500m", "memory": "1600Mi"},
-                        ),
-                    )
-                ],
-            ),
-        ),
-    ),
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        depends_on=[learn_ai_db, db_creds_secret, redis_creds],
-    ),
-)
 
 # Create the apisix custom resources since it doesn't support gateway-api yet
 
