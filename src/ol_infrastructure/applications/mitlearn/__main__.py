@@ -102,7 +102,7 @@ learn_zone_id = dns_stack.require_output("learn")["id"]
 learn_frontend_domain = mitlearn_config.require("frontend_domain")
 legacy_learn_frontend_domain = mitlearn_config.require("legacy_frontend_domain")
 nextjs_heroku_domain = mitlearn_config.require("nextjs_heroku_domain")
-mit_learn_api_domain = mitlearn_config.require("api_domain")
+mitlearn_api_domain = mitlearn_config.require("api_domain")
 
 aws_config = AWSBase(
     tags={
@@ -364,8 +364,8 @@ mitopen_iam_policy = iam.Policy(
     ),
 )
 
-
-mitopen_vault_iam_role = vault.aws.SecretBackendRole(
+# Begin vault resources
+mitlearn_vault_iam_role = vault.aws.SecretBackendRole(
     f"ol-mitopen-iam-permissions-vault-policy-{stack_info.env_suffix}",
     name="ol-mitopen-application",
     backend="aws-mitx",
@@ -374,6 +374,7 @@ mitopen_vault_iam_role = vault.aws.SecretBackendRole(
     policy_arns=[mitopen_iam_policy.arn],
 )
 
+# Duplicate the mount as migration planning rather than just axing the old one
 mitopen_vault_mount = vault.Mount(
     f"ol-mitopen-configuration-secrets-mount-{stack_info.env_suffix}",
     path="secret-mitopen",
@@ -381,7 +382,17 @@ mitopen_vault_mount = vault.Mount(
     options={"version": 2},
     description="Storage of configuration secrets used by MIT-Open",
     opts=ResourceOptions(
-        delete_before_replace=True, depends_on=[mitopen_vault_iam_role]
+        delete_before_replace=True, depends_on=[mitlearn_vault_iam_role]
+    ),
+)
+mitlearn_vault_mount = vault.Mount(
+    f"ol-mitlearn-configuration-secrets-mount-{stack_info.env_suffix}",
+    path="secret-mitlearn",
+    type="kv-v2",
+    options={"version": 2},
+    description="Storage of configuration secrets used by MIT-Learn",
+    opts=ResourceOptions(
+        delete_before_replace=True, depends_on=[mitlearn_vault_iam_role]
     ),
 )
 
@@ -391,12 +402,21 @@ mitopen_vault_secrets = read_yaml_secrets(
     Path(f"mitopen/secrets.{stack_info.env_suffix}.yaml"),
 )
 
-mitlearn_vault_static_secrets = vault.generic.Secret(
+# Second duplication of secrets for migration planning, again.
+# This time it is populating the new mount in addition to the old mount.
+mitopen_vault_static_secrets = vault.generic.Secret(
     f"ol-mitopen-configuration-secrets-{stack_info.env_suffix}",
-    path=mitopen_vault_mount.path.apply("{}/secrets".format),
+    path=mitlearn_vault_mount.path.apply("{}/secrets".format),
+    data_json=json.dumps(mitopen_vault_secrets),
+)
+mitlearn_vault_static_secrets = vault.generic.Secret(
+    f"ol-mitlearn-configuration-secrets-{stack_info.env_suffix}",
+    path=mitlearn_vault_mount.path.apply("{}/secrets".format),
     data_json=json.dumps(mitopen_vault_secrets),
 )
 
+# The policy has been updated to allow for reading from the old or
+# the new mount.
 mitlearn_vault_policy = vault.Policy(
     f"ol-mitlearn-vault-policy-{stack_info.env_suffix}",
     name="mitlearn",
@@ -428,6 +448,8 @@ vault_k8s_resources = OLVaultK8SResources(
         depends_on=[mitlearn_vault_k8s_auth_backend_role],
     ),
 )
+
+### End vault resources
 
 mitopen_db_security_group = ec2.SecurityGroup(
     f"ol-mitopen-db-access-{stack_info.env_suffix}",
@@ -1019,36 +1041,36 @@ env_vars.update(**mitlearn_config.get_object("vars"))
 
 # TODO @Ardiea: 01112024 We should be able to use vault.aws.get_access_credentials_output()
 # for this but it doesn't seem to work
-# auth_aws_mitx_creds_ol_mitopen_application = vault.aws.get_access_credentials_output(backend=mitopen_vault_iam_role.backend, role=mitopen_vault_iam_role.name, opts=InvokeOptions(parent=mitopen_vault_iam_role))  # . TD003
+# auth_aws_mitx_creds_ol_mitopen_application = vault.aws.get_access_credentials_output(backend=mitlearn_vault_iam_role.backend, role=mitlearn_vault_iam_role.name, opts=InvokeOptions(parent=mitlearn_vault_iam_role))  # . TD003
 secret_operations_global_embedly = vault.generic.get_secret_output(
     path="secret-operations/global/embedly",
-    opts=InvokeOptions(parent=mitopen_vault_iam_role),
+    opts=InvokeOptions(parent=mitlearn_vault_iam_role),
 )
 secret_operations_global_odlbot_github_access_token = vault.generic.get_secret_output(
     path="secret-operations/global/odlbot-github-access-token",
-    opts=InvokeOptions(parent=mitopen_vault_iam_role),
+    opts=InvokeOptions(parent=mitlearn_vault_iam_role),
 )
 secret_global_mailgun_api_key = vault.generic.get_secret_output(
     path="secret-global/mailgun",
-    opts=InvokeOptions(parent=mitopen_vault_iam_role),
+    opts=InvokeOptions(parent=mitlearn_vault_iam_role),
 )
 secret_operations_global_mit_smtp = vault.generic.get_secret_output(
     path="secret-operations/global/mit-smtp",
-    opts=InvokeOptions(parent=mitopen_vault_iam_role),
+    opts=InvokeOptions(parent=mitlearn_vault_iam_role),
 )
 secret_operations_global_update_search_data_webhook_key = (
     vault.generic.get_secret_output(
         path="secret-operations/global/update-search-data-webhook-key",
-        opts=InvokeOptions(parent=mitopen_vault_iam_role),
+        opts=InvokeOptions(parent=mitlearn_vault_iam_role),
     )
 )
 secret_operations_sso_learn = vault.generic.get_secret_output(
     path="secret-operations/sso/mitlearn",
-    opts=InvokeOptions(parent=mitopen_vault_iam_role),
+    opts=InvokeOptions(parent=mitlearn_vault_iam_role),
 )
 secret_operations_tika_access_token = vault.generic.get_secret_output(
     path="secret-operations/tika/access-token",
-    opts=InvokeOptions(parent=mitopen_vault_iam_role),
+    opts=InvokeOptions(parent=mitlearn_vault_iam_role),
 )
 
 # Gets masked in any console outputs
@@ -1131,7 +1153,7 @@ gh_workflow_api_base_env_var = github.ActionsVariable(
     f"ol_mitopen_gh_workflow_api_base_env_var-{stack_info.env_suffix}",
     repository=gh_repo.name,
     variable_name=f"API_BASE_{env_var_suffix}",
-    value=f"https://{mit_learn_api_domain}/learn",
+    value=f"https://{mitlearn_api_domain}/learn",
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_accesskey_id_env_secret = github.ActionsSecret(
@@ -1318,7 +1340,7 @@ consul.Keys(
         consul.KeysKeyArgs(
             path="edxapp/learn-api-domain",
             delete=True,
-            value=mit_learn_api_domain,
+            value=mitlearn_api_domain,
         )
     ],
     opts=xpro_consul_opts,
@@ -1349,7 +1371,7 @@ if not mitlearn_config.get_bool("k8s_deploy"):
         "introspection_endpoint_auth_method": "client_secret_basic",
         "ssl_verify": False,
         "logout_path": "/logout/oidc",
-        "post_logout_redirect_uri": f"https://{mit_learn_api_domain}/logout/",
+        "post_logout_redirect_uri": f"https://{mitlearn_api_domain}/logout/",
     }
 
     # MITx Online doesn't have a CI environment. Remove this once that ceases to be true.
@@ -1365,7 +1387,7 @@ if not mitlearn_config.get_bool("k8s_deploy"):
             consul.KeysKeyArgs(
                 path="edxapp/learn-api-domain",
                 delete=True,
-                value=mit_learn_api_domain,
+                value=mitlearn_api_domain,
             )
         ],
         opts=mitxonline_consul_opts,
@@ -1386,7 +1408,7 @@ if not mitlearn_config.get_bool("k8s_deploy"):
                 consul.KeysKeyArgs(
                     path="edxapp/learn-api-domain",
                     delete=True,
-                    value=mit_learn_api_domain,
+                    value=mitlearn_api_domain,
                 )
             ],
             opts=xpro_ci_consul_opts,
@@ -1421,7 +1443,7 @@ if not mitlearn_config.get_bool("k8s_deploy"):
                     ],
                     "match": {
                         "hosts": [
-                            mit_learn_api_domain,
+                            mitlearn_api_domain,
                         ],
                         "paths": [
                             "/*",
@@ -1448,7 +1470,7 @@ if not mitlearn_config.get_bool("k8s_deploy"):
                     ],
                     "match": {
                         "hosts": [
-                            mit_learn_api_domain,
+                            mitlearn_api_domain,
                         ],
                         "paths": [
                             "/logout/oidc/*",
@@ -1476,7 +1498,7 @@ if not mitlearn_config.get_bool("k8s_deploy"):
                     ],
                     "match": {
                         "hosts": [
-                            mit_learn_api_domain,
+                            mitlearn_api_domain,
                         ],
                         "paths": [
                             "/admin/login/*",
@@ -1544,7 +1566,7 @@ if not mitlearn_config.get_bool("k8s_deploy"):
                         unauth_action="pass"
                     ),
                 ],
-                hosts=[mit_learn_api_domain],
+                hosts=[mitlearn_api_domain],
                 paths=["/learn/*"],
                 upstream=learn_external_service_apisix_upstream.resource_name,
             ),
@@ -1557,7 +1579,7 @@ if not mitlearn_config.get_bool("k8s_deploy"):
                         name="redirect", config={"uri": "/logout/oidc"}
                     ),
                 ],
-                hosts=[mit_learn_api_domain],
+                hosts=[mitlearn_api_domain],
                 paths=["/learn/logout/oidc/*"],
                 upstream=learn_external_service_apisix_upstream.resource_name,
             ),
@@ -1571,7 +1593,7 @@ if not mitlearn_config.get_bool("k8s_deploy"):
                         unauth_action="auth"
                     ),
                 ],
-                hosts=[mit_learn_api_domain],
+                hosts=[mitlearn_api_domain],
                 paths=[
                     "/learn/admin/login/*",
                     "/learn/login",
@@ -1594,7 +1616,7 @@ if not mitlearn_config.get_bool("k8s_deploy"):
         path="aws-mitx/creds/ol-mitopen-application",
         with_lease_start_time=False,
         opts=InvokeOptions(
-            parent=mitopen_vault_iam_role,
+            parent=mitlearn_vault_iam_role,
         ),
     )
     sensitive_env_vars["AWS_ACCESS_KEY_ID"] = (
@@ -1611,7 +1633,7 @@ if not mitlearn_config.get_bool("k8s_deploy"):
     auth_postgres_mitopen_creds_app = vault.generic.get_secret_output(
         path="postgres-mitopen/creds/app",
         with_lease_start_time=False,
-        opts=InvokeOptions(parent=mitopen_vault_iam_role),
+        opts=InvokeOptions(parent=mitlearn_vault_iam_role),
     )
     sensitive_env_vars["DATABASE_URL"] = auth_postgres_mitopen_creds_app.data.apply(
         lambda data: "postgres://{}:{}@ol-mitlearn-db-{}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:5432/mitopen".format(
@@ -1647,7 +1669,7 @@ if mitlearn_config.get_bool("k8s_deploy"):
         learn_namespace=learn_namespace,
         k8s_global_labels=k8s_global_labels,
         vault_k8s_resources=vault_k8s_resources,
-        mitopen_vault_mount=mitopen_vault_mount,
+        mitlearn_vault_mount=mitlearn_vault_mount,
         db_config=mitopen_vault_backend,  # Use the original DB config object
     )
 
@@ -1750,7 +1772,7 @@ if mitlearn_config.get_bool("k8s_deploy"):
                         unauth_action="pass"
                     ),
                 ],
-                hosts=[mit_learn_api_domain],
+                hosts=[mitlearn_api_domain],
                 paths=["/*"],
                 backend_service_name=mitlearn_k8s_app.application_lb_service_name,
                 backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
@@ -1764,7 +1786,7 @@ if mitlearn_config.get_bool("k8s_deploy"):
                         name="redirect", config={"uri": "/logout/oidc"}
                     ),
                 ],
-                hosts=[mit_learn_api_domain],
+                hosts=[mitlearn_api_domain],
                 paths=["/logout/oidc/*"],
                 backend_service_name=mitlearn_k8s_app.application_lb_service_name,
                 backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
@@ -1779,7 +1801,7 @@ if mitlearn_config.get_bool("k8s_deploy"):
                         unauth_action="auth"
                     ),
                 ],
-                hosts=[mit_learn_api_domain],
+                hosts=[mitlearn_api_domain],
                 paths=[
                     "/admin/login/*",
                     "/login",
@@ -1809,7 +1831,7 @@ if mitlearn_config.get_bool("k8s_deploy"):
                         unauth_action="pass"
                     ),
                 ],
-                hosts=[mit_learn_api_domain],
+                hosts=[mitlearn_api_domain],
                 paths=["/learn/*"],
                 backend_service_name=mitlearn_k8s_app.application_lb_service_name,
                 backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
@@ -1823,7 +1845,7 @@ if mitlearn_config.get_bool("k8s_deploy"):
                         name="redirect", config={"uri": "/logout/oidc"}
                     ),
                 ],
-                hosts=[mit_learn_api_domain],
+                hosts=[mitlearn_api_domain],
                 paths=["/learn/logout/oidc/*"],
                 backend_service_name=mitlearn_k8s_app.application_lb_service_name,
                 backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
@@ -1838,7 +1860,7 @@ if mitlearn_config.get_bool("k8s_deploy"):
                         unauth_action="auth"
                     ),
                 ],
-                hosts=[mit_learn_api_domain],
+                hosts=[mitlearn_api_domain],
                 paths=[
                     "/learn/admin/login/*",
                     "/learn/login",
@@ -1859,7 +1881,7 @@ export(
     {
         "iam_policy": mitopen_iam_policy.arn,
         "vault_iam_role": Output.all(
-            mitopen_vault_iam_role.backend, mitopen_vault_iam_role.name
+            mitlearn_vault_iam_role.backend, mitlearn_vault_iam_role.name
         ).apply(lambda role: f"{role[0]}/roles/{role[1]}"),
     },
 )

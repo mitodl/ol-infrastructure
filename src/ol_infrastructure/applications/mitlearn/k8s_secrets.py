@@ -127,7 +127,7 @@ def create_mitlearn_k8s_secrets(
     learn_namespace: str,
     k8s_global_labels: dict[str, str],
     vault_k8s_resources: OLVaultK8SResources,
-    mitopen_vault_mount: Mount,
+    mitlearn_vault_mount: Mount,
     db_config: OLVaultDatabaseBackend,
 ) -> list[str]:
     """
@@ -141,7 +141,7 @@ def create_mitlearn_k8s_secrets(
         learn_namespace: The Kubernetes namespace for mitlearn resources.
         k8s_global_labels: Standard labels to apply to all Kubernetes resources.
         vault_k8s_resources: Vault Kubernetes auth backend resources.
-        mitopen_vault_mount: The Vault mount resource for mitopen secrets.
+        mitlearn_vault_mount: The Vault mount resource for mitopen secrets.
         db_config: Configuration for the Vault dynamic PostgreSQL database backend.
 
     Returns:
@@ -160,7 +160,7 @@ def create_mitlearn_k8s_secrets(
         secret_base_name="mitopen",  # Base name for the K8s secret resource  # pragma: allowlist secret  # noqa: S106
         namespace=learn_namespace,
         labels=k8s_global_labels,
-        mount=mitopen_vault_mount.path,
+        mount=mitlearn_vault_mount.path,
         mount_type="kv-v2",  # This mount is kv-v2
         path="secrets",
         templates={
