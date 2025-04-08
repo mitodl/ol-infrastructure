@@ -1300,6 +1300,31 @@ learn_external_service_apisix_upstream = OLApisixExternalUpstream(
     ),
 )
 
+# This now goes outside the conditional since we have a CI environment now.
+xpro_consul_opts = get_consul_provider(
+    StackInfo(
+        name="CI",
+        namespace=stack_info.namespace,
+        env_suffix="ci",
+        env_prefix=stack_info.env_prefix,
+        full_name=stack_info.full_name,
+    ),
+    consul_address=f"https://consul-xpro-{stack_info.env_suffix}.odl.mit.edu",
+    provider_name=f"consul-provider-xpro-{stack_info.env_suffix}",
+)
+consul.Keys(
+    f"learn-api-domain-consul-key-for-xpro-openedx-{stack_info.env_suffix}",
+    keys=[
+        consul.KeysKeyArgs(
+            path="edxapp/learn-api-domain",
+            delete=True,
+            value=mit_learn_api_domain,
+        )
+    ],
+    opts=xpro_consul_opts,
+)
+
+
 # Actions specific to non-Kubernetes (Heroku) deployments
 if not mitlearn_config.get_bool("k8s_deploy"):
     # Create the OIDC secret needed for APISIX when deployed outside K8s
@@ -1334,17 +1359,6 @@ if not mitlearn_config.get_bool("k8s_deploy"):
         consul_address=f"https://consul-mitxonline-{stack_info.env_suffix}.odl.mit.edu",
         provider_name=f"consul-provider-mitxonline-{stack_info.env_suffix}",
     )
-    xpro_consul_opts = get_consul_provider(
-        StackInfo(
-            name="CI",
-            namespace=stack_info.namespace,
-            env_suffix="ci",
-            env_prefix=stack_info.env_prefix,
-            full_name=stack_info.full_name,
-        ),
-        consul_address=f"https://consul-xpro-{stack_info.env_suffix}.odl.mit.edu",
-        provider_name=f"consul-provider-xpro-{stack_info.env_suffix}",
-    )
     consul.Keys(
         "learn-api-domain-consul-key-for-mitxonline-openedx",
         keys=[
@@ -1355,17 +1369,6 @@ if not mitlearn_config.get_bool("k8s_deploy"):
             )
         ],
         opts=mitxonline_consul_opts,
-    )
-    consul.Keys(
-        f"learn-api-domain-consul-key-for-xpro-openedx-{stack_info.env_suffix}",
-        keys=[
-            consul.KeysKeyArgs(
-                path="edxapp/learn-api-domain",
-                delete=True,
-                value=mit_learn_api_domain,
-            )
-        ],
-        opts=xpro_consul_opts,
     )
 
     # TODO(TMM 2025-04-04): Remove this hack once there is a CI deployment of Learn
