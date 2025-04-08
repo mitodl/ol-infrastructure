@@ -63,7 +63,7 @@ config:
     PGBOUNCER_DEFAULT_POOL_SIZE: 50
     PGBOUNER_MAX_CLIENT_CONN: 500
     PGBOUNER_MIN_POOL_SIZE: 20
-    POSTHOG_API_HOST: "https://ph.learn.mit.edu"
+    POSTHOG_API_HOST: "https://app.posthog.com"
     POSTHOG_ENABLED: "true"
     POSTHOG_PROJECT_ID: "63497"
     POSTHOG_TIMEOUT_MS: 1000
@@ -85,6 +85,7 @@ config:
   mitlearn:fastly_domain: "d.sni.global.fastly.net"
   mitlearn:heroku_domain: "computational-cherry-khbuwf9yvncf0kw3hbk5txff.herokudns.com"
   mitlearn:nextjs_heroku_domain: "mitopen-production-nextjs-6b0d663f9110.herokuapp.com"
+  mitlearn:posthog_proxy: "ph.learn.mit.edu"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   mitlearn:learn_ai_recommendation_endpoint: "https://api.learn.mit.edu/ai/http/recommendation_agent/"

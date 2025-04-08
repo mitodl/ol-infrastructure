@@ -1460,6 +1460,8 @@ mitopen_heroku_configassociation = heroku.app.ConfigAssociation(
     vars=heroku_vars,
 )
 
+mit_learn_posthog_proxy = mitlearn_config.require("posthog_proxy")
+
 env_var_suffix = "RC" if stack_info.env_suffix == "qa" else "PROD"
 
 gh_repo = github.get_repository(
@@ -1470,6 +1472,13 @@ gh_workflow_api_base_env_var = github.ActionsVariable(
     repository=gh_repo.name,
     variable_name=f"API_BASE_{env_var_suffix}",
     value=f"https://{mit_learn_api_domain}/learn",
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_posthog_proxy_url_env_var = github.ActionsVariable(
+    f"ol_mitopen_gh_workflow_posthog_proxy_url_env_var-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"POSTHOG_API_HOST_{env_var_suffix}",
+    value=f"https://{mit_learn_posthog_proxy}",
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_accesskey_id_env_secret = github.ActionsSecret(
