@@ -66,7 +66,7 @@ from ol_infrastructure.lib.fastly import (
 )
 from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import StackInfo, parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
@@ -1315,21 +1315,6 @@ if not mitlearn_config.get_bool("k8s_deploy"):
         ),
     )
 
-    api_tls_secret_name = (
-        "api-mitlearn-tls-pair"  # pragma: allowlist secret # noqa: S105
-    )
-    cert_manager_certificate = OLCertManagerCert(
-        f"ol-mitlearn-cert-manager-certificate-{stack_info.env_suffix}",
-        cert_config=OLCertManagerCertConfig(
-            application_name="mitlearn",
-            k8s_namespace=learn_namespace,
-            k8s_labels=application_labels,
-            create_apisixtls_resource=True,
-            dest_secret_name=api_tls_secret_name,
-            dns_names=[mitlearn_config.require("api_domain")],
-        ),
-    )
-
     # We need to be able to change `unauth_action` depending on the route but otherwise
     # the settings for the oidc plugin will be unchanged
     # TODO (mmd, YYYY-MM-DD): Leaving this out of OLApisix* refactoring
@@ -1350,7 +1335,13 @@ if not mitlearn_config.get_bool("k8s_deploy"):
         provider_name=f"consul-provider-mitxonline-{stack_info.env_suffix}",
     )
     xpro_consul_opts = get_consul_provider(
-        stack_info,
+        StackInfo(
+            name="CI",
+            namespace=stack_info.namespace,
+            env_suffix="ci",
+            env_prefix=stack_info.env_prefix,
+            full_name=stack_info.full_name,
+        ),
         consul_address=f"https://consul-xpro-{stack_info.env_suffix}.odl.mit.edu",
         provider_name=f"consul-provider-xpro-{stack_info.env_suffix}",
     )

@@ -60,7 +60,7 @@ class OLApplicationK8sConfiguration(BaseModel):
 
     project_root: Path
     application_replicas: int = 1
-    application_config: dict[str, str]
+    application_config: dict[str, Any]
     application_name: str
     application_namespace: str
     application_lb_service_name: str
