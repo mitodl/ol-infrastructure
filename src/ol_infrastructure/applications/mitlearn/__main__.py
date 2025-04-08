@@ -399,7 +399,7 @@ mitlearn_vault_mount = vault.Mount(
 # There is a reason, I think, why these are still at `bridge/secrets/mitopen`
 # and not `bridge/secrets/mitlearn` -- Open Discussions
 mitopen_vault_secrets = read_yaml_secrets(
-    Path(f"mitopen/secrets.{stack_info.env_suffix}.yaml"),
+    Path(f"mitlearn/secrets.{stack_info.env_suffix}.yaml"),
 )
 
 # Second duplication of secrets for migration planning, again.
