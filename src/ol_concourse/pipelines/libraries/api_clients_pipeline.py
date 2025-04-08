@@ -1,5 +1,5 @@
 # src/ol_concourse/pipelines/libraries/api_clients_pipeline.py
-# --- START NEW CONTENT ---
+import argparse
 import sys
 from pathlib import Path
 
@@ -45,7 +45,34 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     commit_script: str = "api-clients-commit-changes.sh",
     publish_script: str = "api-clients-publish-node.sh",
 ) -> Pipeline:
-    """Generate a pipeline for building and publishing API clients."""
+    """
+    Generate a pipeline definition for building and publishing API clients.
+
+    :param source_repo_name: The identifier for the source code repository resource.
+    :param source_repo_uri: The URI of the source code repository (e.g., GitHub URL).
+    :param source_repo_branch: The branch of the source code repository to track.
+    :param client_repo_name: The identifier for the generated client code repository
+        resource.
+    :param client_repo_uri: The URI of the client code repository (e.g., GitHub SSH
+        URL).
+    :param client_repo_branch: The branch of the client code repository to push to.
+    :param client_repo_subpath: The subpath within the client repo where the generated
+        code resides (relative to src/typescript/).
+    :param vault_ssh_secret_path: The Vault path for the SSH key to push to the client
+        repo.
+    :param vault_npm_secret_path: The Vault path for the NPM token to publish the
+        package.
+    :param python_image_tag: The tag for the Python Docker image resource.
+    :param node_image_tag: The tag for the Node.js Docker image resource.
+    :param openapi_generator_tag: The tag for the OpenAPI Generator Docker image
+        resource.
+    :param generate_script: The name of the script used to generate the client code.
+    :param bump_script: The name of the script used to bump the version.
+    :param commit_script: The name of the script used to commit changes.
+    :param publish_script: The name of the script used to publish the package.
+
+    :return: A Pipeline object representing the Concourse pipeline definition.
+    """
     # Define common resources with parameterized image tags
     openapi_generator_image = Resource(
         name=Identifier("openapi-generator-image"),
@@ -215,74 +242,66 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     )
 
 
+# Define configurations centrally, so meta.py can import it if needed,
+# though currently meta.py duplicates it.
+PIPELINE_CONFIGS = {
+    "mit_open": {
+        "source_repo_name": "mit-open",
+        "source_repo_uri": "https://github.com/mitodl/mit-open",
+        "source_repo_branch": "release",
+        "client_repo_name": "mit-open-api-clients",
+        "client_repo_uri": "git@github.com:mitodl/open-api-clients.git",
+        "client_repo_branch": "main",
+        "client_repo_subpath": "mit-open-api-axios",
+        "vault_ssh_secret_path": "open_api_clients.odlbot_private_ssh_key",  # pragma: allowlist secret  # noqa: E501
+        "vault_npm_secret_path": "open_api_clients.npmjs_token",  # pragma: allowlist secret  # noqa: E501
+        "python_image_tag": "3.12-slim",
+        "node_image_tag": "22-slim",
+        # Use the original npm publish script for mit-open
+        "publish_script": "open-api-clients-publish-node.sh",  # Uses npm, not yarn
+    },
+    "mitxonline": {
+        "source_repo_name": "mitxonline",
+        "source_repo_uri": "https://github.com/mitodl/mitxonline",
+        "source_repo_branch": "main",
+        "client_repo_name": "mitxonline-api-clients",
+        "client_repo_uri": "git@github.com:mitodl/mitxonline-api-clients.git",
+        "client_repo_branch": "release",
+        "client_repo_subpath": "mitxonline-api-axios",
+        "vault_ssh_secret_path": "npm_publish.odlbot_private_ssh_key",  # pragma: allowlist secret  # noqa: E501
+        "vault_npm_secret_path": "npm_publish.npmjs_token",  # pragma: allowlist secret  # noqa: E501
+        "python_image_tag": "3.11-slim",  # Keep original tags
+        "node_image_tag": "18-slim",  # Keep original tags
+        "publish_script": "api-clients-publish-node.sh",  # Uses yarn
+    },
+    "unified_ecommerce": {
+        "source_repo_name": "unified-ecommerce",
+        "source_repo_uri": "https://github.com/mitodl/unified-ecommerce",
+        "source_repo_branch": "main",
+        "client_repo_name": "unified-ecommerce-api-clients",
+        "client_repo_uri": "git@github.com:mitodl/unified-ecommerce-api-clients.git",
+        "client_repo_branch": "release",
+        "client_repo_subpath": "unified-ecommerce-api-axios",
+        "vault_ssh_secret_path": "npm_publish.odlbot_private_ssh_key",  # pragma: allowlist secret  # noqa: E501
+        "vault_npm_secret_path": "npm_publish.npmjs_token",  # pragma: allowlist secret  # noqa: E501
+        "python_image_tag": "3.11-slim",  # Keep original tags
+        "node_image_tag": "18-slim",  # Keep original tags
+        "publish_script": "api-clients-publish-node.sh",  # Uses yarn
+    },
+}
+
+
 if __name__ == "__main__":
-    # Configuration for each pipeline variant
-    configs = {
-        "mit_open": {
-            "pipeline_name": "open-api-clients",
-            "source_repo_name": "mit-open",
-            "source_repo_uri": "https://github.com/mitodl/mit-open",
-            "source_repo_branch": "release",
-            "client_repo_name": "mit-open-api-clients",
-            "client_repo_uri": "git@github.com:mitodl/open-api-clients.git",
-            "client_repo_branch": "main",
-            "client_repo_subpath": "mit-open-api-axios",
-            "vault_ssh_secret_path": "open_api_clients.odlbot_private_ssh_key",  # pragma: allowlist secret  # noqa: E501
-            "vault_npm_secret_path": "open_api_clients.npmjs_token",  # pragma: allowlist secret  # noqa: E501
-            "python_image_tag": "3.12-slim",
-            "node_image_tag": "22-slim",
-            # Use the original npm publish script for mit-open
-            "publish_script": "open-api-clients-publish-node.sh",
-        },
-        "mitxonline": {
-            "pipeline_name": "mitxonline-api-client",
-            "source_repo_name": "mitxonline",
-            "source_repo_uri": "https://github.com/mitodl/mitxonline",
-            "source_repo_branch": "main",
-            "client_repo_name": "mitxonline-api-clients",
-            "client_repo_uri": "git@github.com:mitodl/mitxonline-api-clients.git",
-            "client_repo_branch": "release",
-            "client_repo_subpath": "mitxonline-api-axios",
-            "vault_ssh_secret_path": "npm_publish.odlbot_private_ssh_key",  # pragma: allowlist secret  # noqa: E501
-            "vault_npm_secret_path": "npm_publish.npmjs_token",  # pragma: allowlist secret  # noqa: E501
-            "python_image_tag": "3.11-slim",  # Keep original tags
-            "node_image_tag": "18-slim",  # Keep original tags
-            "publish_script": "api-clients-publish-node.sh",  # Use generic yarn script
-        },
-        "unified_ecommerce": {
-            "pipeline_name": "unified-ecommerce-api-client",
-            "source_repo_name": "unified-ecommerce",
-            "source_repo_uri": "https://github.com/mitodl/unified-ecommerce",
-            "source_repo_branch": "main",
-            "client_repo_name": "unified-ecommerce-api-clients",
-            "client_repo_uri": "git@github.com:mitodl/unified-ecommerce-api-clients.git",  # noqa: E501
-            "client_repo_branch": "release",
-            "client_repo_subpath": "unified-ecommerce-api-axios",
-            "vault_ssh_secret_path": "npm_publish.odlbot_private_ssh_key",  # pragma: allowlist secret  # noqa: E501
-            "vault_npm_secret_path": "npm_publish.npmjs_token",  # pragma: allowlist secret  # noqa: E501
-            "python_image_tag": "3.11-slim",  # Keep original tags
-            "node_image_tag": "18-slim",  # Keep original tags
-            "publish_script": "api-clients-publish-node.sh",  # Use generic yarn script
-        },
-    }
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--variant",
+        required=True,
+        choices=PIPELINE_CONFIGS.keys(),
+        help="The pipeline variant configuration to generate.",
+    )
+    args = parser.parse_args()
 
-    # Generate and print/save pipeline definitions
-    for variant, config in configs.items():
-        pipeline = generate_api_client_pipeline(**config)
-        pipeline_json = pipeline.model_dump_json(indent=2)
-        definition_filename = f"{config['pipeline_name']}-definition.json"
-        with open(definition_filename, "w") as definition_file:  # noqa: PTH123
-            definition_file.write(pipeline_json)
-        print(f"Generated {definition_filename}")  # noqa: T201
-        # Print command for the first pipeline only for brevity
-        if variant == "mit_open":
-            sys.stdout.write(pipeline_json)
-            sys.stdout.write(
-                f"\nfly -t <target> set-pipeline -p {config['pipeline_name']} -c {definition_filename}\n"  # noqa: E501
-            )
-        else:
-            sys.stdout.write(
-                f"\nfly -t <target> set-pipeline -p {config['pipeline_name']} -c {definition_filename}\n"  # noqa: E501
-            )
-
-# --- END NEW CONTENT ---
+    variant_config = PIPELINE_CONFIGS[args.variant]
+    pipeline = generate_api_client_pipeline(**variant_config)
+    # Print the generated pipeline definition JSON to stdout
+    sys.stdout.write(pipeline.model_dump_json(indent=2))
