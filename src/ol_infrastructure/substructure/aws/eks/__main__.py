@@ -685,33 +685,6 @@ alloy_release = kubernetes.helm.v3.Release(
 # Install Karpenter for automatically growing and shrinking
 # the cluster
 ############################################################
-
-# Karpenter Node Role
-# This role is assumed by the EC2 instances launched by Karpenter
-karpenter_node_role = aws.iam.Role(
-    f"{cluster_name}-karpenter-node-role",
-    name=f"KarpenterNodeRole-{cluster_name}",
-    assume_role_policy=json.dumps(
-        {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Principal": {"Service": f"ec2.{aws.get_partition().dns_suffix}"},
-                    "Action": "sts:AssumeRole",
-                }
-            ],
-        }
-    ),
-    managed_policy_arns=[
-        f"arn:{aws.get_partition().partition}:iam::aws:policy/AmazonEKS_CNI_Policy",
-        f"arn:{aws.get_partition().partition}:iam::aws:policy/AmazonEKSWorkerNodePolicy",
-        f"arn:{aws.get_partition().partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",  # ReadOnly is preferred over PullOnly
-        f"arn:{aws.get_partition().partition}:iam::aws:policy/AmazonSSMManagedInstanceCore",
-    ],
-    tags=aws_config.merged_tags({"Name": f"KarpenterNodeRole-{cluster_name}"}),
-)
-
 # Karpenter Interruption Queue
 karpenter_interruption_queue = aws.sqs.Queue(
     f"{cluster_name}-karpenter-interruption-queue",
@@ -1053,6 +1026,3 @@ default_node_pool = kubernetes.apiextensions.CustomResource(
         depends_on=[karpenter_release],
     ),
 )
-
-# Export Karpenter Node Role ARN for potential use in NodePool/EC2NodeClass definitions
-export("karpenter_node_role_arn", karpenter_node_role.arn)
