@@ -303,9 +303,11 @@ cluster = eks.Cluster(
 export("cluster_name", cluster_name)
 export("kube_config", cluster.kubeconfig)
 export("cluster_identities", cluster.eks_cluster.identities)
+export("cluster_version", cluster.eks_cluster.version)
 export("admin_role_arn", administrator_role.arn)
 export("cluster_security_group_id", cluster.cluster_security_group_id)
 export("node_security_group_id", cluster.node_security_group_id)
+export("pod_subnet_ids", pod_subnet_ids)
 export(
     "kube_config_data",
     {
@@ -422,6 +424,7 @@ for ng_name, ng_config in eks_config.require_object("nodegroups").items():
         )
     )
     export("node_group_security_group_id", node_groups[0].node_security_group.id)
+    export("node_instance_profile", node_instance_profile.id)
 
     # There is a bug here when there is more than one node group defined.
     # Don't have mental bandwidth to fix it right now.
