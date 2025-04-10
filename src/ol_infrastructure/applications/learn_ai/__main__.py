@@ -732,9 +732,11 @@ learn_ai_app_k8s = OLApplicationK8s(
         application_lb_service_name="learn-ai-webapp",
         application_lb_service_port_name="http",
         k8s_global_labels=k8s_global_labels,
-        db_creds_secret_name=db_creds_secret_name,
-        redis_creds_secret_name=redis_creds_secret_name,
-        static_secrets_name=static_secrets_name,
+        env_from_secret_names=[
+            db_creds_secret_name,
+            redis_creds_secret_name,
+            static_secrets_name,
+        ],
         application_security_group_id=learn_ai_application_security_group.id,
         # Use the fixed name used in the SecurityGroupPolicy spec
         application_security_group_name=Output.from_input("learn-ai-app"),

@@ -1,0 +1,91 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAHfHR+9AsopLXNDR/0WMaJDAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMdPKMHJ7QC5uVcZxaAgEQgDvdD9ED94tn+62+r/s5QLP8L/3qs2EL1hqJBT77bVauqnYcf6xU2y92vOZt1hzlfvYq67wA8bECXQMezw==
+config:
+  # This is a hack. We need to write a Consul key for use by MITx Online and the apps
+  # and MITx Online VPCs aren't peered, so the Consul clusters aren't peered. We don't
+  # actually use Consul for anything else in this project so this is okay (so far) (TMM
+  # 2025-02-21)
+  consul:address: https://consul-mitxonlinei-ci.odl.mit.edu
+  mitlearn:api_domain: "api.ci.learn.mit.edu"
+  mitlearn:db_instance_size: db.t4g.medium # Leave small for now
+  mitlearn:db_password:
+    secure: v1:4DWyBf0hPnxA52CE:0zCNPoe0Dzkytdqw6ITtlhHJR16tFBXKfuqvHECc8h3OD6FY9NlQM1jkBlckAduNGtwtMToXhRRdLgZ1TnmJq470i8GSYa39sOtBXfT2+d8=
+  mitlearn:fastly_anycast_ips: []
+  mitlearn:fastly_domain: "d.sni.global.fastly.net"
+  mitlearn:frontend_domain: "ci.learn.mit.edu"
+  mitlearn:heroku_domain: "shrouded-brook-krg88s8bvcdg6kgrdjrsrmbq.herokudns.com" # This var shouldn't be needed for CI
+  mitlearn:interpolation_vars:
+    auth_allowed_redirect_hosts:
+    - "draft-ci.ocw.mit.edu"
+    - "live-ci.ocw.mit.edu"
+    - "ci.learn.mit.edu"
+    cors_urls:
+    - "https://ci.learn.mit.edu"
+    - "https://ocw-next.netlify.app"
+    - "https://draft-ci.ocw.mit.edu"
+    - "https://live-ci.ocw.mit.edu"
+    csrf_domains:
+    - "https://api.ci.learn.mit.edu"
+    - "https://ci.learn.mit.edu"
+    - "https://draft-ci.ocw.mit.edu"
+    - "https://live-ci.ocw.mit.edu"
+    mailgun_sender_domain: "mail-ci.learn.mit.edu"
+    session_cookie_domain: ".rc.learn.mit.edu"
+    sso_url: "sso-ci.ol.mit.edu"
+  mitlearn:learn_ai_recommendation_endpoint: "https://api.rc.learn.mit.edu/ai/http/recommendation_agent/"
+  mitlearn:learn_ai_syllabus_endpoint: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
+  mitlearn:legacy_frontend_domain: "mitopen-ci.odl.mit.edu"
+  mitlearn:nextjs_heroku_domain: "next.ci.learn.mit.edu"
+  mitlearn:k8s_deploy: "true"
+  #  heroku:user: "odl-devops"
+  #heroku:app_id:
+  #  secure: v1:eSvnqne7KQRkHJlu:wTyl9W3aivfxlANqBML2wy4GEHe85VuKll60R5HmGUu1hJTcQBEfzK1cJOyvjlbLgBtXLw==
+  mitlearn:vars:
+    AI_MIT_SYLLABUS_URL: "https://api.ci.learn.mit.edu/api/v0/vector_content_files_search/"
+    AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.ci.learn.mit.edu/api/v0/vector_content_files_search/"
+    APPZI_URL: ""
+    CELERY_WORKER_MAX_MEMORY_PER_CHILD: 125000
+    CSRF_COOKIE_NAME: "learn_ci_csrftoken"
+    DEBUG: "false"
+    EDX_LEARNING_COURSE_BUCKET_NAME: "edxorg-qa-edxapp-courses" # Points to QA on purpose
+    ENABLE_INFINITE_CORRIDOR: "true"
+    GA_G_TRACKING_ID: ""
+    GA_TRACKING_ID: ""
+    INDEXING_API_USERNAME: "od_mm_ci_api"
+    KEYCLOAK_BASE_URL: "https://sso-ci.ol.mit.edu"
+    KEYCLOAK_REALM_NAME: "olapps"
+    MITOL_API_LOGOUT_SUFFIX: "logout"
+    MITOL_API_URL: "https://api.ci.learn.mit.edu"
+    MITOL_APP_BASE_URL: "https://ci.learn.mit.edu"
+    MITOL_APP_URL: "https://ci.learn.mit.edu"
+    MITOL_BASE_URL: "https://ci.learn.mit.edu"
+    MITOL_COOKIE_DOMAIN: "learn.mit.edu"
+    MITOL_COOKIE_NAME: "learn-ci"
+    MITOL_LOG_LEVEL: "INFO"
+    MITOL_NEW_USER_LOGIN_URL: "https://ci.learn.mit.edu/onboarding"
+    MITOL_NOINDEX: "true"
+    MITOL_SUPPORT_EMAIL: "odl-learn-ci-support@mit.edu" # Need to verify
+    MITPE_API_ENABLED: "true"
+    OCW_ITERATOR_CHUNK_SIZE: 300
+    OIDC_ENDPOINT: "https://sso-ci.ol.mit.edu/realms/olapps"
+    OPENSEARCH_INDEX: "mitlearn-ci"
+    OPENSEARCH_SHARD_COUNT: 2
+    OPENSEARCH_URL: "https://search-opensearch-mitlearn-ci-q7fuxrc2j26me44ymcftz3ahba.us-east-1.es.amazonaws.com"
+    PGBOUNCER_DEFAULT_POOL_SIZE: 50
+    PGBOUNER_MAX_CLIENT_CONN: 500
+    PGBOUNER_MIN_POOL_SIZE: 20
+    POSTHOG_API_HOST: "https://ph.ci.learn.mit.edu"
+    POSTHOG_ENABLED: "true"
+    POSTHOG_PROJECT_ID: "86325"
+    POSTHOG_TIMEOUT_MS: 1000
+    SEE_API_ENABLED: "true"
+    SENTRY_PROFILES_SAMPLE_RATE: 1
+    SENTRY_TRACES_SAMPLE_RATE: 1
+    SESSION_COOKIE_NAME: "session_mitlearn_ci"
+    SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT:
+    TIKA_SERVER_ENDPOINT: "https://tika-ci.odl.mit.edu"
+    UWSGI_THREADS: 15
+    UWSGI_WORKERS: 3
+  vault:address: "https://vault-ci.odl.mit.edu"
+  vault_server:env_namespace: operations.ci

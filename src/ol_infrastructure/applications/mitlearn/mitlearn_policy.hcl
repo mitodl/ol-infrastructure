@@ -1,7 +1,14 @@
-path "postgres-mitopen/creds/app/*" {
+path "aws-mitx/creds/ol-mitopen-application" {
   capabilities = ["read"]
 }
+path "aws-mitx/creds/ol-mitopen-application/*" {
+  capabilities = ["read"]
+}
+
 path "postgres-mitopen/creds/app" {
+  capabilities = ["read"]
+}
+path "postgres-mitopen/creds/app/*" {
   capabilities = ["read"]
 }
 
@@ -12,7 +19,32 @@ path "secret-operations/sso/mitlearn" {
   capabilities = ["read"]
 }
 
+path "secret-operations/global/embedly" {
+  capabilities = ["read"]
+}
+path "secret-operations/global/embedly/*" {
+  capabilities = ["read"]
+}
+path "secret-operations/global/odlbot-github-access-token" {
+  capabilities = ["read"]
+}
+path "secret-operations/global/mit-smtp" {
+  capabilities = ["read"]
+}
+path "secret-operations/global/update-search-data-webhook-key" {
+  capabilities = ["read"]
+}
+path "secret-operations/tika/access-token" {
+  capabilities = ["read"]
+}
+path "secret-global/data/mailgun" {
+  capabilities = ["read"]
+}
+
 path "secret-mitopen/*" {
+  capabilities = ["read"]
+}
+path "secret-mitlearn/*" {
   capabilities = ["read"]
 }
 # vault-secrets-operator is a little more particular about

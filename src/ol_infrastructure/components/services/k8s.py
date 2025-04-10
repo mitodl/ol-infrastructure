@@ -60,15 +60,13 @@ class OLApplicationK8sConfiguration(BaseModel):
 
     project_root: Path
     application_replicas: int = 1
-    application_config: dict[str, str]
+    application_config: dict[str, Any]
     application_name: str
     application_namespace: str
     application_lb_service_name: str
     application_lb_service_port_name: str
     k8s_global_labels: dict[str, str]
-    db_creds_secret_name: str
-    redis_creds_secret_name: str
-    static_secrets_name: str
+    env_from_secret_names: list[str]
     application_security_group_id: Output[str]
     application_security_group_name: Output[str]
     application_service_account_name: str | Output[str] | None = None
@@ -77,7 +75,8 @@ class OLApplicationK8sConfiguration(BaseModel):
     application_docker_tag: str
     application_cmd_array: Optional[list[str]] = None
     vault_k8s_resource_auth_name: str
-    import_nginx_config: bool
+    import_nginx_config: bool = Field(default=True)
+    import_uwsgi_config: bool = Field(default=False)
     resource_requests: dict[str, str] = Field(
         default={"cpu": "250m", "memory": "300Mi"}
     )
@@ -99,6 +98,12 @@ class OLApplicationK8sConfiguration(BaseModel):
     @classmethod
     def validate_sec_group_name(cls, application_security_group_name: Output[str]):
         return Output.from_input(application_security_group_name)
+
+    @field_validator("application_config")
+    @classmethod
+    def validate_application_config(cls, application_config: dict[str, Any]):
+        # Convert all values to strings because that is what k8s expects.
+        return {key: str(value) for key, value in application_config.items()}
 
 
 stack_info = parse_stack()
@@ -132,6 +137,27 @@ class OLApplicationK8s(ComponentResource):
             ol_app_k8s_config.application_lb_service_port_name
         )
 
+        # Determine the full name of the container image
+        if ol_app_k8s_config.application_image_repository_suffix:
+            app_image = f"{ol_app_k8s_config.application_image_repository}{ol_app_k8s_config.application_image_repository_suffix}:{ol_app_k8s_config.application_docker_tag}"
+        else:
+            app_image = f"{ol_app_k8s_config.application_image_repository}:{ol_app_k8s_config.application_docker_tag}"
+
+        volumes = [
+            kubernetes.core.v1.VolumeArgs(
+                name="staticfiles",
+                empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+            )
+        ]
+        nginx_volume_mounts = [
+            kubernetes.core.v1.VolumeMountArgs(
+                name="staticfiles",
+                mount_path="/src/staticfiles",
+            )
+        ]
+        webapp_volume_mounts = nginx_volume_mounts.copy()
+
+        # Import nginx configuration as a configmap
         if ol_app_k8s_config.import_nginx_config:
             application_nginx_configmap = kubernetes.core.v1.ConfigMap(
                 f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-nginx-configmap",
@@ -147,6 +173,67 @@ class OLApplicationK8s(ComponentResource):
                 },
                 opts=resource_options,
             )
+            volumes.append(
+                kubernetes.core.v1.VolumeArgs(
+                    name="nginx-config",
+                    config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                        name=application_nginx_configmap.metadata.name,
+                        items=[
+                            kubernetes.core.v1.KeyToPathArgs(
+                                key="web.conf",
+                                path="web.conf",
+                            ),
+                        ],
+                    ),
+                )
+            )
+            nginx_volume_mounts.append(
+                kubernetes.core.v1.VolumeMountArgs(
+                    name="nginx-config",
+                    mount_path="/etc/nginx/conf.d/web.conf",
+                    sub_path="web.conf",
+                    read_only=True,
+                )
+            )
+
+        # Import uwsgi configuration as a configmap
+        if ol_app_k8s_config.import_uwsgi_config:
+            application_uwsgi_configmap = kubernetes.core.v1.ConfigMap(
+                f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-uwsgi-configmap",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name="uwsgi-config",
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=ol_app_k8s_config.k8s_global_labels,
+                ),
+                data={
+                    "uwsgi.ini": ol_app_k8s_config.project_root.joinpath(
+                        "files/uwsgi.ini"
+                    ).read_text(),
+                },
+                opts=resource_options,
+            )
+            volumes.append(
+                kubernetes.core.v1.VolumeArgs(
+                    name="uwsgi-config",
+                    config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                        name=application_uwsgi_configmap.metadata.name,
+                        items=[
+                            kubernetes.core.v1.KeyToPathArgs(
+                                key="uwsgi.ini",
+                                path="uwsgi.ini",
+                            ),
+                        ],
+                    ),
+                )
+            )
+            webapp_volume_mounts.append(
+                kubernetes.core.v1.VolumeMountArgs(
+                    name="uwsgi-config",
+                    mount_path="/tmp/uwsgi.ini",  # noqa: S108
+                    sub_path="uwsgi.ini",
+                    read_only=True,
+                )
+            )
 
         # Build a list of not-sensitive env vars for the deployment config
         application_deployment_env_vars = []
@@ -160,32 +247,16 @@ class OLApplicationK8s(ComponentResource):
         application_deployment_env_vars.append(
             kubernetes.core.v1.EnvVarArgs(name="PORT", value=str(DEFAULT_UWSGI_PORT))
         )
-
         # Build a list of sensitive env vars for the deployment config via envFrom
-        application_deployment_envfrom = [
-            # Database creds
-            kubernetes.core.v1.EnvFromSourceArgs(
-                secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-                    name=ol_app_k8s_config.db_creds_secret_name,
-                ),
-            ),
-            # Redis Configuration
-            kubernetes.core.v1.EnvFromSourceArgs(
-                secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-                    name=ol_app_k8s_config.redis_creds_secret_name,
-                ),
-            ),
-            # static secrets from secrets-application/secrets
-            kubernetes.core.v1.EnvFromSourceArgs(
-                secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-                    name=ol_app_k8s_config.static_secrets_name,
-                ),
-            ),
-        ]
-        if ol_app_k8s_config.application_image_repository_suffix:
-            app_image = f"{ol_app_k8s_config.application_image_repository}{ol_app_k8s_config.application_image_repository_suffix}:{ol_app_k8s_config.application_docker_tag}"
-        else:
-            app_image = f"{ol_app_k8s_config.application_image_repository}:{ol_app_k8s_config.application_docker_tag}"
+        application_deployment_envfrom = []
+        for secret_name in ol_app_k8s_config.env_from_secret_names:
+            application_deployment_envfrom.append(  # noqa: PERF401
+                kubernetes.core.v1.EnvFromSourceArgs(
+                    secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+                        name=secret_name,
+                    ),
+                )
+            )
 
         init_containers = []
         if ol_app_k8s_config.init_collectstatic:
@@ -257,25 +328,10 @@ class OLApplicationK8s(ComponentResource):
                         labels=application_labels,
                     ),
                     spec=kubernetes.core.v1.PodSpecArgs(
-                        volumes=[
-                            kubernetes.core.v1.VolumeArgs(
-                                name="staticfiles",
-                                empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
-                            ),
-                            kubernetes.core.v1.VolumeArgs(
-                                name="nginx-config",
-                                config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                                    name=application_nginx_configmap.metadata.name,
-                                    items=[
-                                        kubernetes.core.v1.KeyToPathArgs(
-                                            key="web.conf",
-                                            path="web.conf",
-                                        ),
-                                    ],
-                                ),
-                            ),
+                        volumes=volumes,
+                        init_containers=[
+                            *init_containers,  # Add existing init containers after the new one
                         ],
-                        init_containers=init_containers,
                         dns_policy="ClusterFirst",
                         service_account_name=ol_app_k8s_config.application_service_account_name,
                         containers=[
@@ -293,18 +349,7 @@ class OLApplicationK8s(ComponentResource):
                                     requests=ol_app_k8s_config.resource_requests,
                                     limits=ol_app_k8s_config.resource_limits,
                                 ),
-                                volume_mounts=[
-                                    kubernetes.core.v1.VolumeMountArgs(
-                                        name="staticfiles",
-                                        mount_path="/src/staticfiles",
-                                    ),
-                                    kubernetes.core.v1.VolumeMountArgs(
-                                        name="nginx-config",
-                                        mount_path="/etc/nginx/conf.d/web.conf",
-                                        sub_path="web.conf",
-                                        read_only=True,
-                                    ),
-                                ],
+                                volume_mounts=nginx_volume_mounts,
                             ),
                             # Actual application run with uwsgi
                             kubernetes.core.v1.ContainerArgs(
@@ -323,12 +368,7 @@ class OLApplicationK8s(ComponentResource):
                                 command=ol_app_k8s_config.application_cmd_array,
                                 env=application_deployment_env_vars,
                                 env_from=application_deployment_envfrom,
-                                volume_mounts=[
-                                    kubernetes.core.v1.VolumeMountArgs(
-                                        name="staticfiles",
-                                        mount_path="/src/staticfiles",
-                                    ),
-                                ],
+                                volume_mounts=webapp_volume_mounts,
                             ),
                         ],
                     ),

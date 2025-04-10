@@ -5,7 +5,7 @@ config:
   heroku:user: "odl-devops"
   heroku:app_id:
     secure: v1:eSvnqne7KQRkHJlu:wTyl9W3aivfxlANqBML2wy4GEHe85VuKll60R5HmGUu1hJTcQBEfzK1cJOyvjlbLgBtXLw==
-  heroku_app:vars:
+  mitlearn:vars:
     APPZI_URL: ""
     CELERY_WORKER_MAX_MEMORY_PER_CHILD: 125000
     CSRF_COOKIE_NAME: "learn_rc_csrftoken"
@@ -51,7 +51,7 @@ config:
     TIKA_SERVER_ENDPOINT: "https://tika-qa.odl.mit.edu"
     UWSGI_WORKERS: 3
     UWSGI_THREADS: 15
-  heroku_app:interpolation_vars:
+  mitlearn:interpolation_vars:
     auth_allowed_redirect_hosts:
     - "draft-qa.ocw.mit.edu"
     - "live-qa.ocw.mit.edu"
