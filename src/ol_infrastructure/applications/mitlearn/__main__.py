@@ -1136,6 +1136,7 @@ sensitive_env_vars = {
 # to build the CI environment. Since we won't even need this in K8S we will just let it be
 # for now behind this conditional
 
+
 match stack_info.env_suffix:
     case "production":
         env_var_suffix = "PROD"
@@ -1146,6 +1147,8 @@ match stack_info.env_suffix:
     case _:
         env_var_suffix = "INVALID"
 
+mit_learn_posthog_proxy = mitlearn_config.require("posthog_proxy")
+
 gh_repo = github.get_repository(
     full_name="mitodl/mit-learn", opts=InvokeOptions(provider=github_provider)
 )
@@ -1154,6 +1157,13 @@ gh_workflow_api_base_env_var = github.ActionsVariable(
     repository=gh_repo.name,
     variable_name=f"API_BASE_{env_var_suffix}",
     value=f"https://{mitlearn_api_domain}/learn",
+    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
+)
+gh_workflow_posthog_proxy_url_env_var = github.ActionsVariable(
+    f"ol_mitopen_gh_workflow_posthog_proxy_url_env_var-{stack_info.env_suffix}",
+    repository=gh_repo.name,
+    variable_name=f"POSTHOG_API_HOST_{env_var_suffix}",
+    value=f"https://{mit_learn_posthog_proxy}",
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 gh_workflow_accesskey_id_env_secret = github.ActionsSecret(
