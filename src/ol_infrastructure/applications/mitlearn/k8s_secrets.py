@@ -6,11 +6,14 @@ This module defines functions to create Kubernetes secrets required by the mitle
 application by fetching data from various Vault secret backends (static KV and dynamic).
 """
 
-from typing import Any
+from typing import Any, Union
 
+import pulumi_kubernetes as kubernetes
 from pulumi import ResourceOptions
 from pulumi_vault import Mount
 
+from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
+from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
@@ -124,12 +127,14 @@ def _create_dynamic_secret(
 
 def create_mitlearn_k8s_secrets(
     stack_info: StackInfo,
-    learn_namespace: str,
+    mitlearn_namespace: str,
     k8s_global_labels: dict[str, str],
     vault_k8s_resources: OLVaultK8SResources,
     mitlearn_vault_mount: Mount,
     db_config: OLVaultDatabaseBackend,
-) -> list[str]:
+    redis_password: str,
+    redis_cache: OLAmazonCache,
+) -> tuple[list[str], list[Union[OLVaultK8SSecret, kubernetes.core.v1.Secret]]]:
     """
     Create all Kubernetes secrets required by the mitlearn application.
 
@@ -138,7 +143,7 @@ def create_mitlearn_k8s_secrets(
 
     Args:
         stack_info: Information about the current Pulumi stack.
-        learn_namespace: The Kubernetes namespace for mitlearn resources.
+        mitlearn_namespace: The Kubernetes namespace for mitlearn resources.
         k8s_global_labels: Standard labels to apply to all Kubernetes resources.
         vault_k8s_resources: Vault Kubernetes auth backend resources.
         mitlearn_vault_mount: The Vault mount resource for mitopen secrets.
@@ -149,7 +154,7 @@ def create_mitlearn_k8s_secrets(
     """
     secret_names: list[str] = []
     secret_resources: list[
-        OLVaultK8SSecret
+        Union[OLVaultK8SSecret, kubernetes.core.v1.Secret]
     ] = []  # Keep track of resources if needed later
 
     # 1. Static secrets from the mitopen KV-v2 mount
@@ -158,7 +163,7 @@ def create_mitlearn_k8s_secrets(
     mitopen_static_secret_name, mitopen_static_secret = _create_static_secret(
         stack_info=stack_info,
         secret_base_name="mitopen",  # Base name for the K8s secret resource  # pragma: allowlist secret  # noqa: S106
-        namespace=learn_namespace,
+        namespace=mitlearn_namespace,
         labels=k8s_global_labels,
         mount=mitlearn_vault_mount.path,
         mount_type="kv-v2",  # This mount is kv-v2
@@ -238,7 +243,7 @@ def create_mitlearn_k8s_secrets(
         secret_name, secret_resource = _create_static_secret(
             stack_info=stack_info,
             secret_base_name=config["base_name"],
-            namespace=learn_namespace,
+            namespace=mitlearn_namespace,
             labels=k8s_global_labels,
             mount="secret-operations",
             path=config["path"],
@@ -253,7 +258,7 @@ def create_mitlearn_k8s_secrets(
     secret_global_mailgun_name, secret_global_mailgun = _create_static_secret(
         stack_info=stack_info,
         secret_base_name="secret-global-mailgun",  # Mailgun API key # pragma: allowlist secret  # noqa: S106
-        namespace=learn_namespace,
+        namespace=mitlearn_namespace,
         labels=k8s_global_labels,
         mount="secret-global",
         mount_type="kv-v2",
@@ -269,7 +274,7 @@ def create_mitlearn_k8s_secrets(
     aws_access_key_secret_name, aws_access_key_secret = _create_dynamic_secret(
         stack_info=stack_info,
         secret_base_name="aws-secrets",  # AWS credentials  # pragma: allowlist secret  # noqa: S106
-        namespace=learn_namespace,
+        namespace=mitlearn_namespace,
         labels=k8s_global_labels,
         mount="aws-mitx",
         path="creds/ol-mitopen-application",
@@ -287,7 +292,7 @@ def create_mitlearn_k8s_secrets(
     database_url_secret_name, database_url_secret = _create_dynamic_secret(
         stack_info=stack_info,
         secret_base_name="psql-secrets",  # PostgreSQL credentials  # pragma: allowlist secret  # noqa: S106
-        namespace=learn_namespace,
+        namespace=mitlearn_namespace,
         labels=k8s_global_labels,
         mount=db_config.db_mount.path,
         path="creds/app",
@@ -299,10 +304,35 @@ def create_mitlearn_k8s_secrets(
     secret_names.append(database_url_secret_name)
     secret_resources.append(database_url_secret)
 
-    # For now, just returning the names as the original code did.
-    # The resources themselves are implicitly tracked by Pulumi.
+    # 6. A normal, k8s secret for redis credentials
+    # Vault is not needed for these.
+    redis_creds_secret_name = "redis-creds"  # noqa: S105  # pragma: allowlist secret
+    redis_creds = kubernetes.core.v1.Secret(
+        f"learn-ai-{stack_info.env_suffix}-redis-creds",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=redis_creds_secret_name,
+            namespace=mitlearn_namespace,
+            labels=k8s_global_labels,
+        ),
+        string_data=redis_cache.address.apply(
+            lambda address: {
+                "REDIS_DOMAIN": f"rediss://default:{redis_password}@{address}:{DEFAULT_REDIS_PORT}/0",
+                "REDIS_SSL_CERT_REQS": "required",
+                "CELERY_BROKER_URL": f"rediss://default:{redis_password}@{address}:{DEFAULT_REDIS_PORT}/0?ssl_cert_reqs=required",
+                "CELERY_RESULT_BACKEND": f"rediss://default:{redis_password}@{address}:{DEFAULT_REDIS_PORT}/0?ssl_cert_reqs=required",
+            }
+        ),
+        opts=ResourceOptions(
+            depends_on=[redis_cache],
+            delete_before_replace=True,
+        ),
+    )
+    secret_names.append(redis_creds_secret_name)
+    secret_resources.append(
+        redis_creds
+    )  # This is different from everything else in the list but allowed per the type hints above
 
-    return secret_names
+    return secret_names, secret_resources
 
 
 # OIDC secret is a little different so we do that one with its own function.
