@@ -1,8 +1,10 @@
 # ruff: noqa: E501
+
 import os
 import textwrap
 from pathlib import Path
 
+import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference, export
@@ -17,8 +19,11 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.substructure.aws.eks.karpenter import setup_karpenter
 
 env_config = Config("environment")
+
+aws_account = aws.get_caller_identity()
 
 VERSIONS = {
     "VANTAGE_K8S_AGENT_VERSION": os.environ.get(
@@ -397,7 +402,7 @@ alloy_configmap = kubernetes.core.v1.ConfigMap(
             }}
 
             // Collect all pod logs
-            discovery.kubernetes "pods" {{
+discovery.kubernetes "pods" {{
               role = "pod"
             }}
 
@@ -667,4 +672,14 @@ alloy_release = kubernetes.helm.v3.Release(
         depends_on=[alloy_configmap],
         delete_before_replace=True,
     ),
+)
+
+# Setup Karpenter
+setup_karpenter(
+    cluster_name=cluster_name,
+    cluster_stack=cluster_stack,
+    aws_config=aws_config,
+    k8s_provider=k8s_provider,
+    aws_account=aws_account,
+    k8s_global_labels=k8s_global_labels,
 )
