@@ -33,11 +33,12 @@ config:
     mailgun_sender_domain: "mail-ci.learn.mit.edu"
     session_cookie_domain: ".rc.learn.mit.edu"
     sso_url: "sso-ci.ol.mit.edu"
+  mitlearn:k8s_deploy: "true"
   mitlearn:learn_ai_recommendation_endpoint: "https://api.rc.learn.mit.edu/ai/http/recommendation_agent/"
   mitlearn:learn_ai_syllabus_endpoint: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
   mitlearn:legacy_frontend_domain: "mitopen-ci.odl.mit.edu"
   mitlearn:nextjs_heroku_domain: "next.ci.learn.mit.edu"
-  mitlearn:k8s_deploy: "true"
+  mitlearn:posthog_proxy: ph.ci.learn.mit.edu
   #  heroku:user: "odl-devops"
   #heroku:app_id:
   #  secure: v1:eSvnqne7KQRkHJlu:wTyl9W3aivfxlANqBML2wy4GEHe85VuKll60R5HmGUu1hJTcQBEfzK1cJOyvjlbLgBtXLw==
@@ -87,5 +88,7 @@ config:
     TIKA_SERVER_ENDPOINT: "https://tika-ci.odl.mit.edu"
     UWSGI_THREADS: 15
     UWSGI_WORKERS: 3
+  redis:password:
+    secure: v1:JyjseV72WDGhqdIj:l4p+LgmMz3HY7myVHusGBKXPkP7nXsSMoQ1jpU31bHDSzik4DWYfKhaNjvEzebdpdiWMjWaAwS5mmoDPBoHw9LLBDA+qcQYr8w==
   vault:address: "https://vault-ci.odl.mit.edu"
   vault_server:env_namespace: operations.ci
