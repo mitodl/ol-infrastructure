@@ -316,6 +316,8 @@ def create_mitlearn_k8s_secrets(
         ),
         string_data=redis_cache.address.apply(
             lambda address: {
+                "REDIS_CLOUD_URL": f"rediss://default:{redis_password}@{address}:{DEFAULT_REDIS_PORT}",  # Value in heroku omits db
+                "REDIS_URL": f"rediss://default:{redis_password}@{address}:{DEFAULT_REDIS_PORT}",  # Value in heroku omits db
                 "REDIS_DOMAIN": f"rediss://default:{redis_password}@{address}:{DEFAULT_REDIS_PORT}/0",
                 "REDIS_SSL_CERT_REQS": "required",
                 "CELERY_BROKER_URL": f"rediss://default:{redis_password}@{address}:{DEFAULT_REDIS_PORT}/0?ssl_cert_reqs=required",
