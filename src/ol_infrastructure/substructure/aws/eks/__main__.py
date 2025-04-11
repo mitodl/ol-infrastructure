@@ -697,9 +697,7 @@ karpenter_interruption_queue = aws.sqs.Queue(
 karpenter_interruption_queue_policy = aws.sqs.QueuePolicy(
     f"{cluster_name}-karpenter-interruption-queue-policy",
     queue_url=karpenter_interruption_queue.id,
-    policy=Output.all(
-        queue_arn=karpenter_interruption_queue.arn, partition=aws.get_partition()
-    ).apply(
+    policy=Output.all(queue_arn=karpenter_interruption_queue.arn).apply(
         lambda args: json.dumps(
             {
                 "Version": "2012-10-17",
