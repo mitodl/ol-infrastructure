@@ -14,5 +14,5 @@ ol-openedx-sentry==0.2.1
 openedx-scorm-xblock>=19.0.1,<19.1.0
 pip==25.0.1
 rapid-response-xblock==0.9.1
-uwsgi==2.0.28
+uwsgi==2.0.29
 wheel==0.45.1
