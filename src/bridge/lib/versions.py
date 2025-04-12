@@ -18,7 +18,7 @@ VAULT_VERSION = "1.19.1"
 
 # EKS Specific Versions
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/helm-charts
-AIRBYTE_CHART_VERSION = "1.5.1"
+AIRBYTE_CHART_VERSION = "1.6.0"
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://charts.apiseven.com
 APISIX_CHART_VERSION = "2.10.0"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
