@@ -56,6 +56,10 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
 
 
 class HPAScalerType(Enum):
+    """
+    Potential types of metric to autoscale on.
+    """
+
     CPU = 1
     MEMORY = 2
 
@@ -77,11 +81,33 @@ class OLApplicationK8sConfiguration(BaseModel):
     application_security_group_name: Output[str]
     application_service_account_name: str | Output[str] | None = None
     application_image_repository: str
-    application_image_repository_suffix: Optional[str] = None
+    application_image_repository_suffix: str | None = None
     application_docker_tag: str
-    application_cmd_array: Optional[list[str]] = None
+    application_cmd_array: list[str] | None = None
     vault_k8s_resource_auth_name: str
-    hpa_scaler_type: HPAScalerType = Field(default=HPAScalerType.CPU)
+    # You get CPU and memory autoscaling by default
+    hpa_scaling_metrics: list[kubernetes.autoscaling.v2.MetricSpecArgs] = [
+        kubernetes.autoscaling.v2.MetricSpecArgs(
+            type="Resource",
+            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                name="CPU",
+                target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                    type="Utilization",
+                    average_utilization=80,  # Target memory utilization (80%)
+                ),
+            ),
+        ),
+        kubernetes.autoscaling.v2.MetricSpecArgs(
+            type="Resource",
+            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                name="memory",  # Memory utilization as the scaling metric
+                target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                    type="Utilization",
+                    average_utilization=80,  # Target memory utilization (80%)
+                ),
+            ),
+        ),
+    ]
     target_cpu_utilization_percentage: int = 50
     import_nginx_config: bool = Field(default=True)
     import_uwsgi_config: bool = Field(default=False)
@@ -124,7 +150,7 @@ class OLApplicationK8s(ComponentResource):
     """
 
     # Yes Ruff, this i s gross and needs fix :)
-    def __init__(  # noqa: C901
+    def __init__(
         self,
         ol_app_k8s_config: OLApplicationK8sConfiguration,
         opts: Optional[ResourceOptions] = None,
@@ -386,91 +412,50 @@ class OLApplicationK8s(ComponentResource):
             opts=resource_options,
         )
 
-        # ZOMG this is grotesque. I can't figure out how else to express a complex
-        # layered object instantiation like this where depending on the value of our
-        # HPA scaler type in the config object we instantiate whole different
-        # property/method chains :\
-        if ol_app_k8s_config.hpa_scaler_type == HPAScalerType.CPU:
-            # Should we figure out how to use v2 of the HPA to do a CPU based hpa as well? Probably.
-            _application_hpa = kubernetes.autoscaling.v1.HorizontalPodAutoscaler(
-                f"{ol_app_k8s_config.application_name}-hpa",
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        _application_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
+            "application-hpa",
+            spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
+                scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
+                    api_version="apps/v1",
+                    kind="Deployment",
                     name=truncate_k8s_metanames(
                         f"{ol_app_k8s_config.application_name}-app"
                     ),
-                    namespace=ol_app_k8s_config.application_namespace,
-                    labels=application_labels,
                 ),
-                spec=kubernetes.autoscaling.v1.HorizontalPodAutoscalerSpecArgs(
-                    max_replicas=5,
-                    min_replicas=1,
-                    # target_cpu_utilization_percentage=ol_app_k8s_config.target_cpu_utilization_percentage,
-                    scale_target_ref=kubernetes.autoscaling.v1.CrossVersionObjectReferenceArgs(
-                        api_version="apps/v1",
-                        kind="Deployment",
-                        name=truncate_k8s_metanames(
-                            f"{ol_app_k8s_config.application_name}-app"
-                        ),
+                min_replicas=2,  # Minimum number of replicas
+                max_replicas=10,  # Maximum number of replicas
+                # Corrected parameter name from "metrics" to the proper name for the API
+                metrics=ol_app_k8s_config.hpa_scaling_metrics,
+                # Optional: behavior configuration for scaling
+                behavior=kubernetes.autoscaling.v2.HorizontalPodAutoscalerBehaviorArgs(
+                    scale_up=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+                        stabilization_window_seconds=60,  # Wait 1 minute before scaling up again
+                        select_policy="Max",  # Choose max value when multiple metrics
+                        policies=[
+                            kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                                type="Percent",
+                                value=100,  # Double pods at most
+                                period_seconds=60,  # In this time period
+                            )
+                        ],
+                    ),
+                    scale_down=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+                        stabilization_window_seconds=300,  # Wait 5 minutes before scaling down
+                        select_policy="Min",
+                        policies=[
+                            kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                                type="Percent",
+                                value=25,  # Remove at most 25% of pods at once
+                                period_seconds=60,
+                            )
+                        ],
                     ),
                 ),
-                opts=resource_options,
-            )
-        elif ol_app_k8s_config.hpa_scaler_type == HPAScalerType.MEMORY:
-            _application_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
-                "memory-based-hpa",
-                spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
-                    scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
-                        api_version="apps/v1",
-                        kind="Deployment",
-                        name=truncate_k8s_metanames(
-                            f"{ol_app_k8s_config.application_name}-app"
-                        ),
-                    ),
-                    min_replicas=2,  # Minimum number of replicas
-                    max_replicas=10,  # Maximum number of replicas
-                    # Corrected parameter name from "metrics" to the proper name for the API
-                    metrics=[
-                        kubernetes.autoscaling.v2.MetricSpecArgs(
-                            type="Resource",
-                            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                                name="memory",  # Memory utilization as the scaling metric
-                                target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                                    type="Utilization",
-                                    average_utilization=80,  # Target memory utilization (80%)
-                                ),
-                            ),
-                        )
-                    ],
-                    # Optional: behavior configuration for scaling
-                    behavior=kubernetes.autoscaling.v2.HorizontalPodAutoscalerBehaviorArgs(
-                        scale_up=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
-                            stabilization_window_seconds=60,  # Wait 1 minute before scaling up again
-                            select_policy="Max",  # Choose max value when multiple metrics
-                            policies=[
-                                kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
-                                    type="Percent",
-                                    value=100,  # Double pods at most
-                                    period_seconds=60,  # In this time period
-                                )
-                            ],
-                        ),
-                        scale_down=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
-                            stabilization_window_seconds=300,  # Wait 5 minutes before scaling down
-                            select_policy="Min",
-                            policies=[
-                                kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
-                                    type="Percent",
-                                    value=25,  # Remove at most 25% of pods at once
-                                    period_seconds=60,
-                                )
-                            ],
-                        ),
-                    ),
-                ),
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    namespace="default"  # Namespace where the HPA will be created
-                ),
-            )
+            ),
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                namespace=ol_app_k8s_config.application_namespace,
+            ),
+        )
 
         # A kubernetes service resource to act as load balancer for the app instances
         _application_service = kubernetes.core.v1.Service(
