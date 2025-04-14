@@ -109,6 +109,7 @@ def github_issues(  # noqa: PLR0913
     assignees: Optional[list[str]] = None,
     issue_title_template: Optional[str] = None,
     issue_body_template: Optional[str] = None,
+    poll_frequency: str = "60m",
 ) -> Resource:
     """Generate a github-issue resource for the given owner/repository.
 
@@ -146,7 +147,7 @@ def github_issues(  # noqa: PLR0913
         name=name,
         type="github-issues",
         icon="github",
-        check_every="15m",
+        check_every=poll_frequency,
         expose_build_created_by=True,
         source={k: v for k, v in issue_config.items() if v is not None},
     )
