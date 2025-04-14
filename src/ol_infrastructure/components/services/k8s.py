@@ -59,7 +59,7 @@ class OLApplicationK8sConfiguration(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     project_root: Path
-    application_replicas: int = 1
+    application_replicas: int = 0
     application_config: dict[str, Any]
     application_name: str
     application_namespace: str
@@ -155,6 +155,14 @@ class OLApplicationK8s(ComponentResource):
             opts=opts,
         )
         resource_options = ResourceOptions(parent=self)
+
+        replicas_or_hpa = "You may not have both horizontal pod autoscaling and replicas configured at the same time. Set replicas to 0 or remove the scaling metrics."
+        if (
+            ol_app_k8s_config.application_replicas != 0
+            and ol_app_k8s_config.hpa_scaling_metrics
+        ):
+            raise ValueError(replicas_or_hpa)
+
         self.application_lb_service_name: str = (
             ol_app_k8s_config.application_lb_service_name
         )
