@@ -188,7 +188,7 @@ def setup_karpenter(  # noqa: PLR0913
         f"{cluster_name}-karpenter-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
             name="karpenter",
-            chart="oci://public.ecr.aws/karepenter/karpenter",
+            chart="oci://public.ecr.aws/karpenter/karpenter",
             version=KARPENTER_CHART_VERSION,
             namespace="operations",  # Deploy into the operations namespace
             cleanup_on_fail=True,
