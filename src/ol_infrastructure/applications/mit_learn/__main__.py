@@ -21,12 +21,17 @@ from bridge.lib.constants import FASTLY_A_TLS_1_3, FASTLY_CNAME_TLS_1_3
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
+    DEFAULT_REDIS_PORT,
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.mitlearn.k8s_secrets import (
     create_mitlearn_k8s_secrets,
     create_oidc_k8s_secret,
+)
+from ol_infrastructure.components.aws.cache import (
+    OLAmazonCache,
+    OLAmazonRedisConfig,
 )
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.services.cert_manager import (
@@ -1674,14 +1679,53 @@ if mitlearn_config.get_bool("k8s_deploy"):
         vpc_id=apps_vpc["id"],
     )
 
+    # Redis / Elasticache
+    # only for applications deployed in k8s
+    redis_config = Config("redis")
+    redis_cluster_security_group = ec2.SecurityGroup(
+        f"ol-mitlearn-redis-cluster-security-group-{stack_info.env_suffix}",
+        name_prefix=f"ol-mitlearn-redis-cluster-security-group-{stack_info.env_suffix}",
+        description="Access control for the mitlearn redis cluster.",
+        ingress=[
+            ec2.SecurityGroupIngressArgs(
+                security_groups=[mitlearn_app_security_group.id],
+                protocol="tcp",
+                from_port=DEFAULT_REDIS_PORT,
+                to_port=DEFAULT_REDIS_PORT,
+                description="Allow application pods to talk to Redis",
+            ),
+        ],
+        vpc_id=apps_vpc["id"],
+        tags=aws_config.tags,
+    )
+    redis_cache_config = OLAmazonRedisConfig(
+        encrypt_transit=True,
+        auth_token=redis_config.require("password"),
+        cluster_mode_enabled=False,
+        encrypted=True,
+        engine_version="7.1",
+        num_instances=3,
+        shard_count=1,
+        auto_upgrade=True,
+        cluster_description="Redis cluster for MIT Learn",
+        cluster_name=f"mitlearn-redis-{stack_info.env_suffix}",
+        subnet_group=apps_vpc["elasticache_subnet"],
+        security_groups=[redis_cluster_security_group.id],
+        tags=aws_config.tags,
+        **defaults(stack_info)["redis"],
+    )
+    redis_cache = OLAmazonCache(redis_cache_config)
+
     # Create all Kubernetes secrets needed by the application
-    secret_names = create_mitlearn_k8s_secrets(
+    secret_names, secret_resources = create_mitlearn_k8s_secrets(
         stack_info=stack_info,
-        learn_namespace=learn_namespace,
+        mitlearn_namespace=learn_namespace,
         k8s_global_labels=k8s_global_labels,
         vault_k8s_resources=vault_k8s_resources,
         mitlearn_vault_mount=mitlearn_vault_mount,
         db_config=mitopen_vault_backend,  # Use the original DB config object
+        redis_password=redis_config.require("password"),
+        redis_cache=redis_cache,
     )
 
     # Configure and deploy the mitlearn application using OLApplicationK8s
@@ -1718,9 +1762,7 @@ if mitlearn_config.get_bool("k8s_deploy"):
         opts=ResourceOptions(
             depends_on=[
                 mitlearn_app_security_group,
-                # Ensure all Vault secret resources are created before the app
-                # Dependencies are implicitly handled by Pulumi based on the
-                # resources created within create_mitlearn_k8s_secrets
+                *secret_resources,
             ]
         ),
     )
