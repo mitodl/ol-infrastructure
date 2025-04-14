@@ -4,7 +4,6 @@ This is a service components that replaces a number of "boilerplate" kubernetes
 calls we currently make into one convenient callable package.
 """
 
-from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, Optional
 
@@ -53,15 +52,6 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
         default={"cpu": "500m", "memory": "600Mi"},
     )
     replicas: int = 1  # In lieu of a proper autoscaler 20250407
-
-
-class HPAScalerType(Enum):
-    """
-    Potential types of metric to autoscale on.
-    """
-
-    CPU = 1
-    MEMORY = 2
 
 
 # Refactor this to just be 'Config' rather than 'Configuration' - but not today
