@@ -65,6 +65,8 @@ class OLApplicationK8sConfiguration(BaseModel):
     application_namespace: str
     application_lb_service_name: str
     application_lb_service_port_name: str
+    application_max_replicas: int = 10
+    application_min_replicas: int = 2
     k8s_global_labels: dict[str, str]
     env_from_secret_names: list[str]
     application_security_group_id: Output[str]
@@ -98,7 +100,6 @@ class OLApplicationK8sConfiguration(BaseModel):
             ),
         ),
     ]
-    target_cpu_utilization_percentage: int = 50
     import_nginx_config: bool = Field(default=True)
     import_uwsgi_config: bool = Field(default=False)
     resource_requests: dict[str, str] = Field(
@@ -420,8 +421,8 @@ class OLApplicationK8s(ComponentResource):
                         f"{ol_app_k8s_config.application_name}-app"
                     ),
                 ),
-                min_replicas=2,  # Minimum number of replicas
-                max_replicas=10,  # Maximum number of replicas
+                min_replicas=ol_app_k8s_config.application_max_replicas,  # Minimum number of replicas
+                max_replicas=ol_app_k8s_config.application_min_replicas,  # Minimum number of replicas
                 # Corrected parameter name from "metrics" to the proper name for the API
                 metrics=ol_app_k8s_config.hpa_scaling_metrics,
                 # Optional: behavior configuration for scaling
