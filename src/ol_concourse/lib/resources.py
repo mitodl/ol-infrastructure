@@ -1,6 +1,6 @@
 from typing import Any, Literal, Optional, Union
 
-from ol_concourse.lib.models.pipeline import Identifier, Resource
+from ol_concourse.lib.models.pipeline import Duration, Identifier, Resource
 from ol_concourse.lib.models.resource import Git
 
 
@@ -109,7 +109,7 @@ def github_issues(  # noqa: PLR0913
     assignees: Optional[list[str]] = None,
     issue_title_template: Optional[str] = None,
     issue_body_template: Optional[str] = None,
-    poll_frequency: str = "60m",
+    poll_frequency: Duration = Duration("60m"),
 ) -> Resource:
     """Generate a github-issue resource for the given owner/repository.
 
