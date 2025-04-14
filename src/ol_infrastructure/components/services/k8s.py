@@ -83,7 +83,7 @@ class OLApplicationK8sConfiguration(BaseModel):
                 name="CPU",
                 target=kubernetes.autoscaling.v2.MetricTargetArgs(
                     type="Utilization",
-                    average_utilization=80,  # Target memory utilization (80%)
+                    average_utilization=80,  # Target CPU utilization (80%)
                 ),
             ),
         ),
