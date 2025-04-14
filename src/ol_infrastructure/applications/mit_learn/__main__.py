@@ -958,6 +958,7 @@ env_vars = {
     "MITOL_DEFAULT_SITE_KEY": "micromasters",
     "MITOL_EMAIL_PORT": 587,
     "MITOL_EMAIL_TLS": "True",
+    "EMBEDDINGS_EXTERNAL_FETCH_USE_WEBDRIVER": True,
     "MITOL_ENVIRONMENT": env_name,
     "MITOL_FROM_EMAIL": "MITOpen <mitopen-support@mit.edu>",
     "MITOL_FRONTPAGE_DIGEST_MAX_POSTS": 10,
