@@ -328,7 +328,7 @@ ocw_studio_mediaconvert_config = MediaConvertConfig(
 ocw_studio_mediaconvert = OLMediaConvert(ocw_studio_mediaconvert_config)
 
 env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
-
+heroku_app_vars = heroku_app_config.get_object("vars")
 heroku_vars = {
     "ALLOWED_HOSTS": '["*"]',
     "AWS_ACCOUNT_ID": aws_account.id,
@@ -360,7 +360,9 @@ heroku_vars = {
     "OCW_STUDIO_ENVIRONMENT": env_name,
     "OCW_STUDIO_USE_S3": "True",
     "OCW_WWW_TEST_SLUG": "ocw-ci-test-www",
-    "POSTHOG_API_HOST": "https://ph.ol.mit.edu",
+    "POSTHOG_API_HOST": heroku_app_vars.get(
+        "PUBLISH_POSTHOG_API_HOST", "https://app.posthog.com"
+    ),
     "POSTHOG_ENABLED": "True",
     "POSTHOG_PROJECT_API_KEY": "phc_XDgBzghi6cHYiBbiTsL91Fw03j073dXNSxtG7MWfeS0",  # pragma: allowlist secret
     "PREPUBLISH_ACTIONS": "videos.tasks.update_transcripts_for_website,videos.youtube.update_youtube_metadata,content_sync.tasks.update_website_in_root_website",
