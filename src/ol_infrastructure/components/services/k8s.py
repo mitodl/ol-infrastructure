@@ -5,7 +5,7 @@ calls we currently make into one convenient callable package.
 """
 
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import pulumi
 import pulumi_kubernetes as kubernetes
@@ -32,9 +32,6 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
 def truncate_k8s_metanames(name: str) -> str:
-    """
-    Sanitize the names we use for k8s objects
-    """
     return name[:MAXIMUM_K8S_NAME_LENGTH].rstrip("-_.")
 
 
@@ -59,14 +56,13 @@ class OLApplicationK8sConfiguration(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     project_root: Path
-    application_replicas: int = 0
     application_config: dict[str, Any]
     application_name: str
     application_namespace: str
     application_lb_service_name: str
     application_lb_service_port_name: str
-    application_max_replicas: int = 10
     application_min_replicas: int = 2
+    application_max_replicas: int = 10
     k8s_global_labels: dict[str, str]
     env_from_secret_names: list[str]
     application_security_group_id: Output[str]
@@ -144,7 +140,7 @@ class OLApplicationK8s(ComponentResource):
     def __init__(
         self,
         ol_app_k8s_config: OLApplicationK8sConfiguration,
-        opts: Optional[ResourceOptions] = None,
+        opts: ResourceOptions | None = None,
     ):
         """
         It's .. the constructor. Shaddap Ruff :)
@@ -157,12 +153,13 @@ class OLApplicationK8s(ComponentResource):
         )
         resource_options = ResourceOptions(parent=self)
 
-        replicas_or_hpa = "You may not have both horizontal pod autoscaling and replicas configured at the same time. Set replicas to 0 or remove the scaling metrics."
-        if (
-            ol_app_k8s_config.application_replicas != 0
-            and ol_app_k8s_config.hpa_scaling_metrics
-        ):
-            raise ValueError(replicas_or_hpa)
+        extra_deployment_args: dict[str, int] = {}
+        # If we have ANY metrics args, then we use HPA and don't pass replicas to the deployment
+        # If we don't have metrics, then we pass min_replicas to the deployment
+        if ol_app_k8s_config.hpa_scaling_metrics:
+            extra_deployment_args = {
+                "replicas": ol_app_k8s_config.application_min_replicas
+            }
 
         self.application_lb_service_name: str = (
             ol_app_k8s_config.application_lb_service_name
@@ -343,8 +340,7 @@ class OLApplicationK8s(ComponentResource):
                 labels=application_labels,
             ),
             spec=kubernetes.apps.v1.DeploymentSpecArgs(
-                # TODO @Ardiea: Add horizontial pod autoscaler  # noqa: TD003, FIX002
-                replicas=ol_app_k8s_config.application_replicas,
+                **extra_deployment_args,
                 selector=kubernetes.meta.v1.LabelSelectorArgs(
                     match_labels=application_labels,
                 ),
@@ -421,8 +417,8 @@ class OLApplicationK8s(ComponentResource):
                         f"{ol_app_k8s_config.application_name}-app"
                     ),
                 ),
-                min_replicas=ol_app_k8s_config.application_max_replicas,  # Minimum number of replicas
-                max_replicas=ol_app_k8s_config.application_min_replicas,  # Minimum number of replicas
+                min_replicas=ol_app_k8s_config.application_min_replicas,  # Minimum number of replicas
+                max_replicas=ol_app_k8s_config.application_max_replicas,  # Minimum number of replicas
                 # Corrected parameter name from "metrics" to the proper name for the API
                 metrics=ol_app_k8s_config.hpa_scaling_metrics,
                 # Optional: behavior configuration for scaling
@@ -575,7 +571,7 @@ class OLApplicationK8s(ComponentResource):
 class OLApisixPluginConfig(BaseModel):
     name: str
     enable: bool = True
-    secret_ref: Optional[str] = Field(
+    secret_ref: str | None = Field(
         None,
         alias="secretRef",
     )
@@ -585,15 +581,15 @@ class OLApisixPluginConfig(BaseModel):
 class OLApisixRouteConfig(BaseModel):
     route_name: str
     priority: int = 0
-    shared_plugin_config_name: Optional[str] = None
+    shared_plugin_config_name: str | None = None
     plugins: list[OLApisixPluginConfig] = []
     hosts: list[str] = []
     paths: list[str] = []
-    backend_service_name: Optional[str] = None
-    backend_service_port: Optional[str] = None
+    backend_service_name: str | None = None
+    backend_service_port: str | None = None
     # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/#service-resolution-granularity
     backend_resolve_granularity: Literal["endpoint", "service"] = "service"
-    upstream: Optional[str] = None
+    upstream: str | None = None
     websocket: bool = False
 
     @field_validator("plugins")
@@ -614,9 +610,9 @@ class OLApisixRouteConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_backend_or_upstream(self) -> "OLApisixRouteConfig":
-        upstream: Optional[str] = self.upstream
-        backend_service_name: Optional[str] = self.backend_service_name
-        backend_service_port: Optional[str] = self.backend_service_port
+        upstream: str | None = self.upstream
+        backend_service_name: str | None = self.backend_service_name
+        backend_service_port: str | None = self.backend_service_port
 
         if upstream is not None:
             if backend_service_name is not None or backend_service_port is not None:
@@ -640,7 +636,7 @@ class OLApisixRoute(pulumi.ComponentResource):
         route_configs: list[OLApisixRouteConfig],
         k8s_namespace: str,
         k8s_labels: dict[str, str],
-        opts: Optional[pulumi.ResourceOptions] = None,
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixRoute", name, None, opts
@@ -733,7 +729,7 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
         self,
         name: str,
         oidc_config: OLApisixOIDCConfig,
-        opts: Optional[pulumi.ResourceOptions] = None,
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixOIDCResources", name, None, opts
@@ -834,7 +830,7 @@ class OLApisixSharedPlugins(pulumi.ComponentResource):
         self,
         name: str,
         plugin_config: OLApisixSharedPluginsConfig,
-        opts: Optional[pulumi.ResourceOptions] = None,
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixSharedPlugin", name, None, opts
@@ -918,7 +914,7 @@ class OLApisixExternalUpstream(pulumi.ComponentResource):
         self,
         name: str,
         external_upstream_config: OLApisixExternalUpstreamConfig,
-        opts: Optional[pulumi.ResourceOptions] = None,
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixExternalUpstream", name, None, opts
