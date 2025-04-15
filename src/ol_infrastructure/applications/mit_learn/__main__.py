@@ -25,7 +25,7 @@ from bridge.lib.magic_numbers import (
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from ol_infrastructure.applications.mitlearn.k8s_secrets import (
+from ol_infrastructure.applications.mit_learn.k8s_secrets import (
     create_mitlearn_k8s_secrets,
     create_oidc_k8s_secret,
 )
