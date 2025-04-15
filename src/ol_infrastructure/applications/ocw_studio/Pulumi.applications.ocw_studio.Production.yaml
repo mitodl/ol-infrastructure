@@ -38,7 +38,8 @@ config:
     OCW_STUDIO_LOG_LEVEL: INFO
     OCW_STUDIO_SUPPORT_EMAIL: 'ocw-studio-support@mit.edu'
     OPEN_CATALOG_URLS: 'https://open.mit.edu/api/v0/ocw_next_webhook/,https://api.learn.mit.edu/api/v1/ocw_next_webhook/'
-    PUBLISH_POSTHOG_ENABLED: 'false'
+    PUBLISH_POSTHOG_ENABLED: 'true'
+    PUBLISH_POSTHOG_API_HOST: https://ph.ol.mit.edu
     SEARCH_API_URL: 'https://open.mit.edu/api/v0/search/'
     SENTRY_LOG_LEVEL: 'WARN'
     SITEMAP_DOMAIN: 'ocw.mit.edu'

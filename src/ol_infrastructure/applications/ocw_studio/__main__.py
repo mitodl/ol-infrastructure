@@ -360,7 +360,6 @@ heroku_vars = {
     "OCW_STUDIO_ENVIRONMENT": env_name,
     "OCW_STUDIO_USE_S3": "True",
     "OCW_WWW_TEST_SLUG": "ocw-ci-test-www",
-    "POSTHOG_API_HOST": "https://ph.ol.mit.edu",
     "POSTHOG_API_HOST": heroku_app_vars.get(
         "PUBLISH_POSTHOG_API_HOST", "https://app.posthog.com"
     ),
