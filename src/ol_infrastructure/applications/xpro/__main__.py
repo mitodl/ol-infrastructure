@@ -253,7 +253,7 @@ heroku_vars = {
     "NODE_MODULES_CACHE": "False",
     "OAUTH2_PROVIDER_ALLOWED_REDIRECT_URI_SCHEMES": "http,https,dccrequest",
     "POSTHOG_ENABLED": "True",
-    "POSTHOG_API_HOST": "https://app.posthog.com",
+    "POSTHOG_API_HOST": "https://ph.ol.mit.edu",
     # This can be removed once PR#1314 is in production,
     "OPENEDX_OAUTH_APP_NAME": "edx-oauth-app",
     # This replaces OPENEDX_GRADES_API_TOKEN and is

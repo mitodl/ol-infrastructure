@@ -210,7 +210,7 @@ heroku_vars = {
     "SITE_NAME": "MITx Online",
     "USE_X_FORWARDED_HOST": "True",
     "ZENDESK_HELP_WIDGET_ENABLED": "True",
-    "POSTHOG_API_HOST": "https://app.posthog.com",
+    "POSTHOG_API_HOST": "https://ph.ol.mit.edu",
     "POSTHOG_ENABLED": "True",
 }
 
