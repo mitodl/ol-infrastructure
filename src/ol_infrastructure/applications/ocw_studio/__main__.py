@@ -360,7 +360,7 @@ heroku_vars = {
     "OCW_STUDIO_ENVIRONMENT": env_name,
     "OCW_STUDIO_USE_S3": "True",
     "OCW_WWW_TEST_SLUG": "ocw-ci-test-www",
-    "POSTHOG_API_HOST": "https://app.posthog.com",
+    "POSTHOG_API_HOST": "https://ph.ol.mit.edu",
     "POSTHOG_ENABLED": "True",
     "POSTHOG_PROJECT_API_KEY": "phc_XDgBzghi6cHYiBbiTsL91Fw03j073dXNSxtG7MWfeS0",  # pragma: allowlist secret
     "PREPUBLISH_ACTIONS": "videos.tasks.update_transcripts_for_website,videos.youtube.update_youtube_metadata,content_sync.tasks.update_website_in_root_website",

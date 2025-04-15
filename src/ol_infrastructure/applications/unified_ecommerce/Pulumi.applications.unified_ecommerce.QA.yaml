@@ -30,7 +30,7 @@ config:
     MITOL_UE_SECURE_SSL_REDIRECT: "False" ###FIX
     MITOL_UE_USE_S3: "False" ###FIX
     NODE_ENV: "production"
-    POSTHOG_API_HOST: "https://app.posthog.com"
+    POSTHOG_API_HOST: "https://ph.ol.mit.edu"
     SITE_NAME: "MIT Open Learning Ecommerce"
     UWSGI_THREADS: "5"
   ecommerce:fastly_api_key:
