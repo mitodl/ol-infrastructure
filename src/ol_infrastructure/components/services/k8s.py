@@ -157,8 +157,10 @@ class OLApplicationK8s(ComponentResource):
         # If we have ANY metrics args, then we use HPA and don't pass replicas to the deployment
         # If we don't have metrics, then we pass min_replicas to the deployment
         if ol_app_k8s_config.hpa_scaling_metrics:
+            extra_deployment_args = {}
+        else:
             extra_deployment_args = {
-                "replicas": ol_app_k8s_config.application_min_replicas
+                "replicas": ol_app_k8s_config.application_min_replicas,
             }
 
         self.application_lb_service_name: str = (
@@ -340,7 +342,6 @@ class OLApplicationK8s(ComponentResource):
                 labels=application_labels,
             ),
             spec=kubernetes.apps.v1.DeploymentSpecArgs(
-                **extra_deployment_args,
                 selector=kubernetes.meta.v1.LabelSelectorArgs(
                     match_labels=application_labels,
                 ),
@@ -403,6 +404,7 @@ class OLApplicationK8s(ComponentResource):
                         ],
                     ),
                 ),
+                **extra_deployment_args,
             ),
             opts=resource_options,
         )
