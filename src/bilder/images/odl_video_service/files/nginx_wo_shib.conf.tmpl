@@ -27,7 +27,6 @@ server {
     ssl_prefer_server_ciphers on;
     resolver 1.1.1.1;
 
-    add_header Cross-Origin-Opener-Policy same-origin-allow-popups;
 
     location /status {
         include uwsgi_params;
