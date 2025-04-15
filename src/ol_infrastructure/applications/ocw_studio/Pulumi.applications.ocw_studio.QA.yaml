@@ -47,6 +47,8 @@ config:
     SOCIAL_AUTH_SAML_SP_ENTITY_ID: 'https://ocw-studio-rc.odl.mit.edu/saml/metadata'
     STATIC_API_BASE_URL_TEST: 'https://test-qa.ocw.mit.edu/'
     YT_PROJECT_ID: 'ocw-studio-qa'
+    POST_TRANSCODE_ACTIONS: 'videos.api.update_video_job'
+    VIDEO_S3_UPLOAD_PREFIX: 'gdrive_uploads'
   ocw_studio:app_domain: ocw-studio-rc.odl.mit.edu
   ocw_studio:db_password:
     secure: v1:lSm4Y1lRKps+MvKl:sUdOgCFDFuFa5/3mrrVB8KdWc1/fagKJqgV/dPbBybsKulWq4qW2zKU+LZQirRMJaQZMAD9QPiBdcIKXknY4n1aO1Fo/Bv6JkNhANj1EI5RqBQiVtDJ6CSrA
