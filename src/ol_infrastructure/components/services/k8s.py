@@ -1,11 +1,11 @@
-# ruff: noqa: ERA001, C416, E501
+# ruff: noqa: ERA001, C416, E501, CPY001
 """
 This is a service components that replaces a number of "boilerplate" kubernetes
 calls we currently make into one convenient callable package.
 """
 
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import pulumi
 import pulumi_kubernetes as kubernetes
@@ -32,9 +32,6 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
 def truncate_k8s_metanames(name: str) -> str:
-    """
-    Sanitize the names we use for k8s objects
-    """
     return name[:MAXIMUM_K8S_NAME_LENGTH].rstrip("-_.")
 
 
@@ -59,22 +56,46 @@ class OLApplicationK8sConfiguration(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     project_root: Path
-    application_replicas: int = 1
     application_config: dict[str, Any]
     application_name: str
     application_namespace: str
     application_lb_service_name: str
     application_lb_service_port_name: str
+    application_min_replicas: int = 2
+    application_max_replicas: int = 10
     k8s_global_labels: dict[str, str]
     env_from_secret_names: list[str]
     application_security_group_id: Output[str]
     application_security_group_name: Output[str]
     application_service_account_name: str | Output[str] | None = None
     application_image_repository: str
-    application_image_repository_suffix: Optional[str] = None
+    application_image_repository_suffix: str | None = None
     application_docker_tag: str
-    application_cmd_array: Optional[list[str]] = None
+    application_cmd_array: list[str] | None = None
     vault_k8s_resource_auth_name: str
+    # You get CPU and memory autoscaling by default
+    hpa_scaling_metrics: list[kubernetes.autoscaling.v2.MetricSpecArgs] = [
+        kubernetes.autoscaling.v2.MetricSpecArgs(
+            type="Resource",
+            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                name="CPU",
+                target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                    type="Utilization",
+                    average_utilization=80,  # Target CPU utilization (80%)
+                ),
+            ),
+        ),
+        kubernetes.autoscaling.v2.MetricSpecArgs(
+            type="Resource",
+            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                name="memory",  # Memory utilization as the scaling metric
+                target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                    type="Utilization",
+                    average_utilization=80,  # Target memory utilization (80%)
+                ),
+            ),
+        ),
+    ]
     import_nginx_config: bool = Field(default=True)
     import_uwsgi_config: bool = Field(default=False)
     resource_requests: dict[str, str] = Field(
@@ -115,10 +136,11 @@ class OLApplicationK8s(ComponentResource):
     Main K8s component resource class
     """
 
+    # Yes Ruff, this i s gross and needs fix :)
     def __init__(
         self,
         ol_app_k8s_config: OLApplicationK8sConfiguration,
-        opts: Optional[ResourceOptions] = None,
+        opts: ResourceOptions | None = None,
     ):
         """
         It's .. the constructor. Shaddap Ruff :)
@@ -130,6 +152,15 @@ class OLApplicationK8s(ComponentResource):
             opts=opts,
         )
         resource_options = ResourceOptions(parent=self)
+
+        extra_deployment_args: dict[str, int] = {}
+        # If we have ANY metrics args, then we use HPA and don't pass replicas to the deployment
+        # If we don't have metrics, then we pass min_replicas to the deployment
+        if ol_app_k8s_config.hpa_scaling_metrics:
+            extra_deployment_args = {
+                "replicas": ol_app_k8s_config.application_min_replicas
+            }
+
         self.application_lb_service_name: str = (
             ol_app_k8s_config.application_lb_service_name
         )
@@ -309,8 +340,7 @@ class OLApplicationK8s(ComponentResource):
                 labels=application_labels,
             ),
             spec=kubernetes.apps.v1.DeploymentSpecArgs(
-                # TODO @Ardiea: Add horizontial pod autoscaler  # noqa: TD003, FIX002
-                replicas=ol_app_k8s_config.application_replicas,
+                **extra_deployment_args,
                 selector=kubernetes.meta.v1.LabelSelectorArgs(
                     match_labels=application_labels,
                 ),
@@ -375,6 +405,51 @@ class OLApplicationK8s(ComponentResource):
                 ),
             ),
             opts=resource_options,
+        )
+
+        _application_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
+            "application-hpa",
+            spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
+                scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
+                    api_version="apps/v1",
+                    kind="Deployment",
+                    name=truncate_k8s_metanames(
+                        f"{ol_app_k8s_config.application_name}-app"
+                    ),
+                ),
+                min_replicas=ol_app_k8s_config.application_min_replicas,  # Minimum number of replicas
+                max_replicas=ol_app_k8s_config.application_max_replicas,  # Minimum number of replicas
+                # Corrected parameter name from "metrics" to the proper name for the API
+                metrics=ol_app_k8s_config.hpa_scaling_metrics,
+                # Optional: behavior configuration for scaling
+                behavior=kubernetes.autoscaling.v2.HorizontalPodAutoscalerBehaviorArgs(
+                    scale_up=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+                        stabilization_window_seconds=60,  # Wait 1 minute before scaling up again
+                        select_policy="Max",  # Choose max value when multiple metrics
+                        policies=[
+                            kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                                type="Percent",
+                                value=100,  # Double pods at most
+                                period_seconds=60,  # In this time period
+                            )
+                        ],
+                    ),
+                    scale_down=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+                        stabilization_window_seconds=300,  # Wait 5 minutes before scaling down
+                        select_policy="Min",
+                        policies=[
+                            kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                                type="Percent",
+                                value=25,  # Remove at most 25% of pods at once
+                                period_seconds=60,
+                            )
+                        ],
+                    ),
+                ),
+            ),
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                namespace=ol_app_k8s_config.application_namespace,
+            ),
         )
 
         # A kubernetes service resource to act as load balancer for the app instances
@@ -496,7 +571,7 @@ class OLApplicationK8s(ComponentResource):
 class OLApisixPluginConfig(BaseModel):
     name: str
     enable: bool = True
-    secret_ref: Optional[str] = Field(
+    secret_ref: str | None = Field(
         None,
         alias="secretRef",
     )
@@ -506,15 +581,15 @@ class OLApisixPluginConfig(BaseModel):
 class OLApisixRouteConfig(BaseModel):
     route_name: str
     priority: int = 0
-    shared_plugin_config_name: Optional[str] = None
+    shared_plugin_config_name: str | None = None
     plugins: list[OLApisixPluginConfig] = []
     hosts: list[str] = []
     paths: list[str] = []
-    backend_service_name: Optional[str] = None
-    backend_service_port: Optional[str] = None
+    backend_service_name: str | None = None
+    backend_service_port: str | None = None
     # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/#service-resolution-granularity
     backend_resolve_granularity: Literal["endpoint", "service"] = "service"
-    upstream: Optional[str] = None
+    upstream: str | None = None
     websocket: bool = False
 
     @field_validator("plugins")
@@ -535,9 +610,9 @@ class OLApisixRouteConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_backend_or_upstream(self) -> "OLApisixRouteConfig":
-        upstream: Optional[str] = self.upstream
-        backend_service_name: Optional[str] = self.backend_service_name
-        backend_service_port: Optional[str] = self.backend_service_port
+        upstream: str | None = self.upstream
+        backend_service_name: str | None = self.backend_service_name
+        backend_service_port: str | None = self.backend_service_port
 
         if upstream is not None:
             if backend_service_name is not None or backend_service_port is not None:
@@ -561,7 +636,7 @@ class OLApisixRoute(pulumi.ComponentResource):
         route_configs: list[OLApisixRouteConfig],
         k8s_namespace: str,
         k8s_labels: dict[str, str],
-        opts: Optional[pulumi.ResourceOptions] = None,
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixRoute", name, None, opts
@@ -654,7 +729,7 @@ class OLApisixOIDCResources(pulumi.ComponentResource):
         self,
         name: str,
         oidc_config: OLApisixOIDCConfig,
-        opts: Optional[pulumi.ResourceOptions] = None,
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixOIDCResources", name, None, opts
@@ -755,7 +830,7 @@ class OLApisixSharedPlugins(pulumi.ComponentResource):
         self,
         name: str,
         plugin_config: OLApisixSharedPluginsConfig,
-        opts: Optional[pulumi.ResourceOptions] = None,
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixSharedPlugin", name, None, opts
@@ -839,7 +914,7 @@ class OLApisixExternalUpstream(pulumi.ComponentResource):
         self,
         name: str,
         external_upstream_config: OLApisixExternalUpstreamConfig,
-        opts: Optional[pulumi.ResourceOptions] = None,
+        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
             "ol:infrastructure:services:k8s:OLApisixExternalUpstream", name, None, opts
