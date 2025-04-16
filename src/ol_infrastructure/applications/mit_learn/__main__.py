@@ -3,6 +3,7 @@
 import base64
 import json
 import mimetypes
+import os
 import textwrap
 from pathlib import Path
 from string import Template
@@ -25,7 +26,7 @@ from bridge.lib.magic_numbers import (
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
-from ol_infrastructure.applications.mitlearn.k8s_secrets import (
+from ol_infrastructure.applications.mit_learn.k8s_secrets import (
     create_mitlearn_k8s_secrets,
     create_oidc_k8s_secret,
 )
@@ -49,6 +50,7 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
     OLApplicationK8s,
+    OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfiguration,
 )
 from ol_infrastructure.components.services.vault import (
@@ -71,7 +73,7 @@ from ol_infrastructure.lib.fastly import (
 )
 from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import StackInfo, parse_stack
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 
@@ -877,7 +879,10 @@ mitopen_fastly_service = fastly.ServiceVcl(
     opts=ResourceOptions.merge(
         fastly_provider,
         ResourceOptions(
-            aliases=[Alias(name=f"fastly-mitopen-{stack_info.env_suffix}")]
+            aliases=[
+                Alias(name=f"fastly-mitopen-{stack_info.env_suffix}"),
+                Alias(name=f"fastly-mitlearn-{stack_info.env_suffix}"),
+            ],
         ),
     ),
 )
@@ -1340,13 +1345,7 @@ learn_external_service_apisix_upstream = OLApisixExternalUpstream(
 
 # This now goes outside the conditional since we have a CI environment now.
 xpro_consul_opts = get_consul_provider(
-    StackInfo(
-        name="CI",
-        namespace=stack_info.namespace,
-        env_suffix="ci",
-        env_prefix=stack_info.env_prefix,
-        full_name=stack_info.full_name,
-    ),
+    stack_info=stack_info,
     consul_address=f"https://consul-xpro-{stack_info.env_suffix}.odl.mit.edu",
     provider_name=f"consul-provider-xpro-{stack_info.env_suffix}",
 )
@@ -1355,7 +1354,7 @@ consul.Keys(
     keys=[
         consul.KeysKeyArgs(
             path="edxapp/learn-api-domain",
-            delete=True,
+            delete=False,
             value=mitlearn_api_domain,
         )
     ],
@@ -1364,7 +1363,7 @@ consul.Keys(
 
 
 # Actions specific to non-Kubernetes (Heroku) deployments
-if not mitlearn_config.get_bool("k8s_deploy"):
+if not mitlearn_config.get_bool("k8s_cutover"):
     # Create the OIDC secret needed for APISIX when deployed outside K8s
     oidc_secret_name, oidc_secret = create_oidc_k8s_secret(
         stack_info=stack_info,
@@ -1390,44 +1389,24 @@ if not mitlearn_config.get_bool("k8s_deploy"):
         "post_logout_redirect_uri": f"https://{mitlearn_api_domain}/logout/",
     }
 
-    # MITx Online doesn't have a CI environment. Remove this once that ceases to be true.
-    # TODO(TMM 2025-04-04): Remove this hack once there is a CI deployment of Learn
-    mitxonline_consul_opts = get_consul_provider(
-        stack_info,
-        consul_address=f"https://consul-mitxonline-{stack_info.env_suffix}.odl.mit.edu",
-        provider_name=f"consul-provider-mitxonline-{stack_info.env_suffix}",
-    )
-    consul.Keys(
-        "learn-api-domain-consul-key-for-mitxonline-openedx",
-        keys=[
-            consul.KeysKeyArgs(
-                path="edxapp/learn-api-domain",
-                delete=True,
-                value=mitlearn_api_domain,
-            )
-        ],
-        opts=mitxonline_consul_opts,
-    )
-
-    # TODO(TMM 2025-04-04): Remove this hack once there is a CI deployment of Learn
-    # This condition was originally `if stack_info.env_suffix == "qa":`
-    # It's included here because QA is currently a non-k8s deployment.
-    if stack_info.env_suffix == "qa":
-        xpro_ci_consul_opts = get_consul_provider(
+    if stack_info.env_suffix != "ci":
+        # MITx Online doesn't have a CI environment. Remove this once that ceases to be true.
+        # TODO(TMM 2025-04-04): Remove this hack once there is a CI deployment of Learn
+        mitxonline_consul_opts = get_consul_provider(
             stack_info,
-            consul_address="https://consul-xpro-ci.odl.mit.edu",
-            provider_name="consul-provider-xpro-ci",
+            consul_address=f"https://consul-mitxonline-{stack_info.env_suffix}.odl.mit.edu",
+            provider_name=f"consul-provider-mitxonline-{stack_info.env_suffix}",
         )
         consul.Keys(
-            "learn-api-domain-consul-key-for-xpro-openedx-ci",
+            "learn-api-domain-consul-key-for-mitxonline-openedx",
             keys=[
                 consul.KeysKeyArgs(
                     path="edxapp/learn-api-domain",
-                    delete=True,
+                    delete=False,
                     value=mitlearn_api_domain,
                 )
             ],
-            opts=xpro_ci_consul_opts,
+            opts=mitxonline_consul_opts,
         )
 
     # LEGACY RETIREMENT : goes away
@@ -1663,6 +1642,7 @@ if not mitlearn_config.get_bool("k8s_deploy"):
         app_id=heroku_app_id,
         sensitive_vars=sensitive_env_vars,
         vars=env_vars,
+        opts=ResourceOptions(retain_on_delete=True),
     )
 
 
@@ -1728,37 +1708,50 @@ if mitlearn_config.get_bool("k8s_deploy"):
         redis_cache=redis_cache,
     )
 
+    if "MIT_LEARN_DOCKER_TAG" not in os.environ:
+        msg = "MIT_LEARN_DOCKER_TAG must be set."
+        raise OSError(msg)
+    MIT_LEARN_DOCKER_TAG = os.environ["MIT_LEARN_DOCKER_TAG"]
+
     # Configure and deploy the mitlearn application using OLApplicationK8s
-    mitlearn_k8s_app_config = OLApplicationK8sConfiguration(
-        project_root=Path(__file__).parent,
-        application_config=env_vars,
-        application_name="mitlearn",
-        application_namespace=learn_namespace,
-        application_lb_service_name="mitlearn-webapp",
-        application_lb_service_port_name="http",
-        k8s_global_labels=k8s_global_labels,
-        # Reference all Kubernetes secrets containing environment variables
-        env_from_secret_names=secret_names,
-        application_security_group_id=mitlearn_app_security_group.id,
-        application_security_group_name=mitlearn_app_security_group.name,
-        application_image_repository="ardiea/mitlearn",  # As requested
-        application_docker_tag="testing",  # As requested
-        application_cmd_array=[
-            "uwsgi",
-            "/tmp/uwsgi.ini",  # noqa: S108
-        ],
-        vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
-        import_nginx_config=True,  # Assuming Django app needs nginx
-        import_uwsgi_config=True,  # Assuming Django app needs uwsgi
-        resource_requests={"cpu": "500m", "memory": "1600Mi"},
-        resource_limits={"cpu": "1000m", "memory": "1600Mi"},
-        init_migrations=True,  # Assuming Django app needs migrations
-        init_collectstatic=True,  # Assuming Django app needs collectstatic
-        # Using default resource requests/limits for now
-    )
 
     mitlearn_k8s_app = OLApplicationK8s(
-        ol_app_k8s_config=mitlearn_k8s_app_config,
+        ol_app_k8s_config=OLApplicationK8sConfiguration(
+            project_root=Path(__file__).parent,
+            application_config=env_vars,
+            application_name="mitlearn",
+            application_namespace=learn_namespace,
+            application_lb_service_name="mitlearn-webapp",
+            application_lb_service_port_name="http",
+            k8s_global_labels=k8s_global_labels,
+            # Reference all Kubernetes secrets containing environment variables
+            env_from_secret_names=secret_names,
+            application_security_group_id=mitlearn_app_security_group.id,
+            application_security_group_name=mitlearn_app_security_group.name,
+            application_image_repository="mitodl/mit-learn-app",
+            application_docker_tag=MIT_LEARN_DOCKER_TAG,
+            application_cmd_array=[
+                "uwsgi",
+                "/tmp/uwsgi.ini",  # noqa: S108
+            ],
+            vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
+            import_nginx_config=True,  # Assuming Django app needs nginx
+            import_uwsgi_config=True,  # Assuming Django app needs uwsgi
+            resource_requests={"cpu": "500m", "memory": "1600Mi"},
+            resource_limits={"cpu": "1000m", "memory": "1600Mi"},
+            init_migrations=True,  # Assuming Django app needs migrations
+            init_collectstatic=True,  # Assuming Django app needs collectstatic
+            celery_worker_configs=[
+                OLApplicationK8sCeleryWorkerConfig(
+                    worker_name="default",
+                    queues=["default", "edx_content"],
+                    replicas=4,
+                    resource_requests={"cpu": "500m", "memory": "2000Mi"},
+                    resource_limits={"cpu": "1000m", "memory": "3000Mi"},
+                ),
+            ],
+            # Using default resource requests/limits for now
+        ),
         opts=ResourceOptions(
             depends_on=[
                 mitlearn_app_security_group,
@@ -1767,6 +1760,7 @@ if mitlearn_config.get_bool("k8s_deploy"):
         ),
     )
 
+if mitlearn_config.get_bool("k8s_cutover"):
     mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
         f"ol-mitlearn-k8s-olapisixoidcresources-no-prefix-{stack_info.env_suffix}",
         oidc_config=OLApisixOIDCConfig(

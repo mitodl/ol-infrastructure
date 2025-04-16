@@ -494,7 +494,7 @@ class OLApplicationK8s(ComponentResource):
                 f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.worker_name}-{stack_info.env_suffix}",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     name=truncate_k8s_metanames(
-                        f"{ol_app_k8s_config.application_name}-celery-worker"
+                        f"{ol_app_k8s_config.application_name}-{celery_worker_config.worker_name}-celery-worker"
                     ),
                     namespace=ol_app_k8s_config.application_namespace,
                     labels=celery_labels,
@@ -538,6 +538,7 @@ class OLApplicationK8s(ComponentResource):
                         ),
                     ),
                 ),
+                opts=resource_options,
             )
 
         _application_pod_security_group_policy = (

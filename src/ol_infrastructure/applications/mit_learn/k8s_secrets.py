@@ -169,26 +169,28 @@ def create_mitlearn_k8s_secrets(
         mount_type="kv-v2",  # This mount is kv-v2
         path="secrets",
         templates={
-            "CKEDITOR_ENVIRONMENT_ID": '{{ get .Secrets "ckeditor.environment_id" }}',
-            "CKEDITOR_SECRET_KEY": '{{ get .Secrets "ckeditor.secret_key" }}',
-            "CKEDITOR_UPLOAD_URL": '{{ get .Secrets "ckeditor.upload_url" }}',
-            "EDX_API_CLIENT_ID": '{{ get .Secrets "edx_api_client.id" }}',
-            "EDX_API_CLIENT_SECRET": '{{ get .Secrets "edx_api_client.secret" }}',
+            # Nested keys require `index .Secrets "parent" "child"` syntax
+            "CKEDITOR_ENVIRONMENT_ID": '{{ index .Secrets "ckeditor" "environment_id" }}',
+            "CKEDITOR_SECRET_KEY": '{{ index .Secrets "ckeditor" "secret_key" }}',
+            "CKEDITOR_UPLOAD_URL": '{{ index .Secrets "ckeditor" "upload_url" }}',
+            "EDX_API_CLIENT_ID": '{{ index .Secrets "edx_api_client" "id" }}',
+            "EDX_API_CLIENT_SECRET": '{{ index .Secrets "edx_api_client" "secret" }}',
+            "OLL_API_CLIENT_ID": '{{ index .Secrets "open_learning_library_client" "client_id" }}',
+            "OLL_API_CLIENT_SECRET": '{{ index .Secrets "open_learning_library_client" "client_secret" }}',
+            "OPENAI_API_KEY": '{{ index .Secrets "openai" "api_key" }}',
+            "OPENSEARCH_HTTP_AUTH": '{{ index .Secrets "opensearch" "http_auth" }}',
+            "QDRANT_API_KEY": '{{ index .Secrets "qdrant" "api_key" }}',
+            "QDRANT_HOST": '{{ index .Secrets "qdrant" "host_url" }}',
+            "POSTHOG_PROJECT_API_KEY": '{{ index .Secrets "posthog" "project_api_key" }}',
+            "POSTHOG_PERSONAL_API_KEY": '{{ index .Secrets "posthog" "personal_api_key" }}',
+            "SEE_API_CLIENT_ID": '{{ index .Secrets "see_api_client" "id" }}',
+            "SEE_API_CLIENT_SECRET": '{{ index .Secrets "see_api_client" "secret" }}',
+            # Top-level keys can use `get .Secrets "key"`
             "MITOL_JWT_SECRET": '{{ get .Secrets "jwt_secret" }}',
-            "OLL_API_CLIENT_ID": '{{ get .Secrets "open_learning_library_client.client_id" }}',
-            "OLL_API_CLIENT_SECRET": '{{ get .Secrets "open_learning_library_client.client_secret" }}',
-            "OPENAI_API_KEY": '{{ get .Secrets "openai.api_key" }}',
-            "OPENSEARCH_HTTP_AUTH": '{{ get .Secrets "opensearch.http_auth" }}',
-            "QDRANT_API_KEY": '{{ get .Secrets "qdrant.api_key" }}',
-            "QDRANT_HOST": '{{ get .Secrets "qdrant.host_url" }}',
             "SECRET_KEY": '{{ get .Secrets "django_secret_key" }}',
             "SENTRY_DSN": '{{ get .Secrets "sentry_dsn" }}',
             "STATUS_TOKEN": '{{ get .Secrets "django_status_token" }}',
             "YOUTUBE_DEVELOPER_KEY": '{{ get .Secrets "youtube_developer_key" }}',
-            "POSTHOG_PROJECT_API_KEY": '{{ get .Secrets "posthog.project_api_key" }}',
-            "POSTHOG_PERSONAL_API_KEY": '{{ get .Secrets "posthog.personal_api_key" }}',
-            "SEE_API_CLIENT_ID": '{{ get .Secrets "see_api_client.id" }}',
-            "SEE_API_CLIENT_SECRET": '{{ get .Secrets "see_api_client.secret" }}',
         },
         vaultauth=vault_k8s_resources.auth_name,
     )
@@ -316,10 +318,7 @@ def create_mitlearn_k8s_secrets(
         ),
         string_data=redis_cache.address.apply(
             lambda address: {
-                "REDIS_CLOUD_URL": f"rediss://default:{redis_password}@{address}:{DEFAULT_REDIS_PORT}",  # Value in heroku omits db
                 "REDIS_URL": f"rediss://default:{redis_password}@{address}:{DEFAULT_REDIS_PORT}",  # Value in heroku omits db
-                "REDIS_DOMAIN": f"rediss://default:{redis_password}@{address}:{DEFAULT_REDIS_PORT}/0",
-                "REDIS_SSL_CERT_REQS": "required",
                 "CELERY_BROKER_URL": f"rediss://default:{redis_password}@{address}:{DEFAULT_REDIS_PORT}/0?ssl_cert_reqs=required",
                 "CELERY_RESULT_BACKEND": f"rediss://default:{redis_password}@{address}:{DEFAULT_REDIS_PORT}/0?ssl_cert_reqs=required",
             }
