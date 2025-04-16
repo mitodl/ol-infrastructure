@@ -1,3 +1,5 @@
+"""Generate the meta pipeline which manages the other pipelines."""
+
 from ol_concourse.lib.models.pipeline import (
     Command,
     GetStep,
@@ -70,9 +72,42 @@ def build_meta_job(variant: str) -> Job:
     )
 
 
+def set_self_job() -> Job:
+    """Build a job to regenerate and set the meta pipeline itself."""
+    definition_path = "generated-pipeline/meta-pipeline-definition.json"
+    return Job(
+        name=Identifier("set-self-pipeline"),
+        plan=[
+            GetStep(get=ol_concourse_repo.name, trigger=True),
+            GetStep(get=python_image.name),
+            TaskStep(
+                task=Identifier("generate-meta-pipeline-definition"),
+                image=python_image.name,
+                config=TaskConfig(
+                    platform="linux",
+                    inputs=[Input(name=ol_concourse_repo.name)],
+                    outputs=[Output(name=Identifier("generated-pipeline"))],
+                    run=Command(
+                        path="sh",
+                        args=[
+                            "-exc",
+                            f"python {ol_concourse_repo.name}/src/ol_concourse/pipelines/libraries/meta.py > {definition_path}",  # noqa: E501
+                        ],
+                    ),
+                ),
+            ),
+            SetPipelineStep(
+                set_pipeline=Identifier("self"),
+                file=definition_path,
+            ),
+        ],
+    )
+
+
 def meta_pipeline() -> Pipeline:
     """Generate the meta-pipeline for managing API client pipelines."""
-    jobs = [build_meta_job(variant) for variant in PIPELINE_CONFIGS]
+    api_client_jobs = [build_meta_job(variant) for variant in PIPELINE_CONFIGS]
+    jobs = [set_self_job(), *api_client_jobs]
     return Pipeline(
         resources=[ol_concourse_repo, python_image],
         jobs=jobs,
