@@ -34,6 +34,7 @@ config:
     session_cookie_domain: ".rc.learn.mit.edu"
     sso_url: "sso-ci.ol.mit.edu"
   mitlearn:k8s_deploy: "true"
+  mitlearn:k8s_cutover: "true"
   mitlearn:learn_ai_recommendation_endpoint: "https://api.rc.learn.mit.edu/ai/http/recommendation_agent/"
   mitlearn:learn_ai_syllabus_endpoint: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
   mitlearn:legacy_frontend_domain: "mitopen-ci.odl.mit.edu"

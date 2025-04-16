@@ -538,6 +538,7 @@ class OLApplicationK8s(ComponentResource):
                         ),
                     ),
                 ),
+                opts=resource_options,
             )
 
         _application_pod_security_group_policy = (

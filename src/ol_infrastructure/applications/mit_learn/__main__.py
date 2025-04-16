@@ -879,7 +879,10 @@ mitopen_fastly_service = fastly.ServiceVcl(
     opts=ResourceOptions.merge(
         fastly_provider,
         ResourceOptions(
-            aliases=[Alias(name=f"fastly-mitopen-{stack_info.env_suffix}")]
+            aliases=[
+                Alias(name=f"fastly-mitopen-{stack_info.env_suffix}"),
+                Alias(name=f"fastly-mitlearn-{stack_info.env_suffix}"),
+            ],
         ),
     ),
 )
@@ -1360,7 +1363,7 @@ consul.Keys(
 
 
 # Actions specific to non-Kubernetes (Heroku) deployments
-if not mitlearn_config.get_bool("k8s_deploy"):
+if not mitlearn_config.get_bool("k8s_cutover"):
     # Create the OIDC secret needed for APISIX when deployed outside K8s
     oidc_secret_name, oidc_secret = create_oidc_k8s_secret(
         stack_info=stack_info,
@@ -1639,6 +1642,7 @@ if not mitlearn_config.get_bool("k8s_deploy"):
         app_id=heroku_app_id,
         sensitive_vars=sensitive_env_vars,
         vars=env_vars,
+        opts=ResourceOptions(retain_on_delete=True),
     )
 
 
@@ -1756,6 +1760,7 @@ if mitlearn_config.get_bool("k8s_deploy"):
         ),
     )
 
+if mitlearn_config.get_bool("k8s_cutover"):
     mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
         f"ol-mitlearn-k8s-olapisixoidcresources-no-prefix-{stack_info.env_suffix}",
         oidc_config=OLApisixOIDCConfig(
