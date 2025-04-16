@@ -63,7 +63,6 @@ class OLApplicationK8sConfiguration(BaseModel):
     application_lb_service_port_name: str
     application_min_replicas: NonNegativeInt = 1
     application_max_replicas: NonNegativeInt = 10
-    application_desired_replicas: NonNegativeInt = 2
     k8s_global_labels: dict[str, str]
     env_from_secret_names: list[str]
     application_security_group_id: Output[str]
@@ -422,7 +421,6 @@ class OLApplicationK8s(ComponentResource):
                 ),
                 min_replicas=ol_app_k8s_config.application_min_replicas,  # Minimum number of replicas
                 max_replicas=ol_app_k8s_config.application_max_replicas,  # Minimum number of replicas
-                desired_replicas=ol_app_k8s_config.application_desired_replicas,
                 # Corrected parameter name from "metrics" to the proper name for the API
                 metrics=ol_app_k8s_config.hpa_scaling_metrics,
                 # Optional: behavior configuration for scaling
