@@ -3,6 +3,7 @@ import textwrap
 from collections import defaultdict
 from itertools import chain, product
 from typing import Literal, Optional
+import datetime
 
 from pydantic import BaseModel
 
@@ -75,6 +76,7 @@ def mfe_params(
     learning_mfe_path = OpenEdxMicroFrontend.learn.path
     discussion_mfe_path = OpenEdxMicroFrontend.discussion.path
     return {
+        "APP_ID": mfe.application.value,
         "ABOUT_US_URL": open_edx.about_us_url,
         "ACCESSIBILITY_URL": open_edx.accessibility_url,
         "ACCESS_TOKEN_COOKIE_NAME": (
@@ -83,6 +85,7 @@ def mfe_params(
         "ACCOUNT_SETTINGS_URL": open_edx.account_settings_url,
         "BASE_URL": f"https://{open_edx.lms_domain}/{mfe.application.path}",
         "CONTACT_URL": open_edx.contact_url,
+        "COPYRIGHT_TEXT": f"© {datetime.datetime.now(datetime.timezone.utc).year} {open_edx.site_name}. All rights reserved.",
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "DISPLAY_FEEDBACK_WIDGET": open_edx.display_feedback_widget,
         "ENABLE_CERTIFICATE_PAGE": open_edx.enable_certificate_page,
@@ -154,6 +157,9 @@ def mfe_job(
         )
     )
 
+    slot_config_file = "common-mfe-config"
+    copy_common_config = ""
+
     if (
         open_edx_deployment.deployment_name in ["mitxonline", "xpro"]
         and OpenEdxMicroFrontend[mfe_name].value == OpenEdxMicroFrontend.learn.value
@@ -163,10 +169,13 @@ def mfe_job(
         tar -xvzf mitodl-smoot-design*.tgz
         mv package mitodl-smoot-design
         """
-        learning_mfe_slot_config_file = "learning-mfe-config"
+        slot_config_file = "learning-mfe-config"
+        copy_common_config = f"""
+            cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx {mfe_build_dir.name}/common-mfe-config.env.jsx
+        """
     else:
         mfe_smoot_design_overrides = ""
-        learning_mfe_slot_config_file = "learning"
+
 
     translation_overrides = "\n".join(cmd for cmd in mfe.translation_overrides or [])
     if previous_job and mfe_repo.name == previous_job.plan[0].get:
@@ -176,21 +185,14 @@ def mfe_job(
     mfe_build_dir = Output(name=Identifier("mfe-build"))
     mfe_setup_plan = [clone_mfe_repo]
 
-    mfe_plugin_type_map = {
-        "learning": learning_mfe_slot_config_file,
-        "discussions": "learning",
-        "ora-grading": "learning",
-        "communications": "learning",
-        "gradebook": "simple",
-        "learner-dashboard": "simple",
-    }
-    if slot_config_file := mfe_plugin_type_map.get(
-        OpenEdxMicroFrontend[mfe_name].value
-    ):
+    mfe_plugin_types = ["learning", "discussions", "ora-grading", "communications", "gradebook", "learner-dashboard", "authoring"]
+    if OpenEdxMicroFrontend[mfe_name].value in mfe_plugin_types:
         mfe_setup_command = textwrap.dedent(
             f"""\
             cp -r {mfe_repo.name}/* {mfe_build_dir.name}
+            cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/Footer.jsx {mfe_build_dir.name}/Footer.jsx
             cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/{slot_config_file}.env.jsx {mfe_build_dir.name}/env.config.jsx
+            {copy_common_config}
             """  # noqa: E501
         )
     else:
