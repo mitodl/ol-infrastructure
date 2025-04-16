@@ -1,5 +1,5 @@
 PIPELINE_CONFIGS = {
-    "mit_open": {
+    "mit_learn": {
         "source_repo_name": "mit-learn",
         "source_repo_uri": "https://github.com/mitodl/mit-learn",
         "source_repo_branch": "release",

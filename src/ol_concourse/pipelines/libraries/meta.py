@@ -97,7 +97,7 @@ def set_self_job() -> Job:
                 ),
             ),
             SetPipelineStep(
-                set_pipeline=Identifier("self"),
+                set_pipeline=Identifier("ol-api-clients-meta"),
                 file=definition_path,
             ),
         ],
