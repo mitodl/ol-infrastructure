@@ -65,6 +65,19 @@ class Apps(str, Enum):
     mit_learn = "mit-learn"
 
 
+class K8sLabels(BaseModel):
+    """Base class for Kubernetes resource labels."""
+
+    labels: dict[str, str]
+
+    def __init__(self, stack_info, app: Apps, **kwargs):
+        """Add MIT OL standard labels for app and stack info."""
+        super().__init__(**kwargs)
+        self.labels.update(
+            {"ol.mit.edu/stack": stack_info.name, "ol.mit.edu/service": app}
+        )
+
+
 class AWSBase(BaseModel):
     """Base class for configuration objects to pass to AWS component resources."""
 
