@@ -23,8 +23,9 @@ config:
   eks:gateway_release_channel: "experimental"
   eks:namespaces:
   - "ecommerce"
-  - "mitlearn"
   - "learn-ai"
+  - "mitlearn"
+  - "odl-video-service"
   eks:nodegroups:
     worker-xlarge:
       disk_size_gb: 500
