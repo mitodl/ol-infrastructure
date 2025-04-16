@@ -140,7 +140,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
             ),
             TaskStep(
                 task="bump-version",
-                image=python_image,
+                image=python_image.name,
                 config=TaskConfig(
                     platform="linux",
                     inputs=[Input(name=api_clients_repository.name)],
@@ -200,7 +200,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
             ),
             TaskStep(
                 task="publish-node",
-                image=node_image,
+                image=node_image.name,
                 config=TaskConfig(
                     platform="linux",
                     inputs=[Input(name=api_clients_repository.name)],

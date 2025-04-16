@@ -16,7 +16,7 @@ from ol_concourse.pipelines.libraries.configuration import PIPELINE_CONFIGS
 
 # Resource for the ol-concourse code itself
 ol_concourse_repo = git_repo(
-    name=Identifier("ol-concourse"),
+    name=Identifier("ol-infrastructure"),
     uri="https://github.com/mitodl/ol-infrastructure",
     branch="main",
     paths=[
@@ -27,7 +27,7 @@ ol_concourse_repo = git_repo(
 
 # Resource for a Python image to run the generation script
 python_image = Resource(
-    name=Identifier("python-image"),
+    name=Identifier("ol-infra-image"),
     type="registry-image",
     icon="docker",
     source={
