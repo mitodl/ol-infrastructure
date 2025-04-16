@@ -17,7 +17,7 @@ from ol_concourse.pipelines.libraries.configuration import PIPELINE_CONFIGS
 # Resource for the ol-concourse code itself
 ol_concourse_repo = git_repo(
     name=Identifier("ol-concourse"),
-    uri="https://github.com/mitodl/ol-concourse",
+    uri="https://github.com/mitodl/ol-infrastructure",
     branch="main",
     paths=[
         "src/ol_concourse/pipelines/libraries/",
