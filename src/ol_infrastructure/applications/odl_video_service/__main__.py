@@ -1,19 +1,15 @@
 """The complete state needed to provision OVS running on Docker."""
 
-import base64
 import json
-import textwrap
-from itertools import chain
 from pathlib import Path
 
 import pulumi_consul as consul
-import pulumi_vault as vault
 import pulumi_kubernetes as kubernetes
-import yaml
-from pulumi import Config, Output, ResourceOptions, StackReference, export, Alias
-from pulumi_aws import ec2, get_caller_identity, iam, route53
-from pulumi_consul import Node, Service, ServiceCheckArgs
+import pulumi_vault as vault
+from pulumi import Alias, Config, ResourceOptions, StackReference, export
+from pulumi_aws import ec2, get_caller_identity, iam
 
+from bridge.lib.constants import ECR_PULLTHROUGH_CACHE_PREFIX
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_HTTP_PORT,
@@ -21,18 +17,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
 )
-from bridge.lib.constants import ECR_PULLTHROUGH_CACHE_PREFIX
 from bridge.secrets.sops import read_yaml_secrets
-
-from ol_infrastructure.components.aws.auto_scale_group import (
-    BlockDeviceMapping,
-    OLAutoScaleGroupConfig,
-    OLAutoScaling,
-    OLLaunchTemplateConfig,
-    OLLoadBalancerConfig,
-    OLTargetGroupConfig,
-    TagSpecification,
-)
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
@@ -46,7 +31,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
 )
-from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
+from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
