@@ -3,7 +3,6 @@ import textwrap
 from collections import defaultdict
 from itertools import chain, product
 from typing import Literal, Optional
-import datetime
 
 from pydantic import BaseModel
 
@@ -85,7 +84,6 @@ def mfe_params(
         "ACCOUNT_SETTINGS_URL": open_edx.account_settings_url,
         "BASE_URL": f"https://{open_edx.lms_domain}/{mfe.application.path}",
         "CONTACT_URL": open_edx.contact_url,
-        "COPYRIGHT_TEXT": f"© {datetime.datetime.now(datetime.timezone.utc).year} {open_edx.site_name}. All rights reserved.",
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "DISPLAY_FEEDBACK_WIDGET": open_edx.display_feedback_widget,
         "ENABLE_CERTIFICATE_PAGE": open_edx.enable_certificate_page,
@@ -157,6 +155,14 @@ def mfe_job(
         )
     )
 
+    translation_overrides = "\n".join(cmd for cmd in mfe.translation_overrides or [])
+    if previous_job and mfe_repo.name == previous_job.plan[0].get:
+        clone_mfe_repo.passed = [previous_job.name]
+        clone_mfe_configs.passed = [previous_job.name]
+
+    mfe_build_dir = Output(name=Identifier("mfe-build"))
+    mfe_setup_plan = [clone_mfe_repo]
+
     slot_config_file = "common-mfe-config"
     copy_common_config = ""
 
@@ -170,22 +176,19 @@ def mfe_job(
         mv package mitodl-smoot-design
         """
         slot_config_file = "learning-mfe-config"
-        copy_common_config = f"""
-            cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx {mfe_build_dir.name}/common-mfe-config.env.jsx
-        """
+        copy_common_config = f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx {mfe_build_dir.name}/common-mfe-config.env.jsx"  # noqa: E501
     else:
         mfe_smoot_design_overrides = ""
 
-
-    translation_overrides = "\n".join(cmd for cmd in mfe.translation_overrides or [])
-    if previous_job and mfe_repo.name == previous_job.plan[0].get:
-        clone_mfe_repo.passed = [previous_job.name]
-        clone_mfe_configs.passed = [previous_job.name]
-
-    mfe_build_dir = Output(name=Identifier("mfe-build"))
-    mfe_setup_plan = [clone_mfe_repo]
-
-    mfe_plugin_types = ["learning", "discussions", "ora-grading", "communications", "gradebook", "learner-dashboard", "authoring"]
+    mfe_plugin_types = [
+        "learning",
+        "discussions",
+        "ora-grading",
+        "communications",
+        "gradebook",
+        "learner-dashboard",
+        "authoring",
+    ]
     if OpenEdxMicroFrontend[mfe_name].value in mfe_plugin_types:
         mfe_setup_command = textwrap.dedent(
             f"""\

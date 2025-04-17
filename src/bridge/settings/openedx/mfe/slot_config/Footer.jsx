@@ -164,7 +164,7 @@ const Footer = () => {
                                     {link.label}
                                 </Hyperlink>
 
-                            ))}     
+                            ))}
                         </div>
                     ))}
                     </div>
@@ -193,7 +193,7 @@ const Footer = () => {
                                 ))}
                                 </Dropdown.Menu>
                             </Dropdown>
-                            
+
                         </div>
                     </PluginSlot>
                     <PoweredBy />
