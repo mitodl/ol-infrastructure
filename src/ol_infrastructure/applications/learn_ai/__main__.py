@@ -230,7 +230,7 @@ learn_ai_bedrock_policy = iam.Policy(
 learn_ai_service_account_name = "learn-ai-admin"
 learn_ai_trust_role_config = OLEKSTrustRoleConfig(
     account_id=aws_account.account_id,
-    cluster_name=f"data-{stack_info.name}",
+    cluster_name=f"applications-{stack_info.name}",
     cluster_identities=cluster_stack.require_output("cluster_identities"),
     description="Trust role for allowing the learn_ai service account to "
     "access the aws API",
