@@ -59,7 +59,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     openapi_generator_tag = "v7.2.0"
 
     # Define script names
-    generate_script: str = "api-clients-generate-inner.sh"
+    generate_script: str = "generate-inner.sh"
     bump_script: str = "api-clients-bumpver.sh"
     commit_script: str = "api-clients-commit-changes.sh"
     publish_script: str = "api-clients-publish-node.sh"
