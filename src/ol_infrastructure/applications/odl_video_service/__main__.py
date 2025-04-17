@@ -8,8 +8,9 @@ from pathlib import Path
 
 import pulumi_consul as consul
 import pulumi_vault as vault
+import pulumi_kubernetes as kubernetes
 import yaml
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, StackReference, export, Alias
 from pulumi_aws import ec2, get_caller_identity, iam, route53
 from pulumi_consul import Node, Service, ServiceCheckArgs
 
@@ -20,7 +21,9 @@ from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
 )
+from bridge.lib.constants import ECR_PULLTHROUGH_CACHE_PREFIX
 from bridge.secrets.sops import read_yaml_secrets
+
 from ol_infrastructure.components.aws.auto_scale_group import (
     BlockDeviceMapping,
     OLAutoScaleGroupConfig,
@@ -32,15 +35,22 @@ from ol_infrastructure.components.aws.auto_scale_group import (
 )
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.aws.mediaconvert import (
     MediaConvertConfig,
     OLMediaConvert,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
+    OLVaultK8SResources,
+    OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib.aws.ec2_helper import InstanceTypes, default_egress_args
+from ol_infrastructure.lib.aws.eks_helper import (
+    check_cluster_namespace,
+    setup_k8s_provider,
+)
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.consul import consul_key_helper, get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -52,10 +62,12 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 if Config("vault_server").get("env_namespace"):
     setup_vault_provider()
 ovs_config = Config("ovs")
+vault_config = Config("vault")
 stack_info = parse_stack()
 
 aws_account = get_caller_identity()
 
+cluster_stack = StackReference(f"infrastructure.aws.eks.applications.{stack_info.name}")
 network_stack = StackReference(f"infrastructure.aws.network.{stack_info.name}")
 policy_stack = StackReference("infrastructure.aws.policies")
 dns_stack = StackReference("infrastructure.aws.dns")
@@ -82,11 +94,21 @@ aws_config = AWSBase(
     }
 )
 consul_provider = get_consul_provider(stack_info)
-
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
-# IAM and instance profile
+# EKS Related configurations
+ovs_namespace = "odl-video-service"
+cluster_stack.require_output("namespaces").apply(
+    lambda ns: check_cluster_namespace(ovs_namespace, ns)
+)
 
+k8s_global_labels = {
+    "ol.mit.edu/stack": stack_info.full_name,
+    "ol.mit.edu/application": "odl-video-service",
+}
+setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
+
+# IAM and instance profile
 parliament_config = {
     "PERMISSIONS_MANAGEMENT_ACTIONS": {
         "ignore_locations": [{"actions": ["s3:putobjectacl"]}]
@@ -100,7 +122,7 @@ mediaconvert_policy_statements = OLMediaConvert.get_standard_policy_statements(
     stack_info.env_suffix, service_name="odl-video"
 )
 
-ovs_server_policy_document = {
+ovs_policy_document = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
         {
@@ -158,7 +180,7 @@ ovs_server_policy_document = {
         # The S3 permissions block following this SHOULD cover what this provides
         # but the app must be making some kind of call to bucket that isn't qualified
         # by the environment (CI,RC,Production)
-        # There are 21 odl-video-service* buckets at the moment.
+        # There are 21 odl-video-service* buckets at the moment. (JFC...)
         {
             "Action": [
                 "s3:HeadObject",
@@ -238,12 +260,12 @@ ovs_server_policy_document = {
         *mediaconvert_policy_statements,
     ],
 }
-ovs_server_policy = iam.Policy(
+ovs_policy = iam.Policy(
     "odl-video-service-server-policy",
     name_prefix="odl-video-service-server-policy-",
     path=f"/ol-applications/odl-video-service-server/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     policy=lint_iam_policy(
-        ovs_server_policy_document,
+        ovs_policy_document,
         stringify=True,
         parliament_config=parliament_config,
     ),
@@ -253,43 +275,48 @@ ovs_server_policy = iam.Policy(
     ),
 )
 
-ovs_server_instance_role = iam.Role(
-    f"odl-video-service-server-instance-role-{stack_info.env_suffix}",
-    assume_role_policy=json.dumps(
-        {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Action": "sts:AssumeRole",
-                    "Principal": {"Service": "ec2.amazonaws.com"},
-                }
-            ],
-        }
+
+# Ultimately this trust role may not actually serve any purpose because the app
+# has to have an aws secret key. See below.
+ovs_service_account_name = "odl-video-service"
+ovs_trust_role = OLEKSTrustRole(
+    f"odl-video-service-trust-role-{stack_info.env_suffix}",
+    role_config=OLEKSTrustRoleConfig(
+        account_id=aws_account.account_id,
+        cluster_name=f"applications-{stack_info.name}",
+        cluster_identities=cluster_stack.require_output("cluster_identities"),
+        description="Trust role for allowing the ovs service account to "
+        "access the aws API",
+        policy_operator="StringEquals",
+        role_name="odl-video-service",
+        service_account_identifier=f"system:serviceaccount:{ovs_namespace}:{ovs_service_account_name}",
+        tags=aws_config.tags,
     ),
-    path="/ol-infrastructure/odl-video-service-server/role/",
-    tags=aws_config.tags,
+    opts=ResourceOptions(
+        depends_on=[ovs_policy],
+    ),
 )
-
 iam.RolePolicyAttachment(
-    f"odl-video-service-server-describe-instance-role-policy-{env_name}",
-    policy_arn=policy_stack.require_output("iam_policies")["describe_instances"],
-    role=ovs_server_instance_role.name,
+    f"odl-video-service-s3-transcode-role-policy-{stack_info.env_suffix}",
+    policy_arn=ovs_policy.arn,
+    role=ovs_trust_role.role.name,
+    opts=ResourceOptions(
+        aliases=[Alias(f"odl-video-service-server-s3-transcode-role-policy-{env_name}")]
+    ),
+)
+ovs_service_account = kubernetes.core.v1.ServiceAccount(
+    f"odl-video-service-service-account-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=ovs_service_account_name,
+        namespace=ovs_namespace,
+        annotations={
+            "eks.amazonaws.com/role-arn": ovs_trust_role.role.arn,
+        },
+    ),
+    automount_service_account_token=False,
 )
 
-iam.RolePolicyAttachment(
-    f"odl-video-service-server-s3-transcode-role-policy-{env_name}",
-    policy_arn=ovs_server_policy.arn,
-    role=ovs_server_instance_role.name,
-)
-
-ovs_server_instance_profile = iam.InstanceProfile(
-    f"odl-video-service-server-instance-profile-{env_name}",
-    role=ovs_server_instance_role.name,
-    path="/ol-infrastructure/odl-video-service-server/profile/",
-)
-
-# Need to pin the same policy that the instance profile will use to the aws auth
+# Need to pin the same policy that the trustrole profile will use to the aws auth
 # backend because the app still needs an AWS Key
 ocw_studio_vault_backend_role = vault.aws.SecretBackendRole(
     f"ovs-server-{stack_info.env_suffix}",
@@ -299,15 +326,15 @@ ocw_studio_vault_backend_role = vault.aws.SecretBackendRole(
     iam_tags={"OU": "operations", "vault_managed": "True"},
     policy_arns=[
         policy_stack.require_output("iam_policies")["describe_instances"],
-        ovs_server_policy.arn,
+        ovs_policy.arn,
     ],
     opts=ResourceOptions(delete_before_replace=True),
 )
 
+############################################################
 # Network Access Control
-
 # Create various security groups
-ovs_server_security_group = ec2.SecurityGroup(
+ovs_app_security_group = ec2.SecurityGroup(
     f"odl-video-service-server-security-group-{env_name}",
     name=f"odl-video-service-server-{target_vpc_name}-{env_name}",
     description="Access control for odl-video-service servers",
@@ -345,7 +372,7 @@ ovs_database_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             security_groups=[
-                ovs_server_security_group.id,
+                ovs_app_security_group.id,
                 consul_stack.require_output("security_groups")["consul_server"],
                 vault_stack.require_output("vault_server")["security_group"],
                 data_vpc["security_groups"]["integrator"],
@@ -373,7 +400,7 @@ ovs_redis_security_group = ec2.SecurityGroup(
     ingress=[
         ec2.SecurityGroupIngressArgs(
             security_groups=[
-                ovs_server_security_group.id,
+                ovs_app_security_group.id,
             ],
             protocol="tcp",
             from_port=DEFAULT_REDIS_PORT,
@@ -388,11 +415,10 @@ ovs_redis_security_group = ec2.SecurityGroup(
     tags=aws_config.tags,
 )
 
+############################################################
 # Database
 rds_defaults = defaults(stack_info)["rds"]
-
 rds_password = ovs_config.require("rds_password")
-
 ovs_db_config = OLPostgresDBConfig(
     instance_name=f"odl-video-service-{stack_info.env_suffix}",
     password=rds_password,
@@ -419,41 +445,10 @@ ovs_db_vault_backend_config = OLVaultPostgresDatabaseConfig(
 )
 ovs_db_vault_backend = OLVaultDatabaseBackend(ovs_db_vault_backend_config)
 
-ovs_db_consul_node = Node(
-    f"odl-video-service-{stack_info.env_suffix}-db-node",
-    name="ovs-postgres-db",
-    address=db_address,
-    opts=consul_provider,
-)
-
-ovs_db_consul_service = Service(
-    f"odl-video-service-{stack_info.env_suffix}-db-service",
-    node=ovs_db_consul_node.name,
-    name="ovs-postgres",
-    port=db_port,
-    meta={
-        "external-node": True,
-        "external-probe": True,
-    },
-    checks=[
-        ServiceCheckArgs(
-            check_id="ovs-instance-db",
-            interval="10s",
-            name="ovs-instance-db",
-            timeout="60s",
-            status="passing",
-            tcp=Output.all(
-                address=db_address,
-                port=db_port,
-            ).apply(lambda db: "{address}:{port}".format(**db)),
-        )
-    ],
-    opts=consul_provider,
-)
-
+############################################################
+# Redis
 redis_auth_token = secrets["redis"]["auth_token"]
 redis_config = Config("redis")
-
 ovs_server_redis_config = OLAmazonRedisConfig(
     encrypt_transit=True,
     auth_token=redis_auth_token,
@@ -471,173 +466,40 @@ ovs_server_redis_config = OLAmazonRedisConfig(
 )
 ovs_server_redis_cluster = OLAmazonCache(ovs_server_redis_config)
 
-# Provision EC2 resources
-instance_type_name = (
-    ovs_config.get("instance_type") or InstanceTypes.burstable_medium.name
-)
-instance_type = InstanceTypes[instance_type_name].value
-
-subnets = target_vpc["subnet_ids"]
-subnet_id = subnets.apply(chain)
-
-grafana_credentials = read_yaml_secrets(
-    Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
-)
-consul_datacenter = consul_stack.require_output("datacenter")
-
-instance_tags = aws_config.merged_tags(
-    {"Name": f"odl-video-service-{stack_info.env_suffix}"}
-)
-
-branch_tag = ovs_config.get("ami_branch_tag") or "master"
-
-ovs_server_ami = ec2.get_ami(
-    filters=[
-        {
-            "name": "tag:Name",
-            "values": ["odl_video_service-server"],
-        },
-        {
-            "name": "tag:branch",
-            "values": [branch_tag],
-        },
-        {
-            "name": "virtualization-type",
-            "values": ["hvm"],
-        },
-    ],
-    most_recent=True,
-    owners=[str(aws_account.id)],
-)
-
-block_device_mappings = [BlockDeviceMapping()]
-
-ovs_lb_config = OLLoadBalancerConfig(
-    enable_insecure_http=True,
-    listener_cert_domain="*.odl.mit.edu",
-    listener_use_acm=True,
-    security_groups=[ovs_server_security_group],
-    subnets=subnets,
-    tags=instance_tags,
-)
-
-ovs_tg_config = OLTargetGroupConfig(
-    vpc_id=target_vpc["id"],
-    target_group_healthcheck=False,
-    health_check_interval=60,
-    health_check_matcher="404",  # TODO Figure out a real endpoint for this  # noqa: E501, FIX002, TD002, TD003, TD004
-    health_check_path="/ping",
-    stickiness="lb_cookie",
-    tags=instance_tags,
-)
-
-ovs_lt_config = OLLaunchTemplateConfig(
-    block_device_mappings=block_device_mappings,
-    image_id=ovs_server_ami.id,
-    instance_type=instance_type,
-    instance_profile_arn=ovs_server_instance_profile.arn,
-    security_groups=[
-        target_vpc["security_groups"]["default"],
-        ovs_server_security_group,
-    ],
-    tags=instance_tags,
-    tag_specifications=[
-        TagSpecification(
-            resource_type="instance",
-            tags=instance_tags,
-        ),
-        TagSpecification(
-            resource_type="volume",
-            tags=instance_tags,
-        ),
-    ],
-    user_data=consul_datacenter.apply(
-        lambda consul_dc: base64.b64encode(
-            "#cloud-config\n{}".format(
-                yaml.dump(
-                    {
-                        "write_files": [
-                            {
-                                "path": "/etc/consul.d/02-autojoin.json",
-                                "content": json.dumps(
-                                    {
-                                        "retry_join": [
-                                            "provider=aws tag_key=consul_env "
-                                            f"tag_value={consul_dc}"
-                                        ],
-                                        "datacenter": consul_dc,
-                                    }
-                                ),
-                                "owner": "consul:consul",
-                            },
-                            {
-                                "path": "/etc/default/vector",
-                                "content": textwrap.dedent(
-                                    f"""\
-                            ENVIRONMENT={consul_dc}
-                            APPLICATION=ovs
-                            SERVICE=ovs
-                            VECTOR_CONFIG_DIR=/etc/vector/
-                            VECTOR_STRICT_ENV_VARS=false
-                            AWS_REGION={aws_config.region}
-                            GRAFANA_CLOUD_API_KEY={grafana_credentials["api_key"]}
-                            GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
-                            GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
-                            """
-                                ),
-                                "owner": "root:root",
-                            },
-                        ],
-                    }
-                ),
-            ).encode("utf8")
-        ).decode("utf8")
-    ),
-)
-
-ovs_autoscale_sizes = ovs_config.get_object("auto_scale") or {
-    "desired": 2,
-    "min": 1,
-    "max": 3,
-}
-ovs_asg_config = OLAutoScaleGroupConfig(
-    asg_name=f"odl-video-service-{stack_info.env_suffix}",
-    aws_config=aws_config,
-    desired_size=ovs_autoscale_sizes["desired"],
-    min_size=ovs_autoscale_sizes["min"],
-    max_size=ovs_autoscale_sizes["max"],
-    vpc_zone_identifiers=target_vpc["subnet_ids"],
-    tags=instance_tags,
-)
-
-autoscale_setup = OLAutoScaling(
-    asg_config=ovs_asg_config,
-    lt_config=ovs_lt_config,
-    tg_config=ovs_tg_config,
-    lb_config=ovs_lb_config,
-)
-
-# Vault policy definition
-ovs_server_vault_policy = vault.Policy(
-    "ovs-server-vault-policy",
-    name="odl-video-service-server",
+############################################################
+# Create vault policy and associate it with the auth backend role
+# on the vault k8as cluster auth endpoint
+ovs_vault_policy = vault.Policy(
+    f"odl-video-service-vault-policy-{stack_info.env_suffix}",
+    name="odl-video-service",
     policy=Path(__file__)
-    .parent.joinpath("odl_video_service_server_policy.hcl")
+    .parent.joinpath("odl_video_service_server_policy.hcl")  # TODO FIX
     .read_text(),
+    opts=ResourceOptions(aliases=[Alias("ovs-server-vault-policy")]),
 )
 
-vault.aws.AuthBackendRole(
-    "odl-video-service-server-ec2-vault-auth",
-    backend="aws",
-    auth_type="iam",
-    role="ovs-server",
-    inferred_entity_type="ec2_instance",
-    inferred_aws_region=aws_config.region,
-    bound_iam_instance_profile_arns=[ovs_server_instance_profile.arn],
-    bound_ami_ids=[ovs_server_ami.id],
-    bound_account_ids=[aws_account.account_id],
-    bound_vpc_ids=[target_vpc_id],
-    token_policies=[ovs_server_vault_policy.name],
+ovs_vault_auth_backend_role = vault.kubernetes.AuthBackendRole(
+    "odl-video-service-k8s-auth-backend-role",
+    role_name="odl-video-service",
+    backend=cluster_stack.require_output("vault_auth_endpoint"),
+    bound_service_account_names=["*"],
+    bound_service_account_namespaces=[ovs_namespace],
+    token_policies=[ovs_vault_policy.name],
+)
+
+vault_k8s_resources = OLVaultK8SResources(
+    resource_config=OLVaultK8SResourcesConfig(
+        application_name="odl-video-service",
+        namespace=ovs_namespace,
+        labels=k8s_global_labels,
+        vault_address=vault_config.require("address"),
+        vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+        vault_auth_role_name=ovs_vault_auth_backend_role.role_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[ovs_vault_auth_backend_role],
+    ),
 )
 
 # Vault KV2 mount definition
@@ -668,22 +530,22 @@ else:
 domains_string = ",".join(ovs_config.get_object("domains"))
 
 # Create Route53 DNS records
-five_minutes = 60 * 5
-for domain in ovs_config.get_object("route53_managed_domains"):
-    route53.Record(
-        f"ovs-server-dns-record-{domain}",
-        name=domain,
-        type="CNAME",
-        ttl=five_minutes,
-        records=[autoscale_setup.load_balancer.dns_name],
-        zone_id=mitodl_zone_id,
-    )
+# five_minutes = 60 * 5
+# for domain in ovs_config.get_object("route53_managed_domains"):
+#    route53.Record(
+#        f"ovs-server-dns-record-{domain}",
+#        name=domain,
+#        type="CNAME",
+#        ttl=five_minutes,
+#        records=[autoscale_setup.load_balancer.dns_name],
+#        zone_id=mitodl_zone_id,
+#    )
 
 ovs_mediaconvert_config = MediaConvertConfig(
     service_name="odl-video",
     env_suffix=stack_info.env_suffix,
     tags=aws_config.tags,
-    policy_arn=ovs_server_policy.arn,
+    policy_arn=ovs_policy.arn,
     host=ovs_config.get("default_domain"),
 )
 
@@ -712,6 +574,78 @@ consul.Keys(
     "ovs-server-configuration-data",
     keys=consul_key_helper(consul_keys),
     opts=consul_provider,
+)
+
+volumes = []
+nginx_volume_mounts = []
+app_volume_mounts = []
+
+
+# Application deployment
+application_labels = k8s_global_labels | {
+    "ol.mit.edu/service": "webapp",
+}
+ovs_k8s_deployment_resource = kubernetes.apps.v1.Deployment(
+    f"odl-video-service-k8s-deployment-resource-{env_name}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="odl-video-service",
+        namespace=ovs_namespace,
+        labels=application_labels,
+    ),
+    spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels=application_labels,
+        ),
+        strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
+            type="RollingUpdate",
+            rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
+                max_surge=0,
+                max_unavailable=1,
+            ),
+        ),
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels=application_labels,
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                volumes=volumes,
+                init_containers=[],
+                dns_policy="ClusterFirst",
+                service_account_name=ovs_service_account_name,
+                containers=[
+                    # Nginx + shib container
+                    kubernetes.core.v1.ContainerArgs(
+                        name="nginx",
+                        image=f"{ECR_PULLTHROUGH_CACHE_PREFIX}/pennlabs/shibboleth-sp-nginx:latest",
+                        ports=[
+                            kubenetes.core.v1.ContainerPortArgs(
+                                container_port=DEFAULT_HTTP_PORT,
+                            ),
+                            kubenetes.core.v1.ContainerPortArgs(
+                                container_port=DEFAULT_HTTPS_PORT,
+                            ),
+                        ],
+                        image_pull_policy="IfNotPresent",
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={
+                                "cpu": "100m",
+                                "memory": "128Mi",
+                            },
+                            limits={
+                                "cpu": "200m",
+                                "memory": "256Mi",
+                            },
+                        ),
+                        volume_mounts=nginx_volume_mounts,
+                    ),
+                    kubernetes.core.v1.ContainerArgs(
+                        name="ovs-webapp",
+                        image=f"{ECR_PULLTHROUGH_CACHE_PREFIX}/mitodl/ovs-app:${OVS_DOCKER_TAG}",
+                    ),
+                ],
+            ),
+        ),
+    ),
 )
 
 # Add the resources to the export
