@@ -19,6 +19,7 @@ class BusinessUnit(str, Enum):
     bootcamps = "bootcamps"
     data = "data"
     digital_credentials = "digital-credentials"
+    mit_learn = "mit-learn"
     micromasters = "micromasters"
     mit_open = "mit-open"
     mitx = "mitx"
@@ -29,6 +30,7 @@ class BusinessUnit(str, Enum):
     residential = "residential"
     residential_staging = "residential-staging"
     xpro = "mitxpro"
+    ecommerce = "unified-ecommerce"
 
 
 @unique
@@ -48,6 +50,7 @@ class Environment(str, Enum):
 class Apps(str, Enum):
     """Canonical source of truth for defining apps."""
 
+    airbyte = "airbytte"
     bootcamps = "bootcamps"
     dagster = "dagster"
     edxapp = "edxapp"
@@ -63,18 +66,23 @@ class Apps(str, Enum):
     xpro = "xpro"
     ecommerce = "unified-ecommerce"
     mit_learn = "mit-learn"
+    open_metadata = " open-metadata"
 
 
-class K8sLabels(BaseModel):
+class K8sGlobalLabels(BaseModel):
     """Base class for Kubernetes resource labels."""
 
     labels: dict[str, str]
 
-    def __init__(self, stack_info, app: Apps, **kwargs):
+    def __init__(self, stack_info, app: Apps, ou: BusinessUnit, **kwargs):
         """Add MIT OL standard labels for app and stack info."""
         super().__init__(**kwargs)
         self.labels.update(
-            {"ol.mit.edu/stack": stack_info.name, "ol.mit.edu/service": app}
+            {
+                "ol.mit.edu/stack": stack_info.name,
+                "ol.mit.edu/service": app,
+                "ol.mit.edu/ou": ou,
+            }
         )
 
 

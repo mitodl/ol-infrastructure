@@ -56,7 +56,7 @@ from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
-from ol_infrastructure.lib.ol_types import Apps, AWSBase
+from ol_infrastructure.lib.ol_types import Apps, AWSBase, BusinessUnit, K8sGlobalLabels
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -90,10 +90,12 @@ vault_config = Config("vault")
 
 consul_provider = get_consul_provider(stack_info)
 setup_vault_provider(stack_info)
-k8s_global_labels = {
-    "ol.mit.edu/stack": stack_info.full_name,
-    "ol.mit.edu/service": Apps.ecommerce,
-}
+
+k8s_global_labels = K8sGlobalLabels(
+    app=Apps.ecommerce,
+    ou=BusinessUnit.ecommerce,
+    stack_info=stack_info,
+)
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 if not (UNIFIED_ECOMMERCE_DOCKER_TAG := os.getenv("UNIFIED_ECOMMERCE_DOCKER_TAG")):

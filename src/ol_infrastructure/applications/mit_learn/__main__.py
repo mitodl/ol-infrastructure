@@ -72,7 +72,12 @@ from ol_infrastructure.lib.fastly import (
     get_fastly_provider,
 )
 from ol_infrastructure.lib.heroku import setup_heroku_provider
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import (
+    Apps,
+    AWSBase,
+    BusinessUnit,
+    K8s8sGlobalLabels,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
@@ -122,10 +127,12 @@ app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
     stack_info.env_suffix
 ]
 
-k8s_global_labels = {
-    "ol.mit.edu/stack": stack_info.full_name,
-    "ol.mit.edu/service": "mit-learn",  # What should this actually be?
-}
+k8s_global_labels = K8s8sGlobalLabels(
+    app=Apps.mit_learn,
+    ou=BusinessUnit.mit_learn,
+    stack_info=stack_info,
+)
+
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 learn_namespace = "mitlearn"
 cluster_stack.require_output("namespaces").apply(
