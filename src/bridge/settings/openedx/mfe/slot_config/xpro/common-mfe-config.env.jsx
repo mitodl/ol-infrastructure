@@ -116,7 +116,7 @@ const footerSubSlotsConfig = {
           id: 'custom_legal_notice',
           type: DIRECT_PLUGIN,
           RenderWidget: () => (
-            <CopyrightNotice copyrightText={`© ${currentYear} ${configData.SITE_NAME}. All rights reserved.`} />
+            <CopyrightNotice copyrightText={`© ${currentYear} ${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, "").trim()}. All rights reserved.`} />
           ),
         },
       },

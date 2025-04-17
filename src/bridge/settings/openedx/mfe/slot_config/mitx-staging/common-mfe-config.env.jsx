@@ -43,14 +43,6 @@ const LearningHeaderUserMenu = (widget) => {
       message: 'Dashboard',
     },
     {
-      href: `${configData.MARKETING_SITE_BASE_URL}/profile/`,
-      message: 'Profile',
-    },
-    {
-      href: `${configData.MARKETING_SITE_BASE_URL}/account-settings/`,
-      message: 'Settings',
-    },
-    {
       href: `${configData.LMS_BASE_URL}/logout`,
       message: 'Sign Out',
     },
@@ -98,7 +90,7 @@ const footerSubSlotsConfig = {
           id: 'custom_legal_notice',
           type: DIRECT_PLUGIN,
           RenderWidget: () => (
-            <CopyrightNotice copyrightText={`© ${currentYear} ${configData.SITE_NAME}. All rights reserved.`} />
+            <CopyrightNotice copyrightText={`© ${currentYear} ${configData.SITE_NAME.replace(/\b(CI|QA|Staging)\b/g, "").trim()}. All rights reserved.`} />
           ),
         },
       },
