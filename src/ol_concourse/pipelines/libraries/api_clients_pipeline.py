@@ -97,9 +97,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         name=Identifier(source_repo_name),
         uri=source_repo_uri,
         branch=source_repo_branch,
-        paths=[
-            "openapi/specs/",
-        ],
+        paths=["openapi/specs/*.yaml"],
     )
 
     api_clients_repository = ssh_git_repo(
