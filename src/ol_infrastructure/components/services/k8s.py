@@ -24,6 +24,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_UWSGI_PORT,
     MAXIMUM_K8S_NAME_LENGTH,
 )
+from bridge.lib.versions import NGINX_VERSION
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
@@ -46,9 +47,32 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
         default={"cpu": "250m", "memory": "300Mi"}
     )
     resource_limits: dict[str, str] = Field(
-        default={"cpu": "500m", "memory": "600Mi"},
+        default={"cpu": "2", "memory": "2000Mi"},
     )
-    replicas: int = 1  # In lieu of a proper autoscaler 20250407
+    min_replicas: NonNegativeInt = 1
+    max_replicas: NonNegativeInt = 10
+    hpa_scaling_metrics: list[kubernetes.autoscaling.v2.MetricSpecArgs] = [
+        kubernetes.autoscaling.v2.MetricSpecArgs(
+            type="Resource",
+            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                name="cpu",
+                target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                    type="Utilization",
+                    average_utilization=80,  # Target CPU utilization (80%)
+                ),
+            ),
+        ),
+        kubernetes.autoscaling.v2.MetricSpecArgs(
+            type="Resource",
+            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                name="memory",  # Memory utilization as the scaling metric
+                target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                    type="Utilization",
+                    average_utilization=80,  # Target memory utilization (80%)
+                ),
+            ),
+        ),
+    ]
 
 
 # Refactor this to just be 'Config' rather than 'Configuration' - but not today
@@ -102,7 +126,7 @@ class OLApplicationK8sConfiguration(BaseModel):
         default={"cpu": "250m", "memory": "300Mi"}
     )
     resource_limits: dict[str, str] = Field(
-        default={"cpu": "500m", "memory": "600Mi"},
+        default={"cpu": "2", "memory": "1500Mi"},
     )
     init_migrations: bool = Field(default=True)
     init_collectstatic: bool = Field(default=True)
@@ -369,7 +393,7 @@ class OLApplicationK8s(ComponentResource):
                             # nginx container infront of uwsgi
                             kubernetes.core.v1.ContainerArgs(
                                 name="nginx",
-                                image="nginx:1.9.5",
+                                image=f"nginx:{NGINX_VERSION}",
                                 ports=[
                                     kubernetes.core.v1.ContainerPortArgs(
                                         container_port=DEFAULT_NGINX_PORT
@@ -420,7 +444,7 @@ class OLApplicationK8s(ComponentResource):
                     ),
                 ),
                 min_replicas=ol_app_k8s_config.application_min_replicas,  # Minimum number of replicas
-                max_replicas=ol_app_k8s_config.application_max_replicas,  # Minimum number of replicas
+                max_replicas=ol_app_k8s_config.application_max_replicas,  # Maximum number of replicas
                 # Corrected parameter name from "metrics" to the proper name for the API
                 metrics=ol_app_k8s_config.hpa_scaling_metrics,
                 # Optional: behavior configuration for scaling
@@ -490,6 +514,7 @@ class OLApplicationK8s(ComponentResource):
                 # Every type of worker needs a unique set of labels or the pod selectors will break.
                 "ol.mit.edu/worker-name": celery_worker_config.worker_name,
             }
+
             kubernetes.apps.v1.Deployment(
                 f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.worker_name}-{stack_info.env_suffix}",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -500,7 +525,6 @@ class OLApplicationK8s(ComponentResource):
                     labels=celery_labels,
                 ),
                 spec=kubernetes.apps.v1.DeploymentSpecArgs(
-                    replicas=celery_worker_config.replicas,  # In lieu of a proper autoscaler 20250407
                     selector=kubernetes.meta.v1.LabelSelectorArgs(
                         match_labels=celery_labels,
                     ),
@@ -539,6 +563,50 @@ class OLApplicationK8s(ComponentResource):
                     ),
                 ),
                 opts=resource_options,
+            )
+            _celery_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
+                f"celery-{celery_worker_config.worker_name}-hpa",
+                spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
+                    scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
+                        api_version="apps/v1",
+                        kind="Deployment",
+                        name=truncate_k8s_metanames(
+                            f"{ol_app_k8s_config.application_name}-{celery_worker_config.worker_name}-celery-worker"
+                        ),
+                    ),
+                    min_replicas=celery_worker_config.min_replicas,  # Minimum number of replicas
+                    max_replicas=celery_worker_config.max_replicas,  # Maximum number of replicas
+                    # Corrected parameter name from "metrics" to the proper name for the API
+                    metrics=celery_worker_config.hpa_scaling_metrics,
+                    # Optional: behavior configuration for scaling
+                    behavior=kubernetes.autoscaling.v2.HorizontalPodAutoscalerBehaviorArgs(
+                        scale_up=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+                            stabilization_window_seconds=60,  # Wait 1 minute before scaling up again
+                            select_policy="Max",  # Choose max value when multiple metrics
+                            policies=[
+                                kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                                    type="Percent",
+                                    value=100,  # Double pods at most
+                                    period_seconds=60,  # In this time period
+                                )
+                            ],
+                        ),
+                        scale_down=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+                            stabilization_window_seconds=300,  # Wait 5 minutes before scaling down
+                            select_policy="Min",
+                            policies=[
+                                kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                                    type="Percent",
+                                    value=25,  # Remove at most 25% of pods at once
+                                    period_seconds=60,
+                                )
+                            ],
+                        ),
+                    ),
+                ),
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    namespace=ol_app_k8s_config.application_namespace,
+                ),
             )
 
         _application_pod_security_group_policy = (

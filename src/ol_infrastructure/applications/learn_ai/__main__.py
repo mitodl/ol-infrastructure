@@ -764,7 +764,6 @@ learn_ai_app_k8s = OLApplicationK8s(
             OLApplicationK8sCeleryWorkerConfig(
                 worker_name="default",
                 queues=["default", "edx_content"],
-                replicas=2,
             )
         ],
     ),
