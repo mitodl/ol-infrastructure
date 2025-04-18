@@ -99,12 +99,6 @@ github_provider = github.Provider(
     token=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["token"],
 )
 
-# k8s_global_labels = K8sGlobalLabels(
-#     app=Apps.mit_learn,
-#     ou=BusinessUnit.mit_learn,
-#     stack_info=stack_info,
-# )
-
 k8s_global_labels = K8sGlobalLabels(
     ou=BusinessUnit.mit_learn, service=Apps.mit_learn, stack=stack_info.full_name
 ).model_dump()
