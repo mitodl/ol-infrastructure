@@ -29,7 +29,7 @@ from bridge.lib.versions import (
     VAULT_SECRETS_OPERATOR_CHART_VERSION,
 )
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
-from ol_infrastructure.lib.aws.eks_helper import eks_versions
+from ol_infrastructure.lib.aws.eks_helper import get_cluster_version
 from ol_infrastructure.lib.aws.iam_helper import (
     EKS_ADMIN_USERNAMES,
     IAM_POLICY_VERSION,
@@ -91,7 +91,7 @@ VERSIONS = {
         "VAULT_SECRETS_OPERATOR_CHART", VAULT_SECRETS_OPERATOR_CHART_VERSION
     ),
     # K8S version is special, retrieve it from the AWS APIs
-    "KUBERNETES": os.environ.get("KUBERNETES", eks_versions()[0]),
+    "KUBERNETES": os.environ.get("KUBERNETES", get_cluster_version()),
 }
 
 # A global toleration to allow operators to run on nodes tainted as

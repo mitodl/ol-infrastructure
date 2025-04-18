@@ -32,6 +32,7 @@ dependencies = [
     "pulumiverse-heroku>=1.0.3,<2",
     "pulumi-eks>=3.8.0,<4",
     "pulumi-aws-native>=1.25.0,<2",
+    "packaging>=24.2",
 ]
 
 [project.urls]

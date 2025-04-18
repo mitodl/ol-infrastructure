@@ -3,6 +3,7 @@ from typing import Optional
 
 import boto3
 import pulumi
+from packaging.version import Version
 from pulumi_aws import ec2
 from pulumi_kubernetes import Provider
 
@@ -50,24 +51,22 @@ def check_cluster_namespace(namespace: str, namespaces: list[str]):
 
 
 @lru_cache
-def eks_versions(reference_addon: str = "aws-ebs-csi-driver") -> list[str]:
-    """Return a list of valid, supported EKS versions.
-
-    There is no AWS API call to simply return the currently supported
-    list of K8S resleases in EKS. So we do a hack here where we query a
-    'universal add-on', in this case the EBS CSI driver by default,
-    for the versions of K8S that it is compabitble. The reasoning being
-    that it seems unlikely that AWS will stop supporting this addon
-    any time soon.
-
-    :param reference_addon: Addon to use when performing the lookup.
-    :type reference_addon: str
-    """
-    addons_response = eks_client.describe_addon_versions(addonName=reference_addon)
-    compatabilities_list = addons_response["addons"][0]["addonVersions"][0][
-        "compatibilities"
-    ]
-    return [compat_def["clusterVersion"] for compat_def in compatabilities_list]
+def get_cluster_version(*, use_default: bool = True) -> str:
+    """Get the current version of the EKS cluster."""
+    if use_default:
+        cluster_versions = eks_client.describe_cluster_versions(
+            defaultOnly=use_default, clusterType="eks"
+        )
+    else:
+        cluster_versions = eks_client.describe_cluster_versions(
+            clusterType="eks", versionStatus="STANDARD_SUPPORT"
+        )
+    versions_list = sorted(
+        [version["clusterVersion"] for version in cluster_versions["clusterVersions"]],
+        key=Version,
+        reverse=True,
+    )
+    return versions_list[0]
 
 
 @lru_cache
