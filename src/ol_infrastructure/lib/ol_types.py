@@ -52,7 +52,7 @@ class Environment(str, Enum):
 class Apps(str, Enum):
     """Canonical source of truth for defining apps."""
 
-    airbyte = "airbytte"
+    airbyte = "airbyte"
     bootcamps = "bootcamps"
     dagster = "dagster"
     edxapp = "edxapp"
