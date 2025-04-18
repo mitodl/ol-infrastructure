@@ -7,7 +7,6 @@ from ol_infrastructure.lib.aws.ec2_helper import aws_regions
 
 REQUIRED_TAGS = {"OU", "Environment"}
 RECOMMENDED_TAGS = {"Application", "Owner"}
-REQUIRED_LABELS = {"ol.mit.edu/ou", "ol.mit.edu/service"}
 
 
 @unique
