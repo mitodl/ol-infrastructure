@@ -1,3 +1,4 @@
+# ruff: noqa: UP042, CPY001, D100, ERA001, D102
 from pathlib import Path
 from string import Template
 
@@ -69,10 +70,10 @@ consul_provider = get_consul_provider(stack_info)
 setup_vault_provider(stack_info)
 
 k8s_global_labels = K8sGlobalLabels(
-    app=Apps.open_metadata,
+    service=Apps.open_metadata,
     ou=BusinessUnit.data,
-    stack_info=stack_info,
-)
+    stack=stack_info.full_name,
+).model_dump()
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 

@@ -1,4 +1,5 @@
 """Create the resources needed to run a airbyte server.  # noqa: D200"""
+# ruff: noqa: UP042, CPY001, D100, ERA001, D102
 
 import json
 import os
@@ -82,10 +83,10 @@ aws_config = AWSBase(
 )
 
 k8s_global_labels = K8sGlobalLabels(
-    app=Apps.airbyte,
+    service=Apps.airbyte,
     ou=BusinessUnit.data,
-    stack_info=stack_info,
-)
+    stack=stack_info.full_name,
+).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 airbyte_namespace = "airbyte"
 

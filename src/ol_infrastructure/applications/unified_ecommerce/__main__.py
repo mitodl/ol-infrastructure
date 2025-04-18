@@ -1,4 +1,4 @@
-# ruff: noqa: ERA001, C416, D100
+# ruff: noqa: ERA001, C416, D100, CPY001
 
 import base64
 import json
@@ -92,10 +92,9 @@ consul_provider = get_consul_provider(stack_info)
 setup_vault_provider(stack_info)
 
 k8s_global_labels = K8sGlobalLabels(
-    app=Apps.ecommerce,
-    ou=BusinessUnit.ecommerce,
-    stack_info=stack_info,
-)
+    ou=BusinessUnit.ecommerce, service=Apps.ecommerce, stack=stack_info.full_name
+).model_dump()
+
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 if not (UNIFIED_ECOMMERCE_DOCKER_TAG := os.getenv("UNIFIED_ECOMMERCE_DOCKER_TAG")):

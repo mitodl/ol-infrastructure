@@ -99,11 +99,15 @@ github_provider = github.Provider(
     token=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["token"],
 )
 
+# k8s_global_labels = K8sGlobalLabels(
+#     app=Apps.mit_learn,
+#     ou=BusinessUnit.mit_learn,
+#     stack_info=stack_info,
+# )
+
 k8s_global_labels = K8sGlobalLabels(
-    app=Apps.mit_learn,
-    ou=BusinessUnit.mit_learn,
-    stack_info=stack_info,
-)
+    ou=BusinessUnit.mit_learn, service=Apps.mit_learn, stack=stack_info.full_name
+).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 # Fail hard if LEARN_AI_DOCKER_TAG is not set

@@ -74,37 +74,18 @@ class Apps(str, Enum):
 class K8sGlobalLabels(BaseModel):
     """Base class for Kubernetes resource labels."""
 
-    labels: dict[str, str]
+    ou: BusinessUnit
+    service: Apps
+    stack: str
 
-    # I want a way to instantiate the model with these defaults but can't find one.
-    # Field(default= seems unhappy with a dict.) -cpatti 04/18/2025
-    # def __init__(self, stack_info, app: Apps, ou: BusinessUnit, **kwargs):
-    #     """Add MIT OL standard labels for app and stack info."""
-    #     super().__init__(**kwargs)
-    #     self.labels.update(
-    #         {
-    #             "ol.mit.edu/stack": stack_info.name,
-    #             "ol.mit.edu/service": app,
-    #             "ol.mit.edu/ou": ou,
-    #         }
-    #     )
-    @field_validator("labels")
-    @classmethod
-    def enforce_labels(cls, labels: dict[str, str]) -> dict[str, str]:
-        if not REQUIRED_LABELS.issubset(labels.keys()):
-            msg = f"Not all required labels have been specified. Missing labels: {REQUIRED_LABELS.difference(labels.keys())}"  # noqa: E501
-            raise ValueError(msg)
-        try:
-            BusinessUnit(labels["ol.mit.edu/ou"])
-        except ValueError as exc:
-            msg = "The OU label specified is not a valid business unit"
-            raise ValueError(msg) from exc
-        try:
-            Apps(labels["ol.mit.edu/service"])
-        except ValueError as exc:
-            msg = "The service label specified is not a valid application"
-            raise ValueError(msg) from exc
-        return labels
+    def model_dump(self, *args, **kwargs):
+        kwargs["exclude_none"] = True
+
+        model_dict = super().model_dump(*args, **kwargs)
+        new_dict = {}
+        for key in model_dict:
+            new_dict[f"ol.mit.edu/{key}"] = model_dict[key]
+        return new_dict
 
 
 class AWSBase(BaseModel):
