@@ -131,7 +131,7 @@ k8s_global_labels = K8s8sGlobalLabels(
     app=Apps.mit_learn,
     ou=BusinessUnit.mit_learn,
     stack_info=stack_info,
-)
+).model_dump()
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 learn_namespace = "mitlearn"
