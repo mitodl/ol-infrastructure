@@ -1,3 +1,4 @@
+# ruff: noqa: UP042, CPY001, D100, ERA001, D102
 from enum import Enum, unique
 
 from pydantic import BaseModel, field_validator
@@ -6,6 +7,7 @@ from ol_infrastructure.lib.aws.ec2_helper import aws_regions
 
 REQUIRED_TAGS = {"OU", "Environment"}
 RECOMMENDED_TAGS = {"Application", "Owner"}
+REQUIRED_LABELS = {"ol.mit.edu/ou", "ol.mit.edu/service"}
 
 
 @unique
@@ -74,16 +76,35 @@ class K8sGlobalLabels(BaseModel):
 
     labels: dict[str, str]
 
-    def __init__(self, stack_info, app: Apps, ou: BusinessUnit, **kwargs):
-        """Add MIT OL standard labels for app and stack info."""
-        super().__init__(**kwargs)
-        self.labels.update(
-            {
-                "ol.mit.edu/stack": stack_info.name,
-                "ol.mit.edu/service": app,
-                "ol.mit.edu/ou": ou,
-            }
-        )
+    # I want a way to instantiate the model with these defaults but can't find one.
+    # Field(default= seems unhappy with a dict.) -cpatti 04/18/2025
+    # def __init__(self, stack_info, app: Apps, ou: BusinessUnit, **kwargs):
+    #     """Add MIT OL standard labels for app and stack info."""
+    #     super().__init__(**kwargs)
+    #     self.labels.update(
+    #         {
+    #             "ol.mit.edu/stack": stack_info.name,
+    #             "ol.mit.edu/service": app,
+    #             "ol.mit.edu/ou": ou,
+    #         }
+    #     )
+    @field_validator("labels")
+    @classmethod
+    def enforce_labels(cls, labels: dict[str, str]) -> dict[str, str]:
+        if not REQUIRED_LABELS.issubset(labels.keys()):
+            msg = f"Not all required labels have been specified. Missing labels: {REQUIRED_LABELS.difference(labels.keys())}"  # noqa: E501
+            raise ValueError(msg)
+        try:
+            BusinessUnit(labels["ol.mit.edu/ou"])
+        except ValueError as exc:
+            msg = "The OU label specified is not a valid business unit"
+            raise ValueError(msg) from exc
+        try:
+            Apps(labels["ol.mit.edu/service"])
+        except ValueError as exc:
+            msg = "The service label specified is not a valid application"
+            raise ValueError(msg) from exc
+        return labels
 
 
 class AWSBase(BaseModel):
