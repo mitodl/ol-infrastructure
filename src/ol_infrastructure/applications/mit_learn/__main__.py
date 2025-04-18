@@ -1745,7 +1745,6 @@ if mitlearn_config.get_bool("k8s_deploy"):
                 OLApplicationK8sCeleryWorkerConfig(
                     worker_name="default",
                     queues=["default", "edx_content"],
-                    replicas=4,
                     resource_requests={"cpu": "500m", "memory": "2000Mi"},
                     resource_limits={"cpu": "1000m", "memory": "3000Mi"},
                 ),
