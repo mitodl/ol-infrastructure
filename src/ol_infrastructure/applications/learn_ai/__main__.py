@@ -62,7 +62,7 @@ from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import Apps, AWSBase, BusinessUnit, K8sGlobalLabels
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -99,10 +99,9 @@ github_provider = github.Provider(
     token=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["token"],
 )
 
-k8s_global_labels = {
-    "ol.mit.edu/stack": stack_info.full_name,
-    "ol.mit.edu/application": "learn-ai",
-}
+k8s_global_labels = K8sGlobalLabels(
+    ou=BusinessUnit.mit_learn, service=Apps.mit_learn, stack=stack_info.full_name
+).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 # Fail hard if LEARN_AI_DOCKER_TAG is not set

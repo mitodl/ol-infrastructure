@@ -1,3 +1,4 @@
+# ruff: noqa: UP042, CPY001, D100, ERA001, D102
 from pathlib import Path
 from string import Template
 
@@ -35,7 +36,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.consul import get_consul_provider
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import Apps, AWSBase, BusinessUnit, K8sGlobalLabels
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
@@ -67,10 +68,12 @@ vault_config = Config("vault")
 
 consul_provider = get_consul_provider(stack_info)
 setup_vault_provider(stack_info)
-k8s_global_labels = {
-    "ol.mit.edu/stack": stack_info.full_name,
-    "ol.mit.edu/service": "open-metadata",
-}
+
+k8s_global_labels = K8sGlobalLabels(
+    service=Apps.open_metadata,
+    ou=BusinessUnit.data,
+    stack=stack_info.full_name,
+).model_dump()
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 

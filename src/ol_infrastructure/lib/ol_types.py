@@ -1,3 +1,4 @@
+# ruff: noqa: UP042, CPY001, D100, ERA001, D102
 from enum import Enum, unique
 
 from pydantic import BaseModel, field_validator
@@ -19,6 +20,7 @@ class BusinessUnit(str, Enum):
     bootcamps = "bootcamps"
     data = "data"
     digital_credentials = "digital-credentials"
+    mit_learn = "mit-learn"
     micromasters = "micromasters"
     mit_open = "mit-open"
     mitx = "mitx"
@@ -29,6 +31,7 @@ class BusinessUnit(str, Enum):
     residential = "residential"
     residential_staging = "residential-staging"
     xpro = "mitxpro"
+    ecommerce = "unified-ecommerce"
 
 
 @unique
@@ -48,6 +51,7 @@ class Environment(str, Enum):
 class Apps(str, Enum):
     """Canonical source of truth for defining apps."""
 
+    airbyte = "airbyte"
     bootcamps = "bootcamps"
     dagster = "dagster"
     edxapp = "edxapp"
@@ -63,6 +67,24 @@ class Apps(str, Enum):
     xpro = "xpro"
     ecommerce = "unified-ecommerce"
     mit_learn = "mit-learn"
+    open_metadata = "open-metadata"
+
+
+class K8sGlobalLabels(BaseModel):
+    """Base class for Kubernetes resource labels."""
+
+    ou: BusinessUnit
+    service: Apps
+    stack: str
+
+    def model_dump(self, *args, **kwargs):
+        kwargs["exclude_none"] = True
+
+        model_dict = super().model_dump(*args, **kwargs)
+        new_dict = {}
+        for key in model_dict:
+            new_dict[f"ol.mit.edu/{key}"] = model_dict[key]
+        return new_dict
 
 
 class AWSBase(BaseModel):

@@ -1,4 +1,5 @@
 """Create the resources needed to run a airbyte server.  # noqa: D200"""
+# ruff: noqa: UP042, CPY001, D100, ERA001, D102
 
 import json
 import os
@@ -44,7 +45,7 @@ from ol_infrastructure.lib.aws.iam_helper import (
     lint_iam_policy,
 )
 from ol_infrastructure.lib.consul import get_consul_provider
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import Apps, AWSBase, BusinessUnit, K8sGlobalLabels
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
@@ -81,10 +82,11 @@ aws_config = AWSBase(
     }
 )
 
-k8s_global_labels = {
-    "pulumi_managed": "true",
-    "pulumi_stack": stack_info.full_name,
-}
+k8s_global_labels = K8sGlobalLabels(
+    service=Apps.airbyte,
+    ou=BusinessUnit.data,
+    stack=stack_info.full_name,
+).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 airbyte_namespace = "airbyte"
 
