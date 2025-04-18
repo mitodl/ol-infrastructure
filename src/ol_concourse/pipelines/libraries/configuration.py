@@ -1,10 +1,10 @@
 PIPELINE_CONFIGS = {
-    "mit_learn": {
+    "mit-learn": {
         "source_repo_name": "mit-learn",
         "source_repo_uri": "https://github.com/mitodl/mit-learn",
         "source_repo_branch": "release",
         "client_repo_name": "mit-learn-api-clients",
-        "client_repo_uri": "git@github.com:mitodl/open-api-clients.git",
+        "client_repo_uri": "git@github.com:mitodl/mit-learn-api-clients",
         "client_repo_branch": "main",
         "client_repo_subpath": "mit-learn-api-axios",
     },
@@ -17,7 +17,7 @@ PIPELINE_CONFIGS = {
         "client_repo_branch": "release",
         "client_repo_subpath": "mitxonline-api-axios",
     },
-    "unified_ecommerce": {
+    "unified-ecommerce": {
         "source_repo_name": "unified-ecommerce",
         "source_repo_uri": "https://github.com/mitodl/unified-ecommerce",
         "source_repo_branch": "main",
