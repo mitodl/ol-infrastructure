@@ -148,13 +148,6 @@ def mfe_job(
         trigger=previous_job is None and open_edx.environment_stage != "production",
     )
 
-    branding_overrides = "\n".join(
-        (
-            f"npm install {component}:{override}"
-            for component, override in (mfe.branding_overrides or {}).items()
-        )
-    )
-
     translation_overrides = "\n".join(cmd for cmd in mfe.translation_overrides or [])
     if previous_job and mfe_repo.name == previous_job.plan[0].get:
         clone_mfe_repo.passed = [previous_job.name]
@@ -165,6 +158,7 @@ def mfe_job(
 
     slot_config_file = "common-mfe-config"
     copy_common_config = ""
+    mfe_smoot_design_overrides = ""
 
     if (
         open_edx_deployment.deployment_name in ["mitxonline", "xpro"]
@@ -177,8 +171,6 @@ def mfe_job(
         """
         slot_config_file = "learning-mfe-config"
         copy_common_config = f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx {mfe_build_dir.name}/common-mfe-config.env.jsx"  # noqa: E501
-    else:
-        mfe_smoot_design_overrides = ""
 
     mfe_plugin_types = [
         "learning",
@@ -254,7 +246,6 @@ def mfe_job(
                                 apt-get install -q -y python3 python-is-python3 build-essential git
                                 npm install
                                 npm install -g @edx/openedx-atlas
-                                {branding_overrides}
                                 {translation_overrides}
                                 {mfe_smoot_design_overrides}
                                 npm install webpack
