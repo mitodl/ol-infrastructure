@@ -23,7 +23,9 @@ AIRBYTE_CHART_VERSION = "1.6.0"
 APISIX_CHART_VERSION = "2.10.0"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
+# renovate: datasource=aws-eks-addon depName=ebs-csi-driver
 EBS_CSI_DRIVER_VERSION = "v1.40.1-eksbuild.1"
+# renovate: datasource=aws-eks-addon depName=efs-csi-driver
 EFS_CSI_DRIVER_VERSION = "v2.1.6-eksbuild.1"
 # renovate: datasource=helm depName=external-dns packageName=external-dns
 EXTERNAL_DNS_CHART_VERSION = "1.15.0"
