@@ -61,7 +61,7 @@ class OLApplicationK8sConfiguration(BaseModel):
     application_namespace: str
     application_lb_service_name: str
     application_lb_service_port_name: str
-    application_min_replicas: NonNegativeInt = 1
+    application_min_replicas: NonNegativeInt = 2
     application_max_replicas: NonNegativeInt = 10
     k8s_global_labels: dict[str, str]
     env_from_secret_names: list[str]
