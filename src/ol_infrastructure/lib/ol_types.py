@@ -68,7 +68,7 @@ class Apps(str, Enum):
     xpro = "xpro"
     ecommerce = "unified-ecommerce"
     mit_learn = "mit-learn"
-    open_metadata = " open-metadata"
+    open_metadata = "open-metadata"
 
 
 class K8sGlobalLabels(BaseModel):
