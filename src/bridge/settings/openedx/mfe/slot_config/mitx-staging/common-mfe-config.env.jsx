@@ -39,12 +39,12 @@ const DesktopHeaderUserMenu = (widget) => {
 const LearningHeaderUserMenu = (widget) => {
   widget.content.items = [
     {
-      href: `${configData.LMS_BASE_URL}/dashboard`,
-      message: 'Dashboard',
+      href: userMenu.dashboard.url,
+      message: userMenu.dashboard.title,
     },
     {
-      href: `${configData.LMS_BASE_URL}/logout`,
-      message: 'Sign Out',
+      href: userMenu.logout.url,
+      message: userMenu.logout.title,
     },
   ];
   return widget;
