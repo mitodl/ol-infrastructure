@@ -249,7 +249,7 @@ olapps_realm_events = keycloak.RealmEvents(
     events_expiration=SECONDS_IN_ONE_DAY,
     admin_events_enabled=True,
     admin_events_details_enabled=True,
-    events_listeners=["metrics-listener"],
+    events_listeners=["jboss-logging"],
     opts=resource_options,
 )
 
