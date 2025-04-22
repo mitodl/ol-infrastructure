@@ -45,7 +45,12 @@ from ol_infrastructure.lib.aws.iam_helper import (
     lint_iam_policy,
 )
 from ol_infrastructure.lib.consul import get_consul_provider
-from ol_infrastructure.lib.ol_types import Apps, AWSBase, BusinessUnit, K8sGlobalLabels
+from ol_infrastructure.lib.ol_types import (
+    AWSBase,
+    BusinessUnit,
+    K8sGlobalLabels,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
@@ -83,7 +88,7 @@ aws_config = AWSBase(
 )
 
 k8s_global_labels = K8sGlobalLabels(
-    service=Apps.airbyte,
+    service=Services.airbyte,
     ou=BusinessUnit.data,
     stack=stack_info.full_name,
 ).model_dump()

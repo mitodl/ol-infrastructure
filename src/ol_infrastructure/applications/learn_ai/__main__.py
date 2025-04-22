@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ERA001
+# ruff: noqa: E501, ERA001, D100, CPY001
 import base64
 import json
 import mimetypes
@@ -42,7 +42,7 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixSharedPluginsConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryWorkerConfig,
-    OLApplicationK8sConfiguration,
+    OLApplicationK8sConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SDynamicSecretConfig,
@@ -62,7 +62,12 @@ from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
-from ol_infrastructure.lib.ol_types import Apps, AWSBase, BusinessUnit, K8sGlobalLabels
+from ol_infrastructure.lib.ol_types import (
+    AWSBase,
+    BusinessUnit,
+    K8sGlobalLabels,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
@@ -100,7 +105,7 @@ github_provider = github.Provider(
 )
 
 k8s_global_labels = K8sGlobalLabels(
-    ou=BusinessUnit.mit_learn, service=Apps.mit_learn, stack=stack_info.full_name
+    ou=BusinessUnit.mit_learn, service=Services.mit_learn, stack=stack_info.full_name
 ).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
@@ -722,7 +727,7 @@ learn_ai_nginx_configmap = kubernetes.core.v1.ConfigMap(
 
 # Instantiate the OLApplicationK8s component
 learn_ai_app_k8s = OLApplicationK8s(
-    ol_app_k8s_config=OLApplicationK8sConfiguration(
+    ol_app_k8s_config=OLApplicationK8sConfig(
         project_root=Path(__file__).parent,
         application_config=learn_ai_config.require_object("env_vars") or {},
         application_name="learn-ai",

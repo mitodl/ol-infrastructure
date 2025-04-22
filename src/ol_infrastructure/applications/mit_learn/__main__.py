@@ -51,7 +51,7 @@ from ol_infrastructure.components.services.k8s import (
     OLApisixSharedPluginsConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryWorkerConfig,
-    OLApplicationK8sConfiguration,
+    OLApplicationK8sConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -72,7 +72,12 @@ from ol_infrastructure.lib.fastly import (
     get_fastly_provider,
 )
 from ol_infrastructure.lib.heroku import setup_heroku_provider
-from ol_infrastructure.lib.ol_types import Apps, AWSBase, BusinessUnit, K8sGlobalLabels
+from ol_infrastructure.lib.ol_types import (
+    AWSBase,
+    BusinessUnit,
+    K8sGlobalLabels,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
@@ -123,7 +128,7 @@ app_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
 ]
 
 k8s_global_labels = K8sGlobalLabels(
-    service=Apps.mit_learn,
+    service=Services.mit_learn,
     ou=BusinessUnit.mit_learn,
     stack=stack_info.full_name,
 ).model_dump()
@@ -1718,7 +1723,7 @@ if mitlearn_config.get_bool("k8s_deploy"):
     # Configure and deploy the mitlearn application using OLApplicationK8s
 
     mitlearn_k8s_app = OLApplicationK8s(
-        ol_app_k8s_config=OLApplicationK8sConfiguration(
+        ol_app_k8s_config=OLApplicationK8sConfig(
             project_root=Path(__file__).parent,
             application_config=env_vars,
             application_name="mitlearn",
